@@ -1,0 +1,32 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+publish/
+*.binlog
+
+# IDE / user files
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.rsuser
+*.userprefs
+*.DotSettings.user
+
+# NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+
+# Temporary files
+Temp/
+[Tt]mp/
+*.tmp
+*.log
+
+# Local test runs (machine-specific paths, generated plugins)
+TestRun/

@@ -81,6 +81,76 @@ internal readonly struct Mat3
 /// <summary>Position, rotation and uniform scale of a placed reference.</summary>
 internal readonly record struct PlacedTransform(Vector3 Position, Mat3 Rotation, float Scale);
 
+/// <summary>
+/// Oriented box in world space: world = Center + Rotation * local, with local in
+/// [-HalfExtents, +HalfExtents]. The columns of <see cref="Rotation"/> are the box axes.
+/// </summary>
+internal readonly record struct OrientedBox(Vector3 Center, Mat3 Rotation, Vector3 HalfExtents)
+{
+    /// <summary>Oriented box of a reference's (scaled) local bounds.</summary>
+    public static OrientedBox FromLocal(Box local, PlacedTransform transform)
+    {
+        var scaled = Box.FromCorners(local.Min * transform.Scale, local.Max * transform.Scale);
+        return new OrientedBox(
+            transform.Position + transform.Rotation.Transform(scaled.Center),
+            transform.Rotation,
+            scaled.Size * 0.5f);
+    }
+
+    /// <summary>World AABB enclosing this box grown by <paramref name="padding"/> on every side.</summary>
+    public Box WorldAabb(float padding)
+    {
+        var half = Rotation.AbsTransform(HalfExtents) + new Vector3(padding);
+        return new Box(Center - half, Center + half);
+    }
+
+    /// <summary>
+    /// Separating axis test (15 axes, Ericson, Real-Time Collision Detection 4.4.1): true if the
+    /// boxes intersect once this box is grown by <paramref name="padding"/> on every side
+    /// (padding is a conservative stand-in for "within distance padding" of each other).
+    /// </summary>
+    public bool Intersects(OrientedBox other, float padding)
+    {
+        const float epsilon = 1e-5f;
+        var a = HalfExtents + new Vector3(padding);
+        var b = other.HalfExtents;
+
+        // r = A^T * B: other's axes expressed in this box's frame. t = translation in this frame.
+        var r = Rotation.Transposed() * other.Rotation;
+        var t = Rotation.TransformTransposed(other.Center - Center);
+
+        float r00 = r.M11, r01 = r.M12, r02 = r.M13;
+        float r10 = r.M21, r11 = r.M22, r12 = r.M23;
+        float r20 = r.M31, r21 = r.M32, r22 = r.M33;
+        float a00 = MathF.Abs(r00) + epsilon, a01 = MathF.Abs(r01) + epsilon, a02 = MathF.Abs(r02) + epsilon;
+        float a10 = MathF.Abs(r10) + epsilon, a11 = MathF.Abs(r11) + epsilon, a12 = MathF.Abs(r12) + epsilon;
+        float a20 = MathF.Abs(r20) + epsilon, a21 = MathF.Abs(r21) + epsilon, a22 = MathF.Abs(r22) + epsilon;
+
+        // This box's axes.
+        if (MathF.Abs(t.X) > a.X + b.X * a00 + b.Y * a01 + b.Z * a02) return false;
+        if (MathF.Abs(t.Y) > a.Y + b.X * a10 + b.Y * a11 + b.Z * a12) return false;
+        if (MathF.Abs(t.Z) > a.Z + b.X * a20 + b.Y * a21 + b.Z * a22) return false;
+
+        // Other box's axes.
+        if (MathF.Abs(t.X * r00 + t.Y * r10 + t.Z * r20) > a.X * a00 + a.Y * a10 + a.Z * a20 + b.X) return false;
+        if (MathF.Abs(t.X * r01 + t.Y * r11 + t.Z * r21) > a.X * a01 + a.Y * a11 + a.Z * a21 + b.Y) return false;
+        if (MathF.Abs(t.X * r02 + t.Y * r12 + t.Z * r22) > a.X * a02 + a.Y * a12 + a.Z * a22 + b.Z) return false;
+
+        // Cross products A_i x B_j.
+        if (MathF.Abs(t.Z * r10 - t.Y * r20) > a.Y * a20 + a.Z * a10 + b.Y * a02 + b.Z * a01) return false;
+        if (MathF.Abs(t.Z * r11 - t.Y * r21) > a.Y * a21 + a.Z * a11 + b.X * a02 + b.Z * a00) return false;
+        if (MathF.Abs(t.Z * r12 - t.Y * r22) > a.Y * a22 + a.Z * a12 + b.X * a01 + b.Y * a00) return false;
+        if (MathF.Abs(t.X * r20 - t.Z * r00) > a.X * a20 + a.Z * a00 + b.Y * a12 + b.Z * a11) return false;
+        if (MathF.Abs(t.X * r21 - t.Z * r01) > a.X * a21 + a.Z * a01 + b.X * a12 + b.Z * a10) return false;
+        if (MathF.Abs(t.X * r22 - t.Z * r02) > a.X * a22 + a.Z * a02 + b.X * a11 + b.Y * a10) return false;
+        if (MathF.Abs(t.Y * r00 - t.X * r10) > a.X * a10 + a.Y * a00 + b.Y * a22 + b.Z * a21) return false;
+        if (MathF.Abs(t.Y * r01 - t.X * r11) > a.X * a11 + a.Y * a01 + b.X * a22 + b.Z * a20) return false;
+        if (MathF.Abs(t.Y * r02 - t.X * r12) > a.X * a12 + a.Y * a02 + b.X * a21 + b.Y * a20) return false;
+
+        return true;
+    }
+}
+
 internal static class Geometry
 {
     public static Vector3 ToVector(P3Float p) => new(p.X, p.Y, p.Z);
@@ -171,4 +241,62 @@ internal static class Geometry
     /// </summary>
     public static bool IsInsideOrientedBox(Vector3 worldPoint, Vector3 position, Mat3 rotation, Box localBox) =>
         localBox.Contains(rotation.TransformTransposed(worldPoint - position));
+
+    /// <summary>Squared distance from a point to an axis-aligned box (0 inside).</summary>
+    public static float DistanceSquaredToBox(Vector3 p, Vector3 min, Vector3 max)
+    {
+        var d = Vector3.Max(Vector3.Max(min - p, p - max), Vector3.Zero);
+        return d.LengthSquared();
+    }
+
+    /// <summary>
+    /// Squared distance from <paramref name="p"/> to triangle (a, b, c), via the closest point on
+    /// the triangle (Ericson, Real-Time Collision Detection 5.1.5). Degenerate triangles
+    /// (including a == b == c, a point) are handled; a NaN result compares as "not close".
+    /// </summary>
+    public static float DistanceSquaredToTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c)
+    {
+        var ab = b - a;
+        var ac = c - a;
+        var ap = p - a;
+        var d1 = Vector3.Dot(ab, ap);
+        var d2 = Vector3.Dot(ac, ap);
+        if (d1 <= 0 && d2 <= 0) return ap.LengthSquared();
+
+        var bp = p - b;
+        var d3 = Vector3.Dot(ab, bp);
+        var d4 = Vector3.Dot(ac, bp);
+        if (d3 >= 0 && d4 <= d3) return bp.LengthSquared();
+
+        var vc = d1 * d4 - d3 * d2;
+        if (vc <= 0 && d1 >= 0 && d3 <= 0)
+        {
+            var v = d1 / (d1 - d3);
+            return (p - (a + v * ab)).LengthSquared();
+        }
+
+        var cp = p - c;
+        var d5 = Vector3.Dot(ab, cp);
+        var d6 = Vector3.Dot(ac, cp);
+        if (d6 >= 0 && d5 <= d6) return cp.LengthSquared();
+
+        var vb = d5 * d2 - d1 * d6;
+        if (vb <= 0 && d2 >= 0 && d6 <= 0)
+        {
+            var w = d2 / (d2 - d6);
+            return (p - (a + w * ac)).LengthSquared();
+        }
+
+        var va = d3 * d6 - d5 * d4;
+        if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0)
+        {
+            var w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+            return (p - (b + w * (c - b))).LengthSquared();
+        }
+
+        var denominator = 1f / (va + vb + vc);
+        var vv = vb * denominator;
+        var ww = vc * denominator;
+        return (p - (a + ab * vv + ac * ww)).LengthSquared();
+    }
 }

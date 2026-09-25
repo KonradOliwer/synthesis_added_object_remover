@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Numerics;
 using Mutagen.Bethesda;
@@ -62,8 +63,8 @@ public static class Program
         // 1. One pass over every winning placed record (REFR, ACHR and all placed trap/hazard/projectile types).
         var phaseTimer = Stopwatch.StartNew();
         // Only the target plugin's own file is walked here, to know which spaces can matter.
-        var targetSpaceKeys = CollectTargetSpaceKeys(state, config.Target);
-        var scan = ScanPlacedRecords(state, config, targetSpaceKeys);
+        var targetSpaceInfo = CollectTargetSpaceKeys(state, config.Target);
+        var scan = ScanPlacedRecords(state, config, targetSpaceInfo.SpaceKeys, targetSpaceInfo.OverriddenByTarget);
         Console.WriteLine(
             $"Scanned {scan.RecordsScanned:N0} placed records in {phaseTimer.Elapsed.TotalSeconds:F1}s: "
             + $"{scan.Targets.Count:N0} {config.Target} objects to check, "
@@ -76,6 +77,10 @@ public static class Program
         {
             Console.WriteLine($"  Ignored {scan.TargetsDisabledOrWithoutPlacement:N0} {config.Target} objects that are initially disabled or have no position.");
         }
+        if (scan.OthersOverriddenByTarget > 0)
+        {
+            Console.WriteLine($"  Ignored {scan.OthersOverriddenByTarget:N0} other-mod objects that {config.Target} itself overrides.");
+        }
 
         if (scan.Targets.Count == 0)
         {
@@ -83,46 +88,106 @@ public static class Program
             return;
         }
 
+        var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount };
+        Console.WriteLine($"Using {parallelOptions.MaxDegreeOfParallelism} threads.");
+
         // 2. Index other mods' objects, but only in spaces that contain target objects.
         phaseTimer.Restart();
         var bounds = new ObjectBoundsProvider(state, config.UseNifBounds, config.Verbose);
-        var grids = BuildGrids(scan);
+        var spaces = BuildOtherSpaces(scan);
         Console.WriteLine(
-            $"Indexed {grids.Values.Sum(g => g.Count):N0} other objects in {grids.Count:N0} cells/worldspaces "
+            $"Indexed {spaces.Values.Sum(s => s.Count):N0} other objects in {spaces.Count:N0} cells/worldspaces "
             + $"in {phaseTimer.Elapsed.TotalSeconds:F1}s.");
 
-        // 3. Exact too-close test for every target object.
+        // 3. Bounds warm-up: every target base object's bounds (and, for the touch test, mesh
+        // triangles from the same parse), in parallel. Other objects' bounds are only resolved
+        // later, lazily, for objects a too-close query actually turns up.
         phaseTimer.Restart();
-        var hits = FindTooCloseTargets(scan.Targets, grids, bounds, config.Multiplier);
+        bounds.PrepareArchives();
+        var targetBases = scan.Targets
+            .Select(t => t.Base)
+            .OfType<BaseRef>()
+            .DistinctBy(b => b.FormKey)
+            .ToList();
+        bounds.WarmUp(targetBases, keepGeometry: config.RemoveTouching && config.UseNifBounds, parallelOptions);
+        bounds.PrintMessages();
+        Console.WriteLine($"Bounds warm-up: {targetBases.Count:N0} target base objects in {phaseTimer.Elapsed.TotalSeconds:F1}s.");
+
+        // 3.5. Exclude other-mod objects the target plugin appears to have replaced in place
+        // (same position, similar size) from proximity checks entirely.
+        phaseTimer.Restart();
+        var replacements = ExcludeReplacedObjects(scan, spaces, bounds, config, parallelOptions);
+        bounds.PrintMessages();
+        if (config.IgnoreReplacedObjects)
+        {
+            Console.WriteLine(
+                $"Replacement matching: {replacements.ExcludedCount:N0} other-mod objects excluded in {phaseTimer.Elapsed.TotalSeconds:F1}s.");
+        }
+
+        // 4. Exact too-close test for every target object.
+        phaseTimer.Restart();
+        var hits = FindTooCloseTargets(scan.Targets, spaces, bounds, config.Multiplier, parallelOptions);
+        bounds.PrintMessages();
         Console.WriteLine(
             $"Found {hits.Count:N0} of {scan.Targets.Count:N0} {config.Target} objects too close to other mods' objects "
             + $"in {phaseTimer.Elapsed.TotalSeconds:F1}s.");
 
-        // 4. Decide which to keep, then write overrides (after enumeration has finished).
-        var toRemove = new List<Hit>();
+        // 5. Decide which to keep.
+        var removals = new List<Removal>();
+        var keptTooClose = new List<int>();
         var keptAsReferenced = 0;
         foreach (var hit in hits)
         {
-            var keepReason = config.SkipReferenced ? GetKeepReason(hit.Target, scan.TargetReferences) : null;
+            var target = scan.Targets[hit.TargetIndex];
+            var keepReason = config.SkipReferenced ? GetKeepReason(target, scan.TargetReferences) : null;
             if (keepReason != null)
             {
                 keptAsReferenced++;
-                Console.WriteLine($"  Kept {Describe(hit.Target.Record)} in {scan.SpaceNames[hit.Target.SpaceKey]}: {keepReason}.");
+                keptTooClose.Add(hit.TargetIndex);
+                Console.WriteLine($"  Kept {Describe(target.Record)} in {scan.SpaceNames[target.SpaceKey]}: {keepReason}.");
                 continue;
             }
-            toRemove.Add(hit);
+            removals.Add(new Removal(hit.TargetIndex, hit.Other, TouchedIndex: null));
+        }
+        var removedTooClose = removals.Count;
+
+        // 6. Touching clusters: target objects touching removed target objects go too.
+        if (config.RemoveTouching && removals.Count > 0)
+        {
+            if (!config.UseNifBounds)
+            {
+                Console.WriteLine("Touching objects: skipped, mesh (NIF) measurement is disabled and touching needs mesh geometry.");
+            }
+            else
+            {
+                var touch = FindTouchingClusters(scan, removals, keptTooClose, bounds, config, parallelOptions);
+                bounds.PrintMessages();
+                removals.AddRange(touch.Removals);
+                keptAsReferenced += touch.KeptAsReferenced;
+                PrintTouchStats(touch);
+            }
         }
 
-        foreach (var hit in toRemove)
+        // 7. Write overrides (single-threaded, after all computation has finished).
+        phaseTimer.Restart();
+        foreach (var removal in removals)
         {
-            RemoveObject(hit.Target, state.PatchMod);
-            if (config.Verbose) LogRemoval(bounds, scan, hit);
+            RemoveObject(scan.Targets[removal.TargetIndex], state.PatchMod);
+        }
+        Console.WriteLine($"Wrote {removals.Count:N0} overrides in {phaseTimer.Elapsed.TotalSeconds:F1}s.");
+
+        if (config.Verbose)
+        {
+            foreach (var removal in removals) LogRemoval(bounds, scan, removal);
         }
 
         PrintBoundsStats(bounds, config.UseNifBounds);
-        if (config.Verbose) PrintSpaceSummary(scan, grids, toRemove);
+        if (config.Verbose) PrintSpaceSummary(scan, spaces, removals);
 
-        Console.WriteLine($"Removed {toRemove.Count:N0} objects; kept {keptAsReferenced:N0} referenced objects.");
+        Console.WriteLine(
+            $"Removed {removals.Count:N0} objects ({removedTooClose:N0} too close, "
+            + $"{removals.Count - removedTooClose:N0} touching a removed object); "
+            + $"kept {keptAsReferenced:N0} referenced objects.");
         Console.WriteLine($"Done in {totalTimer.Elapsed.TotalSeconds:F1}s.");
     }
 
@@ -139,7 +204,13 @@ public static class Program
         float Multiplier,
         bool UseNifBounds,
         bool SkipReferenced,
-        bool Verbose);
+        bool RemoveTouching,
+        float TouchTolerance,
+        float VoxelSize,
+        bool Verbose,
+        bool IgnoreReplacedObjects,
+        float ReplacementPositionTolerance,
+        float ReplacementSizeSimilarity);
 
     private static RunConfig? CreateConfig(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, Settings settings)
     {
@@ -201,6 +272,40 @@ public static class Program
             multiplier = 0;
         }
 
+        var touchTolerance = settings.TouchTolerance;
+        if (!float.IsFinite(touchTolerance) || touchTolerance < 0)
+        {
+            Console.WriteLine($"Warning: touch tolerance {settings.TouchTolerance} is invalid; using 0.");
+            touchTolerance = 0;
+        }
+
+        var voxelSize = settings.VoxelSize;
+        if (!float.IsFinite(voxelSize) || voxelSize < 1)
+        {
+            Console.WriteLine($"Warning: voxel size {settings.VoxelSize} is invalid (minimum 1); using 1.");
+            voxelSize = 1;
+        }
+
+        var replacementPositionTolerance = settings.ReplacementPositionTolerance;
+        if (!float.IsFinite(replacementPositionTolerance) || replacementPositionTolerance < 0)
+        {
+            Console.WriteLine($"Warning: replacement position tolerance {settings.ReplacementPositionTolerance} is invalid; using 0.");
+            replacementPositionTolerance = 0;
+        }
+
+        var replacementSizeSimilarity = settings.ReplacementSizeSimilarity;
+        if (!float.IsFinite(replacementSizeSimilarity))
+        {
+            Console.WriteLine($"Warning: replacement size similarity {settings.ReplacementSizeSimilarity} is invalid; using 0.75.");
+            replacementSizeSimilarity = 0.75f;
+        }
+        else if (replacementSizeSimilarity is < 0 or > 1)
+        {
+            var clamped = Math.Clamp(replacementSizeSimilarity, 0f, 1f);
+            Console.WriteLine($"Warning: replacement size similarity {settings.ReplacementSizeSimilarity} is out of range 0-1; using {clamped}.");
+            replacementSizeSimilarity = clamped;
+        }
+
         return new RunConfig(
             Target: target,
             IgnoredOrigins: ignored,
@@ -210,7 +315,13 @@ public static class Program
             Multiplier: multiplier,
             UseNifBounds: settings.UseNifBounds,
             SkipReferenced: settings.SkipReferencedObjects,
-            Verbose: settings.VerboseLogging);
+            RemoveTouching: settings.RemoveTouchingObjects,
+            TouchTolerance: touchTolerance,
+            VoxelSize: voxelSize,
+            Verbose: settings.VerboseLogging,
+            IgnoreReplacedObjects: settings.IgnoreReplacedObjects,
+            ReplacementPositionTolerance: replacementPositionTolerance,
+            ReplacementSizeSimilarity: replacementSizeSimilarity);
     }
 
     private static void PrintConfig(RunConfig config)
@@ -225,6 +336,12 @@ public static class Program
             : "Masters of target are not excluded.");
         Console.WriteLine($"Bounds source: {(config.UseNifBounds ? "NIF mesh, OBND fallback" : "OBND only")}");
         Console.WriteLine($"Keep referenced objects: {config.SkipReferenced}; verbose: {config.Verbose}");
+        Console.WriteLine(config.RemoveTouching
+            ? $"Remove touching objects: tolerance {config.TouchTolerance}, voxel size {config.VoxelSize}"
+            : "Touching objects are not removed.");
+        Console.WriteLine(config.IgnoreReplacedObjects
+            ? $"Ignore replaced objects: position tolerance {config.ReplacementPositionTolerance}, size similarity {config.ReplacementSizeSimilarity}"
+            : "Same-position replacement matching is disabled (objects the target plugin itself overrides are still ignored).");
     }
 
     // ------------------------------------------------------------------
@@ -256,7 +373,14 @@ public static class Program
         P3Float Rotation,
         float Scale);
 
-    private readonly record struct Hit(TargetObject Target, OtherObject Other);
+    /// <summary>A too-close target (index into ScanResult.Targets) and the first other object found.</summary>
+    private readonly record struct Hit(int TargetIndex, OtherObject Other);
+
+    /// <summary>
+    /// A target object to remove (index into ScanResult.Targets): either too close to
+    /// <paramref name="Other"/>, or touching the removed target <paramref name="TouchedIndex"/>.
+    /// </summary>
+    private sealed record Removal(int TargetIndex, OtherObject? Other, int? TouchedIndex);
 
     private sealed class ScanResult
     {
@@ -270,6 +394,9 @@ public static class Program
         public int RecordsScanned { get; set; }
         public int TargetsOverriddenLater { get; set; }
         public int TargetsDisabledOrWithoutPlacement { get; set; }
+
+        /// <summary>Other-mod objects excluded because the target plugin itself overrides them (rule 1).</summary>
+        public int OthersOverriddenByTarget { get; set; }
     }
 
     /// <summary>
@@ -297,7 +424,8 @@ public static class Program
     private static ScanResult ScanPlacedRecords(
         IPatcherState<ISkyrimMod, ISkyrimModGetter> state,
         RunConfig config,
-        IReadOnlySet<FormKey> targetSpaceKeys)
+        IReadOnlySet<FormKey> targetSpaceKeys,
+        IReadOnlySet<FormKey> overriddenByTarget)
     {
         var scan = new ScanResult();
         var seenRecords = new HashSet<FormKey>();
@@ -347,6 +475,21 @@ public static class Program
                         }
                         else if (config.IgnoredOrigins.Contains(origin))
                         {
+                            continue;
+                        }
+                        else if (overriddenByTarget.Contains(record.FormKey))
+                        {
+                            // The target plugin itself overrides this FormKey (its own cell tree
+                            // holds a copy of it), so it is a replacement, not an "other mod" object,
+                            // no matter which plugin currently wins it.
+                            scan.OthersOverriddenByTarget++;
+                            if (config.Verbose)
+                            {
+                                var winner = modKey == origin ? string.Empty : $" (winning override in {modKey})";
+                                Console.WriteLine(
+                                    $"  Ignored other-mod object overridden by {config.Target}: "
+                                    + $"{Describe(record.FormKey, record.EditorID)} from {origin}{winner}.");
+                            }
                             continue;
                         }
 
@@ -442,27 +585,51 @@ public static class Program
     };
 
     /// <summary>
+    /// Result of <see cref="CollectTargetSpaceKeys"/>: the spaces that can contain a target object,
+    /// plus the FormKeys of every placed record the target plugin itself overrides (a record present
+    /// in the target plugin's own cell tree whose FormKey originates from another plugin).
+    /// </summary>
+    private sealed record TargetSpaceInfo(HashSet<FormKey> SpaceKeys, HashSet<FormKey> OverriddenByTarget);
+
+    /// <summary>
     /// Cheaply collects the set of spaces (worldspace or interior cell FormKeys) that contain at
     /// least one placed record created by the target plugin, by walking only the target plugin's
     /// own cell tree once. Used to avoid indexing other mods' objects in spaces that can never
-    /// contain a target object.
+    /// contain a target object. The same pass also collects every FormKey the target plugin
+    /// overrides (regardless of which plugin ends up winning it), so such records are never treated
+    /// as "other mods'" objects: the target plugin replaced them itself.
     /// </summary>
-    private static HashSet<FormKey> CollectTargetSpaceKeys(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, ModKey target)
+    private static TargetSpaceInfo CollectTargetSpaceKeys(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, ModKey target)
     {
         var keys = new HashSet<FormKey>();
+        var overridden = new HashSet<FormKey>();
         var listing = state.LoadOrder.ListedOrder.FirstOrDefault(l => l.ModKey == target);
-        if (listing?.Mod is not { } mod) return keys;
+        if (listing?.Mod is not { } mod) return new TargetSpaceInfo(keys, overridden);
 
         foreach (var cellContext in mod.EnumerateMajorRecordContexts<ICell, ICellGetter>(state.LinkCache))
         {
             var cell = cellContext.Record;
-            if (cell.Persistent.Any(r => r.FormKey.ModKey == target)
-                || cell.Temporary.Any(r => r.FormKey.ModKey == target))
+            var hasTargetRecord = false;
+            for (var list = 0; list < 2; list++)
+            {
+                foreach (var record in list == 0 ? cell.Persistent : cell.Temporary)
+                {
+                    if (record.FormKey.ModKey == target)
+                    {
+                        hasTargetRecord = true;
+                    }
+                    else
+                    {
+                        overridden.Add(record.FormKey);
+                    }
+                }
+            }
+            if (hasTargetRecord)
             {
                 keys.Add(GetCellSpace(cellContext).SpaceKey);
             }
         }
-        return keys;
+        return new TargetSpaceInfo(keys, overridden);
     }
 
     /// <summary>Base object of any placed record type, with the base link's own record type.</summary>
@@ -541,65 +708,457 @@ public static class Program
     private const float OtherObjectSearchMargin = 4096f;
 
     /// <summary>
-    /// Indexes other-mod objects by their raw position only - no bounds/NIF lookup here. The true,
-    /// possibly expensive, bounds center is computed lazily in <see cref="FindTooCloseTargets"/>,
-    /// only for the few candidates a query actually turns up.
+    /// Other-mod objects of one space, indexed by their raw position only - no bounds/NIF lookup
+    /// at build time. Each object's true bounds center (rotation matrix, cached base bounds, maybe a
+    /// mesh read) is computed at most once, lazily, the first time a query turns the object up
+    /// (<see cref="GetBoundsCenter"/>), so objects that are never candidates never cost a mesh read.
+    ///
+    /// Thread-safe: the center is written before its ready flag is published with a release
+    /// store, and read only after an acquire load sees the flag. Two threads computing the same
+    /// center concurrently write identical values, so the race is harmless.
     /// </summary>
-    private static Dictionary<FormKey, SpatialGrid<OtherObject>> BuildGrids(ScanResult scan)
+    private sealed class OtherSpace
     {
-        var grids = new Dictionary<FormKey, SpatialGrid<OtherObject>>();
-        foreach (var spaceKey in scan.Targets.Select(t => t.SpaceKey).Distinct())
+        private readonly OtherObject[] _objects;
+        private readonly Vector3[] _centers;
+        private readonly int[] _centerReady;
+
+        /// <summary>
+        /// 0/1 per object: set (via <see cref="TryExclude"/>) when the object is judged a
+        /// same-position/same-size replacement of some target object (rule 2). Excluded objects are
+        /// still indexed in <see cref="Grid"/> (needed as replacement candidates) but never match in
+        /// the too-close test.
+        /// </summary>
+        private readonly int[] _excluded;
+
+        public OtherSpace(IReadOnlyList<OtherObject> objects)
         {
-            var grid = new SpatialGrid<OtherObject>();
-            if (scan.OthersBySpace.TryGetValue(spaceKey, out var others))
+            _objects = objects.ToArray();
+            _centers = new Vector3[_objects.Length];
+            _centerReady = new int[_objects.Length];
+            _excluded = new int[_objects.Length];
+            var points = new Vector3[_objects.Length];
+            for (var i = 0; i < points.Length; i++)
             {
-                foreach (var other in others)
-                {
-                    grid.Add(Geometry.IsFinite(other.Position) ? other.Position : Vector3.Zero, other);
-                }
+                points[i] = Geometry.IsFinite(_objects[i].Position) ? _objects[i].Position : Vector3.Zero;
             }
-            grids[spaceKey] = grid;
+            Grid = SpatialGrid.FromPoints(points);
         }
-        return grids;
+
+        public SpatialGrid Grid { get; }
+
+        public int Count => _objects.Length;
+
+        public OtherObject this[int index] => _objects[index];
+
+        /// <summary>Marks the object as a replacement. Thread-safe; returns true only the first time.</summary>
+        public bool TryExclude(int index) => Interlocked.CompareExchange(ref _excluded[index], 1, 0) == 0;
+
+        public bool IsExcluded(int index) => Volatile.Read(ref _excluded[index]) != 0;
+
+        public Vector3 GetBoundsCenter(int index, ObjectBoundsProvider bounds)
+        {
+            if (Volatile.Read(ref _centerReady[index]) != 0) return _centers[index];
+
+            ref readonly var other = ref _objects[index];
+            var transform = new PlacedTransform(other.Position, Geometry.RotationFromEuler(other.Rotation), other.Scale);
+            var point = Geometry.WorldBoundsCenter(bounds.GetLocalBox(other.Base), transform);
+            if (!Geometry.IsFinite(point)) point = other.Position;
+
+            _centers[index] = point;
+            Volatile.Write(ref _centerReady[index], 1);
+            return point;
+        }
     }
 
-    private static List<Hit> FindTooCloseTargets(
-        IReadOnlyList<TargetObject> targets,
-        IReadOnlyDictionary<FormKey, SpatialGrid<OtherObject>> grids,
-        ObjectBoundsProvider bounds,
-        float multiplier)
+    /// <summary>One <see cref="OtherSpace"/> per space containing target objects (empty if it has no other objects).</summary>
+    private static Dictionary<FormKey, OtherSpace> BuildOtherSpaces(ScanResult scan)
     {
-        var margin = new Vector3(OtherObjectSearchMargin);
-        var hits = new List<Hit>();
-        foreach (var target in targets)
+        var spaces = new Dictionary<FormKey, OtherSpace>();
+        foreach (var target in scan.Targets)
         {
-            var grid = grids[target.SpaceKey];
-            if (grid.Count == 0) continue;
+            if (spaces.ContainsKey(target.SpaceKey)) continue;
+            spaces[target.SpaceKey] = new OtherSpace(
+                scan.OthersBySpace.TryGetValue(target.SpaceKey, out var others) ? others : []);
+        }
+        return spaces;
+    }
 
-            // Everything about the target (inverse rotation, expanded box, query area) is computed
-            // once per target here, never per candidate.
+    // ------------------------------------------------------------------
+    // Same-position/same-size replacement exclusion (rule 2)
+    // ------------------------------------------------------------------
+
+    private sealed class ReplacementStats
+    {
+        public int ExcludedCount { get; set; }
+    }
+
+    /// <summary>One rule-2 exclusion, for deterministic verbose logging after the parallel pass.</summary>
+    private readonly record struct ReplacementLogEntry(
+        FormKey OtherFormKey,
+        string? OtherEditorId,
+        ModKey OtherPlugin,
+        FormKey TargetFormKey,
+        string? TargetEditorId,
+        float Distance,
+        float SizeRatio);
+
+    /// <summary>
+    /// Rule 2: an other-mod object is excluded from proximity checks entirely when some target
+    /// object in the same space sits within <see cref="RunConfig.ReplacementPositionTolerance"/> of
+    /// it and has a similar scaled size (min/max ratio of each matching sorted dimension pair at
+    /// least <see cref="RunConfig.ReplacementSizeSimilarity"/>) - it looks like the target plugin
+    /// replaced it. Only other objects near a target object are ever measured (grid query per
+    /// target, reusing each space's own grid), and each candidate's bounds are resolved at most
+    /// once (cached by <see cref="ObjectBoundsProvider"/>). Thread-safe: candidates are found in
+    /// parallel per target, and marking an object excluded is a single interlocked write.
+    /// </summary>
+    private static ReplacementStats ExcludeReplacedObjects(
+        ScanResult scan,
+        IReadOnlyDictionary<FormKey, OtherSpace> spaces,
+        ObjectBoundsProvider bounds,
+        RunConfig config,
+        ParallelOptions parallelOptions)
+    {
+        var stats = new ReplacementStats();
+        if (!config.IgnoreReplacedObjects) return stats;
+
+        var tolerance = config.ReplacementPositionTolerance;
+        var similarity = config.ReplacementSizeSimilarity;
+        var margin = new Vector3(tolerance);
+        var excludedCount = 0;
+        var log = config.Verbose ? new ConcurrentBag<ReplacementLogEntry>() : null;
+
+        Parallel.ForEach(scan.Targets, parallelOptions, target =>
+        {
+            if (!spaces.TryGetValue(target.SpaceKey, out var space) || space.Count == 0) return;
+
+            var targetDims = ScaledSortedDims(bounds.GetLocalBox(target.Base), target.Transform.Scale);
+            if (targetDims == null) return; // no bounds: never a replacement match
+
             var position = target.Transform.Position;
-            var inverseRotation = target.Transform.Rotation.Transposed();
-            var expanded = Geometry.ExpandedLocalBox(bounds.GetLocalBox(target.Base), target.Transform.Scale, multiplier);
-            var searchArea = Geometry.WorldAabb(expanded, position, target.Transform.Rotation);
-            var queryArea = new Box(searchArea.Min - margin, searchArea.Max + margin);
+            var candidates = new List<int>();
+            space.Grid.Collect(new Box(position - margin, position + margin), candidates);
+            if (candidates.Count == 0) return;
 
-            bool IsMatch(OtherObject candidate)
+            foreach (var index in candidates)
             {
-                // GetLocalBox is cached per base, so this is only ever a NIF/OBND read the first
-                // time a given base is seen as a query candidate, not once per other object.
-                var transform = new PlacedTransform(candidate.Position, Geometry.RotationFromEuler(candidate.Rotation), candidate.Scale);
-                var point = Geometry.WorldBoundsCenter(bounds.GetLocalBox(candidate.Base), transform);
-                if (!Geometry.IsFinite(point)) point = candidate.Position;
-                return expanded.Contains(inverseRotation.Transform(point - position));
+                var other = space[index];
+                var distance = Vector3.Distance(other.Position, position);
+                if (distance > tolerance) continue;
+
+                var otherDims = ScaledSortedDims(bounds.GetLocalBox(other.Base), other.Scale);
+                if (otherDims == null) continue; // no bounds: never a replacement match
+
+                var ratio = SizeRatio(targetDims.Value, otherDims.Value);
+                if (ratio < similarity) continue;
+
+                if (!space.TryExclude(index)) continue; // already excluded by another target
+                Interlocked.Increment(ref excludedCount);
+                log?.Add(new ReplacementLogEntry(
+                    other.FormKey, other.EditorId, other.WinningMod,
+                    target.Record.FormKey, config.Verbose ? target.Record.EditorID : null,
+                    distance, ratio));
             }
+        });
 
-            if (grid.TryFindFirst(queryArea, IsMatch, out var match))
+        if (log != null)
+        {
+            foreach (var entry in log.OrderBy(e => e.OtherFormKey.ToString(), StringComparer.Ordinal))
             {
-                hits.Add(new Hit(target, match));
+                Console.WriteLine(
+                    $"  Ignored replaced object {Describe(entry.OtherFormKey, entry.OtherEditorId)} from {entry.OtherPlugin}: "
+                    + $"replaced by {Describe(entry.TargetFormKey, entry.TargetEditorId)}, "
+                    + $"distance {entry.Distance:F1}, size ratio {entry.SizeRatio:F2}.");
             }
         }
+
+        stats.ExcludedCount = excludedCount;
+        return stats;
+    }
+
+    /// <summary>
+    /// The local box's scaled dimensions, sorted largest-first, or null when the box has no size at
+    /// all (missing bounds - <see cref="ObjectBoundsProvider.GetLocalBox"/> returns <see cref="Box.Zero"/>
+    /// for those).
+    /// </summary>
+    private static (float A, float B, float C)? ScaledSortedDims(Box local, float scale)
+    {
+        if (local.Size == Vector3.Zero) return null;
+        var size = local.Size * scale;
+        var dims = new[] { MathF.Abs(size.X), MathF.Abs(size.Y), MathF.Abs(size.Z) };
+        Array.Sort(dims);
+        return (dims[2], dims[1], dims[0]);
+    }
+
+    /// <summary>Smallest, across the three matching sorted-dimension pairs, of min(a,b)/max(a,b).</summary>
+    private static float SizeRatio((float A, float B, float C) x, (float A, float B, float C) y) =>
+        MathF.Min(MathF.Min(DimRatio(x.A, y.A), DimRatio(x.B, y.B)), DimRatio(x.C, y.C));
+
+    private static float DimRatio(float a, float b)
+    {
+        if (a <= 0 || b <= 0) return a == b ? 1f : 0f;
+        return MathF.Min(a, b) / MathF.Max(a, b);
+    }
+
+    /// <summary>Exact too-close test of one grid candidate; a struct so the grid query is allocation-free and inlinable.</summary>
+    private readonly struct TooCloseMatcher(OtherSpace space, ObjectBoundsProvider bounds, Box expanded, Vector3 position, Mat3 rotation)
+        : IGridMatcher
+    {
+        public bool IsMatch(int index) =>
+            !space.IsExcluded(index)
+            && expanded.Contains(rotation.TransformTransposed(space.GetBoundsCenter(index, bounds) - position));
+    }
+
+    /// <summary>
+    /// Runs the too-close test for every target in parallel. Each target writes only its own
+    /// result slot, and hits are returned in target order, so the result (including which other
+    /// object is reported first) does not depend on thread scheduling.
+    /// </summary>
+    private static List<Hit> FindTooCloseTargets(
+        IReadOnlyList<TargetObject> targets,
+        IReadOnlyDictionary<FormKey, OtherSpace> spaces,
+        ObjectBoundsProvider bounds,
+        float multiplier,
+        ParallelOptions parallelOptions)
+    {
+        var margin = new Vector3(OtherObjectSearchMargin);
+        var matches = new int[targets.Count];
+
+        Parallel.ForEach(Partitioner.Create(0, targets.Count), parallelOptions, range =>
+        {
+            for (var i = range.Item1; i < range.Item2; i++)
+            {
+                matches[i] = -1;
+                var target = targets[i];
+                var space = spaces[target.SpaceKey];
+                if (space.Count == 0) continue;
+
+                // Everything about the target (expanded box, query area) is computed once per
+                // target here, never per candidate.
+                var position = target.Transform.Position;
+                var rotation = target.Transform.Rotation;
+                var expanded = Geometry.ExpandedLocalBox(bounds.GetLocalBox(target.Base), target.Transform.Scale, multiplier);
+                var searchArea = Geometry.WorldAabb(expanded, position, rotation);
+                var queryArea = new Box(searchArea.Min - margin, searchArea.Max + margin);
+
+                var matcher = new TooCloseMatcher(space, bounds, expanded, position, rotation);
+                if (space.Grid.TryFindFirst(queryArea, ref matcher, out var match))
+                {
+                    matches[i] = match;
+                }
+            }
+        });
+
+        var hits = new List<Hit>();
+        for (var i = 0; i < matches.Length; i++)
+        {
+            if (matches[i] >= 0) hits.Add(new Hit(i, spaces[targets[i].SpaceKey][matches[i]]));
+        }
         return hits;
+    }
+
+    // ------------------------------------------------------------------
+    // Touching clusters
+    // ------------------------------------------------------------------
+
+    private sealed class TouchResult
+    {
+        public List<Removal> Removals { get; } = [];
+        public int KeptAsReferenced { get; set; }
+        public int Components { get; set; }
+        public int ComponentsWithTouching { get; set; }
+        public int LargestComponent { get; set; }
+        public int CandidatePairs { get; set; }
+        public int TouchingPairs { get; set; }
+        public int PairsWithoutGeometry { get; set; }
+        public int MeshesVoxelized { get; set; }
+        public long Voxels { get; set; }
+        public long Samples { get; set; }
+        public int MeshesCoarsened { get; set; }
+        public TimeSpan Setup { get; set; }
+        public TimeSpan BroadPhase { get; set; }
+        public TimeSpan NarrowPhase { get; set; }
+        public TimeSpan Clusters { get; set; }
+    }
+
+    /// <summary>
+    /// Finds every target object connected to a too-close removal through a chain of touching
+    /// target objects (same space only), i.e. the connected components of the "touches" graph
+    /// that contain a removed object. The graph is explored breadth-first from each removed
+    /// object, one level at a time: the broad phase (grid of target world AABBs + oriented box
+    /// test, grown by the tolerance) and the narrow phase (exact mesh test) of a level each run in
+    /// parallel, and the merge of a level runs in frontier order, so the result is deterministic.
+    ///
+    /// The touching decision always comes from mesh triangles (<see cref="VoxelMesh.Touches"/>):
+    /// a pair where either object has no mesh geometry is never touching. Objects kept because
+    /// they are referenced stay and do not propagate (they still support what touches them).
+    /// </summary>
+    private static TouchResult FindTouchingClusters(
+        ScanResult scan,
+        IReadOnlyList<Removal> tooClose,
+        IReadOnlyList<int> keptTooClose,
+        ObjectBoundsProvider bounds,
+        RunConfig config,
+        ParallelOptions parallelOptions)
+    {
+        var result = new TouchResult();
+        var targets = scan.Targets;
+        var tolerance = config.TouchTolerance;
+        var timer = Stopwatch.StartNew();
+
+        // Setup: oriented boxes and per-space grids of world AABBs, only for spaces with removals.
+        var seedSpaces = tooClose.Select(r => targets[r.TargetIndex].SpaceKey).ToHashSet();
+        var boxes = new OrientedBox[targets.Count];
+        Parallel.ForEach(Partitioner.Create(0, targets.Count), parallelOptions, range =>
+        {
+            for (var i = range.Item1; i < range.Item2; i++)
+            {
+                if (!seedSpaces.Contains(targets[i].SpaceKey)) continue;
+                boxes[i] = OrientedBox.FromLocal(bounds.GetLocalBox(targets[i].Base), targets[i].Transform);
+            }
+        });
+
+        var members = new Dictionary<FormKey, List<int>>();
+        for (var i = 0; i < targets.Count; i++)
+        {
+            if (!seedSpaces.Contains(targets[i].SpaceKey)) continue;
+            if (!members.TryGetValue(targets[i].SpaceKey, out var list))
+            {
+                list = [];
+                members[targets[i].SpaceKey] = list;
+            }
+            list.Add(i);
+        }
+        var grids = new Dictionary<FormKey, (SpatialGrid Grid, List<int> Members)>();
+        foreach (var (spaceKey, list) in members)
+        {
+            var aabbs = list.Select(i => boxes[i].WorldAabb(tolerance)).ToArray();
+            grids[spaceKey] = (SpatialGrid.FromBoxes(aabbs), list);
+        }
+        result.Setup = timer.Elapsed;
+
+        var voxels = new VoxelCache(config.VoxelSize);
+        var isSeed = new bool[targets.Count];
+        foreach (var removal in tooClose) isSeed[removal.TargetIndex] = true;
+        // Too-close objects that were kept as referenced stay, are already logged and counted,
+        // and do not propagate: mark them visited up front.
+        var visited = new bool[targets.Count];
+        foreach (var index in keptTooClose) visited[index] = true;
+        var pairsWithoutGeometry = 0;
+
+        var broadTimer = new Stopwatch();
+        var narrowTimer = new Stopwatch();
+        var clusterTimer = Stopwatch.StartNew();
+
+        foreach (var seed in tooClose.Select(r => r.TargetIndex))
+        {
+            // A seed reached from an earlier seed already belongs to that seed's component.
+            if (visited[seed]) continue;
+            visited[seed] = true;
+
+            var componentSize = 1;
+            var frontier = new List<int> { seed };
+            while (frontier.Count > 0)
+            {
+                // Broad phase: unvisited targets whose grown oriented box overlaps.
+                broadTimer.Start();
+                var candidates = new List<int>[frontier.Count];
+                Parallel.For(0, frontier.Count, parallelOptions, () => new List<int>(), (f, _, scratch) =>
+                {
+                    var node = frontier[f];
+                    var (grid, list) = grids[targets[node].SpaceKey];
+                    scratch.Clear();
+                    grid.Collect(boxes[node].WorldAabb(tolerance), scratch);
+                    var found = new List<int>();
+                    foreach (var local in scratch)
+                    {
+                        var other = list[local];
+                        if (other == node || visited[other] || found.Contains(other)) continue;
+                        if (boxes[node].Intersects(boxes[other], tolerance)) found.Add(other);
+                    }
+                    found.Sort();
+                    candidates[f] = found;
+                    return scratch;
+                }, _ => { });
+                var pairs = new List<(int From, int To)>();
+                for (var f = 0; f < frontier.Count; f++)
+                {
+                    foreach (var other in candidates[f]) pairs.Add((frontier[f], other));
+                }
+                broadTimer.Stop();
+                result.CandidatePairs += pairs.Count;
+
+                // Narrow phase: exact mesh test per candidate pair.
+                narrowTimer.Start();
+                var touching = new bool[pairs.Count];
+                Parallel.For(0, pairs.Count, parallelOptions, k =>
+                {
+                    var (from, to) = pairs[k];
+                    var fromGeometry = bounds.GetGeometry(targets[from].Base);
+                    var toGeometry = bounds.GetGeometry(targets[to].Base);
+                    if (fromGeometry == null || toGeometry == null)
+                    {
+                        Interlocked.Increment(ref pairsWithoutGeometry);
+                        return;
+                    }
+                    var fromMesh = voxels.Get(fromGeometry);
+                    var toMesh = voxels.Get(toGeometry);
+                    // Iterate the mesh with fewer voxels; look up in the one with more.
+                    touching[k] = fromMesh.VoxelCount >= toMesh.VoxelCount
+                        ? VoxelMesh.Touches(fromMesh, targets[from].Transform, toMesh, targets[to].Transform, tolerance)
+                        : VoxelMesh.Touches(toMesh, targets[to].Transform, fromMesh, targets[from].Transform, tolerance);
+                });
+                narrowTimer.Stop();
+
+                // Merge in frontier order (deterministic).
+                var next = new List<int>();
+                for (var k = 0; k < pairs.Count; k++)
+                {
+                    if (!touching[k]) continue;
+                    result.TouchingPairs++;
+                    var (from, to) = pairs[k];
+                    if (visited[to]) continue;
+                    visited[to] = true;
+
+                    if (isSeed[to])
+                    {
+                        // Another too-close removal: same component, already removed.
+                        componentSize++;
+                        next.Add(to);
+                        continue;
+                    }
+
+                    var keepReason = config.SkipReferenced ? GetKeepReason(targets[to], scan.TargetReferences) : null;
+                    if (keepReason != null)
+                    {
+                        result.KeptAsReferenced++;
+                        Console.WriteLine(
+                            $"  Kept {Describe(targets[to].Record)} in {scan.SpaceNames[targets[to].SpaceKey]}: {keepReason} "
+                            + $"(touches removed {Describe(targets[from].Record)}).");
+                        continue;
+                    }
+
+                    result.Removals.Add(new Removal(to, Other: null, TouchedIndex: from));
+                    componentSize++;
+                    next.Add(to);
+                }
+                frontier = next;
+            }
+
+            result.Components++;
+            if (componentSize > 1) result.ComponentsWithTouching++;
+            result.LargestComponent = Math.Max(result.LargestComponent, componentSize);
+        }
+
+        clusterTimer.Stop();
+        result.PairsWithoutGeometry = pairsWithoutGeometry;
+        result.BroadPhase = broadTimer.Elapsed;
+        result.NarrowPhase = narrowTimer.Elapsed;
+        result.Clusters = clusterTimer.Elapsed - broadTimer.Elapsed - narrowTimer.Elapsed;
+        result.MeshesVoxelized = voxels.MeshCount;
+        (result.Voxels, result.Samples, result.MeshesCoarsened) = voxels.GetTotals();
+        return result;
     }
 
     private static string? GetKeepReason(TargetObject target, IReadOnlyDictionary<FormKey, string> references)
@@ -656,16 +1215,43 @@ public static class Program
         return bounds.TryResolveBase(reference) is { } record ? Describe(record) : reference.FormKey.ToString();
     }
 
-    private static void LogRemoval(ObjectBoundsProvider bounds, ScanResult scan, Hit hit)
+    private static void LogRemoval(ObjectBoundsProvider bounds, ScanResult scan, Removal removal)
     {
-        var target = hit.Target;
+        var target = scan.Targets[removal.TargetIndex];
         var location = target.CellName == null
             ? scan.SpaceNames[target.SpaceKey]
             : $"{scan.SpaceNames[target.SpaceKey]}, cell {target.CellName}";
+        string reason;
+        if (removal.Other is { } other)
+        {
+            reason = $"too close to {Describe(other.FormKey, other.EditorId)} from {other.FormKey.ModKey}"
+                + (other.WinningMod == other.FormKey.ModKey ? string.Empty : $" (winning override in {other.WinningMod})");
+        }
+        else if (removal.TouchedIndex is { } touched)
+        {
+            reason = $"touches removed {Describe(scan.Targets[touched].Record)}";
+        }
+        else
+        {
+            reason = "removed";
+        }
+        Console.WriteLine($"  Removed {Describe(target.Record)} (base {DescribeBase(bounds, target.Base)}) in {location}; {reason}");
+    }
+
+    private static void PrintTouchStats(TouchResult touch)
+    {
         Console.WriteLine(
-            $"  Removed {Describe(target.Record)} (base {DescribeBase(bounds, target.Base)}) in {location}; "
-            + $"too close to {Describe(hit.Other.FormKey, hit.Other.EditorId)} from {hit.Other.FormKey.ModKey}"
-            + (hit.Other.WinningMod == hit.Other.FormKey.ModKey ? string.Empty : $" (winning override in {hit.Other.WinningMod})"));
+            $"Touching objects: {touch.Removals.Count:N0} removed in {touch.Components:N0} components "
+            + $"({touch.ComponentsWithTouching:N0} with touching objects, largest {touch.LargestComponent:N0} removed objects); "
+            + $"{touch.KeptAsReferenced:N0} kept as referenced.");
+        Console.WriteLine(
+            $"  Pairs: {touch.CandidatePairs:N0} box candidates, {touch.TouchingPairs:N0} touching, "
+            + $"{touch.PairsWithoutGeometry:N0} skipped without mesh geometry (never touching). "
+            + $"Meshes voxelized: {touch.MeshesVoxelized:N0} ({touch.Voxels:N0} voxels, {touch.Samples:N0} samples"
+            + (touch.MeshesCoarsened > 0 ? $", {touch.MeshesCoarsened:N0} sampled coarser due to size" : string.Empty) + ").");
+        Console.WriteLine(
+            $"  Timing: setup {touch.Setup.TotalSeconds:F1}s, broad phase {touch.BroadPhase.TotalSeconds:F1}s, "
+            + $"narrow phase {touch.NarrowPhase.TotalSeconds:F1}s, clusters {touch.Clusters.TotalSeconds:F1}s.");
     }
 
     private static void PrintBoundsStats(ObjectBoundsProvider bounds, bool useNif)
@@ -688,11 +1274,11 @@ public static class Program
 
     private static void PrintSpaceSummary(
         ScanResult scan,
-        IReadOnlyDictionary<FormKey, SpatialGrid<OtherObject>> grids,
-        IReadOnlyList<Hit> removed)
+        IReadOnlyDictionary<FormKey, OtherSpace> spaces,
+        IReadOnlyList<Removal> removed)
     {
         var removedBySpace = removed
-            .GroupBy(h => h.Target.SpaceKey)
+            .GroupBy(r => scan.Targets[r.TargetIndex].SpaceKey)
             .ToDictionary(g => g.Key, g => g.Count());
         Console.WriteLine("Per cell/worldspace (target objects / other objects / removed):");
         foreach (var group in scan.Targets
@@ -701,7 +1287,7 @@ public static class Program
         {
             removedBySpace.TryGetValue(group.Key, out var removedCount);
             Console.WriteLine(
-                $"  {scan.SpaceNames[group.Key]}: {group.Count():N0} / {grids[group.Key].Count:N0} / {removedCount:N0}");
+                $"  {scan.SpaceNames[group.Key]}: {group.Count():N0} / {spaces[group.Key].Count:N0} / {removedCount:N0}");
         }
     }
 }

@@ -158,6 +158,17 @@ internal static class Geometry
     public static bool IsFinite(Vector3 v) => float.IsFinite(v.X) && float.IsFinite(v.Y) && float.IsFinite(v.Z);
 
     /// <summary>
+    /// Largest accepted absolute mesh or placement coordinate. Real content stays far below it
+    /// (a worldspace spans a few hundred thousand units); larger values come from broken exports
+    /// or sentinel values and would blow up grids and voxelization.
+    /// </summary>
+    public const float MaxCoordinate = 1e6f;
+
+    /// <summary>Finite and every component within ±<see cref="MaxCoordinate"/>.</summary>
+    public static bool IsWithinLimits(Vector3 v) =>
+        MathF.Abs(v.X) <= MaxCoordinate && MathF.Abs(v.Y) <= MaxCoordinate && MathF.Abs(v.Z) <= MaxCoordinate;
+
+    /// <summary>
     /// THE single place where a placed reference's Euler rotation (REFR/ACHR DATA, radians,
     /// X/Y/Z as stored in Placement.Rotation) is turned into a rotation matrix.
     ///
@@ -252,7 +263,9 @@ internal static class Geometry
     /// <summary>
     /// Squared distance from <paramref name="p"/> to triangle (a, b, c), via the closest point on
     /// the triangle (Ericson, Real-Time Collision Detection 5.1.5). Degenerate triangles
-    /// (including a == b == c, a point) are handled; a NaN result compares as "not close".
+    /// (coincident vertices, collinear vertices, a single point) are handled without dividing by
+    /// zero: an edge of zero length is treated as its start point, and a zero-area triangle as its
+    /// three edges.
     /// </summary>
     public static float DistanceSquaredToTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c)
     {
@@ -271,7 +284,8 @@ internal static class Geometry
         var vc = d1 * d4 - d3 * d2;
         if (vc <= 0 && d1 >= 0 && d3 <= 0)
         {
-            var v = d1 / (d1 - d3);
+            var abDenominator = d1 - d3;
+            var v = abDenominator != 0 ? d1 / abDenominator : 0f;
             return (p - (a + v * ab)).LengthSquared();
         }
 
@@ -283,20 +297,37 @@ internal static class Geometry
         var vb = d5 * d2 - d1 * d6;
         if (vb <= 0 && d2 >= 0 && d6 <= 0)
         {
-            var w = d2 / (d2 - d6);
+            var acDenominator = d2 - d6;
+            var w = acDenominator != 0 ? d2 / acDenominator : 0f;
             return (p - (a + w * ac)).LengthSquared();
         }
 
         var va = d3 * d6 - d5 * d4;
         if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0)
         {
-            var w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+            var bcDenominator = (d4 - d3) + (d5 - d6);
+            var w = bcDenominator != 0 ? (d4 - d3) / bcDenominator : 0f;
             return (p - (b + w * (c - b))).LengthSquared();
         }
 
-        var denominator = 1f / (va + vb + vc);
+        var sum = va + vb + vc;
+        if (!float.IsFinite(1f / sum))
+        {
+            return MathF.Min(
+                DistanceSquaredToSegment(p, a, b),
+                MathF.Min(DistanceSquaredToSegment(p, b, c), DistanceSquaredToSegment(p, c, a)));
+        }
+        var denominator = 1f / sum;
         var vv = vb * denominator;
         var ww = vc * denominator;
         return (p - (a + ab * vv + ac * ww)).LengthSquared();
+    }
+
+    private static float DistanceSquaredToSegment(Vector3 p, Vector3 a, Vector3 b)
+    {
+        var ab = b - a;
+        var lengthSquared = ab.LengthSquared();
+        var t = lengthSquared > 0 ? Math.Clamp(Vector3.Dot(p - a, ab) / lengthSquared, 0f, 1f) : 0f;
+        return (p - (a + t * ab)).LengthSquared();
     }
 }

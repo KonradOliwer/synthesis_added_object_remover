@@ -127,9 +127,8 @@ internal sealed class SpatialGrid
         long x1 = ToCell(area.Max.X);
         long y0 = ToCell(area.Min.Y);
         long y1 = ToCell(area.Max.Y);
-        var cellCount = (x1 - x0 + 1) * (y1 - y0 + 1);
 
-        if (cellCount > _slotByCell.Count)
+        if (CellCount(x0, x1, y0, y1) > _slotByCell.Count)
         {
             // Query area covers more grid cells than are occupied: scanning the occupied cells is cheaper.
             for (var slot = 0; slot < _slotStart.Length - 1; slot++)
@@ -168,9 +167,8 @@ internal sealed class SpatialGrid
         long x1 = ToCell(area.Max.X);
         long y0 = ToCell(area.Min.Y);
         long y1 = ToCell(area.Max.Y);
-        var cellCount = (x1 - x0 + 1) * (y1 - y0 + 1);
 
-        if (cellCount > _slotByCell.Count)
+        if (CellCount(x0, x1, y0, y1) > _slotByCell.Count)
         {
             results.AddRange(_items);
             return;
@@ -212,6 +210,10 @@ internal sealed class SpatialGrid
         if (y1 < y0) (y0, y1) = (y1, y0);
         return ((long)x1 - x0 + 1) * ((long)y1 - y0 + 1) <= MaxCellsPerItem;
     }
+
+    /// <summary>Number of grid cells in an inclusive range, in double so a full int range cannot overflow.</summary>
+    private static double CellCount(long x0, long x1, long y0, long y1) =>
+        Math.Max(0, x1 - x0 + 1) * (double)Math.Max(0, y1 - y0 + 1);
 
     private static long Pack(int x, int y) => ((long)x << 32) | (uint)y;
 

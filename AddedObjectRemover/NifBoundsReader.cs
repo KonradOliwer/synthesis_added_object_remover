@@ -42,6 +42,18 @@ public sealed class NifGeometry
     public int TriangleCount => Indices.Length / 3;
 }
 
+/// <summary>Outcome of <see cref="NifBoundsReader.ReadGeometry"/>.</summary>
+public enum NifReadStatus
+{
+    Success,
+
+    /// <summary>The NIF could not be parsed or holds invalid data (e.g. out-of-range coordinates).</summary>
+    Failed,
+
+    /// <summary>The NIF parsed fine but has no visible render geometry (e.g. only editor-marker shapes).</summary>
+    NoRenderGeometry,
+}
+
 /// <summary>
 /// Computes the axis-aligned bounding box (in NIF root-node space) of a NIF's render
 /// geometry using NiflySharp, and optionally the root-space triangles. Collision shapes are ignored.
@@ -84,7 +96,7 @@ public static class NifBoundsReader
     {
         min = default;
         max = default;
-        if (!TryReadGeometry(data.ToArray(), includeTriangles: false, out var geometry, out error)) return false;
+        if (ReadGeometry(data.ToArray(), includeTriangles: false, out var geometry, out error) != NifReadStatus.Success) return false;
         min = geometry!.Min;
         max = geometry.Max;
         return true;
@@ -94,9 +106,11 @@ public static class NifBoundsReader
     /// Same shape selection and transforms as <see cref="TryReadBounds"/>, returning the bounds
     /// and, when <paramref name="includeTriangles"/> is set, the root-space vertices and
     /// triangles of every counted shape (shapes that only have a bounding sphere add to the
-    /// bounds but not to the triangles). Never throws.
+    /// bounds but not to the triangles). A vertex that is non-finite or beyond
+    /// <see cref="Geometry.MaxCoordinate"/> makes the whole mesh <see cref="NifReadStatus.Failed"/>.
+    /// Never throws.
     /// </summary>
-    public static bool TryReadGeometry(
+    public static NifReadStatus ReadGeometry(
         byte[] data,
         bool includeTriangles,
         out NifGeometry? geometry,
@@ -108,17 +122,18 @@ public static class NifBoundsReader
         {
             if (ParallelLoadsSafe.Value)
             {
-                return TryReadGeometryCore(data, includeTriangles, out geometry, out error);
+                return ReadGeometryCore(data, includeTriangles, out geometry, out error);
             }
             lock (LoadLock)
             {
-                return TryReadGeometryCore(data, includeTriangles, out geometry, out error);
+                return ReadGeometryCore(data, includeTriangles, out geometry, out error);
             }
         }
         catch (Exception ex)
         {
+            geometry = null;
             error = $"Exception while reading NIF bounds: {ex.Message}";
-            return false;
+            return NifReadStatus.Failed;
         }
     }
 
@@ -135,19 +150,23 @@ public static class NifBoundsReader
             {
                 var template = new NifFile(NiVersion.GetSSE(), withRootNode: true);
                 using var stream = new MemoryStream();
-                if (template.Save(stream) != 0) return false;
+                var saved = template.Save(stream) == 0;
                 stream.Position = 0;
                 var nif = new NifFile();
-                return nif.Load(stream) == 0 && nif.Valid && nif.Blocks.Count > 0;
+                if (saved && nif.Load(stream) == 0 && nif.Valid && nif.Blocks.Count > 0) return true;
+                Console.WriteLine("Warning: NIF loader warm-up read no blocks; meshes are parsed one at a time (slower).");
+                return false;
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine(
+                    $"Warning: NIF loader warm-up failed ({ex.GetType().Name}: {ex.Message}); meshes are parsed one at a time (slower).");
                 return false;
             }
         }
     }
 
-    private static bool TryReadGeometryCore(
+    private static NifReadStatus ReadGeometryCore(
         byte[] data,
         bool includeTriangles,
         out NifGeometry? geometry,
@@ -162,14 +181,14 @@ public static class NifBoundsReader
         if (result != 0 || !nif.Valid)
         {
             error = $"NifFile.Load failed with code {result}.";
-            return false;
+            return NifReadStatus.Failed;
         }
 
         var rootNode = nif.GetRootNode();
         if (rootNode == null || !nif.GetBlockIndex(rootNode, out int rootIndex))
         {
             error = "NIF has no root NiNode.";
-            return false;
+            return NifReadStatus.Failed;
         }
 
         // NiflySharp splits NiAVObject's "Flags" field in two by Bethesda stream version
@@ -200,15 +219,21 @@ public static class NifBoundsReader
         // If that still leaves nothing but some shapes were hidden, a second pass ignores the
         // hidden flag altogether (the mesh is certainly rendered somehow; OBND would be worse).
         var pass = CollectShapes(blocks, parentOf, rootIndex, useFlagsUi, includeHidden: false, includeTriangles);
-        if (!pass.Any && pass.Stats.Hidden > 0)
+        if (pass.Invalid == null && !pass.Any && pass.Stats.Hidden > 0)
         {
             pass = CollectShapes(blocks, parentOf, rootIndex, useFlagsUi, includeHidden: true, includeTriangles);
+        }
+
+        if (pass.Invalid != null)
+        {
+            error = $"NIF has {pass.Invalid}.";
+            return NifReadStatus.Failed;
         }
 
         if (!pass.Any)
         {
             error = $"NIF contains no visible render geometry ({pass.Stats}).";
-            return false;
+            return NifReadStatus.NoRenderGeometry;
         }
 
         var (runningMin, runningMax, allVertices, allIndices) = (pass.Min, pass.Max, pass.Vertices, pass.Indices);
@@ -217,7 +242,7 @@ public static class NifBoundsReader
             runningMax,
             allVertices?.ToArray() ?? [],
             allIndices?.ToArray() ?? []);
-        return true;
+        return NifReadStatus.Success;
     }
 
     /// <summary>Why shapes of one NIF were counted or skipped; printed when a NIF yields no geometry.</summary>
@@ -252,7 +277,8 @@ public static class NifBoundsReader
         Vector3 Max,
         List<Vector3>? Vertices,
         List<int>? Indices,
-        ShapeStats Stats);
+        ShapeStats Stats,
+        string? Invalid);
 
     private enum NodeSkip { None, Hidden, Marker, Unreachable }
 
@@ -323,17 +349,24 @@ public static class NifBoundsReader
         Vector3 runningMax = new(float.NegativeInfinity);
         var allVertices = includeTriangles ? new List<Vector3>() : null;
         var allIndices = includeTriangles ? new List<int>() : null;
+        string? invalid = null;
 
         bool AddPoint(Vector3 p)
         {
-            if (!Geometry.IsFinite(p)) return false;
+            if (!Geometry.IsWithinLimits(p))
+            {
+                invalid ??= Geometry.IsFinite(p)
+                    ? $"vertex coordinates beyond ±{Geometry.MaxCoordinate:0} units"
+                    : "non-finite vertex coordinates";
+                return false;
+            }
             runningMin = Vector3.Min(runningMin, p);
             runningMax = Vector3.Max(runningMax, p);
             any = true;
             return true;
         }
 
-        for (int shapeIndex = 0; shapeIndex < blocks.Count; shapeIndex++)
+        for (int shapeIndex = 0; shapeIndex < blocks.Count && invalid == null; shapeIndex++)
         {
             if (blocks[shapeIndex] is not INiShape shape) continue;
             stats.Shapes++;
@@ -395,7 +428,7 @@ public static class NifBoundsReader
             stats.Counted++;
         }
 
-        return new CollectResult(any, runningMin, runningMax, allVertices, allIndices, stats);
+        return new CollectResult(any, runningMin, runningMax, allVertices, allIndices, stats, invalid);
     }
 
     private static bool HasController(NiBlockRef<NiTimeController>? controller) =>
@@ -430,27 +463,44 @@ public static class NifBoundsReader
         }
 
         if (shape.GeometryData is not NiTriStripsData data) return null;
+        if (StripPointsField == null || StripLengthsField == null)
+        {
+            if (Interlocked.Exchange(ref _stripFieldsMissingReported, 1) == 0)
+            {
+                Console.WriteLine(
+                    "Warning: NiTriStripsData._points/_stripLengths not found in this NiflySharp version; "
+                    + "NiTriStrips shapes are used as points in the touch test.");
+            }
+            return null;
+        }
         try
         {
-            const System.Reflection.BindingFlags fieldFlags =
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
-            var pointsField = typeof(NiTriStripsData).GetField("_points", fieldFlags);
-            var stripLengthsField = typeof(NiTriStripsData).GetField("_stripLengths", fieldFlags);
-            if (pointsField?.GetValue(data) is not List<ushort> { Count: > 0 } points
-                || stripLengthsField?.GetValue(data) is not List<ushort> { Count: > 0 } stripLengths)
+            if (StripPointsField.GetValue(data) is not List<ushort> { Count: > 0 } points
+                || StripLengthsField.GetValue(data) is not List<ushort> { Count: > 0 } stripLengths)
                 return null;
 
             var strips = points.SplitByFlexSize(stripLengths).ToList();
             return strips.Count > 0 ? IndicesHelper.GenerateTrianglesFromStrips(strips) : null;
         }
-        catch
+        catch (Exception ex) when (ex is ArgumentException or IndexOutOfRangeException or InvalidOperationException)
         {
-            return null;
+            return null; // Strip lengths that do not match the point list.
         }
     }
 
+    private const System.Reflection.BindingFlags StripFieldFlags =
+        System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
+
+    private static readonly System.Reflection.FieldInfo? StripPointsField =
+        typeof(NiTriStripsData).GetField("_points", StripFieldFlags);
+
+    private static readonly System.Reflection.FieldInfo? StripLengthsField =
+        typeof(NiTriStripsData).GetField("_stripLengths", StripFieldFlags);
+
+    private static int _stripFieldsMissingReported;
+
     /// <summary>
-    /// Appends a shape's vertices (transformed to root space) and triangles. Non-finite vertices
+    /// Appends a shape's vertices (transformed to root space) and triangles. Out-of-range vertices
     /// and triangles referencing them or out-of-range indices are dropped. A shape without a
     /// triangle list contributes each vertex as a degenerate point triangle.
     /// </summary>
@@ -466,7 +516,7 @@ public static class NifBoundsReader
         for (int i = 0; i < shapeVertices.Count; i++)
         {
             var p = toRoot.Apply(shapeVertices[i]);
-            finite[i] = Geometry.IsFinite(p);
+            finite[i] = Geometry.IsWithinLimits(p);
             allVertices.Add(finite[i] ? p : Vector3.Zero);
         }
 

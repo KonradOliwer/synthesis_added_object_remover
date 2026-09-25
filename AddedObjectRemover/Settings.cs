@@ -25,7 +25,7 @@ public class Settings
     public bool UseNifBounds { get; set; } = true;
 
     [SynthesisSettingName("Keep referenced objects")]
-    [SynthesisTooltip("Do not remove target objects that other placed objects use as Enable Parent or Linked Reference, that are teleport doors, or that are the teleport destination of another door. These are listed in the log.")]
+    [SynthesisTooltip("Do not remove target objects that other placed objects link to (Enable Parent, Linked Reference, Activate Parent, door teleport destination or any other reference field), or that are teleport doors. These are listed in the log.")]
     public bool SkipReferencedObjects { get; set; } = true;
 
     [SynthesisSettingName("Remove touching objects")]

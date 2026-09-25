@@ -28,6 +28,9 @@ public static class Program
     /// <summary>Z coordinate removed objects are moved to (standard "safe disable" depth).</summary>
     private const float RemovedZ = -30000f;
 
+    /// <summary>The player reference (always enabled), used as Enable Parent of removed objects that had one.</summary>
+    private static readonly FormKey PlayerRef = FormKey.Factory("000014:Skyrim.esm");
+
     public static async Task<int> Main(string[] args)
     {
         // Optional "--log-file <path>" (not a Synthesis option): mirrors console output to a file.
@@ -46,7 +49,7 @@ public static class Program
         }
         catch (Exception ex) when (logFile != null)
         {
-            Console.Error.WriteLine(ex);
+            logFile.WriteToFileOnly(ex.ToString());
             throw;
         }
     }
@@ -75,7 +78,7 @@ public static class Program
         }
         if (scan.TargetsDisabledOrWithoutPlacement > 0)
         {
-            Console.WriteLine($"  Ignored {scan.TargetsDisabledOrWithoutPlacement:N0} {config.Target} objects that are initially disabled or have no position.");
+            Console.WriteLine($"  Ignored {scan.TargetsDisabledOrWithoutPlacement:N0} {config.Target} objects that are initially disabled or have no valid position.");
         }
         if (scan.OthersOverriddenByTarget > 0)
         {
@@ -94,14 +97,14 @@ public static class Program
         // 2. Index other mods' objects, but only in spaces that contain target objects.
         phaseTimer.Restart();
         var bounds = new ObjectBoundsProvider(state, config.UseNifBounds, config.Verbose);
-        var spaces = BuildOtherSpaces(scan);
+        var invisibleOthers = new InvisibleCounter();
+        var spaces = BuildOtherSpaces(scan, bounds, invisibleOthers);
         Console.WriteLine(
             $"Indexed {spaces.Values.Sum(s => s.Count):N0} other objects in {spaces.Count:N0} cells/worldspaces "
             + $"in {phaseTimer.Elapsed.TotalSeconds:F1}s.");
 
-        // 3. Bounds warm-up: every target base object's bounds (and, for the touch test, mesh
-        // triangles from the same parse), in parallel. Other objects' bounds are only resolved
-        // later, lazily, for objects a too-close query actually turns up.
+        // 3. Bounds warm-up: every target base object's bounds, in parallel. Other objects' bounds
+        // are only resolved later, lazily, for objects a too-close query actually turns up.
         phaseTimer.Restart();
         bounds.PrepareArchives();
         var targetBases = scan.Targets
@@ -109,7 +112,7 @@ public static class Program
             .OfType<BaseRef>()
             .DistinctBy(b => b.FormKey)
             .ToList();
-        bounds.WarmUp(targetBases, keepGeometry: config.RemoveTouching && config.UseNifBounds, parallelOptions);
+        bounds.WarmUp(targetBases, parallelOptions);
         bounds.PrintMessages();
         Console.WriteLine($"Bounds warm-up: {targetBases.Count:N0} target base objects in {phaseTimer.Elapsed.TotalSeconds:F1}s.");
 
@@ -131,6 +134,7 @@ public static class Program
         Console.WriteLine(
             $"Found {hits.Count:N0} of {scan.Targets.Count:N0} {config.Target} objects too close to other mods' objects "
             + $"in {phaseTimer.Elapsed.TotalSeconds:F1}s.");
+        PrintInvisibleOthers(invisibleOthers, config.Verbose);
 
         // 5. Decide which to keep.
         var removals = new List<Removal>();
@@ -170,11 +174,19 @@ public static class Program
 
         // 7. Write overrides (single-threaded, after all computation has finished).
         phaseTimer.Restart();
+        var placedByList = new Dictionary<object, Dictionary<FormKey, IPlaced>>(ReferenceEqualityComparer.Instance);
+        var enableParentsReplaced = 0;
         foreach (var removal in removals)
         {
-            RemoveObject(scan.Targets[removal.TargetIndex], state.PatchMod);
+            if (RemoveObject(scan.Targets[removal.TargetIndex], state.PatchMod, placedByList)) enableParentsReplaced++;
         }
         Console.WriteLine($"Wrote {removals.Count:N0} overrides in {phaseTimer.Elapsed.TotalSeconds:F1}s.");
+        if (enableParentsReplaced > 0)
+        {
+            Console.WriteLine(
+                $"  {enableParentsReplaced:N0} removed objects had an Enable Parent; it was replaced by the player "
+                + "with \"opposite of parent\" so they stay disabled.");
+        }
 
         if (config.Verbose)
         {
@@ -371,7 +383,8 @@ public static class Program
         BaseRef? Base,
         Vector3 Position,
         P3Float Rotation,
-        float Scale);
+        float Scale,
+        bool IsPrimitive);
 
     /// <summary>A too-close target (index into ScanResult.Targets) and the first other object found.</summary>
     private readonly record struct Hit(int TargetIndex, OtherObject Other);
@@ -495,7 +508,7 @@ public static class Program
 
                         if (IsInitiallyDisabled(record)
                             || record.Placement is not { } placement
-                            || !Geometry.IsFinite(Geometry.ToVector(placement.Position)))
+                            || !Geometry.IsWithinLimits(Geometry.ToVector(placement.Position)))
                         {
                             if (isTarget) scan.TargetsDisabledOrWithoutPlacement++;
                             continue;
@@ -543,7 +556,8 @@ public static class Program
                                 baseRef,
                                 position,
                                 placement.Rotation,
-                                scale));
+                                scale,
+                                record is IPlacedObjectGetter { Primitive: not null }));
                         }
                     }
                 }
@@ -659,15 +673,17 @@ public static class Program
     private static FormKey? LinkKey(IFormLinkGetter link) => link.IsNull ? null : link.FormKey;
 
     /// <summary>
-    /// Records target-plugin objects that this record depends on: as Enable Parent, as Linked
-    /// Reference, or as the destination of its door teleport.
+    /// Records target-plugin objects that this record depends on: as Enable Parent, Linked
+    /// Reference, Activate Parent, destination of its door teleport, or through any other form
+    /// link of the record. Links to non-placed records are recorded too but never looked up.
     /// </summary>
     private static void CollectTargetReferences(IPlacedGetter record, ModKey target, Dictionary<FormKey, string> references)
     {
         void Add(IFormLinkGetter link, string relation)
         {
             if (LinkKey(link) is not { } key || key.ModKey != target || key == record.FormKey) return;
-            references.TryAdd(key, $"{relation} of {record.FormKey}");
+            if (references.ContainsKey(key)) return;
+            references[key] = $"{relation} of {record.FormKey}";
         }
 
         if (record.EnableParent is { } enableParent)
@@ -694,6 +710,26 @@ public static class Program
         {
             Add(destination.Door, "teleport destination of door");
         }
+
+        var activateParents = record switch
+        {
+            IPlacedObjectGetter placedObject => placedObject.ActivateParents,
+            IPlacedNpcGetter placedNpc => placedNpc.ActivateParents,
+            IAPlacedTrapGetter placedTrap => placedTrap.ActivateParents,
+            _ => null,
+        };
+        if (activateParents != null)
+        {
+            foreach (var parent in activateParents.Parents)
+            {
+                Add(parent.Reference, "Activate Parent");
+            }
+        }
+
+        foreach (var link in record.EnumerateFormLinks())
+        {
+            Add(link, "referenced by a link");
+        }
     }
 
     // ------------------------------------------------------------------
@@ -713,15 +749,24 @@ public static class Program
     /// mesh read) is computed at most once, lazily, the first time a query turns the object up
     /// (<see cref="GetBoundsCenter"/>), so objects that are never candidates never cost a mesh read.
     ///
-    /// Thread-safe: the center is written before its ready flag is published with a release
-    /// store, and read only after an acquire load sees the flag. Two threads computing the same
-    /// center concurrently write identical values, so the race is harmless.
+    /// Objects whose base is invisible (<see cref="ObjectBoundsProvider.GetInvisibleReason"/>) are
+    /// found the same lazy way and then never match.
+    ///
+    /// Thread-safe: the center is written before its state is published with an interlocked
+    /// store, and read only after a load sees the state. Two threads measuring the same object
+    /// concurrently write identical values, and only the one that publishes the state counts it.
     /// </summary>
     private sealed class OtherSpace
     {
+        private const int NotMeasured = 0;
+        private const int Visible = 1;
+        private const int Invisible = 2;
+
         private readonly OtherObject[] _objects;
+        private readonly ObjectBoundsProvider _bounds;
+        private readonly InvisibleCounter _invisible;
         private readonly Vector3[] _centers;
-        private readonly int[] _centerReady;
+        private readonly int[] _state;
 
         /// <summary>
         /// 0/1 per object: set (via <see cref="TryExclude"/>) when the object is judged a
@@ -731,11 +776,13 @@ public static class Program
         /// </summary>
         private readonly int[] _excluded;
 
-        public OtherSpace(IReadOnlyList<OtherObject> objects)
+        public OtherSpace(IReadOnlyList<OtherObject> objects, ObjectBoundsProvider bounds, InvisibleCounter invisible)
         {
             _objects = objects.ToArray();
+            _bounds = bounds;
+            _invisible = invisible;
             _centers = new Vector3[_objects.Length];
-            _centerReady = new int[_objects.Length];
+            _state = new int[_objects.Length];
             _excluded = new int[_objects.Length];
             var points = new Vector3[_objects.Length];
             for (var i = 0; i < points.Length; i++)
@@ -756,32 +803,87 @@ public static class Program
 
         public bool IsExcluded(int index) => Volatile.Read(ref _excluded[index]) != 0;
 
-        public Vector3 GetBoundsCenter(int index, ObjectBoundsProvider bounds)
+        /// <summary>
+        /// World-space bounds center of a visible object; false (and no center) for an invisible one.
+        /// </summary>
+        public bool TryGetVisibleCenter(int index, out Vector3 center)
         {
-            if (Volatile.Read(ref _centerReady[index]) != 0) return _centers[index];
+            var state = Volatile.Read(ref _state[index]);
+            if (state == NotMeasured) state = Measure(index);
+            center = _centers[index];
+            return state == Visible;
+        }
 
+        private int Measure(int index)
+        {
             ref readonly var other = ref _objects[index];
-            var transform = new PlacedTransform(other.Position, Geometry.RotationFromEuler(other.Rotation), other.Scale);
-            var point = Geometry.WorldBoundsCenter(bounds.GetLocalBox(other.Base), transform);
-            if (!Geometry.IsFinite(point)) point = other.Position;
+            var reason = _bounds.GetInvisibleReason(other.Base, other.IsPrimitive);
+            int state;
+            if (reason != null)
+            {
+                state = Invisible;
+            }
+            else
+            {
+                var transform = new PlacedTransform(other.Position, Geometry.RotationFromEuler(other.Rotation), other.Scale);
+                var point = Geometry.WorldBoundsCenter(_bounds.GetLocalBox(other.Base), transform);
+                _centers[index] = Geometry.IsFinite(point) ? point : other.Position;
+                state = Visible;
+            }
 
-            _centers[index] = point;
-            Volatile.Write(ref _centerReady[index], 1);
-            return point;
+            if (Interlocked.CompareExchange(ref _state[index], state, NotMeasured) == NotMeasured && reason != null)
+            {
+                _invisible.Add(reason);
+            }
+            return state;
         }
     }
 
-    /// <summary>One <see cref="OtherSpace"/> per space containing target objects (empty if it has no other objects).</summary>
-    private static Dictionary<FormKey, OtherSpace> BuildOtherSpaces(ScanResult scan)
+    /// <summary>Thread-safe count of other objects ignored as invisible, per reason.</summary>
+    private sealed class InvisibleCounter
+    {
+        private readonly ConcurrentDictionary<string, int> _byReason = new(StringComparer.Ordinal);
+
+        public void Add(string reason) => _byReason.AddOrUpdate(reason, 1, (_, count) => count + 1);
+
+        public IReadOnlyList<KeyValuePair<string, int>> Snapshot() =>
+            _byReason.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key, StringComparer.Ordinal).ToList();
+    }
+
+    /// <summary>
+    /// One <see cref="OtherSpace"/> per space containing target objects (empty if it has no other
+    /// objects). The scan's per-space lists are released afterwards.
+    /// </summary>
+    private static Dictionary<FormKey, OtherSpace> BuildOtherSpaces(
+        ScanResult scan,
+        ObjectBoundsProvider bounds,
+        InvisibleCounter invisible)
     {
         var spaces = new Dictionary<FormKey, OtherSpace>();
         foreach (var target in scan.Targets)
         {
             if (spaces.ContainsKey(target.SpaceKey)) continue;
             spaces[target.SpaceKey] = new OtherSpace(
-                scan.OthersBySpace.TryGetValue(target.SpaceKey, out var others) ? others : []);
+                scan.OthersBySpace.TryGetValue(target.SpaceKey, out var others) ? others : [],
+                bounds,
+                invisible);
         }
+        scan.OthersBySpace.Clear();
+        scan.OthersBySpace.TrimExcess();
         return spaces;
+    }
+
+    private static void PrintInvisibleOthers(InvisibleCounter invisible, bool verbose)
+    {
+        var byReason = invisible.Snapshot();
+        var total = byReason.Sum(kv => kv.Value);
+        if (total == 0) return;
+        Console.WriteLine($"  Ignored {total:N0} nearby other-mod objects that are invisible (markers, lights, sounds, decals, trigger boxes, ...).");
+        if (!verbose) return;
+        foreach (var (reason, count) in byReason)
+        {
+            Console.WriteLine($"    {reason}: {count:N0}");
+        }
     }
 
     // ------------------------------------------------------------------
@@ -810,8 +912,9 @@ public static class Program
     /// least <see cref="RunConfig.ReplacementSizeSimilarity"/>) - it looks like the target plugin
     /// replaced it. Only other objects near a target object are ever measured (grid query per
     /// target, reusing each space's own grid), and each candidate's bounds are resolved at most
-    /// once (cached by <see cref="ObjectBoundsProvider"/>). Thread-safe: candidates are found in
-    /// parallel per target, and marking an object excluded is a single interlocked write.
+    /// once (cached by <see cref="ObjectBoundsProvider"/>). Invisible other objects are never
+    /// matched. Matches are found in parallel per target and applied afterwards in target order,
+    /// so each excluded object is attributed to its first matching target.
     /// </summary>
     private static ReplacementStats ExcludeReplacedObjects(
         ScanResult scan,
@@ -826,11 +929,12 @@ public static class Program
         var tolerance = config.ReplacementPositionTolerance;
         var similarity = config.ReplacementSizeSimilarity;
         var margin = new Vector3(tolerance);
-        var excludedCount = 0;
-        var log = config.Verbose ? new ConcurrentBag<ReplacementLogEntry>() : null;
+        var targets = scan.Targets;
+        var matchesByTarget = new List<(int Index, float Distance, float Ratio)>?[targets.Count];
 
-        Parallel.ForEach(scan.Targets, parallelOptions, target =>
+        Parallel.For(0, targets.Count, parallelOptions, t =>
         {
+            var target = targets[t];
             if (!spaces.TryGetValue(target.SpaceKey, out var space) || space.Count == 0) return;
 
             var targetDims = ScaledSortedDims(bounds.GetLocalBox(target.Base), target.Transform.Scale);
@@ -841,11 +945,13 @@ public static class Program
             space.Grid.Collect(new Box(position - margin, position + margin), candidates);
             if (candidates.Count == 0) return;
 
+            List<(int Index, float Distance, float Ratio)>? matches = null;
             foreach (var index in candidates)
             {
                 var other = space[index];
                 var distance = Vector3.Distance(other.Position, position);
                 if (distance > tolerance) continue;
+                if (!space.TryGetVisibleCenter(index, out _)) continue;
 
                 var otherDims = ScaledSortedDims(bounds.GetLocalBox(other.Base), other.Scale);
                 if (otherDims == null) continue; // no bounds: never a replacement match
@@ -853,14 +959,30 @@ public static class Program
                 var ratio = SizeRatio(targetDims.Value, otherDims.Value);
                 if (ratio < similarity) continue;
 
-                if (!space.TryExclude(index)) continue; // already excluded by another target
-                Interlocked.Increment(ref excludedCount);
+                (matches ??= []).Add((index, distance, ratio));
+            }
+            matchesByTarget[t] = matches;
+        });
+
+        // Each replaced object is attributed to its first matching target in scan order.
+        var excludedCount = 0;
+        var log = config.Verbose ? new List<ReplacementLogEntry>() : null;
+        for (var t = 0; t < targets.Count; t++)
+        {
+            if (matchesByTarget[t] is not { } matches) continue;
+            var target = targets[t];
+            var space = spaces[target.SpaceKey];
+            foreach (var (index, distance, ratio) in matches)
+            {
+                if (!space.TryExclude(index)) continue;
+                excludedCount++;
+                var other = space[index];
                 log?.Add(new ReplacementLogEntry(
                     other.FormKey, other.EditorId, other.WinningMod,
-                    target.Record.FormKey, config.Verbose ? target.Record.EditorID : null,
+                    target.Record.FormKey, target.Record.EditorID,
                     distance, ratio));
             }
-        });
+        }
 
         if (log != null)
         {
@@ -902,12 +1024,13 @@ public static class Program
     }
 
     /// <summary>Exact too-close test of one grid candidate; a struct so the grid query is allocation-free and inlinable.</summary>
-    private readonly struct TooCloseMatcher(OtherSpace space, ObjectBoundsProvider bounds, Box expanded, Vector3 position, Mat3 rotation)
+    private readonly struct TooCloseMatcher(OtherSpace space, Box expanded, Vector3 position, Mat3 rotation)
         : IGridMatcher
     {
         public bool IsMatch(int index) =>
             !space.IsExcluded(index)
-            && expanded.Contains(rotation.TransformTransposed(space.GetBoundsCenter(index, bounds) - position));
+            && space.TryGetVisibleCenter(index, out var center)
+            && expanded.Contains(rotation.TransformTransposed(center - position));
     }
 
     /// <summary>
@@ -942,7 +1065,7 @@ public static class Program
                 var searchArea = Geometry.WorldAabb(expanded, position, rotation);
                 var queryArea = new Box(searchArea.Min - margin, searchArea.Max + margin);
 
-                var matcher = new TooCloseMatcher(space, bounds, expanded, position, rotation);
+                var matcher = new TooCloseMatcher(space, expanded, position, rotation);
                 if (space.Grid.TryFindFirst(queryArea, ref matcher, out var match))
                 {
                     matches[i] = match;
@@ -972,10 +1095,7 @@ public static class Program
         public int CandidatePairs { get; set; }
         public int TouchingPairs { get; set; }
         public int PairsWithoutGeometry { get; set; }
-        public int MeshesVoxelized { get; set; }
-        public long Voxels { get; set; }
-        public long Samples { get; set; }
-        public int MeshesCoarsened { get; set; }
+        public VoxelCacheStats Voxels { get; set; }
         public TimeSpan Setup { get; set; }
         public TimeSpan BroadPhase { get; set; }
         public TimeSpan NarrowPhase { get; set; }
@@ -1038,7 +1158,7 @@ public static class Program
         }
         result.Setup = timer.Elapsed;
 
-        var voxels = new VoxelCache(config.VoxelSize);
+        var voxels = new VoxelCache(config.VoxelSize, bounds.ReadGeometry);
         var isSeed = new bool[targets.Count];
         foreach (var removal in tooClose) isSeed[removal.TargetIndex] = true;
         // Too-close objects that were kept as referenced stay, are already logged and counted,
@@ -1064,58 +1184,82 @@ public static class Program
                 // Broad phase: unvisited targets whose grown oriented box overlaps.
                 broadTimer.Start();
                 var candidates = new List<int>[frontier.Count];
-                Parallel.For(0, frontier.Count, parallelOptions, () => new List<int>(), (f, _, scratch) =>
+                Parallel.For(0, frontier.Count, parallelOptions, () => (Scratch: new List<int>(), Seen: new HashSet<int>()), (f, _, local) =>
                 {
                     var node = frontier[f];
                     var (grid, list) = grids[targets[node].SpaceKey];
-                    scratch.Clear();
-                    grid.Collect(boxes[node].WorldAabb(tolerance), scratch);
+                    local.Scratch.Clear();
+                    local.Seen.Clear();
+                    grid.Collect(boxes[node].WorldAabb(tolerance), local.Scratch);
                     var found = new List<int>();
-                    foreach (var local in scratch)
+                    foreach (var slot in local.Scratch)
                     {
-                        var other = list[local];
-                        if (other == node || visited[other] || found.Contains(other)) continue;
+                        var other = list[slot];
+                        if (other == node || visited[other] || !local.Seen.Add(other)) continue;
                         if (boxes[node].Intersects(boxes[other], tolerance)) found.Add(other);
                     }
                     found.Sort();
                     candidates[f] = found;
-                    return scratch;
+                    return local;
                 }, _ => { });
+
+                // Pairs grouped by target node, groups and pairs in frontier order.
                 var pairs = new List<(int From, int To)>();
+                var groups = new List<List<int>>();
+                var groupOf = new Dictionary<int, int>();
                 for (var f = 0; f < frontier.Count; f++)
                 {
-                    foreach (var other in candidates[f]) pairs.Add((frontier[f], other));
+                    foreach (var other in candidates[f])
+                    {
+                        if (!groupOf.TryGetValue(other, out var group))
+                        {
+                            group = groups.Count;
+                            groupOf[other] = group;
+                            groups.Add([]);
+                        }
+                        groups[group].Add(pairs.Count);
+                        pairs.Add((frontier[f], other));
+                    }
                 }
                 broadTimer.Stop();
                 result.CandidatePairs += pairs.Count;
 
-                // Narrow phase: exact mesh test per candidate pair.
+                // Narrow phase: exact mesh test, per target node only until one pair touches.
                 narrowTimer.Start();
-                var touching = new bool[pairs.Count];
-                Parallel.For(0, pairs.Count, parallelOptions, k =>
+                var touchingPair = new int[groups.Count];
+                Parallel.For(0, groups.Count, parallelOptions, g =>
                 {
-                    var (from, to) = pairs[k];
-                    var fromGeometry = bounds.GetGeometry(targets[from].Base);
-                    var toGeometry = bounds.GetGeometry(targets[to].Base);
-                    if (fromGeometry == null || toGeometry == null)
+                    touchingPair[g] = -1;
+                    foreach (var k in groups[g])
                     {
-                        Interlocked.Increment(ref pairsWithoutGeometry);
-                        return;
+                        var (from, to) = pairs[k];
+                        var fromPath = bounds.GetMeshPath(targets[from].Base);
+                        var toPath = bounds.GetMeshPath(targets[to].Base);
+                        var fromMesh = fromPath == null ? null : voxels.Get(fromPath);
+                        var toMesh = fromMesh == null || toPath == null ? null : voxels.Get(toPath);
+                        if (fromMesh == null || toMesh == null)
+                        {
+                            Interlocked.Increment(ref pairsWithoutGeometry);
+                            continue;
+                        }
+                        // Iterate the mesh with fewer voxels; look up in the one with more.
+                        var touches = fromMesh.VoxelCount >= toMesh.VoxelCount
+                            ? VoxelMesh.Touches(fromMesh, targets[from].Transform, toMesh, targets[to].Transform, tolerance)
+                            : VoxelMesh.Touches(toMesh, targets[to].Transform, fromMesh, targets[from].Transform, tolerance);
+                        if (touches)
+                        {
+                            touchingPair[g] = k;
+                            break;
+                        }
                     }
-                    var fromMesh = voxels.Get(fromGeometry);
-                    var toMesh = voxels.Get(toGeometry);
-                    // Iterate the mesh with fewer voxels; look up in the one with more.
-                    touching[k] = fromMesh.VoxelCount >= toMesh.VoxelCount
-                        ? VoxelMesh.Touches(fromMesh, targets[from].Transform, toMesh, targets[to].Transform, tolerance)
-                        : VoxelMesh.Touches(toMesh, targets[to].Transform, fromMesh, targets[from].Transform, tolerance);
                 });
                 narrowTimer.Stop();
 
-                // Merge in frontier order (deterministic).
+                // Merge in pair order (deterministic).
+                var touchingPairs = touchingPair.Where(k => k >= 0).Order().ToList();
                 var next = new List<int>();
-                for (var k = 0; k < pairs.Count; k++)
+                foreach (var k in touchingPairs)
                 {
-                    if (!touching[k]) continue;
                     result.TouchingPairs++;
                     var (from, to) = pairs[k];
                     if (visited[to]) continue;
@@ -1156,8 +1300,7 @@ public static class Program
         result.BroadPhase = broadTimer.Elapsed;
         result.NarrowPhase = narrowTimer.Elapsed;
         result.Clusters = clusterTimer.Elapsed - broadTimer.Elapsed - narrowTimer.Elapsed;
-        result.MeshesVoxelized = voxels.MeshCount;
-        (result.Voxels, result.Samples, result.MeshesCoarsened) = voxels.GetTotals();
+        result.Voxels = voxels.GetStats();
         return result;
     }
 
@@ -1173,20 +1316,33 @@ public static class Program
 
     /// <summary>
     /// Disables the object: sets the Initially Disabled flag and moves it to Z = -30000 (X/Y kept).
-    /// Nothing else on the record is changed. Mirrors what Mutagen's own placed-record context
-    /// does: override the winning cell (without its children), then add a copy of the winning
-    /// placed record to the same child list (persistent or temporary) it was found in.
+    /// An existing Enable Parent would override the flag, so it is replaced by the player with
+    /// "set enable state to opposite of parent" (as xEdit's "Undelete and Disable References"
+    /// does). Mirrors what Mutagen's own placed-record context does: override the winning cell
+    /// (without its children), then add a copy of the winning placed record to the same child
+    /// list (persistent or temporary) it was found in. <paramref name="placedByList"/> caches a
+    /// FormKey lookup per overridden child list. Returns true when an Enable Parent was replaced.
     /// </summary>
-    private static void RemoveObject(TargetObject target, ISkyrimMod patchMod)
+    private static bool RemoveObject(
+        TargetObject target,
+        ISkyrimMod patchMod,
+        Dictionary<object, Dictionary<FormKey, IPlaced>> placedByList)
     {
         var cell = target.WinningCell.GetOrAddAsOverride(patchMod);
         var list = target.InPersistentList ? cell.Persistent : cell.Temporary;
+        if (!placedByList.TryGetValue(list, out var byFormKey))
+        {
+            byFormKey = new Dictionary<FormKey, IPlaced>();
+            foreach (var existing in list) byFormKey.TryAdd(existing.FormKey, existing);
+            placedByList[list] = byFormKey;
+        }
+
         var formKey = target.Record.FormKey;
-        var placed = list.FirstOrDefault(x => x.FormKey == formKey);
-        if (placed == null)
+        if (!byFormKey.TryGetValue(formKey, out var placed))
         {
             placed = (IPlaced)target.Record.DeepCopy();
             list.Add(placed);
+            byFormKey[formKey] = placed;
         }
 
         placed.MajorRecordFlagsRaw |= (int)SkyrimMajorRecord.SkyrimMajorRecordFlag.InitiallyDisabled;
@@ -1194,6 +1350,14 @@ public static class Program
         {
             placement.Position = new P3Float(placement.Position.X, placement.Position.Y, RemovedZ);
         }
+
+        if (placed.EnableParent == null) return false;
+        placed.EnableParent = new EnableParent
+        {
+            Reference = new FormLink<IPlacedGetter>(PlayerRef),
+            Flags = EnableParent.Flag.SetEnableStateToOppositeOfParent,
+        };
+        return true;
     }
 
     // ------------------------------------------------------------------
@@ -1244,11 +1408,16 @@ public static class Program
             $"Touching objects: {touch.Removals.Count:N0} removed in {touch.Components:N0} components "
             + $"({touch.ComponentsWithTouching:N0} with touching objects, largest {touch.LargestComponent:N0} removed objects); "
             + $"{touch.KeptAsReferenced:N0} kept as referenced.");
+        var voxels = touch.Voxels;
         Console.WriteLine(
             $"  Pairs: {touch.CandidatePairs:N0} box candidates, {touch.TouchingPairs:N0} touching, "
-            + $"{touch.PairsWithoutGeometry:N0} skipped without mesh geometry (never touching). "
-            + $"Meshes voxelized: {touch.MeshesVoxelized:N0} ({touch.Voxels:N0} voxels, {touch.Samples:N0} samples"
-            + (touch.MeshesCoarsened > 0 ? $", {touch.MeshesCoarsened:N0} sampled coarser due to size" : string.Empty) + ").");
+            + $"{touch.PairsWithoutGeometry:N0} skipped without mesh geometry (never touching).");
+        Console.WriteLine(
+            $"  Meshes voxelized: {voxels.Built:N0} ({voxels.Voxels:N0} voxels, {voxels.Samples:N0} samples"
+            + (voxels.Coarsened > 0 ? $", {voxels.Coarsened:N0} sampled coarser due to size" : string.Empty)
+            + (voxels.TooLarge > 0 ? $", {voxels.TooLarge:N0} over {VoxelMesh.MaxSamples:N0} samples even when coarsest, not used" : string.Empty)
+            + $"); peak resident {voxels.PeakResidentMeshes:N0} meshes, ~{voxels.PeakResidentBytes / (1024.0 * 1024.0):N0} MB"
+            + (voxels.Evicted > 0 ? $"; {voxels.Evicted:N0} evicted, {voxels.Rebuilt:N0} rebuilt" : string.Empty) + ".");
         Console.WriteLine(
             $"  Timing: setup {touch.Setup.TotalSeconds:F1}s, broad phase {touch.BroadPhase.TotalSeconds:F1}s, "
             + $"narrow phase {touch.NarrowPhase.TotalSeconds:F1}s, clusters {touch.Clusters.TotalSeconds:F1}s.");

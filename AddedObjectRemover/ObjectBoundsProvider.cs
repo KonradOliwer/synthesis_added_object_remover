@@ -18,9 +18,9 @@ internal readonly record struct BaseRef(FormKey FormKey, Type LinkType);
 
 /// <summary>
 /// Provides the local-space bounding box of base objects, measured from the NIF mesh when possible
-/// and falling back to the base record's Object Bounds (OBND), plus (for touch tests) the mesh's
-/// root-space triangles. All results are cached per base FormKey and per normalized model path
-/// (failures included).
+/// and falling back to the base record's Object Bounds (OBND), whether a base is invisible, and
+/// (for touch tests, read on demand and not cached) the mesh's root-space triangles. Bounds and
+/// visibility are cached per base FormKey and per normalized model path (failures included).
 ///
 /// Thread-safe: every cache entry is a <see cref="Lazy{T}"/> in a ConcurrentDictionary, so each
 /// base is resolved and each mesh is read and parsed exactly once even when many threads ask for
@@ -38,7 +38,6 @@ internal sealed class ObjectBoundsProvider
     private readonly string _dataPath;
     private readonly ConcurrentDictionary<FormKey, Lazy<BaseInfo>> _byBase = new();
     private readonly ConcurrentDictionary<string, Lazy<ModelData>> _byModel = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, Lazy<NifGeometry?>> _geometryByModel = new(StringComparer.OrdinalIgnoreCase);
     private readonly Lazy<Dictionary<string, IArchiveFile>> _archiveIndex;
     private readonly ConcurrentQueue<(string Path, string Message)> _messages = new();
 
@@ -62,11 +61,14 @@ internal sealed class ObjectBoundsProvider
         _archiveIndex = new Lazy<Dictionary<string, IArchiveFile>>(BuildArchiveIndex, LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
-    /// <summary>Bounds of a base plus the normalized model path its bounds came from (null for OBND/none).</summary>
-    private sealed record BaseInfo(Box Box, string? ModelPath);
+    /// <summary>
+    /// Bounds of a base, the normalized model path its bounds came from (null for OBND/none), and
+    /// why the base is never visible in game (null when it may be visible).
+    /// </summary>
+    private sealed record BaseInfo(Box Box, string? ModelPath, string? InvisibleReason);
 
-    /// <summary>Per model: bounds (null = unreadable) and, if requested at first read, the triangles.</summary>
-    private sealed record ModelData(Box? Box, NifGeometry? Geometry);
+    /// <summary>Per model: bounds (null = unreadable or no render geometry) and the read outcome.</summary>
+    private sealed record ModelData(Box? Box, NifReadStatus Status);
 
     // Per unique base object
     public int BasesFromNif => Volatile.Read(ref _basesFromNif);
@@ -96,34 +98,47 @@ internal sealed class ObjectBoundsProvider
     /// Local-space bounds of the given base object. Unknown/missing bases yield a zero-size box at the origin.
     /// </summary>
     public Box GetLocalBox(BaseRef? baseRef) =>
-        baseRef is { } reference ? GetBaseInfo(reference, keepGeometry: false).Box : Box.Zero;
+        baseRef is { } reference ? GetBaseInfo(reference).Box : Box.Zero;
 
-    /// <summary>
-    /// Resolves bounds for all given bases in parallel. With <paramref name="keepGeometry"/> the
-    /// triangles of meshes read here are kept for <see cref="GetGeometry"/> (the same parse
-    /// yields both bounds and triangles, so no mesh is read twice).
-    /// </summary>
-    public void WarmUp(IReadOnlyList<BaseRef> bases, bool keepGeometry, ParallelOptions options)
+    /// <summary>Resolves bounds for all given bases in parallel.</summary>
+    public void WarmUp(IReadOnlyList<BaseRef> bases, ParallelOptions options)
     {
-        Parallel.ForEach(bases, options, reference => GetBaseInfo(reference, keepGeometry));
+        Parallel.ForEach(bases, options, reference => GetBaseInfo(reference));
     }
 
     /// <summary>
-    /// Root-space render triangles of the base's mesh, or null when its bounds did not come from a
-    /// readable mesh (OBND fallback, NPCs, no model) or the mesh has no triangles.
+    /// Normalized path of the mesh the base's bounds came from, or null when they did not come
+    /// from a readable mesh (OBND fallback, NPCs, no model).
     /// </summary>
-    public NifGeometry? GetGeometry(BaseRef? baseRef)
+    public string? GetMeshPath(BaseRef? baseRef) =>
+        baseRef is { } reference ? GetBaseInfo(reference).ModelPath : null;
+
+    /// <summary>
+    /// Why an other-mod object with this base can never be seen or collided with (a light or sound
+    /// marker, a decal, a mesh with only marker geometry, ...), or null when it may be visible.
+    /// <paramref name="isPrimitive"/>: the placed reference is a primitive box (trigger/activator
+    /// volume), which only counts when its base has a visible mesh.
+    /// </summary>
+    public string? GetInvisibleReason(BaseRef? baseRef, bool isPrimitive)
     {
         if (baseRef is not { } reference) return null;
-        var info = GetBaseInfo(reference, keepGeometry: true);
-        if (info.ModelPath is not { } path) return null;
-        var model = GetModelData(path, keepGeometry: true);
-        if (model.Box == null) return null;
-        var geometry = model.Geometry
-            ?? _geometryByModel.GetOrAdd(
-                path,
-                p => new Lazy<NifGeometry?>(() => ReadGeometry(p), LazyThreadSafetyMode.ExecutionAndPublication)).Value;
-        return geometry is { TriangleCount: > 0 } ? geometry : null;
+        var info = GetBaseInfo(reference);
+        if (info.InvisibleReason != null) return info.InvisibleReason;
+        return isPrimitive && info.ModelPath == null ? "trigger/activator box without visible mesh" : null;
+    }
+
+    /// <summary>
+    /// Reads the root-space render triangles of a mesh (not cached; the caller keeps what it
+    /// needs). Null when the mesh cannot be read or has no triangles.
+    /// </summary>
+    public NifGeometry? ReadGeometry(string meshPath)
+    {
+        var bytes = LoadMeshBytes(meshPath, countSource: false);
+        return bytes != null
+               && NifBoundsReader.ReadGeometry(bytes, includeTriangles: true, out var geometry, out _) == NifReadStatus.Success
+               && geometry is { TriangleCount: > 0 }
+            ? geometry
+            : null;
     }
 
     /// <summary>
@@ -150,89 +165,105 @@ internal sealed class ObjectBoundsProvider
         foreach (var (_, message) in messages) Console.WriteLine(message);
     }
 
-    private BaseInfo GetBaseInfo(BaseRef reference, bool keepGeometry) =>
+    private BaseInfo GetBaseInfo(BaseRef reference) =>
         _byBase.GetOrAdd(
             reference.FormKey,
-            _ => new Lazy<BaseInfo>(() => ComputeBaseInfo(reference, keepGeometry), LazyThreadSafetyMode.ExecutionAndPublication)).Value;
+            _ => new Lazy<BaseInfo>(() => ComputeBaseInfo(reference), LazyThreadSafetyMode.ExecutionAndPublication)).Value;
 
-    private BaseInfo ComputeBaseInfo(BaseRef baseRef, bool keepGeometry)
+    private BaseInfo ComputeBaseInfo(BaseRef baseRef)
     {
         if (TryResolveBase(baseRef) is not { } record)
         {
             Interlocked.Increment(ref _basesUnresolved);
-            return new BaseInfo(Box.Zero, null);
+            return new BaseInfo(Box.Zero, null, null);
         }
 
-        if (_useNif
-            && record is IModeledGetter { Model: { } model }
-            && !string.IsNullOrWhiteSpace(model.File.GivenPath))
+        var modelPath = record is IModeledGetter { Model: { } model } && !string.IsNullOrWhiteSpace(model.File.GivenPath)
+            ? model.File.GivenPath
+            : null;
+        var meshWithoutGeometry = false;
+        if (_useNif && modelPath != null)
         {
-            var path = NormalizeMeshPath(model.File.GivenPath);
-            if (GetModelData(path, keepGeometry).Box is { } nifBox)
+            var path = NormalizeMeshPath(modelPath);
+            var data = GetModelData(path);
+            if (data.Box is { } nifBox)
             {
                 Interlocked.Increment(ref _basesFromNif);
-                return new BaseInfo(nifBox, path);
+                return new BaseInfo(nifBox, path, GetInvisibleReason(record, hasModel: true, meshWithoutGeometry: false, nifBox));
             }
+            meshWithoutGeometry = data.Status == NifReadStatus.NoRenderGeometry;
             Interlocked.Increment(ref _basesNifFallbackToObnd);
         }
 
         if (record is IObjectBoundedOptionalGetter { ObjectBounds: { } bounds })
         {
             Interlocked.Increment(ref _basesFromObnd);
-            return new BaseInfo(
-                Box.FromCorners(
-                    new Vector3(bounds.First.X, bounds.First.Y, bounds.First.Z),
-                    new Vector3(bounds.Second.X, bounds.Second.Y, bounds.Second.Z)),
-                null);
+            var box = Box.FromCorners(
+                new Vector3(bounds.First.X, bounds.First.Y, bounds.First.Z),
+                new Vector3(bounds.Second.X, bounds.Second.Y, bounds.Second.Z));
+            return new BaseInfo(box, null, GetInvisibleReason(record, modelPath != null, meshWithoutGeometry, box));
         }
 
         Interlocked.Increment(ref _basesWithoutBounds);
-        return new BaseInfo(Box.Zero, null);
+        return new BaseInfo(Box.Zero, null, GetInvisibleReason(record, modelPath != null, meshWithoutGeometry, Box.Zero));
     }
 
     /// <summary>
-    /// Cached bounds (and optionally triangles) of a mesh. Whether triangles are kept is decided by
-    /// the first caller for a path; <see cref="GetGeometry"/> re-reads a mesh whose triangles were
-    /// not kept (only happens for a mesh first seen through an other-mod object).
+    /// Structural invisibility of a base: record types that never render, a mesh that parsed but
+    /// has no visible render geometry (marker meshes), or no mesh at all and zero-size bounds.
+    /// NPCs always count as visible.
     /// </summary>
-    private ModelData GetModelData(string path, bool keepGeometry) =>
+    private static string? GetInvisibleReason(IMajorRecordGetter record, bool hasModel, bool meshWithoutGeometry, Box bounds)
+    {
+        switch (record)
+        {
+            case INpcGetter: return null;
+            case ILightGetter when !hasModel: return "light without mesh";
+            case ISoundMarkerGetter: return "sound marker";
+            case IAcousticSpaceGetter: return "acoustic space";
+            case ITextureSetGetter: return "texture set (decal)";
+            case IIdleMarkerGetter: return "idle marker";
+        }
+        if (meshWithoutGeometry) return "mesh without visible geometry (marker)";
+        if (!hasModel && bounds.Size == Vector3.Zero) return "no mesh and zero bounds";
+        return null;
+    }
+
+    /// <summary>Cached bounds of a mesh.</summary>
+    private ModelData GetModelData(string path) =>
         _byModel.GetOrAdd(
             path,
-            p => new Lazy<ModelData>(() => ReadModel(p, keepGeometry), LazyThreadSafetyMode.ExecutionAndPublication)).Value;
+            p => new Lazy<ModelData>(() => ReadModel(p), LazyThreadSafetyMode.ExecutionAndPublication)).Value;
 
-    private ModelData ReadModel(string path, bool keepGeometry)
+    private ModelData ReadModel(string path)
     {
         Box? box = null;
-        NifGeometry? geometry = null;
+        var status = NifReadStatus.Failed;
         var bytes = LoadMeshBytes(path, countSource: true);
         if (bytes == null)
         {
             Report(path, $"  [mesh] not found: {path}");
         }
-        else if (NifBoundsReader.TryReadGeometry(bytes, keepGeometry, out var read, out var error)
-                 && read != null
-                 && Geometry.IsFinite(read.Min) && Geometry.IsFinite(read.Max))
-        {
-            box = Box.FromCorners(read.Min, read.Max);
-            if (keepGeometry) geometry = read;
-        }
         else
         {
-            Report(path, $"  [mesh] unreadable: {path} ({error ?? "non-finite bounds"})");
+            status = NifBoundsReader.ReadGeometry(bytes, includeTriangles: false, out var read, out var error);
+            if (status == NifReadStatus.Success
+                && read != null
+                && Geometry.IsWithinLimits(read.Min) && Geometry.IsWithinLimits(read.Max))
+            {
+                box = Box.FromCorners(read.Min, read.Max);
+            }
+            else
+            {
+                if (status == NifReadStatus.Success) status = NifReadStatus.Failed;
+                Report(path, $"  [mesh] unreadable: {path} ({error ?? "bounds out of range"})");
+            }
         }
 
         if (box.HasValue) Interlocked.Increment(ref _modelsRead);
         else Interlocked.Increment(ref _modelsFailed);
 
-        return new ModelData(box, geometry);
-    }
-
-    private NifGeometry? ReadGeometry(string path)
-    {
-        var bytes = LoadMeshBytes(path, countSource: false);
-        return bytes != null && NifBoundsReader.TryReadGeometry(bytes, includeTriangles: true, out var geometry, out _)
-            ? geometry
-            : null;
+        return new ModelData(box, status);
     }
 
     private void Report(string path, string message)

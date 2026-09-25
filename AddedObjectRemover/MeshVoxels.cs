@@ -17,8 +17,15 @@ internal sealed class VoxelMesh
     /// <summary>Upper bound for the distance from any triangle point to its nearest sample, in units of Step.</summary>
     public const float SamplingErrorFactor = 0.7072f;
 
-    /// <summary>A mesh whose sampling would exceed this many points is sampled more coarsely (larger Step).</summary>
-    private const long MaxSamples = 2_000_000;
+    /// <summary>
+    /// Hard cap on samples per mesh: a mesh that would exceed it is sampled more coarsely (larger
+    /// Step), and a mesh that exceeds it even at one sample per triangle corner is not voxelized.
+    /// </summary>
+    public const long MaxSamples = 2_000_000;
+
+    private const float MinEdgeLength = 1e-4f;
+    private const int MaxCoarseningSteps = 8;
+    private const float CoarseningFactor = 1.5f;
 
     private const int KeyOffset = 1 << 20;
 
@@ -42,10 +49,12 @@ internal sealed class VoxelMesh
         Vector3[] samples,
         int[] triangleStart,
         int[] triangles,
-        Box sampleBounds)
+        Box sampleBounds,
+        bool coarsened)
     {
         VoxelSize = voxelSize;
         Step = step;
+        Coarsened = coarsened;
         _vertices = vertices;
         _indices = indices;
         _slotByKey = slotByKey;
@@ -66,30 +75,35 @@ internal sealed class VoxelMesh
 
     public int SampleCount => _samples.Length;
 
+    /// <summary>True when the mesh was sampled more coarsely than VoxelSize / 2 to stay within <see cref="MaxSamples"/>.</summary>
+    public bool Coarsened { get; }
+
+    /// <summary>Approximate managed memory held by this mesh, in bytes.</summary>
+    public long EstimatedBytes =>
+        _vertices.Length * 12L + _indices.Length * 4L + _samples.Length * 12L + _triangles.Length * 4L
+        + VoxelCount * (12L + 4L + 4L + 24L);
+
     /// <summary>AABB of all samples (the mesh's triangle bounds).</summary>
     public Box SampleBounds { get; }
 
-    public static VoxelMesh Build(NifGeometry geometry, float voxelSize)
+    /// <summary>
+    /// Voxelizes a mesh, or returns null when it has no triangles or cannot be sampled within
+    /// <see cref="MaxSamples"/> even at its coarsest sampling.
+    /// </summary>
+    public static VoxelMesh? Build(NifGeometry geometry, float voxelSize)
     {
         var vertices = geometry.Vertices;
         var indices = geometry.Indices;
         var triangleCount = indices.Length / 3;
+        if (triangleCount == 0) return null;
 
-        var step = voxelSize * 0.5f;
-        for (var attempt = 0; attempt < 8; attempt++)
-        {
-            long total = 0;
-            for (var t = 0; t < triangleCount; t++)
-            {
-                total += SampleTriangle(vertices[indices[3 * t]], vertices[indices[3 * t + 1]], vertices[indices[3 * t + 2]], step, null);
-                if (total > MaxSamples) break;
-            }
-            if (total <= MaxSamples) break;
-            step *= 1.5f;
-        }
+        var baseStep = voxelSize * 0.5f;
+        if (ChooseStep(vertices, indices, triangleCount, baseStep, out var total) is not { } step) return null;
 
-        var samples = new List<Vector3>();
-        var sampleKeys = new List<long>();
+        // Arrays are sized from the exact count, so the build never holds more than one copy of the samples.
+        var sampleArray = new Vector3[total];
+        var sampleKeyArray = new long[total];
+        var sampleCount = 0;
         var triangleKeys = new List<long>();
         var triangleIds = new List<int>();
         var keysOfTriangle = new HashSet<long>();
@@ -104,8 +118,9 @@ internal sealed class VoxelMesh
             foreach (var sample in triangleSamples)
             {
                 var key = KeyOf(sample, inverseVoxel);
-                samples.Add(sample);
-                sampleKeys.Add(key);
+                sampleArray[sampleCount] = sample;
+                sampleKeyArray[sampleCount] = key;
+                sampleCount++;
                 if (keysOfTriangle.Add(key))
                 {
                     triangleKeys.Add(key);
@@ -114,8 +129,6 @@ internal sealed class VoxelMesh
             }
         }
 
-        var sampleKeyArray = sampleKeys.ToArray();
-        var sampleArray = samples.ToArray();
         Array.Sort(sampleKeyArray, sampleArray);
 
         var slotByKey = new Dictionary<long, int>();
@@ -159,7 +172,69 @@ internal sealed class VoxelMesh
             sampleArray,
             triangleStart,
             triangleIdArray,
-            sampleBounds);
+            sampleBounds,
+            coarsened: step > baseStep);
+    }
+
+    /// <summary>
+    /// Smallest tried sample step (starting at <paramref name="baseStep"/>) whose exact sample count
+    /// is at most <see cref="MaxSamples"/>, or null when even one sample per triangle corner is too
+    /// many. Growth is driven by the total triangle area (about 2 * area / step^2 samples); the
+    /// last resort is a step no smaller than any triangle, which yields exactly the corner samples.
+    /// </summary>
+    private static float? ChooseStep(Vector3[] vertices, int[] indices, int triangleCount, float baseStep, out long total)
+    {
+        total = CountSamples(vertices, indices, triangleCount, baseStep);
+        if (total <= MaxSamples) return baseStep;
+
+        double area = 0;
+        long floor = 0;
+        var floorStep = baseStep;
+        for (var t = 0; t < triangleCount; t++)
+        {
+            OrderByLongestEdge(vertices[indices[3 * t]], vertices[indices[3 * t + 1]], vertices[indices[3 * t + 2]], out var apex, out var left, out var right);
+            var baseLength = Vector3.Distance(left, right);
+            if (!(baseLength > MinEdgeLength))
+            {
+                floor++;
+                continue;
+            }
+            var height = Vector3.Cross(left - apex, right - apex).Length() / baseLength;
+            floor += 3;
+            area += 0.5 * baseLength * height;
+            floorStep = MathF.Max(floorStep, MathF.Max(2 * height, baseLength));
+        }
+        if (floor > MaxSamples)
+        {
+            total = floor;
+            return null;
+        }
+        floorStep *= 1.01f;
+
+        var step = baseStep;
+        var budget = Math.Max(1, MaxSamples - floor);
+        for (var attempt = 0; attempt < MaxCoarseningSteps; attempt++)
+        {
+            var areaStep = (float)Math.Sqrt(2 * area / budget);
+            step = MathF.Min(floorStep, MathF.Max(step * CoarseningFactor, areaStep));
+            total = CountSamples(vertices, indices, triangleCount, step);
+            if (total <= MaxSamples) return step;
+            if (step >= floorStep) break;
+        }
+
+        total = CountSamples(vertices, indices, triangleCount, floorStep);
+        return total <= MaxSamples ? floorStep : null;
+    }
+
+    /// <summary>Exact sample count at <paramref name="step"/>; stops early once it exceeds <see cref="MaxSamples"/>.</summary>
+    private static long CountSamples(Vector3[] vertices, int[] indices, int triangleCount, float step)
+    {
+        long total = 0;
+        for (var t = 0; t < triangleCount && total <= MaxSamples; t++)
+        {
+            total += SampleTriangle(vertices[indices[3 * t]], vertices[indices[3 * t + 1]], vertices[indices[3 * t + 2]], step, null);
+        }
+        return total;
     }
 
     /// <summary>
@@ -268,35 +343,34 @@ internal sealed class VoxelMesh
     /// <summary>
     /// Samples one triangle: rows parallel to its longest edge, at most step/2 apart, each sampled
     /// at most step apart (endpoints included). Every triangle point is then within
-    /// step * sqrt(1/2) of a sample. Returns the sample count; adds samples to
-    /// <paramref name="output"/> when given.
+    /// step * sqrt(1/2) of a sample. Returns the sample count and adds samples to
+    /// <paramref name="output"/> when given; without output, returns MaxSamples + 1 as soon as the
+    /// count exceeds <see cref="MaxSamples"/>.
     /// </summary>
     private static long SampleTriangle(Vector3 a, Vector3 b, Vector3 c, float step, List<Vector3>? output)
     {
-        var lab = Vector3.DistanceSquared(a, b);
-        var lbc = Vector3.DistanceSquared(b, c);
-        var lca = Vector3.DistanceSquared(c, a);
-        Vector3 apex, left, right;
-        if (lbc >= lab && lbc >= lca) { apex = a; left = b; right = c; }
-        else if (lca >= lab) { apex = b; left = c; right = a; }
-        else { apex = c; left = a; right = b; }
+        OrderByLongestEdge(a, b, c, out var apex, out var left, out var right);
 
         var baseLength = Vector3.Distance(left, right);
-        if (!(baseLength > 1e-4f))
+        if (!(baseLength > MinEdgeLength))
         {
             output?.Add(apex);
             return 1;
         }
 
         var height = Vector3.Cross(left - apex, right - apex).Length() / baseLength;
-        var rows = Math.Max(1, (int)Math.Min(MathF.Ceiling(height / (step * 0.5f)), 1_000_000f));
+        var rowCount = Math.Ceiling(height / (step * 0.5));
+        if (!(rowCount <= MaxSamples)) return MaxSamples + 1;
+        var rows = Math.Max(1, (int)rowCount);
         long count = 0;
         for (var k = 0; k <= rows; k++)
         {
             var lambda = (float)k / rows;
             var rowStart = apex + (left - apex) * lambda;
             var rowEnd = apex + (right - apex) * lambda;
-            var points = (int)Math.Min(MathF.Ceiling(baseLength * lambda / step), 1_000_000f);
+            var pointCount = Math.Ceiling(baseLength * lambda / (double)step);
+            if (!(pointCount <= MaxSamples)) return MaxSamples + 1;
+            var points = (int)pointCount;
             if (points == 0)
             {
                 output?.Add(rowStart);
@@ -304,13 +378,28 @@ internal sealed class VoxelMesh
                 continue;
             }
             count += points + 1;
-            if (output == null) continue;
+            if (output == null)
+            {
+                if (count > MaxSamples) return MaxSamples + 1;
+                continue;
+            }
             for (var i = 0; i <= points; i++)
             {
                 output.Add(Vector3.Lerp(rowStart, rowEnd, (float)i / points));
             }
         }
         return count;
+    }
+
+    /// <summary>Names the triangle's corners so that left-right is its longest edge.</summary>
+    private static void OrderByLongestEdge(Vector3 a, Vector3 b, Vector3 c, out Vector3 apex, out Vector3 left, out Vector3 right)
+    {
+        var lab = Vector3.DistanceSquared(a, b);
+        var lbc = Vector3.DistanceSquared(b, c);
+        var lca = Vector3.DistanceSquared(c, a);
+        if (lbc >= lab && lbc >= lca) { apex = a; left = b; right = c; }
+        else if (lca >= lab) { apex = b; left = c; right = a; }
+        else { apex = c; left = a; right = b; }
     }
 
     private static long KeyOf(Vector3 p, float inverseVoxel) =>
@@ -328,40 +417,165 @@ internal sealed class VoxelMesh
         (int)(key & 0x1FFFFF) - KeyOffset);
 }
 
+/// <summary>Counters of a <see cref="VoxelCache"/> run.</summary>
+internal readonly record struct VoxelCacheStats(
+    int Built,
+    int Rebuilt,
+    int Coarsened,
+    int TooLarge,
+    int Evicted,
+    long Voxels,
+    long Samples,
+    int PeakResidentMeshes,
+    long PeakResidentBytes);
+
 /// <summary>
-/// Thread-safe cache of <see cref="VoxelMesh"/> per mesh geometry (each mesh is voxelized once,
-/// on first use).
+/// Thread-safe, memory-bounded cache of <see cref="VoxelMesh"/> per mesh path. Triangles are read
+/// on demand for the build and are then held only by the voxel mesh. When the estimated resident
+/// size exceeds <see cref="MaxResidentBytes"/>, least recently used meshes are dropped (they are
+/// rebuilt if needed again). Builds of large meshes are limited to a few at a time, because a
+/// build temporarily needs several times the finished mesh's memory.
 /// </summary>
 internal sealed class VoxelCache
 {
-    private readonly ConcurrentDictionary<NifGeometry, Lazy<VoxelMesh>> _meshes = new(ReferenceEqualityComparer.Instance);
-    private readonly float _voxelSize;
+    private const long MaxResidentBytes = 1L << 30;
+    private const long EvictToBytes = MaxResidentBytes / 4 * 3;
+    private const int LargeMeshTriangles = 20_000;
+    private const int MaxConcurrentLargeBuilds = 4;
 
-    public VoxelCache(float voxelSize)
+    private sealed class Entry(Lazy<VoxelMesh?> mesh)
     {
-        _voxelSize = voxelSize;
+        public Lazy<VoxelMesh?> Mesh { get; } = mesh;
+        public long LastUse;
     }
 
-    public int MeshCount => _meshes.Count;
+    private readonly ConcurrentDictionary<string, Entry> _meshes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, byte> _everBuilt = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Func<string, NifGeometry?> _readGeometry;
+    private readonly float _voxelSize;
+    private readonly SemaphoreSlim _largeBuilds = new(MaxConcurrentLargeBuilds);
+    private readonly object _evictLock = new();
 
-    public VoxelMesh Get(NifGeometry geometry) =>
-        _meshes.GetOrAdd(
-            geometry,
-            g => new Lazy<VoxelMesh>(() => VoxelMesh.Build(g, _voxelSize), LazyThreadSafetyMode.ExecutionAndPublication)).Value;
+    private long _clock;
+    private long _residentBytes;
+    private long _peakResidentBytes;
+    private int _residentMeshes;
+    private int _peakResidentMeshes;
+    private int _built;
+    private int _rebuilt;
+    private int _coarsened;
+    private int _tooLarge;
+    private int _evicted;
+    private long _voxels;
+    private long _samples;
 
-    /// <summary>Totals over all built meshes: voxels, samples, and meshes sampled more coarsely than VoxelSize / 2.</summary>
-    public (long Voxels, long Samples, int Coarsened) GetTotals()
+    public VoxelCache(float voxelSize, Func<string, NifGeometry?> readGeometry)
     {
-        long voxels = 0, samples = 0;
-        var coarsened = 0;
-        foreach (var lazy in _meshes.Values)
+        _voxelSize = voxelSize;
+        _readGeometry = readGeometry;
+    }
+
+    /// <summary>Voxel mesh of the mesh at <paramref name="meshPath"/>, or null when it has no usable triangles or is too large.</summary>
+    public VoxelMesh? Get(string meshPath)
+    {
+        var entry = _meshes.GetOrAdd(
+            meshPath,
+            p => new Entry(new Lazy<VoxelMesh?>(() => Build(p), LazyThreadSafetyMode.ExecutionAndPublication)));
+        Volatile.Write(ref entry.LastUse, Interlocked.Increment(ref _clock));
+        var mesh = entry.Mesh.Value;
+        if (mesh != null && Volatile.Read(ref _residentBytes) > MaxResidentBytes) Evict();
+        return mesh;
+    }
+
+    public VoxelCacheStats GetStats() => new(
+        Volatile.Read(ref _built),
+        Volatile.Read(ref _rebuilt),
+        Volatile.Read(ref _coarsened),
+        Volatile.Read(ref _tooLarge),
+        Volatile.Read(ref _evicted),
+        Interlocked.Read(ref _voxels),
+        Interlocked.Read(ref _samples),
+        Volatile.Read(ref _peakResidentMeshes),
+        Interlocked.Read(ref _peakResidentBytes));
+
+    private VoxelMesh? Build(string meshPath)
+    {
+        var geometry = _readGeometry(meshPath);
+        if (geometry is not { TriangleCount: > 0 }) return null;
+
+        var large = geometry.TriangleCount > LargeMeshTriangles;
+        if (large) _largeBuilds.Wait();
+        VoxelMesh? mesh;
+        try
         {
-            if (!lazy.IsValueCreated) continue;
-            var mesh = lazy.Value;
-            voxels += mesh.VoxelCount;
-            samples += mesh.SampleCount;
-            if (mesh.Step > mesh.VoxelSize * 0.5f * 1.001f) coarsened++;
+            mesh = VoxelMesh.Build(geometry, _voxelSize);
         }
-        return (voxels, samples, coarsened);
+        finally
+        {
+            if (large) _largeBuilds.Release();
+        }
+
+        if (mesh == null)
+        {
+            Interlocked.Increment(ref _tooLarge);
+            return null;
+        }
+
+        Interlocked.Increment(ref _built);
+        if (!_everBuilt.TryAdd(meshPath, 0)) Interlocked.Increment(ref _rebuilt);
+        if (mesh.Coarsened) Interlocked.Increment(ref _coarsened);
+        Interlocked.Add(ref _voxels, mesh.VoxelCount);
+        Interlocked.Add(ref _samples, mesh.SampleCount);
+        UpdateMax(ref _peakResidentBytes, Interlocked.Add(ref _residentBytes, mesh.EstimatedBytes));
+        UpdateMax(ref _peakResidentMeshes, Interlocked.Increment(ref _residentMeshes));
+        return mesh;
+    }
+
+    /// <summary>Drops least recently used built meshes until the resident estimate is back under budget.</summary>
+    private void Evict()
+    {
+        if (!Monitor.TryEnter(_evictLock)) return;
+        try
+        {
+            if (Volatile.Read(ref _residentBytes) <= MaxResidentBytes) return;
+            var built = _meshes
+                .Where(kv => kv.Value.Mesh.IsValueCreated && kv.Value.Mesh.Value != null)
+                .OrderBy(kv => Volatile.Read(ref kv.Value.LastUse))
+                .ToList();
+            foreach (var pair in built)
+            {
+                if (Volatile.Read(ref _residentBytes) <= EvictToBytes) break;
+                if (!_meshes.TryRemove(pair)) continue;
+                Interlocked.Add(ref _residentBytes, -pair.Value.Mesh.Value!.EstimatedBytes);
+                Interlocked.Decrement(ref _residentMeshes);
+                Interlocked.Increment(ref _evicted);
+            }
+        }
+        finally
+        {
+            Monitor.Exit(_evictLock);
+        }
+    }
+
+    private static void UpdateMax(ref long target, long value)
+    {
+        var current = Interlocked.Read(ref target);
+        while (value > current)
+        {
+            var seen = Interlocked.CompareExchange(ref target, value, current);
+            if (seen == current) return;
+            current = seen;
+        }
+    }
+
+    private static void UpdateMax(ref int target, int value)
+    {
+        var current = Volatile.Read(ref target);
+        while (value > current)
+        {
+            var seen = Interlocked.CompareExchange(ref target, value, current);
+            if (seen == current) return;
+            current = seen;
+        }
     }
 }

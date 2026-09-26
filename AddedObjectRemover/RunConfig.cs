@@ -6,6 +6,8 @@ namespace AddedObjectRemover;
 
 /// <summary>Validated settings of one run.</summary>
 /// <param name="AnchoringThreshold">Fraction (0-1) of an object's support that must come from removed objects for Anchoring to remove it.</param>
+/// <param name="OrphanCheckRadius">Horizontal radius around an invisible target object in which the target's visible objects are counted.</param>
+/// <param name="OrphanRemovedShare">Fraction (0-1) of those visible objects that must be removed for the invisible object to be removed.</param>
 /// <param name="DiagnosticsFolder">Empty when no diagnostics files are written.</param>
 internal sealed record RunConfig(
     ModKey Target,
@@ -18,6 +20,9 @@ internal sealed record RunConfig(
     FollowUpRemovalMode FollowUpMode,
     float TouchDistance,
     float AnchoringThreshold,
+    bool RemoveOrphanedInvisibleObjects,
+    float OrphanCheckRadius,
+    float OrphanRemovedShare,
     bool DetailedLog,
     string DiagnosticsFolder)
 {
@@ -38,6 +43,8 @@ internal static class RunConfigFactory
 
     private const float MinThresholdPercent = 1f;
     private const float MaxThresholdPercent = 99f;
+    private const float MinOrphanSharePercent = 1f;
+    private const float MaxOrphanSharePercent = 100f;
     private const float PercentPerWhole = 100f;
 
     /// <summary>Null (after logging why) when the run must make no changes.</summary>
@@ -63,7 +70,14 @@ internal static class RunConfigFactory
             SizeMultiplier: AtLeast(settings.WhatToCheck.SizeMultiplier, 0, "size multiplier"),
             FollowUpMode: ValidateMode(followUp.Mode),
             TouchDistance: AtLeast(followUp.TouchDistance, 0, "touch distance"),
-            AnchoringThreshold: ClampThresholdPercent(followUp.AnchoringThresholdPercent) / PercentPerWhole,
+            AnchoringThreshold: ClampPercent(
+                followUp.AnchoringThresholdPercent, MinThresholdPercent, MaxThresholdPercent,
+                FollowUpRemovalSettings.DefaultAnchoringThresholdPercent, "anchoring threshold") / PercentPerWhole,
+            RemoveOrphanedInvisibleObjects: followUp.RemoveOrphanedInvisibleObjects,
+            OrphanCheckRadius: Positive(followUp.OrphanCheckRadius, FollowUpRemovalSettings.DefaultOrphanCheckRadius, "orphan check radius"),
+            OrphanRemovedShare: ClampPercent(
+                followUp.OrphanRemovedSharePercent, MinOrphanSharePercent, MaxOrphanSharePercent,
+                FollowUpRemovalSettings.DefaultOrphanRemovedSharePercent, "orphan removed share") / PercentPerWhole,
             DetailedLog: settings.Diagnostics.DetailedLog,
             DiagnosticsFolder: settings.Diagnostics.DiagnosticsFolder.Trim());
     }
@@ -139,11 +153,19 @@ internal static class RunConfigFactory
         return minimum;
     }
 
-    private static float ClampThresholdPercent(float value)
+    /// <summary>A value of 0 or less has no nearest valid value, so it falls back to the default.</summary>
+    private static float Positive(float value, float defaultValue, string name)
     {
-        if (value is >= MinThresholdPercent and <= MaxThresholdPercent) return value;
-        var clamped = float.IsFinite(value) ? Math.Clamp(value, MinThresholdPercent, MaxThresholdPercent) : FollowUpRemovalSettings.DefaultAnchoringThresholdPercent;
-        Console.WriteLine($"Warning: anchoring threshold {value} is outside {MinThresholdPercent}-{MaxThresholdPercent}; using {clamped}.");
+        if (float.IsFinite(value) && value > 0) return value;
+        Console.WriteLine($"Warning: {name} {value} is not more than 0; using {defaultValue}.");
+        return defaultValue;
+    }
+
+    private static float ClampPercent(float value, float minimum, float maximum, float defaultValue, string name)
+    {
+        if (value >= minimum && value <= maximum) return value;
+        var clamped = float.IsFinite(value) ? Math.Clamp(value, minimum, maximum) : defaultValue;
+        Console.WriteLine($"Warning: {name} {value} is outside {minimum}-{maximum}; using {clamped}.");
         return clamped;
     }
 }

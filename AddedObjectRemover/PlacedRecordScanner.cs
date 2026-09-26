@@ -270,7 +270,9 @@ internal sealed class PlacedRecordScanner
                 Geometry.RotationFromEuler(placement.Rotation),
                 Geometry.NormalizeScale(record.Scale)),
             Base: record.GetBaseRef(),
-            IsTeleportDoor: record is IPlacedObjectGetter { TeleportDestination: not null }));
+            IsTeleportDoor: record is IPlacedObjectGetter { TeleportDestination: not null },
+            IsPrimitive: record is IPlacedObjectGetter { Primitive: not null },
+            HasMapMarker: record is IPlacedObjectGetter { MapMarker: not null }));
         _scan.TargetLocations.Add(new TargetLocation(_winningCells[cell.FormKey], persistent));
     }
 

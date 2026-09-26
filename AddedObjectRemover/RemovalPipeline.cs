@@ -18,12 +18,13 @@ internal sealed class RemovalPipeline
         public List<int> KeptIndices => Kept.Select(kept => kept.TargetIndex).ToList();
     }
 
-    /// <summary>Written only by some follow-up modes, so a file an earlier run left behind would look current.</summary>
+    /// <summary>Written only by some follow-up steps, so a file an earlier run left behind would look current.</summary>
     private static readonly string[] FollowUpDiagnosticsFiles =
     [
         AnchoringDiagnosticsWriter.FileName,
         TouchDiagnosticsWriter.EdgesFileName,
         TouchDiagnosticsWriter.ComponentsFileName,
+        OrphanDiagnosticsWriter.FileName,
     ];
 
     private sealed record FollowUpRemovals(IReadOnlyList<Removal> Removals, IReadOnlyList<KeptTarget> Kept)
@@ -70,12 +71,13 @@ internal sealed class RemovalPipeline
         var keepRule = new KeepReferencedRule(scan.TargetReferences);
         var tooClose = SelectTooCloseRemovals(scan, indexes, keepRule);
         var followUp = SelectFollowUpRemovals(scan, tooClose, keepRule);
+        var orphans = SelectOrphanRemovals(scan, [.. tooClose.Removals, .. followUp.Removals], keepRule);
 
-        List<Removal> removals = [.. tooClose.Removals, .. followUp.Removals];
+        List<Removal> removals = [.. tooClose.Removals, .. followUp.Removals, .. orphans.Removals];
         WriteOverrides(scan, removals);
 
-        var keptCount = tooClose.Kept.Count + followUp.Kept.Count;
-        PrintFinalReport(scan, indexes, removals, tooClose.Removals.Count, keptCount);
+        var keptCount = tooClose.Kept.Count + followUp.Kept.Count + orphans.Kept.Count;
+        PrintFinalReport(scan, indexes, removals, tooClose.Removals.Count, orphans.Removals.Count, keptCount);
         Console.WriteLine($"Done in {totalTimer.Elapsed.TotalSeconds:F1}s.");
     }
 
@@ -261,6 +263,32 @@ internal sealed class RemovalPipeline
         });
     }
 
+    private OrphanResult SelectOrphanRemovals(ScanResult scan, IReadOnlyList<Removal> earlierRemovals, KeepReferencedRule keepRule)
+    {
+        if (!_config.RemoveOrphanedInvisibleObjects) return OrphanResult.None;
+
+        var timer = Stopwatch.StartNew();
+        var remover = new OrphanedInvisibleObjectRemover(
+            scan.Targets, _shapes, keepRule, _config.OrphanCheckRadius, _config.OrphanRemovedShare);
+        var orphans = remover.Run(earlierRemovals.Select(removal => removal.TargetIndex).ToHashSet(), _parallelOptions);
+        RunReport.PrintKept(scan, orphans.Kept);
+        _meshMessages.PrintAndClear();
+        RunReport.PrintOrphanStats(orphans, timer.Elapsed);
+        WriteOrphanDiagnostics(scan, orphans);
+        return orphans;
+    }
+
+    private void WriteOrphanDiagnostics(ScanResult scan, OrphanResult orphans)
+    {
+        if (!_config.WritesDiagnostics) return;
+
+        AccessDiagnosticsFolder($"writing {OrphanDiagnosticsWriter.FileName}", () =>
+        {
+            var path = OrphanDiagnosticsWriter.Write(_config.DiagnosticsFolder, scan, _shapes, orphans.Evaluations, _config.OrphanRemovedShare);
+            Console.WriteLine($"Orphan diagnostics: wrote {orphans.Evaluations.Count:N0} evaluations to {path}.");
+        });
+    }
+
     /// <summary>Diagnostics files never change the results, so failing to access them is only a warning.</summary>
     private void AccessDiagnosticsFolder(string description, Action access)
     {
@@ -292,11 +320,12 @@ internal sealed class RemovalPipeline
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
         IReadOnlyList<Removal> removals,
         int removedTooClose,
+        int removedOrphans,
         int keptAsReferenced)
     {
         if (_config.DetailedLog) RunReport.PrintRemovals(scan, _shapes, removals);
         RunReport.PrintBoundsStats(_shapes.GetStats());
         if (_config.DetailedLog) RunReport.PrintSpaceSummary(scan, indexes, removals);
-        RunReport.PrintRemovalSummary(removals.Count, removedTooClose, keptAsReferenced);
+        RunReport.PrintRemovalSummary(removals.Count, removedTooClose, removedOrphans, keptAsReferenced);
     }
 }

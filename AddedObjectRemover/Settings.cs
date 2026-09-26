@@ -49,6 +49,8 @@ public class IgnoreSettings
 public class FollowUpRemovalSettings
 {
     public const float DefaultAnchoringThresholdPercent = 50f;
+    public const float DefaultOrphanCheckRadius = 1024f;
+    public const float DefaultOrphanRemovedSharePercent = 50f;
 
     [SynthesisSettingName("Follow-up removal mode")]
     [SynthesisTooltip("What happens to target objects touching a removed one: Off keeps them, AnyTouch removes every touching object, Anchoring removes only objects that lose most of their support.")]
@@ -61,6 +63,19 @@ public class FollowUpRemovalSettings
     [SynthesisSettingName("Anchoring threshold")]
     [SynthesisTooltip("Anchoring only: an object is removed when at least this percentage (1-99) of its support comes from removed objects.")]
     public float AnchoringThresholdPercent { get; set; } = DefaultAnchoringThresholdPercent;
+
+    [SynthesisSettingName("Remove orphaned invisible objects")]
+    [SynthesisTooltip("Also remove target objects you cannot see (insect spawns, sounds, markers, lights, ...) once the scenery around them has been removed.")]
+    public bool RemoveOrphanedInvisibleObjects { get; set; } = true;
+
+    [SynthesisSettingName("Orphan check radius")]
+    [SynthesisTooltip("How far, in game units, around an invisible object to look for the target's visible scenery (must be more than 0).")]
+    public float OrphanCheckRadius { get; set; } = DefaultOrphanCheckRadius;
+
+    [SynthesisSettingName("Orphan removed share")]
+    [SynthesisTooltip("An invisible object is removed when at least this percentage (1-100) of the scenery around it was removed and every side of it lost some.")]
+    public float OrphanRemovedSharePercent { get; set; } = DefaultOrphanRemovedSharePercent;
+
 }
 
 public class DiagnosticsSettings

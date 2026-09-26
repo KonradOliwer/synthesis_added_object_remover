@@ -93,13 +93,14 @@ internal sealed class BaseObjectShapeProvider
         baseRef is { } reference ? GetBaseShape(reference).MeshPath : null;
 
     /// <summary>
-    /// Why an other-mod object with this base can never be seen or collided with (a light or sound
-    /// marker, a decal, a base with the engine's IsMarker flag, a mesh with only marker geometry,
-    /// ...), or null when it may be visible. A primitive box reference (trigger/activator volume)
-    /// only counts when its base has a visible mesh.
+    /// Why a placed object with this base can never be seen or collided with (a map marker
+    /// reference, a light or sound marker, a decal, a base with the engine's IsMarker flag, a mesh
+    /// with only marker geometry, ...), or null when it may be visible. A primitive box reference
+    /// (trigger/activator volume) only counts when its base has a visible mesh.
     /// </summary>
-    public string? GetInvisibleReason(BaseRef? baseRef, bool isPrimitive)
+    public string? GetInvisibleReason(BaseRef? baseRef, bool isPrimitive, bool hasMapMarker)
     {
+        if (hasMapMarker) return "map marker reference";
         if (baseRef is not { } reference) return null;
         var shape = GetBaseShape(reference);
         if (shape.InvisibleReason != null) return shape.InvisibleReason;

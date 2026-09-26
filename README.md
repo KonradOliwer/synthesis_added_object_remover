@@ -37,11 +37,17 @@ The settings are grouped into four sections, matching what Synthesis shows.
 | Follow-up removal mode | `AnyTouch` | What happens to target objects touching a removed one. See below. |
 | Touch distance | `8` | Largest gap, in game units, between two surfaces for them to count as touching. Used by `AnyTouch` and `Anchoring`. Must be 0 or more. |
 | Anchoring threshold | `50` | `Anchoring` only: percentage (1-99) of an object's support that must come from removed objects for it to be removed. |
+| Remove orphaned invisible objects | `true` | Also remove target objects you cannot see once the scenery around them is gone. |
+| Orphan check radius | `1024` | How far, in game units, around an invisible object to look for the target's visible scenery. Must be more than 0. |
+| Orphan removed share | `50` | Percentage (1-100) of that scenery that must have been removed for the invisible object to be removed. |
 
 Follow-up removal mode:
 - **Off** — only the too-close objects themselves are removed.
 - **Any touch** — every target object connected to a removed one, through a chain of touching target objects, is removed too.
 - **Anchoring** — a touching target object is only removed once most of what was holding it up is gone.
+
+In every mode, invisible target objects (insect spawns, sounds, markers, lights, trigger boxes, ...)
+are removed afterwards when enough of the target's scenery around them was removed, on every side.
 
 ### Diagnostics
 
@@ -83,6 +89,8 @@ Written only when a *Diagnostics folder* is set:
   exploring a group of removed/connected objects.
 - **`components.csv`** (*Any touch* mode only) — one row per such group, with its size and the
   objects that started it.
+- **`orphans.csv`** — one row per invisible target object checked, with the scenery around it on
+  each side, how much of it was removed, and the decision.
 
 ## Known limitations
 

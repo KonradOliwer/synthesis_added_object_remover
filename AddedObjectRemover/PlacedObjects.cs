@@ -15,13 +15,16 @@ namespace AddedObjectRemover;
 internal readonly record struct BaseRef(FormKey FormKey, Type LinkType);
 
 /// <summary>Target-plugin object that may be removed.</summary>
+/// <param name="HasMapMarker">The placed reference itself carries map marker data (XMRK).</param>
 internal sealed record TargetObject(
     IPlacedGetter Record,
     FormKey SpaceKey,
     string? CellName,
     PlacedTransform Transform,
     BaseRef? Base,
-    bool IsTeleportDoor);
+    bool IsTeleportDoor,
+    bool IsPrimitive,
+    bool HasMapMarker);
 
 /// <summary>Where a target object's override is written: through its cell's winning context, into the same child list.</summary>
 internal sealed record TargetLocation(
@@ -57,6 +60,9 @@ internal sealed record TouchingRemoval(int TargetIndex, int TouchedTargetIndex) 
 /// <param name="RemovedShare">Fraction of the object's support held by removed objects.</param>
 /// <param name="MainRemovedSupporter">The removed target holding the largest share of its support.</param>
 internal sealed record AnchoringRemoval(int TargetIndex, float RemovedShare, int MainRemovedSupporter) : Removal(TargetIndex);
+
+/// <summary>An invisible target object whose surrounding visible target objects were removed.</summary>
+internal sealed record OrphanRemoval(int TargetIndex, QuadrantCounts Neighbours) : Removal(TargetIndex);
 
 /// <summary>A target object that would be removed but stays because it is referenced.</summary>
 /// <param name="TouchedTargetIndex">The removed target it touches, when it was reached by the touch test.</param>

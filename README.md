@@ -34,6 +34,7 @@ plugin is `AddedObjectRemover.esp`.
 | --- | --- | --- |
 | Excluded plugins | *(empty)* | Plugins whose objects never count as a conflict. |
 | Ignore the target's masters | `true` | Also ignore objects from the plugins the target plugin was built on. |
+| Ignore mods patched with the target | `true` | If a plugin depends on both the target and another mod, treat it as a compatibility patch: ignore that patch and the other mod. |
 
 ### Follow-up removal
 
@@ -105,6 +106,8 @@ Synthesis does not know stops the run.
 - Objects the target plugin overrides or replaces (e.g. a tree the target plugin swaps for its own
   version at the same spot).
 - Objects added by an earlier Added Object Remover run in the same Synthesis group.
+- Mods linked to the target only by a compatibility patch (a plugin that masters both the target
+  and another mod), and that patch itself.
 
 ## Diagnostics files
 

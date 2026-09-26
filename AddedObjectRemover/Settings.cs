@@ -75,6 +75,10 @@ public class IgnoreSettings
     [SynthesisSettingName("Ignore the target's masters")]
     [SynthesisTooltip("Also ignore objects from the plugins the target plugin was built on (its masters).")]
     public bool IgnoreTargetMasters { get; set; } = true;
+
+    [SynthesisSettingName("Ignore mods patched with the target")]
+    [SynthesisTooltip("If a plugin depends on both the target and another mod, treat it as a compatibility patch: ignore that patch and the other mod.")]
+    public bool IgnoreModsPatchedWithTarget { get; set; } = true;
 }
 
 public class FollowUpRemovalSettings

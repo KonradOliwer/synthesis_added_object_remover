@@ -18,10 +18,26 @@ internal static class RunReport
         Console.WriteLine(config.IgnoreTargetMasters
             ? $"Ignored masters of target: {Join(config.TargetMasters)}"
             : "Masters of target are not ignored.");
+        PrintCompatibilityPatches(config.CompatibilityPatches);
         Console.WriteLine(DescribeFollowUpRemoval(config));
         Console.WriteLine(DescribeLeftoverRemoval(config));
         Console.WriteLine($"Detailed log: {config.DetailedLog}");
         Console.WriteLine($"Diagnostics folder: {(config.WritesDiagnostics ? config.DiagnosticsFolder : "(none)")}");
+    }
+
+    private static void PrintCompatibilityPatches(IReadOnlyList<CompatibilityPatch> patches)
+    {
+        if (patches.Count == 0)
+        {
+            Console.WriteLine("Compatibility patches: none detected.");
+            return;
+        }
+        foreach (var patch in patches)
+        {
+            Console.WriteLine($"  Compatibility patch {patch.Patch}: links target with {string.Join(", ", patch.OtherMasters)}.");
+        }
+        var ignoredMods = CompatibilityPatchDetector.CollectIgnoredMods(patches).OrderBy(mod => mod.ToString(), StringComparer.Ordinal);
+        Console.WriteLine($"Ignored because of compatibility patches: {string.Join(", ", ignoredMods)}.");
     }
 
     private static string DescribeFollowUpRemoval(RunConfig config) => config.FollowUpMode switch

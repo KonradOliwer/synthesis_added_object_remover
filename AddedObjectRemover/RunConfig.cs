@@ -14,6 +14,7 @@ internal sealed record RunConfig(
     IReadOnlyList<ModKey> ExcludedPlugins,
     IReadOnlyList<ModKey> TargetMasters,
     bool IgnoreTargetMasters,
+    IReadOnlyList<CompatibilityPatch> CompatibilityPatches,
     float SizeMultiplier,
     FollowUpRemovalMode FollowUpMode,
     float TouchDistance,
@@ -54,6 +55,8 @@ internal static class RunConfigFactory
         ModKey.FromNameAndExtension("Dragonborn.esm"),
     ];
 
+    private static readonly HashSet<ModKey> BaseGamePluginSet = BaseGamePlugins.ToHashSet();
+
     private const float MaxSizeMultiplier = 5f;
     private const float MaxTouchDistance = 64f;
     private const float MinPercent = 1f;
@@ -70,10 +73,16 @@ internal static class RunConfigFactory
 
         var ignore = settings.WhatToIgnore ?? new IgnoreSettings();
         var excluded = ParseExcludedPlugins(ignore.ExcludedPlugins ?? []);
-        var masters = ignore.IgnoreTargetMasters ? GetTargetMasters(target, targetMod) : [];
+        var allTargetMasters = GetTargetMasters(target, targetMod);
+        var masters = ignore.IgnoreTargetMasters ? allTargetMasters : [];
         var ignored = new HashSet<ModKey>(BaseGamePlugins) { target, state.PatchMod.ModKey };
         ignored.UnionWith(excluded);
         ignored.UnionWith(masters);
+
+        var compatibilityPatches = ignore.IgnoreModsPatchedWithTarget
+            ? CompatibilityPatchDetector.Find(state, target, allTargetMasters.ToHashSet(), BaseGamePluginSet)
+            : [];
+        ignored.UnionWith(CompatibilityPatchDetector.CollectIgnoredMods(compatibilityPatches));
 
         var followUp = settings.FollowUpRemoval ?? new FollowUpRemovalSettings();
         return new RunConfig(
@@ -83,6 +92,7 @@ internal static class RunConfigFactory
             ExcludedPlugins: excluded,
             TargetMasters: masters,
             IgnoreTargetMasters: ignore.IgnoreTargetMasters,
+            CompatibilityPatches: compatibilityPatches,
             SizeMultiplier: Clamp(check.SizeMultiplier, 0, MaxSizeMultiplier, CheckSettings.DefaultSizeMultiplier, "size multiplier"),
             FollowUpMode: ValidateMode(followUp.Mode),
             TouchDistance: Clamp(followUp.TouchDistance, 0, MaxTouchDistance, FollowUpRemovalSettings.DefaultTouchDistance, "touch distance"),

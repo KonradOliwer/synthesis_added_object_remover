@@ -4,7 +4,7 @@ namespace AddedObjectRemover;
 
 /// <summary>
 /// Whether a placed mesh surrounds a point: rays from the point straight up and towards world east,
-/// west, north and south all hit the mesh. A roof alone (bridge, tree canopy, overhang) is hit only
+/// west, north and south all hit the mesh. A roof alone (bridge, overhang) is hit only
 /// from below, so only buildings, caves and similar shells surround a point. Rays are cast in the
 /// mesh's local frame, where they end at the mesh's bounds, so every hit lies within the object.
 /// </summary>

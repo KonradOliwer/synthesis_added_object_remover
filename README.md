@@ -7,7 +7,7 @@ A [Synthesis](https://github.com/Mutagen-Modding/Synthesis) patcher for Skyrim S
 It removes objects added by one plugin (the *target plugin*) when they sit too close to objects
 added by other mods, a common source of clipping and duplicated clutter when several mods edit
 the same area. By default it also removes the target's objects that were touching a removed one,
-and the target's invisible objects (lights, sounds, insect spawners, ...) that sit inside another
+and the target's invisible objects (lights, sounds, critter spawners, ...) that sit inside another
 mod's object or are left behind once the objects around them are gone.
 
 Removal never deletes anything: the object is disabled and moved far below the world. The output
@@ -59,7 +59,7 @@ The log ends with a *Possible manual patch needed* section listing removed marke
 
 - **Off**: only the too-close objects are removed.
 - **AnyTouch**: every target object connected to a removed one through touching target objects is removed too. This can spread through floors and walls to whole rooms.
-- **Anchoring**: a touching target object is removed only when at least *Anchoring threshold* % of what it rests on or touches was removed. The ground and objects of any plugin, the base game included, count as support.
+- **Anchoring**: a touching target object is removed only when at least *Anchoring threshold* % of what it rests on or touches was removed. The ground and objects of any plugin, the base game included, count as support. It works best for objects whose mesh origin is at their base (true for most plants and many props); `mesh-origins.csv` (see *Diagnostics files*) shows how well that holds for your target plugin.
 
 ### Leftover invisible objects
 
@@ -77,7 +77,7 @@ The log ends with a *Possible manual patch needed* section listing removed marke
 The three percentages take values from 10 to 100 in steps of 10.
 
 An invisible object is removed when:
-- it sits inside a building or cave of another mod — not merely under a bridge or tree, or
+- it sits inside a building or cave of another mod — not merely under a bridge or overhang, or
 - its surroundings were removed: the area around it is split into 8 directions (north, north-east,
   east, ...), and at least *Occupied directions required* % of the directions hold target objects,
   and at least *Removed directions required* % of those lost at least *Removed area per direction* %
@@ -110,8 +110,8 @@ type name that Synthesis does not know stops the run.
   `HearthFires.esm`, `Dragonborn.esm`). Creation Club plugins are **not** ignored automatically;
   add them to *Excluded plugins* if needed.
 - Invisible objects, such as markers, lights without a lamp, sounds and trigger boxes.
-- Objects the target plugin overrides or replaces (e.g. a tree the target plugin swaps for its own
-  version at the same spot).
+- Objects the target plugin overrides or replaces (e.g. a piece of clutter the target plugin swaps
+  for its own version at the same spot).
 - Objects added by an earlier Added Object Remover run in the same Synthesis group.
 - Mods linked to the target only by a compatibility patch (a plugin that masters both the target
   and a few other mods), and that patch itself.

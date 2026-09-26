@@ -6,7 +6,7 @@ internal enum LeftoverDecision
 {
     RemovedInsideOtherObject,
     RemovedSurroundingsRemoved,
-    KeptTooLittleScenery,
+    KeptTooFewSurroundingObjects,
     KeptSurroundingsMostlyKept,
     KeptProtectedType,
     KeptReferenced,
@@ -21,7 +21,7 @@ internal static class LeftoverDecisions
     {
         LeftoverDecision.RemovedInsideOtherObject => "inside another mod's object",
         LeftoverDecision.RemovedSurroundingsRemoved => "surroundings removed",
-        LeftoverDecision.KeptTooLittleScenery => "too little scenery around",
+        LeftoverDecision.KeptTooFewSurroundingObjects => "too few surrounding objects",
         LeftoverDecision.KeptSurroundingsMostlyKept => "surroundings mostly kept",
         LeftoverDecision.KeptProtectedType => "protected type",
         LeftoverDecision.KeptReferenced => "referenced",

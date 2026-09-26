@@ -114,7 +114,7 @@ public class LeftoverInvisibleObjectSettings
     public const int DefaultOccupiedDirectionsPercent = 50;
 
     [SynthesisSettingName("Remove leftover invisible objects")]
-    [SynthesisTooltip("Remove the target's invisible objects (lights, sounds, markers, insect spawners, trigger boxes, ...) that sit inside another mod's object or whose surrounding target objects were removed.")]
+    [SynthesisTooltip("Remove the target's invisible objects (lights, sounds, markers, critter spawners, trigger boxes, ...) that sit inside another mod's object or whose surrounding target objects were removed.")]
     public bool RemoveLeftoverInvisibleObjects { get; set; } = true;
 
     [SynthesisSettingName("Protected types")]

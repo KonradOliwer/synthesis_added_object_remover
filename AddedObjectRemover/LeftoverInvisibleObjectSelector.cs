@@ -83,7 +83,7 @@ internal sealed class LeftoverInvisibleObjectSelector(
     private LeftoverDecision DecideByDirections(SectorAreas areas)
     {
         var occupied = areas.OccupiedCount;
-        if (occupied * Percent.PerWhole < config.OccupiedDirectionsPercent * SectorAreas.SectorCount) return LeftoverDecision.KeptTooLittleScenery;
+        if (occupied * Percent.PerWhole < config.OccupiedDirectionsPercent * SectorAreas.SectorCount) return LeftoverDecision.KeptTooFewSurroundingObjects;
         return areas.RemovedCount * Percent.PerWhole >= config.RemovedDirectionsPercent * occupied
             ? LeftoverDecision.RemovedSurroundingsRemoved
             : LeftoverDecision.KeptSurroundingsMostlyKept;

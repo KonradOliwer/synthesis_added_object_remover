@@ -35,7 +35,9 @@ public static class Program
         var totalTimer = Stopwatch.StartNew();
         Console.WriteLine("=== Added Object Remover ===");
 
-        var config = RunConfigFactory.Create(state, _lazySettings.Value);
+        var settings = _lazySettings.Value;
+        DiagnosticsFiles.DeleteEarlierFiles(RunConfigFactory.ReadDiagnosticsFolder(settings));
+        var config = RunConfigFactory.Create(state, settings);
         if (config == null) return;
         RunReport.PrintConfig(config);
 

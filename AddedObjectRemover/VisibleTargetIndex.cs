@@ -3,14 +3,17 @@ using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover;
 
+/// <summary>A visible target object near a point: its distance to the object's box and the side it lies on.</summary>
+internal readonly record struct VisibleNeighbour(int TargetIndex, float Distance, Quadrant Quadrant);
+
 /// <summary>
-/// The target plugin's visible objects of each space, indexed by the X/Y of their world bounds
-/// centre, for counting the visible scenery around a point. Read-only after construction and
+/// The target plugin's visible objects of each space as oriented boxes, for finding the visible
+/// objects whose box comes within a distance of a point. Read-only after construction and
 /// therefore safe to query from many threads at once.
 /// </summary>
 internal sealed class VisibleTargetIndex
 {
-    private sealed record SpaceEntries(int[] TargetIndices, Vector3[] Centers, SpatialGrid Grid);
+    private sealed record SpaceEntries(int[] TargetIndices, OrientedBox[] Boxes, SpatialGrid Grid);
 
     private readonly Dictionary<FormKey, SpaceEntries> _bySpace;
 
@@ -19,11 +22,14 @@ internal sealed class VisibleTargetIndex
         _bySpace = bySpace;
     }
 
-    /// <param name="isVisible">Parallel to <paramref name="targets"/>.</param>
-    public static VisibleTargetIndex Build(IReadOnlyList<TargetObject> targets, IReadOnlyList<bool> isVisible, BaseObjectShapeProvider shapes)
+    /// <param name="visibility">Parallel to <paramref name="targets"/>.</param>
+    public static VisibleTargetIndex Build(
+        IReadOnlyList<TargetObject> targets,
+        IReadOnlyList<ObjectVisibility> visibility,
+        BaseObjectShapeProvider shapes)
     {
         var bySpace = Enumerable.Range(0, targets.Count)
-            .Where(index => isVisible[index])
+            .Where(index => visibility[index].IsVisible)
             .GroupBy(index => targets[index].SpaceKey)
             .ToDictionary(group => group.Key, group => CreateSpaceEntries(group.ToArray(), targets, shapes));
         return new VisibleTargetIndex(bySpace);
@@ -31,41 +37,42 @@ internal sealed class VisibleTargetIndex
 
     private static SpaceEntries CreateSpaceEntries(int[] targetIndices, IReadOnlyList<TargetObject> targets, BaseObjectShapeProvider shapes)
     {
-        var centers = targetIndices.Select(index => GetBoundsCenter(targets[index], shapes)).ToArray();
-        return new SpaceEntries(targetIndices, centers, SpatialGrid.FromPoints(centers));
+        var boxes = targetIndices
+            .Select(index => OrientedBox.FromLocal(shapes.GetLocalBox(targets[index].Base), targets[index].Transform))
+            .ToArray();
+        return new SpaceEntries(targetIndices, boxes, SpatialGrid.FromBoxes(boxes.Select(box => box.WorldAabb(0f)).ToArray()));
     }
 
-    private static Vector3 GetBoundsCenter(TargetObject target, BaseObjectShapeProvider shapes)
+    /// <summary>Visible target objects of the same space whose box lies within <paramref name="radius"/> of <paramref name="invisible"/>'s position.</summary>
+    public List<VisibleNeighbour> FindAround(TargetObject invisible, float radius)
     {
-        var center = Geometry.WorldBoundsCenter(shapes.GetLocalBox(target.Base), target.Transform);
-        return Geometry.IsFinite(center) ? center : target.Transform.Position;
-    }
+        var neighbours = new List<VisibleNeighbour>();
+        if (!_bySpace.TryGetValue(invisible.SpaceKey, out var space)) return neighbours;
 
-    /// <summary>Visible target objects of the same space whose bounds centre lies within <paramref name="radius"/> horizontally.</summary>
-    public QuadrantCounts CountAround(TargetObject invisible, float radius, IReadOnlySet<int> removedTargets)
-    {
-        var counts = new QuadrantCounts();
-        if (!_bySpace.TryGetValue(invisible.SpaceKey, out var space)) return counts;
-
-        var origin = new Vector2(invisible.Transform.Position.X, invisible.Transform.Position.Y);
+        var origin = invisible.Transform.Position;
         foreach (var entry in FindCandidates(space, origin, radius))
         {
-            var center = space.Centers[entry];
-            var offset = new Vector2(center.X, center.Y) - origin;
-            if (offset.LengthSquared() > radius * radius) continue;
-            counts.Add(QuadrantCounts.QuadrantOf(offset), removedTargets.Contains(space.TargetIndices[entry]));
+            var box = space.Boxes[entry];
+            var closest = box.ClosestPoint(origin);
+            var distance = Vector3.Distance(closest, origin);
+            if (distance > radius) continue;
+            neighbours.Add(new VisibleNeighbour(space.TargetIndices[entry], distance, QuadrantCounts.QuadrantOf(HorizontalDirection(origin, closest, box.Center))));
         }
-        return counts;
+        return neighbours;
     }
 
-    /// <summary>Each point is indexed in exactly one grid cell, so no entry is returned twice.</summary>
-    private static List<int> FindCandidates(SpaceEntries space, Vector2 origin, float radius)
+    /// <summary>Towards the closest point of the box, or towards its centre when the point is inside the box or right above or below it.</summary>
+    private static Vector2 HorizontalDirection(Vector3 origin, Vector3 closest, Vector3 center)
     {
-        var area = new Box(
-            new Vector3(origin.X - radius, origin.Y - radius, 0f),
-            new Vector3(origin.X + radius, origin.Y + radius, 0f));
+        var toClosest = new Vector2(closest.X - origin.X, closest.Y - origin.Y);
+        return toClosest != Vector2.Zero ? toClosest : new Vector2(center.X - origin.X, center.Y - origin.Y);
+    }
+
+    /// <summary>Boxes can be indexed in several grid cells, so duplicates are removed.</summary>
+    private static IEnumerable<int> FindCandidates(SpaceEntries space, Vector3 origin, float radius)
+    {
         var candidates = new List<int>();
-        space.Grid.Collect(area, candidates);
-        return candidates;
+        space.Grid.Collect(new Box(origin, origin).Grown(radius), candidates);
+        return candidates.Distinct();
     }
 }

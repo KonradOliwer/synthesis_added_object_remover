@@ -6,8 +6,9 @@ namespace AddedObjectRemover;
 
 /// <summary>Validated settings of one run.</summary>
 /// <param name="AnchoringThreshold">Fraction (0-1) of an object's support that must come from removed objects for Anchoring to remove it.</param>
-/// <param name="OrphanCheckRadius">Horizontal radius around an invisible target object in which the target's visible objects are counted.</param>
-/// <param name="OrphanRemovedShare">Fraction (0-1) of those visible objects that must be removed for the invisible object to be removed.</param>
+/// <param name="LeftoverSearchRadius">Distance from an invisible target object to the target's visible objects that count as its surroundings.</param>
+/// <param name="LeftoverRemovedShare">Fraction (0-1) of those surroundings that must be removed for the invisible object to be removed.</param>
+/// <param name="ProtectedKinds">Invisible object kinds that are never removed as leftovers.</param>
 /// <param name="DiagnosticsFolder">Empty when no diagnostics files are written.</param>
 internal sealed record RunConfig(
     ModKey Target,
@@ -20,9 +21,11 @@ internal sealed record RunConfig(
     FollowUpRemovalMode FollowUpMode,
     float TouchDistance,
     float AnchoringThreshold,
-    bool RemoveOrphanedInvisibleObjects,
-    float OrphanCheckRadius,
-    float OrphanRemovedShare,
+    bool RemoveLeftoverInvisibleObjects,
+    float LeftoverSearchRadius,
+    float LeftoverRemovedShare,
+    ProtectedInvisibleObjectsPreset ProtectedPreset,
+    IReadOnlySet<InvisibleObjectKind> ProtectedKinds,
     bool DetailedLog,
     string DiagnosticsFolder)
 {
@@ -41,25 +44,28 @@ internal static class RunConfigFactory
         ModKey.FromNameAndExtension("Dragonborn.esm"),
     ];
 
-    private const float MinThresholdPercent = 1f;
-    private const float MaxThresholdPercent = 99f;
-    private const float MinOrphanSharePercent = 1f;
-    private const float MaxOrphanSharePercent = 100f;
+    private const float MaxSizeMultiplier = 5f;
+    private const float MaxTouchDistance = 64f;
+    private const float MinPercent = 1f;
+    private const float MaxPercent = 100f;
     private const float PercentPerWhole = 100f;
 
     /// <summary>Null (after logging why) when the run must make no changes.</summary>
     public static RunConfig? Create(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, Settings settings)
     {
-        if (!TryFindTarget(state, settings.WhatToCheck.TargetPlugin, out var target, out var targetMod)) return null;
+        var check = settings.WhatToCheck ?? new CheckSettings();
+        if (!TryFindTarget(state, check.TargetPlugin, out var target, out var targetMod)) return null;
 
-        var ignore = settings.WhatToIgnore;
-        var excluded = ParseExcludedPlugins(ignore.ExcludedPlugins);
+        var ignore = settings.WhatToIgnore ?? new IgnoreSettings();
+        var excluded = ParseExcludedPlugins(ignore.ExcludedPlugins ?? []);
         var masters = ignore.IgnoreTargetMasters ? GetTargetMasters(target, targetMod) : [];
         var ignored = new HashSet<ModKey>(BaseGamePlugins) { target, state.PatchMod.ModKey };
         ignored.UnionWith(excluded);
         ignored.UnionWith(masters);
 
-        var followUp = settings.FollowUpRemoval;
+        var followUp = settings.FollowUpRemoval ?? new FollowUpRemovalSettings();
+        var leftovers = settings.LeftoverInvisibleObjects ?? new LeftoverInvisibleObjectSettings();
+        var protectedPreset = ValidatePreset(leftovers.ProtectedTypes);
         return new RunConfig(
             Target: target,
             TargetMod: targetMod,
@@ -67,24 +73,30 @@ internal static class RunConfigFactory
             ExcludedPlugins: excluded,
             TargetMasters: masters,
             IgnoreTargetMasters: ignore.IgnoreTargetMasters,
-            SizeMultiplier: AtLeast(settings.WhatToCheck.SizeMultiplier, 0, "size multiplier"),
+            SizeMultiplier: Clamp(check.SizeMultiplier, 0, MaxSizeMultiplier, CheckSettings.DefaultSizeMultiplier, "size multiplier"),
             FollowUpMode: ValidateMode(followUp.Mode),
-            TouchDistance: AtLeast(followUp.TouchDistance, 0, "touch distance"),
-            AnchoringThreshold: ClampPercent(
-                followUp.AnchoringThresholdPercent, MinThresholdPercent, MaxThresholdPercent,
+            TouchDistance: Clamp(followUp.TouchDistance, 0, MaxTouchDistance, FollowUpRemovalSettings.DefaultTouchDistance, "touch distance"),
+            AnchoringThreshold: Clamp(
+                followUp.AnchoringThresholdPercent, MinPercent, MaxPercent,
                 FollowUpRemovalSettings.DefaultAnchoringThresholdPercent, "anchoring threshold") / PercentPerWhole,
-            RemoveOrphanedInvisibleObjects: followUp.RemoveOrphanedInvisibleObjects,
-            OrphanCheckRadius: Positive(followUp.OrphanCheckRadius, FollowUpRemovalSettings.DefaultOrphanCheckRadius, "orphan check radius"),
-            OrphanRemovedShare: ClampPercent(
-                followUp.OrphanRemovedSharePercent, MinOrphanSharePercent, MaxOrphanSharePercent,
-                FollowUpRemovalSettings.DefaultOrphanRemovedSharePercent, "orphan removed share") / PercentPerWhole,
-            DetailedLog: settings.Diagnostics.DetailedLog,
-            DiagnosticsFolder: settings.Diagnostics.DiagnosticsFolder.Trim());
+            RemoveLeftoverInvisibleObjects: leftovers.RemoveLeftoverInvisibleObjects,
+            LeftoverSearchRadius: Positive(leftovers.SearchRadius, LeftoverInvisibleObjectSettings.DefaultSearchRadius, "search radius"),
+            LeftoverRemovedShare: Clamp(
+                leftovers.RemovedSurroundingsPercent, MinPercent, MaxPercent,
+                LeftoverInvisibleObjectSettings.DefaultRemovedSurroundingsPercent, "removed surroundings percentage") / PercentPerWhole,
+            ProtectedPreset: protectedPreset,
+            ProtectedKinds: ProtectedInvisibleObjects.Resolve(protectedPreset, ValidateKinds(leftovers.CustomProtectedTypes ?? [])),
+            DetailedLog: settings.Diagnostics?.DetailedLog ?? false,
+            DiagnosticsFolder: ReadDiagnosticsFolder(settings));
     }
+
+    /// <summary>Empty when no diagnostics folder is set.</summary>
+    public static string ReadDiagnosticsFolder(Settings settings) =>
+        settings.Diagnostics?.DiagnosticsFolder?.Trim() ?? string.Empty;
 
     private static bool TryFindTarget(
         IPatcherState<ISkyrimMod, ISkyrimModGetter> state,
-        string targetPlugin,
+        string? targetPlugin,
         out ModKey target,
         out ISkyrimModGetter? targetMod)
     {
@@ -111,7 +123,7 @@ internal static class RunConfigFactory
         return true;
     }
 
-    private static List<ModKey> ParseExcludedPlugins(IEnumerable<string> names)
+    private static List<ModKey> ParseExcludedPlugins(IEnumerable<string?> names)
     {
         var excluded = new List<ModKey>();
         foreach (var name in names)
@@ -142,15 +154,26 @@ internal static class RunConfigFactory
     private static FollowUpRemovalMode ValidateMode(FollowUpRemovalMode mode)
     {
         if (Enum.IsDefined(mode)) return mode;
-        Console.WriteLine($"Warning: follow-up removal mode {mode} is invalid; using {FollowUpRemovalMode.AnyTouch}.");
-        return FollowUpRemovalMode.AnyTouch;
+        Console.WriteLine($"Warning: follow-up removal mode {mode} is invalid; using {FollowUpRemovalSettings.DefaultMode}.");
+        return FollowUpRemovalSettings.DefaultMode;
     }
 
-    private static float AtLeast(float value, float minimum, string name)
+    private static ProtectedInvisibleObjectsPreset ValidatePreset(ProtectedInvisibleObjectsPreset preset)
     {
-        if (float.IsFinite(value) && value >= minimum) return value;
-        Console.WriteLine($"Warning: {name} {value} is invalid; using {minimum}.");
-        return minimum;
+        if (Enum.IsDefined(preset)) return preset;
+        Console.WriteLine($"Warning: protected types {preset} is invalid; using {ProtectedInvisibleObjectsPreset.None}.");
+        return ProtectedInvisibleObjectsPreset.None;
+    }
+
+    private static List<InvisibleObjectKind> ValidateKinds(IEnumerable<InvisibleObjectKind> kinds)
+    {
+        var valid = new List<InvisibleObjectKind>();
+        foreach (var kind in kinds)
+        {
+            if (Enum.IsDefined(kind)) valid.Add(kind);
+            else Console.WriteLine($"Warning: custom protected type {kind} is invalid and was ignored.");
+        }
+        return valid;
     }
 
     /// <summary>A value of 0 or less has no nearest valid value, so it falls back to the default.</summary>
@@ -161,10 +184,11 @@ internal static class RunConfigFactory
         return defaultValue;
     }
 
-    private static float ClampPercent(float value, float minimum, float maximum, float defaultValue, string name)
+    /// <summary>Out of range values become the nearest valid value; values that are not a number become the default.</summary>
+    private static float Clamp(float value, float minimum, float maximum, float defaultValue, string name)
     {
         if (value >= minimum && value <= maximum) return value;
-        var clamped = float.IsFinite(value) ? Math.Clamp(value, minimum, maximum) : defaultValue;
+        var clamped = float.IsNaN(value) ? defaultValue : Math.Clamp(value, minimum, maximum);
         Console.WriteLine($"Warning: {name} {value} is outside {minimum}-{maximum}; using {clamped}.");
         return clamped;
     }

@@ -3,14 +3,24 @@ using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover;
 
-/// <summary>Teleport doors and targets other placed objects link to are never removed.</summary>
-internal sealed class KeepReferencedRule(IReadOnlyDictionary<FormKey, string> targetReferences)
+/// <summary>Why a target object is never removed.</summary>
+/// <param name="Category">Groups reasons in the summary, e.g. "Enable Parent of a placed object" or "linked from a Quest".</param>
+/// <param name="Detail">The full reason for the detailed log, naming the linking record.</param>
+internal sealed record KeepReason(string Category, string Detail);
+
+/// <summary>
+/// Teleport doors and targets that another record links to (placed objects, quests, packages,
+/// locations, scripts, ...) are never removed, because the game may crash or break on them.
+/// </summary>
+internal sealed class KeepReferencedRule(IReadOnlyDictionary<FormKey, KeepReason> targetReferences)
 {
-    public bool TryGetKeepReason(TargetObject target, [NotNullWhen(true)] out string? reason)
+    private static readonly KeepReason TeleportDoor = new("teleport door", "teleport door");
+
+    public bool TryGetKeepReason(TargetObject target, [NotNullWhen(true)] out KeepReason? reason)
     {
         if (target.IsTeleportDoor)
         {
-            reason = "teleport door";
+            reason = TeleportDoor;
             return true;
         }
         return targetReferences.TryGetValue(target.Record.FormKey, out reason);

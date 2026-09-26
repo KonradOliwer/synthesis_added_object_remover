@@ -18,7 +18,7 @@ internal sealed class AnchoringSupporterFinder(
     public List<MeshSupporter> FindMeshSupporters(int candidate)
     {
         var found = FindTargetSupporters(candidate);
-        found.AddRange(FindPlacedSupporters(targets[candidate]));
+        found.AddRange(FindPlacedSupporters(candidate));
         return found;
     }
 
@@ -27,15 +27,15 @@ internal sealed class AnchoringSupporterFinder(
             .Select(neighbor => new MeshSupporter(Supporter.Target(neighbor), targets[neighbor].Transform, search.MeshPaths.Get(neighbor)))
             .ToList();
 
-    private IEnumerable<MeshSupporter> FindPlacedSupporters(TargetObject candidate)
+    private IEnumerable<MeshSupporter> FindPlacedSupporters(int candidate)
     {
-        var index = supporters.GetSpace(candidate.SpaceKey);
-        var candidateBox = OrientedBox.FromLocal(shapes.GetLocalBox(candidate.Base), candidate.Transform);
+        var index = supporters.GetSpace(targets[candidate].SpaceKey);
+        var candidateBox = search.CandidateFinder.BoxOf(candidate);
         var slots = new List<int>();
-        index.Grid.Collect(candidateBox.WorldAabb(touchDistance + TooCloseSearch.OtherObjectSearchMargin), slots);
+        index.Grid.Collect(candidateBox.WorldAabb(touchDistance + OtherObjectIndex.RawPositionSearchMargin), slots);
         foreach (var slot in slots.Distinct().Order())
         {
-            if (!index.TryGetVisibleCenter(slot, out _)) continue;
+            if (!index.IsVisible(slot)) continue;
             var placed = index[slot];
             if (shapes.GetMeshPath(placed.Base) is not { } meshPath) continue;
 

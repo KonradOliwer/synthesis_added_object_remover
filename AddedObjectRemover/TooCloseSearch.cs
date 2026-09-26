@@ -5,18 +5,11 @@ using Mutagen.Bethesda.Plugins;
 namespace AddedObjectRemover;
 
 /// <summary>
-/// Finds target objects whose grown (multiplier-expanded) local box contains the bounds center of
-/// some other-mod object.
+/// Finds visible target objects whose grown (multiplier-expanded) local box contains the bounds
+/// center of some other-mod object. Invisible targets are left to the leftover invisible objects step.
 /// </summary>
 internal static class TooCloseSearch
 {
-    /// <summary>
-    /// Margin (game units) added to a target's search AABB when querying the grid, to compensate
-    /// for indexing other objects by their raw position rather than their (possibly mesh-offset)
-    /// bounds center. One exterior cell width is a generous bound in practice.
-    /// </summary>
-    public const float OtherObjectSearchMargin = 4096f;
-
     /// <summary>A struct so the grid query is allocation-free and inlinable.</summary>
     private readonly struct TooCloseMatcher(OtherObjectIndex index, Box expanded, Vector3 position, Mat3 rotation)
         : IGridMatcher
@@ -31,8 +24,10 @@ internal static class TooCloseSearch
     /// Each target writes only its own result slot and hits are returned in target order, so the
     /// result (including which other object is reported) does not depend on thread scheduling.
     /// </summary>
+    /// <param name="visibility">Parallel to <paramref name="targets"/>.</param>
     public static List<TooCloseHit> FindTooCloseTargets(
         IReadOnlyList<TargetObject> targets,
+        IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
         BaseObjectShapeProvider shapes,
         float multiplier,
@@ -43,7 +38,7 @@ internal static class TooCloseSearch
         {
             for (var i = range.Item1; i < range.Item2; i++)
             {
-                matches[i] = FindFirstTooCloseOther(targets[i], indexes[targets[i].SpaceKey], shapes, multiplier);
+                matches[i] = visibility[i].IsVisible ? FindFirstTooCloseOther(targets[i], indexes[targets[i].SpaceKey], shapes, multiplier) : -1;
             }
         });
 
@@ -63,9 +58,7 @@ internal static class TooCloseSearch
         var position = target.Transform.Position;
         var rotation = target.Transform.Rotation;
         var expanded = Geometry.ExpandedLocalBox(shapes.GetLocalBox(target.Base), target.Transform.Scale, multiplier);
-        var searchArea = Geometry.WorldAabb(expanded, position, rotation);
-        var margin = new Vector3(OtherObjectSearchMargin);
-        var queryArea = new Box(searchArea.Min - margin, searchArea.Max + margin);
+        var queryArea = Geometry.WorldAabb(expanded, position, rotation).Grown(OtherObjectIndex.RawPositionSearchMargin);
 
         var matcher = new TooCloseMatcher(index, expanded, position, rotation);
         return index.Grid.TryFindFirst(queryArea, ref matcher, out var match) ? match : -1;

@@ -4,9 +4,8 @@ namespace AddedObjectRemover;
 
 /// <summary>
 /// Placed objects of any plugin, apart from the target objects themselves, that may hold up an
-/// Anchoring candidate (collected by <see cref="PlacedRecordScanner"/> in the target spaces). A
-/// space is indexed on its first query, so only spaces with candidates are ever indexed, and each
-/// object's visibility is judged lazily as in the too-close test. Thread-safe.
+/// Anchoring candidate. A space is indexed on its first query, so only spaces with candidates are
+/// ever indexed, and each object's visibility is judged lazily. Thread-safe.
 /// </summary>
 internal sealed class SupporterIndex(IReadOnlyDictionary<FormKey, List<OtherObject>> objectsBySpace, BaseObjectShapeProvider shapes)
 {

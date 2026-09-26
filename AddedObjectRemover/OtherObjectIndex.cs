@@ -4,8 +4,7 @@ using Mutagen.Bethesda.Plugins;
 namespace AddedObjectRemover;
 
 /// <summary>
-/// Placed objects of one space (other mods' objects, or Anchoring supporters), indexed by their
-/// raw position only. Each object's true bounds center (which may need a mesh read) is computed at
+/// Placed objects of one space, indexed by their raw position only. Each object's true bounds center (which may need a mesh read) is computed at
 /// most once, lazily, the first time a query turns the object up, so objects that are never
 /// candidates are never measured. Objects whose base is invisible are found the same lazy way and
 /// then never match.
@@ -16,6 +15,13 @@ namespace AddedObjectRemover;
 /// </summary>
 internal sealed class OtherObjectIndex
 {
+    /// <summary>
+    /// Margin (game units) to add to an area queried in <see cref="Grid"/>, because objects are
+    /// indexed by their raw position rather than their (possibly mesh-offset) bounds. One exterior
+    /// cell width is a generous bound in practice.
+    /// </summary>
+    public const float RawPositionSearchMargin = 4096f;
+
     private const int NotMeasured = 0;
     private const int Visible = 1;
     private const int Invisible = 2;
@@ -91,25 +97,22 @@ internal sealed class OtherObjectIndex
         return state == Visible;
     }
 
+    public bool IsVisible(int index) => TryGetVisibleCenter(index, out _);
+
     private int MeasureAndPublish(int index)
     {
         ref readonly var other = ref _objects[index];
-        var reason = _shapes.GetInvisibleReason(other.Base, other.IsPrimitive, other.HasMapMarker);
-        int state;
-        if (reason != null)
-        {
-            state = Invisible;
-        }
-        else
+        var visibility = _shapes.GetVisibility(other.Base, other.IsPrimitive, other.HasMapMarker);
+        if (visibility.IsVisible)
         {
             var point = Geometry.WorldBoundsCenter(_shapes.GetLocalBox(other.Base), other.Transform);
             _centers[index] = Geometry.IsFinite(point) ? point : other.Position;
-            state = Visible;
         }
 
-        if (Interlocked.CompareExchange(ref _state[index], state, NotMeasured) == NotMeasured && reason != null)
+        var state = visibility.IsVisible ? Visible : Invisible;
+        if (Interlocked.CompareExchange(ref _state[index], state, NotMeasured) == NotMeasured && !visibility.IsVisible)
         {
-            _invisible?.Add(reason);
+            _invisible?.Add(visibility.Describe());
         }
         return state;
     }

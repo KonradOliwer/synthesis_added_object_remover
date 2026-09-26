@@ -143,6 +143,13 @@ internal readonly record struct OrientedBox(Vector3 Center, Mat3 Rotation, Vecto
     /// <summary>World AABB enclosing this box grown by <paramref name="padding"/> on every side.</summary>
     public Box WorldAabb(float padding) => Geometry.RotatedAabb(Center, Rotation, HalfExtents).Grown(padding);
 
+    /// <summary>The point of this box (surface or inside) closest to <paramref name="point"/>; the point itself when inside.</summary>
+    public Vector3 ClosestPoint(Vector3 point)
+    {
+        var local = Rotation.TransformTransposed(point - Center);
+        return Center + Rotation.Transform(Vector3.Clamp(local, -HalfExtents, HalfExtents));
+    }
+
     /// <summary>
     /// Separating axis test (15 axes, Ericson, Real-Time Collision Detection 4.4.1): true if the
     /// boxes intersect once this box is grown by <paramref name="padding"/> on every side
@@ -210,7 +217,6 @@ internal static class Geometry
     public static bool IsWithinLimits(Vector3 v) =>
         MathF.Abs(v.X) <= MaxCoordinate && MathF.Abs(v.Y) <= MaxCoordinate && MathF.Abs(v.Z) <= MaxCoordinate;
 
-    // TODO: verify the multi-axis order in-game.
     /// <summary>
     /// Turns a placed reference's Euler rotation (REFR/ACHR DATA, radians, X/Y/Z as stored in
     /// Placement.Rotation) into a rotation matrix.

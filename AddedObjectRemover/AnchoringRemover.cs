@@ -40,8 +40,8 @@ internal sealed record AnchoringResult(
 
 /// <summary>
 /// Anchoring follow-up removal. Candidates are target objects with a mesh that touch an object
-/// removed in the previous iteration (at first the too-close removals), or whose mesh centre that
-/// object's mesh encloses: support also counts enclosed samples, so an object buried inside a
+/// removed in the previous iteration (at first the too-close removals), or whose mesh centre area
+/// that object's mesh encloses: support also counts enclosed samples, so an object buried inside a
 /// removed one must become a candidate although no surfaces come close. Each candidate's support
 /// is split among its supporters by weighted contact points (<see cref="AnchoringContactFinder"/>),
 /// and it is removed when the share held by removed target objects reaches the threshold. Newly
@@ -52,6 +52,9 @@ internal sealed record AnchoringResult(
 /// </summary>
 internal sealed class AnchoringRemover
 {
+    /// <summary>Shares are sums of float fractions, so support that is fully removed can add up to slightly less than 1.</summary>
+    private const float ShareRoundingTolerance = 1e-5f;
+
     private readonly IReadOnlyList<TargetObject> _targets;
     private readonly KeepReferencedRule _keepRule;
     private readonly TouchSearch _search;
@@ -102,6 +105,7 @@ internal sealed class AnchoringRemover
         SupporterIndex supporters,
         TerrainHeights terrain,
         BaseObjectShapeProvider shapes,
+        TriangleTreeCache meshCache,
         KeepReferencedRule keepRule,
         float touchDistance,
         float threshold,
@@ -109,7 +113,7 @@ internal sealed class AnchoringRemover
     {
         var (remover, setup) = Timing.Measure(() =>
         {
-            var search = TouchSearch.Create(targets, seeds, excluded: [], shapes, touchDistance, parallelOptions);
+            var search = TouchSearch.Create(targets, seeds, excluded: [], shapes, meshCache, touchDistance, parallelOptions);
             var supporterFinder = new AnchoringSupporterFinder(targets, search, supporters, shapes, touchDistance);
             var contactFinder = new AnchoringContactFinder(targets, search.MeshPaths, supporterFinder, terrain, search.Cache, touchDistance);
             return new AnchoringRemover(targets, keepRule, search, contactFinder, threshold, parallelOptions);
@@ -174,7 +178,7 @@ internal sealed class AnchoringRemover
         return candidates.ToList();
     }
 
-    private void LogKeptOnce(int target, string reason, int touchedTarget)
+    private void LogKeptOnce(int target, KeepReason reason, int touchedTarget)
     {
         if (_keptLogged[target]) return;
         _keptLogged[target] = true;
@@ -217,7 +221,7 @@ internal sealed class AnchoringRemover
             .ThenBy(share => share.Supporter.Index)
             .ToList();
         var evaluation = new AnchoringEvaluation(candidate, _iterations, contacts, shares, Removed: false);
-        return evaluation with { Removed = evaluation.RemovedShare >= _threshold };
+        return evaluation with { Removed = evaluation.RemovedShare >= _threshold - ShareRoundingTolerance };
     }
 
     private SupportCategory Categorize(Supporter supporter) => supporter.Type switch

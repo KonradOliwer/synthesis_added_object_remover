@@ -83,7 +83,8 @@ internal static class PointContactTest
 
     /// <summary>
     /// Z at which the line along Z through the point crosses the triangle's interior.
-    /// Crossings exactly on an edge are not counted; sample points almost never land there.
+    /// Crossings exactly on an edge are not counted, so points on a mesh's symmetry planes, where
+    /// they are common, must be avoided.
     /// </summary>
     private static bool TryGetLineCrossing(MeshTriangle triangle, Vector3 point, out float z)
     {

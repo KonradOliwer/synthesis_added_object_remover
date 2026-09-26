@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Plugins.Cache;
 using Mutagen.Bethesda.Plugins.Records;
@@ -20,8 +19,8 @@ internal sealed class ScanResult
     public Dictionary<FormKey, List<OtherObject>> OthersBySpace { get; } = new();
     public Dictionary<FormKey, string> SpaceNames { get; } = new();
 
-    /// <summary>Target FormKey -> why another placed object depends on it (first reason found).</summary>
-    public Dictionary<FormKey, string> TargetReferences { get; } = new();
+    /// <summary>Target FormKey -> why another record depends on it (first reason found).</summary>
+    public Dictionary<FormKey, KeepReason> TargetReferences { get; } = new();
 
     public List<OverriddenOtherRecord> OverriddenOthersLog { get; } = [];
 
@@ -57,8 +56,8 @@ internal sealed record TargetPluginFootprint(HashSet<FormKey> SpaceKeys, HashSet
 
 /// <summary>
 /// Collects target objects and other mods' objects from every winning placed record (REFR, ACHR
-/// and all placed trap/hazard/projectile types), and for Anchoring also every possible supporter
-/// and the terrain of the target worldspaces.
+/// and all placed trap/hazard/projectile types), the records that link to target objects, and for
+/// Anchoring also every possible supporter and the terrain of the target worldspaces.
 ///
 /// Walks each mod's cell tree once via <c>EnumerateMajorRecordContexts&lt;ICell&gt;</c> (enumerating
 /// IPlaced walks each tree three times) and reads each cell's Persistent and Temporary lists itself.
@@ -94,7 +93,19 @@ internal sealed class PlacedRecordScanner
     public static ScanResult Scan(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, RunConfig config)
     {
         var footprint = AnalyzeTargetPlugin(state, config);
-        return new PlacedRecordScanner(state, config, footprint).ScanLoadOrder();
+        var scan = new PlacedRecordScanner(state, config, footprint).ScanLoadOrder();
+        CollectNonPlacedReferences(state, config, scan);
+        return scan;
+    }
+
+    private static void CollectNonPlacedReferences(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, RunConfig config, ScanResult scan)
+    {
+        var referencingMods = state.LoadOrder.PriorityOrder
+            .Select(listing => listing.Mod)
+            .OfType<ISkyrimModGetter>()
+            .Where(mod => MayReferenceTarget(state, config, mod));
+        var targets = scan.Targets.Select(target => target.Record.FormKey).ToHashSet();
+        TargetReferenceCollector.CollectFromNonPlaced(referencingMods, targets, scan.TargetReferences);
     }
 
     private void FindLandWorldspaces()
@@ -125,7 +136,7 @@ internal sealed class PlacedRecordScanner
         foreach (var listing in _state.LoadOrder.PriorityOrder)
         {
             if (listing.Mod is not { } mod) continue;
-            var collectReferences = MayReferenceTarget(mod);
+            var collectReferences = MayReferenceTarget(_state, _config, mod);
             foreach (var cellContext in mod.EnumerateMajorRecordContexts<ICell, ICellGetter>(_state.LinkCache))
             {
                 ScanCell(cellContext, listing.ModKey, collectReferences);
@@ -135,10 +146,10 @@ internal sealed class PlacedRecordScanner
     }
 
     /// <summary>A plugin can only link to a target FormKey if it is the target, has it as a master, or is the patch.</summary>
-    private bool MayReferenceTarget(ISkyrimModGetter mod) =>
-        mod.ModKey == _config.Target
-        || mod.ModKey == _state.PatchMod.ModKey
-        || mod.MasterReferences.Any(master => master.Master == _config.Target);
+    private static bool MayReferenceTarget(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, RunConfig config, ISkyrimModGetter mod) =>
+        mod.ModKey == config.Target
+        || mod.ModKey == state.PatchMod.ModKey
+        || mod.MasterReferences.Any(master => master.Master == config.Target);
 
     /// <summary>
     /// Walks only the target plugin's own cell tree. A FormKey the target overrides is a
@@ -204,25 +215,18 @@ internal sealed class PlacedRecordScanner
 
         if (collectReferences)
         {
-            TargetReferenceCollector.Collect(record, _config.Target, _scan.TargetReferences);
+            TargetReferenceCollector.CollectFromPlaced(record, _config.Target, _scan.TargetReferences);
         }
 
         var role = Classify(record, winningMod);
-        if (_collectsAnchoringData && inTargetSpace && role != RecordRole.Target) AddSupporter(record, space.SpaceKey, winningMod);
-        switch (role)
+        var placement = GetPlacementInWorld(record);
+        if (_collectsAnchoringData && inTargetSpace && role != RecordRole.Target && placement != null)
         {
-            case RecordRole.TargetOverriddenLater:
-                _scan.TargetsOverriddenLater++;
-                return;
-            case RecordRole.IgnoredOrigin:
-                return;
-            case RecordRole.OverriddenByTarget:
-                _scan.OthersOverriddenByTarget++;
-                if (_config.DetailedLog) _scan.OverriddenOthersLog.Add(new OverriddenOtherRecord(record.FormKey, record.EditorID, winningMod));
-                return;
+            AddSupporter(record, placement, space.SpaceKey, winningMod);
         }
+        if (CountIfSkipped(role, record, winningMod)) return;
 
-        if (!TryGetPlacementInWorld(record, out var placement))
+        if (placement == null)
         {
             if (role == RecordRole.Target) _scan.TargetsDisabledOrWithoutPlacement++;
             return;
@@ -235,11 +239,30 @@ internal sealed class PlacedRecordScanner
         else AddOther(record, placement, space.SpaceKey, winningMod);
     }
 
-    /// <summary>False for records the game does not show at a valid position: initially disabled, or without a usable placement.</summary>
-    private static bool TryGetPlacementInWorld(IPlacedGetter record, [NotNullWhen(true)] out IPlacementGetter? placement)
+    /// <returns>True when the record is neither a target nor another mod's object.</returns>
+    private bool CountIfSkipped(RecordRole role, IPlacedGetter record, ModKey winningMod)
     {
-        placement = record.IsInitiallyDisabled() ? null : record.Placement;
-        return placement != null && Geometry.IsWithinLimits(Geometry.ToVector(placement.Position));
+        switch (role)
+        {
+            case RecordRole.TargetOverriddenLater:
+                _scan.TargetsOverriddenLater++;
+                return true;
+            case RecordRole.IgnoredOrigin:
+                return true;
+            case RecordRole.OverriddenByTarget:
+                _scan.OthersOverriddenByTarget++;
+                if (_config.DetailedLog) _scan.OverriddenOthersLog.Add(new OverriddenOtherRecord(record.FormKey, record.EditorID, winningMod));
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>Null for records the game does not show at a valid position: initially disabled, or without a usable placement.</summary>
+    private static IPlacementGetter? GetPlacementInWorld(IPlacedGetter record)
+    {
+        var placement = record.IsInitiallyDisabled() ? null : record.Placement;
+        return placement != null && Geometry.IsWithinLimits(Geometry.ToVector(placement.Position)) ? placement : null;
     }
 
     private RecordRole Classify(IPlacedGetter record, ModKey winningMod)
@@ -264,7 +287,7 @@ internal sealed class PlacedRecordScanner
         _scan.Targets.Add(new TargetObject(
             Record: record,
             SpaceKey: space.SpaceKey,
-            CellName: _config.DetailedLog && cell.FormKey != space.SpaceKey ? RecordNames.Describe(cell) : null,
+            CellName: cell.FormKey != space.SpaceKey ? RecordNames.Describe(cell) : null,
             Transform: new PlacedTransform(
                 Geometry.ToVector(placement.Position),
                 Geometry.RotationFromEuler(placement.Rotation),
@@ -279,11 +302,8 @@ internal sealed class PlacedRecordScanner
     private void AddOther(IPlacedGetter record, IPlacementGetter placement, FormKey spaceKey, ModKey winningMod) =>
         AddToSpace(_scan.OthersBySpace, spaceKey, CreateOtherObject(record, placement, winningMod, _config.DetailedLog ? record.EditorID : null));
 
-    private void AddSupporter(IPlacedGetter record, FormKey spaceKey, ModKey winningMod)
-    {
-        if (!TryGetPlacementInWorld(record, out var placement)) return;
+    private void AddSupporter(IPlacedGetter record, IPlacementGetter placement, FormKey spaceKey, ModKey winningMod) =>
         AddToSpace(_scan.SupportersBySpace, spaceKey, CreateOtherObject(record, placement, winningMod, editorId: null));
-    }
 
     private static void AddToSpace(Dictionary<FormKey, List<OtherObject>> objectsBySpace, FormKey spaceKey, OtherObject placed)
     {

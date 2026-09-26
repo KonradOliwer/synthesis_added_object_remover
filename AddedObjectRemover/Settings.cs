@@ -9,6 +9,32 @@ public enum FollowUpRemovalMode
     Anchoring,
 }
 
+/// <summary>Kinds of placed objects that cannot be seen in game.</summary>
+public enum InvisibleObjectKind
+{
+    MapMarkers,
+    XMarkers,
+    IdleMarkers,
+    FurnitureMarkers,
+    DoorMarkers,
+    OtherMarkers,
+    Lights,
+    SoundMarkers,
+    AcousticSpaces,
+    CritterSpawners,
+    TriggerBoxes,
+    Decals,
+}
+
+public enum ProtectedInvisibleObjectsPreset
+{
+    None,
+    Markers,
+    MarkersAndLights,
+    MarkersLightsAndSounds,
+    Custom,
+}
+
 public class Settings
 {
     [SynthesisSettingName("What to check")]
@@ -20,25 +46,30 @@ public class Settings
     [SynthesisSettingName("Follow-up removal")]
     public FollowUpRemovalSettings FollowUpRemoval { get; set; } = new();
 
+    [SynthesisSettingName("Leftover invisible objects")]
+    public LeftoverInvisibleObjectSettings LeftoverInvisibleObjects { get; set; } = new();
+
     [SynthesisSettingName("Diagnostics")]
     public DiagnosticsSettings Diagnostics { get; set; } = new();
 }
 
 public class CheckSettings
 {
+    public const float DefaultSizeMultiplier = 0.5f;
+
     [SynthesisSettingName("Target plugin")]
     [SynthesisTooltip("File name of the plugin whose added objects are checked, e.g. 'SomeMod.esp'; when empty or not in the load order, nothing is changed.")]
     public string TargetPlugin { get; set; } = string.Empty;
 
     [SynthesisSettingName("Size multiplier")]
-    [SynthesisTooltip("How far past its own edges a target object reaches, as a fraction of its size (0.5 = half its size further out on every side); another mod's object whose centre falls inside makes it too close.")]
-    public float SizeMultiplier { get; set; } = 0.5f;
+    [SynthesisTooltip("How far past its own edges a target object reaches, as a fraction of its size (0-5; 0.5 = half its size further out on every side). Another mod's object whose centre falls inside makes it too close. Larger removes more; 0.25-1 is typical.")]
+    public float SizeMultiplier { get; set; } = DefaultSizeMultiplier;
 }
 
 public class IgnoreSettings
 {
     [SynthesisSettingName("Excluded plugins")]
-    [SynthesisTooltip("Plugins whose objects never count as a conflict (the base game plugins are always ignored).")]
+    [SynthesisTooltip("Plugins whose objects never count as a conflict (Skyrim.esm, Update.esm and the three DLCs are always ignored; Creation Club plugins are not).")]
     public List<string> ExcludedPlugins { get; set; } = [];
 
     [SynthesisSettingName("Ignore the target's masters")]
@@ -48,34 +79,47 @@ public class IgnoreSettings
 
 public class FollowUpRemovalSettings
 {
+    public const FollowUpRemovalMode DefaultMode = FollowUpRemovalMode.AnyTouch;
+    public const float DefaultTouchDistance = 8f;
     public const float DefaultAnchoringThresholdPercent = 50f;
-    public const float DefaultOrphanCheckRadius = 1024f;
-    public const float DefaultOrphanRemovedSharePercent = 50f;
 
     [SynthesisSettingName("Follow-up removal mode")]
-    [SynthesisTooltip("What happens to target objects touching a removed one: Off keeps them, AnyTouch removes every touching object, Anchoring removes only objects that lose most of their support.")]
-    public FollowUpRemovalMode Mode { get; set; } = FollowUpRemovalMode.AnyTouch;
+    [SynthesisTooltip("What happens to target objects touching a removed one. Off: only the too-close objects are removed. AnyTouch: also every target object connected to them through touching target objects (can spread through floors and walls). Anchoring: only touching objects that lose at least the Anchoring threshold of what they rest on.")]
+    public FollowUpRemovalMode Mode { get; set; } = DefaultMode;
 
     [SynthesisSettingName("Touch distance")]
-    [SynthesisTooltip("Largest gap, in game units, between two surfaces for them to count as touching (used by AnyTouch and Anchoring).")]
-    public float TouchDistance { get; set; } = 8f;
+    [SynthesisTooltip("Largest gap, in game units (0-64), between two surfaces for them to count as touching (AnyTouch and Anchoring).")]
+    public float TouchDistance { get; set; } = DefaultTouchDistance;
 
     [SynthesisSettingName("Anchoring threshold")]
-    [SynthesisTooltip("Anchoring only: an object is removed when at least this percentage (1-99) of its support comes from removed objects.")]
+    [SynthesisTooltip("Anchoring only: a touching object is removed when at least this percentage (1-100) of what it rests on or touches was removed; the ground and objects of any plugin count as support.")]
     public float AnchoringThresholdPercent { get; set; } = DefaultAnchoringThresholdPercent;
+}
 
-    [SynthesisSettingName("Remove orphaned invisible objects")]
-    [SynthesisTooltip("Also remove target objects you cannot see (insect spawns, sounds, markers, lights, ...) once the scenery around them has been removed.")]
-    public bool RemoveOrphanedInvisibleObjects { get; set; } = true;
+public class LeftoverInvisibleObjectSettings
+{
+    public const float DefaultSearchRadius = 1024f;
+    public const float DefaultRemovedSurroundingsPercent = 50f;
 
-    [SynthesisSettingName("Orphan check radius")]
-    [SynthesisTooltip("How far, in game units, around an invisible object to look for the target's visible scenery (must be more than 0).")]
-    public float OrphanCheckRadius { get; set; } = DefaultOrphanCheckRadius;
+    [SynthesisSettingName("Remove leftover invisible objects")]
+    [SynthesisTooltip("In every follow-up mode, also remove the target's invisible objects (lights, sounds, markers, insect spawners, trigger boxes, ...) once the target's visible objects around them were removed.")]
+    public bool RemoveLeftoverInvisibleObjects { get; set; } = true;
 
-    [SynthesisSettingName("Orphan removed share")]
-    [SynthesisTooltip("An invisible object is removed when at least this percentage (1-100) of the scenery around it was removed and every side of it lost some.")]
-    public float OrphanRemovedSharePercent { get; set; } = DefaultOrphanRemovedSharePercent;
+    [SynthesisSettingName("Search radius")]
+    [SynthesisTooltip("Distance in game units (more than 0) from an invisible object to the edges of the target's visible objects that count as its surroundings.")]
+    public float SearchRadius { get; set; } = DefaultSearchRadius;
 
+    [SynthesisSettingName("Removed surroundings percentage")]
+    [SynthesisTooltip("An invisible object is removed when at least this percentage (1-100) of its surroundings was removed, including the nearest object and at least one object on every side.")]
+    public float RemovedSurroundingsPercent { get; set; } = DefaultRemovedSurroundingsPercent;
+
+    [SynthesisSettingName("Protected types")]
+    [SynthesisTooltip("Invisible object types that are always kept.\nNone: nothing is protected.\nMarkers: map, X, idle, furniture and door markers.\nMarkersAndLights: Markers plus lights.\nMarkersLightsAndSounds: MarkersAndLights plus sound markers and acoustic spaces.\nCustom: the types listed in Custom protected types.")]
+    public ProtectedInvisibleObjectsPreset ProtectedTypes { get; set; } = ProtectedInvisibleObjectsPreset.None;
+
+    [SynthesisSettingName("Custom protected types")]
+    [SynthesisTooltip("Used only when Protected types is Custom: the invisible object types to keep.")]
+    public List<InvisibleObjectKind> CustomProtectedTypes { get; set; } = [];
 }
 
 public class DiagnosticsSettings
@@ -85,6 +129,6 @@ public class DiagnosticsSettings
     public bool DetailedLog { get; set; }
 
     [SynthesisSettingName("Diagnostics folder")]
-    [SynthesisTooltip("Folder to write diagnostics spreadsheets (CSV files) to; leave empty to write nothing.")]
+    [SynthesisTooltip("Absolute folder path for diagnostics spreadsheets (CSV files); leave empty to write nothing. Never changes the result.")]
     public string DiagnosticsFolder { get; set; } = string.Empty;
 }

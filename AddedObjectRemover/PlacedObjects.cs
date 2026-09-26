@@ -15,6 +15,7 @@ namespace AddedObjectRemover;
 internal readonly record struct BaseRef(FormKey FormKey, Type LinkType);
 
 /// <summary>Target-plugin object that may be removed.</summary>
+/// <param name="CellName">Null for an interior, whose cell is the space itself.</param>
 /// <param name="HasMapMarker">The placed reference itself carries map marker data (XMRK).</param>
 internal sealed record TargetObject(
     IPlacedGetter Record,
@@ -62,11 +63,11 @@ internal sealed record TouchingRemoval(int TargetIndex, int TouchedTargetIndex) 
 internal sealed record AnchoringRemoval(int TargetIndex, float RemovedShare, int MainRemovedSupporter) : Removal(TargetIndex);
 
 /// <summary>An invisible target object whose surrounding visible target objects were removed.</summary>
-internal sealed record OrphanRemoval(int TargetIndex, QuadrantCounts Neighbours) : Removal(TargetIndex);
+internal sealed record LeftoverRemoval(int TargetIndex, QuadrantCounts Surroundings) : Removal(TargetIndex);
 
 /// <summary>A target object that would be removed but stays because it is referenced.</summary>
 /// <param name="TouchedTargetIndex">The removed target it touches, when it was reached by the touch test.</param>
-internal sealed record KeptTarget(int TargetIndex, string Reason, int? TouchedTargetIndex);
+internal sealed record KeptTarget(int TargetIndex, KeepReason Reason, int? TouchedTargetIndex);
 
 internal static class PlacedRecordExtensions
 {

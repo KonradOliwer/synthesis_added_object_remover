@@ -40,6 +40,9 @@ internal sealed class TouchCandidateFinder
         return finder;
     }
 
+    /// <summary>World oriented box of an included target.</summary>
+    public OrientedBox BoxOf(int target) => _boxes[target];
+
     /// <returns>Sorted indices of the other included targets whose boxes come within the tolerance of <paramref name="node"/>'s box; empty for a target that is not included.</returns>
     public List<int> FindNeighbors(int node)
     {

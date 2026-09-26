@@ -69,7 +69,7 @@ internal sealed class ReplacementMatcher
             var other = index[otherIndex];
             var distance = Vector3.Distance(other.Position, position);
             if (distance > PositionTolerance) continue;
-            if (!index.TryGetVisibleCenter(otherIndex, out _)) continue;
+            if (!index.IsVisible(otherIndex)) continue;
             if (ScaledSortedDims(_shapes.GetLocalBox(other.Base), other.Scale) is not { } otherDims) continue;
 
             var ratio = SizeRatio(targetDims, otherDims);

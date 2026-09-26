@@ -58,8 +58,12 @@ internal sealed class BaseObjectShapeProvider
     }
 
     /// <param name="MeshPath">Normalized path of the mesh the bounds came from; null for OBND or none.</param>
-    /// <param name="InvisibleReason">Why the base is never visible in game; null when it may be visible.</param>
-    private sealed record BaseShape(Box Box, string? MeshPath, string? InvisibleReason);
+    /// <param name="InvisibleKind">What kind of invisible object the base makes; null when it may be visible.</param>
+    /// <param name="Resolved">False when the base is not in the load order.</param>
+    private sealed record BaseShape(Box Box, string? MeshPath, InvisibleObjectKind? InvisibleKind, bool Resolved = true);
+
+    /// <summary>Vanilla critter spawner activators run this script or one derived from it.</summary>
+    private const string CritterSpawnScriptPrefix = "CritterSpawn";
 
     /// <param name="Box">Null when the mesh is unreadable or has no render geometry.</param>
     private sealed record MeshBounds(Box? Box, NifReadStatus Status);
@@ -93,18 +97,19 @@ internal sealed class BaseObjectShapeProvider
         baseRef is { } reference ? GetBaseShape(reference).MeshPath : null;
 
     /// <summary>
-    /// Why a placed object with this base can never be seen or collided with (a map marker
-    /// reference, a light or sound marker, a decal, a base with the engine's IsMarker flag, a mesh
-    /// with only marker geometry, ...), or null when it may be visible. A primitive box reference
-    /// (trigger/activator volume) only counts when its base has a visible mesh.
+    /// Whether a placed object with this base can be seen in game. A primitive box reference
+    /// (trigger/activator volume) only counts as visible when its base has a visible mesh.
     /// </summary>
-    public string? GetInvisibleReason(BaseRef? baseRef, bool isPrimitive, bool hasMapMarker)
+    public ObjectVisibility GetVisibility(BaseRef? baseRef, bool isPrimitive, bool hasMapMarker)
     {
-        if (hasMapMarker) return "map marker reference";
-        if (baseRef is not { } reference) return null;
+        if (hasMapMarker) return ObjectVisibility.Invisible(InvisibleObjectKind.MapMarkers);
+        if (baseRef is not { } reference) return ObjectVisibility.MissingBase;
         var shape = GetBaseShape(reference);
-        if (shape.InvisibleReason != null) return shape.InvisibleReason;
-        return isPrimitive && shape.MeshPath == null ? "trigger/activator box without visible mesh" : null;
+        if (!shape.Resolved) return ObjectVisibility.MissingBase;
+        if (shape.InvisibleKind is { } kind) return ObjectVisibility.Invisible(kind);
+        return isPrimitive && shape.MeshPath == null
+            ? ObjectVisibility.Invisible(InvisibleObjectKind.TriggerBoxes)
+            : ObjectVisibility.Visible;
     }
 
     /// <summary>Null when the mesh cannot be read or has no triangles.</summary>
@@ -135,15 +140,15 @@ internal sealed class BaseObjectShapeProvider
         if (ResolveBaseOrNull(baseRef) is not { } record)
         {
             Interlocked.Increment(ref _basesUnresolved);
-            return new BaseShape(Box.Zero, null, null);
+            return new BaseShape(Box.Zero, null, null, Resolved: false);
         }
 
         var modelPath = GetModelPath(record);
         var hasModel = modelPath != null;
 
-        if (GetMarkerFlagInvisibleReason(record) is { } markerReason)
+        if (GetMarkerFlagKind(record) is { } markerKind)
         {
-            return new BaseShape(Box.Zero, null, markerReason);
+            return new BaseShape(Box.Zero, null, markerKind);
         }
 
         var meshWithoutGeometry = false;
@@ -154,7 +159,7 @@ internal sealed class BaseObjectShapeProvider
             if (mesh.Box is { } nifBox)
             {
                 Interlocked.Increment(ref _basesFromNif);
-                return new BaseShape(nifBox, meshPath, GetStructuralInvisibleReason(record, hasModel, meshWithoutGeometry: false, nifBox));
+                return new BaseShape(nifBox, meshPath, GetStructuralInvisibleKind(record, hasModel, meshWithoutGeometry: false, nifBox));
             }
             meshWithoutGeometry = mesh.Status == NifReadStatus.NoRenderGeometry;
             Interlocked.Increment(ref _basesNifFallbackToObnd);
@@ -164,11 +169,11 @@ internal sealed class BaseObjectShapeProvider
         {
             Interlocked.Increment(ref _basesFromObnd);
             var box = ToBox(bounds);
-            return new BaseShape(box, null, GetStructuralInvisibleReason(record, hasModel, meshWithoutGeometry, box));
+            return new BaseShape(box, null, GetStructuralInvisibleKind(record, hasModel, meshWithoutGeometry, box));
         }
 
         Interlocked.Increment(ref _basesWithoutBounds);
-        return new BaseShape(Box.Zero, null, GetStructuralInvisibleReason(record, hasModel, meshWithoutGeometry, Box.Zero));
+        return new BaseShape(Box.Zero, null, GetStructuralInvisibleKind(record, hasModel, meshWithoutGeometry, Box.Zero));
     }
 
     private static string? GetModelPath(IMajorRecordGetter record) =>
@@ -184,20 +189,19 @@ internal sealed class BaseObjectShapeProvider
     /// Record types that never render, a mesh that parsed but has no visible render geometry
     /// (marker meshes), or no mesh at all and zero-size bounds. NPCs always count as visible.
     /// </summary>
-    private static string? GetStructuralInvisibleReason(IMajorRecordGetter record, bool hasModel, bool meshWithoutGeometry, Box bounds)
+    private static InvisibleObjectKind? GetStructuralInvisibleKind(IMajorRecordGetter record, bool hasModel, bool meshWithoutGeometry, Box bounds)
     {
         switch (record)
         {
             case INpcGetter: return null;
-            case ILightGetter when !hasModel: return "light without mesh";
-            case ISoundMarkerGetter: return "sound marker";
-            case IAcousticSpaceGetter: return "acoustic space";
-            case ITextureSetGetter: return "texture set (decal)";
-            case IIdleMarkerGetter: return "idle marker";
+            case ILightGetter when !hasModel: return InvisibleObjectKind.Lights;
+            case ISoundMarkerGetter: return InvisibleObjectKind.SoundMarkers;
+            case IAcousticSpaceGetter: return InvisibleObjectKind.AcousticSpaces;
+            case ITextureSetGetter: return InvisibleObjectKind.Decals;
+            case IIdleMarkerGetter: return InvisibleObjectKind.IdleMarkers;
         }
-        if (meshWithoutGeometry) return "mesh without visible geometry (marker)";
-        if (!hasModel && bounds.Size == Vector3.Zero) return "no mesh and zero bounds";
-        return null;
+        var hasNoGeometry = meshWithoutGeometry || (!hasModel && bounds.Size == Vector3.Zero);
+        return hasNoGeometry ? ClassifyMarker(record) : null;
     }
 
     /// <summary>
@@ -205,14 +209,21 @@ internal sealed class BaseObjectShapeProvider
     /// similar marker bases). Only these four base types define that bit with this meaning; other
     /// types reuse the same bit value for unrelated flags. Checked before any mesh read.
     /// </summary>
-    private static string? GetMarkerFlagInvisibleReason(IMajorRecordGetter record) => record switch
+    private static InvisibleObjectKind? GetMarkerFlagKind(IMajorRecordGetter record) => record switch
     {
-        IStaticGetter { MajorFlags: var flags } when flags.HasFlag(Static.MajorFlag.IsMarker) => "marker base (IsMarker flag)",
-        IFurnitureGetter { MajorFlags: var flags } when flags.HasFlag(Furniture.MajorFlag.IsMarker) => "marker base (IsMarker flag)",
-        IActivatorGetter { MajorFlags: var flags } when flags.HasFlag(Mutagen.Bethesda.Skyrim.Activator.MajorFlag.IsMarker) => "marker base (IsMarker flag)",
-        IDoorGetter { MajorFlags: var flags } when flags.HasFlag(Door.MajorFlag.IsMarker) => "marker base (IsMarker flag)",
+        IStaticGetter { MajorFlags: var flags } when flags.HasFlag(Static.MajorFlag.IsMarker) => InvisibleObjectKind.XMarkers,
+        IFurnitureGetter { MajorFlags: var flags } when flags.HasFlag(Furniture.MajorFlag.IsMarker) => InvisibleObjectKind.FurnitureMarkers,
+        IActivatorGetter { MajorFlags: var flags } when flags.HasFlag(Mutagen.Bethesda.Skyrim.Activator.MajorFlag.IsMarker) => ClassifyMarker(record),
+        IDoorGetter { MajorFlags: var flags } when flags.HasFlag(Door.MajorFlag.IsMarker) => InvisibleObjectKind.DoorMarkers,
         _ => null,
     };
+
+    private static InvisibleObjectKind ClassifyMarker(IMajorRecordGetter record) =>
+        IsCritterSpawner(record) ? InvisibleObjectKind.CritterSpawners : InvisibleObjectKind.OtherMarkers;
+
+    private static bool IsCritterSpawner(IMajorRecordGetter record) =>
+        record is IActivatorGetter { VirtualMachineAdapter: { } adapter }
+        && adapter.Scripts.Any(script => script.Name.StartsWith(CritterSpawnScriptPrefix, StringComparison.OrdinalIgnoreCase));
 
     private MeshBounds GetMeshBounds(string meshPath) =>
         _byMesh.GetOrCreate(meshPath, () => ReadMeshBounds(meshPath));

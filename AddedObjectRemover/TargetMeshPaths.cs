@@ -9,7 +9,6 @@ internal sealed class TargetMeshPaths(IReadOnlyList<TargetObject> targets, BaseO
 
     public bool HasMesh(int target) => _paths[target] != null;
 
-    /// <remarks>Only targets with a mesh take part in the touch search and in anchoring.</remarks>
     public string Get(int target) =>
         _paths[target] ?? throw new UnreachableException($"Target {target} has no mesh but was used as a mesh.");
 }

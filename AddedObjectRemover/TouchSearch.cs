@@ -37,11 +37,11 @@ internal sealed class TouchSearch
         IReadOnlyList<int> seeds,
         IReadOnlyList<int> excluded,
         BaseObjectShapeProvider shapes,
+        TriangleTreeCache cache,
         float tolerance,
         ParallelOptions parallelOptions)
     {
         var meshPaths = new TargetMeshPaths(targets, shapes);
-        var cache = new TriangleTreeCache(shapes.ReadGeometry);
         var candidateFinder = TouchCandidateFinder.Create(
             targets,
             seeds.Select(seed => targets[seed].SpaceKey).ToHashSet(),

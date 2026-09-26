@@ -19,9 +19,7 @@ internal static class RunReport
             ? $"Ignored masters of target: {Join(config.TargetMasters)}"
             : "Masters of target are not ignored.");
         Console.WriteLine(DescribeFollowUpRemoval(config));
-        Console.WriteLine(config.RemoveOrphanedInvisibleObjects
-            ? $"Orphaned invisible objects: removed, check radius {config.OrphanCheckRadius}, removed share {config.OrphanRemovedShare:P0}."
-            : "Orphaned invisible objects: kept.");
+        Console.WriteLine(DescribeLeftoverRemoval(config));
         Console.WriteLine($"Detailed log: {config.DetailedLog}");
         Console.WriteLine($"Diagnostics folder: {(config.WritesDiagnostics ? config.DiagnosticsFolder : "(none)")}");
     }
@@ -34,6 +32,14 @@ internal static class RunReport
             $"Follow-up removal: anchoring, touch distance {config.TouchDistance}, threshold {config.AnchoringThreshold:P0}.",
         _ => throw new UnreachableException($"Unknown follow-up removal mode {config.FollowUpMode}."),
     };
+
+    private static string DescribeLeftoverRemoval(RunConfig config)
+    {
+        if (!config.RemoveLeftoverInvisibleObjects) return "Leftover invisible objects: kept.";
+        var protectedKinds = config.ProtectedKinds.Count == 0 ? "none" : string.Join(", ", config.ProtectedKinds.Order());
+        return $"Leftover invisible objects: removed, search radius {config.LeftoverSearchRadius}, "
+            + $"removed surroundings {config.LeftoverRemovedShare:P0}, protected types {config.ProtectedPreset} ({protectedKinds}).";
+    }
 
     public static void PrintOverriddenOthers(ScanResult scan, ModKey target)
     {
@@ -118,7 +124,24 @@ internal static class RunReport
             var touched = entry.TouchedTargetIndex is { } touchedIndex
                 ? $" (touches removed {RecordNames.Describe(scan.Targets[touchedIndex].Record)})"
                 : string.Empty;
-            Console.WriteLine($"  Kept {RecordNames.Describe(target.Record)} in {scan.SpaceNames[target.SpaceKey]}: {entry.Reason}{touched}.");
+            Console.WriteLine($"  Kept {RecordNames.Describe(target.Record)} in {scan.SpaceNames[target.SpaceKey]}: {entry.Reason.Detail}{touched}.");
+        }
+    }
+
+    /// <summary>Each kept target once, counted under the first reason found for it.</summary>
+    public static void PrintKeptSummary(IEnumerable<KeptTarget> kept)
+    {
+        var byCategory = kept
+            .DistinctBy(entry => entry.TargetIndex)
+            .GroupBy(entry => entry.Reason.Category)
+            .Select(group => (Category: group.Key, Count: group.Count()))
+            .OrderByDescending(group => group.Count)
+            .ThenBy(group => group.Category, StringComparer.Ordinal)
+            .ToList();
+        Console.WriteLine($"Kept {byCategory.Sum(group => group.Count):N0} objects that would have been removed because other records depend on them.");
+        foreach (var (category, count) in byCategory)
+        {
+            Console.WriteLine($"  {category}: {count:N0}");
         }
     }
 
@@ -151,13 +174,15 @@ internal static class RunReport
             + $"contact points {stats.ContactPoints.TotalSeconds:F1}s.");
     }
 
-    public static void PrintOrphanStats(OrphanResult orphans, TimeSpan elapsed) =>
+    public static void PrintLeftoverStats(LeftoverResult leftovers, TimeSpan elapsed)
+    {
+        var keptByDecision = Enum.GetValues<LeftoverDecision>()
+            .Where(decision => decision != LeftoverDecision.Removed)
+            .Select(decision => $"{leftovers.CountDecisions(decision):N0} {LeftoverDecisionText.Describe(decision)}");
         Console.WriteLine(
-            $"Orphaned invisible objects: {orphans.Evaluations.Count:N0} evaluated, {orphans.Removals.Count:N0} removed in {elapsed.TotalSeconds:F1}s; kept "
-            + $"{orphans.CountDecisions(OrphanDecision.KeptNoSceneryNearby):N0} with no scenery nearby, "
-            + $"{orphans.CountDecisions(OrphanDecision.KeptNotAllSidesCleared):N0} with not all sides cleared, "
-            + $"{orphans.CountDecisions(OrphanDecision.KeptShareBelowThreshold):N0} with removed share below threshold, "
-            + $"{orphans.CountDecisions(OrphanDecision.KeptReferenced):N0} as referenced.");
+            $"Leftover invisible objects: {leftovers.Evaluations.Count:N0} evaluated, {leftovers.Removals.Count:N0} removed in {elapsed.TotalSeconds:F1}s; "
+            + $"kept {string.Join(", ", keptByDecision)}.");
+    }
 
     private static void PrintPairStats(PairTestStats pairs, int rounds, string roundName) =>
         Console.WriteLine(
@@ -208,9 +233,9 @@ internal static class RunReport
         TouchingRemoval touching => $"touches removed {RecordNames.Describe(scan.Targets[touching.TouchedTargetIndex].Record)}",
         AnchoringRemoval anchoring =>
             $"{anchoring.RemovedShare:P0} of its support was removed (mostly {RecordNames.Describe(scan.Targets[anchoring.MainRemovedSupporter].Record)})",
-        OrphanRemoval { Neighbours: var neighbours } =>
-            $"invisible and {neighbours.RemovedShare:P0} of the visible objects around it were removed "
-            + $"({neighbours.TotalRemoved:N0}/{neighbours.TotalVisible:N0}; {neighbours.Describe()})",
+        LeftoverRemoval { Surroundings: var surroundings } =>
+            $"invisible and {surroundings.RemovedShare:P0} of the visible objects around it were removed "
+            + $"({surroundings.TotalRemoved:N0}/{surroundings.TotalVisible:N0}; {surroundings.Describe()})",
         _ => throw new UnreachableException($"Unknown removal type {removal.GetType().Name}."),
     };
 
@@ -247,10 +272,9 @@ internal static class RunReport
         }
     }
 
-    public static void PrintRemovalSummary(int removedCount, int removedTooClose, int removedOrphans, int keptAsReferenced) =>
+    public static void PrintRemovalSummary(int removedCount, int removedTooClose, int removedLeftovers) =>
         Console.WriteLine(
             $"Removed {removedCount:N0} objects ({removedTooClose:N0} too close, "
-            + $"{removedCount - removedTooClose - removedOrphans:N0} follow-up removals, "
-            + $"{removedOrphans:N0} orphaned invisible objects); "
-            + $"kept {keptAsReferenced:N0} referenced objects.");
+            + $"{removedCount - removedTooClose - removedLeftovers:N0} follow-up removals, "
+            + $"{removedLeftovers:N0} leftover invisible objects).");
 }

@@ -92,7 +92,8 @@ internal sealed class TouchClusterFinder
         ParallelOptions parallelOptions,
         bool collectDiagnostics)
     {
-        var (search, setup) = Timing.Measure(() => TouchSearch.Create(targets, seeds, excluded: keptTooClose, shapes, tolerance, parallelOptions));
+        var (search, setup) = Timing.Measure(() => TouchSearch.Create(
+            targets, seeds, excluded: keptTooClose, shapes, new TriangleTreeCache(shapes.ReadGeometry), tolerance, parallelOptions));
         var finder = new TouchClusterFinder(
             targets,
             keepRule,

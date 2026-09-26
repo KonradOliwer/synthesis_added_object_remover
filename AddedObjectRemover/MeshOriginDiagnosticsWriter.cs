@@ -3,7 +3,7 @@ using static AddedObjectRemover.CsvFile;
 
 namespace AddedObjectRemover;
 
-/// <param name="TriangleBounds">Local bounds of the mesh's triangles, the box Anchoring weights contact points with.</param>
+/// <param name="TriangleBounds">Local bounds of the mesh's triangles.</param>
 /// <param name="OriginFractions">Where the mesh origin sits inside its triangle bounds per axis: 0 at the minimum, 1 at the maximum; NaN on an axis without size.</param>
 internal sealed record MeshOriginRow(
     string ModelPath,
@@ -44,6 +44,7 @@ internal static class MeshOriginDiagnosticsWriter
     public static List<MeshOriginRow> CreateRows(
         IReadOnlyList<TargetObject> targets,
         BaseObjectShapeProvider shapes,
+        TriangleTreeCache meshCache,
         ParallelOptions parallelOptions)
     {
         var users = targets
@@ -51,7 +52,7 @@ internal static class MeshOriginDiagnosticsWriter
             .GroupBy(target => shapes.GetMeshPath(target.Base)!, StringComparer.OrdinalIgnoreCase)
             .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        var bounds = MeasureTriangleBounds(users.Select(group => group.Key).ToList(), shapes, parallelOptions);
+        var bounds = MeasureTriangleBounds(users.Select(group => group.Key).ToList(), meshCache, parallelOptions);
 
         var rows = new List<MeshOriginRow>();
         for (var i = 0; i < users.Count; i++)
@@ -76,9 +77,8 @@ internal static class MeshOriginDiagnosticsWriter
     }
 
     /// <returns>Per mesh: the bounds of its triangles, or null when it has no usable triangles.</returns>
-    private static Box?[] MeasureTriangleBounds(IReadOnlyList<string> meshPaths, BaseObjectShapeProvider shapes, ParallelOptions parallelOptions)
+    private static Box?[] MeasureTriangleBounds(IReadOnlyList<string> meshPaths, TriangleTreeCache cache, ParallelOptions parallelOptions)
     {
-        var cache = new TriangleTreeCache(shapes.ReadGeometry);
         var bounds = new Box?[meshPaths.Count];
         Parallel.For(0, meshPaths.Count, parallelOptions, i =>
         {

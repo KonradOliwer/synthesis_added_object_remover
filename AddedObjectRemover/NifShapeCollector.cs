@@ -15,6 +15,7 @@ internal sealed class ShapeStats
     public int Unreachable;
     public int HiddenAncestor;
     public int MarkerAncestor;
+    public int MismatchedStrips;
     public bool HiddenIgnored;
     public readonly SortedDictionary<string, int> Unsupported = new(StringComparer.Ordinal);
 
@@ -25,7 +26,7 @@ internal sealed class ShapeStats
             : $"{Unsupported.Values.Sum()} [{string.Join(", ", Unsupported.Select(kv => $"{kv.Key} x{kv.Value}"))}]";
         return $"{Shapes} shapes: counted={Counted}, hidden={Hidden}, editorMarker={EditorMarker}, "
             + $"unsupported={unsupported}, noVertices={NoVertices}, unreachable={Unreachable}, "
-            + $"hiddenAncestor={HiddenAncestor}, markerAncestor={MarkerAncestor}"
+            + $"hiddenAncestor={HiddenAncestor}, markerAncestor={MarkerAncestor}, mismatchedStrips={MismatchedStrips}"
             + (HiddenIgnored ? ", hidden flag ignored in 2nd pass" : string.Empty);
     }
 }
@@ -114,7 +115,7 @@ internal sealed class NifShapeCollector
         _stats.Shapes++;
         if (!TryGetShapeToRoot(blockIndex, shape, out var toRoot)) return;
 
-        if (NifShapes.TryGetVertices(shape) is { Count: > 0 } vertices)
+        if (NifShapes.GetVerticesOrNull(shape) is { Count: > 0 } vertices)
         {
             AddShapeVertices(shape, vertices, toRoot);
         }
@@ -171,6 +172,49 @@ internal sealed class NifShapeCollector
     }
 
     /// <summary>
+    /// Out-of-range vertices need no filtering here: any of them already makes the whole read fail.
+    /// Triangles with out-of-range indices are dropped. A shape without a triangle list contributes
+    /// each vertex as a degenerate point triangle.
+    /// </summary>
+    private void AppendTriangles(
+        INiShape shape,
+        List<Vector3> shapeVertices,
+        Similarity toRoot,
+        List<Vector3> allVertices,
+        List<int> allIndices)
+    {
+        var baseIndex = allVertices.Count;
+        foreach (var v in shapeVertices) allVertices.Add(toRoot.Apply(v));
+
+        var triangles = NifShapes.GetTriangles(shape, out var stripsMismatched);
+        if (stripsMismatched) _stats.MismatchedStrips++;
+        if (triangles is not { Count: > 0 })
+        {
+            AppendPointTriangles(baseIndex, shapeVertices.Count, allIndices);
+            return;
+        }
+
+        foreach (var triangle in triangles)
+        {
+            int a = triangle.V1, b = triangle.V2, c = triangle.V3;
+            if (a >= shapeVertices.Count || b >= shapeVertices.Count || c >= shapeVertices.Count) continue;
+            allIndices.Add(baseIndex + a);
+            allIndices.Add(baseIndex + b);
+            allIndices.Add(baseIndex + c);
+        }
+    }
+
+    private static void AppendPointTriangles(int baseIndex, int vertexCount, List<int> allIndices)
+    {
+        for (var i = 0; i < vertexCount; i++)
+        {
+            allIndices.Add(baseIndex + i);
+            allIndices.Add(baseIndex + i);
+            allIndices.Add(baseIndex + i);
+        }
+    }
+
+    /// <summary>
     /// A sphere stays a sphere under a similarity transform, so transforming the center and scaling
     /// the radius gives an exact, rotation-invariant AABB. Legacy NiGeometry without a data block and
     /// zero/negative/non-finite radii are ignored (they would add a stray point at the shape origin).
@@ -189,49 +233,5 @@ internal sealed class NifShapeCollector
         _bounds.AddPoint(center - extent);
         _bounds.AddPoint(center + extent);
         _stats.Counted++;
-    }
-
-    /// <summary>
-    /// Out-of-range vertices, and triangles referencing them or out-of-range indices, are dropped.
-    /// A shape without a triangle list contributes each vertex as a degenerate point triangle.
-    /// </summary>
-    private static void AppendTriangles(
-        INiShape shape,
-        List<Vector3> shapeVertices,
-        Similarity toRoot,
-        List<Vector3> allVertices,
-        List<int> allIndices)
-    {
-        var baseIndex = allVertices.Count;
-        var usable = new bool[shapeVertices.Count];
-        for (var i = 0; i < shapeVertices.Count; i++)
-        {
-            var p = toRoot.Apply(shapeVertices[i]);
-            usable[i] = Geometry.IsWithinLimits(p);
-            allVertices.Add(usable[i] ? p : Vector3.Zero);
-        }
-
-        var triangles = NifShapes.GetTriangles(shape);
-        if (triangles is not { Count: > 0 })
-        {
-            for (var i = 0; i < shapeVertices.Count; i++)
-            {
-                if (!usable[i]) continue;
-                allIndices.Add(baseIndex + i);
-                allIndices.Add(baseIndex + i);
-                allIndices.Add(baseIndex + i);
-            }
-            return;
-        }
-
-        foreach (var triangle in triangles)
-        {
-            int a = triangle.V1, b = triangle.V2, c = triangle.V3;
-            if (a >= usable.Length || b >= usable.Length || c >= usable.Length) continue;
-            if (!usable[a] || !usable[b] || !usable[c]) continue;
-            allIndices.Add(baseIndex + a);
-            allIndices.Add(baseIndex + b);
-            allIndices.Add(baseIndex + c);
-        }
     }
 }

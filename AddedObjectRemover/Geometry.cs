@@ -164,6 +164,10 @@ internal static class Geometry
 
     public static Vector3 ToVector(P3Float p) => new(p.X, p.Y, p.Z);
 
+    /// <summary>A placed reference's scale; missing, non-finite or non-positive values mean 1.</summary>
+    public static float NormalizeScale(float? scale) =>
+        scale is { } s && float.IsFinite(s) && s > 0 ? s : 1f;
+
     public static bool IsFinite(Vector3 v) => float.IsFinite(v.X) && float.IsFinite(v.Y) && float.IsFinite(v.Z);
 
     /// <summary>Finite and every component within ±<see cref="MaxCoordinate"/>.</summary>

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Numerics;
 using Mutagen.Bethesda.Plugins;
 
@@ -22,7 +21,7 @@ internal sealed class OtherObjectIndex
 
     private readonly OtherObject[] _objects;
     private readonly BaseObjectShapeProvider _shapes;
-    private readonly InvisibleObjectCounter _invisible;
+    private readonly ReasonCounter _invisible;
     private readonly Vector3[] _centers;
     private readonly int[] _state;
 
@@ -33,7 +32,7 @@ internal sealed class OtherObjectIndex
     /// </summary>
     private readonly int[] _replaced;
 
-    private OtherObjectIndex(IReadOnlyList<OtherObject> objects, BaseObjectShapeProvider shapes, InvisibleObjectCounter invisible)
+    private OtherObjectIndex(IReadOnlyList<OtherObject> objects, BaseObjectShapeProvider shapes, ReasonCounter invisible)
     {
         _objects = objects.ToArray();
         _shapes = shapes;
@@ -51,7 +50,7 @@ internal sealed class OtherObjectIndex
     public static Dictionary<FormKey, OtherObjectIndex> BuildForTargetSpaces(
         ScanResult scan,
         BaseObjectShapeProvider shapes,
-        InvisibleObjectCounter invisible)
+        ReasonCounter invisible)
     {
         var indexes = new Dictionary<FormKey, OtherObjectIndex>();
         foreach (var target in scan.Targets)
@@ -82,12 +81,12 @@ internal sealed class OtherObjectIndex
     public bool TryGetVisibleCenter(int index, out Vector3 center)
     {
         var state = Volatile.Read(ref _state[index]);
-        if (state == NotMeasured) state = Measure(index);
+        if (state == NotMeasured) state = MeasureAndPublish(index);
         center = _centers[index];
         return state == Visible;
     }
 
-    private int Measure(int index)
+    private int MeasureAndPublish(int index)
     {
         ref readonly var other = ref _objects[index];
         var reason = _shapes.GetInvisibleReason(other.Base, other.IsPrimitive);
@@ -110,15 +109,4 @@ internal sealed class OtherObjectIndex
         }
         return state;
     }
-}
-
-/// <summary>Thread-safe count of other objects ignored as invisible, per reason.</summary>
-internal sealed class InvisibleObjectCounter
-{
-    private readonly ConcurrentDictionary<string, int> _byReason = new(StringComparer.Ordinal);
-
-    public void Add(string reason) => _byReason.AddOrUpdate(reason, 1, (_, count) => count + 1);
-
-    public IReadOnlyList<KeyValuePair<string, int>> Snapshot() =>
-        _byReason.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key, StringComparer.Ordinal).ToList();
 }

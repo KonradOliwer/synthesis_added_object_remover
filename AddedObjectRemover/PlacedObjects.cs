@@ -50,7 +50,8 @@ internal sealed record TooCloseRemoval(int TargetIndex, OtherObject TooCloseTo) 
 internal sealed record TouchingRemoval(int TargetIndex, int TouchedTargetIndex) : Removal(TargetIndex);
 
 /// <summary>A target object that would be removed but stays because it is referenced.</summary>
-internal sealed record KeptTarget(int TargetIndex, string Reason, int? TouchedRemovedIndex);
+/// <param name="TouchedTargetIndex">The removed target it touches, when it was reached by the touch test.</param>
+internal sealed record KeptTarget(int TargetIndex, string Reason, int? TouchedTargetIndex);
 
 internal static class PlacedRecordExtensions
 {
@@ -82,7 +83,4 @@ internal static class PlacedRecordExtensions
     private static BaseRef? ToBaseRef<TGetter>(IFormLinkGetter<TGetter> link)
         where TGetter : class, IMajorRecordGetter =>
         link.IsNull ? null : new BaseRef(link.FormKey, typeof(TGetter));
-
-    public static float NormalizeScale(float? scale) =>
-        scale is { } s && float.IsFinite(s) && s > 0 ? s : 1f;
 }

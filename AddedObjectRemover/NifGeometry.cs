@@ -26,14 +26,3 @@ internal sealed class NifGeometry(Vector3 min, Vector3 max, Vector3[] vertices, 
         Vertices[Indices[3 * triangle + 1]],
         Vertices[Indices[3 * triangle + 2]]);
 }
-
-internal enum NifReadStatus
-{
-    Success,
-
-    /// <summary>The NIF could not be parsed or holds invalid data (e.g. out-of-range coordinates).</summary>
-    Failed,
-
-    /// <summary>The NIF parsed fine but has no visible render geometry (e.g. only editor-marker shapes).</summary>
-    NoRenderGeometry,
-}

@@ -12,6 +12,12 @@ internal static class RecordNames
     public static string Describe(FormKey formKey, string? editorId) =>
         string.IsNullOrEmpty(editorId) ? formKey.ToString() : $"{editorId} [{formKey}]";
 
+    /// <summary>"from Origin.esp", plus the winning plugin when a later plugin overrides the record.</summary>
+    public static string DescribeOrigin(FormKey formKey, ModKey winningMod) =>
+        winningMod == formKey.ModKey
+            ? $"from {formKey.ModKey}"
+            : $"from {formKey.ModKey} (winning override in {winningMod})";
+
     public static string DescribeSpace(IMajorRecordGetter spaceRecord) => spaceRecord switch
     {
         IWorldspaceGetter worldspace => $"worldspace {Describe(worldspace)}",

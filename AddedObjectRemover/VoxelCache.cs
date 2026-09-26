@@ -59,8 +59,8 @@ internal sealed class VoxelCache
         _readGeometry = readGeometry;
     }
 
-    /// <summary>Null when the mesh has no usable triangles or is too large.</summary>
-    public VoxelMesh? Get(string meshPath)
+    /// <summary>Null when the mesh has no usable triangles or is too large. May evict other meshes.</summary>
+    public VoxelMesh? GetOrBuild(string meshPath)
     {
         var entry = _meshes.GetOrAdd(
             meshPath,

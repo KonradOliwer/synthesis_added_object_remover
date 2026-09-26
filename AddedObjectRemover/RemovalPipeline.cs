@@ -18,7 +18,7 @@ internal sealed class RemovalPipeline
     private readonly ParallelOptions _parallelOptions = new() { MaxDegreeOfParallelism = Environment.ProcessorCount };
     private readonly MeshMessageLog _meshMessages;
     private readonly BaseObjectShapeProvider _shapes;
-    private readonly InvisibleObjectCounter _invisibleOthers = new();
+    private readonly ReasonCounter _invisibleOthers = new();
 
     public RemovalPipeline(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, RunConfig config)
     {
@@ -63,6 +63,7 @@ internal sealed class RemovalPipeline
     {
         var timer = Stopwatch.StartNew();
         var scan = PlacedRecordScanner.Scan(_state, _config);
+        RunReport.PrintOverriddenOthers(scan, _config.Target);
         RunReport.PrintScanSummary(scan, _config.Target, timer.Elapsed);
         return scan;
     }
@@ -89,7 +90,7 @@ internal sealed class RemovalPipeline
             .OfType<BaseRef>()
             .DistinctBy(b => b.FormKey)
             .ToList();
-        _shapes.ResolveBounds(targetBases, _parallelOptions);
+        _shapes.MeasureBases(targetBases, _parallelOptions);
         _meshMessages.PrintAndClear();
         RunReport.PrintWarmUpSummary(targetBases.Count, timer.Elapsed);
     }
@@ -118,19 +119,28 @@ internal sealed class RemovalPipeline
         RunReport.PrintTooCloseSummary(hits.Count, scan.Targets.Count, _config.Target, timer.Elapsed);
         RunReport.PrintInvisibleOthers(_invisibleOthers, _config.Verbose);
 
+        var selection = SplitByKeepRule(scan.Targets, hits, keepRule);
+        RunReport.PrintKept(scan, selection.Kept);
+        return selection;
+    }
+
+    private static TooCloseSelection SplitByKeepRule(
+        IReadOnlyList<TargetObject> targets,
+        IEnumerable<TooCloseHit> hits,
+        KeepReferencedRule keepRule)
+    {
         var selection = new TooCloseSelection([], []);
         foreach (var hit in hits)
         {
-            if (keepRule.TryGetKeepReason(scan.Targets[hit.TargetIndex], out var reason))
+            if (keepRule.TryGetKeepReason(targets[hit.TargetIndex], out var reason))
             {
-                selection.Kept.Add(new KeptTarget(hit.TargetIndex, reason, TouchedRemovedIndex: null));
+                selection.Kept.Add(new KeptTarget(hit.TargetIndex, reason, TouchedTargetIndex: null));
             }
             else
             {
                 selection.Removals.Add(new TooCloseRemoval(hit.TargetIndex, hit.TooCloseTo));
             }
         }
-        RunReport.PrintKept(scan, selection.Kept);
         return selection;
     }
 

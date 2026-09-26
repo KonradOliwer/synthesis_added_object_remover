@@ -58,12 +58,12 @@ internal sealed class MeshFileSource
 
     public (byte[]? Bytes, MeshSource Source) Load(string meshPath)
     {
-        if (TryReadLooseFile(meshPath) is { } looseBytes) return (looseBytes, MeshSource.LooseFile);
-        if (TryExtractFromArchive(meshPath) is { } archiveBytes) return (archiveBytes, MeshSource.Archive);
+        if (ReadLooseFileOrNull(meshPath) is { } looseBytes) return (looseBytes, MeshSource.LooseFile);
+        if (ExtractFromArchiveOrNull(meshPath) is { } archiveBytes) return (archiveBytes, MeshSource.Archive);
         return (null, MeshSource.NotFound);
     }
 
-    private byte[]? TryReadLooseFile(string meshPath)
+    private byte[]? ReadLooseFileOrNull(string meshPath)
     {
         var loosePath = Path.Combine(_dataPath, meshPath);
         try
@@ -77,7 +77,7 @@ internal sealed class MeshFileSource
         }
     }
 
-    private byte[]? TryExtractFromArchive(string meshPath)
+    private byte[]? ExtractFromArchiveOrNull(string meshPath)
     {
         if (!_archiveIndex.Value.TryGetValue(meshPath, out var archiveFile)) return null;
         try
@@ -128,30 +128,52 @@ internal sealed class MeshFileSource
 
     /// <summary>
     /// Archives listed in the game INI (vanilla archives) first, then each plugin's archives in
-    /// load order: "&lt;Plugin&gt;.bsa", then "&lt;Plugin&gt; - &lt;Suffix&gt;.bsa" by name.
+    /// load order, as matched by Mutagen's <see cref="Archive.IsApplicable"/> ("&lt;Plugin&gt;.bsa"
+    /// first, then "&lt;Plugin&gt; - &lt;Suffix&gt;.bsa" by name). Only archives present in the Data
+    /// folder are used.
     /// </summary>
     private List<string> GetArchivePathsInPriorityOrder()
     {
+        var present = ListDataFolderArchives();
         var ordered = new List<string>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        void AddIfExists(string fileName)
+        void AddIfPresent(string fileName)
         {
-            if (!seen.Add(fileName)) return;
-            var fullPath = Path.Combine(_dataPath, fileName);
-            if (File.Exists(fullPath)) ordered.Add(fullPath);
+            if (present.Contains(fileName) && seen.Add(fileName)) ordered.Add(Path.Combine(_dataPath, fileName));
         }
 
-        foreach (var fileName in GetIniArchiveNames()) AddIfExists(fileName);
-
-        var extension = Archive.GetExtension(_release);
+        foreach (var fileName in GetIniArchiveNames()) AddIfPresent(fileName);
         foreach (var modKey in _loadOrder)
         {
-            AddIfExists(modKey.Name + extension);
-            foreach (var fileName in GetSuffixedArchiveNames(modKey.Name, extension)) AddIfExists(fileName);
+            foreach (var fileName in GetPluginArchiveNames(modKey, present)) AddIfPresent(fileName);
         }
-
         return ordered;
+    }
+
+    private IEnumerable<string> GetPluginArchiveNames(ModKey modKey, IEnumerable<string> archiveNames)
+    {
+        var ownName = modKey.Name + Archive.GetExtension(_release);
+        return archiveNames
+            .Where(fileName => Archive.IsApplicable(_release, modKey, new FileName(fileName)))
+            .OrderBy(fileName => !fileName.Equals(ownName, StringComparison.OrdinalIgnoreCase))
+            .ThenBy(fileName => fileName, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>File names of every archive in the Data folder; empty (with a warning) when the folder cannot be listed.</summary>
+    private HashSet<string> ListDataFolderArchives()
+    {
+        try
+        {
+            return Directory.EnumerateFiles(_dataPath, "*" + Archive.GetExtension(_release))
+                .Select(path => Path.GetFileName(path))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+        catch (Exception ex) when (ExpectedFailures.IsFileAccess(ex))
+        {
+            Console.WriteLine($"  Warning: could not list archives in {_dataPath}: {ex.Message}");
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
     }
 
     private List<string> GetIniArchiveNames()
@@ -164,22 +186,6 @@ internal sealed class MeshFileSource
         {
             Console.WriteLine($"  Warning: could not read archive list from game INI: {ex.Message}");
             return [];
-        }
-    }
-
-    private List<string> GetSuffixedArchiveNames(string pluginStem, string extension)
-    {
-        try
-        {
-            return Directory.EnumerateFiles(_dataPath, $"{pluginStem} - *{extension}")
-                .Select(fullPath => Path.GetFileName(fullPath))
-                .OfType<string>()
-                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
-        {
-            return []; // Unusual characters in a plugin name or an unreadable folder: suffixed archives are skipped.
         }
     }
 }

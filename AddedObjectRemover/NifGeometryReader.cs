@@ -25,28 +25,22 @@ internal static class NifGeometryReader
     /// A vertex that is non-finite or beyond <see cref="Geometry.MaxCoordinate"/> makes the whole
     /// mesh <see cref="NifReadStatus.Failed"/>. Malformed files are reported, not thrown.
     /// </summary>
-    public static NifReadStatus ReadGeometry(
-        byte[] data,
-        bool includeTriangles,
-        out NifGeometry? geometry,
-        out string? error)
+    public static NifReadResult ReadGeometry(byte[] data, bool includeTriangles)
     {
         try
         {
             if (ParallelLoadsSafe.Value)
             {
-                return ReadGeometryUnlocked(data, includeTriangles, out geometry, out error);
+                return ReadGeometryUnlocked(data, includeTriangles);
             }
             lock (LoadLock)
             {
-                return ReadGeometryUnlocked(data, includeTriangles, out geometry, out error);
+                return ReadGeometryUnlocked(data, includeTriangles);
             }
         }
-        catch (Exception ex) when (ExpectedFailures.IsMalformedNif(ex))
+        catch (MalformedNifException ex)
         {
-            geometry = null;
-            error = $"{ex.GetType().Name} while reading NIF bounds: {ex.Message}";
-            return NifReadStatus.Failed;
+            return NifReadResult.Failed(ex.LibraryExceptionType, $"{ex.LibraryExceptionType} while reading NIF: {ex.Message}");
         }
     }
 
@@ -78,57 +72,47 @@ internal static class NifGeometryReader
         }
     }
 
-    private static NifReadStatus ReadGeometryUnlocked(
-        byte[] data,
-        bool includeTriangles,
-        out NifGeometry? geometry,
-        out string? error)
+    private static NifReadResult ReadGeometryUnlocked(byte[] data, bool includeTriangles)
     {
-        geometry = null;
         using var stream = new MemoryStream(data, writable: false);
-        if (!TryLoad(stream, out var nif, out var rootIndex, out error)) return NifReadStatus.Failed;
+        var nif = new NifFile();
+        var loadResult = NiflyCalls.Call(() => nif.Load(stream));
+        if (loadResult != 0 || !nif.Valid)
+        {
+            return NifReadResult.Failed(NifReadResult.LoadFailedKind, $"NifFile.Load failed with code {loadResult}.");
+        }
+        if (FindRootIndex(nif) is not { } rootIndex)
+        {
+            return NifReadResult.Failed(NifReadResult.NoRootNodeKind, "NIF has no root NiNode.");
+        }
 
         var shapes = CollectWithHiddenFallback(nif, rootIndex, includeTriangles);
+        return ToResult(shapes);
+    }
+
+    private static int? FindRootIndex(NifFile nif) =>
+        NiflyCalls.Call(() => nif.GetRootNode() is { } rootNode && nif.GetBlockIndex(rootNode, out var index) ? index : (int?)null);
+
+    private static NifReadResult ToResult(ShapeCollection shapes)
+    {
         if (shapes.Bounds.Invalid != null)
         {
-            error = $"NIF has {shapes.Bounds.Invalid}.";
-            return NifReadStatus.Failed;
+            return NifReadResult.Failed(NifReadResult.InvalidCoordinatesKind, $"NIF has {shapes.Bounds.Invalid}.");
         }
         if (!shapes.Bounds.Any)
         {
-            error = $"NIF contains no visible render geometry ({shapes.Stats}).";
-            return NifReadStatus.NoRenderGeometry;
+            return NifReadResult.WithoutRenderGeometry($"NIF contains no visible render geometry ({shapes.Stats}).");
         }
 
-        geometry = new NifGeometry(
+        var geometry = new NifGeometry(
             shapes.Bounds.Min,
             shapes.Bounds.Max,
             shapes.Vertices?.ToArray() ?? [],
             shapes.Indices?.ToArray() ?? []);
-        return NifReadStatus.Success;
-    }
-
-    private static bool TryLoad(MemoryStream stream, out NifFile nif, out int rootIndex, out string? error)
-    {
-        nif = new NifFile();
-        var result = nif.Load(stream); // 0 = success, >0 = error code.
-        if (result != 0 || !nif.Valid)
-        {
-            rootIndex = -1;
-            error = $"NifFile.Load failed with code {result}.";
-            return false;
-        }
-
-        var rootNode = nif.GetRootNode();
-        if (rootNode == null || !nif.GetBlockIndex(rootNode, out rootIndex))
-        {
-            rootIndex = -1;
-            error = "NIF has no root NiNode.";
-            return false;
-        }
-
-        error = null;
-        return true;
+        var warning = shapes.Stats.MismatchedStrips > 0
+            ? $"{shapes.Stats.MismatchedStrips} NiTriStrips shape(s) whose strip lengths do not match their points are used as points."
+            : null;
+        return NifReadResult.Succeeded(geometry, warning);
     }
 
     /// <summary>

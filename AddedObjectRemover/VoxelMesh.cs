@@ -25,6 +25,15 @@ internal sealed class VoxelMesh
     /// <summary>Half the space diagonal of a unit cube, sqrt(3)/2, rounded up.</summary>
     private const float HalfCubeDiagonalFactor = 0.8661f;
 
+    /// <summary>Base sample spacing as a fraction of the voxel size (documented in the settings tooltip and README).</summary>
+    private const float StepPerVoxel = 0.5f;
+
+    private const long BytesPerVector3 = 12;
+    private const long BytesPerInt = 4;
+
+    /// <summary>Rough cost of one <see cref="_slotByKey"/> entry (key, value, hash bucket and next index).</summary>
+    private const long PerVoxelDictionaryOverhead = 24;
+
     private const float MinEdgeLength = 1e-4f;
     private const int MaxCoarseningSteps = 8;
     private const float CoarseningFactor = 1.5f;
@@ -81,8 +90,11 @@ internal sealed class VoxelMesh
 
     /// <summary>Approximate managed memory held by this mesh, in bytes.</summary>
     public long EstimatedBytes =>
-        _geometry.Vertices.Length * 12L + _geometry.Indices.Length * 4L + _samples.Length * 12L + _triangles.Length * 4L
-        + VoxelCount * (12L + 4L + 4L + 24L);
+        _geometry.Vertices.Length * BytesPerVector3
+        + _geometry.Indices.Length * BytesPerInt
+        + _samples.Length * BytesPerVector3
+        + _triangles.Length * BytesPerInt
+        + VoxelCount * (3 * BytesPerInt + BytesPerInt + BytesPerInt + PerVoxelDictionaryOverhead);
 
     /// <summary>AABB of all samples (the mesh's triangle bounds).</summary>
     public Box SampleBounds { get; }
@@ -95,7 +107,7 @@ internal sealed class VoxelMesh
     {
         if (geometry.TriangleCount == 0) return null;
 
-        var baseStep = voxelSize * 0.5f;
+        var baseStep = voxelSize * StepPerVoxel;
         if (ChooseStep(geometry, baseStep, out var sampleCount) is not { } step) return null;
 
         var samples = SampleMesh(geometry, step, voxelSize, sampleCount);
@@ -434,12 +446,35 @@ internal sealed class VoxelMesh
             return Math.Max(1, (int)rowCount);
         }
 
-        /// <summary>Intervals of at most step along row <paramref name="lambda"/> (0 at the apex), or null beyond <see cref="MaxSamples"/>.</summary>
-        public int? PointIntervals(float lambda, float step)
+        /// <summary>
+        /// Row <paramref name="k"/> of <paramref name="rowCount"/> (row 0 is the apex), parallel to
+        /// the base and sampled at most step apart, or null when it would exceed <see cref="MaxSamples"/>.
+        /// </summary>
+        public SampleRow? Row(int k, int rowCount, float step)
         {
-            var pointCount = Math.Ceiling(BaseLength * lambda / (double)step);
-            if (!(pointCount <= MaxSamples)) return null;
-            return (int)pointCount;
+            var lambda = (float)k / rowCount;
+            var intervals = Math.Ceiling(BaseLength * lambda / (double)step);
+            if (!(intervals <= MaxSamples)) return null;
+            return new SampleRow(Apex + (Left - Apex) * lambda, Apex + (Right - Apex) * lambda, (int)intervals);
+        }
+    }
+
+    /// <summary>Evenly spaced samples from Start to End (both included), or only Start when Intervals is 0.</summary>
+    private readonly record struct SampleRow(Vector3 Start, Vector3 End, int Intervals)
+    {
+        public int SampleCount => Intervals == 0 ? 1 : Intervals + 1;
+
+        public void AddSamples(List<Vector3> output)
+        {
+            if (Intervals == 0)
+            {
+                output.Add(Start);
+                return;
+            }
+            for (var i = 0; i <= Intervals; i++)
+            {
+                output.Add(Vector3.Lerp(Start, End, (float)i / Intervals));
+            }
         }
     }
 
@@ -456,13 +491,8 @@ internal sealed class VoxelMesh
         long count = 0;
         for (var k = 0; k <= rows; k++)
         {
-            if (triangle.PointIntervals((float)k / rows, step) is not { } intervals) return MaxSamples + 1;
-            if (intervals == 0)
-            {
-                count++;
-                continue;
-            }
-            count += intervals + 1;
+            if (triangle.Row(k, rows, step) is not { } row) return MaxSamples + 1;
+            count += row.SampleCount;
             if (count > MaxSamples) return MaxSamples + 1;
         }
         return count;
@@ -471,7 +501,7 @@ internal sealed class VoxelMesh
     /// <summary>
     /// Samples one triangle: rows parallel to its longest edge, at most step/2 apart, each sampled
     /// at most step apart (endpoints included). Every triangle point is then within
-    /// step * sqrt(1/2) of a sample.
+    /// step * sqrt(1/2) of a sample. A degenerate triangle yields its apex only.
     /// </summary>
     private static void SampleTriangle(Vector3 a, Vector3 b, Vector3 c, float step, List<Vector3> output)
     {
@@ -485,19 +515,8 @@ internal sealed class VoxelMesh
 
         for (var k = 0; k <= rows; k++)
         {
-            var lambda = (float)k / rows;
-            var rowStart = triangle.Apex + (triangle.Left - triangle.Apex) * lambda;
-            var rowEnd = triangle.Apex + (triangle.Right - triangle.Apex) * lambda;
-            if (triangle.PointIntervals(lambda, step) is not { } intervals) return;
-            if (intervals == 0)
-            {
-                output.Add(rowStart);
-                continue;
-            }
-            for (var i = 0; i <= intervals; i++)
-            {
-                output.Add(Vector3.Lerp(rowStart, rowEnd, (float)i / intervals));
-            }
+            if (triangle.Row(k, rows, step) is not { } row) return;
+            row.AddSamples(output);
         }
     }
 

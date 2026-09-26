@@ -58,6 +58,8 @@ internal sealed class TouchClusterFinder
 
     private TouchClusterFinder(
         IReadOnlyList<TargetObject> targets,
+        IReadOnlyList<int> seeds,
+        IReadOnlyList<int> keptTooClose,
         BaseObjectShapeProvider shapes,
         KeepReferencedRule keepRule,
         float tolerance,
@@ -73,6 +75,8 @@ internal sealed class TouchClusterFinder
         _boxes = new OrientedBox[targets.Count];
         _isSeed = new bool[targets.Count];
         _visited = new bool[targets.Count];
+        foreach (var seed in seeds) _isSeed[seed] = true;
+        foreach (var index in keptTooClose) _visited[index] = true;
     }
 
     /// <param name="seeds">Target indices of the too-close removals, in removal order.</param>
@@ -88,13 +92,9 @@ internal sealed class TouchClusterFinder
         ParallelOptions parallelOptions)
     {
         var setupTimer = Stopwatch.StartNew();
-        var finder = new TouchClusterFinder(targets, shapes, keepRule, tolerance, voxelSize, parallelOptions);
+        var finder = new TouchClusterFinder(targets, seeds, keptTooClose, shapes, keepRule, tolerance, voxelSize, parallelOptions);
         finder.BuildIndex(seeds.Select(seed => targets[seed].SpaceKey).ToHashSet());
-        var setup = setupTimer.Elapsed;
-
-        foreach (var seed in seeds) finder._isSeed[seed] = true;
-        foreach (var index in keptTooClose) finder._visited[index] = true;
-        return finder.ExploreComponents(seeds, setup);
+        return finder.ExploreComponents(seeds, setupTimer.Elapsed);
     }
 
     /// <summary>Oriented boxes and per-space grids of grown world AABBs, only for spaces with seeds.</summary>
@@ -261,8 +261,8 @@ internal sealed class TouchClusterFinder
     {
         var fromPath = _shapes.GetMeshPath(_targets[from].Base);
         var toPath = _shapes.GetMeshPath(_targets[to].Base);
-        var fromMesh = fromPath == null ? null : _voxels.Get(fromPath);
-        var toMesh = fromMesh == null || toPath == null ? null : _voxels.Get(toPath);
+        var fromMesh = fromPath == null ? null : _voxels.GetOrBuild(fromPath);
+        var toMesh = fromMesh == null || toPath == null ? null : _voxels.GetOrBuild(toPath);
         if (fromMesh == null || toMesh == null) return PairTest.NoGeometry;
 
         // Sample the mesh with fewer voxels (cheaper); look up in the other.
@@ -272,7 +272,10 @@ internal sealed class TouchClusterFinder
         return touches ? PairTest.Touching : PairTest.Apart;
     }
 
-    /// <summary>Applies the level's touching pairs in pair order and returns the next frontier.</summary>
+    /// <summary>
+    /// Applies the level's touching pairs in pair order and returns the next frontier. Each reached
+    /// node has one pair group and was unvisited in the broad phase, so it is merged at most once.
+    /// </summary>
     private List<int> MergeLevel(CandidateLevel level, int[] touchingPairPerTo, ref int componentSize)
     {
         var next = new List<int>();
@@ -280,7 +283,6 @@ internal sealed class TouchClusterFinder
         {
             _touchingPairs++;
             var (from, to) = level.Pairs[k];
-            if (_visited[to]) continue;
             _visited[to] = true;
 
             if (_isSeed[to])
@@ -293,7 +295,7 @@ internal sealed class TouchClusterFinder
 
             if (_keepRule.TryGetKeepReason(_targets[to], out var keepReason))
             {
-                _kept.Add(new KeptTarget(to, keepReason, TouchedRemovedIndex: from));
+                _kept.Add(new KeptTarget(to, keepReason, TouchedTargetIndex: from));
                 continue;
             }
 

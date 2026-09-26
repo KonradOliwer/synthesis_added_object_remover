@@ -26,17 +26,18 @@ internal static class RunReport
             : "Same-position replacement matching is disabled (objects the target plugin itself overrides are still ignored).");
     }
 
-    public static void PrintScanSummary(ScanResult scan, ModKey target, TimeSpan elapsed)
+    public static void PrintOverriddenOthers(ScanResult scan, ModKey target)
     {
         foreach (var other in scan.OverriddenOthersLog)
         {
-            var origin = other.FormKey.ModKey;
-            var winner = other.WinningMod == origin ? string.Empty : $" (winning override in {other.WinningMod})";
             Console.WriteLine(
                 $"  Ignored other-mod object overridden by {target}: "
-                + $"{RecordNames.Describe(other.FormKey, other.EditorId)} from {origin}{winner}.");
+                + $"{RecordNames.Describe(other.FormKey, other.EditorId)} {RecordNames.DescribeOrigin(other.FormKey, other.WinningMod)}.");
         }
+    }
 
+    public static void PrintScanSummary(ScanResult scan, ModKey target, TimeSpan elapsed)
+    {
         Console.WriteLine(
             $"Scanned {scan.RecordsScanned:N0} placed records in {elapsed.TotalSeconds:F1}s: "
             + $"{scan.Targets.Count:N0} {target} objects to check, "
@@ -83,7 +84,7 @@ internal static class RunReport
             $"Found {hitCount:N0} of {targetCount:N0} {target} objects too close to other mods' objects "
             + $"in {elapsed.TotalSeconds:F1}s.");
 
-    public static void PrintInvisibleOthers(InvisibleObjectCounter invisible, bool verbose)
+    public static void PrintInvisibleOthers(ReasonCounter invisible, bool verbose)
     {
         var byReason = invisible.Snapshot();
         var total = byReason.Sum(kv => kv.Value);
@@ -101,7 +102,7 @@ internal static class RunReport
         foreach (var entry in kept)
         {
             var target = scan.Targets[entry.TargetIndex];
-            var touched = entry.TouchedRemovedIndex is { } touchedIndex
+            var touched = entry.TouchedTargetIndex is { } touchedIndex
                 ? $" (touches removed {RecordNames.Describe(scan.Targets[touchedIndex].Record)})"
                 : string.Empty;
             Console.WriteLine($"  Kept {RecordNames.Describe(target.Record)} in {scan.SpaceNames[target.SpaceKey]}: {entry.Reason}{touched}.");
@@ -157,8 +158,7 @@ internal static class RunReport
     private static string DescribeRemovalReason(ScanResult scan, Removal removal) => removal switch
     {
         TooCloseRemoval { TooCloseTo: var other } =>
-            $"too close to {RecordNames.Describe(other.FormKey, other.EditorId)} from {other.FormKey.ModKey}"
-            + (other.WinningMod == other.FormKey.ModKey ? string.Empty : $" (winning override in {other.WinningMod})"),
+            $"too close to {RecordNames.Describe(other.FormKey, other.EditorId)} {RecordNames.DescribeOrigin(other.FormKey, other.WinningMod)}",
         TouchingRemoval touching => $"touches removed {RecordNames.Describe(scan.Targets[touching.TouchedTargetIndex].Record)}",
         _ => throw new UnreachableException($"Unknown removal type {removal.GetType().Name}."),
     };
@@ -172,6 +172,11 @@ internal static class RunReport
                 + $"{stats.BasesFromObnd:N0} from OBND, {stats.BasesWithoutBounds + stats.BasesUnresolved:N0} without bounds. "
                 + $"Meshes: {stats.ModelsRead:N0} read, {stats.ModelsFailed:N0} failed "
                 + $"({stats.ModelsFromLooseFiles:N0} loose, {stats.ModelsFromArchives:N0} from {stats.ArchivesIndexed:N0} archives).");
+            if (stats.ModelFailuresByKind.Count > 0)
+            {
+                Console.WriteLine(
+                    $"  Mesh failures: {string.Join(", ", stats.ModelFailuresByKind.Select(kv => $"{kv.Value:N0} {kv.Key}"))}.");
+            }
         }
         else
         {

@@ -79,13 +79,20 @@ internal sealed class PlacedRecordScanner
         foreach (var listing in _state.LoadOrder.PriorityOrder)
         {
             if (listing.Mod is not { } mod) continue;
+            var collectReferences = _config.KeepReferencedObjects && MayReferenceTarget(mod);
             foreach (var cellContext in mod.EnumerateMajorRecordContexts<ICell, ICellGetter>(_state.LinkCache))
             {
-                ScanCell(cellContext, listing.ModKey);
+                ScanCell(cellContext, listing.ModKey, collectReferences);
             }
         }
         return _scan;
     }
+
+    /// <summary>A plugin can only link to a target FormKey if it is the target, has it as a master, or is the patch.</summary>
+    private bool MayReferenceTarget(ISkyrimModGetter mod) =>
+        mod.ModKey == _config.Target
+        || mod.ModKey == _state.PatchMod.ModKey
+        || mod.MasterReferences.Any(master => master.Master == _config.Target);
 
     /// <summary>
     /// Walks only the target plugin's own cell tree. A FormKey the target overrides is a
@@ -109,7 +116,10 @@ internal sealed class PlacedRecordScanner
         return footprint;
     }
 
-    private void ScanCell(IModContext<ISkyrimMod, ISkyrimModGetter, ICell, ICellGetter> cellContext, ModKey winningMod)
+    private void ScanCell(
+        IModContext<ISkyrimMod, ISkyrimModGetter, ICell, ICellGetter> cellContext,
+        ModKey winningMod,
+        bool collectReferences)
     {
         var cell = cellContext.Record;
         var space = GetCellSpace(cellContext);
@@ -118,7 +128,7 @@ internal sealed class PlacedRecordScanner
 
         foreach (var (record, persistent) in cell.EnumeratePlaced())
         {
-            ScanRecord(record, persistent, cell, space, inTargetSpace, winningMod);
+            ScanRecord(record, persistent, cell, space, inTargetSpace, winningMod, collectReferences);
         }
     }
 
@@ -128,13 +138,14 @@ internal sealed class PlacedRecordScanner
         ICellGetter cell,
         CellSpace space,
         bool inTargetSpace,
-        ModKey winningMod)
+        ModKey winningMod,
+        bool collectReferences)
     {
         if (!_seenRecords.Add(record.FormKey)) return;
         _scan.RecordsScanned++;
         if (record.IsDeleted) return;
 
-        if (_config.KeepReferencedObjects)
+        if (collectReferences)
         {
             TargetReferenceCollector.Collect(record, _config.Target, _scan.TargetReferences);
         }
@@ -194,7 +205,7 @@ internal sealed class PlacedRecordScanner
             Transform: new PlacedTransform(
                 Geometry.ToVector(placement.Position),
                 Geometry.RotationFromEuler(placement.Rotation),
-                PlacedRecordExtensions.NormalizeScale(record.Scale)),
+                Geometry.NormalizeScale(record.Scale)),
             Base: record.GetBaseRef(),
             IsTeleportDoor: record is IPlacedObjectGetter { TeleportDestination: not null }));
         _scan.TargetLocations.Add(new TargetLocation(_winningCells[cell.FormKey], persistent));
@@ -214,7 +225,7 @@ internal sealed class PlacedRecordScanner
             record.GetBaseRef(),
             Geometry.ToVector(placement.Position),
             placement.Rotation,
-            PlacedRecordExtensions.NormalizeScale(record.Scale),
+            Geometry.NormalizeScale(record.Scale),
             record is IPlacedObjectGetter { Primitive: not null }));
     }
 

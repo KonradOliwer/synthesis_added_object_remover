@@ -9,7 +9,10 @@ using NiflySharp.Structs;
 
 namespace AddedObjectRemover;
 
-/// <summary>Per-shape access to NiflySharp shape blocks: type filtering, vertices and triangles.</summary>
+/// <summary>
+/// Per-shape access to NiflySharp shape blocks: type filtering, vertices and triangles. Library
+/// failures on malformed data surface as <see cref="MalformedNifException"/>.
+/// </summary>
 internal static class NifShapes
 {
     private const BindingFlags StripFieldFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -40,8 +43,8 @@ internal static class NifShapes
     }
 
     /// <summary>
-    /// Vertex positions in shape space, or null when the shape carries none (caller then uses
-    /// the bounding sphere).
+    /// Vertex positions in shape space, or null when the shape carries none (the bounding sphere
+    /// is used instead).
     /// <list type="bullet">
     /// <item>BSDynamicTriShape: positions live in its dynamic vertex list (<c>Vertices</c>,
     /// Vector4 xyz). Its vertex descriptor never has the Vertex flag, and NifFile.PrepareData only
@@ -52,41 +55,37 @@ internal static class NifShapes
     /// <item>Legacy NiTriShape/NiTriStrips: the NiGeometryData block.</item>
     /// </list>
     /// </summary>
-    public static List<Vector3>? TryGetVertices(INiShape shape)
+    public static List<Vector3>? GetVerticesOrNull(INiShape shape) => shape switch
     {
-        switch (shape)
-        {
-            case BSDynamicTriShape dynamicShape:
-                if (dynamicShape.Vertices is not { Count: > 0 } dynamicVertices) return null;
-                var positions = new List<Vector3>(dynamicVertices.Count);
-                foreach (var v in dynamicVertices) positions.Add(new Vector3(v.X, v.Y, v.Z));
-                return positions;
-            case BSTriShape triShape:
-                return triShape.VertexCount > 0 && (triShape.HasVertices || triShape.IsSkinned)
-                    ? triShape.VertexPositions
-                    : null;
-            default:
-                return shape.GeometryData?.Vertices;
-        }
+        BSDynamicTriShape dynamicShape => ToPositions(NiflyCalls.Call(() => dynamicShape.Vertices)),
+        BSTriShape triShape => NiflyCalls.Call(() =>
+            triShape.VertexCount > 0 && (triShape.HasVertices || triShape.IsSkinned) ? triShape.VertexPositions : null),
+        _ => NiflyCalls.Call(() => shape.GeometryData?.Vertices),
+    };
+
+    private static List<Vector3>? ToPositions(List<Vector4>? dynamicVertices)
+    {
+        if (dynamicVertices is not { Count: > 0 }) return null;
+        var positions = new List<Vector3>(dynamicVertices.Count);
+        foreach (var v in dynamicVertices) positions.Add(new Vector3(v.X, v.Y, v.Z));
+        return positions;
     }
 
     /// <summary>
     /// The shape's own triangle list (BSTriShape family, NiTriShape), or for legacy NiTriStrips the
     /// strips of its NiTriStripsData converted to triangles (alternating winding, degenerate
-    /// triangles and strips shorter than 3 points skipped).
+    /// triangles and strips shorter than 3 points skipped). BSGeometry (Starfield) has no triangle
+    /// access in NiflySharp.
     /// </summary>
-    public static List<Triangle>? GetTriangles(INiShape shape)
+    /// <param name="stripsMismatched">True when the strip lengths do not match the strip points; the result is then null.</param>
+    public static List<Triangle>? GetTriangles(INiShape shape, out bool stripsMismatched)
     {
-        try
-        {
-            if (shape.Triangles is { Count: > 0 } triangles) return triangles;
-        }
-        catch (NotImplementedException)
-        {
-            return null; // BSGeometry (Starfield) does not implement Triangles.
-        }
-
-        return shape.GeometryData is NiTriStripsData data ? GetStripTriangles(data) : null;
+        stripsMismatched = false;
+        if (shape is BSGeometry) return null;
+        if (NiflyCalls.Call(() => shape.Triangles) is { Count: > 0 } triangles) return triangles;
+        return NiflyCalls.Call(() => shape.GeometryData) is NiTriStripsData data
+            ? GetStripTriangles(data, out stripsMismatched)
+            : null;
     }
 
     /// <summary>
@@ -94,25 +93,27 @@ internal static class NifShapes
     /// <c>_points</c> (flat index list, sum of <c>_stripLengths</c> entries) and <c>_stripLengths</c>
     /// are read by reflection.
     /// </summary>
-    private static List<Triangle>? GetStripTriangles(NiTriStripsData data)
+    private static List<Triangle>? GetStripTriangles(NiTriStripsData data, out bool stripsMismatched)
     {
+        stripsMismatched = false;
         if (StripPointsField == null || StripLengthsField == null)
         {
             ReportStripFieldsMissingOnce();
             return null;
         }
+        if (StripPointsField.GetValue(data) is not List<ushort> { Count: > 0 } points
+            || StripLengthsField.GetValue(data) is not List<ushort> { Count: > 0 } stripLengths)
+            return null;
+
         try
         {
-            if (StripPointsField.GetValue(data) is not List<ushort> { Count: > 0 } points
-                || StripLengthsField.GetValue(data) is not List<ushort> { Count: > 0 } stripLengths)
-                return null;
-
             var strips = points.SplitByFlexSize(stripLengths).ToList();
             return strips.Count > 0 ? IndicesHelper.GenerateTrianglesFromStrips(strips) : null;
         }
         catch (Exception ex) when (ex is ArgumentException or IndexOutOfRangeException or InvalidOperationException)
         {
-            return null; // Strip lengths that do not match the point list.
+            stripsMismatched = true;
+            return null;
         }
     }
 
@@ -127,26 +128,4 @@ internal static class NifShapes
     /// <summary>Editor markers have no dedicated API; they are recognised by the Creation Kit naming convention.</summary>
     public static bool IsEditorMarker(string? name) =>
         name != null && name.Contains("EditorMarker", StringComparison.OrdinalIgnoreCase);
-}
-
-/// <summary>
-/// Reads the NIF "hidden" bit (0x1) of NiAVObject flags. NiflySharp splits the Flags field by
-/// Bethesda stream version (nif.xml: uint when BSVER > 26, ushort otherwise; LE is 83, SSE 100);
-/// only the field matching the file's stream version is populated.
-/// </summary>
-internal readonly record struct AvObjectFlags(bool UsesUIntFlags)
-{
-    private const int LastBsVersionWithUShortFlags = 26;
-    private const uint HiddenBit = 0x1;
-
-    public static AvObjectFlags For(NifFile nif) => new(nif.Header.Version?.StreamVersion > LastBsVersionWithUShortFlags);
-
-    /// <summary>
-    /// Objects with a time controller never count as hidden: animated NIFs (furniture, carts,
-    /// doors, ...) often store parts with the hidden bit set and show them through a visibility
-    /// controller at runtime.
-    /// </summary>
-    public bool IsHiddenWithoutController(uint flagsUi, ushort flagsUs, NiBlockRef<NiTimeController>? controller) =>
-        ((UsesUIntFlags ? flagsUi : flagsUs) & HiddenBit) != 0
-        && (controller == null || controller.IsEmpty());
 }

@@ -15,7 +15,7 @@ mods edit the same area. The output plugin is `AddedObjectRemover.esp`.
 | Excluded plugins | *(empty)* | Plugins whose objects are never treated as "other mods" objects. |
 | Exclude masters of the target plugin | `true` | Masters of the target plugin are also excluded. |
 | Measure size from meshes (NIF) | `true` | Measure base objects from their NIF mesh, falling back to Object Bounds (OBND). If disabled, only OBND is used. |
-| Keep referenced objects | `true` | Never remove target objects that other placed objects link to (Enable Parent, Linked Reference, Activate Parent, door teleport destination or any other reference field), or teleport doors. Kept objects are listed in the log. |
+| Keep referenced objects | `true` | Never remove target objects that other placed objects link to (Enable Parent, Linked Reference, Activate Parent, door teleport destination, script properties or any other reference field), or teleport doors. Kept objects are listed in the log. |
 | Remove touching objects | `true` | Also remove target objects whose mesh touches a removed target object, repeatedly (whole touching groups), so e.g. a tree standing on a removed rock does not stay floating. See *Touching objects* below. |
 | Touch tolerance | `8` | Maximum gap in game units between two mesh surfaces for them to count as touching. Must be 0 or more. |
 | Voxel size | `8` | Edge length (mesh units) of the voxels indexing mesh surfaces for the touch test; surfaces are sampled every voxel size / 2. Minimum 1. Smaller is more precise but slower and uses more memory. |
@@ -60,14 +60,16 @@ automatically; add them to *Excluded plugins* if needed.
    `BSDynamicTriShape` the dynamic vertex data is used. A shape without usable vertices falls
    back to its bounding sphere, unless that sphere has zero radius. A mesh with any non-finite
    vertex, or any coordinate beyond ±1,000,000 units (broken exports, sentinel values), is treated
-   as unreadable (logged with the reason) and the base falls back to OBND.
+   as unreadable (logged with the reason) and the base falls back to OBND. Mesh failures are
+   counted per kind (not found, NiflySharp exception type, ...) in the final bounds summary. Running
+   out of memory while parsing a mesh stops the run instead of counting as a mesh failure, so
+   results never depend on memory pressure.
 4. **Replaced objects.** The target plugin often *replaces* an existing object (e.g. a tree) with
    its own new one at the same spot; such replaced other-mod objects must not trigger proximity
    removals. Two exclusions are applied to the "other objects" set before the too-close test:
    - *Overridden by the target plugin* (always on): any placed record present in the target
      plugin's own cell tree that originates from another plugin (i.e. the target plugin overrides
-     it) is never an "other object", no matter which plugin ends up winning that record. Collected
-     during the existing pass over the target plugin's own cells (no extra full load-order pass).
+     it) is never an "other object", no matter which plugin ends up winning that record.
    - *Same-position lookalike* (*Ignore replaced objects*): an other object is excluded from
      proximity checks entirely when some target object in the same space has its position within
      *Replacement position tolerance* of it (`Vector3.Distance` between the two reference
@@ -75,9 +77,7 @@ automatically; add them to *Excluded plugins* if needed.
      (`(max - min) * scale`) are sorted largest-first, and the three matching pairs must each have
      a min/max ratio of at least *Replacement size similarity*. If either object has no bounds
      (zero-size box - unresolved base, missing OBND/mesh), or the other object is invisible (see
-     below), it is never treated as a match. Only other objects near a target object are ever
-     measured, by reusing each space's own spatial grid (a small position-tolerance query per
-     target); bounds are computed lazily and cached, as elsewhere. Matches are found in parallel
+     below), it is never treated as a match. Matches are found in parallel
      and then applied in target scan order, so each excluded object is attributed to its first
      matching target object; the verbose log (sorted by the excluded object) is the same on every
      run.
@@ -98,9 +98,10 @@ automatically; add them to *Excluded plugins* if needed.
      parses but has no visible render geometry (e.g. XMarker, heading, door and map markers, whose
      meshes only hold `EditorMarker` shapes) is invisible; so is a base with no mesh and zero-size
      bounds, and a primitive box reference (trigger/activator volume) whose base has no readable
-     visible mesh. NPCs always count. Missing or unreadable meshes do not make a base invisible.
-     The mesh check needs *Measure size from meshes (NIF)*. The number of ignored objects is
-     logged (per reason with verbose logging).
+     visible mesh (with *Measure size from meshes (NIF)* off: whose base names no model at all).
+     NPCs always count. Missing or unreadable meshes do not make a base invisible. The marker-mesh
+     check needs *Measure size from meshes (NIF)*. The number of ignored objects is logged (per
+     reason with verbose logging).
 6. **Touching objects** (if *Remove touching objects* is on and meshes are used). Only target
    plugin objects are considered, and only within the same interior cell or worldspace.
    - *Broad phase*: each target's oriented (rotated, scaled) bounding box, grown by the touch
@@ -183,13 +184,18 @@ records are deleted, so references from scripts, quests and other records still 
   without their surfaces coming within the tolerance does not count as touching. Legacy
   `NiTriStrips` shapes are converted to triangles (read from NiflySharp's strip data by
   reflection; if a NiflySharp update removes those fields, a warning is logged and such shapes
-  count as points only).
+  count as points only; a shape whose strip lengths do not match its points also counts as points
+  and is logged with verbose logging).
 - References are only checked through form links of other placed objects (Enable Parent, Linked
-  References, Activate Parents, door teleports and any other reference field). Scripts, quest
-  aliases, packages and other non-placed dependencies are **not** checked. Review the verbose log
-  if the target mod relies on scripted objects.
-- The archive list comes from the game INI plus `<Plugin>.bsa` / `<Plugin> - *.bsa` for each
-  plugin in load order. Archives loaded in other ways are not searched.
+  References, Activate Parents, door teleports, script properties on placed objects and any other
+  reference field), and only in plugins that can link to the target plugin's objects (the target
+  itself, plugins with it as a master, and the patch). Quest aliases, packages, scripts on
+  non-placed records and other non-placed dependencies are **not** checked. Review the verbose
+  log if the target mod relies on scripted objects.
+- The archive list comes from the game INI, then, for each plugin in load order, the Data-folder
+  archives Mutagen considers applicable to it: `<Plugin>.bsa`, then `<Plugin> - <Suffix>.bsa` by
+  name, where the plugin name is everything before the last ` - `. Archives loaded in other ways
+  are not searched.
 - Only the target plugin's own, unmodified objects are checked. Objects that a later plugin
   overrides are skipped.
 

@@ -106,13 +106,14 @@ internal sealed class ReplacementMatcher
 
     /// <summary>
     /// Scaled dimensions sorted largest-first, or null when the box has no size at all (missing
-    /// bounds come back as <see cref="Box.Zero"/>).
+    /// bounds come back as <see cref="Box.Zero"/>). Box sizes and normalized scales are never
+    /// negative, so neither are the dimensions.
     /// </summary>
     private static (float A, float B, float C)? ScaledSortedDims(Box local, float scale)
     {
         if (local.Size == Vector3.Zero) return null;
         var size = local.Size * scale;
-        var dims = new[] { MathF.Abs(size.X), MathF.Abs(size.Y), MathF.Abs(size.Z) };
+        var dims = new[] { size.X, size.Y, size.Z };
         Array.Sort(dims);
         return (dims[2], dims[1], dims[0]);
     }
@@ -123,7 +124,7 @@ internal sealed class ReplacementMatcher
 
     private static float DimensionRatio(float a, float b)
     {
-        if (a <= 0 || b <= 0) return a == b ? 1f : 0f;
+        if (a == 0 || b == 0) return a == b ? 1f : 0f;
         return MathF.Min(a, b) / MathF.Max(a, b);
     }
 }

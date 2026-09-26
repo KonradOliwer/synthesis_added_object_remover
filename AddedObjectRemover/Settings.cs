@@ -42,7 +42,7 @@ public class Settings
 
     [SynthesisSettingName("Verbose logging")]
     [SynthesisTooltip("Log every removed object with its base, cell/worldspace and the conflicting object, plus per-space counts and unreadable meshes.")]
-    public bool VerboseLogging { get; set; } = false;
+    public bool VerboseLogging { get; set; }
 
     [SynthesisSettingName("Ignore replaced objects")]
     [SynthesisTooltip("Do not treat another mod's object as an 'other mod' object for proximity purposes when a target plugin object in the same cell/worldspace sits at essentially the same position and has a similar size (it looks like the target plugin replaced it). Records the target plugin itself overrides are always ignored this way, regardless of this setting.")]
@@ -54,5 +54,5 @@ public class Settings
 
     [SynthesisSettingName("Replacement size similarity")]
     [SynthesisTooltip("How similar in size (scaled bounds) a target plugin object and another mod's object must be to be considered a replacement match: the smallest-to-largest ratio of each pair of matching dimensions must be at least this value (0.75 = within about 25%). Clamped to 0-1.")]
-    public float ReplacementSizeSimilarity { get; set; } = 0.75f;
+    public float ReplacementSizeSimilarity { get; set; } = RunConfig.DefaultReplacementSizeSimilarity;
 }

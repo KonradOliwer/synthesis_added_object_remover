@@ -32,11 +32,8 @@ internal sealed class SpatialGrid
     private readonly int[] _items;
     private readonly int[] _oversize;
 
-    public int Count { get; }
-
-    private SpatialGrid(int count, Dictionary<long, int> slotByCell, int[] slotStart, int[] items, int[] oversize)
+    private SpatialGrid(Dictionary<long, int> slotByCell, int[] slotStart, int[] items, int[] oversize)
     {
-        Count = count;
         _slotByCell = slotByCell;
         _slotStart = slotStart;
         _items = items;
@@ -54,14 +51,24 @@ internal sealed class SpatialGrid
     /// <summary>Indexes each box (item index = position in the list) in every cell its X/Y range overlaps.</summary>
     public static SpatialGrid FromBoxes(IReadOnlyList<Box> boxes)
     {
+        var (slotByCell, counts, oversize) = AssignSlots(boxes);
+
+        var slotStart = new int[counts.Count + 1];
+        for (var s = 0; s < counts.Count; s++) slotStart[s + 1] = slotStart[s] + counts[s];
+
+        var items = FillSlots(boxes, slotByCell, slotStart);
+        return new SpatialGrid(slotByCell, slotStart, items, oversize.ToArray());
+    }
+
+    /// <summary>Slots are numbered in first-seen cell order; counts are entries per slot.</summary>
+    private static (Dictionary<long, int> SlotByCell, List<int> Counts, List<int> Oversize) AssignSlots(IReadOnlyList<Box> boxes)
+    {
         var slotByCell = new Dictionary<long, int>();
         var counts = new List<int>();
         var oversize = new List<int>();
-
-        // Pass 1: assign slots (first-seen order) and count entries per slot.
         for (var i = 0; i < boxes.Count; i++)
         {
-            if (!TryGetCellRange(boxes[i], out var x0, out var x1, out var y0, out var y1))
+            if (!TryGetItemCellRange(boxes[i], out var x0, out var x1, out var y0, out var y1))
             {
                 oversize.Add(i);
                 continue;
@@ -81,17 +88,19 @@ internal sealed class SpatialGrid
                 }
             }
         }
+        return (slotByCell, counts, oversize);
+    }
 
-        var slotStart = new int[counts.Count + 1];
-        for (var s = 0; s < counts.Count; s++) slotStart[s + 1] = slotStart[s] + counts[s];
-
-        // Pass 2: fill, keeping insertion order within each cell.
-        var items = new int[slotStart[counts.Count]];
-        var fill = new int[counts.Count];
-        Array.Copy(slotStart, fill, counts.Count);
+    /// <summary>Flat item array grouped by slot, keeping insertion order within each cell.</summary>
+    private static int[] FillSlots(IReadOnlyList<Box> boxes, Dictionary<long, int> slotByCell, int[] slotStart)
+    {
+        var slotCount = slotStart.Length - 1;
+        var items = new int[slotStart[slotCount]];
+        var fill = new int[slotCount];
+        Array.Copy(slotStart, fill, slotCount);
         for (var i = 0; i < boxes.Count; i++)
         {
-            if (!TryGetCellRange(boxes[i], out var x0, out var x1, out var y0, out var y1)) continue;
+            if (!TryGetItemCellRange(boxes[i], out var x0, out var x1, out var y0, out var y1)) continue;
             for (var x = x0; x <= x1; x++)
             {
                 for (var y = y0; y <= y1; y++)
@@ -100,16 +109,12 @@ internal sealed class SpatialGrid
                 }
             }
         }
-
-        return new SpatialGrid(boxes.Count, slotByCell, slotStart, items, oversize.ToArray());
+        return items;
     }
 
     /// <summary>
-    /// Finds the first item indexed in a grid cell overlapping the X/Y range of
-    /// <paramref name="area"/> (grid-cell granularity) that satisfies the matcher. The matcher
-    /// receives the item index, so a caller can index by a cheap approximate point (e.g. a raw
-    /// position) and do an exact, possibly expensive, test only for the few candidates whose
-    /// indexed cell falls in range. An item indexed in several cells may be tested more than once.
+    /// First item in grid cells overlapping <paramref name="area"/>'s X/Y range that the matcher
+    /// accepts; items may be tested more than once.
     /// </summary>
     public bool TryFindFirst<TMatcher>(Box area, ref TMatcher matcher, out int index)
         where TMatcher : struct, IGridMatcher
@@ -123,14 +128,10 @@ internal sealed class SpatialGrid
             }
         }
 
-        long x0 = ToCell(area.Min.X);
-        long x1 = ToCell(area.Max.X);
-        long y0 = ToCell(area.Min.Y);
-        long y1 = ToCell(area.Max.Y);
-
-        if (CellCount(x0, x1, y0, y1) > _slotByCell.Count)
+        var range = CellRange.Of(area);
+        if (range.CellCount > _slotByCell.Count)
         {
-            // Query area covers more grid cells than are occupied: scanning the occupied cells is cheaper.
+            // Scanning the occupied cells is cheaper than walking the query range.
             for (var slot = 0; slot < _slotStart.Length - 1; slot++)
             {
                 if (TryMatchSlot(slot, ref matcher, out index)) return true;
@@ -138,9 +139,9 @@ internal sealed class SpatialGrid
         }
         else
         {
-            for (var x = x0; x <= x1; x++)
+            for (var x = range.X0; x <= range.X1; x++)
             {
-                for (var y = y0; y <= y1; y++)
+                for (var y = range.Y0; y <= range.Y1; y++)
                 {
                     if (_slotByCell.TryGetValue(Pack((int)x, (int)y), out var slot)
                         && TryMatchSlot(slot, ref matcher, out index))
@@ -163,20 +164,16 @@ internal sealed class SpatialGrid
     {
         results.AddRange(_oversize);
 
-        long x0 = ToCell(area.Min.X);
-        long x1 = ToCell(area.Max.X);
-        long y0 = ToCell(area.Min.Y);
-        long y1 = ToCell(area.Max.Y);
-
-        if (CellCount(x0, x1, y0, y1) > _slotByCell.Count)
+        var range = CellRange.Of(area);
+        if (range.CellCount > _slotByCell.Count)
         {
             results.AddRange(_items);
             return;
         }
 
-        for (var x = x0; x <= x1; x++)
+        for (var x = range.X0; x <= range.X1; x++)
         {
-            for (var y = y0; y <= y1; y++)
+            for (var y = range.Y0; y <= range.Y1; y++)
             {
                 if (!_slotByCell.TryGetValue(Pack((int)x, (int)y), out var slot)) continue;
                 for (var i = _slotStart[slot]; i < _slotStart[slot + 1]; i++) results.Add(_items[i]);
@@ -200,7 +197,7 @@ internal sealed class SpatialGrid
         return false;
     }
 
-    private static bool TryGetCellRange(Box box, out int x0, out int x1, out int y0, out int y1)
+    private static bool TryGetItemCellRange(Box box, out int x0, out int x1, out int y0, out int y1)
     {
         x0 = ToCell(box.Min.X);
         x1 = ToCell(box.Max.X);
@@ -211,10 +208,6 @@ internal sealed class SpatialGrid
         return ((long)x1 - x0 + 1) * ((long)y1 - y0 + 1) <= MaxCellsPerItem;
     }
 
-    /// <summary>Number of grid cells in an inclusive range, in double so a full int range cannot overflow.</summary>
-    private static double CellCount(long x0, long x1, long y0, long y1) =>
-        Math.Max(0, x1 - x0 + 1) * (double)Math.Max(0, y1 - y0 + 1);
-
     private static long Pack(int x, int y) => ((long)x << 32) | (uint)y;
 
     private static int ToCell(float coordinate)
@@ -222,5 +215,15 @@ internal sealed class SpatialGrid
         var cell = Math.Floor(coordinate / CellSize);
         if (double.IsNaN(cell)) return 0;
         return (int)Math.Clamp(cell, int.MinValue, int.MaxValue);
+    }
+
+    /// <summary>Inclusive grid-cell range of a query area; long so that loops over a full int range terminate.</summary>
+    private readonly record struct CellRange(long X0, long X1, long Y0, long Y1)
+    {
+        public static CellRange Of(Box area) =>
+            new(ToCell(area.Min.X), ToCell(area.Max.X), ToCell(area.Min.Y), ToCell(area.Max.Y));
+
+        /// <summary>In double so a full int range cannot overflow.</summary>
+        public double CellCount => Math.Max(0, X1 - X0 + 1) * (double)Math.Max(0, Y1 - Y0 + 1);
     }
 }

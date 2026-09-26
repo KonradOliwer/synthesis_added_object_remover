@@ -15,6 +15,9 @@ internal readonly record struct Box(Vector3 Min, Vector3 Max)
     /// <summary>Builds a box from two arbitrary corners (order per axis does not matter).</summary>
     public static Box FromCorners(Vector3 a, Vector3 b) => new(Vector3.Min(a, b), Vector3.Max(a, b));
 
+    /// <summary>Both corners multiplied by <paramref name="scale"/>, re-ordered (a negative scale flips them).</summary>
+    public Box Scaled(float scale) => FromCorners(Min * scale, Max * scale);
+
     /// <summary>Inclusive containment test.</summary>
     public bool Contains(Vector3 p) =>
         p.X >= Min.X && p.X <= Max.X
@@ -22,10 +25,7 @@ internal readonly record struct Box(Vector3 Min, Vector3 Max)
         && p.Z >= Min.Z && p.Z <= Max.Z;
 }
 
-/// <summary>
-/// Row-major 3x3 matrix applied to column vectors (v' = M * v).
-/// Kept deliberately small and explicit so the rotation convention is easy to audit.
-/// </summary>
+/// <summary>Row-major 3x3 matrix applied to column vectors (v' = M * v).</summary>
 internal readonly struct Mat3
 {
     public readonly float M11, M12, M13;
@@ -41,6 +41,8 @@ internal readonly struct Mat3
         M21 = m21; M22 = m22; M23 = m23;
         M31 = m31; M32 = m32; M33 = m33;
     }
+
+    public static Mat3 Identity => new(1, 0, 0, 0, 1, 0, 0, 0, 1);
 
     public static Mat3 operator *(Mat3 a, Mat3 b) => new(
         a.M11 * b.M11 + a.M12 * b.M21 + a.M13 * b.M31,
@@ -78,7 +80,6 @@ internal readonly struct Mat3
         MathF.Abs(M31) * v.X + MathF.Abs(M32) * v.Y + MathF.Abs(M33) * v.Z);
 }
 
-/// <summary>Position, rotation and uniform scale of a placed reference.</summary>
 internal readonly record struct PlacedTransform(Vector3 Position, Mat3 Rotation, float Scale);
 
 /// <summary>
@@ -87,10 +88,12 @@ internal readonly record struct PlacedTransform(Vector3 Position, Mat3 Rotation,
 /// </summary>
 internal readonly record struct OrientedBox(Vector3 Center, Mat3 Rotation, Vector3 HalfExtents)
 {
-    /// <summary>Oriented box of a reference's (scaled) local bounds.</summary>
+    /// <summary>Added to every |R| term so near-parallel axes do not produce a false separation from rounding.</summary>
+    private const float ParallelAxisEpsilon = 1e-5f;
+
     public static OrientedBox FromLocal(Box local, PlacedTransform transform)
     {
-        var scaled = Box.FromCorners(local.Min * transform.Scale, local.Max * transform.Scale);
+        var scaled = local.Scaled(transform.Scale);
         return new OrientedBox(
             transform.Position + transform.Rotation.Transform(scaled.Center),
             transform.Rotation,
@@ -111,7 +114,6 @@ internal readonly record struct OrientedBox(Vector3 Center, Mat3 Rotation, Vecto
     /// </summary>
     public bool Intersects(OrientedBox other, float padding)
     {
-        const float epsilon = 1e-5f;
         var a = HalfExtents + new Vector3(padding);
         var b = other.HalfExtents;
 
@@ -122,9 +124,9 @@ internal readonly record struct OrientedBox(Vector3 Center, Mat3 Rotation, Vecto
         float r00 = r.M11, r01 = r.M12, r02 = r.M13;
         float r10 = r.M21, r11 = r.M22, r12 = r.M23;
         float r20 = r.M31, r21 = r.M32, r22 = r.M33;
-        float a00 = MathF.Abs(r00) + epsilon, a01 = MathF.Abs(r01) + epsilon, a02 = MathF.Abs(r02) + epsilon;
-        float a10 = MathF.Abs(r10) + epsilon, a11 = MathF.Abs(r11) + epsilon, a12 = MathF.Abs(r12) + epsilon;
-        float a20 = MathF.Abs(r20) + epsilon, a21 = MathF.Abs(r21) + epsilon, a22 = MathF.Abs(r22) + epsilon;
+        float a00 = MathF.Abs(r00) + ParallelAxisEpsilon, a01 = MathF.Abs(r01) + ParallelAxisEpsilon, a02 = MathF.Abs(r02) + ParallelAxisEpsilon;
+        float a10 = MathF.Abs(r10) + ParallelAxisEpsilon, a11 = MathF.Abs(r11) + ParallelAxisEpsilon, a12 = MathF.Abs(r12) + ParallelAxisEpsilon;
+        float a20 = MathF.Abs(r20) + ParallelAxisEpsilon, a21 = MathF.Abs(r21) + ParallelAxisEpsilon, a22 = MathF.Abs(r22) + ParallelAxisEpsilon;
 
         // This box's axes.
         if (MathF.Abs(t.X) > a.X + b.X * a00 + b.Y * a01 + b.Z * a02) return false;
@@ -153,10 +155,6 @@ internal readonly record struct OrientedBox(Vector3 Center, Mat3 Rotation, Vecto
 
 internal static class Geometry
 {
-    public static Vector3 ToVector(P3Float p) => new(p.X, p.Y, p.Z);
-
-    public static bool IsFinite(Vector3 v) => float.IsFinite(v.X) && float.IsFinite(v.Y) && float.IsFinite(v.Z);
-
     /// <summary>
     /// Largest accepted absolute mesh or placement coordinate. Real content stays far below it
     /// (a worldspace spans a few hundred thousand units); larger values come from broken exports
@@ -164,13 +162,18 @@ internal static class Geometry
     /// </summary>
     public const float MaxCoordinate = 1e6f;
 
+    public static Vector3 ToVector(P3Float p) => new(p.X, p.Y, p.Z);
+
+    public static bool IsFinite(Vector3 v) => float.IsFinite(v.X) && float.IsFinite(v.Y) && float.IsFinite(v.Z);
+
     /// <summary>Finite and every component within ±<see cref="MaxCoordinate"/>.</summary>
     public static bool IsWithinLimits(Vector3 v) =>
         MathF.Abs(v.X) <= MaxCoordinate && MathF.Abs(v.Y) <= MaxCoordinate && MathF.Abs(v.Z) <= MaxCoordinate;
 
+    // TODO: verify the multi-axis order in-game.
     /// <summary>
-    /// THE single place where a placed reference's Euler rotation (REFR/ACHR DATA, radians,
-    /// X/Y/Z as stored in Placement.Rotation) is turned into a rotation matrix.
+    /// Turns a placed reference's Euler rotation (REFR/ACHR DATA, radians, X/Y/Z as stored in
+    /// Placement.Rotation) into a rotation matrix.
     ///
     /// Convention: the Creation Engine rotates clockwise (left-handed) about each axis, which is the
     /// same as a standard right-handed rotation by the negated angle. The composite world matrix is
@@ -180,10 +183,6 @@ internal static class Geometry
     ///     Ry(a) = [cos a 0 sin a; 0 1 0; -sin a 0 cos a]
     ///     Rz(a) = [cos a -sin a 0; sin a cos a 0; 0 0 1]
     /// and applied to column vectors: v_world = R * v_local (+ position).
-    ///
-    /// NOTE: this convention should be verified in-game (e.g. place a long, thin object rotated on
-    /// all three axes and compare its extents with what this matrix predicts). If it turns out to
-    /// be wrong, only this function needs to change.
     /// </summary>
     public static Mat3 RotationFromEuler(P3Float rotationRadians)
     {
@@ -229,12 +228,11 @@ internal static class Geometry
     /// </summary>
     public static Box ExpandedLocalBox(Box local, float scale, float multiplier)
     {
-        var scaled = Box.FromCorners(local.Min * scale, local.Max * scale);
+        var scaled = local.Scaled(scale);
         var padding = scaled.Size * multiplier;
         return new Box(scaled.Min - padding, scaled.Max + padding);
     }
 
-    /// <summary>World-space AABB enclosing a local box after rotation and translation.</summary>
     public static Box WorldAabb(Box local, Vector3 position, Mat3 rotation)
     {
         var center = position + rotation.Transform(local.Center);
@@ -242,14 +240,10 @@ internal static class Geometry
         return new Box(center - halfExtents, center + halfExtents);
     }
 
-    /// <summary>World-space center of a reference's (scaled, rotated) local bounds.</summary>
     public static Vector3 WorldBoundsCenter(Box local, PlacedTransform transform) =>
         transform.Position + transform.Rotation.Transform(local.Center * transform.Scale);
 
-    /// <summary>
-    /// True if <paramref name="worldPoint"/> lies inside <paramref name="localBox"/> (inclusive) once the
-    /// point is transformed into the reference's local frame: p_local = R^T * (p - position).
-    /// </summary>
+    /// <summary>Inclusive test in the reference's local frame: p_local = R^T * (p - position).</summary>
     public static bool IsInsideOrientedBox(Vector3 worldPoint, Vector3 position, Mat3 rotation, Box localBox) =>
         localBox.Contains(rotation.TransformTransposed(worldPoint - position));
 

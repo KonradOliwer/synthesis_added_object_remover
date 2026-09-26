@@ -1,0 +1,237 @@
+using System.Numerics;
+using NiflySharp;
+using NiflySharp.Blocks;
+
+namespace AddedObjectRemover;
+
+/// <summary>Why shapes of one NIF were counted or skipped; printed when a NIF yields no geometry.</summary>
+internal sealed class ShapeStats
+{
+    public int Shapes;
+    public int Counted;
+    public int Hidden;
+    public int EditorMarker;
+    public int NoVertices;
+    public int Unreachable;
+    public int HiddenAncestor;
+    public int MarkerAncestor;
+    public bool HiddenIgnored;
+    public readonly SortedDictionary<string, int> Unsupported = new(StringComparer.Ordinal);
+
+    public override string ToString()
+    {
+        var unsupported = Unsupported.Count == 0
+            ? "0"
+            : $"{Unsupported.Values.Sum()} [{string.Join(", ", Unsupported.Select(kv => $"{kv.Key} x{kv.Value}"))}]";
+        return $"{Shapes} shapes: counted={Counted}, hidden={Hidden}, editorMarker={EditorMarker}, "
+            + $"unsupported={unsupported}, noVertices={NoVertices}, unreachable={Unreachable}, "
+            + $"hiddenAncestor={HiddenAncestor}, markerAncestor={MarkerAncestor}"
+            + (HiddenIgnored ? ", hidden flag ignored in 2nd pass" : string.Empty);
+    }
+}
+
+/// <summary>Running AABB of accepted points; the first rejected point records why the mesh is invalid.</summary>
+internal sealed class BoundsAccumulator
+{
+    public bool Any { get; private set; }
+    public Vector3 Min { get; private set; } = new(float.PositiveInfinity);
+    public Vector3 Max { get; private set; } = new(float.NegativeInfinity);
+    public string? Invalid { get; private set; }
+
+    public bool AddPoint(Vector3 p)
+    {
+        if (!Geometry.IsWithinLimits(p))
+        {
+            Invalid ??= Geometry.IsFinite(p)
+                ? $"vertex coordinates beyond ±{Geometry.MaxCoordinate:0} units"
+                : "non-finite vertex coordinates";
+            return false;
+        }
+        Min = Vector3.Min(Min, p);
+        Max = Vector3.Max(Max, p);
+        Any = true;
+        return true;
+    }
+}
+
+/// <summary>Result of one pass over a NIF's shapes. Vertices/Indices are null when triangles were not requested.</summary>
+internal sealed record ShapeCollection(BoundsAccumulator Bounds, List<Vector3>? Vertices, List<int>? Indices, ShapeStats Stats);
+
+/// <summary>
+/// One pass over all shapes of a NIF: bounds (and optionally root-space triangles) of every render
+/// shape reachable from the root through visible, non-marker nodes, with per-reason skip counts.
+/// </summary>
+internal sealed class NifShapeCollector
+{
+    private readonly List<INiObject> _blocks;
+    private readonly IReadOnlyDictionary<int, int> _parentOf;
+    private readonly AvObjectFlags _flags;
+    private readonly bool _includeHidden;
+    private readonly NodeTransformResolver _nodes;
+    private readonly BoundsAccumulator _bounds = new();
+    private readonly List<Vector3>? _vertices;
+    private readonly List<int>? _indices;
+    private readonly ShapeStats _stats;
+
+    private NifShapeCollector(
+        List<INiObject> blocks,
+        IReadOnlyDictionary<int, int> parentOf,
+        int rootIndex,
+        AvObjectFlags flags,
+        bool includeHidden,
+        bool includeTriangles)
+    {
+        _blocks = blocks;
+        _parentOf = parentOf;
+        _flags = flags;
+        _includeHidden = includeHidden;
+        _nodes = new NodeTransformResolver(blocks, parentOf, rootIndex, flags, includeHidden);
+        _vertices = includeTriangles ? [] : null;
+        _indices = includeTriangles ? [] : null;
+        _stats = new ShapeStats { HiddenIgnored = includeHidden };
+    }
+
+    public static ShapeCollection Collect(
+        List<INiObject> blocks,
+        IReadOnlyDictionary<int, int> parentOf,
+        int rootIndex,
+        AvObjectFlags flags,
+        bool includeHidden,
+        bool includeTriangles) =>
+        new NifShapeCollector(blocks, parentOf, rootIndex, flags, includeHidden, includeTriangles).CollectAll();
+
+    private ShapeCollection CollectAll()
+    {
+        for (var blockIndex = 0; blockIndex < _blocks.Count && _bounds.Invalid == null; blockIndex++)
+        {
+            if (_blocks[blockIndex] is INiShape shape) CollectShape(blockIndex, shape);
+        }
+        return new ShapeCollection(_bounds, _vertices, _indices, _stats);
+    }
+
+    private void CollectShape(int blockIndex, INiShape shape)
+    {
+        _stats.Shapes++;
+        if (!TryGetShapeToRoot(blockIndex, shape, out var toRoot)) return;
+
+        if (NifShapes.TryGetVertices(shape) is { Count: > 0 } vertices)
+        {
+            AddShapeVertices(shape, vertices, toRoot);
+        }
+        else
+        {
+            AddShapeSphere(shape, toRoot);
+        }
+    }
+
+    /// <summary>False (with the skip reason counted) when the shape is not counted at all.</summary>
+    private bool TryGetShapeToRoot(int blockIndex, INiShape shape, out Similarity toRoot)
+    {
+        toRoot = Similarity.Identity;
+        if (!NifShapes.IsRenderGeometry(shape))
+        {
+            var name = shape.GetType().Name;
+            _stats.Unsupported[name] = _stats.Unsupported.GetValueOrDefault(name) + 1;
+            return false;
+        }
+        if (NifShapes.IsEditorMarker(shape.Name?.String))
+        {
+            _stats.EditorMarker++;
+            return false;
+        }
+        if (!_includeHidden && _flags.IsHiddenWithoutController(shape.Flags_ui, shape.Flags_us, shape.Controller))
+        {
+            _stats.Hidden++;
+            return false;
+        }
+        if (!_parentOf.TryGetValue(blockIndex, out var parentIndex))
+        {
+            _stats.Unreachable++;
+            return false;
+        }
+
+        var parent = _nodes.Resolve(parentIndex);
+        switch (parent.Skip)
+        {
+            case NodeSkip.Unreachable: _stats.Unreachable++; return false;
+            case NodeSkip.Hidden: _stats.HiddenAncestor++; return false;
+            case NodeSkip.Marker: _stats.MarkerAncestor++; return false;
+        }
+        toRoot = parent.ToRoot.After(Similarity.From(shape.Translation, shape.Rotation, shape.Scale));
+        return true;
+    }
+
+    private void AddShapeVertices(INiShape shape, List<Vector3> vertices, Similarity toRoot)
+    {
+        var added = false;
+        foreach (var v in vertices) added |= _bounds.AddPoint(toRoot.Apply(v));
+        if (added) _stats.Counted++;
+        else _stats.NoVertices++;
+        if (_vertices != null && _indices != null) AppendTriangles(shape, vertices, toRoot, _vertices, _indices);
+    }
+
+    /// <summary>
+    /// A sphere stays a sphere under a similarity transform, so transforming the center and scaling
+    /// the radius gives an exact, rotation-invariant AABB. Legacy NiGeometry without a data block and
+    /// zero/negative/non-finite radii are ignored (they would add a stray point at the shape origin).
+    /// </summary>
+    private void AddShapeSphere(INiShape shape, Similarity toRoot)
+    {
+        var sphere = shape.Bounds;
+        if ((shape is not BSTriShape && shape.GeometryData == null)
+            || !(sphere.Radius > 0) || !float.IsFinite(sphere.Radius))
+        {
+            _stats.NoVertices++;
+            return;
+        }
+        var center = toRoot.Apply(sphere.Center);
+        var extent = new Vector3(MathF.Abs(sphere.Radius * toRoot.Scale));
+        _bounds.AddPoint(center - extent);
+        _bounds.AddPoint(center + extent);
+        _stats.Counted++;
+    }
+
+    /// <summary>
+    /// Out-of-range vertices, and triangles referencing them or out-of-range indices, are dropped.
+    /// A shape without a triangle list contributes each vertex as a degenerate point triangle.
+    /// </summary>
+    private static void AppendTriangles(
+        INiShape shape,
+        List<Vector3> shapeVertices,
+        Similarity toRoot,
+        List<Vector3> allVertices,
+        List<int> allIndices)
+    {
+        var baseIndex = allVertices.Count;
+        var usable = new bool[shapeVertices.Count];
+        for (var i = 0; i < shapeVertices.Count; i++)
+        {
+            var p = toRoot.Apply(shapeVertices[i]);
+            usable[i] = Geometry.IsWithinLimits(p);
+            allVertices.Add(usable[i] ? p : Vector3.Zero);
+        }
+
+        var triangles = NifShapes.GetTriangles(shape);
+        if (triangles is not { Count: > 0 })
+        {
+            for (var i = 0; i < shapeVertices.Count; i++)
+            {
+                if (!usable[i]) continue;
+                allIndices.Add(baseIndex + i);
+                allIndices.Add(baseIndex + i);
+                allIndices.Add(baseIndex + i);
+            }
+            return;
+        }
+
+        foreach (var triangle in triangles)
+        {
+            int a = triangle.V1, b = triangle.V2, c = triangle.V3;
+            if (a >= usable.Length || b >= usable.Length || c >= usable.Length) continue;
+            if (!usable[a] || !usable[b] || !usable[c]) continue;
+            allIndices.Add(baseIndex + a);
+            allIndices.Add(baseIndex + b);
+            allIndices.Add(baseIndex + c);
+        }
+    }
+}

@@ -17,7 +17,23 @@ internal sealed record TouchStats(
     TimeSpan NarrowPhase,
     TimeSpan Clusters);
 
-internal sealed record TouchClusters(List<TouchingRemoval> Removals, List<KeptTarget> Kept, TouchStats Stats);
+internal sealed record TouchClusters(List<TouchingRemoval> Removals, List<KeptTarget> Kept, TouchStats Stats, TouchDiagnosticsData? Diagnostics);
+
+/// <summary>
+/// Raw exploration data kept only when touch diagnostics output was requested (see
+/// <see cref="TouchDiagnosticsWriter"/>); otherwise null and nothing extra is tracked.
+/// </summary>
+/// <param name="ComponentId">Target index -&gt; component id, or -1 if never reached.</param>
+/// <param name="ParentOf">Target index -&gt; the target index it was reached through, or -1 for the component's first (root) seed.</param>
+/// <param name="Depth">Target index -&gt; its distance (edge count) from the component's root seed.</param>
+/// <param name="ComponentMembers">Component id -&gt; every target index reached in it (seed, touch-removed or kept), in discovery order.</param>
+internal sealed record TouchDiagnosticsData(
+    int[] ComponentId,
+    int[] ParentOf,
+    int[] Depth,
+    List<List<int>> ComponentMembers,
+    TouchCandidates Candidates,
+    PairTouch[] PairResults);
 
 /// <summary>
 /// Connected components of the "touches" graph (target objects of one space) that contain a
@@ -44,13 +60,20 @@ internal sealed class TouchClusterFinder
     private int _componentsWithTouching;
     private int _largestComponent;
 
+    // Diagnostics-only bookkeeping; null (and never written to) unless requested.
+    private readonly int[]? _componentId;
+    private readonly int[]? _parentOf;
+    private readonly int[]? _depth;
+    private readonly List<List<int>>? _componentMembers;
+
     private TouchClusterFinder(
         IReadOnlyList<TargetObject> targets,
         KeepReferencedRule keepRule,
         TouchCandidates candidates,
         PairTouch[] pairResults,
         bool[] isSeed,
-        bool[] visited)
+        bool[] visited,
+        bool collectDiagnostics)
     {
         _targets = targets;
         _keepRule = keepRule;
@@ -58,6 +81,14 @@ internal sealed class TouchClusterFinder
         _pairResults = pairResults;
         _isSeed = isSeed;
         _visited = visited;
+
+        if (!collectDiagnostics) return;
+        _componentId = new int[targets.Count];
+        Array.Fill(_componentId, -1);
+        _parentOf = new int[targets.Count];
+        Array.Fill(_parentOf, -1);
+        _depth = new int[targets.Count];
+        _componentMembers = [];
     }
 
     /// <param name="seeds">Target indices of the too-close removals, in removal order.</param>
@@ -69,7 +100,8 @@ internal sealed class TouchClusterFinder
         BaseObjectShapeProvider shapes,
         KeepReferencedRule keepRule,
         float tolerance,
-        ParallelOptions parallelOptions)
+        ParallelOptions parallelOptions,
+        bool collectDiagnostics = false)
     {
         var isSeed = MarkAll(targets.Count, seeds);
         var keptBefore = MarkAll(targets.Count, keptTooClose);
@@ -90,12 +122,16 @@ internal sealed class TouchClusterFinder
         narrowTimer.Stop();
 
         var clusterTimer = Stopwatch.StartNew();
-        var finder = new TouchClusterFinder(targets, keepRule, candidates, narrow.Results, isSeed, visited: (bool[])keptBefore.Clone());
+        var finder = new TouchClusterFinder(
+            targets, keepRule, candidates, narrow.Results, isSeed, visited: (bool[])keptBefore.Clone(), collectDiagnostics);
         finder.ExploreComponents(seeds);
         clusterTimer.Stop();
 
         var stats = finder.CreateStats(candidates, narrow, setupTimer.Elapsed, broadTimer.Elapsed, narrowTimer.Elapsed, clusterTimer.Elapsed);
-        return new TouchClusters(finder._removals, finder._kept, stats);
+        var diagnostics = collectDiagnostics
+            ? new TouchDiagnosticsData(finder._componentId!, finder._parentOf!, finder._depth!, finder._componentMembers!, candidates, narrow.Results)
+            : null;
+        return new TouchClusters(finder._removals, finder._kept, stats, diagnostics);
     }
 
     private static bool[] MarkAll(int count, IEnumerable<int> indices)
@@ -120,23 +156,35 @@ internal sealed class TouchClusterFinder
             // A seed reached from an earlier seed already belongs to that seed's component.
             if (_visited[seed]) continue;
             _visited[seed] = true;
+            RecordMember(_components, seed, parent: -1, depth: 0);
 
-            var componentSize = ExploreComponent(seed);
+            var componentSize = ExploreComponent(seed, _components);
             _components++;
             if (componentSize > 1) _componentsWithTouching++;
             _largestComponent = Math.Max(_largestComponent, componentSize);
         }
     }
 
+    /// <summary>Diagnostics-only; a no-op unless diagnostics collection was requested.</summary>
+    private void RecordMember(int componentId, int node, int parent, int depth)
+    {
+        if (_componentId == null) return;
+        _componentId[node] = componentId;
+        _parentOf![node] = parent;
+        _depth![node] = depth;
+        while (_componentMembers!.Count <= componentId) _componentMembers.Add([]);
+        _componentMembers[componentId].Add(node);
+    }
+
     /// <returns>Number of removed objects in the component, the seed included.</returns>
-    private int ExploreComponent(int seed)
+    private int ExploreComponent(int seed, int componentId)
     {
         var componentSize = 1;
         var frontier = new List<int> { seed };
         while (frontier.Count > 0)
         {
             var reached = ReachUnvisitedTouching(frontier);
-            frontier = MergeLevel(reached, ref componentSize);
+            frontier = MergeLevel(reached, componentId, ref componentSize);
         }
         return componentSize;
     }
@@ -165,15 +213,17 @@ internal sealed class TouchClusterFinder
     };
 
     /// <summary>Applies the level's reached nodes in order and returns the next frontier.</summary>
-    private List<int> MergeLevel(List<(int From, int To)> reached, ref int componentSize)
+    private List<int> MergeLevel(List<(int From, int To)> reached, int componentId, ref int componentSize)
     {
         var next = new List<int>();
         foreach (var (from, to) in reached)
         {
+            var depth = (_depth?[from] ?? 0) + 1;
             if (_isSeed[to])
             {
                 // Another too-close removal: same component, already removed.
                 componentSize++;
+                RecordMember(componentId, to, from, depth);
                 next.Add(to);
                 continue;
             }
@@ -181,10 +231,12 @@ internal sealed class TouchClusterFinder
             if (_keepRule.TryGetKeepReason(_targets[to], out var keepReason))
             {
                 _kept.Add(new KeptTarget(to, keepReason, TouchedTargetIndex: from));
+                RecordMember(componentId, to, from, depth);
                 continue;
             }
 
             _removals.Add(new TouchingRemoval(to, TouchedTargetIndex: from));
+            RecordMember(componentId, to, from, depth);
             componentSize++;
             next.Add(to);
         }

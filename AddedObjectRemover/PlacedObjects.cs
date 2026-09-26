@@ -15,13 +15,15 @@ namespace AddedObjectRemover;
 internal readonly record struct BaseRef(FormKey FormKey, Type LinkType);
 
 /// <summary>Target-plugin object that may be removed.</summary>
+/// <param name="RotationRadians">Raw placement rotation (radians, as stored), kept alongside <see cref="Transform"/>'s already-converted matrix for human-readable diagnostics output.</param>
 internal sealed record TargetObject(
     IPlacedGetter Record,
     FormKey SpaceKey,
     string? CellName,
     PlacedTransform Transform,
     BaseRef? Base,
-    bool IsTeleportDoor);
+    bool IsTeleportDoor,
+    P3Float RotationRadians);
 
 /// <summary>Where a target object's override is written: through its cell's winning context, into the same child list.</summary>
 internal sealed record TargetLocation(

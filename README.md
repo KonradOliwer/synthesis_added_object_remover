@@ -23,6 +23,7 @@ mods edit the same area. The output plugin is `AddedObjectRemover.esp`.
 | Ignore replaced objects | `true` | Do not treat another mod's object as an "other mod" object when a target plugin object in the same space sits at essentially the same position and has a similar size (looks like the target plugin replaced it). See *Replaced objects* below. Records the target plugin itself overrides are always ignored this way, regardless of this setting. |
 | Replacement position tolerance | `16` | Maximum distance, in game units, between a target object's position and another mod's object's position to be a possible replacement match. Must be 0 or more. |
 | Replacement size similarity | `0.75` | Minimum smallest-to-largest ratio, per matching sorted dimension, between a target object's and another mod's object's scaled bounds for them to count as a replacement match (`0.75` = within about 25%). Clamped to 0-1. |
+| Touch diagnostics file | *(empty)* | Optional path of a file to write touch-diagnostics CSVs to (see *Touch diagnostics* below). Empty writes nothing (default) and has no effect on results or performance. Relative paths resolve against the patcher's working directory; an absolute path is recommended. |
 
 The base game plugins `Skyrim.esm`, `Update.esm`, `Dawnguard.esm`, `HearthFires.esm` and
 `Dragonborn.esm` never count as other mods, and neither does the patcher's own output plugin
@@ -142,7 +143,36 @@ automatically; add them to *Excluded plugins* if needed.
      the previous level (in index order) that touches it, so the log is the same on every run.
      Objects kept by *Keep referenced objects* stay and do not pass the removal on. The log
      reports components, the largest component and pair counts.
-7. **Rotation convention.** Placement rotations are radians. The engine rotates clockwise
+7. **Touch diagnostics** (optional, off by default). When *Touch diagnostics file* is set, two CSV
+   files are written after touch computation, single-threaded, so they never slow down or change
+   the normal run: `<path>.edges.csv` and `<path>.components.csv`. They let a touching chain be
+   judged from the log alone, without opening xEdit. Both are UTF-8, comma-separated, invariant
+   culture, RFC 4180-style quoted when a field holds a comma, quote or newline, and written in a
+   fixed order (by component, then by FormKey) so they are the same on every run.
+   - **`.edges.csv`**: every touching edge found among target objects in the explored components,
+     including seed-to-seed touches (which the console log does not otherwise report). Columns:
+     `componentId`, `fromFormKey`, `toFormKey`, `fromIsSeed`, `toIsSeed`,
+     `measuredMinSurfaceDistance`, `tolerance`, `centerToCenterDistance`, then, for `from_` and
+     `to_` separately: `editorId`, `base` (base object FormKey and EditorID), `modelPath`,
+     `spaceFormKey`, `posX/Y/Z`, `rotXDeg/YDeg/ZDeg`, `scale`, `halfExtentX/Y/Z` (half the scaled
+     local bounds size, for a quick ratio against the measured distance). `measuredMinSurfaceDistance`
+     is not merely the first triangle pair found under tolerance: the diagnostics pass re-walks the
+     same tolerance-grown overlap region as the real touch test but does not stop early, so it
+     reports the true minimum surface distance between the two meshes' triangles in that region (a
+     value that is always ≤ tolerance, since the pair is already known to touch). Rotation is shown
+     in degrees for readability; the engine's own convention (see below) still applies to it.
+   - **`.components.csv`**: one row per explored component. Columns: `componentId`, `size` (every
+     member: seeds, touch-removed and kept-as-referenced objects alike), `seedCount`,
+     `removedByTouchCount`, `keptAsReferencedCount`, `spaces` (distinct cell/worldspace names,
+     truncated to 10), `worldAabbMinX/Y/Z`, `worldAabbMaxX/Y/Z` (world-space bounds of every
+     member), `topBaseEditorIds` (the 5 most common base objects, as `EditorID:count`),
+     `longestChainLength` and `longestChainFormKeys` (the longest seed-to-leaf path through the
+     touching graph, by edge count, and that path's FormKeys in order), and `seedReasons` (each
+     seed's too-close conflicting object, as `FormKey (Plugin)`).
+   - Mesh triangles are re-read for diagnostics edges (cached per mesh path for the duration of the
+     write, but not shared with the main run's mesh cache), so a diagnostics file with many edges
+     takes some extra time; this only happens when the setting is non-empty.
+8. **Rotation convention.** Placement rotations are radians. The engine rotates clockwise
    (left-handed) about each axis, so the world matrix is `R = Rx(-x) * Ry(-y) * Rz(-z)` using
    standard right-handed matrices applied to column vectors. This lives in one function,
    `Geometry.RotationFromEuler`, and still needs to be verified in-game.

@@ -31,6 +31,54 @@ internal static class MeshTouchTest
             ? WalkAndLookUp(walked: first, firstTransform, lookup: second, secondTransform, tolerance, scratch)
             : WalkAndLookUp(walked: second, secondTransform, lookup: first, firstTransform, tolerance, scratch);
 
+    /// <summary>
+    /// True minimum surface distance (world units) between the two meshes, searched within the same
+    /// tolerance-grown overlap region as <see cref="Touches"/>. For touch diagnostics only: called
+    /// only on a pair already known to touch, so that region is guaranteed to hold the closest
+    /// triangle pair; never called from the hot narrow-phase path.
+    /// </summary>
+    public static float MinSurfaceDistance(
+        MeshTriangleTree first,
+        PlacedTransform firstTransform,
+        MeshTriangleTree second,
+        PlacedTransform secondTransform,
+        float tolerance,
+        TouchScratch scratch) =>
+        first.TriangleCount <= second.TriangleCount
+            ? WalkMinDistance(walked: first, firstTransform, lookup: second, secondTransform, tolerance, scratch)
+            : WalkMinDistance(walked: second, secondTransform, lookup: first, firstTransform, tolerance, scratch);
+
+    private static float WalkMinDistance(
+        MeshTriangleTree walked,
+        PlacedTransform walkedTransform,
+        MeshTriangleTree lookup,
+        PlacedTransform lookupTransform,
+        float tolerance,
+        TouchScratch scratch)
+    {
+        var overlapRegion = RelativeTransform.Create(from: lookupTransform, to: walkedTransform)
+            .ApplyToBox(lookup.Bounds)
+            .Grown(tolerance / walkedTransform.Scale);
+
+        walked.CollectLeafTriangles(overlapRegion, scratch.WalkedTriangles);
+        var toLookup = RelativeTransform.Create(from: walkedTransform, to: lookupTransform);
+        var lookupTolerance = tolerance / lookupTransform.Scale;
+        var minDistanceSquared = float.PositiveInfinity;
+        foreach (var triangle in scratch.WalkedTriangles)
+        {
+            var placed = toLookup.Apply(walked.GetTriangle(triangle));
+            var reach = placed.Bounds.Grown(lookupTolerance);
+            lookup.CollectLeafTriangles(reach, scratch.NearbyTriangles);
+            foreach (var nearbyIndex in scratch.NearbyTriangles)
+            {
+                var distanceSquared = TriangleProximity.MinDistanceSquared(placed, lookup.GetTriangle(nearbyIndex));
+                if (distanceSquared < minDistanceSquared) minDistanceSquared = distanceSquared;
+            }
+        }
+        // Distances above were computed in the lookup mesh's local units; scale back to world units.
+        return float.IsPositiveInfinity(minDistanceSquared) ? float.NaN : MathF.Sqrt(minDistanceSquared) * lookupTransform.Scale;
+    }
+
     private static bool WalkAndLookUp(
         MeshTriangleTree walked,
         PlacedTransform walkedTransform,

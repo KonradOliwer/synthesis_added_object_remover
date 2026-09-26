@@ -26,6 +26,9 @@ internal static class RunReport
         Console.WriteLine(config.IgnoreReplacedObjects
             ? $"Ignore replaced objects: position tolerance {config.ReplacementPositionTolerance}, size similarity {config.ReplacementSizeSimilarity}"
             : "Same-position replacement matching is disabled (objects the target plugin itself overrides are still ignored).");
+        Console.WriteLine(string.IsNullOrEmpty(config.TouchDiagnosticsFile)
+            ? "Touch diagnostics file: (none)"
+            : $"Touch diagnostics file: {config.TouchDiagnosticsFile}.edges.csv / .components.csv");
     }
 
     public static void PrintOverriddenOthers(ScanResult scan, ModKey target)

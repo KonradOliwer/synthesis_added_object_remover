@@ -21,7 +21,8 @@ internal sealed record RunConfig(
     bool Verbose,
     bool IgnoreReplacedObjects,
     float ReplacementPositionTolerance,
-    float ReplacementSizeSimilarity)
+    float ReplacementSizeSimilarity,
+    string TouchDiagnosticsFile)
 {
     public const float DefaultReplacementSizeSimilarity = 0.75f;
 }
@@ -64,7 +65,8 @@ internal static class RunConfigFactory
             Verbose: settings.VerboseLogging,
             IgnoreReplacedObjects: settings.IgnoreReplacedObjects,
             ReplacementPositionTolerance: AtLeast(settings.ReplacementPositionTolerance, 0, "replacement position tolerance"),
-            ReplacementSizeSimilarity: ClampSimilarity(settings.ReplacementSizeSimilarity));
+            ReplacementSizeSimilarity: ClampSimilarity(settings.ReplacementSizeSimilarity),
+            TouchDiagnosticsFile: settings.TouchDiagnosticsFile.Trim());
     }
 
     private static bool TryFindTarget(

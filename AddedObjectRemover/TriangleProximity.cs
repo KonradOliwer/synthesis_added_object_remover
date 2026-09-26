@@ -19,6 +19,31 @@ internal static class TriangleProximity
         || AnyEdgeCrosses(p, q)
         || AnyEdgeCrosses(q, p);
 
+    /// <summary>
+    /// True minimum squared distance between two triangles (0 when they intersect, coplanar overlap
+    /// included). Used only by touch diagnostics to report a real distance value; the touch test
+    /// itself only needs the threshold check in <see cref="AreWithin"/> and does not call this.
+    /// </summary>
+    public static float MinDistanceSquared(in MeshTriangle p, in MeshTriangle q)
+    {
+        if (AnyEdgeCrosses(p, q) || AnyEdgeCrosses(q, p)) return 0f;
+        return Math.Min(MinVertexToFace(p, q), Math.Min(MinVertexToFace(q, p), MinEdgeToEdge(p, q)));
+    }
+
+    private static float MinVertexToFace(in MeshTriangle vertices, in MeshTriangle face) => Math.Min(
+        Geometry.DistanceSquaredToTriangle(vertices.A, face.A, face.B, face.C),
+        Math.Min(
+            Geometry.DistanceSquaredToTriangle(vertices.B, face.A, face.B, face.C),
+            Geometry.DistanceSquaredToTriangle(vertices.C, face.A, face.B, face.C)));
+
+    private static float MinEdgeToEdge(in MeshTriangle p, in MeshTriangle q) => Math.Min(
+        MinEdgeToTriangleEdges(p.A, p.B, q),
+        Math.Min(MinEdgeToTriangleEdges(p.B, p.C, q), MinEdgeToTriangleEdges(p.C, p.A, q)));
+
+    private static float MinEdgeToTriangleEdges(Vector3 start, Vector3 end, in MeshTriangle q) => Math.Min(
+        SegmentDistanceSquared(start, end, q.A, q.B),
+        Math.Min(SegmentDistanceSquared(start, end, q.B, q.C), SegmentDistanceSquared(start, end, q.C, q.A)));
+
     private static bool AnyVertexWithin(in MeshTriangle vertices, in MeshTriangle face, float distanceSquared) =>
         Geometry.DistanceSquaredToTriangle(vertices.A, face.A, face.B, face.C) <= distanceSquared
         || Geometry.DistanceSquaredToTriangle(vertices.B, face.A, face.B, face.C) <= distanceSquared

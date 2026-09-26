@@ -55,4 +55,8 @@ public class Settings
     [SynthesisSettingName("Replacement size similarity")]
     [SynthesisTooltip("How similar in size (scaled bounds) a target plugin object and another mod's object must be to be considered a replacement match: the smallest-to-largest ratio of each pair of matching dimensions must be at least this value (0.75 = within about 25%). Clamped to 0-1.")]
     public float ReplacementSizeSimilarity { get; set; } = RunConfig.DefaultReplacementSizeSimilarity;
+
+    [SynthesisSettingName("Touch diagnostics file")]
+    [SynthesisTooltip("Optional: path of a file to write touch-diagnostics CSVs to, so touching chains can be judged from the output alone (without xEdit). Leave empty to write nothing (default; no effect on results or performance). Relative paths resolve against the patcher's working directory; an absolute path is recommended. Two files are written: '<path>.edges.csv' (every touching edge found, including seed-to-seed touches) and '<path>.components.csv' (one row per touching component). See the README for the column layout.")]
+    public string TouchDiagnosticsFile { get; set; } = string.Empty;
 }

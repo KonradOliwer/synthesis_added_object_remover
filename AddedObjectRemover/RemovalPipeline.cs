@@ -161,11 +161,23 @@ internal sealed class RemovalPipeline
             _shapes,
             keepRule,
             _config.TouchTolerance,
-            _parallelOptions);
+            _parallelOptions,
+            collectDiagnostics: !string.IsNullOrEmpty(_config.TouchDiagnosticsFile));
         RunReport.PrintKept(scan, clusters.Kept);
         _meshMessages.PrintAndClear();
         RunReport.PrintTouchStats(clusters);
+        WriteTouchDiagnostics(scan, tooClose.Removals, clusters);
         return clusters;
+    }
+
+    private void WriteTouchDiagnostics(ScanResult scan, IReadOnlyList<TooCloseRemoval> seeds, TouchClusters clusters)
+    {
+        if (string.IsNullOrEmpty(_config.TouchDiagnosticsFile) || clusters.Diagnostics is not { } diagnostics) return;
+
+        var timer = Stopwatch.StartNew();
+        var written = TouchDiagnosticsWriter.Write(_config.TouchDiagnosticsFile, scan, _shapes, _config.TouchTolerance, seeds, clusters, diagnostics);
+        Console.WriteLine($"Touch diagnostics: wrote {written.EdgeCount:N0} edges, {written.ComponentCount:N0} components in {timer.Elapsed.TotalSeconds:F1}s "
+            + $"to {written.EdgesPath} / {written.ComponentsPath}.");
     }
 
     private void WriteOverrides(ScanResult scan, IReadOnlyList<Removal> removals)

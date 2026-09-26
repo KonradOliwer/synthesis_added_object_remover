@@ -24,6 +24,9 @@ internal sealed class ScanResult
 
     public List<OverriddenOtherRecord> OverriddenOthersLog { get; } = [];
 
+    /// <summary>Winning LAND record of each exterior cell in a target worldspace; collected only for Anchoring.</summary>
+    public Dictionary<ExteriorCell, ILandscapeGetter> Landscapes { get; } = new();
+
     public int RecordsScanned { get; set; }
     public int TargetsOverriddenLater { get; set; }
     public int TargetsDisabledOrWithoutPlacement { get; set; }
@@ -79,7 +82,7 @@ internal sealed class PlacedRecordScanner
         foreach (var listing in _state.LoadOrder.PriorityOrder)
         {
             if (listing.Mod is not { } mod) continue;
-            var collectReferences = _config.KeepReferencedObjects && MayReferenceTarget(mod);
+            var collectReferences = MayReferenceTarget(mod);
             foreach (var cellContext in mod.EnumerateMajorRecordContexts<ICell, ICellGetter>(_state.LinkCache))
             {
                 ScanCell(cellContext, listing.ModKey, collectReferences);
@@ -125,11 +128,22 @@ internal sealed class PlacedRecordScanner
         var space = GetCellSpace(cellContext);
         var inTargetSpace = _footprint.SpaceKeys.Contains(space.SpaceKey);
         if (inTargetSpace) _winningCells.TryAdd(cell.FormKey, cellContext);
+        if (inTargetSpace && _config.FollowUpMode == FollowUpRemovalMode.Anchoring) CollectLandscape(cell, space);
 
         foreach (var (record, persistent) in cell.EnumeratePlaced())
         {
             ScanRecord(record, persistent, cell, space, inTargetSpace, winningMod, collectReferences);
         }
+    }
+
+    /// <remarks>
+    /// LAND is a record of its own inside the cell, so a cell override without it leaves the
+    /// terrain to a lower-priority plugin; the first cell copy found that carries one is the winner.
+    /// </remarks>
+    private void CollectLandscape(ICellGetter cell, CellSpace space)
+    {
+        if (space.SpaceKey == cell.FormKey || cell.Grid is not { } grid || cell.Landscape is not { } landscape) return;
+        _scan.Landscapes.TryAdd(new ExteriorCell(space.SpaceKey, grid.Point.X, grid.Point.Y), landscape);
     }
 
     private void ScanRecord(

@@ -1,6 +1,5 @@
-using System.Globalization;
 using System.Numerics;
-using System.Text;
+using static AddedObjectRemover.CsvFile;
 
 namespace AddedObjectRemover;
 
@@ -57,9 +56,9 @@ internal static class TouchDiagnosticsWriter
         string DeepestChainFormKeys,
         string SeedReasons);
 
-    /// <param name="filePathBase">Written to as "&lt;filePathBase&gt;.edges.csv" and "&lt;filePathBase&gt;.components.csv".</param>
+    /// <param name="folder">Written to as "edges.csv" and "components.csv" inside it.</param>
     public static TouchDiagnosticsWriteResult Write(
-        string filePathBase,
+        string folder,
         ScanResult scan,
         BaseObjectShapeProvider shapes,
         float tolerance,
@@ -71,10 +70,10 @@ internal static class TouchDiagnosticsWriter
         var edgeRows = CreateEdgeRows(scan.Targets, diagnostics, seedReasonByTarget);
         var componentRows = CreateComponentRows(scan, shapes, diagnostics, clusters, seedReasonByTarget);
 
-        var edgesPath = filePathBase + ".edges.csv";
-        var componentsPath = filePathBase + ".components.csv";
-        WriteCsv(edgesPath, EdgeHeader, edgeRows.Select(row => FormatEdge(row, shapes, tolerance)));
-        WriteCsv(componentsPath, ComponentHeader, componentRows.Select(FormatComponent));
+        var edgesPath = Path.Combine(folder, "edges.csv");
+        var componentsPath = Path.Combine(folder, "components.csv");
+        CsvFile.Write(edgesPath, EdgeHeader, edgeRows.Select(row => FormatEdge(row, shapes, tolerance)));
+        CsvFile.Write(componentsPath, ComponentHeader, componentRows.Select(FormatComponent));
         return new TouchDiagnosticsWriteResult(edgeRows.Count, componentRows.Count, edgesPath, componentsPath);
     }
 
@@ -194,7 +193,7 @@ internal static class TouchDiagnosticsWriter
 
     private static IEnumerable<string> FormatEdge(EdgeRow row, BaseObjectShapeProvider shapes, float tolerance) =>
     [
-        Num(row.ComponentId), Csv(row.First.Record.FormKey.ToString()), Csv(row.Second.Record.FormKey.ToString()),
+        Num(row.ComponentId), Text(row.First.Record.FormKey.ToString()), Text(row.Second.Record.FormKey.ToString()),
         Bool(row.FirstIsSeed), Bool(row.SecondIsSeed),
         Num(row.MinSurfaceDistance), Num(tolerance), Num(Vector3.Distance(row.First.Transform.Position, row.Second.Transform.Position)),
         .. FormatTargetColumns(row.First, shapes),
@@ -204,10 +203,10 @@ internal static class TouchDiagnosticsWriter
     private static IEnumerable<string> FormatComponent(ComponentRow row) =>
     [
         Num(row.ComponentId), Num(row.Size), Num(row.SeedCount), Num(row.RemovedByTouchCount), Num(row.KeptAsReferencedCount),
-        Csv(row.Spaces),
+        Text(row.Spaces),
         Num(row.WorldAabb.Min.X), Num(row.WorldAabb.Min.Y), Num(row.WorldAabb.Min.Z),
         Num(row.WorldAabb.Max.X), Num(row.WorldAabb.Max.Y), Num(row.WorldAabb.Max.Z),
-        Csv(row.TopBases), Num(row.DeepestChainLength), Csv(row.DeepestChainFormKeys), Csv(row.SeedReasons),
+        Text(row.TopBases), Num(row.DeepestChainLength), Text(row.DeepestChainFormKeys), Text(row.SeedReasons),
     ];
 
     private static IEnumerable<string> FormatTargetColumns(TargetObject target, BaseObjectShapeProvider shapes)
@@ -216,35 +215,14 @@ internal static class TouchDiagnosticsWriter
         var halfExtents = shapes.GetLocalBox(target.Base).Scaled(target.Transform.Scale).Size * 0.5f;
         return
         [
-            Csv(target.Record.EditorID ?? string.Empty),
-            Csv(RecordNames.DescribeBase(shapes, target.Base)),
-            Csv(shapes.GetMeshPath(target.Base) ?? string.Empty),
-            Csv(target.SpaceKey.ToString()),
+            Text(target.Record.EditorID ?? string.Empty),
+            Text(RecordNames.DescribeBase(shapes, target.Base)),
+            Text(shapes.GetMeshPath(target.Base) ?? string.Empty),
+            Text(target.SpaceKey.ToString()),
             Num(target.Transform.Position.X), Num(target.Transform.Position.Y), Num(target.Transform.Position.Z),
             Num(float.RadiansToDegrees(rotation.X)), Num(float.RadiansToDegrees(rotation.Y)), Num(float.RadiansToDegrees(rotation.Z)),
             Num(target.Transform.Scale),
             Num(halfExtents.X), Num(halfExtents.Y), Num(halfExtents.Z),
         ];
-    }
-
-    private static void WriteCsv(string path, IEnumerable<string> header, IEnumerable<IEnumerable<string>> rows)
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
-        using var writer = new StreamWriter(path, false, Encoding.UTF8);
-        writer.WriteLine(string.Join(",", header));
-        foreach (var row in rows) writer.WriteLine(string.Join(",", row));
-    }
-
-    private static string Num(float value) => value.ToString(CultureInfo.InvariantCulture);
-
-    private static string Num(int value) => value.ToString(CultureInfo.InvariantCulture);
-
-    private static string Bool(bool value) => value ? "true" : "false";
-
-    /// <summary>CSV-escapes a field: quoted, with embedded quotes doubled, whenever it holds a comma, quote or newline.</summary>
-    private static string Csv(string value)
-    {
-        if (value.IndexOfAny([',', '"', '\n', '\r']) < 0) return value;
-        return "\"" + value.Replace("\"", "\"\"") + "\"";
     }
 }

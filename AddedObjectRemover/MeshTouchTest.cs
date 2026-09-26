@@ -1,5 +1,3 @@
-using System.Numerics;
-
 namespace AddedObjectRemover;
 
 /// <summary>Reusable per-thread buffers and counters of <see cref="MeshTouchTest"/>.</summary>
@@ -127,24 +125,5 @@ internal static class MeshTouchTest
         public MeshTriangle PlaceInLookup(int walkedTriangle) => ToLookup.Apply(Walked.GetTriangle(walkedTriangle));
 
         public float ToWorldDistance(float lookupDistance) => lookupDistance * LookupScale;
-    }
-
-    /// <summary>
-    /// Mesh-local of one reference -> mesh-local of another: x_to = R_to^T * (pos_from + R_from * (s_from * x) - pos_to) / s_to,
-    /// computed as Rotation * x * Ratio + Translation.
-    /// </summary>
-    private readonly record struct RelativeTransform(Mat3 Rotation, float Ratio, Vector3 Translation)
-    {
-        public static RelativeTransform Create(PlacedTransform from, PlacedTransform to) => new(
-            to.Rotation.Transposed() * from.Rotation,
-            from.Scale / to.Scale,
-            to.Rotation.TransformTransposed(from.Position - to.Position) / to.Scale);
-
-        public Vector3 Apply(Vector3 v) => Rotation.Transform(v) * Ratio + Translation;
-
-        public MeshTriangle Apply(MeshTriangle triangle) => new(Apply(triangle.A), Apply(triangle.B), Apply(triangle.C));
-
-        /// <summary>AABB enclosing the transformed box.</summary>
-        public Box ApplyToBox(Box box) => Geometry.RotatedAabb(Apply(box.Center), Rotation, box.Size * (0.5f * Ratio));
     }
 }

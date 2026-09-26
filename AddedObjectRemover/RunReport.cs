@@ -13,23 +13,24 @@ internal static class RunReport
         static string Join(IReadOnlyList<ModKey> keys) => keys.Count == 0 ? "(none)" : string.Join(", ", keys);
 
         Console.WriteLine($"Target plugin: {config.Target}");
-        Console.WriteLine($"Multiplier: {config.Multiplier}");
+        Console.WriteLine($"Size multiplier: {config.Multiplier}");
         Console.WriteLine($"Excluded plugins: {Join(config.ExcludedPlugins)}");
-        Console.WriteLine(config.ExcludeTargetMasters
-            ? $"Excluded masters of target: {Join(config.TargetMasters)}"
-            : "Masters of target are not excluded.");
-        Console.WriteLine($"Bounds source: {(config.UseNifBounds ? "NIF mesh, OBND fallback" : "OBND only")}");
-        Console.WriteLine($"Keep referenced objects: {config.KeepReferencedObjects}; verbose: {config.Verbose}");
-        Console.WriteLine(config.RemoveTouching
-            ? $"Remove touching objects: tolerance {config.TouchTolerance}"
-            : "Touching objects are not removed.");
-        Console.WriteLine(config.IgnoreReplacedObjects
-            ? $"Ignore replaced objects: position tolerance {config.ReplacementPositionTolerance}, size similarity {config.ReplacementSizeSimilarity}"
-            : "Same-position replacement matching is disabled (objects the target plugin itself overrides are still ignored).");
-        Console.WriteLine(string.IsNullOrEmpty(config.TouchDiagnosticsFile)
-            ? "Touch diagnostics file: (none)"
-            : $"Touch diagnostics file: {config.TouchDiagnosticsFile}.edges.csv / .components.csv");
+        Console.WriteLine(config.IgnoreTargetMasters
+            ? $"Ignored masters of target: {Join(config.TargetMasters)}"
+            : "Masters of target are not ignored.");
+        Console.WriteLine(DescribeFollowUpRemoval(config));
+        Console.WriteLine($"Detailed log: {config.Verbose}");
+        Console.WriteLine($"Diagnostics folder: {(config.WritesDiagnostics ? config.DiagnosticsFolder : "(none)")}");
     }
+
+    private static string DescribeFollowUpRemoval(RunConfig config) => config.FollowUpMode switch
+    {
+        FollowUpRemovalMode.Off => "Follow-up removal: off.",
+        FollowUpRemovalMode.AnyTouch => $"Follow-up removal: any touch, touch distance {config.TouchDistance}.",
+        FollowUpRemovalMode.Anchoring =>
+            $"Follow-up removal: anchoring, touch distance {config.TouchDistance}, threshold {config.AnchoringThreshold:P0}.",
+        _ => throw new UnreachableException($"Unknown follow-up removal mode {config.FollowUpMode}."),
+    };
 
     public static void PrintOverriddenOthers(ScanResult scan, ModKey target)
     {
@@ -121,22 +122,45 @@ internal static class RunReport
             $"Touching objects: {touch.Removals.Count:N0} removed in {stats.Components:N0} components "
             + $"({stats.ComponentsWithTouching:N0} with touching objects, largest {stats.LargestComponent:N0} removed objects); "
             + $"{touch.Kept.Count:N0} kept as referenced.");
-        var pairs = stats.Pairs;
-        var meshes = pairs.Meshes;
-        Console.WriteLine(
-            $"  Pairs: {pairs.PairsTested:N0} box candidates next to a removal tested over {stats.Levels:N0} levels, "
-            + $"{pairs.TouchingPairs:N0} touching, {pairs.PairsWithoutGeometry:N0} without mesh triangles (never touching); "
-            + $"{pairs.TrianglePairsTested:N0} triangle pairs tested exactly.");
-        Console.WriteLine(
-            $"  Meshes indexed: {meshes.Built:N0} ({meshes.Triangles:N0} triangles), {meshes.Rebuilt:N0} rebuilt, "
-            + $"{meshes.Evicted:N0} evicted"
-            + (meshes.TooLarge > 0 ? $", {meshes.TooLarge:N0} over {MeshTriangleTree.MaxTriangles:N0} triangles not used" : string.Empty)
-            + $"; peak resident {meshes.PeakResidentMeshes:N0} meshes, ~{meshes.PeakResidentBytes / BytesPerMegabyte:N0} MB.");
+        PrintPairStats(stats.Pairs, stats.Levels, "levels");
+        PrintMeshStats(stats.Pairs.Meshes);
         Console.WriteLine(
             $"  Timing: setup {stats.Setup.TotalSeconds:F1}s, broad phase {stats.BroadPhase.TotalSeconds:F1}s, "
             + $"narrow phase {stats.NarrowPhase.TotalSeconds:F1}s"
             + (touch.Diagnostics != null ? $", diagnostics edges {stats.DiagnosticsEdges.TotalSeconds:F1}s." : "."));
     }
+
+    public static void PrintAnchoringStats(AnchoringResult anchoring)
+    {
+        var stats = anchoring.Stats;
+        Console.WriteLine(
+            $"Anchoring: {anchoring.Removals.Count:N0} removed over {stats.Iterations:N0} iterations; "
+            + $"{stats.Candidates:N0} touching objects evaluated ({stats.Evaluations:N0} evaluations), "
+            + $"{stats.KeptWithoutContacts:N0} kept without any contact points, {anchoring.Kept.Count:N0} kept as referenced.");
+        PrintPairStats(stats.Pairs, stats.Iterations, "iterations");
+        PrintMeshStats(stats.Pairs.Meshes);
+        Console.WriteLine(
+            $"  Timing: setup {stats.Setup.TotalSeconds:F1}s, touch search {stats.TouchSearch.TotalSeconds:F1}s, "
+            + $"contact points {stats.ContactPoints.TotalSeconds:F1}s.");
+    }
+
+    private static void PrintPairStats(PairTestStats pairs, int rounds, string roundName) =>
+        Console.WriteLine(
+            $"  Pairs: {pairs.PairsTested:N0} box candidates next to a removal tested over {rounds:N0} {roundName}, "
+            + $"{pairs.TouchingPairs:N0} touching, {pairs.PairsWithoutGeometry:N0} without mesh triangles (never touching); "
+            + $"{pairs.TrianglePairsTested:N0} triangle pairs tested exactly.");
+
+    private static void PrintMeshStats(TriangleTreeStats meshes) =>
+        Console.WriteLine(
+            $"  Meshes indexed: {meshes.Built:N0} ({meshes.Triangles:N0} triangles), {meshes.Rebuilt:N0} rebuilt, "
+            + $"{meshes.Evicted:N0} evicted"
+            + (meshes.TooLarge > 0 ? $", {meshes.TooLarge:N0} over {MeshTriangleTree.MaxTriangles:N0} triangles not used" : string.Empty)
+            + $"; peak resident {meshes.PeakResidentMeshes:N0} meshes, ~{meshes.PeakResidentBytes / BytesPerMegabyte:N0} MB.");
+
+    public static void PrintMeshOriginSummary(MeshOriginSummary summary) =>
+        Console.WriteLine(
+            $"Mesh origins: {summary.Meshes:N0} target meshes, {summary.NearBottom:N0} {MeshOriginReport.NearBottom}, "
+            + $"{summary.NearCentre:N0} {MeshOriginReport.NearCentre}, {summary.Other:N0} {MeshOriginReport.Other}.");
 
     public static void PrintWriteSummary(int overrideCount, int enableParentsReplaced, TimeSpan elapsed)
     {
@@ -167,29 +191,22 @@ internal static class RunReport
         TooCloseRemoval { TooCloseTo: var other } =>
             $"too close to {RecordNames.Describe(other.FormKey, other.EditorId)} {RecordNames.DescribeOrigin(other.FormKey, other.WinningMod)}",
         TouchingRemoval touching => $"touches removed {RecordNames.Describe(scan.Targets[touching.TouchedTargetIndex].Record)}",
+        AnchoringRemoval anchoring =>
+            $"{anchoring.RemovedShare:P0} of its support was removed (mostly {RecordNames.Describe(scan.Targets[anchoring.MainRemovedSupporter].Record)})",
         _ => throw new UnreachableException($"Unknown removal type {removal.GetType().Name}."),
     };
 
-    public static void PrintBoundsStats(BoundsStats stats, bool useNif)
+    public static void PrintBoundsStats(BoundsStats stats)
     {
-        if (useNif)
+        Console.WriteLine(
+            $"Bounds: {stats.BasesFromNif:N0} bases from NIF, {stats.BasesNifFallbackToObnd:N0} NIF misses, "
+            + $"{stats.BasesFromObnd:N0} from OBND, {stats.BasesWithoutBounds + stats.BasesUnresolved:N0} without bounds. "
+            + $"Meshes: {stats.ModelsRead:N0} read, {stats.ModelsFailed:N0} failed "
+            + $"({stats.ModelsFromLooseFiles:N0} loose, {stats.ModelsFromArchives:N0} from {stats.ArchivesIndexed:N0} archives).");
+        if (stats.ModelFailuresByKind.Count > 0)
         {
             Console.WriteLine(
-                $"Bounds: {stats.BasesFromNif:N0} bases from NIF, {stats.BasesNifFallbackToObnd:N0} NIF misses, "
-                + $"{stats.BasesFromObnd:N0} from OBND, {stats.BasesWithoutBounds + stats.BasesUnresolved:N0} without bounds. "
-                + $"Meshes: {stats.ModelsRead:N0} read, {stats.ModelsFailed:N0} failed "
-                + $"({stats.ModelsFromLooseFiles:N0} loose, {stats.ModelsFromArchives:N0} from {stats.ArchivesIndexed:N0} archives).");
-            if (stats.ModelFailuresByKind.Count > 0)
-            {
-                Console.WriteLine(
-                    $"  Mesh failures: {string.Join(", ", stats.ModelFailuresByKind.Select(kv => $"{kv.Value:N0} {kv.Key}"))}.");
-            }
-        }
-        else
-        {
-            Console.WriteLine(
-                $"Bounds: {stats.BasesFromObnd:N0} bases from OBND, "
-                + $"{stats.BasesWithoutBounds + stats.BasesUnresolved:N0} without bounds.");
+                $"  Mesh failures: {string.Join(", ", stats.ModelFailuresByKind.Select(kv => $"{kv.Value:N0} {kv.Key}"))}.");
         }
     }
 
@@ -215,6 +232,6 @@ internal static class RunReport
     public static void PrintRemovalSummary(int removedCount, int removedTooClose, int keptAsReferenced) =>
         Console.WriteLine(
             $"Removed {removedCount:N0} objects ({removedTooClose:N0} too close, "
-            + $"{removedCount - removedTooClose:N0} touching a removed object); "
+            + $"{removedCount - removedTooClose:N0} follow-up removals); "
             + $"kept {keptAsReferenced:N0} referenced objects.");
 }

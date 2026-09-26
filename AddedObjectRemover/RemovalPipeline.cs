@@ -13,6 +13,11 @@ internal sealed class RemovalPipeline
 {
     private sealed record TooCloseSelection(List<TooCloseRemoval> Removals, List<KeptTarget> Kept);
 
+    private sealed record FollowUpRemovals(IReadOnlyList<Removal> Removals, IReadOnlyList<KeptTarget> Kept)
+    {
+        public static FollowUpRemovals None { get; } = new([], []);
+    }
+
     private readonly IPatcherState<ISkyrimMod, ISkyrimModGetter> _state;
     private readonly RunConfig _config;
     private readonly ParallelOptions _parallelOptions = new() { MaxDegreeOfParallelism = Environment.ProcessorCount };
@@ -30,7 +35,7 @@ internal sealed class RemovalPipeline
             state.GameRelease,
             state.LoadOrder.ListedOrder.Select(listing => listing.ModKey).ToList(),
             _meshMessages);
-        _shapes = new BaseObjectShapeProvider(state.LinkCache, meshFiles, _meshMessages, config.UseNifBounds);
+        _shapes = new BaseObjectShapeProvider(state.LinkCache, meshFiles, _meshMessages);
     }
 
     public void Run(Stopwatch totalTimer)
@@ -45,16 +50,17 @@ internal sealed class RemovalPipeline
 
         var indexes = IndexOtherObjects(scan);
         WarmUpTargetBounds(scan.Targets);
+        WriteMeshOrigins(scan.Targets);
         MarkReplacedObjects(scan.Targets, indexes);
 
-        var keepRule = new KeepReferencedRule(_config.KeepReferencedObjects, scan.TargetReferences);
+        var keepRule = new KeepReferencedRule(scan.TargetReferences);
         var tooClose = SelectTooCloseRemovals(scan, indexes, keepRule);
-        var touching = FindTouchingClusters(scan, tooClose, keepRule);
+        var followUp = SelectFollowUpRemovals(scan, indexes, tooClose, keepRule);
 
-        List<Removal> removals = [.. tooClose.Removals, .. touching?.Removals ?? []];
+        List<Removal> removals = [.. tooClose.Removals, .. followUp.Removals];
         WriteOverrides(scan, removals);
 
-        var keptCount = tooClose.Kept.Count + (touching?.Kept.Count ?? 0);
+        var keptCount = tooClose.Kept.Count + followUp.Kept.Count;
         PrintFinalReport(scan, indexes, removals, tooClose.Removals.Count, keptCount);
         Console.WriteLine($"Done in {totalTimer.Elapsed.TotalSeconds:F1}s.");
     }
@@ -95,13 +101,24 @@ internal sealed class RemovalPipeline
         RunReport.PrintWarmUpSummary(targetBases.Count, timer.Elapsed);
     }
 
+    private void WriteMeshOrigins(IReadOnlyList<TargetObject> targets)
+    {
+        if (!_config.WritesDiagnostics) return;
+
+        var rows = MeshOriginReport.CreateRows(targets, _shapes);
+        RunReport.PrintMeshOriginSummary(MeshOriginReport.Summarize(rows));
+        WriteDiagnosticsFile(MeshOriginReport.FileName, () =>
+        {
+            var path = MeshOriginReport.Write(_config.DiagnosticsFolder, rows);
+            Console.WriteLine($"  Wrote {rows.Count:N0} mesh origins to {path}.");
+        });
+    }
+
     private void MarkReplacedObjects(IReadOnlyList<TargetObject> targets, IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes)
     {
-        if (!_config.IgnoreReplacedObjects) return;
-
         var timer = Stopwatch.StartNew();
         var matcher = new ReplacementMatcher(
-            targets, indexes, _shapes, _config.ReplacementPositionTolerance, _config.ReplacementSizeSimilarity);
+            targets, indexes, _shapes, RunConfig.ReplacementPositionTolerance, RunConfig.ReplacementSizeSimilarity);
         var result = matcher.MarkReplacedObjects(collectLog: _config.Verbose, _parallelOptions);
         RunReport.PrintReplacementLog(result.LogEntries);
         _meshMessages.PrintAndClear();
@@ -144,46 +161,99 @@ internal sealed class RemovalPipeline
         return selection;
     }
 
-    /// <summary>Null when touching objects are not removed.</summary>
-    private TouchClusters? FindTouchingClusters(ScanResult scan, TooCloseSelection tooClose, KeepReferencedRule keepRule)
+    private FollowUpRemovals SelectFollowUpRemovals(
+        ScanResult scan,
+        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
+        TooCloseSelection tooClose,
+        KeepReferencedRule keepRule)
     {
-        if (!_config.RemoveTouching || tooClose.Removals.Count == 0) return null;
-        if (!_config.UseNifBounds)
+        if (tooClose.Removals.Count == 0) return FollowUpRemovals.None;
+        return _config.FollowUpMode switch
         {
-            Console.WriteLine("Touching objects: skipped, mesh (NIF) measurement is disabled and touching needs mesh geometry.");
-            return null;
-        }
+            FollowUpRemovalMode.Off => FollowUpRemovals.None,
+            FollowUpRemovalMode.AnyTouch => RemoveTouchingClusters(scan, tooClose, keepRule),
+            FollowUpRemovalMode.Anchoring => RemoveUnanchoredObjects(scan, indexes, tooClose, keepRule),
+            _ => throw new UnreachableException($"Unknown follow-up removal mode {_config.FollowUpMode}."),
+        };
+    }
 
+    private FollowUpRemovals RemoveTouchingClusters(ScanResult scan, TooCloseSelection tooClose, KeepReferencedRule keepRule)
+    {
         var clusters = TouchClusterFinder.Find(
             scan.Targets,
             tooClose.Removals.Select(r => r.TargetIndex).ToList(),
             tooClose.Kept.Select(k => k.TargetIndex).ToList(),
             _shapes,
             keepRule,
-            _config.TouchTolerance,
+            _config.TouchDistance,
             _parallelOptions,
-            collectDiagnostics: !string.IsNullOrEmpty(_config.TouchDiagnosticsFile));
+            collectDiagnostics: _config.WritesDiagnostics);
         RunReport.PrintKept(scan, clusters.Kept);
         _meshMessages.PrintAndClear();
         RunReport.PrintTouchStats(clusters);
         WriteTouchDiagnostics(scan, tooClose.Removals, clusters);
-        return clusters;
+        return new FollowUpRemovals(clusters.Removals, clusters.Kept);
     }
 
     private void WriteTouchDiagnostics(ScanResult scan, IReadOnlyList<TooCloseRemoval> seeds, TouchClusters clusters)
     {
         if (clusters.Diagnostics is not { } diagnostics) return;
 
-        var timer = Stopwatch.StartNew();
-        try
+        WriteDiagnosticsFile("touch diagnostics", () =>
         {
-            var written = TouchDiagnosticsWriter.Write(_config.TouchDiagnosticsFile, scan, _shapes, _config.TouchTolerance, seeds, clusters, diagnostics);
+            var timer = Stopwatch.StartNew();
+            var written = TouchDiagnosticsWriter.Write(_config.DiagnosticsFolder, scan, _shapes, _config.TouchDistance, seeds, clusters, diagnostics);
             Console.WriteLine($"Touch diagnostics: wrote {written.EdgeCount:N0} edges, {written.ComponentCount:N0} components in {timer.Elapsed.TotalSeconds:F1}s "
                 + $"to {written.EdgesPath} / {written.ComponentsPath}.");
+        });
+    }
+
+    private FollowUpRemovals RemoveUnanchoredObjects(
+        ScanResult scan,
+        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
+        TooCloseSelection tooClose,
+        KeepReferencedRule keepRule)
+    {
+        var anchoring = AnchoringRemover.Run(
+            scan.Targets,
+            tooClose.Removals.Select(r => r.TargetIndex).ToList(),
+            tooClose.Kept.Select(k => k.TargetIndex).ToList(),
+            indexes,
+            new TerrainHeights(scan.Landscapes),
+            _shapes,
+            keepRule,
+            _config.TouchDistance,
+            _config.AnchoringThreshold,
+            _parallelOptions);
+        RunReport.PrintKept(scan, anchoring.Kept);
+        _meshMessages.PrintAndClear();
+        RunReport.PrintAnchoringStats(anchoring);
+        WriteAnchoringDiagnostics(scan, indexes, anchoring);
+        return new FollowUpRemovals(anchoring.Removals, anchoring.Kept);
+    }
+
+    private void WriteAnchoringDiagnostics(ScanResult scan, IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes, AnchoringResult anchoring)
+    {
+        if (!_config.WritesDiagnostics) return;
+
+        WriteDiagnosticsFile(AnchoringDiagnosticsWriter.FileName, () =>
+        {
+            var path = AnchoringDiagnosticsWriter.Write(
+                _config.DiagnosticsFolder, scan, _shapes, indexes, anchoring.Evaluations, _config.AnchoringThreshold);
+            Console.WriteLine($"Anchoring diagnostics: wrote {anchoring.Evaluations.Count:N0} evaluations to {path}.");
+        });
+    }
+
+    /// <summary>A diagnostics file never changes the results, so failing to write one is only a warning.</summary>
+    private void WriteDiagnosticsFile(string description, Action write)
+    {
+        try
+        {
+            write();
         }
         catch (Exception ex) when (ExpectedFailures.IsFileAccess(ex))
         {
-            Console.WriteLine($"  Warning: could not write touch diagnostics to {_config.TouchDiagnosticsFile}: {ex.Message}");
+            Console.WriteLine($"  Warning: could not write {description} to {_config.DiagnosticsFolder}: {ex.Message}");
         }
     }
 
@@ -208,7 +278,7 @@ internal sealed class RemovalPipeline
         int keptAsReferenced)
     {
         if (_config.Verbose) RunReport.PrintRemovals(scan, _shapes, removals);
-        RunReport.PrintBoundsStats(_shapes.GetStats(), _config.UseNifBounds);
+        RunReport.PrintBoundsStats(_shapes.GetStats());
         if (_config.Verbose) RunReport.PrintSpaceSummary(scan, indexes, removals);
         RunReport.PrintRemovalSummary(removals.Count, removedTooClose, keptAsReferenced);
     }

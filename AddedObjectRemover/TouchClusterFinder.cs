@@ -111,7 +111,7 @@ internal sealed class TouchClusterFinder
             targets,
             keepRule,
             candidateFinder,
-            new TouchPairTester(targets, meshPaths, shapes, tolerance),
+            new TouchPairTester(targets, meshPaths, new TriangleTreeCache(shapes.ReadGeometry), tolerance),
             parallelOptions,
             MarkAll(targets.Count, seeds),
             visited: keptTooCloseMarks);

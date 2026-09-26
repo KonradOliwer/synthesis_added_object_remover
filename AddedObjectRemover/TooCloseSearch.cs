@@ -15,7 +15,7 @@ internal static class TooCloseSearch
     /// for indexing other objects by their raw position rather than their (possibly mesh-offset)
     /// bounds center. One exterior cell width is a generous bound in practice.
     /// </summary>
-    private const float OtherObjectSearchMargin = 4096f;
+    public const float OtherObjectSearchMargin = 4096f;
 
     /// <summary>A struct so the grid query is allocation-free and inlinable.</summary>
     private readonly struct TooCloseMatcher(OtherObjectIndex index, Box expanded, Vector3 position, Mat3 rotation)

@@ -51,6 +51,10 @@ internal sealed record TooCloseRemoval(int TargetIndex, OtherObject TooCloseTo) 
 
 internal sealed record TouchingRemoval(int TargetIndex, int TouchedTargetIndex) : Removal(TargetIndex);
 
+/// <param name="RemovedShare">Fraction of the object's support held by removed objects.</param>
+/// <param name="MainRemovedSupporter">The removed target holding the largest share of its support.</param>
+internal sealed record AnchoringRemoval(int TargetIndex, float RemovedShare, int MainRemovedSupporter) : Removal(TargetIndex);
+
 /// <summary>A target object that would be removed but stays because it is referenced.</summary>
 /// <param name="TouchedTargetIndex">The removed target it touches, when it was reached by the touch test.</param>
 internal sealed record KeptTarget(int TargetIndex, string Reason, int? TouchedTargetIndex);

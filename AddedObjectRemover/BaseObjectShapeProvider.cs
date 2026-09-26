@@ -33,7 +33,6 @@ internal sealed class BaseObjectShapeProvider
     private readonly ILinkCache _linkCache;
     private readonly MeshFileSource _meshFiles;
     private readonly MeshMessageLog _messages;
-    private readonly bool _useNif;
     private readonly LazyCache<FormKey, BaseShape> _byBase = new();
     private readonly LazyCache<string, MeshBounds> _byMesh = new(StringComparer.OrdinalIgnoreCase);
     private readonly ReasonCounter _modelFailures = new();
@@ -51,18 +50,16 @@ internal sealed class BaseObjectShapeProvider
     private int _modelsFromLooseFiles;
     private int _modelsFromArchives;
 
-    public BaseObjectShapeProvider(ILinkCache linkCache, MeshFileSource meshFiles, MeshMessageLog messages, bool useNif)
+    public BaseObjectShapeProvider(ILinkCache linkCache, MeshFileSource meshFiles, MeshMessageLog messages)
     {
         _linkCache = linkCache;
         _meshFiles = meshFiles;
         _messages = messages;
-        _useNif = useNif;
     }
 
     /// <param name="MeshPath">Normalized path of the mesh the bounds came from; null for OBND or none.</param>
-    /// <param name="HasModel">The base record names a model file, whether or not it could be read.</param>
     /// <param name="InvisibleReason">Why the base is never visible in game; null when it may be visible.</param>
-    private sealed record BaseShape(Box Box, string? MeshPath, bool HasModel, string? InvisibleReason);
+    private sealed record BaseShape(Box Box, string? MeshPath, string? InvisibleReason);
 
     /// <param name="Box">Null when the mesh is unreadable or has no render geometry.</param>
     private sealed record MeshBounds(Box? Box, NifReadStatus Status);
@@ -80,10 +77,7 @@ internal sealed class BaseObjectShapeProvider
         _meshFiles.ArchivesIndexed,
         _modelFailures.Snapshot());
 
-    public void BuildArchiveIndexNow()
-    {
-        if (_useNif) _meshFiles.BuildArchiveIndexNow();
-    }
+    public void BuildArchiveIndexNow() => _meshFiles.BuildArchiveIndexNow();
 
     /// <summary>Unknown or missing bases yield a zero-size box at the origin.</summary>
     public Box GetLocalBox(BaseRef? baseRef) =>
@@ -102,16 +96,14 @@ internal sealed class BaseObjectShapeProvider
     /// Why an other-mod object with this base can never be seen or collided with (a light or sound
     /// marker, a decal, a base with the engine's IsMarker flag, a mesh with only marker geometry,
     /// ...), or null when it may be visible. A primitive box reference (trigger/activator volume)
-    /// only counts when its base has a visible mesh; without NIF measurement, any model counts as
-    /// visible.
+    /// only counts when its base has a visible mesh.
     /// </summary>
     public string? GetInvisibleReason(BaseRef? baseRef, bool isPrimitive)
     {
         if (baseRef is not { } reference) return null;
         var shape = GetBaseShape(reference);
         if (shape.InvisibleReason != null) return shape.InvisibleReason;
-        var hasVisibleMesh = _useNif ? shape.MeshPath != null : shape.HasModel;
-        return isPrimitive && !hasVisibleMesh ? "trigger/activator box without visible mesh" : null;
+        return isPrimitive && shape.MeshPath == null ? "trigger/activator box without visible mesh" : null;
     }
 
     /// <summary>Null when the mesh cannot be read or has no triangles.</summary>
@@ -136,13 +128,13 @@ internal sealed class BaseObjectShapeProvider
     private BaseShape GetBaseShape(BaseRef reference) =>
         _byBase.GetOrCreate(reference.FormKey, () => MeasureBase(reference));
 
-    /// <summary>NIF bounds when enabled and readable, else OBND, else none.</summary>
+    /// <summary>NIF bounds when readable, else OBND, else none.</summary>
     private BaseShape MeasureBase(BaseRef baseRef)
     {
         if (ResolveBaseOrNull(baseRef) is not { } record)
         {
             Interlocked.Increment(ref _basesUnresolved);
-            return new BaseShape(Box.Zero, null, HasModel: false, null);
+            return new BaseShape(Box.Zero, null, null);
         }
 
         var modelPath = GetModelPath(record);
@@ -150,18 +142,18 @@ internal sealed class BaseObjectShapeProvider
 
         if (GetMarkerFlagInvisibleReason(record) is { } markerReason)
         {
-            return new BaseShape(Box.Zero, null, hasModel, markerReason);
+            return new BaseShape(Box.Zero, null, markerReason);
         }
 
         var meshWithoutGeometry = false;
-        if (_useNif && modelPath != null)
+        if (modelPath != null)
         {
             var meshPath = MeshFileSource.NormalizeMeshPath(modelPath);
             var mesh = GetMeshBounds(meshPath);
             if (mesh.Box is { } nifBox)
             {
                 Interlocked.Increment(ref _basesFromNif);
-                return new BaseShape(nifBox, meshPath, hasModel, GetStructuralInvisibleReason(record, hasModel, meshWithoutGeometry: false, nifBox));
+                return new BaseShape(nifBox, meshPath, GetStructuralInvisibleReason(record, hasModel, meshWithoutGeometry: false, nifBox));
             }
             meshWithoutGeometry = mesh.Status == NifReadStatus.NoRenderGeometry;
             Interlocked.Increment(ref _basesNifFallbackToObnd);
@@ -171,11 +163,11 @@ internal sealed class BaseObjectShapeProvider
         {
             Interlocked.Increment(ref _basesFromObnd);
             var box = ToBox(bounds);
-            return new BaseShape(box, null, hasModel, GetStructuralInvisibleReason(record, hasModel, meshWithoutGeometry, box));
+            return new BaseShape(box, null, GetStructuralInvisibleReason(record, hasModel, meshWithoutGeometry, box));
         }
 
         Interlocked.Increment(ref _basesWithoutBounds);
-        return new BaseShape(Box.Zero, null, hasModel, GetStructuralInvisibleReason(record, hasModel, meshWithoutGeometry, Box.Zero));
+        return new BaseShape(Box.Zero, null, GetStructuralInvisibleReason(record, hasModel, meshWithoutGeometry, Box.Zero));
     }
 
     private static string? GetModelPath(IMajorRecordGetter record) =>

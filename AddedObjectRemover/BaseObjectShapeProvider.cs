@@ -100,9 +100,10 @@ internal sealed class BaseObjectShapeProvider
 
     /// <summary>
     /// Why an other-mod object with this base can never be seen or collided with (a light or sound
-    /// marker, a decal, a mesh with only marker geometry, ...), or null when it may be visible.
-    /// A primitive box reference (trigger/activator volume) only counts when its base has a visible
-    /// mesh; without NIF measurement, any model counts as visible.
+    /// marker, a decal, a base with the engine's IsMarker flag, a mesh with only marker geometry,
+    /// ...), or null when it may be visible. A primitive box reference (trigger/activator volume)
+    /// only counts when its base has a visible mesh; without NIF measurement, any model counts as
+    /// visible.
     /// </summary>
     public string? GetInvisibleReason(BaseRef? baseRef, bool isPrimitive)
     {
@@ -146,6 +147,12 @@ internal sealed class BaseObjectShapeProvider
 
         var modelPath = GetModelPath(record);
         var hasModel = modelPath != null;
+
+        if (GetMarkerFlagInvisibleReason(record) is { } markerReason)
+        {
+            return new BaseShape(Box.Zero, null, hasModel, markerReason);
+        }
+
         var meshWithoutGeometry = false;
         if (_useNif && modelPath != null)
         {
@@ -199,6 +206,20 @@ internal sealed class BaseObjectShapeProvider
         if (!hasModel && bounds.Size == Vector3.Zero) return "no mesh and zero bounds";
         return null;
     }
+
+    /// <summary>
+    /// The base's own major record flags carry the engine's IsMarker bit (map, XMarkerHeading and
+    /// similar marker bases). Only these four base types define that bit with this meaning; other
+    /// types reuse the same bit value for unrelated flags. Checked before any mesh read.
+    /// </summary>
+    private static string? GetMarkerFlagInvisibleReason(IMajorRecordGetter record) => record switch
+    {
+        IStaticGetter { MajorFlags: var flags } when flags.HasFlag(Static.MajorFlag.IsMarker) => "marker base (IsMarker flag)",
+        IFurnitureGetter { MajorFlags: var flags } when flags.HasFlag(Furniture.MajorFlag.IsMarker) => "marker base (IsMarker flag)",
+        IActivatorGetter { MajorFlags: var flags } when flags.HasFlag(Mutagen.Bethesda.Skyrim.Activator.MajorFlag.IsMarker) => "marker base (IsMarker flag)",
+        IDoorGetter { MajorFlags: var flags } when flags.HasFlag(Door.MajorFlag.IsMarker) => "marker base (IsMarker flag)",
+        _ => null,
+    };
 
     private MeshBounds GetMeshBounds(string meshPath) =>
         _byMesh.GetOrCreate(meshPath, () => ReadMeshBounds(meshPath));

@@ -227,7 +227,8 @@ internal sealed class PlacedRecordScanner
             Geometry.ToVector(placement.Position),
             placement.Rotation,
             Geometry.NormalizeScale(record.Scale),
-            record is IPlacedObjectGetter { Primitive: not null }));
+            record is IPlacedObjectGetter { Primitive: not null },
+            record is IPlacedObjectGetter { MapMarker: not null }));
     }
 
     /// <summary>

@@ -89,7 +89,7 @@ internal sealed class OtherObjectIndex
     private int MeasureAndPublish(int index)
     {
         ref readonly var other = ref _objects[index];
-        var reason = _shapes.GetInvisibleReason(other.Base, other.IsPrimitive);
+        var reason = other.HasMapMarker ? "map marker reference" : _shapes.GetInvisibleReason(other.Base, other.IsPrimitive);
         int state;
         if (reason != null)
         {

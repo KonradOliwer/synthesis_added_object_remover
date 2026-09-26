@@ -93,16 +93,21 @@ automatically; add them to *Excluded plugins* if needed.
      Only the cells overlapping the world AABB of the rotated grown box, widened by 4096 units,
      are checked. An other object's bounds center (and so its mesh) is computed only the first
      time a query turns it up, then cached; objects that are never candidates are never measured.
-   - *Invisible other objects never count.* When a query first turns up an other object, its base
-     is classified once (cached per base): lights without a mesh, sound markers, acoustic spaces,
-     texture sets (decals) and idle markers are invisible by record type; any base whose mesh
-     parses but has no visible render geometry (e.g. XMarker, heading, door and map markers, whose
-     meshes only hold `EditorMarker` shapes) is invisible; so is a base with no mesh and zero-size
-     bounds, and a primitive box reference (trigger/activator volume) whose base has no readable
-     visible mesh (with *Measure size from meshes (NIF)* off: whose base names no model at all).
-     NPCs always count. Missing or unreadable meshes do not make a base invisible. The marker-mesh
-     check needs *Measure size from meshes (NIF)*. The number of ignored objects is logged (per
-     reason with verbose logging).
+   - *Invisible other objects never count.* When a query first turns up an other object, it is
+     first checked for map marker data on the placed reference itself (`XMRK`, e.g. a fast-travel
+     marker); if so it is invisible ("map marker reference"), regardless of its base. Otherwise
+     its base is classified once (cached per base): a `Static`, `Furniture`, `Activator` or `Door`
+     base whose major record flags carry the engine's `IsMarker` bit (these are the only base
+     types that define that bit with this meaning) is invisible ("marker base (IsMarker flag)"),
+     checked before any mesh read; lights without a mesh, sound markers, acoustic spaces, texture
+     sets (decals) and idle markers are invisible by record type; any base whose mesh parses but
+     has no visible render geometry (e.g. heading and other marker meshes that only hold
+     `EditorMarker` shapes) is invisible; so is a base with no mesh and zero-size bounds, and a
+     primitive box reference (trigger/activator volume) whose base has no readable visible mesh
+     (with *Measure size from meshes (NIF)* off: whose base names no model at all). NPCs always
+     count. Missing or unreadable meshes do not make a base invisible. The marker-mesh check needs
+     *Measure size from meshes (NIF)*; the map marker reference and `IsMarker` base checks do not.
+     The number of ignored objects is logged (per reason with verbose logging).
 6. **Touching objects** (if *Remove touching objects* is on and meshes are used). Only target
    plugin objects are considered, and only within the same interior cell or worldspace.
    - *Broad phase*: in every space that contains a too-close removal, each target's oriented

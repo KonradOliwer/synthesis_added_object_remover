@@ -31,6 +31,7 @@ internal sealed record TargetLocation(
     bool InPersistentList);
 
 /// <summary>Compact snapshot of another mod's placed object (winning version).</summary>
+/// <param name="HasMapMarker">The placed reference itself carries map marker data (XMRK), e.g. a fast-travel marker.</param>
 internal readonly record struct OtherObject(
     FormKey FormKey,
     ModKey WinningMod,
@@ -39,7 +40,8 @@ internal readonly record struct OtherObject(
     Vector3 Position,
     P3Float Rotation,
     float Scale,
-    bool IsPrimitive);
+    bool IsPrimitive,
+    bool HasMapMarker);
 
 /// <summary>A too-close target (index into the scanned targets) and the first other object found.</summary>
 internal readonly record struct TooCloseHit(int TargetIndex, OtherObject TooCloseTo);

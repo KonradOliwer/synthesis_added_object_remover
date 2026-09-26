@@ -48,6 +48,8 @@ public class IgnoreSettings
 
 public class FollowUpRemovalSettings
 {
+    public const float DefaultAnchoringThresholdPercent = 50f;
+
     [SynthesisSettingName("Follow-up removal mode")]
     [SynthesisTooltip("What happens to target objects touching a removed one: Off keeps them, AnyTouch removes every touching object, Anchoring removes only objects that lose most of their support.")]
     public FollowUpRemovalMode Mode { get; set; } = FollowUpRemovalMode.AnyTouch;
@@ -58,7 +60,7 @@ public class FollowUpRemovalSettings
 
     [SynthesisSettingName("Anchoring threshold")]
     [SynthesisTooltip("Anchoring only: an object is removed when at least this percentage (1-99) of its support comes from removed objects.")]
-    public float AnchoringThresholdPercent { get; set; } = 50f;
+    public float AnchoringThresholdPercent { get; set; } = DefaultAnchoringThresholdPercent;
 }
 
 public class DiagnosticsSettings

@@ -3,24 +3,25 @@ using static AddedObjectRemover.CsvFile;
 
 namespace AddedObjectRemover;
 
-/// <param name="OriginFractions">Where the mesh origin sits inside its local bounds per axis: 0 at the minimum, 1 at the maximum; NaN on an axis without size.</param>
+/// <param name="TriangleBounds">Local bounds of the mesh's triangles, the box Anchoring weights contact points with.</param>
+/// <param name="OriginFractions">Where the mesh origin sits inside its triangle bounds per axis: 0 at the minimum, 1 at the maximum; NaN on an axis without size.</param>
 internal sealed record MeshOriginRow(
     string ModelPath,
     string BaseEditorIds,
     int ReferenceCount,
-    Box LocalBounds,
+    Box TriangleBounds,
     Vector3 OriginFractions,
     string Classification);
 
-/// <summary>Counts of meshes per origin classification, for the log.</summary>
 internal readonly record struct MeshOriginSummary(int Meshes, int NearBottom, int NearCentre, int Other);
 
 /// <summary>
-/// Optional mesh-origins.csv: for every mesh used by target objects, where its origin sits inside
-/// its local bounds. Anchoring weights contact points by closeness to the origin, which assumes
-/// the origin marks where an object rests; this file shows how often that holds.
+/// Optional mesh-origins.csv: for every mesh with triangles used by target objects, where its
+/// origin sits inside the bounds of its triangles. Anchoring weights contact points by closeness
+/// to the origin, which assumes the origin marks where an object rests; this file shows how often
+/// that holds.
 /// </summary>
-internal static class MeshOriginReport
+internal static class MeshOriginDiagnosticsWriter
 {
     public const string FileName = "mesh-origins.csv";
 
@@ -39,14 +40,26 @@ internal static class MeshOriginReport
         "originFractionX", "originFractionY", "originFractionZ", "classification",
     ];
 
-    /// <summary>One row per target mesh, ordered by model path.</summary>
-    public static List<MeshOriginRow> CreateRows(IReadOnlyList<TargetObject> targets, BaseObjectShapeProvider shapes) =>
-        targets
+    /// <summary>One row per target mesh with usable triangles, ordered by model path.</summary>
+    public static List<MeshOriginRow> CreateRows(
+        IReadOnlyList<TargetObject> targets,
+        BaseObjectShapeProvider shapes,
+        ParallelOptions parallelOptions)
+    {
+        var users = targets
             .Where(target => shapes.GetMeshPath(target.Base) != null)
             .GroupBy(target => shapes.GetMeshPath(target.Base)!, StringComparer.OrdinalIgnoreCase)
             .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
-            .Select(group => CreateRow(group.Key, group.ToList(), shapes))
             .ToList();
+        var bounds = MeasureTriangleBounds(users.Select(group => group.Key).ToList(), shapes, parallelOptions);
+
+        var rows = new List<MeshOriginRow>();
+        for (var i = 0; i < users.Count; i++)
+        {
+            if (bounds[i] is { } triangleBounds) rows.Add(CreateRow(users[i].Key, users[i].ToList(), triangleBounds, shapes));
+        }
+        return rows;
+    }
 
     public static MeshOriginSummary Summarize(IReadOnlyList<MeshOriginRow> rows) => new(
         rows.Count,
@@ -62,11 +75,23 @@ internal static class MeshOriginReport
         return path;
     }
 
-    private static MeshOriginRow CreateRow(string modelPath, IReadOnlyList<TargetObject> users, BaseObjectShapeProvider shapes)
+    /// <returns>Per mesh: the bounds of its triangles, or null when it has no usable triangles.</returns>
+    private static Box?[] MeasureTriangleBounds(IReadOnlyList<string> meshPaths, BaseObjectShapeProvider shapes, ParallelOptions parallelOptions)
     {
-        var bounds = shapes.GetLocalBox(users[0].Base);
-        var fractions = OriginFractions(bounds);
-        return new MeshOriginRow(modelPath, DescribeBases(users, shapes), users.Count, bounds, fractions, Classify(fractions.Z));
+        var cache = new TriangleTreeCache(shapes.ReadGeometry);
+        var bounds = new Box?[meshPaths.Count];
+        Parallel.For(0, meshPaths.Count, parallelOptions, i =>
+        {
+            using var lease = cache.Acquire(meshPaths[i]);
+            bounds[i] = lease.Tree?.Bounds;
+        });
+        return bounds;
+    }
+
+    private static MeshOriginRow CreateRow(string modelPath, IReadOnlyList<TargetObject> users, Box triangleBounds, BaseObjectShapeProvider shapes)
+    {
+        var fractions = OriginFractions(triangleBounds);
+        return new MeshOriginRow(modelPath, DescribeBases(users, shapes), users.Count, triangleBounds, fractions, Classify(fractions.Z));
     }
 
     private static string DescribeBases(IEnumerable<TargetObject> users, BaseObjectShapeProvider shapes) =>
@@ -95,8 +120,8 @@ internal static class MeshOriginReport
     private static IEnumerable<string> FormatRow(MeshOriginRow row) =>
     [
         Text(row.ModelPath), Text(row.BaseEditorIds), Num(row.ReferenceCount),
-        Num(row.LocalBounds.Min.X), Num(row.LocalBounds.Min.Y), Num(row.LocalBounds.Min.Z),
-        Num(row.LocalBounds.Max.X), Num(row.LocalBounds.Max.Y), Num(row.LocalBounds.Max.Z),
+        Num(row.TriangleBounds.Min.X), Num(row.TriangleBounds.Min.Y), Num(row.TriangleBounds.Min.Z),
+        Num(row.TriangleBounds.Max.X), Num(row.TriangleBounds.Max.Y), Num(row.TriangleBounds.Max.Z),
         Num(row.OriginFractions.X), Num(row.OriginFractions.Y), Num(row.OriginFractions.Z),
         Text(row.Classification),
     ];

@@ -4,7 +4,6 @@ using Mutagen.Bethesda.Skyrim;
 
 namespace AddedObjectRemover;
 
-/// <summary>An exterior cell: its worldspace and its grid coordinates.</summary>
 internal readonly record struct ExteriorCell(FormKey WorldspaceKey, int X, int Y);
 
 /// <summary>
@@ -16,7 +15,11 @@ internal readonly record struct ExteriorCell(FormKey WorldspaceKey, int X, int Y
 /// vertices the height is interpolated bilinearly. Each cell is decoded once, on first use.
 /// Thread-safe.
 /// </summary>
-internal sealed class TerrainHeights(IReadOnlyDictionary<ExteriorCell, ILandscapeGetter> landscapes)
+/// <param name="landscapes">LAND records by the cell of the worldspace that holds them.</param>
+/// <param name="landWorldspaces">Target worldspace -> the worldspace whose LAND records it uses (itself, or a parent whose land data it uses).</param>
+internal sealed class TerrainHeights(
+    IReadOnlyDictionary<ExteriorCell, ILandscapeGetter> landscapes,
+    IReadOnlyDictionary<FormKey, FormKey> landWorldspaces)
 {
     private const float CellSize = 4096f;
     private const int VerticesPerSide = 33;
@@ -26,15 +29,17 @@ internal sealed class TerrainHeights(IReadOnlyDictionary<ExteriorCell, ILandscap
     private readonly LazyCache<ExteriorCell, float[]?> _heightsByCell = new();
     private readonly HashSet<FormKey> _worldspacesWithTerrain = landscapes.Keys.Select(cell => cell.WorldspaceKey).ToHashSet();
 
-    /// <summary>False for interior cells and worldspaces without any LAND record.</summary>
-    public bool HasTerrain(FormKey spaceKey) => _worldspacesWithTerrain.Contains(spaceKey);
+    /// <summary>False for interior cells and worldspaces whose land has no LAND record.</summary>
+    public bool HasTerrain(FormKey spaceKey) =>
+        landWorldspaces.TryGetValue(spaceKey, out var landWorldspace) && _worldspacesWithTerrain.Contains(landWorldspace);
 
-    /// <summary>False where the worldspace has no terrain (no, a deleted, or an empty LAND record).</summary>
+    /// <param name="worldspaceKey">A worldspace with terrain (<see cref="HasTerrain"/>).</param>
+    /// <returns>False where the worldspace has no terrain (no, a deleted, or an empty LAND record).</returns>
     public bool TryGetHeight(FormKey worldspaceKey, Vector2 position, out float height)
     {
         var cellX = (int)MathF.Floor(position.X / CellSize);
         var cellY = (int)MathF.Floor(position.Y / CellSize);
-        var cell = new ExteriorCell(worldspaceKey, cellX, cellY);
+        var cell = new ExteriorCell(landWorldspaces[worldspaceKey], cellX, cellY);
         if (_heightsByCell.GetOrCreate(cell, () => DecodeHeights(cell)) is not { } heights)
         {
             height = 0;

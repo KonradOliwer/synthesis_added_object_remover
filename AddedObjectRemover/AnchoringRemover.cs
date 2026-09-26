@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover;
 
@@ -7,15 +6,19 @@ internal enum SupportCategory { RemovedTarget, KeptTarget, OtherPlugin, Terrain 
 
 internal readonly record struct SupporterShare(Supporter Supporter, SupportCategory Category, float Share);
 
-/// <summary>One evaluation of a candidate in one iteration.</summary>
 /// <param name="Shares">Share of each supporter, largest first; empty when the candidate has no contact points.</param>
 internal sealed record AnchoringEvaluation(
     int TargetIndex,
     int Iteration,
     CandidateContacts Contacts,
     IReadOnlyList<SupporterShare> Shares,
-    float RemovedShare,
-    bool Removed);
+    bool Removed)
+{
+    public float RemovedShare => ShareOf(SupportCategory.RemovedTarget);
+
+    public float ShareOf(SupportCategory category) =>
+        Shares.Where(share => share.Category == category).Sum(share => share.Share);
+}
 
 /// <param name="Candidates">Distinct candidates evaluated at least once.</param>
 /// <param name="KeptWithoutContacts">Candidates kept because no surface sample touched any supporter.</param>
@@ -37,20 +40,21 @@ internal sealed record AnchoringResult(
 
 /// <summary>
 /// Anchoring follow-up removal. Candidates are target objects with a mesh that touch an object
-/// removed in the previous iteration (at first the too-close removals). Each candidate's support
+/// removed in the previous iteration (at first the too-close removals), or whose mesh centre that
+/// object's mesh encloses: support also counts enclosed samples, so an object buried inside a
+/// removed one must become a candidate although no surfaces come close. Each candidate's support
 /// is split among its supporters by weighted contact points (<see cref="AnchoringContactFinder"/>),
 /// and it is removed when the share held by removed target objects reaches the threshold. Newly
-/// removed objects start the next iteration, which re-evaluates every object touching them, until
-/// nothing changes. All candidates of one iteration are judged against the removals of earlier
-/// iterations only, so the result does not depend on their order. Referenced objects are never
-/// removed and keep supporting others.
+/// removed objects start the next iteration, which re-evaluates every object in contact with them,
+/// until nothing changes. All candidates of one iteration are judged against the removals of
+/// earlier iterations only, so the result does not depend on their order. Referenced objects are
+/// never removed and keep supporting others.
 /// </summary>
 internal sealed class AnchoringRemover
 {
     private readonly IReadOnlyList<TargetObject> _targets;
     private readonly KeepReferencedRule _keepRule;
-    private readonly TouchCandidateFinder _targetFinder;
-    private readonly TouchPairTester _tester;
+    private readonly TouchSearch _search;
     private readonly AnchoringContactFinder _contactFinder;
     private readonly float _threshold;
     private readonly ParallelOptions _parallelOptions;
@@ -71,16 +75,14 @@ internal sealed class AnchoringRemover
     private AnchoringRemover(
         IReadOnlyList<TargetObject> targets,
         KeepReferencedRule keepRule,
-        TouchCandidateFinder targetFinder,
-        TouchPairTester tester,
+        TouchSearch search,
         AnchoringContactFinder contactFinder,
         float threshold,
         ParallelOptions parallelOptions)
     {
         _targets = targets;
         _keepRule = keepRule;
-        _targetFinder = targetFinder;
-        _tester = tester;
+        _search = search;
         _contactFinder = contactFinder;
         _threshold = threshold;
         _parallelOptions = parallelOptions;
@@ -97,7 +99,7 @@ internal sealed class AnchoringRemover
         IReadOnlyList<TargetObject> targets,
         IReadOnlyList<int> seeds,
         IReadOnlyList<int> keptTooClose,
-        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
+        SupporterIndex supporters,
         TerrainHeights terrain,
         BaseObjectShapeProvider shapes,
         KeepReferencedRule keepRule,
@@ -105,25 +107,13 @@ internal sealed class AnchoringRemover
         float threshold,
         ParallelOptions parallelOptions)
     {
-        var setupTimer = Stopwatch.StartNew();
-        var meshPaths = targets.Select(t => shapes.GetMeshPath(t.Base)).ToArray();
-        var cache = new TriangleTreeCache(shapes.ReadGeometry);
-        var targetFinder = TouchCandidateFinder.Create(
-            targets,
-            seeds.Select(seed => targets[seed].SpaceKey).ToHashSet(),
-            excluded: meshPaths.Select(path => path == null).ToArray(),
-            shapes,
-            touchDistance,
-            parallelOptions);
-        var remover = new AnchoringRemover(
-            targets,
-            keepRule,
-            targetFinder,
-            new TouchPairTester(targets, meshPaths, cache, touchDistance),
-            new AnchoringContactFinder(targets, meshPaths, targetFinder, indexes, shapes, terrain, cache, touchDistance),
-            threshold,
-            parallelOptions);
-        var setup = setupTimer.Elapsed;
+        var (remover, setup) = Timing.Measure(() =>
+        {
+            var search = TouchSearch.Create(targets, seeds, excluded: [], shapes, touchDistance, parallelOptions);
+            var supporterFinder = new AnchoringSupporterFinder(targets, search, supporters, shapes, touchDistance);
+            var contactFinder = new AnchoringContactFinder(targets, search.MeshPaths, supporterFinder, terrain, search.Cache, touchDistance);
+            return new AnchoringRemover(targets, keepRule, search, contactFinder, threshold, parallelOptions);
+        });
 
         remover.RemoveUnanchored(seeds, keptTooClose);
         return remover.CreateResult(setup);
@@ -138,32 +128,42 @@ internal sealed class AnchoringRemover
         while (frontier.Count > 0)
         {
             _iterations++;
-            var candidates = Timed(() => FindCandidatesTouching(frontier), ref _touchSearch);
-            Timed(() => FindMissingContacts(candidates), ref _contactPoints);
+            var (candidates, touchSearch) = Timing.Measure(() => FindCandidatesInContactWith(frontier));
+            _touchSearch += touchSearch;
+            _contactPoints += Timing.Measure(() => FindMissingContacts(candidates));
             frontier = EvaluateAndRemove(candidates);
         }
     }
 
-    /// <returns>Sorted indices of objects not yet removed that touch a frontier object, referenced objects excluded (and logged once).</returns>
-    private List<int> FindCandidatesTouching(List<int> frontier)
+    /// <returns>Sorted indices of objects not yet removed in contact with a frontier object, referenced objects excluded (and logged once).</returns>
+    private List<int> FindCandidatesInContactWith(List<int> frontier)
     {
-        var neighbors = new List<int>[frontier.Count];
-        Parallel.For(0, frontier.Count, _parallelOptions, i => neighbors[i] = _targetFinder.FindNeighbors(frontier[i]));
-        var pairs = new List<TargetPair>();
-        for (var i = 0; i < frontier.Count; i++)
-        {
-            foreach (var neighbor in neighbors[i])
-            {
-                if (!_removed[neighbor]) pairs.Add(new TargetPair(frontier[i], neighbor));
-            }
-        }
+        var pairs = _search.CollectFrontierPairs(frontier, skip: target => _removed[target]);
+        var inContact = FindPairsInContact(pairs);
+        return ExcludeKept(inContact);
+    }
 
-        var results = _tester.TestPairs(pairs, _parallelOptions);
-        var candidates = new SortedSet<int>();
-        for (var k = 0; k < pairs.Count; k++)
+    /// <returns>The pairs, in order, whose meshes touch or whose first mesh encloses the second's centre.</returns>
+    private List<TargetPair> FindPairsInContact(List<TargetPair> pairs)
+    {
+        var touches = _search.Tester.TestPairs(pairs, _parallelOptions);
+        var apart = Enumerable.Range(0, pairs.Count).Where(k => touches[k] == PairTouch.Apart).ToList();
+        var enclosed = _search.Tester.TestEnclosures(apart.Select(k => pairs[k]).ToList(), _parallelOptions);
+
+        var inContact = touches.Select(touch => touch == PairTouch.Touching).ToArray();
+        for (var j = 0; j < apart.Count; j++)
         {
-            if (results[k] != PairTouch.Touching) continue;
-            var (from, to) = pairs[k];
+            if (enclosed[j]) inContact[apart[j]] = true;
+        }
+        return pairs.Where((_, k) => inContact[k]).ToList();
+    }
+
+    /// <returns>Sorted second members of the pairs that are not referenced.</returns>
+    private List<int> ExcludeKept(List<TargetPair> pairs)
+    {
+        var candidates = new SortedSet<int>();
+        foreach (var (from, to) in pairs)
+        {
             if (_keepRule.TryGetKeepReason(_targets[to], out var reason))
             {
                 LogKeptOnce(to, reason, from);
@@ -206,28 +206,24 @@ internal sealed class AnchoringRemover
         return removedNow;
     }
 
+    /// <remarks>A candidate without contact points has no shares, so it is never removed.</remarks>
     private AnchoringEvaluation Evaluate(int candidate)
     {
         var contacts = _contacts[candidate]!;
-        if (contacts.ContactPoints == 0)
-        {
-            return new AnchoringEvaluation(candidate, _iterations, contacts, [], 0f, Removed: false);
-        }
-
         var shares = contacts.Supporters
             .Select(entry => new SupporterShare(entry.Supporter, Categorize(entry.Supporter), entry.Weight / contacts.TotalWeight))
             .OrderByDescending(share => share.Share)
             .ThenBy(share => share.Supporter.Type)
             .ThenBy(share => share.Supporter.Index)
             .ToList();
-        var removedShare = shares.Where(share => share.Category == SupportCategory.RemovedTarget).Sum(share => share.Share);
-        return new AnchoringEvaluation(candidate, _iterations, contacts, shares, removedShare, Removed: removedShare >= _threshold);
+        var evaluation = new AnchoringEvaluation(candidate, _iterations, contacts, shares, Removed: false);
+        return evaluation with { Removed = evaluation.RemovedShare >= _threshold };
     }
 
     private SupportCategory Categorize(Supporter supporter) => supporter.Type switch
     {
         SupporterType.Target => _removed[supporter.Index] ? SupportCategory.RemovedTarget : SupportCategory.KeptTarget,
-        SupporterType.OtherObject => SupportCategory.OtherPlugin,
+        SupporterType.PlacedObject => SupportCategory.OtherPlugin,
         SupporterType.Terrain => SupportCategory.Terrain,
         _ => throw new UnreachableException($"Unknown supporter type {supporter.Type}."),
     };
@@ -243,21 +239,6 @@ internal sealed class AnchoringRemover
         _keptWithoutContacts++;
     }
 
-    private static T Timed<T>(Func<T> action, ref TimeSpan total)
-    {
-        var timer = Stopwatch.StartNew();
-        var result = action();
-        total += timer.Elapsed;
-        return result;
-    }
-
-    private static void Timed(Action action, ref TimeSpan total)
-    {
-        var timer = Stopwatch.StartNew();
-        action();
-        total += timer.Elapsed;
-    }
-
     private AnchoringResult CreateResult(TimeSpan setup)
     {
         var stats = new AnchoringStats(
@@ -265,7 +246,7 @@ internal sealed class AnchoringRemover
             _contacts.Count(contacts => contacts != null),
             _evaluations.Count,
             _keptWithoutContacts,
-            _tester.GetStats(),
+            _search.Tester.GetStats(),
             setup,
             _touchSearch,
             _contactPoints);

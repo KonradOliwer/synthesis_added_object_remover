@@ -24,24 +24,24 @@ internal sealed record ReplacementResult(int ReplacedCount, IReadOnlyList<Replac
 /// </summary>
 internal sealed class ReplacementMatcher
 {
+    /// <summary>Largest distance between a target object and another mod's object for the other one to count as replaced.</summary>
+    private const float PositionTolerance = 16f;
+
+    /// <summary>Smallest min/max ratio of each pair of sorted scaled dimensions for another mod's object to count as replaced.</summary>
+    private const float SizeSimilarity = 0.75f;
+
     private readonly IReadOnlyList<TargetObject> _targets;
     private readonly IReadOnlyDictionary<FormKey, OtherObjectIndex> _indexes;
     private readonly BaseObjectShapeProvider _shapes;
-    private readonly float _positionTolerance;
-    private readonly float _sizeSimilarity;
 
     public ReplacementMatcher(
         IReadOnlyList<TargetObject> targets,
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
-        BaseObjectShapeProvider shapes,
-        float positionTolerance,
-        float sizeSimilarity)
+        BaseObjectShapeProvider shapes)
     {
         _targets = targets;
         _indexes = indexes;
         _shapes = shapes;
-        _positionTolerance = positionTolerance;
-        _sizeSimilarity = sizeSimilarity;
     }
 
     private readonly record struct Match(int OtherIndex, float Distance, float SizeRatio);
@@ -59,7 +59,7 @@ internal sealed class ReplacementMatcher
         if (ScaledSortedDims(_shapes.GetLocalBox(target.Base), target.Transform.Scale) is not { } targetDims) return null;
 
         var position = target.Transform.Position;
-        var margin = new Vector3(_positionTolerance);
+        var margin = new Vector3(PositionTolerance);
         var candidates = new List<int>();
         index.Grid.Collect(new Box(position - margin, position + margin), candidates);
 
@@ -68,12 +68,12 @@ internal sealed class ReplacementMatcher
         {
             var other = index[otherIndex];
             var distance = Vector3.Distance(other.Position, position);
-            if (distance > _positionTolerance) continue;
+            if (distance > PositionTolerance) continue;
             if (!index.TryGetVisibleCenter(otherIndex, out _)) continue;
             if (ScaledSortedDims(_shapes.GetLocalBox(other.Base), other.Scale) is not { } otherDims) continue;
 
             var ratio = SizeRatio(targetDims, otherDims);
-            if (ratio < _sizeSimilarity) continue;
+            if (ratio < SizeSimilarity) continue;
 
             (matches ??= []).Add(new Match(otherIndex, distance, ratio));
         }

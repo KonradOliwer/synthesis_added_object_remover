@@ -14,19 +14,13 @@ internal sealed record RunConfig(
     IReadOnlyList<ModKey> ExcludedPlugins,
     IReadOnlyList<ModKey> TargetMasters,
     bool IgnoreTargetMasters,
-    float Multiplier,
+    float SizeMultiplier,
     FollowUpRemovalMode FollowUpMode,
     float TouchDistance,
     float AnchoringThreshold,
-    bool Verbose,
+    bool DetailedLog,
     string DiagnosticsFolder)
 {
-    /// <summary>Largest distance between a target object and another mod's object for the other one to count as replaced.</summary>
-    public const float ReplacementPositionTolerance = 16f;
-
-    /// <summary>Smallest min/max ratio of each pair of sorted scaled dimensions for another mod's object to count as replaced.</summary>
-    public const float ReplacementSizeSimilarity = 0.75f;
-
     public bool WritesDiagnostics => DiagnosticsFolder.Length > 0;
 }
 
@@ -66,11 +60,11 @@ internal static class RunConfigFactory
             ExcludedPlugins: excluded,
             TargetMasters: masters,
             IgnoreTargetMasters: ignore.IgnoreTargetMasters,
-            Multiplier: AtLeast(settings.WhatToCheck.SizeMultiplier, 0, "size multiplier"),
+            SizeMultiplier: AtLeast(settings.WhatToCheck.SizeMultiplier, 0, "size multiplier"),
             FollowUpMode: ValidateMode(followUp.Mode),
             TouchDistance: AtLeast(followUp.TouchDistance, 0, "touch distance"),
             AnchoringThreshold: ClampThresholdPercent(followUp.AnchoringThresholdPercent) / PercentPerWhole,
-            Verbose: settings.Diagnostics.DetailedLog,
+            DetailedLog: settings.Diagnostics.DetailedLog,
             DiagnosticsFolder: settings.Diagnostics.DiagnosticsFolder.Trim());
     }
 
@@ -148,7 +142,7 @@ internal static class RunConfigFactory
     private static float ClampThresholdPercent(float value)
     {
         if (value is >= MinThresholdPercent and <= MaxThresholdPercent) return value;
-        var clamped = float.IsFinite(value) ? Math.Clamp(value, MinThresholdPercent, MaxThresholdPercent) : new FollowUpRemovalSettings().AnchoringThresholdPercent;
+        var clamped = float.IsFinite(value) ? Math.Clamp(value, MinThresholdPercent, MaxThresholdPercent) : FollowUpRemovalSettings.DefaultAnchoringThresholdPercent;
         Console.WriteLine($"Warning: anchoring threshold {value} is outside {MinThresholdPercent}-{MaxThresholdPercent}; using {clamped}.");
         return clamped;
     }

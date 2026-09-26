@@ -1,19 +1,37 @@
+using System.Diagnostics;
 using System.Numerics;
 
 namespace AddedObjectRemover;
 
 /// <summary>
 /// Whether a point (in a mesh's local frame) is in contact with that mesh: within the tolerance of
-/// one of its triangles, or embedded in it. A point counts as embedded when a line through it
-/// along the mesh's local Z axis crosses the mesh an odd number of times both above and below it,
-/// which is exact for closed meshes; open meshes (e.g. rocks without a bottom) are never treated
-/// as enclosing a point, only their surface counts.
+/// one of its triangles, or enclosed by it. A point counts as enclosed when lines through it along
+/// each of the mesh's local axes Z, X and Y all cross the mesh an odd number of times both before
+/// and after it. This is exact for closed meshes. An open mesh encloses nothing unless it is closed
+/// along all three lines, so layered open meshes (floor and ceiling of one room piece, storeys of
+/// a building shell) do not; a mesh closed on every side, such as a room piece with walls, floor
+/// and ceiling, still encloses what is inside it.
 /// </summary>
 internal static class PointContactTest
 {
+    private enum LineAxis { Z, X, Y }
+
+    private static readonly LineAxis[] LineAxes = [LineAxis.Z, LineAxis.X, LineAxis.Y];
+
     /// <param name="scratch">Reused buffer for triangle queries.</param>
     public static bool IsInContact(MeshTriangleTree tree, Vector3 point, float tolerance, List<int> scratch) =>
         IsNearSurface(tree, point, tolerance, scratch) || IsEnclosed(tree, point, scratch);
+
+    /// <param name="scratch">Reused buffer for triangle queries.</param>
+    public static bool IsEnclosed(MeshTriangleTree tree, Vector3 point, List<int> scratch)
+    {
+        if (!tree.Bounds.Contains(point)) return false;
+        foreach (var axis in LineAxes)
+        {
+            if (!IsInsideAlong(tree, point, axis, scratch)) return false;
+        }
+        return true;
+    }
 
     private static bool IsNearSurface(MeshTriangleTree tree, Vector3 point, float tolerance, List<int> scratch)
     {
@@ -28,28 +46,46 @@ internal static class PointContactTest
         return false;
     }
 
-    private static bool IsEnclosed(MeshTriangleTree tree, Vector3 point, List<int> scratch)
+    private static bool IsInsideAlong(MeshTriangleTree tree, Vector3 point, LineAxis axis, List<int> scratch)
     {
-        var bounds = tree.Bounds;
-        if (!bounds.Contains(point)) return false;
-
-        tree.CollectLeafTriangles(new Box(point with { Z = bounds.Min.Z }, point with { Z = bounds.Max.Z }), scratch);
-        var above = 0;
-        var below = 0;
+        tree.CollectLeafTriangles(LineThroughBounds(point, tree.Bounds, axis), scratch);
+        var framedPoint = ToLineFrame(point, axis);
+        var after = 0;
+        var before = 0;
         foreach (var index in scratch)
         {
-            if (!TryGetVerticalCrossing(tree.GetTriangle(index), point, out var z)) continue;
-            if (z > point.Z) above++;
-            else if (z < point.Z) below++;
+            var triangle = tree.GetTriangle(index);
+            var framed = new MeshTriangle(ToLineFrame(triangle.A, axis), ToLineFrame(triangle.B, axis), ToLineFrame(triangle.C, axis));
+            if (!TryGetLineCrossing(framed, framedPoint, out var crossing)) continue;
+            if (crossing > framedPoint.Z) after++;
+            else if (crossing < framedPoint.Z) before++;
         }
-        return above % 2 == 1 && below % 2 == 1;
+        return after % 2 == 1 && before % 2 == 1;
     }
 
+    /// <summary>The segment of the line through the point along the axis that lies inside the bounds, as a degenerate box.</summary>
+    private static Box LineThroughBounds(Vector3 point, Box bounds, LineAxis axis) => axis switch
+    {
+        LineAxis.Z => new Box(point with { Z = bounds.Min.Z }, point with { Z = bounds.Max.Z }),
+        LineAxis.X => new Box(point with { X = bounds.Min.X }, point with { X = bounds.Max.X }),
+        LineAxis.Y => new Box(point with { Y = bounds.Min.Y }, point with { Y = bounds.Max.Y }),
+        _ => throw new UnreachableException($"Unknown line axis {axis}."),
+    };
+
+    /// <summary>Permutes the coordinates so the line axis becomes Z.</summary>
+    private static Vector3 ToLineFrame(Vector3 v, LineAxis axis) => axis switch
+    {
+        LineAxis.Z => v,
+        LineAxis.X => new Vector3(v.Y, v.Z, v.X),
+        LineAxis.Y => new Vector3(v.Z, v.X, v.Y),
+        _ => throw new UnreachableException($"Unknown line axis {axis}."),
+    };
+
     /// <summary>
-    /// Height at which the vertical line through the point crosses the triangle's interior.
+    /// Z at which the line along Z through the point crosses the triangle's interior.
     /// Crossings exactly on an edge are not counted; sample points almost never land there.
     /// </summary>
-    private static bool TryGetVerticalCrossing(MeshTriangle triangle, Vector3 point, out float z)
+    private static bool TryGetLineCrossing(MeshTriangle triangle, Vector3 point, out float z)
     {
         var edgeBc = Cross2D(triangle.B, triangle.C, point);
         var edgeCa = Cross2D(triangle.C, triangle.A, point);

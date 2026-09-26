@@ -4,10 +4,11 @@ using Mutagen.Bethesda.Plugins;
 namespace AddedObjectRemover;
 
 /// <summary>
-/// Other-mod objects of one space, indexed by their raw position only. Each object's true bounds
-/// center (which may need a mesh read) is computed at most once, lazily, the first time a query
-/// turns the object up, so objects that are never candidates are never measured. Objects whose
-/// base is invisible are found the same lazy way and then never match.
+/// Placed objects of one space (other mods' objects, or Anchoring supporters), indexed by their
+/// raw position only. Each object's true bounds center (which may need a mesh read) is computed at
+/// most once, lazily, the first time a query turns the object up, so objects that are never
+/// candidates are never measured. Objects whose base is invisible are found the same lazy way and
+/// then never match.
 ///
 /// Thread-safe: the center is written before its state is published with an interlocked store,
 /// and read only after a load sees the state. Two threads measuring the same object concurrently
@@ -21,7 +22,7 @@ internal sealed class OtherObjectIndex
 
     private readonly OtherObject[] _objects;
     private readonly BaseObjectShapeProvider _shapes;
-    private readonly ReasonCounter _invisible;
+    private readonly ReasonCounter? _invisible;
     private readonly Vector3[] _centers;
     private readonly int[] _state;
 
@@ -32,7 +33,8 @@ internal sealed class OtherObjectIndex
     /// </summary>
     private readonly int[] _replaced;
 
-    private OtherObjectIndex(IReadOnlyList<OtherObject> objects, BaseObjectShapeProvider shapes, ReasonCounter invisible)
+    /// <param name="invisible">Counts each invisible object once per reason; null counts nothing.</param>
+    private OtherObjectIndex(IReadOnlyList<OtherObject> objects, BaseObjectShapeProvider shapes, ReasonCounter? invisible)
     {
         _objects = objects.ToArray();
         _shapes = shapes;
@@ -66,6 +68,9 @@ internal sealed class OtherObjectIndex
         return indexes;
     }
 
+    public static OtherObjectIndex CreateUncounted(IReadOnlyList<OtherObject> objects, BaseObjectShapeProvider shapes) =>
+        new(objects, shapes, invisible: null);
+
     public SpatialGrid Grid { get; }
 
     public int Count => _objects.Length;
@@ -97,15 +102,14 @@ internal sealed class OtherObjectIndex
         }
         else
         {
-            var transform = new PlacedTransform(other.Position, Geometry.RotationFromEuler(other.Rotation), other.Scale);
-            var point = Geometry.WorldBoundsCenter(_shapes.GetLocalBox(other.Base), transform);
+            var point = Geometry.WorldBoundsCenter(_shapes.GetLocalBox(other.Base), other.Transform);
             _centers[index] = Geometry.IsFinite(point) ? point : other.Position;
             state = Visible;
         }
 
         if (Interlocked.CompareExchange(ref _state[index], state, NotMeasured) == NotMeasured && reason != null)
         {
-            _invisible.Add(reason);
+            _invisible?.Add(reason);
         }
         return state;
     }

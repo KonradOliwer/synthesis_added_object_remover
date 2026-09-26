@@ -39,7 +39,10 @@ internal readonly record struct OtherObject(
     P3Float Rotation,
     float Scale,
     bool IsPrimitive,
-    bool HasMapMarker);
+    bool HasMapMarker)
+{
+    public PlacedTransform Transform => new(Position, Geometry.RotationFromEuler(Rotation), Scale);
+}
 
 /// <summary>A too-close target (index into the scanned targets) and the first other object found.</summary>
 internal readonly record struct TooCloseHit(int TargetIndex, OtherObject TooCloseTo);

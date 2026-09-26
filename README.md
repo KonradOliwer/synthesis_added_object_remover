@@ -73,8 +73,14 @@ automatically; add them to *Excluded plugins* if needed.
    - *Kept objects*: target objects that other placed objects link to (Enable Parent, Linked
      Reference, Activate Parent, door teleport destination, script properties or any other
      reference field), and teleport doors, are never removed. Kept objects are listed in the log.
-   - *Terrain* (`Anchoring` only): the winning LAND record of every exterior cell in a worldspace
-     that holds target objects.
+   - *Possible supporters* (`Anchoring` only): every other placed record in a cell or worldspace
+     that holds target objects, whatever plugin it comes from (base game, the target's masters,
+     excluded plugins, records the target plugin overrides, target records a later plugin
+     overrides, other mods), using its winning version. These are everything physically there that
+     a target object may rest on; the exclusions above only decide what counts as a conflict.
+   - *Terrain* (`Anchoring` only): the winning LAND record of every exterior cell of each
+     worldspace that holds target objects, or, for a worldspace that uses its parent's land data,
+     of that parent (followed up the chain while each link uses its parent's land data).
 2. **Spaces.** Interior objects are only compared with objects in the same cell. Exterior objects
    (including the worldspace's persistent cell) are compared across the whole worldspace in world
    coordinates.
@@ -180,55 +186,74 @@ automatically; add them to *Excluded plugins* if needed.
 7. **Anchoring** (*Follow-up removal mode* `Anchoring`). Removes only the touching target objects
    that lose most of what holds them in place.
    - *Candidates*: target objects with mesh triangles, not removed and not kept, that touch a
-     removed target object (same broad and narrow phase as *AnyTouch*, with the touch distance).
-     Kept objects that touch a removed one are logged once and stay.
+     removed target object (same broad and narrow phase as *AnyTouch*, with the touch distance),
+     or whose mesh centre (the centre of its triangles' bounds) is enclosed by a removed target
+     object's mesh (see *Contact points*). An object fully buried in a removed one, with no
+     surfaces close to each other, only becomes a candidate this way. Kept objects that touch a
+     removed one are logged once and stay.
    - *Supporters* of a candidate: every target object with a mesh whose oriented box comes within
      the touch distance of the candidate's (removed or not, kept objects included), every visible
-     other-mod object with a mesh doing the same (same visibility rules as the too-close test;
-     replaced objects count, since they are still in the game), and in exterior cells the terrain.
-   - *Contact points*: the candidate's surface is sampled in its local frame, about 4096 points
-     per mesh spread by triangle area (at most 16 per triangle, fixed pattern, so the same on
-     every run). A sample is a contact point of a mesh supporter when it lies within the touch
-     distance of one of its triangles, or is embedded in it: a line through the sample along the
-     supporter's local Z axis crosses the supporter's mesh an odd number of times both above and
-     below it (exact for closed meshes; open meshes, such as rocks without a bottom, only count by
-     their surface). A sample is a contact point of the terrain when it lies at or below the
+     placed object with a mesh from any plugin doing the same (the *possible supporters* above:
+     base game, masters, excluded plugins, overridden records and other mods alike; same
+     visibility rules as the too-close test; replaced objects count, since they are still in the
+     game), and in exterior cells the terrain. A cell or worldspace's possible supporters are
+     indexed only when a candidate in it first needs them.
+   - *Contact points*: the candidate's surface is sampled in its local frame: exactly 4096 points
+     per mesh, each standing for the same area. The triangles are laid end to end by area and the
+     points taken at equal steps along that total, so every triangle gets a number of points
+     proportional to its area (within one), large flat faces included; a triangle smaller than
+     one step gets at most one. Vertices are not added, since they would carry no area and bias
+     the weights. Points inside a triangle follow a fixed pattern, so the result is the same on
+     every run. A sample is a contact point of a mesh supporter when it lies within the touch
+     distance of one of its triangles, or is enclosed by it: lines through the sample along each
+     of the supporter's local Z, X and Y axes all cross the supporter's mesh an odd number of
+     times on both sides of it. This is exact for closed meshes; open meshes such as rocks without
+     a bottom, or layered ones such as a room piece with floor and ceiling, only count by their
+     surface, but a mesh closed on every side (a room piece with walls, floor and ceiling) encloses
+     what is inside it. A sample is a contact point of the terrain when it lies at or below the
      terrain height plus the touch distance.
    - *Terrain height*: from the winning LAND record's vertex height map (VHGT): 33x33 vertices
      128 units apart per 4096-unit cell; each byte is a height delta (the first of a row relative
      to the first vertex of the previous row, starting from the record's offset, the others to the
      previous vertex in the row), and the running value times 8 is the height in game units.
      Between vertices the height is interpolated bilinearly (the game splits each quad into two
-     triangles, so this can differ slightly on uneven ground). Cells without a LAND record have no
-     terrain; interiors never do.
+     triangles, so this can differ slightly on uneven ground). A worldspace that uses its parent's
+     land data takes the parent's LAND records. Cells without a LAND record have no terrain;
+     interiors never do.
    - *Weights*: each contact point is weighted by its closeness to the candidate's mesh origin,
      measured in the mesh's local frame (not in the world), because most objects are placed with
      the origin where they rest:
      `weight = 1 / (1 + (d / L)^2)`, where `d` is the point's distance from the origin and
-     `L = 0.25 * the diagonal of the mesh's local bounds` (a point at distance `L` has half
+     `L = 0.25 * the diagonal of the local bounds of the mesh's triangles` (a point at distance `L` has half
      weight). A contact point touching several supporters splits its weight equally among them.
    - *Decision*: each supporter's share is the weight it holds divided by the total weight of all
      contact points. The candidate is removed when the removed target objects together hold at
      least the *Anchoring threshold*. A candidate without any contact point is kept (counted in
      the log).
-   - *Iterations*: objects removed in one iteration make every object touching them a candidate in
-     the next (objects kept earlier are re-evaluated with the new removals), until nothing more is
-     removed. All candidates of one iteration are judged against the removals of earlier
+   - *Iterations*: objects removed in one iteration make every object touching them (or whose
+     centre they enclose) a candidate in the next, until nothing more is removed. An object kept
+     earlier is re-evaluated only when it touches a newly removed object in this sense; one that
+     lost support from a removed object it does not touch keeps its earlier decision. All candidates of one iteration are judged against the removals of earlier
      iterations only, so the result does not depend on their order. Contact points of a candidate
      are found once, in parallel, and reused.
    - The log reports removals, iterations, candidates and evaluations, candidates without contact
      points, pair and mesh counts and timings. With *Detailed log*, each removal names the share of
      support removed and the removed object holding most of it.
 8. **Diagnostics files** (optional, off by default). When *Diagnostics folder* is set, these CSV
-   files are written into it (existing files are replaced). They never change the results, but
+   files are written into it (existing files are replaced, and the files of the follow-up modes
+   are deleted at the start of every run, so a file in the folder always belongs to the latest
+   run; `anchoring.csv`, `edges.csv` and `components.csv` are missing when that run had no
+   too-close removals or used another mode). They never change the results, but
    finding and measuring every edge adds run time, and an error writing them (e.g. a folder that
    cannot be created) is only logged as a warning. They let decisions be judged from the output
    alone, without opening xEdit. All are UTF-8, comma-separated, invariant culture, RFC 4180-style
    quoted when a field holds a comma, quote or newline, and written in a fixed order so they are
    the same on every run.
-   - **`mesh-origins.csv`** (always): one row per mesh used by target objects, by model path.
+   - **`mesh-origins.csv`** (always): one row per mesh with triangles used by target objects, by
+     model path (meshes without usable triangles are never sampled and are left out).
      Columns: `modelPath`, `baseEditorIds` (the target bases using it), `referenceCount`,
-     `localMinX/Y/Z`, `localMaxX/Y/Z` (the mesh's local bounds), `originFractionX/Y/Z` (where the
+     `localMinX/Y/Z`, `localMaxX/Y/Z` (the local bounds of the mesh's triangles, the same box
+     *Anchoring* weights with), `originFractionX/Y/Z` (where the
      origin sits inside the bounds per axis: 0 at the minimum, 1 at the maximum, `NaN` on an axis
      without size) and `classification`: `origin near bottom` (Z fraction at most 0.1),
      `origin near centre` (Z fraction 0.35-0.65) or `other`. The log prints the count per
@@ -236,7 +261,8 @@ automatically; add them to *Excluded plugins* if needed.
      holds for the target plugin's meshes.
    - **`anchoring.csv`** (`Anchoring` only): one row per candidate evaluation, by iteration and
      FormKey. Columns: `iteration`, `formKey`, `editorId`, `base`, `modelPath`, `space`,
-     `contactPoints`, `totalWeight`, `removedTargetShare`, `keptTargetShare`, `otherPluginShare`,
+     `contactPoints`, `totalWeight`, `removedTargetShare`, `keptTargetShare`, `otherPluginShare`
+     (held by possible supporters, i.e. placed objects of any plugin that are not target objects),
      `terrainShare`, `threshold`, `decision` (`removed`, `kept` or `kept (no contact points)`) and
      `topSupporters` (the 5 largest, as `FormKey Category share`, or `terrain Terrain share`).
    - **`edges.csv`** (`AnyTouch` only): every touching pair of target objects that belong to the same explored
@@ -276,7 +302,8 @@ automatically; add them to *Excluded plugins* if needed.
   computation.
 - Target base objects are measured first in a parallel warm-up. Each mesh is read and parsed
   once for its bounds; the triangles of a mesh are read again only if it takes part in a tested
-  touch pair.
+  touch pair, or is sampled or tested as an *Anchoring* candidate or supporter (and, with a
+  *Diagnostics folder*, for `mesh-origins.csv`).
 - Other objects' bounds centers are computed lazily, once each, and only for objects a query
   turns up.
 - NIFs are parsed in parallel. NiflySharp's only static state touched while loading (a
@@ -312,8 +339,8 @@ records are deleted, so references from scripts, quests and other records still 
   beyond the target's box. An object whose mesh center is more than that far from its own
   origin (e.g. some combined meshes) can be missed.
 - The rotation convention above has not yet been checked in-game.
-- Touching uses render triangles only (no collision), so an object fully inside another one
-  without their surfaces coming within the tolerance does not count as touching. Legacy
+- Touching uses render triangles only (no collision), so in *AnyTouch* an object fully inside
+  another one without their surfaces coming within the tolerance does not count as touching. Legacy
   `NiTriStrips` shapes are converted to triangles (read from NiflySharp's strip data by
   reflection; if a NiflySharp update removes those fields, a warning is logged and such shapes
   count as points only; a shape whose strip lengths do not match its points also counts as points
@@ -333,7 +360,8 @@ records are deleted, so references from scripts, quests and other records still 
 - *Anchoring* samples surfaces (about 4096 points per mesh), so a very small contact area can be
   missed or under-weighted; its origin-based weights assume the origin marks where an object
   rests (check `mesh-origins.csv`); terrain is interpolated bilinearly rather than per game
-  triangle; only closed meshes can enclose an embedded point.
+  triangle; only meshes closed along all three local axes can enclose a point, and a fully
+  embedded object becomes a candidate only when its mesh centre is enclosed.
 
 ## Building
 

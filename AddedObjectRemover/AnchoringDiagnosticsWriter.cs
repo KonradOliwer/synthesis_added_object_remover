@@ -1,4 +1,4 @@
-using Mutagen.Bethesda.Plugins;
+using System.Diagnostics;
 using static AddedObjectRemover.CsvFile;
 
 namespace AddedObjectRemover;
@@ -26,7 +26,7 @@ internal static class AnchoringDiagnosticsWriter
         string folder,
         ScanResult scan,
         BaseObjectShapeProvider shapes,
-        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
+        SupporterIndex supporters,
         IReadOnlyList<AnchoringEvaluation> evaluations,
         float threshold)
     {
@@ -34,7 +34,7 @@ internal static class AnchoringDiagnosticsWriter
         var rows = evaluations
             .OrderBy(evaluation => evaluation.Iteration)
             .ThenBy(evaluation => scan.Targets[evaluation.TargetIndex].Record.FormKey.ToString(), StringComparer.Ordinal)
-            .Select(evaluation => FormatRow(evaluation, scan, shapes, indexes, threshold));
+            .Select(evaluation => FormatRow(evaluation, scan, shapes, supporters, threshold));
         CsvFile.Write(path, Header, rows);
         return path;
     }
@@ -43,7 +43,7 @@ internal static class AnchoringDiagnosticsWriter
         AnchoringEvaluation evaluation,
         ScanResult scan,
         BaseObjectShapeProvider shapes,
-        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
+        SupporterIndex supporters,
         float threshold)
     {
         var target = scan.Targets[evaluation.TargetIndex];
@@ -58,17 +58,14 @@ internal static class AnchoringDiagnosticsWriter
             Num(evaluation.Contacts.ContactPoints),
             Num(evaluation.Contacts.TotalWeight),
             Num(evaluation.RemovedShare),
-            Num(ShareOf(evaluation, SupportCategory.KeptTarget)),
-            Num(ShareOf(evaluation, SupportCategory.OtherPlugin)),
-            Num(ShareOf(evaluation, SupportCategory.Terrain)),
+            Num(evaluation.ShareOf(SupportCategory.KeptTarget)),
+            Num(evaluation.ShareOf(SupportCategory.OtherPlugin)),
+            Num(evaluation.ShareOf(SupportCategory.Terrain)),
             Num(threshold),
             Text(DescribeDecision(evaluation)),
-            Text(DescribeTopSupporters(evaluation, scan, indexes[target.SpaceKey])),
+            Text(DescribeTopSupporters(evaluation, scan, supporters.GetSpace(target.SpaceKey))),
         ];
     }
-
-    private static float ShareOf(AnchoringEvaluation evaluation, SupportCategory category) =>
-        evaluation.Shares.Where(share => share.Category == category).Sum(share => share.Share);
 
     private static string DescribeDecision(AnchoringEvaluation evaluation)
     {
@@ -76,17 +73,18 @@ internal static class AnchoringDiagnosticsWriter
         return evaluation.Contacts.ContactPoints == 0 ? "kept (no contact points)" : "kept";
     }
 
-    private static string DescribeTopSupporters(AnchoringEvaluation evaluation, ScanResult scan, OtherObjectIndex others) =>
+    private static string DescribeTopSupporters(AnchoringEvaluation evaluation, ScanResult scan, OtherObjectIndex placed) =>
         string.Join(
             "; ",
             evaluation.Shares
                 .Take(MaxListedSupporters)
-                .Select(share => $"{DescribeSupporter(share.Supporter, scan, others)} {share.Category} {Num(share.Share)}"));
+                .Select(share => $"{DescribeSupporter(share.Supporter, scan, placed)} {share.Category} {Num(share.Share)}"));
 
-    private static string DescribeSupporter(Supporter supporter, ScanResult scan, OtherObjectIndex others) => supporter.Type switch
+    private static string DescribeSupporter(Supporter supporter, ScanResult scan, OtherObjectIndex placed) => supporter.Type switch
     {
         SupporterType.Target => scan.Targets[supporter.Index].Record.FormKey.ToString(),
-        SupporterType.OtherObject => others[supporter.Index].FormKey.ToString(),
-        _ => "terrain",
+        SupporterType.PlacedObject => placed[supporter.Index].FormKey.ToString(),
+        SupporterType.Terrain => "terrain",
+        _ => throw new UnreachableException($"Unknown supporter type {supporter.Type}."),
     };
 }

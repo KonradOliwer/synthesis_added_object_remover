@@ -3,46 +3,60 @@ using System.Numerics;
 namespace AddedObjectRemover;
 
 /// <summary>
-/// Points spread evenly over a mesh's surface, in mesh-local space: about
-/// <see cref="TargetSamplesPerMesh"/> in total, each triangle getting a share proportional to its
-/// area (so finely tessellated parts do not outweigh large flat ones), at most
-/// <see cref="MaxSamplesPerTriangle"/>. Fractional shares are carried over to the next triangle,
-/// and the points inside a triangle follow a fixed low-discrepancy pattern, so the result is the
-/// same on every run.
+/// Exactly <see cref="SamplesPerMesh"/> points spread over a mesh's surface in mesh-local space,
+/// each standing for the same area. The triangles are laid end to end by area and the points are
+/// taken at equal steps along that total (systematic sampling), so every triangle gets a number of
+/// points proportional to its area, within one: large flat faces get their full share however
+/// finely the rest is tessellated, and a triangle smaller than one step gets at most one point,
+/// depending on where the steps fall. Vertices are not added, since a point standing for no area
+/// would bias the weights. The points inside a triangle follow a fixed low-discrepancy
+/// pattern, so the result is the same on every run.
 /// </summary>
 internal static class SurfaceSampler
 {
-    private const int TargetSamplesPerMesh = 4096;
-    private const int MaxSamplesPerTriangle = 16;
+    private const int SamplesPerMesh = 4096;
+
+    /// <summary>Where each point lies inside its step along the total area.</summary>
+    private const double StepOffset = 0.5;
 
     /// <summary>Additive recurrence of the plastic number (R2 sequence), well spread in the unit square.</summary>
-    private const float SequenceStepU = 0.7548776662f;
-    private const float SequenceStepV = 0.5698402910f;
-    private const float SequenceStart = 0.5f;
+    private const double SequenceStepU = 0.7548776662466927;
+    private const double SequenceStepV = 0.5698402909980532;
+    private const double SequenceStart = 0.5;
 
     /// <summary>Empty when the mesh has no surface area (only points or zero-area triangles).</summary>
     public static Vector3[] Sample(MeshTriangleTree tree)
     {
-        var totalArea = 0f;
-        for (var t = 0; t < tree.TriangleCount; t++) totalArea += Area(tree.GetTriangle(t));
+        var areas = new double[tree.TriangleCount];
+        var totalArea = 0.0;
+        for (var t = 0; t < areas.Length; t++)
+        {
+            areas[t] = Area(tree.GetTriangle(t));
+            totalArea += areas[t];
+        }
         if (!(totalArea > 0)) return [];
 
-        var samplesPerArea = TargetSamplesPerMesh / totalArea;
-        var samples = new List<Vector3>(TargetSamplesPerMesh);
-        var carry = 0f;
-        for (var t = 0; t < tree.TriangleCount; t++)
+        var step = totalArea / SamplesPerMesh;
+        var samples = new Vector3[SamplesPerMesh];
+        var triangle = 0;
+        var areaBeforeTriangle = 0.0;
+        var pointsInTriangle = 0;
+        for (var i = 0; i < SamplesPerMesh; i++)
         {
-            var triangle = tree.GetTriangle(t);
-            carry += Area(triangle) * samplesPerArea;
-            var count = (int)carry;
-            carry -= count;
-            for (var k = 0; k < Math.Min(count, MaxSamplesPerTriangle); k++) samples.Add(PointInTriangle(triangle, k));
+            var position = (i + StepOffset) * step;
+            while (triangle < areas.Length - 1 && areaBeforeTriangle + areas[triangle] <= position)
+            {
+                areaBeforeTriangle += areas[triangle];
+                triangle++;
+                pointsInTriangle = 0;
+            }
+            samples[i] = PointInTriangle(tree.GetTriangle(triangle), pointsInTriangle++);
         }
-        return samples.ToArray();
+        return samples;
     }
 
-    private static float Area(MeshTriangle triangle) =>
-        0.5f * Vector3.Cross(triangle.B - triangle.A, triangle.C - triangle.A).Length();
+    private static double Area(MeshTriangle triangle) =>
+        0.5 * Vector3.Cross(triangle.B - triangle.A, triangle.C - triangle.A).Length();
 
     /// <summary>The k-th point of the pattern, mapped uniformly onto the triangle.</summary>
     private static Vector3 PointInTriangle(MeshTriangle triangle, int k)
@@ -53,5 +67,5 @@ internal static class SurfaceSampler
         return triangle.A * (1 - root) + triangle.B * (root * (1 - v)) + triangle.C * (root * v);
     }
 
-    private static float Fraction(float value) => value - MathF.Floor(value);
+    private static float Fraction(double value) => (float)(value - Math.Floor(value));
 }

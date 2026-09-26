@@ -3,7 +3,6 @@ using static AddedObjectRemover.CsvFile;
 
 namespace AddedObjectRemover;
 
-/// <summary>Result of one diagnostics write, for the console summary line.</summary>
 internal readonly record struct TouchDiagnosticsWriteResult(int EdgeCount, int ComponentCount, string EdgesPath, string ComponentsPath);
 
 /// <summary>
@@ -13,6 +12,9 @@ internal readonly record struct TouchDiagnosticsWriteResult(int EdgeCount, int C
 /// </summary>
 internal static class TouchDiagnosticsWriter
 {
+    public const string EdgesFileName = "edges.csv";
+    public const string ComponentsFileName = "components.csv";
+
     private const int MaxListedSpaces = 10;
     private const int MaxTopBases = 5;
 
@@ -56,7 +58,6 @@ internal static class TouchDiagnosticsWriter
         string DeepestChainFormKeys,
         string SeedReasons);
 
-    /// <param name="folder">Written to as "edges.csv" and "components.csv" inside it.</param>
     public static TouchDiagnosticsWriteResult Write(
         string folder,
         ScanResult scan,
@@ -70,8 +71,8 @@ internal static class TouchDiagnosticsWriter
         var edgeRows = CreateEdgeRows(scan.Targets, diagnostics, seedReasonByTarget);
         var componentRows = CreateComponentRows(scan, shapes, diagnostics, clusters, seedReasonByTarget);
 
-        var edgesPath = Path.Combine(folder, "edges.csv");
-        var componentsPath = Path.Combine(folder, "components.csv");
+        var edgesPath = Path.Combine(folder, EdgesFileName);
+        var componentsPath = Path.Combine(folder, ComponentsFileName);
         CsvFile.Write(edgesPath, EdgeHeader, edgeRows.Select(row => FormatEdge(row, shapes, tolerance)));
         CsvFile.Write(componentsPath, ComponentHeader, componentRows.Select(FormatComponent));
         return new TouchDiagnosticsWriteResult(edgeRows.Count, componentRows.Count, edgesPath, componentsPath);

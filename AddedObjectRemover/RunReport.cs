@@ -13,13 +13,13 @@ internal static class RunReport
         static string Join(IReadOnlyList<ModKey> keys) => keys.Count == 0 ? "(none)" : string.Join(", ", keys);
 
         Console.WriteLine($"Target plugin: {config.Target}");
-        Console.WriteLine($"Size multiplier: {config.Multiplier}");
+        Console.WriteLine($"Size multiplier: {config.SizeMultiplier}");
         Console.WriteLine($"Excluded plugins: {Join(config.ExcludedPlugins)}");
         Console.WriteLine(config.IgnoreTargetMasters
             ? $"Ignored masters of target: {Join(config.TargetMasters)}"
             : "Masters of target are not ignored.");
         Console.WriteLine(DescribeFollowUpRemoval(config));
-        Console.WriteLine($"Detailed log: {config.Verbose}");
+        Console.WriteLine($"Detailed log: {config.DetailedLog}");
         Console.WriteLine($"Diagnostics folder: {(config.WritesDiagnostics ? config.DiagnosticsFolder : "(none)")}");
     }
 
@@ -59,6 +59,10 @@ internal static class RunReport
         if (scan.OthersOverriddenByTarget > 0)
         {
             Console.WriteLine($"  Ignored {scan.OthersOverriddenByTarget:N0} other-mod objects that {target} itself overrides.");
+        }
+        if (scan.SupportersBySpace.Count > 0)
+        {
+            Console.WriteLine($"  Recorded {scan.SupporterCount:N0} placed objects of any plugin as possible Anchoring supporters.");
         }
     }
 
@@ -159,8 +163,8 @@ internal static class RunReport
 
     public static void PrintMeshOriginSummary(MeshOriginSummary summary) =>
         Console.WriteLine(
-            $"Mesh origins: {summary.Meshes:N0} target meshes, {summary.NearBottom:N0} {MeshOriginReport.NearBottom}, "
-            + $"{summary.NearCentre:N0} {MeshOriginReport.NearCentre}, {summary.Other:N0} {MeshOriginReport.Other}.");
+            $"Mesh origins: {summary.Meshes:N0} target meshes, {summary.NearBottom:N0} {MeshOriginDiagnosticsWriter.NearBottom}, "
+            + $"{summary.NearCentre:N0} {MeshOriginDiagnosticsWriter.NearCentre}, {summary.Other:N0} {MeshOriginDiagnosticsWriter.Other}.");
 
     public static void PrintWriteSummary(int overrideCount, int enableParentsReplaced, TimeSpan elapsed)
     {

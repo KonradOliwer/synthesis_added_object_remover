@@ -22,9 +22,13 @@ internal static class CsvFile
 
     public static string Num(int value) => value.ToString(CultureInfo.InvariantCulture);
 
+    public static void DeleteIfPresent(string path)
+    {
+        if (File.Exists(path)) File.Delete(path);
+    }
+
     public static string Bool(bool value) => value ? "true" : "false";
 
-    /// <summary>CSV-escapes a field: quoted, with embedded quotes doubled, whenever it holds a comma, quote or newline.</summary>
     public static string Text(string value)
     {
         if (value.IndexOfAny([',', '"', '\n', '\r']) < 0) return value;

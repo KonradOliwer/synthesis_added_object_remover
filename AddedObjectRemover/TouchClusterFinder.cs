@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace AddedObjectRemover;
 
 internal sealed record TouchStats(
@@ -43,8 +41,7 @@ internal sealed class TouchClusterFinder
 {
     private readonly IReadOnlyList<TargetObject> _targets;
     private readonly KeepReferencedRule _keepRule;
-    private readonly TouchCandidateFinder _candidateFinder;
-    private readonly TouchPairTester _tester;
+    private readonly TouchSearch _search;
     private readonly ParallelOptions _parallelOptions;
     private readonly bool[] _isSeed;
     private readonly bool[] _visited;
@@ -65,16 +62,14 @@ internal sealed class TouchClusterFinder
     private TouchClusterFinder(
         IReadOnlyList<TargetObject> targets,
         KeepReferencedRule keepRule,
-        TouchCandidateFinder candidateFinder,
-        TouchPairTester tester,
+        TouchSearch search,
         ParallelOptions parallelOptions,
         bool[] isSeed,
         bool[] visited)
     {
         _targets = targets;
         _keepRule = keepRule;
-        _candidateFinder = candidateFinder;
-        _tester = tester;
+        _search = search;
         _parallelOptions = parallelOptions;
         _isSeed = isSeed;
         _visited = visited;
@@ -97,24 +92,14 @@ internal sealed class TouchClusterFinder
         ParallelOptions parallelOptions,
         bool collectDiagnostics)
     {
-        var keptTooCloseMarks = MarkAll(targets.Count, keptTooClose);
-        var meshPaths = targets.Select(t => shapes.GetMeshPath(t.Base)).ToArray();
-        var (candidateFinder, setup) = Timed(() => TouchCandidateFinder.Create(
-            targets,
-            seeds.Select(seed => targets[seed].SpaceKey).ToHashSet(),
-            excluded: FindExcluded(keptTooCloseMarks, meshPaths),
-            shapes,
-            tolerance,
-            parallelOptions));
-
+        var (search, setup) = Timing.Measure(() => TouchSearch.Create(targets, seeds, excluded: keptTooClose, shapes, tolerance, parallelOptions));
         var finder = new TouchClusterFinder(
             targets,
             keepRule,
-            candidateFinder,
-            new TouchPairTester(targets, meshPaths, new TriangleTreeCache(shapes.ReadGeometry), tolerance),
+            search,
             parallelOptions,
             MarkAll(targets.Count, seeds),
-            visited: keptTooCloseMarks);
+            visited: MarkAll(targets.Count, keptTooClose));
         finder.ExploreComponents(seeds);
         return finder.CreateClusters(setup, collectDiagnostics);
     }
@@ -124,17 +109,6 @@ internal sealed class TouchClusterFinder
         var marked = new bool[count];
         foreach (var index in indices) marked[index] = true;
         return marked;
-    }
-
-    /// <summary>Kept too-close targets and targets without a mesh: they never pass a removal on.</summary>
-    private static bool[] FindExcluded(bool[] keptTooClose, string?[] meshPaths) =>
-        keptTooClose.Select((kept, i) => kept || meshPaths[i] == null).ToArray();
-
-    private static (T Result, TimeSpan Elapsed) Timed<T>(Func<T> action)
-    {
-        var timer = Stopwatch.StartNew();
-        var result = action();
-        return (result, timer.Elapsed);
     }
 
     private void ExploreComponents(IReadOnlyList<int> seeds)
@@ -171,8 +145,8 @@ internal sealed class TouchClusterFinder
     private List<TargetPair> ReachUnvisitedTouching(List<int> frontier)
     {
         _levels++;
-        var (pairs, broadPhase) = Timed(() => CollectUnvisitedCandidatePairs(frontier));
-        var (results, narrowPhase) = Timed(() => _tester.TestPairs(pairs, _parallelOptions));
+        var (pairs, broadPhase) = Timing.Measure(() => _search.CollectFrontierPairs(frontier, skip: node => _visited[node]));
+        var (results, narrowPhase) = Timing.Measure(() => _search.Tester.TestPairs(pairs, _parallelOptions));
         _broadPhase += broadPhase;
         _narrowPhase += narrowPhase;
 
@@ -185,28 +159,6 @@ internal sealed class TouchClusterFinder
             reached.Add(pairs[k]);
         }
         return reached;
-    }
-
-    /// <returns>(frontier node, unvisited candidate) pairs in frontier order, then neighbor order.</returns>
-    private List<TargetPair> CollectUnvisitedCandidatePairs(List<int> frontier)
-    {
-        var neighbors = FindNeighborsOfAll(frontier);
-        var pairs = new List<TargetPair>();
-        for (var i = 0; i < frontier.Count; i++)
-        {
-            foreach (var neighbor in neighbors[i])
-            {
-                if (!_visited[neighbor]) pairs.Add(new TargetPair(frontier[i], neighbor));
-            }
-        }
-        return pairs;
-    }
-
-    private List<int>[] FindNeighborsOfAll(IReadOnlyList<int> nodes)
-    {
-        var neighbors = new List<int>[nodes.Count];
-        Parallel.For(0, nodes.Count, _parallelOptions, i => neighbors[i] = _candidateFinder.FindNeighbors(nodes[i]));
-        return neighbors;
     }
 
     /// <summary>Applies the level's reached nodes in order and returns the next frontier.</summary>
@@ -252,14 +204,14 @@ internal sealed class TouchClusterFinder
             _componentsWithTouching,
             _largestComponent,
             _levels,
-            _tester.GetStats(),
+            _search.Tester.GetStats(),
             setup,
             _broadPhase,
             _narrowPhase,
             TimeSpan.Zero);
         if (!collectDiagnostics) return new TouchClusters(_removals, _kept, stats, null);
 
-        var (diagnostics, elapsed) = Timed(CreateDiagnostics);
+        var (diagnostics, elapsed) = Timing.Measure(CreateDiagnostics);
         return new TouchClusters(_removals, _kept, stats with { DiagnosticsEdges = elapsed }, diagnostics);
     }
 
@@ -267,7 +219,7 @@ internal sealed class TouchClusterFinder
     private TouchDiagnosticsData CreateDiagnostics()
     {
         var pairs = CollectSameComponentCandidatePairs();
-        var results = _tester.TestPairs(pairs, _parallelOptions);
+        var results = _search.Tester.TestPairs(pairs, _parallelOptions);
         var touching = pairs.Where((_, k) => results[k] == PairTouch.Touching).ToList();
         var distances = MeasureMinSurfaceDistances(touching);
         var edges = touching.Select((pair, i) => new TouchEdge(_componentId[pair.First], pair, distances[i])).ToList();
@@ -278,7 +230,7 @@ internal sealed class TouchClusterFinder
     private List<TargetPair> CollectSameComponentCandidatePairs()
     {
         var members = _componentMembers.SelectMany(component => component).ToList();
-        var neighbors = FindNeighborsOfAll(members);
+        var neighbors = _search.FindNeighborsOfAll(members);
         var pairs = new List<TargetPair>();
         for (var i = 0; i < members.Count; i++)
         {
@@ -300,7 +252,7 @@ internal sealed class TouchClusterFinder
             () => new TouchScratch(),
             (i, _, scratch) =>
             {
-                distances[i] = _tester.MeasureMinSurfaceDistance(pairs[i], scratch);
+                distances[i] = _search.Tester.MeasureMinSurfaceDistance(pairs[i], scratch);
                 return scratch;
             },
             _ => { });

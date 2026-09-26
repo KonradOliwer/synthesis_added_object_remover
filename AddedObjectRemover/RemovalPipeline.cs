@@ -11,7 +11,20 @@ namespace AddedObjectRemover;
 /// </summary>
 internal sealed class RemovalPipeline
 {
-    private sealed record TooCloseSelection(List<TooCloseRemoval> Removals, List<KeptTarget> Kept);
+    private sealed record TooCloseSelection(List<TooCloseRemoval> Removals, List<KeptTarget> Kept)
+    {
+        public List<int> SeedIndices => Removals.Select(removal => removal.TargetIndex).ToList();
+
+        public List<int> KeptIndices => Kept.Select(kept => kept.TargetIndex).ToList();
+    }
+
+    /// <summary>Written only by some follow-up modes, so a file an earlier run left behind would look current.</summary>
+    private static readonly string[] FollowUpDiagnosticsFiles =
+    [
+        AnchoringDiagnosticsWriter.FileName,
+        TouchDiagnosticsWriter.EdgesFileName,
+        TouchDiagnosticsWriter.ComponentsFileName,
+    ];
 
     private sealed record FollowUpRemovals(IReadOnlyList<Removal> Removals, IReadOnlyList<KeptTarget> Kept)
     {
@@ -29,7 +42,7 @@ internal sealed class RemovalPipeline
     {
         _state = state;
         _config = config;
-        _meshMessages = new MeshMessageLog(config.Verbose);
+        _meshMessages = new MeshMessageLog(config.DetailedLog);
         var meshFiles = new MeshFileSource(
             state.DataFolderPath.Path,
             state.GameRelease,
@@ -50,12 +63,13 @@ internal sealed class RemovalPipeline
 
         var indexes = IndexOtherObjects(scan);
         WarmUpTargetBounds(scan.Targets);
+        DeleteEarlierFollowUpDiagnostics();
         WriteMeshOrigins(scan.Targets);
         MarkReplacedObjects(scan.Targets, indexes);
 
         var keepRule = new KeepReferencedRule(scan.TargetReferences);
         var tooClose = SelectTooCloseRemovals(scan, indexes, keepRule);
-        var followUp = SelectFollowUpRemovals(scan, indexes, tooClose, keepRule);
+        var followUp = SelectFollowUpRemovals(scan, tooClose, keepRule);
 
         List<Removal> removals = [.. tooClose.Removals, .. followUp.Removals];
         WriteOverrides(scan, removals);
@@ -83,10 +97,7 @@ internal sealed class RemovalPipeline
         return indexes;
     }
 
-    /// <summary>
-    /// Resolves every target base's bounds in parallel. Other objects' bounds are resolved lazily,
-    /// only for objects a query turns up.
-    /// </summary>
+    /// <summary>Resolves every target base's bounds in parallel.</summary>
     private void WarmUpTargetBounds(IReadOnlyList<TargetObject> targets)
     {
         var timer = Stopwatch.StartNew();
@@ -101,15 +112,26 @@ internal sealed class RemovalPipeline
         RunReport.PrintWarmUpSummary(targetBases.Count, timer.Elapsed);
     }
 
+    private void DeleteEarlierFollowUpDiagnostics()
+    {
+        if (!_config.WritesDiagnostics) return;
+
+        AccessDiagnosticsFolder("deleting earlier follow-up diagnostics files", () =>
+        {
+            foreach (var fileName in FollowUpDiagnosticsFiles) CsvFile.DeleteIfPresent(Path.Combine(_config.DiagnosticsFolder, fileName));
+        });
+    }
+
     private void WriteMeshOrigins(IReadOnlyList<TargetObject> targets)
     {
         if (!_config.WritesDiagnostics) return;
 
-        var rows = MeshOriginReport.CreateRows(targets, _shapes);
-        RunReport.PrintMeshOriginSummary(MeshOriginReport.Summarize(rows));
-        WriteDiagnosticsFile(MeshOriginReport.FileName, () =>
+        var rows = MeshOriginDiagnosticsWriter.CreateRows(targets, _shapes, _parallelOptions);
+        _meshMessages.PrintAndClear();
+        RunReport.PrintMeshOriginSummary(MeshOriginDiagnosticsWriter.Summarize(rows));
+        AccessDiagnosticsFolder($"writing {MeshOriginDiagnosticsWriter.FileName}", () =>
         {
-            var path = MeshOriginReport.Write(_config.DiagnosticsFolder, rows);
+            var path = MeshOriginDiagnosticsWriter.Write(_config.DiagnosticsFolder, rows);
             Console.WriteLine($"  Wrote {rows.Count:N0} mesh origins to {path}.");
         });
     }
@@ -117,9 +139,8 @@ internal sealed class RemovalPipeline
     private void MarkReplacedObjects(IReadOnlyList<TargetObject> targets, IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes)
     {
         var timer = Stopwatch.StartNew();
-        var matcher = new ReplacementMatcher(
-            targets, indexes, _shapes, RunConfig.ReplacementPositionTolerance, RunConfig.ReplacementSizeSimilarity);
-        var result = matcher.MarkReplacedObjects(collectLog: _config.Verbose, _parallelOptions);
+        var matcher = new ReplacementMatcher(targets, indexes, _shapes);
+        var result = matcher.MarkReplacedObjects(collectLog: _config.DetailedLog, _parallelOptions);
         RunReport.PrintReplacementLog(result.LogEntries);
         _meshMessages.PrintAndClear();
         RunReport.PrintReplacementSummary(result.ReplacedCount, timer.Elapsed);
@@ -131,10 +152,10 @@ internal sealed class RemovalPipeline
         KeepReferencedRule keepRule)
     {
         var timer = Stopwatch.StartNew();
-        var hits = TooCloseSearch.FindTooCloseTargets(scan.Targets, indexes, _shapes, _config.Multiplier, _parallelOptions);
+        var hits = TooCloseSearch.FindTooCloseTargets(scan.Targets, indexes, _shapes, _config.SizeMultiplier, _parallelOptions);
         _meshMessages.PrintAndClear();
         RunReport.PrintTooCloseSummary(hits.Count, scan.Targets.Count, _config.Target, timer.Elapsed);
-        RunReport.PrintInvisibleOthers(_invisibleOthers, _config.Verbose);
+        RunReport.PrintInvisibleOthers(_invisibleOthers, _config.DetailedLog);
 
         var selection = SplitByKeepRule(scan.Targets, hits, keepRule);
         RunReport.PrintKept(scan, selection.Kept);
@@ -163,7 +184,6 @@ internal sealed class RemovalPipeline
 
     private FollowUpRemovals SelectFollowUpRemovals(
         ScanResult scan,
-        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
         TooCloseSelection tooClose,
         KeepReferencedRule keepRule)
     {
@@ -172,7 +192,7 @@ internal sealed class RemovalPipeline
         {
             FollowUpRemovalMode.Off => FollowUpRemovals.None,
             FollowUpRemovalMode.AnyTouch => RemoveTouchingClusters(scan, tooClose, keepRule),
-            FollowUpRemovalMode.Anchoring => RemoveUnanchoredObjects(scan, indexes, tooClose, keepRule),
+            FollowUpRemovalMode.Anchoring => RemoveUnanchoredObjects(scan, tooClose, keepRule),
             _ => throw new UnreachableException($"Unknown follow-up removal mode {_config.FollowUpMode}."),
         };
     }
@@ -181,8 +201,8 @@ internal sealed class RemovalPipeline
     {
         var clusters = TouchClusterFinder.Find(
             scan.Targets,
-            tooClose.Removals.Select(r => r.TargetIndex).ToList(),
-            tooClose.Kept.Select(k => k.TargetIndex).ToList(),
+            tooClose.SeedIndices,
+            tooClose.KeptIndices,
             _shapes,
             keepRule,
             _config.TouchDistance,
@@ -199,7 +219,7 @@ internal sealed class RemovalPipeline
     {
         if (clusters.Diagnostics is not { } diagnostics) return;
 
-        WriteDiagnosticsFile("touch diagnostics", () =>
+        AccessDiagnosticsFolder($"writing {TouchDiagnosticsWriter.EdgesFileName} / {TouchDiagnosticsWriter.ComponentsFileName}", () =>
         {
             var timer = Stopwatch.StartNew();
             var written = TouchDiagnosticsWriter.Write(_config.DiagnosticsFolder, scan, _shapes, _config.TouchDistance, seeds, clusters, diagnostics);
@@ -208,18 +228,15 @@ internal sealed class RemovalPipeline
         });
     }
 
-    private FollowUpRemovals RemoveUnanchoredObjects(
-        ScanResult scan,
-        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
-        TooCloseSelection tooClose,
-        KeepReferencedRule keepRule)
+    private FollowUpRemovals RemoveUnanchoredObjects(ScanResult scan, TooCloseSelection tooClose, KeepReferencedRule keepRule)
     {
+        var supporters = new SupporterIndex(scan.SupportersBySpace, _shapes);
         var anchoring = AnchoringRemover.Run(
             scan.Targets,
-            tooClose.Removals.Select(r => r.TargetIndex).ToList(),
-            tooClose.Kept.Select(k => k.TargetIndex).ToList(),
-            indexes,
-            new TerrainHeights(scan.Landscapes),
+            tooClose.SeedIndices,
+            tooClose.KeptIndices,
+            supporters,
+            new TerrainHeights(scan.Landscapes, scan.LandWorldspaces),
             _shapes,
             keepRule,
             _config.TouchDistance,
@@ -228,32 +245,32 @@ internal sealed class RemovalPipeline
         RunReport.PrintKept(scan, anchoring.Kept);
         _meshMessages.PrintAndClear();
         RunReport.PrintAnchoringStats(anchoring);
-        WriteAnchoringDiagnostics(scan, indexes, anchoring);
+        WriteAnchoringDiagnostics(scan, supporters, anchoring);
         return new FollowUpRemovals(anchoring.Removals, anchoring.Kept);
     }
 
-    private void WriteAnchoringDiagnostics(ScanResult scan, IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes, AnchoringResult anchoring)
+    private void WriteAnchoringDiagnostics(ScanResult scan, SupporterIndex supporters, AnchoringResult anchoring)
     {
         if (!_config.WritesDiagnostics) return;
 
-        WriteDiagnosticsFile(AnchoringDiagnosticsWriter.FileName, () =>
+        AccessDiagnosticsFolder($"writing {AnchoringDiagnosticsWriter.FileName}", () =>
         {
             var path = AnchoringDiagnosticsWriter.Write(
-                _config.DiagnosticsFolder, scan, _shapes, indexes, anchoring.Evaluations, _config.AnchoringThreshold);
+                _config.DiagnosticsFolder, scan, _shapes, supporters, anchoring.Evaluations, _config.AnchoringThreshold);
             Console.WriteLine($"Anchoring diagnostics: wrote {anchoring.Evaluations.Count:N0} evaluations to {path}.");
         });
     }
 
-    /// <summary>A diagnostics file never changes the results, so failing to write one is only a warning.</summary>
-    private void WriteDiagnosticsFile(string description, Action write)
+    /// <summary>Diagnostics files never change the results, so failing to access them is only a warning.</summary>
+    private void AccessDiagnosticsFolder(string description, Action access)
     {
         try
         {
-            write();
+            access();
         }
         catch (Exception ex) when (ExpectedFailures.IsFileAccess(ex))
         {
-            Console.WriteLine($"  Warning: could not write {description} to {_config.DiagnosticsFolder}: {ex.Message}");
+            Console.WriteLine($"  Warning: {description} in {_config.DiagnosticsFolder} failed: {ex.Message}");
         }
     }
 
@@ -277,9 +294,9 @@ internal sealed class RemovalPipeline
         int removedTooClose,
         int keptAsReferenced)
     {
-        if (_config.Verbose) RunReport.PrintRemovals(scan, _shapes, removals);
+        if (_config.DetailedLog) RunReport.PrintRemovals(scan, _shapes, removals);
         RunReport.PrintBoundsStats(_shapes.GetStats());
-        if (_config.Verbose) RunReport.PrintSpaceSummary(scan, indexes, removals);
+        if (_config.DetailedLog) RunReport.PrintSpaceSummary(scan, indexes, removals);
         RunReport.PrintRemovalSummary(removals.Count, removedTooClose, keptAsReferenced);
     }
 }

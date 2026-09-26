@@ -6,32 +6,31 @@ namespace AddedObjectRemover;
 
 /// <summary>
 /// Winning navmesh triangles (world space) of each space, for finding the nearest point on them
-/// that is free. A space is indexed on its first query. Thread-safe.
+/// that is free. The navmeshes of one exterior cell, or of all of a space outside the exterior
+/// grid, are decoded and indexed on the first query that reaches them. Thread-safe.
 /// </summary>
-internal sealed class NavmeshIndex(IReadOnlyDictionary<FormKey, List<MeshTriangle>> trianglesBySpace)
+internal sealed class NavmeshIndex
 {
     /// <summary>Points tried per triangle side when the triangle's closest point is not free.</summary>
     private const int SamplesPerSide = 8;
 
-    private sealed record SpaceTriangles(MeshTriangle[] Triangles, SpatialGrid Grid);
+    /// <param name="Grid">The exterior cell; null for the space's navmeshes outside the exterior grid.</param>
+    private readonly record struct Bucket(FormKey SpaceKey, (int X, int Y)? Grid);
+
+    private sealed record BucketTriangles(MeshTriangle[] Triangles, SpatialGrid Grid);
 
     private readonly record struct Candidate(Vector3 Point, float Distance);
 
-    private readonly LazyCache<FormKey, SpaceTriangles> _bySpace = new();
+    private readonly Dictionary<Bucket, INavigationMeshDataGetter[]> _navmeshes;
+    private readonly LazyCache<Bucket, BucketTriangles> _triangles = new();
 
-    /// <summary>Triangles of one navmesh record; triangles naming a missing vertex (broken data) are skipped.</summary>
-    public static IEnumerable<MeshTriangle> ReadTriangles(INavigationMeshDataGetter data)
+    public NavmeshIndex(IReadOnlyDictionary<FormKey, List<CellNavmesh>> navmeshesBySpace)
     {
-        var vertices = data.Vertices.Select(Geometry.ToVector).ToArray();
-        foreach (var triangle in data.Triangles)
-        {
-            var corners = triangle.Vertices;
-            if (!IsVertex(corners.X, vertices) || !IsVertex(corners.Y, vertices) || !IsVertex(corners.Z, vertices)) continue;
-            yield return new MeshTriangle(vertices[corners.X], vertices[corners.Y], vertices[corners.Z]);
-        }
+        _navmeshes = navmeshesBySpace
+            .SelectMany(space => space.Value.Select(navmesh => (Bucket: new Bucket(space.Key, navmesh.Grid), navmesh.Data)))
+            .GroupBy(entry => entry.Bucket, entry => entry.Data)
+            .ToDictionary(group => group.Key, group => group.ToArray());
     }
-
-    private static bool IsVertex(short index, Vector3[] vertices) => index >= 0 && index < vertices.Length;
 
     /// <summary>
     /// The navmesh point nearest to <paramref name="point"/>, within <paramref name="maxDistance"/>,
@@ -54,23 +53,44 @@ internal sealed class NavmeshIndex(IReadOnlyDictionary<FormKey, List<MeshTriangl
         return bestDistance < maxDistance;
     }
 
-    private IEnumerable<(MeshTriangle Triangle, float Distance)> FindTrianglesByDistance(FormKey spaceKey, Vector3 point, float maxDistance)
+    private List<(MeshTriangle Triangle, float Distance)> FindTrianglesByDistance(FormKey spaceKey, Vector3 point, float maxDistance)
     {
-        if (!trianglesBySpace.TryGetValue(spaceKey, out var triangles)) return [];
-        var space = _bySpace.GetOrCreate(spaceKey, () => IndexSpace(triangles));
-        var candidates = new List<int>();
-        space.Grid.Collect(new Box(point, point).Grown(maxDistance), candidates);
-        return candidates
-            .Distinct()
-            .Select(index => space.Triangles[index])
+        var query = new Box(point, point).Grown(maxDistance);
+        return EnumerateBuckets(spaceKey, query)
+            .Where(_navmeshes.ContainsKey)
+            .SelectMany(bucket => FindTrianglesIn(_triangles.GetOrCreate(bucket, () => DecodeBucket(bucket)), query))
             .Select(triangle => (Triangle: triangle, Distance: Vector3.Distance(point, ClosestPoint(triangle, point))))
             .Where(entry => entry.Distance < maxDistance)
             .OrderBy(entry => entry.Distance)
             .ToList();
     }
 
-    private static SpaceTriangles IndexSpace(List<MeshTriangle> triangles) =>
-        new(triangles.ToArray(), SpatialGrid.FromBoxes(triangles.Select(triangle => triangle.Bounds).ToArray()));
+    /// <summary>An exterior cell's navmesh lies within the cell's square, so only the cells overlapping the query can hold a triangle in it.</summary>
+    private static IEnumerable<Bucket> EnumerateBuckets(FormKey spaceKey, Box query)
+    {
+        yield return new Bucket(spaceKey, Grid: null);
+        for (var x = ExteriorGrid.CellIndex(query.Min.X); x <= ExteriorGrid.CellIndex(query.Max.X); x++)
+        {
+            for (var y = ExteriorGrid.CellIndex(query.Min.Y); y <= ExteriorGrid.CellIndex(query.Max.Y); y++)
+            {
+                yield return new Bucket(spaceKey, (x, y));
+            }
+        }
+    }
+
+    private BucketTriangles DecodeBucket(Bucket bucket)
+    {
+        var triangles = _navmeshes[bucket].SelectMany(NavmeshTriangles.Read).ToArray();
+        return new BucketTriangles(triangles, SpatialGrid.FromBoxes(triangles.Select(triangle => triangle.Bounds).ToArray()));
+    }
+
+    /// <summary>Triangles can be indexed in several grid cells, so duplicates are removed.</summary>
+    private static IEnumerable<MeshTriangle> FindTrianglesIn(BucketTriangles bucket, Box query)
+    {
+        var candidates = new List<int>();
+        bucket.Grid.Collect(query, candidates);
+        return candidates.Distinct().Select(index => bucket.Triangles[index]);
+    }
 
     private static Candidate? FindNearestFreePointOn(MeshTriangle triangle, Vector3 point, float withinDistance, Func<Vector3, bool> isFree)
     {

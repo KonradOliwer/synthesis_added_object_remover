@@ -62,7 +62,7 @@ internal sealed class BaseObjectShapeProvider
     /// <param name="Resolved">False when the base is not in the load order.</param>
     private sealed record BaseShape(Box Box, string? MeshPath, InvisibleObjectKind? InvisibleKind, bool Resolved = true);
 
-    /// <summary>Vanilla critter spawner activators run this script or one derived from it.</summary>
+    /// <summary>Vanilla critter spawner activators run a script whose name starts with this.</summary>
     private const string CritterSpawnScriptPrefix = "CritterSpawn";
 
     /// <param name="Box">Null when the mesh is unreadable or has no render geometry.</param>

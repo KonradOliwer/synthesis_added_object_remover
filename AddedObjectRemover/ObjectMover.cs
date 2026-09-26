@@ -7,7 +7,6 @@ namespace AddedObjectRemover;
 /// <summary>Writes overrides that change only a placed record's position (rotation kept). Not thread-safe.</summary>
 internal sealed class ObjectMover(PlacedOverrideWriter overrides)
 {
-    /// <remarks>Target objects always have a placement; the scan skips those without one.</remarks>
     public void MoveTo(IPlacedGetter record, TargetLocation location, Vector3 position)
     {
         var placed = overrides.GetOrAddOverride(record, location);

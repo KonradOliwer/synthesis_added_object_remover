@@ -68,6 +68,8 @@ public class CheckSettings
 
 public class IgnoreSettings
 {
+    public const int DefaultMaxOtherMastersForPatch = 10;
+
     [SynthesisSettingName("Excluded plugins")]
     [SynthesisTooltip("Plugins whose objects never count as a conflict (Skyrim.esm, Update.esm and the three DLCs are always ignored; Creation Club plugins are not).")]
     public List<string> ExcludedPlugins { get; set; } = [];
@@ -77,8 +79,12 @@ public class IgnoreSettings
     public bool IgnoreTargetMasters { get; set; } = true;
 
     [SynthesisSettingName("Ignore mods patched with the target")]
-    [SynthesisTooltip("If a plugin depends on both the target and another mod, treat it as a compatibility patch: ignore that patch and the other mod.")]
+    [SynthesisTooltip("If a plugin depends on both the target and another mod, treat it as a compatibility patch: ignore that patch and the other mod. A plugin that depends on many mods (e.g. DynDOLOD.esp) is not treated as a patch. The log lists what was ignored.")]
     public bool IgnoreModsPatchedWithTarget { get; set; } = true;
+
+    [SynthesisSettingName("Maximum other masters for a patch")]
+    [SynthesisTooltip("A plugin counts as a compatibility patch only if it depends on the target plus at most this many other mods (1-100; the base game and the target's masters do not count). Plugins with more are skipped and listed in the log.")]
+    public int MaxOtherMastersForPatch { get; set; } = DefaultMaxOtherMastersForPatch;
 }
 
 public class FollowUpRemovalSettings
@@ -111,22 +117,6 @@ public class LeftoverInvisibleObjectSettings
     [SynthesisTooltip("Remove the target's invisible objects (lights, sounds, markers, insect spawners, trigger boxes, ...) that sit inside another mod's object or whose surrounding target objects were removed.")]
     public bool RemoveLeftoverInvisibleObjects { get; set; } = true;
 
-    [SynthesisSettingName("Search radius")]
-    [SynthesisTooltip("Largest distance in game units (more than 0) from an invisible object to the target's visible objects that count as its surroundings; a light or sound with a smaller reach uses its reach.")]
-    public float SearchRadius { get; set; } = DefaultSearchRadius;
-
-    [SynthesisSettingName("Direction threshold")]
-    [SynthesisTooltip("A direction counts as removed when at least this percentage (10-100, in steps of 10) of the ground area of the target objects in it was removed.")]
-    public int DirectionThresholdPercent { get; set; } = DefaultDirectionThresholdPercent;
-
-    [SynthesisSettingName("Removed directions required")]
-    [SynthesisTooltip("An invisible object is removed when at least this percentage (10-100, in steps of 10) of the directions holding target objects are removed.")]
-    public int RemovedDirectionsPercent { get; set; } = DefaultRemovedDirectionsPercent;
-
-    [SynthesisSettingName("Occupied directions required")]
-    [SynthesisTooltip("An invisible object is kept unless at least this percentage (10-100, in steps of 10) of the 8 directions around it hold target objects.")]
-    public int OccupiedDirectionsPercent { get; set; } = DefaultOccupiedDirectionsPercent;
-
     [SynthesisSettingName("Protected types")]
     [SynthesisTooltip("Invisible object types that are always kept.\nNone: nothing is protected.\nMarkers: map, X, idle, furniture and door markers.\nMarkersAndLights: Markers plus lights.\nMarkersLightsAndSounds: MarkersAndLights plus sound markers and acoustic spaces.\nCustom: the types listed in Custom protected types.")]
     public ProtectedInvisibleObjectsPreset ProtectedTypes { get; set; } = ProtectedInvisibleObjectsPreset.None;
@@ -135,8 +125,24 @@ public class LeftoverInvisibleObjectSettings
     [SynthesisTooltip("Used only when Protected types is Custom: the invisible object types to keep.")]
     public List<InvisibleObjectKind> CustomProtectedTypes { get; set; } = [];
 
+    [SynthesisSettingName("Search radius")]
+    [SynthesisTooltip("Largest distance in game units (64-8192) from an invisible object to the target's visible objects that count as its surroundings. A light, sound or trigger box that reaches less far uses its own reach.")]
+    public float SearchRadius { get; set; } = DefaultSearchRadius;
+
+    [SynthesisSettingName("Removed area per direction")]
+    [SynthesisTooltip("A direction counts as removed when at least this percentage (10-100, in steps of 10) of the ground area of the target objects in it was removed.")]
+    public int DirectionThresholdPercent { get; set; } = DefaultDirectionThresholdPercent;
+
+    [SynthesisSettingName("Removed directions required")]
+    [SynthesisTooltip("An invisible object is removed when at least this percentage (10-100, in steps of 10) of the directions holding target objects are removed.")]
+    public int RemovedDirectionsPercent { get; set; } = DefaultRemovedDirectionsPercent;
+
+    [SynthesisSettingName("Occupied directions required")]
+    [SynthesisTooltip("Invisible objects with target objects in fewer than this percentage (10-100, in steps of 10) of the 8 directions around them are kept.")]
+    public int OccupiedDirectionsPercent { get; set; } = DefaultOccupiedDirectionsPercent;
+
     [SynthesisSettingName("Move kept markers out of other mods' objects")]
-    [SynthesisTooltip("Move an invisible object that is kept although it sits inside another mod's object to the nearest free spot on the navmesh or, failing that, the ground.")]
+    [SynthesisTooltip("Move a kept map, X (including heading), idle or other marker that sits inside another mod's object to the nearest free spot on the navmesh or, failing that, the ground. Lights, sounds, acoustic spaces, trigger boxes, critter spawners, decals, furniture and door markers are never moved.")]
     public bool MoveKeptMarkersOutOfOtherModsObjects { get; set; }
 }
 

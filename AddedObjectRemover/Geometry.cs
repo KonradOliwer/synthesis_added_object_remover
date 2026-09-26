@@ -12,6 +12,9 @@ internal readonly record struct Box(Vector3 Min, Vector3 Max)
 
     public Vector3 Size => Max - Min;
 
+    /// <summary>Distance from the origin to the box corner farthest from it.</summary>
+    public float FarthestCornerDistance => Vector3.Max(Vector3.Abs(Min), Vector3.Abs(Max)).Length();
+
     /// <summary>Builds a box from two arbitrary corners (order per axis does not matter).</summary>
     public static Box FromCorners(Vector3 a, Vector3 b) => new(Vector3.Min(a, b), Vector3.Max(a, b));
 
@@ -143,8 +146,14 @@ internal readonly record struct OrientedBox(Vector3 Center, Mat3 Rotation, Vecto
             scaled.Size * 0.5f);
     }
 
-    /// <summary>Ground footprint: the box's own width (local X) times its depth (local Y).</summary>
-    public float FootprintArea => (2f * HalfExtents.X) * (2f * HalfExtents.Y);
+    /// <summary>
+    /// Ground footprint: the area of the box projected straight down onto the world XY plane. Each
+    /// face pair contributes its area times the vertical component of its normal (row 3 of the rotation).
+    /// </summary>
+    public float FootprintArea =>
+        4f * (HalfExtents.Y * HalfExtents.Z * MathF.Abs(Rotation.M31)
+              + HalfExtents.X * HalfExtents.Z * MathF.Abs(Rotation.M32)
+              + HalfExtents.X * HalfExtents.Y * MathF.Abs(Rotation.M33));
 
     /// <summary>World AABB enclosing this box grown by <paramref name="padding"/> on every side.</summary>
     public Box WorldAabb(float padding) => Geometry.RotatedAabb(Center, Rotation, HalfExtents).Grown(padding);

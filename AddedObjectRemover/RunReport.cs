@@ -25,18 +25,23 @@ internal static class RunReport
         Console.WriteLine($"Diagnostics folder: {(config.WritesDiagnostics ? config.DiagnosticsFolder : "(none)")}");
     }
 
-    private static void PrintCompatibilityPatches(IReadOnlyList<CompatibilityPatch> patches)
+    private static void PrintCompatibilityPatches(CompatibilityPatches patches)
     {
-        if (patches.Count == 0)
+        foreach (var skipped in patches.SkippedTooManyMasters)
+        {
+            Console.WriteLine(
+                $"  Plugin {skipped.Patch} skipped: too many masters (likely generated or merged); it masters the target and {skipped.OtherMasters.Count:N0} other mods.");
+        }
+        if (patches.Patches.Count == 0)
         {
             Console.WriteLine("Compatibility patches: none detected.");
             return;
         }
-        foreach (var patch in patches)
+        foreach (var patch in patches.Patches)
         {
             Console.WriteLine($"  Compatibility patch {patch.Patch}: links target with {string.Join(", ", patch.OtherMasters)}.");
         }
-        var ignoredMods = CompatibilityPatchDetector.CollectIgnoredMods(patches).OrderBy(mod => mod.ToString(), StringComparer.Ordinal);
+        var ignoredMods = patches.CollectIgnoredMods().OrderBy(mod => mod.ToString(), StringComparer.Ordinal);
         Console.WriteLine($"Ignored because of compatibility patches: {string.Join(", ", ignoredMods)}.");
     }
 
@@ -55,7 +60,7 @@ internal static class RunReport
         if (!leftovers.Enabled) return "Leftover invisible objects: kept.";
         var protectedKinds = leftovers.ProtectedKinds.Count == 0 ? "none" : string.Join(", ", leftovers.ProtectedKinds.Order());
         return $"Leftover invisible objects: removed, search radius {leftovers.SearchRadius}, "
-            + $"direction threshold {leftovers.DirectionThresholdPercent}%, removed directions required {leftovers.RemovedDirectionsPercent}%, "
+            + $"removed area per direction {leftovers.DirectionThresholdPercent}%,removed directions required {leftovers.RemovedDirectionsPercent}%, "
             + $"occupied directions required {leftovers.OccupiedDirectionsPercent}%, protected types {leftovers.ProtectedPreset} ({protectedKinds}), "
             + $"kept markers inside other mods' objects {(leftovers.MovesKeptMarkers ? "moved" : "left in place")}.";
     }
@@ -92,9 +97,9 @@ internal static class RunReport
         {
             Console.WriteLine($"  Recorded {scan.SupporterCount:N0} placed objects of any plugin as possible supporters or obstacles.");
         }
-        if (scan.NavmeshTrianglesBySpace.Count > 0)
+        if (scan.NavmeshesBySpace.Count > 0)
         {
-            Console.WriteLine($"  Recorded {scan.NavmeshTrianglesBySpace.Values.Sum(triangles => triangles.Count):N0} navmesh triangles.");
+            Console.WriteLine($"  Recorded {scan.NavmeshCount:N0} navmeshes.");
         }
     }
 
@@ -202,13 +207,13 @@ internal static class RunReport
         var decisions = Enum.GetValues<LeftoverDecision>();
         Console.WriteLine(
             $"Leftover invisible objects: {leftovers.Evaluations.Count:N0} evaluated in {elapsed.TotalSeconds:F1}s; "
-            + $"removed {leftovers.Removals.Count:N0} ({DescribeDecisionCounts(leftovers, decisions.Where(LeftoverDecisionText.IsRemoval))}); "
+            + $"removed {leftovers.Removals.Count:N0} ({DescribeDecisionCounts(leftovers, decisions.Where(decision => decision.IsRemoval()))}); "
             + $"kept {leftovers.Evaluations.Count - leftovers.Removals.Count:N0} "
-            + $"({DescribeDecisionCounts(leftovers, decisions.Where(decision => !LeftoverDecisionText.IsRemoval(decision)))}).");
+            + $"({DescribeDecisionCounts(leftovers, decisions.Where(decision => !decision.IsRemoval()))}).");
     }
 
     private static string DescribeDecisionCounts(LeftoverResult leftovers, IEnumerable<LeftoverDecision> decisions) =>
-        string.Join(", ", decisions.Select(decision => $"{leftovers.CountDecisions(decision):N0} {LeftoverDecisionText.Describe(decision)}"));
+        string.Join(", ", decisions.Select(decision => $"{leftovers.CountDecisions(decision):N0} {decision.Describe()}"));
 
     public static void PrintLeftoverDecisions(ScanResult scan, IEnumerable<LeftoverEvaluation> evaluations)
     {
@@ -225,8 +230,8 @@ internal static class RunReport
     /// <summary>The reason, naming the other mod's object the invisible object sits inside, if any.</summary>
     private static string DescribeLeftoverReason(LeftoverEvaluation evaluation) =>
         evaluation.ContainingObject is { } inside
-            ? $"{LeftoverDecisionText.DescribeReason(evaluation)} (inside {DescribeOtherObject(inside)})"
-            : LeftoverDecisionText.DescribeReason(evaluation);
+            ? $"{evaluation.DescribeReason()} (inside {DescribeOtherObject(inside)})"
+            : evaluation.DescribeReason();
 
     private static string DescribeOtherObject(OtherObject other) =>
         $"{RecordNames.Describe(other.FormKey, other.EditorId)} {RecordNames.DescribeOrigin(other.FormKey, other.WinningMod)}";
@@ -248,7 +253,7 @@ internal static class RunReport
                 + $"inside {DescribeOtherObject(evaluation.ContainingObject!.Value)}: no free navmesh or terrain spot within {KeptObjectRelocator.MaxMoveDistance:F0} units.");
         }
         Console.WriteLine(
-            $"Moved {relocations.Moved.Count:N0} kept invisible objects out of other mods' objects; {relocations.LeftInPlace.Count:N0} left in place.");
+            $"Moved {relocations.Moved.Count:N0} kept markers out of other mods' objects; {relocations.LeftInPlace.Count:N0} left in place.");
     }
 
     private static void PrintPairStats(PairTestStats pairs, int rounds, string roundName) =>

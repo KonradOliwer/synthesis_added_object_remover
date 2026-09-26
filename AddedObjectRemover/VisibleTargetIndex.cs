@@ -3,8 +3,9 @@ using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover;
 
-/// <summary>A visible target object near a point: the direction it lies in and its ground footprint area.</summary>
-internal readonly record struct VisibleNeighbour(int TargetIndex, DirectionSector Sector, float FootprintArea);
+/// <summary>A visible target object near a point: the directions it counts in and its ground footprint area.</summary>
+/// <param name="Sectors">The one direction it lies in, or all of them when its box contains the point.</param>
+internal readonly record struct VisibleNeighbour(int TargetIndex, IReadOnlyList<DirectionSector> Sectors, float FootprintArea);
 
 /// <summary>
 /// Visible target objects of each space as oriented boxes, for finding the ones whose box comes
@@ -55,8 +56,8 @@ internal sealed class VisibleTargetIndex
             var box = space.Boxes[entry];
             var closest = box.ClosestPoint(point);
             if (Vector3.Distance(closest, point) > radius) continue;
-            var sector = SectorAreas.SectorOf(HorizontalDirection(point, closest, box.Center));
-            neighbours.Add(new VisibleNeighbour(space.TargetIndices[entry], sector, box.FootprintArea));
+            IReadOnlyList<DirectionSector> sectors = closest == point ? SectorAreas.All : [SectorAreas.SectorOf(HorizontalDirection(point, closest, box.Center))];
+            neighbours.Add(new VisibleNeighbour(space.TargetIndices[entry], sectors, box.FootprintArea));
         }
         return neighbours;
     }
@@ -70,7 +71,7 @@ internal sealed class VisibleTargetIndex
             .Any(target => containment.Contains(target.Base, target.Transform, point));
     }
 
-    /// <summary>Towards the closest point of the box, or towards its centre when the point is inside the box or right above or below it.</summary>
+    /// <summary>Towards the closest point of the box, or towards its centre when the point is right above or below it.</summary>
     private static Vector2 HorizontalDirection(Vector3 origin, Vector3 closest, Vector3 center)
     {
         var toClosest = new Vector2(closest.X - origin.X, closest.Y - origin.Y);

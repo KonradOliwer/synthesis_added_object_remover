@@ -38,8 +38,8 @@ internal sealed class ScanResult
     /// <summary>Winning LAND record of each exterior cell in a worldspace of <see cref="LandWorldspaces"/>; collected only for Anchoring and for moving kept markers.</summary>
     public Dictionary<ExteriorCell, ILandscapeGetter> Landscapes { get; } = new();
 
-    /// <summary>Triangles (world space) of the winning navmeshes of each target space; collected only for moving kept markers.</summary>
-    public Dictionary<FormKey, List<MeshTriangle>> NavmeshTrianglesBySpace { get; } = new();
+    /// <summary>The winning navmeshes of each target space, not yet decoded; collected only for moving kept markers.</summary>
+    public Dictionary<FormKey, List<CellNavmesh>> NavmeshesBySpace { get; } = new();
 
     public int RecordsScanned { get; set; }
     public int TargetsOverriddenLater { get; set; }
@@ -49,6 +49,8 @@ internal sealed class ScanResult
     public int OtherObjectCount => OthersBySpace.Values.Sum(x => x.Count);
 
     public int SupporterCount => SupportersBySpace.Values.Sum(x => x.Count);
+
+    public int NavmeshCount => NavmeshesBySpace.Values.Sum(x => x.Count);
 }
 
 /// <summary>
@@ -190,7 +192,7 @@ internal sealed class PlacedRecordScanner
         var inTargetSpace = _footprint.SpaceKeys.Contains(space.SpaceKey);
         if (inTargetSpace) _winningCells.TryAdd(cell.FormKey, cellContext);
         if (_landWorldspaces.Contains(space.SpaceKey)) CollectLandscape(cell, space);
-        if (_collectsNavmeshes && inTargetSpace) CollectNavmeshes(cell, space.SpaceKey);
+        if (_collectsNavmeshes && inTargetSpace) CollectNavmeshes(cell, space);
 
         foreach (var (record, persistent) in cell.EnumeratePlaced())
         {
@@ -209,12 +211,13 @@ internal sealed class PlacedRecordScanner
     }
 
     /// <remarks>Like placed records, the first copy of a navmesh found is its winner.</remarks>
-    private void CollectNavmeshes(ICellGetter cell, FormKey spaceKey)
+    private void CollectNavmeshes(ICellGetter cell, CellSpace space)
     {
+        (int X, int Y)? grid = space.SpaceKey != cell.FormKey && cell.Grid is { } cellGrid ? (cellGrid.Point.X, cellGrid.Point.Y) : null;
         foreach (var navmesh in cell.NavigationMeshes)
         {
             if (!_seenNavmeshes.Add(navmesh.FormKey) || navmesh.IsDeleted || navmesh.Data is not { } data) continue;
-            GetOrAddSpaceList(_scan.NavmeshTrianglesBySpace, spaceKey).AddRange(NavmeshIndex.ReadTriangles(data));
+            GetOrAddSpaceList(_scan.NavmeshesBySpace, space.SpaceKey).Add(new CellNavmesh(grid, data));
         }
     }
 

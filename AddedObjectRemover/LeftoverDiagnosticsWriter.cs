@@ -64,7 +64,7 @@ internal static class LeftoverDiagnosticsWriter
             Num(surroundings.OccupiedCount),
             Num(surroundings.RemovedCount),
             Text(evaluation.IsRemoved ? "removed" : "kept"),
-            Text(LeftoverDecisionText.DescribeReason(evaluation)),
+            Text(evaluation.DescribeReason()),
             .. FormatMove(move),
         ];
     }

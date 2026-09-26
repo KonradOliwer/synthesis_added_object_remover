@@ -13,6 +13,14 @@ mod's object or are left behind once the objects around them are gone.
 Removal never deletes anything: the object is disabled and moved far below the world. The output
 plugin is `AddedObjectRemover.esp`.
 
+## Safety
+
+- Teleport doors, and objects that any other record links to (placed objects, quests and their
+  aliases, AI packages, locations, factions, navmeshes, dialogue, scripts, ...), are never
+  removed by any step, so nothing the game or a script relies on goes missing.
+- Objects that a script finds only by FormID at run time (for example with GetFormFromFile)
+  cannot be detected.
+
 ## How to use
 
 1. Add this repository to a Synthesis group as a Git patcher, with the group placed after the target plugin.
@@ -34,7 +42,8 @@ plugin is `AddedObjectRemover.esp`.
 | --- | --- | --- |
 | Excluded plugins | *(empty)* | Plugins whose objects never count as a conflict. |
 | Ignore the target's masters | `true` | Also ignore objects from the plugins the target plugin was built on. |
-| Ignore mods patched with the target | `true` | If a plugin depends on both the target and another mod, treat it as a compatibility patch: ignore that patch and the other mod. |
+| Ignore mods patched with the target | `true` | If a plugin depends on both the target and another mod, treat it as a compatibility patch: ignore that patch and the other mod. The log lists every detected patch and the mods it causes to be ignored. |
+| Maximum other masters for a patch | `10` | A plugin counts as a compatibility patch only if it depends on the target plus at most this many other mods (1-100; the base game and the target's masters do not count). Plugins that depend on many mods, such as `DynDOLOD.esp` or a Bashed Patch, are therefore not treated as patches; the log lists them as skipped. |
 
 ### Follow-up removal
 
@@ -53,21 +62,22 @@ plugin is `AddedObjectRemover.esp`.
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | Remove leftover invisible objects | `true` | Remove the target's invisible objects that sit inside another mod's object or whose surroundings were removed. Works in every follow-up mode. |
-| Search radius | `1024` | Largest distance in game units (more than 0) from an invisible object to the edges of the target's visible objects that count as its surroundings. A light or sound that reaches less far uses its own reach. |
-| Direction threshold | `50` | A direction counts as removed when at least this percentage of the ground area of the target objects in it was removed. |
-| Removed directions required | `60` | An invisible object is removed when at least this percentage of the directions holding target objects are removed. |
-| Occupied directions required | `50` | An invisible object is kept unless at least this percentage of the 8 directions around it hold target objects. |
 | Protected types | `None` | Invisible object types that are always kept (see below). |
 | Custom protected types | *(empty)* | The types to keep when *Protected types* is `Custom`. |
-| Move kept markers out of other mods' objects | `false` | Move an invisible object that is kept although it sits inside another mod's object to the nearest free spot on the navmesh or, failing that, the ground. Only its position changes. |
+| Search radius | `1024` | Largest distance in game units (64-8192) from an invisible object to the edges of the target's visible objects that count as its surroundings. A light, sound or trigger box that reaches less far uses its own reach. |
+| Removed area per direction | `50` | A direction counts as removed when at least this percentage of the ground area of the target objects in it was removed. |
+| Removed directions required | `60` | An invisible object is removed when at least this percentage of the directions holding target objects are removed. |
+| Occupied directions required | `50` | Invisible objects with target objects in fewer than this percentage of the 8 directions around them are kept. |
+| Move kept markers out of other mods' objects | `false` | Move a kept map, X (including heading), idle or other marker that sits inside another mod's object to the nearest free spot on the navmesh or, failing that, the ground. Only its position changes. Lights, sounds, acoustic spaces, trigger boxes, critter spawners, decals, furniture and door markers are never moved. |
 
 The three percentages take values from 10 to 100 in steps of 10.
 
 An invisible object is removed when:
-- it sits inside a visible object of another mod, or
+- it sits inside a building or cave of another mod — not merely under a bridge or tree, or
 - its surroundings were removed: the area around it is split into 8 directions (north, north-east,
-  east, ...), and enough directions hold target objects and enough of those lost most of their
-  ground area.
+  east, ...), and at least *Occupied directions required* % of the directions hold target objects,
+  and at least *Removed directions required* % of those lost at least *Removed area per direction* %
+  of their ground area. A target object the invisible object sits in counts in every direction.
 
 Only the target plugin's own objects count as surroundings. Protected types and objects that
 something depends on (see *Safety*) are kept in any case. Protected types presets:
@@ -87,15 +97,8 @@ something depends on (see *Safety*) are kept in any case. Protected types preset
 | Diagnostics folder | *(empty)* | Folder for diagnostics spreadsheets (CSV files). Leave empty to write nothing. Use an absolute path; a relative one is resolved against Synthesis's working folder. These files never change the result. |
 
 Invalid values are replaced, with a warning in the log: numbers out of range by the nearest valid
-value, percentages that are not a step of 10 by the nearest step, a search radius of 0 or less by
-its default. A follow-up mode or protected type name that
-Synthesis does not know stops the run.
-
-## Safety
-
-- Teleport doors, and objects that any other record links to (placed objects, quests and their
-  aliases, AI packages, locations, factions, navmeshes, dialogue, scripts, ...), are never
-  removed by any step, so nothing the game or a script relies on goes missing.
+value, percentages that are not a step of 10 by the nearest step. A follow-up mode or protected
+type name that Synthesis does not know stops the run.
 
 ## What is never counted as a conflict
 
@@ -107,7 +110,7 @@ Synthesis does not know stops the run.
   version at the same spot).
 - Objects added by an earlier Added Object Remover run in the same Synthesis group.
 - Mods linked to the target only by a compatibility patch (a plugin that masters both the target
-  and another mod), and that patch itself.
+  and a few other mods), and that patch itself.
 
 ## Diagnostics files
 
@@ -137,8 +140,9 @@ fractions: 0.5 = 50%.
   counts it.
 - Only the target plugin's own, unmodified objects are checked; objects a later plugin overrides
   are skipped.
-- A kept invisible object is moved only up to 2048 units, and in tight interiors the navmesh and
-  floor often lie inside room pieces, so it may be left where it is (the log says so).
+- A kept marker is moved only up to 2048 units, an exterior one usually only within its own cell,
+  and in tight interiors the navmesh and floor often lie inside room pieces, so it may be left
+  where it is (the log says so).
 
 ## Upgrading from an earlier version
 

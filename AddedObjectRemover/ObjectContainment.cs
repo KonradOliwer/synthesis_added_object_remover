@@ -3,16 +3,11 @@ using System.Numerics;
 namespace AddedObjectRemover;
 
 /// <summary>
-/// Whether a point lies inside a placed object: inside its rotated, scaled bounding box and, when
-/// its mesh is closed, also enclosed by the mesh itself (<see cref="PointContactTest.IsEnclosed"/>).
-/// An open or unreadable mesh leaves the box test as the answer. Thread-safe.
+/// Whether a point lies inside a placed object: the object's mesh surrounds it
+/// (<see cref="SurroundingRayTest"/>). Objects without readable mesh triangles contain nothing. Thread-safe.
 /// </summary>
-internal sealed class ObjectContainment(BaseObjectShapeProvider shapes)
+internal sealed class ObjectContainment(BaseObjectShapeProvider shapes, TriangleTreeCache meshCache)
 {
-    private readonly BaseObjectShapeProvider _shapes = shapes;
-    private readonly TriangleTreeCache _trees = new(shapes.ReadGeometry);
-    private readonly LazyCache<string, bool> _closedMeshes = new(StringComparer.OrdinalIgnoreCase);
-
     /// <summary>A struct so the grid query is allocation-free and inlinable.</summary>
     private readonly struct ContainingMatcher(OtherObjectIndex index, ObjectContainment containment, Vector3 point, bool skipReplaced)
         : IGridMatcher
@@ -20,14 +15,17 @@ internal sealed class ObjectContainment(BaseObjectShapeProvider shapes)
         public bool IsMatch(int otherIndex) =>
             !(skipReplaced && index.IsReplaced(otherIndex))
             && index.IsVisible(otherIndex)
-            && containment.Contains(index[otherIndex].Base, index[otherIndex].Transform, point);
+            && containment.Contains(index[otherIndex], point);
     }
 
     public bool Contains(BaseRef? baseRef, PlacedTransform transform, Vector3 worldPoint)
     {
+        if (shapes.GetMeshPath(baseRef) is not { } meshPath) return false;
         var local = transform.ToLocal(worldPoint);
-        if (!_shapes.GetLocalBox(baseRef).Contains(local)) return false;
-        return _shapes.GetMeshPath(baseRef) is not { } meshPath || IsInsideMeshWhenClosed(meshPath, local);
+        if (!shapes.GetLocalBox(baseRef).Contains(local)) return false;
+
+        using var lease = meshCache.Acquire(meshPath);
+        return lease.Tree is { } tree && SurroundingRayTest.IsSurrounded(tree, local, transform.Rotation, []);
     }
 
     /// <param name="skipReplaced">Ignore objects the target plugin replaced.</param>
@@ -39,11 +37,14 @@ internal sealed class ObjectContainment(BaseObjectShapeProvider shapes)
         return index.Grid.TryFindFirst(area, ref matcher, out var match) ? match : -1;
     }
 
-    private bool IsInsideMeshWhenClosed(string meshPath, Vector3 local)
+    /// <summary>
+    /// Rejects an object whose bounding box, however it is rotated, cannot reach the point before
+    /// its rotation is computed.
+    /// </summary>
+    private bool Contains(OtherObject other, Vector3 worldPoint)
     {
-        using var lease = _trees.Acquire(meshPath);
-        if (lease.Tree is not { } tree) return true;
-        if (!_closedMeshes.GetOrCreate(meshPath, () => MeshClosure.IsClosed(tree))) return true;
-        return PointContactTest.IsEnclosed(tree, local, []);
+        var reach = shapes.GetLocalBox(other.Base).FarthestCornerDistance * other.Scale;
+        return Vector3.DistanceSquared(other.Position, worldPoint) <= reach * reach
+            && Contains(other.Base, other.Transform, worldPoint);
     }
 }

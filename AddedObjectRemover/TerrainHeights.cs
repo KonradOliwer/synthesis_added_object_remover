@@ -21,9 +21,8 @@ internal sealed class TerrainHeights(
     IReadOnlyDictionary<ExteriorCell, ILandscapeGetter> landscapes,
     IReadOnlyDictionary<FormKey, FormKey> landWorldspaces)
 {
-    private const float CellSize = 4096f;
     private const int VerticesPerSide = 33;
-    private const float VertexSpacing = CellSize / (VerticesPerSide - 1);
+    private const float VertexSpacing = ExteriorGrid.CellSize / (VerticesPerSide - 1);
     private const float UnitsPerHeightStep = 8f;
 
     private readonly LazyCache<ExteriorCell, float[]?> _heightsByCell = new();
@@ -37,8 +36,8 @@ internal sealed class TerrainHeights(
     /// <returns>False where the worldspace has no terrain (no, a deleted, or an empty LAND record).</returns>
     public bool TryGetHeight(FormKey worldspaceKey, Vector2 position, out float height)
     {
-        var cellX = (int)MathF.Floor(position.X / CellSize);
-        var cellY = (int)MathF.Floor(position.Y / CellSize);
+        var cellX = ExteriorGrid.CellIndex(position.X);
+        var cellY = ExteriorGrid.CellIndex(position.Y);
         var cell = new ExteriorCell(landWorldspaces[worldspaceKey], cellX, cellY);
         if (_heightsByCell.GetOrCreate(cell, () => DecodeHeights(cell)) is not { } heights)
         {
@@ -46,7 +45,7 @@ internal sealed class TerrainHeights(
             return false;
         }
 
-        var local = (position - new Vector2(cellX, cellY) * CellSize) / VertexSpacing;
+        var local = (position - new Vector2(cellX, cellY) * ExteriorGrid.CellSize) / VertexSpacing;
         height = InterpolateBilinear(heights, local);
         return true;
     }

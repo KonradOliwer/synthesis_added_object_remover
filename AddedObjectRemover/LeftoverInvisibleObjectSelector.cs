@@ -1,68 +1,6 @@
-using System.Diagnostics;
 using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover;
-
-internal enum LeftoverDecision
-{
-    RemovedInsideOtherObject,
-    RemovedSurroundingsRemoved,
-    KeptTooLittleScenery,
-    KeptSurroundingsMostlyKept,
-    KeptProtectedType,
-    KeptReferenced,
-}
-
-internal static class LeftoverDecisionText
-{
-    public static bool IsRemoval(LeftoverDecision decision) =>
-        decision is LeftoverDecision.RemovedInsideOtherObject or LeftoverDecision.RemovedSurroundingsRemoved;
-
-    public static string Describe(LeftoverDecision decision) => decision switch
-    {
-        LeftoverDecision.RemovedInsideOtherObject => "inside another mod's object",
-        LeftoverDecision.RemovedSurroundingsRemoved => "surroundings removed",
-        LeftoverDecision.KeptTooLittleScenery => "too little scenery around",
-        LeftoverDecision.KeptSurroundingsMostlyKept => "surroundings mostly kept",
-        LeftoverDecision.KeptProtectedType => "protected type",
-        LeftoverDecision.KeptReferenced => "referenced",
-        _ => throw new UnreachableException($"Unknown leftover decision {decision}."),
-    };
-
-    /// <summary>The decision's reason, with the linking record for a referenced object.</summary>
-    public static string DescribeReason(LeftoverEvaluation evaluation)
-    {
-        var decision = Describe(evaluation.Decision);
-        return evaluation.KeepReason is { } keepReason ? $"{decision}: {keepReason.Detail}" : decision;
-    }
-}
-
-/// <summary>One invisible target object checked for being left behind.</summary>
-/// <param name="Radius">The search radius used: the configured one, or the object's own smaller reach.</param>
-/// <param name="ContainingObject">The visible other-mod object it sits inside; null when none.</param>
-/// <param name="KeepReason">Why a referenced object is kept; null otherwise.</param>
-internal sealed record LeftoverEvaluation(
-    int TargetIndex,
-    InvisibleObjectKind Kind,
-    float Radius,
-    OtherObject? ContainingObject,
-    SectorAreas Surroundings,
-    LeftoverDecision Decision,
-    KeepReason? KeepReason)
-{
-    public bool IsRemoved => LeftoverDecisionText.IsRemoval(Decision);
-}
-
-/// <param name="Evaluations">In target order.</param>
-internal sealed record LeftoverResult(
-    IReadOnlyList<LeftoverRemoval> Removals,
-    IReadOnlyList<KeptTarget> Kept,
-    IReadOnlyList<LeftoverEvaluation> Evaluations)
-{
-    public static LeftoverResult None { get; } = new([], [], []);
-
-    public int CountDecisions(LeftoverDecision decision) => Evaluations.Count(evaluation => evaluation.Decision == decision);
-}
 
 /// <summary>
 /// Final removal step: selects the target's invisible objects (critter spawners, sound and idle
@@ -81,8 +19,6 @@ internal sealed class LeftoverInvisibleObjectSelector(
     KeepReferencedRule keepRule,
     LeftoverConfig config)
 {
-    private const int PercentPerWhole = 100;
-
     /// <param name="removedTargets">Target indices removed by the earlier steps.</param>
     public LeftoverResult SelectRemovals(IReadOnlySet<int> removedTargets, ParallelOptions options)
     {
@@ -92,8 +28,7 @@ internal sealed class LeftoverInvisibleObjectSelector(
 
     private LeftoverEvaluation[] EvaluateAll(IReadOnlySet<int> removedTargets, ParallelOptions options)
     {
-        var visibleTargets = Enumerable.Range(0, targets.Count).Where(index => visibility[index].IsVisible);
-        var surroundings = VisibleTargetIndex.Build(targets, visibleTargets, shapes);
+        var surroundings = VisibleTargetIndex.Build(targets, ObjectVisibility.VisibleIndices(visibility, except: new HashSet<int>()), shapes);
         var candidates = Enumerable.Range(0, targets.Count)
             .Where(index => visibility[index].Kind != null && !removedTargets.Contains(index))
             .ToArray();
@@ -138,7 +73,8 @@ internal sealed class LeftoverInvisibleObjectSelector(
         var areas = new SectorAreas(config.DirectionThresholdPercent);
         foreach (var neighbour in surroundings.FindAround(target.SpaceKey, target.Transform.Position, radius))
         {
-            areas.Add(neighbour.Sector, neighbour.FootprintArea, removedTargets.Contains(neighbour.TargetIndex));
+            var removed = removedTargets.Contains(neighbour.TargetIndex);
+            foreach (var sector in neighbour.Sectors) areas.Add(sector, neighbour.FootprintArea, removed);
         }
         return areas;
     }
@@ -146,8 +82,8 @@ internal sealed class LeftoverInvisibleObjectSelector(
     private LeftoverDecision DecideByDirections(SectorAreas areas)
     {
         var occupied = areas.OccupiedCount;
-        if (occupied * PercentPerWhole < config.OccupiedDirectionsPercent * SectorAreas.SectorCount) return LeftoverDecision.KeptTooLittleScenery;
-        return areas.RemovedCount * PercentPerWhole >= config.RemovedDirectionsPercent * occupied
+        if (occupied * Percent.PerWhole < config.OccupiedDirectionsPercent * SectorAreas.SectorCount) return LeftoverDecision.KeptTooLittleScenery;
+        return areas.RemovedCount * Percent.PerWhole >= config.RemovedDirectionsPercent * occupied
             ? LeftoverDecision.RemovedSurroundingsRemoved
             : LeftoverDecision.KeptSurroundingsMostlyKept;
     }
@@ -155,7 +91,7 @@ internal sealed class LeftoverInvisibleObjectSelector(
     /// <summary>Protected types and referenced objects stay whatever the rules decided.</summary>
     private (LeftoverDecision Decision, KeepReason? KeepReason) ApplyKeepRules(TargetObject target, InvisibleObjectKind kind, LeftoverDecision ruleDecision)
     {
-        if (!LeftoverDecisionText.IsRemoval(ruleDecision)) return (ruleDecision, null);
+        if (!ruleDecision.IsRemoval()) return (ruleDecision, null);
         if (config.ProtectedKinds.Contains(kind)) return (LeftoverDecision.KeptProtectedType, null);
         return keepRule.TryGetKeepReason(target, out var keepReason)
             ? (LeftoverDecision.KeptReferenced, keepReason)

@@ -14,7 +14,7 @@ internal sealed record RunConfig(
     IReadOnlyList<ModKey> ExcludedPlugins,
     IReadOnlyList<ModKey> TargetMasters,
     bool IgnoreTargetMasters,
-    IReadOnlyList<CompatibilityPatch> CompatibilityPatches,
+    CompatibilityPatches CompatibilityPatches,
     float SizeMultiplier,
     FollowUpRemovalMode FollowUpMode,
     float TouchDistance,
@@ -32,7 +32,7 @@ internal sealed record RunConfig(
 /// <param name="RemovedDirectionsPercent">Share of the occupied directions (10-100) that must be removed for removal.</param>
 /// <param name="OccupiedDirectionsPercent">Share of all directions (10-100) that must be occupied for the direction rule to apply.</param>
 /// <param name="ProtectedKinds">Invisible object kinds that are never removed as leftovers.</param>
-/// <param name="MovesKeptMarkers">Kept invisible objects inside another mod's object are moved to a free spot; false whenever the step is off.</param>
+/// <param name="MovesKeptMarkers">Kept markers inside another mod's object are moved to a free spot; false whenever the step is off.</param>
 internal sealed record LeftoverConfig(
     bool Enabled,
     float SearchRadius,
@@ -59,11 +59,12 @@ internal static class RunConfigFactory
 
     private const float MaxSizeMultiplier = 5f;
     private const float MaxTouchDistance = 64f;
+    private const float MinSearchRadius = 64f;
+    private const float MaxSearchRadius = 8192f;
+    private const int MinOtherMastersForPatch = 1;
+    private const int MaxOtherMastersForPatch = 100;
     private const float MinPercent = 1f;
-    private const float MaxPercent = 100f;
-    private const float PercentPerWhole = 100f;
     private const int PercentStep = 10;
-    private const int MaxWholePercent = (int)MaxPercent;
 
     /// <summary>Null (after logging why) when the run must make no changes.</summary>
     public static RunConfig? Create(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, Settings settings)
@@ -80,9 +81,11 @@ internal static class RunConfigFactory
         ignored.UnionWith(masters);
 
         var compatibilityPatches = ignore.IgnoreModsPatchedWithTarget
-            ? CompatibilityPatchDetector.Find(state, target, allTargetMasters.ToHashSet(), BaseGamePluginSet)
-            : [];
-        ignored.UnionWith(CompatibilityPatchDetector.CollectIgnoredMods(compatibilityPatches));
+            ? CompatibilityPatchDetector.Find(
+                state, target, allTargetMasters.ToHashSet(), BaseGamePluginSet,
+                Clamp(ignore.MaxOtherMastersForPatch, MinOtherMastersForPatch, MaxOtherMastersForPatch, "maximum other masters for a patch"))
+            : CompatibilityPatches.None;
+        ignored.UnionWith(compatibilityPatches.CollectIgnoredMods());
 
         var followUp = settings.FollowUpRemoval ?? new FollowUpRemovalSettings();
         return new RunConfig(
@@ -97,8 +100,8 @@ internal static class RunConfigFactory
             FollowUpMode: ValidateMode(followUp.Mode),
             TouchDistance: Clamp(followUp.TouchDistance, 0, MaxTouchDistance, FollowUpRemovalSettings.DefaultTouchDistance, "touch distance"),
             AnchoringThreshold: Clamp(
-                followUp.AnchoringThresholdPercent, MinPercent, MaxPercent,
-                FollowUpRemovalSettings.DefaultAnchoringThresholdPercent, "anchoring threshold") / PercentPerWhole,
+                followUp.AnchoringThresholdPercent, MinPercent, Percent.PerWhole,
+                FollowUpRemovalSettings.DefaultAnchoringThresholdPercent, "anchoring threshold") / Percent.PerWhole,
             Leftovers: CreateLeftoverConfig(settings.LeftoverInvisibleObjects ?? new LeftoverInvisibleObjectSettings()),
             DetailedLog: settings.Diagnostics?.DetailedLog ?? false,
             DiagnosticsFolder: ReadDiagnosticsFolder(settings));
@@ -109,8 +112,8 @@ internal static class RunConfigFactory
         var protectedPreset = ValidatePreset(leftovers.ProtectedTypes);
         return new LeftoverConfig(
             Enabled: leftovers.RemoveLeftoverInvisibleObjects,
-            SearchRadius: Positive(leftovers.SearchRadius, LeftoverInvisibleObjectSettings.DefaultSearchRadius, "search radius"),
-            DirectionThresholdPercent: WholeTens(leftovers.DirectionThresholdPercent, "direction threshold"),
+            SearchRadius: Clamp(leftovers.SearchRadius, MinSearchRadius, MaxSearchRadius, LeftoverInvisibleObjectSettings.DefaultSearchRadius, "search radius"),
+            DirectionThresholdPercent: WholeTens(leftovers.DirectionThresholdPercent, "removed area per direction"),
             RemovedDirectionsPercent: WholeTens(leftovers.RemovedDirectionsPercent, "removed directions required"),
             OccupiedDirectionsPercent: WholeTens(leftovers.OccupiedDirectionsPercent, "occupied directions required"),
             ProtectedPreset: protectedPreset,
@@ -204,20 +207,19 @@ internal static class RunConfigFactory
         return valid;
     }
 
-    /// <summary>A value of 0 or less has no nearest valid value, so it falls back to the default.</summary>
-    private static float Positive(float value, float defaultValue, string name)
-    {
-        if (float.IsFinite(value) && value > 0) return value;
-        Console.WriteLine($"Warning: {name} {value} is not more than 0; using {defaultValue}.");
-        return defaultValue;
-    }
-
     /// <summary>A percentage limited to 10-100 and rounded to the nearest ten.</summary>
     private static int WholeTens(int percent, string name)
     {
-        var valid = (int)Math.Round(Math.Clamp(percent, PercentStep, MaxWholePercent) / (double)PercentStep, MidpointRounding.AwayFromZero) * PercentStep;
-        if (valid != percent) Console.WriteLine($"Warning: {name} {percent} is not a multiple of {PercentStep} from {PercentStep} to {MaxWholePercent}; using {valid}.");
+        var valid = (int)Math.Round(Math.Clamp(percent, PercentStep, Percent.PerWhole) / (double)PercentStep, MidpointRounding.AwayFromZero) * PercentStep;
+        if (valid != percent) Console.WriteLine($"Warning: {name} {percent} is not a multiple of {PercentStep} from {PercentStep} to {Percent.PerWhole}; using {valid}.");
         return valid;
+    }
+
+    private static int Clamp(int value, int minimum, int maximum, string name)
+    {
+        var clamped = Math.Clamp(value, minimum, maximum);
+        if (clamped != value) Console.WriteLine($"Warning: {name} {value} is outside {minimum}-{maximum}; using {clamped}.");
+        return clamped;
     }
 
     /// <summary>Out of range values become the nearest valid value; values that are not a number become the default.</summary>

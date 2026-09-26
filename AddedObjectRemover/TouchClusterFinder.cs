@@ -87,13 +87,14 @@ internal sealed class TouchClusterFinder
         IReadOnlyList<int> seeds,
         IReadOnlyList<int> keptTooClose,
         BaseObjectShapeProvider shapes,
+        TriangleTreeCache meshCache,
         KeepReferencedRule keepRule,
         float tolerance,
         ParallelOptions parallelOptions,
         bool collectDiagnostics)
     {
         var (search, setup) = Timing.Measure(() => TouchSearch.Create(
-            targets, seeds, excluded: keptTooClose, shapes, new TriangleTreeCache(shapes.ReadGeometry), tolerance, parallelOptions));
+            targets, seeds, excluded: keptTooClose, shapes, meshCache, tolerance, parallelOptions));
         var finder = new TouchClusterFinder(
             targets,
             keepRule,

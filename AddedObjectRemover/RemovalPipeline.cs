@@ -28,6 +28,7 @@ internal sealed class RemovalPipeline
     private readonly ParallelOptions _parallelOptions = new() { MaxDegreeOfParallelism = Environment.ProcessorCount };
     private readonly MeshMessageLog _meshMessages;
     private readonly BaseObjectShapeProvider _shapes;
+    private readonly TriangleTreeCache _meshCache;
     private readonly ObjectContainment _containment;
     private readonly ReasonCounter _invisibleOthers = new();
 
@@ -42,7 +43,8 @@ internal sealed class RemovalPipeline
             state.LoadOrder.ListedOrder.Select(listing => listing.ModKey).ToList(),
             _meshMessages);
         _shapes = new BaseObjectShapeProvider(state.LinkCache, meshFiles, _meshMessages);
-        _containment = new ObjectContainment(_shapes);
+        _meshCache = new TriangleTreeCache(_shapes.ReadGeometry);
+        _containment = new ObjectContainment(_shapes, _meshCache);
     }
 
     public void Run(Stopwatch totalTimer)
@@ -61,12 +63,13 @@ internal sealed class RemovalPipeline
         MarkReplacedObjects(scan.Targets, indexes);
 
         var keepRule = new KeepReferencedRule(scan.TargetReferences);
+        var supporters = new SupporterIndex(scan.SupportersBySpace, _shapes);
         var tooClose = SelectTooCloseRemovals(scan, visibility, indexes, keepRule);
-        var followUp = SelectFollowUpRemovals(scan, tooClose, keepRule);
+        var followUp = SelectFollowUpRemovals(scan, tooClose, supporters, keepRule);
         List<Removal> removals = [.. tooClose.Removals, .. followUp.Removals];
         var leftovers = SelectLeftoverRemovals(scan, visibility, indexes, removals, keepRule);
         removals.AddRange(leftovers.Removals);
-        var relocations = RelocateKeptMarkers(scan, visibility, removals, leftovers);
+        var relocations = RelocateKeptMarkers(scan, visibility, supporters, removals, leftovers);
         WriteLeftoverDiagnostics(scan, leftovers, relocations);
         WriteOverrides(scan, removals, relocations.Moved);
 
@@ -169,6 +172,7 @@ internal sealed class RemovalPipeline
     private FollowUpRemovals SelectFollowUpRemovals(
         ScanResult scan,
         TooCloseSelection tooClose,
+        SupporterIndex supporters,
         KeepReferencedRule keepRule)
     {
         if (tooClose.Removals.Count == 0) return FollowUpRemovals.None;
@@ -176,7 +180,7 @@ internal sealed class RemovalPipeline
         {
             FollowUpRemovalMode.Off => FollowUpRemovals.None,
             FollowUpRemovalMode.AnyTouch => SelectTouchingRemovals(scan, tooClose, keepRule),
-            FollowUpRemovalMode.Anchoring => SelectUnanchoredRemovals(scan, tooClose, keepRule),
+            FollowUpRemovalMode.Anchoring => SelectUnanchoredRemovals(scan, tooClose, supporters, keepRule),
             _ => throw new UnreachableException($"Unknown follow-up removal mode {_config.FollowUpMode}."),
         };
     }
@@ -188,6 +192,7 @@ internal sealed class RemovalPipeline
             tooClose.SeedIndices,
             tooClose.KeptIndices,
             _shapes,
+            _meshCache,
             keepRule,
             _config.TouchDistance,
             _parallelOptions,
@@ -212,10 +217,12 @@ internal sealed class RemovalPipeline
         });
     }
 
-    private FollowUpRemovals SelectUnanchoredRemovals(ScanResult scan, TooCloseSelection tooClose, KeepReferencedRule keepRule)
+    private FollowUpRemovals SelectUnanchoredRemovals(
+        ScanResult scan,
+        TooCloseSelection tooClose,
+        SupporterIndex supporters,
+        KeepReferencedRule keepRule)
     {
-        var supporters = new SupporterIndex(scan.SupportersBySpace, _shapes);
-        var meshCache = new TriangleTreeCache(_shapes.ReadGeometry);
         var anchoring = AnchoringRemover.Run(
             scan.Targets,
             tooClose.SeedIndices,
@@ -223,7 +230,7 @@ internal sealed class RemovalPipeline
             supporters,
             new TerrainHeights(scan.Landscapes, scan.LandWorldspaces),
             _shapes,
-            meshCache,
+            _meshCache,
             keepRule,
             _config.TouchDistance,
             _config.AnchoringThreshold,
@@ -232,7 +239,7 @@ internal sealed class RemovalPipeline
         _meshMessages.PrintAndClear();
         RunReport.PrintAnchoringStats(anchoring);
         WriteAnchoringDiagnostics(scan, supporters, anchoring);
-        WriteMeshOrigins(scan.Targets, meshCache);
+        WriteMeshOrigins(scan.Targets);
         return new FollowUpRemovals(anchoring.Removals, anchoring.Kept);
     }
 
@@ -248,11 +255,11 @@ internal sealed class RemovalPipeline
         });
     }
 
-    private void WriteMeshOrigins(IReadOnlyList<TargetObject> targets, TriangleTreeCache meshCache)
+    private void WriteMeshOrigins(IReadOnlyList<TargetObject> targets)
     {
         if (!_config.WritesDiagnostics) return;
 
-        var rows = MeshOriginDiagnosticsWriter.CreateRows(targets, _shapes, meshCache, _parallelOptions);
+        var rows = MeshOriginDiagnosticsWriter.CreateRows(targets, _shapes, _meshCache, _parallelOptions);
         _meshMessages.PrintAndClear();
         RunReport.PrintMeshOriginSummary(MeshOriginDiagnosticsWriter.Summarize(rows));
         AccessDiagnosticsFolder($"writing {MeshOriginDiagnosticsWriter.FileName}", () =>
@@ -296,27 +303,35 @@ internal sealed class RemovalPipeline
     private RelocationResult RelocateKeptMarkers(
         ScanResult scan,
         IReadOnlyList<ObjectVisibility> visibility,
+        SupporterIndex supporters,
         IReadOnlyList<Removal> removals,
         LeftoverResult leftovers)
     {
         if (!_config.Leftovers.MovesKeptMarkers) return RelocationResult.None;
 
-        var removed = ToTargetIndices(removals);
-        var remainingVisible = Enumerable.Range(0, scan.Targets.Count).Where(index => visibility[index].IsVisible && !removed.Contains(index));
-        var obstacles = new VisibleObstacles(
-            new SupporterIndex(scan.SupportersBySpace, _shapes),
-            VisibleTargetIndex.Build(scan.Targets, remainingVisible, _shapes),
-            _containment);
-        var relocator = new KeptObjectRelocator(
-            scan.Targets,
-            obstacles,
-            new NavmeshIndex(scan.NavmeshTrianglesBySpace),
-            new TerrainSpotSearch(new TerrainHeights(scan.Landscapes, scan.LandWorldspaces)));
+        var relocator = CreateRelocator(scan, CreateObstacles(scan, visibility, supporters, removals));
         var relocations = relocator.Relocate(leftovers.Evaluations, _parallelOptions);
         _meshMessages.PrintAndClear();
         RunReport.PrintRelocations(scan, relocations);
         return relocations;
     }
+
+    private VisibleObstacles CreateObstacles(
+        ScanResult scan,
+        IReadOnlyList<ObjectVisibility> visibility,
+        SupporterIndex supporters,
+        IReadOnlyList<Removal> removals)
+    {
+        var remainingVisible = ObjectVisibility.VisibleIndices(visibility, except: ToTargetIndices(removals));
+        return new VisibleObstacles(supporters, VisibleTargetIndex.Build(scan.Targets, remainingVisible, _shapes), _containment);
+    }
+
+    private static KeptObjectRelocator CreateRelocator(ScanResult scan, VisibleObstacles obstacles) => new(
+        scan.Targets,
+        scan.TargetLocations,
+        obstacles,
+        new NavmeshIndex(scan.NavmeshesBySpace),
+        new TerrainSpotSearch(new TerrainHeights(scan.Landscapes, scan.LandWorldspaces)));
 
     private void WriteLeftoverDiagnostics(ScanResult scan, LeftoverResult leftovers, RelocationResult relocations)
     {

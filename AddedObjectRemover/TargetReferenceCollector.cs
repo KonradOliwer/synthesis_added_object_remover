@@ -14,7 +14,7 @@ internal static class TargetReferenceCollector
 {
     private const string PlacedCategoryPrefix = "placed object: ";
 
-    /// <remarks>The target is not known yet during the placed scan, so links to non-placed target records are recorded too but never looked up.</remarks>
+    /// <remarks>Only links to target-plugin FormKeys are recorded; which of them are target objects is decided later.</remarks>
     public static void CollectFromPlaced(IPlacedGetter record, ModKey target, Dictionary<FormKey, KeepReason> references)
     {
         foreach (var link in record.EnumerateFormLinks())
@@ -27,8 +27,8 @@ internal static class TargetReferenceCollector
     }
 
     /// <summary>
-    /// Every version of every non-placed record of the given plugins is checked, overridden ones
-    /// included, so no link the game might still follow is missed.
+    /// Every version of every non-placed record of the given plugins is checked. Overridden versions,
+    /// which the game does not use, are included as well; this is conservative.
     /// </summary>
     public static void CollectFromNonPlaced(IEnumerable<ISkyrimModGetter> mods, IReadOnlySet<FormKey> targets, Dictionary<FormKey, KeepReason> references)
     {

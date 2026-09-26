@@ -38,7 +38,6 @@ internal sealed class SectorAreas(int thresholdPercent)
 
     private const float FullTurnDegrees = 360f;
     private const float SectorDegrees = FullTurnDegrees / SectorCount;
-    private const float PercentPerWhole = 100f;
 
     /// <summary>Half a sector, in sectors: each sector is centred on its direction.</summary>
     private const float CentredSectorShift = 0.5f;
@@ -76,14 +75,14 @@ internal sealed class SectorAreas(int thresholdPercent)
 
     public float Removed(DirectionSector sector) => _removed[(int)sector];
 
-    /// <summary>A direction whose objects all have no ground area (e.g. upright flat meshes) is judged by object count instead.</summary>
+    /// <summary>A direction whose objects all have no ground area is judged by object count instead.</summary>
     public SectorState State(DirectionSector sector)
     {
         var index = (int)sector;
         if (_objects[index] == 0) return SectorState.Empty;
         var reachesThreshold = _total[index] > 0
-            ? _removed[index] * PercentPerWhole >= thresholdPercent * _total[index]
-            : _removedObjects[index] * PercentPerWhole >= thresholdPercent * _objects[index];
+            ? _removed[index] * Percent.PerWhole >= thresholdPercent * _total[index]
+            : _removedObjects[index] * Percent.PerWhole >= thresholdPercent * _objects[index];
         return reachesThreshold ? SectorState.Removed : SectorState.Kept;
     }
 

@@ -4,10 +4,10 @@ using Mutagen.Bethesda.Plugins;
 namespace AddedObjectRemover;
 
 /// <summary>
-/// Placed objects of one space, indexed by their raw position only. Each object's true bounds center (which may need a mesh read) is computed at
-/// most once, lazily, the first time a query turns the object up, so objects that are never
-/// candidates are never measured. Objects whose base is invisible are found the same lazy way and
-/// then never match.
+/// Placed objects of one space, indexed by their raw position only. Each object's true bounds
+/// center (which may need a mesh read) is computed at most once, lazily, the first time a query
+/// turns the object up, so objects that are never candidates are never measured. Objects whose
+/// base is invisible are found the same lazy way and then never match.
 ///
 /// Thread-safe: the center is written before its state is published with an interlocked store,
 /// and read only after a load sees the state. Two threads measuring the same object concurrently
@@ -20,7 +20,7 @@ internal sealed class OtherObjectIndex
     /// indexed by their raw position rather than their (possibly mesh-offset) bounds. One exterior
     /// cell width is a generous bound in practice.
     /// </summary>
-    public const float RawPositionSearchMargin = 4096f;
+    public const float RawPositionSearchMargin = ExteriorGrid.CellSize;
 
     private const int NotMeasured = 0;
     private const int Visible = 1;

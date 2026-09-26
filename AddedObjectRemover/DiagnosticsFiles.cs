@@ -11,6 +11,7 @@ internal static class DiagnosticsFiles
         TouchDiagnosticsWriter.EdgesFileName,
         TouchDiagnosticsWriter.ComponentsFileName,
         LeftoverDiagnosticsWriter.FileName,
+        ManualPatchHintsWriter.FileName,
     ];
 
     /// <param name="folder">Empty when no diagnostics are written.</param>

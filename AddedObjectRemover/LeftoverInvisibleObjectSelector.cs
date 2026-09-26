@@ -7,7 +7,8 @@ namespace AddedObjectRemover;
 /// markers, lights, trigger boxes, ...) that sit inside another mod's visible object or whose
 /// surroundings, the target's visible objects around them, were removed. Every object is first
 /// evaluated against the removals of the earlier steps only, and the removals are applied together
-/// afterwards, so invisible objects never influence each other.
+/// afterwards, so invisible objects never influence each other. The linked groups of the removals
+/// are added afterwards by the caller.
 /// </summary>
 internal sealed class LeftoverInvisibleObjectSelector(
     IReadOnlyList<TargetObject> targets,
@@ -49,7 +50,7 @@ internal sealed class LeftoverInvisibleObjectSelector(
         var containingObject = FindContainingOtherObject(target);
         var areas = MeasureSurroundings(target, radius, surroundings, removedTargets);
         var ruleDecision = containingObject != null ? LeftoverDecision.RemovedInsideOtherObject : DecideByDirections(areas);
-        var (decision, keepReason) = ApplyKeepRules(target, kind, ruleDecision);
+        var (decision, keepReason) = ApplyKeepRules(targetIndex, kind, ruleDecision);
         return new LeftoverEvaluation(targetIndex, kind, radius, containingObject, areas, decision, keepReason);
     }
 
@@ -89,11 +90,11 @@ internal sealed class LeftoverInvisibleObjectSelector(
     }
 
     /// <summary>Protected types and referenced objects stay whatever the rules decided.</summary>
-    private (LeftoverDecision Decision, KeepReason? KeepReason) ApplyKeepRules(TargetObject target, InvisibleObjectKind kind, LeftoverDecision ruleDecision)
+    private (LeftoverDecision Decision, KeepReason? KeepReason) ApplyKeepRules(int targetIndex, InvisibleObjectKind kind, LeftoverDecision ruleDecision)
     {
         if (!ruleDecision.IsRemoval()) return (ruleDecision, null);
         if (config.ProtectedKinds.Contains(kind)) return (LeftoverDecision.KeptProtectedType, null);
-        return keepRule.TryGetKeepReason(target, out var keepReason)
+        return keepRule.TryGetKeepReason(targetIndex, out var keepReason)
             ? (LeftoverDecision.KeptReferenced, keepReason)
             : (ruleDecision, null);
     }

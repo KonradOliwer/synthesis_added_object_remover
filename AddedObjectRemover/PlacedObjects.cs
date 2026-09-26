@@ -65,7 +65,11 @@ internal sealed record AnchoringRemoval(int TargetIndex, float RemovedShare, int
 /// <summary>An invisible target object inside another mod's object or whose surrounding visible target objects were removed.</summary>
 internal sealed record LeftoverRemoval(int TargetIndex, LeftoverEvaluation Evaluation) : Removal(TargetIndex);
 
-/// <summary>A target object that would be removed but stays because it is referenced.</summary>
+/// <summary>A member of the linked group of a removed target object.</summary>
+/// <param name="LinkedToTargetIndex">The removed member whose removal took the group along.</param>
+internal sealed record LinkedRemoval(int TargetIndex, int LinkedToTargetIndex) : Removal(TargetIndex);
+
+/// <summary>A target object that would be removed but stays because it, or a member of its linked group, is referenced.</summary>
 /// <param name="TouchedTargetIndex">The removed target it touches, when it was reached by the touch test.</param>
 internal sealed record KeptTarget(int TargetIndex, KeepReason Reason, int? TouchedTargetIndex);
 

@@ -137,6 +137,8 @@ internal readonly record struct OrientedBox(Vector3 Center, Mat3 Rotation, Vecto
     /// <summary>Added to every |R| term so near-parallel axes do not produce a false separation from rounding.</summary>
     private const float ParallelAxisEpsilon = 1e-5f;
 
+    private static readonly float[] CornerSigns = [-1f, 1f];
+
     public static OrientedBox FromLocal(Box local, PlacedTransform transform)
     {
         var scaled = local.Scaled(transform.Scale);
@@ -154,6 +156,18 @@ internal readonly record struct OrientedBox(Vector3 Center, Mat3 Rotation, Vecto
         4f * (HalfExtents.Y * HalfExtents.Z * MathF.Abs(Rotation.M31)
               + HalfExtents.X * HalfExtents.Z * MathF.Abs(Rotation.M32)
               + HalfExtents.X * HalfExtents.Y * MathF.Abs(Rotation.M33));
+
+    public IEnumerable<Vector3> Corners()
+    {
+        var center = Center;
+        var rotation = Rotation;
+        var halfExtents = HalfExtents;
+        return
+            from x in CornerSigns
+            from y in CornerSigns
+            from z in CornerSigns
+            select center + rotation.Transform(halfExtents * new Vector3(x, y, z));
+    }
 
     /// <summary>World AABB enclosing this box grown by <paramref name="padding"/> on every side.</summary>
     public Box WorldAabb(float padding) => Geometry.RotatedAabb(Center, Rotation, HalfExtents).Grown(padding);

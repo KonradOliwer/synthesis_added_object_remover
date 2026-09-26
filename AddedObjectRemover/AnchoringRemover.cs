@@ -55,7 +55,6 @@ internal sealed class AnchoringRemover
     /// <summary>Shares are sums of float fractions, so support that is fully removed can add up to slightly less than 1.</summary>
     private const float ShareRoundingTolerance = 1e-5f;
 
-    private readonly IReadOnlyList<TargetObject> _targets;
     private readonly KeepReferencedRule _keepRule;
     private readonly TouchSearch _search;
     private readonly AnchoringContactFinder _contactFinder;
@@ -76,26 +75,25 @@ internal sealed class AnchoringRemover
     private TimeSpan _contactPoints;
 
     private AnchoringRemover(
-        IReadOnlyList<TargetObject> targets,
+        int targetCount,
         KeepReferencedRule keepRule,
         TouchSearch search,
         AnchoringContactFinder contactFinder,
         float threshold,
         ParallelOptions parallelOptions)
     {
-        _targets = targets;
         _keepRule = keepRule;
         _search = search;
         _contactFinder = contactFinder;
         _threshold = threshold;
         _parallelOptions = parallelOptions;
-        _removed = new bool[targets.Count];
-        _keptLogged = new bool[targets.Count];
-        _countedWithoutContacts = new bool[targets.Count];
-        _contacts = new CandidateContacts?[targets.Count];
+        _removed = new bool[targetCount];
+        _keptLogged = new bool[targetCount];
+        _countedWithoutContacts = new bool[targetCount];
+        _contacts = new CandidateContacts?[targetCount];
     }
 
-    /// <param name="seeds">Target indices of the too-close removals.</param>
+    /// <param name="seeds">Target indices of the earlier removals (too close, and their linked groups).</param>
     /// <param name="keptTooClose">Too-close targets kept as referenced: already logged, still supporters.</param>
     /// <param name="threshold">Fraction of support held by removed objects at which a candidate is removed.</param>
     public static AnchoringResult Run(
@@ -116,7 +114,7 @@ internal sealed class AnchoringRemover
             var search = TouchSearch.Create(targets, seeds, excluded: [], shapes, meshCache, touchDistance, parallelOptions);
             var supporterFinder = new AnchoringSupporterFinder(targets, search, supporters, shapes, touchDistance);
             var contactFinder = new AnchoringContactFinder(targets, search.MeshPaths, supporterFinder, terrain, search.Cache, touchDistance);
-            return new AnchoringRemover(targets, keepRule, search, contactFinder, threshold, parallelOptions);
+            return new AnchoringRemover(targets.Count, keepRule, search, contactFinder, threshold, parallelOptions);
         });
 
         remover.RemoveUnanchored(seeds, keptTooClose);
@@ -168,7 +166,7 @@ internal sealed class AnchoringRemover
         var candidates = new SortedSet<int>();
         foreach (var (from, to) in pairs)
         {
-            if (_keepRule.TryGetKeepReason(_targets[to], out var reason))
+            if (_keepRule.TryGetKeepReason(to, out var reason))
             {
                 LogKeptOnce(to, reason, from);
                 continue;

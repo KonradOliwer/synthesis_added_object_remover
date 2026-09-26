@@ -13,8 +13,6 @@ internal sealed class RemovalPipeline
 {
     private sealed record TooCloseSelection(List<TooCloseRemoval> Removals, List<KeptTarget> Kept)
     {
-        public List<int> SeedIndices => Removals.Select(removal => removal.TargetIndex).ToList();
-
         public List<int> KeptIndices => Kept.Select(kept => kept.TargetIndex).ToList();
     }
 
@@ -62,20 +60,35 @@ internal sealed class RemovalPipeline
         var visibility = ClassifyTargetVisibility(scan.Targets);
         MarkReplacedObjects(scan.Targets, indexes);
 
-        var keepRule = new KeepReferencedRule(scan.TargetReferences);
+        var groups = LinkedGroups.Build(scan.Targets, scan.TargetLinks);
+        var keepRule = new KeepReferencedRule(scan.Targets, scan.TargetReferences, groups);
         var supporters = new SupporterIndex(scan.SupportersBySpace, _shapes);
         var tooClose = SelectTooCloseRemovals(scan, visibility, indexes, keepRule);
-        var followUp = SelectFollowUpRemovals(scan, tooClose, supporters, keepRule);
-        List<Removal> removals = [.. tooClose.Removals, .. followUp.Removals];
+        List<Removal> removals = [.. tooClose.Removals];
+        AddLinkedRemovals(removals, tooClose.Removals, groups, "too-close");
+        var followUp = SelectFollowUpRemovals(scan, removals.ToList(), tooClose, supporters, keepRule);
+        removals.AddRange(followUp.Removals);
+        AddLinkedRemovals(removals, followUp.Removals, groups, "follow-up");
         var leftovers = SelectLeftoverRemovals(scan, visibility, indexes, removals, keepRule);
         removals.AddRange(leftovers.Removals);
+        AddLinkedRemovals(removals, leftovers.Removals, groups, "leftover invisible object");
         var relocations = RelocateKeptMarkers(scan, visibility, supporters, removals, leftovers);
         WriteLeftoverDiagnostics(scan, leftovers, relocations);
         WriteOverrides(scan, removals, relocations.Moved);
 
         List<KeptTarget> kept = [.. tooClose.Kept, .. followUp.Kept, .. leftovers.Kept];
-        PrintFinalReport(scan, indexes, removals, tooClose.Removals.Count, leftovers.Removals.Count, kept);
+        PrintFinalReport(scan, indexes, removals, kept);
+        ReportManualPatchHints(scan, visibility, removals, kept, new ManualPatchHints(scan.Targets, visibility, groups, keepRule));
         Console.WriteLine($"Done in {totalTimer.Elapsed.TotalSeconds:F1}s.");
+    }
+
+    /// <summary>Removes the rest of the linked groups of one step's removals, so the next steps see them removed.</summary>
+    /// <param name="removals">Every removal so far, <paramref name="decided"/> included; the linked removals are appended.</param>
+    private static void AddLinkedRemovals(List<Removal> removals, IEnumerable<Removal> decided, LinkedGroups groups, string step)
+    {
+        var linked = groups.CollectLinkedRemovals(decided, ToTargetIndices(removals));
+        removals.AddRange(linked);
+        RunReport.PrintLinkedRemovals(linked.Count, step);
     }
 
     private ScanResult ScanLoadOrder()
@@ -144,20 +157,17 @@ internal sealed class RemovalPipeline
         RunReport.PrintTooCloseSummary(hits.Count, scan.Targets.Count, _config.Target, timer.Elapsed);
         RunReport.PrintInvisibleOthers(_invisibleOthers, _config.DetailedLog);
 
-        var selection = SplitByKeepRule(scan.Targets, hits, keepRule);
+        var selection = SplitByKeepRule(hits, keepRule);
         RunReport.PrintKept(scan, selection.Kept);
         return selection;
     }
 
-    private static TooCloseSelection SplitByKeepRule(
-        IReadOnlyList<TargetObject> targets,
-        IEnumerable<TooCloseHit> hits,
-        KeepReferencedRule keepRule)
+    private static TooCloseSelection SplitByKeepRule(IEnumerable<TooCloseHit> hits, KeepReferencedRule keepRule)
     {
         var selection = new TooCloseSelection([], []);
         foreach (var hit in hits)
         {
-            if (keepRule.TryGetKeepReason(targets[hit.TargetIndex], out var reason))
+            if (keepRule.TryGetKeepReason(hit.TargetIndex, out var reason))
             {
                 selection.Kept.Add(new KeptTarget(hit.TargetIndex, reason, TouchedTargetIndex: null));
             }
@@ -169,27 +179,33 @@ internal sealed class RemovalPipeline
         return selection;
     }
 
+    /// <param name="seeds">The too-close removals and their linked groups.</param>
     private FollowUpRemovals SelectFollowUpRemovals(
         ScanResult scan,
+        IReadOnlyList<Removal> seeds,
         TooCloseSelection tooClose,
         SupporterIndex supporters,
         KeepReferencedRule keepRule)
     {
-        if (tooClose.Removals.Count == 0) return FollowUpRemovals.None;
+        if (seeds.Count == 0) return FollowUpRemovals.None;
         return _config.FollowUpMode switch
         {
             FollowUpRemovalMode.Off => FollowUpRemovals.None,
-            FollowUpRemovalMode.AnyTouch => SelectTouchingRemovals(scan, tooClose, keepRule),
-            FollowUpRemovalMode.Anchoring => SelectUnanchoredRemovals(scan, tooClose, supporters, keepRule),
+            FollowUpRemovalMode.AnyTouch => SelectTouchingRemovals(scan, seeds, tooClose, keepRule),
+            FollowUpRemovalMode.Anchoring => SelectUnanchoredRemovals(scan, seeds, tooClose, supporters, keepRule),
             _ => throw new UnreachableException($"Unknown follow-up removal mode {_config.FollowUpMode}."),
         };
     }
 
-    private FollowUpRemovals SelectTouchingRemovals(ScanResult scan, TooCloseSelection tooClose, KeepReferencedRule keepRule)
+    private FollowUpRemovals SelectTouchingRemovals(
+        ScanResult scan,
+        IReadOnlyList<Removal> seeds,
+        TooCloseSelection tooClose,
+        KeepReferencedRule keepRule)
     {
         var clusters = TouchClusterFinder.Find(
             scan.Targets,
-            tooClose.SeedIndices,
+            ToTargetIndexList(seeds),
             tooClose.KeptIndices,
             _shapes,
             _meshCache,
@@ -200,11 +216,11 @@ internal sealed class RemovalPipeline
         RunReport.PrintKept(scan, clusters.Kept);
         _meshMessages.PrintAndClear();
         RunReport.PrintTouchStats(clusters);
-        WriteTouchDiagnostics(scan, tooClose.Removals, clusters);
+        WriteTouchDiagnostics(scan, seeds, clusters);
         return new FollowUpRemovals(clusters.Removals, clusters.Kept);
     }
 
-    private void WriteTouchDiagnostics(ScanResult scan, IReadOnlyList<TooCloseRemoval> seeds, TouchClusters clusters)
+    private void WriteTouchDiagnostics(ScanResult scan, IReadOnlyList<Removal> seeds, TouchClusters clusters)
     {
         if (clusters.Diagnostics is not { } diagnostics) return;
 
@@ -219,13 +235,14 @@ internal sealed class RemovalPipeline
 
     private FollowUpRemovals SelectUnanchoredRemovals(
         ScanResult scan,
+        IReadOnlyList<Removal> seeds,
         TooCloseSelection tooClose,
         SupporterIndex supporters,
         KeepReferencedRule keepRule)
     {
         var anchoring = AnchoringRemover.Run(
             scan.Targets,
-            tooClose.SeedIndices,
+            ToTargetIndexList(seeds),
             tooClose.KeptIndices,
             supporters,
             new TerrainHeights(scan.Landscapes, scan.LandWorldspaces),
@@ -299,6 +316,9 @@ internal sealed class RemovalPipeline
     private static HashSet<int> ToTargetIndices(IEnumerable<Removal> removals) =>
         removals.Select(removal => removal.TargetIndex).ToHashSet();
 
+    private static List<int> ToTargetIndexList(IEnumerable<Removal> removals) =>
+        removals.Select(removal => removal.TargetIndex).ToList();
+
     /// <param name="removals">Every removal of the run.</param>
     private RelocationResult RelocateKeptMarkers(
         ScanResult scan,
@@ -310,7 +330,9 @@ internal sealed class RemovalPipeline
         if (!_config.Leftovers.MovesKeptMarkers) return RelocationResult.None;
 
         var relocator = CreateRelocator(scan, CreateObstacles(scan, visibility, supporters, removals));
-        var relocations = relocator.Relocate(leftovers.Evaluations, _parallelOptions);
+        var removed = ToTargetIndices(removals);
+        var keptEvaluations = leftovers.Evaluations.Where(evaluation => !removed.Contains(evaluation.TargetIndex)).ToList();
+        var relocations = relocator.Relocate(keptEvaluations, _parallelOptions);
         _meshMessages.PrintAndClear();
         RunReport.PrintRelocations(scan, relocations);
         return relocations;
@@ -323,7 +345,7 @@ internal sealed class RemovalPipeline
         IReadOnlyList<Removal> removals)
     {
         var remainingVisible = ObjectVisibility.VisibleIndices(visibility, except: ToTargetIndices(removals));
-        return new VisibleObstacles(supporters, VisibleTargetIndex.Build(scan.Targets, remainingVisible, _shapes), _containment);
+        return new VisibleObstacles(supporters, VisibleTargetIndex.Build(scan.Targets, remainingVisible, _shapes), _containment, _shapes);
     }
 
     private static KeptObjectRelocator CreateRelocator(ScanResult scan, VisibleObstacles obstacles) => new(
@@ -331,7 +353,7 @@ internal sealed class RemovalPipeline
         scan.TargetLocations,
         obstacles,
         new NavmeshIndex(scan.NavmeshesBySpace),
-        new TerrainSpotSearch(new TerrainHeights(scan.Landscapes, scan.LandWorldspaces)));
+        new TerrainSpotSearch(new TerrainHeights(scan.Landscapes, scan.LandWorldspaces), obstacles));
 
     private void WriteLeftoverDiagnostics(ScanResult scan, LeftoverResult leftovers, RelocationResult relocations)
     {
@@ -372,14 +394,31 @@ internal sealed class RemovalPipeline
         ScanResult scan,
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
         IReadOnlyList<Removal> removals,
-        int removedTooClose,
-        int removedLeftovers,
         IReadOnlyList<KeptTarget> kept)
     {
         if (_config.DetailedLog) RunReport.PrintRemovals(scan, _shapes, removals);
         RunReport.PrintBoundsStats(_shapes.GetStats());
         if (_config.DetailedLog) RunReport.PrintSpaceSummary(scan, indexes, removals);
-        RunReport.PrintRemovalSummary(removals.Count, removedTooClose, removedLeftovers);
+        RunReport.PrintRemovalSummary(removals);
         RunReport.PrintKeptSummary(kept);
+    }
+
+    private void ReportManualPatchHints(
+        ScanResult scan,
+        IReadOnlyList<ObjectVisibility> visibility,
+        IReadOnlyList<Removal> removals,
+        IReadOnlyList<KeptTarget> kept,
+        ManualPatchHints hintCollector)
+    {
+        RunReport.PrintRemovedMarkersByType(removals, visibility);
+        var hints = hintCollector.Collect(removals, kept);
+        RunReport.PrintManualPatchHints(scan, hints);
+        if (!_config.WritesDiagnostics) return;
+
+        AccessDiagnosticsFolder($"writing {ManualPatchHintsWriter.FileName}", () =>
+        {
+            var path = ManualPatchHintsWriter.Write(_config.DiagnosticsFolder, scan, hints);
+            Console.WriteLine($"Manual patch hints: wrote {hints.Count:N0} rows to {path}.");
+        });
     }
 }

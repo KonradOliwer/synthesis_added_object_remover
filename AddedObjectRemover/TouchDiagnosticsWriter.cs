@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Numerics;
 using static AddedObjectRemover.CsvFile;
 
@@ -63,11 +64,11 @@ internal static class TouchDiagnosticsWriter
         ScanResult scan,
         BaseObjectShapeProvider shapes,
         float tolerance,
-        IReadOnlyList<TooCloseRemoval> seeds,
+        IReadOnlyList<Removal> seeds,
         TouchClusters clusters,
         TouchDiagnosticsData diagnostics)
     {
-        var seedReasonByTarget = seeds.ToDictionary(s => s.TargetIndex, s => s.TooCloseTo);
+        var seedReasonByTarget = seeds.ToDictionary(seed => seed.TargetIndex, seed => DescribeSeedReason(seed, scan.Targets));
         var edgeRows = CreateEdgeRows(scan.Targets, diagnostics, seedReasonByTarget);
         var componentRows = CreateComponentRows(scan, shapes, diagnostics, clusters, seedReasonByTarget);
 
@@ -78,8 +79,15 @@ internal static class TouchDiagnosticsWriter
         return new TouchDiagnosticsWriteResult(edgeRows.Count, componentRows.Count, edgesPath, componentsPath);
     }
 
+    private static string DescribeSeedReason(Removal seed, IReadOnlyList<TargetObject> targets) => seed switch
+    {
+        TooCloseRemoval { TooCloseTo: var other } => $"{other.FormKey} ({other.WinningMod})",
+        LinkedRemoval linked => $"linked to {targets[linked.LinkedToTargetIndex].Record.FormKey}",
+        _ => throw new UnreachableException($"Unexpected seed removal type {seed.GetType().Name}."),
+    };
+
     private static List<EdgeRow> CreateEdgeRows(
-        IReadOnlyList<TargetObject> targets, TouchDiagnosticsData diagnostics, IReadOnlyDictionary<int, OtherObject> seedReasonByTarget) =>
+        IReadOnlyList<TargetObject> targets, TouchDiagnosticsData diagnostics, IReadOnlyDictionary<int, string> seedReasonByTarget) =>
         diagnostics.Edges
             .Select(edge => new EdgeRow(
                 edge.ComponentId,
@@ -98,7 +106,7 @@ internal static class TouchDiagnosticsWriter
         BaseObjectShapeProvider shapes,
         TouchDiagnosticsData diagnostics,
         TouchClusters clusters,
-        IReadOnlyDictionary<int, OtherObject> seedReasonByTarget)
+        IReadOnlyDictionary<int, string> seedReasonByTarget)
     {
         var removedByComponent = CountByComponent(clusters.Removals.Select(r => r.TargetIndex), diagnostics.ComponentId);
         var keptByComponent = CountByComponent(clusters.Kept.Select(k => k.TargetIndex), diagnostics.ComponentId);
@@ -184,13 +192,8 @@ internal static class TouchDiagnosticsWriter
         return (diagnostics.Depth[deepest], string.Join(" -> ", chain.Select(node => targets[node].Record.FormKey.ToString())));
     }
 
-    private static string DescribeSeedReasons(IReadOnlyList<int> members, IReadOnlyDictionary<int, OtherObject> seedReasonByTarget) =>
-        string.Join(
-            "; ",
-            members
-                .Where(seedReasonByTarget.ContainsKey)
-                .Select(member => seedReasonByTarget[member])
-                .Select(other => $"{other.FormKey} ({other.WinningMod})"));
+    private static string DescribeSeedReasons(IReadOnlyList<int> members, IReadOnlyDictionary<int, string> seedReasonByTarget) =>
+        string.Join("; ", members.Where(seedReasonByTarget.ContainsKey).Select(member => seedReasonByTarget[member]));
 
     private static IEnumerable<string> FormatEdge(EdgeRow row, BaseObjectShapeProvider shapes, float tolerance) =>
     [

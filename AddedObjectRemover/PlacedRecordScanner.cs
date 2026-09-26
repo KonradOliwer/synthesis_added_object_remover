@@ -22,6 +22,9 @@ internal sealed class ScanResult
     /// <summary>Target FormKey -> why another record depends on it (first reason found).</summary>
     public Dictionary<FormKey, KeepReason> TargetReferences { get; } = new();
 
+    /// <summary>Links from target objects to other target-plugin records, which form linked groups.</summary>
+    public List<TargetLink> TargetLinks { get; } = [];
+
     public List<OverriddenOtherRecord> OverriddenOthersLog { get; } = [];
 
     /// <summary>
@@ -234,13 +237,14 @@ internal sealed class PlacedRecordScanner
         _scan.RecordsScanned++;
         if (record.IsDeleted) return;
 
-        if (collectReferences)
-        {
-            TargetReferenceCollector.CollectFromPlaced(record, _config.Target, _scan.TargetReferences);
-        }
-
         var role = Classify(record, winningMod);
         var placement = GetPlacementInWorld(record);
+        if (collectReferences)
+        {
+            var isTargetObject = role == RecordRole.Target && placement != null && inTargetSpace;
+            TargetReferenceCollector.CollectFromPlaced(record, isTargetObject, _config.Target, _scan.TargetReferences, _scan.TargetLinks);
+        }
+
         if (_collectsSurroundingsData && inTargetSpace && role != RecordRole.Target && placement != null)
         {
             AddSupporter(record, placement, space.SpaceKey, winningMod);

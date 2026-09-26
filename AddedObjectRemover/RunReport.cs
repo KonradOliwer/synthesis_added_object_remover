@@ -290,11 +290,9 @@ internal static class RunReport
         foreach (var removal in removals)
         {
             var target = scan.Targets[removal.TargetIndex];
-            var space = scan.SpaceNames[target.SpaceKey];
-            var location = target.CellName == null ? space : $"{space}, cell {target.CellName}";
             Console.WriteLine(
                 $"  Removed {RecordNames.Describe(target.Record)} (base {RecordNames.DescribeBase(shapes, target.Base)}) "
-                + $"in {location}; {DescribeRemovalReason(scan, removal)}");
+                + $"in {DescribeLocation(scan, target)}; {DescribeRemovalReason(scan, removal)}");
         }
     }
 
@@ -305,6 +303,7 @@ internal static class RunReport
         AnchoringRemoval anchoring =>
             $"{anchoring.RemovedShare:P0} of its support was removed (mostly {RecordNames.Describe(scan.Targets[anchoring.MainRemovedSupporter].Record)})",
         LeftoverRemoval { Evaluation: var evaluation } => $"invisible, {DescribeLeftoverReason(evaluation)}",
+        LinkedRemoval linked => $"linked to removed {RecordNames.Describe(scan.Targets[linked.LinkedToTargetIndex].Record)}",
         _ => throw new UnreachableException($"Unknown removal type {removal.GetType().Name}."),
     };
 
@@ -341,9 +340,54 @@ internal static class RunReport
         }
     }
 
-    public static void PrintRemovalSummary(int removedCount, int removedTooClose, int removedLeftovers) =>
+    public static void PrintLinkedRemovals(int count, string step) =>
+        Console.WriteLine($"Linked groups: {count:N0} more objects removed with the {step} removals they are linked to.");
+
+    public static void PrintRemovalSummary(IReadOnlyList<Removal> removals)
+    {
+        var tooClose = removals.Count(removal => removal is TooCloseRemoval);
+        var followUp = removals.Count(removal => removal is TouchingRemoval or AnchoringRemoval);
+        var leftovers = removals.Count(removal => removal is LeftoverRemoval);
+        var linked = removals.Count(removal => removal is LinkedRemoval);
         Console.WriteLine(
-            $"Removed {removedCount:N0} objects ({removedTooClose:N0} too close, "
-            + $"{removedCount - removedTooClose - removedLeftovers:N0} follow-up removals, "
-            + $"{removedLeftovers:N0} leftover invisible objects).");
+            $"Removed {removals.Count:N0} objects ({tooClose:N0} too close, {followUp:N0} follow-up removals, "
+            + $"{leftovers:N0} leftover invisible objects, {linked:N0} linked to removed objects).");
+    }
+
+    public static void PrintRemovedMarkersByType(IEnumerable<Removal> removals, IReadOnlyList<ObjectVisibility> visibility)
+    {
+        var counts = removals
+            .Select(removal => visibility[removal.TargetIndex].Kind)
+            .OfType<InvisibleObjectKind>()
+            .GroupBy(kind => kind)
+            .OrderBy(group => group.Key)
+            .Select(group => $"{group.Count():N0} {group.Key}")
+            .ToList();
+        Console.WriteLine($"Removed markers by type: {(counts.Count == 0 ? "none" : string.Join(", ", counts))}.");
+    }
+
+    public static void PrintManualPatchHints(ScanResult scan, IReadOnlyList<ManualPatchHint> hints)
+    {
+        Console.WriteLine($"Possible manual patch needed: {hints.Count:N0} objects to check.");
+        foreach (var hint in hints)
+        {
+            var target = scan.Targets[hint.TargetIndex];
+            Console.WriteLine($"  {DescribeHintType(hint.Type)} {RecordNames.Describe(target.Record)} in {DescribeLocation(scan, target)}: {hint.Detail}.");
+        }
+    }
+
+    private static string DescribeLocation(ScanResult scan, TargetObject target)
+    {
+        var space = scan.SpaceNames[target.SpaceKey];
+        return target.CellName == null ? space : $"{space}, cell {target.CellName}";
+    }
+
+    private static string DescribeHintType(ManualPatchHintType type) => type switch
+    {
+        ManualPatchHintType.RemovedMarker => "Removed marker",
+        ManualPatchHintType.KeptLinkedGroup => "Kept linked group of",
+        ManualPatchHintType.KeptForNonPlacedReference => "Kept, referenced by a non-placed record:",
+        ManualPatchHintType.KeptTeleportDoor => "Kept teleport door",
+        _ => throw new UnreachableException($"Unknown manual patch hint type {type}."),
+    };
 }

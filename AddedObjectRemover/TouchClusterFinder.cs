@@ -39,7 +39,6 @@ internal sealed record TouchDiagnosticsData(
 /// </summary>
 internal sealed class TouchClusterFinder
 {
-    private readonly IReadOnlyList<TargetObject> _targets;
     private readonly KeepReferencedRule _keepRule;
     private readonly TouchSearch _search;
     private readonly ParallelOptions _parallelOptions;
@@ -60,27 +59,26 @@ internal sealed class TouchClusterFinder
     private TimeSpan _narrowPhase;
 
     private TouchClusterFinder(
-        IReadOnlyList<TargetObject> targets,
+        int targetCount,
         KeepReferencedRule keepRule,
         TouchSearch search,
         ParallelOptions parallelOptions,
         bool[] isSeed,
         bool[] visited)
     {
-        _targets = targets;
         _keepRule = keepRule;
         _search = search;
         _parallelOptions = parallelOptions;
         _isSeed = isSeed;
         _visited = visited;
-        _componentId = new int[targets.Count];
+        _componentId = new int[targetCount];
         Array.Fill(_componentId, -1);
-        _parentOf = new int[targets.Count];
+        _parentOf = new int[targetCount];
         Array.Fill(_parentOf, -1);
-        _depth = new int[targets.Count];
+        _depth = new int[targetCount];
     }
 
-    /// <param name="seeds">Target indices of the too-close removals, in removal order.</param>
+    /// <param name="seeds">Target indices of the earlier removals (too close, and their linked groups), in removal order.</param>
     /// <param name="keptTooClose">Too-close targets kept as referenced: already logged and counted, never propagated.</param>
     public static TouchClusters Find(
         IReadOnlyList<TargetObject> targets,
@@ -96,7 +94,7 @@ internal sealed class TouchClusterFinder
         var (search, setup) = Timing.Measure(() => TouchSearch.Create(
             targets, seeds, excluded: keptTooClose, shapes, meshCache, tolerance, parallelOptions));
         var finder = new TouchClusterFinder(
-            targets,
+            targets.Count,
             keepRule,
             search,
             parallelOptions,
@@ -172,13 +170,13 @@ internal sealed class TouchClusterFinder
             RecordMember(componentId, to, from);
             if (_isSeed[to])
             {
-                // Another too-close removal: same component, already removed.
+                // Another earlier removal: same component, already removed.
                 componentSize++;
                 next.Add(to);
                 continue;
             }
 
-            if (_keepRule.TryGetKeepReason(_targets[to], out var keepReason))
+            if (_keepRule.TryGetKeepReason(to, out var keepReason))
             {
                 _kept.Add(new KeptTarget(to, keepReason, TouchedTargetIndex: from));
                 continue;

@@ -5,25 +5,47 @@ using Mutagen.Bethesda.Skyrim;
 namespace AddedObjectRemover;
 
 /// <summary>
-/// Records target-plugin objects that other records link to: placed records through any of their
-/// form links (labelled as Enable Parent, Linked Reference, Activate Parent or teleport destination
-/// where the link is one of those), and non-placed records such as quest aliases, AI packages,
-/// locations, factions, navmesh doors, conditions and script properties.
+/// Records the links to target-plugin objects. A link from a checked target object to another
+/// target-plugin FormKey joins a linked group; any other link keeps the linked object: from other
+/// placed records (labelled as Enable Parent, Linked Reference, Activate Parent, Attach Ref or
+/// teleport destination where the link is one of those), from non-placed records such as quest
+/// aliases, AI packages, locations, factions, navmesh doors, conditions and script properties,
+/// and every teleport destination.
 /// </summary>
 internal static class TargetReferenceCollector
 {
     private const string PlacedCategoryPrefix = "placed object: ";
+    private const string TeleportDestination = "teleport destination";
 
+    /// <param name="isTargetObject">The record is a checked target object, whose links to other target objects group them.</param>
     /// <remarks>Only links to target-plugin FormKeys are recorded; which of them are target objects is decided later.</remarks>
-    public static void CollectFromPlaced(IPlacedGetter record, ModKey target, Dictionary<FormKey, KeepReason> references)
+    public static void CollectFromPlaced(
+        IPlacedGetter record,
+        bool isTargetObject,
+        ModKey target,
+        Dictionary<FormKey, KeepReason> references,
+        List<TargetLink> links)
     {
         foreach (var link in record.EnumerateFormLinks())
         {
             var formKey = link.FormKey;
-            if (link.IsNull || formKey.ModKey != target || formKey == record.FormKey || references.ContainsKey(formKey)) continue;
-            var relation = DescribeRelation(record, formKey);
-            references[formKey] = new KeepReason(PlacedCategoryPrefix + relation, $"{relation} of {record.FormKey}");
+            if (link.IsNull || formKey.ModKey != target || formKey == record.FormKey) continue;
+            if (isTargetObject && !IsTeleportDestination(record, formKey))
+            {
+                links.Add(new TargetLink(record.FormKey, formKey));
+            }
+            else if (!references.ContainsKey(formKey))
+            {
+                references[formKey] = CreatePlacedReason(record, formKey);
+            }
         }
+    }
+
+    private static KeepReason CreatePlacedReason(IPlacedGetter record, FormKey linked)
+    {
+        var relation = DescribeRelation(record, linked);
+        var kind = relation == TeleportDestination ? KeepKind.TeleportDoor : KeepKind.PlacedReference;
+        return new KeepReason(kind, PlacedCategoryPrefix + relation, $"{relation} of {record.FormKey}");
     }
 
     /// <summary>
@@ -41,7 +63,7 @@ internal static class TargetReferenceCollector
                 {
                     if (!targets.Contains(link.FormKey) || references.ContainsKey(link.FormKey)) continue;
                     var type = record.Registration.Name;
-                    references[link.FormKey] = new KeepReason($"{type} record", $"linked from {type} {RecordNames.Describe(record)}");
+                    references[link.FormKey] = new KeepReason(KeepKind.NonPlacedReference, $"{type} record", $"linked from {type} {RecordNames.Describe(record)}");
                 }
             }
         }
@@ -55,15 +77,16 @@ internal static class TargetReferenceCollector
 
     private static string DescribeRelation(IPlacedGetter record, FormKey linked)
     {
+        if (IsTeleportDestination(record, linked)) return TeleportDestination;
         if (record.EnableParent?.Reference.FormKey == linked) return "Enable Parent";
         if (GetLinkedReferences(record).Any(reference => reference.Reference.FormKey == linked)) return "Linked Reference";
-        if (record is IPlacedObjectGetter { TeleportDestination: { } destination } && destination.Door.FormKey == linked)
-        {
-            return "teleport destination";
-        }
         if (GetActivateParents(record).Any(parent => parent.Reference.FormKey == linked)) return "Activate Parent";
+        if (record is IPlacedObjectGetter placedObject && placedObject.AttachRef.FormKey == linked) return "Attach Ref";
         return "other link";
     }
+
+    private static bool IsTeleportDestination(IPlacedGetter record, FormKey linked) =>
+        record is IPlacedObjectGetter { TeleportDestination: { } destination } && destination.Door.FormKey == linked;
 
     private static IEnumerable<ILinkedReferencesGetter> GetLinkedReferences(IPlacedGetter record) => record switch
     {

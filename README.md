@@ -15,9 +15,11 @@ plugin is `AddedObjectRemover.esp`.
 
 ## Safety
 
-- Teleport doors, and objects that any other record links to (placed objects, quests and their
-  aliases, AI packages, locations, factions, navmeshes, dialogue, scripts, ...), are never
+- Teleport doors, and objects that another mod's objects or any other record links to (quests and
+  their aliases, AI packages, locations, factions, navmeshes, dialogue, scripts, ...), are never
   removed by any step, so nothing the game or a script relies on goes missing.
+- Objects of the target plugin linked together (enable parent, linked references, ...) are removed
+  together, or all kept.
 - Objects that a script finds only by FormID at run time (for example with GetFormFromFile)
   cannot be detected.
 
@@ -26,6 +28,8 @@ plugin is `AddedObjectRemover.esp`.
 1. Add this repository to a Synthesis group as a Git patcher, with the group placed after the target plugin.
 2. Set *Target plugin*.
 3. Run the group and keep `AddedObjectRemover.esp` enabled after the target plugin.
+
+The log ends with a *Possible manual patch needed* section listing removed markers and kept objects worth checking by hand.
 
 ## Settings
 
@@ -79,8 +83,8 @@ An invisible object is removed when:
   and at least *Removed directions required* % of those lost at least *Removed area per direction* %
   of their ground area. A target object the invisible object sits in counts in every direction.
 
-Only the target plugin's own objects count as surroundings. Protected types and objects that
-something depends on (see *Safety*) are kept in any case. Protected types presets:
+Only the target plugin's own objects count as surroundings. Objects that something depends on
+(see *Safety*) are kept in any case, protected types unless they are linked to a removed object. Protected types presets:
 - **None**: nothing is protected.
 - **Markers**: map markers, X markers (XMarker, XMarkerHeading), idle, furniture and door markers.
 - **MarkersAndLights**: *Markers* plus lights.
@@ -128,6 +132,7 @@ fractions: 0.5 = 50%.
 - **`leftover-invisible-objects.csv`**: one row per invisible target object checked, with the
   other mod's object it sits inside, the ground area around it and how much of it was removed in
   each direction, the decision, and where it was moved to, if it was.
+- **`manual-patch-hints.csv`**: the *Possible manual patch needed* section of the log.
 
 ## Known limitations
 

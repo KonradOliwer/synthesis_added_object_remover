@@ -71,6 +71,12 @@ internal sealed class VisibleTargetIndex
             .Any(target => containment.Contains(target.Base, target.Transform, point));
     }
 
+    /// <summary>The boxes of the space that may come within <paramref name="radius"/> of <paramref name="point"/>, and possibly a few farther ones.</summary>
+    public IEnumerable<OrientedBox> FindBoxesNear(FormKey spaceKey, Vector3 point, float radius) =>
+        _bySpace.TryGetValue(spaceKey, out var space)
+            ? FindCandidates(space, point, radius).Select(entry => space.Boxes[entry])
+            : [];
+
     /// <summary>Towards the closest point of the box, or towards its centre when the point is right above or below it.</summary>
     private static Vector2 HorizontalDirection(Vector3 origin, Vector3 closest, Vector3 center)
     {

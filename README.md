@@ -17,8 +17,8 @@ mods edit the same area. The output plugin is `AddedObjectRemover.esp`.
 | Measure size from meshes (NIF) | `true` | Measure base objects from their NIF mesh, falling back to Object Bounds (OBND). If disabled, only OBND is used. |
 | Keep referenced objects | `true` | Never remove target objects that other placed objects link to (Enable Parent, Linked Reference, Activate Parent, door teleport destination, script properties or any other reference field), or teleport doors. Kept objects are listed in the log. |
 | Remove touching objects | `true` | Also remove target objects whose mesh touches a removed target object, repeatedly (whole touching groups), so e.g. a tree standing on a removed rock does not stay floating. See *Touching objects* below. |
-| Touch tolerance | `8` | Maximum gap in game units between two mesh surfaces for them to count as touching. Must be 0 or more. |
-| Voxel size | `8` | Edge length (mesh units) of the voxels indexing mesh surfaces for the touch test; surfaces are sampled every voxel size / 2. Minimum 1. Smaller is more precise but slower and uses more memory. |
+| Touch tolerance | `8` | Maximum gap in game units between two mesh surfaces for them to count as touching. Must be 0 or more. The test is exact (see *Touching objects*). |
+| Voxel size | `8` | No longer used: the touch test compares triangles exactly and needs no voxels. Kept so saved settings still load. |
 | Verbose logging | `false` | Log every removed object (FormKey, EditorID, base, cell/worldspace, the conflicting object and its plugin), per-space counts and unreadable meshes. |
 | Ignore replaced objects | `true` | Do not treat another mod's object as an "other mod" object when a target plugin object in the same space sits at essentially the same position and has a similar size (looks like the target plugin replaced it). See *Replaced objects* below. Records the target plugin itself overrides are always ignored this way, regardless of this setting. |
 | Replacement position tolerance | `16` | Maximum distance, in game units, between a target object's position and another mod's object's position to be a possible replacement match. Must be 0 or more. |
@@ -104,35 +104,44 @@ automatically; add them to *Excluded plugins* if needed.
      reason with verbose logging).
 6. **Touching objects** (if *Remove touching objects* is on and meshes are used). Only target
    plugin objects are considered, and only within the same interior cell or worldspace.
-   - *Broad phase*: each target's oriented (rotated, scaled) bounding box, grown by the touch
-     tolerance, is tested against nearby targets' boxes (spatial hash of world AABBs, then an
-     exact oriented-box separating-axis test). Boxes only select candidate pairs; they never
-     decide that two objects touch.
+   - *Broad phase*: in every space that contains a too-close removal, each target's oriented
+     (rotated, scaled) bounding box, grown by the touch tolerance, is tested against nearby
+     targets' boxes (spatial hash of world AABBs, then an exact oriented-box separating-axis
+     test), once per pair. Boxes only select candidate pairs; they never decide that two objects
+     touch. Too-close targets kept as referenced never take part.
+   - *Which pairs are tested*: only a removed object passes a removal on, so a pair can matter
+     only if one end is a seed or a not-kept target that is connected to a seed through a chain of
+     candidate pairs between such objects. These pairs are found with a union-find over the
+     candidate graph (no mesh work); all other candidate pairs are skipped.
    - *Narrow phase*: the actual render triangles (same shapes and node transforms as the bounds).
-     Each unique mesh is voxelized when first needed: every triangle is sampled in rows at most *voxel size / 4*
-     apart with points at most *voxel size / 2* apart, so every surface point is within
-     `0.71 * voxel size / 2` of a sample; samples are bucketed in voxels of *voxel size*, and each
-     voxel lists the triangles sampled into it. For a pair, the samples of the mesh with fewer
-     voxels are transformed to world space (position, rotation, scale) and into the other mesh's
-     local frame, and the **exact point-to-triangle distance** to the nearby triangles is
-     compared with the tolerance. The voxels are only an index.
-   - *Accuracy*: a sample lies on its mesh's surface, so a pair is only reported touching if the
-     real surfaces come within the tolerance (no false positives beyond it, whatever the voxel
-     size). A gap smaller than `tolerance - 0.71 * voxelSize / 2 * scale` of the sampled object is
-     always found (defaults: gaps up to about 5.2 units always count, gaps over 8 never count).
-   - *Memory*: a mesh is capped at 2,000,000 samples. A mesh that would need more is sampled more
-     coarsely (counted in the log; the guaranteed gap shrinks accordingly), down to one sample per
-     triangle corner; a mesh still over the cap (roughly 670,000+ triangles) is not voxelized and
-     never touches anything (counted in the log). Triangles are read only for meshes that appear in
-     a candidate pair and are held only by their voxel data. Voxel data is kept in a cache of about
-     1 GB; least recently used meshes are dropped beyond that and rebuilt if needed again. At most
-     four large meshes are voxelized at the same time. Peak resident meshes and size are logged.
+     Each unique mesh gets a bounding volume hierarchy over its triangles. For a pair, the other
+     mesh's bounds are placed into the walked mesh's frame (position, rotation, scale) and grown
+     by the tolerance; only the walked mesh's triangles inside this **overlap region** are
+     visited (the mesh with fewer triangles is walked). Each is placed into the other mesh's frame
+     and compared with that mesh's triangles near it by an **exact triangle-to-triangle distance
+     test** (vertex-to-face and edge-to-edge distances plus edge-through-face intersection).
+   - *Accuracy*: there is no sampling, so the result is exact up to floating-point rounding: two
+     objects touch if and only if some triangle of each comes within the tolerance of the other
+     (no false positives beyond the tolerance, and every gap up to the tolerance is found,
+     including intersecting surfaces).
+   - *Scheduling and memory*: all tested pairs are known before the narrow phase, so the mesh
+     cache is told how often each mesh is used. A mesh's triangles are read and indexed on its
+     first use and dropped right after its last pair, so each mesh is built once and only meshes
+     with pending pairs stay resident. Pairs are processed in parallel, roughly in scan order
+     (cell by cell), which keeps that working set small. As a fallback, if the resident meshes
+     exceed about 1 GB, least recently used ones are dropped and rebuilt if needed again. A mesh
+     over 2,000,000 triangles is not indexed and never touches anything. At most four large
+     meshes are indexed at the same time. The log reports meshes built, rebuilt and evicted,
+     triangles indexed, peak resident meshes and size, pairs tested and triangle pairs tested.
    - Objects without mesh triangles (OBND fallback, unreadable mesh, NPCs) never touch anything;
      such pairs are counted in the log.
    - *Clusters*: every target object connected to a too-close removal through a chain of
      touching target objects is removed as well, however large the group (connected components
-     of the "touches" graph, no size cap). Objects kept by *Keep referenced objects* stay and do
-     not pass the removal on. The log reports components, the largest component and pair counts.
+     of the "touches" graph, no size cap). The components are explored breadth first from each
+     too-close removal in removal order; each reached object is attributed to the first object of
+     the previous level (in index order) that touches it, so the log is the same on every run.
+     Objects kept by *Keep referenced objects* stay and do not pass the removal on. The log
+     reports components, the largest component and pair counts.
 7. **Rotation convention.** Placement rotations are radians. The engine rotates clockwise
    (left-handed) about each axis, so the world matrix is `R = Rx(-x) * Ry(-y) * Rz(-z)` using
    standard right-handed matrices applied to column vectors. This lives in one function,
@@ -141,7 +150,9 @@ automatically; add them to *Excluded plugins* if needed.
 ## Performance
 
 - The too-close tests (one per target object) and the touch broad/narrow phases run in
-  parallel on all CPU cores; the thread count is logged. Writing the overrides into the patch
+  parallel on all CPU cores; the thread count is logged. Narrow-phase results are stored per
+  pair and the clusters are built from them single-threaded, so results do not depend on thread
+  scheduling. Writing the overrides into the patch
   is single-threaded and happens after all computation.
 - Target base objects are measured first in a parallel warm-up. Each mesh is read and parsed
   once for its bounds; the triangles of a mesh are read again only if it takes part in a touch

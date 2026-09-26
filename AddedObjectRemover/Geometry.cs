@@ -23,6 +23,23 @@ internal readonly record struct Box(Vector3 Min, Vector3 Max)
         p.X >= Min.X && p.X <= Max.X
         && p.Y >= Min.Y && p.Y <= Max.Y
         && p.Z >= Min.Z && p.Z <= Max.Z;
+
+    /// <summary>Inclusive overlap test (touching faces count).</summary>
+    public bool Overlaps(Box other) =>
+        Min.X <= other.Max.X && other.Min.X <= Max.X
+        && Min.Y <= other.Max.Y && other.Min.Y <= Max.Y
+        && Min.Z <= other.Max.Z && other.Min.Z <= Max.Z;
+
+    /// <summary>This box grown by <paramref name="padding"/> on every side.</summary>
+    public Box Grown(float padding) => new(Min - new Vector3(padding), Max + new Vector3(padding));
+
+    public Box Union(Box other) => new(Vector3.Min(Min, other.Min), Vector3.Max(Max, other.Max));
+}
+
+/// <summary>A triangle given by its three corners.</summary>
+internal readonly record struct MeshTriangle(Vector3 A, Vector3 B, Vector3 C)
+{
+    public Box Bounds => new(Vector3.Min(A, Vector3.Min(B, C)), Vector3.Max(A, Vector3.Max(B, C)));
 }
 
 /// <summary>Row-major 3x3 matrix applied to column vectors (v' = M * v).</summary>
@@ -158,7 +175,7 @@ internal static class Geometry
     /// <summary>
     /// Largest accepted absolute mesh or placement coordinate. Real content stays far below it
     /// (a worldspace spans a few hundred thousand units); larger values come from broken exports
-    /// or sentinel values and would blow up grids and voxelization.
+    /// or sentinel values and would blow up spatial grids and triangle indexes.
     /// </summary>
     public const float MaxCoordinate = 1e6f;
 

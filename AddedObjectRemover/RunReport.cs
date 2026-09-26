@@ -6,6 +6,8 @@ namespace AddedObjectRemover;
 /// <summary>Console output of a run: configuration, per-phase summaries, verbose details and final statistics.</summary>
 internal static class RunReport
 {
+    private const double BytesPerMegabyte = 1024.0 * 1024.0;
+
     public static void PrintConfig(RunConfig config)
     {
         static string Join(IReadOnlyList<ModKey> keys) => keys.Count == 0 ? "(none)" : string.Join(", ", keys);
@@ -19,7 +21,7 @@ internal static class RunReport
         Console.WriteLine($"Bounds source: {(config.UseNifBounds ? "NIF mesh, OBND fallback" : "OBND only")}");
         Console.WriteLine($"Keep referenced objects: {config.KeepReferencedObjects}; verbose: {config.Verbose}");
         Console.WriteLine(config.RemoveTouching
-            ? $"Remove touching objects: tolerance {config.TouchTolerance}, voxel size {config.VoxelSize}"
+            ? $"Remove touching objects: tolerance {config.TouchTolerance}"
             : "Touching objects are not removed.");
         Console.WriteLine(config.IgnoreReplacedObjects
             ? $"Ignore replaced objects: position tolerance {config.ReplacementPositionTolerance}, size similarity {config.ReplacementSizeSimilarity}"
@@ -116,16 +118,16 @@ internal static class RunReport
             $"Touching objects: {touch.Removals.Count:N0} removed in {stats.Components:N0} components "
             + $"({stats.ComponentsWithTouching:N0} with touching objects, largest {stats.LargestComponent:N0} removed objects); "
             + $"{touch.Kept.Count:N0} kept as referenced.");
-        var voxels = stats.Voxels;
+        var meshes = stats.Meshes;
         Console.WriteLine(
-            $"  Pairs: {stats.CandidatePairs:N0} box candidates, {stats.TouchingPairs:N0} touching, "
-            + $"{stats.PairsWithoutGeometry:N0} skipped without mesh geometry (never touching).");
+            $"  Pairs: {stats.CandidatePairs:N0} box candidates, {stats.PairsTested:N0} tested (reachable from a removal), "
+            + $"{stats.TouchingPairs:N0} touching, {stats.PairsWithoutGeometry:N0} without mesh geometry (never touching); "
+            + $"{stats.TrianglePairsTested:N0} triangle pairs tested exactly.");
         Console.WriteLine(
-            $"  Meshes voxelized: {voxels.Built:N0} ({voxels.Voxels:N0} voxels, {voxels.Samples:N0} samples"
-            + (voxels.Coarsened > 0 ? $", {voxels.Coarsened:N0} sampled coarser due to size" : string.Empty)
-            + (voxels.TooLarge > 0 ? $", {voxels.TooLarge:N0} over {VoxelMesh.MaxSamples:N0} samples even when coarsest, not used" : string.Empty)
-            + $"); peak resident {voxels.PeakResidentMeshes:N0} meshes, ~{voxels.PeakResidentBytes / (1024.0 * 1024.0):N0} MB"
-            + (voxels.Evicted > 0 ? $"; {voxels.Evicted:N0} evicted, {voxels.Rebuilt:N0} rebuilt" : string.Empty) + ".");
+            $"  Meshes indexed: {meshes.Built:N0} ({meshes.Triangles:N0} triangles), {meshes.Rebuilt:N0} rebuilt, "
+            + $"{meshes.Evicted:N0} evicted early"
+            + (meshes.TooLarge > 0 ? $", {meshes.TooLarge:N0} over {MeshTriangleTree.MaxTriangles:N0} triangles not used" : string.Empty)
+            + $"; peak resident {meshes.PeakResidentMeshes:N0} meshes, ~{meshes.PeakResidentBytes / BytesPerMegabyte:N0} MB.");
         Console.WriteLine(
             $"  Timing: setup {stats.Setup.TotalSeconds:F1}s, broad phase {stats.BroadPhase.TotalSeconds:F1}s, "
             + $"narrow phase {stats.NarrowPhase.TotalSeconds:F1}s, clusters {stats.Clusters.TotalSeconds:F1}s.");

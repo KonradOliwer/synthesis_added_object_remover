@@ -33,11 +33,11 @@ public class Settings
     public bool RemoveTouchingObjects { get; set; } = true;
 
     [SynthesisSettingName("Touch tolerance")]
-    [SynthesisTooltip("Maximum gap, in game units, between two meshes' surfaces for them to count as touching. Must be 0 or more. Gaps up to this value may count; gaps below it minus about 0.7 x (voxel size / 2) always count.")]
+    [SynthesisTooltip("Maximum gap, in game units, between two meshes' surfaces for them to count as touching. Must be 0 or more. The test is exact: gaps up to this value count, larger gaps never do.")]
     public float TouchTolerance { get; set; } = 8f;
 
     [SynthesisSettingName("Voxel size")]
-    [SynthesisTooltip("Edge length, in mesh units, of the voxels used to index mesh surfaces for the touch test (minimum 1). Surfaces are sampled every voxel size / 2. Smaller values are more precise but slower and use more memory.")]
+    [SynthesisTooltip("No longer used: the touch test now compares mesh triangles exactly and needs no voxels. Kept so saved settings still load.")]
     public float VoxelSize { get; set; } = 8f;
 
     [SynthesisSettingName("Verbose logging")]

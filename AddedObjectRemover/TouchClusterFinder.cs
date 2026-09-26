@@ -1,6 +1,4 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
-using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover;
 
@@ -9,9 +7,11 @@ internal sealed record TouchStats(
     int ComponentsWithTouching,
     int LargestComponent,
     int CandidatePairs,
+    int PairsTested,
     int TouchingPairs,
     int PairsWithoutGeometry,
-    VoxelCacheStats Voxels,
+    long TrianglePairsTested,
+    TriangleTreeStats Meshes,
     TimeSpan Setup,
     TimeSpan BroadPhase,
     TimeSpan NarrowPhase,
@@ -21,62 +21,43 @@ internal sealed record TouchClusters(List<TouchingRemoval> Removals, List<KeptTa
 
 /// <summary>
 /// Connected components of the "touches" graph (target objects of one space) that contain a
-/// too-close removal. BFS by level; each level's broad and narrow phases run in parallel and
-/// merge in frontier order (deterministic). Touching is decided from mesh triangles only, so a
-/// pair where either object has no mesh geometry never touches. Referenced objects stay and do
-/// not propagate.
+/// too-close removal. The graph is built first: broad phase over all targets of the seeds'
+/// spaces, then the narrow phase on every candidate pair the search can reach (see
+/// <see cref="SeedReachability"/>). The components are then explored breadth first from each
+/// seed in removal order; within a level, frontier nodes are taken in order and each reached
+/// node is attributed to the first frontier node (in neighbor order) that touches it, so the
+/// result is deterministic. Touching is decided from mesh triangles only, so a pair where either
+/// object has no mesh geometry never touches. Referenced objects stay and do not propagate.
 /// </summary>
 internal sealed class TouchClusterFinder
 {
-    private enum PairTest { NoGeometry, Apart, Touching }
-
-    /// <summary>One BFS level's candidate pairs, grouped by the node they reach (groups and pairs in frontier order).</summary>
-    private sealed record CandidateLevel(List<(int From, int To)> Pairs, List<List<int>> PairsByTo);
-
     private readonly IReadOnlyList<TargetObject> _targets;
-    private readonly BaseObjectShapeProvider _shapes;
     private readonly KeepReferencedRule _keepRule;
-    private readonly float _tolerance;
-    private readonly ParallelOptions _parallelOptions;
-    private readonly VoxelCache _voxels;
-
-    private readonly OrientedBox[] _boxes;
-    private readonly Dictionary<FormKey, (SpatialGrid Grid, List<int> Members)> _grids = new();
+    private readonly TouchCandidates _candidates;
+    private readonly PairTouch[] _pairResults;
     private readonly bool[] _isSeed;
     private readonly bool[] _visited;
 
     private readonly List<TouchingRemoval> _removals = [];
     private readonly List<KeptTarget> _kept = [];
-    private readonly Stopwatch _broadTimer = new();
-    private readonly Stopwatch _narrowTimer = new();
     private int _components;
     private int _componentsWithTouching;
     private int _largestComponent;
-    private int _candidatePairs;
-    private int _touchingPairs;
-    private int _pairsWithoutGeometry;
 
     private TouchClusterFinder(
         IReadOnlyList<TargetObject> targets,
-        IReadOnlyList<int> seeds,
-        IReadOnlyList<int> keptTooClose,
-        BaseObjectShapeProvider shapes,
         KeepReferencedRule keepRule,
-        float tolerance,
-        float voxelSize,
-        ParallelOptions parallelOptions)
+        TouchCandidates candidates,
+        PairTouch[] pairResults,
+        bool[] isSeed,
+        bool[] visited)
     {
         _targets = targets;
-        _shapes = shapes;
         _keepRule = keepRule;
-        _tolerance = tolerance;
-        _parallelOptions = parallelOptions;
-        _voxels = new VoxelCache(voxelSize, shapes.ReadGeometry);
-        _boxes = new OrientedBox[targets.Count];
-        _isSeed = new bool[targets.Count];
-        _visited = new bool[targets.Count];
-        foreach (var seed in seeds) _isSeed[seed] = true;
-        foreach (var index in keptTooClose) _visited[index] = true;
+        _candidates = candidates;
+        _pairResults = pairResults;
+        _isSeed = isSeed;
+        _visited = visited;
     }
 
     /// <param name="seeds">Target indices of the too-close removals, in removal order.</param>
@@ -88,48 +69,52 @@ internal sealed class TouchClusterFinder
         BaseObjectShapeProvider shapes,
         KeepReferencedRule keepRule,
         float tolerance,
-        float voxelSize,
         ParallelOptions parallelOptions)
     {
+        var isSeed = MarkAll(targets.Count, seeds);
+        var keptBefore = MarkAll(targets.Count, keptTooClose);
+
         var setupTimer = Stopwatch.StartNew();
-        var finder = new TouchClusterFinder(targets, seeds, keptTooClose, shapes, keepRule, tolerance, voxelSize, parallelOptions);
-        finder.BuildIndex(seeds.Select(seed => targets[seed].SpaceKey).ToHashSet());
-        return finder.ExploreComponents(seeds, setupTimer.Elapsed);
-    }
+        var seedSpaces = seeds.Select(seed => targets[seed].SpaceKey).ToHashSet();
+        var candidateFinder = TouchCandidateFinder.Create(targets, seedSpaces, keptBefore, shapes, tolerance, parallelOptions);
+        setupTimer.Stop();
 
-    /// <summary>Oriented boxes and per-space grids of grown world AABBs, only for spaces with seeds.</summary>
-    private void BuildIndex(HashSet<FormKey> seedSpaces)
-    {
-        Parallel.ForEach(Partitioner.Create(0, _targets.Count), _parallelOptions, range =>
-        {
-            for (var i = range.Item1; i < range.Item2; i++)
-            {
-                if (!seedSpaces.Contains(_targets[i].SpaceKey)) continue;
-                _boxes[i] = OrientedBox.FromLocal(_shapes.GetLocalBox(_targets[i].Base), _targets[i].Transform);
-            }
-        });
+        var broadTimer = Stopwatch.StartNew();
+        var candidates = candidateFinder.FindPairs();
+        var propagates = FindPropagatingTargets(targets, isSeed, keepRule);
+        var needed = SeedReachability.FindPairsToTest(candidates, propagates, seeds);
+        broadTimer.Stop();
 
-        var membersBySpace = new Dictionary<FormKey, List<int>>();
-        for (var i = 0; i < _targets.Count; i++)
-        {
-            if (!seedSpaces.Contains(_targets[i].SpaceKey)) continue;
-            if (!membersBySpace.TryGetValue(_targets[i].SpaceKey, out var members))
-            {
-                members = [];
-                membersBySpace[_targets[i].SpaceKey] = members;
-            }
-            members.Add(i);
-        }
-        foreach (var (spaceKey, members) in membersBySpace)
-        {
-            var aabbs = members.Select(i => _boxes[i].WorldAabb(_tolerance)).ToArray();
-            _grids[spaceKey] = (SpatialGrid.FromBoxes(aabbs), members);
-        }
-    }
+        var narrowTimer = Stopwatch.StartNew();
+        var narrow = TouchPairTester.TestPairs(targets, candidates, needed, shapes, tolerance, parallelOptions);
+        narrowTimer.Stop();
 
-    private TouchClusters ExploreComponents(IReadOnlyList<int> seeds, TimeSpan setup)
-    {
         var clusterTimer = Stopwatch.StartNew();
+        var finder = new TouchClusterFinder(targets, keepRule, candidates, narrow.Results, isSeed, visited: (bool[])keptBefore.Clone());
+        finder.ExploreComponents(seeds);
+        clusterTimer.Stop();
+
+        var stats = finder.CreateStats(candidates, narrow, setupTimer.Elapsed, broadTimer.Elapsed, narrowTimer.Elapsed, clusterTimer.Elapsed);
+        return new TouchClusters(finder._removals, finder._kept, stats);
+    }
+
+    private static bool[] MarkAll(int count, IEnumerable<int> indices)
+    {
+        var marked = new bool[count];
+        foreach (var index in indices) marked[index] = true;
+        return marked;
+    }
+
+    /// <summary>Seeds and targets the keep rule would not keep: the only nodes that can pass a removal on.</summary>
+    private static bool[] FindPropagatingTargets(IReadOnlyList<TargetObject> targets, bool[] isSeed, KeepReferencedRule keepRule)
+    {
+        var propagates = new bool[targets.Count];
+        for (var i = 0; i < targets.Count; i++) propagates[i] = isSeed[i] || !keepRule.TryGetKeepReason(targets[i], out _);
+        return propagates;
+    }
+
+    private void ExploreComponents(IReadOnlyList<int> seeds)
+    {
         foreach (var seed in seeds)
         {
             // A seed reached from an earlier seed already belongs to that seed's component.
@@ -141,21 +126,6 @@ internal sealed class TouchClusterFinder
             if (componentSize > 1) _componentsWithTouching++;
             _largestComponent = Math.Max(_largestComponent, componentSize);
         }
-        clusterTimer.Stop();
-
-        var stats = new TouchStats(
-            _components,
-            _componentsWithTouching,
-            _largestComponent,
-            _candidatePairs,
-            _touchingPairs,
-            _pairsWithoutGeometry,
-            _voxels.GetStats(),
-            setup,
-            _broadTimer.Elapsed,
-            _narrowTimer.Elapsed,
-            clusterTimer.Elapsed - _broadTimer.Elapsed - _narrowTimer.Elapsed);
-        return new TouchClusters(_removals, _kept, stats);
     }
 
     /// <returns>Number of removed objects in the component, the seed included.</returns>
@@ -165,126 +135,41 @@ internal sealed class TouchClusterFinder
         var frontier = new List<int> { seed };
         while (frontier.Count > 0)
         {
-            var level = FindCandidatePairs(frontier);
-            _candidatePairs += level.Pairs.Count;
-            var touchingPairs = FindFirstTouchingPairPerTo(level);
-            frontier = MergeLevel(level, touchingPairs, ref componentSize);
+            var reached = ReachUnvisitedTouching(frontier);
+            frontier = MergeLevel(reached, ref componentSize);
         }
         return componentSize;
     }
 
-    /// <summary>Broad phase: unvisited targets whose grown oriented box overlaps a frontier node's box.</summary>
-    private CandidateLevel FindCandidatePairs(List<int> frontier)
+    /// <summary>Unvisited nodes touching a frontier node, each with the first frontier node that touches it; marks them visited.</summary>
+    private List<(int From, int To)> ReachUnvisitedTouching(List<int> frontier)
     {
-        _broadTimer.Start();
-        var candidates = new List<int>[frontier.Count];
-        Parallel.For(
-            0,
-            frontier.Count,
-            _parallelOptions,
-            () => (Scratch: new List<int>(), Seen: new HashSet<int>()),
-            (f, _, local) =>
-            {
-                candidates[f] = FindOverlappingUnvisited(frontier[f], local.Scratch, local.Seen);
-                return local;
-            },
-            _ => { });
-
-        var level = GroupPairsByTo(frontier, candidates);
-        _broadTimer.Stop();
-        return level;
-    }
-
-    /// <returns>Sorted target indices.</returns>
-    private List<int> FindOverlappingUnvisited(int node, List<int> scratch, HashSet<int> seen)
-    {
-        var (grid, members) = _grids[_targets[node].SpaceKey];
-        scratch.Clear();
-        seen.Clear();
-        grid.Collect(_boxes[node].WorldAabb(_tolerance), scratch);
-        var found = new List<int>();
-        foreach (var slot in scratch)
+        var reached = new List<(int From, int To)>();
+        foreach (var from in frontier)
         {
-            var other = members[slot];
-            if (other == node || _visited[other] || !seen.Add(other)) continue;
-            if (_boxes[node].Intersects(_boxes[other], _tolerance)) found.Add(other);
-        }
-        found.Sort();
-        return found;
-    }
-
-    private static CandidateLevel GroupPairsByTo(List<int> frontier, List<int>[] candidates)
-    {
-        var pairs = new List<(int From, int To)>();
-        var groups = new List<List<int>>();
-        var groupOf = new Dictionary<int, int>();
-        for (var f = 0; f < frontier.Count; f++)
-        {
-            foreach (var to in candidates[f])
+            foreach (var neighbor in _candidates.NeighborsOf(from))
             {
-                if (!groupOf.TryGetValue(to, out var group))
-                {
-                    group = groups.Count;
-                    groupOf[to] = group;
-                    groups.Add([]);
-                }
-                groups[group].Add(pairs.Count);
-                pairs.Add((frontier[f], to));
+                if (_visited[neighbor.Node] || !IsTouching(neighbor.Pair)) continue;
+                _visited[neighbor.Node] = true;
+                reached.Add((from, neighbor.Node));
             }
         }
-        return new CandidateLevel(pairs, groups);
+        return reached;
     }
 
-    /// <summary>Narrow phase: per reached node, the first pair (in pair order) whose meshes touch, or -1.</summary>
-    private int[] FindFirstTouchingPairPerTo(CandidateLevel level)
+    private bool IsTouching(int pair) => _pairResults[pair] switch
     {
-        _narrowTimer.Start();
-        var touchingPair = new int[level.PairsByTo.Count];
-        Parallel.For(0, level.PairsByTo.Count, _parallelOptions, g =>
-        {
-            touchingPair[g] = -1;
-            foreach (var k in level.PairsByTo[g])
-            {
-                var (from, to) = level.Pairs[k];
-                var result = TestPair(from, to);
-                if (result == PairTest.NoGeometry) Interlocked.Increment(ref _pairsWithoutGeometry);
-                if (result != PairTest.Touching) continue;
-                touchingPair[g] = k;
-                break;
-            }
-        });
-        _narrowTimer.Stop();
-        return touchingPair;
-    }
+        PairTouch.Touching => true,
+        PairTouch.Untested => throw new UnreachableException($"Candidate pair {pair} is reachable from a seed but was not tested."),
+        _ => false,
+    };
 
-    private PairTest TestPair(int from, int to)
-    {
-        var fromPath = _shapes.GetMeshPath(_targets[from].Base);
-        var toPath = _shapes.GetMeshPath(_targets[to].Base);
-        var fromMesh = fromPath == null ? null : _voxels.GetOrBuild(fromPath);
-        var toMesh = fromMesh == null || toPath == null ? null : _voxels.GetOrBuild(toPath);
-        if (fromMesh == null || toMesh == null) return PairTest.NoGeometry;
-
-        // Sample the mesh with fewer voxels (cheaper); look up in the other.
-        var touches = fromMesh.VoxelCount >= toMesh.VoxelCount
-            ? VoxelMesh.Touches(fromMesh, _targets[from].Transform, toMesh, _targets[to].Transform, _tolerance)
-            : VoxelMesh.Touches(toMesh, _targets[to].Transform, fromMesh, _targets[from].Transform, _tolerance);
-        return touches ? PairTest.Touching : PairTest.Apart;
-    }
-
-    /// <summary>
-    /// Applies the level's touching pairs in pair order and returns the next frontier. Each reached
-    /// node has one pair group and was unvisited in the broad phase, so it is merged at most once.
-    /// </summary>
-    private List<int> MergeLevel(CandidateLevel level, int[] touchingPairPerTo, ref int componentSize)
+    /// <summary>Applies the level's reached nodes in order and returns the next frontier.</summary>
+    private List<int> MergeLevel(List<(int From, int To)> reached, ref int componentSize)
     {
         var next = new List<int>();
-        foreach (var k in touchingPairPerTo.Where(k => k >= 0).Order())
+        foreach (var (from, to) in reached)
         {
-            _touchingPairs++;
-            var (from, to) = level.Pairs[k];
-            _visited[to] = true;
-
             if (_isSeed[to])
             {
                 // Another too-close removal: same component, already removed.
@@ -305,4 +190,25 @@ internal sealed class TouchClusterFinder
         }
         return next;
     }
+
+    private TouchStats CreateStats(
+        TouchCandidates candidates,
+        NarrowPhaseResult narrow,
+        TimeSpan setup,
+        TimeSpan broadPhase,
+        TimeSpan narrowPhase,
+        TimeSpan clusters) => new(
+        _components,
+        _componentsWithTouching,
+        _largestComponent,
+        candidates.Pairs.Count,
+        narrow.PairsTested,
+        narrow.Results.Count(r => r == PairTouch.Touching),
+        narrow.Results.Count(r => r == PairTouch.NoGeometry),
+        narrow.TrianglePairsTested,
+        narrow.Meshes,
+        setup,
+        broadPhase,
+        narrowPhase,
+        clusters);
 }

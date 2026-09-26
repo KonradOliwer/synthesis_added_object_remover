@@ -18,7 +18,6 @@ internal sealed record RunConfig(
     bool KeepReferencedObjects,
     bool RemoveTouching,
     float TouchTolerance,
-    float VoxelSize,
     bool Verbose,
     bool IgnoreReplacedObjects,
     float ReplacementPositionTolerance,
@@ -62,7 +61,6 @@ internal static class RunConfigFactory
             KeepReferencedObjects: settings.SkipReferencedObjects,
             RemoveTouching: settings.RemoveTouchingObjects,
             TouchTolerance: AtLeast(settings.TouchTolerance, 0, "touch tolerance"),
-            VoxelSize: AtLeast(settings.VoxelSize, 1, "voxel size", " (minimum 1)"),
             Verbose: settings.VerboseLogging,
             IgnoreReplacedObjects: settings.IgnoreReplacedObjects,
             ReplacementPositionTolerance: AtLeast(settings.ReplacementPositionTolerance, 0, "replacement position tolerance"),
@@ -126,10 +124,10 @@ internal static class RunConfigFactory
         return targetMod.MasterReferences.Select(master => master.Master).ToList();
     }
 
-    private static float AtLeast(float value, float minimum, string name, string minimumNote = "")
+    private static float AtLeast(float value, float minimum, string name)
     {
         if (float.IsFinite(value) && value >= minimum) return value;
-        Console.WriteLine($"Warning: {name} {value} is invalid{minimumNote}; using {minimum}.");
+        Console.WriteLine($"Warning: {name} {value} is invalid; using {minimum}.");
         return minimum;
     }
 

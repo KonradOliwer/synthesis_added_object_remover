@@ -161,7 +161,6 @@ internal sealed class RemovalPipeline
             _shapes,
             keepRule,
             _config.TouchTolerance,
-            _config.VoxelSize,
             _parallelOptions);
         RunReport.PrintKept(scan, clusters.Kept);
         _meshMessages.PrintAndClear();

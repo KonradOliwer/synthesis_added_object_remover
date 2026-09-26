@@ -9,35 +9,53 @@ internal readonly record struct TouchDiagnosticsWriteResult(int EdgeCount, int C
 
 /// <summary>
 /// Optional CSV output that lets a touching chain be judged from the log alone, without opening
-/// xEdit: every touching edge among target objects in the explored components (seed-to-seed
-/// included), and one row per component with its members, seeds and longest chain. Runs after all
-/// touch computation, single-threaded, and only when <see cref="RunConfig.TouchDiagnosticsFile"/>
-/// is set, so it never affects the normal run's results or performance.
+/// xEdit: every touching edge among target objects of one explored component (seed-to-seed
+/// included), and one row per component with its members, seeds and deepest chain.
 /// </summary>
 internal static class TouchDiagnosticsWriter
 {
     private const int MaxListedSpaces = 10;
     private const int MaxTopBases = 5;
-    private const float RadiansToDegreesFactor = 180f / MathF.PI;
 
     private static readonly string[] EdgeHeader =
     [
-        "componentId", "fromFormKey", "toFormKey", "fromIsSeed", "toIsSeed",
+        "componentId", "firstFormKey", "secondFormKey", "firstIsSeed", "secondIsSeed",
         "measuredMinSurfaceDistance", "tolerance", "centerToCenterDistance",
-        "from_editorId", "from_base", "from_modelPath", "from_spaceFormKey",
-        "from_posX", "from_posY", "from_posZ", "from_rotXDeg", "from_rotYDeg", "from_rotZDeg",
-        "from_scale", "from_halfExtentX", "from_halfExtentY", "from_halfExtentZ",
-        "to_editorId", "to_base", "to_modelPath", "to_spaceFormKey",
-        "to_posX", "to_posY", "to_posZ", "to_rotXDeg", "to_rotYDeg", "to_rotZDeg",
-        "to_scale", "to_halfExtentX", "to_halfExtentY", "to_halfExtentZ",
+        "first_editorId", "first_base", "first_modelPath", "first_spaceFormKey",
+        "first_posX", "first_posY", "first_posZ", "first_rotXDeg", "first_rotYDeg", "first_rotZDeg",
+        "first_scale", "first_halfExtentX", "first_halfExtentY", "first_halfExtentZ",
+        "second_editorId", "second_base", "second_modelPath", "second_spaceFormKey",
+        "second_posX", "second_posY", "second_posZ", "second_rotXDeg", "second_rotYDeg", "second_rotZDeg",
+        "second_scale", "second_halfExtentX", "second_halfExtentY", "second_halfExtentZ",
     ];
 
     private static readonly string[] ComponentHeader =
     [
         "componentId", "size", "seedCount", "removedByTouchCount", "keptAsReferencedCount",
         "spaces", "worldAabbMinX", "worldAabbMinY", "worldAabbMinZ", "worldAabbMaxX", "worldAabbMaxY", "worldAabbMaxZ",
-        "topBaseEditorIds", "longestChainLength", "longestChainFormKeys", "seedReasons",
+        "topBaseEditorIds", "deepestChainLength", "deepestChainFormKeys", "seedReasons",
     ];
+
+    private sealed record EdgeRow(
+        int ComponentId,
+        TargetObject First,
+        TargetObject Second,
+        bool FirstIsSeed,
+        bool SecondIsSeed,
+        float MinSurfaceDistance);
+
+    private sealed record ComponentRow(
+        int ComponentId,
+        int Size,
+        int SeedCount,
+        int RemovedByTouchCount,
+        int KeptAsReferencedCount,
+        string Spaces,
+        Box WorldAabb,
+        string TopBases,
+        int DeepestChainLength,
+        string DeepestChainFormKeys,
+        string SeedReasons);
 
     /// <param name="filePathBase">Written to as "&lt;filePathBase&gt;.edges.csv" and "&lt;filePathBase&gt;.components.csv".</param>
     public static TouchDiagnosticsWriteResult Write(
@@ -49,116 +67,60 @@ internal static class TouchDiagnosticsWriter
         TouchClusters clusters,
         TouchDiagnosticsData diagnostics)
     {
-        var seedTargetIndices = seeds.Select(s => s.TargetIndex).ToHashSet();
         var seedReasonByTarget = seeds.ToDictionary(s => s.TargetIndex, s => s.TooCloseTo);
+        var edgeRows = CreateEdgeRows(scan.Targets, diagnostics, seedReasonByTarget);
+        var componentRows = CreateComponentRows(scan, shapes, diagnostics, clusters, seedReasonByTarget);
 
         var edgesPath = filePathBase + ".edges.csv";
         var componentsPath = filePathBase + ".components.csv";
-        var edgeCount = WriteEdges(edgesPath, scan, shapes, tolerance, diagnostics, seedTargetIndices);
-        var componentCount = WriteComponents(componentsPath, scan, shapes, diagnostics, clusters, seedTargetIndices, seedReasonByTarget);
-        return new TouchDiagnosticsWriteResult(edgeCount, componentCount, edgesPath, componentsPath);
+        WriteCsv(edgesPath, EdgeHeader, edgeRows.Select(row => FormatEdge(row, shapes, tolerance)));
+        WriteCsv(componentsPath, ComponentHeader, componentRows.Select(FormatComponent));
+        return new TouchDiagnosticsWriteResult(edgeRows.Count, componentRows.Count, edgesPath, componentsPath);
     }
 
-    private static int WriteEdges(
-        string path,
-        ScanResult scan,
-        BaseObjectShapeProvider shapes,
-        float tolerance,
-        TouchDiagnosticsData diagnostics,
-        HashSet<int> seedTargetIndices)
-    {
-        var targets = scan.Targets;
-        var edges = CollectTouchingEdges(diagnostics);
-        edges.Sort((a, b) => CompareEdges(a, b, targets));
+    private static List<EdgeRow> CreateEdgeRows(
+        IReadOnlyList<TargetObject> targets, TouchDiagnosticsData diagnostics, IReadOnlyDictionary<int, OtherObject> seedReasonByTarget) =>
+        diagnostics.Edges
+            .Select(edge => new EdgeRow(
+                edge.ComponentId,
+                targets[edge.Pair.First],
+                targets[edge.Pair.Second],
+                seedReasonByTarget.ContainsKey(edge.Pair.First),
+                seedReasonByTarget.ContainsKey(edge.Pair.Second),
+                edge.MinSurfaceDistance))
+            .OrderBy(row => row.ComponentId)
+            .ThenBy(row => row.First.Record.FormKey.ToString(), StringComparer.Ordinal)
+            .ThenBy(row => row.Second.Record.FormKey.ToString(), StringComparer.Ordinal)
+            .ToList();
 
-        using var writer = new StreamWriter(path, false, Encoding.UTF8);
-        writer.WriteLine(string.Join(",", EdgeHeader));
-
-        var meshCache = new Dictionary<string, MeshTriangleTree?>(StringComparer.OrdinalIgnoreCase);
-        var scratch = new TouchScratch();
-        foreach (var (componentId, from, to) in edges)
-        {
-            var fromTarget = targets[from];
-            var toTarget = targets[to];
-            var distance = MeasureDistance(fromTarget, toTarget, tolerance, shapes, meshCache, scratch);
-            var centerDistance = Vector3Distance(fromTarget.Transform.Position, toTarget.Transform.Position);
-            var fromInfo = Describe(fromTarget, shapes);
-            var toInfo = Describe(toTarget, shapes);
-            var fields = new List<string>
-            {
-                Num(componentId), Csv(fromTarget.Record.FormKey.ToString()), Csv(toTarget.Record.FormKey.ToString()),
-                Bool(seedTargetIndices.Contains(from)), Bool(seedTargetIndices.Contains(to)),
-                Num(distance), Num(tolerance), Num(centerDistance),
-            };
-            fields.AddRange(fromInfo);
-            fields.AddRange(toInfo);
-            writer.WriteLine(string.Join(",", fields));
-        }
-        return edges.Count;
-    }
-
-    /// <summary>Every candidate pair the narrow phase found touching, restricted to explored (componentId &gt;= 0) targets.</summary>
-    private static List<(int ComponentId, int From, int To)> CollectTouchingEdges(TouchDiagnosticsData diagnostics)
-    {
-        var edges = new List<(int ComponentId, int From, int To)>();
-        for (var k = 0; k < diagnostics.Candidates.Pairs.Count; k++)
-        {
-            if (diagnostics.PairResults[k] != PairTouch.Touching) continue;
-            var pair = diagnostics.Candidates.Pairs[k];
-            var componentId = diagnostics.ComponentId[pair.First];
-            if (componentId < 0) continue;
-            edges.Add((componentId, pair.First, pair.Second));
-        }
-        return edges;
-    }
-
-    private static int CompareEdges(
-        (int ComponentId, int From, int To) a, (int ComponentId, int From, int To) b, IReadOnlyList<TargetObject> targets)
-    {
-        var byComponent = a.ComponentId.CompareTo(b.ComponentId);
-        if (byComponent != 0) return byComponent;
-        var byFrom = string.CompareOrdinal(targets[a.From].Record.FormKey.ToString(), targets[b.From].Record.FormKey.ToString());
-        return byFrom != 0 ? byFrom : string.CompareOrdinal(targets[a.To].Record.FormKey.ToString(), targets[b.To].Record.FormKey.ToString());
-    }
-
-    private static int WriteComponents(
-        string path,
+    private static List<ComponentRow> CreateComponentRows(
         ScanResult scan,
         BaseObjectShapeProvider shapes,
         TouchDiagnosticsData diagnostics,
         TouchClusters clusters,
-        HashSet<int> seedTargetIndices,
         IReadOnlyDictionary<int, OtherObject> seedReasonByTarget)
     {
         var removedByComponent = CountByComponent(clusters.Removals.Select(r => r.TargetIndex), diagnostics.ComponentId);
         var keptByComponent = CountByComponent(clusters.Kept.Select(k => k.TargetIndex), diagnostics.ComponentId);
-
-        using var writer = new StreamWriter(path, false, Encoding.UTF8);
-        writer.WriteLine(string.Join(",", ComponentHeader));
-
+        var rows = new List<ComponentRow>();
         for (var componentId = 0; componentId < diagnostics.ComponentMembers.Count; componentId++)
         {
             var members = diagnostics.ComponentMembers[componentId];
-            var seedCount = members.Count(seedTargetIndices.Contains);
-            var (min, max) = ComponentWorldAabb(members, scan.Targets, shapes);
-            var fields = new List<string>
-            {
-                Num(componentId),
-                Num(members.Count),
-                Num(seedCount),
-                Num(removedByComponent.GetValueOrDefault(componentId)),
-                Num(keptByComponent.GetValueOrDefault(componentId)),
-                Csv(DescribeSpaces(members, scan)),
-                Num(min.X), Num(min.Y), Num(min.Z), Num(max.X), Num(max.Y), Num(max.Z),
-                Csv(DescribeTopBases(members, scan, shapes)),
-            };
-            var (chainLength, chainFormKeys) = DescribeLongestChain(members, diagnostics, scan.Targets);
-            fields.Add(Num(chainLength));
-            fields.Add(Csv(chainFormKeys));
-            fields.Add(Csv(DescribeSeedReasons(members, seedTargetIndices, seedReasonByTarget)));
-            writer.WriteLine(string.Join(",", fields));
+            var (chainLength, chainFormKeys) = DescribeDeepestChain(members, diagnostics, scan.Targets);
+            rows.Add(new ComponentRow(
+                componentId,
+                members.Count,
+                members.Count(seedReasonByTarget.ContainsKey),
+                removedByComponent.GetValueOrDefault(componentId),
+                keptByComponent.GetValueOrDefault(componentId),
+                DescribeSpaces(members, scan),
+                ComponentWorldAabb(members, scan.Targets, shapes),
+                DescribeTopBases(members, scan, shapes),
+                chainLength,
+                chainFormKeys,
+                DescribeSeedReasons(members, seedReasonByTarget)));
         }
-        return diagnostics.ComponentMembers.Count;
+        return rows;
     }
 
     private static Dictionary<int, int> CountByComponent(IEnumerable<int> targetIndices, int[] componentIdByTarget)
@@ -172,17 +134,10 @@ internal static class TouchDiagnosticsWriter
         return counts;
     }
 
-    private static (Vector3 Min, Vector3 Max) ComponentWorldAabb(
-        IReadOnlyList<int> members, IReadOnlyList<TargetObject> targets, BaseObjectShapeProvider shapes)
-    {
-        var aabb = OrientedBox.FromLocal(shapes.GetLocalBox(targets[members[0]].Base), targets[members[0]].Transform).WorldAabb(0);
-        for (var i = 1; i < members.Count; i++)
-        {
-            var target = targets[members[i]];
-            aabb = aabb.Union(OrientedBox.FromLocal(shapes.GetLocalBox(target.Base), target.Transform).WorldAabb(0));
-        }
-        return (aabb.Min, aabb.Max);
-    }
+    private static Box ComponentWorldAabb(IReadOnlyList<int> members, IReadOnlyList<TargetObject> targets, BaseObjectShapeProvider shapes) =>
+        members
+            .Select(member => OrientedBox.FromLocal(shapes.GetLocalBox(targets[member].Base), targets[member].Transform).WorldAabb(0))
+            .Aggregate((a, b) => a.Union(b));
 
     private static string DescribeSpaces(IReadOnlyList<int> members, ScanResult scan)
     {
@@ -213,8 +168,8 @@ internal static class TouchDiagnosticsWriter
                 .Select(kv => $"{kv.Key}:{kv.Value}"));
     }
 
-    /// <summary>Longest path, by edge count, from any component member back to the component's root seed.</summary>
-    private static (int Length, string FormKeys) DescribeLongestChain(
+    /// <summary>Path from the root seed to the member with the largest BFS depth.</summary>
+    private static (int Length, string FormKeys) DescribeDeepestChain(
         IReadOnlyList<int> members, TouchDiagnosticsData diagnostics, IReadOnlyList<TargetObject> targets)
     {
         var deepest = members[0];
@@ -229,43 +184,36 @@ internal static class TouchDiagnosticsWriter
         return (diagnostics.Depth[deepest], string.Join(" -> ", chain.Select(node => targets[node].Record.FormKey.ToString())));
     }
 
-    private static string DescribeSeedReasons(
-        IReadOnlyList<int> members, HashSet<int> seedTargetIndices, IReadOnlyDictionary<int, OtherObject> seedReasonByTarget) =>
+    private static string DescribeSeedReasons(IReadOnlyList<int> members, IReadOnlyDictionary<int, OtherObject> seedReasonByTarget) =>
         string.Join(
             "; ",
             members
-                .Where(seedTargetIndices.Contains)
-                .Select(member => seedReasonByTarget.TryGetValue(member, out var other)
-                    ? $"{other.FormKey} ({other.WinningMod})"
-                    : "(unknown)"));
+                .Where(seedReasonByTarget.ContainsKey)
+                .Select(member => seedReasonByTarget[member])
+                .Select(other => $"{other.FormKey} ({other.WinningMod})"));
 
-    /// <summary>One touching edge's measured minimum surface distance, world units; NaN if either side has no readable mesh.</summary>
-    private static float MeasureDistance(
-        TargetObject from,
-        TargetObject to,
-        float tolerance,
-        BaseObjectShapeProvider shapes,
-        Dictionary<string, MeshTriangleTree?> meshCache,
-        TouchScratch scratch)
-    {
-        var fromTree = GetTree(shapes.GetMeshPath(from.Base), shapes, meshCache);
-        var toTree = GetTree(shapes.GetMeshPath(to.Base), shapes, meshCache);
-        if (fromTree == null || toTree == null) return float.NaN;
-        return MeshTouchTest.MinSurfaceDistance(fromTree, from.Transform, toTree, to.Transform, tolerance, scratch);
-    }
+    private static IEnumerable<string> FormatEdge(EdgeRow row, BaseObjectShapeProvider shapes, float tolerance) =>
+    [
+        Num(row.ComponentId), Csv(row.First.Record.FormKey.ToString()), Csv(row.Second.Record.FormKey.ToString()),
+        Bool(row.FirstIsSeed), Bool(row.SecondIsSeed),
+        Num(row.MinSurfaceDistance), Num(tolerance), Num(Vector3.Distance(row.First.Transform.Position, row.Second.Transform.Position)),
+        .. FormatTargetColumns(row.First, shapes),
+        .. FormatTargetColumns(row.Second, shapes),
+    ];
 
-    private static MeshTriangleTree? GetTree(string? meshPath, BaseObjectShapeProvider shapes, Dictionary<string, MeshTriangleTree?> cache)
-    {
-        if (meshPath == null) return null;
-        if (cache.TryGetValue(meshPath, out var cached)) return cached;
-        var tree = shapes.ReadGeometry(meshPath) is { } geometry ? MeshTriangleTree.Build(geometry) : null;
-        cache[meshPath] = tree;
-        return tree;
-    }
+    private static IEnumerable<string> FormatComponent(ComponentRow row) =>
+    [
+        Num(row.ComponentId), Num(row.Size), Num(row.SeedCount), Num(row.RemovedByTouchCount), Num(row.KeptAsReferencedCount),
+        Csv(row.Spaces),
+        Num(row.WorldAabb.Min.X), Num(row.WorldAabb.Min.Y), Num(row.WorldAabb.Min.Z),
+        Num(row.WorldAabb.Max.X), Num(row.WorldAabb.Max.Y), Num(row.WorldAabb.Max.Z),
+        Csv(row.TopBases), Num(row.DeepestChainLength), Csv(row.DeepestChainFormKeys), Csv(row.SeedReasons),
+    ];
 
-    private static List<string> Describe(TargetObject target, BaseObjectShapeProvider shapes)
+    private static IEnumerable<string> FormatTargetColumns(TargetObject target, BaseObjectShapeProvider shapes)
     {
-        var scaledSize = shapes.GetLocalBox(target.Base).Scaled(target.Transform.Scale).Size;
+        var rotation = target.Record.Placement!.Rotation;
+        var halfExtents = shapes.GetLocalBox(target.Base).Scaled(target.Transform.Scale).Size * 0.5f;
         return
         [
             Csv(target.Record.EditorID ?? string.Empty),
@@ -273,15 +221,19 @@ internal static class TouchDiagnosticsWriter
             Csv(shapes.GetMeshPath(target.Base) ?? string.Empty),
             Csv(target.SpaceKey.ToString()),
             Num(target.Transform.Position.X), Num(target.Transform.Position.Y), Num(target.Transform.Position.Z),
-            Num(target.RotationRadians.X * RadiansToDegreesFactor),
-            Num(target.RotationRadians.Y * RadiansToDegreesFactor),
-            Num(target.RotationRadians.Z * RadiansToDegreesFactor),
+            Num(float.RadiansToDegrees(rotation.X)), Num(float.RadiansToDegrees(rotation.Y)), Num(float.RadiansToDegrees(rotation.Z)),
             Num(target.Transform.Scale),
-            Num(scaledSize.X * 0.5f), Num(scaledSize.Y * 0.5f), Num(scaledSize.Z * 0.5f),
+            Num(halfExtents.X), Num(halfExtents.Y), Num(halfExtents.Z),
         ];
     }
 
-    private static float Vector3Distance(Vector3 a, Vector3 b) => (a - b).Length();
+    private static void WriteCsv(string path, IEnumerable<string> header, IEnumerable<IEnumerable<string>> rows)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        using var writer = new StreamWriter(path, false, Encoding.UTF8);
+        writer.WriteLine(string.Join(",", header));
+        foreach (var row in rows) writer.WriteLine(string.Join(",", row));
+    }
 
     private static string Num(float value) => value.ToString(CultureInfo.InvariantCulture);
 

@@ -16,6 +16,7 @@ internal sealed class MeshFileSource
 {
     private const string MeshesPrefix = "meshes\\";
     private const string DataPrefix = "data\\";
+    private const string ArchiveSuffixDelimiter = " - ";
 
     private readonly string _dataPath;
     private readonly GameRelease _release;
@@ -135,6 +136,7 @@ internal sealed class MeshFileSource
     private List<string> GetArchivePathsInPriorityOrder()
     {
         var present = ListDataFolderArchives();
+        var presentByStem = IndexByStem(present);
         var ordered = new List<string>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -146,15 +148,33 @@ internal sealed class MeshFileSource
         foreach (var fileName in GetIniArchiveNames()) AddIfPresent(fileName);
         foreach (var modKey in _loadOrder)
         {
-            foreach (var fileName in GetPluginArchiveNames(modKey, present)) AddIfPresent(fileName);
+            foreach (var fileName in GetPluginArchiveNames(modKey, presentByStem)) AddIfPresent(fileName);
         }
         return ordered;
     }
 
-    private IEnumerable<string> GetPluginArchiveNames(ModKey modKey, IEnumerable<string> archiveNames)
+    /// <summary>
+    /// Archive file names keyed by every plugin name they could belong to: the name without
+    /// extension, and the part before its last " - ". A superset of what
+    /// <see cref="Archive.IsApplicable"/> accepts, so each plugin only checks its own few candidates.
+    /// </summary>
+    private static ILookup<string, string> IndexByStem(IEnumerable<string> archiveNames) =>
+        archiveNames
+            .SelectMany(fileName => GetStems(fileName).Select(stem => (Stem: stem, FileName: fileName)))
+            .ToLookup(entry => entry.Stem, entry => entry.FileName, StringComparer.OrdinalIgnoreCase);
+
+    private static IEnumerable<string> GetStems(string fileName)
+    {
+        var name = Path.GetFileNameWithoutExtension(fileName);
+        yield return name;
+        var delimiter = name.LastIndexOf(ArchiveSuffixDelimiter, StringComparison.Ordinal);
+        if (delimiter >= 0) yield return name[..delimiter];
+    }
+
+    private IEnumerable<string> GetPluginArchiveNames(ModKey modKey, ILookup<string, string> archivesByStem)
     {
         var ownName = modKey.Name + Archive.GetExtension(_release);
-        return archiveNames
+        return archivesByStem[modKey.Name]
             .Where(fileName => Archive.IsApplicable(_release, modKey, new FileName(fileName)))
             .OrderBy(fileName => !fileName.Equals(ownName, StringComparison.OrdinalIgnoreCase))
             .ThenBy(fileName => fileName, StringComparer.OrdinalIgnoreCase);

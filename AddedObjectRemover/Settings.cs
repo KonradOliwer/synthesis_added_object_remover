@@ -36,10 +36,6 @@ public class Settings
     [SynthesisTooltip("Maximum gap, in game units, between two meshes' surfaces for them to count as touching. Must be 0 or more. The test is exact: gaps up to this value count, larger gaps never do.")]
     public float TouchTolerance { get; set; } = 8f;
 
-    [SynthesisSettingName("Voxel size")]
-    [SynthesisTooltip("No longer used: the touch test now compares mesh triangles exactly and needs no voxels. Kept so saved settings still load.")]
-    public float VoxelSize { get; set; } = 8f;
-
     [SynthesisSettingName("Verbose logging")]
     [SynthesisTooltip("Log every removed object with its base, cell/worldspace and the conflicting object, plus per-space counts and unreadable meshes.")]
     public bool VerboseLogging { get; set; }
@@ -57,6 +53,6 @@ public class Settings
     public float ReplacementSizeSimilarity { get; set; } = RunConfig.DefaultReplacementSizeSimilarity;
 
     [SynthesisSettingName("Touch diagnostics file")]
-    [SynthesisTooltip("Optional: path of a file to write touch-diagnostics CSVs to, so touching chains can be judged from the output alone (without xEdit). Leave empty to write nothing (default; no effect on results or performance). Relative paths resolve against the patcher's working directory; an absolute path is recommended. Two files are written: '<path>.edges.csv' (every touching edge found, including seed-to-seed touches) and '<path>.components.csv' (one row per touching component). See the README for the column layout.")]
+    [SynthesisTooltip("Optional: path of a file to write touch-diagnostics CSVs to, so touching chains can be judged from the output alone (without xEdit). Leave empty to write nothing (default). Writing them never changes the results but adds run time; a write error is only a warning. Relative paths resolve against the patcher's working directory; an absolute path is recommended. Two files are written: '<path>.edges.csv' (every touching edge within a touching component, including seed-to-seed touches) and '<path>.components.csv' (one row per touching component). See the README for the column layout.")]
     public string TouchDiagnosticsFile { get; set; } = string.Empty;
 }

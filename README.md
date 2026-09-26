@@ -18,12 +18,11 @@ mods edit the same area. The output plugin is `AddedObjectRemover.esp`.
 | Keep referenced objects | `true` | Never remove target objects that other placed objects link to (Enable Parent, Linked Reference, Activate Parent, door teleport destination, script properties or any other reference field), or teleport doors. Kept objects are listed in the log. |
 | Remove touching objects | `true` | Also remove target objects whose mesh touches a removed target object, repeatedly (whole touching groups), so e.g. a tree standing on a removed rock does not stay floating. See *Touching objects* below. |
 | Touch tolerance | `8` | Maximum gap in game units between two mesh surfaces for them to count as touching. Must be 0 or more. The test is exact (see *Touching objects*). |
-| Voxel size | `8` | No longer used: the touch test compares triangles exactly and needs no voxels. Kept so saved settings still load. |
 | Verbose logging | `false` | Log every removed object (FormKey, EditorID, base, cell/worldspace, the conflicting object and its plugin), per-space counts and unreadable meshes. |
 | Ignore replaced objects | `true` | Do not treat another mod's object as an "other mod" object when a target plugin object in the same space sits at essentially the same position and has a similar size (looks like the target plugin replaced it). See *Replaced objects* below. Records the target plugin itself overrides are always ignored this way, regardless of this setting. |
 | Replacement position tolerance | `16` | Maximum distance, in game units, between a target object's position and another mod's object's position to be a possible replacement match. Must be 0 or more. |
 | Replacement size similarity | `0.75` | Minimum smallest-to-largest ratio, per matching sorted dimension, between a target object's and another mod's object's scaled bounds for them to count as a replacement match (`0.75` = within about 25%). Clamped to 0-1. |
-| Touch diagnostics file | *(empty)* | Optional path of a file to write touch-diagnostics CSVs to (see *Touch diagnostics* below). Empty writes nothing (default) and has no effect on results or performance. Relative paths resolve against the patcher's working directory; an absolute path is recommended. |
+| Touch diagnostics file | *(empty)* | Optional path of a file to write touch-diagnostics CSVs to (see *Touch diagnostics* below). Empty writes nothing (default). Writing never changes the results but adds run time; a write error is only a warning. Relative paths resolve against the patcher's working directory; an absolute path is recommended. |
 
 The base game plugins `Skyrim.esm`, `Update.esm`, `Dawnguard.esm`, `HearthFires.esm` and
 `Dragonborn.esm` never count as other mods, and neither does the patcher's own output plugin
@@ -110,15 +109,16 @@ automatically; add them to *Excluded plugins* if needed.
      The number of ignored objects is logged (per reason with verbose logging).
 6. **Touching objects** (if *Remove touching objects* is on and meshes are used). Only target
    plugin objects are considered, and only within the same interior cell or worldspace.
+   - *Search by levels*: the touching groups are explored breadth first from the too-close
+     removals. Each level takes the objects just removed (at first the too-close removals) and
+     tests only the pairs between them and objects not reached yet, in parallel; the results are
+     then applied in a fixed order. So only pairs next to an object that is actually removed are
+     ever tested, however many objects stand close together elsewhere.
    - *Broad phase*: in every space that contains a too-close removal, each target's oriented
      (rotated, scaled) bounding box, grown by the touch tolerance, is tested against nearby
      targets' boxes (spatial hash of world AABBs, then an exact oriented-box separating-axis
-     test), once per pair. Boxes only select candidate pairs; they never decide that two objects
-     touch. Too-close targets kept as referenced never take part.
-   - *Which pairs are tested*: only a removed object passes a removal on, so a pair can matter
-     only if one end is a seed or a not-kept target that is connected to a seed through a chain of
-     candidate pairs between such objects. These pairs are found with a union-find over the
-     candidate graph (no mesh work); all other candidate pairs are skipped.
+     test). Boxes only select candidate pairs; they never decide that two objects touch.
+     Too-close targets kept as referenced and objects without a mesh never take part.
    - *Narrow phase*: the actual render triangles (same shapes and node transforms as the bounds).
      Each unique mesh gets a bounding volume hierarchy over its triangles. For a pair, the other
      mesh's bounds are placed into the walked mesh's frame (position, rotation, scale) and grown
@@ -129,36 +129,41 @@ automatically; add them to *Excluded plugins* if needed.
    - *Accuracy*: there is no sampling, so the result is exact up to floating-point rounding: two
      objects touch if and only if some triangle of each comes within the tolerance of the other
      (no false positives beyond the tolerance, and every gap up to the tolerance is found,
-     including intersecting surfaces).
-   - *Scheduling and memory*: all tested pairs are known before the narrow phase, so the mesh
-     cache is told how often each mesh is used. A mesh's triangles are read and indexed on its
-     first use and dropped right after its last pair, so each mesh is built once and only meshes
-     with pending pairs stay resident. Pairs are processed in parallel, roughly in scan order
-     (cell by cell), which keeps that working set small. As a fallback, if the resident meshes
-     exceed about 1 GB, least recently used ones are dropped and rebuilt if needed again. A mesh
-     over 2,000,000 triangles is not indexed and never touches anything. At most four large
-     meshes are indexed at the same time. The log reports meshes built, rebuilt and evicted,
-     triangles indexed, peak resident meshes and size, pairs tested and triangle pairs tested.
-   - Objects without mesh triangles (OBND fallback, unreadable mesh, NPCs) never touch anything;
-     such pairs are counted in the log.
+     including intersecting surfaces). An edge that runs almost parallel to the other triangle's
+     plane (within about 0.06°) is not trusted to the edge-through-face test, whose result would be
+     rounding noise there; such an edge that does pass through the triangle stays within 0.1% of
+     its length of the triangle, and the vertex and edge distance tests find it.
+   - *Memory*: a mesh's triangles are read and indexed on its first use and kept for later levels,
+     so each mesh is normally built once. If the resident meshes exceed about 1 GB, the least
+     recently used meshes not in use by a running test are dropped, and rebuilt if needed again.
+     A mesh over 2,000,000 triangles is not indexed and never touches anything. At most four
+     large meshes are indexed at the same time. The log reports meshes built, rebuilt and
+     evicted, triangles indexed, peak resident meshes and size, levels, pairs tested and triangle
+     pairs tested.
+   - Objects without mesh triangles (OBND fallback, unreadable mesh, NPCs) never touch anything
+     and never pass a removal on; pairs whose mesh turns out to have no usable triangles are
+     counted in the log.
    - *Clusters*: every target object connected to a too-close removal through a chain of
      touching target objects is removed as well, however large the group (connected components
-     of the "touches" graph, no size cap). The components are explored breadth first from each
-     too-close removal in removal order; each reached object is attributed to the first object of
-     the previous level (in index order) that touches it, so the log is the same on every run.
-     Objects kept by *Keep referenced objects* stay and do not pass the removal on. The log
-     reports components, the largest component and pair counts.
+     of the "touches" graph, no size cap). The components are explored from each too-close
+     removal in removal order; each reached object is attributed to the first object of the
+     previous level (in the order the previous level was reached) that touches it, so the log is
+     the same on every run. Objects kept by *Keep referenced objects* stay and do not pass the
+     removal on. The log reports components, the largest component and pair counts.
 7. **Touch diagnostics** (optional, off by default). When *Touch diagnostics file* is set, two CSV
-   files are written after touch computation, single-threaded, so they never slow down or change
-   the normal run: `<path>.edges.csv` and `<path>.components.csv`. They let a touching chain be
-   judged from the log alone, without opening xEdit. Both are UTF-8, comma-separated, invariant
-   culture, RFC 4180-style quoted when a field holds a comma, quote or newline, and written in a
-   fixed order (by component, then by FormKey) so they are the same on every run.
-   - **`.edges.csv`**: every touching edge found among target objects in the explored components,
-     including seed-to-seed touches (which the console log does not otherwise report). Columns:
-     `componentId`, `fromFormKey`, `toFormKey`, `fromIsSeed`, `toIsSeed`,
-     `measuredMinSurfaceDistance`, `tolerance`, `centerToCenterDistance`, then, for `from_` and
-     `to_` separately: `editorId`, `base` (base object FormKey and EditorID), `modelPath`,
+   files are written after the touch search: `<path>.edges.csv` and `<path>.components.csv`.
+   They never change the results, but finding and measuring every edge adds run time, and an
+   error writing them (e.g. a folder that cannot be created) is only logged as a warning. They
+   let a touching chain be judged from the log alone, without opening xEdit. Both are UTF-8,
+   comma-separated, invariant culture, RFC 4180-style quoted when a field holds a comma, quote or
+   newline, and written in a fixed order (by component, then by FormKey) so they are the same on
+   every run.
+   - **`.edges.csv`**: every touching pair of target objects that belong to the same explored
+     component, including seed-to-seed touches (which the console log does not otherwise report).
+     Pairs inside a component that the search itself never needed are tested for this file.
+     Columns: `componentId`, `firstFormKey`, `secondFormKey`, `firstIsSeed`, `secondIsSeed`,
+     `measuredMinSurfaceDistance`, `tolerance`, `centerToCenterDistance`, then, for `first_` and
+     `second_` separately (an edge has no direction): `editorId`, `base` (base object FormKey and EditorID), `modelPath`,
      `spaceFormKey`, `posX/Y/Z`, `rotXDeg/YDeg/ZDeg`, `scale`, `halfExtentX/Y/Z` (half the scaled
      local bounds size, for a quick ratio against the measured distance). `measuredMinSurfaceDistance`
      is not merely the first triangle pair found under tolerance: the diagnostics pass re-walks the
@@ -171,12 +176,11 @@ automatically; add them to *Excluded plugins* if needed.
      `removedByTouchCount`, `keptAsReferencedCount`, `spaces` (distinct cell/worldspace names,
      truncated to 10), `worldAabbMinX/Y/Z`, `worldAabbMaxX/Y/Z` (world-space bounds of every
      member), `topBaseEditorIds` (the 5 most common base objects, as `EditorID:count`),
-     `longestChainLength` and `longestChainFormKeys` (the longest seed-to-leaf path through the
-     touching graph, by edge count, and that path's FormKeys in order), and `seedReasons` (each
-     seed's too-close conflicting object, as `FormKey (Plugin)`).
-   - Mesh triangles are re-read for diagnostics edges (cached per mesh path for the duration of the
-     write, but not shared with the main run's mesh cache), so a diagnostics file with many edges
-     takes some extra time; this only happens when the setting is non-empty.
+     `deepestChainLength` and `deepestChainFormKeys` (the path by which the search reached the
+     member farthest from the component's first seed: its edge count and its FormKeys in order,
+     a shortest touching path to that member), and `seedReasons` (each seed's too-close
+     conflicting object, as `FormKey (Plugin)`).
+   - The edges use the same mesh cache as the search, so the memory limit above applies.
 8. **Rotation convention.** Placement rotations are radians. The engine rotates clockwise
    (left-handed) about each axis, so the world matrix is `R = Rx(-x) * Ry(-y) * Rz(-z)` using
    standard right-handed matrices applied to column vectors. This lives in one function,
@@ -186,12 +190,12 @@ automatically; add them to *Excluded plugins* if needed.
 
 - The too-close tests (one per target object) and the touch broad/narrow phases run in
   parallel on all CPU cores; the thread count is logged. Narrow-phase results are stored per
-  pair and the clusters are built from them single-threaded, so results do not depend on thread
-  scheduling. Writing the overrides into the patch
-  is single-threaded and happens after all computation.
+  pair and each level is applied single-threaded, so results do not depend on thread
+  scheduling. Writing the overrides into the patch is single-threaded and happens after all
+  computation.
 - Target base objects are measured first in a parallel warm-up. Each mesh is read and parsed
-  once for its bounds; the triangles of a mesh are read again only if it takes part in a touch
-  candidate pair.
+  once for its bounds; the triangles of a mesh are read again only if it takes part in a tested
+  touch pair.
 - Other objects' bounds centers are computed lazily, once each, and only for objects a query
   turns up.
 - NIFs are parsed in parallel. NiflySharp's only static state touched while loading (a
@@ -200,7 +204,8 @@ automatically; add them to *Excluded plugins* if needed.
 - Verbose output from parallel phases (mesh messages) is collected and printed afterwards in a
   fixed order, so logs are deterministic.
 - The log shows the time of each phase: scan, indexing, bounds warm-up, replacement matching,
-  too-close search, touch setup / broad phase / narrow phase / clusters, and writing.
+  too-close search, touch setup / broad phase / narrow phase (and diagnostics edges, when
+  requested), and writing.
 
 ## How objects are removed
 

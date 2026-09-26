@@ -118,11 +118,7 @@ internal readonly record struct OrientedBox(Vector3 Center, Mat3 Rotation, Vecto
     }
 
     /// <summary>World AABB enclosing this box grown by <paramref name="padding"/> on every side.</summary>
-    public Box WorldAabb(float padding)
-    {
-        var half = Rotation.AbsTransform(HalfExtents) + new Vector3(padding);
-        return new Box(Center - half, Center + half);
-    }
+    public Box WorldAabb(float padding) => Geometry.RotatedAabb(Center, Rotation, HalfExtents).Grown(padding);
 
     /// <summary>
     /// Separating axis test (15 axes, Ericson, Real-Time Collision Detection 4.4.1): true if the
@@ -254,11 +250,14 @@ internal static class Geometry
         return new Box(scaled.Min - padding, scaled.Max + padding);
     }
 
-    public static Box WorldAabb(Box local, Vector3 position, Mat3 rotation)
+    public static Box WorldAabb(Box local, Vector3 position, Mat3 rotation) =>
+        RotatedAabb(position + rotation.Transform(local.Center), rotation, local.Size * 0.5f);
+
+    /// <summary>AABB enclosing the box of the given half extents, rotated by <paramref name="rotation"/> and centered at <paramref name="center"/>.</summary>
+    public static Box RotatedAabb(Vector3 center, Mat3 rotation, Vector3 halfExtents)
     {
-        var center = position + rotation.Transform(local.Center);
-        var halfExtents = rotation.AbsTransform(local.Size * 0.5f);
-        return new Box(center - halfExtents, center + halfExtents);
+        var rotatedHalfExtents = rotation.AbsTransform(halfExtents);
+        return new Box(center - rotatedHalfExtents, center + rotatedHalfExtents);
     }
 
     public static Vector3 WorldBoundsCenter(Box local, PlacedTransform transform) =>
@@ -267,13 +266,6 @@ internal static class Geometry
     /// <summary>Inclusive test in the reference's local frame: p_local = R^T * (p - position).</summary>
     public static bool IsInsideOrientedBox(Vector3 worldPoint, Vector3 position, Mat3 rotation, Box localBox) =>
         localBox.Contains(rotation.TransformTransposed(worldPoint - position));
-
-    /// <summary>Squared distance from a point to an axis-aligned box (0 inside).</summary>
-    public static float DistanceSquaredToBox(Vector3 p, Vector3 min, Vector3 max)
-    {
-        var d = Vector3.Max(Vector3.Max(min - p, p - max), Vector3.Zero);
-        return d.LengthSquared();
-    }
 
     /// <summary>
     /// Squared distance from <paramref name="p"/> to triangle (a, b, c), via the closest point on

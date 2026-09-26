@@ -172,12 +172,19 @@ internal sealed class RemovalPipeline
 
     private void WriteTouchDiagnostics(ScanResult scan, IReadOnlyList<TooCloseRemoval> seeds, TouchClusters clusters)
     {
-        if (string.IsNullOrEmpty(_config.TouchDiagnosticsFile) || clusters.Diagnostics is not { } diagnostics) return;
+        if (clusters.Diagnostics is not { } diagnostics) return;
 
         var timer = Stopwatch.StartNew();
-        var written = TouchDiagnosticsWriter.Write(_config.TouchDiagnosticsFile, scan, _shapes, _config.TouchTolerance, seeds, clusters, diagnostics);
-        Console.WriteLine($"Touch diagnostics: wrote {written.EdgeCount:N0} edges, {written.ComponentCount:N0} components in {timer.Elapsed.TotalSeconds:F1}s "
-            + $"to {written.EdgesPath} / {written.ComponentsPath}.");
+        try
+        {
+            var written = TouchDiagnosticsWriter.Write(_config.TouchDiagnosticsFile, scan, _shapes, _config.TouchTolerance, seeds, clusters, diagnostics);
+            Console.WriteLine($"Touch diagnostics: wrote {written.EdgeCount:N0} edges, {written.ComponentCount:N0} components in {timer.Elapsed.TotalSeconds:F1}s "
+                + $"to {written.EdgesPath} / {written.ComponentsPath}.");
+        }
+        catch (Exception ex) when (ExpectedFailures.IsFileAccess(ex))
+        {
+            Console.WriteLine($"  Warning: could not write touch diagnostics to {_config.TouchDiagnosticsFile}: {ex.Message}");
+        }
     }
 
     private void WriteOverrides(ScanResult scan, IReadOnlyList<Removal> removals)

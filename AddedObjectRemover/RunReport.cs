@@ -121,19 +121,21 @@ internal static class RunReport
             $"Touching objects: {touch.Removals.Count:N0} removed in {stats.Components:N0} components "
             + $"({stats.ComponentsWithTouching:N0} with touching objects, largest {stats.LargestComponent:N0} removed objects); "
             + $"{touch.Kept.Count:N0} kept as referenced.");
-        var meshes = stats.Meshes;
+        var pairs = stats.Pairs;
+        var meshes = pairs.Meshes;
         Console.WriteLine(
-            $"  Pairs: {stats.CandidatePairs:N0} box candidates, {stats.PairsTested:N0} tested (reachable from a removal), "
-            + $"{stats.TouchingPairs:N0} touching, {stats.PairsWithoutGeometry:N0} without mesh geometry (never touching); "
-            + $"{stats.TrianglePairsTested:N0} triangle pairs tested exactly.");
+            $"  Pairs: {pairs.PairsTested:N0} box candidates next to a removal tested over {stats.Levels:N0} levels, "
+            + $"{pairs.TouchingPairs:N0} touching, {pairs.PairsWithoutGeometry:N0} without mesh triangles (never touching); "
+            + $"{pairs.TrianglePairsTested:N0} triangle pairs tested exactly.");
         Console.WriteLine(
             $"  Meshes indexed: {meshes.Built:N0} ({meshes.Triangles:N0} triangles), {meshes.Rebuilt:N0} rebuilt, "
-            + $"{meshes.Evicted:N0} evicted early"
+            + $"{meshes.Evicted:N0} evicted"
             + (meshes.TooLarge > 0 ? $", {meshes.TooLarge:N0} over {MeshTriangleTree.MaxTriangles:N0} triangles not used" : string.Empty)
             + $"; peak resident {meshes.PeakResidentMeshes:N0} meshes, ~{meshes.PeakResidentBytes / BytesPerMegabyte:N0} MB.");
         Console.WriteLine(
             $"  Timing: setup {stats.Setup.TotalSeconds:F1}s, broad phase {stats.BroadPhase.TotalSeconds:F1}s, "
-            + $"narrow phase {stats.NarrowPhase.TotalSeconds:F1}s, clusters {stats.Clusters.TotalSeconds:F1}s.");
+            + $"narrow phase {stats.NarrowPhase.TotalSeconds:F1}s"
+            + (touch.Diagnostics != null ? $", diagnostics edges {stats.DiagnosticsEdges.TotalSeconds:F1}s." : "."));
     }
 
     public static void PrintWriteSummary(int overrideCount, int enableParentsReplaced, TimeSpan elapsed)

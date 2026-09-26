@@ -4,9 +4,9 @@ namespace AddedObjectRemover;
 
 /// <summary>
 /// Bounding volume hierarchy over one mesh's triangles, in mesh-local (NIF root) space. Inner
-/// nodes are split at the middle of their triangles' centroid bounds along the longest axis, so
-/// the build is O(n log n) and needs memory proportional to the triangle count only. Read-only
-/// after construction and safe to query from many threads at once.
+/// nodes are split at the middle of their triangles' centroid bounds along the longest axis; the
+/// build needs memory proportional to the triangle count only. Read-only after construction and
+/// safe to query from many threads at once.
 /// </summary>
 internal sealed class MeshTriangleTree
 {

@@ -19,23 +19,29 @@ internal sealed class TouchScratch
 /// </summary>
 internal static class MeshTouchTest
 {
-    /// <remarks>The mesh with fewer triangles is walked; ties walk <paramref name="first"/>, so the result does not depend on scheduling.</remarks>
     public static bool Touches(
         MeshTriangleTree first,
         PlacedTransform firstTransform,
         MeshTriangleTree second,
         PlacedTransform secondTransform,
         float tolerance,
-        TouchScratch scratch) =>
-        first.TriangleCount <= second.TriangleCount
-            ? WalkAndLookUp(walked: first, firstTransform, lookup: second, secondTransform, tolerance, scratch)
-            : WalkAndLookUp(walked: second, secondTransform, lookup: first, firstTransform, tolerance, scratch);
+        TouchScratch scratch)
+    {
+        var frames = PairFrames.Create(first, firstTransform, second, secondTransform, tolerance);
+        if (!frames.OverlapRegion.Overlaps(frames.Walked.Bounds)) return false;
+
+        frames.Walked.CollectLeafTriangles(frames.OverlapRegion, scratch.WalkedTriangles);
+        foreach (var triangle in scratch.WalkedTriangles)
+        {
+            if (IsNearAnyTriangle(frames.Lookup, frames.PlaceInLookup(triangle), frames.LookupTolerance, scratch)) return true;
+        }
+        return false;
+    }
 
     /// <summary>
-    /// True minimum surface distance (world units) between the two meshes, searched within the same
-    /// tolerance-grown overlap region as <see cref="Touches"/>. For touch diagnostics only: called
-    /// only on a pair already known to touch, so that region is guaranteed to hold the closest
-    /// triangle pair; never called from the hot narrow-phase path.
+    /// Minimum surface distance (world units) between the two meshes' triangles within the same
+    /// overlap region as <see cref="Touches"/>, or NaN when the region holds no triangles. It is
+    /// the true minimum only for meshes that touch: only then does the region hold the closest pair.
     /// </summary>
     public static float MinSurfaceDistance(
         MeshTriangleTree first,
@@ -43,63 +49,22 @@ internal static class MeshTouchTest
         MeshTriangleTree second,
         PlacedTransform secondTransform,
         float tolerance,
-        TouchScratch scratch) =>
-        first.TriangleCount <= second.TriangleCount
-            ? WalkMinDistance(walked: first, firstTransform, lookup: second, secondTransform, tolerance, scratch)
-            : WalkMinDistance(walked: second, secondTransform, lookup: first, firstTransform, tolerance, scratch);
-
-    private static float WalkMinDistance(
-        MeshTriangleTree walked,
-        PlacedTransform walkedTransform,
-        MeshTriangleTree lookup,
-        PlacedTransform lookupTransform,
-        float tolerance,
         TouchScratch scratch)
     {
-        var overlapRegion = RelativeTransform.Create(from: lookupTransform, to: walkedTransform)
-            .ApplyToBox(lookup.Bounds)
-            .Grown(tolerance / walkedTransform.Scale);
-
-        walked.CollectLeafTriangles(overlapRegion, scratch.WalkedTriangles);
-        var toLookup = RelativeTransform.Create(from: walkedTransform, to: lookupTransform);
-        var lookupTolerance = tolerance / lookupTransform.Scale;
+        var frames = PairFrames.Create(first, firstTransform, second, secondTransform, tolerance);
+        frames.Walked.CollectLeafTriangles(frames.OverlapRegion, scratch.WalkedTriangles);
         var minDistanceSquared = float.PositiveInfinity;
         foreach (var triangle in scratch.WalkedTriangles)
         {
-            var placed = toLookup.Apply(walked.GetTriangle(triangle));
-            var reach = placed.Bounds.Grown(lookupTolerance);
-            lookup.CollectLeafTriangles(reach, scratch.NearbyTriangles);
+            var placed = frames.PlaceInLookup(triangle);
+            frames.Lookup.CollectLeafTriangles(placed.Bounds.Grown(frames.LookupTolerance), scratch.NearbyTriangles);
             foreach (var nearbyIndex in scratch.NearbyTriangles)
             {
-                var distanceSquared = TriangleProximity.MinDistanceSquared(placed, lookup.GetTriangle(nearbyIndex));
-                if (distanceSquared < minDistanceSquared) minDistanceSquared = distanceSquared;
+                minDistanceSquared = MathF.Min(
+                    minDistanceSquared, TriangleProximity.MinDistanceSquared(placed, frames.Lookup.GetTriangle(nearbyIndex)));
             }
         }
-        // Distances above were computed in the lookup mesh's local units; scale back to world units.
-        return float.IsPositiveInfinity(minDistanceSquared) ? float.NaN : MathF.Sqrt(minDistanceSquared) * lookupTransform.Scale;
-    }
-
-    private static bool WalkAndLookUp(
-        MeshTriangleTree walked,
-        PlacedTransform walkedTransform,
-        MeshTriangleTree lookup,
-        PlacedTransform lookupTransform,
-        float tolerance,
-        TouchScratch scratch)
-    {
-        var overlapRegion = RelativeTransform.Create(from: lookupTransform, to: walkedTransform)
-            .ApplyToBox(lookup.Bounds)
-            .Grown(tolerance / walkedTransform.Scale);
-        if (!overlapRegion.Overlaps(walked.Bounds)) return false;
-
-        walked.CollectLeafTriangles(overlapRegion, scratch.WalkedTriangles);
-        var toLookup = RelativeTransform.Create(from: walkedTransform, to: lookupTransform);
-        var lookupTolerance = tolerance / lookupTransform.Scale;
-        foreach (var triangle in scratch.WalkedTriangles)
-        {
-            if (IsNearAnyTriangle(lookup, toLookup.Apply(walked.GetTriangle(triangle)), lookupTolerance, scratch)) return true;
-        }
-        return false;
+        return float.IsPositiveInfinity(minDistanceSquared) ? float.NaN : frames.ToWorldDistance(MathF.Sqrt(minDistanceSquared));
     }
 
     /// <param name="triangle">Already in <paramref name="lookup"/>'s frame.</param>
@@ -122,6 +87,49 @@ internal static class MeshTouchTest
     }
 
     /// <summary>
+    /// The walked mesh, the lookup mesh, the overlap region in the walked mesh's frame, and the
+    /// walked-to-lookup transform with the tolerance in lookup units.
+    /// </summary>
+    private readonly record struct PairFrames(
+        MeshTriangleTree Walked,
+        MeshTriangleTree Lookup,
+        Box OverlapRegion,
+        RelativeTransform ToLookup,
+        float LookupScale,
+        float LookupTolerance)
+    {
+        /// <remarks>The mesh with fewer triangles is walked; ties walk <paramref name="first"/>, so the result does not depend on scheduling.</remarks>
+        public static PairFrames Create(
+            MeshTriangleTree first,
+            PlacedTransform firstTransform,
+            MeshTriangleTree second,
+            PlacedTransform secondTransform,
+            float tolerance) =>
+            first.TriangleCount <= second.TriangleCount
+                ? CreateWalking(walked: first, firstTransform, lookup: second, secondTransform, tolerance)
+                : CreateWalking(walked: second, secondTransform, lookup: first, firstTransform, tolerance);
+
+        private static PairFrames CreateWalking(
+            MeshTriangleTree walked,
+            PlacedTransform walkedTransform,
+            MeshTriangleTree lookup,
+            PlacedTransform lookupTransform,
+            float tolerance) => new(
+            walked,
+            lookup,
+            RelativeTransform.Create(from: lookupTransform, to: walkedTransform)
+                .ApplyToBox(lookup.Bounds)
+                .Grown(tolerance / walkedTransform.Scale),
+            RelativeTransform.Create(from: walkedTransform, to: lookupTransform),
+            lookupTransform.Scale,
+            tolerance / lookupTransform.Scale);
+
+        public MeshTriangle PlaceInLookup(int walkedTriangle) => ToLookup.Apply(Walked.GetTriangle(walkedTriangle));
+
+        public float ToWorldDistance(float lookupDistance) => lookupDistance * LookupScale;
+    }
+
+    /// <summary>
     /// Mesh-local of one reference -> mesh-local of another: x_to = R_to^T * (pos_from + R_from * (s_from * x) - pos_to) / s_to,
     /// computed as Rotation * x * Ratio + Translation.
     /// </summary>
@@ -137,11 +145,6 @@ internal static class MeshTouchTest
         public MeshTriangle Apply(MeshTriangle triangle) => new(Apply(triangle.A), Apply(triangle.B), Apply(triangle.C));
 
         /// <summary>AABB enclosing the transformed box.</summary>
-        public Box ApplyToBox(Box box)
-        {
-            var center = Apply(box.Center);
-            var halfExtents = Rotation.AbsTransform(box.Size * 0.5f) * Ratio;
-            return new Box(center - halfExtents, center + halfExtents);
-        }
+        public Box ApplyToBox(Box box) => Geometry.RotatedAabb(Apply(box.Center), Rotation, box.Size * (0.5f * Ratio));
     }
 }

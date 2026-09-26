@@ -62,8 +62,8 @@ internal sealed record TouchingRemoval(int TargetIndex, int TouchedTargetIndex) 
 /// <param name="MainRemovedSupporter">The removed target holding the largest share of its support.</param>
 internal sealed record AnchoringRemoval(int TargetIndex, float RemovedShare, int MainRemovedSupporter) : Removal(TargetIndex);
 
-/// <summary>An invisible target object whose surrounding visible target objects were removed.</summary>
-internal sealed record LeftoverRemoval(int TargetIndex, QuadrantCounts Surroundings) : Removal(TargetIndex);
+/// <summary>An invisible target object inside another mod's object or whose surrounding visible target objects were removed.</summary>
+internal sealed record LeftoverRemoval(int TargetIndex, LeftoverEvaluation Evaluation) : Removal(TargetIndex);
 
 /// <summary>A target object that would be removed but stays because it is referenced.</summary>
 /// <param name="TouchedTargetIndex">The removed target it touches, when it was reached by the touch test.</param>

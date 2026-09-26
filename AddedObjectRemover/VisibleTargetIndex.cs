@@ -3,36 +3,37 @@ using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover;
 
-/// <summary>A visible target object near a point: its distance to the object's box and the side it lies on.</summary>
-internal readonly record struct VisibleNeighbour(int TargetIndex, float Distance, Quadrant Quadrant);
+/// <summary>A visible target object near a point: the direction it lies in and its ground footprint area.</summary>
+internal readonly record struct VisibleNeighbour(int TargetIndex, DirectionSector Sector, float FootprintArea);
 
 /// <summary>
-/// The target plugin's visible objects of each space as oriented boxes, for finding the visible
-/// objects whose box comes within a distance of a point. Read-only after construction and
-/// therefore safe to query from many threads at once.
+/// Visible target objects of each space as oriented boxes, for finding the ones whose box comes
+/// within a distance of a point or contains it. Read-only after construction and therefore safe
+/// to query from many threads at once.
 /// </summary>
 internal sealed class VisibleTargetIndex
 {
     private sealed record SpaceEntries(int[] TargetIndices, OrientedBox[] Boxes, SpatialGrid Grid);
 
+    private readonly IReadOnlyList<TargetObject> _targets;
     private readonly Dictionary<FormKey, SpaceEntries> _bySpace;
 
-    private VisibleTargetIndex(Dictionary<FormKey, SpaceEntries> bySpace)
+    private VisibleTargetIndex(IReadOnlyList<TargetObject> targets, Dictionary<FormKey, SpaceEntries> bySpace)
     {
+        _targets = targets;
         _bySpace = bySpace;
     }
 
-    /// <param name="visibility">Parallel to <paramref name="targets"/>.</param>
+    /// <param name="visibleIndices">The visible targets to index.</param>
     public static VisibleTargetIndex Build(
         IReadOnlyList<TargetObject> targets,
-        IReadOnlyList<ObjectVisibility> visibility,
+        IEnumerable<int> visibleIndices,
         BaseObjectShapeProvider shapes)
     {
-        var bySpace = Enumerable.Range(0, targets.Count)
-            .Where(index => visibility[index].IsVisible)
+        var bySpace = visibleIndices
             .GroupBy(index => targets[index].SpaceKey)
             .ToDictionary(group => group.Key, group => CreateSpaceEntries(group.ToArray(), targets, shapes));
-        return new VisibleTargetIndex(bySpace);
+        return new VisibleTargetIndex(targets, bySpace);
     }
 
     private static SpaceEntries CreateSpaceEntries(int[] targetIndices, IReadOnlyList<TargetObject> targets, BaseObjectShapeProvider shapes)
@@ -43,22 +44,30 @@ internal sealed class VisibleTargetIndex
         return new SpaceEntries(targetIndices, boxes, SpatialGrid.FromBoxes(boxes.Select(box => box.WorldAabb(0f)).ToArray()));
     }
 
-    /// <summary>Visible target objects of the same space whose box lies within <paramref name="radius"/> of <paramref name="invisible"/>'s position.</summary>
-    public List<VisibleNeighbour> FindAround(TargetObject invisible, float radius)
+    /// <summary>Visible target objects of the space whose box lies within <paramref name="radius"/> of <paramref name="point"/>.</summary>
+    public List<VisibleNeighbour> FindAround(FormKey spaceKey, Vector3 point, float radius)
     {
         var neighbours = new List<VisibleNeighbour>();
-        if (!_bySpace.TryGetValue(invisible.SpaceKey, out var space)) return neighbours;
+        if (!_bySpace.TryGetValue(spaceKey, out var space)) return neighbours;
 
-        var origin = invisible.Transform.Position;
-        foreach (var entry in FindCandidates(space, origin, radius))
+        foreach (var entry in FindCandidates(space, point, radius))
         {
             var box = space.Boxes[entry];
-            var closest = box.ClosestPoint(origin);
-            var distance = Vector3.Distance(closest, origin);
-            if (distance > radius) continue;
-            neighbours.Add(new VisibleNeighbour(space.TargetIndices[entry], distance, QuadrantCounts.QuadrantOf(HorizontalDirection(origin, closest, box.Center))));
+            var closest = box.ClosestPoint(point);
+            if (Vector3.Distance(closest, point) > radius) continue;
+            var sector = SectorAreas.SectorOf(HorizontalDirection(point, closest, box.Center));
+            neighbours.Add(new VisibleNeighbour(space.TargetIndices[entry], sector, box.FootprintArea));
         }
         return neighbours;
+    }
+
+    /// <summary>True when some indexed object of the space contains <paramref name="point"/>.</summary>
+    public bool AnyContains(FormKey spaceKey, Vector3 point, ObjectContainment containment)
+    {
+        if (!_bySpace.TryGetValue(spaceKey, out var space)) return false;
+        return FindCandidates(space, point, radius: 0f)
+            .Select(entry => _targets[space.TargetIndices[entry]])
+            .Any(target => containment.Contains(target.Base, target.Transform, point));
     }
 
     /// <summary>Towards the closest point of the box, or towards its centre when the point is inside the box or right above or below it.</summary>
@@ -69,10 +78,10 @@ internal sealed class VisibleTargetIndex
     }
 
     /// <summary>Boxes can be indexed in several grid cells, so duplicates are removed.</summary>
-    private static IEnumerable<int> FindCandidates(SpaceEntries space, Vector3 origin, float radius)
+    private static IEnumerable<int> FindCandidates(SpaceEntries space, Vector3 point, float radius)
     {
         var candidates = new List<int>();
-        space.Grid.Collect(new Box(origin, origin).Grown(radius), candidates);
+        space.Grid.Collect(new Box(point, point).Grown(radius), candidates);
         return candidates.Distinct();
     }
 }

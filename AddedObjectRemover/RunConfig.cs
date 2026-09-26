@@ -6,9 +6,6 @@ namespace AddedObjectRemover;
 
 /// <summary>Validated settings of one run.</summary>
 /// <param name="AnchoringThreshold">Fraction (0-1) of an object's support that must come from removed objects for Anchoring to remove it.</param>
-/// <param name="LeftoverSearchRadius">Distance from an invisible target object to the target's visible objects that count as its surroundings.</param>
-/// <param name="LeftoverRemovedShare">Fraction (0-1) of those surroundings that must be removed for the invisible object to be removed.</param>
-/// <param name="ProtectedKinds">Invisible object kinds that are never removed as leftovers.</param>
 /// <param name="DiagnosticsFolder">Empty when no diagnostics files are written.</param>
 internal sealed record RunConfig(
     ModKey Target,
@@ -21,16 +18,29 @@ internal sealed record RunConfig(
     FollowUpRemovalMode FollowUpMode,
     float TouchDistance,
     float AnchoringThreshold,
-    bool RemoveLeftoverInvisibleObjects,
-    float LeftoverSearchRadius,
-    float LeftoverRemovedShare,
-    ProtectedInvisibleObjectsPreset ProtectedPreset,
-    IReadOnlySet<InvisibleObjectKind> ProtectedKinds,
+    LeftoverConfig Leftovers,
     bool DetailedLog,
     string DiagnosticsFolder)
 {
     public bool WritesDiagnostics => DiagnosticsFolder.Length > 0;
 }
+
+/// <summary>Validated settings of the leftover invisible objects step.</summary>
+/// <param name="SearchRadius">Largest distance from an invisible target object to the target's visible objects that count as its surroundings.</param>
+/// <param name="DirectionThresholdPercent">Removed share of a direction's ground area (10-100) that makes the direction removed.</param>
+/// <param name="RemovedDirectionsPercent">Share of the occupied directions (10-100) that must be removed for removal.</param>
+/// <param name="OccupiedDirectionsPercent">Share of all directions (10-100) that must be occupied for the direction rule to apply.</param>
+/// <param name="ProtectedKinds">Invisible object kinds that are never removed as leftovers.</param>
+/// <param name="MovesKeptMarkers">Kept invisible objects inside another mod's object are moved to a free spot; false whenever the step is off.</param>
+internal sealed record LeftoverConfig(
+    bool Enabled,
+    float SearchRadius,
+    int DirectionThresholdPercent,
+    int RemovedDirectionsPercent,
+    int OccupiedDirectionsPercent,
+    ProtectedInvisibleObjectsPreset ProtectedPreset,
+    IReadOnlySet<InvisibleObjectKind> ProtectedKinds,
+    bool MovesKeptMarkers);
 
 internal static class RunConfigFactory
 {
@@ -49,6 +59,8 @@ internal static class RunConfigFactory
     private const float MinPercent = 1f;
     private const float MaxPercent = 100f;
     private const float PercentPerWhole = 100f;
+    private const int PercentStep = 10;
+    private const int MaxWholePercent = (int)MaxPercent;
 
     /// <summary>Null (after logging why) when the run must make no changes.</summary>
     public static RunConfig? Create(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, Settings settings)
@@ -64,8 +76,6 @@ internal static class RunConfigFactory
         ignored.UnionWith(masters);
 
         var followUp = settings.FollowUpRemoval ?? new FollowUpRemovalSettings();
-        var leftovers = settings.LeftoverInvisibleObjects ?? new LeftoverInvisibleObjectSettings();
-        var protectedPreset = ValidatePreset(leftovers.ProtectedTypes);
         return new RunConfig(
             Target: target,
             TargetMod: targetMod,
@@ -79,15 +89,23 @@ internal static class RunConfigFactory
             AnchoringThreshold: Clamp(
                 followUp.AnchoringThresholdPercent, MinPercent, MaxPercent,
                 FollowUpRemovalSettings.DefaultAnchoringThresholdPercent, "anchoring threshold") / PercentPerWhole,
-            RemoveLeftoverInvisibleObjects: leftovers.RemoveLeftoverInvisibleObjects,
-            LeftoverSearchRadius: Positive(leftovers.SearchRadius, LeftoverInvisibleObjectSettings.DefaultSearchRadius, "search radius"),
-            LeftoverRemovedShare: Clamp(
-                leftovers.RemovedSurroundingsPercent, MinPercent, MaxPercent,
-                LeftoverInvisibleObjectSettings.DefaultRemovedSurroundingsPercent, "removed surroundings percentage") / PercentPerWhole,
-            ProtectedPreset: protectedPreset,
-            ProtectedKinds: ProtectedInvisibleObjects.Resolve(protectedPreset, ValidateKinds(leftovers.CustomProtectedTypes ?? [])),
+            Leftovers: CreateLeftoverConfig(settings.LeftoverInvisibleObjects ?? new LeftoverInvisibleObjectSettings()),
             DetailedLog: settings.Diagnostics?.DetailedLog ?? false,
             DiagnosticsFolder: ReadDiagnosticsFolder(settings));
+    }
+
+    private static LeftoverConfig CreateLeftoverConfig(LeftoverInvisibleObjectSettings leftovers)
+    {
+        var protectedPreset = ValidatePreset(leftovers.ProtectedTypes);
+        return new LeftoverConfig(
+            Enabled: leftovers.RemoveLeftoverInvisibleObjects,
+            SearchRadius: Positive(leftovers.SearchRadius, LeftoverInvisibleObjectSettings.DefaultSearchRadius, "search radius"),
+            DirectionThresholdPercent: WholeTens(leftovers.DirectionThresholdPercent, "direction threshold"),
+            RemovedDirectionsPercent: WholeTens(leftovers.RemovedDirectionsPercent, "removed directions required"),
+            OccupiedDirectionsPercent: WholeTens(leftovers.OccupiedDirectionsPercent, "occupied directions required"),
+            ProtectedPreset: protectedPreset,
+            ProtectedKinds: ProtectedInvisibleObjects.Resolve(protectedPreset, ValidateKinds(leftovers.CustomProtectedTypes ?? [])),
+            MovesKeptMarkers: leftovers.RemoveLeftoverInvisibleObjects && leftovers.MoveKeptMarkersOutOfOtherModsObjects);
     }
 
     /// <summary>Empty when no diagnostics folder is set.</summary>
@@ -182,6 +200,14 @@ internal static class RunConfigFactory
         if (float.IsFinite(value) && value > 0) return value;
         Console.WriteLine($"Warning: {name} {value} is not more than 0; using {defaultValue}.");
         return defaultValue;
+    }
+
+    /// <summary>A percentage limited to 10-100 and rounded to the nearest ten.</summary>
+    private static int WholeTens(int percent, string name)
+    {
+        var valid = (int)Math.Round(Math.Clamp(percent, PercentStep, MaxWholePercent) / (double)PercentStep, MidpointRounding.AwayFromZero) * PercentStep;
+        if (valid != percent) Console.WriteLine($"Warning: {name} {percent} is not a multiple of {PercentStep} from {PercentStep} to {MaxWholePercent}; using {valid}.");
+        return valid;
     }
 
     /// <summary>Out of range values become the nearest valid value; values that are not a number become the default.</summary>

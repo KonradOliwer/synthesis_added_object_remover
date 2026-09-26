@@ -101,6 +101,9 @@ internal readonly record struct PlacedTransform(Vector3 Position, Mat3 Rotation,
 {
     /// <summary>Mesh-local -> world: position + R * (scale * local).</summary>
     public Vector3 ToWorld(Vector3 local) => Position + Rotation.Transform(local * Scale);
+
+    /// <summary>World -> mesh-local, the inverse of <see cref="ToWorld"/>.</summary>
+    public Vector3 ToLocal(Vector3 world) => Rotation.TransformTransposed(world - Position) / Scale;
 }
 
 /// <summary>
@@ -139,6 +142,9 @@ internal readonly record struct OrientedBox(Vector3 Center, Mat3 Rotation, Vecto
             transform.Rotation,
             scaled.Size * 0.5f);
     }
+
+    /// <summary>Ground footprint: the box's own width (local X) times its depth (local Y).</summary>
+    public float FootprintArea => (2f * HalfExtents.X) * (2f * HalfExtents.Y);
 
     /// <summary>World AABB enclosing this box grown by <paramref name="padding"/> on every side.</summary>
     public Box WorldAabb(float padding) => Geometry.RotatedAabb(Center, Rotation, HalfExtents).Grown(padding);
@@ -296,46 +302,48 @@ internal static class Geometry
     public static bool IsInsideOrientedBox(Vector3 worldPoint, Vector3 position, Mat3 rotation, Box localBox) =>
         localBox.Contains(rotation.TransformTransposed(worldPoint - position));
 
+    public static float DistanceSquaredToTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c) =>
+        (p - ClosestPointOnTriangle(p, a, b, c)).LengthSquared();
+
     /// <summary>
-    /// Squared distance from <paramref name="p"/> to triangle (a, b, c), via the closest point on
-    /// the triangle (Ericson, Real-Time Collision Detection 5.1.5). Degenerate triangles
-    /// (coincident vertices, collinear vertices, a single point) are handled without dividing by
-    /// zero: an edge of zero length is treated as its start point, and a zero-area triangle as its
-    /// three edges.
+    /// The point of triangle (a, b, c) closest to <paramref name="p"/> (Ericson, Real-Time
+    /// Collision Detection 5.1.5). Degenerate triangles (coincident vertices, collinear vertices, a
+    /// single point) are handled without dividing by zero: an edge of zero length is treated as its
+    /// start point, and a zero-area triangle as its three edges.
     /// </summary>
-    public static float DistanceSquaredToTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c)
+    public static Vector3 ClosestPointOnTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c)
     {
         var ab = b - a;
         var ac = c - a;
         var ap = p - a;
         var d1 = Vector3.Dot(ab, ap);
         var d2 = Vector3.Dot(ac, ap);
-        if (d1 <= 0 && d2 <= 0) return ap.LengthSquared();
+        if (d1 <= 0 && d2 <= 0) return a;
 
         var bp = p - b;
         var d3 = Vector3.Dot(ab, bp);
         var d4 = Vector3.Dot(ac, bp);
-        if (d3 >= 0 && d4 <= d3) return bp.LengthSquared();
+        if (d3 >= 0 && d4 <= d3) return b;
 
         var vc = d1 * d4 - d3 * d2;
         if (vc <= 0 && d1 >= 0 && d3 <= 0)
         {
             var abDenominator = d1 - d3;
             var v = abDenominator != 0 ? d1 / abDenominator : 0f;
-            return (p - (a + v * ab)).LengthSquared();
+            return a + v * ab;
         }
 
         var cp = p - c;
         var d5 = Vector3.Dot(ab, cp);
         var d6 = Vector3.Dot(ac, cp);
-        if (d6 >= 0 && d5 <= d6) return cp.LengthSquared();
+        if (d6 >= 0 && d5 <= d6) return c;
 
         var vb = d5 * d2 - d1 * d6;
         if (vb <= 0 && d2 >= 0 && d6 <= 0)
         {
             var acDenominator = d2 - d6;
             var w = acDenominator != 0 ? d2 / acDenominator : 0f;
-            return (p - (a + w * ac)).LengthSquared();
+            return a + w * ac;
         }
 
         var va = d3 * d6 - d5 * d4;
@@ -343,27 +351,32 @@ internal static class Geometry
         {
             var bcDenominator = (d4 - d3) + (d5 - d6);
             var w = bcDenominator != 0 ? (d4 - d3) / bcDenominator : 0f;
-            return (p - (b + w * (c - b))).LengthSquared();
+            return b + w * (c - b);
         }
 
         var sum = va + vb + vc;
-        if (!float.IsFinite(1f / sum))
-        {
-            return MathF.Min(
-                DistanceSquaredToSegment(p, a, b),
-                MathF.Min(DistanceSquaredToSegment(p, b, c), DistanceSquaredToSegment(p, c, a)));
-        }
+        if (!float.IsFinite(1f / sum)) return ClosestPointOnEdges(p, a, b, c);
         var denominator = 1f / sum;
         var vv = vb * denominator;
         var ww = vc * denominator;
-        return (p - (a + ab * vv + ac * ww)).LengthSquared();
+        return a + ab * vv + ac * ww;
     }
 
-    private static float DistanceSquaredToSegment(Vector3 p, Vector3 a, Vector3 b)
+    private static Vector3 ClosestPointOnEdges(Vector3 p, Vector3 a, Vector3 b, Vector3 c)
+    {
+        var closest = ClosestPointOnSegment(p, a, b);
+        closest = Closer(p, closest, ClosestPointOnSegment(p, b, c));
+        return Closer(p, closest, ClosestPointOnSegment(p, c, a));
+    }
+
+    private static Vector3 Closer(Vector3 p, Vector3 first, Vector3 second) =>
+        (p - second).LengthSquared() < (p - first).LengthSquared() ? second : first;
+
+    private static Vector3 ClosestPointOnSegment(Vector3 p, Vector3 a, Vector3 b)
     {
         var ab = b - a;
         var lengthSquared = ab.LengthSquared();
         var t = lengthSquared > 0 ? Math.Clamp(Vector3.Dot(p - a, ab) / lengthSquared, 0f, 1f) : 0f;
-        return (p - (a + t * ab)).LengthSquared();
+        return a + t * ab;
     }
 }

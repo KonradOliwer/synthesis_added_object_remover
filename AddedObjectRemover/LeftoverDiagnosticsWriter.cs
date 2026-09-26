@@ -4,8 +4,9 @@ namespace AddedObjectRemover;
 
 /// <summary>
 /// Optional leftover-invisible-objects.csv: one row per invisible target object checked by the
-/// leftover invisible objects step, with the visible/removed target objects around it per quadrant
-/// and the decision.
+/// leftover invisible objects step, with the other mod's object it sits inside, the ground area of
+/// the target objects around it and how much of it was removed per direction, the decision and,
+/// when it was moved, where to.
 /// </summary>
 internal static class LeftoverDiagnosticsWriter
 {
@@ -14,8 +15,10 @@ internal static class LeftoverDiagnosticsWriter
     private static readonly string[] Header =
     [
         "formKey", "editorId", "base", "baseType", "invisibleType", "space", "cell", "x", "y", "z",
-        .. QuadrantCounts.All.SelectMany(quadrant => new[] { $"{quadrant}Visible", $"{quadrant}Removed" }),
-        "visible", "removed", "removedShare", "threshold", "decision", "reason",
+        "radius", "insideObject", "insideObjectPlugin",
+        .. SectorAreas.All.SelectMany(sector => new[] { $"{sector}Total", $"{sector}Removed", $"{sector}State" }),
+        "occupiedDirections", "removedDirections", "decision", "reason",
+        "movedToX", "movedToY", "movedToZ", "moveDistance", "movedOnto",
     ];
 
     /// <returns>The path written to.</returns>
@@ -24,21 +27,23 @@ internal static class LeftoverDiagnosticsWriter
         ScanResult scan,
         BaseObjectShapeProvider shapes,
         IReadOnlyList<LeftoverEvaluation> evaluations,
-        float threshold)
+        RelocationResult relocations)
     {
         var path = Path.Combine(folder, FileName);
+        var movesByTarget = relocations.Moved.ToDictionary(move => move.Evaluation.TargetIndex);
         var rows = evaluations
             .OrderBy(evaluation => scan.Targets[evaluation.TargetIndex].Record.FormKey.ToString(), StringComparer.Ordinal)
-            .Select(evaluation => FormatRow(evaluation, scan, shapes, threshold));
+            .Select(evaluation => FormatRow(evaluation, scan, shapes, movesByTarget.GetValueOrDefault(evaluation.TargetIndex)));
         CsvFile.Write(path, Header, rows);
         return path;
     }
 
-    private static IEnumerable<string> FormatRow(LeftoverEvaluation evaluation, ScanResult scan, BaseObjectShapeProvider shapes, float threshold)
+    private static IEnumerable<string> FormatRow(LeftoverEvaluation evaluation, ScanResult scan, BaseObjectShapeProvider shapes, Relocation? move)
     {
         var target = scan.Targets[evaluation.TargetIndex];
         var surroundings = evaluation.Surroundings;
         var position = target.Transform.Position;
+        var inside = evaluation.ContainingObject;
         return
         [
             Text(target.Record.FormKey.ToString()),
@@ -49,22 +54,25 @@ internal static class LeftoverDiagnosticsWriter
             Text(scan.SpaceNames[target.SpaceKey]),
             Text(target.CellName ?? string.Empty),
             Num(position.X), Num(position.Y), Num(position.Z),
-            .. QuadrantCounts.All.SelectMany(quadrant => new[] { Num(surroundings.Visible(quadrant)), Num(surroundings.Removed(quadrant)) }),
-            Num(surroundings.TotalVisible),
-            Num(surroundings.TotalRemoved),
-            Num(surroundings.RemovedShare),
-            Num(threshold),
-            Text(evaluation.Decision == LeftoverDecision.Removed ? "removed" : "kept"),
-            Text(DescribeReason(evaluation)),
+            Num(evaluation.Radius),
+            Text(inside?.FormKey.ToString() ?? string.Empty),
+            Text(inside?.WinningMod.ToString() ?? string.Empty),
+            .. SectorAreas.All.SelectMany(sector => new[]
+            {
+                Num(surroundings.Total(sector)), Num(surroundings.Removed(sector)), Text(surroundings.State(sector).ToString()),
+            }),
+            Num(surroundings.OccupiedCount),
+            Num(surroundings.RemovedCount),
+            Text(evaluation.IsRemoved ? "removed" : "kept"),
+            Text(LeftoverDecisionText.DescribeReason(evaluation)),
+            .. FormatMove(move),
         ];
     }
 
+    private static IEnumerable<string> FormatMove(Relocation? move) => move == null
+        ? [string.Empty, string.Empty, string.Empty, string.Empty, string.Empty]
+        : [Num(move.To.X), Num(move.To.Y), Num(move.To.Z), Num(move.Distance), Text(move.Surface.ToString())];
+
     private static string DescribeBaseType(BaseObjectShapeProvider shapes, BaseRef? baseRef) =>
         baseRef is { } reference && shapes.ResolveBaseOrNull(reference) is { } record ? record.Registration.Name : string.Empty;
-
-    private static string DescribeReason(LeftoverEvaluation evaluation)
-    {
-        var decision = LeftoverDecisionText.Describe(evaluation.Decision);
-        return evaluation.KeepReason is { } keepReason ? $"{decision}: {keepReason.Detail}" : decision;
-    }
 }

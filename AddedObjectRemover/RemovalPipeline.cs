@@ -28,6 +28,7 @@ internal sealed class RemovalPipeline
     private readonly ParallelOptions _parallelOptions = new() { MaxDegreeOfParallelism = Environment.ProcessorCount };
     private readonly MeshMessageLog _meshMessages;
     private readonly BaseObjectShapeProvider _shapes;
+    private readonly ObjectContainment _containment;
     private readonly ReasonCounter _invisibleOthers = new();
 
     public RemovalPipeline(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, RunConfig config)
@@ -41,6 +42,7 @@ internal sealed class RemovalPipeline
             state.LoadOrder.ListedOrder.Select(listing => listing.ModKey).ToList(),
             _meshMessages);
         _shapes = new BaseObjectShapeProvider(state.LinkCache, meshFiles, _meshMessages);
+        _containment = new ObjectContainment(_shapes);
     }
 
     public void Run(Stopwatch totalTimer)
@@ -62,9 +64,11 @@ internal sealed class RemovalPipeline
         var tooClose = SelectTooCloseRemovals(scan, visibility, indexes, keepRule);
         var followUp = SelectFollowUpRemovals(scan, tooClose, keepRule);
         List<Removal> removals = [.. tooClose.Removals, .. followUp.Removals];
-        var leftovers = SelectLeftoverRemovals(scan, visibility, removals, keepRule);
+        var leftovers = SelectLeftoverRemovals(scan, visibility, indexes, removals, keepRule);
         removals.AddRange(leftovers.Removals);
-        WriteOverrides(scan, removals);
+        var relocations = RelocateKeptMarkers(scan, visibility, removals, leftovers);
+        WriteLeftoverDiagnostics(scan, leftovers, relocations);
+        WriteOverrides(scan, removals, relocations.Moved);
 
         List<KeptTarget> kept = [.. tooClose.Kept, .. followUp.Kept, .. leftovers.Kept];
         PrintFinalReport(scan, indexes, removals, tooClose.Removals.Count, leftovers.Removals.Count, kept);
@@ -261,29 +265,66 @@ internal sealed class RemovalPipeline
     private LeftoverResult SelectLeftoverRemovals(
         ScanResult scan,
         IReadOnlyList<ObjectVisibility> visibility,
+        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
         IReadOnlyList<Removal> earlierRemovals,
         KeepReferencedRule keepRule)
     {
-        if (!_config.RemoveLeftoverInvisibleObjects) return LeftoverResult.None;
+        if (!_config.Leftovers.Enabled) return LeftoverResult.None;
 
         var timer = Stopwatch.StartNew();
         var selector = new LeftoverInvisibleObjectSelector(
-            scan.Targets, visibility, _shapes, keepRule, _config.ProtectedKinds, _config.LeftoverSearchRadius, _config.LeftoverRemovedShare);
-        var leftovers = selector.SelectRemovals(earlierRemovals.Select(removal => removal.TargetIndex).ToHashSet(), _parallelOptions);
+            scan.Targets,
+            visibility,
+            _shapes,
+            indexes,
+            _containment,
+            new InvisibleObjectReach(_state.LinkCache, _shapes),
+            keepRule,
+            _config.Leftovers);
+        var leftovers = selector.SelectRemovals(ToTargetIndices(earlierRemovals), _parallelOptions);
         RunReport.PrintKept(scan, leftovers.Kept);
         _meshMessages.PrintAndClear();
+        if (_config.DetailedLog) RunReport.PrintLeftoverDecisions(scan, leftovers.Evaluations);
         RunReport.PrintLeftoverStats(leftovers, timer.Elapsed);
-        WriteLeftoverDiagnostics(scan, leftovers);
         return leftovers;
     }
 
-    private void WriteLeftoverDiagnostics(ScanResult scan, LeftoverResult leftovers)
+    private static HashSet<int> ToTargetIndices(IEnumerable<Removal> removals) =>
+        removals.Select(removal => removal.TargetIndex).ToHashSet();
+
+    /// <param name="removals">Every removal of the run.</param>
+    private RelocationResult RelocateKeptMarkers(
+        ScanResult scan,
+        IReadOnlyList<ObjectVisibility> visibility,
+        IReadOnlyList<Removal> removals,
+        LeftoverResult leftovers)
     {
-        if (!_config.WritesDiagnostics) return;
+        if (!_config.Leftovers.MovesKeptMarkers) return RelocationResult.None;
+
+        var removed = ToTargetIndices(removals);
+        var remainingVisible = Enumerable.Range(0, scan.Targets.Count).Where(index => visibility[index].IsVisible && !removed.Contains(index));
+        var obstacles = new VisibleObstacles(
+            new SupporterIndex(scan.SupportersBySpace, _shapes),
+            VisibleTargetIndex.Build(scan.Targets, remainingVisible, _shapes),
+            _containment);
+        var relocator = new KeptObjectRelocator(
+            scan.Targets,
+            obstacles,
+            new NavmeshIndex(scan.NavmeshTrianglesBySpace),
+            new TerrainSpotSearch(new TerrainHeights(scan.Landscapes, scan.LandWorldspaces)));
+        var relocations = relocator.Relocate(leftovers.Evaluations, _parallelOptions);
+        _meshMessages.PrintAndClear();
+        RunReport.PrintRelocations(scan, relocations);
+        return relocations;
+    }
+
+    private void WriteLeftoverDiagnostics(ScanResult scan, LeftoverResult leftovers, RelocationResult relocations)
+    {
+        if (!_config.WritesDiagnostics || !_config.Leftovers.Enabled) return;
 
         AccessDiagnosticsFolder($"writing {LeftoverDiagnosticsWriter.FileName}", () =>
         {
-            var path = LeftoverDiagnosticsWriter.Write(_config.DiagnosticsFolder, scan, _shapes, leftovers.Evaluations, _config.LeftoverRemovedShare);
+            var path = LeftoverDiagnosticsWriter.Write(_config.DiagnosticsFolder, scan, _shapes, leftovers.Evaluations, relocations);
             Console.WriteLine($"Leftover invisible objects diagnostics: wrote {leftovers.Evaluations.Count:N0} evaluations to {path}.");
         });
     }
@@ -291,17 +332,25 @@ internal sealed class RemovalPipeline
     private void AccessDiagnosticsFolder(string description, Action access) =>
         DiagnosticsFiles.Access(_config.DiagnosticsFolder, description, access);
 
-    private void WriteOverrides(ScanResult scan, IReadOnlyList<Removal> removals)
+    private void WriteOverrides(ScanResult scan, IReadOnlyList<Removal> removals, IReadOnlyList<Relocation> moves)
     {
         var timer = Stopwatch.StartNew();
-        var remover = new ObjectRemover(_state.PatchMod);
+        var overrides = new PlacedOverrideWriter(_state.PatchMod);
+        var remover = new ObjectRemover(overrides);
         var enableParentsReplaced = 0;
         foreach (var removal in removals)
         {
             var index = removal.TargetIndex;
             if (remover.Disable(scan.Targets[index].Record, scan.TargetLocations[index])) enableParentsReplaced++;
         }
-        RunReport.PrintWriteSummary(removals.Count, enableParentsReplaced, timer.Elapsed);
+
+        var mover = new ObjectMover(overrides);
+        foreach (var move in moves)
+        {
+            var index = move.Evaluation.TargetIndex;
+            mover.MoveTo(scan.Targets[index].Record, scan.TargetLocations[index], move.To);
+        }
+        RunReport.PrintWriteSummary(removals.Count, moves.Count, enableParentsReplaced, timer.Elapsed);
     }
 
     private void PrintFinalReport(

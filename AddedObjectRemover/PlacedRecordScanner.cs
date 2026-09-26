@@ -27,16 +27,19 @@ internal sealed class ScanResult
     /// <summary>
     /// Placed objects of any plugin in the target spaces that are not target objects (base game,
     /// masters, excluded plugins, records the target overrides, target records a later plugin
-    /// overrides, other mods): everything physically there that may hold up a target object.
-    /// Collected only for Anchoring.
+    /// overrides, other mods): everything physically there that may hold up a target object or
+    /// block a moved one. Collected only for Anchoring and for moving kept markers.
     /// </summary>
     public Dictionary<FormKey, List<OtherObject>> SupportersBySpace { get; } = new();
 
-    /// <summary>Target worldspace -> the worldspace whose LAND records it uses; collected only for Anchoring.</summary>
+    /// <summary>Target worldspace -> the worldspace whose LAND records it uses; collected only for Anchoring and for moving kept markers.</summary>
     public Dictionary<FormKey, FormKey> LandWorldspaces { get; } = new();
 
-    /// <summary>Winning LAND record of each exterior cell in a worldspace of <see cref="LandWorldspaces"/>; collected only for Anchoring.</summary>
+    /// <summary>Winning LAND record of each exterior cell in a worldspace of <see cref="LandWorldspaces"/>; collected only for Anchoring and for moving kept markers.</summary>
     public Dictionary<ExteriorCell, ILandscapeGetter> Landscapes { get; } = new();
+
+    /// <summary>Triangles (world space) of the winning navmeshes of each target space; collected only for moving kept markers.</summary>
+    public Dictionary<FormKey, List<MeshTriangle>> NavmeshTrianglesBySpace { get; } = new();
 
     public int RecordsScanned { get; set; }
     public int TargetsOverriddenLater { get; set; }
@@ -56,8 +59,9 @@ internal sealed record TargetPluginFootprint(HashSet<FormKey> SpaceKeys, HashSet
 
 /// <summary>
 /// Collects target objects and other mods' objects from every winning placed record (REFR, ACHR
-/// and all placed trap/hazard/projectile types), the records that link to target objects, and for
-/// Anchoring also every possible supporter and the terrain of the target worldspaces.
+/// and all placed trap/hazard/projectile types), the records that link to target objects, for
+/// Anchoring and moving kept markers also every other placed object and the terrain of the target
+/// worldspaces, and for moving kept markers the navmeshes of the target spaces.
 ///
 /// Walks each mod's cell tree once via <c>EnumerateMajorRecordContexts&lt;ICell&gt;</c> (enumerating
 /// IPlaced walks each tree three times) and reads each cell's Persistent and Temporary lists itself.
@@ -71,10 +75,12 @@ internal sealed class PlacedRecordScanner
     private readonly IPatcherState<ISkyrimMod, ISkyrimModGetter> _state;
     private readonly RunConfig _config;
     private readonly TargetPluginFootprint _footprint;
-    private readonly bool _collectsAnchoringData;
+    private readonly bool _collectsSurroundingsData;
+    private readonly bool _collectsNavmeshes;
     private readonly HashSet<FormKey> _landWorldspaces;
     private readonly ScanResult _scan = new();
     private readonly HashSet<FormKey> _seenRecords = new();
+    private readonly HashSet<FormKey> _seenNavmeshes = new();
     private readonly Dictionary<FormKey, IModContext<ISkyrimMod, ISkyrimModGetter, ICell, ICellGetter>> _winningCells = new();
 
     private PlacedRecordScanner(
@@ -85,8 +91,9 @@ internal sealed class PlacedRecordScanner
         _state = state;
         _config = config;
         _footprint = footprint;
-        _collectsAnchoringData = config.FollowUpMode == FollowUpRemovalMode.Anchoring;
-        if (_collectsAnchoringData) FindLandWorldspaces();
+        _collectsNavmeshes = config.Leftovers.MovesKeptMarkers;
+        _collectsSurroundingsData = config.FollowUpMode == FollowUpRemovalMode.Anchoring || _collectsNavmeshes;
+        if (_collectsSurroundingsData) FindLandWorldspaces();
         _landWorldspaces = _scan.LandWorldspaces.Values.ToHashSet();
     }
 
@@ -183,6 +190,7 @@ internal sealed class PlacedRecordScanner
         var inTargetSpace = _footprint.SpaceKeys.Contains(space.SpaceKey);
         if (inTargetSpace) _winningCells.TryAdd(cell.FormKey, cellContext);
         if (_landWorldspaces.Contains(space.SpaceKey)) CollectLandscape(cell, space);
+        if (_collectsNavmeshes && inTargetSpace) CollectNavmeshes(cell, space.SpaceKey);
 
         foreach (var (record, persistent) in cell.EnumeratePlaced())
         {
@@ -198,6 +206,16 @@ internal sealed class PlacedRecordScanner
     {
         if (space.SpaceKey == cell.FormKey || cell.Grid is not { } grid || cell.Landscape is not { } landscape) return;
         _scan.Landscapes.TryAdd(new ExteriorCell(space.SpaceKey, grid.Point.X, grid.Point.Y), landscape);
+    }
+
+    /// <remarks>Like placed records, the first copy of a navmesh found is its winner.</remarks>
+    private void CollectNavmeshes(ICellGetter cell, FormKey spaceKey)
+    {
+        foreach (var navmesh in cell.NavigationMeshes)
+        {
+            if (!_seenNavmeshes.Add(navmesh.FormKey) || navmesh.IsDeleted || navmesh.Data is not { } data) continue;
+            GetOrAddSpaceList(_scan.NavmeshTrianglesBySpace, spaceKey).AddRange(NavmeshIndex.ReadTriangles(data));
+        }
     }
 
     private void ScanRecord(
@@ -220,7 +238,7 @@ internal sealed class PlacedRecordScanner
 
         var role = Classify(record, winningMod);
         var placement = GetPlacementInWorld(record);
-        if (_collectsAnchoringData && inTargetSpace && role != RecordRole.Target && placement != null)
+        if (_collectsSurroundingsData && inTargetSpace && role != RecordRole.Target && placement != null)
         {
             AddSupporter(record, placement, space.SpaceKey, winningMod);
         }
@@ -300,19 +318,19 @@ internal sealed class PlacedRecordScanner
     }
 
     private void AddOther(IPlacedGetter record, IPlacementGetter placement, FormKey spaceKey, ModKey winningMod) =>
-        AddToSpace(_scan.OthersBySpace, spaceKey, CreateOtherObject(record, placement, winningMod, _config.DetailedLog ? record.EditorID : null));
+        GetOrAddSpaceList(_scan.OthersBySpace, spaceKey).Add(CreateOtherObject(record, placement, winningMod, _config.DetailedLog ? record.EditorID : null));
 
     private void AddSupporter(IPlacedGetter record, IPlacementGetter placement, FormKey spaceKey, ModKey winningMod) =>
-        AddToSpace(_scan.SupportersBySpace, spaceKey, CreateOtherObject(record, placement, winningMod, editorId: null));
+        GetOrAddSpaceList(_scan.SupportersBySpace, spaceKey).Add(CreateOtherObject(record, placement, winningMod, editorId: null));
 
-    private static void AddToSpace(Dictionary<FormKey, List<OtherObject>> objectsBySpace, FormKey spaceKey, OtherObject placed)
+    private static List<T> GetOrAddSpaceList<T>(Dictionary<FormKey, List<T>> bySpace, FormKey spaceKey)
     {
-        if (!objectsBySpace.TryGetValue(spaceKey, out var objects))
+        if (!bySpace.TryGetValue(spaceKey, out var items))
         {
-            objects = [];
-            objectsBySpace[spaceKey] = objects;
+            items = [];
+            bySpace[spaceKey] = items;
         }
-        objects.Add(placed);
+        return items;
     }
 
     private static OtherObject CreateOtherObject(IPlacedGetter record, IPlacementGetter placement, ModKey winningMod, string? editorId) => new(

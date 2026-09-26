@@ -99,19 +99,29 @@ public class FollowUpRemovalSettings
 public class LeftoverInvisibleObjectSettings
 {
     public const float DefaultSearchRadius = 1024f;
-    public const float DefaultRemovedSurroundingsPercent = 50f;
+    public const int DefaultDirectionThresholdPercent = 50;
+    public const int DefaultRemovedDirectionsPercent = 60;
+    public const int DefaultOccupiedDirectionsPercent = 50;
 
     [SynthesisSettingName("Remove leftover invisible objects")]
-    [SynthesisTooltip("In every follow-up mode, also remove the target's invisible objects (lights, sounds, markers, insect spawners, trigger boxes, ...) once the target's visible objects around them were removed.")]
+    [SynthesisTooltip("Remove the target's invisible objects (lights, sounds, markers, insect spawners, trigger boxes, ...) that sit inside another mod's object or whose surrounding target objects were removed.")]
     public bool RemoveLeftoverInvisibleObjects { get; set; } = true;
 
     [SynthesisSettingName("Search radius")]
-    [SynthesisTooltip("Distance in game units (more than 0) from an invisible object to the edges of the target's visible objects that count as its surroundings.")]
+    [SynthesisTooltip("Largest distance in game units (more than 0) from an invisible object to the target's visible objects that count as its surroundings; a light or sound with a smaller reach uses its reach.")]
     public float SearchRadius { get; set; } = DefaultSearchRadius;
 
-    [SynthesisSettingName("Removed surroundings percentage")]
-    [SynthesisTooltip("An invisible object is removed when at least this percentage (1-100) of its surroundings was removed, including the nearest object and at least one object on every side.")]
-    public float RemovedSurroundingsPercent { get; set; } = DefaultRemovedSurroundingsPercent;
+    [SynthesisSettingName("Direction threshold")]
+    [SynthesisTooltip("A direction counts as removed when at least this percentage (10-100, in steps of 10) of the ground area of the target objects in it was removed.")]
+    public int DirectionThresholdPercent { get; set; } = DefaultDirectionThresholdPercent;
+
+    [SynthesisSettingName("Removed directions required")]
+    [SynthesisTooltip("An invisible object is removed when at least this percentage (10-100, in steps of 10) of the directions holding target objects are removed.")]
+    public int RemovedDirectionsPercent { get; set; } = DefaultRemovedDirectionsPercent;
+
+    [SynthesisSettingName("Occupied directions required")]
+    [SynthesisTooltip("An invisible object is kept unless at least this percentage (10-100, in steps of 10) of the 8 directions around it hold target objects.")]
+    public int OccupiedDirectionsPercent { get; set; } = DefaultOccupiedDirectionsPercent;
 
     [SynthesisSettingName("Protected types")]
     [SynthesisTooltip("Invisible object types that are always kept.\nNone: nothing is protected.\nMarkers: map, X, idle, furniture and door markers.\nMarkersAndLights: Markers plus lights.\nMarkersLightsAndSounds: MarkersAndLights plus sound markers and acoustic spaces.\nCustom: the types listed in Custom protected types.")]
@@ -120,6 +130,10 @@ public class LeftoverInvisibleObjectSettings
     [SynthesisSettingName("Custom protected types")]
     [SynthesisTooltip("Used only when Protected types is Custom: the invisible object types to keep.")]
     public List<InvisibleObjectKind> CustomProtectedTypes { get; set; } = [];
+
+    [SynthesisSettingName("Move kept markers out of other mods' objects")]
+    [SynthesisTooltip("Move an invisible object that is kept although it sits inside another mod's object to the nearest free spot on the navmesh or, failing that, the ground.")]
+    public bool MoveKeptMarkersOutOfOtherModsObjects { get; set; }
 }
 
 public class DiagnosticsSettings

@@ -35,10 +35,13 @@ internal static class RunReport
 
     private static string DescribeLeftoverRemoval(RunConfig config)
     {
-        if (!config.RemoveLeftoverInvisibleObjects) return "Leftover invisible objects: kept.";
-        var protectedKinds = config.ProtectedKinds.Count == 0 ? "none" : string.Join(", ", config.ProtectedKinds.Order());
-        return $"Leftover invisible objects: removed, search radius {config.LeftoverSearchRadius}, "
-            + $"removed surroundings {config.LeftoverRemovedShare:P0}, protected types {config.ProtectedPreset} ({protectedKinds}).";
+        var leftovers = config.Leftovers;
+        if (!leftovers.Enabled) return "Leftover invisible objects: kept.";
+        var protectedKinds = leftovers.ProtectedKinds.Count == 0 ? "none" : string.Join(", ", leftovers.ProtectedKinds.Order());
+        return $"Leftover invisible objects: removed, search radius {leftovers.SearchRadius}, "
+            + $"direction threshold {leftovers.DirectionThresholdPercent}%, removed directions required {leftovers.RemovedDirectionsPercent}%, "
+            + $"occupied directions required {leftovers.OccupiedDirectionsPercent}%, protected types {leftovers.ProtectedPreset} ({protectedKinds}), "
+            + $"kept markers inside other mods' objects {(leftovers.MovesKeptMarkers ? "moved" : "left in place")}.";
     }
 
     public static void PrintOverriddenOthers(ScanResult scan, ModKey target)
@@ -71,7 +74,11 @@ internal static class RunReport
         }
         if (scan.SupportersBySpace.Count > 0)
         {
-            Console.WriteLine($"  Recorded {scan.SupporterCount:N0} placed objects of any plugin as possible Anchoring supporters.");
+            Console.WriteLine($"  Recorded {scan.SupporterCount:N0} placed objects of any plugin as possible supporters or obstacles.");
+        }
+        if (scan.NavmeshTrianglesBySpace.Count > 0)
+        {
+            Console.WriteLine($"  Recorded {scan.NavmeshTrianglesBySpace.Values.Sum(triangles => triangles.Count):N0} navmesh triangles.");
         }
     }
 
@@ -176,12 +183,56 @@ internal static class RunReport
 
     public static void PrintLeftoverStats(LeftoverResult leftovers, TimeSpan elapsed)
     {
-        var keptByDecision = Enum.GetValues<LeftoverDecision>()
-            .Where(decision => decision != LeftoverDecision.Removed)
-            .Select(decision => $"{leftovers.CountDecisions(decision):N0} {LeftoverDecisionText.Describe(decision)}");
+        var decisions = Enum.GetValues<LeftoverDecision>();
         Console.WriteLine(
-            $"Leftover invisible objects: {leftovers.Evaluations.Count:N0} evaluated, {leftovers.Removals.Count:N0} removed in {elapsed.TotalSeconds:F1}s; "
-            + $"kept {string.Join(", ", keptByDecision)}.");
+            $"Leftover invisible objects: {leftovers.Evaluations.Count:N0} evaluated in {elapsed.TotalSeconds:F1}s; "
+            + $"removed {leftovers.Removals.Count:N0} ({DescribeDecisionCounts(leftovers, decisions.Where(LeftoverDecisionText.IsRemoval))}); "
+            + $"kept {leftovers.Evaluations.Count - leftovers.Removals.Count:N0} "
+            + $"({DescribeDecisionCounts(leftovers, decisions.Where(decision => !LeftoverDecisionText.IsRemoval(decision)))}).");
+    }
+
+    private static string DescribeDecisionCounts(LeftoverResult leftovers, IEnumerable<LeftoverDecision> decisions) =>
+        string.Join(", ", decisions.Select(decision => $"{leftovers.CountDecisions(decision):N0} {LeftoverDecisionText.Describe(decision)}"));
+
+    public static void PrintLeftoverDecisions(ScanResult scan, IEnumerable<LeftoverEvaluation> evaluations)
+    {
+        foreach (var evaluation in evaluations)
+        {
+            var target = scan.Targets[evaluation.TargetIndex];
+            Console.WriteLine(
+                $"  Leftover {RecordNames.Describe(target.Record)} ({evaluation.Kind}) in {scan.SpaceNames[target.SpaceKey]}: "
+                + $"{(evaluation.IsRemoved ? "removed" : "kept")}, {DescribeLeftoverReason(evaluation)}; radius {evaluation.Radius:F0}, "
+                + $"removed/total ground area {evaluation.Surroundings.Describe()}.");
+        }
+    }
+
+    /// <summary>The reason, naming the other mod's object the invisible object sits inside, if any.</summary>
+    private static string DescribeLeftoverReason(LeftoverEvaluation evaluation) =>
+        evaluation.ContainingObject is { } inside
+            ? $"{LeftoverDecisionText.DescribeReason(evaluation)} (inside {DescribeOtherObject(inside)})"
+            : LeftoverDecisionText.DescribeReason(evaluation);
+
+    private static string DescribeOtherObject(OtherObject other) =>
+        $"{RecordNames.Describe(other.FormKey, other.EditorId)} {RecordNames.DescribeOrigin(other.FormKey, other.WinningMod)}";
+
+    public static void PrintRelocations(ScanResult scan, RelocationResult relocations)
+    {
+        foreach (var move in relocations.Moved)
+        {
+            var target = scan.Targets[move.Evaluation.TargetIndex];
+            Console.WriteLine(
+                $"  Moved kept {RecordNames.Describe(target.Record)} in {scan.SpaceNames[target.SpaceKey]} "
+                + $"out of {DescribeOtherObject(move.Evaluation.ContainingObject!.Value)}: {move.Distance:F0} units onto the {move.Surface.ToString().ToLowerInvariant()}.");
+        }
+        foreach (var evaluation in relocations.LeftInPlace)
+        {
+            var target = scan.Targets[evaluation.TargetIndex];
+            Console.WriteLine(
+                $"  Left kept {RecordNames.Describe(target.Record)} in {scan.SpaceNames[target.SpaceKey]} "
+                + $"inside {DescribeOtherObject(evaluation.ContainingObject!.Value)}: no free navmesh or terrain spot within {KeptObjectRelocator.MaxMoveDistance:F0} units.");
+        }
+        Console.WriteLine(
+            $"Moved {relocations.Moved.Count:N0} kept invisible objects out of other mods' objects; {relocations.LeftInPlace.Count:N0} left in place.");
     }
 
     private static void PrintPairStats(PairTestStats pairs, int rounds, string roundName) =>
@@ -202,9 +253,9 @@ internal static class RunReport
             $"Mesh origins: {summary.Meshes:N0} target meshes, {summary.NearBottom:N0} {MeshOriginDiagnosticsWriter.NearBottom}, "
             + $"{summary.NearCentre:N0} {MeshOriginDiagnosticsWriter.NearCentre}, {summary.Other:N0} {MeshOriginDiagnosticsWriter.Other}.");
 
-    public static void PrintWriteSummary(int overrideCount, int enableParentsReplaced, TimeSpan elapsed)
+    public static void PrintWriteSummary(int removedCount, int movedCount, int enableParentsReplaced, TimeSpan elapsed)
     {
-        Console.WriteLine($"Wrote {overrideCount:N0} overrides in {elapsed.TotalSeconds:F1}s.");
+        Console.WriteLine($"Wrote {removedCount + movedCount:N0} overrides ({removedCount:N0} removed, {movedCount:N0} moved) in {elapsed.TotalSeconds:F1}s.");
         if (enableParentsReplaced > 0)
         {
             Console.WriteLine(
@@ -228,14 +279,11 @@ internal static class RunReport
 
     private static string DescribeRemovalReason(ScanResult scan, Removal removal) => removal switch
     {
-        TooCloseRemoval { TooCloseTo: var other } =>
-            $"too close to {RecordNames.Describe(other.FormKey, other.EditorId)} {RecordNames.DescribeOrigin(other.FormKey, other.WinningMod)}",
+        TooCloseRemoval { TooCloseTo: var other } => $"too close to {DescribeOtherObject(other)}",
         TouchingRemoval touching => $"touches removed {RecordNames.Describe(scan.Targets[touching.TouchedTargetIndex].Record)}",
         AnchoringRemoval anchoring =>
             $"{anchoring.RemovedShare:P0} of its support was removed (mostly {RecordNames.Describe(scan.Targets[anchoring.MainRemovedSupporter].Record)})",
-        LeftoverRemoval { Surroundings: var surroundings } =>
-            $"invisible and {surroundings.RemovedShare:P0} of the visible objects around it were removed "
-            + $"({surroundings.TotalRemoved:N0}/{surroundings.TotalVisible:N0}; {surroundings.Describe()})",
+        LeftoverRemoval { Evaluation: var evaluation } => $"invisible, {DescribeLeftoverReason(evaluation)}",
         _ => throw new UnreachableException($"Unknown removal type {removal.GetType().Name}."),
     };
 

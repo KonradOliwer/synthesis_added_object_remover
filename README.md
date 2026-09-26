@@ -7,8 +7,8 @@ A [Synthesis](https://github.com/Mutagen-Modding/Synthesis) patcher for Skyrim S
 It removes objects added by one plugin (the *target plugin*) when they sit too close to objects
 added by other mods, a common source of clipping and duplicated clutter when several mods edit
 the same area. By default it also removes the target's objects that were touching a removed one,
-and the target's invisible objects (lights, sounds, insect spawners, ...) left behind once the
-objects around them are gone.
+and the target's invisible objects (lights, sounds, insect spawners, ...) that sit inside another
+mod's object or are left behind once the objects around them are gone.
 
 Removal never deletes anything: the object is disabled and moved far below the world. The output
 plugin is `AddedObjectRemover.esp`.
@@ -51,13 +51,25 @@ plugin is `AddedObjectRemover.esp`.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| Remove leftover invisible objects | `true` | Remove the target's invisible objects once the target's visible objects around them were removed. Works in every follow-up mode. |
-| Search radius | `1024` | Distance in game units (more than 0) from an invisible object to the edges of the target's visible objects that count as its surroundings. |
-| Removed surroundings percentage | `50` | An invisible object is removed when at least this percentage (1-100) of its surroundings was removed, including the nearest object and at least one object on every side (north-east, north-west, south-west, south-east). |
+| Remove leftover invisible objects | `true` | Remove the target's invisible objects that sit inside another mod's object or whose surroundings were removed. Works in every follow-up mode. |
+| Search radius | `1024` | Largest distance in game units (more than 0) from an invisible object to the edges of the target's visible objects that count as its surroundings. A light or sound that reaches less far uses its own reach. |
+| Direction threshold | `50` | A direction counts as removed when at least this percentage of the ground area of the target objects in it was removed. |
+| Removed directions required | `60` | An invisible object is removed when at least this percentage of the directions holding target objects are removed. |
+| Occupied directions required | `50` | An invisible object is kept unless at least this percentage of the 8 directions around it hold target objects. |
 | Protected types | `None` | Invisible object types that are always kept (see below). |
 | Custom protected types | *(empty)* | The types to keep when *Protected types* is `Custom`. |
+| Move kept markers out of other mods' objects | `false` | Move an invisible object that is kept although it sits inside another mod's object to the nearest free spot on the navmesh or, failing that, the ground. Only its position changes. |
 
-Only the target plugin's own objects count as surroundings. Protected types presets:
+The three percentages take values from 10 to 100 in steps of 10.
+
+An invisible object is removed when:
+- it sits inside a visible object of another mod, or
+- its surroundings were removed: the area around it is split into 8 directions (north, north-east,
+  east, ...), and enough directions hold target objects and enough of those lost most of their
+  ground area.
+
+Only the target plugin's own objects count as surroundings. Protected types and objects that
+something depends on (see *Safety*) are kept in any case. Protected types presets:
 - **None**: nothing is protected.
 - **Markers**: map markers, X markers (XMarker, XMarkerHeading), idle, furniture and door markers.
 - **MarkersAndLights**: *Markers* plus lights.
@@ -74,7 +86,8 @@ Only the target plugin's own objects count as surroundings. Protected types pres
 | Diagnostics folder | *(empty)* | Folder for diagnostics spreadsheets (CSV files). Leave empty to write nothing. Use an absolute path; a relative one is resolved against Synthesis's working folder. These files never change the result. |
 
 Invalid values are replaced, with a warning in the log: numbers out of range by the nearest valid
-value, a search radius of 0 or less by its default. A follow-up mode or protected type name that
+value, percentages that are not a step of 10 by the nearest step, a search radius of 0 or less by
+its default. A follow-up mode or protected type name that
 Synthesis does not know stops the run.
 
 ## Safety
@@ -106,8 +119,9 @@ fractions: 0.5 = 50%.
 - **`edges.csv`** (*AnyTouch* only): pairs of target objects found touching, with their distance.
 - **`components.csv`** (*AnyTouch* only): one row per chain of touching objects removed together,
   with the too-close object(s) that started it.
-- **`leftover-invisible-objects.csv`**: one row per invisible target object checked, with its
-  surroundings on each side, how much of them was removed, and the decision.
+- **`leftover-invisible-objects.csv`**: one row per invisible target object checked, with the
+  other mod's object it sits inside, the ground area around it and how much of it was removed in
+  each direction, the decision, and where it was moved to, if it was.
 
 ## Known limitations
 
@@ -120,6 +134,8 @@ fractions: 0.5 = 50%.
   counts it.
 - Only the target plugin's own, unmodified objects are checked; objects a later plugin overrides
   are skipped.
+- A kept invisible object is moved only up to 2048 units, and in tight interiors the navmesh and
+  floor often lie inside room pieces, so it may be left where it is (the log says so).
 
 ## Upgrading from an earlier version
 

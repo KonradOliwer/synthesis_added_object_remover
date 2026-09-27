@@ -96,7 +96,11 @@ internal static class RunReport
         }
         if (scan.TargetsDisabledOrWithoutPlacement > 0)
         {
-            Console.WriteLine($"  Ignored {scan.TargetsDisabledOrWithoutPlacement:N0} {target} objects that are initially disabled or have no valid position.");
+            Console.WriteLine($"  Ignored {scan.TargetsDisabledOrWithoutPlacement:N0} {target} objects that are initially disabled or have no valid position or rotation.");
+        }
+        if (scan.InvalidPlacements > 0)
+        {
+            Console.WriteLine($"  Ignored {scan.InvalidPlacements:N0} placed objects in the spaces of {target} objects whose position or rotation is out of range or not a number.");
         }
         if (scan.OthersOverriddenByTarget > 0)
         {

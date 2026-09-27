@@ -70,7 +70,7 @@ internal sealed class RemovalPipeline
         var tooClose = SelectTooCloseRemovals(scan, visibility, indexes, keepRule);
         List<Removal> removals = [.. tooClose.Removals];
         AddLinkedRemovals(removals, tooClose.Removals, groups, "too-close");
-        var followUp = SelectFollowUpRemovals(scan, removals.ToList(), tooClose, supporters, keepRule);
+        var followUp = SelectFollowUpRemovals(scan, visibility, removals.ToList(), tooClose, supporters, keepRule);
         removals.AddRange(followUp.Removals);
         AddLinkedRemovals(removals, followUp.Removals, groups, "follow-up");
         var leftovers = SelectLeftoverRemovals(scan, visibility, indexes, removals, keepRule);
@@ -228,6 +228,7 @@ internal sealed class RemovalPipeline
     /// <param name="seeds">The too-close removals and their linked groups.</param>
     private FollowUpRemovals SelectFollowUpRemovals(
         ScanResult scan,
+        IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyList<Removal> seeds,
         TooCloseSelection tooClose,
         SupporterIndex supporters,
@@ -237,20 +238,22 @@ internal sealed class RemovalPipeline
         return _config.FollowUpMode switch
         {
             FollowUpRemovalMode.Nothing => FollowUpRemovals.None,
-            FollowUpRemovalMode.EverythingTouching => SelectTouchingRemovals(scan, seeds, tooClose, keepRule),
-            FollowUpRemovalMode.ObjectsSupportedByIt => SelectUnanchoredRemovals(scan, seeds, tooClose, supporters, keepRule),
+            FollowUpRemovalMode.EverythingTouching => SelectTouchingRemovals(scan, visibility, seeds, tooClose, keepRule),
+            FollowUpRemovalMode.ObjectsSupportedByIt => SelectUnanchoredRemovals(scan, visibility, seeds, tooClose, supporters, keepRule),
             _ => throw new UnreachableException($"Unknown follow-up removal mode {_config.FollowUpMode}."),
         };
     }
 
     private FollowUpRemovals SelectTouchingRemovals(
         ScanResult scan,
+        IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyList<Removal> seeds,
         TooCloseSelection tooClose,
         KeepReferencedRule keepRule)
     {
         var clusters = TouchClusterFinder.Find(
             scan.Targets,
+            visibility,
             ToTargetIndexList(seeds),
             tooClose.KeptIndices,
             _shapes,
@@ -281,6 +284,7 @@ internal sealed class RemovalPipeline
 
     private FollowUpRemovals SelectUnanchoredRemovals(
         ScanResult scan,
+        IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyList<Removal> seeds,
         TooCloseSelection tooClose,
         SupporterIndex supporters,
@@ -288,6 +292,7 @@ internal sealed class RemovalPipeline
     {
         var anchoring = AnchoringRemover.Run(
             scan.Targets,
+            visibility,
             ToTargetIndexList(seeds),
             tooClose.KeptIndices,
             supporters,

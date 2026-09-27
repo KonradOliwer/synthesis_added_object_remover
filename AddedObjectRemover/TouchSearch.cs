@@ -3,7 +3,7 @@ namespace AddedObjectRemover;
 /// <summary>
 /// The touch search among target objects shared by AnyTouch and Anchoring: the broad phase over the
 /// spaces that contain a seed, the narrow phase, and the triangle trees they read. Targets without
-/// a mesh never take part.
+/// a mesh or not visible never take part.
 /// </summary>
 internal sealed class TouchSearch
 {
@@ -31,9 +31,11 @@ internal sealed class TouchSearch
 
     public TriangleTreeCache Cache { get; }
 
-    /// <param name="excluded">Targets that never take part, in addition to those without a mesh.</param>
+    /// <param name="visibility">Parallel to <paramref name="targets"/>.</param>
+    /// <param name="excluded">Targets that never take part, in addition to those without a mesh or not visible.</param>
     public static TouchSearch Create(
         IReadOnlyList<TargetObject> targets,
+        IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyList<int> seeds,
         IReadOnlyList<int> excluded,
         BaseObjectShapeProvider shapes,
@@ -45,7 +47,7 @@ internal sealed class TouchSearch
         var candidateFinder = TouchCandidateFinder.Create(
             targets,
             seeds.Select(seed => targets[seed].SpaceKey).ToHashSet(),
-            MarkExcluded(targets.Count, excluded, meshPaths),
+            MarkExcluded(visibility, excluded, meshPaths),
             shapes,
             tolerance,
             parallelOptions);
@@ -53,10 +55,14 @@ internal sealed class TouchSearch
         return new TouchSearch(meshPaths, candidateFinder, tester, cache, parallelOptions);
     }
 
-    private static bool[] MarkExcluded(int count, IReadOnlyList<int> excluded, TargetMeshPaths meshPaths)
+    /// <remarks>
+    /// An invisible target (marker, light, sound emitter, ...) can still have a mesh, for example an
+    /// idle marker or a map marker reference; it neither holds up nor touches anything in game.
+    /// </remarks>
+    internal static bool[] MarkExcluded(IReadOnlyList<ObjectVisibility> visibility, IReadOnlyList<int> excluded, TargetMeshPaths meshPaths)
     {
-        var marks = new bool[count];
-        for (var i = 0; i < count; i++) marks[i] = !meshPaths.HasMesh(i);
+        var marks = new bool[visibility.Count];
+        for (var i = 0; i < marks.Length; i++) marks[i] = !meshPaths.HasMesh(i) || !visibility[i].IsVisible;
         foreach (var target in excluded) marks[target] = true;
         return marks;
     }

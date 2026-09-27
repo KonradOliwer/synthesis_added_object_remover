@@ -93,11 +93,13 @@ internal sealed class AnchoringRemover
         _contacts = new CandidateContacts?[targetCount];
     }
 
+    /// <param name="visibility">Parallel to <paramref name="targets"/>; invisible targets are never candidates or supporters.</param>
     /// <param name="seeds">Target indices of the earlier removals (too close, and their linked groups).</param>
     /// <param name="keptTooClose">Too-close targets kept as referenced: already logged, still supporters.</param>
     /// <param name="threshold">Fraction of support held by removed objects at which a candidate is removed.</param>
     public static AnchoringResult Run(
         IReadOnlyList<TargetObject> targets,
+        IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyList<int> seeds,
         IReadOnlyList<int> keptTooClose,
         SupporterIndex supporters,
@@ -111,7 +113,7 @@ internal sealed class AnchoringRemover
     {
         var (remover, setup) = Timing.Measure(() =>
         {
-            var search = TouchSearch.Create(targets, seeds, excluded: [], shapes, meshCache, touchDistance, parallelOptions);
+            var search = TouchSearch.Create(targets, visibility, seeds, excluded: [], shapes, meshCache, touchDistance, parallelOptions);
             var supporterFinder = new AnchoringSupporterFinder(targets, search, supporters, shapes, touchDistance);
             var contactFinder = new AnchoringContactFinder(targets, search.MeshPaths, supporterFinder, terrain, search.Cache, touchDistance);
             return new AnchoringRemover(targets.Count, keepRule, search, contactFinder, threshold, parallelOptions);

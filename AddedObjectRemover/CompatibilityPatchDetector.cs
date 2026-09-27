@@ -42,9 +42,14 @@ internal static class CompatibilityPatchDetector
     /// Every plugin in the load order that masters <paramref name="target"/> and other, non-base-game
     /// mods; it is a patch when there are at most <paramref name="maxOtherMasters"/> of those.
     /// </summary>
+    /// <param name="patchMod">
+    /// This run's output plugin. Its listing holds the output of earlier patchers of the same run,
+    /// which masters whatever they touched, so it is never a compatibility patch.
+    /// </param>
     public static CompatibilityPatches Find(
         IEnumerable<IModListingGetter<ISkyrimModGetter>> loadOrder,
         ModKey target,
+        ModKey patchMod,
         IReadOnlySet<ModKey> targetMasters,
         IReadOnlySet<ModKey> baseGamePlugins,
         int maxOtherMasters)
@@ -54,7 +59,7 @@ internal static class CompatibilityPatchDetector
         var mastering = 0;
         foreach (var listing in loadOrder)
         {
-            if (listing.ModKey == target || listing.Mod is not { } mod) continue;
+            if (listing.ModKey == target || listing.ModKey == patchMod || listing.Mod is not { } mod) continue;
 
             var masters = mod.MasterReferences.Select(master => master.Master).ToList();
             if (!masters.Contains(target)) continue;

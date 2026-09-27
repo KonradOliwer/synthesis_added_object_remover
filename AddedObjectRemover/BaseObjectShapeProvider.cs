@@ -63,8 +63,17 @@ internal sealed class BaseObjectShapeProvider
     /// <param name="InvisibleKind">What kind of invisible object the base makes; null when it may be visible.</param>
     /// <param name="Resolved">False when the base is not in the load order.</param>
     /// <param name="EffectOnlyMesh">The base's mesh holds only effect-shader shapes, nothing solid.</param>
-    private sealed record BaseShape(
-        Box Box, string? MeshPath, InvisibleObjectKind? InvisibleKind, bool Resolved = true, bool EffectOnlyMesh = false);
+    /// <param name="InvisibleForLackOfGeometry">
+    /// <paramref name="InvisibleKind"/> is only a marker kind guessed from the base having no geometry,
+    /// not from its record type or marker flag; a primitive reference of such a base is a trigger volume.
+    /// </param>
+    internal sealed record BaseShape(
+        Box Box,
+        string? MeshPath,
+        InvisibleObjectKind? InvisibleKind,
+        bool Resolved = true,
+        bool EffectOnlyMesh = false,
+        bool InvisibleForLackOfGeometry = false);
 
     /// <summary>Vanilla critter spawner activators run a script whose name starts with this.</summary>
     private const string CritterSpawnScriptPrefix = "CritterSpawn";
@@ -103,7 +112,8 @@ internal sealed class BaseObjectShapeProvider
 
     /// <summary>
     /// Whether a placed object with this base can be seen in game. A primitive box reference
-    /// (trigger/activator volume) only counts as visible when its base has a visible mesh.
+    /// (trigger/activator volume) only counts as visible when its base has a visible mesh; otherwise
+    /// it is a trigger box, unless the base's record type or marker flag names another invisible kind.
     /// </summary>
     public ObjectVisibility GetVisibility(BaseRef? baseRef, bool isPrimitive, bool hasMapMarker)
     {
@@ -111,7 +121,7 @@ internal sealed class BaseObjectShapeProvider
         if (baseRef is not { } reference) return ObjectVisibility.MissingBase;
         var shape = GetBaseShape(reference);
         if (!shape.Resolved) return ObjectVisibility.MissingBase;
-        if (shape.InvisibleKind is { } kind) return ObjectVisibility.Invisible(kind);
+        if (shape.InvisibleKind is { } kind && !(isPrimitive && shape.InvisibleForLackOfGeometry)) return ObjectVisibility.Invisible(kind);
         if (shape.EffectOnlyMesh) return ObjectVisibility.EffectOnly;
         return isPrimitive && shape.MeshPath == null
             ? ObjectVisibility.Invisible(InvisibleObjectKind.TriggerBoxes)
@@ -168,7 +178,7 @@ internal sealed class BaseObjectShapeProvider
             if (mesh.Box is { } nifBox)
             {
                 Interlocked.Increment(ref _basesFromNif);
-                return new BaseShape(nifBox, meshPath, GetStructuralInvisibleKind(record, hasModel, meshWithoutGeometry: false, nifBox));
+                return ClassifyShape(record, nifBox, meshPath, hasModel, meshWithoutGeometry: false);
             }
             Interlocked.Increment(ref _basesNifFallbackToObnd);
             if (mesh.Status == NifReadStatus.EffectOnly) return MeasureEffectOnlyBase(record);
@@ -178,12 +188,11 @@ internal sealed class BaseObjectShapeProvider
         if (record is IObjectBoundedOptionalGetter { ObjectBounds: { } bounds })
         {
             Interlocked.Increment(ref _basesFromObnd);
-            var box = ToBox(bounds);
-            return new BaseShape(box, null, GetStructuralInvisibleKind(record, hasModel, meshWithoutGeometry, box));
+            return ClassifyShape(record, ToBox(bounds), meshPath: null, hasModel, meshWithoutGeometry);
         }
 
         Interlocked.Increment(ref _basesWithoutBounds);
-        return new BaseShape(Box.Zero, null, GetStructuralInvisibleKind(record, hasModel, meshWithoutGeometry, Box.Zero));
+        return ClassifyShape(record, Box.Zero, meshPath: null, hasModel, meshWithoutGeometry);
     }
 
     /// <summary>OBND box when present; a light whose model is only an effect (glow, light rays) stays a light.</summary>
@@ -204,23 +213,29 @@ internal sealed class BaseObjectShapeProvider
         new Vector3(bounds.Second.X, bounds.Second.Y, bounds.Second.Z));
 
     /// <summary>
-    /// Record types that never render, a mesh that parsed but has no visible render geometry
-    /// (marker meshes), or no mesh at all and zero-size bounds. NPCs always count as visible.
+    /// Invisible are record types that never render, and bases with a mesh that parsed but has no
+    /// visible render geometry (marker meshes) or with no mesh at all and zero-size bounds. NPCs
+    /// always count as visible.
     /// </summary>
-    private static InvisibleObjectKind? GetStructuralInvisibleKind(IMajorRecordGetter record, bool hasModel, bool meshWithoutGeometry, Box bounds)
+    internal static BaseShape ClassifyShape(IMajorRecordGetter record, Box box, string? meshPath, bool hasModel, bool meshWithoutGeometry)
     {
-        switch (record)
-        {
-            case INpcGetter: return null;
-            case ILightGetter when !hasModel: return InvisibleObjectKind.Lights;
-            case ISoundMarkerGetter: return InvisibleObjectKind.SoundMarkers;
-            case IAcousticSpaceGetter: return InvisibleObjectKind.AcousticSpaces;
-            case ITextureSetGetter: return InvisibleObjectKind.Decals;
-            case IIdleMarkerGetter: return InvisibleObjectKind.IdleMarkers;
-        }
-        var hasNoGeometry = meshWithoutGeometry || (!hasModel && bounds.Size == Vector3.Zero);
-        return hasNoGeometry ? ClassifyMarker(record) : null;
+        if (record is INpcGetter) return new BaseShape(box, meshPath, InvisibleKind: null);
+        if (GetRecordTypeInvisibleKind(record, hasModel, meshWithoutGeometry) is { } kind) return new BaseShape(box, meshPath, kind);
+        var hasNoGeometry = meshWithoutGeometry || (!hasModel && box.Size == Vector3.Zero);
+        return hasNoGeometry
+            ? new BaseShape(box, meshPath, ClassifyMarker(record), InvisibleForLackOfGeometry: true)
+            : new BaseShape(box, meshPath, InvisibleKind: null);
     }
+
+    private static InvisibleObjectKind? GetRecordTypeInvisibleKind(IMajorRecordGetter record, bool hasModel, bool meshWithoutGeometry) => record switch
+    {
+        ILightGetter when !hasModel || meshWithoutGeometry => InvisibleObjectKind.Lights,
+        ISoundMarkerGetter => InvisibleObjectKind.SoundMarkers,
+        IAcousticSpaceGetter => InvisibleObjectKind.AcousticSpaces,
+        ITextureSetGetter => InvisibleObjectKind.Decals,
+        IIdleMarkerGetter => InvisibleObjectKind.IdleMarkers,
+        _ => null,
+    };
 
     /// <summary>
     /// The base's own major record flags carry the engine's IsMarker bit (map, XMarkerHeading and

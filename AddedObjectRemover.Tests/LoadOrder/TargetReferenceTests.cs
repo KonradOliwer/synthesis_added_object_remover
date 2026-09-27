@@ -51,6 +51,24 @@ public class TargetReferenceTests
     }
 
     [Fact]
+    public void BaseObjectLinkIsNeitherAGroupLinkNorAKeepReason()
+    {
+        var targetBase = new FormKey(TestTargets.TargetMod, 0x700);
+        var fromTarget = new PlacedObject(TestTargets.Key(0), SkyrimRelease.SkyrimSE);
+        fromTarget.Base.SetTo(targetBase);
+        var fromOther = new PlacedObject(new FormKey(OtherMod, 0x903), SkyrimRelease.SkyrimSE);
+        fromOther.Base.SetTo(targetBase);
+        var references = new Dictionary<FormKey, KeepReason>();
+        var links = new List<TargetLink>();
+
+        TargetReferenceCollector.CollectFromPlaced(fromTarget, isTargetObject: true, TestTargets.TargetMod, references, links);
+        TargetReferenceCollector.CollectFromPlaced(fromOther, isTargetObject: false, TestTargets.TargetMod, references, links);
+
+        Assert.Empty(links);
+        Assert.Empty(references);
+    }
+
+    [Fact]
     public void NonPlacedRecordLinkKeepsTheTarget()
     {
         var mod = new SkyrimMod(OtherMod, SkyrimRelease.SkyrimSE);

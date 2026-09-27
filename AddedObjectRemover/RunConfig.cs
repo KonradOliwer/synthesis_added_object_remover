@@ -82,7 +82,7 @@ internal static class RunConfigFactory
 
         var compatibilityPatches = ignore.IgnoreModsPatchedWithTarget
             ? CompatibilityPatchDetector.Find(
-                state.LoadOrder.ListedOrder, target, allTargetMasters.ToHashSet(), BaseGamePluginSet,
+                state.LoadOrder.ListedOrder, target, state.PatchMod.ModKey, allTargetMasters.ToHashSet(), BaseGamePluginSet,
                 Clamp(ignore.MaxOtherMastersForPatch, MinOtherMastersForPatch, MaxOtherMastersForPatch, "maximum other masters for a patch"))
             : CompatibilityPatches.None;
         ignored.UnionWith(compatibilityPatches.CollectIgnoredMods());

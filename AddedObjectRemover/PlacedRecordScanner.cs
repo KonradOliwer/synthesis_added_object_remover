@@ -49,11 +49,29 @@ internal sealed class ScanResult
     public int TargetsDisabledOrWithoutPlacement { get; set; }
     public int OthersOverriddenByTarget { get; set; }
 
+    /// <summary>Placed records in the target spaces ignored for a position out of range or a position or rotation that is not a number.</summary>
+    public int InvalidPlacements { get; set; }
+
     public int OtherObjectCount => OthersBySpace.Values.Sum(x => x.Count);
 
     public int SupporterCount => SupportersBySpace.Values.Sum(x => x.Count);
 
     public int NavmeshCount => NavmeshesBySpace.Values.Sum(x => x.Count);
+}
+
+/// <summary>Which placed records count as present in the world, and which placements are usable.</summary>
+internal static class PlacementInWorld
+{
+    /// <summary>
+    /// Initially Disabled hides a record, except another mod's record with an Enable Parent: the
+    /// parent's state decides whether the game shows it, so it counts as present.
+    /// </summary>
+    public static bool IsHidden(IPlacedGetter record, bool isTarget) =>
+        record.IsInitiallyDisabled() && (isTarget || record.EnableParent == null);
+
+    /// <summary>A non-finite rotation would make every oriented box test report a hit.</summary>
+    public static bool IsValid(IPlacementGetter placement) =>
+        Geometry.IsWithinLimits(Geometry.ToVector(placement.Position)) && Geometry.IsFinite(Geometry.ToVector(placement.Rotation));
 }
 
 /// <summary>
@@ -238,27 +256,25 @@ internal sealed class PlacedRecordScanner
         if (record.IsDeleted) return;
 
         var role = Classify(record, winningMod);
-        var placement = GetPlacementInWorld(record);
+        // Targets define the target spaces, so no placement outside them can matter.
+        var placement = inTargetSpace ? FindPlacementInWorld(record, role) : null;
         if (collectReferences)
         {
-            var isTargetObject = role == RecordRole.Target && placement != null && inTargetSpace;
+            var isTargetObject = role == RecordRole.Target && placement != null;
             TargetReferenceCollector.CollectFromPlaced(record, isTargetObject, _config.Target, _scan.TargetReferences, _scan.TargetLinks);
         }
 
-        if (_collectsSurroundingsData && inTargetSpace && role != RecordRole.Target && placement != null)
+        if (_collectsSurroundingsData && role != RecordRole.Target && placement != null)
         {
             AddSupporter(record, placement, space.SpaceKey, winningMod);
         }
-        if (CountIfSkipped(role, record, winningMod)) return;
+        if (CountIfSkipped(role, record, winningMod) || !inTargetSpace) return;
 
         if (placement == null)
         {
             if (role == RecordRole.Target) _scan.TargetsDisabledOrWithoutPlacement++;
             return;
         }
-
-        // Targets define the target spaces, so no object outside them can matter.
-        if (!inTargetSpace) return;
 
         if (role == RecordRole.Target) AddTarget(record, persistent, placement, cell, space);
         else AddOther(record, placement, space.SpaceKey, winningMod);
@@ -283,11 +299,13 @@ internal sealed class PlacedRecordScanner
         }
     }
 
-    /// <summary>Null for records the game does not show at a valid position: initially disabled, or without a usable placement.</summary>
-    private static IPlacementGetter? GetPlacementInWorld(IPlacedGetter record)
+    /// <summary>Null for records the game does not show (see <see cref="PlacementInWorld.IsHidden"/>) or without a valid placement; invalid ones are counted.</summary>
+    private IPlacementGetter? FindPlacementInWorld(IPlacedGetter record, RecordRole role)
     {
-        var placement = record.IsInitiallyDisabled() ? null : record.Placement;
-        return placement != null && Geometry.IsWithinLimits(Geometry.ToVector(placement.Position)) ? placement : null;
+        if (PlacementInWorld.IsHidden(record, isTarget: role == RecordRole.Target) || record.Placement is not { } placement) return null;
+        if (PlacementInWorld.IsValid(placement)) return placement;
+        _scan.InvalidPlacements++;
+        return null;
     }
 
     private RecordRole Classify(IPlacedGetter record, ModKey winningMod)

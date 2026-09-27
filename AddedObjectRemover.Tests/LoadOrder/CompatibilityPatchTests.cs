@@ -19,6 +19,7 @@ public class CompatibilityPatchTests
     private static readonly ModKey Merged = ModKey.FromNameAndExtension("Merged.esp");
     private static readonly ModKey Unrelated = ModKey.FromNameAndExtension("Unrelated.esp");
     private static readonly ModKey Missing = ModKey.FromNameAndExtension("Missing.esp");
+    private static readonly ModKey SynthesisOutput = ModKey.FromNameAndExtension("Synthesis.esp");
 
     [Fact]
     public void PluginMasteringTargetAndFewOtherModsIsAPatch()
@@ -36,7 +37,7 @@ public class CompatibilityPatchTests
             new ModListing<ISkyrimModGetter>(Missing, mod: null, enabled: true),
         };
 
-        var result = CompatibilityPatchDetector.Find(loadOrder, Target, new HashSet<ModKey> { TargetMaster }, new HashSet<ModKey> { Skyrim }, maxOtherMasters: 2);
+        var result = Find(loadOrder);
 
         Assert.Equal(3, result.PluginsMasteringTarget);
         var patch = Assert.Single(result.Patches);
@@ -46,6 +47,28 @@ public class CompatibilityPatchTests
         Assert.Equal(Merged, skipped.Patch);
         Assert.Equal(new[] { Patch, OtherA }.ToHashSet(), result.CollectIgnoredMods());
     }
+
+    [Fact]
+    public void OutputOfEarlierPatchersIsNeverAPatch()
+    {
+        var loadOrder = new List<IModListingGetter<ISkyrimModGetter>>
+        {
+            Listing(Skyrim),
+            Listing(Target, Skyrim),
+            Listing(OtherA, Skyrim),
+            Listing(SynthesisOutput, Skyrim, Target, OtherA),
+        };
+
+        var result = Find(loadOrder);
+
+        Assert.Equal(0, result.PluginsMasteringTarget);
+        Assert.Empty(result.Patches);
+        Assert.Empty(result.CollectIgnoredMods());
+    }
+
+    private static CompatibilityPatches Find(IEnumerable<IModListingGetter<ISkyrimModGetter>> loadOrder) =>
+        CompatibilityPatchDetector.Find(
+            loadOrder, Target, SynthesisOutput, new HashSet<ModKey> { TargetMaster }, new HashSet<ModKey> { Skyrim }, maxOtherMasters: 2);
 
     private static ModListing<ISkyrimModGetter> Listing(ModKey key, params ModKey[] masters)
     {

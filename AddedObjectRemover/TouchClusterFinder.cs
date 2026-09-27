@@ -34,7 +34,8 @@ internal sealed record TouchDiagnosticsData(
 /// in parallel, only the candidate pairs between the current frontier and unvisited targets; the
 /// results are then applied in frontier order, and each reached node is attributed to the first
 /// frontier node (in neighbor order) that touches it, so the result is deterministic. Touching is
-/// decided from mesh triangles only, so targets without a mesh never take part. Referenced
+/// decided from mesh triangles only, so targets without a mesh never take part, and neither do
+/// invisible ones. Referenced
 /// objects stay and do not propagate.
 /// </summary>
 internal sealed class TouchClusterFinder
@@ -78,10 +79,12 @@ internal sealed class TouchClusterFinder
         _depth = new int[targetCount];
     }
 
+    /// <param name="visibility">Parallel to <paramref name="targets"/>.</param>
     /// <param name="seeds">Target indices of the earlier removals (too close, and their linked groups), in removal order.</param>
     /// <param name="keptTooClose">Too-close targets kept as referenced: already logged and counted, never propagated.</param>
     public static TouchClusters Find(
         IReadOnlyList<TargetObject> targets,
+        IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyList<int> seeds,
         IReadOnlyList<int> keptTooClose,
         BaseObjectShapeProvider shapes,
@@ -92,7 +95,7 @@ internal sealed class TouchClusterFinder
         bool collectDiagnostics)
     {
         var (search, setup) = Timing.Measure(() => TouchSearch.Create(
-            targets, seeds, excluded: keptTooClose, shapes, meshCache, tolerance, parallelOptions));
+            targets, visibility, seeds, excluded: keptTooClose, shapes, meshCache, tolerance, parallelOptions));
         var finder = new TouchClusterFinder(
             targets.Count,
             keepRule,

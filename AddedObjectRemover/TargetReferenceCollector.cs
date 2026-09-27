@@ -18,7 +18,10 @@ internal static class TargetReferenceCollector
     private const string TeleportDestination = "teleport destination";
 
     /// <param name="isTargetObject">The record is a checked target object, whose links to other target objects group them.</param>
-    /// <remarks>Only links to target-plugin FormKeys are recorded; which of them are target objects is decided later.</remarks>
+    /// <remarks>
+    /// Only links to target-plugin FormKeys are recorded; which of them are target objects is decided
+    /// later. The base object link is never one to a placed object.
+    /// </remarks>
     public static void CollectFromPlaced(
         IPlacedGetter record,
         bool isTargetObject,
@@ -26,10 +29,11 @@ internal static class TargetReferenceCollector
         Dictionary<FormKey, KeepReason> references,
         List<TargetLink> links)
     {
+        var baseKey = record.GetBaseRef()?.FormKey;
         foreach (var link in record.EnumerateFormLinks())
         {
             var formKey = link.FormKey;
-            if (link.IsNull || formKey.ModKey != target || formKey == record.FormKey) continue;
+            if (link.IsNull || formKey.ModKey != target || formKey == record.FormKey || formKey == baseKey) continue;
             if (isTargetObject && !IsTeleportDestination(record, formKey))
             {
                 links.Add(new TargetLink(record.FormKey, formKey));

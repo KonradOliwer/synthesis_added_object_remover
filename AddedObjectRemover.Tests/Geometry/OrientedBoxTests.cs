@@ -49,16 +49,18 @@ public class OrientedBoxTests
         }
     }
 
-    [Fact]
-    [Trait(KnownBug.Trait, "A1: a NaN rotation makes every SAT comparison false, so the boxes are reported as intersecting")]
-    public void NaNRotationIntersectsEverything()
+    [Theory]
+    [InlineData(10000f)]
+    [InlineData(0f)]
+    public void NaNRotationIntersectsNothing(float distance)
     {
         var a = new OrientedBox(Vector3.Zero, Mat3.Identity, UnitHalf);
         var broken = new OrientedBox(
-            new Vector3(10000, 0, 0),
+            new Vector3(distance, 0, 0),
             AddedObjectRemover.Geometry.RotationFromEuler(new P3Float(float.NaN, 0, 0)),
             UnitHalf);
-        Assert.True(a.Intersects(broken, 0));
+        Assert.False(a.Intersects(broken, 0));
+        Assert.False(broken.Intersects(a, 0));
         Assert.False(broken.Contains(Vector3.Zero));
     }
 

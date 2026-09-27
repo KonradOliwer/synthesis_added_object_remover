@@ -20,7 +20,7 @@ internal enum KeepKind
 }
 
 /// <summary>Why a target object is never removed.</summary>
-/// <param name="Category">Groups reasons in the summary, e.g. "placed object: Enable Parent" or "QUST record".</param>
+/// <param name="Category">Groups reasons in the summary, e.g. "placed object: Enable Parent" or "Quest record".</param>
 /// <param name="Detail">The full reason for the log, naming the linking record.</param>
 internal sealed record KeepReason(KeepKind Kind, string Category, string Detail);
 

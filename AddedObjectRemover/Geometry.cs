@@ -208,28 +208,31 @@ internal readonly record struct OrientedBox(Vector3 Center, Mat3 Rotation, Vecto
         float a20 = MathF.Abs(r20) + ParallelAxisEpsilon, a21 = MathF.Abs(r21) + ParallelAxisEpsilon, a22 = MathF.Abs(r22) + ParallelAxisEpsilon;
 
         // This box's axes.
-        if (MathF.Abs(t.X) > a.X + b.X * a00 + b.Y * a01 + b.Z * a02) return false;
-        if (MathF.Abs(t.Y) > a.Y + b.X * a10 + b.Y * a11 + b.Z * a12) return false;
-        if (MathF.Abs(t.Z) > a.Z + b.X * a20 + b.Y * a21 + b.Z * a22) return false;
+        if (Separates(t.X, a.X + b.X * a00 + b.Y * a01 + b.Z * a02)) return false;
+        if (Separates(t.Y, a.Y + b.X * a10 + b.Y * a11 + b.Z * a12)) return false;
+        if (Separates(t.Z, a.Z + b.X * a20 + b.Y * a21 + b.Z * a22)) return false;
 
         // Other box's axes.
-        if (MathF.Abs(t.X * r00 + t.Y * r10 + t.Z * r20) > a.X * a00 + a.Y * a10 + a.Z * a20 + b.X) return false;
-        if (MathF.Abs(t.X * r01 + t.Y * r11 + t.Z * r21) > a.X * a01 + a.Y * a11 + a.Z * a21 + b.Y) return false;
-        if (MathF.Abs(t.X * r02 + t.Y * r12 + t.Z * r22) > a.X * a02 + a.Y * a12 + a.Z * a22 + b.Z) return false;
+        if (Separates(t.X * r00 + t.Y * r10 + t.Z * r20, a.X * a00 + a.Y * a10 + a.Z * a20 + b.X)) return false;
+        if (Separates(t.X * r01 + t.Y * r11 + t.Z * r21, a.X * a01 + a.Y * a11 + a.Z * a21 + b.Y)) return false;
+        if (Separates(t.X * r02 + t.Y * r12 + t.Z * r22, a.X * a02 + a.Y * a12 + a.Z * a22 + b.Z)) return false;
 
         // Cross products A_i x B_j.
-        if (MathF.Abs(t.Z * r10 - t.Y * r20) > a.Y * a20 + a.Z * a10 + b.Y * a02 + b.Z * a01) return false;
-        if (MathF.Abs(t.Z * r11 - t.Y * r21) > a.Y * a21 + a.Z * a11 + b.X * a02 + b.Z * a00) return false;
-        if (MathF.Abs(t.Z * r12 - t.Y * r22) > a.Y * a22 + a.Z * a12 + b.X * a01 + b.Y * a00) return false;
-        if (MathF.Abs(t.X * r20 - t.Z * r00) > a.X * a20 + a.Z * a00 + b.Y * a12 + b.Z * a11) return false;
-        if (MathF.Abs(t.X * r21 - t.Z * r01) > a.X * a21 + a.Z * a01 + b.X * a12 + b.Z * a10) return false;
-        if (MathF.Abs(t.X * r22 - t.Z * r02) > a.X * a22 + a.Z * a02 + b.X * a11 + b.Y * a10) return false;
-        if (MathF.Abs(t.Y * r00 - t.X * r10) > a.X * a10 + a.Y * a00 + b.Y * a22 + b.Z * a21) return false;
-        if (MathF.Abs(t.Y * r01 - t.X * r11) > a.X * a11 + a.Y * a01 + b.X * a22 + b.Z * a20) return false;
-        if (MathF.Abs(t.Y * r02 - t.X * r12) > a.X * a12 + a.Y * a02 + b.X * a21 + b.Y * a20) return false;
+        if (Separates(t.Z * r10 - t.Y * r20, a.Y * a20 + a.Z * a10 + b.Y * a02 + b.Z * a01)) return false;
+        if (Separates(t.Z * r11 - t.Y * r21, a.Y * a21 + a.Z * a11 + b.X * a02 + b.Z * a00)) return false;
+        if (Separates(t.Z * r12 - t.Y * r22, a.Y * a22 + a.Z * a12 + b.X * a01 + b.Y * a00)) return false;
+        if (Separates(t.X * r20 - t.Z * r00, a.X * a20 + a.Z * a00 + b.Y * a12 + b.Z * a11)) return false;
+        if (Separates(t.X * r21 - t.Z * r01, a.X * a21 + a.Z * a01 + b.X * a12 + b.Z * a10)) return false;
+        if (Separates(t.X * r22 - t.Z * r02, a.X * a22 + a.Z * a02 + b.X * a11 + b.Y * a10)) return false;
+        if (Separates(t.Y * r00 - t.X * r10, a.X * a10 + a.Y * a00 + b.Y * a22 + b.Z * a21)) return false;
+        if (Separates(t.Y * r01 - t.X * r11, a.X * a11 + a.Y * a01 + b.X * a22 + b.Z * a20)) return false;
+        if (Separates(t.Y * r02 - t.X * r12, a.X * a12 + a.Y * a02 + b.X * a21 + b.Y * a20)) return false;
 
         return true;
     }
+
+    /// <remarks>Written as "not within" so that a NaN projection or bound separates: a broken box intersects nothing.</remarks>
+    private static bool Separates(float projection, float bound) => !(MathF.Abs(projection) <= bound);
 }
 
 internal static class Geometry

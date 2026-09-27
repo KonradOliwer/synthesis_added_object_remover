@@ -21,6 +21,21 @@ public class OrientedBoxTests
     }
 
     [Fact]
+    public void BoxContainsARotatedBoxOnlyWhenAllItsCornersAreInside()
+    {
+        var outer = new OrientedBox(Vector3.Zero, AddedObjectRemover.Geometry.RotationFromEuler(new P3Float(0, 0, 0.3f)), new Vector3(10));
+        var rotation = AddedObjectRemover.Geometry.RotationFromEuler(new P3Float(0.5f, 0.2f, 1.1f));
+        var inner = new OrientedBox(new Vector3(2, 1, 0), rotation, new Vector3(3, 2, 1));
+        var pokingOut = inner with { Center = new Vector3(9.5f, 0, 0) };
+
+        Assert.True(outer.Contains(inner));
+        Assert.True(inner.Corners().All(outer.Contains));
+        Assert.False(outer.Contains(pokingOut));
+        Assert.False(pokingOut.Corners().All(outer.Contains));
+        Assert.False(outer.Contains(inner with { HalfExtents = new Vector3(float.NaN) }));
+    }
+
+    [Fact]
     public void EdgeToEdgeBoxesAreSeparatedByACrossAxis()
     {
         var a = new OrientedBox(Vector3.Zero, Mat3.Identity, UnitHalf);

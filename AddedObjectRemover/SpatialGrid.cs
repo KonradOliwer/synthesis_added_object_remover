@@ -2,12 +2,6 @@ using System.Numerics;
 
 namespace AddedObjectRemover;
 
-/// <summary>Exact test run by <see cref="SpatialGrid.TryFindFirst{TMatcher}"/> on each candidate index.</summary>
-internal interface IGridMatcher
-{
-    bool IsMatch(int index);
-}
-
 /// <summary>
 /// Immutable uniform 2D (X/Y) spatial hash of item indices. Z is not bucketed; callers run an
 /// exact test on every candidate anyway, so the grid only has to be a conservative pre-filter.
@@ -113,50 +107,6 @@ internal sealed class SpatialGrid
     }
 
     /// <summary>
-    /// First item in grid cells overlapping <paramref name="area"/>'s X/Y range that the matcher
-    /// accepts; items may be tested more than once.
-    /// </summary>
-    public bool TryFindFirst<TMatcher>(Box area, ref TMatcher matcher, out int index)
-        where TMatcher : struct, IGridMatcher
-    {
-        foreach (var candidate in _oversize)
-        {
-            if (matcher.IsMatch(candidate))
-            {
-                index = candidate;
-                return true;
-            }
-        }
-
-        var range = CellRange.Of(area);
-        if (range.CellCount > _slotByCell.Count)
-        {
-            // Scanning the occupied cells is cheaper than walking the query range.
-            for (var slot = 0; slot < _slotStart.Length - 1; slot++)
-            {
-                if (TryMatchSlot(slot, ref matcher, out index)) return true;
-            }
-        }
-        else
-        {
-            for (var x = range.X0; x <= range.X1; x++)
-            {
-                for (var y = range.Y0; y <= range.Y1; y++)
-                {
-                    if (_slotByCell.TryGetValue(Pack((int)x, (int)y), out var slot)
-                        && TryMatchSlot(slot, ref matcher, out index))
-                    {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        index = -1;
-        return false;
-    }
-
-    /// <summary>
     /// Adds every item indexed in a grid cell overlapping the X/Y range of <paramref name="area"/>
     /// to <paramref name="results"/>. Items indexed in several cells can appear more than once.
     /// </summary>
@@ -183,22 +133,6 @@ internal sealed class SpatialGrid
 
     /// <summary>Number of grid cells the X/Y range of <paramref name="box"/> overlaps.</summary>
     public static double CountCells(Box box) => CellRange.Of(box).CellCount;
-
-    private bool TryMatchSlot<TMatcher>(int slot, ref TMatcher matcher, out int index)
-        where TMatcher : struct, IGridMatcher
-    {
-        for (var i = _slotStart[slot]; i < _slotStart[slot + 1]; i++)
-        {
-            var candidate = _items[i];
-            if (matcher.IsMatch(candidate))
-            {
-                index = candidate;
-                return true;
-            }
-        }
-        index = -1;
-        return false;
-    }
 
     private static bool TryGetItemCellRange(Box box, out int x0, out int x1, out int y0, out int y1)
     {

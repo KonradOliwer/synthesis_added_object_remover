@@ -21,9 +21,10 @@ internal static class ShapeZoneContact
         || IsInside(bubble, zone, other, otherTransform, scratch);
 
     /// <summary>
-    /// Called only when no triangles intersect, so the other mesh is either wholly inside or wholly
-    /// outside the bubble and one of its vertices decides. An open bubble has no inside, so its
-    /// box stands in for it.
+    /// Called only when no triangles intersect. A closed bubble then holds each part (NIF shape) of
+    /// the other mesh wholly or not at all, so one vertex per part decides; the parts are separate
+    /// pieces, so any one of them inside counts. An open bubble has no inside: the other object
+    /// counts as inside only when its whole mesh box lies in the zone's box.
     /// </summary>
     private static bool IsInside(
         MeshTriangleTree bubble,
@@ -32,8 +33,12 @@ internal static class ShapeZoneContact
         PlacedTransform otherTransform,
         TouchScratch scratch)
     {
-        var vertex = otherTransform.ToWorld(other.GetTriangle(0).A);
-        if (!bubble.IsClosed) return zone.Box.Contains(vertex);
-        return SurroundingRayTest.IsSurrounded(bubble, zone.Bubble.ToLocal(vertex), zone.Bubble.Rotation, scratch.NearbyTriangles);
+        if (!bubble.IsClosed) return zone.Box.Contains(OrientedBox.FromLocal(other.Bounds, otherTransform));
+        foreach (var firstTriangle in other.PartFirstTriangles)
+        {
+            var vertex = otherTransform.ToWorld(other.GetTriangle(firstTriangle).A);
+            if (SurroundingRayTest.IsSurrounded(bubble, zone.Bubble.ToLocal(vertex), zone.Bubble.Rotation, scratch.NearbyTriangles)) return true;
+        }
+        return false;
     }
 }

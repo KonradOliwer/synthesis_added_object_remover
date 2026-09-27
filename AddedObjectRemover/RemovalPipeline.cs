@@ -66,7 +66,7 @@ internal sealed class RemovalPipeline
         var groups = LinkedGroups.Build(scan.Targets, scan.TargetLinks);
         RunReport.PrintLinkedGroups(groups, scan.TargetLinks.Count);
         var keepRule = new KeepReferencedRule(scan.Targets, scan.TargetReferences, groups);
-        var supporters = new SupporterIndex(scan.SupportersBySpace, _shapes);
+        var supporters = new SupporterIndex(scan.SupportersBySpace, _shapes, _parallelOptions);
         var tooClose = SelectTooCloseRemovals(scan, visibility, indexes, keepRule);
         List<Removal> removals = [.. tooClose.Removals];
         AddLinkedRemovals(removals, tooClose.Removals, groups, "too-close");
@@ -108,7 +108,7 @@ internal sealed class RemovalPipeline
     private Dictionary<FormKey, OtherObjectIndex> IndexOtherObjects(ScanResult scan)
     {
         var timer = Stopwatch.StartNew();
-        var indexes = OtherObjectIndex.BuildForTargetSpaces(scan, _shapes, _invisibleOthers);
+        var indexes = OtherObjectIndex.BuildForTargetSpaces(scan, _shapes, _invisibleOthers, _parallelOptions);
         RunReport.PrintIndexSummary(indexes, timer.Elapsed);
         return indexes;
     }
@@ -199,7 +199,7 @@ internal sealed class RemovalPipeline
     {
         var indexTimer = Stopwatch.StartNew();
         var search = ShapeZoneSearch.Create(
-            scan.Targets, visibility, indexes, _shapes, _meshCache, _config.SizeMultiplier, npcRule, _parallelOptions);
+            scan.Targets, visibility, indexes, _shapes, _meshCache, _config.SizeMultiplier, npcRule);
         var indexTime = indexTimer.Elapsed;
         var searchTimer = Stopwatch.StartNew();
         var hits = search.FindTooCloseTargets(visibility, _parallelOptions);

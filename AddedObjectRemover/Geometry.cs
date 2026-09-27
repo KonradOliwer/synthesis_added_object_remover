@@ -176,6 +176,17 @@ internal readonly record struct OrientedBox(Vector3 Center, Mat3 Rotation, Vecto
         return local.X <= HalfExtents.X && local.Y <= HalfExtents.Y && local.Z <= HalfExtents.Z;
     }
 
+    /// <summary>
+    /// Inclusive test: whether <paramref name="inner"/> lies entirely in this box, i.e. its extent
+    /// along each of this box's axes stays within this box's half extent. A NaN makes it fail.
+    /// </summary>
+    public bool Contains(OrientedBox inner)
+    {
+        var offset = Vector3.Abs(Rotation.TransformTransposed(inner.Center - Center));
+        var reach = offset + (Rotation.Transposed() * inner.Rotation).AbsTransform(inner.HalfExtents);
+        return reach.X <= HalfExtents.X && reach.Y <= HalfExtents.Y && reach.Z <= HalfExtents.Z;
+    }
+
     /// <summary>World AABB enclosing this box grown by <paramref name="padding"/> on every side.</summary>
     public Box WorldAabb(float padding) => Geometry.RotatedAabb(Center, Rotation, HalfExtents).Grown(padding);
 

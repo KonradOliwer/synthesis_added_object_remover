@@ -109,7 +109,7 @@ public class MeshTriangleTreeTests
 
     [Fact]
     public void EmptyMeshIsNotIndexed() =>
-        Assert.Null(MeshTriangleTree.Build(new NifGeometry(Vector3.Zero, Vector3.Zero, [], [])));
+        Assert.Null(MeshTriangleTree.Build(new NifGeometry(Vector3.Zero, Vector3.Zero, [], [], [])));
 
     [Fact]
     public void BoxMeshIsClosed() => Assert.True(BoxMesh.CreateTree(TestMeshes.UnitCube).IsClosed);

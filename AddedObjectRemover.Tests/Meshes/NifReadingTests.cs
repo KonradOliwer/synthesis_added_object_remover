@@ -28,6 +28,21 @@ public class NifReadingTests
     }
 
     [Fact]
+    public void EveryShapeStartsAPart()
+    {
+        var nif = TestNifs.CreateWithRoot();
+        TestNifs.AddShape(nif, TestNifs.Root(nif), TestMeshes.BoxTriangles(Crate));
+        TestNifs.AddShape(nif, TestNifs.Root(nif), TestMeshes.BoxTriangles(Crate).Take(5).ToList());
+        TestNifs.AddShape(nif, TestNifs.Root(nif), TestMeshes.BoxTriangles(Crate));
+
+        var result = NifGeometryReader.ReadGeometry(TestNifs.Save(nif), includeTriangles: true);
+
+        Assert.Equal(NifReadStatus.Success, result.Status);
+        Assert.Equal(new[] { 0, 12, 17 }, result.Geometry!.PartFirstTriangles);
+        Assert.Equal(29, result.Geometry.TriangleCount);
+    }
+
+    [Fact]
     public void RootNamedAsEditorMarkerHasNoRenderGeometry()
     {
         var nif = TestNifs.CreateWithRoot();

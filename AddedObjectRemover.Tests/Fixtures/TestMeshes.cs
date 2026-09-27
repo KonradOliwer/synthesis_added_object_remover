@@ -10,7 +10,18 @@ internal static class TestMeshes
     public static MeshTriangleTree Tree(IReadOnlyList<MeshTriangle> triangles) =>
         MeshTriangleTree.Build(Geometry(triangles)) ?? throw new InvalidOperationException("Mesh has no triangles.");
 
-    public static NifGeometry Geometry(IReadOnlyList<MeshTriangle> triangles)
+    public static NifGeometry Geometry(IReadOnlyList<MeshTriangle> triangles) => Geometry(triangles, [0]);
+
+    /// <summary>One mesh made of several parts (NIF shapes), in the given order.</summary>
+    public static MeshTriangleTree PartsTree(params IReadOnlyList<MeshTriangle>[] parts)
+    {
+        var partFirstTriangles = new int[parts.Length];
+        for (var p = 1; p < parts.Length; p++) partFirstTriangles[p] = partFirstTriangles[p - 1] + parts[p - 1].Count;
+        return MeshTriangleTree.Build(Geometry(parts.SelectMany(part => part).ToList(), partFirstTriangles))
+            ?? throw new InvalidOperationException("Mesh has no triangles.");
+    }
+
+    private static NifGeometry Geometry(IReadOnlyList<MeshTriangle> triangles, int[] partFirstTriangles)
     {
         var vertices = new Vector3[triangles.Count * 3];
         var indices = new int[triangles.Count * 3];
@@ -24,7 +35,7 @@ internal static class TestMeshes
             indices[3 * t + 2] = 3 * t + 2;
         }
         var bounds = triangles.Select(triangle => triangle.Bounds).Aggregate((a, b) => a.Union(b));
-        return new NifGeometry(bounds.Min, bounds.Max, vertices, indices);
+        return new NifGeometry(bounds.Min, bounds.Max, vertices, indices, partFirstTriangles);
     }
 
     /// <summary>The 12 triangles of <see cref="BoxMesh"/> for <paramref name="box"/>.</summary>

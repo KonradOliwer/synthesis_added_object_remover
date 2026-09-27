@@ -3,7 +3,7 @@ using System.Numerics;
 namespace AddedObjectRemover;
 
 /// <summary>Render geometry of a NIF in root-node space: its bounds plus (optionally) the triangles.</summary>
-internal sealed class NifGeometry(Vector3 min, Vector3 max, Vector3[] vertices, int[] indices)
+internal sealed class NifGeometry(Vector3 min, Vector3 max, Vector3[] vertices, int[] indices, int[] partFirstTriangles)
 {
     /// <summary>AABB of all render geometry, including bounding-sphere fallbacks of shapes without vertices.</summary>
     public Vector3 Min { get; } = min;
@@ -18,6 +18,12 @@ internal sealed class NifGeometry(Vector3 min, Vector3 max, Vector3[] vertices, 
     /// triangle list contribute each vertex as a degenerate (point) triangle.
     /// </summary>
     public int[] Indices { get; } = indices;
+
+    /// <summary>
+    /// Per part (one NIF shape that contributed triangles), ascending, the index of its first
+    /// triangle; a part's triangles run up to the next part's first triangle.
+    /// </summary>
+    public int[] PartFirstTriangles { get; } = partFirstTriangles;
 
     public int TriangleCount => Indices.Length / 3;
 

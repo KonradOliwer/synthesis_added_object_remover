@@ -25,7 +25,7 @@ internal sealed class VisibleObstacles(
     {
         var index = nonTargetObjects.GetSpace(spaceKey);
         var candidates = new List<int>();
-        index.Grid.Collect(new Box(point, point).Grown(radius + OtherObjectIndex.RawPositionSearchMargin), candidates);
+        index.Bounds.CollectCandidates(new Box(point, point).Grown(radius), [], candidates);
         return candidates
             .Where(index.IsVisible)
             .Select(candidate => OrientedBox.FromLocal(shapes.GetLocalBox(index[candidate].Base), index[candidate].Transform));

@@ -56,8 +56,9 @@ internal sealed class BoundsAccumulator
     }
 }
 
-/// <summary>Result of one pass over a NIF's shapes. Vertices/Indices are null when triangles were not requested.</summary>
-internal sealed record ShapeCollection(BoundsAccumulator Bounds, List<Vector3>? Vertices, List<int>? Indices, ShapeStats Stats);
+/// <summary>Result of one pass over a NIF's shapes. Vertices/Indices/PartFirstTriangles are null when triangles were not requested.</summary>
+internal sealed record ShapeCollection(
+    BoundsAccumulator Bounds, List<Vector3>? Vertices, List<int>? Indices, List<int>? PartFirstTriangles, ShapeStats Stats);
 
 /// <summary>
 /// One pass over all shapes of a NIF: bounds (and optionally root-space triangles) of every solid
@@ -73,6 +74,7 @@ internal sealed class NifShapeCollector
     private readonly BoundsAccumulator _bounds = new();
     private readonly List<Vector3>? _vertices;
     private readonly List<int>? _indices;
+    private readonly List<int>? _partFirstTriangles;
     private readonly ShapeStats _stats;
 
     private NifShapeCollector(
@@ -90,6 +92,7 @@ internal sealed class NifShapeCollector
         _nodes = new NodeTransformResolver(blocks, parentOf, rootIndex, flags, includeHidden);
         _vertices = includeTriangles ? [] : null;
         _indices = includeTriangles ? [] : null;
+        _partFirstTriangles = includeTriangles ? [] : null;
         _stats = new ShapeStats { HiddenIgnored = includeHidden };
     }
 
@@ -108,7 +111,7 @@ internal sealed class NifShapeCollector
         {
             if (_blocks[blockIndex] is INiShape shape) CollectShape(blockIndex, shape);
         }
-        return new ShapeCollection(_bounds, _vertices, _indices, _stats);
+        return new ShapeCollection(_bounds, _vertices, _indices, _partFirstTriangles, _stats);
     }
 
     private void CollectShape(int blockIndex, INiShape shape)
@@ -180,7 +183,14 @@ internal sealed class NifShapeCollector
         }
         if (added) _stats.Counted++;
         else _stats.NoVertices++;
-        if (_indices != null) AppendTriangles(shape, baseIndex, vertices.Count, _indices);
+        if (_indices != null && _partFirstTriangles != null) AppendPart(shape, baseIndex, vertices.Count, _indices, _partFirstTriangles);
+    }
+
+    private void AppendPart(INiShape shape, int baseIndex, int vertexCount, List<int> allIndices, List<int> partFirstTriangles)
+    {
+        var firstIndex = allIndices.Count;
+        AppendTriangles(shape, baseIndex, vertexCount, allIndices);
+        if (allIndices.Count > firstIndex) partFirstTriangles.Add(firstIndex / 3);
     }
 
     /// <summary>

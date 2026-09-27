@@ -9,6 +9,9 @@ internal static class BoxMesh
     /// <summary>Corner i has the maximum X when bit 0 is set, Y for bit 1, Z for bit 2.</summary>
     private const int CornerCount = 8;
 
+    /// <summary>The whole box is one part, starting at triangle 0.</summary>
+    private static readonly int[] SinglePart = [0];
+
     /// <summary>Two triangles per face: bottom, top, -Y, +Y, -X, +X.</summary>
     private static readonly int[] FaceTriangles =
     [
@@ -33,6 +36,6 @@ internal static class BoxMesh
                 (i & 2) != 0 ? box.Max.Y : box.Min.Y,
                 (i & 4) != 0 ? box.Max.Z : box.Min.Z);
         }
-        return new NifGeometry(box.Min, box.Max, corners, FaceTriangles);
+        return new NifGeometry(box.Min, box.Max, corners, FaceTriangles, SinglePart);
     }
 }

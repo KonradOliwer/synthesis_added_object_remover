@@ -5,11 +5,6 @@ namespace AddedObjectRemover.Tests.Spatial;
 
 public class SpatialGridTests
 {
-    private readonly struct SetMatcher(HashSet<int> accepted) : IGridMatcher
-    {
-        public bool IsMatch(int index) => accepted.Contains(index);
-    }
-
     [Fact]
     public void NegativePointIsFoundByQueriesAroundIt()
     {
@@ -47,11 +42,6 @@ public class SpatialGridTests
                 var area = RandomBox(random);
                 var expected = Enumerable.Range(0, boxes.Count).Where(i => OverlapsXy(boxes[i], area)).ToHashSet();
                 Assert.Subset(Collect(grid, area).ToHashSet(), expected);
-
-                var matcher = new SetMatcher(expected);
-                var found = grid.TryFindFirst(area, ref matcher, out var index);
-                Assert.Equal(expected.Count > 0, found);
-                if (found) Assert.Contains(index, expected);
             }
         }
     }

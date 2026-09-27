@@ -27,7 +27,7 @@ internal sealed class ShapeZoneSearch
 
     private readonly IReadOnlyList<TargetObject> _targets;
     private readonly IReadOnlyDictionary<FormKey, OtherObjectIndex> _indexes;
-    private readonly Dictionary<FormKey, OtherObjectBoxIndex> _boxIndexes;
+    private readonly IReadOnlyList<OtherObjectBoxIndex> _visibleTargetSpaceBounds;
     private readonly BaseObjectShapeProvider _shapes;
     private readonly TriangleTreeCache _meshCache;
     private readonly float _multiplier;
@@ -37,7 +37,7 @@ internal sealed class ShapeZoneSearch
     private ShapeZoneSearch(
         IReadOnlyList<TargetObject> targets,
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
-        Dictionary<FormKey, OtherObjectBoxIndex> boxIndexes,
+        IReadOnlyList<OtherObjectBoxIndex> visibleTargetSpaceBounds,
         BaseObjectShapeProvider shapes,
         TriangleTreeCache meshCache,
         float multiplier,
@@ -45,7 +45,7 @@ internal sealed class ShapeZoneSearch
     {
         _targets = targets;
         _indexes = indexes;
-        _boxIndexes = boxIndexes;
+        _visibleTargetSpaceBounds = visibleTargetSpaceBounds;
         _shapes = shapes;
         _meshCache = meshCache;
         _multiplier = multiplier;
@@ -54,9 +54,9 @@ internal sealed class ShapeZoneSearch
 
     public ShapeZoneStats Stats { get; } = new();
 
-    public int LargeOtherObjects => _boxIndexes.Values.Sum(index => index.LargeObjectCount);
+    public int LargeOtherObjects => _visibleTargetSpaceBounds.Sum(bounds => bounds.LargeObjectCount);
 
-    /// <summary>Indexes the other objects of every space holding a visible target by their world AABB.</summary>
+    /// <summary>Indexes the other objects of every space holding a visible target by their world AABB up front.</summary>
     /// <param name="visibility">Parallel to <paramref name="targets"/>.</param>
     public static ShapeZoneSearch Create(
         IReadOnlyList<TargetObject> targets,
@@ -65,17 +65,15 @@ internal sealed class ShapeZoneSearch
         BaseObjectShapeProvider shapes,
         TriangleTreeCache meshCache,
         float multiplier,
-        NpcClashRule npcRule,
-        ParallelOptions parallelOptions)
+        NpcClashRule npcRule)
     {
-        var boxIndexes = new Dictionary<FormKey, OtherObjectBoxIndex>();
-        for (var i = 0; i < targets.Count; i++)
-        {
-            var spaceKey = targets[i].SpaceKey;
-            if (!visibility[i].IsVisible || boxIndexes.ContainsKey(spaceKey)) continue;
-            boxIndexes[spaceKey] = OtherObjectBoxIndex.Build(indexes[spaceKey], shapes, parallelOptions);
-        }
-        return new ShapeZoneSearch(targets, indexes, boxIndexes, shapes, meshCache, multiplier, npcRule);
+        var visibleTargetSpaceBounds = Enumerable.Range(0, targets.Count)
+            .Where(i => visibility[i].IsVisible)
+            .Select(i => targets[i].SpaceKey)
+            .Distinct()
+            .Select(spaceKey => indexes[spaceKey].Bounds)
+            .ToList();
+        return new ShapeZoneSearch(targets, indexes, visibleTargetSpaceBounds, shapes, meshCache, multiplier, npcRule);
     }
 
     /// <param name="visibility">Parallel to the targets.</param>
@@ -123,7 +121,7 @@ internal sealed class ShapeZoneSearch
         if (_shapes.GetMeshPath(target.Base) is not { } meshPath) return FindFirstInBoxZone(target, others, scratch);
 
         var zone = ShapeZone.Create(_shapes.GetLocalBox(target.Base), target.Transform, _multiplier);
-        CollectOthersOverlappingZoneBox(target.SpaceKey, others, zone, scratch);
+        CollectOthersOverlappingZoneBox(others, zone, scratch);
         if (scratch.BoxPassed.Count == 0) return -1;
 
         using var bubble = _meshCache.Acquire(meshPath);
@@ -141,15 +139,15 @@ internal sealed class ShapeZoneSearch
     private int FindFirstInBoxZone(TargetObject target, OtherObjectIndex others, Scratch scratch)
     {
         scratch.Stats.BoxZoneTargets++;
-        var match = TooCloseSearch.FindFirstCentreInBoxZone(target, others, _shapes, _multiplier, _npcRule);
+        var match = TooCloseSearch.FindFirstCentreInBoxZone(target, others, _shapes, _multiplier, _npcRule, scratch.Slots, scratch.Candidates);
         if (match >= 0) scratch.Stats.Hits++;
         return match;
     }
 
     /// <summary>Fills <see cref="Scratch.BoxPassed"/> with the visible, not replaced others tested like objects whose oriented box overlaps the zone's box, in index order.</summary>
-    private void CollectOthersOverlappingZoneBox(FormKey spaceKey, OtherObjectIndex others, ShapeZone zone, Scratch scratch)
+    private void CollectOthersOverlappingZoneBox(OtherObjectIndex others, ShapeZone zone, Scratch scratch)
     {
-        _boxIndexes[spaceKey].CollectCandidates(zone.Box.WorldAabb(0f), scratch.Slots, scratch.Candidates);
+        others.Bounds.CollectCandidates(zone.Box.WorldAabb(0f), scratch.Slots, scratch.Candidates);
         scratch.Stats.CandidatePairs += scratch.Candidates.Count;
         scratch.BoxPassed.Clear();
         foreach (var otherIndex in scratch.Candidates)

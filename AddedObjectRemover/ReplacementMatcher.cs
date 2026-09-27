@@ -61,7 +61,7 @@ internal sealed class ReplacementMatcher
         var position = target.Transform.Position;
         var margin = new Vector3(PositionTolerance);
         var candidates = new List<int>();
-        index.Grid.Collect(new Box(position - margin, position + margin), candidates);
+        index.PositionGrid.Collect(new Box(position - margin, position + margin), candidates);
 
         List<Match>? matches = null;
         foreach (var otherIndex in candidates)

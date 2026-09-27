@@ -31,9 +31,9 @@ internal sealed class AnchoringSupporterFinder(
     {
         var index = supporters.GetSpace(targets[candidate].SpaceKey);
         var candidateBox = search.CandidateFinder.BoxOf(candidate);
-        var slots = new List<int>();
-        index.Grid.Collect(candidateBox.WorldAabb(touchDistance + OtherObjectIndex.RawPositionSearchMargin), slots);
-        foreach (var slot in slots.Distinct().Order())
+        var candidates = new List<int>();
+        index.Bounds.CollectCandidates(candidateBox.WorldAabb(touchDistance), [], candidates);
+        foreach (var slot in candidates)
         {
             if (!index.IsVisible(slot)) continue;
             var placed = index[slot];

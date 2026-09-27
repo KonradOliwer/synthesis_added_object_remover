@@ -79,6 +79,9 @@ internal sealed class MeshTriangleTree
 
     public MeshTriangle GetTriangle(int triangle) => GetTriangle(_geometry, triangle);
 
+    /// <summary>The first triangle of each mesh part (<see cref="NifGeometry.PartFirstTriangles"/>).</summary>
+    public IReadOnlyList<int> PartFirstTriangles => _geometry.PartFirstTriangles;
+
     /// <summary>Replaces <paramref name="output"/> with the triangles of every leaf overlapping <paramref name="query"/>, in a fixed order.</summary>
     public void CollectLeafTriangles(Box query, List<int> output) =>
         CollectLeafTriangles(new OverlapFilter(query), output);

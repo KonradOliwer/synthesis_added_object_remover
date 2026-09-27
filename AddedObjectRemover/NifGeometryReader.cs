@@ -113,7 +113,8 @@ internal static class NifGeometryReader
             shapes.Bounds.Min,
             shapes.Bounds.Max,
             shapes.Vertices?.ToArray() ?? [],
-            shapes.Indices?.ToArray() ?? []);
+            shapes.Indices?.ToArray() ?? [],
+            shapes.PartFirstTriangles?.ToArray() ?? []);
         var warning = shapes.Stats.MismatchedStrips > 0
             ? $"{shapes.Stats.MismatchedStrips} NiTriStrips shape(s) whose strip lengths do not match their points are used as points."
             : null;

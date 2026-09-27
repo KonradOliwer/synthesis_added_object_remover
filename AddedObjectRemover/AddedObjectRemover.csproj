@@ -4,23 +4,28 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <RootNamespace>AddedObjectRemover</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Mutagen.Bethesda" Version="0.54.2" />
-    <PackageReference Include="Mutagen.Bethesda.Core" Version="0.54.2" />
-    <PackageReference Include="Mutagen.Bethesda.FormKeys.SkyrimSE" Version="3.4.0" />
-    <PackageReference Include="Mutagen.Bethesda.Json" Version="0.54.2" />
-    <PackageReference Include="Mutagen.Bethesda.Kernel" Version="0.54.2" />
-    <PackageReference Include="Mutagen.Bethesda.Serialization" Version="1.38.6" />
-    <PackageReference Include="Mutagen.Bethesda.Serialization.Newtonsoft" Version="1.38.6" />
     <PackageReference Include="Mutagen.Bethesda.Skyrim" Version="0.54.2" />
     <PackageReference Include="Mutagen.Bethesda.Synthesis" Version="0.36.5" />
     <PackageReference Include="NetTopologySuite" Version="2.6.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="Nifly" Version="1.1.0" />
-    <PackageReference Include="Noggog.SourceGenerators" Version="4.3.0" />
-    <PackageReference Include="Synthesis.Bethesda" Version="0.36.5" />
+    <!-- Pinned exactly: NifShapes.cs reads Nifly's private _points/_stripLengths fields via reflection,
+         which breaks silently on a library update. -->
+    <PackageReference Include="Nifly" Version="[1.1.0]" />
+    <!-- Used directly by ExpectedFailures.cs; otherwise only arrives transitively through Mutagen. -->
+    <PackageReference Include="SharpZipLib" Version="1.4.2" />
+    <PackageReference Include="ini-parser-netstandard" Version="2.5.3" />
   </ItemGroup>
+
+  <!-- Mutagen.Bethesda.Synthesis transitively brings in the Noggog.SourceGenerators analyzer,
+       whose generated AssemblyVersions.g.cs conflicts (CS0436) with the AssemblyVersions type
+       already compiled into Mutagen.Bethesda.Synthesis.dll. Nothing in this project uses that
+       generator, so drop it from the analyzer set before compiling. -->
+  <Target Name="RemoveConflictingNoggogAnalyzer" BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <Analyzer Remove="@(Analyzer)" Condition="$([System.String]::Copy('%(Analyzer.Identity)').Contains('Noggog.SourceGenerators'))" />
+    </ItemGroup>
+  </Target>
 </Project>

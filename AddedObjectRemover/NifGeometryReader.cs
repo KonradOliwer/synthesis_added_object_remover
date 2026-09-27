@@ -19,7 +19,8 @@ internal static class NifGeometryReader
     /// the root node's own transform: the engine overwrites the root's local transform with the
     /// placed reference's position/rotation/scale, so it has no effect in game. Only shapes
     /// reachable from the root node are counted (orphan blocks are never rendered). Collision and
-    /// particle systems, hidden shapes/nodes and "EditorMarker" shapes/nodes are skipped.
+    /// particle systems, hidden shapes/nodes, "EditorMarker" shapes/nodes and effect-shader shapes
+    /// (fog, light rays, water spray, mist planes: nothing solid) are skipped.
     /// With <paramref name="includeTriangles"/>, also returns the root-space vertices and triangles
     /// of every counted shape (shapes that only have a bounding sphere add to the bounds only).
     /// A vertex that is non-finite or beyond <see cref="Geometry.MaxCoordinate"/> makes the whole
@@ -98,6 +99,10 @@ internal static class NifGeometryReader
         if (shapes.Bounds.Invalid != null)
         {
             return NifReadResult.Failed(NifReadResult.InvalidCoordinatesKind, $"NIF has {shapes.Bounds.Invalid}.");
+        }
+        if (!shapes.Bounds.Any && shapes.Stats.EffectShader > 0)
+        {
+            return NifReadResult.WithEffectsOnly($"NIF contains only effect-shader render geometry ({shapes.Stats}).");
         }
         if (!shapes.Bounds.Any)
         {

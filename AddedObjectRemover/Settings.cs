@@ -2,6 +2,13 @@ using Mutagen.Bethesda.Synthesis.Settings;
 
 namespace AddedObjectRemover;
 
+/// <summary>The zone around a cleaned mod's object in which another mod's object makes it too close.</summary>
+public enum ZoneShape
+{
+    ObjectShape,
+    BoundingBox,
+}
+
 public enum FollowUpRemovalMode
 {
     Nothing,
@@ -61,6 +68,7 @@ public class Settings
 public class CheckSettings
 {
     public const float DefaultSizeMultiplier = 0.5f;
+    public const ZoneShape DefaultZoneShape = ZoneShape.ObjectShape;
 
     [SynthesisSettingName("Mod to clean up")]
     [SynthesisTooltip("The plugin whose added objects may be removed.")]
@@ -69,6 +77,10 @@ public class CheckSettings
     [SynthesisSettingName("Removal distance (× object size)")]
     [SynthesisTooltip("Removes the cleaned mod's object when another mod's object is this close, measured in multiples of the object's own size.")]
     public float SizeMultiplier { get; set; } = DefaultSizeMultiplier;
+
+    [SynthesisSettingName("Removal zone")]
+    [SynthesisTooltip("ObjectShape: the object's own shape, enlarged. BoundingBox: faster, its box.")]
+    public ZoneShape ZoneShape { get; set; } = DefaultZoneShape;
 }
 
 public class IgnoreSettings

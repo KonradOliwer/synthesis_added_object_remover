@@ -5,8 +5,9 @@ using Mutagen.Bethesda.Plugins;
 namespace AddedObjectRemover;
 
 /// <summary>
-/// Finds visible target objects whose grown (multiplier-expanded) local box contains the bounds
-/// center of some other-mod object. Invisible targets are left to the leftover invisible objects step.
+/// BoundingBox removal zone: finds visible target objects whose grown (multiplier-expanded) local
+/// box contains the bounds center of some other-mod object. Invisible targets are left to the
+/// leftover invisible objects step.
 /// </summary>
 internal static class TooCloseSearch
 {
@@ -38,20 +39,30 @@ internal static class TooCloseSearch
         {
             for (var i = range.Item1; i < range.Item2; i++)
             {
-                matches[i] = visibility[i].IsVisible ? FindFirstTooCloseOther(targets[i], indexes[targets[i].SpaceKey], shapes, multiplier) : -1;
+                matches[i] = visibility[i].IsVisible ? FindFirstCentreInBoxZone(targets[i], indexes[targets[i].SpaceKey], shapes, multiplier) : -1;
             }
         });
 
+        return ToHits(targets, indexes, matches);
+    }
+
+    /// <param name="matches">Per target, the index of the other object it is too close to, or -1.</param>
+    /// <returns>The hits in target order.</returns>
+    public static List<TooCloseHit> ToHits(
+        IReadOnlyList<TargetObject> targets,
+        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
+        IReadOnlyList<int> matches)
+    {
         var hits = new List<TooCloseHit>();
-        for (var i = 0; i < matches.Length; i++)
+        for (var i = 0; i < matches.Count; i++)
         {
             if (matches[i] >= 0) hits.Add(new TooCloseHit(i, indexes[targets[i].SpaceKey][matches[i]]));
         }
         return hits;
     }
 
-    /// <summary>Index of the first too-close other object, or -1.</summary>
-    private static int FindFirstTooCloseOther(TargetObject target, OtherObjectIndex index, BaseObjectShapeProvider shapes, float multiplier)
+    /// <summary>Index of the first other object whose bounds centre lies in the target's BoundingBox zone, or -1.</summary>
+    public static int FindFirstCentreInBoxZone(TargetObject target, OtherObjectIndex index, BaseObjectShapeProvider shapes, float multiplier)
     {
         if (index.Count == 0) return -1;
 

@@ -9,6 +9,9 @@ internal enum NifReadStatus
 
     /// <summary>The NIF parsed fine but has no visible render geometry (e.g. only editor-marker shapes).</summary>
     NoRenderGeometry,
+
+    /// <summary>The NIF's only render geometry uses effect shaders (fog, light rays, water spray, mist planes).</summary>
+    EffectOnly,
 }
 
 /// <param name="Geometry">Set only on success.</param>
@@ -27,6 +30,7 @@ internal sealed record NifReadResult(
     public const string NoRootNodeKind = "no root node";
     public const string InvalidCoordinatesKind = "invalid vertex coordinates";
     public const string NoRenderGeometryKind = "no visible render geometry";
+    public const string EffectOnlyKind = "effect-only mesh";
 
     public static NifReadResult Succeeded(NifGeometry geometry, string? warning) =>
         new(NifReadStatus.Success, geometry, null, null, warning);
@@ -36,4 +40,7 @@ internal sealed record NifReadResult(
 
     public static NifReadResult WithoutRenderGeometry(string error) =>
         new(NifReadStatus.NoRenderGeometry, null, error, NoRenderGeometryKind, null);
+
+    public static NifReadResult WithEffectsOnly(string error) =>
+        new(NifReadStatus.EffectOnly, null, error, EffectOnlyKind, null);
 }

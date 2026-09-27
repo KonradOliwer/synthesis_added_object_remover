@@ -169,6 +169,13 @@ internal readonly record struct OrientedBox(Vector3 Center, Mat3 Rotation, Vecto
             select center + rotation.Transform(halfExtents * new Vector3(x, y, z));
     }
 
+    /// <summary>Inclusive test: whether the world point lies in the box.</summary>
+    public bool Contains(Vector3 point)
+    {
+        var local = Vector3.Abs(Rotation.TransformTransposed(point - Center));
+        return local.X <= HalfExtents.X && local.Y <= HalfExtents.Y && local.Z <= HalfExtents.Z;
+    }
+
     /// <summary>World AABB enclosing this box grown by <paramref name="padding"/> on every side.</summary>
     public Box WorldAabb(float padding) => Geometry.RotatedAabb(Center, Rotation, HalfExtents).Grown(padding);
 

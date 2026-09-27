@@ -39,6 +39,7 @@ The log ends with a *Possible manual patch needed* section listing removed marke
 | --- | --- | --- |
 | Mod to clean up | *(empty)* | The plugin whose added objects may be removed, e.g. `SomeMod.esp`. If it is empty or not in the load order, nothing is changed. |
 | Removal distance (× object size) | `0.5` | Removes the cleaned mod's object when another mod's object is this close, measured in multiples of the object's own size (0-5). Larger removes more; 0.25-1 is typical. |
+| Removal zone | `ObjectShape` | The zone that other mods' objects must reach: `ObjectShape` uses the object's own shape, enlarged by the removal distance, and checks the other object's shape against it; `BoundingBox` (faster, less exact) uses the object's enlarged box and the other object's centre. |
 
 ### Mods that never count as clashing
 
@@ -113,6 +114,7 @@ value that Synthesis does not know stops the run.
   `HearthFires.esm`, `Dragonborn.esm`). Creation Club plugins are **not** ignored automatically;
   add them to *Excluded plugins* if needed.
 - Invisible objects, such as markers, lights without a lamp, sounds and trigger boxes.
+- Effect meshes, such as fog, light rays and water spray: they never cause removals.
 - Objects the target plugin overrides or replaces (e.g. a piece of clutter the target plugin swaps
   for its own version at the same spot).
 - Objects added by an earlier Added Object Remover run in the same Synthesis group.
@@ -139,8 +141,8 @@ these files are fractions: 0.5 = 50%.
 
 ## Known limitations
 
-- Objects are compared by an approximate bounding box, so two large objects that only overlap at
-  their edges may not be detected as too close.
+- With *Removal zone* `BoundingBox`, objects are compared by an approximate bounding box, so two
+  large objects that only overlap at their edges may not be detected as too close.
 - Object size comes from the mesh (or its Object Bounds as a fallback), which can differ slightly
   from what you see in game.
 - Touching is based on visible mesh surfaces, not game collision. In *EverythingTouching* mode an

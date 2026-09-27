@@ -181,6 +181,9 @@ internal sealed class SpatialGrid
         }
     }
 
+    /// <summary>Number of grid cells the X/Y range of <paramref name="box"/> overlaps.</summary>
+    public static double CountCells(Box box) => CellRange.Of(box).CellCount;
+
     private bool TryMatchSlot<TMatcher>(int slot, ref TMatcher matcher, out int index)
         where TMatcher : struct, IGridMatcher
     {

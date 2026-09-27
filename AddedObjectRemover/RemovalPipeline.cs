@@ -154,7 +154,12 @@ internal sealed class RemovalPipeline
         KeepReferencedRule keepRule)
     {
         var timer = Stopwatch.StartNew();
-        var hits = TooCloseSearch.FindTooCloseTargets(scan.Targets, visibility, indexes, _shapes, _config.SizeMultiplier, _parallelOptions);
+        var hits = _config.ZoneShape switch
+        {
+            ZoneShape.BoundingBox => TooCloseSearch.FindTooCloseTargets(scan.Targets, visibility, indexes, _shapes, _config.SizeMultiplier, _parallelOptions),
+            ZoneShape.ObjectShape => FindShapeZoneHits(scan, visibility, indexes),
+            _ => throw new UnreachableException($"Unknown removal zone {_config.ZoneShape}."),
+        };
         _meshMessages.PrintAndClear();
         RunReport.PrintTooCloseSummary(hits.Count, scan.Targets.Count, _config.Target, timer.Elapsed);
         RunReport.PrintInvisibleOthers(_invisibleOthers, _config.DetailedLog);
@@ -162,6 +167,21 @@ internal sealed class RemovalPipeline
         var selection = SplitByKeepRule(hits, keepRule);
         RunReport.PrintKept(scan, selection.Kept);
         return selection;
+    }
+
+    private List<TooCloseHit> FindShapeZoneHits(
+        ScanResult scan,
+        IReadOnlyList<ObjectVisibility> visibility,
+        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes)
+    {
+        var indexTimer = Stopwatch.StartNew();
+        var search = ShapeZoneSearch.Create(scan.Targets, visibility, indexes, _shapes, _meshCache, _config.SizeMultiplier, _parallelOptions);
+        var indexTime = indexTimer.Elapsed;
+        var searchTimer = Stopwatch.StartNew();
+        var hits = search.FindTooCloseTargets(visibility, _parallelOptions);
+        RunReport.PrintShapeZoneStats(
+            search.Stats, search.LargeOtherObjects, _meshCache.GetStats(), _shapes.GetStats().ModelsEffectOnly, indexTime, searchTimer.Elapsed);
+        return hits;
     }
 
     private static TooCloseSelection SplitByKeepRule(IEnumerable<TooCloseHit> hits, KeepReferencedRule keepRule)

@@ -16,6 +16,7 @@ internal sealed record RunConfig(
     bool IgnoreTargetMasters,
     CompatibilityPatches CompatibilityPatches,
     float SizeMultiplier,
+    ZoneShape ZoneShape,
     FollowUpRemovalMode FollowUpMode,
     float TouchDistance,
     float AnchoringThreshold,
@@ -95,6 +96,7 @@ internal static class RunConfigFactory
             IgnoreTargetMasters: ignore.IgnoreTargetMasters,
             CompatibilityPatches: compatibilityPatches,
             SizeMultiplier: Clamp(check.SizeMultiplier, 0, MaxSizeMultiplier, CheckSettings.DefaultSizeMultiplier, "size multiplier"),
+            ZoneShape: ValidateZoneShape(check.ZoneShape),
             FollowUpMode: ValidateMode(followUp.Mode),
             TouchDistance: Clamp(followUp.TouchDistance, 0, MaxTouchDistance, FollowUpRemovalSettings.DefaultTouchDistance, "touch distance"),
             AnchoringThreshold: Clamp(
@@ -185,6 +187,13 @@ internal static class RunConfigFactory
             return [];
         }
         return targetMod.MasterReferences.Select(master => master.Master).ToList();
+    }
+
+    private static ZoneShape ValidateZoneShape(ZoneShape zoneShape)
+    {
+        if (Enum.IsDefined(zoneShape)) return zoneShape;
+        Console.WriteLine($"Warning: removal zone {zoneShape} is invalid; using {CheckSettings.DefaultZoneShape}.");
+        return CheckSettings.DefaultZoneShape;
     }
 
     private static FollowUpRemovalMode ValidateMode(FollowUpRemovalMode mode)

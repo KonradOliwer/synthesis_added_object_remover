@@ -32,6 +32,7 @@ internal sealed class MeshTriangleTree
     private readonly Node[] _nodes;
     private readonly int[] _order;
     private readonly int _depth;
+    private readonly Lazy<bool> _isClosed;
 
     private MeshTriangleTree(NifGeometry geometry, Node[] nodes, int[] order, int depth)
     {
@@ -39,9 +40,13 @@ internal sealed class MeshTriangleTree
         _nodes = nodes;
         _order = order;
         _depth = depth;
+        _isClosed = new Lazy<bool>(() => MeshClosedness.IsClosed(this), LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
     public int TriangleCount => _geometry.TriangleCount;
+
+    /// <summary>Whether the mesh has no open edges (<see cref="MeshClosedness"/>); worked out on first use.</summary>
+    public bool IsClosed => _isClosed.Value;
 
     /// <summary>AABB of all triangles.</summary>
     public Box Bounds => _nodes[0].Bounds;

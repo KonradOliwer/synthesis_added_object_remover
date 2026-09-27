@@ -14,6 +14,7 @@ internal static class RunReport
 
         Console.WriteLine($"Target plugin: {config.Target}");
         Console.WriteLine($"Size multiplier: {config.SizeMultiplier}");
+        Console.WriteLine($"Removal zone: {config.ZoneShape}");
         Console.WriteLine($"Excluded plugins: {Join(config.ExcludedPlugins)}");
         Console.WriteLine(config.IgnoreTargetMasters
             ? $"Ignored masters of target: {Join(config.TargetMasters)}"
@@ -137,6 +138,27 @@ internal static class RunReport
         Console.WriteLine(
             $"Found {hitCount:N0} of {targetCount:N0} {target} objects too close to other mods' objects "
             + $"in {elapsed.TotalSeconds:F1}s.");
+
+    public static void PrintShapeZoneStats(
+        ShapeZoneStats stats,
+        int largeOtherObjects,
+        TriangleTreeStats meshes,
+        int effectOnlyMeshes,
+        TimeSpan indexTime,
+        TimeSpan searchTime)
+    {
+        Console.WriteLine(
+            $"Object-shape zones: {stats.CandidatePairs:N0} candidate pairs, {stats.BoxFilterPasses:N0} passed the box filter, "
+            + $"{stats.NarrowTests:N0} mesh tests, {stats.Hits:N0} hits, {stats.CentrePointFallbacks:N0} centre-point fallbacks "
+            + $"(other object without mesh triangles), {stats.BoxZoneTargets:N0} targets without mesh triangles used their box; "
+            + $"{stats.TrianglePairsTested:N0} triangle pairs tested exactly.");
+        Console.WriteLine(
+            $"  {largeOtherObjects:N0} large other objects tested against every target of their space; "
+            + $"{effectOnlyMeshes:N0} effect-only meshes (fog, light rays, water spray) ignored.");
+        Console.WriteLine(
+            $"  Meshes indexed: {meshes.Built:N0} ({meshes.Triangles:N0} triangles), peak resident ~{meshes.PeakResidentBytes / BytesPerMegabyte:N0} MB; "
+            + $"timing: box index {indexTime.TotalSeconds:F1}s, search {searchTime.TotalSeconds:F1}s.");
+    }
 
     public static void PrintInvisibleOthers(ReasonCounter invisible, bool verbose)
     {
@@ -319,7 +341,7 @@ internal static class RunReport
         Console.WriteLine(
             $"Bounds: {stats.BasesFromNif:N0} bases from NIF, {stats.BasesNifFallbackToObnd:N0} NIF misses, "
             + $"{stats.BasesFromObnd:N0} from OBND, {stats.BasesWithoutBounds + stats.BasesUnresolved:N0} without bounds. "
-            + $"Meshes: {stats.ModelsRead:N0} read, {stats.ModelsFailed:N0} failed "
+            + $"Meshes: {stats.ModelsRead:N0} read, {stats.ModelsEffectOnly:N0} effect-only, {stats.ModelsFailed:N0} failed "
             + $"({stats.ModelsFromLooseFiles:N0} loose, {stats.ModelsFromArchives:N0} from {stats.ArchivesIndexed:N0} archives).");
         if (stats.ModelFailuresByKind.Count > 0)
         {

@@ -11,6 +11,7 @@ internal sealed class ShapeStats
     public int Counted;
     public int Hidden;
     public int EditorMarker;
+    public int EffectShader;
     public int NoVertices;
     public int Unreachable;
     public int HiddenAncestor;
@@ -24,7 +25,7 @@ internal sealed class ShapeStats
         var unsupported = Unsupported.Count == 0
             ? "0"
             : $"{Unsupported.Values.Sum()} [{string.Join(", ", Unsupported.Select(kv => $"{kv.Key} x{kv.Value}"))}]";
-        return $"{Shapes} shapes: counted={Counted}, hidden={Hidden}, editorMarker={EditorMarker}, "
+        return $"{Shapes} shapes: counted={Counted}, hidden={Hidden}, editorMarker={EditorMarker}, effectShader={EffectShader}, "
             + $"unsupported={unsupported}, noVertices={NoVertices}, unreachable={Unreachable}, "
             + $"hiddenAncestor={HiddenAncestor}, markerAncestor={MarkerAncestor}, mismatchedStrips={MismatchedStrips}"
             + (HiddenIgnored ? ", hidden flag ignored in 2nd pass" : string.Empty);
@@ -59,8 +60,8 @@ internal sealed class BoundsAccumulator
 internal sealed record ShapeCollection(BoundsAccumulator Bounds, List<Vector3>? Vertices, List<int>? Indices, ShapeStats Stats);
 
 /// <summary>
-/// One pass over all shapes of a NIF: bounds (and optionally root-space triangles) of every render
-/// shape reachable from the root through visible, non-marker nodes, with per-reason skip counts.
+/// One pass over all shapes of a NIF: bounds (and optionally root-space triangles) of every solid
+/// render shape reachable from the root through visible, non-marker nodes, with per-reason skip counts.
 /// </summary>
 internal sealed class NifShapeCollector
 {
@@ -138,6 +139,11 @@ internal sealed class NifShapeCollector
         if (NifShapes.IsEditorMarker(shape.Name?.String))
         {
             _stats.EditorMarker++;
+            return false;
+        }
+        if (NifShapes.HasEffectShader(shape, _blocks))
+        {
+            _stats.EffectShader++;
             return false;
         }
         if (!_includeHidden && _flags.IsHiddenWithoutController(shape.Flags_ui, shape.Flags_us, shape.Controller))

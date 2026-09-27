@@ -14,6 +14,7 @@ internal readonly record struct BoundsStats(
     int BasesUnresolved,
     int ModelsRead,
     int ModelsFailed,
+    int ModelsEffectOnly,
     int ModelsFromLooseFiles,
     int ModelsFromArchives,
     int ArchivesIndexed,
@@ -47,6 +48,7 @@ internal sealed class BaseObjectShapeProvider
     // Per unique mesh path
     private int _modelsRead;
     private int _modelsFailed;
+    private int _modelsEffectOnly;
     private int _modelsFromLooseFiles;
     private int _modelsFromArchives;
 
@@ -60,7 +62,9 @@ internal sealed class BaseObjectShapeProvider
     /// <param name="MeshPath">Normalized path of the mesh the bounds came from; null for OBND or none.</param>
     /// <param name="InvisibleKind">What kind of invisible object the base makes; null when it may be visible.</param>
     /// <param name="Resolved">False when the base is not in the load order.</param>
-    private sealed record BaseShape(Box Box, string? MeshPath, InvisibleObjectKind? InvisibleKind, bool Resolved = true);
+    /// <param name="EffectOnlyMesh">The base's mesh holds only effect-shader shapes, nothing solid.</param>
+    private sealed record BaseShape(
+        Box Box, string? MeshPath, InvisibleObjectKind? InvisibleKind, bool Resolved = true, bool EffectOnlyMesh = false);
 
     /// <summary>Vanilla critter spawner activators run a script whose name starts with this.</summary>
     private const string CritterSpawnScriptPrefix = "CritterSpawn";
@@ -76,6 +80,7 @@ internal sealed class BaseObjectShapeProvider
         Volatile.Read(ref _basesUnresolved),
         Volatile.Read(ref _modelsRead),
         Volatile.Read(ref _modelsFailed),
+        Volatile.Read(ref _modelsEffectOnly),
         Volatile.Read(ref _modelsFromLooseFiles),
         Volatile.Read(ref _modelsFromArchives),
         _meshFiles.ArchivesIndexed,
@@ -107,6 +112,7 @@ internal sealed class BaseObjectShapeProvider
         var shape = GetBaseShape(reference);
         if (!shape.Resolved) return ObjectVisibility.MissingBase;
         if (shape.InvisibleKind is { } kind) return ObjectVisibility.Invisible(kind);
+        if (shape.EffectOnlyMesh) return ObjectVisibility.EffectOnly;
         return isPrimitive && shape.MeshPath == null
             ? ObjectVisibility.Invisible(InvisibleObjectKind.TriggerBoxes)
             : ObjectVisibility.Visible;
@@ -161,8 +167,9 @@ internal sealed class BaseObjectShapeProvider
                 Interlocked.Increment(ref _basesFromNif);
                 return new BaseShape(nifBox, meshPath, GetStructuralInvisibleKind(record, hasModel, meshWithoutGeometry: false, nifBox));
             }
-            meshWithoutGeometry = mesh.Status == NifReadStatus.NoRenderGeometry;
             Interlocked.Increment(ref _basesNifFallbackToObnd);
+            if (mesh.Status == NifReadStatus.EffectOnly) return MeasureEffectOnlyBase(record);
+            meshWithoutGeometry = mesh.Status == NifReadStatus.NoRenderGeometry;
         }
 
         if (record is IObjectBoundedOptionalGetter { ObjectBounds: { } bounds })
@@ -174,6 +181,14 @@ internal sealed class BaseObjectShapeProvider
 
         Interlocked.Increment(ref _basesWithoutBounds);
         return new BaseShape(Box.Zero, null, GetStructuralInvisibleKind(record, hasModel, meshWithoutGeometry, Box.Zero));
+    }
+
+    /// <summary>OBND box when present; a light whose model is only an effect (glow, light rays) stays a light.</summary>
+    private static BaseShape MeasureEffectOnlyBase(IMajorRecordGetter record)
+    {
+        var box = record is IObjectBoundedOptionalGetter { ObjectBounds: { } bounds } ? ToBox(bounds) : Box.Zero;
+        var kind = record is ILightGetter ? InvisibleObjectKind.Lights : (InvisibleObjectKind?)null;
+        return new BaseShape(box, null, kind, EffectOnlyMesh: true);
     }
 
     private static string? GetModelPath(IMajorRecordGetter record) =>
@@ -237,6 +252,11 @@ internal sealed class BaseObjectShapeProvider
         {
             Interlocked.Increment(ref _modelsRead);
             return new MeshBounds(Box.FromCorners(geometry.Min, geometry.Max), result.Status);
+        }
+        if (result.Status == NifReadStatus.EffectOnly)
+        {
+            Interlocked.Increment(ref _modelsEffectOnly);
+            return new MeshBounds(null, result.Status);
         }
 
         Interlocked.Increment(ref _modelsFailed);

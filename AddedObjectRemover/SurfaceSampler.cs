@@ -55,8 +55,12 @@ internal static class SurfaceSampler
         return samples;
     }
 
-    private static double Area(MeshTriangle triangle) =>
-        0.5 * Vector3.Cross(triangle.B - triangle.A, triangle.C - triangle.A).Length();
+    /// <summary>Zero for a triangle with non-finite corners, so it gets no points instead of spoiling the total.</summary>
+    private static double Area(MeshTriangle triangle)
+    {
+        var area = 0.5 * Vector3.Cross(triangle.B - triangle.A, triangle.C - triangle.A).Length();
+        return double.IsFinite(area) ? area : 0;
+    }
 
     /// <summary>The k-th point of the pattern, mapped uniformly onto the triangle.</summary>
     private static Vector3 PointInTriangle(MeshTriangle triangle, int k)

@@ -170,11 +170,17 @@ internal sealed class NifShapeCollector
 
     private void AddShapeVertices(INiShape shape, List<Vector3> vertices, Similarity toRoot)
     {
+        var baseIndex = _vertices?.Count ?? 0;
         var added = false;
-        foreach (var v in vertices) added |= _bounds.AddPoint(toRoot.Apply(v));
+        foreach (var v in vertices)
+        {
+            var rootVertex = toRoot.Apply(v);
+            added |= _bounds.AddPoint(rootVertex);
+            _vertices?.Add(rootVertex);
+        }
         if (added) _stats.Counted++;
         else _stats.NoVertices++;
-        if (_vertices != null && _indices != null) AppendTriangles(shape, vertices, toRoot, _vertices, _indices);
+        if (_indices != null) AppendTriangles(shape, baseIndex, vertices.Count, _indices);
     }
 
     /// <summary>
@@ -182,28 +188,20 @@ internal sealed class NifShapeCollector
     /// Triangles with out-of-range indices are dropped. A shape without a triangle list contributes
     /// each vertex as a degenerate point triangle.
     /// </summary>
-    private void AppendTriangles(
-        INiShape shape,
-        List<Vector3> shapeVertices,
-        Similarity toRoot,
-        List<Vector3> allVertices,
-        List<int> allIndices)
+    private void AppendTriangles(INiShape shape, int baseIndex, int vertexCount, List<int> allIndices)
     {
-        var baseIndex = allVertices.Count;
-        foreach (var v in shapeVertices) allVertices.Add(toRoot.Apply(v));
-
         var triangles = NifShapes.GetTriangles(shape, out var stripsMismatched);
         if (stripsMismatched) _stats.MismatchedStrips++;
         if (triangles is not { Count: > 0 })
         {
-            AppendPointTriangles(baseIndex, shapeVertices.Count, allIndices);
+            AppendPointTriangles(baseIndex, vertexCount, allIndices);
             return;
         }
 
         foreach (var triangle in triangles)
         {
             int a = triangle.V1, b = triangle.V2, c = triangle.V3;
-            if (a >= shapeVertices.Count || b >= shapeVertices.Count || c >= shapeVertices.Count) continue;
+            if (a >= vertexCount || b >= vertexCount || c >= vertexCount) continue;
             allIndices.Add(baseIndex + a);
             allIndices.Add(baseIndex + b);
             allIndices.Add(baseIndex + c);

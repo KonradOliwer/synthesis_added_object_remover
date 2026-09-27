@@ -37,7 +37,7 @@ internal sealed class NodeTransformResolver
         _parentOf = parentOf;
         _flags = flags;
         _includeHidden = includeHidden;
-        _states = new Dictionary<int, NodeState> { [rootIndex] = new(Similarity.Identity, NodeSkip.None) };
+        _states = new Dictionary<int, NodeState> { [rootIndex] = RootState(blocks[rootIndex]) };
     }
 
     public NodeState Resolve(int nodeIndex)
@@ -79,14 +79,26 @@ internal sealed class NodeTransformResolver
         return path;
     }
 
+    /// <summary>
+    /// The root's own transform is left out (the engine replaces it with the placed reference's),
+    /// but its hidden flag and marker name count like any other node's.
+    /// </summary>
+    private NodeState RootState(INiObject block) =>
+        block is NiNode node ? new NodeState(Similarity.Identity, SkipOf(node)) : UnreachableState;
+
     private NodeState ChildState(NodeState parent, INiObject block)
     {
         if (block is not NiNode node) return UnreachableState;
-        if (NifShapes.IsEditorMarker(node.Name?.String)) return new NodeState(Similarity.Identity, NodeSkip.Marker);
-        if (!_includeHidden && _flags.IsHiddenWithoutController(node.Flags_ui, node.Flags_us, node.Controller))
-        {
-            return new NodeState(Similarity.Identity, NodeSkip.Hidden);
-        }
-        return new NodeState(parent.ToRoot.After(Similarity.From(node.Translation, node.Rotation, node.Scale)), NodeSkip.None);
+        var skip = SkipOf(node);
+        return skip == NodeSkip.None
+            ? new NodeState(parent.ToRoot.After(Similarity.From(node.Translation, node.Rotation, node.Scale)), NodeSkip.None)
+            : new NodeState(Similarity.Identity, skip);
+    }
+
+    private NodeSkip SkipOf(NiNode node)
+    {
+        if (NifShapes.IsEditorMarker(node.Name?.String)) return NodeSkip.Marker;
+        if (!_includeHidden && _flags.IsHiddenWithoutController(node.Flags_ui, node.Flags_us, node.Controller)) return NodeSkip.Hidden;
+        return NodeSkip.None;
     }
 }

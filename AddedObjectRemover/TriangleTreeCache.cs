@@ -26,30 +26,33 @@ internal sealed class TriangleTreeCache(Func<string, NifGeometry?> readGeometry)
     private const int MaxConcurrentLargeBuilds = 4;
 
     /// <summary><see cref="Users"/> and <see cref="LastUse"/> are guarded by the cache lock.</summary>
-    private sealed class Entry(Lazy<MeshTriangleTree?> tree)
+    internal sealed class Entry(Lazy<MeshTriangleTree?> tree)
     {
         public Lazy<MeshTriangleTree?> Tree { get; } = tree;
         public long LastUse;
         public int Users;
     }
 
-    /// <summary>One use of a cached tree; disposing it ends the use.</summary>
+    /// <summary>One use of a cached tree; disposing it ends the use. A default lease holds nothing.</summary>
     public readonly struct Lease : IDisposable
     {
-        private readonly TriangleTreeCache _cache;
-        private readonly string _meshPath;
+        private readonly TriangleTreeCache? _cache;
+        private readonly Entry? _entry;
 
-        internal Lease(TriangleTreeCache cache, string meshPath, MeshTriangleTree? tree)
+        internal Lease(TriangleTreeCache cache, Entry entry, MeshTriangleTree? tree)
         {
             _cache = cache;
-            _meshPath = meshPath;
+            _entry = entry;
             Tree = tree;
         }
 
         /// <summary>Null when the mesh has no usable triangles or is too large.</summary>
         public MeshTriangleTree? Tree { get; }
 
-        public void Dispose() => _cache.EndUse(_meshPath);
+        public void Dispose()
+        {
+            if (_cache != null && _entry != null) _cache.EndUse(_entry);
+        }
     }
 
     private readonly Dictionary<string, Entry> _entries = new(StringComparer.OrdinalIgnoreCase);
@@ -68,13 +71,25 @@ internal sealed class TriangleTreeCache(Func<string, NifGeometry?> readGeometry)
     private int _evicted;
     private long _triangles;
 
-    /// <summary>The tree stays resident at least until the returned lease is disposed.</summary>
+    /// <summary>
+    /// The tree stays resident at least until the returned lease is disposed. When the build
+    /// throws, the exception passes through and the mesh is built again on its next use.
+    /// </summary>
     public Lease Acquire(string meshPath)
     {
         var entry = BeginUse(meshPath);
-        var tree = entry.Tree.Value;
+        MeshTriangleTree? tree;
+        try
+        {
+            tree = entry.Tree.Value;
+        }
+        catch
+        {
+            EndFailedUse(meshPath, entry);
+            throw;
+        }
         if (tree != null && Interlocked.Read(ref _residentBytes) > MaxResidentBytes) EvictLeastRecentlyUsed();
-        return new Lease(this, meshPath, tree);
+        return new Lease(this, entry, tree);
     }
 
     public TriangleTreeStats GetStats() => new(
@@ -101,10 +116,19 @@ internal sealed class TriangleTreeCache(Func<string, NifGeometry?> readGeometry)
         }
     }
 
-    /// <remarks>An entry in use is never evicted, so the path still finds it.</remarks>
-    private void EndUse(string meshPath)
+    private void EndUse(Entry entry)
     {
-        lock (_lock) _entries[meshPath].Users--;
+        lock (_lock) entry.Users--;
+    }
+
+    /// <summary>A lazy value keeps its exception, so the failed entry is dropped (unless another use already replaced it).</summary>
+    private void EndFailedUse(string meshPath, Entry entry)
+    {
+        lock (_lock)
+        {
+            entry.Users--;
+            if (_entries.TryGetValue(meshPath, out var current) && current == entry) _entries.Remove(meshPath);
+        }
     }
 
     private MeshTriangleTree? Build(string meshPath)

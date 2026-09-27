@@ -123,13 +123,37 @@ public class TriangleDistanceTests
     }
 
     [Fact]
-    [Trait(KnownBug.Trait, "A3: an edge crossing a face at a sine below 1e-3 skips the crossing test, so intersecting triangles report a small non-zero distance")]
-    public void ShallowCrossingIsReportedApart()
+    public void ShallowCrossingHasZeroDistance()
     {
         var p = new MeshTriangle(Vector3.Zero, new Vector3(1000, 0, 0), new Vector3(0, 1000, 0));
         var q = new MeshTriangle(new Vector3(-100, 100, -0.05f), new Vector3(900, 100, 0.05f), new Vector3(-100, 110, -0.05f));
-        Assert.InRange(TriangleProximity.MinDistanceSquared(p, q), 1e-4f, 1e-2f);
-        Assert.False(TriangleProximity.AreWithin(p, q, 0f));
+        Assert.Equal(0f, TriangleProximity.MinDistanceSquared(p, q));
+        Assert.Equal(0f, TriangleProximity.MinDistanceSquared(q, p));
+        Assert.True(TriangleProximity.AreWithin(p, q, 0f));
+    }
+
+    [Fact]
+    public void TriangleJustAboveAFaceIsApart()
+    {
+        var p = new MeshTriangle(Vector3.Zero, new Vector3(1000, 0, 0), new Vector3(0, 1000, 0));
+        var q = new MeshTriangle(new Vector3(-100, 100, 0.05f), new Vector3(900, 100, 0.05f), new Vector3(-100, 110, 0.05f));
+        Assert.Equal(0.05f * 0.05f, TriangleProximity.MinDistanceSquared(p, q), 1e-6f);
+    }
+
+    [Fact]
+    public void NearlyCollinearTriangleUsesItsSegment()
+    {
+        var a = new Vector3(0.1f, 0.1f, 0.1f);
+        var c = new Vector3(0.7f, 0.7f, 0.7000001f);
+        var point = new Vector3(0.5f, 0.2f, 0.9f);
+
+        var closest = AddedObjectRemover.Geometry.ClosestPointOnTriangle(point, a, new Vector3(0.3f, 0.3f, 0.3f), c);
+
+        var along = Vector3.Dot(closest - a, c - a) / (c - a).LengthSquared();
+        Assert.InRange(along, -1e-4f, 1 + 1e-4f);
+        Assert.True(Vector3.Distance(closest, a + (c - a) * along) < 1e-4f);
+        var exact = a + (c - a) * Math.Clamp(Vector3.Dot(point - a, c - a) / (c - a).LengthSquared(), 0f, 1f);
+        Assert.Equal(Vector3.Distance(point, exact), Vector3.Distance(point, closest), 1e-4f);
     }
 
     private static float SampledDistance(MeshTriangle sampled, MeshTriangle face) =>

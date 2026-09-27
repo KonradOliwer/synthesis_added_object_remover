@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Numerics;
 
 namespace AddedObjectRemover;
 
@@ -28,13 +27,6 @@ internal sealed class TouchPairTester(
 {
     private const int PairsPerChunk = 64;
 
-    /// <summary>
-    /// Moves the enclosure test point slightly off the second mesh's centre, per axis as a
-    /// fraction of its size: an enclosing mesh placed concentrically and symmetric about that
-    /// centre has its triangle diagonals there, where line crossings are not counted.
-    /// </summary>
-    private static readonly Vector3 CentreNudgeFractions = new(0.0137f, 0.0219f, 0.0071f);
-
     private readonly TriangleTreeCache _cache = cache;
     private int _pairsTested;
     private int _touchingPairs;
@@ -60,7 +52,7 @@ internal sealed class TouchPairTester(
         return results;
     }
 
-    /// <summary>Per pair: whether the first's mesh encloses a point near the centre of the second's mesh (<see cref="PointContactTest.IsEnclosed"/>).</summary>
+    /// <summary>Per pair: whether the first's mesh encloses the centre of the second's mesh bounds (<see cref="PointContactTest.IsEnclosed"/>).</summary>
     public bool[] TestEnclosures(IReadOnlyList<TargetPair> pairs, ParallelOptions parallelOptions)
     {
         var results = new bool[pairs.Count];
@@ -72,7 +64,7 @@ internal sealed class TouchPairTester(
             () => new List<int>(),
             (range, _, scratch) =>
             {
-                for (var i = range.Item1; i < range.Item2; i++) results[i] = EnclosesNearCentreOfSecond(pairs[i], scratch);
+                for (var i = range.Item1; i < range.Item2; i++) results[i] = EnclosesCentreOfSecond(pairs[i], scratch);
                 return scratch;
             },
             _ => { });
@@ -106,15 +98,14 @@ internal sealed class TouchPairTester(
         return touches ? PairTouch.Touching : PairTouch.Apart;
     }
 
-    private bool EnclosesNearCentreOfSecond(TargetPair pair, List<int> scratch)
+    private bool EnclosesCentreOfSecond(TargetPair pair, List<int> scratch)
     {
         using var first = _cache.Acquire(meshPaths.Get(pair.First));
         using var second = _cache.Acquire(meshPaths.Get(pair.Second));
         if (first.Tree is not { } enclosing || second.Tree is not { } enclosed) return false;
 
         var toFirst = RelativeTransform.Create(from: targets[pair.Second].Transform, to: targets[pair.First].Transform);
-        var nearCentre = enclosed.Bounds.Center + enclosed.Bounds.Size * CentreNudgeFractions;
-        return PointContactTest.IsEnclosed(enclosing, toFirst.Apply(nearCentre), scratch);
+        return PointContactTest.IsEnclosed(enclosing, toFirst.Apply(enclosed.Bounds.Center), scratch);
     }
 
     private void CountResults(PairTouch[] results)

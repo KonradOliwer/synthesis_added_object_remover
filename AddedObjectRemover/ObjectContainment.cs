@@ -8,14 +8,20 @@ namespace AddedObjectRemover;
 /// </summary>
 internal sealed class ObjectContainment(BaseObjectShapeProvider shapes, TriangleTreeCache meshCache)
 {
-    /// <summary>A struct so the grid query is allocation-free and inlinable.</summary>
+    [ThreadStatic] private static List<int>? _scratch;
+
     private readonly struct ContainingMatcher(OtherObjectIndex index, ObjectContainment containment, Vector3 point, bool skipReplaced)
         : IGridMatcher
     {
-        public bool IsMatch(int otherIndex) =>
-            !(skipReplaced && index.IsReplaced(otherIndex))
-            && index.IsVisible(otherIndex)
-            && containment.Contains(index[otherIndex], point);
+        /// <remarks>The reach test comes first: it is cheap, and visibility may need the object's mesh measured.</remarks>
+        public bool IsMatch(int otherIndex)
+        {
+            if (skipReplaced && index.IsReplaced(otherIndex)) return false;
+            var other = index[otherIndex];
+            return containment.CanReach(other, point)
+                && index.IsVisible(otherIndex)
+                && containment.Contains(other.Base, other.Transform, point);
+        }
     }
 
     public bool Contains(BaseRef? baseRef, PlacedTransform transform, Vector3 worldPoint)
@@ -25,7 +31,7 @@ internal sealed class ObjectContainment(BaseObjectShapeProvider shapes, Triangle
         if (!shapes.GetLocalBox(baseRef).Contains(local)) return false;
 
         using var lease = meshCache.Acquire(meshPath);
-        return lease.Tree is { } tree && SurroundingRayTest.IsSurrounded(tree, local, transform.Rotation, []);
+        return lease.Tree is { } tree && SurroundingRayTest.IsSurrounded(tree, local, transform.Rotation, _scratch ??= []);
     }
 
     /// <param name="skipReplaced">Ignore objects the target plugin replaced.</param>
@@ -37,14 +43,10 @@ internal sealed class ObjectContainment(BaseObjectShapeProvider shapes, Triangle
         return index.Grid.TryFindFirst(area, ref matcher, out var match) ? match : -1;
     }
 
-    /// <summary>
-    /// Rejects an object whose bounding box, however it is rotated, cannot reach the point before
-    /// its rotation is computed.
-    /// </summary>
-    private bool Contains(OtherObject other, Vector3 worldPoint)
+    /// <summary>Whether the object's bounding box, however it is rotated, can reach the point.</summary>
+    private bool CanReach(OtherObject other, Vector3 worldPoint)
     {
         var reach = shapes.GetLocalBox(other.Base).FarthestCornerDistance * other.Scale;
-        return Vector3.DistanceSquared(other.Position, worldPoint) <= reach * reach
-            && Contains(other.Base, other.Transform, worldPoint);
+        return Vector3.DistanceSquared(other.Position, worldPoint) <= reach * reach;
     }
 }

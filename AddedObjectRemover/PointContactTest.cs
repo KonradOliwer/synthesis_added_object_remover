@@ -82,29 +82,49 @@ internal static class PointContactTest
     };
 
     /// <summary>
-    /// Z at which the line along Z through the point crosses the triangle's interior.
-    /// Crossings exactly on an edge are not counted, so points on a mesh's symmetry planes, where
-    /// they are common, must be avoided.
+    /// Z at which the line along Z through the point crosses the triangle. A line through an edge
+    /// or corner shared by several triangles must be counted once, so the projected triangle is
+    /// turned counter-clockwise and a point exactly on an edge belongs to it only when that edge
+    /// is a top or left edge (the rasterization fill rule). Two triangles on opposite sides of a
+    /// shared edge then count it exactly once, and two folding back on the same side zero or two
+    /// times, which keeps the parity. Triangles seen edge-on are never crossed.
     /// </summary>
     private static bool TryGetLineCrossing(MeshTriangle triangle, Vector3 point, out float z)
     {
-        var edgeBc = Cross2D(triangle.B, triangle.C, point);
-        var edgeCa = Cross2D(triangle.C, triangle.A, point);
-        var edgeAb = Cross2D(triangle.A, triangle.B, point);
-        var inside = (edgeBc > 0 && edgeCa > 0 && edgeAb > 0) || (edgeBc < 0 && edgeCa < 0 && edgeAb < 0);
-        if (!inside)
-        {
-            z = 0;
-            return false;
-        }
+        z = 0;
+        var (a, b, c) = (triangle.A, triangle.B, triangle.C);
+        var orientation = EdgeFunction(a, b, c);
+        if (orientation == 0) return false;
+        if (orientation < 0) (b, c) = (c, b);
+
+        var edgeBc = EdgeFunction(b, c, point);
+        var edgeCa = EdgeFunction(c, a, point);
+        var edgeAb = EdgeFunction(a, b, point);
+        if (!Covers(edgeBc, b, c) || !Covers(edgeCa, c, a) || !Covers(edgeAb, a, b)) return false;
 
         // Each edge function is twice the signed area of the sub-triangle opposite a corner, so it is that corner's barycentric weight.
         var twiceArea = edgeBc + edgeCa + edgeAb;
-        z = (edgeBc * triangle.A.Z + edgeCa * triangle.B.Z + edgeAb * triangle.C.Z) / twiceArea;
+        z = (float)((edgeBc * a.Z + edgeCa * b.Z + edgeAb * c.Z) / twiceArea);
         return true;
     }
 
-    /// <summary>Z of (end - start) x (point - start) in the XY plane.</summary>
-    private static float Cross2D(Vector3 start, Vector3 end, Vector3 point) =>
-        (end.X - start.X) * (point.Y - start.Y) - (end.Y - start.Y) * (point.X - start.X);
+    /// <summary>Whether a point with this edge function value belongs to the counter-clockwise triangle, by the top-left rule on the edge.</summary>
+    private static bool Covers(double edgeFunction, Vector3 start, Vector3 end) =>
+        edgeFunction > 0 || (edgeFunction == 0 && IsTopOrLeftEdge(start, end));
+
+    /// <summary>A left edge runs downwards, a top edge is horizontal and runs leftwards (counter-clockwise, Y up).</summary>
+    private static bool IsTopOrLeftEdge(Vector3 start, Vector3 end) =>
+        end.Y < start.Y || (end.Y == start.Y && end.X < start.X);
+
+    /// <summary>
+    /// Z of (end - start) x (point - start) in the XY plane. Always evaluated from the edge's
+    /// lower endpoint (by X, then Y), so the two triangles sharing an edge get exactly opposite values.
+    /// </summary>
+    private static double EdgeFunction(Vector3 start, Vector3 end, Vector3 point) =>
+        start.X < end.X || (start.X == end.X && start.Y <= end.Y)
+            ? Cross2D(start, end, point)
+            : -Cross2D(end, start, point);
+
+    private static double Cross2D(Vector3 start, Vector3 end, Vector3 point) =>
+        ((double)end.X - start.X) * ((double)point.Y - start.Y) - ((double)end.Y - start.Y) * ((double)point.X - start.X);
 }

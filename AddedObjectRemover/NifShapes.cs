@@ -105,16 +105,14 @@ internal static class NifShapes
             || StripLengthsField.GetValue(data) is not List<ushort> { Count: > 0 } stripLengths)
             return null;
 
-        try
-        {
-            var strips = points.SplitByFlexSize(stripLengths).ToList();
-            return strips.Count > 0 ? IndicesHelper.GenerateTrianglesFromStrips(strips) : null;
-        }
-        catch (Exception ex) when (ex is ArgumentException or IndexOutOfRangeException or InvalidOperationException)
+        // SplitByFlexSize silently truncates when the lengths do not add up to the point count.
+        if (stripLengths.Sum(length => (int)length) != points.Count)
         {
             stripsMismatched = true;
             return null;
         }
+        var strips = points.SplitByFlexSize(stripLengths).ToList();
+        return IndicesHelper.GenerateTrianglesFromStrips(strips);
     }
 
     private static void ReportStripFieldsMissingOnce()

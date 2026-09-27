@@ -80,7 +80,52 @@ internal sealed class MeshTriangleTree
     public MeshTriangle GetTriangle(int triangle) => GetTriangle(_geometry, triangle);
 
     /// <summary>Replaces <paramref name="output"/> with the triangles of every leaf overlapping <paramref name="query"/>, in a fixed order.</summary>
-    public void CollectLeafTriangles(Box query, List<int> output)
+    public void CollectLeafTriangles(Box query, List<int> output) =>
+        CollectLeafTriangles(new OverlapFilter(query), output);
+
+    /// <summary>
+    /// Replaces <paramref name="output"/> with the triangles of every leaf whose box the ray from
+    /// <paramref name="origin"/> along <paramref name="direction"/> touches, in a fixed order.
+    /// </summary>
+    public void CollectLeafTrianglesAlongRay(Vector3 origin, Vector3 direction, List<int> output) =>
+        CollectLeafTriangles(new RayFilter(origin, direction), output);
+
+    private interface INodeFilter
+    {
+        bool Accepts(Box bounds);
+    }
+
+    private readonly struct OverlapFilter(Box query) : INodeFilter
+    {
+        public bool Accepts(Box bounds) => bounds.Overlaps(query);
+    }
+
+    private readonly struct RayFilter(Vector3 origin, Vector3 direction) : INodeFilter
+    {
+        /// <summary>Slab test, inclusive of the box's faces; a NaN makes it fail.</summary>
+        public bool Accepts(Box bounds)
+        {
+            var enter = 0f;
+            var exit = float.PositiveInfinity;
+            for (var axis = 0; axis < 3; axis++)
+            {
+                var start = origin[axis];
+                var step = direction[axis];
+                if (step == 0)
+                {
+                    if (start < bounds.Min[axis] || start > bounds.Max[axis]) return false;
+                    continue;
+                }
+                var toMin = (bounds.Min[axis] - start) / step;
+                var toMax = (bounds.Max[axis] - start) / step;
+                enter = MathF.Max(enter, MathF.Min(toMin, toMax));
+                exit = MathF.Min(exit, MathF.Max(toMin, toMax));
+            }
+            return enter <= exit;
+        }
+    }
+
+    private void CollectLeafTriangles<TFilter>(TFilter filter, List<int> output) where TFilter : struct, INodeFilter
     {
         output.Clear();
         var stackSize = _depth + 1;
@@ -90,7 +135,7 @@ internal sealed class MeshTriangleTree
         while (top > 0)
         {
             var node = _nodes[stack[--top]];
-            if (!node.Bounds.Overlaps(query)) continue;
+            if (!filter.Accepts(node.Bounds)) continue;
             if (node.IsLeaf)
             {
                 for (var i = node.First; i < node.First + node.Count; i++) output.Add(_order[i]);

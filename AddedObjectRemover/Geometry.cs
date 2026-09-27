@@ -244,6 +244,9 @@ internal static class Geometry
     /// </summary>
     public const float MaxCoordinate = 1e6f;
 
+    /// <summary>Squared sine of the smallest angle at a triangle's first corner for which its face is used; see <see cref="ClosestPointOnTriangle"/>.</summary>
+    private const float MinFaceSineSquared = 1e-6f;
+
     public static Vector3 ToVector(P3Float p) => new(p.X, p.Y, p.Z);
 
     /// <summary>A placed reference's scale; missing, non-finite or non-positive values mean 1.</summary>
@@ -340,14 +343,20 @@ internal static class Geometry
 
     /// <summary>
     /// The point of triangle (a, b, c) closest to <paramref name="p"/> (Ericson, Real-Time
-    /// Collision Detection 5.1.5). Degenerate triangles (coincident vertices, collinear vertices, a
-    /// single point) are handled without dividing by zero: an edge of zero length is treated as its
-    /// start point, and a zero-area triangle as its three edges.
+    /// Collision Detection 5.1.5). A triangle whose angle at a has a squared sine at or below
+    /// <see cref="MinFaceSineSquared"/> (coincident vertices, collinear or nearly collinear
+    /// vertices, a single point) is treated as its three edges: its region weights would be
+    /// rounding noise, and its face lies within 1e-3 of an edge length of those edges.
     /// </summary>
     public static Vector3 ClosestPointOnTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c)
     {
         var ab = b - a;
         var ac = c - a;
+        if (!(Vector3.Cross(ab, ac).LengthSquared() > MinFaceSineSquared * ab.LengthSquared() * ac.LengthSquared()))
+        {
+            return ClosestPointOnEdges(p, a, b, c);
+        }
+
         var ap = p - a;
         var d1 = Vector3.Dot(ab, ap);
         var d2 = Vector3.Dot(ac, ap);
@@ -387,8 +396,9 @@ internal static class Geometry
             return b + w * (c - b);
         }
 
+        // Equals |ab x ac|^2 in exact arithmetic; rounding can still cancel it when p is far from the triangle.
         var sum = va + vb + vc;
-        if (!float.IsFinite(1f / sum)) return ClosestPointOnEdges(p, a, b, c);
+        if (!(sum > 0)) return ClosestPointOnEdges(p, a, b, c);
         var denominator = 1f / sum;
         var vv = vb * denominator;
         var ww = vc * denominator;

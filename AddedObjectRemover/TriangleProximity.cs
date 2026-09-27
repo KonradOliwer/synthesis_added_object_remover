@@ -12,15 +12,6 @@ namespace AddedObjectRemover;
 /// </summary>
 internal static class TriangleProximity
 {
-    /// <summary>
-    /// Smallest sine of the angle between an edge and a face's plane for which the edge-through-face
-    /// test is trusted. Below it the determinant can be dominated by rounding, and the crossing test
-    /// could report arbitrary results. An edge that does cross the face at such an angle has both
-    /// ends within (edge length x this) of the face's plane, so the vertex-to-face or edge-to-edge
-    /// distance is at most that and the distance tests find the touch instead.
-    /// </summary>
-    private const float MinCrossingSine = 1e-3f;
-
     public static bool AreWithin(in MeshTriangle p, in MeshTriangle q, float distanceSquared) =>
         DistanceSquared(p, q, stopAtOrBelow: distanceSquared) <= distanceSquared;
 
@@ -61,31 +52,28 @@ internal static class TriangleProximity
         || SegmentCrossesTriangle(edges.C, edges.A, face);
 
     /// <summary>
-    /// Möller-Trumbore restricted to the segment. A segment (nearly) parallel to the face's plane,
-    /// a zero-length segment and a degenerate face never cross; see <see cref="MinCrossingSine"/>.
+    /// Whether the segment passes through the face: its ends lie on opposite sides of the face's
+    /// plane (or one on it), and the point where it meets the plane lies in the face, edges
+    /// included. The signed plane distances stay accurate at any angle, so a segment crossing at a
+    /// very shallow angle is found too. A segment lying in the plane, and a degenerate face, never
+    /// cross; the vertex and edge tests cover them.
     /// </summary>
     private static bool SegmentCrossesTriangle(Vector3 start, Vector3 end, in MeshTriangle face)
     {
-        var direction = end - start;
-        var edge1 = face.B - face.A;
-        var edge2 = face.C - face.A;
-        var h = Vector3.Cross(direction, edge2);
-        var determinant = Vector3.Dot(edge1, h);
-        // determinant = -direction . (edge1 x edge2), so this compares the sine of the edge-to-plane angle.
-        if (!(MathF.Abs(determinant) > MinCrossingSine * direction.Length() * Vector3.Cross(edge1, edge2).Length())) return false;
+        var normal = Vector3.Cross(face.B - face.A, face.C - face.A);
+        var startSide = Vector3.Dot(normal, start - face.A);
+        var endSide = Vector3.Dot(normal, end - face.A);
+        if ((startSide > 0 && endSide > 0) || (startSide < 0 && endSide < 0) || startSide == endSide) return false;
 
-        var inverseDeterminant = 1f / determinant;
-        var fromA = start - face.A;
-        var u = Vector3.Dot(fromA, h) * inverseDeterminant;
-        if (u is not (>= 0f and <= 1f)) return false;
-
-        var q = Vector3.Cross(fromA, edge1);
-        var v = Vector3.Dot(direction, q) * inverseDeterminant;
-        if (v is not (>= 0f and <= 1f) || u + v > 1) return false;
-
-        var t = Vector3.Dot(edge2, q) * inverseDeterminant;
-        return t is >= 0f and <= 1f;
+        var crossing = start + (end - start) * (startSide / (startSide - endSide));
+        return IsInFace(crossing, face, normal);
     }
+
+    /// <summary>Whether a point in the face's plane lies in the face, edges included; false for NaN.</summary>
+    private static bool IsInFace(Vector3 point, in MeshTriangle face, Vector3 normal) =>
+        Vector3.Dot(normal, Vector3.Cross(face.B - face.A, point - face.A)) >= 0
+        && Vector3.Dot(normal, Vector3.Cross(face.C - face.B, point - face.B)) >= 0
+        && Vector3.Dot(normal, Vector3.Cross(face.A - face.C, point - face.C)) >= 0;
 
     /// <summary>Squared distance between segments p1-q1 and p2-q2 (Ericson 5.1.9), zero-length segments included.</summary>
     private static float SegmentDistanceSquared(Vector3 p1, Vector3 q1, Vector3 p2, Vector3 q2)

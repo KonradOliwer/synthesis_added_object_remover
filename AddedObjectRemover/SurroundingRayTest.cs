@@ -10,6 +10,13 @@ namespace AddedObjectRemover;
 /// </summary>
 internal static class SurroundingRayTest
 {
+    /// <summary>
+    /// Smallest sine of the angle between a ray and a triangle's plane for which the ray can hit
+    /// the triangle; below it the ray runs along the plane and the intersection determinant is
+    /// rounding noise.
+    /// </summary>
+    private const float MinHitSine = 1e-6f;
+
     private static readonly Vector3[] WorldDirections = [Vector3.UnitZ, Vector3.UnitX, -Vector3.UnitX, Vector3.UnitY, -Vector3.UnitY];
 
     /// <param name="localPoint">The point in the mesh's local frame.</param>
@@ -27,8 +34,7 @@ internal static class SurroundingRayTest
 
     private static bool HitsMesh(MeshTriangleTree tree, Vector3 origin, Vector3 direction, List<int> scratch)
     {
-        var end = origin + direction * DistanceToBoundsExit(tree.Bounds, origin, direction);
-        tree.CollectLeafTriangles(Box.FromCorners(origin, end), scratch);
+        tree.CollectLeafTrianglesAlongRay(origin, direction, scratch);
         foreach (var index in scratch)
         {
             if (RayHitsTriangle(origin, direction, tree.GetTriangle(index))) return true;
@@ -36,37 +42,26 @@ internal static class SurroundingRayTest
         return false;
     }
 
-    /// <summary>How far along the unit direction a ray starting inside the bounds leaves them.</summary>
-    private static float DistanceToBoundsExit(Box bounds, Vector3 origin, Vector3 direction)
-    {
-        var exit = float.PositiveInfinity;
-        for (var axis = 0; axis < 3; axis++)
-        {
-            if (direction[axis] > 0) exit = MathF.Min(exit, (bounds.Max[axis] - origin[axis]) / direction[axis]);
-            else if (direction[axis] < 0) exit = MathF.Min(exit, (bounds.Min[axis] - origin[axis]) / direction[axis]);
-        }
-        return exit;
-    }
-
     /// <summary>
     /// Möller-Trumbore intersection. Hits on a triangle's edges and corners count, so a ray through
-    /// a mesh's seams or symmetry planes still hits it.
+    /// a mesh's seams or symmetry planes still hits it. A NaN anywhere means no hit.
     /// </summary>
-    private static bool RayHitsTriangle(Vector3 origin, Vector3 direction, MeshTriangle triangle)
+    internal static bool RayHitsTriangle(Vector3 origin, Vector3 direction, MeshTriangle triangle)
     {
         var edge1 = triangle.B - triangle.A;
         var edge2 = triangle.C - triangle.A;
         var p = Vector3.Cross(direction, edge2);
         var determinant = Vector3.Dot(edge1, p);
-        if (determinant == 0) return false;
+        // determinant = -direction . (edge1 x edge2), so this compares the sine of the ray-to-plane angle.
+        if (!(MathF.Abs(determinant) > MinHitSine * direction.Length() * Vector3.Cross(edge1, edge2).Length())) return false;
 
         var inverse = 1f / determinant;
         var toOrigin = origin - triangle.A;
         var u = Vector3.Dot(toOrigin, p) * inverse;
-        if (u < 0 || u > 1) return false;
+        if (u is not (>= 0f and <= 1f)) return false;
         var q = Vector3.Cross(toOrigin, edge1);
         var v = Vector3.Dot(direction, q) * inverse;
-        if (v < 0 || u + v > 1) return false;
-        return Vector3.Dot(edge2, q) * inverse >= 0;
+        if (v is not >= 0f || !(u + v <= 1f)) return false;
+        return Vector3.Dot(edge2, q) * inverse is >= 0f;
     }
 }

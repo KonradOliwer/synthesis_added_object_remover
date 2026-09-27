@@ -42,23 +42,29 @@ public class TriangleTreeCacheTests
     }
 
     [Fact]
-    [Trait(KnownBug.Trait, "A6: a failed build is cached, so the mesh is never retried and its use count is never released")]
-    public void FailedBuildIsNeverRetried()
+    public void FailedBuildIsRetriedOnTheNextUse()
     {
         var reads = 0;
         var cache = new TriangleTreeCache(_ =>
         {
             reads++;
-            throw new IOException("unreadable");
+            if (reads <= 2) throw new IOException("unreadable");
+            return BoxMesh.CreateGeometry(TestMeshes.UnitCube);
         });
 
-        Assert.Throws<IOException>(() => cache.Acquire("broken.nif"));
-        Assert.Throws<IOException>(() => cache.Acquire("broken.nif"));
-        Assert.Equal(1, reads);
+        Assert.Throws<IOException>(() => cache.Acquire("flaky.nif"));
+        Assert.Throws<IOException>(() => cache.Acquire("flaky.nif"));
+        using var lease = cache.Acquire("flaky.nif");
+
+        Assert.NotNull(lease.Tree);
+        Assert.Equal(3, reads);
+        Assert.Equal(1, cache.GetStats().Built);
     }
 
     [Fact]
-    [Trait(KnownBug.Trait, "A6: disposing a default lease dereferences a null cache")]
-    public void DefaultLeaseCannotBeDisposed() =>
-        Assert.Throws<NullReferenceException>(() => default(TriangleTreeCache.Lease).Dispose());
+    public void DisposingADefaultLeaseDoesNothing()
+    {
+        var exception = Record.Exception(() => default(TriangleTreeCache.Lease).Dispose());
+        Assert.Null(exception);
+    }
 }

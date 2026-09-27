@@ -8,6 +8,8 @@ public class NpcStuckTestTests
     private static readonly PlacedTransform Identity = TestTargets.At(Vector3.Zero);
     private static readonly Box NpcBodyBox = new(new Vector3(-20, -20, 0), new Vector3(20, 20, 80));
     private static readonly Box Platform = new(new Vector3(-50, -50, -20), new Vector3(50, 50, 0));
+    private const float BuildingHalfWidth = 100f;
+    private const float BuildingHeight = 200f;
 
     private static bool IsStuck(MeshTriangleTree objectTree, Box npcBodyBox, PlacedTransform npcTransform) =>
         NpcStuckTest.IsAnyBodyStuck(objectTree, Identity, SingleBody(npcBodyBox), npcTransform, new NpcScratch());
@@ -65,12 +67,35 @@ public class NpcStuckTestTests
     }
 
     [Fact]
-    public void InsideAnOpenShellIsNotStuck()
-    {
-        var openShell = TestMeshes.Tree(TestMeshes.BoxWithoutFace(new Box(new Vector3(-100), new Vector3(100)), v => v.X == 100));
+    public void BuildingWithoutAFloorIsAnOpenMesh() => Assert.False(OpenBuilding().IsClosed);
 
-        Assert.False(IsStuck(openShell, NpcBodyBox, TestTargets.At(new Vector3(0, 0, -40))));
+    [Fact]
+    public void StandingInARoomOfAnOpenBuildingIsStuck() =>
+        Assert.True(IsStuck(OpenBuilding(), NpcBodyBox, TestTargets.At(Vector3.Zero)));
+
+    [Fact]
+    public void StandingOnTopOfAnOpenBuildingIsNotStuck() =>
+        Assert.False(IsStuck(OpenBuilding(), NpcBodyBox, TestTargets.At(new Vector3(0, 0, BuildingHeight))));
+
+    [Fact]
+    public void StandingOutsideNextToAnOpenBuildingIsNotStuck() =>
+        Assert.False(IsStuck(OpenBuilding(), NpcBodyBox, TestTargets.At(new Vector3(BuildingHalfWidth + 50, 0, 0))));
+
+    [Fact]
+    public void AnyOfSeveralPossibleBodiesInARoomIsStuck()
+    {
+        var bodies = NpcBodySet.Of([
+            new NpcBody(NpcSizeSource.BodyMesh, NpcBodyBox, null),
+            new NpcBody(NpcSizeSource.BodyMesh, new Box(new Vector3(-10, -10, 0), new Vector3(10, 10, 40)), null)]);
+
+        Assert.True(NpcStuckTest.IsAnyBodyStuck(OpenBuilding(), Identity, bodies, TestTargets.At(Vector3.Zero), new NpcScratch()));
     }
+
+    /// <summary>One room: walls and roof, no floor, standing on the ground at height 0.</summary>
+    private static MeshTriangleTree OpenBuilding() =>
+        TestMeshes.Tree(TestMeshes.BoxWithoutFace(
+            new Box(new Vector3(-BuildingHalfWidth, -BuildingHalfWidth, 0), new Vector3(BuildingHalfWidth, BuildingHalfWidth, BuildingHeight)),
+            v => v.Z == 0));
 
     [Fact]
     public void CombinedMissRejectsWithoutTestingEachBody()

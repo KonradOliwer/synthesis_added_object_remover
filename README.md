@@ -19,8 +19,9 @@ plugin is `AddedObjectRemover.esp`.
   their aliases, AI packages, locations, factions, navmeshes, dialogue, scripts, ...), are never
   removed by any step, so nothing the game or a script relies on goes missing.
 - Objects of the target plugin linked together (enable parent, linked references, ...) are removed
-  together, or all kept. A linked object removed this way gets the same follow-up removal as the
-  object it is linked to, so what it holds up or touches goes too.
+  together, or all kept. A linked object removed with a too-close or follow-up removal gets the
+  same follow-up removal, so what it holds up or touches goes too; one removed with a leftover
+  invisible object (see below) does not.
 - Objects that a script finds only by FormID at run time (for example with GetFormFromFile)
   cannot be detected.
 
@@ -49,7 +50,7 @@ The log ends with a *Possible manual patch needed* section listing removed marke
 | Mods to ignore | *(empty)* | Objects from these plugins never cause removals. |
 | Ignore the mod's own masters | `true` | Objects from mods it requires never cause removals. |
 | Ignore mods sharing a patch | `true` | If a patch combines both mods, they don't clash. The log lists every detected patch and the mods it causes to be ignored. |
-| NPCs and creatures | `OnlyWhenStuckInObject` | Whether other mods' NPCs and creatures cause removals: `CountLikeObjects` treats them like any other object, `OnlyWhenStuckInObject` only when their body would be inside the object at its real size, `Ignore` never. NPCs placed through a leveled list count with their largest possible body. |
+| NPCs and creatures | `OnlyWhenStuckInObject` | Whether other mods' NPCs and creatures cause removals: `CountLikeObjects` treats them like any other object, `OnlyWhenStuckInObject` only when they are stuck in the object at its real size, `Ignore` never. An NPC is stuck when its body sinks more than 8 units into the object, or when it stands inside the object (for example inside a boulder, or in a room of a building); standing on or leaning against the object does not count. An NPC placed through a leveled list counts when any of the NPCs it can be is stuck. |
 | Patch master limit | `10` | Plugins with more masters than this aren't treated as patches (1-100; the base game and the cleaned mod's masters do not count). Plugins that depend on many mods, such as `DynDOLOD.esp` or a Bashed Patch, are therefore not treated as patches; the log lists them as skipped. |
 
 ### Objects resting on removed ones

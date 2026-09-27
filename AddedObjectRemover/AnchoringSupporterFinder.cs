@@ -15,10 +15,10 @@ internal sealed class AnchoringSupporterFinder(
     float touchDistance)
 {
     /// <returns>Target supporters in neighbor order, then placed supporters in index order.</returns>
-    public List<MeshSupporter> FindMeshSupporters(int candidate)
+    public List<MeshSupporter> FindMeshSupporters(int candidate, SpatialQueryScratch scratch)
     {
         var found = FindTargetSupporters(candidate);
-        found.AddRange(FindPlacedSupporters(candidate));
+        AddPlacedSupporters(candidate, scratch, found);
         return found;
     }
 
@@ -27,13 +27,12 @@ internal sealed class AnchoringSupporterFinder(
             .Select(neighbor => new MeshSupporter(Supporter.Target(neighbor), targets[neighbor].Transform, search.MeshPaths.Get(neighbor)))
             .ToList();
 
-    private IEnumerable<MeshSupporter> FindPlacedSupporters(int candidate)
+    private void AddPlacedSupporters(int candidate, SpatialQueryScratch scratch, List<MeshSupporter> found)
     {
         var index = supporters.GetSpace(targets[candidate].SpaceKey);
         var candidateBox = search.CandidateFinder.BoxOf(candidate);
-        var candidates = new List<int>();
-        index.Bounds.CollectCandidates(candidateBox.WorldAabb(touchDistance), [], candidates);
-        foreach (var slot in candidates)
+        index.Bounds.CollectCandidates(candidateBox.WorldAabb(touchDistance), scratch.Slots, scratch.Candidates);
+        foreach (var slot in scratch.Candidates)
         {
             if (!index.IsVisible(slot)) continue;
             var placed = index[slot];
@@ -43,7 +42,7 @@ internal sealed class AnchoringSupporterFinder(
             var placedBox = OrientedBox.FromLocal(shapes.GetLocalBox(placed.Base), transform);
             if (!candidateBox.Intersects(placedBox, touchDistance)) continue;
 
-            yield return new MeshSupporter(Supporter.Placed(slot), transform, meshPath);
+            found.Add(new MeshSupporter(Supporter.Placed(slot), transform, meshPath));
         }
     }
 }

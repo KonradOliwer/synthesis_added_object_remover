@@ -81,6 +81,7 @@ internal sealed class RemovalPipeline
         var relocations = RelocateKeptMarkers(scan, visibility, supporters, removals, leftovers);
         WriteLeftoverDiagnostics(scan, leftovers, relocations);
         WriteOverrides(scan, removals, relocations.Moved);
+        RunReport.PrintBoundsIndexTimes(indexes.Values, supporters.GetIndexedSpaces());
 
         List<KeptTarget> kept = [.. tooClose.Kept, .. followUp.Kept, .. leftovers.Kept];
         PrintFinalReport(scan, indexes, removals, kept);
@@ -188,7 +189,7 @@ internal sealed class RemovalPipeline
     {
         if (npcRule.StuckSearch is { } stuckSearch)
         {
-            RunReport.PrintNpcStuckSummary(stuckSearch.GetSummary(), _npcBodies.GetStats(), _bodyMeasurer.GetMeasurements(), _config.DetailedLog);
+            RunReport.PrintNpcStuckSummary(stuckSearch.GetSummary(), _npcBodies.GetStats(), _bodyMeasurer.GetMeasurements().Count, _config.DetailedLog);
         }
         else if (npcRule.Handling == NpcHandling.Ignore) RunReport.PrintIgnoredNpcs(CountPlacedNpcs(indexes));
     }

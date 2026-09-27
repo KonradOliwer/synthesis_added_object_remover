@@ -54,12 +54,13 @@ internal sealed class AnchoringContactFinder(
     internal readonly record struct SupporterHits(Supporter Supporter, bool[] Hits);
 
     /// <param name="candidate">Index of a target object with a mesh.</param>
-    public CandidateContacts FindContacts(int candidate)
+    /// <param name="scratch">The calling thread's buffers.</param>
+    public CandidateContacts FindContacts(int candidate, SpatialQueryScratch scratch)
     {
         var target = targets[candidate];
         var samples = SampleSurface(candidate);
-        var hits = supporterFinder.FindMeshSupporters(candidate)
-            .Select(supporter => new SupporterHits(supporter.Supporter, FindSamplesTouchingMesh(samples.Points, target.Transform, supporter)))
+        var hits = supporterFinder.FindMeshSupporters(candidate, scratch)
+            .Select(supporter => new SupporterHits(supporter.Supporter, FindSamplesTouchingMesh(samples.Points, target.Transform, supporter, scratch)))
             .ToList();
         if (terrain.HasTerrain(target.SpaceKey))
         {
@@ -75,7 +76,7 @@ internal sealed class AnchoringContactFinder(
     }
 
     /// <returns>Per sample: whether it is in contact with the supporter's mesh.</returns>
-    private bool[] FindSamplesTouchingMesh(Vector3[] points, PlacedTransform candidateTransform, MeshSupporter supporter)
+    private bool[] FindSamplesTouchingMesh(Vector3[] points, PlacedTransform candidateTransform, MeshSupporter supporter, SpatialQueryScratch scratch)
     {
         var hits = new bool[points.Length];
         using var lease = cache.Acquire(supporter.MeshPath);
@@ -84,11 +85,10 @@ internal sealed class AnchoringContactFinder(
         var toSupporter = RelativeTransform.Create(from: candidateTransform, to: supporter.Transform);
         var localTolerance = touchDistance / supporter.Transform.Scale;
         var region = tree.Bounds.Grown(localTolerance);
-        var scratch = new List<int>();
         for (var i = 0; i < points.Length; i++)
         {
             var point = toSupporter.Apply(points[i]);
-            hits[i] = region.Contains(point) && PointContactTest.IsInContact(tree, point, localTolerance, scratch);
+            hits[i] = region.Contains(point) && PointContactTest.IsInContact(tree, point, localTolerance, scratch.Triangles);
         }
         return hits;
     }

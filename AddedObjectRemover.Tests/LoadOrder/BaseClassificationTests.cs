@@ -35,6 +35,20 @@ public class BaseClassificationTests
     }
 
     [Fact]
+    public void PrimitiveOfACritterSpawnerStaysACritterSpawner()
+    {
+        var spawner = new Mutagen.Bethesda.Skyrim.Activator(new FormKey(Mod, 0x806), SkyrimRelease.SkyrimSE)
+        {
+            VirtualMachineAdapter = new VirtualMachineAdapter { Scripts = { new ScriptEntry { Name = "CritterSpawnFish" } } },
+        };
+
+        var shape = BaseObjectShapeProvider.ClassifyShape(spawner, Box.Zero, meshPath: null, hasModel: false, meshWithoutGeometry: false);
+
+        Assert.Equal(InvisibleObjectKind.CritterSpawners, shape.InvisibleKind);
+        Assert.False(shape.InvisibleForLackOfGeometry);
+    }
+
+    [Fact]
     public void LightWhoseMeshHasNoRenderGeometryIsALight()
     {
         var light = new Light(new FormKey(Mod, 0x804), SkyrimRelease.SkyrimSE);

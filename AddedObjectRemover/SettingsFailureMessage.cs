@@ -16,7 +16,7 @@ internal static class SettingsFailureMessage
         @"Error converting value (.*?) to type|Could not convert string to \w+: (.*?)\.\s*Path",
         RegexOptions.Compiled);
 
-    public static string Describe(JsonException exception) => Describe(PathOf(exception), exception.Message);
+    public static string Describe(JsonException exception) => Describe(PathOf(exception), LocationOf(exception), exception.Message);
 
     /// <summary>Path is on <see cref="JsonSerializationException"/> and <see cref="JsonReaderException"/> individually, not on the shared base type.</summary>
     private static string? PathOf(JsonException exception) => exception switch
@@ -26,12 +26,23 @@ internal static class SettingsFailureMessage
         _ => null,
     };
 
-    internal static string Describe(string? path, string exceptionMessage)
+    /// <summary>Like the path, the line and position are on the two exception types individually; line 0 means unknown.</summary>
+    private static string? LocationOf(JsonException exception) => exception switch
+    {
+        JsonSerializationException { LineNumber: > 0 } serialization => DescribeLocation(serialization.LineNumber, serialization.LinePosition),
+        JsonReaderException { LineNumber: > 0 } reader => DescribeLocation(reader.LineNumber, reader.LinePosition),
+        _ => null,
+    };
+
+    private static string DescribeLocation(int line, int position) => $"line {line}, position {position}";
+
+    /// <param name="location">Where in settings.json the error lies; named only when no setting can be.</param>
+    private static string Describe(string? path, string? location, string exceptionMessage)
     {
         var setting = string.IsNullOrEmpty(path) ? null : ResolveSetting(path);
-        var settingDescription = setting == null
-            ? "the settings file"
-            : $"'{setting.Value.Breadcrumb}' (settings.json path '{path}')";
+        var settingDescription = setting != null
+            ? $"'{setting.Value.Breadcrumb}' (settings.json path '{path}')"
+            : location != null ? $"the settings file at {location}" : "the settings file";
 
         var message = $"Invalid saved setting: {settingDescription}.";
         var foundValue = ExtractFoundValue(exceptionMessage);
@@ -90,6 +101,7 @@ internal static class SettingsFailureMessage
         if (type.IsEnum) return $"Allowed values: {string.Join(", ", Enum.GetNames(type))}.";
         if (type == typeof(bool)) return "Expected value: true or false.";
         if (type == typeof(int) || type == typeof(float) || type == typeof(double)) return "Expected a number.";
-        return $"Expected type: {type.Name}.";
+        if (type == typeof(string)) return "Expected a text value.";
+        return "Expected a different kind of value.";
     }
 }

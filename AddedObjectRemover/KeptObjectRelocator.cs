@@ -52,10 +52,17 @@ internal sealed class KeptObjectRelocator(
     {
         var candidates = evaluations.Where(IsMovableMarkerKeptInsideOtherObject).ToArray();
         var relocations = new Relocation?[candidates.Length];
-        Parallel.For(0, candidates.Length, options, i =>
-        {
-            relocations[i] = TryFindRelocation(candidates[i]);
-        });
+        Parallel.For(
+            0,
+            candidates.Length,
+            options,
+            () => new SpatialQueryScratch(),
+            (i, _, scratch) =>
+            {
+                relocations[i] = TryFindRelocation(candidates[i], scratch);
+                return scratch;
+            },
+            _ => { });
         return new RelocationResult(
             relocations.OfType<Relocation>().ToList(),
             candidates.Where((_, i) => relocations[i] == null).ToList());
@@ -64,20 +71,20 @@ internal sealed class KeptObjectRelocator(
     private static bool IsMovableMarkerKeptInsideOtherObject(LeftoverEvaluation evaluation) =>
         evaluation.ContainingObject != null && !evaluation.IsRemoved && MovableKinds.Contains(evaluation.Kind);
 
-    private Relocation? TryFindRelocation(LeftoverEvaluation evaluation)
+    private Relocation? TryFindRelocation(LeftoverEvaluation evaluation, SpatialQueryScratch scratch)
     {
-        if (homeCellOf(evaluation.TargetIndex) is not { } homeCell) return TryFindRelocationIn(evaluation, allowedCells: null, homeCell: null);
-        return TryFindRelocationIn(evaluation, homeCell, homeCell)
-               ?? TryFindRelocationIn(evaluation, homeCell.WithNeighbors(), homeCell);
+        if (homeCellOf(evaluation.TargetIndex) is not { } homeCell) return TryFindRelocationIn(evaluation, allowedCells: null, homeCell: null, scratch);
+        return TryFindRelocationIn(evaluation, homeCell, homeCell, scratch)
+               ?? TryFindRelocationIn(evaluation, homeCell.WithNeighbors(), homeCell, scratch);
     }
 
-    private Relocation? TryFindRelocationIn(LeftoverEvaluation evaluation, CellArea? allowedCells, CellArea? homeCell)
+    private Relocation? TryFindRelocationIn(LeftoverEvaluation evaluation, CellArea? allowedCells, CellArea? homeCell, SpatialQueryScratch scratch)
     {
         var target = targets[evaluation.TargetIndex];
         var from = target.Transform.Position;
         foreach (var surface in surfaces)
         {
-            if (surface.TryFindNearestFreePoint(target.SpaceKey, from, MaxMoveDistance, allowedCells, out var to))
+            if (surface.TryFindNearestFreePoint(target.SpaceKey, from, MaxMoveDistance, allowedCells, scratch, out var to))
             {
                 return new Relocation(evaluation, from, to, surface.Surface, LeftHomeCell: homeCell is { } home && !home.Contains(to));
             }

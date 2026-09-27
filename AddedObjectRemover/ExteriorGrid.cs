@@ -29,6 +29,18 @@ internal readonly record struct CellArea(int MinX, int MinY, int MaxX, int MaxY)
         return x >= MinX && x <= MaxX && y >= MinY && y <= MaxY;
     }
 
+    /// <summary>The area's world rectangle shrunk by <paramref name="inset"/> on every side.</summary>
+    public (Vector2 Min, Vector2 Max) GetInsetRectangle(float inset) => (
+        new Vector2(MinX * ExteriorGrid.CellSize + inset, MinY * ExteriorGrid.CellSize + inset),
+        new Vector2((MaxX + 1) * ExteriorGrid.CellSize - inset, (MaxY + 1) * ExteriorGrid.CellSize - inset));
+
+    /// <summary>Whether the point lies horizontally in <see cref="GetInsetRectangle"/>.</summary>
+    public bool ContainsInset(Vector3 point, float inset)
+    {
+        var (min, max) = GetInsetRectangle(inset);
+        return point.X >= min.X && point.X <= max.X && point.Y >= min.Y && point.Y <= max.Y;
+    }
+
     public IEnumerable<(int X, int Y)> Cells()
     {
         for (var x = MinX; x <= MaxX; x++)

@@ -22,13 +22,14 @@ internal sealed class NavmeshSpotSearch(NavmeshIndex navmeshes, VisibleObstacles
     public RelocationSurface Surface => RelocationSurface.Navmesh;
 
     /// <remarks>Neighboring navmesh triangles offer the same points, so each point is tested once per search.</remarks>
-    public bool TryFindNearestFreePoint(FormKey spaceKey, Vector3 point, float maxDistance, CellArea? allowedCells, out Vector3 found)
+    public bool TryFindNearestFreePoint(
+        FormKey spaceKey, Vector3 point, float maxDistance, CellArea? allowedCells, SpatialQueryScratch scratch, out Vector3 found)
     {
         var tested = new Dictionary<Vector3, bool>();
         bool IsFree(Vector3 spot)
         {
             if (tested.TryGetValue(spot, out var free)) return free;
-            free = IsAllowed(spaceKey, spot, allowedCells);
+            free = IsAllowed(spaceKey, spot, allowedCells, scratch);
             tested[spot] = free;
             return free;
         }
@@ -36,7 +37,7 @@ internal sealed class NavmeshSpotSearch(NavmeshIndex navmeshes, VisibleObstacles
         return navmeshes.TryFindNearestFreePoint(spaceKey, point, maxDistance, IsFree, out found);
     }
 
-    private bool IsAllowed(FormKey spaceKey, Vector3 spot, CellArea? allowedCells) =>
-        (allowedCells is not { } cells || cells.Contains(spot))
-        && ClearanceOffsets.All(offset => !obstacles.IsInsideAny(spaceKey, spot + offset));
+    private bool IsAllowed(FormKey spaceKey, Vector3 spot, CellArea? allowedCells, SpatialQueryScratch scratch) =>
+        (allowedCells is not { } cells || cells.ContainsInset(spot, IFreeSpotSearch.Clearance))
+        && ClearanceOffsets.All(offset => !obstacles.IsInsideAny(spaceKey, spot + offset, scratch));
 }

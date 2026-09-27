@@ -100,7 +100,7 @@ internal static class RunReport
         }
         if (scan.InvalidPlacements > 0)
         {
-            Console.WriteLine($"  Ignored {scan.InvalidPlacements:N0} placed objects in the spaces of {target} objects whose position or rotation is out of range or not a number.");
+            Console.WriteLine($"  Ignored {scan.InvalidPlacements:N0} other-mod objects in the spaces of {target} objects whose position or rotation is out of range or not a number.");
         }
         if (scan.OthersOverriddenByTarget > 0)
         {
@@ -120,6 +120,20 @@ internal static class RunReport
         Console.WriteLine(
             $"Indexed {indexes.Values.Sum(s => s.Count):N0} other objects in {indexes.Count:N0} cells/worldspaces "
             + $"in {elapsed.TotalSeconds:F1}s.");
+
+    /// <param name="otherObjects">The other-mod object indexes of the target spaces.</param>
+    /// <param name="supporters">The indexes of every plugin's objects built for support and obstacles.</param>
+    public static void PrintBoundsIndexTimes(IEnumerable<OtherObjectIndex> otherObjects, IEnumerable<OtherObjectIndex> supporters)
+    {
+        static string Describe(IEnumerable<OtherObjectIndex> indexes)
+        {
+            var built = indexes.Where(index => index.BoundsBuildTime > TimeSpan.Zero).ToList();
+            var seconds = built.Sum(index => index.BoundsBuildTime.TotalSeconds);
+            return $"{built.Count:N0} spaces in {seconds:F1}s";
+        }
+
+        Console.WriteLine($"World-bounds indexes built: other mods' objects {Describe(otherObjects)}, supporters and obstacles {Describe(supporters)}.");
+    }
 
     public static void PrintWarmUpSummary(int targetBaseCount, TimeSpan elapsed) =>
         Console.WriteLine($"Bounds warm-up: {targetBaseCount:N0} target base objects in {elapsed.TotalSeconds:F1}s.");
@@ -171,7 +185,7 @@ internal static class RunReport
     public static void PrintNpcStuckSummary(
         NpcStuckSummary summary,
         NpcBodyCacheStats cache,
-        IReadOnlyList<SkinnedBodyMeasurement> bodyMeasurements,
+        int bodyMeshSetsMeasured,
         bool detailedLog)
     {
         var sizes = summary.Sizes;
@@ -186,24 +200,12 @@ internal static class RunReport
             $"  NPC body cache: {cache.BodiesBuilt:N0} bodies built, {cache.BodiesReused:N0} reused; "
             + $"{cache.BasesResolved:N0} NPC bases resolved, {cache.BasesReused:N0} reused; "
             + $"{cache.ListsResolved:N0} leveled lists resolved, {cache.ListsReused:N0} reused; "
-            + $"{bodyMeasurements.Count:N0} body mesh sets measured.");
+            + $"{bodyMeshSetsMeasured:N0} body mesh sets measured.");
         if (!detailedLog) return;
-        foreach (var measurement in bodyMeasurements)
-        {
-            Console.WriteLine($"  {DescribeBodyMeasurement(measurement)}");
-        }
         foreach (var fallback in summary.PointFallbacks)
         {
             Console.WriteLine($"  Sized as a point {DescribeOtherObject(fallback.Npc)}: {fallback.Reason}.");
         }
-    }
-
-    private static string DescribeBodyMeasurement(SkinnedBodyMeasurement measurement)
-    {
-        var raw = measurement.Size.Raw.Size;
-        var body = measurement.Size.Body.Size;
-        return $"Body mesh {measurement.Meshes}: raw {raw.X:F0} wide × {raw.Y:F0} deep, "
-            + $"waist-based {body.X:F0} wide × {body.Y:F0} deep, {body.Z:F0} tall (units before race and NPC height).";
     }
 
     public static void PrintInvisibleOthers(ReasonCounter invisible, bool verbose)
@@ -323,8 +325,7 @@ internal static class RunReport
             {
                 Console.WriteLine(
                     $"  Warning: {RecordNames.Describe(target.Record)} was moved into the neighboring cell "
-                    + $"({ExteriorGrid.CellIndex(move.To.X)}, {ExteriorGrid.CellIndex(move.To.Y)}) because its own cell has no free spot; "
-                    + "it is still listed in its own cell.");
+                    + $"({ExteriorGrid.CellIndex(move.To.X)}, {ExteriorGrid.CellIndex(move.To.Y)}) because its own cell has no free spot.");
             }
         }
         foreach (var evaluation in relocations.LeftInPlace)

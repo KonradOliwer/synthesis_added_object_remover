@@ -35,22 +35,29 @@ internal sealed class LeftoverInvisibleObjectSelector(
             .ToArray();
 
         var evaluations = new LeftoverEvaluation[candidates.Length];
-        Parallel.For(0, candidates.Length, options, i =>
-        {
-            evaluations[i] = Evaluate(candidates[i], surroundings, removedTargets);
-        });
+        Parallel.For(
+            0,
+            candidates.Length,
+            options,
+            () => new SpatialQueryScratch(),
+            (i, _, scratch) =>
+            {
+                evaluations[i] = Evaluate(candidates[i], surroundings, removedTargets, scratch);
+                return scratch;
+            },
+            _ => { });
         return evaluations;
     }
 
-    private LeftoverEvaluation Evaluate(int targetIndex, VisibleTargetIndex surroundings, IReadOnlySet<int> removedTargets)
+    private LeftoverEvaluation Evaluate(int targetIndex, VisibleTargetIndex surroundings, IReadOnlySet<int> removedTargets, SpatialQueryScratch scratch)
     {
         var target = targets[targetIndex];
         var kind = visibility[targetIndex].Kind!.Value;
         var radius = GetEffectiveRadius(target);
-        var containingObject = FindContainingOtherObject(target);
+        var containingObject = FindContainingOtherObject(target, scratch);
         var areas = MeasureSurroundings(target, radius, surroundings, removedTargets);
         var ruleDecision = containingObject != null ? LeftoverDecision.RemovedInsideOtherObject : DecideByDirections(areas, config);
-        var (decision, keepReason) = ApplyKeepRules(targetIndex, kind, ruleDecision, config, keepRule);
+        var (decision, keepReason) = ApplyKeepRules(targetIndex, kind, ruleDecision);
         return new LeftoverEvaluation(targetIndex, kind, radius, containingObject, areas, decision, keepReason);
     }
 
@@ -58,10 +65,10 @@ internal sealed class LeftoverInvisibleObjectSelector(
         reach.GetReach(target) is { } ownReach ? MathF.Min(config.SearchRadius, ownReach) : config.SearchRadius;
 
     /// <summary>Objects the target plugin replaced do not count, as everywhere else.</summary>
-    private OtherObject? FindContainingOtherObject(TargetObject target)
+    private OtherObject? FindContainingOtherObject(TargetObject target, SpatialQueryScratch scratch)
     {
         var index = otherObjects[target.SpaceKey];
-        var match = containment.FindContainingVisible(index, target.Transform.Position, skipReplaced: true);
+        var match = containment.FindContainingVisible(index, target.Transform.Position, skipReplaced: true, scratch);
         return match >= 0 ? index[match] : null;
     }
 
@@ -90,12 +97,7 @@ internal sealed class LeftoverInvisibleObjectSelector(
     }
 
     /// <summary>Protected types and referenced objects stay whatever the rules decided.</summary>
-    internal static (LeftoverDecision Decision, KeepReason? KeepReason) ApplyKeepRules(
-        int targetIndex,
-        InvisibleObjectKind kind,
-        LeftoverDecision ruleDecision,
-        LeftoverConfig config,
-        KeepReferencedRule keepRule)
+    private (LeftoverDecision Decision, KeepReason? KeepReason) ApplyKeepRules(int targetIndex, InvisibleObjectKind kind, LeftoverDecision ruleDecision)
     {
         if (!ruleDecision.IsRemoval()) return (ruleDecision, null);
         if (config.ProtectedKinds.Contains(kind)) return (LeftoverDecision.KeptProtectedType, null);

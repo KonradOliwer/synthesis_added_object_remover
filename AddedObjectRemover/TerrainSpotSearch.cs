@@ -22,13 +22,14 @@ internal sealed class TerrainSpotSearch(TerrainHeights terrain, VisibleObstacles
 
     public RelocationSurface Surface => RelocationSurface.Terrain;
 
-    public bool TryFindNearestFreePoint(FormKey spaceKey, Vector3 point, float maxDistance, CellArea? allowedCells, out Vector3 found)
+    public bool TryFindNearestFreePoint(
+        FormKey spaceKey, Vector3 point, float maxDistance, CellArea? allowedCells, SpatialQueryScratch scratch, out Vector3 found)
     {
         found = default;
         if (!terrain.HasTerrain(spaceKey)) return false;
 
         var start = Factory.CreatePoint(new Coordinate(point.X, point.Y));
-        var freeArea = FindFreeArea(spaceKey, point, start, maxDistance, allowedCells);
+        var freeArea = FindFreeArea(spaceKey, point, start, maxDistance, allowedCells, scratch);
         if (freeArea.IsEmpty) return false;
 
         var nearest = DistanceOp.NearestPoints(freeArea, start)[0];
@@ -38,7 +39,8 @@ internal sealed class TerrainSpotSearch(TerrainHeights terrain, VisibleObstacles
         return true;
     }
 
-    private NtsGeometry FindFreeArea(FormKey spaceKey, Vector3 point, Point start, float maxDistance, CellArea? allowedCells)
+    private NtsGeometry FindFreeArea(
+        FormKey spaceKey, Vector3 point, Point start, float maxDistance, CellArea? allowedCells, SpatialQueryScratch scratch)
     {
         var searchArea = start.Buffer(maxDistance);
         if (allowedCells is { } cells)
@@ -47,16 +49,16 @@ internal sealed class TerrainSpotSearch(TerrainHeights terrain, VisibleObstacles
             if (searchArea.IsEmpty) return searchArea;
         }
 
-        var blocked = CollectFootprints(spaceKey, point, maxDistance)
-            .Concat(FindCellsWithoutTerrain(spaceKey, searchArea.EnvelopeInternal).Select(cell => CreateCellsRectangle(cell, inset: 0)))
+        var blocked = CollectFootprints(spaceKey, point, maxDistance, scratch)
+            .Concat(FindCellsWithoutTerrain(spaceKey, searchArea.EnvelopeInternal).Select(cell => CreateCellsRectangle(cell, inset: 0f)))
             .ToList();
         if (blocked.Count == 0) return searchArea;
         var blockedArea = OverlayNGRobust.Union(blocked).Buffer(IFreeSpotSearch.Clearance);
         return OverlayNGRobust.Overlay(searchArea, blockedArea, SpatialFunction.Difference);
     }
 
-    private IEnumerable<NtsGeometry> CollectFootprints(FormKey spaceKey, Vector3 point, float maxDistance) =>
-        obstacles.FindBoxesNear(spaceKey, point, maxDistance).Select(CreateFootprint);
+    private IEnumerable<NtsGeometry> CollectFootprints(FormKey spaceKey, Vector3 point, float maxDistance, SpatialQueryScratch scratch) =>
+        obstacles.FindBoxesNear(spaceKey, point, maxDistance, scratch).Select(CreateFootprint);
 
     private IEnumerable<CellArea> FindCellsWithoutTerrain(FormKey spaceKey, Envelope area)
     {
@@ -68,14 +70,11 @@ internal sealed class TerrainSpotSearch(TerrainHeights terrain, VisibleObstacles
             .Select(cell => CellArea.Single(cell.X, cell.Y));
     }
 
-    /// <param name="inset">Distance kept from the rectangle's border; for allowed cells, a point on the north or east border already belongs to the next cell.</param>
-    private static NtsGeometry CreateCellsRectangle(CellArea cells, double inset)
+    /// <param name="inset">Distance kept from the rectangle's border.</param>
+    private static NtsGeometry CreateCellsRectangle(CellArea cells, float inset)
     {
-        var minX = cells.MinX * (double)ExteriorGrid.CellSize + inset;
-        var minY = cells.MinY * (double)ExteriorGrid.CellSize + inset;
-        var maxX = (cells.MaxX + 1) * (double)ExteriorGrid.CellSize - inset;
-        var maxY = (cells.MaxY + 1) * (double)ExteriorGrid.CellSize - inset;
-        return Factory.ToGeometry(new Envelope(minX, maxX, minY, maxY));
+        var (min, max) = cells.GetInsetRectangle(inset);
+        return Factory.ToGeometry(new Envelope(min.X, max.X, min.Y, max.Y));
     }
 
     /// <summary>The convex hull of the box corners seen from above; a point or line for a flat or empty box.</summary>

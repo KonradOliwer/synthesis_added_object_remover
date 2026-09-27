@@ -33,6 +33,7 @@ internal sealed class OtherObjectIndex
     private readonly int[] _replaced;
 
     private readonly Lazy<OtherObjectBoxIndex> _bounds;
+    private TimeSpan _boundsBuildTime;
 
     /// <param name="invisible">Counts each invisible object once per reason; null counts nothing.</param>
     private OtherObjectIndex(
@@ -45,8 +46,14 @@ internal sealed class OtherObjectIndex
         _state = new int[_objects.Length];
         _replaced = new int[_objects.Length];
         PositionGrid = SpatialGrid.FromPoints(_objects.Select(o => o.Position).ToArray());
-        _bounds = new Lazy<OtherObjectBoxIndex>(
-            () => OtherObjectBoxIndex.Build(_objects, shapes, parallelOptions), LazyThreadSafetyMode.ExecutionAndPublication);
+        _bounds = new Lazy<OtherObjectBoxIndex>(() => BuildBounds(parallelOptions), LazyThreadSafetyMode.ExecutionAndPublication);
+    }
+
+    private OtherObjectBoxIndex BuildBounds(ParallelOptions parallelOptions)
+    {
+        var (bounds, elapsed) = Timing.Measure(() => OtherObjectBoxIndex.Build(_objects, _shapes, parallelOptions));
+        _boundsBuildTime = elapsed;
+        return bounds;
     }
 
     /// <summary>
@@ -83,6 +90,9 @@ internal sealed class OtherObjectIndex
 
     /// <summary>The objects by world bounds: for every question about what an object's bounds reach.</summary>
     public OtherObjectBoxIndex Bounds => _bounds.Value;
+
+    /// <summary>Time spent building <see cref="Bounds"/>; zero while it is not built.</summary>
+    public TimeSpan BoundsBuildTime => _bounds.IsValueCreated ? _boundsBuildTime : TimeSpan.Zero;
 
     public int Count => _objects.Length;
 

@@ -14,9 +14,10 @@
     <!-- Pinned exactly: NifShapes.cs reads Nifly's private _points/_stripLengths fields via reflection,
          which breaks silently on a library update. -->
     <PackageReference Include="Nifly" Version="[1.1.0]" />
-    <!-- Used directly by ExpectedFailures.cs; otherwise only arrives transitively through Mutagen. -->
+    <!-- Used directly (ExpectedFailures.cs, Program.cs, SettingsFailureMessage.cs); otherwise they only arrive transitively through Mutagen and Synthesis. -->
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
     <PackageReference Include="ini-parser-netstandard" Version="2.5.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />

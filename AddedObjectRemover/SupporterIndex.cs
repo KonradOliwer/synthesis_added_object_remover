@@ -14,4 +14,7 @@ internal sealed class SupporterIndex(
     public OtherObjectIndex GetSpace(FormKey spaceKey) =>
         _bySpace.GetOrCreate(
             spaceKey, () => OtherObjectIndex.CreateUncounted(objectsBySpace.GetValueOrDefault(spaceKey) ?? [], shapes, parallelOptions));
+
+    /// <summary>The spaces indexed so far.</summary>
+    public IEnumerable<OtherObjectIndex> GetIndexedSpaces() => _bySpace.GetCreatedValues();
 }

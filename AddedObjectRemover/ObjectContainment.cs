@@ -8,31 +8,27 @@ namespace AddedObjectRemover;
 /// </summary>
 internal sealed class ObjectContainment(BaseObjectShapeProvider shapes, TriangleTreeCache meshCache)
 {
-    [ThreadStatic] private static List<int>? _nearbyTriangles;
-    [ThreadStatic] private static List<int>? _slots;
-    [ThreadStatic] private static List<int>? _candidates;
-
-    public bool Contains(BaseRef? baseRef, PlacedTransform transform, Vector3 worldPoint)
+    /// <param name="scratch">Only its triangle buffer is used.</param>
+    public bool Contains(BaseRef? baseRef, PlacedTransform transform, Vector3 worldPoint, SpatialQueryScratch scratch)
     {
         if (shapes.GetMeshPath(baseRef) is not { } meshPath) return false;
         var local = transform.ToLocal(worldPoint);
         if (!shapes.GetLocalBox(baseRef).Contains(local)) return false;
 
         using var lease = meshCache.Acquire(meshPath);
-        return lease.Tree is { } tree && SurroundingRayTest.IsSurrounded(tree, local, transform.Rotation, _nearbyTriangles ??= []);
+        return lease.Tree is { } tree && SurroundingRayTest.IsSurrounded(tree, local, transform.Rotation, scratch.Triangles);
     }
 
     /// <param name="skipReplaced">Ignore objects the target plugin replaced.</param>
     /// <returns>Lowest index of a visible object of <paramref name="index"/> containing the point, or -1.</returns>
-    public int FindContainingVisible(OtherObjectIndex index, Vector3 worldPoint, bool skipReplaced)
+    public int FindContainingVisible(OtherObjectIndex index, Vector3 worldPoint, bool skipReplaced, SpatialQueryScratch scratch)
     {
-        var candidates = _candidates ??= [];
-        index.Bounds.CollectCandidates(new Box(worldPoint, worldPoint), _slots ??= [], candidates);
-        foreach (var otherIndex in candidates)
+        index.Bounds.CollectCandidates(new Box(worldPoint, worldPoint), scratch.Slots, scratch.Candidates);
+        foreach (var otherIndex in scratch.Candidates)
         {
             if (skipReplaced && index.IsReplaced(otherIndex)) continue;
             var other = index[otherIndex];
-            if (index.IsVisible(otherIndex) && Contains(other.Base, other.Transform, worldPoint)) return otherIndex;
+            if (index.IsVisible(otherIndex) && Contains(other.Base, other.Transform, worldPoint, scratch)) return otherIndex;
         }
         return -1;
     }

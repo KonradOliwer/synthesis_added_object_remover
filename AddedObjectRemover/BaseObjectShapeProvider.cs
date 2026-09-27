@@ -222,9 +222,9 @@ internal sealed class BaseObjectShapeProvider
         if (record is INpcGetter) return new BaseShape(box, meshPath, InvisibleKind: null);
         if (GetRecordTypeInvisibleKind(record, hasModel, meshWithoutGeometry) is { } kind) return new BaseShape(box, meshPath, kind);
         var hasNoGeometry = meshWithoutGeometry || (!hasModel && box.Size == Vector3.Zero);
-        return hasNoGeometry
-            ? new BaseShape(box, meshPath, ClassifyMarker(record), InvisibleForLackOfGeometry: true)
-            : new BaseShape(box, meshPath, InvisibleKind: null);
+        if (!hasNoGeometry) return new BaseShape(box, meshPath, InvisibleKind: null);
+        var markerKind = ClassifyMarker(record);
+        return new BaseShape(box, meshPath, markerKind, InvisibleForLackOfGeometry: markerKind == InvisibleObjectKind.OtherMarkers);
     }
 
     private static InvisibleObjectKind? GetRecordTypeInvisibleKind(IMajorRecordGetter record, bool hasModel, bool meshWithoutGeometry) => record switch

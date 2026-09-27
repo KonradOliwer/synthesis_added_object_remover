@@ -81,7 +81,8 @@ public class RelocationTests
     {
         public RelocationSurface Surface => surface;
 
-        public bool TryFindNearestFreePoint(FormKey spaceKey, Vector3 point, float maxDistance, CellArea? allowedCells, out Vector3 found)
+        public bool TryFindNearestFreePoint(
+            FormKey spaceKey, Vector3 point, float maxDistance, CellArea? allowedCells, SpatialQueryScratch scratch, out Vector3 found)
         {
             var allowed = spots
                 .Where(spot => Vector3.Distance(spot, point) <= maxDistance && (allowedCells is not { } cells || cells.Contains(spot)))
@@ -115,7 +116,7 @@ public class FreeSpotSearchTests
             new NavmeshIndex(new Dictionary<FormKey, List<CellNavmesh>> { [TestTargets.Space] = [new CellNavmesh((0, 0), SquareNavmesh(1000))] }),
             CreateObstacles(Wall));
 
-        Assert.True(search.TryFindNearestFreePoint(TestTargets.Space, marker, KeptObjectRelocator.MaxMoveDistance, HomeCell, out var found));
+        Assert.True(search.TryFindNearestFreePoint(TestTargets.Space, marker, KeptObjectRelocator.MaxMoveDistance, HomeCell, new SpatialQueryScratch(), out var found));
 
         // The navmesh offers points every 125 units; those at x = 375 and 625 lie outside the wall but within the clearance.
         Assert.True(found.X <= 380 - IFreeSpotSearch.Clearance || found.X >= 620 + IFreeSpotSearch.Clearance);
@@ -131,7 +132,7 @@ public class FreeSpotSearchTests
 
         // The marker stands in cell (1, 0), which has no LAND, inside the block; the nearest free
         // spot with terrain is just below the block and west of cell (1, 0), both less the clearance.
-        Assert.True(search.TryFindNearestFreePoint(TestTargets.Space, new Vector3(4200, 2000, 0), KeptObjectRelocator.MaxMoveDistance, allowedCells: null, out var found));
+        Assert.True(search.TryFindNearestFreePoint(TestTargets.Space, new Vector3(4200, 2000, 0), KeptObjectRelocator.MaxMoveDistance, allowedCells: null, new SpatialQueryScratch(), out var found));
 
         Assert.Equal(ExteriorGrid.CellSize - IFreeSpotSearch.Clearance, found.X, 0.5f);
         Assert.Equal(1500 - IFreeSpotSearch.Clearance, found.Y, 0.5f);

@@ -10,9 +10,9 @@ namespace AddedObjectRemover;
 /// Works out an NPC's body from its records, first match wins and nothing is guessed:
 /// 1. the meshes of its body armour (worn armour, else the race's skin) whose armour addons are
 ///    for its race, or for the race's Armor Race in the slots no addon of the race itself fills,
-///    for its sex (the male model when the female one is missing), sized as it stands
-///    (<see cref="WaistBandSizing"/>); for a playable race at least <see cref="HumanoidHeight"/>
-///    tall, because the head is not part of the body armour;
+///    for its sex (the male model when the female one is missing), sized by their combined
+///    bounds; for a playable race at least <see cref="HumanoidHeight"/> tall, because the head is
+///    not part of the body armour;
 /// 2. its Object Bounds;
 /// 3. for a playable (humanoid) race only, <see cref="HumanoidBox"/>;
 /// 4. otherwise the NPC is sized as a point at its placement position (<see cref="NpcBody.Point"/>).
@@ -79,7 +79,7 @@ internal sealed class NpcBodyResolver(ILinkCache linkCache, BaseObjectShapeProvi
         var playable = race.Flags.HasFlag(Race.Flag.Playable);
         if (MeasureBodyMeshes(npc, race, female) is { } measured)
         {
-            return NpcBody.FromBox(NpcSizeSource.BodyMesh, playable ? WithHumanoidHeight(measured.Body) : measured.Body, heightScale);
+            return NpcBody.FromBox(NpcSizeSource.BodyMesh, playable ? WithHumanoidHeight(measured) : measured, heightScale);
         }
         var bounds = BaseObjectShapeProvider.ToBox(npc.ObjectBounds);
         if (HasVolume(bounds)) return NpcBody.FromBox(NpcSizeSource.ObjectBounds, bounds, heightScale);
@@ -110,7 +110,7 @@ internal sealed class NpcBodyResolver(ILinkCache linkCache, BaseObjectShapeProvi
     private static float GetHeightScale(IRaceGetter race, INpcGetter npc, bool female) =>
         Geometry.NormalizeScale((female ? race.Height.Female : race.Height.Male) * npc.Height);
 
-    private SkinnedBodySize? MeasureBodyMeshes(INpcGetter npc, IRaceGetter race, bool female)
+    private Box? MeasureBodyMeshes(INpcGetter npc, IRaceGetter race, bool female)
     {
         var meshPaths = ReadBodyMeshPaths(npc, race, female);
         return meshPaths.Count > 0 ? bodyMeasurer.Measure(meshPaths) : null;

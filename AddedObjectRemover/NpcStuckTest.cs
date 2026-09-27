@@ -6,9 +6,9 @@ namespace AddedObjectRemover;
 /// Whether an NPC's body is stuck in an object at the object's real size: the body must penetrate
 /// the object by more than <see cref="FootClearance"/>, so an NPC standing on the object or
 /// brushing against it is not stuck. The body box shrunk by the clearance on every side (its
-/// core) is stuck when an object triangle overlaps it, or, for a closed (solid) object only, when
-/// the core lies inside the object (<see cref="SurroundingRayTest"/>); an NPC walking inside a
-/// hollow object is not stuck.
+/// core) is stuck when an object triangle overlaps it, or when the core lies inside the object,
+/// i.e. the object's mesh surrounds it (<see cref="SurroundingRayTest"/>), open meshes included:
+/// an NPC standing in a room of the object counts as inside it.
 /// </summary>
 internal static class NpcStuckTest
 {
@@ -16,8 +16,9 @@ internal static class NpcStuckTest
     public const float FootClearance = 8f;
 
     /// <summary>
-    /// Stuck when any of the bodies is. Several bodies are first tested together as the union of
-    /// their cores, which holds every body's core, so a miss there clears them all.
+    /// Stuck when any of the bodies is. Several bodies are first tested for triangle overlap
+    /// together, as the union of their cores, which holds every body's core: when no triangle
+    /// overlaps it, none overlaps any core, and only each core's inside test is left.
     /// </summary>
     public static bool IsAnyBodyStuck(
         MeshTriangleTree objectTree,
@@ -33,7 +34,11 @@ internal static class NpcStuckTest
 
         var combined = cores[0];
         foreach (var core in cores) combined = combined.Union(core);
-        if (!IsCoreStuck(objectTree, objectTransform, combined, bodyTransform, scratch)) return false;
+        scratch.CoreTests++;
+        if (!OverlapsAnyTriangle(objectTree, objectTransform, combined, bodyTransform, scratch))
+        {
+            return cores.Any(core => IsInside(objectTree, objectTransform, core, bodyTransform, scratch));
+        }
         foreach (var core in cores)
         {
             if (IsCoreStuck(objectTree, objectTransform, core, bodyTransform, scratch)) return true;
@@ -68,7 +73,7 @@ internal static class NpcStuckTest
     {
         scratch.CoreTests++;
         return OverlapsAnyTriangle(objectTree, objectTransform, core, bodyTransform, scratch)
-            || objectTree.IsClosed && IsInside(objectTree, objectTransform, core, bodyTransform, scratch);
+            || IsInside(objectTree, objectTransform, core, bodyTransform, scratch);
     }
 
     private static bool OverlapsAnyTriangle(

@@ -73,12 +73,12 @@ internal sealed class VisibleTargetIndex
     }
 
     /// <summary>True when some indexed object of the space contains <paramref name="point"/>.</summary>
-    public bool AnyContains(FormKey spaceKey, Vector3 point, ObjectContainment containment)
+    public bool AnyContains(FormKey spaceKey, Vector3 point, ObjectContainment containment, SpatialQueryScratch scratch)
     {
         if (!_bySpace.TryGetValue(spaceKey, out var space)) return false;
         return FindCandidates(space, point, radius: 0f)
             .Select(entry => _targets[space.TargetIndices[entry]])
-            .Any(target => containment.Contains(target.Base, target.Transform, point));
+            .Any(target => containment.Contains(target.Base, target.Transform, point, scratch));
     }
 
     /// <summary>The boxes of the space that may come within <paramref name="radius"/> of <paramref name="point"/>, and possibly a few farther ones.</summary>

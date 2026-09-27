@@ -49,6 +49,28 @@ public class SettingsFailureMessageTests
     }
 
     [Fact]
+    public void TextListGivenASingleTextAsksForTextInPlainWords()
+    {
+        var ex = Deserialize("""{"WhatToIgnore":{"ExcludedPlugins":"SomeMod.esp"}}""");
+
+        var message = SettingsFailureMessage.Describe(ex);
+
+        Assert.Contains("WhatToIgnore.ExcludedPlugins", message);
+        Assert.Contains("Expected a text value.", message);
+        Assert.DoesNotContain("String", message);
+    }
+
+    [Fact]
+    public void SyntaxErrorOutsideAnySettingNamesItsLineAndPosition()
+    {
+        var ex = Deserialize("{\n,}");
+
+        var message = SettingsFailureMessage.Describe(ex);
+
+        Assert.Contains("the settings file at line 2, position", message);
+    }
+
+    [Fact]
     public void PathIsMappedToItsDisplayNameBreadcrumb()
     {
         var setting = SettingsFailureMessage.ResolveSetting("LeftoverInvisibleObjects.CustomProtectedTypes[0]");

@@ -16,7 +16,6 @@ public class NpcBodyResolverTests
     private const float VariantBodyHeight = 180f;
     private const float ShortBodyHeight = 100f;
     private const float HumanoidHeight = 128f;
-    private const float ArmsBesideTorsoFactor = 1.6f;
     private const string BaseRaceBodyMesh = @"test\baserace_body.nif";
     private const string VariantBodyMesh = @"test\variant_body.nif";
     private const string ShortBodyMesh = @"test\short_body.nif";
@@ -46,13 +45,14 @@ public class NpcBodyResolverTests
     private static readonly BaseObjectShapeProvider Shapes = CreateShapes();
 
     [Fact]
-    public void BodyMeshOfTheRaceIsSizedByItsWaistBand()
+    public void BodyMeshOfTheRaceIsSizedByTheFullExtentOfItsMeshes()
     {
         var body = SingleBody(CreateCache().GetBodies(BaseRaceMale));
 
         Assert.Equal(NpcSizeSource.BodyMesh, body.Source);
         Assert.Equal(BaseRaceBodyHeight, body.LocalBox.Size.Z, 3);
-        Assert.Equal(2 * TestBodies.TorsoHalfWidth * ArmsBesideTorsoFactor, body.LocalBox.Size.X, 3);
+        Assert.Equal(TestBodies.ArmSpan, body.LocalBox.Size.X, 3);
+        Assert.Equal(2 * TestBodies.TorsoHalfDepth, body.LocalBox.Size.Y, 3);
     }
 
     [Fact]
@@ -150,64 +150,44 @@ public class NpcBodyResolverTests
     private static PlacedNpcIndex BuildIndex(params OtherObject[] npcs) =>
         PlacedNpcIndex.Build(OtherObjectIndex.CreateUncounted(npcs, Shapes, new ParallelOptions()), CreateCache(), new ParallelOptions());
 
-    private static OtherObject PlaceNpc(int index, FormKey npc, P3Float rotation) =>
-        new(new FormKey(Mod, 0x900 + (uint)index), Mod, EditorId: null, new BaseRef(npc, typeof(INpcGetter)), Vector3.Zero, rotation, 1f,
-            IsPrimitive: false, HasMapMarker: false);
+    private static OtherObject PlaceNpc(int index, FormKey npc, P3Float rotation) => TestNpcs.Place(Mod, index, npc, Vector3.Zero, rotation);
 
     private static SkyrimMod CreateRecords()
     {
         var mod = new SkyrimMod(Mod, SkyrimRelease.SkyrimSE);
-        mod.Races.Add(CreateRace(BaseRace, Skin, playable: false, armorRace: null));
-        mod.Races.Add(CreateRace(VariantRace, Skin, playable: false, armorRace: BaseRace));
-        mod.Races.Add(CreateRace(ShortPlayableRace, ShortSkin, playable: true, armorRace: null));
+        mod.Races.Add(TestNpcs.CreateRace(BaseRace, Skin, playable: false, armorRace: null));
+        mod.Races.Add(TestNpcs.CreateRace(VariantRace, Skin, playable: false, armorRace: BaseRace));
+        mod.Races.Add(TestNpcs.CreateRace(ShortPlayableRace, ShortSkin, playable: true, armorRace: null));
         mod.Armors.Add(CreateSkin(Skin, BaseRaceBodyAddon, VariantBodyAddon, BaseRaceHandsAddon));
         mod.Armors.Add(CreateSkin(ShortSkin, ShortBodyAddon));
         mod.ArmorAddons.Add(CreateAddon(BaseRaceBodyAddon, BaseRace, BipedObjectFlag.Body, BaseRaceBodyMesh));
         mod.ArmorAddons.Add(CreateAddon(VariantBodyAddon, VariantRace, BipedObjectFlag.Body, VariantBodyMesh));
         mod.ArmorAddons.Add(CreateAddon(BaseRaceHandsAddon, BaseRace, BipedObjectFlag.Hands, HandsMesh));
         mod.ArmorAddons.Add(CreateAddon(ShortBodyAddon, ShortPlayableRace, BipedObjectFlag.Body, ShortBodyMesh));
-        mod.Npcs.Add(CreateNpc(BaseRaceMale, BaseRace, female: false, template: null));
-        mod.Npcs.Add(CreateNpc(BaseRaceFemale, BaseRace, female: true, template: null));
-        mod.Npcs.Add(CreateNpc(VariantNpc, VariantRace, female: false, template: null));
-        mod.Npcs.Add(CreateNpc(ShortNpc, ShortPlayableRace, female: false, template: null));
-        mod.Npcs.Add(CreateNpc(LeveledTemplateNpc, BaseRace, female: false, template: Leveled));
-        mod.Npcs.Add(CreateNpc(OtherLeveledTemplateNpc, BaseRace, female: false, template: Leveled));
-        mod.Npcs.Add(CreateNpc(EmptyListTemplateNpc, BaseRace, female: false, template: EmptyLeveled));
-        mod.LeveledNpcs.Add(CreateLeveledList(Leveled, BaseRaceMale, BaseRaceFemale, VariantNpc, Missing));
-        mod.LeveledNpcs.Add(CreateLeveledList(EmptyLeveled));
+        mod.Npcs.Add(TestNpcs.CreateNpc(BaseRaceMale, BaseRace, female: false, template: null));
+        mod.Npcs.Add(TestNpcs.CreateNpc(BaseRaceFemale, BaseRace, female: true, template: null));
+        mod.Npcs.Add(TestNpcs.CreateNpc(VariantNpc, VariantRace, female: false, template: null));
+        mod.Npcs.Add(TestNpcs.CreateNpc(ShortNpc, ShortPlayableRace, female: false, template: null));
+        mod.Npcs.Add(TestNpcs.CreateNpc(LeveledTemplateNpc, BaseRace, female: false, template: Leveled));
+        mod.Npcs.Add(TestNpcs.CreateNpc(OtherLeveledTemplateNpc, BaseRace, female: false, template: Leveled));
+        mod.Npcs.Add(TestNpcs.CreateNpc(EmptyListTemplateNpc, BaseRace, female: false, template: EmptyLeveled));
+        mod.LeveledNpcs.Add(TestNpcs.CreateLeveledList(Leveled, BaseRaceMale, BaseRaceFemale, VariantNpc, Missing));
+        mod.LeveledNpcs.Add(TestNpcs.CreateLeveledList(EmptyLeveled));
         return mod;
     }
 
     private static BaseObjectShapeProvider CreateShapes()
     {
         var dataPath = Path.Combine(AppContext.BaseDirectory, "NpcBodyData");
-        WriteMesh(dataPath, BaseRaceBodyMesh, TestBodies.TPose(BaseRaceBodyHeight));
-        WriteMesh(dataPath, VariantBodyMesh, TestBodies.TPose(VariantBodyHeight));
-        WriteMesh(dataPath, ShortBodyMesh, TestBodies.TPose(ShortBodyHeight));
-        WriteMesh(dataPath, HandsMesh, TestMeshes.BoxTriangles(new Box(new Vector3(-5, -5, 60), new Vector3(5, 5, 70))));
+        TestShapes.WriteMesh(dataPath, BaseRaceBodyMesh, TestBodies.TPose(BaseRaceBodyHeight));
+        TestShapes.WriteMesh(dataPath, VariantBodyMesh, TestBodies.TPose(VariantBodyHeight));
+        TestShapes.WriteMesh(dataPath, ShortBodyMesh, TestBodies.TPose(ShortBodyHeight));
+        TestShapes.WriteMesh(dataPath, HandsMesh, TestMeshes.BoxTriangles(new Box(new Vector3(-5, -5, 60), new Vector3(5, 5, 70))));
 
         var messages = new MeshMessageLog(enabled: false);
         var meshFiles = new MeshFileSource(dataPath, GameRelease.SkyrimSE, [Mod], messages);
         return new BaseObjectShapeProvider(Records.ToImmutableLinkCache(), meshFiles, messages);
     }
-
-    private static void WriteMesh(string dataPath, string model, IReadOnlyList<MeshTriangle> triangles)
-    {
-        var nif = TestNifs.CreateWithRoot();
-        TestNifs.AddShape(nif, TestNifs.Root(nif), triangles);
-        var meshPath = Path.Combine(dataPath, MeshFileSource.NormalizeMeshPath(model));
-        Directory.CreateDirectory(Path.GetDirectoryName(meshPath)!);
-        File.WriteAllBytes(meshPath, TestNifs.Save(nif));
-    }
-
-    private static Race CreateRace(FormKey formKey, FormKey skin, bool playable, FormKey? armorRace) =>
-        new(formKey, SkyrimRelease.SkyrimSE)
-        {
-            Flags = playable ? Race.Flag.Playable : default,
-            Height = new GenderedItem<float>(1f, 1f),
-            Skin = new FormLinkNullable<IArmorGetter>(skin),
-            ArmorRace = new FormLinkNullable<IRaceGetter>(armorRace),
-        };
 
     private static Armor CreateSkin(FormKey formKey, params FormKey[] addons)
     {
@@ -223,27 +203,5 @@ public class NpcBodyResolverTests
             Race = new FormLinkNullable<IRaceGetter>(race),
             BodyTemplate = new BodyTemplate { FirstPersonFlags = slots },
             WorldModel = new GenderedItem<Model?>(new Model { File = maleModel }, null),
-        };
-
-    private static Mutagen.Bethesda.Skyrim.Npc CreateNpc(FormKey formKey, FormKey race, bool female, FormKey? template)
-    {
-        var npc = new Mutagen.Bethesda.Skyrim.Npc(formKey, SkyrimRelease.SkyrimSE)
-        {
-            Race = new FormLink<IRaceGetter>(race),
-            Height = 1f,
-            Template = new FormLinkNullable<INpcSpawnGetter>(template),
-        };
-        if (female) npc.Configuration.Flags |= NpcConfiguration.Flag.Female;
-        if (template != null) npc.Configuration.TemplateFlags |= NpcConfiguration.TemplateFlag.Traits;
-        return npc;
-    }
-
-    private static LeveledNpc CreateLeveledList(FormKey formKey, params FormKey[] spawns) =>
-        new(formKey, SkyrimRelease.SkyrimSE)
-        {
-            Entries = new ExtendedList<LeveledNpcEntry>(spawns.Select(spawn => new LeveledNpcEntry
-            {
-                Data = new LeveledNpcEntryData { Reference = new FormLink<INpcSpawnGetter>(spawn), Level = 1, Count = 1 },
-            })),
         };
 }

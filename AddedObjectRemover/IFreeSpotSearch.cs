@@ -11,6 +11,10 @@ internal interface IFreeSpotSearch
 
     RelocationSurface Surface { get; }
 
-    /// <param name="allowedCells">The exterior cells the spot must lie in; null when it may lie anywhere.</param>
-    bool TryFindNearestFreePoint(FormKey spaceKey, Vector3 point, float maxDistance, CellArea? allowedCells, out Vector3 found);
+    /// <param name="allowedCells">
+    /// The exterior cells the spot must lie in, at least <see cref="Clearance"/> from their outer
+    /// border; null when it may lie anywhere.
+    /// </param>
+    /// <param name="scratch">The calling thread's buffers.</param>
+    bool TryFindNearestFreePoint(FormKey spaceKey, Vector3 point, float maxDistance, CellArea? allowedCells, SpatialQueryScratch scratch, out Vector3 found);
 }

@@ -22,6 +22,9 @@ internal static class TestTargets
     public static TargetObject Create(IPlacedGetter record, PlacedTransform transform, bool isTeleportDoor = false) =>
         new(record, Space, CellName: null, transform, Base: null, isTeleportDoor, IsPrimitive: false, HasMapMarker: false);
 
+    public static TargetObject Create(int index, PlacedTransform transform, BaseRef? baseRef, FormKey space) =>
+        new(Record(index), space, CellName: null, transform, baseRef, IsTeleportDoor: false, IsPrimitive: false, HasMapMarker: false);
+
     public static List<TargetObject> CreateMany(int count) =>
         Enumerable.Range(0, count).Select(index => Create(index, At(Vector3.Zero))).ToList();
 

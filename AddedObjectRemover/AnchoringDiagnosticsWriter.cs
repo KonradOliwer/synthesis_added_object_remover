@@ -70,6 +70,7 @@ internal static class AnchoringDiagnosticsWriter
     private static string DescribeDecision(AnchoringEvaluation evaluation)
     {
         if (evaluation.Removed) return "removed";
+        if (evaluation.RemovedAsLinked) return "removed (linked to a removed object)";
         return evaluation.Contacts.ContactPoints == 0 ? "kept (no contact points)" : "kept";
     }
 

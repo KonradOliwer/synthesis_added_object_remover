@@ -49,7 +49,7 @@ internal sealed class ScanResult
     public int TargetsDisabledOrWithoutPlacement { get; set; }
     public int OthersOverriddenByTarget { get; set; }
 
-    /// <summary>Placed records in the target spaces ignored for a position out of range or a position or rotation that is not a number.</summary>
+    /// <summary>Other mods' objects in the target spaces ignored for a position out of range or a position or rotation that is not a number.</summary>
     public int InvalidPlacements { get; set; }
 
     public int OtherObjectCount => OthersBySpace.Values.Sum(x => x.Count);
@@ -273,6 +273,7 @@ internal sealed class PlacedRecordScanner
         if (placement == null)
         {
             if (role == RecordRole.Target) _scan.TargetsDisabledOrWithoutPlacement++;
+            else if (IsShownWithInvalidPlacement(record)) _scan.InvalidPlacements++;
             return;
         }
 
@@ -299,14 +300,16 @@ internal sealed class PlacedRecordScanner
         }
     }
 
-    /// <summary>Null for records the game does not show (see <see cref="PlacementInWorld.IsHidden"/>) or without a valid placement; invalid ones are counted.</summary>
-    private IPlacementGetter? FindPlacementInWorld(IPlacedGetter record, RecordRole role)
+    /// <summary>Null for records the game does not show (see <see cref="PlacementInWorld.IsHidden"/>) or without a valid placement.</summary>
+    private static IPlacementGetter? FindPlacementInWorld(IPlacedGetter record, RecordRole role)
     {
         if (PlacementInWorld.IsHidden(record, isTarget: role == RecordRole.Target) || record.Placement is not { } placement) return null;
-        if (PlacementInWorld.IsValid(placement)) return placement;
-        _scan.InvalidPlacements++;
-        return null;
+        return PlacementInWorld.IsValid(placement) ? placement : null;
     }
+
+    /// <summary>For another mod's object: shown by the game, but with a position or rotation out of range or not a number.</summary>
+    private static bool IsShownWithInvalidPlacement(IPlacedGetter record) =>
+        !PlacementInWorld.IsHidden(record, isTarget: false) && record.Placement is { } placement && !PlacementInWorld.IsValid(placement);
 
     private RecordRole Classify(IPlacedGetter record, ModKey winningMod)
     {

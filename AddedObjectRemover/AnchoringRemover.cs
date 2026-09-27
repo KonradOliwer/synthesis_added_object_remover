@@ -7,12 +7,15 @@ internal enum SupportCategory { RemovedTarget, KeptTarget, OtherPlugin, Terrain 
 internal readonly record struct SupporterShare(Supporter Supporter, SupportCategory Category, float Share);
 
 /// <param name="Shares">Share of each supporter, largest first; empty when the candidate has no contact points.</param>
+/// <param name="Removed">Removed for its own lost support.</param>
+/// <param name="RemovedAsLinked">Not removed for its own support, but in the same iteration with a linked object that was.</param>
 internal sealed record AnchoringEvaluation(
     int TargetIndex,
     int Iteration,
     CandidateContacts Contacts,
     IReadOnlyList<SupporterShare> Shares,
-    bool Removed)
+    bool Removed,
+    bool RemovedAsLinked)
 {
     public float RemovedShare => ShareOf(SupportCategory.RemovedTarget);
 
@@ -181,7 +184,16 @@ internal sealed class AnchoringRemover
     private void FindMissingContacts(List<int> candidates)
     {
         var missing = candidates.Where(candidate => _contacts[candidate] == null).ToList();
-        Parallel.ForEach(missing, _parallelOptions, candidate => _contacts[candidate] = _contactFinder.FindContacts(candidate));
+        Parallel.ForEach(
+            missing,
+            _parallelOptions,
+            () => new SpatialQueryScratch(),
+            (candidate, _, scratch) =>
+            {
+                _contacts[candidate] = _contactFinder.FindContacts(candidate, scratch);
+                return scratch;
+            },
+            _ => { });
     }
 
     /// <returns>The objects removed in this iteration: the removed candidates, then their linked group members.</returns>
@@ -191,7 +203,6 @@ internal sealed class AnchoringRemover
         var removedCandidates = new List<int>();
         foreach (var evaluation in evaluations)
         {
-            _evaluations.Add(evaluation);
             if (evaluation.Contacts.ContactPoints == 0) CountWithoutContactsOnce(evaluation.TargetIndex);
             if (!evaluation.Removed) continue;
 
@@ -200,6 +211,8 @@ internal sealed class AnchoringRemover
             removedCandidates.Add(evaluation.TargetIndex);
         }
         var linked = removedCandidates.SelectMany(RemoveLinkedPartners).ToList();
+        _evaluations.AddRange(evaluations.Select(evaluation =>
+            evaluation with { RemovedAsLinked = !evaluation.Removed && _removed[evaluation.TargetIndex] }));
         return [.. removedCandidates, .. linked];
     }
 
@@ -228,7 +241,7 @@ internal sealed class AnchoringRemover
             .ThenBy(share => share.Supporter.Type)
             .ThenBy(share => share.Supporter.Index)
             .ToList();
-        var evaluation = new AnchoringEvaluation(candidate, _iterations, contacts, shares, Removed: false);
+        var evaluation = new AnchoringEvaluation(candidate, _iterations, contacts, shares, Removed: false, RemovedAsLinked: false);
         return evaluation with { Removed = ReachesThreshold(evaluation.RemovedShare, _threshold) };
     }
 

@@ -31,7 +31,4 @@ internal static class TestBodies
             new Vector3(ArmSpan / 2, ArmHalfThickness, shoulder + ArmHalfThickness))));
         return triangles;
     }
-
-    public static Vector3[] Vertices(IEnumerable<MeshTriangle> triangles) =>
-        triangles.SelectMany(triangle => new[] { triangle.A, triangle.B, triangle.C }).ToArray();
 }

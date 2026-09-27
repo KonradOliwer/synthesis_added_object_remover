@@ -25,7 +25,13 @@ public class FollowUpLinkedGroupTests
     private static readonly TestStatic ItemModel = new(
         new FormKey(TestTargets.TargetMod, 0x702), @"test\item.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-3, -3, 0), new Vector3(3, 3, 6))));
 
-    private static readonly BaseObjectShapeProvider Shapes = TestShapes.Create(TestTargets.TargetMod, "FollowUpLinkedGroupData", TableModel, ItemModel);
+    private static readonly TestStatic FloorModel = new(
+        new FormKey(TestTargets.TargetMod, 0x703), @"test\floor.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-200, -200, -10), new Vector3(200, 200, 0))));
+
+    private static readonly ModKey OtherMod = ModKey.FromNameAndExtension("Other.esp");
+
+    private static readonly BaseObjectShapeProvider Shapes =
+        TestShapes.Create(TestTargets.TargetMod, "FollowUpLinkedGroupData", TableModel, ItemModel, FloorModel);
 
     /// <summary>A table (the seed) with an item on it, a shelf in another space linked to that item, an item on the shelf, and an unrelated table.</summary>
     private static readonly List<TargetObject> Targets =
@@ -72,7 +78,7 @@ public class FollowUpLinkedGroupTests
             keptTooClose: [],
             Groups,
             new SupporterIndex(new Dictionary<FormKey, List<OtherObject>>(), Shapes, Options()),
-            new TerrainHeights(new Dictionary<ExteriorCell, Mutagen.Bethesda.Skyrim.ILandscapeGetter>(), new Dictionary<FormKey, FormKey>()),
+            NoTerrain(),
             Shapes,
             NewCache(),
             NewKeepRule(),
@@ -87,6 +93,45 @@ public class FollowUpLinkedGroupTests
     }
 
     [Fact]
+    public void CandidateKeptByItsSupportButRemovedWithItsLinkedPartnerIsReportedAsRemovedAsLinked()
+    {
+        const int seedTable = 0;
+        const int itemOnTable = 1;
+        const int crateBesideTable = 2;
+        List<TargetObject> targets =
+        [
+            Place(seedTable, TableModel, TestTargets.Space, Vector3.Zero),
+            Place(itemOnTable, ItemModel, TestTargets.Space, new Vector3(5, 5, 10)),
+            Place(crateBesideTable, ItemModel, TestTargets.Space, new Vector3(23, 0, 0)),
+        ];
+        var groups = LinkedGroups.Build(targets, [new TargetLink(TestTargets.Key(itemOnTable), TestTargets.Key(crateBesideTable))]);
+        var floor = TestShapes.Placed(OtherMod, 0, FloorModel.Ref, Vector3.Zero);
+
+        var anchoring = AnchoringRemover.Run(
+            targets,
+            Enumerable.Repeat(ObjectVisibility.Visible, targets.Count).ToArray(),
+            seeds: [seedTable],
+            keptTooClose: [],
+            groups,
+            new SupporterIndex(new Dictionary<FormKey, List<OtherObject>> { [TestTargets.Space] = [floor] }, Shapes, Options()),
+            NoTerrain(),
+            Shapes,
+            NewCache(),
+            new KeepReferencedRule(targets, new Dictionary<FormKey, KeepReason>(), groups),
+            TouchDistance,
+            threshold: 0.9f,
+            Options());
+
+        Assert.Equal(
+            new[] { (itemOnTable, typeof(AnchoringRemoval)), (crateBesideTable, typeof(LinkedRemoval)) },
+            anchoring.Removals.Select(removal => (removal.TargetIndex, removal.GetType())));
+        var crate = Assert.Single(anchoring.Evaluations, evaluation => evaluation.TargetIndex == crateBesideTable);
+        Assert.False(crate.Removed);
+        Assert.True(crate.RemovedAsLinked);
+        Assert.False(Assert.Single(anchoring.Evaluations, evaluation => evaluation.TargetIndex == itemOnTable).RemovedAsLinked);
+    }
+
+    [Fact]
     public void ReachableSpacesFollowLinkedGroups()
     {
         Assert.Equal(new HashSet<FormKey> { TestTargets.Space, OtherSpace }, Groups.CollectReachableSpaces(Targets, [Table]));
@@ -94,9 +139,12 @@ public class FollowUpLinkedGroupTests
     }
 
     private static TargetObject Place(int index, TestStatic model, FormKey space, Vector3 position) =>
-        new(TestTargets.Record(index), space, CellName: null, TestTargets.At(position), model.Ref, IsTeleportDoor: false, IsPrimitive: false, HasMapMarker: false);
+        TestTargets.Create(index, TestTargets.At(position), model.Ref, space);
 
     private static TriangleTreeCache NewCache() => new(Shapes.ReadGeometry);
+
+    private static TerrainHeights NoTerrain() =>
+        new(new Dictionary<ExteriorCell, Mutagen.Bethesda.Skyrim.ILandscapeGetter>(), new Dictionary<FormKey, FormKey>());
 
     private static KeepReferencedRule NewKeepRule() => new(Targets, new Dictionary<FormKey, KeepReason>(), Groups);
 

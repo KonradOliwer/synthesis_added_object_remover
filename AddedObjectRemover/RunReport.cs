@@ -22,11 +22,18 @@ internal static class RunReport
         Console.WriteLine(DescribeFollowUpRemoval(config));
         Console.WriteLine(DescribeLeftoverRemoval(config));
         Console.WriteLine($"Detailed log: {config.DetailedLog}");
-        Console.WriteLine($"Diagnostics folder: {(config.WritesDiagnostics ? config.DiagnosticsFolder : "(none)")}");
+        Console.WriteLine($"Write report files: {config.WritesDiagnostics}");
+        Console.WriteLine($"Report folder: {config.DiagnosticsFolder}");
     }
 
     private static void PrintCompatibilityPatches(CompatibilityPatches patches)
     {
+        if (ReferenceEquals(patches, CompatibilityPatches.None))
+        {
+            Console.WriteLine("Compatibility patches: detection off.");
+            return;
+        }
+        Console.WriteLine($"Compatibility patch detection: {patches.PluginsMasteringTarget:N0} plugins master the target.");
         foreach (var skipped in patches.SkippedTooManyMasters)
         {
             Console.WriteLine(
@@ -47,10 +54,10 @@ internal static class RunReport
 
     private static string DescribeFollowUpRemoval(RunConfig config) => config.FollowUpMode switch
     {
-        FollowUpRemovalMode.Off => "Follow-up removal: off.",
-        FollowUpRemovalMode.AnyTouch => $"Follow-up removal: any touch, touch distance {config.TouchDistance}.",
-        FollowUpRemovalMode.Anchoring =>
-            $"Follow-up removal: anchoring, touch distance {config.TouchDistance}, threshold {config.AnchoringThreshold:P0}.",
+        FollowUpRemovalMode.Nothing => "Also remove: nothing.",
+        FollowUpRemovalMode.EverythingTouching => $"Also remove: everything touching, touch distance {config.TouchDistance}.",
+        FollowUpRemovalMode.ObjectsSupportedByIt =>
+            $"Also remove: objects supported by it, touch distance {config.TouchDistance}, threshold {config.AnchoringThreshold:P0}.",
         _ => throw new UnreachableException($"Unknown follow-up removal mode {config.FollowUpMode}."),
     };
 
@@ -338,6 +345,32 @@ internal static class RunReport
             Console.WriteLine(
                 $"  {scan.SpaceNames[group.Key]}: {group.Count():N0} / {indexes[group.Key].Count:N0} / {removedCount:N0}");
         }
+    }
+
+    /// <param name="linkCount">Links from target objects to other target-plugin records, before those not between two target objects are dropped.</param>
+    public static void PrintLinkedGroups(LinkedGroups groups, int linkCount)
+    {
+        var multiMember = groups.MultiMemberGroups.ToList();
+        Console.WriteLine(
+            $"Linked groups: {multiMember.Count:N0} groups of linked target objects ({multiMember.Sum(members => members.Count):N0} objects) "
+            + $"from {linkCount:N0} links to target-plugin records.");
+    }
+
+    /// <param name="withoutPlacement">Target-plugin objects not checked because they are initially disabled or have no valid position.</param>
+    public static void PrintTargetVisibility(IReadOnlyList<ObjectVisibility> visibility, int withoutPlacement)
+    {
+        var invisibleByKind = visibility
+            .Where(entry => !entry.IsVisible)
+            .GroupBy(entry => entry.Describe())
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => group.Key, StringComparer.Ordinal)
+            .Select(group => $"{group.Count():N0} {group.Key}")
+            .ToList();
+        var visible = visibility.Count(entry => entry.IsVisible);
+        var kinds = invisibleByKind.Count == 0 ? "none" : string.Join(", ", invisibleByKind);
+        Console.WriteLine(
+            $"Target objects: {visible:N0} visible, {visibility.Count - visible:N0} invisible (by kind: {kinds}), "
+            + $"{withoutPlacement:N0} without placement/disabled.");
     }
 
     public static void PrintLinkedRemovals(int count, string step) =>

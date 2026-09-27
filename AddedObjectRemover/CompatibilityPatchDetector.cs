@@ -11,9 +11,13 @@ internal readonly record struct CompatibilityPatch(ModKey Patch, IReadOnlyList<M
 
 /// <param name="Patches">Plugins treated as compatibility patches.</param>
 /// <param name="SkippedTooManyMasters">Plugins that master the target but too many other mods to be a patch, such as generated or merged plugins.</param>
-internal sealed record CompatibilityPatches(IReadOnlyList<CompatibilityPatch> Patches, IReadOnlyList<CompatibilityPatch> SkippedTooManyMasters)
+/// <param name="PluginsMasteringTarget">Every plugin that masters the target, patch or not: the detector's input.</param>
+internal sealed record CompatibilityPatches(
+    IReadOnlyList<CompatibilityPatch> Patches,
+    IReadOnlyList<CompatibilityPatch> SkippedTooManyMasters,
+    int PluginsMasteringTarget)
 {
-    public static CompatibilityPatches None { get; } = new([], []);
+    public static CompatibilityPatches None { get; } = new([], [], 0);
 
     /// <summary>Every mod ignored because a compatibility patch links it to the target: the patches themselves and their other masters.</summary>
     public HashSet<ModKey> CollectIgnoredMods()
@@ -47,12 +51,14 @@ internal static class CompatibilityPatchDetector
     {
         var patches = new List<CompatibilityPatch>();
         var skipped = new List<CompatibilityPatch>();
+        var mastering = 0;
         foreach (var listing in state.LoadOrder.ListedOrder)
         {
             if (listing.ModKey == target || listing.Mod is not { } mod) continue;
 
             var masters = mod.MasterReferences.Select(master => master.Master).ToList();
             if (!masters.Contains(target)) continue;
+            mastering++;
 
             var otherMasters = masters
                 .Where(master => master != target && !baseGamePlugins.Contains(master) && !targetMasters.Contains(master))
@@ -62,6 +68,6 @@ internal static class CompatibilityPatchDetector
             var candidate = new CompatibilityPatch(listing.ModKey, otherMasters);
             (otherMasters.Count <= maxOtherMasters ? patches : skipped).Add(candidate);
         }
-        return new CompatibilityPatches(patches, skipped);
+        return new CompatibilityPatches(patches, skipped, mastering);
     }
 }

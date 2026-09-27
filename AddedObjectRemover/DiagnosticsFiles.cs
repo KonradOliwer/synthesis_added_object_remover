@@ -14,10 +14,10 @@ internal static class DiagnosticsFiles
         ManualPatchHintsWriter.FileName,
     ];
 
-    /// <param name="folder">Empty when no diagnostics are written.</param>
-    public static void DeleteEarlierFiles(string folder)
+    /// <param name="writesReports">Stale files are left alone when report writing is off.</param>
+    public static void DeleteEarlierFiles(string folder, bool writesReports)
     {
-        if (folder.Length == 0) return;
+        if (!writesReports) return;
 
         Access(folder, "deleting earlier diagnostics files", () =>
         {

@@ -97,7 +97,7 @@ internal sealed class PlacedRecordScanner
         _config = config;
         _footprint = footprint;
         _collectsNavmeshes = config.Leftovers.MovesKeptMarkers;
-        _collectsSurroundingsData = config.FollowUpMode == FollowUpRemovalMode.Anchoring || _collectsNavmeshes;
+        _collectsSurroundingsData = config.FollowUpMode == FollowUpRemovalMode.ObjectsSupportedByIt || _collectsNavmeshes;
         if (_collectsSurroundingsData) FindLandWorldspaces();
         _landWorldspaces = _scan.LandWorldspaces.Values.ToHashSet();
     }

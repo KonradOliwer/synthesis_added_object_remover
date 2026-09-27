@@ -58,9 +58,11 @@ internal sealed class RemovalPipeline
         var indexes = IndexOtherObjects(scan);
         WarmUpTargetBounds(scan.Targets);
         var visibility = ClassifyTargetVisibility(scan.Targets);
+        RunReport.PrintTargetVisibility(visibility, scan.TargetsDisabledOrWithoutPlacement);
         MarkReplacedObjects(scan.Targets, indexes);
 
         var groups = LinkedGroups.Build(scan.Targets, scan.TargetLinks);
+        RunReport.PrintLinkedGroups(groups, scan.TargetLinks.Count);
         var keepRule = new KeepReferencedRule(scan.Targets, scan.TargetReferences, groups);
         var supporters = new SupporterIndex(scan.SupportersBySpace, _shapes);
         var tooClose = SelectTooCloseRemovals(scan, visibility, indexes, keepRule);
@@ -190,9 +192,9 @@ internal sealed class RemovalPipeline
         if (seeds.Count == 0) return FollowUpRemovals.None;
         return _config.FollowUpMode switch
         {
-            FollowUpRemovalMode.Off => FollowUpRemovals.None,
-            FollowUpRemovalMode.AnyTouch => SelectTouchingRemovals(scan, seeds, tooClose, keepRule),
-            FollowUpRemovalMode.Anchoring => SelectUnanchoredRemovals(scan, seeds, tooClose, supporters, keepRule),
+            FollowUpRemovalMode.Nothing => FollowUpRemovals.None,
+            FollowUpRemovalMode.EverythingTouching => SelectTouchingRemovals(scan, seeds, tooClose, keepRule),
+            FollowUpRemovalMode.ObjectsSupportedByIt => SelectUnanchoredRemovals(scan, seeds, tooClose, supporters, keepRule),
             _ => throw new UnreachableException($"Unknown follow-up removal mode {_config.FollowUpMode}."),
         };
     }

@@ -26,52 +26,54 @@ plugin is `AddedObjectRemover.esp`.
 ## How to use
 
 1. Add this repository to a Synthesis group as a Git patcher, with the group placed after the target plugin.
-2. Set *Target plugin*.
+2. Set *Mod to clean up*.
 3. Run the group and keep `AddedObjectRemover.esp` enabled after the target plugin.
 
 The log ends with a *Possible manual patch needed* section listing removed markers and kept objects worth checking by hand.
 
 ## Settings
 
-### What to check
+### Mod to clean up
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| Target plugin | *(empty)* | File name of the plugin whose added objects are checked, e.g. `SomeMod.esp`. If it is empty or not in the load order, nothing is changed. |
-| Size multiplier | `0.5` | How far past its own edges a target object reaches, as a fraction of its size (0-5). Another mod's object whose centre falls inside that range makes the target object too close. Larger removes more; 0.25-1 is typical. |
+| Mod to clean up | *(empty)* | The plugin whose added objects may be removed, e.g. `SomeMod.esp`. If it is empty or not in the load order, nothing is changed. |
+| Removal distance (× object size) | `0.5` | Removes the cleaned mod's object when another mod's object is this close, measured in multiples of the object's own size (0-5). Larger removes more; 0.25-1 is typical. |
 
-### What to ignore
-
-| Setting | Default | Meaning |
-| --- | --- | --- |
-| Excluded plugins | *(empty)* | Plugins whose objects never count as a conflict. |
-| Ignore the target's masters | `true` | Also ignore objects from the plugins the target plugin was built on. |
-| Ignore mods patched with the target | `true` | If a plugin depends on both the target and another mod, treat it as a compatibility patch: ignore that patch and the other mod. The log lists every detected patch and the mods it causes to be ignored. |
-| Maximum other masters for a patch | `10` | A plugin counts as a compatibility patch only if it depends on the target plus at most this many other mods (1-100; the base game and the target's masters do not count). Plugins that depend on many mods, such as `DynDOLOD.esp` or a Bashed Patch, are therefore not treated as patches; the log lists them as skipped. |
-
-### Follow-up removal
+### Mods that never count as clashing
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| Follow-up removal mode | `AnyTouch` | What happens to target objects touching a removed one (see below). |
-| Touch distance | `8` | Largest gap, in game units (0-64), between two surfaces for them to count as touching. |
-| Anchoring threshold | `50` | `Anchoring` only: percentage (1-100) of what an object rests on or touches that must be removed for it to be removed. |
+| Mods to ignore | *(empty)* | Objects from these plugins never cause removals. |
+| Ignore the mod's own masters | `true` | Objects from mods it requires never cause removals. |
+| Ignore mods sharing a patch | `true` | If a patch combines both mods, they don't clash. The log lists every detected patch and the mods it causes to be ignored. |
+| Patch master limit | `10` | Plugins with more masters than this aren't treated as patches (1-100; the base game and the cleaned mod's masters do not count). Plugins that depend on many mods, such as `DynDOLOD.esp` or a Bashed Patch, are therefore not treated as patches; the log lists them as skipped. |
 
-- **Off**: only the too-close objects are removed.
-- **AnyTouch**: every target object connected to a removed one through touching target objects is removed too. This can spread through floors and walls to whole rooms.
-- **Anchoring**: a touching target object is removed only when at least *Anchoring threshold* % of what it rests on or touches was removed. The ground and objects of any plugin, the base game included, count as support. It works best for objects whose mesh origin is at their base (true for most plants and many props); `mesh-origins.csv` (see *Diagnostics files*) shows how well that holds for your target plugin.
-
-### Leftover invisible objects
+### Objects resting on removed ones
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| Remove leftover invisible objects | `true` | Remove the target's invisible objects that sit inside another mod's object or whose surroundings were removed. Works in every follow-up mode. |
-| Protected types | `None` | Invisible object types that are always kept (see below). |
-| Custom protected types | *(empty)* | The types to keep when *Protected types* is `Custom`. |
-| Search radius | `1024` | Largest distance in game units (64-8192) from an invisible object to the edges of the target's visible objects that count as its surroundings. A light, sound or trigger box that reaches less far uses its own reach. |
-| Removed area per direction | `50` | A direction counts as removed when at least this percentage of the ground area of the target objects in it was removed. |
-| Removed directions required | `60` | An invisible object is removed when at least this percentage of the directions holding target objects are removed. |
-| Occupied directions required | `50` | Invisible objects with target objects in fewer than this percentage of the 8 directions around them are kept. |
+| Also remove | `EverythingTouching` | What else goes with a removed object (see below). |
+| Touch gap | `8` | Gap still counted as touching, in game units (0-64). |
+| Support lost (%) | `50` | `ObjectsSupportedByIt` only: remove an object once this much of its support is gone (1-100). |
+
+- **Nothing**: only the too-close objects are removed.
+- **EverythingTouching**: every object connected to a removed one through touching objects is removed too. This can spread through floors and walls to whole rooms.
+- **ObjectsSupportedByIt**: a touching object is removed only when at least *Support lost (%)* of what it rests on or touches was removed. The ground and objects of any plugin, the base game included, count as support. It works best for objects whose mesh origin is at their base (true for most plants and many props); `mesh-origins.csv` (see *Diagnostics files*) shows how well that holds for your target plugin.
+
+*This setting resets to its default once when upgrading, because its options were renamed.*
+
+### Invisible objects left behind
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| Remove leftover sounds and markers | `true` | Removes invisible objects whose surroundings were removed. Works with any *Also remove* setting. |
+| Look-around distance | `1024` | How far around to check, in game units (64-8192). A light, sound or trigger box that reaches less far uses its own reach. |
+| Direction cleared at (%) | `50` | Share removed for a direction to count as cleared. |
+| Cleared directions needed (%) | `60` | Share of directions that must be cleared. |
+| Minimum directions with objects (%) | `50` | Of the 8 directions, this share must contain the cleaned mod's objects before deciding. |
+| Never remove | `None` | Invisible object types to always keep (see below). |
+| Types to never remove (Custom) | *(empty)* | Used when *Never remove* is `Custom`: the types to keep. |
 | Move kept markers out of other mods' objects | `false` | Move a kept map, X (including heading), idle or other marker that sits inside another mod's object to the nearest free spot on the navmesh or, failing that, the ground. Only its position changes. Lights, sounds, acoustic spaces, trigger boxes, critter spawners, decals, furniture and door markers are never moved. |
 
 The three percentages take values from 10 to 100 in steps of 10.
@@ -84,25 +86,26 @@ An invisible object is removed when:
   of their ground area. A target object the invisible object sits in counts in every direction.
 
 Only the target plugin's own objects count as surroundings. Objects that something depends on
-(see *Safety*) are kept in any case, protected types unless they are linked to a removed object. Protected types presets:
+(see *Safety*) are kept in any case, protected types unless they are linked to a removed object. *Never remove* presets:
 - **None**: nothing is protected.
 - **Markers**: map markers, X markers (XMarker, XMarkerHeading), idle, furniture and door markers.
 - **MarkersAndLights**: *Markers* plus lights.
 - **MarkersLightsAndSounds**: *MarkersAndLights* plus sound markers and acoustic spaces.
-- **Custom**: the types listed in *Custom protected types*: `MapMarkers`, `XMarkers`, `IdleMarkers`,
+- **Custom**: the types listed in *Types to never remove (Custom)*: `MapMarkers`, `XMarkers`, `IdleMarkers`,
   `FurnitureMarkers`, `DoorMarkers`, `OtherMarkers`, `Lights`, `SoundMarkers`, `AcousticSpaces`,
   `CritterSpawners`, `TriggerBoxes`, `Decals`.
 
-### Diagnostics
+### Logs and reports
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| Detailed log | `false` | Log every removed and kept object with its reason, per-space counts and unreadable meshes. |
-| Diagnostics folder | *(empty)* | Folder for diagnostics spreadsheets (CSV files). Leave empty to write nothing. Use an absolute path; a relative one is resolved against Synthesis's working folder. These files never change the result. |
+| Detailed log | `false` | Lists every removed object and why, plus per-space counts and unreadable meshes. |
+| Write report files | `false` | Saves CSV files for checking the results (see *Diagnostics files*). |
+| Report folder | `AddedObjectRemover Reports` | Folder for report files: a full path, or relative to the patch output folder. Only used when *Write report files* is on. |
 
 Invalid values are replaced, with a warning in the log: numbers out of range by the nearest valid
-value, percentages that are not a step of 10 by the nearest step. A follow-up mode or protected
-type name that Synthesis does not know stops the run.
+value, percentages that are not a step of 10 by the nearest step. An *Also remove* or *Never remove*
+value that Synthesis does not know stops the run.
 
 ## What is never counted as a conflict
 
@@ -118,16 +121,16 @@ type name that Synthesis does not know stops the run.
 
 ## Diagnostics files
 
-Written only when a *Diagnostics folder* is set. Shares and thresholds in these files are
-fractions: 0.5 = 50%.
+Written only when *Write report files* is on, into the *Report folder*. Shares and thresholds in
+these files are fractions: 0.5 = 50%.
 
-- **`anchoring.csv`** (*Anchoring* only): one row per object *Anchoring* evaluated, with the share
+- **`anchoring.csv`** (*ObjectsSupportedByIt* only): one row per object evaluated, with the share
   of support held by removed objects, kept objects, other plugins and the ground, and the decision.
-- **`mesh-origins.csv`** (*Anchoring* only): for each mesh the target uses, whether the object's
-  placement point is at its bottom. *Anchoring* works best when it is; check this if *Anchoring*
-  removes or keeps unexpected objects.
-- **`edges.csv`** (*AnyTouch* only): pairs of target objects found touching, with their distance.
-- **`components.csv`** (*AnyTouch* only): one row per chain of touching objects removed together,
+- **`mesh-origins.csv`** (*ObjectsSupportedByIt* only): for each mesh the target uses, whether the
+  object's placement point is at its bottom. *ObjectsSupportedByIt* works best when it is; check
+  this if it removes or keeps unexpected objects.
+- **`edges.csv`** (*EverythingTouching* only): pairs of target objects found touching, with their distance.
+- **`components.csv`** (*EverythingTouching* only): one row per chain of touching objects removed together,
   with the too-close object(s) that started it.
 - **`leftover-invisible-objects.csv`**: one row per invisible target object checked, with the
   other mod's object it sits inside, the ground area around it and how much of it was removed in
@@ -140,9 +143,9 @@ fractions: 0.5 = 50%.
   their edges may not be detected as too close.
 - Object size comes from the mesh (or its Object Bounds as a fallback), which can differ slightly
   from what you see in game.
-- Touching is based on visible mesh surfaces, not game collision. In *AnyTouch* mode an object
-  fully inside another one without their surfaces meeting does not count as touching; *Anchoring*
-  counts it.
+- Touching is based on visible mesh surfaces, not game collision. In *EverythingTouching* mode an
+  object fully inside another one without their surfaces meeting does not count as touching;
+  *ObjectsSupportedByIt* counts it.
 - Only the target plugin's own, unmodified objects are checked; objects a later plugin overrides
   are skipped.
 - A kept marker is moved only up to 2048 units, an exterior one usually only within its own cell,
@@ -152,4 +155,5 @@ fractions: 0.5 = 50%.
 ## Upgrading from an earlier version
 
 Settings were regrouped and renamed, so settings saved by an older version may reset to their
-defaults. Re-enter the target plugin and check the other values after updating.
+defaults. Re-enter the target plugin and check the other values after updating. The *Also remove*
+setting resets to its default once, because its options were renamed.

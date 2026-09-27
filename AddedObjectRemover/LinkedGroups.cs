@@ -44,6 +44,9 @@ internal sealed class LinkedGroups
 
     public bool IsLinked(int targetIndex) => MembersOf(targetIndex).Count > 1;
 
+    /// <summary>The groups with more than one member.</summary>
+    public IEnumerable<IReadOnlyList<int>> MultiMemberGroups => _groups.Where(members => members.Length > 1);
+
     /// <param name="decided">The removals one step decided, in its order.</param>
     /// <param name="removed">Every target index removed so far, <paramref name="decided"/> included.</param>
     /// <returns>The other members of the decided removals' groups not removed yet.</returns>

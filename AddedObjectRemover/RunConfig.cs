@@ -5,8 +5,8 @@ using Mutagen.Bethesda.Synthesis;
 namespace AddedObjectRemover;
 
 /// <summary>Validated settings of one run.</summary>
-/// <param name="AnchoringThreshold">Fraction (0-1) of an object's support that must come from removed objects for Anchoring to remove it.</param>
-/// <param name="DiagnosticsFolder">Empty when no diagnostics files are written.</param>
+/// <param name="AnchoringThreshold">Fraction (0-1) of an object's support that must come from removed objects for ObjectsSupportedByIt to remove it.</param>
+/// <param name="WritesDiagnostics">Whether report files (CSVs) are written; DiagnosticsFolder is resolved regardless so the folder can be shown in the log.</param>
 internal sealed record RunConfig(
     ModKey Target,
     ISkyrimModGetter? TargetMod,
@@ -21,10 +21,8 @@ internal sealed record RunConfig(
     float AnchoringThreshold,
     LeftoverConfig Leftovers,
     bool DetailedLog,
-    string DiagnosticsFolder)
-{
-    public bool WritesDiagnostics => DiagnosticsFolder.Length > 0;
-}
+    bool WritesDiagnostics,
+    string DiagnosticsFolder);
 
 /// <summary>Validated settings of the leftover invisible objects step.</summary>
 /// <param name="SearchRadius">Largest distance from an invisible target object to the target's visible objects that count as its surroundings.</param>
@@ -104,7 +102,8 @@ internal static class RunConfigFactory
                 FollowUpRemovalSettings.DefaultAnchoringThresholdPercent, "anchoring threshold") / Percent.PerWhole,
             Leftovers: CreateLeftoverConfig(settings.LeftoverInvisibleObjects ?? new LeftoverInvisibleObjectSettings()),
             DetailedLog: settings.Diagnostics?.DetailedLog ?? false,
-            DiagnosticsFolder: ReadDiagnosticsFolder(settings));
+            WritesDiagnostics: settings.Diagnostics?.WriteReportFiles ?? false,
+            DiagnosticsFolder: ResolveReportFolder(state, settings));
     }
 
     private static LeftoverConfig CreateLeftoverConfig(LeftoverInvisibleObjectSettings leftovers)
@@ -121,9 +120,15 @@ internal static class RunConfigFactory
             MovesKeptMarkers: leftovers.RemoveLeftoverInvisibleObjects && leftovers.MoveKeptMarkersOutOfOtherModsObjects);
     }
 
-    /// <summary>Empty when no diagnostics folder is set.</summary>
-    public static string ReadDiagnosticsFolder(Settings settings) =>
-        settings.Diagnostics?.DiagnosticsFolder?.Trim() ?? string.Empty;
+    /// <summary>A rooted path is used as is; a relative one is resolved against the output plugin's folder.</summary>
+    public static string ResolveReportFolder(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, Settings settings)
+    {
+        var configured = settings.Diagnostics?.DiagnosticsFolder?.Trim();
+        var folder = string.IsNullOrEmpty(configured) ? DiagnosticsSettings.DefaultReportFolder : configured;
+        if (Path.IsPathRooted(folder)) return folder;
+        var outputDirectory = Path.GetDirectoryName(state.OutputPath.Path) ?? string.Empty;
+        return Path.Combine(outputDirectory, folder);
+    }
 
     private static bool TryFindTarget(
         IPatcherState<ISkyrimMod, ISkyrimModGetter> state,

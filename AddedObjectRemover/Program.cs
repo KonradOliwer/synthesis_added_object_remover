@@ -36,9 +36,9 @@ public static class Program
         Console.WriteLine("=== Added Object Remover ===");
 
         var settings = _lazySettings.Value;
-        DiagnosticsFiles.DeleteEarlierFiles(RunConfigFactory.ReadDiagnosticsFolder(settings));
         var config = RunConfigFactory.Create(state, settings);
         if (config == null) return;
+        DiagnosticsFiles.DeleteEarlierFiles(config.DiagnosticsFolder, config.WritesDiagnostics);
         RunReport.PrintConfig(config);
 
         new RemovalPipeline(state, config).Run(totalTimer);

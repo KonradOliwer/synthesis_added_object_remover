@@ -396,7 +396,8 @@ internal static class RunReport
             $"Bounds: {stats.BasesFromNif:N0} bases from NIF, {stats.BasesNifFallbackToObnd:N0} NIF misses, "
             + $"{stats.BasesFromObnd:N0} from OBND, {stats.BasesWithoutBounds + stats.BasesUnresolved:N0} without bounds. "
             + $"Meshes: {stats.ModelsRead:N0} read, {stats.ModelsEffectOnly:N0} effect-only, {stats.ModelsFailed:N0} failed "
-            + $"({stats.ModelsFromLooseFiles:N0} loose, {stats.ModelsFromArchives:N0} from {stats.ArchivesIndexed:N0} archives).");
+            + $"({stats.ModelsFromLooseFiles:N0} loose, {stats.ModelsFromArchives:N0} from {stats.ArchivesIndexed:N0} archives), "
+            + $"{stats.ModelsWithFooterRoot:N0} with a footer root other than their first node.");
         if (stats.ModelFailuresByKind.Count > 0)
         {
             Console.WriteLine(

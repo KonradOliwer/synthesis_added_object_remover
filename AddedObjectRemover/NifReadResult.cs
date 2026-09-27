@@ -32,6 +32,9 @@ internal sealed record NifReadResult(
     public const string NoRenderGeometryKind = "no visible render geometry";
     public const string EffectOnlyKind = "effect-only mesh";
 
+    /// <summary>Set when the file footer's root node was used instead of NiflySharp's GetRootNode().</summary>
+    public NifRoot? FooterRoot { get; init; }
+
     public static NifReadResult Succeeded(NifGeometry geometry, string? warning) =>
         new(NifReadStatus.Success, geometry, null, null, warning);
 

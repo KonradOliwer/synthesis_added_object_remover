@@ -51,6 +51,18 @@ internal static class TestNifs
         return stream.ToArray();
     }
 
+    /// <summary>Saved NIF bytes whose footer (root count, then root block indices) is replaced by <paramref name="footer"/>.</summary>
+    public static byte[] WithFooter(byte[] saved, params int[] footer)
+    {
+        int[] defaultFooter = [1, 0];
+        var defaultFooterLength = defaultFooter.Length * sizeof(int);
+        Assert.Equal(defaultFooter, IntsOf(saved.AsSpan(saved.Length - defaultFooterLength)));
+        return [.. saved.AsSpan(0, saved.Length - defaultFooterLength), .. footer.SelectMany(value => BitConverter.GetBytes(value))];
+    }
+
+    private static int[] IntsOf(ReadOnlySpan<byte> bytes) =>
+        System.Runtime.InteropServices.MemoryMarshal.Cast<byte, int>(bytes).ToArray();
+
     private static void AddChild(NifFile nif, NiNode parent, INiObject child) =>
         parent.Children.AddBlockRef(nif.AddBlock(child));
 }

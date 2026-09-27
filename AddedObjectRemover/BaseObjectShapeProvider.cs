@@ -17,6 +17,7 @@ internal readonly record struct BoundsStats(
     int ModelsEffectOnly,
     int ModelsFromLooseFiles,
     int ModelsFromArchives,
+    int ModelsWithFooterRoot,
     int ArchivesIndexed,
     IReadOnlyList<KeyValuePair<string, int>> ModelFailuresByKind);
 
@@ -51,6 +52,7 @@ internal sealed class BaseObjectShapeProvider
     private int _modelsEffectOnly;
     private int _modelsFromLooseFiles;
     private int _modelsFromArchives;
+    private int _modelsWithFooterRoot;
 
     public BaseObjectShapeProvider(ILinkCache linkCache, MeshFileSource meshFiles, MeshMessageLog messages)
     {
@@ -92,6 +94,7 @@ internal sealed class BaseObjectShapeProvider
         Volatile.Read(ref _modelsEffectOnly),
         Volatile.Read(ref _modelsFromLooseFiles),
         Volatile.Read(ref _modelsFromArchives),
+        Volatile.Read(ref _modelsWithFooterRoot),
         _meshFiles.ArchivesIndexed,
         _modelFailures.Snapshot());
 
@@ -265,6 +268,7 @@ internal sealed class BaseObjectShapeProvider
     {
         var (result, source) = LoadAndParse(meshPath, includeTriangles: false);
         CountMeshSource(source);
+        CountFooterRoot(meshPath, result.FooterRoot);
 
         if (result is { Status: NifReadStatus.Success, Geometry: { } geometry })
         {
@@ -302,5 +306,13 @@ internal sealed class BaseObjectShapeProvider
             case MeshSource.LooseFile: Interlocked.Increment(ref _modelsFromLooseFiles); break;
             case MeshSource.Archive: Interlocked.Increment(ref _modelsFromArchives); break;
         }
+    }
+
+    private void CountFooterRoot(string meshPath, NifRoot? footerRoot)
+    {
+        if (footerRoot is not { } root) return;
+        Interlocked.Increment(ref _modelsWithFooterRoot);
+        _messages.Add(meshPath,
+            $"  [mesh] {meshPath}: footer root block {root.Index} used instead of first-node root block {root.LibraryRootIndex}");
     }
 }

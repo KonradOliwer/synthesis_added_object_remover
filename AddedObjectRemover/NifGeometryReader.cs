@@ -14,7 +14,8 @@ internal static class NifGeometryReader
     private static readonly Lazy<bool> ParallelLoadsSafe = new(TryPrimeBlockTypeCache, LazyThreadSafetyMode.ExecutionAndPublication);
 
     /// <summary>
-    /// Loads a NIF from memory and computes the AABB, in the NIF root node's local space, of all
+    /// Loads a NIF from memory and computes the AABB, in the local space of the root node picked by
+    /// <see cref="NifRootFinder"/>, of all
     /// render-geometry vertices, applying parent transforms cumulatively up to (but not including)
     /// the root node's own transform: the engine overwrites the root's local transform with the
     /// placed reference's position/rotation/scale, so it has no effect in game. Only shapes
@@ -82,17 +83,14 @@ internal static class NifGeometryReader
         {
             return NifReadResult.Failed(NifReadResult.LoadFailedKind, $"NifFile.Load failed with code {loadResult}.");
         }
-        if (FindRootIndex(nif) is not { } rootIndex)
+        if (NifRootFinder.Find(nif, data) is not { } root)
         {
             return NifReadResult.Failed(NifReadResult.NoRootNodeKind, "NIF has no root NiNode.");
         }
 
-        var shapes = CollectWithHiddenFallback(nif, rootIndex, includeTriangles);
-        return ToResult(shapes);
+        var shapes = CollectWithHiddenFallback(nif, root.Index, includeTriangles);
+        return ToResult(shapes) with { FooterRoot = root.DiffersFromLibraryRoot ? root : null };
     }
-
-    private static int? FindRootIndex(NifFile nif) =>
-        NiflyCalls.Call(() => nif.GetRootNode() is { } rootNode && nif.GetBlockIndex(rootNode, out var index) ? index : (int?)null);
 
     private static NifReadResult ToResult(ShapeCollection shapes)
     {

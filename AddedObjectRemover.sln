@@ -4,6 +4,8 @@ VisualStudioVersion = 17.10.35122.118
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AddedObjectRemover", "AddedObjectRemover\AddedObjectRemover.csproj", "{4F1C7A2E-9B3D-4E61-8C5A-2D7E9F013B64}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AddedObjectRemover.Tests", "AddedObjectRemover.Tests\AddedObjectRemover.Tests.csproj", "{8D2B5E41-3C7A-4F90-A6B1-7E4C2D9F5A18}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -14,6 +16,10 @@ Global
 		{4F1C7A2E-9B3D-4E61-8C5A-2D7E9F013B64}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4F1C7A2E-9B3D-4E61-8C5A-2D7E9F013B64}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4F1C7A2E-9B3D-4E61-8C5A-2D7E9F013B64}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8D2B5E41-3C7A-4F90-A6B1-7E4C2D9F5A18}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8D2B5E41-3C7A-4F90-A6B1-7E4C2D9F5A18}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8D2B5E41-3C7A-4F90-A6B1-7E4C2D9F5A18}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8D2B5E41-3C7A-4F90-A6B1-7E4C2D9F5A18}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

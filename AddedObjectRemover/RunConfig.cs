@@ -82,7 +82,7 @@ internal static class RunConfigFactory
 
         var compatibilityPatches = ignore.IgnoreModsPatchedWithTarget
             ? CompatibilityPatchDetector.Find(
-                state, target, allTargetMasters.ToHashSet(), BaseGamePluginSet,
+                state.LoadOrder.ListedOrder, target, allTargetMasters.ToHashSet(), BaseGamePluginSet,
                 Clamp(ignore.MaxOtherMastersForPatch, MinOtherMastersForPatch, MaxOtherMastersForPatch, "maximum other masters for a patch"))
             : CompatibilityPatches.None;
         ignored.UnionWith(compatibilityPatches.CollectIgnoredMods());
@@ -231,7 +231,7 @@ internal static class RunConfigFactory
     }
 
     /// <summary>A percentage limited to 10-100 and rounded to the nearest ten.</summary>
-    private static int WholeTens(int percent, string name)
+    internal static int WholeTens(int percent, string name)
     {
         var valid = (int)Math.Round(Math.Clamp(percent, PercentStep, Percent.PerWhole) / (double)PercentStep, MidpointRounding.AwayFromZero) * PercentStep;
         if (valid != percent) Console.WriteLine($"Warning: {name} {percent} is not a multiple of {PercentStep} from {PercentStep} to {Percent.PerWhole}; using {valid}.");
@@ -246,7 +246,7 @@ internal static class RunConfigFactory
     }
 
     /// <summary>Out of range values become the nearest valid value; values that are not a number become the default.</summary>
-    private static float Clamp(float value, float minimum, float maximum, float defaultValue, string name)
+    internal static float Clamp(float value, float minimum, float maximum, float defaultValue, string name)
     {
         if (value >= minimum && value <= maximum) return value;
         var clamped = float.IsNaN(value) ? defaultValue : Math.Clamp(value, minimum, maximum);

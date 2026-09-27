@@ -50,7 +50,8 @@ internal sealed class AnchoringContactFinder(
     TriangleTreeCache cache,
     float touchDistance)
 {
-    private readonly record struct SupporterHits(Supporter Supporter, bool[] Hits);
+    /// <param name="Hits">Per surface sample: whether it is in contact with the supporter.</param>
+    internal readonly record struct SupporterHits(Supporter Supporter, bool[] Hits);
 
     /// <param name="candidate">Index of a target object with a mesh.</param>
     public CandidateContacts FindContacts(int candidate)
@@ -105,7 +106,7 @@ internal sealed class AnchoringContactFinder(
         return hits;
     }
 
-    private static CandidateContacts SplitWeightsAmongSupporters(IReadOnlyList<SupporterHits> hitsBySupporter, float[] weights)
+    internal static CandidateContacts SplitWeightsAmongSupporters(IReadOnlyList<SupporterHits> hitsBySupporter, float[] weights)
     {
         var supportersPerPoint = new int[weights.Length];
         foreach (var (_, hits) in hitsBySupporter)

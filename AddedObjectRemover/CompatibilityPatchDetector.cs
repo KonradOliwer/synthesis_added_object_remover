@@ -1,6 +1,6 @@
 using Mutagen.Bethesda.Plugins;
+using Mutagen.Bethesda.Plugins.Order;
 using Mutagen.Bethesda.Skyrim;
-using Mutagen.Bethesda.Synthesis;
 
 namespace AddedObjectRemover;
 
@@ -43,7 +43,7 @@ internal static class CompatibilityPatchDetector
     /// mods; it is a patch when there are at most <paramref name="maxOtherMasters"/> of those.
     /// </summary>
     public static CompatibilityPatches Find(
-        IPatcherState<ISkyrimMod, ISkyrimModGetter> state,
+        IEnumerable<IModListingGetter<ISkyrimModGetter>> loadOrder,
         ModKey target,
         IReadOnlySet<ModKey> targetMasters,
         IReadOnlySet<ModKey> baseGamePlugins,
@@ -52,7 +52,7 @@ internal static class CompatibilityPatchDetector
         var patches = new List<CompatibilityPatch>();
         var skipped = new List<CompatibilityPatch>();
         var mastering = 0;
-        foreach (var listing in state.LoadOrder.ListedOrder)
+        foreach (var listing in loadOrder)
         {
             if (listing.ModKey == target || listing.Mod is not { } mod) continue;
 

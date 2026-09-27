@@ -49,8 +49,8 @@ internal sealed class LeftoverInvisibleObjectSelector(
         var radius = GetEffectiveRadius(target);
         var containingObject = FindContainingOtherObject(target);
         var areas = MeasureSurroundings(target, radius, surroundings, removedTargets);
-        var ruleDecision = containingObject != null ? LeftoverDecision.RemovedInsideOtherObject : DecideByDirections(areas);
-        var (decision, keepReason) = ApplyKeepRules(targetIndex, kind, ruleDecision);
+        var ruleDecision = containingObject != null ? LeftoverDecision.RemovedInsideOtherObject : DecideByDirections(areas, config);
+        var (decision, keepReason) = ApplyKeepRules(targetIndex, kind, ruleDecision, config, keepRule);
         return new LeftoverEvaluation(targetIndex, kind, radius, containingObject, areas, decision, keepReason);
     }
 
@@ -80,7 +80,7 @@ internal sealed class LeftoverInvisibleObjectSelector(
         return areas;
     }
 
-    private LeftoverDecision DecideByDirections(SectorAreas areas)
+    internal static LeftoverDecision DecideByDirections(SectorAreas areas, LeftoverConfig config)
     {
         var occupied = areas.OccupiedCount;
         if (occupied * Percent.PerWhole < config.OccupiedDirectionsPercent * SectorAreas.SectorCount) return LeftoverDecision.KeptTooFewSurroundingObjects;
@@ -90,7 +90,12 @@ internal sealed class LeftoverInvisibleObjectSelector(
     }
 
     /// <summary>Protected types and referenced objects stay whatever the rules decided.</summary>
-    private (LeftoverDecision Decision, KeepReason? KeepReason) ApplyKeepRules(int targetIndex, InvisibleObjectKind kind, LeftoverDecision ruleDecision)
+    internal static (LeftoverDecision Decision, KeepReason? KeepReason) ApplyKeepRules(
+        int targetIndex,
+        InvisibleObjectKind kind,
+        LeftoverDecision ruleDecision,
+        LeftoverConfig config,
+        KeepReferencedRule keepRule)
     {
         if (!ruleDecision.IsRemoval()) return (ruleDecision, null);
         if (config.ProtectedKinds.Contains(kind)) return (LeftoverDecision.KeptProtectedType, null);

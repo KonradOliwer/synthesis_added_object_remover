@@ -1,0 +1,11 @@
+<Project>
+  <!-- Mutagen.Bethesda.Synthesis transitively brings in the Noggog.SourceGenerators analyzer,
+       whose generated AssemblyVersions.g.cs conflicts (CS0436) with the AssemblyVersions type
+       already compiled into Mutagen.Bethesda.Synthesis.dll. Nothing here uses that generator,
+       so drop it from the analyzer set before compiling. -->
+  <Target Name="RemoveConflictingNoggogAnalyzer" BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <Analyzer Remove="@(Analyzer)" Condition="$([System.String]::Copy('%(Analyzer.Identity)').Contains('Noggog.SourceGenerators'))" />
+    </ItemGroup>
+  </Target>
+</Project>

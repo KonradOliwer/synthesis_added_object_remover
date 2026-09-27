@@ -219,8 +219,11 @@ internal sealed class AnchoringRemover
             .ThenBy(share => share.Supporter.Index)
             .ToList();
         var evaluation = new AnchoringEvaluation(candidate, _iterations, contacts, shares, Removed: false);
-        return evaluation with { Removed = evaluation.RemovedShare >= _threshold - ShareRoundingTolerance };
+        return evaluation with { Removed = ReachesThreshold(evaluation.RemovedShare, _threshold) };
     }
+
+    internal static bool ReachesThreshold(float removedShare, float threshold) =>
+        removedShare >= threshold - ShareRoundingTolerance;
 
     private SupportCategory Categorize(Supporter supporter) => supporter.Type switch
     {

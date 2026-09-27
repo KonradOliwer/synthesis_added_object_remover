@@ -20,7 +20,10 @@ internal static class BoxMesh
         1, 3, 5, 3, 7, 5,
     ];
 
-    public static MeshTriangleTree CreateTree(Box box)
+    public static MeshTriangleTree CreateTree(Box box) =>
+        MeshTriangleTree.Build(CreateGeometry(box)) ?? throw new UnreachableException("A box mesh always has 12 triangles.");
+
+    public static NifGeometry CreateGeometry(Box box)
     {
         var corners = new Vector3[CornerCount];
         for (var i = 0; i < CornerCount; i++)
@@ -30,7 +33,6 @@ internal static class BoxMesh
                 (i & 2) != 0 ? box.Max.Y : box.Min.Y,
                 (i & 4) != 0 ? box.Max.Z : box.Min.Z);
         }
-        var geometry = new NifGeometry(box.Min, box.Max, corners, FaceTriangles);
-        return MeshTriangleTree.Build(geometry) ?? throw new UnreachableException("A box mesh always has 12 triangles.");
+        return new NifGeometry(box.Min, box.Max, corners, FaceTriangles);
     }
 }

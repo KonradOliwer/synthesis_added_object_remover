@@ -18,14 +18,7 @@
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
     <PackageReference Include="ini-parser-netstandard" Version="2.5.3" />
   </ItemGroup>
-
-  <!-- Mutagen.Bethesda.Synthesis transitively brings in the Noggog.SourceGenerators analyzer,
-       whose generated AssemblyVersions.g.cs conflicts (CS0436) with the AssemblyVersions type
-       already compiled into Mutagen.Bethesda.Synthesis.dll. Nothing in this project uses that
-       generator, so drop it from the analyzer set before compiling. -->
-  <Target Name="RemoveConflictingNoggogAnalyzer" BeforeTargets="CoreCompile">
-    <ItemGroup>
-      <Analyzer Remove="@(Analyzer)" Condition="$([System.String]::Copy('%(Analyzer.Identity)').Contains('Noggog.SourceGenerators'))" />
-    </ItemGroup>
-  </Target>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AddedObjectRemover.Tests" />
+  </ItemGroup>
 </Project>

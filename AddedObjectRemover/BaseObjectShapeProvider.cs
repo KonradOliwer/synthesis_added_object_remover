@@ -118,6 +118,9 @@ internal sealed class BaseObjectShapeProvider
             : ObjectVisibility.Visible;
     }
 
+    /// <summary>Mesh-local bounds of a normalized mesh path; null when it is unreadable or has no render geometry. Cached, failures included.</summary>
+    public Box? GetMeshBox(string meshPath) => GetMeshBounds(meshPath).Box;
+
     /// <summary>Null when the mesh cannot be read or has no triangles.</summary>
     public NifGeometry? ReadGeometry(string meshPath)
     {
@@ -196,7 +199,7 @@ internal sealed class BaseObjectShapeProvider
             ? model.File.GivenPath
             : null;
 
-    private static Box ToBox(IObjectBoundsGetter bounds) => Box.FromCorners(
+    public static Box ToBox(IObjectBoundsGetter bounds) => Box.FromCorners(
         new Vector3(bounds.First.X, bounds.First.Y, bounds.First.Z),
         new Vector3(bounds.Second.X, bounds.Second.Y, bounds.Second.Z));
 

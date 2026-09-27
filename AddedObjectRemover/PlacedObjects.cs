@@ -46,6 +46,9 @@ internal readonly record struct OtherObject(
     bool HasMapMarker)
 {
     public PlacedTransform Transform => new(Position, Geometry.RotationFromEuler(Rotation), Scale);
+
+    /// <summary>A placed NPC or creature (ACHR), the only placed type whose base link is an NPC.</summary>
+    public bool IsPlacedNpc => Base is { LinkType: var linkType } && linkType == typeof(INpcGetter);
 }
 
 /// <summary>A too-close target (index into the scanned targets) and the first other object found.</summary>

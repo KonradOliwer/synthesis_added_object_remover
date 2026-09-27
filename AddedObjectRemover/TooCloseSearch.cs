@@ -6,17 +6,18 @@ namespace AddedObjectRemover;
 
 /// <summary>
 /// BoundingBox removal zone: finds visible target objects whose grown (multiplier-expanded) local
-/// box contains the bounds center of some other-mod object. Invisible targets are left to the
-/// leftover invisible objects step.
+/// box contains the bounds center of some other-mod object. Other mods' placed NPCs follow the
+/// <see cref="NpcClashRule"/>. Invisible targets are left to the leftover invisible objects step.
 /// </summary>
 internal static class TooCloseSearch
 {
     /// <summary>A struct so the grid query is allocation-free and inlinable.</summary>
-    private readonly struct TooCloseMatcher(OtherObjectIndex index, Box expanded, Vector3 position, Mat3 rotation)
+    private readonly struct TooCloseMatcher(OtherObjectIndex index, Box expanded, Vector3 position, Mat3 rotation, NpcClashRule npcRule)
         : IGridMatcher
     {
         public bool IsMatch(int otherIndex) =>
             !index.IsReplaced(otherIndex)
+            && npcRule.TestsLikeObject(index[otherIndex])
             && index.TryGetVisibleCenter(otherIndex, out var center)
             && Geometry.IsInsideOrientedBox(center, position, rotation, expanded);
     }
@@ -32,14 +33,22 @@ internal static class TooCloseSearch
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
         BaseObjectShapeProvider shapes,
         float multiplier,
+        NpcClashRule npcRule,
         ParallelOptions parallelOptions)
     {
         var matches = new int[targets.Count];
         Parallel.ForEach(Partitioner.Create(0, targets.Count), parallelOptions, range =>
         {
+            var npcScratch = new NpcScratch();
             for (var i = range.Item1; i < range.Item2; i++)
             {
-                matches[i] = visibility[i].IsVisible ? FindFirstCentreInBoxZone(targets[i], indexes[targets[i].SpaceKey], shapes, multiplier) : -1;
+                if (!visibility[i].IsVisible)
+                {
+                    matches[i] = -1;
+                    continue;
+                }
+                var objectMatch = FindFirstCentreInBoxZone(targets[i], indexes[targets[i].SpaceKey], shapes, multiplier, npcRule);
+                matches[i] = npcRule.ThenFirstStuckNpc(objectMatch, i, npcScratch);
             }
         });
 
@@ -61,8 +70,9 @@ internal static class TooCloseSearch
         return hits;
     }
 
-    /// <summary>Index of the first other object whose bounds centre lies in the target's BoundingBox zone, or -1.</summary>
-    public static int FindFirstCentreInBoxZone(TargetObject target, OtherObjectIndex index, BaseObjectShapeProvider shapes, float multiplier)
+    /// <summary>Index of the first other object whose bounds centre lies in the target's BoundingBox zone, or -1; NPCs only when <paramref name="npcRule"/> tests them like objects.</summary>
+    public static int FindFirstCentreInBoxZone(
+        TargetObject target, OtherObjectIndex index, BaseObjectShapeProvider shapes, float multiplier, NpcClashRule npcRule)
     {
         if (index.Count == 0) return -1;
 
@@ -71,7 +81,7 @@ internal static class TooCloseSearch
         var expanded = Geometry.ExpandedLocalBox(shapes.GetLocalBox(target.Base), target.Transform.Scale, multiplier);
         var queryArea = Geometry.WorldAabb(expanded, position, rotation).Grown(OtherObjectIndex.RawPositionSearchMargin);
 
-        var matcher = new TooCloseMatcher(index, expanded, position, rotation);
+        var matcher = new TooCloseMatcher(index, expanded, position, rotation, npcRule);
         return index.Grid.TryFindFirst(queryArea, ref matcher, out var match) ? match : -1;
     }
 }

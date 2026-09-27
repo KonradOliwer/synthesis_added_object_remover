@@ -15,6 +15,7 @@ internal sealed record RunConfig(
     IReadOnlyList<ModKey> TargetMasters,
     bool IgnoreTargetMasters,
     CompatibilityPatches CompatibilityPatches,
+    NpcHandling NpcHandling,
     float SizeMultiplier,
     ZoneShape ZoneShape,
     FollowUpRemovalMode FollowUpMode,
@@ -95,6 +96,7 @@ internal static class RunConfigFactory
             TargetMasters: masters,
             IgnoreTargetMasters: ignore.IgnoreTargetMasters,
             CompatibilityPatches: compatibilityPatches,
+            NpcHandling: ValidateNpcHandling(ignore.NpcHandling),
             SizeMultiplier: Clamp(check.SizeMultiplier, 0, MaxSizeMultiplier, CheckSettings.DefaultSizeMultiplier, "size multiplier"),
             ZoneShape: ValidateZoneShape(check.ZoneShape),
             FollowUpMode: ValidateMode(followUp.Mode),
@@ -194,6 +196,13 @@ internal static class RunConfigFactory
         if (Enum.IsDefined(zoneShape)) return zoneShape;
         Console.WriteLine($"Warning: removal zone {zoneShape} is invalid; using {CheckSettings.DefaultZoneShape}.");
         return CheckSettings.DefaultZoneShape;
+    }
+
+    private static NpcHandling ValidateNpcHandling(NpcHandling handling)
+    {
+        if (Enum.IsDefined(handling)) return handling;
+        Console.WriteLine($"Warning: NPCs and creatures setting {handling} is invalid; using {IgnoreSettings.DefaultNpcHandling}.");
+        return IgnoreSettings.DefaultNpcHandling;
     }
 
     private static FollowUpRemovalMode ValidateMode(FollowUpRemovalMode mode)

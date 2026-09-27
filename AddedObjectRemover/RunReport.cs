@@ -20,6 +20,7 @@ internal static class RunReport
             ? $"Ignored masters of target: {Join(config.TargetMasters)}"
             : "Masters of target are not ignored.");
         PrintCompatibilityPatches(config.CompatibilityPatches);
+        Console.WriteLine($"NPCs and creatures: {config.NpcHandling}");
         Console.WriteLine(DescribeFollowUpRemoval(config));
         Console.WriteLine(DescribeLeftoverRemoval(config));
         Console.WriteLine($"Detailed log: {config.DetailedLog}");
@@ -158,6 +159,26 @@ internal static class RunReport
         Console.WriteLine(
             $"  Meshes indexed: {meshes.Built:N0} ({meshes.Triangles:N0} triangles), peak resident ~{meshes.PeakResidentBytes / BytesPerMegabyte:N0} MB; "
             + $"timing: box index {indexTime.TotalSeconds:F1}s, search {searchTime.TotalSeconds:F1}s.");
+    }
+
+    public static void PrintIgnoredNpcs(int placedNpcCount) =>
+        Console.WriteLine($"NPCs and creatures: ignored; {placedNpcCount:N0} placed NPCs of other mods never cause removals.");
+
+    public static void PrintNpcStuckSummary(NpcStuckSummary summary, NpcBodyCacheStats cache)
+    {
+        var sizes = summary.Sizes;
+        Console.WriteLine(
+            $"NPCs and creatures (only when stuck in the object): {sizes.Evaluated:N0} placed NPCs evaluated: "
+            + $"{sizes.ByBodyMesh:N0} sized by body mesh, {sizes.ByObjectBounds:N0} by Object Bounds, "
+            + $"{sizes.ByHumanoidApproximation:N0} by humanoid approximation, {sizes.Skipped:N0} skipped (size unknown); "
+            + $"{summary.PairsTested:N0} NPC-object pairs tested, {summary.Conflicts:N0} objects with an NPC stuck in them.");
+        Console.WriteLine(
+            $"  NPC body cache: {cache.BodiesBuilt:N0} bodies built, {cache.BodiesReused:N0} reused; "
+            + $"{cache.BasesResolved:N0} NPC bases and leveled lists resolved, {cache.BasesReused:N0} reused.");
+        foreach (var unsized in summary.Unsized)
+        {
+            Console.WriteLine($"  Skipped NPC {DescribeOtherObject(unsized.Npc)}: size unknown ({unsized.Reason}).");
+        }
     }
 
     public static void PrintInvisibleOthers(ReasonCounter invisible, bool verbose)
@@ -443,6 +464,7 @@ internal static class RunReport
         ManualPatchHintType.KeptLinkedGroup => "Kept linked group of",
         ManualPatchHintType.KeptForNonPlacedReference => "Kept, referenced by a non-placed record:",
         ManualPatchHintType.KeptTeleportDoor => "Kept teleport door",
+        ManualPatchHintType.NpcSizeUnknown => "NPC size unknown, NPC stands in",
         _ => throw new UnreachableException($"Unknown manual patch hint type {type}."),
     };
 }

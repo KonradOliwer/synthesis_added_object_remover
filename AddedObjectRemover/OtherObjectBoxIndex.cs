@@ -61,7 +61,7 @@ internal sealed class OtherObjectBoxIndex
         return aabbs;
     }
 
-    private static void RemoveAdjacentDuplicates(List<int> sorted)
+    public static void RemoveAdjacentDuplicates(List<int> sorted)
     {
         var kept = 0;
         for (var i = 0; i < sorted.Count; i++)

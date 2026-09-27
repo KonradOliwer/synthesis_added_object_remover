@@ -48,6 +48,7 @@ The log ends with a *Possible manual patch needed* section listing removed marke
 | Mods to ignore | *(empty)* | Objects from these plugins never cause removals. |
 | Ignore the mod's own masters | `true` | Objects from mods it requires never cause removals. |
 | Ignore mods sharing a patch | `true` | If a patch combines both mods, they don't clash. The log lists every detected patch and the mods it causes to be ignored. |
+| NPCs and creatures | `OnlyWhenStuckInObject` | Whether other mods' NPCs and creatures cause removals: `CountLikeObjects` treats them like any other object, `OnlyWhenStuckInObject` only when their body would be inside the object at its real size, `Ignore` never. NPCs placed through a leveled list count with their largest possible body. |
 | Patch master limit | `10` | Plugins with more masters than this aren't treated as patches (1-100; the base game and the cleaned mod's masters do not count). Plugins that depend on many mods, such as `DynDOLOD.esp` or a Bashed Patch, are therefore not treated as patches; the log lists them as skipped. |
 
 ### Objects resting on removed ones
@@ -150,6 +151,7 @@ these files are fractions: 0.5 = 50%.
   *ObjectsSupportedByIt* counts it.
 - Only the target plugin's own, unmodified objects are checked; objects a later plugin overrides
   are skipped.
+- With *NPCs and creatures* `OnlyWhenStuckInObject`, NPCs and creatures whose size cannot be read from the game data never cause removals; the log lists them, and the *Possible manual patch needed* section names the objects they stand in.
 - A kept marker is moved only up to 2048 units, an exterior one usually only within its own cell,
   and in tight interiors the navmesh and floor often lie inside room pieces, so it may be left
   where it is (the log says so).

@@ -9,6 +9,14 @@ public enum ZoneShape
     BoundingBox,
 }
 
+/// <summary>How other mods' placed NPCs and creatures take part in the too-close step.</summary>
+public enum NpcHandling
+{
+    CountLikeObjects,
+    OnlyWhenStuckInObject,
+    Ignore,
+}
+
 public enum FollowUpRemovalMode
 {
     Nothing,
@@ -86,6 +94,7 @@ public class CheckSettings
 public class IgnoreSettings
 {
     public const int DefaultMaxOtherMastersForPatch = 10;
+    public const NpcHandling DefaultNpcHandling = NpcHandling.OnlyWhenStuckInObject;
 
     [SynthesisSettingName("Mods to ignore")]
     [SynthesisTooltip("Objects from these plugins never cause removals.")]
@@ -102,6 +111,10 @@ public class IgnoreSettings
     [SynthesisSettingName("Patch master limit")]
     [SynthesisTooltip("Plugins with more masters than this aren't treated as patches.")]
     public int MaxOtherMastersForPatch { get; set; } = DefaultMaxOtherMastersForPatch;
+
+    [SynthesisSettingName("NPCs and creatures")]
+    [SynthesisTooltip("Whether other mods' NPCs cause removals. Default: only when they'd stand inside the object.")]
+    public NpcHandling NpcHandling { get; set; } = DefaultNpcHandling;
 }
 
 public class FollowUpRemovalSettings

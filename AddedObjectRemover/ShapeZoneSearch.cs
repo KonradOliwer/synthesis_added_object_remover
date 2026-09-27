@@ -8,7 +8,8 @@ namespace AddedObjectRemover;
 /// solid mesh intersects the target's enlarged mesh or lies inside it (<see cref="ShapeZoneContact"/>).
 /// Broad phase: other objects' world AABBs against the zone's box; box filter: oriented boxes.
 /// Targets without mesh triangles use the BoundingBox zone, and other objects without mesh
-/// triangles are tested by their bounds centre. Each target writes only its own result slot and
+/// triangles are tested by their bounds centre. Other mods' placed NPCs follow the
+/// <see cref="NpcClashRule"/>. Each target writes only its own result slot and
 /// candidates are tested in index order, so the result does not depend on thread scheduling.
 /// </summary>
 internal sealed class ShapeZoneSearch
@@ -21,6 +22,7 @@ internal sealed class ShapeZoneSearch
         public List<int> Candidates { get; } = [];
         public List<int> BoxPassed { get; } = [];
         public ShapeZoneStats Stats { get; } = new();
+        public NpcScratch Npcs { get; } = new();
     }
 
     private readonly IReadOnlyList<TargetObject> _targets;
@@ -29,6 +31,7 @@ internal sealed class ShapeZoneSearch
     private readonly BaseObjectShapeProvider _shapes;
     private readonly TriangleTreeCache _meshCache;
     private readonly float _multiplier;
+    private readonly NpcClashRule _npcRule;
     private readonly object _statsLock = new();
 
     private ShapeZoneSearch(
@@ -37,7 +40,8 @@ internal sealed class ShapeZoneSearch
         Dictionary<FormKey, OtherObjectBoxIndex> boxIndexes,
         BaseObjectShapeProvider shapes,
         TriangleTreeCache meshCache,
-        float multiplier)
+        float multiplier,
+        NpcClashRule npcRule)
     {
         _targets = targets;
         _indexes = indexes;
@@ -45,6 +49,7 @@ internal sealed class ShapeZoneSearch
         _shapes = shapes;
         _meshCache = meshCache;
         _multiplier = multiplier;
+        _npcRule = npcRule;
     }
 
     public ShapeZoneStats Stats { get; } = new();
@@ -60,6 +65,7 @@ internal sealed class ShapeZoneSearch
         BaseObjectShapeProvider shapes,
         TriangleTreeCache meshCache,
         float multiplier,
+        NpcClashRule npcRule,
         ParallelOptions parallelOptions)
     {
         var boxIndexes = new Dictionary<FormKey, OtherObjectBoxIndex>();
@@ -69,7 +75,7 @@ internal sealed class ShapeZoneSearch
             if (!visibility[i].IsVisible || boxIndexes.ContainsKey(spaceKey)) continue;
             boxIndexes[spaceKey] = OtherObjectBoxIndex.Build(indexes[spaceKey], shapes, parallelOptions);
         }
-        return new ShapeZoneSearch(targets, indexes, boxIndexes, shapes, meshCache, multiplier);
+        return new ShapeZoneSearch(targets, indexes, boxIndexes, shapes, meshCache, multiplier, npcRule);
     }
 
     /// <param name="visibility">Parallel to the targets.</param>
@@ -106,8 +112,11 @@ internal sealed class ShapeZoneSearch
         lock (_statsLock) Stats.Add(scratch.Stats);
     }
 
+    private int FindFirstTooCloseOther(int targetIndex, Scratch scratch) =>
+        _npcRule.ThenFirstStuckNpc(FindFirstObjectInZone(targetIndex, scratch), targetIndex, scratch.Npcs);
+
     /// <summary>Index of the first other object reaching the target's zone, or -1.</summary>
-    private int FindFirstTooCloseOther(int targetIndex, Scratch scratch)
+    private int FindFirstObjectInZone(int targetIndex, Scratch scratch)
     {
         var target = _targets[targetIndex];
         var others = _indexes[target.SpaceKey];
@@ -132,12 +141,12 @@ internal sealed class ShapeZoneSearch
     private int FindFirstInBoxZone(TargetObject target, OtherObjectIndex others, Scratch scratch)
     {
         scratch.Stats.BoxZoneTargets++;
-        var match = TooCloseSearch.FindFirstCentreInBoxZone(target, others, _shapes, _multiplier);
+        var match = TooCloseSearch.FindFirstCentreInBoxZone(target, others, _shapes, _multiplier, _npcRule);
         if (match >= 0) scratch.Stats.Hits++;
         return match;
     }
 
-    /// <summary>Fills <see cref="Scratch.BoxPassed"/> with the visible, not replaced others whose oriented box overlaps the zone's box, in index order.</summary>
+    /// <summary>Fills <see cref="Scratch.BoxPassed"/> with the visible, not replaced others tested like objects whose oriented box overlaps the zone's box, in index order.</summary>
     private void CollectOthersOverlappingZoneBox(FormKey spaceKey, OtherObjectIndex others, ShapeZone zone, Scratch scratch)
     {
         _boxIndexes[spaceKey].CollectCandidates(zone.Box.WorldAabb(0f), scratch.Slots, scratch.Candidates);
@@ -145,8 +154,8 @@ internal sealed class ShapeZoneSearch
         scratch.BoxPassed.Clear();
         foreach (var otherIndex in scratch.Candidates)
         {
-            if (others.IsReplaced(otherIndex) || !others.IsVisible(otherIndex)) continue;
             var other = others[otherIndex];
+            if (others.IsReplaced(otherIndex) || !_npcRule.TestsLikeObject(other) || !others.IsVisible(otherIndex)) continue;
             if (!zone.Box.Intersects(OrientedBox.FromLocal(_shapes.GetLocalBox(other.Base), other.Transform), 0f)) continue;
             scratch.BoxPassed.Add(otherIndex);
         }

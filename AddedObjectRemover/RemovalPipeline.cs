@@ -11,7 +11,8 @@ namespace AddedObjectRemover;
 /// </summary>
 internal sealed class RemovalPipeline
 {
-    private sealed record TooCloseSelection(List<TooCloseRemoval> Removals, List<KeptTarget> Kept)
+    /// <param name="UnsizedNpcs">Other mods' NPCs of unknown size standing in a target object; they caused no removal.</param>
+    private sealed record TooCloseSelection(List<TooCloseRemoval> Removals, List<KeptTarget> Kept, IReadOnlyList<UnsizedNpcAtTarget> UnsizedNpcs)
     {
         public List<int> KeptIndices => Kept.Select(kept => kept.TargetIndex).ToList();
     }
@@ -28,6 +29,7 @@ internal sealed class RemovalPipeline
     private readonly BaseObjectShapeProvider _shapes;
     private readonly TriangleTreeCache _meshCache;
     private readonly ObjectContainment _containment;
+    private readonly NpcBodyCache _npcBodies;
     private readonly ReasonCounter _invisibleOthers = new();
 
     public RemovalPipeline(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, RunConfig config)
@@ -43,6 +45,7 @@ internal sealed class RemovalPipeline
         _shapes = new BaseObjectShapeProvider(state.LinkCache, meshFiles, _meshMessages);
         _meshCache = new TriangleTreeCache(_shapes.ReadGeometry);
         _containment = new ObjectContainment(_shapes, _meshCache);
+        _npcBodies = new NpcBodyCache(new NpcBodyResolver(state.LinkCache, _shapes));
     }
 
     public void Run(Stopwatch totalTimer)
@@ -80,7 +83,7 @@ internal sealed class RemovalPipeline
 
         List<KeptTarget> kept = [.. tooClose.Kept, .. followUp.Kept, .. leftovers.Kept];
         PrintFinalReport(scan, indexes, removals, kept);
-        ReportManualPatchHints(scan, visibility, removals, kept, new ManualPatchHints(scan.Targets, visibility, groups, keepRule));
+        ReportManualPatchHints(scan, visibility, removals, kept, tooClose.UnsizedNpcs, new ManualPatchHints(scan.Targets, visibility, groups, keepRule));
         Console.WriteLine($"Done in {totalTimer.Elapsed.TotalSeconds:F1}s.");
     }
 
@@ -154,28 +157,50 @@ internal sealed class RemovalPipeline
         KeepReferencedRule keepRule)
     {
         var timer = Stopwatch.StartNew();
+        var npcRule = CreateNpcClashRule(scan, visibility, indexes);
         var hits = _config.ZoneShape switch
         {
-            ZoneShape.BoundingBox => TooCloseSearch.FindTooCloseTargets(scan.Targets, visibility, indexes, _shapes, _config.SizeMultiplier, _parallelOptions),
-            ZoneShape.ObjectShape => FindShapeZoneHits(scan, visibility, indexes),
+            ZoneShape.BoundingBox => TooCloseSearch.FindTooCloseTargets(
+                scan.Targets, visibility, indexes, _shapes, _config.SizeMultiplier, npcRule, _parallelOptions),
+            ZoneShape.ObjectShape => FindShapeZoneHits(scan, visibility, indexes, npcRule),
             _ => throw new UnreachableException($"Unknown removal zone {_config.ZoneShape}."),
         };
         _meshMessages.PrintAndClear();
         RunReport.PrintTooCloseSummary(hits.Count, scan.Targets.Count, _config.Target, timer.Elapsed);
         RunReport.PrintInvisibleOthers(_invisibleOthers, _config.DetailedLog);
+        PrintNpcHandling(npcRule, indexes);
 
-        var selection = SplitByKeepRule(hits, keepRule);
+        var selection = SplitByKeepRule(hits, keepRule) with { UnsizedNpcs = npcRule.StuckSearch?.CollectUnsizedAtTargets() ?? [] };
         RunReport.PrintKept(scan, selection.Kept);
         return selection;
     }
 
+    private NpcClashRule CreateNpcClashRule(
+        ScanResult scan,
+        IReadOnlyList<ObjectVisibility> visibility,
+        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes) =>
+        NpcClashRule.Create(
+            _config.NpcHandling,
+            () => NpcStuckSearch.Create(scan.Targets, visibility, indexes, _npcBodies, _shapes, _meshCache, _parallelOptions));
+
+    private void PrintNpcHandling(NpcClashRule npcRule, IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes)
+    {
+        if (npcRule.StuckSearch is { } stuckSearch) RunReport.PrintNpcStuckSummary(stuckSearch.GetSummary(), _npcBodies.GetStats());
+        else if (npcRule.Handling == NpcHandling.Ignore) RunReport.PrintIgnoredNpcs(CountPlacedNpcs(indexes));
+    }
+
+    private static int CountPlacedNpcs(IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes) =>
+        indexes.Values.Sum(index => Enumerable.Range(0, index.Count).Count(i => index[i].IsPlacedNpc));
+
     private List<TooCloseHit> FindShapeZoneHits(
         ScanResult scan,
         IReadOnlyList<ObjectVisibility> visibility,
-        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes)
+        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
+        NpcClashRule npcRule)
     {
         var indexTimer = Stopwatch.StartNew();
-        var search = ShapeZoneSearch.Create(scan.Targets, visibility, indexes, _shapes, _meshCache, _config.SizeMultiplier, _parallelOptions);
+        var search = ShapeZoneSearch.Create(
+            scan.Targets, visibility, indexes, _shapes, _meshCache, _config.SizeMultiplier, npcRule, _parallelOptions);
         var indexTime = indexTimer.Elapsed;
         var searchTimer = Stopwatch.StartNew();
         var hits = search.FindTooCloseTargets(visibility, _parallelOptions);
@@ -186,7 +211,7 @@ internal sealed class RemovalPipeline
 
     private static TooCloseSelection SplitByKeepRule(IEnumerable<TooCloseHit> hits, KeepReferencedRule keepRule)
     {
-        var selection = new TooCloseSelection([], []);
+        var selection = new TooCloseSelection([], [], []);
         foreach (var hit in hits)
         {
             if (keepRule.TryGetKeepReason(hit.TargetIndex, out var reason))
@@ -430,10 +455,11 @@ internal sealed class RemovalPipeline
         IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyList<Removal> removals,
         IReadOnlyList<KeptTarget> kept,
+        IReadOnlyList<UnsizedNpcAtTarget> unsizedNpcs,
         ManualPatchHints hintCollector)
     {
         RunReport.PrintRemovedMarkersByType(removals, visibility);
-        var hints = hintCollector.Collect(removals, kept);
+        var hints = hintCollector.Collect(removals, kept, unsizedNpcs);
         RunReport.PrintManualPatchHints(scan, hints);
         if (!_config.WritesDiagnostics) return;
 

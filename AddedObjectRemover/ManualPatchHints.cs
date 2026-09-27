@@ -6,6 +6,7 @@ internal enum ManualPatchHintType
     KeptLinkedGroup,
     KeptForNonPlacedReference,
     KeptTeleportDoor,
+    NpcSizeUnknown,
 }
 
 /// <summary>A removed or kept target object whose surroundings may need a manual patch.</summary>
@@ -15,7 +16,8 @@ internal sealed record ManualPatchHint(ManualPatchHintType Type, int TargetIndex
 /// <summary>
 /// Collects the objects to check by hand after a run: removed markers that actors or the map
 /// use (door, map, idle and furniture markers), and objects that would have been removed but were
-/// kept, grouped by why they stay. Ordered by type, then FormKey.
+/// kept, grouped by why they stay, and objects another mod's NPC of unknown size stands in (that
+/// NPC was skipped). Ordered by type, then FormKey, then detail.
 /// </summary>
 internal sealed class ManualPatchHints(
     IReadOnlyList<TargetObject> targets,
@@ -31,16 +33,27 @@ internal sealed class ManualPatchHints(
         InvisibleObjectKind.FurnitureMarkers,
     ];
 
-    public List<ManualPatchHint> Collect(IEnumerable<Removal> removals, IEnumerable<KeptTarget> kept)
+    public List<ManualPatchHint> Collect(IEnumerable<Removal> removals, IEnumerable<KeptTarget> kept, IEnumerable<UnsizedNpcAtTarget> unsizedNpcs)
     {
         var keptIndices = kept.Select(entry => entry.TargetIndex).Distinct().ToList();
         return CollectRemovedMarkers(removals)
             .Concat(CollectKeptLinkedGroups(keptIndices))
             .Concat(CollectKeptByOwnReason(keptIndices, KeepKind.NonPlacedReference, ManualPatchHintType.KeptForNonPlacedReference))
             .Concat(CollectKeptByOwnReason(keptIndices, KeepKind.TeleportDoor, ManualPatchHintType.KeptTeleportDoor))
+            .Concat(unsizedNpcs.Select(DescribeUnsizedNpc))
             .OrderBy(hint => hint.Type)
             .ThenBy(hint => targets[hint.TargetIndex].Record.FormKey.ToString(), StringComparer.Ordinal)
+            .ThenBy(hint => hint.Detail, StringComparer.Ordinal)
             .ToList();
+    }
+
+    private static ManualPatchHint DescribeUnsizedNpc(UnsizedNpcAtTarget entry)
+    {
+        var npc = entry.Npc.Npc;
+        return new ManualPatchHint(
+            ManualPatchHintType.NpcSizeUnknown,
+            entry.TargetIndex,
+            $"{RecordNames.Describe(npc.FormKey, npc.EditorId)} {RecordNames.DescribeOrigin(npc.FormKey, npc.WinningMod)} skipped ({entry.Npc.Reason})");
     }
 
     private IEnumerable<ManualPatchHint> CollectRemovedMarkers(IEnumerable<Removal> removals) =>

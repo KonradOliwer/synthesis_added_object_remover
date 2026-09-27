@@ -164,20 +164,21 @@ internal static class RunReport
     public static void PrintIgnoredNpcs(int placedNpcCount) =>
         Console.WriteLine($"NPCs and creatures: ignored; {placedNpcCount:N0} placed NPCs of other mods never cause removals.");
 
-    public static void PrintNpcStuckSummary(NpcStuckSummary summary, NpcBodyCacheStats cache)
+    public static void PrintNpcStuckSummary(NpcStuckSummary summary, NpcBodyCacheStats cache, bool detailedLog)
     {
         var sizes = summary.Sizes;
         Console.WriteLine(
             $"NPCs and creatures (only when stuck in the object): {sizes.Evaluated:N0} placed NPCs evaluated: "
             + $"{sizes.ByBodyMesh:N0} sized by body mesh, {sizes.ByObjectBounds:N0} by Object Bounds, "
-            + $"{sizes.ByHumanoidApproximation:N0} by humanoid approximation, {sizes.Skipped:N0} skipped (size unknown); "
+            + $"{sizes.ByHumanoidApproximation:N0} by humanoid approximation, {sizes.ByPoint:N0} sized as a point; "
             + $"{summary.PairsTested:N0} NPC-object pairs tested, {summary.Conflicts:N0} objects with an NPC stuck in them.");
         Console.WriteLine(
             $"  NPC body cache: {cache.BodiesBuilt:N0} bodies built, {cache.BodiesReused:N0} reused; "
             + $"{cache.BasesResolved:N0} NPC bases and leveled lists resolved, {cache.BasesReused:N0} reused.");
-        foreach (var unsized in summary.Unsized)
+        if (!detailedLog) return;
+        foreach (var fallback in summary.PointFallbacks)
         {
-            Console.WriteLine($"  Skipped NPC {DescribeOtherObject(unsized.Npc)}: size unknown ({unsized.Reason}).");
+            Console.WriteLine($"  Sized as a point {DescribeOtherObject(fallback.Npc)}: {fallback.Reason}.");
         }
     }
 
@@ -464,7 +465,6 @@ internal static class RunReport
         ManualPatchHintType.KeptLinkedGroup => "Kept linked group of",
         ManualPatchHintType.KeptForNonPlacedReference => "Kept, referenced by a non-placed record:",
         ManualPatchHintType.KeptTeleportDoor => "Kept teleport door",
-        ManualPatchHintType.NpcSizeUnknown => "NPC size unknown, NPC stands in",
         _ => throw new UnreachableException($"Unknown manual patch hint type {type}."),
     };
 }

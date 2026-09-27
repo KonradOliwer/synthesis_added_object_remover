@@ -1,62 +1,60 @@
 namespace AddedObjectRemover;
 
-internal readonly record struct NpcSizeCounts(int Evaluated, int ByBodyMesh, int ByObjectBounds, int ByHumanoidApproximation, int Skipped)
+internal readonly record struct NpcSizeCounts(int Evaluated, int ByBodyMesh, int ByObjectBounds, int ByHumanoidApproximation, int ByPoint)
 {
     public static NpcSizeCounts Of(IReadOnlyCollection<NpcBody> bodies) => new(
         bodies.Count,
         bodies.Count(body => body.Source == NpcSizeSource.BodyMesh),
         bodies.Count(body => body.Source == NpcSizeSource.ObjectBounds),
         bodies.Count(body => body.Source == NpcSizeSource.HumanoidApproximation),
-        bodies.Count(body => body.Source == NpcSizeSource.Unknown));
+        bodies.Count(body => body.Source == NpcSizeSource.Point));
 
     public NpcSizeCounts Add(NpcSizeCounts other) => new(
         Evaluated + other.Evaluated,
         ByBodyMesh + other.ByBodyMesh,
         ByObjectBounds + other.ByObjectBounds,
         ByHumanoidApproximation + other.ByHumanoidApproximation,
-        Skipped + other.Skipped);
+        ByPoint + other.ByPoint);
 }
 
-/// <summary>An other-mod placed NPC whose size could not be worked out, so it never causes a removal.</summary>
-internal readonly record struct UnsizedNpc(OtherObject Npc, string Reason);
+/// <summary>An other-mod placed NPC sized as a point because its real size could not be determined.</summary>
+internal readonly record struct PointNpc(OtherObject Npc, string Reason);
 
 /// <summary>
-/// The placed NPCs among one space's other objects with their bodies. Sized NPCs are indexed by
-/// the world AABB of their body, NPCs of unknown size by their position. Slots are in other-object
-/// index order. Read-only after construction and safe to query from many threads at once.
+/// The placed NPCs among one space's other objects with their bodies, indexed by the world AABB of
+/// their body (a single point for a point-sized NPC). Slots are in other-object index order.
+/// Read-only after construction and safe to query from many threads at once.
 /// </summary>
 internal sealed class PlacedNpcIndex
 {
-    private readonly int[] _sizedOthers;
-    private readonly NpcBody[] _sizedBodies;
-    private readonly PlacedTransform[] _sizedTransforms;
-    private readonly OrientedBox[] _sizedWorldBoxes;
-    private readonly SpatialGrid _sizedGrid;
-    private readonly UnsizedNpc[] _unsized;
-    private readonly SpatialGrid _unsizedGrid;
+    private readonly int[] _others;
+    private readonly NpcBody[] _bodies;
+    private readonly PlacedTransform[] _transforms;
+    private readonly OrientedBox[] _worldBoxes;
+    private readonly SpatialGrid _grid;
+    private readonly PointNpc[] _pointFallbacks;
 
     private PlacedNpcIndex(OtherObjectIndex others, int[] npcOthers, NpcBody[] bodies)
     {
-        var sized = Enumerable.Range(0, npcOthers.Length).Where(i => bodies[i].IsSized).ToArray();
-        _sizedOthers = sized.Select(i => npcOthers[i]).ToArray();
-        _sizedBodies = sized.Select(i => bodies[i]).ToArray();
-        _sizedTransforms = sized.Select(i => ToBodyTransform(others[npcOthers[i]], bodies[i])).ToArray();
-        _sizedWorldBoxes = Enumerable.Range(0, sized.Length)
-            .Select(slot => OrientedBox.FromLocal(_sizedBodies[slot].LocalBox, _sizedTransforms[slot]))
+        _others = npcOthers;
+        _bodies = bodies;
+        _transforms = Enumerable.Range(0, npcOthers.Length).Select(i => ToBodyTransform(others[npcOthers[i]], bodies[i])).ToArray();
+        _worldBoxes = Enumerable.Range(0, npcOthers.Length)
+            .Select(slot => OrientedBox.FromLocal(_bodies[slot].LocalBox, _transforms[slot]))
             .ToArray();
-        _sizedGrid = SpatialGrid.FromBoxes(_sizedWorldBoxes.Select(box => box.WorldAabb(0f)).ToArray());
+        _grid = SpatialGrid.FromBoxes(_worldBoxes.Select(box => box.WorldAabb(0f)).ToArray());
 
-        _unsized = Enumerable.Range(0, npcOthers.Length)
-            .Where(i => !bodies[i].IsSized)
-            .Select(i => new UnsizedNpc(others[npcOthers[i]], bodies[i].UnknownReason ?? string.Empty))
+        _pointFallbacks = Enumerable.Range(0, npcOthers.Length)
+            .Where(i => bodies[i].Source == NpcSizeSource.Point)
+            .Select(i => new PointNpc(others[npcOthers[i]], bodies[i].PointReason ?? string.Empty))
             .ToArray();
-        _unsizedGrid = SpatialGrid.FromPoints(_unsized.Select(unsized => unsized.Npc.Position).ToArray());
         Counts = NpcSizeCounts.Of(bodies);
     }
 
     public NpcSizeCounts Counts { get; }
 
-    public IReadOnlyList<UnsizedNpc> Unsized => _unsized;
+    /// <summary>For the detailed log only: the NPCs sized as a point, with why their real size is unknown.</summary>
+    public IReadOnlyList<PointNpc> PointFallbacks => _pointFallbacks;
 
     public static PlacedNpcIndex Build(OtherObjectIndex others, NpcBodyCache bodies, ParallelOptions parallelOptions)
     {
@@ -67,34 +65,23 @@ internal sealed class PlacedNpcIndex
     }
 
     private static NpcBody GetBody(OtherObject npc, NpcBodyCache bodies) =>
-        npc.Base is { } baseRef ? bodies.GetBody(baseRef.FormKey) : NpcBody.Unknown("no base NPC");
+        npc.Base is { } baseRef ? bodies.GetBody(baseRef.FormKey) : NpcBody.Point("no base NPC");
 
-    public int OtherIndexOf(int slot) => _sizedOthers[slot];
+    public int OtherIndexOf(int slot) => _others[slot];
 
-    public NpcBody BodyOf(int slot) => _sizedBodies[slot];
+    public NpcBody BodyOf(int slot) => _bodies[slot];
 
-    public PlacedTransform TransformOf(int slot) => _sizedTransforms[slot];
+    public PlacedTransform TransformOf(int slot) => _transforms[slot];
 
-    public OrientedBox WorldBoxOf(int slot) => _sizedWorldBoxes[slot];
+    public OrientedBox WorldBoxOf(int slot) => _worldBoxes[slot];
 
-    /// <summary>Replaces <paramref name="slots"/> with the sorted, distinct sized NPC slots whose body AABB may overlap <paramref name="area"/>.</summary>
-    public void CollectSized(Box area, List<int> slots)
+    /// <summary>Replaces <paramref name="slots"/> with the sorted, distinct NPC slots whose body AABB may overlap <paramref name="area"/>.</summary>
+    public void Collect(Box area, List<int> slots)
     {
         slots.Clear();
-        _sizedGrid.Collect(area, slots);
+        _grid.Collect(area, slots);
         slots.Sort();
         OtherObjectBoxIndex.RemoveAdjacentDuplicates(slots);
-    }
-
-    /// <summary>NPCs of unknown size standing (by their placement point) inside <paramref name="box"/>, in index order.</summary>
-    /// <param name="slots">Reused buffer.</param>
-    public List<UnsizedNpc> CollectUnsizedInside(OrientedBox box, List<int> slots)
-    {
-        slots.Clear();
-        _unsizedGrid.Collect(box.WorldAabb(0f), slots);
-        slots.Sort();
-        OtherObjectBoxIndex.RemoveAdjacentDuplicates(slots);
-        return slots.Where(slot => box.Contains(_unsized[slot].Npc.Position)).Select(slot => _unsized[slot]).ToList();
     }
 
     /// <summary>The body placed at the reference, scaled by the reference scale times the body's height scale.</summary>

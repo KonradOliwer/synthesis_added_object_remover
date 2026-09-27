@@ -11,7 +11,7 @@ namespace AddedObjectRemover;
 ///    for its race, for its sex;
 /// 2. its Object Bounds;
 /// 3. for a playable (humanoid) race only, <see cref="HumanoidBox"/>;
-/// 4. otherwise the size is unknown.
+/// 4. otherwise the NPC is sized as a point at its placement position (<see cref="NpcBody.Point"/>).
 /// Each is scaled by the race height for its sex × the NPC height. Race, sex, height and worn
 /// armour come from the template chain while the Traits template flag is set.
 /// </summary>
@@ -49,7 +49,7 @@ internal sealed class NpcBodyResolver(ILinkCache linkCache, BaseObjectShapeProvi
     {
         if (!linkCache.TryResolve<IRaceGetter>(npc.Race.FormKey, out var race))
         {
-            return NpcBody.Unknown($"race {npc.Race.FormKey} not found");
+            return NpcBody.Point($"race {npc.Race.FormKey} not found");
         }
 
         var heightScale = GetHeightScale(race, npc, female);
@@ -61,7 +61,7 @@ internal sealed class NpcBodyResolver(ILinkCache linkCache, BaseObjectShapeProvi
         var bounds = BaseObjectShapeProvider.ToBox(npc.ObjectBounds);
         if (HasVolume(bounds)) return NpcBody.FromBox(NpcSizeSource.ObjectBounds, bounds, heightScale);
         if (race.Flags.HasFlag(Race.Flag.Playable)) return NpcBody.FromBox(NpcSizeSource.HumanoidApproximation, HumanoidBox, heightScale);
-        return NpcBody.Unknown($"no body mesh for race {RecordNames.Describe(race)}, no Object Bounds, race not playable");
+        return NpcBody.Point($"no body mesh for race {RecordNames.Describe(race)}, no Object Bounds, race not playable");
     }
 
     private void CollectTraitSources(FormKey spawn, HashSet<FormKey> visited, List<INpcGetter> sources)

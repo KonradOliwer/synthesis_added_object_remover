@@ -11,8 +11,7 @@ namespace AddedObjectRemover;
 /// </summary>
 internal sealed class RemovalPipeline
 {
-    /// <param name="UnsizedNpcs">Other mods' NPCs of unknown size standing in a target object; they caused no removal.</param>
-    private sealed record TooCloseSelection(List<TooCloseRemoval> Removals, List<KeptTarget> Kept, IReadOnlyList<UnsizedNpcAtTarget> UnsizedNpcs)
+    private sealed record TooCloseSelection(List<TooCloseRemoval> Removals, List<KeptTarget> Kept)
     {
         public List<int> KeptIndices => Kept.Select(kept => kept.TargetIndex).ToList();
     }
@@ -83,7 +82,7 @@ internal sealed class RemovalPipeline
 
         List<KeptTarget> kept = [.. tooClose.Kept, .. followUp.Kept, .. leftovers.Kept];
         PrintFinalReport(scan, indexes, removals, kept);
-        ReportManualPatchHints(scan, visibility, removals, kept, tooClose.UnsizedNpcs, new ManualPatchHints(scan.Targets, visibility, groups, keepRule));
+        ReportManualPatchHints(scan, visibility, removals, kept, new ManualPatchHints(scan.Targets, visibility, groups, keepRule));
         Console.WriteLine($"Done in {totalTimer.Elapsed.TotalSeconds:F1}s.");
     }
 
@@ -170,7 +169,7 @@ internal sealed class RemovalPipeline
         RunReport.PrintInvisibleOthers(_invisibleOthers, _config.DetailedLog);
         PrintNpcHandling(npcRule, indexes);
 
-        var selection = SplitByKeepRule(hits, keepRule) with { UnsizedNpcs = npcRule.StuckSearch?.CollectUnsizedAtTargets() ?? [] };
+        var selection = SplitByKeepRule(hits, keepRule);
         RunReport.PrintKept(scan, selection.Kept);
         return selection;
     }
@@ -185,7 +184,7 @@ internal sealed class RemovalPipeline
 
     private void PrintNpcHandling(NpcClashRule npcRule, IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes)
     {
-        if (npcRule.StuckSearch is { } stuckSearch) RunReport.PrintNpcStuckSummary(stuckSearch.GetSummary(), _npcBodies.GetStats());
+        if (npcRule.StuckSearch is { } stuckSearch) RunReport.PrintNpcStuckSummary(stuckSearch.GetSummary(), _npcBodies.GetStats(), _config.DetailedLog);
         else if (npcRule.Handling == NpcHandling.Ignore) RunReport.PrintIgnoredNpcs(CountPlacedNpcs(indexes));
     }
 
@@ -211,7 +210,7 @@ internal sealed class RemovalPipeline
 
     private static TooCloseSelection SplitByKeepRule(IEnumerable<TooCloseHit> hits, KeepReferencedRule keepRule)
     {
-        var selection = new TooCloseSelection([], [], []);
+        var selection = new TooCloseSelection([], []);
         foreach (var hit in hits)
         {
             if (keepRule.TryGetKeepReason(hit.TargetIndex, out var reason))
@@ -455,11 +454,10 @@ internal sealed class RemovalPipeline
         IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyList<Removal> removals,
         IReadOnlyList<KeptTarget> kept,
-        IReadOnlyList<UnsizedNpcAtTarget> unsizedNpcs,
         ManualPatchHints hintCollector)
     {
         RunReport.PrintRemovedMarkersByType(removals, visibility);
-        var hints = hintCollector.Collect(removals, kept, unsizedNpcs);
+        var hints = hintCollector.Collect(removals, kept);
         RunReport.PrintManualPatchHints(scan, hints);
         if (!_config.WritesDiagnostics) return;
 

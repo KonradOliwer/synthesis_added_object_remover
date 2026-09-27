@@ -8,11 +8,12 @@ namespace AddedObjectRemover;
 internal readonly record struct NpcBodyCacheStats(int BodiesBuilt, int BodiesReused, int BasesResolved, int BasesReused);
 
 /// <summary>
-/// Thread-safe cache of NPC bodies, failures included: per placed base (NPC or leveled list) the
-/// resolved body, and per (NPC supplying its own traits, sex) the body it has. A base that can be
-/// several NPCs (leveled lists, templates pointing at one) gets the largest body by box volume,
-/// so an NPC is never assumed smaller than it may be; NPCs of unknown size are left out of that
-/// choice while a sized one exists. Body mesh triangles live in the bounded <see cref="TriangleTreeCache"/>.
+/// Thread-safe cache of NPC bodies, point fallbacks included: per placed base (NPC or leveled
+/// list) the resolved body, and per (NPC supplying its own traits, sex) the body it has. A base
+/// that can be several NPCs (leveled lists, templates pointing at one) gets the largest body by
+/// box volume, so an NPC is never assumed smaller than it may be; since a point body has zero
+/// volume, the base is sized as a point only when every possible NPC is. Body mesh triangles live
+/// in the bounded <see cref="TriangleTreeCache"/>.
 /// </summary>
 internal sealed class NpcBodyCache(NpcBodyResolver resolver)
 {
@@ -45,7 +46,7 @@ internal sealed class NpcBodyCache(NpcBodyResolver resolver)
     {
         Interlocked.Increment(ref _basesResolved);
         var sources = resolver.CollectTraitSources(placedBase);
-        if (sources.Count == 0) return NpcBody.Unknown("no NPC found through its templates and leveled lists");
+        if (sources.Count == 0) return NpcBody.Point("no NPC found through its templates and leveled lists");
         return SelectLargest(sources.Select(GetOwnBody).ToList());
     }
 
@@ -65,11 +66,11 @@ internal sealed class NpcBodyCache(NpcBodyResolver resolver)
     /// <summary>Ties keep the first body, so the choice follows the record order.</summary>
     private static NpcBody SelectLargest(IReadOnlyList<NpcBody> bodies)
     {
-        NpcBody? largest = null;
-        foreach (var body in bodies.Where(body => body.IsSized))
+        var largest = bodies[0];
+        foreach (var body in bodies.Skip(1))
         {
-            if (largest == null || body.Volume > largest.Volume) largest = body;
+            if (body.Volume > largest.Volume) largest = body;
         }
-        return largest ?? bodies[0];
+        return largest;
     }
 }

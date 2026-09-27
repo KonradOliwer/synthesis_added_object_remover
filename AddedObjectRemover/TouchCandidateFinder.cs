@@ -6,7 +6,7 @@ namespace AddedObjectRemover;
 /// <summary>
 /// Broad phase of the touch search: a target's oriented box grown by the tolerance, tested against
 /// nearby targets of the same space (spatial hash of grown world AABBs, then an exact oriented box
-/// test). Only targets in spaces that contain a seed and not excluded take part. Read-only after
+/// test). Only targets in the given spaces and not excluded take part. Read-only after
 /// creation and safe to query from many threads at once.
 /// </summary>
 internal sealed class TouchCandidateFinder
@@ -25,17 +25,18 @@ internal sealed class TouchCandidateFinder
         _included = new bool[targets.Count];
     }
 
+    /// <param name="spaces">The spaces whose targets take part.</param>
     /// <param name="excluded">Targets that never take part in a pair.</param>
     public static TouchCandidateFinder Create(
         IReadOnlyList<TargetObject> targets,
-        HashSet<FormKey> seedSpaces,
+        IReadOnlySet<FormKey> spaces,
         bool[] excluded,
         BaseObjectShapeProvider shapes,
         float tolerance,
         ParallelOptions parallelOptions)
     {
         var finder = new TouchCandidateFinder(targets, tolerance);
-        finder.BuildBoxes(seedSpaces, excluded, shapes, parallelOptions);
+        finder.BuildBoxes(spaces, excluded, shapes, parallelOptions);
         finder.BuildGrids();
         return finder;
     }
@@ -64,13 +65,13 @@ internal sealed class TouchCandidateFinder
     private bool AreBoxesClose(int a, int b) =>
         _boxes[Math.Min(a, b)].Intersects(_boxes[Math.Max(a, b)], _tolerance);
 
-    private void BuildBoxes(HashSet<FormKey> seedSpaces, bool[] excluded, BaseObjectShapeProvider shapes, ParallelOptions parallelOptions)
+    private void BuildBoxes(IReadOnlySet<FormKey> spaces, bool[] excluded, BaseObjectShapeProvider shapes, ParallelOptions parallelOptions)
     {
         Parallel.ForEach(Partitioner.Create(0, _targets.Count), parallelOptions, range =>
         {
             for (var i = range.Item1; i < range.Item2; i++)
             {
-                if (excluded[i] || !seedSpaces.Contains(_targets[i].SpaceKey)) continue;
+                if (excluded[i] || !spaces.Contains(_targets[i].SpaceKey)) continue;
                 _boxes[i] = OrientedBox.FromLocal(shapes.GetLocalBox(_targets[i].Base), _targets[i].Transform);
                 _included[i] = true;
             }

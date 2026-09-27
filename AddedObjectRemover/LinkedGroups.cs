@@ -47,6 +47,31 @@ internal sealed class LinkedGroups
     /// <summary>The groups with more than one member.</summary>
     public IEnumerable<IReadOnlyList<int>> MultiMemberGroups => _groups.Where(members => members.Length > 1);
 
+    /// <summary>
+    /// The spaces of <paramref name="seeds"/> and every space removals can spread to from there
+    /// through linked groups: once a space is collected, so are the spaces of every member of each
+    /// group with a member in it.
+    /// </summary>
+    public HashSet<FormKey> CollectReachableSpaces(IReadOnlyList<TargetObject> targets, IEnumerable<int> seeds)
+    {
+        var spaces = seeds.Select(seed => targets[seed].SpaceKey).ToHashSet();
+        var groupSpaces = MultiMemberGroups
+            .Select(members => members.Select(member => targets[member].SpaceKey).ToHashSet())
+            .Where(memberSpaces => memberSpaces.Count > 1)
+            .ToList();
+        bool added;
+        do
+        {
+            added = false;
+            foreach (var memberSpaces in groupSpaces.Where(spaces.Overlaps))
+            {
+                foreach (var space in memberSpaces) added |= spaces.Add(space);
+            }
+        }
+        while (added);
+        return spaces;
+    }
+
     /// <param name="decided">The removals one step decided, in its order.</param>
     /// <param name="removed">Every target index removed so far, <paramref name="decided"/> included.</param>
     /// <returns>The other members of the decided removals' groups not removed yet.</returns>

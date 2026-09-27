@@ -66,17 +66,8 @@ internal sealed class NavmeshIndex
     }
 
     /// <summary>An exterior cell's navmesh lies within the cell's square, so only the cells overlapping the query can hold a triangle in it.</summary>
-    private static IEnumerable<Bucket> EnumerateBuckets(FormKey spaceKey, Box query)
-    {
-        yield return new Bucket(spaceKey, Grid: null);
-        for (var x = ExteriorGrid.CellIndex(query.Min.X); x <= ExteriorGrid.CellIndex(query.Max.X); x++)
-        {
-            for (var y = ExteriorGrid.CellIndex(query.Min.Y); y <= ExteriorGrid.CellIndex(query.Max.Y); y++)
-            {
-                yield return new Bucket(spaceKey, (x, y));
-            }
-        }
-    }
+    private static IEnumerable<Bucket> EnumerateBuckets(FormKey spaceKey, Box query) =>
+        CellArea.Covering(query).Cells().Select(cell => new Bucket(spaceKey, cell)).Prepend(new Bucket(spaceKey, Grid: null));
 
     private BucketTriangles DecodeBucket(Bucket bucket)
     {
@@ -105,6 +96,7 @@ internal sealed class NavmeshIndex
         return null;
     }
 
+    /// <remarks>The corners are returned exactly, so triangles sharing a vertex offer the identical point.</remarks>
     private static IEnumerable<Vector3> EnumeratePointsOn(MeshTriangle triangle, Vector3 point)
     {
         yield return ClosestPoint(triangle, point);
@@ -112,7 +104,15 @@ internal sealed class NavmeshIndex
         var toC = (triangle.C - triangle.A) / SamplesPerSide;
         for (var i = 0; i <= SamplesPerSide; i++)
         {
-            for (var j = 0; i + j <= SamplesPerSide; j++) yield return triangle.A + toB * i + toC * j;
+            for (var j = 0; i + j <= SamplesPerSide; j++)
+            {
+                yield return (i, j) switch
+                {
+                    (SamplesPerSide, _) => triangle.B,
+                    (_, SamplesPerSide) => triangle.C,
+                    _ => triangle.A + toB * i + toC * j,
+                };
+            }
         }
     }
 

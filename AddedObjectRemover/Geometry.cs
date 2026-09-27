@@ -187,6 +187,37 @@ internal readonly record struct OrientedBox(Vector3 Center, Mat3 Rotation, Vecto
         return reach.X <= HalfExtents.X && reach.Y <= HalfExtents.Y && reach.Z <= HalfExtents.Z;
     }
 
+    /// <summary>
+    /// Inclusive test: whether the vertical line through <paramref name="point"/> passes through the
+    /// box, i.e. the point lies inside the box or straight above or below it.
+    /// </summary>
+    public bool IsCrossedByVerticalLine(Vector3 point)
+    {
+        var origin = Rotation.TransformTransposed(point - Center);
+        // World up (0, 0, 1) in the box frame: R^T * up is the rotation's third row.
+        var up = new Vector3(Rotation.M31, Rotation.M32, Rotation.M33);
+        var entry = float.NegativeInfinity;
+        var exit = float.PositiveInfinity;
+        return NarrowToSlab(origin.X, up.X, HalfExtents.X, ref entry, ref exit)
+               && NarrowToSlab(origin.Y, up.Y, HalfExtents.Y, ref entry, ref exit)
+               && NarrowToSlab(origin.Z, up.Z, HalfExtents.Z, ref entry, ref exit)
+               && entry <= exit;
+    }
+
+    /// <summary>
+    /// Narrows the line's parameter range to the part inside one axis slab; false when a line
+    /// parallel to the slab lies outside it.
+    /// </summary>
+    private static bool NarrowToSlab(float origin, float direction, float halfExtent, ref float entry, ref float exit)
+    {
+        if (MathF.Abs(direction) <= ParallelAxisEpsilon) return MathF.Abs(origin) <= halfExtent;
+        var first = (-halfExtent - origin) / direction;
+        var second = (halfExtent - origin) / direction;
+        entry = MathF.Max(entry, MathF.Min(first, second));
+        exit = MathF.Min(exit, MathF.Max(first, second));
+        return true;
+    }
+
     /// <summary>World AABB enclosing this box grown by <paramref name="padding"/> on every side.</summary>
     public Box WorldAabb(float padding) => Geometry.RotatedAabb(Center, Rotation, HalfExtents).Grown(padding);
 

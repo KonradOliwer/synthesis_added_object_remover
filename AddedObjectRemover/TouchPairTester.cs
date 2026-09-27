@@ -4,8 +4,37 @@ namespace AddedObjectRemover;
 
 internal enum PairTouch : byte { NoGeometry, Apart, Touching }
 
-/// <summary>Two target indices.</summary>
+/// <summary>When two meshes are in contact.</summary>
+internal enum ContactRule
+{
+    /// <summary>Their surfaces come within the tolerance.</summary>
+    Touch,
+
+    /// <summary>
+    /// Their surfaces come within the tolerance, or the first's mesh encloses the centre of the
+    /// second's mesh bounds (<see cref="PointContactTest.IsEnclosed"/>).
+    /// </summary>
+    TouchOrEnclose,
+}
+
 internal readonly record struct TargetPair(int First, int Second);
+
+/// <summary>One thread's buffers and counts for <see cref="TouchPairTester.FindFirstInContact"/>.</summary>
+internal sealed class ContactScratch
+{
+    public TouchScratch Touch { get; } = new();
+    public List<int> Enclosure { get; } = [];
+    public int PairsTested { get; private set; }
+    public int TouchingPairs { get; private set; }
+    public int PairsWithoutGeometry { get; private set; }
+
+    public void Count(PairTouch touch)
+    {
+        PairsTested++;
+        if (touch == PairTouch.Touching) TouchingPairs++;
+        if (touch == PairTouch.NoGeometry) PairsWithoutGeometry++;
+    }
+}
 
 internal readonly record struct PairTestStats(
     int PairsTested,
@@ -52,23 +81,69 @@ internal sealed class TouchPairTester(
         return results;
     }
 
-    /// <summary>Per pair: whether the first's mesh encloses the centre of the second's mesh bounds (<see cref="PointContactTest.IsEnclosed"/>).</summary>
-    public bool[] TestEnclosures(IReadOnlyList<TargetPair> pairs, ParallelOptions parallelOptions)
+    /// <summary>
+    /// For each distinct second member, the first of its pairs, in the given order, whose meshes are
+    /// in contact: its pairs are tested in that order and the rest are skipped once one is. The found
+    /// pairs are returned in the given order.
+    /// </summary>
+    public List<TargetPair> FindFirstInContact(IReadOnlyList<TargetPair> pairs, ContactRule rule, ParallelOptions parallelOptions)
     {
-        var results = new bool[pairs.Count];
-        if (pairs.Count == 0) return results;
-
-        Parallel.ForEach(
-            Partitioner.Create(0, pairs.Count, PairsPerChunk),
+        var pairsBySecond = GroupBySecond(pairs);
+        var firstInContact = new int[pairsBySecond.Count];
+        Parallel.For(
+            0,
+            pairsBySecond.Count,
             parallelOptions,
-            () => new List<int>(),
-            (range, _, scratch) =>
+            () => new ContactScratch(),
+            (group, _, scratch) =>
             {
-                for (var i = range.Item1; i < range.Item2; i++) results[i] = EnclosesCentreOfSecond(pairs[i], scratch);
+                firstInContact[group] = FindFirstInContact(pairs, pairsBySecond[group], rule, scratch);
                 return scratch;
             },
-            _ => { });
-        return results;
+            AddCounts);
+        return firstInContact.Where(pairIndex => pairIndex >= 0).Order().Select(pairIndex => pairs[pairIndex]).ToList();
+    }
+
+    /// <returns>Pair indices per distinct second member, each list in the given order.</returns>
+    private static List<List<int>> GroupBySecond(IReadOnlyList<TargetPair> pairs)
+    {
+        var groups = new List<List<int>>();
+        var groupOf = new Dictionary<int, int>();
+        for (var k = 0; k < pairs.Count; k++)
+        {
+            if (!groupOf.TryGetValue(pairs[k].Second, out var group))
+            {
+                group = groups.Count;
+                groupOf[pairs[k].Second] = group;
+                groups.Add([]);
+            }
+            groups[group].Add(k);
+        }
+        return groups;
+    }
+
+    /// <returns>The index of the first pair in contact; -1 when none is.</returns>
+    private int FindFirstInContact(IReadOnlyList<TargetPair> pairs, List<int> pairIndices, ContactRule rule, ContactScratch scratch)
+    {
+        foreach (var pairIndex in pairIndices)
+        {
+            var touch = TestPair(pairs[pairIndex], scratch.Touch);
+            scratch.Count(touch);
+            if (touch == PairTouch.Touching) return pairIndex;
+            if (touch == PairTouch.Apart && rule == ContactRule.TouchOrEnclose && EnclosesCentreOfSecond(pairs[pairIndex], scratch.Enclosure))
+            {
+                return pairIndex;
+            }
+        }
+        return -1;
+    }
+
+    private void AddCounts(ContactScratch scratch)
+    {
+        Interlocked.Add(ref _pairsTested, scratch.PairsTested);
+        Interlocked.Add(ref _touchingPairs, scratch.TouchingPairs);
+        Interlocked.Add(ref _pairsWithoutGeometry, scratch.PairsWithoutGeometry);
+        Interlocked.Add(ref _trianglePairsTested, scratch.Touch.TrianglePairsTested);
     }
 
     /// <summary>Minimum surface distance of a pair known to touch, world units; NaN when either mesh has no usable triangles.</summary>

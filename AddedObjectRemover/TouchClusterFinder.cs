@@ -1,23 +1,29 @@
 namespace AddedObjectRemover;
 
+/// <param name="ComponentsWithRemovals">Components in which more than the root seed is removed.</param>
+/// <param name="LargestComponent">The most removed objects in one component.</param>
+/// <param name="Levels">Search levels, summed over the components, that reached at least one object.</param>
+/// <param name="MaxDepth">The longest chain, in steps, from a component's root seed to an object reached from it.</param>
 internal sealed record TouchStats(
     int Components,
-    int ComponentsWithTouching,
+    int ComponentsWithRemovals,
     int LargestComponent,
     int Levels,
+    int MaxDepth,
     PairTestStats Pairs,
     TimeSpan Setup,
     TimeSpan BroadPhase,
     TimeSpan NarrowPhase,
     TimeSpan DiagnosticsEdges);
 
-internal sealed record TouchClusters(List<TouchingRemoval> Removals, List<KeptTarget> Kept, TouchStats Stats, TouchDiagnosticsData? Diagnostics);
+/// <param name="Removals">Touching removals and the linked group members removed with them.</param>
+internal sealed record TouchClusters(List<Removal> Removals, List<KeptTarget> Kept, TouchStats Stats, TouchDiagnosticsData? Diagnostics);
 
 /// <summary>A touching pair of targets explored in the same component; First &lt; Second.</summary>
 internal readonly record struct TouchEdge(int ComponentId, TargetPair Pair, float MinSurfaceDistance);
 
 /// <param name="ComponentId">Target index -&gt; component id, or -1 if never reached.</param>
-/// <param name="ParentOf">Target index -&gt; the target index it was reached through, or -1 for the component's first (root) seed.</param>
+/// <param name="ParentOf">Target index -&gt; the target index it was reached through (by touch or by a link), or -1 for the component's first (root) seed.</param>
 /// <param name="Depth">Target index -&gt; its distance (edge count) from the component's root seed.</param>
 /// <param name="ComponentMembers">Component id -&gt; every target index reached in it (seed, touch-removed or kept), in discovery order.</param>
 /// <param name="Edges">Every touching pair with both ends in the same component.</param>
@@ -29,17 +35,18 @@ internal sealed record TouchDiagnosticsData(
     List<TouchEdge> Edges);
 
 /// <summary>
-/// Connected components of the "touches" graph (target objects of one space) that contain a
-/// too-close removal, explored breadth first from each seed in removal order. Each level tests,
-/// in parallel, only the candidate pairs between the current frontier and unvisited targets; the
-/// results are then applied in frontier order, and each reached node is attributed to the first
-/// frontier node (in neighbor order) that touches it, so the result is deterministic. Touching is
+/// Connected components of the "touches" graph of target objects that contain a seed removal,
+/// explored breadth first from each seed in removal order. Each level tests, in parallel, only the
+/// candidate pairs between the current frontier and unvisited targets; each reached node is
+/// attributed to the first frontier node (in frontier order, then neighbor order) that touches it,
+/// so the result is deterministic. A removed node takes the rest of its linked group along, and
+/// those members continue the search from where they are, like any removed node. Touching is
 /// decided from mesh triangles only, so targets without a mesh never take part, and neither do
-/// invisible ones. Referenced
-/// objects stay and do not propagate.
+/// invisible ones. Referenced objects stay and do not propagate.
 /// </summary>
 internal sealed class TouchClusterFinder
 {
+    private readonly LinkedGroups _groups;
     private readonly KeepReferencedRule _keepRule;
     private readonly TouchSearch _search;
     private readonly ParallelOptions _parallelOptions;
@@ -51,22 +58,25 @@ internal sealed class TouchClusterFinder
     private readonly int[] _depth;
     private readonly List<List<int>> _componentMembers = [];
 
-    private readonly List<TouchingRemoval> _removals = [];
+    private readonly List<Removal> _removals = [];
     private readonly List<KeptTarget> _kept = [];
-    private int _componentsWithTouching;
+    private int _componentsWithRemovals;
     private int _largestComponent;
     private int _levels;
+    private int _maxDepth;
     private TimeSpan _broadPhase;
     private TimeSpan _narrowPhase;
 
     private TouchClusterFinder(
         int targetCount,
+        LinkedGroups groups,
         KeepReferencedRule keepRule,
         TouchSearch search,
         ParallelOptions parallelOptions,
         bool[] isSeed,
         bool[] visited)
     {
+        _groups = groups;
         _keepRule = keepRule;
         _search = search;
         _parallelOptions = parallelOptions;
@@ -80,13 +90,14 @@ internal sealed class TouchClusterFinder
     }
 
     /// <param name="visibility">Parallel to <paramref name="targets"/>.</param>
-    /// <param name="seeds">Target indices of the earlier removals (too close, and their linked groups), in removal order.</param>
-    /// <param name="keptTooClose">Too-close targets kept as referenced: already logged and counted, never propagated.</param>
+    /// <param name="seeds">Target indices removed before this step, in removal order; every linked group member of a seed is a seed too.</param>
+    /// <param name="keptTooClose">Targets never removed and never propagating, not reported again.</param>
     public static TouchClusters Find(
         IReadOnlyList<TargetObject> targets,
         IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyList<int> seeds,
         IReadOnlyList<int> keptTooClose,
+        LinkedGroups groups,
         BaseObjectShapeProvider shapes,
         TriangleTreeCache meshCache,
         KeepReferencedRule keepRule,
@@ -95,9 +106,17 @@ internal sealed class TouchClusterFinder
         bool collectDiagnostics)
     {
         var (search, setup) = Timing.Measure(() => TouchSearch.Create(
-            targets, visibility, seeds, excluded: keptTooClose, shapes, meshCache, tolerance, parallelOptions));
+            targets,
+            visibility,
+            groups.CollectReachableSpaces(targets, seeds),
+            excluded: keptTooClose,
+            shapes,
+            meshCache,
+            tolerance,
+            parallelOptions));
         var finder = new TouchClusterFinder(
             targets.Count,
+            groups,
             keepRule,
             search,
             parallelOptions,
@@ -126,7 +145,7 @@ internal sealed class TouchClusterFinder
             RecordMember(componentId, seed, parent: -1);
 
             var componentSize = ExploreComponent(seed, componentId);
-            if (componentSize > 1) _componentsWithTouching++;
+            if (componentSize > 1) _componentsWithRemovals++;
             _largestComponent = Math.Max(_largestComponent, componentSize);
         }
     }
@@ -139,6 +158,7 @@ internal sealed class TouchClusterFinder
         while (frontier.Count > 0)
         {
             var reached = ReachUnvisitedTouching(frontier);
+            if (reached.Count > 0) _levels++;
             frontier = MergeLevel(reached, componentId, ref componentSize);
         }
         return componentSize;
@@ -147,20 +167,11 @@ internal sealed class TouchClusterFinder
     /// <summary>Unvisited nodes touching a frontier node, each paired with the first frontier node that touches it; marks them visited.</summary>
     private List<TargetPair> ReachUnvisitedTouching(List<int> frontier)
     {
-        _levels++;
         var (pairs, broadPhase) = Timing.Measure(() => _search.CollectFrontierPairs(frontier, skip: node => _visited[node]));
-        var (results, narrowPhase) = Timing.Measure(() => _search.Tester.TestPairs(pairs, _parallelOptions));
+        var (reached, narrowPhase) = Timing.Measure(() => _search.Tester.FindFirstInContact(pairs, ContactRule.Touch, _parallelOptions));
         _broadPhase += broadPhase;
         _narrowPhase += narrowPhase;
-
-        var reached = new List<TargetPair>();
-        for (var k = 0; k < pairs.Count; k++)
-        {
-            var (_, to) = pairs[k];
-            if (results[k] != PairTouch.Touching || _visited[to]) continue;
-            _visited[to] = true;
-            reached.Add(pairs[k]);
-        }
+        foreach (var (_, to) in reached) _visited[to] = true;
         return reached;
     }
 
@@ -188,8 +199,24 @@ internal sealed class TouchClusterFinder
             _removals.Add(new TouchingRemoval(to, TouchedTargetIndex: from));
             componentSize++;
             next.Add(to);
+            RemoveLinkedPartners(to, componentId, next, ref componentSize);
         }
         return next;
+    }
+
+    /// <summary>Removes the unreached members of the removed node's linked group, which then continue the search with the next level.</summary>
+    /// <remarks>A group shares its keep reason, so the members of a removed node's group are never kept.</remarks>
+    private void RemoveLinkedPartners(int removed, int componentId, List<int> next, ref int componentSize)
+    {
+        foreach (var partner in _groups.MembersOf(removed))
+        {
+            if (_visited[partner] || _isSeed[partner]) continue;
+            _visited[partner] = true;
+            RecordMember(componentId, partner, removed);
+            _removals.Add(new LinkedRemoval(partner, LinkedToTargetIndex: removed));
+            componentSize++;
+            next.Add(partner);
+        }
     }
 
     private void RecordMember(int componentId, int node, int parent)
@@ -197,6 +224,7 @@ internal sealed class TouchClusterFinder
         _componentId[node] = componentId;
         _parentOf[node] = parent;
         _depth[node] = parent < 0 ? 0 : _depth[parent] + 1;
+        _maxDepth = Math.Max(_maxDepth, _depth[node]);
         _componentMembers[componentId].Add(node);
     }
 
@@ -204,9 +232,10 @@ internal sealed class TouchClusterFinder
     {
         var stats = new TouchStats(
             _componentMembers.Count,
-            _componentsWithTouching,
+            _componentsWithRemovals,
             _largestComponent,
             _levels,
+            _maxDepth,
             _search.Tester.GetStats(),
             setup,
             _broadPhase,

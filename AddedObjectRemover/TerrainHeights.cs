@@ -38,8 +38,7 @@ internal sealed class TerrainHeights(
     {
         var cellX = ExteriorGrid.CellIndex(position.X);
         var cellY = ExteriorGrid.CellIndex(position.Y);
-        var cell = new ExteriorCell(landWorldspaces[worldspaceKey], cellX, cellY);
-        if (_heightsByCell.GetOrCreate(cell, () => DecodeHeights(cell)) is not { } heights)
+        if (GetHeights(worldspaceKey, cellX, cellY) is not { } heights)
         {
             height = 0;
             return false;
@@ -48,6 +47,16 @@ internal sealed class TerrainHeights(
         var local = (position - new Vector2(cellX, cellY) * ExteriorGrid.CellSize) / VertexSpacing;
         height = InterpolateBilinear(heights, local);
         return true;
+    }
+
+    /// <param name="worldspaceKey">A worldspace with terrain (<see cref="HasTerrain"/>).</param>
+    /// <returns>False where the cell has no terrain (no, a deleted, or an empty LAND record).</returns>
+    public bool HasHeights(FormKey worldspaceKey, int cellX, int cellY) => GetHeights(worldspaceKey, cellX, cellY) != null;
+
+    private float[]? GetHeights(FormKey worldspaceKey, int cellX, int cellY)
+    {
+        var cell = new ExteriorCell(landWorldspaces[worldspaceKey], cellX, cellY);
+        return _heightsByCell.GetOrCreate(cell, () => DecodeHeights(cell));
     }
 
     private float[]? DecodeHeights(ExteriorCell cell)

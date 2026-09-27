@@ -72,9 +72,9 @@ internal sealed class RemovalPipeline
         var tooClose = SelectTooCloseRemovals(scan, visibility, indexes, keepRule);
         List<Removal> removals = [.. tooClose.Removals];
         AddLinkedRemovals(removals, tooClose.Removals, groups, "too-close");
-        var followUp = SelectFollowUpRemovals(scan, visibility, removals.ToList(), tooClose, supporters, keepRule);
+        var followUp = SelectFollowUpRemovals(scan, visibility, removals.ToList(), tooClose, groups, supporters, keepRule);
         removals.AddRange(followUp.Removals);
-        AddLinkedRemovals(removals, followUp.Removals, groups, "follow-up");
+        RunReport.PrintLinkedRemovals(followUp.Removals.Count(removal => removal is LinkedRemoval), "follow-up");
         var leftovers = SelectLeftoverRemovals(scan, visibility, indexes, removals, keepRule);
         removals.AddRange(leftovers.Removals);
         AddLinkedRemovals(removals, leftovers.Removals, groups, "leftover invisible object");
@@ -231,11 +231,13 @@ internal sealed class RemovalPipeline
     }
 
     /// <param name="seeds">The too-close removals and their linked groups.</param>
+    /// <returns>The follow-up removals, with the linked groups of each.</returns>
     private FollowUpRemovals SelectFollowUpRemovals(
         ScanResult scan,
         IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyList<Removal> seeds,
         TooCloseSelection tooClose,
+        LinkedGroups groups,
         SupporterIndex supporters,
         KeepReferencedRule keepRule)
     {
@@ -243,8 +245,8 @@ internal sealed class RemovalPipeline
         return _config.FollowUpMode switch
         {
             FollowUpRemovalMode.Nothing => FollowUpRemovals.None,
-            FollowUpRemovalMode.EverythingTouching => SelectTouchingRemovals(scan, visibility, seeds, tooClose, keepRule),
-            FollowUpRemovalMode.ObjectsSupportedByIt => SelectUnanchoredRemovals(scan, visibility, seeds, tooClose, supporters, keepRule),
+            FollowUpRemovalMode.EverythingTouching => SelectTouchingRemovals(scan, visibility, seeds, tooClose, groups, keepRule),
+            FollowUpRemovalMode.ObjectsSupportedByIt => SelectUnanchoredRemovals(scan, visibility, seeds, tooClose, groups, supporters, keepRule),
             _ => throw new UnreachableException($"Unknown follow-up removal mode {_config.FollowUpMode}."),
         };
     }
@@ -254,6 +256,7 @@ internal sealed class RemovalPipeline
         IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyList<Removal> seeds,
         TooCloseSelection tooClose,
+        LinkedGroups groups,
         KeepReferencedRule keepRule)
     {
         var clusters = TouchClusterFinder.Find(
@@ -261,6 +264,7 @@ internal sealed class RemovalPipeline
             visibility,
             ToTargetIndexList(seeds),
             tooClose.KeptIndices,
+            groups,
             _shapes,
             _meshCache,
             keepRule,
@@ -292,6 +296,7 @@ internal sealed class RemovalPipeline
         IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyList<Removal> seeds,
         TooCloseSelection tooClose,
+        LinkedGroups groups,
         SupporterIndex supporters,
         KeepReferencedRule keepRule)
     {
@@ -300,6 +305,7 @@ internal sealed class RemovalPipeline
             visibility,
             ToTargetIndexList(seeds),
             tooClose.KeptIndices,
+            groups,
             supporters,
             new TerrainHeights(scan.Landscapes, scan.LandWorldspaces),
             _shapes,
@@ -406,10 +412,11 @@ internal sealed class RemovalPipeline
 
     private static KeptObjectRelocator CreateRelocator(ScanResult scan, VisibleObstacles obstacles) => new(
         scan.Targets,
-        scan.TargetLocations,
-        obstacles,
-        new NavmeshIndex(scan.NavmeshesBySpace),
-        new TerrainSpotSearch(new TerrainHeights(scan.Landscapes, scan.LandWorldspaces), obstacles));
+        index => KeptObjectRelocator.FindHomeCell(scan.Targets[index], scan.TargetLocations[index]),
+        [
+            new NavmeshSpotSearch(new NavmeshIndex(scan.NavmeshesBySpace), obstacles),
+            new TerrainSpotSearch(new TerrainHeights(scan.Landscapes, scan.LandWorldspaces), obstacles),
+        ]);
 
     private void WriteLeftoverDiagnostics(ScanResult scan, LeftoverResult leftovers, RelocationResult relocations)
     {

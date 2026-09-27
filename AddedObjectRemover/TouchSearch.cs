@@ -1,9 +1,11 @@
+using Mutagen.Bethesda.Plugins;
+
 namespace AddedObjectRemover;
 
 /// <summary>
-/// The touch search among target objects shared by AnyTouch and Anchoring: the broad phase over the
-/// spaces that contain a seed, the narrow phase, and the triangle trees they read. Targets without
-/// a mesh or not visible never take part.
+/// The touch search among target objects of the follow-up removal: the broad phase over the given
+/// spaces, the narrow phase, and the triangle trees they read. Targets without a mesh or not visible
+/// never take part.
 /// </summary>
 internal sealed class TouchSearch
 {
@@ -32,11 +34,12 @@ internal sealed class TouchSearch
     public TriangleTreeCache Cache { get; }
 
     /// <param name="visibility">Parallel to <paramref name="targets"/>.</param>
+    /// <param name="spaces">The spaces whose targets take part.</param>
     /// <param name="excluded">Targets that never take part, in addition to those without a mesh or not visible.</param>
     public static TouchSearch Create(
         IReadOnlyList<TargetObject> targets,
         IReadOnlyList<ObjectVisibility> visibility,
-        IReadOnlyList<int> seeds,
+        IReadOnlySet<FormKey> spaces,
         IReadOnlyList<int> excluded,
         BaseObjectShapeProvider shapes,
         TriangleTreeCache cache,
@@ -46,7 +49,7 @@ internal sealed class TouchSearch
         var meshPaths = new TargetMeshPaths(targets, shapes);
         var candidateFinder = TouchCandidateFinder.Create(
             targets,
-            seeds.Select(seed => targets[seed].SpaceKey).ToHashSet(),
+            spaces,
             MarkExcluded(visibility, excluded, meshPaths),
             shapes,
             tolerance,

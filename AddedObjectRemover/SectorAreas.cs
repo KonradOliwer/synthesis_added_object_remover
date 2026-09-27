@@ -6,7 +6,7 @@ namespace AddedObjectRemover;
 /// One of 8 equal 45° directions around an invisible object, by the world X (east) and Y (north)
 /// axes. Each spans 22.5° to either side of its compass direction; an angle exactly on a boundary
 /// belongs to the direction counter-clockwise of it (22.5° from east is NorthEast). An offset with
-/// no horizontal part (straight above or below) counts as East.
+/// no horizontal part at all counts as <see cref="SectorAreas.NoHorizontalOffset"/>.
 /// </summary>
 internal enum DirectionSector
 {
@@ -36,6 +36,13 @@ internal sealed class SectorAreas(int thresholdPercent)
 {
     public const int SectorCount = 8;
 
+    /// <summary>
+    /// The direction of an offset that has no horizontal part at all (exactly zero), such as an
+    /// object whose box centre lies exactly straight above or below: any fixed direction will do,
+    /// as long as the object counts in exactly one.
+    /// </summary>
+    public const DirectionSector NoHorizontalOffset = DirectionSector.East;
+
     private const float FullTurnDegrees = 360f;
     private const float SectorDegrees = FullTurnDegrees / SectorCount;
 
@@ -57,6 +64,7 @@ internal sealed class SectorAreas(int thresholdPercent)
 
     public static DirectionSector SectorOf(Vector2 offset)
     {
+        if (offset == Vector2.Zero) return NoHorizontalOffset;
         var degrees = float.RadiansToDegrees(MathF.Atan2(offset.Y, offset.X));
         var fromEast = degrees < 0 ? degrees + FullTurnDegrees : degrees;
         return (DirectionSector)((int)MathF.Floor(fromEast / SectorDegrees + CentredSectorShift) % SectorCount);

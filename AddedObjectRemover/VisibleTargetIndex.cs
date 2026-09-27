@@ -54,12 +54,22 @@ internal sealed class VisibleTargetIndex
         foreach (var entry in FindCandidates(space, point, radius))
         {
             var box = space.Boxes[entry];
-            var closest = box.ClosestPoint(point);
-            if (Vector3.Distance(closest, point) > radius) continue;
-            IReadOnlyList<DirectionSector> sectors = closest == point ? SectorAreas.All : [SectorAreas.SectorOf(HorizontalDirection(point, closest, box.Center))];
-            neighbours.Add(new VisibleNeighbour(space.TargetIndices[entry], sectors, box.FootprintArea));
+            if (Vector3.Distance(box.ClosestPoint(point), point) > radius) continue;
+            neighbours.Add(new VisibleNeighbour(space.TargetIndices[entry], FindSectors(box, point), box.FootprintArea));
         }
         return neighbours;
+    }
+
+    /// <summary>
+    /// Every direction when the box contains the point. Otherwise exactly one: towards the box
+    /// centre's horizontal offset when the box lies straight above or below the point (however
+    /// small that offset), else towards the box's closest point.
+    /// </summary>
+    internal static IReadOnlyList<DirectionSector> FindSectors(OrientedBox box, Vector3 point)
+    {
+        if (box.Contains(point)) return SectorAreas.All;
+        var towards = box.IsCrossedByVerticalLine(point) ? box.Center : box.ClosestPoint(point);
+        return [SectorAreas.SectorOf(new Vector2(towards.X - point.X, towards.Y - point.Y))];
     }
 
     /// <summary>True when some indexed object of the space contains <paramref name="point"/>.</summary>
@@ -76,13 +86,6 @@ internal sealed class VisibleTargetIndex
         _bySpace.TryGetValue(spaceKey, out var space)
             ? FindCandidates(space, point, radius).Select(entry => space.Boxes[entry])
             : [];
-
-    /// <summary>Towards the closest point of the box, or towards its centre when the point is right above or below it.</summary>
-    private static Vector2 HorizontalDirection(Vector3 origin, Vector3 closest, Vector3 center)
-    {
-        var toClosest = new Vector2(closest.X - origin.X, closest.Y - origin.Y);
-        return toClosest != Vector2.Zero ? toClosest : new Vector2(center.X - origin.X, center.Y - origin.Y);
-    }
 
     /// <summary>Boxes can be indexed in several grid cells, so duplicates are removed.</summary>
     private static IEnumerable<int> FindCandidates(SpaceEntries space, Vector3 point, float radius)

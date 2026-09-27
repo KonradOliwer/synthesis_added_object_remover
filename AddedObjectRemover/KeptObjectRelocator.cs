@@ -9,7 +9,8 @@ internal enum RelocationSurface
 }
 
 /// <summary>A kept marker moved out of the other mod's object it sat inside.</summary>
-internal sealed record Relocation(LeftoverEvaluation Evaluation, Vector3 From, Vector3 To, RelocationSurface Surface)
+/// <param name="LeftHomeCell">No free spot was found in the marker's own exterior cell, so it was moved into a neighboring one.</param>
+internal sealed record Relocation(LeftoverEvaluation Evaluation, Vector3 From, Vector3 To, RelocationSurface Surface, bool LeftHomeCell)
 {
     public float Distance => Vector3.Distance(From, To);
 }
@@ -22,18 +23,19 @@ internal sealed record RelocationResult(IReadOnlyList<Relocation> Moved, IReadOn
 
 /// <summary>
 /// Moves markers of the target that stay (protected or referenced) although they sit inside
-/// another mod's visible object to the nearest spot outside every remaining visible object: on
-/// the winning navmesh, else on the terrain outside every remaining object's ground footprint.
-/// Only the position changes. Lights, sounds, volumes,
-/// critter spawners, decals, furniture and door markers are never moved: what they cover or light
-/// up, or where an actor uses them, depends on their exact place.
+/// another mod's visible object to the nearest spot outside every remaining visible object, trying
+/// the surfaces in order (the winning navmesh, then the terrain). An exterior marker preferably
+/// stays in its own cell, which the game attaches it to: only when no surface has a free spot there
+/// may it move into a neighboring cell. Only the position changes. Lights, sounds, volumes, critter
+/// spawners, decals, furniture and door markers are never moved: what they cover or light up, or
+/// where an actor uses them, depends on their exact place.
 /// </summary>
+/// <param name="homeCellOf">Target index -&gt; the exterior cell it belongs to; null for an interior one, which may move anywhere.</param>
+/// <param name="surfaces">The spot searches, most preferred first.</param>
 internal sealed class KeptObjectRelocator(
     IReadOnlyList<TargetObject> targets,
-    IReadOnlyList<TargetLocation> locations,
-    VisibleObstacles obstacles,
-    NavmeshIndex navmeshes,
-    TerrainSpotSearch terrain)
+    Func<int, CellArea?> homeCellOf,
+    IReadOnlyList<IFreeSpotSearch> surfaces)
 {
     /// <summary>Largest distance, in game units, an object is moved.</summary>
     public const float MaxMoveDistance = 2048f;
@@ -64,29 +66,35 @@ internal sealed class KeptObjectRelocator(
 
     private Relocation? TryFindRelocation(LeftoverEvaluation evaluation)
     {
+        if (homeCellOf(evaluation.TargetIndex) is not { } homeCell) return TryFindRelocationIn(evaluation, allowedCells: null, homeCell: null);
+        return TryFindRelocationIn(evaluation, homeCell, homeCell)
+               ?? TryFindRelocationIn(evaluation, homeCell.WithNeighbors(), homeCell);
+    }
+
+    private Relocation? TryFindRelocationIn(LeftoverEvaluation evaluation, CellArea? allowedCells, CellArea? homeCell)
+    {
         var target = targets[evaluation.TargetIndex];
         var from = target.Transform.Position;
-        var requiredCell = FindRequiredCell(target, locations[evaluation.TargetIndex]);
-        bool IsAllowedSpot(Vector3 point) =>
-            (requiredCell is not { } cell || ExteriorGrid.IsInCell(point, cell.X, cell.Y)) && !obstacles.IsInsideAny(target.SpaceKey, point);
-
-        if (navmeshes.TryFindNearestFreePoint(target.SpaceKey, from, MaxMoveDistance, IsAllowedSpot, out var onNavmesh))
+        foreach (var surface in surfaces)
         {
-            return new Relocation(evaluation, from, onNavmesh, RelocationSurface.Navmesh);
+            if (surface.TryFindNearestFreePoint(target.SpaceKey, from, MaxMoveDistance, allowedCells, out var to))
+            {
+                return new Relocation(evaluation, from, to, surface.Surface, LeftHomeCell: homeCell is { } home && !home.Contains(to));
+            }
         }
-        return terrain.TryFindNearestFreePoint(target.SpaceKey, from, MaxMoveDistance, requiredCell, out var onTerrain)
-            ? new Relocation(evaluation, from, onTerrain, RelocationSurface.Terrain)
-            : null;
+        return null;
     }
 
     /// <summary>
-    /// The game attaches a temporary exterior reference to the cell that lists it, so it must stay
-    /// within that cell's square. Persistent and interior references may move anywhere (null).
+    /// The exterior cell whose list holds the reference, or for a reference of a worldspace's
+    /// persistent cell the cell it stands in; null for an interior reference.
     /// </summary>
-    private static (int X, int Y)? FindRequiredCell(TargetObject target, TargetLocation location)
+    public static CellArea? FindHomeCell(TargetObject target, TargetLocation location)
     {
         var cell = location.WinningCell.Record;
-        if (location.InPersistentList || cell.FormKey == target.SpaceKey || cell.Grid is not { } grid) return null;
-        return (grid.Point.X, grid.Point.Y);
+        if (cell.FormKey == target.SpaceKey) return null;
+        if (cell.Grid is { } grid) return CellArea.Single(grid.Point.X, grid.Point.Y);
+        var position = target.Transform.Position;
+        return CellArea.Single(ExteriorGrid.CellIndex(position.X), ExteriorGrid.CellIndex(position.Y));
     }
 }

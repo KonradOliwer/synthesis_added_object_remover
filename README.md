@@ -19,7 +19,8 @@ plugin is `AddedObjectRemover.esp`.
   their aliases, AI packages, locations, factions, navmeshes, dialogue, scripts, ...), are never
   removed by any step, so nothing the game or a script relies on goes missing.
 - Objects of the target plugin linked together (enable parent, linked references, ...) are removed
-  together, or all kept.
+  together, or all kept. A linked object removed this way gets the same follow-up removal as the
+  object it is linked to, so what it holds up or touches goes too.
 - Objects that a script finds only by FormID at run time (for example with GetFormFromFile)
   cannot be detected.
 
@@ -152,8 +153,9 @@ these files are fractions: 0.5 = 50%.
 - Only the target plugin's own, unmodified objects are checked; objects a later plugin overrides
   are skipped.
 - With *NPCs and creatures* `OnlyWhenStuckInObject`, NPCs and creatures whose size cannot be read from the game data are checked by their standing point instead.
-- A kept marker is moved only up to 2048 units, an exterior one usually only within its own cell,
-  and in tight interiors the navmesh and floor often lie inside room pieces, so it may be left
+- A kept marker is moved only up to 2048 units. An exterior one stays in its own cell when that
+  cell has a free spot; otherwise it may move into a neighboring cell, and the log warns about it.
+  In tight interiors the navmesh and floor often lie inside room pieces, so it may be left
   where it is (the log says so).
 
 ## Upgrading from an earlier version

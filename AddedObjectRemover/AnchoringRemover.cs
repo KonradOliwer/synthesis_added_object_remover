@@ -32,8 +32,9 @@ internal sealed record AnchoringStats(
     TimeSpan TouchSearch,
     TimeSpan ContactPoints);
 
+/// <param name="Removals">Anchoring removals and the linked group members removed with them.</param>
 internal sealed record AnchoringResult(
-    List<AnchoringRemoval> Removals,
+    List<Removal> Removals,
     List<KeptTarget> Kept,
     AnchoringStats Stats,
     List<AnchoringEvaluation> Evaluations);
@@ -44,17 +45,19 @@ internal sealed record AnchoringResult(
 /// that object's mesh encloses: support also counts enclosed samples, so an object buried inside a
 /// removed one must become a candidate although no surfaces come close. Each candidate's support
 /// is split among its supporters by weighted contact points (<see cref="AnchoringContactFinder"/>),
-/// and it is removed when the share held by removed target objects reaches the threshold. Newly
-/// removed objects start the next iteration, which re-evaluates every object in contact with them,
-/// until nothing changes. All candidates of one iteration are judged against the removals of
-/// earlier iterations only, so the result does not depend on their order. Referenced objects are
-/// never removed and keep supporting others.
+/// and it is removed when the share held by removed target objects reaches the threshold. A removed
+/// candidate takes the rest of its linked group along. Newly removed objects, linked ones included,
+/// start the next iteration, which re-evaluates every object in contact with them, until nothing
+/// changes. All candidates of one iteration are judged against the removals of earlier iterations
+/// only, so the result does not depend on their order. Referenced objects are never removed and
+/// keep supporting others.
 /// </summary>
 internal sealed class AnchoringRemover
 {
     /// <summary>Shares are sums of float fractions, so support that is fully removed can add up to slightly less than 1.</summary>
     private const float ShareRoundingTolerance = 1e-5f;
 
+    private readonly LinkedGroups _groups;
     private readonly KeepReferencedRule _keepRule;
     private readonly TouchSearch _search;
     private readonly AnchoringContactFinder _contactFinder;
@@ -66,7 +69,7 @@ internal sealed class AnchoringRemover
     private readonly bool[] _countedWithoutContacts;
     private readonly CandidateContacts?[] _contacts;
 
-    private readonly List<AnchoringRemoval> _removals = [];
+    private readonly List<Removal> _removals = [];
     private readonly List<KeptTarget> _kept = [];
     private readonly List<AnchoringEvaluation> _evaluations = [];
     private int _iterations;
@@ -76,12 +79,14 @@ internal sealed class AnchoringRemover
 
     private AnchoringRemover(
         int targetCount,
+        LinkedGroups groups,
         KeepReferencedRule keepRule,
         TouchSearch search,
         AnchoringContactFinder contactFinder,
         float threshold,
         ParallelOptions parallelOptions)
     {
+        _groups = groups;
         _keepRule = keepRule;
         _search = search;
         _contactFinder = contactFinder;
@@ -94,14 +99,15 @@ internal sealed class AnchoringRemover
     }
 
     /// <param name="visibility">Parallel to <paramref name="targets"/>; invisible targets are never candidates or supporters.</param>
-    /// <param name="seeds">Target indices of the earlier removals (too close, and their linked groups).</param>
-    /// <param name="keptTooClose">Too-close targets kept as referenced: already logged, still supporters.</param>
+    /// <param name="seeds">Target indices removed before this step; every linked group member of a seed is a seed too.</param>
+    /// <param name="keptTooClose">Targets never removed that still support others, not reported again.</param>
     /// <param name="threshold">Fraction of support held by removed objects at which a candidate is removed.</param>
     public static AnchoringResult Run(
         IReadOnlyList<TargetObject> targets,
         IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyList<int> seeds,
         IReadOnlyList<int> keptTooClose,
+        LinkedGroups groups,
         SupporterIndex supporters,
         TerrainHeights terrain,
         BaseObjectShapeProvider shapes,
@@ -113,10 +119,11 @@ internal sealed class AnchoringRemover
     {
         var (remover, setup) = Timing.Measure(() =>
         {
-            var search = TouchSearch.Create(targets, visibility, seeds, excluded: [], shapes, meshCache, touchDistance, parallelOptions);
+            var search = TouchSearch.Create(
+                targets, visibility, groups.CollectReachableSpaces(targets, seeds), excluded: [], shapes, meshCache, touchDistance, parallelOptions);
             var supporterFinder = new AnchoringSupporterFinder(targets, search, supporters, shapes, touchDistance);
             var contactFinder = new AnchoringContactFinder(targets, search.MeshPaths, supporterFinder, terrain, search.Cache, touchDistance);
-            return new AnchoringRemover(targets.Count, keepRule, search, contactFinder, threshold, parallelOptions);
+            return new AnchoringRemover(targets.Count, groups, keepRule, search, contactFinder, threshold, parallelOptions);
         });
 
         remover.RemoveUnanchored(seeds, keptTooClose);
@@ -143,23 +150,8 @@ internal sealed class AnchoringRemover
     private List<int> FindCandidatesInContactWith(List<int> frontier)
     {
         var pairs = _search.CollectFrontierPairs(frontier, skip: target => _removed[target]);
-        var inContact = FindPairsInContact(pairs);
+        var inContact = _search.Tester.FindFirstInContact(pairs, ContactRule.TouchOrEnclose, _parallelOptions);
         return ExcludeKept(inContact);
-    }
-
-    /// <returns>The pairs, in order, whose meshes touch or whose first mesh encloses the second's centre.</returns>
-    private List<TargetPair> FindPairsInContact(List<TargetPair> pairs)
-    {
-        var touches = _search.Tester.TestPairs(pairs, _parallelOptions);
-        var apart = Enumerable.Range(0, pairs.Count).Where(k => touches[k] == PairTouch.Apart).ToList();
-        var enclosed = _search.Tester.TestEnclosures(apart.Select(k => pairs[k]).ToList(), _parallelOptions);
-
-        var inContact = touches.Select(touch => touch == PairTouch.Touching).ToArray();
-        for (var j = 0; j < apart.Count; j++)
-        {
-            if (enclosed[j]) inContact[apart[j]] = true;
-        }
-        return pairs.Where((_, k) => inContact[k]).ToList();
     }
 
     /// <returns>Sorted second members of the pairs that are not referenced.</returns>
@@ -192,11 +184,11 @@ internal sealed class AnchoringRemover
         Parallel.ForEach(missing, _parallelOptions, candidate => _contacts[candidate] = _contactFinder.FindContacts(candidate));
     }
 
-    /// <returns>The candidates removed in this iteration.</returns>
+    /// <returns>The objects removed in this iteration: the removed candidates, then their linked group members.</returns>
     private List<int> EvaluateAndRemove(List<int> candidates)
     {
         var evaluations = candidates.Select(Evaluate).ToList();
-        var removedNow = new List<int>();
+        var removedCandidates = new List<int>();
         foreach (var evaluation in evaluations)
         {
             _evaluations.Add(evaluation);
@@ -205,9 +197,25 @@ internal sealed class AnchoringRemover
 
             _removed[evaluation.TargetIndex] = true;
             _removals.Add(new AnchoringRemoval(evaluation.TargetIndex, evaluation.RemovedShare, MainRemovedSupporter(evaluation)));
-            removedNow.Add(evaluation.TargetIndex);
+            removedCandidates.Add(evaluation.TargetIndex);
         }
-        return removedNow;
+        var linked = removedCandidates.SelectMany(RemoveLinkedPartners).ToList();
+        return [.. removedCandidates, .. linked];
+    }
+
+    /// <returns>The members of the removed candidate's linked group removed with it.</returns>
+    /// <remarks>A group shares its keep reason, so the members of a removed candidate's group are never kept.</remarks>
+    private List<int> RemoveLinkedPartners(int removed)
+    {
+        var partners = new List<int>();
+        foreach (var partner in _groups.MembersOf(removed))
+        {
+            if (_removed[partner]) continue;
+            _removed[partner] = true;
+            _removals.Add(new LinkedRemoval(partner, LinkedToTargetIndex: removed));
+            partners.Add(partner);
+        }
+        return partners;
     }
 
     /// <remarks>A candidate without contact points has no shares, so it is never removed.</remarks>

@@ -17,9 +17,15 @@ internal sealed class VisibleObstacles(
         containment.FindContainingVisible(nonTargetObjects.GetSpace(spaceKey), point, skipReplaced: false) >= 0
         || remainingTargets.AnyContains(spaceKey, point, containment);
 
-    /// <summary>The boxes of the obstacles that may come within <paramref name="radius"/> of <paramref name="point"/>, and possibly a few farther ones.</summary>
+    /// <summary>
+    /// The boxes of the obstacles that may come within <paramref name="radius"/> of
+    /// <paramref name="point"/>, and possibly a few farther ones; none whose world AABB lies
+    /// horizontally farther away.
+    /// </summary>
     public IEnumerable<OrientedBox> FindBoxesNear(FormKey spaceKey, Vector3 point, float radius) =>
-        FindNonTargetBoxesNear(spaceKey, point, radius).Concat(remainingTargets.FindBoxesNear(spaceKey, point, radius));
+        FindNonTargetBoxesNear(spaceKey, point, radius)
+            .Concat(remainingTargets.FindBoxesNear(spaceKey, point, radius))
+            .Where(box => IsHorizontallyWithin(box.WorldAabb(0f), point, radius));
 
     private IEnumerable<OrientedBox> FindNonTargetBoxesNear(FormKey spaceKey, Vector3 point, float radius)
     {
@@ -29,5 +35,12 @@ internal sealed class VisibleObstacles(
         return candidates
             .Where(index.IsVisible)
             .Select(candidate => OrientedBox.FromLocal(shapes.GetLocalBox(index[candidate].Base), index[candidate].Transform));
+    }
+
+    private static bool IsHorizontallyWithin(Box box, Vector3 point, float radius)
+    {
+        var belowMin = new Vector2(box.Min.X - point.X, box.Min.Y - point.Y);
+        var aboveMax = new Vector2(point.X - box.Max.X, point.Y - box.Max.Y);
+        return Vector2.Max(Vector2.Zero, Vector2.Max(belowMin, aboveMax)).Length() <= radius;
     }
 }

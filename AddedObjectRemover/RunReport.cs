@@ -252,9 +252,9 @@ internal static class RunReport
     {
         var stats = touch.Stats;
         Console.WriteLine(
-            $"Touching objects: {touch.Removals.Count:N0} removed in {stats.Components:N0} components "
-            + $"({stats.ComponentsWithTouching:N0} with touching objects, largest {stats.LargestComponent:N0} removed objects); "
-            + $"{touch.Kept.Count:N0} kept as referenced.");
+            $"Touching objects: {touch.Removals.Count(removal => removal is TouchingRemoval):N0} removed in {stats.Components:N0} components "
+            + $"({stats.ComponentsWithRemovals:N0} with follow-up removals, largest {stats.LargestComponent:N0} removed objects, "
+            + $"longest chain {stats.MaxDepth:N0} steps); {touch.Kept.Count:N0} kept as referenced.");
         PrintPairStats(stats.Pairs, stats.Levels, "levels");
         PrintMeshStats(stats.Pairs.Meshes);
         Console.WriteLine(
@@ -267,7 +267,7 @@ internal static class RunReport
     {
         var stats = anchoring.Stats;
         Console.WriteLine(
-            $"Anchoring: {anchoring.Removals.Count:N0} removed over {stats.Iterations:N0} iterations; "
+            $"Anchoring: {anchoring.Removals.Count(removal => removal is AnchoringRemoval):N0} removed over {stats.Iterations:N0} iterations; "
             + $"{stats.Candidates:N0} touching objects evaluated ({stats.Evaluations:N0} evaluations), "
             + $"{stats.KeptWithoutContacts:N0} kept without any contact points, {anchoring.Kept.Count:N0} kept as referenced.");
         PrintPairStats(stats.Pairs, stats.Iterations, "iterations");
@@ -319,6 +319,13 @@ internal static class RunReport
             Console.WriteLine(
                 $"  Moved kept {RecordNames.Describe(target.Record)} in {scan.SpaceNames[target.SpaceKey]} "
                 + $"out of {DescribeOtherObject(move.Evaluation.ContainingObject!.Value)}: {move.Distance:F0} units onto the {move.Surface.ToString().ToLowerInvariant()}.");
+            if (move.LeftHomeCell)
+            {
+                Console.WriteLine(
+                    $"  Warning: {RecordNames.Describe(target.Record)} was moved into the neighboring cell "
+                    + $"({ExteriorGrid.CellIndex(move.To.X)}, {ExteriorGrid.CellIndex(move.To.Y)}) because its own cell has no free spot; "
+                    + "it is still listed in its own cell.");
+            }
         }
         foreach (var evaluation in relocations.LeftInPlace)
         {

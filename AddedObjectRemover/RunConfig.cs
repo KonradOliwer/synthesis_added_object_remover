@@ -127,11 +127,19 @@ internal static class RunConfigFactory
     /// <summary>A rooted path is used as is; a relative one is resolved against the output plugin's folder.</summary>
     public static string ResolveReportFolder(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, Settings settings)
     {
-        var configured = settings.Diagnostics?.DiagnosticsFolder?.Trim();
-        var folder = string.IsNullOrEmpty(configured) ? DiagnosticsSettings.DefaultReportFolder : configured;
+        var folder = ValidateFolder(settings.Diagnostics?.DiagnosticsFolder?.Trim());
         if (Path.IsPathRooted(folder)) return folder;
         var outputDirectory = Path.GetDirectoryName(state.OutputPath.Path) ?? string.Empty;
         return Path.Combine(outputDirectory, folder);
+    }
+
+    /// <summary>A folder containing characters no path can contain (for example a NUL character) falls back to the default.</summary>
+    internal static string ValidateFolder(string? configured)
+    {
+        if (string.IsNullOrEmpty(configured)) return DiagnosticsSettings.DefaultReportFolder;
+        if (configured.IndexOfAny(Path.GetInvalidPathChars()) < 0) return configured;
+        Console.WriteLine($"Warning: report folder '{configured}' contains characters not allowed in a path; using '{DiagnosticsSettings.DefaultReportFolder}'.");
+        return DiagnosticsSettings.DefaultReportFolder;
     }
 
     private static bool TryFindTarget(
@@ -233,9 +241,17 @@ internal static class RunConfigFactory
     /// <summary>A percentage limited to 10-100 and rounded to the nearest ten.</summary>
     internal static int WholeTens(int percent, string name)
     {
-        var valid = (int)Math.Round(Math.Clamp(percent, PercentStep, Percent.PerWhole) / (double)PercentStep, MidpointRounding.AwayFromZero) * PercentStep;
-        if (valid != percent) Console.WriteLine($"Warning: {name} {percent} is not a multiple of {PercentStep} from {PercentStep} to {Percent.PerWhole}; using {valid}.");
-        return valid;
+        var withinRange = Math.Clamp(percent, PercentStep, Percent.PerWhole);
+        if (withinRange != percent)
+        {
+            Console.WriteLine($"Warning: {name} {percent} is outside {PercentStep}-{Percent.PerWhole}; using {withinRange}.");
+        }
+        var rounded = (int)Math.Round(withinRange / (double)PercentStep, MidpointRounding.AwayFromZero) * PercentStep;
+        if (rounded != withinRange)
+        {
+            Console.WriteLine($"Warning: {name} {withinRange} is not a multiple of {PercentStep}; using {rounded}.");
+        }
+        return rounded;
     }
 
     private static int Clamp(int value, int minimum, int maximum, string name)
@@ -245,11 +261,16 @@ internal static class RunConfigFactory
         return clamped;
     }
 
-    /// <summary>Out of range values become the nearest valid value; values that are not a number become the default.</summary>
+    /// <summary>Out of range values become the nearest valid value; a value that is not a number becomes the default.</summary>
     internal static float Clamp(float value, float minimum, float maximum, float defaultValue, string name)
     {
+        if (float.IsNaN(value))
+        {
+            Console.WriteLine($"Warning: {name} is not a valid number; using {defaultValue}.");
+            return defaultValue;
+        }
         if (value >= minimum && value <= maximum) return value;
-        var clamped = float.IsNaN(value) ? defaultValue : Math.Clamp(value, minimum, maximum);
+        var clamped = Math.Clamp(value, minimum, maximum);
         Console.WriteLine($"Warning: {name} {value} is outside {minimum}-{maximum}; using {clamped}.");
         return clamped;
     }

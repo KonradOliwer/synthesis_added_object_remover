@@ -106,9 +106,10 @@ Only the target plugin's own objects count as surroundings. Objects that somethi
 | Write report files | `false` | Saves CSV files for checking the results (see *Diagnostics files*). |
 | Report folder | `AddedObjectRemover Reports` | Folder for report files: a full path, or relative to the patch output folder. Only used when *Write report files* is on. |
 
-Invalid values are replaced, with a warning in the log: numbers out of range by the nearest valid
-value, percentages that are not a step of 10 by the nearest step. An *Also remove* or *Never remove*
-value that Synthesis does not know stops the run.
+Numbers out of range are corrected to the nearest valid value, and percentages are rounded to the
+nearest step of 10, each with a warning in the log. A saved setting that fails to load at all (for
+example a dropdown value that no longer exists) stops the run, and the log names the setting and
+what is allowed there instead of only showing a raw error.
 
 ## What is never counted as a conflict
 

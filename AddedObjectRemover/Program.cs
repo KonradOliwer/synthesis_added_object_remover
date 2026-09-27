@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Skyrim;
 using Mutagen.Bethesda.Synthesis;
+using Newtonsoft.Json;
 
 namespace AddedObjectRemover;
 
@@ -35,12 +36,27 @@ public static class Program
         var totalTimer = Stopwatch.StartNew();
         Console.WriteLine("=== Added Object Remover ===");
 
-        var settings = _lazySettings.Value;
+        var settings = LoadSettings();
         var config = RunConfigFactory.Create(state, settings);
         if (config == null) return;
         DiagnosticsFiles.DeleteEarlierFiles(config.DiagnosticsFolder, config.WritesDiagnostics);
         RunReport.PrintConfig(config);
 
         new RemovalPipeline(state, config).Run(totalTimer);
+    }
+
+    /// <summary>Settings are read lazily from settings.json; an invalid saved value throws here on first access.</summary>
+    private static Settings LoadSettings()
+    {
+        try
+        {
+            return _lazySettings.Value;
+        }
+        catch (JsonException ex)
+        {
+            var message = SettingsFailureMessage.Describe(ex);
+            Console.Error.WriteLine(message);
+            throw new InvalidOperationException(message, ex);
+        }
     }
 }

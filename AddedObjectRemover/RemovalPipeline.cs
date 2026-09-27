@@ -28,6 +28,7 @@ internal sealed class RemovalPipeline
     private readonly BaseObjectShapeProvider _shapes;
     private readonly TriangleTreeCache _meshCache;
     private readonly ObjectContainment _containment;
+    private readonly SkinnedBodyMeasurer _bodyMeasurer;
     private readonly NpcBodyCache _npcBodies;
     private readonly ReasonCounter _invisibleOthers = new();
 
@@ -44,7 +45,8 @@ internal sealed class RemovalPipeline
         _shapes = new BaseObjectShapeProvider(state.LinkCache, meshFiles, _meshMessages);
         _meshCache = new TriangleTreeCache(_shapes.ReadGeometry);
         _containment = new ObjectContainment(_shapes, _meshCache);
-        _npcBodies = new NpcBodyCache(new NpcBodyResolver(state.LinkCache, _shapes));
+        _bodyMeasurer = new SkinnedBodyMeasurer(_shapes.ReadGeometry);
+        _npcBodies = new NpcBodyCache(new NpcBodyResolver(state.LinkCache, _shapes, _bodyMeasurer));
     }
 
     public void Run(Stopwatch totalTimer)
@@ -184,7 +186,10 @@ internal sealed class RemovalPipeline
 
     private void PrintNpcHandling(NpcClashRule npcRule, IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes)
     {
-        if (npcRule.StuckSearch is { } stuckSearch) RunReport.PrintNpcStuckSummary(stuckSearch.GetSummary(), _npcBodies.GetStats(), _config.DetailedLog);
+        if (npcRule.StuckSearch is { } stuckSearch)
+        {
+            RunReport.PrintNpcStuckSummary(stuckSearch.GetSummary(), _npcBodies.GetStats(), _bodyMeasurer.GetMeasurements(), _config.DetailedLog);
+        }
         else if (npcRule.Handling == NpcHandling.Ignore) RunReport.PrintIgnoredNpcs(CountPlacedNpcs(indexes));
     }
 

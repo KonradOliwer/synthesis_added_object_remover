@@ -29,6 +29,9 @@ internal sealed class NpcClashRule
     public int FindFirstStuckNpc(int targetIndex, NpcScratch scratch) =>
         StuckSearch?.FindFirstStuckNpc(targetIndex, scratch) ?? -1;
 
+    /// <summary>Adds a worker thread's NPC counters once it is done.</summary>
+    public void AddStats(NpcScratch scratch) => StuckSearch?.AddStats(scratch);
+
     /// <summary>The first object match wins; NPCs are only looked at when no object matched.</summary>
     public int ThenFirstStuckNpc(int objectMatch, int targetIndex, NpcScratch scratch) =>
         objectMatch >= 0 ? objectMatch : FindFirstStuckNpc(targetIndex, scratch);

@@ -41,6 +41,7 @@ internal static class TooCloseSearch
                     targets[i], indexes[targets[i].SpaceKey], shapes, multiplier, npcRule, slots, candidates);
                 matches[i] = npcRule.ThenFirstStuckNpc(objectMatch, i, npcScratch);
             }
+            npcRule.AddStats(npcScratch);
         });
 
         return ToHits(targets, indexes, matches);

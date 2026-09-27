@@ -2,27 +2,30 @@ using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover;
 
-/// <summary>Reusable buffers of one worker thread for <see cref="NpcStuckSearch"/>.</summary>
+/// <summary>Reusable buffers and counters of one worker thread for <see cref="NpcStuckSearch"/>.</summary>
 internal sealed class NpcScratch
 {
-    public TouchScratch Touch { get; } = new();
+    public List<int> Triangles { get; } = [];
+    public List<Box> Cores { get; } = [];
     public List<int> Slots { get; } = [];
     public List<int> Candidates { get; } = [];
+    public long PairsTested { get; set; }
+    public long CoreTests { get; set; }
+    public int Conflicts { get; set; }
 }
 
 /// <param name="Sizes">Per placed NPC of the searched spaces, how its size was found.</param>
+/// <param name="CoreTests">Body boxes tested against an object, combined boxes of several possible bodies included.</param>
 /// <param name="Conflicts">Target objects found with an NPC stuck in them.</param>
 /// <param name="PointFallbacks">NPCs sized as a point, with why, ordered by FormKey; for the detailed log only.</param>
-internal sealed record NpcStuckSummary(NpcSizeCounts Sizes, long PairsTested, int Conflicts, IReadOnlyList<PointNpc> PointFallbacks);
+internal sealed record NpcStuckSummary(NpcSizeCounts Sizes, long PairsTested, long CoreTests, int Conflicts, IReadOnlyList<PointNpc> PointFallbacks);
 
 /// <summary>
 /// The OnlyWhenStuckInObject NPC setting: a visible target object is too close to another mod's
-/// placed NPC only when the NPC's body is stuck in the target at the target's real size, not
-/// enlarged (<see cref="NpcStuckTest"/>). A target without mesh triangles uses its real box, as a
-/// closed box mesh. An NPC whose real size is unknown is sized as a point
-/// (<see cref="NpcSizeSource.Point"/>) and can only be found stuck by standing inside the target's
-/// shape. Candidates are tested in index order and each target writes only its own slot, so
-/// results do not depend on thread scheduling.
+/// placed NPC only when one of the NPC's possible bodies is stuck in the target at the target's
+/// real size, not enlarged (<see cref="NpcStuckTest"/>). A target without mesh triangles uses its
+/// real box, as a closed box mesh. Candidates are tested in index order and each target writes
+/// only its own slot, so results do not depend on thread scheduling.
 /// </summary>
 internal sealed class NpcStuckSearch
 {
@@ -32,7 +35,9 @@ internal sealed class NpcStuckSearch
     private readonly BaseObjectShapeProvider _shapes;
     private readonly TriangleTreeCache _meshCache;
     private readonly LazyCache<FormKey, MeshTriangleTree> _targetBoxTrees = new();
+    private readonly object _statsLock = new();
     private long _pairsTested;
+    private long _coreTests;
     private int _conflicts;
 
     private NpcStuckSearch(
@@ -70,25 +75,42 @@ internal sealed class NpcStuckSearch
         return new NpcStuckSearch(targets, indexes, npcIndexes, shapes, meshCache);
     }
 
-    public NpcStuckSummary GetSummary() => new(
-        _npcIndexes.Values.Aggregate(default(NpcSizeCounts), (sum, index) => sum.Add(index.Counts)),
-        Interlocked.Read(ref _pairsTested),
-        Volatile.Read(ref _conflicts),
-        _npcIndexes.Values
-            .SelectMany(index => index.PointFallbacks)
-            .OrderBy(fallback => fallback.Npc.FormKey.ToString(), StringComparer.Ordinal)
-            .ToList());
+    public NpcStuckSummary GetSummary()
+    {
+        lock (_statsLock)
+        {
+            return new NpcStuckSummary(
+                _npcIndexes.Values.Aggregate(default(NpcSizeCounts), (sum, index) => sum.Add(index.Counts)),
+                _pairsTested,
+                _coreTests,
+                _conflicts,
+                _npcIndexes.Values
+                    .SelectMany(index => index.PointFallbacks)
+                    .OrderBy(fallback => fallback.Npc.FormKey.ToString(), StringComparer.Ordinal)
+                    .ToList());
+        }
+    }
+
+    /// <summary>Adds a worker thread's counters once it is done; its scratch must not be used afterwards.</summary>
+    public void AddStats(NpcScratch scratch)
+    {
+        lock (_statsLock)
+        {
+            _pairsTested += scratch.PairsTested;
+            _coreTests += scratch.CoreTests;
+            _conflicts += scratch.Conflicts;
+        }
+    }
 
     /// <summary>Index of the first other-mod NPC stuck in the visible target, or -1.</summary>
     public int FindFirstStuckNpc(int targetIndex, NpcScratch scratch)
     {
         var target = _targets[targetIndex];
-        if (target.Base is not { } baseRef) return -1;
-
         var npcs = _npcIndexes[target.SpaceKey];
+        if (target.Base is not { } baseRef || npcs.Count == 0) return -1;
+
         var localBox = _shapes.GetLocalBox(baseRef);
-        var realBox = OrientedBox.FromLocal(localBox, target.Transform);
-        CollectCandidates(npcs, _indexes[target.SpaceKey], realBox, scratch);
+        CollectCandidates(npcs, _indexes[target.SpaceKey], OrientedBox.FromLocal(localBox, target.Transform), scratch);
         if (scratch.Candidates.Count == 0) return -1;
 
         if (_shapes.GetMeshPath(baseRef) is not { } meshPath) return FindFirstStuck(GetBoxTree(baseRef, localBox), target.Transform, npcs, scratch);
@@ -108,30 +130,16 @@ internal sealed class NpcStuckSearch
         }
     }
 
-    private int FindFirstStuck(MeshTriangleTree objectTree, PlacedTransform objectTransform, PlacedNpcIndex npcs, NpcScratch scratch)
+    private static int FindFirstStuck(MeshTriangleTree objectTree, PlacedTransform objectTransform, PlacedNpcIndex npcs, NpcScratch scratch)
     {
         foreach (var slot in scratch.Candidates)
         {
-            Interlocked.Increment(ref _pairsTested);
-            if (!IsBodyStuck(objectTree, objectTransform, npcs.BodyOf(slot), npcs.TransformOf(slot), scratch.Touch)) continue;
-            Interlocked.Increment(ref _conflicts);
+            scratch.PairsTested++;
+            if (!NpcStuckTest.IsAnyBodyStuck(objectTree, objectTransform, npcs.BodiesOf(slot), npcs.TransformOf(slot), scratch)) continue;
+            scratch.Conflicts++;
             return npcs.OtherIndexOf(slot);
         }
         return -1;
-    }
-
-    /// <summary>Each body mesh in turn; the body's box only when none of its meshes has usable triangles.</summary>
-    private bool IsBodyStuck(MeshTriangleTree objectTree, PlacedTransform objectTransform, NpcBody body, PlacedTransform bodyTransform, TouchScratch scratch)
-    {
-        var usedMesh = false;
-        foreach (var meshPath in body.MeshPaths)
-        {
-            using var mesh = _meshCache.Acquire(meshPath);
-            if (mesh.Tree is not { } bodyTree) continue;
-            usedMesh = true;
-            if (NpcStuckTest.IsStuck(objectTree, objectTransform, bodyTree, bodyTransform, scratch)) return true;
-        }
-        return !usedMesh && NpcStuckTest.IsStuck(objectTree, objectTransform, body.BoxTree, bodyTransform, scratch);
     }
 
     private MeshTriangleTree GetBoxTree(BaseRef baseRef, Box localBox) =>

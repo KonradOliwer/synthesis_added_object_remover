@@ -10,4 +10,8 @@ internal sealed class LazyCache<TKey, TValue>(IEqualityComparer<TKey>? comparer 
 
     public TValue GetOrCreate(TKey key, Func<TValue> create) =>
         _entries.GetOrAdd(key, _ => new Lazy<TValue>(create, LazyThreadSafetyMode.ExecutionAndPublication)).Value;
+
+    /// <summary>The values created so far, in no particular order.</summary>
+    public List<TValue> GetCreatedValues() =>
+        _entries.Values.Where(entry => entry.IsValueCreated).Select(entry => entry.Value).ToList();
 }

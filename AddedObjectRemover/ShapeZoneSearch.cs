@@ -108,6 +108,7 @@ internal sealed class ShapeZoneSearch
     {
         scratch.Stats.TrianglePairsTested = scratch.Touch.TrianglePairsTested;
         lock (_statsLock) Stats.Add(scratch.Stats);
+        _npcRule.AddStats(scratch.Npcs);
     }
 
     private int FindFirstTooCloseOther(int targetIndex, Scratch scratch) =>

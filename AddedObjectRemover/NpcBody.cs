@@ -10,39 +10,37 @@ internal enum NpcSizeSource
 }
 
 /// <summary>
-/// The body of an NPC base in mesh-local units, plus the factor (race height × NPC height) that
-/// the placed reference's scale multiplies. A <see cref="NpcSizeSource.Point"/> body is a
-/// zero-size box at the placement point, so it is indexed and tested exactly like a sized body,
-/// but can only ever be found stuck by standing inside the target's own shape.
+/// The body of an NPC as an upright box standing on the placement point, in NPC-local units at
+/// reference scale 1 (the race and NPC height are already applied). A <see cref="NpcSizeSource.Point"/>
+/// body is a zero-size box at the placement point, so it is stuck only when its feet are deeper
+/// in the target than <see cref="NpcStuckTest.FootClearance"/>.
 /// </summary>
-/// <param name="MeshPaths">Normalized body meshes for <see cref="NpcSizeSource.BodyMesh"/>; empty otherwise.</param>
-/// <param name="LocalBox">Encloses the whole body; the origin point only for <see cref="NpcSizeSource.Point"/>.</param>
-/// <param name="BoxTree"><see cref="LocalBox"/> as a closed mesh, used when no body mesh triangles apply.</param>
 /// <param name="PointReason">Why the real size could not be determined; set only for <see cref="NpcSizeSource.Point"/>.</param>
-internal sealed record NpcBody(
-    NpcSizeSource Source,
-    IReadOnlyList<string> MeshPaths,
-    Box LocalBox,
-    float HeightScale,
-    MeshTriangleTree BoxTree,
-    string? PointReason)
+internal sealed record NpcBody(NpcSizeSource Source, Box LocalBox, string? PointReason)
 {
-    /// <summary>Volume of the body's box at its height scale; zero for <see cref="NpcSizeSource.Point"/>.</summary>
-    public float Volume
+    public static NpcBody FromBox(NpcSizeSource source, Box localBox, float heightScale) =>
+        new(source, localBox.Scaled(heightScale), null);
+
+    public static NpcBody Point(string reason) => new(NpcSizeSource.Point, Box.Zero, reason);
+}
+
+/// <summary>
+/// Every distinct body a placed base can have: one for a plain NPC, one per distinct possible NPC
+/// of a leveled list or template chain, in record order.
+/// </summary>
+/// <param name="CombinedBox">Encloses every body: the largest width, depth and height of them all.</param>
+internal sealed record NpcBodySet(IReadOnlyList<NpcBody> Bodies, Box CombinedBox)
+{
+    /// <summary>Bodies with the same box are tested once; the first of them is kept.</summary>
+    public static NpcBodySet Of(IReadOnlyList<NpcBody> possibleBodies)
     {
-        get
-        {
-            var size = LocalBox.Scaled(HeightScale).Size;
-            return size.X * size.Y * size.Z;
-        }
+        var distinct = possibleBodies.DistinctBy(body => body.LocalBox).ToList();
+        return new NpcBodySet(distinct, distinct.Skip(1).Aggregate(distinct[0].LocalBox, (union, body) => union.Union(body.LocalBox)));
     }
 
-    public static NpcBody FromMeshes(IReadOnlyList<string> meshPaths, Box localBox, float heightScale) =>
-        new(NpcSizeSource.BodyMesh, meshPaths, localBox, heightScale, BoxMesh.CreateTree(localBox), null);
+    /// <summary>The least precise size source among the bodies.</summary>
+    public NpcSizeSource Source => Bodies.Max(body => body.Source);
 
-    public static NpcBody FromBox(NpcSizeSource source, Box localBox, float heightScale) =>
-        new(source, [], localBox, heightScale, BoxMesh.CreateTree(localBox), null);
-
-    public static NpcBody Point(string reason) =>
-        new(NpcSizeSource.Point, [], Box.Zero, 1f, BoxMesh.CreateTree(Box.Zero), reason);
+    /// <summary>The first body sized as a point, if any.</summary>
+    public NpcBody? FirstPoint => Bodies.FirstOrDefault(body => body.Source == NpcSizeSource.Point);
 }

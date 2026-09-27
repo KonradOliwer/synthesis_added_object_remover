@@ -168,22 +168,42 @@ internal static class RunReport
     public static void PrintIgnoredNpcs(int placedNpcCount) =>
         Console.WriteLine($"NPCs and creatures: ignored; {placedNpcCount:N0} placed NPCs of other mods never cause removals.");
 
-    public static void PrintNpcStuckSummary(NpcStuckSummary summary, NpcBodyCacheStats cache, bool detailedLog)
+    public static void PrintNpcStuckSummary(
+        NpcStuckSummary summary,
+        NpcBodyCacheStats cache,
+        IReadOnlyList<SkinnedBodyMeasurement> bodyMeasurements,
+        bool detailedLog)
     {
         var sizes = summary.Sizes;
         Console.WriteLine(
             $"NPCs and creatures (only when stuck in the object): {sizes.Evaluated:N0} placed NPCs evaluated: "
             + $"{sizes.ByBodyMesh:N0} sized by body mesh, {sizes.ByObjectBounds:N0} by Object Bounds, "
             + $"{sizes.ByHumanoidApproximation:N0} by humanoid approximation, {sizes.ByPoint:N0} sized as a point; "
-            + $"{summary.PairsTested:N0} NPC-object pairs tested, {summary.Conflicts:N0} objects with an NPC stuck in them.");
+            + $"{sizes.WithoutNpc:N0} skipped because their base is no NPC; "
+            + $"{summary.PairsTested:N0} NPC-object pairs tested ({summary.CoreTests:N0} body boxes), "
+            + $"{summary.Conflicts:N0} objects with an NPC stuck in them.");
         Console.WriteLine(
             $"  NPC body cache: {cache.BodiesBuilt:N0} bodies built, {cache.BodiesReused:N0} reused; "
-            + $"{cache.BasesResolved:N0} NPC bases and leveled lists resolved, {cache.BasesReused:N0} reused.");
+            + $"{cache.BasesResolved:N0} NPC bases resolved, {cache.BasesReused:N0} reused; "
+            + $"{cache.ListsResolved:N0} leveled lists resolved, {cache.ListsReused:N0} reused; "
+            + $"{bodyMeasurements.Count:N0} body mesh sets measured.");
         if (!detailedLog) return;
+        foreach (var measurement in bodyMeasurements)
+        {
+            Console.WriteLine($"  {DescribeBodyMeasurement(measurement)}");
+        }
         foreach (var fallback in summary.PointFallbacks)
         {
             Console.WriteLine($"  Sized as a point {DescribeOtherObject(fallback.Npc)}: {fallback.Reason}.");
         }
+    }
+
+    private static string DescribeBodyMeasurement(SkinnedBodyMeasurement measurement)
+    {
+        var raw = measurement.Size.Raw.Size;
+        var body = measurement.Size.Body.Size;
+        return $"Body mesh {measurement.Meshes}: raw {raw.X:F0} wide × {raw.Y:F0} deep, "
+            + $"waist-based {body.X:F0} wide × {body.Y:F0} deep, {body.Z:F0} tall (units before race and NPC height).";
     }
 
     public static void PrintInvisibleOthers(ReasonCounter invisible, bool verbose)

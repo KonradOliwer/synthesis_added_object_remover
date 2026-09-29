@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace AddedObjectRemover;
 
 /// <summary>Parts of steps whose time the detailed log reports.</summary>
@@ -12,6 +14,8 @@ internal enum TimedPhase
     AnchoringContactPoints,
     RivalBoundsBuild,
     SolidBoundsBuild,
+    ShapeZoneIndexBuild,
+    ShapeZoneSearch,
 }
 
 /// <summary>
@@ -38,4 +42,15 @@ internal sealed class UntimedPhases : IPhaseTimer
     public T Time<T>(TimedPhase phase, Func<T> work) => work();
 
     public void Time(TimedPhase phase, Action work) => work();
+}
+
+/// <summary>The times recorded for the timed phases, as data for the detailed log.</summary>
+/// <param name="ByPhase">Every time a phase took, in the order the timings ended.</param>
+internal sealed record PhaseTimes(ImmutableDictionary<TimedPhase, ImmutableArray<TimeSpan>> ByPhase)
+{
+    public static PhaseTimes None { get; } = new(ImmutableDictionary<TimedPhase, ImmutableArray<TimeSpan>>.Empty);
+
+    public ImmutableArray<TimeSpan> Samples(TimedPhase phase) => ByPhase.GetValueOrDefault(phase, []);
+
+    public TimeSpan Total(TimedPhase phase) => Samples(phase).Aggregate(TimeSpan.Zero, (total, sample) => total + sample);
 }

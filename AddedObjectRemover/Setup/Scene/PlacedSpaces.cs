@@ -9,17 +9,17 @@ internal sealed class PlacedSpaces
     private readonly Dictionary<FormKey, OtherObject[]> _bySpace;
     private readonly int[] _slotOf;
     private readonly ShapeCatalog _shapes;
-    private readonly ParallelOptions _parallelOptions;
+    private readonly Execution _execution;
     private readonly IPhaseTimer _timer;
     private readonly TimedPhase _boundsPhase;
     private readonly LazyCache<FormKey, OtherObjectIndex> _indexes = new();
 
     /// <param name="objects">By <see cref="OtherId"/>: the object at position i has id i.</param>
-    public PlacedSpaces(IReadOnlyList<OtherObject> objects, ShapeCatalog shapes, ParallelOptions parallelOptions, IPhaseTimer timer, TimedPhase boundsPhase)
+    public PlacedSpaces(IReadOnlyList<OtherObject> objects, ShapeCatalog shapes, Execution execution, IPhaseTimer timer, TimedPhase boundsPhase)
     {
         _objects = objects;
         _shapes = shapes;
-        _parallelOptions = parallelOptions;
+        _execution = execution;
         _timer = timer;
         _boundsPhase = boundsPhase;
         _bySpace = objects.GroupBy(other => other.SpaceKey).ToDictionary(group => group.Key, group => group.ToArray());
@@ -37,7 +37,7 @@ internal sealed class PlacedSpaces
 
     /// <summary>The index of the space; its slots follow <see cref="ObjectsIn"/>.</summary>
     public OtherObjectIndex IndexOf(FormKey space) =>
-        _indexes.GetOrCreate(space, () => OtherObjectIndex.Create(ObjectsIn(space), _shapes, _parallelOptions, _timer, _boundsPhase));
+        _indexes.GetOrCreate(space, () => OtherObjectIndex.Create(ObjectsIn(space), _shapes, _execution, _timer, _boundsPhase));
 
     /// <summary>The index of the object's space and its slot there.</summary>
     public (OtherObjectIndex Index, int Slot) Locate(OtherId id) => (IndexOf(Get(id).SpaceKey), _slotOf[id.Index]);

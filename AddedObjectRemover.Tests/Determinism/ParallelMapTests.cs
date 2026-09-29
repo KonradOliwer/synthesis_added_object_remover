@@ -34,7 +34,6 @@ public class ParallelMapTests
     [InlineData(1)]
     [InlineData(3)]
     [InlineData(8)]
-    [InlineData(-1)]
     public void AnyWorkerCountGivesTheSequentialResultsAndWork(int workers)
     {
         var (results, work) = RunCounting(Workers(workers), Shuffled(ItemCount));
@@ -143,7 +142,6 @@ public class ParallelMapTests
     [Theory]
     [InlineData(2, 3)]
     [InlineData(2, 100)]
-    [InlineData(-1, 5)]
     public void FewItemsPerWorkerStillRunEveryItemOnce(int workers, int count)
     {
         var (results, work) = RunCounting(Workers(workers), [.. Enumerable.Range(0, count)]);
@@ -152,15 +150,21 @@ public class ParallelMapTests
         Assert.Equal(count, work.Items);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void FewerThanOneWorkerIsRejected(int workers) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => new Execution(workers));
+
     private static void AssertSurfaces(Action run)
     {
         var failure = Assert.Throws<AggregateException>(run);
         Assert.Contains(failure.InnerExceptions, exception => exception is InvalidOperationException);
     }
 
-    private static (long[] Results, Work Work) RunCounting(ParallelOptions exec, ImmutableArray<int> order) =>
+    private static (long[] Results, Work Work) RunCounting(Execution execution, ImmutableArray<int> order) =>
         ParallelMap.Run(
-            exec,
+            execution,
             order,
             () => new CountingScratch(),
             (item, scratch) =>
@@ -180,5 +184,5 @@ public class ParallelMapTests
         return [.. order];
     }
 
-    private static ParallelOptions Workers(int count) => new() { MaxDegreeOfParallelism = count };
+    private static Execution Workers(int count) => new(count);
 }

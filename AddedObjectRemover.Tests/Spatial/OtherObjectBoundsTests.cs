@@ -71,7 +71,7 @@ public class OtherObjectBoundsTests
 
     private static OtherObject Place(int id, TestStatic model, Vector3 position) => TestShapes.Placed(Mod, id, model.Ref, position);
 
-    private static OtherObjectIndex CreateIndex(params OtherObject[] objects) => OtherObjectIndex.Create(objects, Shapes, new ParallelOptions(), UntimedPhases.Instance, TimedPhase.RivalBoundsBuild);
+    private static OtherObjectIndex CreateIndex(params OtherObject[] objects) => OtherObjectIndex.Create(objects, Shapes, new Execution(Environment.ProcessorCount), UntimedPhases.Instance, TimedPhase.RivalBoundsBuild);
 
     private static List<int> Collect(OtherObjectIndex index, Box area)
     {

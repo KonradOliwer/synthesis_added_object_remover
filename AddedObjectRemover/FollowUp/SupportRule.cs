@@ -42,7 +42,7 @@ internal sealed class SupportRule(
     AnchoringContactFinder contactFinder,
     float threshold,
     int targetCount,
-    ParallelOptions parallelOptions,
+    Execution execution,
     IPhaseTimer timer)
     : IFollowUpRule
 {
@@ -70,7 +70,7 @@ internal sealed class SupportRule(
     {
         var frontier = removedLastRound.Order().Select(target => target.Index).ToList();
         var pairs = search.CollectFrontierPairs(frontier, skip: node => ledger.IsDecided(new TargetId(node)));
-        var (inContact, work) = search.Tester.FindFirstInContact(pairs, ContactRule.TouchOrEnclose, parallelOptions);
+        var (inContact, work) = search.Tester.FindFirstInContact(pairs, ContactRule.TouchOrEnclose, execution);
         return (inContact.Select(pair => pair.Second).Distinct().Order().ToList(), work);
     }
 
@@ -78,7 +78,7 @@ internal sealed class SupportRule(
     {
         var missing = candidates.Where(candidate => _contacts[candidate] == null).ToList();
         var found = ParallelMap.Run(
-            parallelOptions, missing.Count, () => new SpatialQueryScratch(), (k, scratch) => contactFinder.FindContacts(missing[k], scratch));
+            execution, missing.Count, () => new SpatialQueryScratch(), (k, scratch) => contactFinder.FindContacts(missing[k], scratch));
         for (var k = 0; k < missing.Count; k++) _contacts[missing[k]] = found[k];
     }
 

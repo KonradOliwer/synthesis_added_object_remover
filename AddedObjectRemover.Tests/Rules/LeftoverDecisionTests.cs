@@ -14,15 +14,13 @@ public class LeftoverDecisionTests
 
     private static readonly ShapeCatalog Shapes = TestShapes.Create(OtherMod, "LeftoverDecisionData", Room);
 
-    private static LeftoverConfig Config(int occupiedPercent = 50, int removedPercent = 60, params InvisibleObjectKind[] protectedKinds) => new(
-        Enabled: true,
-        SearchRadius: 1024,
-        DirectionThresholdPercent: 50,
-        RemovedDirectionsPercent: removedPercent,
+    private static LeftoverOptions Config(int occupiedPercent = 50, int removedPercent = 60, params InvisibleObjectKind[] protectedKinds) => new(
+        LookAround: 1024,
+        DirectionClearedPercent: 50,
+        ClearedDirectionsPercent: removedPercent,
         OccupiedDirectionsPercent: occupiedPercent,
-        ProtectedPreset: ProtectedInvisibleObjectsPreset.Custom,
-        ProtectedKinds: protectedKinds.ToHashSet(),
-        MovesKeptMarkers: false);
+        NeverRemove: protectedKinds.ToHashSet(),
+        Preset: ProtectedInvisibleObjectsPreset.Custom);
 
     [Theory]
     [InlineData(3, 3, nameof(LeftoverDecision.KeptTooFewSurroundingObjects))]
@@ -67,13 +65,13 @@ public class LeftoverDecisionTests
             TestTargets.Create(markerInRoom, TestTargets.At(inRoom)),
             TestTargets.Create(protectedLightAlone, TestTargets.At(new Vector3(5000, 0, 0))),
         };
-        var visibility = new[]
-        {
+        var looks = new TargetLooks(
+        [
             ObjectVisibility.Invisible(InvisibleObjectKind.Lights),
             ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers),
             ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers),
             ObjectVisibility.Invisible(InvisibleObjectKind.Lights),
-        };
+        ]);
         var protection = Protection.Build(
             targets,
             [],
@@ -82,8 +80,8 @@ public class LeftoverDecisionTests
                 new Dictionary<int, KeepReason> { [referencedMarkerInRoom] = new(KeepKind.NonPlacedReference, "QUST record", "linked from QUST") }));
         var room = TestShapes.Placed(OtherMod, 0, Room.Ref, inRoom);
 
-        var evaluated = TestLeftovers.CreateSelector(targets, visibility, Shapes, [room], Config(protectedKinds: InvisibleObjectKind.Lights))
-            .SelectRemovals(new HashSet<int>(), new ParallelOptions());
+        var evaluated = TestLeftovers.CreateSelector(targets, looks, Shapes, [room], Config(protectedKinds: InvisibleObjectKind.Lights))
+            .SelectRemovals(new HashSet<int>(), new Execution(Environment.ProcessorCount));
         var result = TestLeftovers.DecideWithLedger(evaluated, protection, targets.Count);
 
         var decisions = result.Evaluations.ToDictionary(evaluation => evaluation.TargetIndex);

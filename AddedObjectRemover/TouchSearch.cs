@@ -9,20 +9,20 @@ namespace AddedObjectRemover;
 /// </summary>
 internal sealed class TouchSearch
 {
-    private readonly ParallelOptions _parallelOptions;
+    private readonly Execution _execution;
 
     private TouchSearch(
         TargetMeshPaths meshPaths,
         TouchCandidateFinder candidateFinder,
         TouchPairTester tester,
         TriangleStore cache,
-        ParallelOptions parallelOptions)
+        Execution execution)
     {
         MeshPaths = meshPaths;
         CandidateFinder = candidateFinder;
         Tester = tester;
         Cache = cache;
-        _parallelOptions = parallelOptions;
+        _execution = execution;
     }
 
     public TargetMeshPaths MeshPaths { get; }
@@ -33,39 +33,39 @@ internal sealed class TouchSearch
 
     public TriangleStore Cache { get; }
 
-    /// <param name="visibility">Parallel to <paramref name="targets"/>.</param>
+    /// <param name="looks">Parallel to <paramref name="targets"/>.</param>
     /// <param name="spaces">The spaces whose targets take part.</param>
     /// <param name="excluded">Targets that never take part, in addition to those without a mesh or not visible.</param>
     public static TouchSearch Create(
         IReadOnlyList<TargetObject> targets,
-        IReadOnlyList<ObjectVisibility> visibility,
+        TargetLooks looks,
         IReadOnlySet<FormKey> spaces,
         IReadOnlyList<int> excluded,
         ShapeCatalog shapes,
         TriangleStore cache,
         float tolerance,
-        ParallelOptions parallelOptions)
+        Execution execution)
     {
         var meshPaths = new TargetMeshPaths(targets, shapes);
         var candidateFinder = TouchCandidateFinder.Create(
             targets,
             spaces,
-            MarkExcluded(visibility, excluded, meshPaths),
+            MarkExcluded(looks, excluded, meshPaths),
             shapes,
             tolerance,
-            parallelOptions);
+            execution);
         var tester = new TouchPairTester(targets, meshPaths, cache, tolerance);
-        return new TouchSearch(meshPaths, candidateFinder, tester, cache, parallelOptions);
+        return new TouchSearch(meshPaths, candidateFinder, tester, cache, execution);
     }
 
     /// <remarks>
     /// An invisible target (marker, light, sound emitter, ...) can still have a mesh, for example an
     /// idle marker or a map marker reference; it neither holds up nor touches anything in game.
     /// </remarks>
-    internal static bool[] MarkExcluded(IReadOnlyList<ObjectVisibility> visibility, IReadOnlyList<int> excluded, TargetMeshPaths meshPaths)
+    internal static bool[] MarkExcluded(TargetLooks looks, IReadOnlyList<int> excluded, TargetMeshPaths meshPaths)
     {
-        var marks = new bool[visibility.Count];
-        for (var i = 0; i < marks.Length; i++) marks[i] = !meshPaths.HasMesh(i) || !visibility[i].IsVisible;
+        var marks = new bool[looks.ByTarget.Length];
+        for (var i = 0; i < marks.Length; i++) marks[i] = !meshPaths.HasMesh(i) || !looks.ByTarget[i].IsVisible;
         foreach (var target in excluded) marks[target] = true;
         return marks;
     }
@@ -87,6 +87,6 @@ internal sealed class TouchSearch
 
     public List<int>[] FindNeighborsOfAll(IReadOnlyList<int> nodes)
     {
-        return ParallelMap.Run(_parallelOptions, nodes.Count, i => CandidateFinder.FindNeighbors(nodes[i]));
+        return ParallelMap.Run(_execution, nodes.Count, i => CandidateFinder.FindNeighbors(nodes[i]));
     }
 }

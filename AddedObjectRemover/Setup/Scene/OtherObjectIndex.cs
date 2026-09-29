@@ -26,20 +26,20 @@ internal sealed class OtherObjectIndex
     private readonly Lazy<OtherObjectBoxIndex> _bounds;
 
     private OtherObjectIndex(
-        IReadOnlyList<OtherObject> objects, ShapeCatalog shapes, ParallelOptions parallelOptions, IPhaseTimer timer, TimedPhase boundsPhase)
+        IReadOnlyList<OtherObject> objects, ShapeCatalog shapes, Execution execution, IPhaseTimer timer, TimedPhase boundsPhase)
     {
         _objects = objects.ToArray();
         _shapes = shapes;
         _centers = new Vector3[_objects.Length];
         _state = new int[_objects.Length];
         PositionGrid = SpatialGrid.FromPoints(_objects.Select(o => o.Position).ToArray());
-        _bounds = new Lazy<OtherObjectBoxIndex>(() => timer.Time(boundsPhase, () => OtherObjectBoxIndex.Build(_objects, _shapes, parallelOptions)), LazyThreadSafetyMode.ExecutionAndPublication);
+        _bounds = new Lazy<OtherObjectBoxIndex>(() => timer.Time(boundsPhase, () => OtherObjectBoxIndex.Build(_objects, _shapes, execution)), LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
     /// <param name="boundsPhase">The phase under which building <see cref="Bounds"/> is timed.</param>
     public static OtherObjectIndex Create(
-        IReadOnlyList<OtherObject> objects, ShapeCatalog shapes, ParallelOptions parallelOptions, IPhaseTimer timer, TimedPhase boundsPhase) =>
-        new(objects, shapes, parallelOptions, timer, boundsPhase);
+        IReadOnlyList<OtherObject> objects, ShapeCatalog shapes, Execution execution, IPhaseTimer timer, TimedPhase boundsPhase) =>
+        new(objects, shapes, execution, timer, boundsPhase);
 
     /// <summary>The objects by raw position: only for matching objects by where they are placed.</summary>
     public SpatialGrid PositionGrid { get; }

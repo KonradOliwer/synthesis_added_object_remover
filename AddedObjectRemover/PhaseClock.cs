@@ -24,16 +24,10 @@ internal sealed class PhaseClock : IPhaseTimer
         Record(phase, timer.Elapsed);
     }
 
-    /// <summary>Every time the phase took, in the order the timings ended.</summary>
-    public ImmutableArray<TimeSpan> Samples(TimedPhase phase)
+    /// <summary>The times recorded so far.</summary>
+    public PhaseTimes Times()
     {
-        lock (_samplesLock) return _samples.TryGetValue(phase, out var samples) ? [.. samples] : [];
-    }
-
-    public TimeSpan Total(TimedPhase phase)
-    {
-        lock (_samplesLock)
-            return _samples.TryGetValue(phase, out var samples) ? samples.Aggregate(TimeSpan.Zero, (total, sample) => total + sample) : TimeSpan.Zero;
+        lock (_samplesLock) return new PhaseTimes(_samples.ToImmutableDictionary(entry => entry.Key, entry => entry.Value.ToImmutableArray()));
     }
 
     private void Record(TimedPhase phase, TimeSpan elapsed)

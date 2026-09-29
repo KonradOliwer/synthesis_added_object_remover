@@ -72,10 +72,10 @@ internal sealed class PlacedNpcIndex
     public IReadOnlyList<PointNpc> PointFallbacks => _pointFallbacks;
 
     /// <param name="spaceObjects">The objects of one space, in <see cref="OtherId"/> order.</param>
-    public static PlacedNpcIndex Build(IReadOnlyList<OtherObject> spaceObjects, NpcBodyCache bodies, ParallelOptions parallelOptions)
+    public static PlacedNpcIndex Build(IReadOnlyList<OtherObject> spaceObjects, NpcBodyCache bodies, Execution execution)
     {
         var placedNpcs = spaceObjects.Where(other => other.IsPlacedNpc).ToArray();
-        var placedBodies = ParallelMap.Run(parallelOptions, placedNpcs.Length, i => GetBodies(placedNpcs[i], bodies), rangeSize: ParallelMap.OneItemPerRange);
+        var placedBodies = ParallelMap.Run(execution, placedNpcs.Length, i => GetBodies(placedNpcs[i], bodies), rangeSize: ParallelMap.OneItemPerRange);
 
         var spawning = Enumerable.Range(0, placedNpcs.Length).Where(i => placedBodies[i] != null).ToArray();
         return new PlacedNpcIndex(

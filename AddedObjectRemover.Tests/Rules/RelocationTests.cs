@@ -55,17 +55,17 @@ public class RelocationTests
     public void MarkerWithoutAFreeSpotStaysInPlace()
     {
         var result = CreateRelocator(HomeCell, new FakeSurface(RelocationSurface.Navmesh, new Vector3(9000, 100, 0)))
-            .Relocate([KeptMarkerInsideOtherObject()], new ParallelOptions());
+            .Relocate([KeptMarkerInsideOtherObject()], new Execution(Environment.ProcessorCount));
 
         Assert.Empty(result.Moved);
         Assert.Single(result.LeftInPlace);
     }
 
     private static Relocation Relocate(CellArea? homeCell, params IFreeSpotSearch[] surfaces) =>
-        Assert.Single(CreateRelocator(homeCell, surfaces).Relocate([KeptMarkerInsideOtherObject()], new ParallelOptions()).Moved);
+        Assert.Single(CreateRelocator(homeCell, surfaces).Relocate([KeptMarkerInsideOtherObject()], new Execution(Environment.ProcessorCount)).Moved);
 
     private static KeptObjectRelocator CreateRelocator(CellArea? homeCell, params IFreeSpotSearch[] surfaces) =>
-        new([TestTargets.Create(0, TestTargets.At(Marker))], _ => homeCell, surfaces);
+        new([TestTargets.Create(0, TestTargets.At(Marker))], _ => homeCell, surfaces, KeptObjectRelocator.MaxMoveDistance);
 
     private static LeftoverEvaluation KeptMarkerInsideOtherObject() => new(
         TargetIndex: 0,
@@ -144,7 +144,7 @@ public class FreeSpotSearchTests
     private static VisibleObstacles CreateObstacles(TestStatic model)
     {
         var scene = TestScenes.CreateWithBackdrop([], [TestShapes.Placed(OtherMod, 0, model.Ref, Vector3.Zero)], Shapes);
-        return new VisibleObstacles(scene.Solids(), scene.VisibleTargets([]), new HashSet<int>(), Shapes);
+        return new VisibleObstacles(scene.Solids(), scene.VisibleTargets(new TargetLooks([])), new HashSet<int>(), Shapes);
     }
 
     /// <summary>Two triangles covering [0, size] x [0, size] at height 0.</summary>

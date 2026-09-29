@@ -1,0 +1,3 @@
+Warning: archive a.bsa is unreadable.
+[mesh] m.nif not found.
+Bounds warm-up: 6 target base objects in 1.5s.

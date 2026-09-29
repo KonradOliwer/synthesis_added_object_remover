@@ -10,24 +10,24 @@ internal sealed class Scene
     private readonly ShapeCatalog _shapes;
     private readonly NpcBodyCache _bodies;
     private readonly ObjectContainment _containment;
-    private readonly ParallelOptions _parallelOptions;
+    private readonly Execution _execution;
     private readonly PlacedSpaces _rivals;
     private readonly Lazy<PlacedSpaces> _solids;
 
-    private Scene(World world, ShapeCatalog shapes, TriangleStore triangles, NpcBodyCache bodies, ParallelOptions parallelOptions, IPhaseTimer timer)
+    private Scene(World world, ShapeCatalog shapes, TriangleStore triangles, NpcBodyCache bodies, Execution execution, IPhaseTimer timer)
     {
         _world = world;
         _shapes = shapes;
         _bodies = bodies;
         _containment = new ObjectContainment(shapes, triangles);
-        _parallelOptions = parallelOptions;
-        _rivals = new PlacedSpaces(world.Rivals, shapes, parallelOptions, timer, TimedPhase.RivalBoundsBuild);
+        _execution = execution;
+        _rivals = new PlacedSpaces(world.Rivals, shapes, execution, timer, TimedPhase.RivalBoundsBuild);
         _solids = new Lazy<PlacedSpaces>(
-            () => new PlacedSpaces([.. world.RivalsAndBackdrop], shapes, parallelOptions, timer, TimedPhase.SolidBoundsBuild), LazyThreadSafetyMode.ExecutionAndPublication);
+            () => new PlacedSpaces([.. world.RivalsAndBackdrop], shapes, execution, timer, TimedPhase.SolidBoundsBuild), LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
-    public static Scene Create(World world, ShapeCatalog shapes, TriangleStore triangles, NpcBodyCache bodies, ParallelOptions parallelOptions, IPhaseTimer timer) =>
-        new(world, shapes, triangles, bodies, parallelOptions, timer);
+    public static Scene Create(World world, ShapeCatalog shapes, TriangleStore triangles, NpcBodyCache bodies, Execution execution, IPhaseTimer timer) =>
+        new(world, shapes, triangles, bodies, execution, timer);
 
     public IRivalPositions RivalPositions() => new RivalPositions(_rivals);
 
@@ -37,21 +37,21 @@ internal sealed class Scene
             _containment,
             rival => !replaced.IsReplaced(rival.Id) && (npcs == NpcHandling.CountLikeObjects || !rival.IsPlacedNpc));
 
-    public INpcs Npcs(Replacements replaced) => new Npcs(_rivals, _bodies, replaced, _parallelOptions);
+    public INpcs Npcs(Replacements replaced) => new Npcs(_rivals, _bodies, replaced, _execution);
 
     /// <summary>Only when the run collected the backdrop.</summary>
     public ISolids Solids() => new Solids(_solids.Value, _containment);
 
-    /// <param name="visibility">By <see cref="TargetId"/>.</param>
-    public IVisibleTargets VisibleTargets(IReadOnlyList<ObjectVisibility> visibility) =>
-        new VisibleTargets(_world.Targets, visibility, _shapes, _containment);
+    /// <param name="looks">By <see cref="TargetId"/>.</param>
+    public IVisibleTargets VisibleTargets(TargetLooks looks) =>
+        new VisibleTargets(_world.Targets, looks, _shapes, _containment);
 
-    /// <param name="visibility">By <see cref="TargetId"/>.</param>
-    public RivalCensus Census(IReadOnlyList<ObjectVisibility> visibility)
+    /// <param name="looks">By <see cref="TargetId"/>.</param>
+    public RivalCensus Census(TargetLooks looks)
     {
         var targetSpaces = _world.Targets.Select(target => target.SpaceKey).ToHashSet();
         var visibleTargetSpaces = _world.Targets
-            .Where(target => visibility[target.Id.Index].IsVisible)
+            .Where(target => looks.ByTarget[target.Id.Index].IsVisible)
             .Select(target => target.SpaceKey)
             .ToHashSet();
         var invisibleByReason = _world.Rivals

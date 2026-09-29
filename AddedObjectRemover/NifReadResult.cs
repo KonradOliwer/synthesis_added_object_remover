@@ -35,6 +35,9 @@ internal sealed record NifReadResult(
     /// <summary>Set when the file footer's root node was used instead of NiflySharp's GetRootNode().</summary>
     public NifRoot? FooterRoot { get; init; }
 
+    /// <summary>Set when a NiTriStrips shape needed strip fields this NiflySharp version lacks.</summary>
+    public bool StripFieldsMissing { get; init; }
+
     public static NifReadResult Succeeded(NifGeometry geometry, string? warning) =>
         new(NifReadStatus.Success, geometry, null, null, warning);
 

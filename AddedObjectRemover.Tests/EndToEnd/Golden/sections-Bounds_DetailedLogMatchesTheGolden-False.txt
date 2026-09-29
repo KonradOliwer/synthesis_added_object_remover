@@ -1,0 +1,1 @@
+Bounds: 10 bases from NIF, 1 NIF misses, 2 from OBND, 4 without bounds. Meshes: 8 read, 1 effect-only, 0 failed (5 loose, 3 from 2 archives), 1 with a footer root other than their first node.

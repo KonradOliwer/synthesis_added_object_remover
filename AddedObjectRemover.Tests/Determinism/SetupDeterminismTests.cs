@@ -29,7 +29,7 @@ public class SetupDeterminismTests
 
     private static readonly ShapeCatalog Shapes = TestShapes.Create(Mod, "SetupDeterminismData", Table, Room);
 
-    private sealed record Scene(List<TargetObject> Targets, List<ObjectVisibility> Visibility, List<OtherObject> Rivals);
+    private sealed record Scene(List<TargetObject> Targets, TargetLooks Looks, List<OtherObject> Rivals);
 
     [Fact]
     public void ReplacementsMatchForOneAndEightWorkers()
@@ -79,6 +79,21 @@ public class SetupDeterminismTests
         Assert.Equal(expected, reversed);
     }
 
+    [Fact]
+    public void LooksMatchThePerTargetClassificationForOneAndEightWorkers()
+    {
+        var scene = CreateScene();
+        var expected = scene.Targets.Select(target => Shapes.GetVisibility(target.Base, target.IsPrimitive, target.HasMapMarker)).ToList();
+
+        var sequential = Looks.OfTargets(scene.Targets, Shapes, Options(SequentialWorkers));
+        var parallel = Looks.OfTargets(scene.Targets, Shapes, Options(ParallelWorkers));
+
+        Assert.Contains(expected, look => !look.IsVisible);
+        Assert.Contains(expected, look => look.IsVisible);
+        Assert.Equal(expected, sequential.ByTarget);
+        Assert.Equal(expected, parallel.ByTarget);
+    }
+
     /// <summary>A grid of visible tables, each third one shadowed by a rival table, and an invisible marker on each other cell, some inside a rival room.</summary>
     private static Scene CreateScene()
     {
@@ -103,7 +118,7 @@ public class SetupDeterminismTests
                 if (cell % ReplacedEvery == 0) rivals.Add(TestShapes.Placed(Mod, rivals.Count, Table.Ref, position + new Vector3(ReplacementOffset, 0, 0)));
             }
         }
-        return new Scene(targets, visibility, rivals);
+        return new Scene(targets, new TargetLooks([.. visibility]), rivals);
     }
 
     private static List<Replacement> FindReplacements(Scene scene, WorkOrder order, int workers) =>
@@ -119,7 +134,7 @@ public class SetupDeterminismTests
     {
         var world = CreateWorld(scene, workers);
         var rivals = world.ActiveRivals(Replacements.None(scene.Rivals.Count), NpcHandling.OnlyWhenStuckInObject);
-        var hosts = Hosts.Find(scene.Targets, scene.Visibility, rivals, order, Options(workers));
+        var hosts = Hosts.Find(scene.Targets, scene.Looks, rivals, order, Options(workers));
         return [.. Enumerable.Range(0, scene.Targets.Count).Select(index => hosts.HostOf(index)?.Id)];
     }
 
@@ -128,5 +143,5 @@ public class SetupDeterminismTests
 
     private static WorkOrder Reversed(int count) => new([.. Enumerable.Range(0, count).Reverse()]);
 
-    private static ParallelOptions Options(int workers) => new() { MaxDegreeOfParallelism = workers };
+    private static Execution Options(int workers) => new(workers);
 }

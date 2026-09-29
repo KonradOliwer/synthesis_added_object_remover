@@ -32,10 +32,10 @@ internal sealed class TouchCandidateFinder
         bool[] excluded,
         ShapeCatalog shapes,
         float tolerance,
-        ParallelOptions parallelOptions)
+        Execution execution)
     {
         var finder = new TouchCandidateFinder(targets, tolerance);
-        finder.BuildBoxes(spaces, excluded, shapes, parallelOptions);
+        finder.BuildBoxes(spaces, excluded, shapes, execution);
         finder.BuildGrids();
         return finder;
     }
@@ -64,9 +64,9 @@ internal sealed class TouchCandidateFinder
     private bool AreBoxesClose(int a, int b) =>
         _boxes[Math.Min(a, b)].Intersects(_boxes[Math.Max(a, b)], _tolerance);
 
-    private void BuildBoxes(IReadOnlySet<FormKey> spaces, bool[] excluded, ShapeCatalog shapes, ParallelOptions parallelOptions)
+    private void BuildBoxes(IReadOnlySet<FormKey> spaces, bool[] excluded, ShapeCatalog shapes, Execution execution)
     {
-        var boxes = ParallelMap.Run(parallelOptions, _targets.Count, i =>
+        var boxes = ParallelMap.Run(execution, _targets.Count, i =>
             excluded[i] || !spaces.Contains(_targets[i].SpaceKey)
                 ? (OrientedBox?)null
                 : OrientedBox.FromLocal(shapes.GetLocalBox(_targets[i].Base), _targets[i].Transform));

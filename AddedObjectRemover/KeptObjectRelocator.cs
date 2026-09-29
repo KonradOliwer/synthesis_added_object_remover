@@ -32,10 +32,12 @@ internal sealed record RelocationResult(IReadOnlyList<Relocation> Moved, IReadOn
 /// </summary>
 /// <param name="homeCellOf">Target index -&gt; the exterior cell it belongs to; null for an interior one, which may move anywhere.</param>
 /// <param name="surfaces">The spot searches, most preferred first.</param>
+/// <param name="maxDistance">Largest distance, in game units, an object is moved.</param>
 internal sealed class KeptObjectRelocator(
     IReadOnlyList<TargetObject> targets,
     Func<int, CellArea?> homeCellOf,
-    IReadOnlyList<IFreeSpotSearch> surfaces)
+    IReadOnlyList<IFreeSpotSearch> surfaces,
+    float maxDistance = KeptObjectRelocator.MaxMoveDistance)
 {
     /// <summary>Largest distance, in game units, an object is moved.</summary>
     public const float MaxMoveDistance = 2048f;
@@ -48,11 +50,11 @@ internal sealed class KeptObjectRelocator(
         InvisibleObjectKind.OtherMarkers,
     ];
 
-    public RelocationResult Relocate(IReadOnlyList<LeftoverEvaluation> evaluations, ParallelOptions options)
+    public RelocationResult Relocate(IReadOnlyList<LeftoverEvaluation> evaluations, Execution execution)
     {
         var candidates = evaluations.Where(IsMovableMarkerKeptInsideOtherObject).ToArray();
         var relocations = ParallelMap.Run(
-            options,
+            execution,
             candidates.Length,
             () => new SpatialQueryScratch(),
             (i, scratch) => TryFindRelocation(candidates[i], scratch),
@@ -78,7 +80,7 @@ internal sealed class KeptObjectRelocator(
         var from = target.Transform.Position;
         foreach (var surface in surfaces)
         {
-            if (surface.TryFindNearestFreePoint(target.SpaceKey, from, MaxMoveDistance, allowedCells, scratch, out var to))
+            if (surface.TryFindNearestFreePoint(target.SpaceKey, from, maxDistance, allowedCells, scratch, out var to))
             {
                 return new Relocation(evaluation, from, to, surface.Surface, LeftHomeCell: homeCell is { } home && !home.Contains(to));
             }

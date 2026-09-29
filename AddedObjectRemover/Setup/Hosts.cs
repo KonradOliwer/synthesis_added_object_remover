@@ -18,20 +18,20 @@ internal sealed class Hosts
     public OtherObject? HostOf(int targetIndex) =>
         (_hosts ?? throw new InvalidOperationException("The hosts were not computed in this run."))[targetIndex];
 
-    /// <param name="visibility">Parallel to <paramref name="targets"/>; only invisible targets have a host.</param>
+    /// <param name="looks">Parallel to <paramref name="targets"/>; only invisible targets have a host.</param>
     public static Hosts Find(
         IReadOnlyList<TargetObject> targets,
-        IReadOnlyList<ObjectVisibility> visibility,
+        TargetLooks looks,
         IActiveRivals rivals,
         WorkOrder order,
-        ParallelOptions options)
+        Execution execution)
     {
         return new(ParallelMap.Run(
-            options,
+            execution,
             order,
             targets.Count,
             () => new SpatialQueryScratch(),
-            (i, scratch) => visibility[i].Kind != null ? FindHost(targets[i], rivals, scratch) : null));
+            (i, scratch) => looks.ByTarget[i].Kind != null ? FindHost(targets[i], rivals, scratch) : null));
     }
 
     private static OtherObject? FindHost(TargetObject target, IActiveRivals rivals, SpatialQueryScratch scratch) =>

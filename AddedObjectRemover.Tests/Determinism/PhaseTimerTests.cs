@@ -25,11 +25,11 @@ public class PhaseTimerTests
         clock.Time(TimedPhase.TouchNarrowPhase, () => { });
 
         Assert.Equal(Answer, result);
-        var samples = clock.Samples(TimedPhase.TouchNarrowPhase);
+        var samples = clock.Times().Samples(TimedPhase.TouchNarrowPhase);
         Assert.Equal(2, samples.Length);
-        Assert.Equal(samples[0] + samples[1], clock.Total(TimedPhase.TouchNarrowPhase));
-        Assert.Empty(clock.Samples(TimedPhase.TouchSetup));
-        Assert.Equal(TimeSpan.Zero, clock.Total(TimedPhase.TouchSetup));
+        Assert.Equal(samples[0] + samples[1], clock.Times().Total(TimedPhase.TouchNarrowPhase));
+        Assert.Empty(clock.Times().Samples(TimedPhase.TouchSetup));
+        Assert.Equal(TimeSpan.Zero, clock.Times().Total(TimedPhase.TouchSetup));
     }
 
     [Fact]
@@ -40,10 +40,10 @@ public class PhaseTimerTests
         clock.Time(TimedPhase.TouchSetup, () => clock.Time(TimedPhase.RivalBoundsBuild, () => { }));
         clock.Time(TimedPhase.TouchSetup, () => clock.Time(TimedPhase.TouchSetup, () => { }));
 
-        var outer = clock.Samples(TimedPhase.TouchSetup);
+        var outer = clock.Times().Samples(TimedPhase.TouchSetup);
         Assert.Equal(3, outer.Length);
-        Assert.Single(clock.Samples(TimedPhase.RivalBoundsBuild));
-        Assert.True(outer[0] >= clock.Samples(TimedPhase.RivalBoundsBuild)[0]);
+        Assert.Single(clock.Times().Samples(TimedPhase.RivalBoundsBuild));
+        Assert.True(outer[0] >= clock.Times().Samples(TimedPhase.RivalBoundsBuild)[0]);
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public class PhaseTimerTests
 
         Assert.Throws<InvalidOperationException>(() => clock.Time(TimedPhase.TouchSetup, () => throw new InvalidOperationException()));
 
-        Assert.Empty(clock.Samples(TimedPhase.TouchSetup));
+        Assert.Empty(clock.Times().Samples(TimedPhase.TouchSetup));
     }
 
     [Fact]
@@ -63,6 +63,6 @@ public class PhaseTimerTests
 
         Parallel.For(0, ConcurrentTimings, _ => clock.Time(TimedPhase.RivalBoundsBuild, () => { }));
 
-        Assert.Equal(ConcurrentTimings, clock.Samples(TimedPhase.RivalBoundsBuild).Length);
+        Assert.Equal(ConcurrentTimings, clock.Times().Samples(TimedPhase.RivalBoundsBuild).Length);
     }
 }

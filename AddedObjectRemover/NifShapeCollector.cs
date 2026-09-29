@@ -17,6 +17,7 @@ internal sealed class ShapeStats
     public int HiddenAncestor;
     public int MarkerAncestor;
     public int MismatchedStrips;
+    public int StripFieldsMissing;
     public bool HiddenIgnored;
     public readonly SortedDictionary<string, int> Unsupported = new(StringComparer.Ordinal);
 
@@ -200,8 +201,9 @@ internal sealed class NifShapeCollector
     /// </summary>
     private void AppendTriangles(INiShape shape, int baseIndex, int vertexCount, List<int> allIndices)
     {
-        var triangles = NifShapes.GetTriangles(shape, out var stripsMismatched);
-        if (stripsMismatched) _stats.MismatchedStrips++;
+        var triangles = NifShapes.GetTriangles(shape, out var stripFault);
+        if (stripFault == StripFault.LengthsMismatch) _stats.MismatchedStrips++;
+        if (stripFault == StripFault.FieldsMissing) _stats.StripFieldsMissing++;
         if (triangles is not { Count: > 0 })
         {
             AppendPointTriangles(baseIndex, vertexCount, allIndices);

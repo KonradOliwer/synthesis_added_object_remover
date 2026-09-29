@@ -59,10 +59,10 @@ internal sealed class ShapeZoneSearch
     public int LargeOtherObjects { get; }
 
     /// <summary>Indexes the rivals of every space holding a visible target by their world AABB up front.</summary>
-    /// <param name="visibility">Parallel to <paramref name="targets"/>.</param>
+    /// <param name="looks">Parallel to <paramref name="targets"/>.</param>
     public static ShapeZoneSearch Create(
         IReadOnlyList<TargetObject> targets,
-        IReadOnlyList<ObjectVisibility> visibility,
+        TargetLooks looks,
         IActiveRivals rivals,
         ShapeCatalog shapes,
         TriangleStore meshCache,
@@ -70,22 +70,22 @@ internal sealed class ShapeZoneSearch
         NpcClashRule npcRule)
     {
         var largeRivals = Enumerable.Range(0, targets.Count)
-            .Where(i => visibility[i].IsVisible)
+            .Where(i => looks.ByTarget[i].IsVisible)
             .Select(i => targets[i].SpaceKey)
             .Distinct()
             .Sum(rivals.LargeObjectCount);
         return new ShapeZoneSearch(targets, rivals, largeRivals, shapes, meshCache, multiplier, npcRule);
     }
 
-    /// <param name="visibility">Parallel to the targets.</param>
-    public ClashSearchResult FindTooCloseTargets(IReadOnlyList<ObjectVisibility> visibility, WorkOrder order, ParallelOptions parallelOptions)
+    /// <param name="looks">Parallel to the targets.</param>
+    public ClashSearchResult FindTooCloseTargets(TargetLooks looks, WorkOrder order, Execution execution)
     {
         var (matches, work) = ParallelMap.Run(
-            parallelOptions,
+            execution,
             order,
             _targets.Count,
             () => new Scratch(),
-            (targetIndex, scratch) => visibility[targetIndex].IsVisible ? FindFirstTooCloseOther(targetIndex, scratch) : null,
+            (targetIndex, scratch) => looks.ByTarget[targetIndex].IsVisible ? FindFirstTooCloseOther(targetIndex, scratch) : null,
             scratch => scratch.Harvest());
         return new ClashSearchResult(TooCloseSearch.ToHits(_rivals, matches), work);
     }

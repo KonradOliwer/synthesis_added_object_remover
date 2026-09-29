@@ -1,0 +1,7 @@
+  Kept 000804:Target.esp in Tamriel: linked from QUST (touches removed 000800:Target.esp).
+Warning: archive a.bsa is unreadable.
+[mesh] m.nif not found.
+Touching objects: 1 removed in 1 components (1 with follow-up removals, largest 3 removed objects, longest chain 1 steps); 1 kept as referenced.
+  Pairs: 10 box candidates next to a removal tested over 1 levels, 4 touching, 1 without mesh triangles (never touching); 77 triangle pairs tested exactly.
+  Meshes indexed: 3 (900 triangles), 1 rebuilt, 1 evicted, 2 over 2,000,000 triangles not used; peak resident 2 meshes, ~5 MB.
+  Timing: setup 0.0s, broad phase 0.0s, narrow phase 0.0s.

@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 
 namespace AddedObjectRemover;
 
-internal readonly record struct TriangleTreeStats(
+internal readonly record struct TriangleStoreStats(
     int Built,
     int Rebuilt,
     int TooLarge,
@@ -94,7 +94,7 @@ internal sealed class TriangleStore(Func<string, NifGeometry?> readGeometry, lon
         return new TriangleLease(this, entry, tree);
     }
 
-    public TriangleTreeStats GetStats() => new(
+    public TriangleStoreStats GetStats() => new(
         Volatile.Read(ref _built),
         Volatile.Read(ref _rebuilt),
         Volatile.Read(ref _tooLarge),

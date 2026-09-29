@@ -35,12 +35,11 @@ internal sealed class PlacedRecordScanner
     private sealed record FoundTarget(TargetObject Target, IPlacedGetter Record, TargetLocation Location);
 
     private readonly IPatcherState<ISkyrimMod, ISkyrimModGetter> _state;
-    private readonly RunConfig _config;
+    private readonly ModKey _target;
+    private readonly ReadPlan _plan;
     private readonly ModTable _mods;
     private readonly ModStanding _standing;
     private readonly TargetPluginFootprint _footprint;
-    private readonly bool _collectsSurroundingsData;
-    private readonly bool _collectsNavmeshes;
     private readonly HashSet<FormKey> _landWorldspaces;
     private readonly HashSet<FormKey> _seenRecords = new();
     private readonly HashSet<FormKey> _seenNavmeshes = new();
@@ -65,25 +64,25 @@ internal sealed class PlacedRecordScanner
 
     private PlacedRecordScanner(
         IPatcherState<ISkyrimMod, ISkyrimModGetter> state,
-        RunConfig config,
+        ModKey target,
+        ReadPlan plan,
         ModTable mods,
         ModStanding standing,
         TargetPluginFootprint footprint)
     {
         _state = state;
-        _config = config;
+        _target = target;
+        _plan = plan;
         _mods = mods;
         _standing = standing;
         _footprint = footprint;
-        _collectsNavmeshes = config.Leftovers.MovesKeptMarkers;
-        _collectsSurroundingsData = config.FollowUpMode == FollowUpRemovalMode.ObjectsSupportedByIt || _collectsNavmeshes;
-        if (_collectsSurroundingsData) FindLandWorldspaces();
+        if (plan.Terrain) FindLandWorldspaces();
         _landWorldspaces = _landWorldspaceOf.Values.ToHashSet();
     }
 
-    public static GameSnapshot Scan(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, RunConfig config, ModTable mods, ModStanding standing)
+    public static GameSnapshot Read(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, ModKey target, ReadPlan plan, ModTable mods, ModStanding standing)
     {
-        var scanner = new PlacedRecordScanner(state, config, mods, standing, AnalyzeTargetPlugin(state, config));
+        var scanner = new PlacedRecordScanner(state, target, plan, mods, standing, AnalyzeTargetPlugin(state, target));
         scanner.ScanLoadOrder();
         scanner.CollectNonPlacedReferences();
         return scanner.CreateSnapshot();
@@ -137,25 +136,25 @@ internal sealed class PlacedRecordScanner
 
     /// <summary>A plugin can only link to a target FormKey if it is the target, has it as a master, or is the patch.</summary>
     private bool MayReferenceTarget(ISkyrimModGetter mod) =>
-        mod.ModKey == _config.Target
+        mod.ModKey == _target
         || mod.ModKey == _state.PatchMod.ModKey
-        || mod.MasterReferences.Any(master => master.Master == _config.Target);
+        || mod.MasterReferences.Any(master => master.Master == _target);
 
     /// <summary>
     /// Walks only the target plugin's own cell tree. A FormKey the target overrides is a
     /// replacement, never an "other mod" object, whichever plugin wins it.
     /// </summary>
-    private static TargetPluginFootprint AnalyzeTargetPlugin(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, RunConfig config)
+    private static TargetPluginFootprint AnalyzeTargetPlugin(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, ModKey target)
     {
         var footprint = new TargetPluginFootprint([], []);
-        if (state.LoadOrder.ListedOrder.FirstOrDefault(listing => listing.ModKey == config.Target)?.Mod is not { } mod) return footprint;
+        if (state.LoadOrder.ListedOrder.FirstOrDefault(listing => listing.ModKey == target)?.Mod is not { } mod) return footprint;
 
         foreach (var cellContext in mod.EnumerateMajorRecordContexts<ICell, ICellGetter>(state.LinkCache))
         {
             var hasTargetRecord = false;
             foreach (var (record, _) in cellContext.Record.EnumeratePlaced())
             {
-                if (record.FormKey.ModKey == config.Target) hasTargetRecord = true;
+                if (record.FormKey.ModKey == target) hasTargetRecord = true;
                 else footprint.OverriddenFormKeys.Add(record.FormKey);
             }
             if (hasTargetRecord) footprint.SpaceKeys.Add(GetCellSpace(cellContext).SpaceKey);
@@ -173,7 +172,7 @@ internal sealed class PlacedRecordScanner
         var inTargetSpace = _footprint.SpaceKeys.Contains(space.SpaceKey);
         if (inTargetSpace) _winningCells.TryAdd(cell.FormKey, cellContext);
         if (_landWorldspaces.Contains(space.SpaceKey)) CollectLandscape(cell, space);
-        if (_collectsNavmeshes && inTargetSpace) CollectNavmeshes(cell, space);
+        if (_plan.Navmesh && inTargetSpace) CollectNavmeshes(cell, space);
 
         foreach (var (record, persistent) in cell.EnumeratePlaced())
         {
@@ -222,10 +221,10 @@ internal sealed class PlacedRecordScanner
         if (collectReferences)
         {
             var isTargetObject = role == RecordRole.Target && placement != null;
-            TargetReferenceCollector.CollectFromPlaced(record, isTargetObject, _config.Target, _references, _links);
+            TargetReferenceCollector.CollectFromPlaced(record, isTargetObject, _target, _references, _links);
         }
 
-        if (_collectsSurroundingsData && role is not (RecordRole.Target or RecordRole.Other) && placement != null)
+        if (_plan.Backdrop && role is not (RecordRole.Target or RecordRole.Other) && placement != null)
         {
             _backdrop.Add(CreateOtherObject(record, placement, space.SpaceKey, winningMod, editorId: null));
         }
@@ -239,7 +238,7 @@ internal sealed class PlacedRecordScanner
         }
 
         if (role == RecordRole.Target) AddTarget(record, persistent, placement, cell, space);
-        else _rivals.Add(CreateOtherObject(record, placement, space.SpaceKey, winningMod, _config.DetailedLog ? record.EditorID : null));
+        else _rivals.Add(CreateOtherObject(record, placement, space.SpaceKey, winningMod, _plan.OtherEditorIds ? record.EditorID : null));
     }
 
     /// <returns>True when the record is neither a target nor another mod's object.</returns>
@@ -254,7 +253,7 @@ internal sealed class PlacedRecordScanner
                 return true;
             case RecordRole.OverriddenByTarget:
                 _othersOverriddenByTarget++;
-                if (_config.DetailedLog) _overriddenOthers.Add(new OverriddenOtherRecord(record.FormKey, record.EditorID, winningMod));
+                if (_plan.OverriddenOthersList) _overriddenOthers.Add(new OverriddenOtherRecord(record.FormKey, record.EditorID, winningMod));
                 return true;
             default:
                 return false;
@@ -270,10 +269,10 @@ internal sealed class PlacedRecordScanner
     private RecordRole Classify(IPlacedGetter record, ModKey winningMod)
     {
         var origin = record.FormKey.ModKey;
-        if (origin == _config.Target)
+        if (origin == _target)
         {
             // Also true when an earlier patcher in this run (the patch mod) overrode it.
-            return winningMod == _config.Target ? RecordRole.Target : RecordRole.TargetOverriddenLater;
+            return winningMod == _target ? RecordRole.Target : RecordRole.TargetOverriddenLater;
         }
         if (_mods.Find(origin) is { } originMod && _standing.IgnoredOrigins.Contains(originMod)) return RecordRole.IgnoredOrigin;
         return _footprint.OverriddenFormKeys.Contains(record.FormKey) ? RecordRole.OverriddenByTarget : RecordRole.Other;
@@ -334,7 +333,7 @@ internal sealed class PlacedRecordScanner
         var world = new World(
             targets.Select((found, index) => found.Target with { Id = new TargetId(index) }).ToImmutableArray(),
             NumberInFormKeyOrder(_rivals, firstId: 0),
-            _collectsSurroundingsData
+            _plan.Backdrop
                 ? Collected<ImmutableArray<OtherObject>>.Of(NumberInFormKeyOrder(_backdrop, firstId: _rivals.Count))
                 : Collected<ImmutableArray<OtherObject>>.NotCollected,
             ResolveLinks(targets),

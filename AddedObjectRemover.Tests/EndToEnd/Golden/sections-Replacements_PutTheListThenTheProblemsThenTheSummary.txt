@@ -1,0 +1,4 @@
+  Ignored replaced object Alpha [000010:Other.esp] from Other.esp: replaced by 000801:Target.esp, distance 3.5, size ratio 0.90.
+Warning: archive a.bsa is unreadable.
+[mesh] m.nif not found.
+Replacement matching: 1 other-mod objects excluded in 1.5s.

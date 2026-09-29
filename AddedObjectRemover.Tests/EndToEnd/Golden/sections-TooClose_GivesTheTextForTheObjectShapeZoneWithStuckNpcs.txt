@@ -1,0 +1,13 @@
+Object-shape zones: 10 candidate pairs, 8 passed the box filter, 6 mesh tests, 3 hits, 2 centre-point fallbacks (other object without mesh triangles), 1 targets without mesh triangles used their box; 40 triangle pairs tested exactly.
+  2 large other objects tested against every target of their space; 9 effect-only meshes (fog, light rays, water spray) ignored.
+  Meshes indexed: 4 (900 triangles), peak resident ~5 MB; timing: box index 0.5s, search 2.5s.
+Warning: archive a.bsa is unreadable.
+[mesh] m.nif not found.
+Found 1 of 3 Target.esp objects too close to other mods' objects in 1.5s.
+  Ignored 4 other-mod objects that are invisible (markers, lights, sounds, decals, trigger boxes, ...).
+    Lights: 3
+    Sounds: 1
+NPCs and creatures (only when stuck in the object): 5 placed NPCs evaluated: 2 sized by body mesh, 1 by Object Bounds, 1 by humanoid approximation, 1 sized as a point; 3 skipped because their base is no NPC; 12 NPC-object pairs tested (30 body boxes), 4 objects with an NPC stuck in them.
+  NPC body cache: 3 bodies built, 2 reused; 4 NPC bases resolved, 5 reused; 6 leveled lists resolved, 7 reused; 8 body mesh sets measured.
+  Sized as a point Beta [000011:Other.esp] from Other.esp: no body mesh.
+  Kept 000802:Target.esp in Tamriel: linked from QUST.

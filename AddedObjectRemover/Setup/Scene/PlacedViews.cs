@@ -56,7 +56,7 @@ internal sealed class ActiveRivals(PlacedSpaces rivals, ObjectContainment contai
     public int LargeObjectCount(FormKey space) => rivals.IndexOf(space).Bounds.LargeObjectCount;
 }
 
-internal sealed class Npcs(PlacedSpaces rivals, NpcBodyCache bodies, Replacements replaced, ParallelOptions parallelOptions) : INpcs
+internal sealed class Npcs(PlacedSpaces rivals, NpcBodyCache bodies, Replacements replaced, Execution execution) : INpcs
 {
     private readonly LazyCache<FormKey, PlacedNpcIndex> _bySpace = new();
 
@@ -80,7 +80,7 @@ internal sealed class Npcs(PlacedSpaces rivals, NpcBodyCache bodies, Replacement
     public IReadOnlyList<PointNpc> PointFallbacksIn(FormKey space) => IndexOf(space).PointFallbacks;
 
     private PlacedNpcIndex IndexOf(FormKey space) =>
-        _bySpace.GetOrCreate(space, () => PlacedNpcIndex.Build(rivals.ObjectsIn(space), bodies, parallelOptions));
+        _bySpace.GetOrCreate(space, () => PlacedNpcIndex.Build(rivals.ObjectsIn(space), bodies, execution));
 }
 
 internal sealed class Solids(PlacedSpaces solids, ObjectContainment containment) : ISolids

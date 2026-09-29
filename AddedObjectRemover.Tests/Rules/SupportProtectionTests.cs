@@ -39,10 +39,10 @@ public class SupportProtectionTests
         var held = Assert.IsType<Verdict.Held>(run.Ledger.Of(new TargetId(Protected)));
         var lost = Assert.IsType<Cause.LostSupport>(held.Cause);
         Assert.Equal(new TargetId(SeedTable), lost.MainSupporter);
-        var kept = Assert.Single(run.Anchoring.Kept);
+        var kept = Assert.Single(run.Kept);
         Assert.Equal(Protected, kept.TargetIndex);
         Assert.Equal(SeedTable, kept.TouchedTargetIndex);
-        Assert.True(Assert.Single(run.Anchoring.Evaluations, evaluation => evaluation.TargetIndex == Protected).Held);
+        Assert.True(Assert.Single(run.Evaluations, evaluation => evaluation.TargetIndex == Protected).Held);
     }
 
     [Fact]
@@ -53,8 +53,8 @@ public class SupportProtectionTests
         var run = Execute(itemPosition: new Vector3(23, 0, 0), otherSupporters: [floor]);
 
         Assert.Null(run.Ledger.Of(new TargetId(Protected)));
-        Assert.Empty(run.Anchoring.Kept);
-        var evaluation = Assert.Single(run.Anchoring.Evaluations, evaluation => evaluation.TargetIndex == Protected);
+        Assert.Empty(run.Kept);
+        var evaluation = Assert.Single(run.Evaluations, evaluation => evaluation.TargetIndex == Protected);
         Assert.False(evaluation.Held);
         Assert.False(evaluation.Removed);
     }
@@ -66,10 +66,10 @@ public class SupportProtectionTests
     {
         var run = Execute(itemPosition: new Vector3(5, 5, 10.5f), otherSupporters: [], isProtected, NeedleModel);
 
-        var evaluation = Assert.Single(run.Anchoring.Evaluations, evaluation => evaluation.TargetIndex == Protected);
+        var evaluation = Assert.Single(run.Evaluations, evaluation => evaluation.TargetIndex == Protected);
         Assert.Equal(0, evaluation.Contacts.ContactPoints);
-        Assert.Equal(1, run.Anchoring.Stats.Candidates);
-        Assert.Equal(isProtected ? 0 : 1, run.Anchoring.Stats.KeptWithoutContacts);
+        Assert.Equal(1, run.Result.Work.Candidates);
+        Assert.Equal(isProtected ? 0 : 1, run.Result.Work.KeptWithoutContacts);
     }
 
     private static TestSupportCascade.Run Execute(Vector3 itemPosition, List<OtherObject> otherSupporters, bool isProtected = true, TestStatic? itemModel = null)

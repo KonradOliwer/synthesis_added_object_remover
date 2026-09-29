@@ -39,6 +39,14 @@ internal sealed class WorkOrder
 
     /// <param name="targets">Target indexes, e.g. a step's candidates.</param>
     /// <returns>A permutation of the positions in <paramref name="targets"/>, in this order; equal targets keep their positions' order.</returns>
-    public ImmutableArray<int> Among(IReadOnlyList<int> targets) =>
-        [.. Enumerable.Range(0, targets.Count).OrderBy(position => _rank[targets[position]]).ThenBy(position => position)];
+    /// <exception cref="ArgumentOutOfRangeException">A target index is not one of the targets this order was built for.</exception>
+    public ImmutableArray<int> Among(IReadOnlyList<int> targets)
+    {
+        foreach (var target in targets)
+        {
+            if ((uint)target >= (uint)_rank.Length)
+                throw new ArgumentOutOfRangeException(nameof(targets), target, $"The work order covers {_rank.Length} targets.");
+        }
+        return [.. Enumerable.Range(0, targets.Count).OrderBy(position => _rank[targets[position]]).ThenBy(position => position)];
+    }
 }

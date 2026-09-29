@@ -181,7 +181,7 @@ public class DiagnosticsSettings
     public const string DefaultReportFolder = "AddedObjectRemover Reports";
 
     [SynthesisSettingName("Detailed log")]
-    [SynthesisTooltip("Lists every removed object and why.")]
+    [SynthesisTooltip("Lists every removed object and why, plus timings and statistics.")]
     public bool DetailedLog { get; set; }
 
     [SynthesisSettingName("Write report files")]

@@ -10,7 +10,7 @@ Compatibility patch detection: 2 plugins master the target.
 Ignored because of compatibility patches: Patched.esp, TargetPatch.esp.
 NPCs and creatures: OnlyWhenStuckInObject
 Also remove: objects supported by it, touch distance 8, threshold 50 %.
-Leftover invisible objects: removed, search radius 1024, removed area per direction 50%,removed directions required 60%, occupied directions required 50%, protected types None (none), kept markers inside other mods' objects left in place.
+Leftover invisible objects: removed, search radius 1024, removed area per direction 50%, removed directions required 60%, occupied directions required 50%, protected types None (none), kept markers inside other mods' objects left in place.
 Detailed log: True
 Write report files: True
 Report folder: <root>/Output/AddedObjectRemover Reports
@@ -35,9 +35,6 @@ NPCs and creatures (only when stuck in the object): 2 placed NPCs evaluated: 0 s
 Linked groups: 1 more objects removed with the too-close removals they are linked to.
 Anchoring: 1 removed over 2 iterations; 3 touching objects evaluated (3 evaluations), 0 kept without any contact points, 0 kept as referenced.
   Pairs: 3 box candidates next to a removal tested over 2 iterations, 3 touching, 0 without mesh triangles (never touching); 9 triangle pairs tested exactly.
-Anchoring diagnostics: wrote 3 evaluations to <root>/Output/AddedObjectRemover Reports/anchoring.csv.
-Mesh origins: 2 target meshes, 2 origin near bottom, 0 origin near centre, 0 other.
-  Wrote 2 mesh origins to <root>/Output/AddedObjectRemover Reports/mesh-origins.csv.
 Linked groups: 0 more objects removed with the follow-up removals they are linked to.
   Kept T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Leftover T_MarkerInsideBuilding [00081B:Target.esp] (XMarkers) in interior AorInterior [000800:Skyrim.esm]: removed, inside another mod's object (inside R_InsideBuilding [000814:Rival.esp] from Rival.esp); radius 1024, removed/total ground area East -, NorthEast -, North -, NorthWest -, West -, SouthWest -, South -, SouthEast -.
@@ -47,7 +44,6 @@ Linked groups: 0 more objects removed with the follow-up removals they are linke
   Leftover T_ExteriorMarkerInBuilding [000829:Target.esp] (XMarkers) in worldspace AorWorld [000801:Skyrim.esm]: kept, referenced: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp] (inside R_ExteriorBuilding [00081D:Rival.esp] from Rival.esp); radius 1024, removed/total ground area East -, NorthEast -, North -, NorthWest -, West -, SouthWest -, South -, SouthEast -.
 Leftover invisible objects: 5 evaluated in <time>; removed 4 (2 inside another mod's object, 2 surroundings removed); kept 1 (0 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 1 referenced).
 Linked groups: 0 more objects removed with the leftover invisible object removals they are linked to.
-Leftover invisible objects diagnostics: wrote 5 evaluations to <root>/Output/AddedObjectRemover Reports/leftover-invisible-objects.csv.
 Wrote 22 overrides (22 removed, 0 moved) in <time>.
   1 removed objects had an Enable Parent; it was replaced by the player with "opposite of parent" so they stay disabled.
   Removed T_TooClose [000807:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_TooClose_Pad [000805:Rival.esp] from Rival.esp
@@ -86,6 +82,10 @@ Possible manual patch needed: 3 objects to check.
   Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept, referenced by a non-placed record: T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm], cell AorExterior [000802:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
+Anchoring diagnostics: wrote 3 evaluations to <root>/Output/AddedObjectRemover Reports/anchoring.csv.
+Mesh origins: 2 target meshes, 2 origin near bottom, 0 origin near centre, 0 other.
+  Wrote 2 mesh origins to <root>/Output/AddedObjectRemover Reports/mesh-origins.csv.
+Leftover invisible objects diagnostics: wrote 5 evaluations to <root>/Output/AddedObjectRemover Reports/leftover-invisible-objects.csv.
 Manual patch hints: wrote 3 rows to <root>/Output/AddedObjectRemover Reports/manual-patch-hints.csv.
 ## patch
 000807:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (0.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none

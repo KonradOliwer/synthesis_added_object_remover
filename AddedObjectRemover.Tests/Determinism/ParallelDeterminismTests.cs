@@ -55,7 +55,7 @@ public class ParallelDeterminismTests
         var meshPaths = new TargetMeshPaths(paths);
         var tester = new TouchPairTester(targets, meshPaths, cache, Tolerance);
         var pairs = FindNearbyPairs(targets, meshPaths);
-        var options = new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism };
+        var options = new Execution(maxDegreeOfParallelism);
 
         var (touches, touchesWork) = tester.TestPairs(pairs, options);
         var (firstTouching, firstTouchingWork) = tester.FindFirstInContact(pairs, ContactRule.Touch, options);

@@ -13,7 +13,7 @@ internal static partial class OutputMasks
     private const string DurationPlaceholder = "in <time>";
 
     /// <summary>Timing, cache, memory and thread-count lines.</summary>
-    private static readonly string[] PerformanceLinePrefixes =
+    public static readonly IReadOnlyList<string> PerformanceLinePrefixes =
     [
         "Bounds warm-up: ",
         "World-bounds indexes built: ",
@@ -30,10 +30,10 @@ internal static partial class OutputMasks
     ];
 
     [GeneratedRegex(@"^Using \d+ threads\.$")]
-    private static partial Regex ThreadCount();
+    public static partial Regex ThreadCount();
 
     [GeneratedRegex(@"\bin \d+\.\d+s\b")]
-    private static partial Regex Duration();
+    public static partial Regex Duration();
 
     public static IReadOnlyList<string> MaskLog(IEnumerable<string> lines, string root) =>
         lines

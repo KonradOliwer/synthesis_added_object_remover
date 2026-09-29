@@ -66,11 +66,11 @@ internal sealed class ReplacementMatcher
         int rivalCount,
         ShapeCatalog shapes,
         WorkOrder order,
-        ParallelOptions parallelOptions)
+        Execution execution)
     {
         var matcher = new ReplacementMatcher(targets, rivals, shapes);
         var matchesByTarget = ParallelMap.Run(
-            parallelOptions,
+            execution,
             order,
             targets.Count,
             () => new List<OtherId>(),

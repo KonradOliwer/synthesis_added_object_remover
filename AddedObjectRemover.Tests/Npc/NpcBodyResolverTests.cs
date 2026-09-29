@@ -148,7 +148,7 @@ public class NpcBodyResolverTests
         new(new NpcBodyResolver(Records.ToImmutableLinkCache(), Shapes, measurer ?? new SkinnedBodyMeasurer(Shapes.ReadGeometry)));
 
     private static PlacedNpcIndex BuildIndex(params OtherObject[] npcs) =>
-        PlacedNpcIndex.Build(npcs, CreateCache(), new ParallelOptions());
+        PlacedNpcIndex.Build(npcs, CreateCache(), new Execution(Environment.ProcessorCount));
 
     private static OtherObject PlaceNpc(int index, FormKey npc, P3Float rotation) => TestNpcs.Place(Mod, index, npc, Vector3.Zero, rotation);
 

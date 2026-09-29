@@ -66,7 +66,7 @@ internal sealed class MeshFileSource
 
     private byte[]? ReadLooseFileOrNull(string meshPath)
     {
-        var loosePath = Path.Combine(_dataPath, meshPath);
+        var loosePath = Path.Combine(_dataPath, meshPath.Replace('\\', Path.DirectorySeparatorChar));
         try
         {
             return File.Exists(loosePath) ? File.ReadAllBytes(loosePath) : null;

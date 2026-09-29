@@ -13,7 +13,7 @@ Also remove: nothing.
 Leftover invisible objects: kept.
 Detailed log: True
 Write report files: True
-Report folder: <root>\Output\AddedObjectRemover Reports
+Report folder: <root>/Output/AddedObjectRemover Reports
   Ignored other-mod object overridden by Target.esp: R_OverriddenByTarget_Pad [000821:Rival.esp] from Rival.esp.
 Scanned 75 placed records in <time>: 40 Target.esp objects to check, 28 objects from other mods.
   Ignored 1 Target.esp objects whose winning version comes from a later plugin.
@@ -65,7 +65,7 @@ Removed markers by type: none.
 Possible manual patch needed: 2 objects to check.
   Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
-Manual patch hints: wrote 2 rows to <root>\Output\AddedObjectRemover Reports\manual-patch-hints.csv.
+Manual patch hints: wrote 2 rows to <root>/Output/AddedObjectRemover Reports/manual-patch-hints.csv.
 ## patch
 000807:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (0.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
 000808:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (4000.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none

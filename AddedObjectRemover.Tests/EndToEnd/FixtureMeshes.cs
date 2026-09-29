@@ -49,7 +49,7 @@ internal static class FixtureMeshes
     {
         var nif = TestNifs.CreateWithRoot();
         foreach (var part in parts) TestNifs.AddShape(nif, TestNifs.Root(nif), TestMeshes.BoxTriangles(part));
-        var path = Path.Combine(dataFolder, MeshesFolder, model);
+        var path = Path.Combine(dataFolder, MeshesFolder, model.Replace('\\', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllBytes(path, TestNifs.Save(nif));
     }

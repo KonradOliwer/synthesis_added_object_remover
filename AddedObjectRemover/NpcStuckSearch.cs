@@ -59,16 +59,16 @@ internal sealed class NpcStuckSearch
     }
 
     /// <summary>Sizes the placed NPCs of every space holding a visible target up front.</summary>
-    /// <param name="visibility">Parallel to <paramref name="targets"/>.</param>
+    /// <param name="looks">Parallel to <paramref name="targets"/>.</param>
     public static NpcStuckSearch Create(
         IReadOnlyList<TargetObject> targets,
-        IReadOnlyList<ObjectVisibility> visibility,
+        TargetLooks looks,
         INpcs npcs,
         ShapeCatalog shapes,
         TriangleStore meshCache)
     {
         var spaces = Enumerable.Range(0, targets.Count)
-            .Where(i => visibility[i].IsVisible)
+            .Where(i => looks.ByTarget[i].IsVisible)
             .Select(i => targets[i].SpaceKey)
             .Distinct()
             .ToList();

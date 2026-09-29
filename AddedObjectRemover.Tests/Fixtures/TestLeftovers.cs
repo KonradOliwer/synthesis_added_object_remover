@@ -12,18 +12,18 @@ internal static class TestLeftovers
     /// <param name="others">Other mods' objects of <see cref="TestTargets.Space"/>.</param>
     public static LeftoverInvisibleObjectSelector CreateSelector(
         IReadOnlyList<TargetObject> targets,
-        IReadOnlyList<ObjectVisibility> visibility,
+        TargetLooks looks,
         ShapeCatalog shapes,
         IReadOnlyList<OtherObject> others,
-        LeftoverConfig config)
+        LeftoverOptions config)
     {
         var scene = TestScenes.Create(targets, others, shapes);
         var order = WorkOrder.Of(targets);
         return new(
             targets,
-            visibility,
-            scene.VisibleTargets(visibility),
-            Hosts.Find(targets, visibility, scene.ActiveRivals(Replacements.None(others.Count), NpcHandling.OnlyWhenStuckInObject), order, new ParallelOptions()),
+            looks,
+            scene.VisibleTargets(looks),
+            Hosts.Find(targets, looks, scene.ActiveRivals(Replacements.None(others.Count), NpcHandling.OnlyWhenStuckInObject), order, new Execution(Environment.ProcessorCount)),
             new InvisibleObjectReach(new BaseFactsReader(new SkyrimMod(ReachRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache())),
             config,
             order);

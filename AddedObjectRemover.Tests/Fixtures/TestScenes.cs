@@ -25,7 +25,7 @@ internal static class TestScenes
             shapes,
             new TriangleStore(shapes.ReadGeometry),
             bodies ?? CreateBodiesWithoutRecords(shapes),
-            new ParallelOptions { MaxDegreeOfParallelism = threads },
+            new Execution(threads),
             UntimedPhases.Instance);
 
     /// <summary>A scene whose only other objects are backdrop objects, as solids for support and obstacles.</summary>

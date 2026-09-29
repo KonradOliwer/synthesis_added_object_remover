@@ -27,7 +27,7 @@ not.
 2. Set *Mod to clean up*.
 3. Run the group and keep `AddedObjectRemover.esp` enabled after the target plugin.
 
-The log ends with a *Possible manual patch needed* section listing removed markers and kept objects worth checking by hand.
+The log ends with a *Possible manual patch needed* section listing removed markers and kept objects worth checking by hand, followed by where the report files were written.
 
 ## Settings
 
@@ -98,7 +98,7 @@ types unless they are linked to a removed object. *Never remove* presets:
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| Detailed log | `false` | Lists every removed object and why, plus per-space counts and unreadable meshes. |
+| Detailed log | `false` | Lists every removed object and why, plus per-space counts, unreadable meshes, timings and processing statistics. |
 | Write report files | `false` | Saves CSV files for checking the results (see *Reports and log*). |
 | Report folder | `AddedObjectRemover Reports` | Folder for report files: a full path, or relative to the patch output folder. Only used when *Write report files* is on. |
 
@@ -125,7 +125,9 @@ what is allowed there instead of only showing a raw error.
 
 ## Reports and log
 
-The log always ends with a *Possible manual patch needed* section: removed markers actors or the
+The normal log shows only what you need: the settings in use, warnings and errors, the final summaries of removed, kept and moved objects, one line per kept object, a summary of unreadable meshes, and where report files were written. Turn on *Detailed log* for every removed object and why, per-space counts, unreadable-mesh details, timings and processing statistics.
+
+The log ends with a *Possible manual patch needed* section, followed by where the report files were written: removed markers actors or the
 map use (door, map, idle and furniture markers), and objects that would have been removed but were
 kept, grouped by why (part of a linked group, kept because something depends on it, or a teleport
 door).

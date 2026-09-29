@@ -1,0 +1,15 @@
+Target plugin: Target.esp
+Size multiplier: 0.5
+Removal zone: ObjectShape
+Excluded plugins: Extra.esp, Second.esp
+Ignored masters of target: Skyrim.esm
+Compatibility patch detection: 2 plugins master the target.
+  Plugin Merged.esp skipped: too many masters (likely generated or merged); it masters the target and 3 other mods.
+  Compatibility patch Compat.esp: links target with Other.esp.
+Ignored because of compatibility patches: Compat.esp, Other.esp.
+NPCs and creatures: OnlyWhenStuckInObject
+Also remove: objects supported by it, touch distance 8, threshold 50 %.
+Leftover invisible objects: removed, search radius 1024, removed area per direction 50%, removed directions required 60%, occupied directions required 50%, protected types None (none), kept markers inside other mods' objects moved.
+Detailed log: True
+Write report files: True
+Report folder: /out/AddedObjectRemover Reports

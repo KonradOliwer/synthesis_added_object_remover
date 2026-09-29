@@ -41,14 +41,56 @@ public static class Program
         Console.WriteLine("=== Added Object Remover ===");
 
         var settings = loadSettings();
-        var mods = ModFactsReader.Read(state);
-        var config = RunConfigFactory.Create(settings, mods, state.OutputPath.Path);
-        if (config == null) return;
-        var standing = Standing.Decide(mods, config.Standing);
-        DiagnosticsFiles.DeleteEarlierFiles(config.DiagnosticsFolder, config.WritesDiagnostics);
-        RunReport.PrintConfig(config, mods, standing);
+        var log = new ConsoleRunLog();
+        var game = new GameReader(state);
+        var mods = game.ReadModFacts();
+        var built = OptionsBuilder.Build(settings, mods, state.OutputPath.Path, workers);
+        log.Print(LogSections.Warnings(built.Warnings));
+        if (built is not OptionsResult.Ready { Options: var options })
+        {
+            log.Print(LogSections.Stop(((OptionsResult.Stop)built).Reason));
+            return;
+        }
+        if (ReportFolder.Prepare(options.Reports) is { } folderWarning) log.Print(LogSections.ReportFolderWarning(folderWarning));
 
-        new RemovalPipeline(state, config, mods, standing, workers).Run(totalTimer);
+        var assets = Assets.Create(state, new BaseFactsReader(state.LinkCache));
+        var context = assets.ReportContext(options.DetailedLog);
+        var result = Composition.Run(options, mods, game, assets, log);
+        switch (result)
+        {
+            case RunResult.Stopped stopped:
+                log.Print(LogSections.Stop(stopped.Reason));
+                return;
+            case RunResult.Done done:
+                PrintOutcome(done.Outcome, context, log);
+                WriteReports(options, done, context, log);
+                log.Print(LogSections.Done(totalTimer.Elapsed, context));
+                return;
+            default:
+                throw new InvalidOperationException($"Unhandled run result {result.GetType().Name}.");
+        }
+    }
+
+    /// <summary>The closing sections: what was removed and kept, and what may need a manual patch.</summary>
+    private static void PrintOutcome(Outcome outcome, ReportContext context, IRunLog log)
+    {
+        var world = outcome.World;
+        var removals = outcome.Removals;
+        log.Print(LogSections.Removals(world, removals, context));
+        log.Print(LogSections.Bounds(outcome.Shapes, context));
+        log.Print(LogSections.Spaces(world, removals, context));
+        log.Print(LogSections.RemovalSummary(removals));
+        log.Print(LogSections.KeptSummary(Decisions.Kept(outcome.Final)));
+        log.Print(LogSections.MarkersByType(removals, outcome.Looks));
+        log.Print(LogSections.Hints(world, outcome.Hints));
+    }
+
+    private static void WriteReports(RunOptions options, RunResult.Done done, ReportContext context, IRunLog log)
+    {
+        var tables = Tables.Build(done.Outcome, done.Explanations, options.Reports, options.Leftovers, options.FollowUp, context);
+        var files = ReportFolder.Write(options.Reports, tables);
+        log.Print(LogSections.Written(files.Written, done.Explanations, context));
+        log.Print(LogSections.ReportFileWarnings(files.Warnings));
     }
 
     /// <summary>Settings are read lazily from settings.json; an invalid saved value throws here on first access.</summary>

@@ -24,7 +24,7 @@ public class RivalCensusTests
             TestTargets.Create(0, TestTargets.At(Vector3.Zero), Crate.Ref, TestTargets.Space),
             TestTargets.Create(1, TestTargets.At(Vector3.Zero), baseRef: null, SpaceWithOnlyInvisibleTargets),
         ];
-        ObjectVisibility[] visibility = [ObjectVisibility.Visible, ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers)];
+        TargetLooks looks = new([ObjectVisibility.Visible, ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers)]);
         var farAway = new Vector3(50000, 0, 0);
         List<OtherObject> rivals =
         [
@@ -35,7 +35,7 @@ public class RivalCensusTests
             TestNpcs.Place(Mod, 4, MissingBase.FormKey, Vector3.Zero, default) with { SpaceKey = SpaceWithOnlyInvisibleTargets },
         ];
 
-        var census = TestScenes.Create(targets, rivals, Shapes).Census(visibility);
+        var census = TestScenes.Create(targets, rivals, Shapes).Census(looks);
 
         Assert.Equal(
             new[] { KeyValuePair.Create("MapMarkers", 1), KeyValuePair.Create("base not found", 1) },

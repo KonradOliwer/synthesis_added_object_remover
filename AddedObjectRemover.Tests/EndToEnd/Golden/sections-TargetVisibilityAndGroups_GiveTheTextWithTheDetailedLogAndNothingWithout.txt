@@ -1,0 +1,2 @@
+Target objects: 1 visible, 2 invisible (by kind: 1 DoorMarkers, 1 base not found), 5 without placement/disabled.
+Linked groups: 1 groups of linked target objects (2 objects) from 2 links to target-plugin records.

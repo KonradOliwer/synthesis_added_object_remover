@@ -15,24 +15,8 @@ internal sealed record TouchStats(
     int MaxDepth,
     PairTestStats Pairs);
 
-/// <param name="Removals">The follow-up rounds' removals: touching ones and the linked group members removed with them.</param>
-/// <param name="Kept">The objects the follow-up rounds held.</param>
-internal sealed record TouchClusters(List<Removal> Removals, List<KeptTarget> Kept, TouchStats Stats, TouchDiagnosticsData? Diagnostics);
-
 /// <summary>A touching pair of targets in the same component; First &lt; Second.</summary>
 internal readonly record struct TouchEdge(int ComponentId, TargetPair Pair, float MinSurfaceDistance);
-
-/// <param name="ComponentId">Target index -&gt; component id, or -1 if not a node.</param>
-/// <param name="ParentOf">Target index -&gt; the target index it was reached through (its Touching or Linked cause), or -1 for a seed.</param>
-/// <param name="Depth">Target index -&gt; its distance (edge count) from a seed.</param>
-/// <param name="ComponentMembers">Component id -&gt; every target index in it (seed, removed or held): seeds, then round by round, each in target order.</param>
-/// <param name="Edges">Every touching pair with both ends in the same component.</param>
-internal sealed record TouchDiagnosticsData(
-    int[] ComponentId,
-    int[] ParentOf,
-    int[] Depth,
-    List<List<int>> ComponentMembers,
-    List<TouchEdge> Edges);
 
 /// <summary>
 /// The connected components of the touch cascade, read from the ledger. Nodes are the seeds (every
@@ -45,53 +29,52 @@ internal sealed record TouchDiagnosticsData(
 /// </summary>
 internal sealed class TouchComponents
 {
-    private const int None = -1;
-
     private readonly Ledger _ledger;
     private readonly TouchSearch _search;
-    private readonly ParallelOptions _parallelOptions;
+    private readonly Execution _execution;
     private readonly List<int> _nodes = [];
     private readonly int[] _componentId;
     private readonly int[] _parentOf;
     private readonly int[] _depth;
     private readonly List<List<int>> _componentMembers = [];
 
-    private TouchComponents(Ledger ledger, int targetCount, TouchSearch search, ParallelOptions parallelOptions)
+    private TouchComponents(Ledger ledger, int targetCount, TouchSearch search, Execution execution)
     {
         _ledger = ledger;
         _search = search;
-        _parallelOptions = parallelOptions;
+        _execution = execution;
         _componentId = new int[targetCount];
-        Array.Fill(_componentId, None);
+        Array.Fill(_componentId, TouchComponentSet.None);
         _parentOf = new int[targetCount];
-        Array.Fill(_parentOf, None);
+        Array.Fill(_parentOf, TouchComponentSet.None);
         _depth = new int[targetCount];
     }
 
-    /// <param name="ledger">The ledger after the follow-up rounds.</param>
-    /// <param name="seedRound">The too-close round.</param>
-    /// <param name="followUpRounds">The rounds of the touch cascade, in order.</param>
-    /// <param name="evidence">The cascade's evidence, one per follow-up round.</param>
-    public static TouchClusters Find(
-        Ledger ledger,
-        LedgerReport report,
-        int targetCount,
-        Round seedRound,
-        ImmutableArray<Round> followUpRounds,
-        ImmutableArray<RoundEvidence> evidence,
-        TouchSearch search,
-        ParallelOptions parallelOptions,
-        IPhaseTimer timer,
-        bool collectDiagnostics)
+    /// <param name="followUp">A result of the touch rounds; its ledger ends with them, right after the too-close round.</param>
+    public static TouchComponentSet Find(FollowUpResult followUp, int targetCount, Execution execution)
     {
-        var components = new TouchComponents(ledger, targetCount, search, parallelOptions);
-        components.RecordDiscovery(seedRound, followUpRounds);
-        components.AssignComponents(ledger.RemovedIn(seedRound), followUpRounds);
-        var stats = components.CreateStats([.. evidence.Cast<TouchRound>()]);
-        var removals = followUpRounds.SelectMany(report.RemovalsIn).ToList();
-        var kept = followUpRounds.SelectMany(round => LedgerReport.KeptIn(ledger, round)).ToList();
-        var diagnostics = collectDiagnostics ? timer.Time(TimedPhase.TouchDiagnosticsEdges, components.CreateDiagnostics) : null;
-        return new TouchClusters(removals, kept, stats, diagnostics);
+        var context = followUp.Context ?? throw new ArgumentException("Touch components need the touch rounds' context.", nameof(followUp));
+        var ledger = followUp.Ledger;
+        var seedRound = ledger.Rounds[ledger.Rounds.Length - followUp.Rounds.Length - 1];
+        var components = new TouchComponents(ledger, targetCount, context.Search, execution);
+        components.RecordDiscovery(seedRound, followUp.Rounds);
+        components.AssignComponents(ledger.RemovedIn(seedRound), followUp.Rounds);
+        return components.CreateSet([.. followUp.Evidence.Cast<TouchRound>()]);
+    }
+
+    /// <returns>The candidate pairs from each of <paramref name="nodes"/> to a larger neighbour <paramref name="include"/> accepts, each once with First &lt; Second.</returns>
+    public static List<TargetPair> CollectCandidatePairs(TouchSearch search, IReadOnlyList<int> nodes, Func<int, int, bool> include)
+    {
+        var neighbors = search.FindNeighborsOfAll(nodes);
+        var pairs = new List<TargetPair>();
+        for (var i = 0; i < nodes.Count; i++)
+        {
+            foreach (var neighbor in neighbors[i])
+            {
+                if (neighbor > nodes[i] && include(nodes[i], neighbor)) pairs.Add(new TargetPair(nodes[i], neighbor));
+            }
+        }
+        return pairs;
     }
 
     /// <summary>Seeds in target order at depth 0, then each follow-up round's objects in target order, one step beyond their cause.</summary>
@@ -147,24 +130,17 @@ internal sealed class TouchComponents
     private List<TargetPair> FindTouchingPairs(IReadOnlyList<int> nodes)
     {
         var inSet = nodes.ToHashSet();
-        var pairs = CollectCandidatePairs(nodes, (first, second) => inSet.Contains(second));
-        var (results, _) = _search.Tester.TestPairs(pairs, _parallelOptions);
+        var pairs = CollectCandidatePairs(_search, nodes, (_, second) => inSet.Contains(second));
+        var (results, _) = _search.Tester.TestPairs(pairs, _execution);
         return pairs.Where((_, k) => results[k] == PairTouch.Touching).ToList();
     }
 
-    private List<TargetPair> CollectCandidatePairs(IReadOnlyList<int> nodes, Func<int, int, bool> include)
-    {
-        var neighbors = _search.FindNeighborsOfAll(nodes);
-        var pairs = new List<TargetPair>();
-        for (var i = 0; i < nodes.Count; i++)
-        {
-            foreach (var neighbor in neighbors[i])
-            {
-                if (neighbor > nodes[i] && include(nodes[i], neighbor)) pairs.Add(new TargetPair(nodes[i], neighbor));
-            }
-        }
-        return pairs;
-    }
+    private TouchComponentSet CreateSet(IReadOnlyList<TouchRound> rounds) => new(
+        CreateStats(rounds),
+        [.. _componentId],
+        [.. _parentOf],
+        [.. _depth],
+        [.. _componentMembers.Select(members => members.ToImmutableArray())]);
 
     private TouchStats CreateStats(IReadOnlyList<TouchRound> rounds)
     {
@@ -179,21 +155,4 @@ internal sealed class TouchComponents
             _nodes.Select(node => _depth[node]).DefaultIfEmpty(0).Max(),
             PairTestStats.Sum(rounds.Select(round => round.Work)));
     }
-
-    /// <summary>The touching pairs with both ends, held objects included, in the same component, with their distances.</summary>
-    private TouchDiagnosticsData CreateDiagnostics()
-    {
-        var pairs = CollectCandidatePairs(_nodes, (first, second) => _componentId[second] != None && _componentId[second] == _componentId[first]);
-        var (results, _) = _search.Tester.TestPairs(pairs, _parallelOptions);
-        var touching = pairs.Where((_, k) => results[k] == PairTouch.Touching).ToList();
-        var distances = MeasureMinSurfaceDistances(touching);
-        var edges = touching.Select((pair, i) => new TouchEdge(_componentId[pair.First], pair, distances[i])).ToList();
-        return new TouchDiagnosticsData(_componentId, _parentOf, _depth, _componentMembers, edges);
-    }
-
-    private float[] MeasureMinSurfaceDistances(List<TargetPair> pairs) =>
-        ParallelMap.Run(_parallelOptions, pairs.Count, () => new TouchScratch(), (i, scratch) => _search.Tester.MeasureMinSurfaceDistance(pairs[i], scratch));
 }
-
-/// <summary>Where the touch search spent its time; for the log only.</summary>
-internal readonly record struct TouchTimes(TimeSpan Setup, TimeSpan BroadPhase, TimeSpan NarrowPhase, TimeSpan DiagnosticsEdges);

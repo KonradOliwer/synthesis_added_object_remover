@@ -29,23 +29,23 @@ internal static class TooCloseSearch
     }
 
     /// <summary>Candidates are tested in index order, so which rival is reported does not depend on thread scheduling.</summary>
-    /// <param name="visibility">Parallel to <paramref name="targets"/>.</param>
+    /// <param name="looks">Parallel to <paramref name="targets"/>.</param>
     public static ClashSearchResult FindTooCloseTargets(
         IReadOnlyList<TargetObject> targets,
-        IReadOnlyList<ObjectVisibility> visibility,
+        TargetLooks looks,
         IActiveRivals rivals,
         ShapeCatalog shapes,
         float multiplier,
         NpcClashRule npcRule,
         WorkOrder order,
-        ParallelOptions parallelOptions)
+        Execution execution)
     {
         var (matches, work) = ParallelMap.Run(
-            parallelOptions,
+            execution,
             order,
             targets.Count,
             () => new Scratch(),
-            (targetIndex, scratch) => visibility[targetIndex].IsVisible
+            (targetIndex, scratch) => looks.ByTarget[targetIndex].IsVisible
                 ? FindFirstTooCloseOther(targets[targetIndex], targetIndex, rivals, shapes, multiplier, npcRule, scratch)
                 : null,
             scratch => scratch.Harvest());

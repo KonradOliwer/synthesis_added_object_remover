@@ -1,13 +1,15 @@
 namespace AddedObjectRemover.Tests.EndToEnd;
 
-/// <summary>The settings the end-to-end runs use; every variant logs in detail and writes report files.</summary>
+/// <summary>The settings the end-to-end runs use; every variant writes report files, and all but the normal-log one log in detail.</summary>
 internal static class SettingsVariants
 {
     public const string TouchWithLeftoversAndRelocation = "touch-leftovers-relocation";
     public const string Support = "support";
     public const string NothingWithBoxZoneAndNpcsAsObjects = "nothing-box-npcs-as-objects";
+    public const string TouchWithLeftoversAndRelocationNormalLog = "touch-leftovers-relocation-normal";
 
-    public static readonly IReadOnlyList<string> Names = [TouchWithLeftoversAndRelocation, Support, NothingWithBoxZoneAndNpcsAsObjects];
+    public static readonly IReadOnlyList<string> Names =
+        [TouchWithLeftoversAndRelocation, Support, NothingWithBoxZoneAndNpcsAsObjects, TouchWithLeftoversAndRelocationNormalLog];
 
     public static Settings Of(string name) => name switch
     {
@@ -26,6 +28,7 @@ internal static class SettingsVariants
         NothingWithBoxZoneAndNpcsAsObjects => Create(
             ZoneShape.BoundingBox, NpcHandling.CountLikeObjects, FollowUpRemovalMode.Nothing,
             new LeftoverInvisibleObjectSettings { RemoveLeftoverInvisibleObjects = false }),
+        TouchWithLeftoversAndRelocationNormalLog => WithNormalLog(Of(TouchWithLeftoversAndRelocation)),
         _ => throw new ArgumentOutOfRangeException(nameof(name), name, "Unknown settings variant."),
     };
 
@@ -43,4 +46,10 @@ internal static class SettingsVariants
         LeftoverInvisibleObjects = leftovers,
         Diagnostics = new DiagnosticsSettings { DetailedLog = true, WriteReportFiles = true },
     };
+
+    private static Settings WithNormalLog(Settings settings)
+    {
+        settings.Diagnostics!.DetailedLog = false;
+        return settings;
+    }
 }

@@ -10,27 +10,27 @@ namespace AddedObjectRemover;
 /// </summary>
 internal sealed class LeftoverInvisibleObjectSelector(
     IReadOnlyList<TargetObject> targets,
-    IReadOnlyList<ObjectVisibility> visibility,
+    TargetLooks looks,
     IVisibleTargets surroundings,
     Hosts hosts,
     InvisibleObjectReach reach,
-    LeftoverConfig config,
+    LeftoverOptions config,
     WorkOrder order)
 {
     /// <param name="removedTargets">Target indices removed by the earlier steps.</param>
-    public LeftoverResult SelectRemovals(IReadOnlySet<int> removedTargets, ParallelOptions options)
+    public LeftoverResult SelectRemovals(IReadOnlySet<int> removedTargets, Execution execution)
     {
-        return new LeftoverResult(EvaluateAll(removedTargets, options));
+        return new LeftoverResult(EvaluateAll(removedTargets, execution));
     }
 
-    private LeftoverEvaluation[] EvaluateAll(IReadOnlySet<int> removedTargets, ParallelOptions options)
+    private LeftoverEvaluation[] EvaluateAll(IReadOnlySet<int> removedTargets, Execution execution)
     {
         var candidates = Enumerable.Range(0, targets.Count)
-            .Where(index => visibility[index].Kind != null && !removedTargets.Contains(index))
+            .Where(index => looks.ByTarget[index].Kind != null && !removedTargets.Contains(index))
             .ToArray();
 
         return ParallelMap.Run(
-            options,
+            execution,
             order.Among(candidates),
             () => new List<VisibleNeighbour>(),
             (position, neighbours) => Evaluate(candidates[position], removedTargets, neighbours));
@@ -40,7 +40,7 @@ internal sealed class LeftoverInvisibleObjectSelector(
     private LeftoverEvaluation Evaluate(int targetIndex, IReadOnlySet<int> removedTargets, List<VisibleNeighbour> neighbours)
     {
         var target = targets[targetIndex];
-        var kind = visibility[targetIndex].Kind!.Value;
+        var kind = looks.ByTarget[targetIndex].Kind!.Value;
         var radius = GetEffectiveRadius(target);
         var containingObject = hosts.HostOf(targetIndex);
         var areas = MeasureSurroundings(target, radius, removedTargets, neighbours);
@@ -49,7 +49,7 @@ internal sealed class LeftoverInvisibleObjectSelector(
     }
 
     private float GetEffectiveRadius(TargetObject target) =>
-        reach.GetReach(target) is { } ownReach ? MathF.Min(config.SearchRadius, ownReach) : config.SearchRadius;
+        reach.GetReach(target) is { } ownReach ? MathF.Min(config.LookAround, ownReach) : config.LookAround;
 
     private SectorAreas MeasureSurroundings(
         TargetObject target,
@@ -57,7 +57,7 @@ internal sealed class LeftoverInvisibleObjectSelector(
         IReadOnlySet<int> removedTargets,
         List<VisibleNeighbour> neighbours)
     {
-        var areas = new SectorAreas(config.DirectionThresholdPercent);
+        var areas = new SectorAreas(config.DirectionClearedPercent);
         surroundings.Around(target.SpaceKey, target.Transform.Position, radius, neighbours);
         foreach (var neighbour in neighbours)
         {
@@ -67,16 +67,16 @@ internal sealed class LeftoverInvisibleObjectSelector(
         return areas;
     }
 
-    internal static LeftoverDecision DecideByDirections(SectorAreas areas, LeftoverConfig config)
+    internal static LeftoverDecision DecideByDirections(SectorAreas areas, LeftoverOptions config)
     {
         var occupied = areas.OccupiedCount;
         if (occupied * Percent.PerWhole < config.OccupiedDirectionsPercent * SectorAreas.SectorCount) return LeftoverDecision.KeptTooFewSurroundingObjects;
-        return areas.RemovedCount * Percent.PerWhole >= config.RemovedDirectionsPercent * occupied
+        return areas.RemovedCount * Percent.PerWhole >= config.ClearedDirectionsPercent * occupied
             ? LeftoverDecision.RemovedSurroundingsRemoved
             : LeftoverDecision.KeptSurroundingsMostlyKept;
     }
 
     /// <summary>Protected types stay whatever the rules decided; referenced objects are held by the ledger.</summary>
     private LeftoverDecision ApplyProtectedTypes(InvisibleObjectKind kind, LeftoverDecision ruleDecision) =>
-        ruleDecision.IsRemoval() && config.ProtectedKinds.Contains(kind) ? LeftoverDecision.KeptProtectedType : ruleDecision;
+        ruleDecision.IsRemoval() && config.NeverRemove.Contains(kind) ? LeftoverDecision.KeptProtectedType : ruleDecision;
 }

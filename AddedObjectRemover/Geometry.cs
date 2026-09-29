@@ -12,9 +12,6 @@ internal readonly record struct Box(Vector3 Min, Vector3 Max)
 
     public Vector3 Size => Max - Min;
 
-    /// <summary>Distance from the origin to the box corner farthest from it.</summary>
-    public float FarthestCornerDistance => Vector3.Max(Vector3.Abs(Min), Vector3.Abs(Max)).Length();
-
     /// <summary>Builds a box from two arbitrary corners (order per axis does not matter).</summary>
     public static Box FromCorners(Vector3 a, Vector3 b) => new(Vector3.Min(a, b), Vector3.Max(a, b));
 

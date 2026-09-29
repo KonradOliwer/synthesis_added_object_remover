@@ -62,28 +62,6 @@ internal readonly record struct OtherObject(
 /// <summary>A too-close target (index into the scanned targets) and the first other object found.</summary>
 internal readonly record struct TooCloseHit(int TargetIndex, OtherObject TooCloseTo);
 
-/// <summary>A target object to remove (index into the scanned targets).</summary>
-internal abstract record Removal(int TargetIndex);
-
-internal sealed record TooCloseRemoval(int TargetIndex, OtherObject TooCloseTo) : Removal(TargetIndex);
-
-internal sealed record TouchingRemoval(int TargetIndex, int TouchedTargetIndex) : Removal(TargetIndex);
-
-/// <param name="RemovedShare">Fraction of the object's support held by removed objects.</param>
-/// <param name="MainRemovedSupporter">The removed target holding the largest share of its support.</param>
-internal sealed record AnchoringRemoval(int TargetIndex, float RemovedShare, int MainRemovedSupporter) : Removal(TargetIndex);
-
-/// <summary>An invisible target object inside another mod's object or whose surrounding visible target objects were removed.</summary>
-internal sealed record LeftoverRemoval(int TargetIndex, LeftoverEvaluation Evaluation) : Removal(TargetIndex);
-
-/// <summary>A member of the linked group of a removed target object.</summary>
-/// <param name="LinkedToTargetIndex">The removed member whose removal took the group along.</param>
-internal sealed record LinkedRemoval(int TargetIndex, int LinkedToTargetIndex) : Removal(TargetIndex);
-
-/// <summary>A target object that would be removed but stays because it, or a member of its linked group, is referenced.</summary>
-/// <param name="TouchedTargetIndex">The removed target it touches or rests on most, if any.</param>
-internal sealed record KeptTarget(int TargetIndex, KeepReason Reason, int? TouchedTargetIndex);
-
 internal static class PlacedRecordExtensions
 {
     public static IEnumerable<(IPlacedGetter Record, bool Persistent)> EnumeratePlaced(this ICellGetter cell)

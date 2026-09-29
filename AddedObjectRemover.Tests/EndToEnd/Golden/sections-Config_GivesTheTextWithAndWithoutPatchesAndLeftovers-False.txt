@@ -1,0 +1,12 @@
+Target plugin: Target.esp
+Size multiplier: 0.5
+Removal zone: ObjectShape
+Excluded plugins: (none)
+Masters of target are not ignored.
+Compatibility patches: detection off.
+NPCs and creatures: OnlyWhenStuckInObject
+Also remove: nothing.
+Leftover invisible objects: kept.
+Detailed log: False
+Write report files: False
+Report folder: /out/AddedObjectRemover Reports

@@ -38,6 +38,16 @@ public class WorkOrderTests
         Assert.Empty(order.Among([]));
     }
 
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(3)]
+    public void AmongRejectsATargetTheOrderWasNotBuiltFor(int target)
+    {
+        var order = new WorkOrder([2, 0, 1]);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => order.Among([0, target]));
+    }
+
     [Fact]
     public void TargetsInTheSameSpaceAndCellKeepTheirIndexOrder()
     {

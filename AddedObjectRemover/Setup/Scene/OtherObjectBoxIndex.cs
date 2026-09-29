@@ -33,9 +33,9 @@ internal sealed class OtherObjectBoxIndex
 
     public int LargeObjectCount => _largeObjects.Length;
 
-    public static OtherObjectBoxIndex Build(IReadOnlyList<OtherObject> objects, ShapeCatalog shapes, ParallelOptions parallelOptions)
+    public static OtherObjectBoxIndex Build(IReadOnlyList<OtherObject> objects, ShapeCatalog shapes, Execution execution)
     {
-        var aabbs = MeasureWorldAabbs(objects, shapes, parallelOptions);
+        var aabbs = MeasureWorldAabbs(objects, shapes, execution);
         var gridMembers = new List<int>();
         var largeObjects = new List<int>();
         for (var i = 0; i < aabbs.Length; i++)
@@ -64,9 +64,9 @@ internal sealed class OtherObjectBoxIndex
         if (_aabbs[index].Overlaps(area)) candidates.Add(index);
     }
 
-    private static Box[] MeasureWorldAabbs(IReadOnlyList<OtherObject> objects, ShapeCatalog shapes, ParallelOptions parallelOptions)
+    private static Box[] MeasureWorldAabbs(IReadOnlyList<OtherObject> objects, ShapeCatalog shapes, Execution execution)
     {
-        return ParallelMap.Run(parallelOptions, objects.Count, i =>
+        return ParallelMap.Run(execution, objects.Count, i =>
         {
             var other = objects[i];
             return OrientedBox.FromLocal(shapes.GetLocalBox(other.Base), other.Transform).WorldAabb(RoundingSlack);

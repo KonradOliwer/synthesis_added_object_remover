@@ -60,7 +60,7 @@ public class StepDeterminismTests
 
     private sealed record FollowUpScene(List<TargetObject> Targets, List<int> Seeds, Protection Protection);
 
-    private sealed record ShapeZoneScene(List<TargetObject> Targets, List<ObjectVisibility> Visibility, List<OtherObject> Rivals);
+    private sealed record ShapeZoneScene(List<TargetObject> Targets, TargetLooks Looks, List<OtherObject> Rivals);
 
     [Fact]
     public void EverythingTouchingMatchesForOneAndEightThreads()
@@ -70,14 +70,15 @@ public class StepDeterminismTests
         var sequential = RunTouchCascade(scene, SequentialThreads);
         var parallel = RunTouchCascade(scene, ParallelThreads);
 
-        Assert.NotEmpty(sequential.Clusters.Removals);
-        Assert.Contains(sequential.Clusters.Removals, removal => removal is LinkedRemoval);
+        Assert.NotEqual(0, sequential.Result.CountRemovedByRule());
+        Assert.Contains(
+            sequential.FollowUpRounds.SelectMany(round => sequential.Ledger.RemovedIn(round)),
+            target => sequential.Ledger.Of(target)!.Cause is Cause.Linked);
         Assert.Equal(DescribeRounds(sequential.Ledger), DescribeRounds(parallel.Ledger));
         Assert.Equal(sequential.Ledger.All().ToList(), parallel.Ledger.All().ToList());
-        Assert.Equal(sequential.Clusters.Removals, parallel.Clusters.Removals);
-        Assert.Equal(sequential.Clusters.Kept, parallel.Clusters.Kept);
-        Assert.Equal(DescribeStats(sequential.Clusters.Stats), DescribeStats(parallel.Clusters.Stats));
-        Assert.Equal(DescribeDiagnostics(sequential.Clusters.Diagnostics!), DescribeDiagnostics(parallel.Clusters.Diagnostics!));
+        Assert.Equal(sequential.Result.Work, parallel.Result.Work);
+        Assert.Equal(DescribeStats(sequential.Components.Stats), DescribeStats(parallel.Components.Stats));
+        Assert.Equal(DescribeComponents(sequential.Explanation!), DescribeComponents(parallel.Explanation!));
     }
 
     [Fact]
@@ -88,13 +89,11 @@ public class StepDeterminismTests
         var sequential = RunSupportCascade(scene, SequentialThreads);
         var parallel = RunSupportCascade(scene, ParallelThreads);
 
-        Assert.True(sequential.Anchoring.Stats.Iterations > 1);
+        Assert.True(sequential.Result.Work.Rounds > 1);
         Assert.Equal(DescribeRounds(sequential.Ledger), DescribeRounds(parallel.Ledger));
         Assert.Equal(sequential.Ledger.All().ToList(), parallel.Ledger.All().ToList());
-        Assert.Equal(sequential.Anchoring.Removals, parallel.Anchoring.Removals);
-        Assert.Equal(sequential.Anchoring.Kept, parallel.Anchoring.Kept);
-        Assert.Equal(DescribeEvaluations(sequential.Anchoring), DescribeEvaluations(parallel.Anchoring));
-        Assert.Equal(DescribeStats(sequential.Anchoring.Stats), DescribeStats(parallel.Anchoring.Stats));
+        Assert.Equal(DescribeEvaluations(sequential.Result), DescribeEvaluations(parallel.Result));
+        Assert.Equal(sequential.Result.Work, parallel.Result.Work);
     }
 
     [Fact]
@@ -168,8 +167,8 @@ public class StepDeterminismTests
             .Select(i => TestShapes.Placed(Mod, i, Boulder.Ref, RandomGridPoint(random)))
             .ToList();
 
-        var sequential = SelectLeftovers(targets, visibility, rooms, removed, SequentialThreads);
-        var parallel = SelectLeftovers(targets, visibility, rooms, removed, ParallelThreads);
+        var sequential = SelectLeftovers(targets, new TargetLooks([.. visibility]), rooms, removed, SequentialThreads);
+        var parallel = SelectLeftovers(targets, new TargetLooks([.. visibility]), rooms, removed, ParallelThreads);
 
         Assert.NotEqual(0, sequential.RemovedCount);
         Assert.Contains(sequential.Evaluations, evaluation => evaluation.ContainingObject != null);
@@ -208,17 +207,17 @@ public class StepDeterminismTests
     {
         var replacements = Replacements.None(scene.Rivals.Count);
         var sceneIndex = TestScenes.Create(scene.Targets, scene.Rivals, Shapes, bodies: NewBodies(), threads: threads);
-        var npcRule = CreateStuckNpcRule(scene.Targets, scene.Visibility, sceneIndex, replacements);
+        var npcRule = CreateStuckNpcRule(scene.Targets, scene.Looks, sceneIndex, replacements);
         var rivals = sceneIndex.ActiveRivals(replacements, NpcHandling.OnlyWhenStuckInObject);
-        return ShapeZoneSearch.Create(scene.Targets, scene.Visibility, rivals, Shapes, NewCache(), ShapeZoneMultiplier, npcRule)
-            .FindTooCloseTargets(scene.Visibility, order, Options(threads));
+        return ShapeZoneSearch.Create(scene.Targets, scene.Looks, rivals, Shapes, NewCache(), ShapeZoneMultiplier, npcRule)
+            .FindTooCloseTargets(scene.Looks, order, Options(threads));
     }
 
     private static NpcClashRule CreateStuckNpcRule(
-        IReadOnlyList<TargetObject> targets, IReadOnlyList<ObjectVisibility> visibility, Scene scene, Replacements replacements) =>
+        IReadOnlyList<TargetObject> targets, TargetLooks looks, Scene scene, Replacements replacements) =>
         NpcClashRule.Create(
             NpcHandling.OnlyWhenStuckInObject,
-            () => NpcStuckSearch.Create(targets, visibility, scene.Npcs(replacements), Shapes, NewCache()));
+            () => NpcStuckSearch.Create(targets, looks, scene.Npcs(replacements), Shapes, NewCache()));
 
     /// <summary>
     /// Targets with and without meshes, every few of them invisible, among other mods' objects with
@@ -240,12 +239,12 @@ public class StepDeterminismTests
                 ? TestShapes.Placed(Mod, i, rivalBases[random.Next(rivalBases.Length)], RandomGroundPoint(random), TestMeshes.RandomAngle(random))
                 : TestNpcs.Place(Mod, i, NpcBases[random.Next(NpcBases.Length)], RandomGroundPoint(random), new P3Float(0, 0, TestMeshes.RandomAngle(random))))
             .ToList();
-        return new ShapeZoneScene(targets, visibility, rivals);
+        return new ShapeZoneScene(targets, new TargetLooks([.. visibility]), rivals);
     }
 
     private static LeftoverResult SelectLeftovers(
-        List<TargetObject> targets, List<ObjectVisibility> visibility, List<OtherObject> rooms, HashSet<int> removed, int threads) =>
-        TestLeftovers.CreateSelector(targets, visibility, Shapes, rooms, CreateLeftoverConfig())
+        List<TargetObject> targets, TargetLooks looks, List<OtherObject> rooms, HashSet<int> removed, int threads) =>
+        TestLeftovers.CreateSelector(targets, looks, Shapes, rooms, CreateLeftoverConfig())
             .SelectRemovals(removed, Options(threads));
 
     /// <summary>A grid of tables close enough that some touch, items (some stacked) on most of them, random links and seeds.</summary>
@@ -303,11 +302,6 @@ public class StepDeterminismTests
         $"{stats.Components} {stats.ComponentsWithRemovals} {stats.LargestComponent} {stats.Levels} {stats.MaxDepth} "
         + $"{stats.Pairs.PairsTested} {stats.Pairs.TouchingPairs} {stats.Pairs.TrianglePairsTested}";
 
-    /// <summary>The work counts only; the timings and mesh cache stats depend on scheduling.</summary>
-    private static string DescribeStats(AnchoringStats stats) =>
-        $"{stats.Iterations} {stats.Candidates} {stats.Evaluations} {stats.KeptWithoutContacts} "
-        + $"{stats.Pairs.PairsTested} {stats.Pairs.TouchingPairs} {stats.Pairs.PairsWithoutGeometry} {stats.Pairs.TrianglePairsTested}";
-
     /// <summary>Each round with what it removed and held, one line per round, so a failure shows where two runs part.</summary>
     private static List<string> DescribeRounds(Ledger ledger) =>
     [
@@ -316,17 +310,17 @@ public class StepDeterminismTests
     ];
 
     /// <summary>Everything but the edges' distances.</summary>
-    private static string DescribeDiagnostics(TouchDiagnosticsData diagnostics) =>
+    private static string DescribeComponents(TouchExplanation explanation) =>
         string.Join(
             "; ",
-            string.Join(' ', diagnostics.ComponentId),
-            string.Join(' ', diagnostics.ParentOf),
-            string.Join(' ', diagnostics.Depth),
-            string.Join(" | ", diagnostics.ComponentMembers.Select(members => string.Join(' ', members))),
-            string.Join(' ', diagnostics.Edges.Select(edge => $"{edge.ComponentId}:{edge.Pair.First}-{edge.Pair.Second}")));
+            string.Join(' ', explanation.Components.ComponentOf),
+            string.Join(' ', explanation.Components.ParentOf),
+            string.Join(' ', explanation.Components.DepthOf),
+            string.Join(" | ", explanation.Components.Members.Select(members => string.Join(' ', members))),
+            string.Join(' ', explanation.Edges.Select(edge => $"{edge.ComponentId}:{edge.Pair.First}-{edge.Pair.Second}")));
 
-    private static List<string> DescribeEvaluations(AnchoringResult anchoring) =>
-        anchoring.Evaluations
+    private static List<string> DescribeEvaluations(FollowUpResult followUp) =>
+        AnchoringRows.Join(followUp)
             .Select(evaluation => $"{evaluation.TargetIndex} {evaluation.Iteration} {evaluation.Removed} {evaluation.RemovedAsLinked} {evaluation.Held} {evaluation.RemovedShare}")
             .ToList();
 
@@ -335,25 +329,22 @@ public class StepDeterminismTests
             .Select(evaluation => $"{evaluation.TargetIndex} {evaluation.Decision} {evaluation.ContainingObject?.FormKey} {evaluation.Radius} {evaluation.Surroundings.Describe()}")
             .ToList();
 
-    private static LeftoverConfig CreateLeftoverConfig() => new(
-        Enabled: true,
-        SearchRadius: 100,
-        DirectionThresholdPercent: 50,
-        RemovedDirectionsPercent: 60,
+    private static LeftoverOptions CreateLeftoverConfig() => new(
+        LookAround: 100,
+        DirectionClearedPercent: 50,
+        ClearedDirectionsPercent: 60,
         OccupiedDirectionsPercent: 50,
-        ProtectedPreset: ProtectedInvisibleObjectsPreset.None,
-        ProtectedKinds: new HashSet<InvisibleObjectKind>(),
-        MovesKeptMarkers: false);
+        NeverRemove: new HashSet<InvisibleObjectKind>(),
+        Preset: ProtectedInvisibleObjectsPreset.None);
 
-    private static ObjectVisibility[] AllVisible(IReadOnlyList<TargetObject> targets) =>
-        Enumerable.Repeat(ObjectVisibility.Visible, targets.Count).ToArray();
+    private static TargetLooks AllVisible(IReadOnlyList<TargetObject> targets) => TestSeededLedger.AllVisible(targets.Count);
 
     private static TriangleStore NewCache() => new(Shapes.ReadGeometry);
 
     private static NpcBodyCache NewBodies() =>
         new(new NpcBodyResolver(Records.ToImmutableLinkCache(), Shapes, new SkinnedBodyMeasurer(Shapes.ReadGeometry)));
 
-    private static ParallelOptions Options(int threads) => new() { MaxDegreeOfParallelism = threads };
+    private static Execution Options(int threads) => new(threads);
 
     /// <summary>Non-playable race without a skin, so every NPC is sized by its Object Bounds.</summary>
     private static SkyrimMod CreateRecords()

@@ -36,7 +36,7 @@ public class TouchComponentsTests
         ];
         var protection = Protection.Build(targets, [], TestTargets.References(targets.Count));
 
-        var (_, _, clusters) = TestTouchCascade.Execute(
+        var components = TestTouchCascade.Execute(
             targets,
             Shapes,
             protection,
@@ -44,11 +44,11 @@ public class TouchComponentsTests
             TouchDistance,
             threads: 4,
             collectDiagnostics: true,
-            (_, _) => new ScriptedRule([new Proposal(new TargetId(reached), new Cause.Touching(new TargetId(seed)))]));
+            (_, _) => new ScriptedRule([new Proposal(new TargetId(reached), new Cause.Touching(new TargetId(seed)))])).Components;
 
-        Assert.Equal(1, clusters.Stats.Components);
-        Assert.Equal(2, clusters.Stats.LargestComponent);
-        Assert.Equal(new[] { seed, reached }, Assert.Single(clusters.Diagnostics!.ComponentMembers));
+        Assert.Equal(1, components.Stats.Components);
+        Assert.Equal(2, components.Stats.LargestComponent);
+        Assert.Equal(new[] { seed, reached }, Assert.Single(components.Members).ToArray());
     }
 
     [Fact]
@@ -65,13 +65,13 @@ public class TouchComponentsTests
         ];
         var protection = Protection.Build(targets, [TestTargets.Link(itemOnTable, partner)], TestTargets.References(targets.Count));
 
-        var (ledger, _, clusters) =
-            TestTouchCascade.Execute(targets, Shapes, protection, [seedTable], TouchDistance, threads: 4, collectDiagnostics: true);
+        var run = TestTouchCascade.Execute(targets, Shapes, protection, [seedTable], TouchDistance, threads: 4, collectDiagnostics: true);
+        var (ledger, components) = (run.Ledger, run.Components);
 
         Assert.Equal(new Cause.Linked(new TargetId(itemOnTable)), ledger.Of(new TargetId(partner))!.Cause);
-        Assert.Equal(1, clusters.Diagnostics!.Depth[itemOnTable]);
-        Assert.Equal(2, clusters.Diagnostics.Depth[partner]);
-        Assert.Equal(2, clusters.Stats.MaxDepth);
+        Assert.Equal(1, components.DepthOf[itemOnTable]);
+        Assert.Equal(2, components.DepthOf[partner]);
+        Assert.Equal(2, components.Stats.MaxDepth);
     }
 
     [Fact]
@@ -88,13 +88,13 @@ public class TouchComponentsTests
         ];
         var protection = Protection.Build(targets, [], TestTargets.References(targets.Count));
 
-        var (ledger, _, clusters) =
-            TestTouchCascade.Execute(targets, Shapes, protection, [firstSeed, secondSeed], TouchDistance, threads: 4, collectDiagnostics: true);
+        var run = TestTouchCascade.Execute(targets, Shapes, protection, [firstSeed, secondSeed], TouchDistance, threads: 4, collectDiagnostics: true);
+        var (ledger, components) = (run.Ledger, run.Components);
 
         Assert.True(ledger.IsRemoved(new TargetId(plank)));
-        Assert.Equal(1, clusters.Stats.Components);
-        Assert.Equal(3, clusters.Stats.LargestComponent);
-        Assert.Equal(new[] { firstSeed, secondSeed, plank }, Assert.Single(clusters.Diagnostics!.ComponentMembers));
+        Assert.Equal(1, components.Stats.Components);
+        Assert.Equal(3, components.Stats.LargestComponent);
+        Assert.Equal(new[] { firstSeed, secondSeed, plank }, Assert.Single(components.Members).ToArray());
     }
 
     private static TargetObject Place(int index, TestStatic model, FormKey space, Vector3 position) =>

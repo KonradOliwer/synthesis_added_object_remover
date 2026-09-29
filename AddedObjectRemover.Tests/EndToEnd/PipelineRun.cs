@@ -8,7 +8,8 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 internal sealed record ReportFile(string Name, IReadOnlyList<string> Lines);
 
 /// <summary>Everything a run produces, masked so that it depends only on the fixture and the settings.</summary>
-internal sealed record RunOutput(IReadOnlyList<string> Log, IReadOnlyList<string> Patch, IReadOnlyList<ReportFile> Reports)
+/// <param name="UnmaskedLog">The log as printed, for checks the masks would hide; not part of the golden lines.</param>
+internal sealed record RunOutput(IReadOnlyList<string> Log, IReadOnlyList<string> Patch, IReadOnlyList<ReportFile> Reports, IReadOnlyList<string> UnmaskedLog)
 {
     /// <summary>One section per output: the log, the patch overrides, then each report file by name.</summary>
     public IReadOnlyList<string> ToGoldenLines() =>
@@ -49,7 +50,8 @@ internal static class PipelineRun
         return new RunOutput(
             OutputMasks.MaskLog(log, root),
             PatchDump.Describe(state.PatchMod),
-            ReadReports(RunConfigFactory.ResolveReportFolder(state.OutputPath.Path, settings), root));
+            ReadReports(OptionsBuilder.ResolveReportFolder(state.OutputPath.Path, settings, []), root),
+            log);
     }
 
     /// <remarks>

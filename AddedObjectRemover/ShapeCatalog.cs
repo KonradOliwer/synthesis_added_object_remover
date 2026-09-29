@@ -98,9 +98,9 @@ internal sealed class ShapeCatalog
     public Box GetLocalBox(BaseRef? baseRef) =>
         baseRef is { } reference ? GetBaseShape(reference).Box : Box.Zero;
 
-    public void MeasureBases(IReadOnlyList<BaseRef> bases, ParallelOptions options)
+    public void MeasureBases(IReadOnlyList<BaseRef> bases, Execution execution)
     {
-        ParallelMap.Run(options, bases.Count, i => GetBaseShape(bases[i]));
+        ParallelMap.Run(execution, bases.Count, i => GetBaseShape(bases[i]));
     }
 
     /// <summary>Null when the bounds did not come from a readable mesh (OBND fallback, NPCs, no model).</summary>
@@ -265,6 +265,8 @@ internal sealed class ShapeCatalog
         var result = bytes == null
             ? NifReadResult.Failed(NifReadResult.NotFoundKind, "mesh file not found")
             : NifGeometryReader.ReadGeometry(bytes, includeTriangles);
+        if (NifGeometryReader.LoaderWarmUpProblem is { } warmUpProblem) _problems.Add(warmUpProblem);
+        if (result.StripFieldsMissing) _problems.Add(NifShapes.StripFieldsMissing);
         if (result.Warning != null)
         {
             _problems.Add(new AssetProblem(meshPath, AssetProblemKind.ReadWarning, $"  [mesh] {meshPath}: {result.Warning}"));

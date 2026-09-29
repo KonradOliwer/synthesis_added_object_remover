@@ -18,15 +18,15 @@ internal sealed class VisibleTargets : IVisibleTargets
     private readonly Dictionary<FormKey, TargetId[]> _visibleBySpace;
     private readonly LazyCache<FormKey, SpaceEntries> _entries = new();
 
-    /// <param name="visibility">Parallel to <paramref name="targets"/>.</param>
+    /// <param name="looks">Parallel to <paramref name="targets"/>.</param>
     public VisibleTargets(
-        IReadOnlyList<TargetObject> targets, IReadOnlyList<ObjectVisibility> visibility, ShapeCatalog shapes, ObjectContainment containment)
+        IReadOnlyList<TargetObject> targets, TargetLooks looks, ShapeCatalog shapes, ObjectContainment containment)
     {
         _targets = targets;
         _shapes = shapes;
         _containment = containment;
         _visibleBySpace = targets
-            .Where(target => visibility[target.Id.Index].IsVisible)
+            .Where(target => looks.ByTarget[target.Id.Index].IsVisible)
             .GroupBy(target => target.SpaceKey)
             .ToDictionary(group => group.Key, group => group.Select(target => target.Id).ToArray());
     }

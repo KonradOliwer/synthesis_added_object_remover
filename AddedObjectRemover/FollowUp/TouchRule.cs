@@ -9,7 +9,7 @@ namespace AddedObjectRemover;
 /// ledger never lists them as removed.
 /// </summary>
 /// <param name="search">Built once from the seeds; its participants exclude the objects held in the too-close round.</param>
-internal sealed class TouchRule(TouchSearch search, ParallelOptions parallelOptions, IPhaseTimer timer) : IFollowUpRule
+internal sealed class TouchRule(TouchSearch search, Execution execution, IPhaseTimer timer) : IFollowUpRule
 {
     public RoundProposals Next(Ledger ledger, ImmutableArray<TargetId> removedLastRound)
     {
@@ -17,7 +17,7 @@ internal sealed class TouchRule(TouchSearch search, ParallelOptions parallelOpti
         var pairs = timer.Time(
             TimedPhase.TouchBroadPhase, () => search.CollectFrontierPairs(frontier, skip: node => ledger.IsDecided(new TargetId(node))));
         var (reached, work) = timer.Time(
-            TimedPhase.TouchNarrowPhase, () => search.Tester.FindFirstInContact(pairs, ContactRule.Touch, parallelOptions));
+            TimedPhase.TouchNarrowPhase, () => search.Tester.FindFirstInContact(pairs, ContactRule.Touch, execution));
         return new RoundProposals(
             [.. reached.Select(pair => new Proposal(new TargetId(pair.Second), new Cause.Touching(new TargetId(pair.First))))],
             new TouchRound([.. reached], work));

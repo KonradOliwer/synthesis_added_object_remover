@@ -49,8 +49,8 @@ public class FollowUpLinkedGroupTests
     [Fact]
     public void EverythingTouchingFollowsLinkedPartnersIntoTheirOwnTouchSearch()
     {
-        var (ledger, followUpRounds, clusters) =
-            TestTouchCascade.Execute(Targets, Shapes, SceneProtection, [Table], TouchDistance, threads: 4, collectDiagnostics: true);
+        var run = TestTouchCascade.Execute(Targets, Shapes, SceneProtection, [Table], TouchDistance, threads: 4, collectDiagnostics: false);
+        var (ledger, followUpRounds, stats) = (run.Ledger, run.FollowUpRounds, run.Components.Stats);
 
         Assert.Equal(
             new (int, Cause)[]
@@ -60,25 +60,17 @@ public class FollowUpLinkedGroupTests
                 (ItemOnShelf, new Cause.Touching(new TargetId(Shelf))),
             },
             followUpRounds.SelectMany(round => ledger.RemovedIn(round)).Select(target => (target.Index, ledger.Of(target)!.Cause)));
-        Assert.Equal(
-            new Removal[]
-            {
-                new TouchingRemoval(ItemOnTable, TouchedTargetIndex: Table),
-                new LinkedRemoval(Shelf, LinkedToTargetIndex: ItemOnTable),
-                new TouchingRemoval(ItemOnShelf, TouchedTargetIndex: Shelf),
-            },
-            clusters.Removals);
-        Assert.Equal(1, clusters.Stats.Components);
-        Assert.Equal(1, clusters.Stats.ComponentsWithRemovals);
-        Assert.Equal(4, clusters.Stats.LargestComponent);
-        Assert.Equal(2, clusters.Stats.Levels);
-        Assert.Equal(3, clusters.Stats.MaxDepth);
+        Assert.Equal(1, stats.Components);
+        Assert.Equal(1, stats.ComponentsWithRemovals);
+        Assert.Equal(4, stats.LargestComponent);
+        Assert.Equal(2, stats.Levels);
+        Assert.Equal(3, stats.MaxDepth);
     }
 
     [Fact]
     public void AnchoringFollowsLinkedPartnersAndReevaluatesOnlyTheirNeighbours()
     {
-        var anchoring = TestSupportCascade.Execute(
+        var run = TestSupportCascade.Execute(
             Targets,
             Shapes,
             SceneProtection,
@@ -87,12 +79,14 @@ public class FollowUpLinkedGroupTests
             NoTerrain(),
             TouchDistance,
             threshold: 0.5f,
-            threads: 4).Anchoring;
+            threads: 4);
 
         Assert.Equal(
-            new[] { (ItemOnTable, typeof(AnchoringRemoval)), (Shelf, typeof(LinkedRemoval)), (ItemOnShelf, typeof(AnchoringRemoval)) },
-            anchoring.Removals.Select(removal => (removal.TargetIndex, removal.GetType())));
-        Assert.Equal(new[] { (ItemOnTable, 1), (ItemOnShelf, 2) }, anchoring.Evaluations.Select(evaluation => (evaluation.TargetIndex, evaluation.Iteration)));
+            new[] { (ItemOnTable, typeof(Cause.LostSupport)), (Shelf, typeof(Cause.Linked)), (ItemOnShelf, typeof(Cause.LostSupport)) },
+            DescribeRemovals(run));
+        Assert.Equal(
+            new[] { (ItemOnTable, 1), (ItemOnShelf, 2) },
+            AnchoringRows.Join(run.Result).Select(evaluation => (evaluation.TargetIndex, evaluation.Iteration)));
     }
 
     [Fact]
@@ -110,7 +104,7 @@ public class FollowUpLinkedGroupTests
         var protection = Protection.Build(targets, [TestTargets.Link(itemOnTable, crateBesideTable)], TestTargets.References(targets.Count));
         var floor = TestShapes.Placed(OtherMod, 0, FloorModel.Ref, Vector3.Zero);
 
-        var anchoring = TestSupportCascade.Execute(
+        var run = TestSupportCascade.Execute(
             targets,
             Shapes,
             protection,
@@ -119,15 +113,14 @@ public class FollowUpLinkedGroupTests
             NoTerrain(),
             TouchDistance,
             threshold: 0.9f,
-            threads: 4).Anchoring;
+            threads: 4);
 
-        Assert.Equal(
-            new[] { (itemOnTable, typeof(AnchoringRemoval)), (crateBesideTable, typeof(LinkedRemoval)) },
-            anchoring.Removals.Select(removal => (removal.TargetIndex, removal.GetType())));
-        var crate = Assert.Single(anchoring.Evaluations, evaluation => evaluation.TargetIndex == crateBesideTable);
+        Assert.Equal(new[] { (itemOnTable, typeof(Cause.LostSupport)), (crateBesideTable, typeof(Cause.Linked)) }, DescribeRemovals(run));
+        var evaluations = AnchoringRows.Join(run.Result);
+        var crate = Assert.Single(evaluations, evaluation => evaluation.TargetIndex == crateBesideTable);
         Assert.False(crate.Removed);
         Assert.True(crate.RemovedAsLinked);
-        Assert.False(Assert.Single(anchoring.Evaluations, evaluation => evaluation.TargetIndex == itemOnTable).RemovedAsLinked);
+        Assert.False(Assert.Single(evaluations, evaluation => evaluation.TargetIndex == itemOnTable).RemovedAsLinked);
     }
 
     [Fact]
@@ -137,11 +130,13 @@ public class FollowUpLinkedGroupTests
         Assert.Equal(new HashSet<FormKey> { OtherSpace }, LinkedGroups.Build(Targets.Count, []).CollectReachableSpaces(Targets, [Shelf]));
     }
 
+    /// <returns>The follow-up rounds' removals in ledger order, with the type of their cause.</returns>
+    private static IEnumerable<(int, Type)> DescribeRemovals(TestSupportCascade.Run run) =>
+        run.FollowUpRounds.SelectMany(round => run.Ledger.RemovedIn(round)).Select(target => (target.Index, run.Ledger.Of(target)!.Cause.GetType()));
+
     private static TargetObject Place(int index, TestStatic model, FormKey space, Vector3 position) =>
         TestTargets.Create(index, TestTargets.At(position), model.Ref, space);
 
     private static TerrainHeights NoTerrain() =>
         new(new Dictionary<ExteriorCell, Mutagen.Bethesda.Skyrim.ILandscapeGetter>(), new Dictionary<FormKey, FormKey>());
-
-    private static ParallelOptions Options() => new() { MaxDegreeOfParallelism = 4 };
 }

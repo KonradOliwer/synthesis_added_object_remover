@@ -24,14 +24,11 @@ internal static class ParallelMap
     /// <summary>For items that are slow and uneven in cost, so each is handed out on its own.</summary>
     public const int OneItemPerRange = 1;
 
-    /// <summary>The <see cref="ParallelOptions.MaxDegreeOfParallelism"/> that means no limit besides the machine's.</summary>
-    private const int UnlimitedWorkers = -1;
-
     /// <param name="order">A permutation of the item indexes, in the order they are started.</param>
     /// <param name="harvest">Reads a scratch's work counts once, after its worker is done.</param>
     /// <param name="rangeSize">Items per range handed to a worker; null chooses automatically.</param>
     public static (TOut[] Results, TWork Work) Run<TScratch, TOut, TWork>(
-        ParallelOptions exec,
+        Execution execution,
         ImmutableArray<int> order,
         Func<TScratch> newScratch,
         Func<int, TScratch, TOut> body,
@@ -40,12 +37,12 @@ internal static class ParallelMap
         where TWork : IWork<TWork>
     {
         Permutation.Require(order, nameof(order));
-        return RunSummingWork(exec, order.Length, position => order[position], newScratch, body, harvest, rangeSize);
+        return RunSummingWork(execution, order.Length, position => order[position], newScratch, body, harvest, rangeSize);
     }
 
     /// <summary>Runs one item per target, in the work order; throws unless the order covers exactly <paramref name="targetCount"/> targets.</summary>
     public static (TOut[] Results, TWork Work) Run<TScratch, TOut, TWork>(
-        ParallelOptions exec,
+        Execution execution,
         WorkOrder order,
         int targetCount,
         Func<TScratch> newScratch,
@@ -54,45 +51,45 @@ internal static class ParallelMap
         where TWork : IWork<TWork>
     {
         order.RequireCovers(targetCount);
-        return Run(exec, order.TargetsBySpaceAndCell, newScratch, body, harvest);
+        return Run(execution, order.TargetsBySpaceAndCell, newScratch, body, harvest);
     }
 
     /// <summary>Runs one item per target, in the work order; throws unless the order covers exactly <paramref name="targetCount"/> targets.</summary>
     public static TOut[] Run<TScratch, TOut>(
-        ParallelOptions exec, WorkOrder order, int targetCount, Func<TScratch> newScratch, Func<int, TScratch, TOut> body)
+        Execution execution, WorkOrder order, int targetCount, Func<TScratch> newScratch, Func<int, TScratch, TOut> body)
     {
         order.RequireCovers(targetCount);
-        return Run(exec, order.TargetsBySpaceAndCell, newScratch, body);
+        return Run(execution, order.TargetsBySpaceAndCell, newScratch, body);
     }
 
     /// <summary>Starts the items in index order.</summary>
     public static (TOut[] Results, TWork Work) Run<TScratch, TOut, TWork>(
-        ParallelOptions exec,
+        Execution execution,
         int count,
         Func<TScratch> newScratch,
         Func<int, TScratch, TOut> body,
         Func<TScratch, TWork> harvest,
         int? rangeSize = null)
         where TWork : IWork<TWork> =>
-        RunSummingWork(exec, count, static position => position, newScratch, body, harvest, rangeSize);
+        RunSummingWork(execution, count, static position => position, newScratch, body, harvest, rangeSize);
 
     /// <param name="order">A permutation of the item indexes, in the order they are started.</param>
     public static TOut[] Run<TScratch, TOut>(
-        ParallelOptions exec, ImmutableArray<int> order, Func<TScratch> newScratch, Func<int, TScratch, TOut> body, int? rangeSize = null)
+        Execution execution, ImmutableArray<int> order, Func<TScratch> newScratch, Func<int, TScratch, TOut> body, int? rangeSize = null)
     {
         Permutation.Require(order, nameof(order));
-        return Map(exec, order.Length, position => order[position], newScratch, body, rangeSize, finish: static _ => { });
+        return Map(execution, order.Length, position => order[position], newScratch, body, rangeSize, finish: static _ => { });
     }
 
     public static TOut[] Run<TScratch, TOut>(
-        ParallelOptions exec, int count, Func<TScratch> newScratch, Func<int, TScratch, TOut> body, int? rangeSize = null) =>
-        Map(exec, count, static position => position, newScratch, body, rangeSize, finish: static _ => { });
+        Execution execution, int count, Func<TScratch> newScratch, Func<int, TScratch, TOut> body, int? rangeSize = null) =>
+        Map(execution, count, static position => position, newScratch, body, rangeSize, finish: static _ => { });
 
-    public static TOut[] Run<TOut>(ParallelOptions exec, int count, Func<int, TOut> body, int? rangeSize = null) =>
-        Map<object?, TOut>(exec, count, static position => position, static () => null, (item, _) => body(item), rangeSize, finish: static _ => { });
+    public static TOut[] Run<TOut>(Execution execution, int count, Func<int, TOut> body, int? rangeSize = null) =>
+        Map<object?, TOut>(execution, count, static position => position, static () => null, (item, _) => body(item), rangeSize, finish: static _ => { });
 
     private static (TOut[] Results, TWork Work) RunSummingWork<TScratch, TOut, TWork>(
-        ParallelOptions exec,
+        Execution execution,
         int count,
         Func<int, int> itemAt,
         Func<TScratch> newScratch,
@@ -103,7 +100,7 @@ internal static class ParallelMap
     {
         var work = TWork.Zero;
         var workLock = new object();
-        var results = Map(exec, count, itemAt, newScratch, body, rangeSize, scratch =>
+        var results = Map(execution, count, itemAt, newScratch, body, rangeSize, scratch =>
         {
             var harvested = harvest(scratch);
             lock (workLock) work += harvested;
@@ -112,7 +109,7 @@ internal static class ParallelMap
     }
 
     private static TOut[] Map<TScratch, TOut>(
-        ParallelOptions exec,
+        Execution execution,
         int count,
         Func<int, int> itemAt,
         Func<TScratch> newScratch,
@@ -123,8 +120,8 @@ internal static class ParallelMap
         var results = new TOut[count];
         if (count == 0) return results;
         Parallel.ForEach(
-            Partitioner.Create(0, count, ChooseRangeSize(exec, count, rangeSize)),
-            exec,
+            Partitioner.Create(0, count, ChooseRangeSize(execution, count, rangeSize)),
+            new ParallelOptions { MaxDegreeOfParallelism = execution.Workers },
             newScratch,
             (range, _, scratch) =>
             {
@@ -139,10 +136,9 @@ internal static class ParallelMap
         return results;
     }
 
-    private static int ChooseRangeSize(ParallelOptions exec, int count, int? rangeSize)
+    private static int ChooseRangeSize(Execution execution, int count, int? rangeSize)
     {
         if (rangeSize is { } given) return given;
-        var workers = exec.MaxDegreeOfParallelism == UnlimitedWorkers ? Environment.ProcessorCount : exec.MaxDegreeOfParallelism;
-        return Math.Max(1, count / (workers * RangesPerWorker));
+        return Math.Max(1, count / (execution.Workers * RangesPerWorker));
     }
 }

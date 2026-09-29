@@ -9,7 +9,7 @@ internal readonly record struct NpcBodyPerf(NpcBodyCacheStats Cache, int BodyMes
 /// </summary>
 internal interface IPerfProbe
 {
-    TriangleTreeStats Triangles();
+    TriangleStoreStats Triangles();
 
     NpcBodyPerf Bodies();
 }

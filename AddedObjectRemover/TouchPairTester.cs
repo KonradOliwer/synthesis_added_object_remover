@@ -77,9 +77,9 @@ internal sealed class TouchPairTester(
 
     private readonly TriangleStore _cache = cache;
 
-    public (PairTouch[] Results, PairTestStats Work) TestPairs(IReadOnlyList<TargetPair> pairs, ParallelOptions parallelOptions) =>
+    public (PairTouch[] Results, PairTestStats Work) TestPairs(IReadOnlyList<TargetPair> pairs, Execution execution) =>
         ParallelMap.Run(
-            parallelOptions,
+            execution,
             pairs.Count,
             () => new ContactScratch(),
             (k, scratch) => scratch.Count(TestPair(pairs[k], scratch.Touch)),
@@ -91,11 +91,11 @@ internal sealed class TouchPairTester(
     /// in contact: its pairs are tested in that order and the rest are skipped once one is. The found
     /// pairs are returned in the given order.
     /// </summary>
-    public (List<TargetPair> Found, PairTestStats Work) FindFirstInContact(IReadOnlyList<TargetPair> pairs, ContactRule rule, ParallelOptions parallelOptions)
+    public (List<TargetPair> Found, PairTestStats Work) FindFirstInContact(IReadOnlyList<TargetPair> pairs, ContactRule rule, Execution execution)
     {
         var pairsBySecond = GroupBySecond(pairs);
         var (firstInContact, work) = ParallelMap.Run(
-            parallelOptions,
+            execution,
             pairsBySecond.Count,
             () => new ContactScratch(),
             (group, scratch) => FindFirstInContact(pairs, pairsBySecond[group], rule, scratch),

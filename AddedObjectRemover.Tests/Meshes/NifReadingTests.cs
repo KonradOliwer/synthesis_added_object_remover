@@ -77,9 +77,9 @@ public class NifReadingTests
     {
         var strips = CreateStrips(points: [0, 1, 2, 3], stripLengths: [4]);
 
-        var triangles = NifShapes.GetTriangles(strips, out var mismatched);
+        var triangles = NifShapes.GetTriangles(strips, out var fault);
 
-        Assert.False(mismatched);
+        Assert.Equal(StripFault.None, fault);
         Assert.Equal(2, triangles!.Count);
     }
 
@@ -90,9 +90,9 @@ public class NifReadingTests
     {
         var strips = CreateStrips(points: [0, 1, 2, 3], stripLengths: [(ushort)stripLength]);
 
-        var triangles = NifShapes.GetTriangles(strips, out var mismatched);
+        var triangles = NifShapes.GetTriangles(strips, out var fault);
 
-        Assert.True(mismatched);
+        Assert.Equal(StripFault.LengthsMismatch, fault);
         Assert.Null(triangles);
     }
 

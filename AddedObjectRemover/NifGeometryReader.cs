@@ -11,11 +11,21 @@ internal static class NifGeometryReader
     /// LoadLock, after which loads are parallel-safe. If that fails, every load is serialized.
     /// </summary>
     private static readonly object LoadLock = new();
-    private static readonly Lazy<bool> ParallelLoadsSafe = new(TryPrimeBlockTypeCache, LazyThreadSafetyMode.ExecutionAndPublication);
-    private static volatile ArchiveProblem? _loaderWarmUpProblem;
+    private static readonly Lazy<WarmUp> LoaderWarmUp = new(TryPrimeBlockTypeCache, LazyThreadSafetyMode.ExecutionAndPublication);
 
-    /// <summary>Why the warm-up failed; null when it succeeded or has not run yet.</summary>
-    public static ArchiveProblem? LoaderWarmUpProblem => _loaderWarmUpProblem;
+    /// <summary>
+    /// Why the process-wide warm-up failed; null when it succeeded or no NIF was read yet. A run reports it
+    /// itself after each read, so the report does not depend on which run in the process read the first NIF.
+    /// </summary>
+    public static ArchiveProblem? LoaderWarmUpProblem => LoaderWarmUp.IsValueCreated ? LoaderWarmUp.Value.Problem : null;
+
+    private sealed record WarmUp(bool ParallelLoadsSafe, ArchiveProblem? Problem)
+    {
+        public static WarmUp Succeeded() => new(true, null);
+
+        public static WarmUp Failed(string message) =>
+            new(false, new ArchiveProblem(ArchiveProblemKind.NifLoaderWarmUpFailed, "NIF loader", message));
+    }
 
     /// <summary>
     /// Loads a NIF from memory and computes the AABB, in the local space of the root node picked by
@@ -35,7 +45,7 @@ internal static class NifGeometryReader
     {
         try
         {
-            if (ParallelLoadsSafe.Value)
+            if (LoaderWarmUp.Value.ParallelLoadsSafe)
             {
                 return ReadGeometryUnlocked(data, includeTriangles);
             }
@@ -52,9 +62,9 @@ internal static class NifGeometryReader
 
     /// <summary>
     /// Builds NiflySharp's static block-type cache by saving and re-loading a minimal in-memory NIF
-    /// (one root NiNode). True if that load read a block, i.e. the cache now exists.
+    /// (one root NiNode). Safe if that load read a block, i.e. the cache now exists.
     /// </summary>
-    private static bool TryPrimeBlockTypeCache()
+    private static WarmUp TryPrimeBlockTypeCache()
     {
         lock (LoadLock)
         {
@@ -65,21 +75,16 @@ internal static class NifGeometryReader
                 var saved = template.Save(stream) == 0;
                 stream.Position = 0;
                 var nif = new NifFile();
-                if (saved && nif.Load(stream) == 0 && nif.Valid && nif.Blocks.Count > 0) return true;
-                RecordWarmUpProblem("Warning: NIF loader warm-up read no blocks; meshes are parsed one at a time (slower).");
-                return false;
+                if (saved && nif.Load(stream) == 0 && nif.Valid && nif.Blocks.Count > 0) return WarmUp.Succeeded();
+                return WarmUp.Failed("Warning: NIF loader warm-up read no blocks; meshes are parsed one at a time (slower).");
             }
             catch (Exception ex) when (ExpectedFailures.IsMalformedNif(ex))
             {
-                RecordWarmUpProblem(
+                return WarmUp.Failed(
                     $"Warning: NIF loader warm-up failed ({ex.GetType().Name}: {ex.Message}); meshes are parsed one at a time (slower).");
-                return false;
             }
         }
     }
-
-    private static void RecordWarmUpProblem(string message) =>
-        _loaderWarmUpProblem = new ArchiveProblem(ArchiveProblemKind.NifLoaderWarmUpFailed, "NIF loader", message);
 
     private static NifReadResult ReadGeometryUnlocked(byte[] data, bool includeTriangles)
     {
@@ -96,7 +101,11 @@ internal static class NifGeometryReader
         }
 
         var shapes = CollectWithHiddenFallback(nif, root.Index, includeTriangles);
-        return ToResult(shapes) with { FooterRoot = root.DiffersFromLibraryRoot ? root : null };
+        return ToResult(shapes) with
+        {
+            FooterRoot = root.DiffersFromLibraryRoot ? root : null,
+            StripFieldsMissing = shapes.Stats.StripFieldsMissing > 0,
+        };
     }
 
     private static NifReadResult ToResult(ShapeCollection shapes)

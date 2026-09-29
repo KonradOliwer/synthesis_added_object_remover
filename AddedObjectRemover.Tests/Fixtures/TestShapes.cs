@@ -31,9 +31,9 @@ internal static class TestShapes
         var dataPath = Path.Combine(AppContext.BaseDirectory, dataFolderName);
         foreach (var model in statics) WriteMesh(dataPath, model.Model, model.Triangles);
 
-        var messages = new MeshMessageLog(enabled: false);
-        var meshFiles = new MeshFileSource(dataPath, GameRelease.SkyrimSE, [mod], messages);
-        return new BaseObjectShapeProvider(skyrimMod.ToImmutableLinkCache(), meshFiles, messages);
+        var problems = new AssetProblemLog();
+        var meshFiles = new MeshFileSource(dataPath, GameRelease.SkyrimSE, [mod], problems);
+        return new BaseObjectShapeProvider(skyrimMod.ToImmutableLinkCache(), meshFiles, problems);
     }
 
     public static OtherObject Placed(ModKey mod, int index, BaseRef baseRef, Vector3 position, float zRadians = 0f) =>

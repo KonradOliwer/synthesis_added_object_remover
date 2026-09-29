@@ -17,7 +17,8 @@ internal sealed class RemovalPipeline
     private readonly ModFacts _mods;
     private readonly ModStanding _standing;
     private readonly ParallelOptions _parallelOptions;
-    private readonly MeshMessageLog _meshMessages;
+    private readonly AssetProblemLog _problems = new();
+    private ProblemMark _problemsPrintedUpTo;
     private readonly BaseObjectShapeProvider _shapes;
     private readonly TriangleTreeCache _meshCache;
     private readonly ObjectContainment _containment;
@@ -33,13 +34,12 @@ internal sealed class RemovalPipeline
         _mods = mods;
         _standing = standing;
         _parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = workers };
-        _meshMessages = new MeshMessageLog(config.DetailedLog);
         var meshFiles = new MeshFileSource(
             state.DataFolderPath.Path,
             state.GameRelease,
             state.LoadOrder.ListedOrder.Select(listing => listing.ModKey).ToList(),
-            _meshMessages);
-        _shapes = new BaseObjectShapeProvider(state.LinkCache, meshFiles, _meshMessages);
+            _problems);
+        _shapes = new BaseObjectShapeProvider(state.LinkCache, meshFiles, _problems);
         _meshCache = new TriangleTreeCache(_shapes.ReadGeometry);
         _containment = new ObjectContainment(_shapes, _meshCache);
         _bodyMeasurer = new SkinnedBodyMeasurer(_shapes.ReadGeometry);
@@ -124,6 +124,15 @@ internal sealed class RemovalPipeline
         return indexes;
     }
 
+    private void PrintProblemsSinceLastPhase()
+    {
+        if (NifGeometryReader.LoaderWarmUpProblem is { } warmUp) _problems.Add(warmUp);
+        if (NifShapes.StripFieldsProblem is { } stripFields) _problems.Add(stripFields);
+        RunReport.PrintArchiveProblems(_problems.ArchiveProblemsSince(_problemsPrintedUpTo));
+        if (_config.DetailedLog) RunReport.PrintAssetProblems(_problems.Since(_problemsPrintedUpTo));
+        _problemsPrintedUpTo = _problems.Mark();
+    }
+
     private void WarmUpTargetBounds(IReadOnlyList<TargetObject> targets)
     {
         var timer = Stopwatch.StartNew();
@@ -134,7 +143,7 @@ internal sealed class RemovalPipeline
             .DistinctBy(b => b.FormKey)
             .ToList();
         _shapes.MeasureBases(targetBases, _parallelOptions);
-        _meshMessages.PrintAndClear();
+        PrintProblemsSinceLastPhase();
         RunReport.PrintWarmUpSummary(targetBases.Count, timer.Elapsed);
     }
 
@@ -155,7 +164,7 @@ internal sealed class RemovalPipeline
         var timer = Stopwatch.StartNew();
         var replacements = ReplacementMatcher.Find(world.Targets, indexes, world.Rivals.Length, _shapes, _parallelOptions);
         if (_config.DetailedLog) RunReport.PrintReplacementLog(world, replacements);
-        _meshMessages.PrintAndClear();
+        PrintProblemsSinceLastPhase();
         RunReport.PrintReplacementSummary(replacements.Count, timer.Elapsed);
         return replacements;
     }
@@ -177,7 +186,7 @@ internal sealed class RemovalPipeline
             ZoneShape.ObjectShape => FindShapeZoneHits(world, visibility, indexes, replacements, npcRule),
             _ => throw new UnreachableException($"Unknown removal zone {_config.ZoneShape}."),
         };
-        _meshMessages.PrintAndClear();
+        PrintProblemsSinceLastPhase();
         RunReport.PrintTooCloseSummary(hits.Count, world.Targets.Length, _config.Target, timer.Elapsed);
         RunReport.PrintInvisibleOthers(_invisibleOthers, _config.DetailedLog);
         PrintNpcHandling(npcRule, indexes);
@@ -284,7 +293,7 @@ internal sealed class RemovalPipeline
             _parallelOptions,
             collectDiagnostics: _config.WritesDiagnostics);
         PrintKept(world, next, rounds);
-        _meshMessages.PrintAndClear();
+        PrintProblemsSinceLastPhase();
         RunReport.PrintTouchStats(clusters);
         WriteTouchDiagnostics(world, [.. report.RemovalsIn(ledger.Rounds[^1])], clusters);
         return next;
@@ -334,7 +343,7 @@ internal sealed class RemovalPipeline
         var anchoring = AnchoringOutcome.Create(
             next, new LedgerReport(next, world, LeftoverResult.None), rounds, evidence, rule, setup);
         PrintKept(world, next, rounds);
-        _meshMessages.PrintAndClear();
+        PrintProblemsSinceLastPhase();
         RunReport.PrintAnchoringStats(anchoring);
         WriteAnchoringDiagnostics(world, supporters, anchoring);
         WriteMeshOrigins(world.Targets);
@@ -358,7 +367,7 @@ internal sealed class RemovalPipeline
         if (!_config.WritesDiagnostics) return;
 
         var rows = MeshOriginDiagnosticsWriter.CreateRows(targets, _shapes, _meshCache, _parallelOptions);
-        _meshMessages.PrintAndClear();
+        PrintProblemsSinceLastPhase();
         RunReport.PrintMeshOriginSummary(MeshOriginDiagnosticsWriter.Summarize(rows));
         AccessDiagnosticsFolder($"writing {MeshOriginDiagnosticsWriter.FileName}", () =>
         {
@@ -390,7 +399,7 @@ internal sealed class RemovalPipeline
         var final = ledger.Apply(RoundKind.Leftover, evaluated.Proposals);
         var leftovers = evaluated.WithVerdicts(final);
         PrintKept(world, final, RoundsAddedTo(ledger, final));
-        _meshMessages.PrintAndClear();
+        PrintProblemsSinceLastPhase();
         if (_config.DetailedLog) RunReport.PrintLeftoverDecisions(world, leftovers.Evaluations);
         RunReport.PrintLeftoverStats(leftovers, timer.Elapsed);
         return (final, leftovers);
@@ -409,7 +418,7 @@ internal sealed class RemovalPipeline
         var relocator = CreateRelocator(snapshot, CreateObstacles(snapshot.World, visibility, supporters, removed));
         var keptEvaluations = leftovers.Evaluations.Where(evaluation => !removed.Contains(evaluation.TargetIndex)).ToList();
         var relocations = relocator.Relocate(keptEvaluations, _parallelOptions);
-        _meshMessages.PrintAndClear();
+        PrintProblemsSinceLastPhase();
         RunReport.PrintRelocations(snapshot.World, relocations);
         return relocations;
     }

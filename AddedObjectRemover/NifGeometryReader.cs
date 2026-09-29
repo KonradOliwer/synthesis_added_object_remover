@@ -12,6 +12,10 @@ internal static class NifGeometryReader
     /// </summary>
     private static readonly object LoadLock = new();
     private static readonly Lazy<bool> ParallelLoadsSafe = new(TryPrimeBlockTypeCache, LazyThreadSafetyMode.ExecutionAndPublication);
+    private static volatile ArchiveProblem? _loaderWarmUpProblem;
+
+    /// <summary>Why the warm-up failed; null when it succeeded or has not run yet (reading this never runs it).</summary>
+    public static ArchiveProblem? LoaderWarmUpProblem => _loaderWarmUpProblem;
 
     /// <summary>
     /// Loads a NIF from memory and computes the AABB, in the local space of the root node picked by
@@ -62,17 +66,20 @@ internal static class NifGeometryReader
                 stream.Position = 0;
                 var nif = new NifFile();
                 if (saved && nif.Load(stream) == 0 && nif.Valid && nif.Blocks.Count > 0) return true;
-                Console.WriteLine("Warning: NIF loader warm-up read no blocks; meshes are parsed one at a time (slower).");
+                RecordWarmUpProblem("Warning: NIF loader warm-up read no blocks; meshes are parsed one at a time (slower).");
                 return false;
             }
             catch (Exception ex) when (ExpectedFailures.IsMalformedNif(ex))
             {
-                Console.WriteLine(
+                RecordWarmUpProblem(
                     $"Warning: NIF loader warm-up failed ({ex.GetType().Name}: {ex.Message}); meshes are parsed one at a time (slower).");
                 return false;
             }
         }
     }
+
+    private static void RecordWarmUpProblem(string message) =>
+        _loaderWarmUpProblem = new ArchiveProblem(ArchiveProblemKind.NifLoaderWarmUpFailed, "NIF loader", message);
 
     private static NifReadResult ReadGeometryUnlocked(byte[] data, bool includeTriangles)
     {

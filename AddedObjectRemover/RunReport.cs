@@ -144,6 +144,16 @@ internal static class RunReport
     public static void PrintWarmUpSummary(int targetBaseCount, TimeSpan elapsed) =>
         Console.WriteLine($"Bounds warm-up: {targetBaseCount:N0} target base objects in {elapsed.TotalSeconds:F1}s.");
 
+    public static void PrintArchiveProblems(IEnumerable<ArchiveProblem> problems)
+    {
+        foreach (var problem in problems) Console.WriteLine(problem.Message);
+    }
+
+    public static void PrintAssetProblems(IEnumerable<AssetProblem> problems)
+    {
+        foreach (var problem in problems) Console.WriteLine(problem.Message);
+    }
+
     public static void PrintReplacementLog(World world, Replacements replacements)
     {
         var entries = replacements.List

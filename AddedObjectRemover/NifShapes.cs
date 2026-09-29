@@ -19,7 +19,16 @@ internal static class NifShapes
 
     private static readonly FieldInfo? StripPointsField = typeof(NiTriStripsData).GetField("_points", StripFieldFlags);
     private static readonly FieldInfo? StripLengthsField = typeof(NiTriStripsData).GetField("_stripLengths", StripFieldFlags);
-    private static int _stripFieldsMissingReported;
+    private static readonly ArchiveProblem StripFieldsMissing = new(
+        ArchiveProblemKind.StripFieldsMissing,
+        "NiTriStripsData",
+        "Warning: NiTriStripsData._points/_stripLengths not found in this NiflySharp version; "
+        + "NiTriStrips shapes are used as points in the touch test.");
+
+    private static volatile ArchiveProblem? _stripFieldsProblem;
+
+    /// <summary>Set once a strips shape needed the strip fields this NiflySharp version lacks; null until then.</summary>
+    public static ArchiveProblem? StripFieldsProblem => _stripFieldsProblem;
 
     private static readonly ConcurrentDictionary<Type, bool> RenderGeometryTypes = new();
 
@@ -98,7 +107,7 @@ internal static class NifShapes
         stripsMismatched = false;
         if (StripPointsField == null || StripLengthsField == null)
         {
-            ReportStripFieldsMissingOnce();
+            _stripFieldsProblem = StripFieldsMissing;
             return null;
         }
         if (StripPointsField.GetValue(data) is not List<ushort> { Count: > 0 } points
@@ -113,14 +122,6 @@ internal static class NifShapes
         }
         var strips = points.SplitByFlexSize(stripLengths).ToList();
         return IndicesHelper.GenerateTrianglesFromStrips(strips);
-    }
-
-    private static void ReportStripFieldsMissingOnce()
-    {
-        if (Interlocked.Exchange(ref _stripFieldsMissingReported, 1) != 0) return;
-        Console.WriteLine(
-            "Warning: NiTriStripsData._points/_stripLengths not found in this NiflySharp version; "
-            + "NiTriStrips shapes are used as points in the touch test.");
     }
 
     /// <summary>

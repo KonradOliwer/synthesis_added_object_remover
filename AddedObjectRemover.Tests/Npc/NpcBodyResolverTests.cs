@@ -184,9 +184,9 @@ public class NpcBodyResolverTests
         TestShapes.WriteMesh(dataPath, ShortBodyMesh, TestBodies.TPose(ShortBodyHeight));
         TestShapes.WriteMesh(dataPath, HandsMesh, TestMeshes.BoxTriangles(new Box(new Vector3(-5, -5, 60), new Vector3(5, 5, 70))));
 
-        var messages = new MeshMessageLog(enabled: false);
-        var meshFiles = new MeshFileSource(dataPath, GameRelease.SkyrimSE, [Mod], messages);
-        return new BaseObjectShapeProvider(Records.ToImmutableLinkCache(), meshFiles, messages);
+        var problems = new AssetProblemLog();
+        var meshFiles = new MeshFileSource(dataPath, GameRelease.SkyrimSE, [Mod], problems);
+        return new BaseObjectShapeProvider(Records.ToImmutableLinkCache(), meshFiles, problems);
     }
 
     private static Armor CreateSkin(FormKey formKey, params FormKey[] addons)

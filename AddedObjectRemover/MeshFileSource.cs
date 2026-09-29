@@ -21,16 +21,16 @@ internal sealed class MeshFileSource
     private readonly string _dataPath;
     private readonly GameRelease _release;
     private readonly IReadOnlyList<ModKey> _loadOrder;
-    private readonly MeshMessageLog _messages;
+    private readonly AssetProblemLog _problems;
     private readonly Lazy<Dictionary<string, IArchiveFile>> _archiveIndex;
     private int _archivesIndexed;
 
-    public MeshFileSource(string dataPath, GameRelease release, IReadOnlyList<ModKey> loadOrder, MeshMessageLog messages)
+    public MeshFileSource(string dataPath, GameRelease release, IReadOnlyList<ModKey> loadOrder, AssetProblemLog problems)
     {
         _dataPath = dataPath;
         _release = release;
         _loadOrder = loadOrder;
-        _messages = messages;
+        _problems = problems;
         _archiveIndex = new Lazy<Dictionary<string, IArchiveFile>>(BuildArchiveIndex, LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
@@ -73,7 +73,8 @@ internal sealed class MeshFileSource
         }
         catch (Exception ex) when (ExpectedFailures.IsFileAccess(ex))
         {
-            _messages.Add(meshPath, $"  [mesh] could not read loose file {loosePath}: {ex.Message}");
+            _problems.Add(new AssetProblem(
+                meshPath, AssetProblemKind.LooseFileUnreadable, $"  [mesh] could not read loose file {loosePath}: {ex.Message}"));
             return null;
         }
     }
@@ -87,7 +88,8 @@ internal sealed class MeshFileSource
         }
         catch (Exception ex) when (ExpectedFailures.IsCorruptArchive(ex))
         {
-            _messages.Add(meshPath, $"  [mesh] could not extract {meshPath} from archive: {ex.GetType().Name}: {ex.Message}");
+            _problems.Add(new AssetProblem(
+                meshPath, AssetProblemKind.ArchiveExtractFailed, $"  [mesh] could not extract {meshPath} from archive: {ex.GetType().Name}: {ex.Message}"));
             return null;
         }
     }
@@ -108,7 +110,9 @@ internal sealed class MeshFileSource
             }
             catch (Exception ex) when (ExpectedFailures.IsCorruptArchive(ex))
             {
-                Console.WriteLine($"  Warning: could not read archive {Path.GetFileName(archivePath)}: {ex.Message}");
+                var archiveName = Path.GetFileName(archivePath);
+                _problems.Add(new ArchiveProblem(
+                    ArchiveProblemKind.ArchiveUnreadable, archiveName, $"  Warning: could not read archive {archiveName}: {ex.Message}"));
             }
         }
         return index;
@@ -191,7 +195,8 @@ internal sealed class MeshFileSource
         }
         catch (Exception ex) when (ExpectedFailures.IsFileAccess(ex))
         {
-            Console.WriteLine($"  Warning: could not list archives in {_dataPath}: {ex.Message}");
+            _problems.Add(new ArchiveProblem(
+                ArchiveProblemKind.DataFolderUnlistable, _dataPath, $"  Warning: could not list archives in {_dataPath}: {ex.Message}"));
             return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
     }
@@ -204,7 +209,8 @@ internal sealed class MeshFileSource
         }
         catch (Exception ex) when (ExpectedFailures.IsUnreadableIni(ex))
         {
-            Console.WriteLine($"  Warning: could not read archive list from game INI: {ex.Message}");
+            _problems.Add(new ArchiveProblem(
+                ArchiveProblemKind.IniArchiveListUnreadable, "game INI", $"  Warning: could not read archive list from game INI: {ex.Message}"));
             return [];
         }
     }

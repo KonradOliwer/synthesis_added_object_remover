@@ -34,7 +34,7 @@ internal sealed class BaseObjectShapeProvider
 {
     private readonly ILinkCache _linkCache;
     private readonly MeshFileSource _meshFiles;
-    private readonly MeshMessageLog _messages;
+    private readonly AssetProblemLog _problems;
     private readonly LazyCache<FormKey, BaseShape> _byBase = new();
     private readonly LazyCache<string, MeshBounds> _byMesh = new(StringComparer.OrdinalIgnoreCase);
     private readonly ReasonCounter _modelFailures = new();
@@ -54,11 +54,11 @@ internal sealed class BaseObjectShapeProvider
     private int _modelsFromArchives;
     private int _modelsWithFooterRoot;
 
-    public BaseObjectShapeProvider(ILinkCache linkCache, MeshFileSource meshFiles, MeshMessageLog messages)
+    public BaseObjectShapeProvider(ILinkCache linkCache, MeshFileSource meshFiles, AssetProblemLog problems)
     {
         _linkCache = linkCache;
         _meshFiles = meshFiles;
-        _messages = messages;
+        _problems = problems;
     }
 
     /// <param name="MeshPath">Normalized path of the mesh the bounds came from; null for OBND or none.</param>
@@ -140,7 +140,8 @@ internal sealed class BaseObjectShapeProvider
         var (result, _) = LoadAndParse(meshPath, includeTriangles: true);
         if (result.Status != NifReadStatus.Success)
         {
-            _messages.Add(meshPath, $"  [mesh] triangles unreadable: {meshPath} ({result.Error})");
+            _problems.Add(new AssetProblem(
+                meshPath, AssetProblemKind.TrianglesUnreadable, $"  [mesh] triangles unreadable: {meshPath} ({result.Error})"));
             return null;
         }
         return result.Geometry is { TriangleCount: > 0 } geometry ? geometry : null;
@@ -283,9 +284,9 @@ internal sealed class BaseObjectShapeProvider
 
         Interlocked.Increment(ref _modelsFailed);
         _modelFailures.Add(result.ErrorKind ?? result.Status.ToString());
-        _messages.Add(meshPath, result.ErrorKind == NifReadResult.NotFoundKind
-            ? $"  [mesh] not found: {meshPath}"
-            : $"  [mesh] unreadable: {meshPath} ({result.Error})");
+        _problems.Add(result.ErrorKind == NifReadResult.NotFoundKind
+            ? new AssetProblem(meshPath, AssetProblemKind.NotFound, $"  [mesh] not found: {meshPath}")
+            : new AssetProblem(meshPath, AssetProblemKind.Unreadable, $"  [mesh] unreadable: {meshPath} ({result.Error})"));
         return new MeshBounds(null, result.Status);
     }
 
@@ -295,7 +296,10 @@ internal sealed class BaseObjectShapeProvider
         var result = bytes == null
             ? NifReadResult.Failed(NifReadResult.NotFoundKind, "mesh file not found")
             : NifGeometryReader.ReadGeometry(bytes, includeTriangles);
-        if (result.Warning != null) _messages.Add(meshPath, $"  [mesh] {meshPath}: {result.Warning}");
+        if (result.Warning != null)
+        {
+            _problems.Add(new AssetProblem(meshPath, AssetProblemKind.ReadWarning, $"  [mesh] {meshPath}: {result.Warning}"));
+        }
         return (result, source);
     }
 
@@ -312,7 +316,9 @@ internal sealed class BaseObjectShapeProvider
     {
         if (footerRoot is not { } root) return;
         Interlocked.Increment(ref _modelsWithFooterRoot);
-        _messages.Add(meshPath,
-            $"  [mesh] {meshPath}: footer root block {root.Index} used instead of first-node root block {root.LibraryRootIndex}");
+        _problems.Add(new AssetProblem(
+            meshPath,
+            AssetProblemKind.FooterRoot,
+            $"  [mesh] {meshPath}: footer root block {root.Index} used instead of first-node root block {root.LibraryRootIndex}"));
     }
 }

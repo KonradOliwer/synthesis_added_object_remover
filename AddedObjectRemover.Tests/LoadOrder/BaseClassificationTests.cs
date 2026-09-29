@@ -79,8 +79,8 @@ public class BaseClassificationTests
         });
         mod.AcousticSpaces.Add(new AcousticSpace(AcousticSpaceBase, SkyrimRelease.SkyrimSE));
 
-        var messages = new MeshMessageLog(enabled: false);
-        var meshFiles = new MeshFileSource(Path.GetTempPath(), GameRelease.SkyrimSE, [Mod], messages);
-        return new BaseObjectShapeProvider(mod.ToImmutableLinkCache(), meshFiles, messages);
+        var problems = new AssetProblemLog();
+        var meshFiles = new MeshFileSource(Path.GetTempPath(), GameRelease.SkyrimSE, [Mod], problems);
+        return new BaseObjectShapeProvider(mod.ToImmutableLinkCache(), meshFiles, problems);
     }
 }

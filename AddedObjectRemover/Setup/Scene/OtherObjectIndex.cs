@@ -1,5 +1,4 @@
 using System.Numerics;
-using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover;
 
@@ -7,11 +6,11 @@ namespace AddedObjectRemover;
 /// Placed objects of one space, indexed by their raw position (<see cref="PositionGrid"/>) and by
 /// their world bounds (<see cref="Bounds"/>, built on first use for the whole space). Each object's
 /// visibility and true bounds center are worked out at most once, lazily, the first time a query
-/// turns the object up. Objects whose base is invisible are found the same lazy way and then never match.
+/// turns the object up. Objects whose base is invisible are found the same lazy way.
 ///
 /// Thread-safe: the center is written before its state is published with an interlocked store,
 /// and read only after a load sees the state. Two threads measuring the same object concurrently
-/// write identical values, and only the one that publishes the state counts it.
+/// write identical values.
 /// </summary>
 internal sealed class OtherObjectIndex
 {
@@ -21,62 +20,32 @@ internal sealed class OtherObjectIndex
 
     private readonly OtherObject[] _objects;
     private readonly ShapeCatalog _shapes;
-    private readonly ReasonCounter? _invisible;
     private readonly Vector3[] _centers;
     private readonly int[] _state;
 
     private readonly Lazy<OtherObjectBoxIndex> _bounds;
-    private TimeSpan _boundsBuildTime;
 
-    /// <param name="invisible">Counts each invisible object once per reason; null counts nothing.</param>
     private OtherObjectIndex(
-        IReadOnlyList<OtherObject> objects, ShapeCatalog shapes, ReasonCounter? invisible, ParallelOptions parallelOptions)
+        IReadOnlyList<OtherObject> objects, ShapeCatalog shapes, ParallelOptions parallelOptions, IPhaseTimer timer, TimedPhase boundsPhase)
     {
         _objects = objects.ToArray();
         _shapes = shapes;
-        _invisible = invisible;
         _centers = new Vector3[_objects.Length];
         _state = new int[_objects.Length];
         PositionGrid = SpatialGrid.FromPoints(_objects.Select(o => o.Position).ToArray());
-        _bounds = new Lazy<OtherObjectBoxIndex>(() => BuildBounds(parallelOptions), LazyThreadSafetyMode.ExecutionAndPublication);
+        _bounds = new Lazy<OtherObjectBoxIndex>(() => timer.Time(boundsPhase, () => OtherObjectBoxIndex.Build(_objects, _shapes, parallelOptions)), LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
-    private OtherObjectBoxIndex BuildBounds(ParallelOptions parallelOptions)
-    {
-        var (bounds, elapsed) = Timing.Measure(() => OtherObjectBoxIndex.Build(_objects, _shapes, parallelOptions));
-        _boundsBuildTime = elapsed;
-        return bounds;
-    }
-
-    /// <summary>One index per space containing target objects (empty if it has no other objects).</summary>
-    public static Dictionary<FormKey, OtherObjectIndex> BuildForTargetSpaces(
-        World world,
-        ShapeCatalog shapes,
-        ReasonCounter invisible,
-        ParallelOptions parallelOptions)
-    {
-        var indexes = new Dictionary<FormKey, OtherObjectIndex>();
-        foreach (var target in world.Targets)
-        {
-            if (indexes.ContainsKey(target.SpaceKey)) continue;
-            var others = world.Rivals.Where(rival => rival.SpaceKey == target.SpaceKey).ToList();
-            indexes[target.SpaceKey] = new OtherObjectIndex(others, shapes, invisible, parallelOptions);
-        }
-        return indexes;
-    }
-
-    public static OtherObjectIndex CreateUncounted(
-        IReadOnlyList<OtherObject> objects, ShapeCatalog shapes, ParallelOptions parallelOptions) =>
-        new(objects, shapes, invisible: null, parallelOptions);
+    /// <param name="boundsPhase">The phase under which building <see cref="Bounds"/> is timed.</param>
+    public static OtherObjectIndex Create(
+        IReadOnlyList<OtherObject> objects, ShapeCatalog shapes, ParallelOptions parallelOptions, IPhaseTimer timer, TimedPhase boundsPhase) =>
+        new(objects, shapes, parallelOptions, timer, boundsPhase);
 
     /// <summary>The objects by raw position: only for matching objects by where they are placed.</summary>
     public SpatialGrid PositionGrid { get; }
 
     /// <summary>The objects by world bounds: for every question about what an object's bounds reach.</summary>
     public OtherObjectBoxIndex Bounds => _bounds.Value;
-
-    /// <summary>Time spent building <see cref="Bounds"/>; zero while it is not built.</summary>
-    public TimeSpan BoundsBuildTime => _bounds.IsValueCreated ? _boundsBuildTime : TimeSpan.Zero;
 
     public int Count => _objects.Length;
 
@@ -104,10 +73,7 @@ internal sealed class OtherObjectIndex
         }
 
         var state = visibility.IsVisible ? Visible : Invisible;
-        if (Interlocked.CompareExchange(ref _state[index], state, NotMeasured) == NotMeasured && !visibility.IsVisible)
-        {
-            _invisible?.Add(visibility.Describe());
-        }
+        Interlocked.CompareExchange(ref _state[index], state, NotMeasured);
         return state;
     }
 }

@@ -11,10 +11,11 @@ namespace AddedObjectRemover;
 internal sealed class LeftoverInvisibleObjectSelector(
     IReadOnlyList<TargetObject> targets,
     IReadOnlyList<ObjectVisibility> visibility,
-    ShapeCatalog shapes,
+    IVisibleTargets surroundings,
     Hosts hosts,
     InvisibleObjectReach reach,
-    LeftoverConfig config)
+    LeftoverConfig config,
+    WorkOrder order)
 {
     /// <param name="removedTargets">Target indices removed by the earlier steps.</param>
     public LeftoverResult SelectRemovals(IReadOnlySet<int> removedTargets, ParallelOptions options)
@@ -24,23 +25,25 @@ internal sealed class LeftoverInvisibleObjectSelector(
 
     private LeftoverEvaluation[] EvaluateAll(IReadOnlySet<int> removedTargets, ParallelOptions options)
     {
-        var surroundings = VisibleTargetIndex.Build(targets, ObjectVisibility.VisibleIndices(visibility, except: new HashSet<int>()), shapes);
         var candidates = Enumerable.Range(0, targets.Count)
             .Where(index => visibility[index].Kind != null && !removedTargets.Contains(index))
             .ToArray();
 
-        var evaluations = new LeftoverEvaluation[candidates.Length];
-        Parallel.For(0, candidates.Length, options, i => evaluations[i] = Evaluate(candidates[i], surroundings, removedTargets));
-        return evaluations;
+        return ParallelMap.Run(
+            options,
+            order.Among(candidates),
+            () => new List<VisibleNeighbour>(),
+            (position, neighbours) => Evaluate(candidates[position], removedTargets, neighbours));
     }
 
-    private LeftoverEvaluation Evaluate(int targetIndex, VisibleTargetIndex surroundings, IReadOnlySet<int> removedTargets)
+    /// <param name="neighbours">The calling worker's buffer.</param>
+    private LeftoverEvaluation Evaluate(int targetIndex, IReadOnlySet<int> removedTargets, List<VisibleNeighbour> neighbours)
     {
         var target = targets[targetIndex];
         var kind = visibility[targetIndex].Kind!.Value;
         var radius = GetEffectiveRadius(target);
         var containingObject = hosts.HostOf(targetIndex);
-        var areas = MeasureSurroundings(target, radius, surroundings, removedTargets);
+        var areas = MeasureSurroundings(target, radius, removedTargets, neighbours);
         var ruleDecision = containingObject != null ? LeftoverDecision.RemovedInsideOtherObject : DecideByDirections(areas, config);
         return new LeftoverEvaluation(targetIndex, kind, radius, containingObject, areas, ApplyProtectedTypes(kind, ruleDecision), KeepReason: null);
     }
@@ -51,13 +54,14 @@ internal sealed class LeftoverInvisibleObjectSelector(
     private SectorAreas MeasureSurroundings(
         TargetObject target,
         float radius,
-        VisibleTargetIndex surroundings,
-        IReadOnlySet<int> removedTargets)
+        IReadOnlySet<int> removedTargets,
+        List<VisibleNeighbour> neighbours)
     {
         var areas = new SectorAreas(config.DirectionThresholdPercent);
-        foreach (var neighbour in surroundings.FindAround(target.SpaceKey, target.Transform.Position, radius))
+        surroundings.Around(target.SpaceKey, target.Transform.Position, radius, neighbours);
+        foreach (var neighbour in neighbours)
         {
-            var removed = removedTargets.Contains(neighbour.TargetIndex);
+            var removed = removedTargets.Contains(neighbour.Target.Index);
             foreach (var sector in neighbour.Sectors) areas.Add(sector, neighbour.FootprintArea, removed);
         }
         return areas;

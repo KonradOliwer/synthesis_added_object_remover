@@ -100,7 +100,7 @@ internal sealed class ShapeCatalog
 
     public void MeasureBases(IReadOnlyList<BaseRef> bases, ParallelOptions options)
     {
-        Parallel.ForEach(bases, options, reference => GetBaseShape(reference));
+        ParallelMap.Run(options, bases.Count, i => GetBaseShape(bases[i]));
     }
 
     /// <summary>Null when the bounds did not come from a readable mesh (OBND fallback, NPCs, no model).</summary>

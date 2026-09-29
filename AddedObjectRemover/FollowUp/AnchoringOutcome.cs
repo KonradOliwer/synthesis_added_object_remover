@@ -23,16 +23,17 @@ internal sealed record AnchoringEvaluation(
 
 /// <param name="Iterations">The follow-up rounds.</param>
 /// <param name="Candidates">Distinct candidates evaluated at least once.</param>
-/// <param name="KeptWithoutContacts">Candidates kept because no surface sample touched any supporter.</param>
+/// <param name="KeptWithoutContacts">Unprotected candidates kept because no surface sample touched any supporter.</param>
+/// <param name="Pairs">The pair tests that found the candidates.</param>
 internal sealed record AnchoringStats(
     int Iterations,
     int Candidates,
     int Evaluations,
     int KeptWithoutContacts,
-    PairTestStats Pairs,
-    TimeSpan Setup,
-    TimeSpan TouchSearch,
-    TimeSpan ContactPoints);
+    PairTestStats Pairs);
+
+/// <summary>Where the support cascade spent its time; for the log only.</summary>
+internal readonly record struct AnchoringTimes(TimeSpan Setup, TimeSpan TouchSearch, TimeSpan ContactPoints);
 
 /// <param name="Removals">The follow-up rounds' removals: lost support and the linked group members removed with them.</param>
 /// <param name="Kept">The objects the follow-up rounds held.</param>
@@ -52,28 +53,32 @@ internal static class AnchoringOutcome
         Ledger ledger,
         LedgerReport report,
         ImmutableArray<Round> rounds,
-        ImmutableArray<RoundEvidence> evidence,
-        SupportRule rule,
-        TimeSpan setup)
+        ImmutableArray<RoundEvidence> evidence)
     {
+        var supportRounds = evidence.Cast<SupportRound>().ToList();
         var evaluations = rounds
-            .SelectMany((round, index) => ((SupportRound)evidence[index]).Evaluations.Select(evaluation => Join(evaluation, round, iteration: index + 1, ledger)))
+            .SelectMany((round, index) => supportRounds[index].Evaluations.Select(evaluation => Join(evaluation, round, iteration: index + 1, ledger)))
             .ToList();
         var stats = new AnchoringStats(
             rounds.Length,
-            rule.CandidatesWithContacts,
+            evaluations.Select(evaluation => evaluation.TargetIndex).Distinct().Count(),
             evaluations.Count,
-            evaluations.Where(evaluation => evaluation.Contacts.ContactPoints == 0).Select(evaluation => evaluation.TargetIndex).Distinct().Count(),
-            rule.PairStats,
-            setup,
-            rule.TouchSearch,
-            rule.ContactPoints);
+            CountKeptWithoutContacts(evaluations, ledger),
+            PairTestStats.Sum(supportRounds.Select(round => round.Work)));
         return new AnchoringResult(
             [.. rounds.SelectMany(report.RemovalsIn)],
             [.. rounds.SelectMany(round => LedgerReport.KeptIn(ledger, round))],
             stats,
             evaluations);
     }
+
+    private static int CountKeptWithoutContacts(IEnumerable<AnchoringEvaluation> evaluations, Ledger ledger) =>
+        evaluations
+            .Where(evaluation => evaluation.Contacts.ContactPoints == 0)
+            .Select(evaluation => new TargetId(evaluation.TargetIndex))
+            .Where(target => !ledger.IsProtected(target))
+            .Distinct()
+            .Count();
 
     /// <param name="iteration">The round's position among the follow-up rounds, from 1.</param>
     private static AnchoringEvaluation Join(SupportEvaluation evaluation, Round round, int iteration, Ledger ledger)

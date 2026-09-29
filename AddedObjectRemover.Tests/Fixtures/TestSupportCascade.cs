@@ -5,8 +5,6 @@ namespace AddedObjectRemover.Tests.Fixtures;
 /// <summary>The support cascade over a scene of visible targets, seeded by a too-close round like the pipeline does.</summary>
 internal static class TestSupportCascade
 {
-    private static readonly Cause SeedCause = new Cause.TooClose(new OtherId(0));
-
     public sealed record Run(Ledger Ledger, ImmutableArray<Round> FollowUpRounds, AnchoringResult Anchoring);
 
     public static Run Execute(
@@ -14,16 +12,15 @@ internal static class TestSupportCascade
         ShapeCatalog shapes,
         Protection protection,
         IReadOnlyList<int> seeds,
-        SupporterIndex supporters,
+        ISolids solids,
         TerrainHeights terrain,
         float touchDistance,
         float threshold,
         int threads)
     {
         var options = new ParallelOptions { MaxDegreeOfParallelism = threads };
-        var visibility = Enumerable.Repeat(ObjectVisibility.Visible, targets.Count).ToArray();
-        var start = Ledger.Start(protection, targets.Count);
-        var seeded = start.Apply(RoundKind.TooClose, [.. seeds.Select(seed => new Proposal(new TargetId(seed), SeedCause))]);
+        var visibility = TestSeededLedger.AllVisible(targets.Count);
+        var seeded = TestSeededLedger.Seed(protection, targets.Count, seeds);
         var seedRound = seeded.Rounds[^1];
         var search = TouchSearch.Create(
             targets,
@@ -34,14 +31,13 @@ internal static class TestSupportCascade
             new TriangleStore(shapes.ReadGeometry),
             touchDistance,
             options);
-        var supporterFinder = new AnchoringSupporterFinder(targets, search, supporters, shapes, touchDistance);
+        var supporterFinder = new AnchoringSupporterFinder(targets, search, solids, shapes, touchDistance);
         var contactFinder = new AnchoringContactFinder(targets, search.MeshPaths, supporterFinder, terrain, search.Cache, touchDistance);
-        var rule = new SupportRule(search, contactFinder, threshold, targets.Count, options);
+        var rule = new SupportRule(search, contactFinder, threshold, targets.Count, options, UntimedPhases.Instance);
         var (ledger, evidence) = Cascade.Run(seeded, rule);
-        var followUpRounds = ledger.Rounds.RemoveRange(0, seeded.Rounds.Length);
-        // Only the too-close round's causes read the world, and the report is asked for follow-up rounds only.
-        var report = new LedgerReport(ledger, null!, LeftoverResult.None);
-        var anchoring = AnchoringOutcome.Create(ledger, report, followUpRounds, evidence, rule, TimeSpan.Zero);
+        var followUpRounds = TestSeededLedger.FollowUpRounds(seeded, ledger);
+        var report = TestSeededLedger.ReportOfFollowUpRounds(ledger);
+        var anchoring = AnchoringOutcome.Create(ledger, report, followUpRounds, evidence);
         return new Run(ledger, followUpRounds, anchoring);
     }
 }

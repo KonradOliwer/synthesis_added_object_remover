@@ -1,95 +1,92 @@
-using System.Collections.Concurrent;
-using Mutagen.Bethesda.Plugins;
-
 namespace AddedObjectRemover;
+
+/// <summary>Work counts of the too-close search: the ObjectShape zone's (zero for the BoundingBox zone) and the NPC-stuck search's.</summary>
+internal readonly record struct ClashWork(ShapeZoneWork Zone, NpcWork Npcs) : IWork<ClashWork>
+{
+    public static ClashWork Zero => default;
+
+    public static ClashWork operator +(ClashWork a, ClashWork b) => new(a.Zone + b.Zone, a.Npcs + b.Npcs);
+}
+
+/// <param name="Hits">In target order.</param>
+internal sealed record ClashSearchResult(List<TooCloseHit> Hits, ClashWork Work);
 
 /// <summary>
 /// BoundingBox removal zone: finds visible target objects whose grown (multiplier-expanded) local
-/// box contains the bounds center of some other-mod object. Other mods' placed NPCs follow the
+/// box contains the bounds center of some active rival. Other mods' placed NPCs follow the
 /// <see cref="NpcClashRule"/>. Invisible targets are left to the leftover invisible objects step.
 /// </summary>
 internal static class TooCloseSearch
 {
-    /// <summary>
-    /// Each target writes only its own result slot and hits are returned in target order, so the
-    /// result (including which other object is reported) does not depend on thread scheduling.
-    /// </summary>
+    /// <summary>Reusable buffers and counters of one worker thread.</summary>
+    private sealed class Scratch
+    {
+        public SpatialQueryScratch Query { get; } = new();
+        public List<OtherId> Candidates { get; } = [];
+        public NpcScratch Npcs { get; } = new();
+
+        public ClashWork Harvest() => new(ShapeZoneWork.Zero, Npcs.Harvest());
+    }
+
+    /// <summary>Candidates are tested in index order, so which rival is reported does not depend on thread scheduling.</summary>
     /// <param name="visibility">Parallel to <paramref name="targets"/>.</param>
-    public static List<TooCloseHit> FindTooCloseTargets(
+    public static ClashSearchResult FindTooCloseTargets(
         IReadOnlyList<TargetObject> targets,
         IReadOnlyList<ObjectVisibility> visibility,
-        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
-        Replacements replacements,
+        IActiveRivals rivals,
         ShapeCatalog shapes,
         float multiplier,
         NpcClashRule npcRule,
+        WorkOrder order,
         ParallelOptions parallelOptions)
     {
-        var matches = new int[targets.Count];
-        Parallel.ForEach(Partitioner.Create(0, targets.Count), parallelOptions, range =>
-        {
-            var npcScratch = new NpcScratch();
-            var slots = new List<int>();
-            var candidates = new List<int>();
-            for (var i = range.Item1; i < range.Item2; i++)
-            {
-                if (!visibility[i].IsVisible)
-                {
-                    matches[i] = -1;
-                    continue;
-                }
-                var objectMatch = FindFirstCentreInBoxZone(
-                    targets[i], indexes[targets[i].SpaceKey], replacements, shapes, multiplier, npcRule, slots, candidates);
-                matches[i] = npcRule.ThenFirstStuckNpc(objectMatch, i, npcScratch);
-            }
-            npcRule.AddStats(npcScratch);
-        });
-
-        return ToHits(targets, indexes, matches);
+        var (matches, work) = ParallelMap.Run(
+            parallelOptions,
+            order,
+            targets.Count,
+            () => new Scratch(),
+            (targetIndex, scratch) => visibility[targetIndex].IsVisible
+                ? FindFirstTooCloseOther(targets[targetIndex], targetIndex, rivals, shapes, multiplier, npcRule, scratch)
+                : null,
+            scratch => scratch.Harvest());
+        return new ClashSearchResult(ToHits(rivals, matches), work);
     }
 
-    /// <param name="matches">Per target, the index of the other object it is too close to, or -1.</param>
+    /// <param name="matches">Per target, the rival it is too close to, or null.</param>
     /// <returns>The hits in target order.</returns>
-    public static List<TooCloseHit> ToHits(
-        IReadOnlyList<TargetObject> targets,
-        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
-        IReadOnlyList<int> matches)
+    public static List<TooCloseHit> ToHits(IActiveRivals rivals, IReadOnlyList<OtherId?> matches)
     {
         var hits = new List<TooCloseHit>();
         for (var i = 0; i < matches.Count; i++)
         {
-            if (matches[i] >= 0) hits.Add(new TooCloseHit(i, indexes[targets[i].SpaceKey][matches[i]]));
+            if (matches[i] is { } rival) hits.Add(new TooCloseHit(i, rivals.Get(rival)));
         }
         return hits;
     }
 
-    /// <summary>
-    /// Lowest index of an other object whose bounds centre lies in the target's BoundingBox zone,
-    /// or -1; NPCs only when <paramref name="npcRule"/> tests them like objects.
-    /// </summary>
-    /// <param name="slots">Reused buffer.</param>
+    private static OtherId? FindFirstTooCloseOther(
+        TargetObject target, int targetIndex, IActiveRivals rivals, ShapeCatalog shapes, float multiplier, NpcClashRule npcRule, Scratch scratch) =>
+        npcRule.ThenFirstStuckNpc(
+            FindFirstCentreInBoxZone(target, rivals, shapes, multiplier, scratch.Query, scratch.Candidates), targetIndex, scratch.Npcs);
+
+    /// <summary>The lowest active rival whose bounds centre lies in the target's BoundingBox zone, or null.</summary>
     /// <param name="candidates">Reused buffer.</param>
-    public static int FindFirstCentreInBoxZone(
+    public static OtherId? FindFirstCentreInBoxZone(
         TargetObject target,
-        OtherObjectIndex index,
-        Replacements replacements,
+        IActiveRivals rivals,
         ShapeCatalog shapes,
         float multiplier,
-        NpcClashRule npcRule,
-        List<int> slots,
-        List<int> candidates)
+        SpatialQueryScratch scratch,
+        List<OtherId> candidates)
     {
-        if (index.Count == 0) return -1;
-
         var position = target.Transform.Position;
         var rotation = target.Transform.Rotation;
         var expanded = Geometry.ExpandedLocalBox(shapes.GetLocalBox(target.Base), target.Transform.Scale, multiplier);
-        index.Bounds.CollectCandidates(Geometry.WorldAabb(expanded, position, rotation), slots, candidates);
-        foreach (var otherIndex in candidates)
+        rivals.Overlapping(target.SpaceKey, Geometry.WorldAabb(expanded, position, rotation), scratch, candidates);
+        foreach (var rival in candidates)
         {
-            if (replacements.IsReplaced(index[otherIndex].Id) || !npcRule.TestsLikeObject(index[otherIndex])) continue;
-            if (index.TryGetVisibleCenter(otherIndex, out var center) && Geometry.IsInsideOrientedBox(center, position, rotation, expanded)) return otherIndex;
+            if (Geometry.IsInsideOrientedBox(rivals.CentreOf(rival), position, rotation, expanded)) return rival;
         }
-        return -1;
+        return null;
     }
 }

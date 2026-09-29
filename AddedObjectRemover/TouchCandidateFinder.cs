@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover;
@@ -67,15 +66,16 @@ internal sealed class TouchCandidateFinder
 
     private void BuildBoxes(IReadOnlySet<FormKey> spaces, bool[] excluded, ShapeCatalog shapes, ParallelOptions parallelOptions)
     {
-        Parallel.ForEach(Partitioner.Create(0, _targets.Count), parallelOptions, range =>
+        var boxes = ParallelMap.Run(parallelOptions, _targets.Count, i =>
+            excluded[i] || !spaces.Contains(_targets[i].SpaceKey)
+                ? (OrientedBox?)null
+                : OrientedBox.FromLocal(shapes.GetLocalBox(_targets[i].Base), _targets[i].Transform));
+        for (var i = 0; i < boxes.Length; i++)
         {
-            for (var i = range.Item1; i < range.Item2; i++)
-            {
-                if (excluded[i] || !spaces.Contains(_targets[i].SpaceKey)) continue;
-                _boxes[i] = OrientedBox.FromLocal(shapes.GetLocalBox(_targets[i].Base), _targets[i].Transform);
-                _included[i] = true;
-            }
-        });
+            if (boxes[i] is not { } box) continue;
+            _boxes[i] = box;
+            _included[i] = true;
+        }
     }
 
     /// <summary>Per-space grids of the included targets' grown world AABBs.</summary>

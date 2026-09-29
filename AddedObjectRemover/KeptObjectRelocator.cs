@@ -51,18 +51,12 @@ internal sealed class KeptObjectRelocator(
     public RelocationResult Relocate(IReadOnlyList<LeftoverEvaluation> evaluations, ParallelOptions options)
     {
         var candidates = evaluations.Where(IsMovableMarkerKeptInsideOtherObject).ToArray();
-        var relocations = new Relocation?[candidates.Length];
-        Parallel.For(
-            0,
-            candidates.Length,
+        var relocations = ParallelMap.Run(
             options,
+            candidates.Length,
             () => new SpatialQueryScratch(),
-            (i, _, scratch) =>
-            {
-                relocations[i] = TryFindRelocation(candidates[i], scratch);
-                return scratch;
-            },
-            _ => { });
+            (i, scratch) => TryFindRelocation(candidates[i], scratch),
+            rangeSize: ParallelMap.OneItemPerRange);
         return new RelocationResult(
             relocations.OfType<Relocation>().ToList(),
             candidates.Where((_, i) => relocations[i] == null).ToList());

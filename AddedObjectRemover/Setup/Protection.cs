@@ -65,6 +65,8 @@ internal sealed class Protection
         return reason != null;
     }
 
+    public bool IsProtected(int targetIndex) => _reasons[targetIndex] != null;
+
     /// <summary>Why the target itself must stay, ignoring its group; null when nothing depends on it.</summary>
     public KeepReason? GetOwnReason(int targetIndex) => _ownReasons[targetIndex];
 

@@ -5,8 +5,6 @@ namespace AddedObjectRemover.Tests.Fixtures;
 /// <summary>The touch cascade over a scene of visible targets, seeded by a too-close round like the pipeline does.</summary>
 internal static class TestTouchCascade
 {
-    private static readonly Cause SeedCause = new Cause.TooClose(new OtherId(0));
-
     public sealed record Run(Ledger Ledger, ImmutableArray<Round> FollowUpRounds, TouchClusters Clusters);
 
     public static Run Execute(
@@ -16,12 +14,23 @@ internal static class TestTouchCascade
         IReadOnlyList<int> seeds,
         float touchDistance,
         int threads,
-        bool collectDiagnostics)
+        bool collectDiagnostics) =>
+        Execute(targets, shapes, protection, seeds, touchDistance, threads, collectDiagnostics, (search, options) => new TouchRule(search, options, UntimedPhases.Instance));
+
+    /// <param name="createRule">The rule deciding the follow-up rounds; the components are still found with the touch search.</param>
+    public static Run Execute(
+        IReadOnlyList<TargetObject> targets,
+        ShapeCatalog shapes,
+        Protection protection,
+        IReadOnlyList<int> seeds,
+        float touchDistance,
+        int threads,
+        bool collectDiagnostics,
+        Func<TouchSearch, ParallelOptions, IFollowUpRule> createRule)
     {
         var options = new ParallelOptions { MaxDegreeOfParallelism = threads };
-        var visibility = Enumerable.Repeat(ObjectVisibility.Visible, targets.Count).ToArray();
-        var start = Ledger.Start(protection, targets.Count);
-        var seeded = start.Apply(RoundKind.TooClose, [.. seeds.Select(seed => new Proposal(new TargetId(seed), SeedCause))]);
+        var visibility = TestSeededLedger.AllVisible(targets.Count);
+        var seeded = TestSeededLedger.Seed(protection, targets.Count, seeds);
         var seedRound = seeded.Rounds[^1];
         var search = TouchSearch.Create(
             targets,
@@ -32,11 +41,9 @@ internal static class TestTouchCascade
             new TriangleStore(shapes.ReadGeometry),
             touchDistance,
             options);
-        var rule = new TouchRule(search, options);
-        var (ledger, evidence) = Cascade.Run(seeded, rule);
-        var followUpRounds = ledger.Rounds.RemoveRange(0, seeded.Rounds.Length);
-        // Only the too-close round's causes read the world, and the report is asked for follow-up rounds only.
-        var report = new LedgerReport(ledger, null!, LeftoverResult.None);
+        var (ledger, evidence) = Cascade.Run(seeded, createRule(search, options));
+        var followUpRounds = TestSeededLedger.FollowUpRounds(seeded, ledger);
+        var report = TestSeededLedger.ReportOfFollowUpRounds(ledger);
         var clusters = TouchComponents.Find(
             ledger,
             report,
@@ -45,9 +52,8 @@ internal static class TestTouchCascade
             followUpRounds,
             evidence,
             search,
-            search.Tester.GetStats(),
-            new TouchTimes(TimeSpan.Zero, rule.BroadPhase, rule.NarrowPhase),
             options,
+            UntimedPhases.Instance,
             collectDiagnostics);
         return new Run(ledger, followUpRounds, clusters);
     }

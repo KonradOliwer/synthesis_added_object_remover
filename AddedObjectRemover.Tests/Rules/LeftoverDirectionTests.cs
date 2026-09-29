@@ -22,7 +22,7 @@ public class LeftoverDirectionTests
         var box = Place(Table, position, zRadians: 0.7f);
         var point = position + TestTargets.At(Vector3.Zero, 0.7f).ToWorld(new Vector3(x, y, z));
 
-        Assert.Equal(SectorAreas.All, VisibleTargetIndex.FindSectors(box, point));
+        Assert.Equal(SectorAreas.All, VisibleTargets.FindSectors(box, point));
     }
 
     [Theory]
@@ -35,8 +35,8 @@ public class LeftoverDirectionTests
         var box = Place(Table, Vector3.Zero);
         var sector = Enum.Parse<DirectionSector>(expected);
 
-        AssertOnly(sector, VisibleTargetIndex.FindSectors(box, new Vector3(pointX, pointY, 41f)));
-        AssertOnly(sector, VisibleTargetIndex.FindSectors(box, new Vector3(pointX, pointY, -500f)));
+        AssertOnly(sector, VisibleTargets.FindSectors(box, new Vector3(pointX, pointY, 41f)));
+        AssertOnly(sector, VisibleTargets.FindSectors(box, new Vector3(pointX, pointY, -500f)));
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public class LeftoverDirectionTests
     {
         var box = Place(Table, new Vector3(300, 400, 0));
 
-        AssertOnly(SectorAreas.NoHorizontalOffset, VisibleTargetIndex.FindSectors(box, new Vector3(300, 400, 41f)));
+        AssertOnly(SectorAreas.NoHorizontalOffset, VisibleTargets.FindSectors(box, new Vector3(300, 400, 41f)));
     }
 
     [Fact]
@@ -56,9 +56,9 @@ public class LeftoverDirectionTests
         var besideTheBeam = new Vector3(50, 50, 20);
 
         Assert.True(beam.IsCrossedByVerticalLine(overTheBeam));
-        AssertOnly(DirectionSector.NorthWest, VisibleTargetIndex.FindSectors(beam, overTheBeam));
+        AssertOnly(DirectionSector.NorthWest, VisibleTargets.FindSectors(beam, overTheBeam));
         Assert.False(beam.IsCrossedByVerticalLine(besideTheBeam));
-        AssertOnly(DirectionSector.SouthWest, VisibleTargetIndex.FindSectors(beam, besideTheBeam));
+        AssertOnly(DirectionSector.SouthWest, VisibleTargets.FindSectors(beam, besideTheBeam));
     }
 
     [Fact]
@@ -66,8 +66,8 @@ public class LeftoverDirectionTests
     {
         var box = Place(Table, new Vector3(100, 60, 0));
 
-        AssertOnly(DirectionSector.East, VisibleTargetIndex.FindSectors(box, new Vector3(0, 40, 20)));
-        AssertOnly(DirectionSector.NorthEast, VisibleTargetIndex.FindSectors(box, new Vector3(0, 0, 20)));
+        AssertOnly(DirectionSector.East, VisibleTargets.FindSectors(box, new Vector3(0, 40, 20)));
+        AssertOnly(DirectionSector.NorthEast, VisibleTargets.FindSectors(box, new Vector3(0, 0, 20)));
     }
 
     private static void AssertOnly(DirectionSector expected, IReadOnlyList<DirectionSector> actual) =>

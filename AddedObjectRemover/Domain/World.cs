@@ -62,6 +62,9 @@ internal sealed record World(
 {
     public TargetObject this[TargetId id] => Targets[id.Index];
 
+    /// <summary>A rival, or a backdrop object when the backdrop was collected.</summary>
+    public OtherObject Other(OtherId id) => id.Index < Rivals.Length ? Rivals[id.Index] : Backdrop.Value[id.Index - Rivals.Length];
+
     /// <summary>The rivals and the backdrop together, by <see cref="OtherId"/>; only when the backdrop was collected.</summary>
     public IEnumerable<OtherObject> RivalsAndBackdrop => Rivals.Concat(Backdrop.Value);
 }

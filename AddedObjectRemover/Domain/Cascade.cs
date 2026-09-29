@@ -15,7 +15,8 @@ internal sealed record RoundProposals(IReadOnlyList<Proposal> Proposals, RoundEv
 internal abstract record RoundEvidence;
 
 /// <param name="Reached">Each object reached by touch, paired with the frontier object that touched it first.</param>
-internal sealed record TouchRound(ImmutableArray<TargetPair> Reached) : RoundEvidence;
+/// <param name="Work">The round's pair tests.</param>
+internal sealed record TouchRound(ImmutableArray<TargetPair> Reached, PairTestStats Work) : RoundEvidence;
 
 /// <summary>Runs a follow-up rule in FollowUp rounds until a round removes nothing.</summary>
 internal static class Cascade

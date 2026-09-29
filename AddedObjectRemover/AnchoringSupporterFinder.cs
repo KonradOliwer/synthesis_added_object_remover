@@ -4,17 +4,17 @@ internal readonly record struct MeshSupporter(Supporter Supporter, PlacedTransfo
 
 /// <summary>
 /// Everything with a mesh that may hold up an Anchoring candidate: target objects whose oriented
-/// box comes within the touch distance of the candidate's (removed or not), and visible placed
-/// objects of any plugin doing the same (<see cref="SupporterIndex"/>). Thread-safe.
+/// box comes within the touch distance of the candidate's (removed or not), and solids doing the
+/// same. Thread-safe.
 /// </summary>
 internal sealed class AnchoringSupporterFinder(
     IReadOnlyList<TargetObject> targets,
     TouchSearch search,
-    SupporterIndex supporters,
+    ISolids solids,
     ShapeCatalog shapes,
     float touchDistance)
 {
-    /// <returns>Target supporters in neighbor order, then placed supporters in index order.</returns>
+    /// <returns>Target supporters in neighbor order, then placed supporters in id order.</returns>
     public List<MeshSupporter> FindMeshSupporters(int candidate, SpatialQueryScratch scratch)
     {
         var found = FindTargetSupporters(candidate);
@@ -29,20 +29,18 @@ internal sealed class AnchoringSupporterFinder(
 
     private void AddPlacedSupporters(int candidate, SpatialQueryScratch scratch, List<MeshSupporter> found)
     {
-        var index = supporters.GetSpace(targets[candidate].SpaceKey);
         var candidateBox = search.CandidateFinder.BoxOf(candidate);
-        index.Bounds.CollectCandidates(candidateBox.WorldAabb(touchDistance), scratch.Slots, scratch.Candidates);
-        foreach (var slot in scratch.Candidates)
+        solids.Overlapping(targets[candidate].SpaceKey, candidateBox.WorldAabb(touchDistance), scratch, scratch.Others);
+        foreach (var id in scratch.Others)
         {
-            if (!index.IsVisible(slot)) continue;
-            var placed = index[slot];
+            var placed = solids.Get(id);
             if (shapes.GetMeshPath(placed.Base) is not { } meshPath) continue;
 
             var transform = placed.Transform;
             var placedBox = OrientedBox.FromLocal(shapes.GetLocalBox(placed.Base), transform);
             if (!candidateBox.Intersects(placedBox, touchDistance)) continue;
 
-            found.Add(new MeshSupporter(Supporter.Placed(slot), transform, meshPath));
+            found.Add(new MeshSupporter(Supporter.Placed(id), transform, meshPath));
         }
     }
 }

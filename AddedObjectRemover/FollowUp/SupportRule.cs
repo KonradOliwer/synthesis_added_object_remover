@@ -22,7 +22,8 @@ internal sealed record SupportEvaluation(int TargetIndex, CandidateContacts Cont
 }
 
 /// <param name="Evaluations">In target order.</param>
-internal sealed record SupportRound(ImmutableArray<SupportEvaluation> Evaluations) : RoundEvidence;
+/// <param name="Work">The pair tests that found the round's candidates.</param>
+internal sealed record SupportRound(ImmutableArray<SupportEvaluation> Evaluations, PairTestStats Work) : RoundEvidence;
 
 /// <summary>
 /// ObjectsSupportedByIt. Candidates are the undecided target objects with a mesh that touch an
@@ -36,7 +37,13 @@ internal sealed record SupportRound(ImmutableArray<SupportEvaluation> Evaluation
 /// judged against the removals of earlier rounds only, so the result does not depend on order.
 /// </summary>
 /// <param name="search">Built once from the seeds.</param>
-internal sealed class SupportRule(TouchSearch search, AnchoringContactFinder contactFinder, float threshold, int targetCount, ParallelOptions parallelOptions)
+internal sealed class SupportRule(
+    TouchSearch search,
+    AnchoringContactFinder contactFinder,
+    float threshold,
+    int targetCount,
+    ParallelOptions parallelOptions,
+    IPhaseTimer timer)
     : IFollowUpRule
 {
     /// <summary>Shares are sums of float fractions, so support that is fully removed can add up to slightly less than 1.</summary>
@@ -45,53 +52,34 @@ internal sealed class SupportRule(TouchSearch search, AnchoringContactFinder con
     /// <summary>Contact points do not depend on what is removed, so each candidate's are found once.</summary>
     private readonly CandidateContacts?[] _contacts = new CandidateContacts?[targetCount];
 
-    /// <summary>Time spent finding the candidates; for the log only.</summary>
-    public TimeSpan TouchSearch { get; private set; }
-
-    /// <summary>Time spent finding contact points; for the log only.</summary>
-    public TimeSpan ContactPoints { get; private set; }
-
-    public PairTestStats PairStats => search.Tester.GetStats();
-
-    /// <summary>Distinct candidates whose contact points were found.</summary>
-    public int CandidatesWithContacts => _contacts.Count(contacts => contacts != null);
-
     internal static bool ReachesThreshold(float removedShare, float threshold) =>
         removedShare >= threshold - ShareRoundingTolerance;
 
     public RoundProposals Next(Ledger ledger, ImmutableArray<TargetId> removedLastRound)
     {
-        var (candidates, touchSearch) = Timing.Measure(() => FindCandidatesInContactWith(ledger, removedLastRound));
-        TouchSearch += touchSearch;
-        ContactPoints += Timing.Measure(() => FindMissingContacts(candidates));
+        var (candidates, work) = timer.Time(TimedPhase.AnchoringTouchSearch, () => FindCandidatesInContactWith(ledger, removedLastRound));
+        timer.Time(TimedPhase.AnchoringContactPoints, () => FindMissingContacts(candidates));
         var evaluations = candidates.Select(candidate => Evaluate(ledger, candidate)).ToImmutableArray();
         return new RoundProposals(
             [.. evaluations.Where(evaluation => evaluation.Proposed).Select(ToProposal)],
-            new SupportRound(evaluations));
+            new SupportRound(evaluations, work));
     }
 
-    /// <returns>Sorted undecided objects in contact with an object the previous round removed.</returns>
-    private List<int> FindCandidatesInContactWith(Ledger ledger, ImmutableArray<TargetId> removedLastRound)
+    /// <returns>Sorted undecided objects in contact with an object the previous round removed, and the pair tests that found them.</returns>
+    private (List<int> Candidates, PairTestStats Work) FindCandidatesInContactWith(Ledger ledger, ImmutableArray<TargetId> removedLastRound)
     {
         var frontier = removedLastRound.Order().Select(target => target.Index).ToList();
         var pairs = search.CollectFrontierPairs(frontier, skip: node => ledger.IsDecided(new TargetId(node)));
-        var inContact = search.Tester.FindFirstInContact(pairs, ContactRule.TouchOrEnclose, parallelOptions);
-        return inContact.Select(pair => pair.Second).Distinct().Order().ToList();
+        var (inContact, work) = search.Tester.FindFirstInContact(pairs, ContactRule.TouchOrEnclose, parallelOptions);
+        return (inContact.Select(pair => pair.Second).Distinct().Order().ToList(), work);
     }
 
     private void FindMissingContacts(List<int> candidates)
     {
         var missing = candidates.Where(candidate => _contacts[candidate] == null).ToList();
-        Parallel.ForEach(
-            missing,
-            parallelOptions,
-            () => new SpatialQueryScratch(),
-            (candidate, _, scratch) =>
-            {
-                _contacts[candidate] = contactFinder.FindContacts(candidate, scratch);
-                return scratch;
-            },
-            _ => { });
+        var found = ParallelMap.Run(
+            parallelOptions, missing.Count, () => new SpatialQueryScratch(), (k, scratch) => contactFinder.FindContacts(missing[k], scratch));
+        for (var k = 0; k < missing.Count; k++) _contacts[missing[k]] = found[k];
     }
 
     /// <remarks>A candidate without contact points has no shares, so it is never proposed.</remarks>

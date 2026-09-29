@@ -12,7 +12,13 @@ public class ParallelDeterminismTests
     private const float Tolerance = 2f;
 
     private sealed record PairResults(
-        PairTouch[] Touches, List<TargetPair> FirstTouching, List<TargetPair> FirstInContact, float[] Distances, PairTestStats Stats);
+        PairTouch[] Touches,
+        List<TargetPair> FirstTouching,
+        List<TargetPair> FirstInContact,
+        float[] Distances,
+        PairTestStats TouchesWork,
+        PairTestStats FirstTouchingWork,
+        PairTestStats FirstInContactWork);
 
     [Fact]
     public void TouchAndContactResultsMatchForOneAndEightThreads()
@@ -27,9 +33,9 @@ public class ParallelDeterminismTests
         Assert.Equal(sequential.FirstTouching, parallel.FirstTouching);
         Assert.Equal(sequential.FirstInContact, parallel.FirstInContact);
         Assert.Equal(sequential.Distances, parallel.Distances);
-        Assert.Equal(sequential.Stats.PairsTested, parallel.Stats.PairsTested);
-        Assert.Equal(sequential.Stats.TouchingPairs, parallel.Stats.TouchingPairs);
-        Assert.Equal(sequential.Stats.TrianglePairsTested, parallel.Stats.TrianglePairsTested);
+        Assert.Equal(sequential.TouchesWork, parallel.TouchesWork);
+        Assert.Equal(sequential.FirstTouchingWork, parallel.FirstTouchingWork);
+        Assert.Equal(sequential.FirstInContactWork, parallel.FirstInContactWork);
     }
 
     private static PairResults RunTouchTests(int maxDegreeOfParallelism)
@@ -51,12 +57,12 @@ public class ParallelDeterminismTests
         var pairs = FindNearbyPairs(targets, meshPaths);
         var options = new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism };
 
-        var touches = tester.TestPairs(pairs, options);
-        var firstTouching = tester.FindFirstInContact(pairs, ContactRule.Touch, options);
-        var firstInContact = tester.FindFirstInContact(pairs, ContactRule.TouchOrEnclose, options);
+        var (touches, touchesWork) = tester.TestPairs(pairs, options);
+        var (firstTouching, firstTouchingWork) = tester.FindFirstInContact(pairs, ContactRule.Touch, options);
+        var (firstInContact, firstInContactWork) = tester.FindFirstInContact(pairs, ContactRule.TouchOrEnclose, options);
         var scratch = new TouchScratch();
         var distances = pairs.Select((pair, k) => touches[k] == PairTouch.Touching ? tester.MeasureMinSurfaceDistance(pair, scratch) : float.NaN).ToArray();
-        return new PairResults(touches, firstTouching, firstInContact, distances, tester.GetStats());
+        return new PairResults(touches, firstTouching, firstInContact, distances, touchesWork, firstTouchingWork, firstInContactWork);
     }
 
     /// <summary>Mesh kind k is a box of size 5 + 6k, so larger boxes can enclose smaller ones.</summary>

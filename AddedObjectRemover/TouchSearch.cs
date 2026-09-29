@@ -87,8 +87,6 @@ internal sealed class TouchSearch
 
     public List<int>[] FindNeighborsOfAll(IReadOnlyList<int> nodes)
     {
-        var neighbors = new List<int>[nodes.Count];
-        Parallel.For(0, nodes.Count, _parallelOptions, i => neighbors[i] = CandidateFinder.FindNeighbors(nodes[i]));
-        return neighbors;
+        return ParallelMap.Run(_parallelOptions, nodes.Count, i => CandidateFinder.FindNeighbors(nodes[i]));
     }
 }

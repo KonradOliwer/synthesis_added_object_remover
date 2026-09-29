@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
-using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Skyrim;
 using Mutagen.Bethesda.Synthesis;
 
@@ -22,10 +21,10 @@ internal sealed class RemovalPipeline
     private readonly BaseFactsReader _bases;
     private readonly ShapeCatalog _shapes;
     private readonly TriangleStore _meshCache;
-    private readonly ObjectContainment _containment;
     private readonly SkinnedBodyMeasurer _bodyMeasurer;
     private readonly NpcBodyCache _npcBodies;
-    private readonly ReasonCounter _invisibleOthers = new();
+    private readonly IPerfProbe _perf;
+    private readonly PhaseClock _clock = new();
 
     public RemovalPipeline(
         IPatcherState<ISkyrimMod, ISkyrimModGetter> state, RunConfig config, ModFacts mods, ModStanding standing, int workers)
@@ -43,9 +42,9 @@ internal sealed class RemovalPipeline
         _bases = new BaseFactsReader(state.LinkCache);
         _shapes = new ShapeCatalog(_bases, meshFiles, _problems);
         _meshCache = new TriangleStore(_shapes.ReadGeometry);
-        _containment = new ObjectContainment(_shapes, _meshCache);
         _bodyMeasurer = new SkinnedBodyMeasurer(_shapes.ReadGeometry);
         _npcBodies = new NpcBodyCache(new NpcBodyResolver(state.LinkCache, _shapes, _bodyMeasurer));
+        _perf = new PerfProbe(_meshCache, _npcBodies, _bodyMeasurer);
     }
 
     public void Run(Stopwatch totalTimer)
@@ -59,32 +58,33 @@ internal sealed class RemovalPipeline
         }
         Console.WriteLine($"Using {_parallelOptions.MaxDegreeOfParallelism} threads.");
 
-        var indexes = IndexOtherObjects(world);
+        var scene = CreateScene(world);
+        var order = WorkOrder.Of(world.Targets);
         WarmUpTargetBounds(world.Targets);
         var visibility = ClassifyTargetVisibility(world.Targets);
         RunReport.PrintTargetVisibility(visibility, world.Counts.TargetsHiddenOrWithoutPlacement);
-        var replacements = FindReplacements(world, indexes);
+        var replacements = FindReplacements(world, scene.RivalPositions(), order);
 
         var protection = Protection.Build(world.Targets, world.Links, world.References);
         RunReport.PrintLinkedGroups(protection.Groups, world.Counts.TargetPluginLinks);
-        var supporters = new SupporterIndex(GroupSupportersBySpace(world), _shapes, _parallelOptions);
+        var rivals = scene.ActiveRivals(replacements, _config.NpcHandling);
         var ledger = Ledger.Start(protection, world.Targets.Length);
-        var tooClose = DecideTooClose(world, visibility, indexes, replacements, ledger);
+        var tooClose = DecideTooClose(world, visibility, scene, rivals, replacements, order, ledger);
         PrintLinkedRemovals(tooClose, RoundsAddedTo(ledger, tooClose), "too-close");
-        var followUp = DecideFollowUp(snapshot, visibility, supporters, protection, tooClose);
+        var followUp = DecideFollowUp(snapshot, visibility, scene, protection, tooClose);
         PrintLinkedRemovals(followUp, RoundsAddedTo(tooClose, followUp), "follow-up");
-        var (final, leftovers) = DecideLeftovers(world, visibility, indexes, replacements, followUp);
+        var (final, leftovers) = DecideLeftovers(world, visibility, scene, rivals, order, followUp);
         PrintLinkedRemovals(final, RoundsAddedTo(followUp, final), "leftover invisible object");
 
         var report = new LedgerReport(final, world, leftovers);
         var removals = report.Removals();
-        var relocations = RelocateKeptMarkers(snapshot, visibility, supporters, final, leftovers);
+        var relocations = RelocateKeptMarkers(snapshot, visibility, scene, final, leftovers);
         WriteLeftoverDiagnostics(world, leftovers, relocations);
         WriteOverrides(snapshot, removals, relocations.Moved);
-        RunReport.PrintBoundsIndexTimes(indexes.Values, supporters.GetIndexedSpaces());
+        RunReport.PrintBoundsIndexTimes(_clock);
 
         var kept = report.Kept();
-        PrintFinalReport(world, indexes, removals, kept);
+        PrintFinalReport(world, removals, kept);
         ReportManualPatchHints(world, visibility, removals, kept, new ManualPatchHints(world.Targets, visibility, protection));
         Console.WriteLine($"Done in {totalTimer.Elapsed.TotalSeconds:F1}s.");
     }
@@ -111,19 +111,12 @@ internal sealed class RemovalPipeline
         return snapshot;
     }
 
-    /// <summary>Empty unless the run collected the objects of any plugin as supporters or obstacles.</summary>
-    private static Dictionary<FormKey, List<OtherObject>> GroupSupportersBySpace(World world) =>
-        world.Backdrop.IsCollected
-            ? world.RivalsAndBackdrop.GroupBy(other => other.SpaceKey).ToDictionary(group => group.Key, group => group.ToList())
-            : new Dictionary<FormKey, List<OtherObject>>();
-
-    /// <summary>Only spaces that contain target objects are indexed.</summary>
-    private Dictionary<FormKey, OtherObjectIndex> IndexOtherObjects(World world)
+    private Scene CreateScene(World world)
     {
         var timer = Stopwatch.StartNew();
-        var indexes = OtherObjectIndex.BuildForTargetSpaces(world, _shapes, _invisibleOthers, _parallelOptions);
-        RunReport.PrintIndexSummary(indexes, timer.Elapsed);
-        return indexes;
+        var scene = Scene.Create(world, _shapes, _meshCache, _npcBodies, _parallelOptions, _clock);
+        RunReport.PrintIndexSummary(world, timer.Elapsed);
+        return scene;
     }
 
     private void PrintProblemsSinceLastPhase()
@@ -150,21 +143,17 @@ internal sealed class RemovalPipeline
     }
 
     /// <returns>Parallel to <paramref name="targets"/>.</returns>
-    private ObjectVisibility[] ClassifyTargetVisibility(IReadOnlyList<TargetObject> targets)
-    {
-        var visibility = new ObjectVisibility[targets.Count];
-        Parallel.For(0, targets.Count, _parallelOptions, index =>
+    private ObjectVisibility[] ClassifyTargetVisibility(IReadOnlyList<TargetObject> targets) =>
+        ParallelMap.Run(_parallelOptions, targets.Count, index =>
         {
             var target = targets[index];
-            visibility[index] = _shapes.GetVisibility(target.Base, target.IsPrimitive, target.HasMapMarker);
+            return _shapes.GetVisibility(target.Base, target.IsPrimitive, target.HasMapMarker);
         });
-        return visibility;
-    }
 
-    private Replacements FindReplacements(World world, IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes)
+    private Replacements FindReplacements(World world, IRivalPositions rivals, WorkOrder order)
     {
         var timer = Stopwatch.StartNew();
-        var replacements = ReplacementMatcher.Find(world.Targets, indexes, world.Rivals.Length, _shapes, _parallelOptions);
+        var replacements = ReplacementMatcher.Find(world.Targets, rivals, world.Rivals.Length, _shapes, order, _parallelOptions);
         if (_config.DetailedLog) RunReport.PrintReplacementLog(world, replacements);
         PrintProblemsSinceLastPhase();
         RunReport.PrintReplacementSummary(replacements.Count, timer.Elapsed);
@@ -175,23 +164,27 @@ internal sealed class RemovalPipeline
     private Ledger DecideTooClose(
         World world,
         IReadOnlyList<ObjectVisibility> visibility,
-        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
+        Scene scene,
+        IActiveRivals rivals,
         Replacements replacements,
+        WorkOrder order,
         Ledger ledger)
     {
         var timer = Stopwatch.StartNew();
-        var npcRule = CreateNpcClashRule(world, visibility, indexes, replacements);
-        var hits = _config.ZoneShape switch
+        var npcRule = CreateNpcClashRule(world, visibility, scene, replacements);
+        var result = _config.ZoneShape switch
         {
             ZoneShape.BoundingBox => TooCloseSearch.FindTooCloseTargets(
-                world.Targets, visibility, indexes, replacements, _shapes, _config.SizeMultiplier, npcRule, _parallelOptions),
-            ZoneShape.ObjectShape => FindShapeZoneHits(world, visibility, indexes, replacements, npcRule),
+                world.Targets, visibility, rivals, _shapes, _config.SizeMultiplier, npcRule, order, _parallelOptions),
+            ZoneShape.ObjectShape => FindShapeZoneHits(world, visibility, rivals, npcRule, order),
             _ => throw new UnreachableException($"Unknown removal zone {_config.ZoneShape}."),
         };
+        var hits = result.Hits;
         PrintProblemsSinceLastPhase();
         RunReport.PrintTooCloseSummary(hits.Count, world.Targets.Length, _config.Target, timer.Elapsed);
-        RunReport.PrintInvisibleOthers(_invisibleOthers, _config.DetailedLog);
-        PrintNpcHandling(npcRule, indexes);
+        var census = scene.Census(visibility);
+        RunReport.PrintInvisibleOthers(census, _config.DetailedLog);
+        PrintNpcHandling(npcRule, census, result.Work.Npcs);
 
         var next = ledger.Apply(
             RoundKind.TooClose,
@@ -200,43 +193,35 @@ internal sealed class RemovalPipeline
         return next;
     }
 
-    private NpcClashRule CreateNpcClashRule(
-        World world,
-        IReadOnlyList<ObjectVisibility> visibility,
-        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
-        Replacements replacements) =>
+    private NpcClashRule CreateNpcClashRule(World world, IReadOnlyList<ObjectVisibility> visibility, Scene scene, Replacements replacements) =>
         NpcClashRule.Create(
             _config.NpcHandling,
-            () => NpcStuckSearch.Create(world.Targets, visibility, indexes, replacements, _npcBodies, _shapes, _meshCache, _parallelOptions));
+            () => NpcStuckSearch.Create(world.Targets, visibility, scene.Npcs(replacements), _shapes, _meshCache));
 
-    private void PrintNpcHandling(NpcClashRule npcRule, IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes)
+    private void PrintNpcHandling(NpcClashRule npcRule, RivalCensus census, NpcWork work)
     {
         if (npcRule.StuckSearch is { } stuckSearch)
         {
-            RunReport.PrintNpcStuckSummary(stuckSearch.GetSummary(), _npcBodies.GetStats(), _bodyMeasurer.GetMeasurements().Count, _config.DetailedLog);
+            RunReport.PrintNpcStuckSummary(stuckSearch.GetSummary(work), _perf.Bodies(), _config.DetailedLog);
         }
-        else if (npcRule.Handling == NpcHandling.Ignore) RunReport.PrintIgnoredNpcs(CountPlacedNpcs(indexes));
+        else if (npcRule.Handling == NpcHandling.Ignore) RunReport.PrintIgnoredNpcs(census.PlacedNpcs);
     }
 
-    private static int CountPlacedNpcs(IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes) =>
-        indexes.Values.Sum(index => Enumerable.Range(0, index.Count).Count(i => index[i].IsPlacedNpc));
-
-    private List<TooCloseHit> FindShapeZoneHits(
+    private ClashSearchResult FindShapeZoneHits(
         World world,
         IReadOnlyList<ObjectVisibility> visibility,
-        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
-        Replacements replacements,
-        NpcClashRule npcRule)
+        IActiveRivals rivals,
+        NpcClashRule npcRule,
+        WorkOrder order)
     {
         var indexTimer = Stopwatch.StartNew();
-        var search = ShapeZoneSearch.Create(
-            world.Targets, visibility, indexes, replacements, _shapes, _meshCache, _config.SizeMultiplier, npcRule);
+        var search = ShapeZoneSearch.Create(world.Targets, visibility, rivals, _shapes, _meshCache, _config.SizeMultiplier, npcRule);
         var indexTime = indexTimer.Elapsed;
         var searchTimer = Stopwatch.StartNew();
-        var hits = search.FindTooCloseTargets(visibility, _parallelOptions);
+        var result = search.FindTooCloseTargets(visibility, order, _parallelOptions);
         RunReport.PrintShapeZoneStats(
-            search.Stats, search.LargeOtherObjects, _meshCache.GetStats(), _shapes.GetStats().ModelsEffectOnly, indexTime, searchTimer.Elapsed);
-        return hits;
+            result.Work.Zone, search.LargeOtherObjects, _perf.Triangles(), _shapes.GetStats().ModelsEffectOnly, indexTime, searchTimer.Elapsed);
+        return result;
     }
 
     /// <summary>The follow-up rounds, seeded with the too-close round's removals; none without seeds or with follow-up removal off.</summary>
@@ -244,7 +229,7 @@ internal sealed class RemovalPipeline
     private Ledger DecideFollowUp(
         GameSnapshot snapshot,
         IReadOnlyList<ObjectVisibility> visibility,
-        SupporterIndex supporters,
+        Scene scene,
         Protection protection,
         Ledger ledger)
     {
@@ -256,7 +241,7 @@ internal sealed class RemovalPipeline
         {
             FollowUpRemovalMode.Nothing => ledger,
             FollowUpRemovalMode.EverythingTouching => DecideTouching(snapshot.World, visibility, seeds, keptTooClose, protection, ledger),
-            FollowUpRemovalMode.ObjectsSupportedByIt => DecideUnanchored(snapshot, visibility, seeds, supporters, protection, ledger),
+            FollowUpRemovalMode.ObjectsSupportedByIt => DecideUnanchored(snapshot, visibility, seeds, scene.Solids(), protection, ledger),
             _ => throw new UnreachableException($"Unknown follow-up removal mode {_config.FollowUpMode}."),
         };
     }
@@ -269,7 +254,7 @@ internal sealed class RemovalPipeline
         Protection protection,
         Ledger ledger)
     {
-        var (search, setup) = Timing.Measure(() => TouchSearch.Create(
+        var search = _clock.Time(TimedPhase.TouchSetup, () => TouchSearch.Create(
             world.Targets,
             visibility,
             protection.Groups.CollectReachableSpaces(world.Targets, seeds),
@@ -278,9 +263,9 @@ internal sealed class RemovalPipeline
             _meshCache,
             _config.TouchDistance,
             _parallelOptions));
-        var rule = new TouchRule(search, _parallelOptions);
+        var rule = new TouchRule(search, _parallelOptions, _clock);
         var (next, evidence) = Cascade.Run(ledger, rule);
-        var rounds = RoundsAddedTo(ledger, next);
+                var rounds = RoundsAddedTo(ledger, next);
         var report = new LedgerReport(next, world, LeftoverResult.None);
         var clusters = TouchComponents.Find(
             next,
@@ -290,13 +275,19 @@ internal sealed class RemovalPipeline
             rounds,
             evidence,
             search,
-            search.Tester.GetStats(),
-            new TouchTimes(setup, rule.BroadPhase, rule.NarrowPhase),
             _parallelOptions,
+            _clock,
             collectDiagnostics: _config.WritesDiagnostics);
         PrintKept(world, next, rounds);
         PrintProblemsSinceLastPhase();
-        RunReport.PrintTouchStats(clusters);
+        RunReport.PrintTouchStats(
+            clusters,
+            new TouchTimes(
+                _clock.Total(TimedPhase.TouchSetup),
+                _clock.Total(TimedPhase.TouchBroadPhase),
+                _clock.Total(TimedPhase.TouchNarrowPhase),
+                _clock.Total(TimedPhase.TouchDiagnosticsEdges)),
+            _perf.Triangles());
         WriteTouchDiagnostics(world, [.. report.RemovalsIn(ledger.Rounds[^1])], clusters);
         return next;
     }
@@ -305,15 +296,16 @@ internal sealed class RemovalPipeline
         GameSnapshot snapshot,
         IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyList<int> seeds,
-        SupporterIndex supporters,
-        Protection protection)
+        ISolids solids,
+        Protection protection,
+        IPhaseTimer timer)
     {
         var targets = snapshot.World.Targets;
         var search = TouchSearch.Create(
             targets, visibility, protection.Groups.CollectReachableSpaces(targets, seeds), excluded: [], _shapes, _meshCache, _config.TouchDistance, _parallelOptions);
-        var supporterFinder = new AnchoringSupporterFinder(targets, search, supporters, _shapes, _config.TouchDistance);
+        var supporterFinder = new AnchoringSupporterFinder(targets, search, solids, _shapes, _config.TouchDistance);
         var contactFinder = new AnchoringContactFinder(targets, search.MeshPaths, supporterFinder, snapshot.Terrain, search.Cache, _config.TouchDistance);
-        return new SupportRule(search, contactFinder, _config.AnchoringThreshold, targets.Length, _parallelOptions);
+        return new SupportRule(search, contactFinder, _config.AnchoringThreshold, targets.Length, _parallelOptions, timer);
     }
 
     private void WriteTouchDiagnostics(World world, IReadOnlyList<Removal> seeds, TouchClusters clusters)
@@ -334,32 +326,38 @@ internal sealed class RemovalPipeline
         GameSnapshot snapshot,
         IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyList<int> seeds,
-        SupporterIndex supporters,
+        ISolids solids,
         Protection protection,
         Ledger ledger)
     {
         var world = snapshot.World;
-        var (rule, setup) = Timing.Measure(() => CreateSupportRule(snapshot, visibility, seeds, supporters, protection));
+        var rule = _clock.Time(TimedPhase.AnchoringSetup, () => CreateSupportRule(snapshot, visibility, seeds, solids, protection, _clock));
         var (next, evidence) = Cascade.Run(ledger, rule);
-        var rounds = RoundsAddedTo(ledger, next);
+                var rounds = RoundsAddedTo(ledger, next);
         var anchoring = AnchoringOutcome.Create(
-            next, new LedgerReport(next, world, LeftoverResult.None), rounds, evidence, rule, setup);
+            next, new LedgerReport(next, world, LeftoverResult.None), rounds, evidence);
         PrintKept(world, next, rounds);
         PrintProblemsSinceLastPhase();
-        RunReport.PrintAnchoringStats(anchoring);
-        WriteAnchoringDiagnostics(world, supporters, anchoring);
+        RunReport.PrintAnchoringStats(
+            anchoring,
+            new AnchoringTimes(
+                _clock.Total(TimedPhase.AnchoringSetup),
+                _clock.Total(TimedPhase.AnchoringTouchSearch),
+                _clock.Total(TimedPhase.AnchoringContactPoints)),
+            _perf.Triangles());
+        WriteAnchoringDiagnostics(world, anchoring);
         WriteMeshOrigins(world.Targets);
         return next;
     }
 
-    private void WriteAnchoringDiagnostics(World world, SupporterIndex supporters, AnchoringResult anchoring)
+    private void WriteAnchoringDiagnostics(World world, AnchoringResult anchoring)
     {
         if (!_config.WritesDiagnostics) return;
 
         AccessDiagnosticsFolder($"writing {AnchoringDiagnosticsWriter.FileName}", () =>
         {
             var path = AnchoringDiagnosticsWriter.Write(
-                _config.DiagnosticsFolder, world, _shapes, _bases, supporters, anchoring.Evaluations, _config.AnchoringThreshold);
+                _config.DiagnosticsFolder, world, _shapes, _bases, anchoring.Evaluations, _config.AnchoringThreshold);
             Console.WriteLine($"Anchoring diagnostics: wrote {anchoring.Evaluations.Count:N0} evaluations to {path}.");
         });
     }
@@ -382,21 +380,22 @@ internal sealed class RemovalPipeline
     private (Ledger Final, LeftoverResult Leftovers) DecideLeftovers(
         World world,
         IReadOnlyList<ObjectVisibility> visibility,
-        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
-        Replacements replacements,
+        Scene scene,
+        IActiveRivals rivals,
+        WorkOrder order,
         Ledger ledger)
     {
         if (!_config.Leftovers.Enabled) return (ledger.Apply(RoundKind.Leftover, []), LeftoverResult.None);
 
         var timer = Stopwatch.StartNew();
-        var hosts = Hosts.Find(world.Targets, visibility, indexes, _containment, replacements, _parallelOptions);
+        var hosts = Hosts.Find(world.Targets, visibility, rivals, order, _parallelOptions);
         var selector = new LeftoverInvisibleObjectSelector(
             world.Targets,
             visibility,
-            _shapes,
+            scene.VisibleTargets(visibility),
             hosts,
             new InvisibleObjectReach(_bases),
-            _config.Leftovers);
+            _config.Leftovers, order);
         var evaluated = selector.SelectRemovals(CollectRemoved(ledger), _parallelOptions);
         var final = ledger.Apply(RoundKind.Leftover, evaluated.Proposals);
         var leftovers = evaluated.WithVerdicts(final);
@@ -410,29 +409,20 @@ internal sealed class RemovalPipeline
     private RelocationResult RelocateKeptMarkers(
         GameSnapshot snapshot,
         IReadOnlyList<ObjectVisibility> visibility,
-        SupporterIndex supporters,
+        Scene scene,
         Ledger final,
         LeftoverResult leftovers)
     {
         if (!_config.Leftovers.MovesKeptMarkers) return RelocationResult.None;
 
         var removed = CollectRemoved(final);
-        var relocator = CreateRelocator(snapshot, CreateObstacles(snapshot.World, visibility, supporters, removed));
+        var obstacles = new VisibleObstacles(scene.Solids(), scene.VisibleTargets(visibility), removed, _shapes);
+        var relocator = CreateRelocator(snapshot, obstacles);
         var keptEvaluations = leftovers.Evaluations.Where(evaluation => !removed.Contains(evaluation.TargetIndex)).ToList();
         var relocations = relocator.Relocate(keptEvaluations, _parallelOptions);
         PrintProblemsSinceLastPhase();
         RunReport.PrintRelocations(snapshot.World, relocations);
         return relocations;
-    }
-
-    private VisibleObstacles CreateObstacles(
-        World world,
-        IReadOnlyList<ObjectVisibility> visibility,
-        SupporterIndex supporters,
-        IReadOnlySet<int> removed)
-    {
-        var remainingVisible = ObjectVisibility.VisibleIndices(visibility, except: removed);
-        return new VisibleObstacles(supporters, VisibleTargetIndex.Build(world.Targets, remainingVisible, _shapes), _containment, _shapes);
     }
 
     private static KeptObjectRelocator CreateRelocator(GameSnapshot snapshot, VisibleObstacles obstacles) => new(
@@ -479,15 +469,11 @@ internal sealed class RemovalPipeline
         RunReport.PrintWriteSummary(removals.Count, moves.Count, enableParentsReplaced, timer.Elapsed);
     }
 
-    private void PrintFinalReport(
-        World world,
-        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
-        IReadOnlyList<Removal> removals,
-        IReadOnlyList<KeptTarget> kept)
+    private void PrintFinalReport(World world, IReadOnlyList<Removal> removals, IReadOnlyList<KeptTarget> kept)
     {
         if (_config.DetailedLog) RunReport.PrintRemovals(world, _bases, removals);
         RunReport.PrintBoundsStats(_shapes.GetStats());
-        if (_config.DetailedLog) RunReport.PrintSpaceSummary(world, indexes, removals);
+        if (_config.DetailedLog) RunReport.PrintSpaceSummary(world, removals);
         RunReport.PrintRemovalSummary(removals);
         RunReport.PrintKeptSummary(kept);
     }

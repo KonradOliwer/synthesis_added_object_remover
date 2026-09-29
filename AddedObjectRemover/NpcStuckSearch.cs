@@ -12,9 +12,21 @@ internal sealed class NpcScratch
     public long PairsTested { get; set; }
     public long CoreTests { get; set; }
     public int Conflicts { get; set; }
+
+    public NpcWork Harvest() => new(PairsTested, CoreTests, Conflicts);
 }
 
-/// <param name="Sizes">Per placed NPC of the searched spaces, how its size was found.</param>
+/// <summary>Work counts of <see cref="NpcStuckSearch"/>.</summary>
+/// <param name="CoreTests">Body boxes tested against an object, combined boxes of several possible bodies included.</param>
+/// <param name="Conflicts">Target objects found with an NPC stuck in them.</param>
+internal readonly record struct NpcWork(long PairsTested, long CoreTests, int Conflicts) : IWork<NpcWork>
+{
+    public static NpcWork Zero => default;
+
+    public static NpcWork operator +(NpcWork a, NpcWork b) => new(a.PairsTested + b.PairsTested, a.CoreTests + b.CoreTests, a.Conflicts + b.Conflicts);
+}
+
+/// <param name="Sizes">Per placed NPC of the spaces holding a visible target, how its size was found.</param>
 /// <param name="CoreTests">Body boxes tested against an object, combined boxes of several possible bodies included.</param>
 /// <param name="Conflicts">Target objects found with an NPC stuck in them.</param>
 /// <param name="PointFallbacks">NPCs sized as a point, with why, ordered by FormKey; for the detailed log only.</param>
@@ -30,120 +42,89 @@ internal sealed record NpcStuckSummary(NpcSizeCounts Sizes, long PairsTested, lo
 internal sealed class NpcStuckSearch
 {
     private readonly IReadOnlyList<TargetObject> _targets;
-    private readonly IReadOnlyDictionary<FormKey, OtherObjectIndex> _indexes;
-    private readonly Dictionary<FormKey, PlacedNpcIndex> _npcIndexes;
-    private readonly Replacements _replacements;
+    private readonly INpcs _npcs;
+    private readonly IReadOnlyList<FormKey> _spaces;
     private readonly ShapeCatalog _shapes;
     private readonly TriangleStore _meshCache;
     private readonly LazyCache<FormKey, MeshTriangleTree> _targetBoxTrees = new();
-    private readonly object _statsLock = new();
-    private long _pairsTested;
-    private long _coreTests;
-    private int _conflicts;
 
     private NpcStuckSearch(
-        IReadOnlyList<TargetObject> targets,
-        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
-        Dictionary<FormKey, PlacedNpcIndex> npcIndexes,
-        Replacements replacements,
-        ShapeCatalog shapes,
-        TriangleStore meshCache)
+        IReadOnlyList<TargetObject> targets, INpcs npcs, IReadOnlyList<FormKey> spaces, ShapeCatalog shapes, TriangleStore meshCache)
     {
         _targets = targets;
-        _indexes = indexes;
-        _npcIndexes = npcIndexes;
-        _replacements = replacements;
+        _npcs = npcs;
+        _spaces = spaces;
         _shapes = shapes;
         _meshCache = meshCache;
     }
 
-    /// <summary>Sizes the placed NPCs of every space holding a visible target.</summary>
+    /// <summary>Sizes the placed NPCs of every space holding a visible target up front.</summary>
     /// <param name="visibility">Parallel to <paramref name="targets"/>.</param>
     public static NpcStuckSearch Create(
         IReadOnlyList<TargetObject> targets,
         IReadOnlyList<ObjectVisibility> visibility,
-        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
-        Replacements replacements,
-        NpcBodyCache bodies,
+        INpcs npcs,
         ShapeCatalog shapes,
-        TriangleStore meshCache,
-        ParallelOptions parallelOptions)
+        TriangleStore meshCache)
     {
-        var npcIndexes = new Dictionary<FormKey, PlacedNpcIndex>();
-        for (var i = 0; i < targets.Count; i++)
-        {
-            var spaceKey = targets[i].SpaceKey;
-            if (!visibility[i].IsVisible || npcIndexes.ContainsKey(spaceKey)) continue;
-            npcIndexes[spaceKey] = PlacedNpcIndex.Build(indexes[spaceKey], bodies, parallelOptions);
-        }
-        return new NpcStuckSearch(targets, indexes, npcIndexes, replacements, shapes, meshCache);
+        var spaces = Enumerable.Range(0, targets.Count)
+            .Where(i => visibility[i].IsVisible)
+            .Select(i => targets[i].SpaceKey)
+            .Distinct()
+            .ToList();
+        foreach (var space in spaces) npcs.SizesIn(space);
+        return new NpcStuckSearch(targets, npcs, spaces, shapes, meshCache);
     }
 
-    public NpcStuckSummary GetSummary()
-    {
-        lock (_statsLock)
-        {
-            return new NpcStuckSummary(
-                _npcIndexes.Values.Aggregate(default(NpcSizeCounts), (sum, index) => sum.Add(index.Counts)),
-                _pairsTested,
-                _coreTests,
-                _conflicts,
-                _npcIndexes.Values
-                    .SelectMany(index => index.PointFallbacks)
-                    .OrderBy(fallback => fallback.Npc.FormKey.ToString(), StringComparer.Ordinal)
-                    .ToList());
-        }
-    }
+    /// <param name="work">The search's work counts, harvested from its scratches.</param>
+    public NpcStuckSummary GetSummary(NpcWork work) =>
+        new(
+            _spaces.Aggregate(default(NpcSizeCounts), (sum, space) => sum.Add(_npcs.SizesIn(space))),
+            work.PairsTested,
+            work.CoreTests,
+            work.Conflicts,
+            _spaces
+                .SelectMany(_npcs.PointFallbacksIn)
+                .OrderBy(fallback => fallback.Npc.FormKey.ToString(), StringComparer.Ordinal)
+                .ToList());
 
-    /// <summary>Adds a worker thread's counters once it is done; its scratch must not be used afterwards.</summary>
-    public void AddStats(NpcScratch scratch)
-    {
-        lock (_statsLock)
-        {
-            _pairsTested += scratch.PairsTested;
-            _coreTests += scratch.CoreTests;
-            _conflicts += scratch.Conflicts;
-        }
-    }
-
-    /// <summary>Index of the first other-mod NPC stuck in the visible target, or -1.</summary>
-    public int FindFirstStuckNpc(int targetIndex, NpcScratch scratch)
+    /// <summary>The first other-mod NPC stuck in the visible target, or null.</summary>
+    public OtherId? FindFirstStuckNpc(int targetIndex, NpcScratch scratch)
     {
         var target = _targets[targetIndex];
-        var npcs = _npcIndexes[target.SpaceKey];
-        if (target.Base is not { } baseRef || npcs.Count == 0) return -1;
+        if (target.Base is not { } baseRef) return null;
 
         var localBox = _shapes.GetLocalBox(baseRef);
-        CollectCandidates(npcs, _indexes[target.SpaceKey], OrientedBox.FromLocal(localBox, target.Transform), scratch);
-        if (scratch.Candidates.Count == 0) return -1;
+        CollectCandidates(target.SpaceKey, OrientedBox.FromLocal(localBox, target.Transform), scratch);
+        if (scratch.Candidates.Count == 0) return null;
 
-        if (_shapes.GetMeshPath(baseRef) is not { } meshPath) return FindFirstStuck(GetBoxTree(baseRef, localBox), target.Transform, npcs, scratch);
+        if (_shapes.GetMeshPath(baseRef) is not { } meshPath) return FindFirstStuck(GetBoxTree(baseRef, localBox), target, scratch);
         using var mesh = _meshCache.Acquire(meshPath);
-        return FindFirstStuck(mesh.Tree ?? GetBoxTree(baseRef, localBox), target.Transform, npcs, scratch);
+        return FindFirstStuck(mesh.Tree ?? GetBoxTree(baseRef, localBox), target, scratch);
     }
 
-    /// <summary>Fills <see cref="NpcScratch.Candidates"/> with the not replaced NPC slots whose body box overlaps the target's real box.</summary>
-    private void CollectCandidates(PlacedNpcIndex npcs, OtherObjectIndex others, OrientedBox realBox, NpcScratch scratch)
+    /// <summary>Fills <see cref="NpcScratch.Candidates"/> with the NPC slots whose body box overlaps the target's real box.</summary>
+    private void CollectCandidates(FormKey space, OrientedBox realBox, NpcScratch scratch)
     {
-        npcs.Collect(realBox.WorldAabb(0f), scratch.Slots);
+        _npcs.Overlapping(space, realBox.WorldAabb(0f), scratch.Slots);
         scratch.Candidates.Clear();
         foreach (var slot in scratch.Slots)
         {
-            if (_replacements.IsReplaced(others[npcs.OtherIndexOf(slot)].Id) || !realBox.Intersects(npcs.WorldBoxOf(slot), 0f)) continue;
-            scratch.Candidates.Add(slot);
+            if (realBox.Intersects(_npcs.WorldBoxOf(space, slot), 0f)) scratch.Candidates.Add(slot);
         }
     }
 
-    private static int FindFirstStuck(MeshTriangleTree objectTree, PlacedTransform objectTransform, PlacedNpcIndex npcs, NpcScratch scratch)
+    private OtherId? FindFirstStuck(MeshTriangleTree objectTree, TargetObject target, NpcScratch scratch)
     {
+        var space = target.SpaceKey;
         foreach (var slot in scratch.Candidates)
         {
             scratch.PairsTested++;
-            if (!NpcStuckTest.IsAnyBodyStuck(objectTree, objectTransform, npcs.BodiesOf(slot), npcs.TransformOf(slot), scratch)) continue;
+            if (!NpcStuckTest.IsAnyBodyStuck(objectTree, target.Transform, _npcs.BodiesOf(space, slot), _npcs.TransformOf(space, slot), scratch)) continue;
             scratch.Conflicts++;
-            return npcs.OtherIndexOf(slot);
+            return _npcs.NpcOf(space, slot).Id;
         }
-        return -1;
+        return null;
     }
 
     private MeshTriangleTree GetBoxTree(BaseRef baseRef, Box localBox) =>

@@ -8,8 +8,8 @@ using Noggog;
 namespace AddedObjectRemover.Tests.Determinism;
 
 /// <summary>
-/// The follow-up loops, the NPC-stuck search and the leftover selection give the same results with
-/// one and with eight threads, on synthetic scenes large enough to span many parallel batches.
+/// The follow-up loops, the too-close searches and the leftover selection give the same results and
+/// work counts with one and with eight threads, on synthetic scenes large enough to span many parallel batches.
 /// </summary>
 public class StepDeterminismTests
 {
@@ -25,6 +25,11 @@ public class StepDeterminismTests
     private const float SceneExtent = 1000f;
     private const int NpcTargetCount = 30;
     private const int PlacedNpcCount = 150;
+    private const int ShapeZoneTargetCount = 80;
+    private const int ShapeZoneRivalCount = 120;
+    private const int InvisibleEvery = 5;
+    private const int ObjectRivalEvery = 4;
+    private const float ShapeZoneMultiplier = 1.5f;
     private const int MarkerCount = 120;
     private const int RoomCount = 4;
 
@@ -54,6 +59,8 @@ public class StepDeterminismTests
     private static readonly ShapeCatalog Shapes = TestShapes.Create(Records, "StepDeterminismData", Table, Item, Boulder, Building);
 
     private sealed record FollowUpScene(List<TargetObject> Targets, List<int> Seeds, Protection Protection);
+
+    private sealed record ShapeZoneScene(List<TargetObject> Targets, List<ObjectVisibility> Visibility, List<OtherObject> Rivals);
 
     [Fact]
     public void EverythingTouchingMatchesForOneAndEightThreads()
@@ -87,6 +94,7 @@ public class StepDeterminismTests
         Assert.Equal(sequential.Anchoring.Removals, parallel.Anchoring.Removals);
         Assert.Equal(sequential.Anchoring.Kept, parallel.Anchoring.Kept);
         Assert.Equal(DescribeEvaluations(sequential.Anchoring), DescribeEvaluations(parallel.Anchoring));
+        Assert.Equal(DescribeStats(sequential.Anchoring.Stats), DescribeStats(parallel.Anchoring.Stats));
     }
 
     [Fact]
@@ -105,7 +113,37 @@ public class StepDeterminismTests
 
         Assert.NotEmpty(sequential.Hits);
         Assert.Equal(sequential.Hits, parallel.Hits);
+        Assert.Equal(sequential.Work, parallel.Work);
         Assert.Equal(sequential.Summary, parallel.Summary);
+    }
+
+    [Fact]
+    public void ShapeZoneSearchMatchesForOneAndEightThreads()
+    {
+        var scene = CreateShapeZoneScene();
+
+        var sequential = FindShapeZoneHits(scene, WorkOrder.Of(scene.Targets), SequentialThreads);
+        var parallel = FindShapeZoneHits(scene, WorkOrder.Of(scene.Targets), ParallelThreads);
+
+        Assert.NotEmpty(sequential.Hits);
+        Assert.NotEqual(0, sequential.Work.Zone.NarrowTests);
+        Assert.NotEqual(0, sequential.Work.Zone.BoxZoneTargets);
+        Assert.NotEqual(0, sequential.Work.Npcs.PairsTested);
+        Assert.Equal(sequential.Hits, parallel.Hits);
+        Assert.Equal(sequential.Work, parallel.Work);
+    }
+
+    [Fact]
+    public void ShapeZoneSearchMatchesForAReversedWorkOrder()
+    {
+        var scene = CreateShapeZoneScene();
+        var order = WorkOrder.Of(scene.Targets);
+
+        var forward = FindShapeZoneHits(scene, order, ParallelThreads);
+        var reversed = FindShapeZoneHits(scene, new WorkOrder([.. order.TargetsBySpaceAndCell.Reverse()]), ParallelThreads);
+
+        Assert.Equal(forward.Hits, reversed.Hits);
+        Assert.Equal(forward.Work, reversed.Work);
     }
 
     [Fact]
@@ -147,25 +185,62 @@ public class StepDeterminismTests
             Shapes,
             scene.Protection,
             scene.Seeds,
-            new SupporterIndex(new Dictionary<FormKey, List<OtherObject>>(), Shapes, Options(threads)),
+            TestScenes.CreateWithBackdrop(scene.Targets, [], Shapes, threads).Solids(),
             new TerrainHeights(new Dictionary<ExteriorCell, ILandscapeGetter>(), new Dictionary<FormKey, FormKey>()),
             TouchDistance,
             threshold: 0.5f,
             threads);
 
-    private static (List<TooCloseHit> Hits, string Summary) FindStuckNpcs(List<TargetObject> targets, List<OtherObject> npcs, int threads)
+    private static (List<TooCloseHit> Hits, ClashWork Work, string Summary) FindStuckNpcs(List<TargetObject> targets, List<OtherObject> npcs, int threads)
     {
-        var options = Options(threads);
         var visibility = AllVisible(targets);
-        var indexes = new Dictionary<FormKey, OtherObjectIndex> { [TestTargets.Space] = OtherObjectIndex.CreateUncounted(npcs, Shapes, options) };
         var replacements = Replacements.None(npcs.Count);
-        var bodies = new NpcBodyCache(new NpcBodyResolver(Records.ToImmutableLinkCache(), Shapes, new SkinnedBodyMeasurer(Shapes.ReadGeometry)));
-        var npcRule = NpcClashRule.Create(
+        var scene = TestScenes.Create(targets, npcs, Shapes, bodies: NewBodies(), threads: threads);
+        var npcRule = CreateStuckNpcRule(targets, visibility, scene, replacements);
+        var rivals = scene.ActiveRivals(replacements, NpcHandling.OnlyWhenStuckInObject);
+        var result = TooCloseSearch.FindTooCloseTargets(
+            targets, visibility, rivals, Shapes, multiplier: 0f, npcRule, WorkOrder.Of(targets), Options(threads));
+        var summary = npcRule.StuckSearch!.GetSummary(result.Work.Npcs);
+        return (result.Hits, result.Work, $"{summary.Sizes} {summary.PairsTested} {summary.CoreTests} {summary.Conflicts} {summary.PointFallbacks.Count}");
+    }
+
+    private static ClashSearchResult FindShapeZoneHits(ShapeZoneScene scene, WorkOrder order, int threads)
+    {
+        var replacements = Replacements.None(scene.Rivals.Count);
+        var sceneIndex = TestScenes.Create(scene.Targets, scene.Rivals, Shapes, bodies: NewBodies(), threads: threads);
+        var npcRule = CreateStuckNpcRule(scene.Targets, scene.Visibility, sceneIndex, replacements);
+        var rivals = sceneIndex.ActiveRivals(replacements, NpcHandling.OnlyWhenStuckInObject);
+        return ShapeZoneSearch.Create(scene.Targets, scene.Visibility, rivals, Shapes, NewCache(), ShapeZoneMultiplier, npcRule)
+            .FindTooCloseTargets(scene.Visibility, order, Options(threads));
+    }
+
+    private static NpcClashRule CreateStuckNpcRule(
+        IReadOnlyList<TargetObject> targets, IReadOnlyList<ObjectVisibility> visibility, Scene scene, Replacements replacements) =>
+        NpcClashRule.Create(
             NpcHandling.OnlyWhenStuckInObject,
-            () => NpcStuckSearch.Create(targets, visibility, indexes, replacements, bodies, Shapes, NewCache(), options));
-        var hits = TooCloseSearch.FindTooCloseTargets(targets, visibility, indexes, replacements, Shapes, multiplier: 0f, npcRule, options);
-        var summary = npcRule.StuckSearch!.GetSummary();
-        return (hits, $"{summary.Sizes} {summary.PairsTested} {summary.CoreTests} {summary.Conflicts} {summary.PointFallbacks.Count}");
+            () => NpcStuckSearch.Create(targets, visibility, scene.Npcs(replacements), Shapes, NewCache()));
+
+    /// <summary>
+    /// Targets with and without meshes, every few of them invisible, among other mods' objects with
+    /// meshes and placed NPCs.
+    /// </summary>
+    private static ShapeZoneScene CreateShapeZoneScene()
+    {
+        var random = new Random(45);
+        BaseRef?[] targetBases = [Table.Ref, Boulder.Ref, Building.Ref, null];
+        var targets = Enumerable.Range(0, ShapeZoneTargetCount)
+            .Select(i => TestTargets.Create(i, TestTargets.At(RandomGroundPoint(random), TestMeshes.RandomAngle(random)), targetBases[i % targetBases.Length], TestTargets.Space))
+            .ToList();
+        var visibility = Enumerable.Range(0, targets.Count)
+            .Select(i => i % InvisibleEvery == 0 ? ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers) : ObjectVisibility.Visible)
+            .ToList();
+        BaseRef[] rivalBases = [Item.Ref, Table.Ref, Boulder.Ref];
+        var rivals = Enumerable.Range(0, ShapeZoneRivalCount)
+            .Select(i => i % ObjectRivalEvery == 0
+                ? TestShapes.Placed(Mod, i, rivalBases[random.Next(rivalBases.Length)], RandomGroundPoint(random), TestMeshes.RandomAngle(random))
+                : TestNpcs.Place(Mod, i, NpcBases[random.Next(NpcBases.Length)], RandomGroundPoint(random), new P3Float(0, 0, TestMeshes.RandomAngle(random))))
+            .ToList();
+        return new ShapeZoneScene(targets, visibility, rivals);
     }
 
     private static LeftoverResult SelectLeftovers(
@@ -228,7 +303,11 @@ public class StepDeterminismTests
         $"{stats.Components} {stats.ComponentsWithRemovals} {stats.LargestComponent} {stats.Levels} {stats.MaxDepth} "
         + $"{stats.Pairs.PairsTested} {stats.Pairs.TouchingPairs} {stats.Pairs.TrianglePairsTested}";
 
-    /// <summary>Everything but the edges' distances and the timings.</summary>
+    /// <summary>The work counts only; the timings and mesh cache stats depend on scheduling.</summary>
+    private static string DescribeStats(AnchoringStats stats) =>
+        $"{stats.Iterations} {stats.Candidates} {stats.Evaluations} {stats.KeptWithoutContacts} "
+        + $"{stats.Pairs.PairsTested} {stats.Pairs.TouchingPairs} {stats.Pairs.PairsWithoutGeometry} {stats.Pairs.TrianglePairsTested}";
+
     /// <summary>Each round with what it removed and held, one line per round, so a failure shows where two runs part.</summary>
     private static List<string> DescribeRounds(Ledger ledger) =>
     [
@@ -236,6 +315,7 @@ public class StepDeterminismTests
             $"{round}: removed {string.Join(" ", ledger.RemovedIn(round).Select(target => target.Index))}; held {string.Join(" ", ledger.HeldIn(round).Select(target => target.Index))}"),
     ];
 
+    /// <summary>Everything but the edges' distances.</summary>
     private static string DescribeDiagnostics(TouchDiagnosticsData diagnostics) =>
         string.Join(
             "; ",
@@ -269,6 +349,9 @@ public class StepDeterminismTests
         Enumerable.Repeat(ObjectVisibility.Visible, targets.Count).ToArray();
 
     private static TriangleStore NewCache() => new(Shapes.ReadGeometry);
+
+    private static NpcBodyCache NewBodies() =>
+        new(new NpcBodyResolver(Records.ToImmutableLinkCache(), Shapes, new SkinnedBodyMeasurer(Shapes.ReadGeometry)));
 
     private static ParallelOptions Options(int threads) => new() { MaxDegreeOfParallelism = threads };
 

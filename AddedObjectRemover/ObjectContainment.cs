@@ -19,15 +19,15 @@ internal sealed class ObjectContainment(ShapeCatalog shapes, TriangleStore meshC
         return lease.Tree is { } tree && SurroundingRayTest.IsSurrounded(tree, local, transform.Rotation, scratch.Triangles);
     }
 
-    /// <param name="replacements">Objects the target plugin replaced are ignored; null ignores none.</param>
-    /// <returns>Lowest index of a visible object of <paramref name="index"/> containing the point, or -1.</returns>
-    public int FindContainingVisible(OtherObjectIndex index, Vector3 worldPoint, Replacements? replacements, SpatialQueryScratch scratch)
+    /// <param name="include">Which objects of the index count; the others are skipped.</param>
+    /// <returns>Lowest index of an included visible object of <paramref name="index"/> containing the point, or -1.</returns>
+    public int FindContainingVisible(OtherObjectIndex index, Vector3 worldPoint, Func<OtherObject, bool> include, SpatialQueryScratch scratch)
     {
         index.Bounds.CollectCandidates(new Box(worldPoint, worldPoint), scratch.Slots, scratch.Candidates);
         foreach (var otherIndex in scratch.Candidates)
         {
-            if (replacements?.IsReplaced(index[otherIndex].Id) == true) continue;
             var other = index[otherIndex];
+            if (!include(other)) continue;
             if (index.IsVisible(otherIndex) && Contains(other.Base, other.Transform, worldPoint, scratch)) return otherIndex;
         }
         return -1;

@@ -80,13 +80,11 @@ internal static class MeshOriginDiagnosticsWriter
     /// <returns>Per mesh: the bounds of its triangles, or null when it has no usable triangles.</returns>
     private static Box?[] MeasureTriangleBounds(IReadOnlyList<string> meshPaths, TriangleStore cache, ParallelOptions parallelOptions)
     {
-        var bounds = new Box?[meshPaths.Count];
-        Parallel.For(0, meshPaths.Count, parallelOptions, i =>
+        return ParallelMap.Run(parallelOptions, meshPaths.Count, i =>
         {
             using var lease = cache.Acquire(meshPaths[i]);
-            bounds[i] = lease.Tree?.Bounds;
-        });
-        return bounds;
+            return lease.Tree?.Bounds;
+        }, rangeSize: ParallelMap.OneItemPerRange);
     }
 
     private static MeshOriginRow CreateRow(string modelPath, IReadOnlyList<TargetObject> users, Box triangleBounds, IBaseFacts bases)

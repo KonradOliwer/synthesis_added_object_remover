@@ -143,14 +143,8 @@ public class FreeSpotSearchTests
 
     private static VisibleObstacles CreateObstacles(TestStatic model)
     {
-        var options = new ParallelOptions();
-        var nonTargets = new SupporterIndex(
-            new Dictionary<FormKey, List<OtherObject>> { [TestTargets.Space] = [TestShapes.Placed(OtherMod, 0, model.Ref, Vector3.Zero)] }, Shapes, options);
-        return new VisibleObstacles(
-            nonTargets,
-            VisibleTargetIndex.Build([], [], Shapes),
-            new ObjectContainment(Shapes, new TriangleStore(Shapes.ReadGeometry)),
-            Shapes);
+        var scene = TestScenes.CreateWithBackdrop([], [TestShapes.Placed(OtherMod, 0, model.Ref, Vector3.Zero)], Shapes);
+        return new VisibleObstacles(scene.Solids(), scene.VisibleTargets([]), new HashSet<int>(), Shapes);
     }
 
     /// <summary>Two triangles covering [0, size] x [0, size] at height 0.</summary>

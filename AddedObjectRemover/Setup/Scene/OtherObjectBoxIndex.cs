@@ -56,7 +56,7 @@ internal sealed class OtherObjectBoxIndex
         foreach (var slot in slots) AddIfOverlapping(_gridMembers[slot], area, candidates);
         foreach (var large in _largeObjects) AddIfOverlapping(large, area, candidates);
         candidates.Sort();
-        RemoveAdjacentDuplicates(candidates);
+        SpatialGrid.RemoveAdjacentDuplicates(candidates);
     }
 
     private void AddIfOverlapping(int index, Box area, List<int> candidates)
@@ -66,23 +66,10 @@ internal sealed class OtherObjectBoxIndex
 
     private static Box[] MeasureWorldAabbs(IReadOnlyList<OtherObject> objects, ShapeCatalog shapes, ParallelOptions parallelOptions)
     {
-        var aabbs = new Box[objects.Count];
-        Parallel.For(0, objects.Count, parallelOptions, i =>
+        return ParallelMap.Run(parallelOptions, objects.Count, i =>
         {
             var other = objects[i];
-            aabbs[i] = OrientedBox.FromLocal(shapes.GetLocalBox(other.Base), other.Transform).WorldAabb(RoundingSlack);
+            return OrientedBox.FromLocal(shapes.GetLocalBox(other.Base), other.Transform).WorldAabb(RoundingSlack);
         });
-        return aabbs;
-    }
-
-    public static void RemoveAdjacentDuplicates(List<int> sorted)
-    {
-        var kept = 0;
-        for (var i = 0; i < sorted.Count; i++)
-        {
-            if (kept > 0 && sorted[kept - 1] == sorted[i]) continue;
-            sorted[kept++] = sorted[i];
-        }
-        sorted.RemoveRange(kept, sorted.Count - kept);
     }
 }

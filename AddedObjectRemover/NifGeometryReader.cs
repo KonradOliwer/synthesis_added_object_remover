@@ -14,7 +14,7 @@ internal static class NifGeometryReader
     private static readonly Lazy<bool> ParallelLoadsSafe = new(TryPrimeBlockTypeCache, LazyThreadSafetyMode.ExecutionAndPublication);
     private static volatile ArchiveProblem? _loaderWarmUpProblem;
 
-    /// <summary>Why the warm-up failed; null when it succeeded or has not run yet (reading this never runs it).</summary>
+    /// <summary>Why the warm-up failed; null when it succeeded or has not run yet.</summary>
     public static ArchiveProblem? LoaderWarmUpProblem => _loaderWarmUpProblem;
 
     /// <summary>

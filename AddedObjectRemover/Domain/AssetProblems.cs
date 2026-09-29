@@ -20,8 +20,8 @@ internal readonly record struct ProblemMark(long Sequence);
 
 /// <summary>
 /// The problems a run's asset reading met. Each problem is recorded once (per mesh and kind, or
-/// per kind and subject); the first record wins and nothing is ever dropped. Which problems a phase
-/// records depends only on the meshes it reads, so every list is deterministic.
+/// per kind and subject); the first record wins and later records of the same problem are ignored.
+/// Which problems a phase records depends only on the meshes it reads, so every list is deterministic.
 /// </summary>
 internal interface IAssetProblems
 {

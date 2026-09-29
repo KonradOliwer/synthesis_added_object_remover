@@ -23,8 +23,4 @@ internal readonly record struct ObjectVisibility(InvisibleObjectKind? Kind, bool
         if (EffectOnlyMesh) return "effect-only mesh";
         return Kind?.ToString() ?? "visible";
     }
-
-    /// <returns>Indices of the visible entries of <paramref name="visibility"/> that are not in <paramref name="except"/>.</returns>
-    public static IEnumerable<int> VisibleIndices(IReadOnlyList<ObjectVisibility> visibility, IReadOnlySet<int> except) =>
-        Enumerable.Range(0, visibility.Count).Where(index => visibility[index].IsVisible && !except.Contains(index));
 }

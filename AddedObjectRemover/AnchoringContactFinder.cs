@@ -16,14 +16,14 @@ internal readonly record struct Supporter
 
     public SupporterType Type { get; }
 
-    /// <summary>The target index of a target; the slot in its space's <see cref="SupporterIndex"/> of a placed object.</summary>
+    /// <summary>The <see cref="TargetId"/> index of a target; the <see cref="OtherId"/> index of a placed object.</summary>
     public int Index { get; }
 
     public static Supporter Terrain { get; } = new(SupporterType.Terrain, NoIndex);
 
     public static Supporter Target(int targetIndex) => new(SupporterType.Target, targetIndex);
 
-    public static Supporter Placed(int slot) => new(SupporterType.PlacedObject, slot);
+    public static Supporter Placed(OtherId id) => new(SupporterType.PlacedObject, id.Index);
 }
 
 internal readonly record struct SupporterWeight(Supporter Supporter, float Weight);

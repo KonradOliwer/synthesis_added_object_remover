@@ -25,13 +25,10 @@ public class OtherObjectBoundsTests
 
     private static readonly ShapeCatalog Shapes = TestShapes.Create(Mod, "OtherObjectBoundsData", Crate, FarCrate, Cliff);
 
-    private static readonly NpcClashRule CountNpcsLikeObjects =
-        NpcClashRule.Create(NpcHandling.CountLikeObjects, () => throw new InvalidOperationException("Not used."));
-
     [Fact]
     public void ObjectIsFoundWhereItsMeshIsNotWhereItsOriginIs()
     {
-        var index = CreateIndex(Place(FarCrate, Vector3.Zero));
+        var index = CreateIndex(Place(0, FarCrate, Vector3.Zero));
 
         Assert.Equal(new[] { 0 }, Collect(index, new Box(FarOffset, FarOffset)));
         Assert.Empty(Collect(index, new Box(Vector3.Zero, Vector3.Zero)));
@@ -40,7 +37,7 @@ public class OtherObjectBoundsTests
     [Fact]
     public void LargeObjectIsReturnedOnlyWhereItReaches()
     {
-        var index = CreateIndex(Place(Cliff, Vector3.Zero), Place(Crate, new Vector3(50000, 0, 0)));
+        var index = CreateIndex(Place(0, Cliff, Vector3.Zero), Place(1, Crate, new Vector3(50000, 0, 0)));
 
         Assert.Equal(1, index.Bounds.LargeObjectCount);
         Assert.Equal(new[] { 0 }, Collect(index, new Box(new Vector3(19000, 0, 50), new Vector3(19000, 0, 50))));
@@ -51,30 +48,30 @@ public class OtherObjectBoundsTests
     [Fact]
     public void BoundingBoxZoneFindsAnObjectWhoseMeshLiesFarFromItsOrigin()
     {
-        var index = CreateIndex(Place(FarCrate, Vector3.Zero));
+        OtherObject[] rivals = [Place(0, FarCrate, Vector3.Zero)];
 
-        Assert.Equal(0, FindInBoxZone(index, FarOffset));
-        Assert.Equal(-1, FindInBoxZone(index, Vector3.Zero));
+        Assert.Equal(new OtherId(0), FindInBoxZone(rivals, FarOffset));
+        Assert.Null(FindInBoxZone(rivals, Vector3.Zero));
     }
 
     [Fact]
-    public void BoundingBoxZoneReportsTheLowestIndex()
+    public void BoundingBoxZoneReportsTheLowestId()
     {
-        var index = CreateIndex(Place(Crate, new Vector3(30, 0, 0)), Place(Crate, new Vector3(-30, 0, 0)));
+        OtherObject[] rivals = [Place(0, Crate, new Vector3(30, 0, 0)), Place(1, Crate, new Vector3(-30, 0, 0))];
 
-        Assert.Equal(0, FindInBoxZone(index, Vector3.Zero));
+        Assert.Equal(new OtherId(0), FindInBoxZone(rivals, Vector3.Zero));
     }
 
-    private static int FindInBoxZone(OtherObjectIndex index, Vector3 targetPosition)
+    private static OtherId? FindInBoxZone(OtherObject[] rivals, Vector3 targetPosition)
     {
         var target = TestTargets.Create(0, TestTargets.At(targetPosition)) with { Base = Crate.Ref };
-        return TooCloseSearch.FindFirstCentreInBoxZone(target, index, Replacements.None(rivalCount: 1), Shapes, multiplier: 0f, CountNpcsLikeObjects, [], []);
+        var active = TestScenes.Create([target], rivals, Shapes).ActiveRivals(Replacements.None(rivals.Length), NpcHandling.CountLikeObjects);
+        return TooCloseSearch.FindFirstCentreInBoxZone(target, active, Shapes, multiplier: 0f, new SpatialQueryScratch(), []);
     }
 
-    private static OtherObject Place(TestStatic model, Vector3 position) => TestShapes.Placed(Mod, 0, model.Ref, position);
+    private static OtherObject Place(int id, TestStatic model, Vector3 position) => TestShapes.Placed(Mod, id, model.Ref, position);
 
-    private static OtherObjectIndex CreateIndex(params OtherObject[] objects) =>
-        OtherObjectIndex.CreateUncounted(objects, Shapes, new ParallelOptions());
+    private static OtherObjectIndex CreateIndex(params OtherObject[] objects) => OtherObjectIndex.Create(objects, Shapes, new ParallelOptions(), UntimedPhases.Instance, TimedPhase.RivalBoundsBuild);
 
     private static List<int> Collect(OtherObjectIndex index, Box area)
     {

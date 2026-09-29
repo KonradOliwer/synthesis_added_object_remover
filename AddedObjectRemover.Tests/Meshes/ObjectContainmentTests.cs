@@ -17,51 +17,63 @@ public class ObjectContainmentTests
     private static readonly TestStatic FarRoom = new(
         new FormKey(Mod, 0x802), @"test\farroom.nif", TestMeshes.BoxTriangles(new Box(RoomBox.Min + FarOffset, RoomBox.Max + FarOffset)));
 
-    [Fact]
-    public void FindsTheObjectWhoseMeshSurroundsThePoint()
-    {
-        var (containment, index) = CreateIndex(Place(Room, new Vector3(1000, 0, 0)), Place(Room, Vector3.Zero));
+    private static readonly ShapeCatalog Shapes = TestShapes.Create(Mod, "ObjectContainmentData", Room, FarRoom);
 
-        Assert.Equal(1, containment.FindContainingVisible(index, new Vector3(10, 20, 30), replacements: null, new SpatialQueryScratch()));
-        Assert.Equal(0, containment.FindContainingVisible(index, new Vector3(1010, 20, 30), replacements: null, new SpatialQueryScratch()));
-        Assert.Equal(-1, containment.FindContainingVisible(index, new Vector3(500, 0, 0), replacements: null, new SpatialQueryScratch()));
+    [Fact]
+    public void FindsTheRivalWhoseMeshSurroundsThePoint()
+    {
+        var rivals = CreateRivals(Place(0, Room, new Vector3(1000, 0, 0)), Place(1, Room, Vector3.Zero));
+
+        Assert.Equal(new OtherId(1), FirstCovering(rivals, new Vector3(10, 20, 30)));
+        Assert.Equal(new OtherId(0), FirstCovering(rivals, new Vector3(1010, 20, 30)));
+        Assert.Null(FirstCovering(rivals, new Vector3(500, 0, 0)));
     }
 
     [Fact]
-    public void ReplacedObjectsAreSkippedOnRequest()
+    public void ReplacedRivalsCoverNothing()
     {
-        var (containment, index) = CreateIndex(Place(Room, Vector3.Zero));
-        var replacements = Replacements.Of(rivalCount: 1, [new Replacement(index[0].Id, new TargetId(0), Distance: 0f, SizeRatio: 1f)]);
+        var room = Place(0, Room, Vector3.Zero);
+        var replacements = Replacements.Of(rivalCount: 1, [new Replacement(room.Id, new TargetId(0), Distance: 0f, SizeRatio: 1f)]);
 
-        Assert.Equal(-1, containment.FindContainingVisible(index, new Vector3(10, 20, 30), replacements, new SpatialQueryScratch()));
-        Assert.Equal(0, containment.FindContainingVisible(index, new Vector3(10, 20, 30), replacements: null, new SpatialQueryScratch()));
+        Assert.Null(FirstCovering(CreateRivals(replacements, room), new Vector3(10, 20, 30)));
+        Assert.Equal(room.Id, FirstCovering(CreateRivals(room), new Vector3(10, 20, 30)));
     }
 
     [Fact]
     public void ObjectWhoseMeshLiesFarFromItsOriginIsFoundWhereItsMeshIs()
     {
-        var (containment, index) = CreateIndex(Place(FarRoom, Vector3.Zero));
+        var rivals = CreateRivals(Place(0, FarRoom, Vector3.Zero));
 
-        Assert.Equal(0, containment.FindContainingVisible(index, FarOffset + new Vector3(10, 20, 30), replacements: null, new SpatialQueryScratch()));
-        Assert.Equal(-1, containment.FindContainingVisible(index, new Vector3(10, 20, 30), replacements: null, new SpatialQueryScratch()));
+        Assert.Equal(new OtherId(0), FirstCovering(rivals, FarOffset + new Vector3(10, 20, 30)));
+        Assert.Null(FirstCovering(rivals, new Vector3(10, 20, 30)));
     }
 
     [Fact]
-    public void LowestIndexWinsWhenSeveralObjectsContainThePoint()
+    public void LowestIdWinsWhenSeveralRivalsContainThePoint()
     {
-        var (containment, index) = CreateIndex(Place(Room, new Vector3(60, 0, 0)), Place(Room, new Vector3(-60, 0, 0)));
+        var rivals = CreateRivals(Place(0, Room, new Vector3(60, 0, 0)), Place(1, Room, new Vector3(-60, 0, 0)));
 
-        Assert.Equal(0, containment.FindContainingVisible(index, new Vector3(0, 20, 30), replacements: null, new SpatialQueryScratch()));
+        Assert.Equal(new OtherId(0), FirstCovering(rivals, new Vector3(0, 20, 30)));
+    }
+
+    [Fact]
+    public void SolidsContainThePointInsideAnyVisibleMesh()
+    {
+        var solids = TestScenes.CreateWithBackdrop([], [Place(0, Room, Vector3.Zero)], Shapes).Solids();
+
+        Assert.True(solids.Contains(TestTargets.Space, new Vector3(10, 20, 30), new SpatialQueryScratch()));
+        Assert.False(solids.Contains(TestTargets.Space, new Vector3(500, 0, 0), new SpatialQueryScratch()));
     }
 
     /// <summary>Rooms are turned so the containment test runs in a rotated frame; the far room is not, so its mesh stays at <see cref="FarOffset"/>.</summary>
-    private static OtherObject Place(TestStatic model, Vector3 position) =>
-        TestShapes.Placed(Mod, 0, model.Ref, position, zRadians: model == FarRoom ? 0f : 0.7f);
+    private static OtherObject Place(int id, TestStatic model, Vector3 position) =>
+        TestShapes.Placed(Mod, id, model.Ref, position, zRadians: model == FarRoom ? 0f : 0.7f);
 
-    private static (ObjectContainment Containment, OtherObjectIndex Index) CreateIndex(params OtherObject[] objects)
-    {
-        var shapes = TestShapes.Create(Mod, "ObjectContainmentData", Room, FarRoom);
-        var containment = new ObjectContainment(shapes, new TriangleStore(shapes.ReadGeometry));
-        return (containment, OtherObjectIndex.CreateUncounted(objects, shapes, new ParallelOptions()));
-    }
+    private static IActiveRivals CreateRivals(params OtherObject[] rivals) => CreateRivals(Replacements.None(rivals.Length), rivals);
+
+    private static IActiveRivals CreateRivals(Replacements replacements, params OtherObject[] rivals) =>
+        TestScenes.Create([], rivals, Shapes).ActiveRivals(replacements, NpcHandling.CountLikeObjects);
+
+    private static OtherId? FirstCovering(IActiveRivals rivals, Vector3 point) =>
+        rivals.FirstCovering(TestTargets.Space, point, new SpatialQueryScratch());
 }

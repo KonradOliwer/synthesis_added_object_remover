@@ -131,6 +131,26 @@ internal sealed class SpatialGrid
         }
     }
 
+    /// <summary>Replaces <paramref name="results"/> with the distinct items <see cref="Collect"/> finds, ascending.</summary>
+    public void CollectDistinct(Box area, List<int> results)
+    {
+        results.Clear();
+        Collect(area, results);
+        results.Sort();
+        RemoveAdjacentDuplicates(results);
+    }
+
+    public static void RemoveAdjacentDuplicates(List<int> sorted)
+    {
+        var kept = 0;
+        for (var i = 0; i < sorted.Count; i++)
+        {
+            if (kept > 0 && sorted[kept - 1] == sorted[i]) continue;
+            sorted[kept++] = sorted[i];
+        }
+        sorted.RemoveRange(kept, sorted.Count - kept);
+    }
+
     /// <summary>Number of grid cells the X/Y range of <paramref name="box"/> overlaps.</summary>
     public static double CountCells(Box box) => CellRange.Of(box).CellCount;
 

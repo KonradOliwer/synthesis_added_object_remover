@@ -4,18 +4,14 @@ using Mutagen.Bethesda.Plugins;
 namespace AddedObjectRemover;
 
 /// <summary>
-/// The visible placed objects that remain after this run: every non-target object of any plugin
-/// and the target's visible objects that are not removed. Thread-safe.
+/// The visible placed objects that remain after this run: every solid and the visible target
+/// objects that are not removed. Thread-safe.
 /// </summary>
-internal sealed class VisibleObstacles(
-    SupporterIndex nonTargetObjects,
-    VisibleTargetIndex remainingTargets,
-    ObjectContainment containment,
-    ShapeCatalog shapes)
+/// <param name="removed">By <see cref="TargetId"/> index.</param>
+internal sealed class VisibleObstacles(ISolids solids, IVisibleTargets targets, IReadOnlySet<int> removed, ShapeCatalog shapes)
 {
     public bool IsInsideAny(FormKey spaceKey, Vector3 point, SpatialQueryScratch scratch) =>
-        containment.FindContainingVisible(nonTargetObjects.GetSpace(spaceKey), point, replacements: null, scratch) >= 0
-        || remainingTargets.AnyContains(spaceKey, point, containment, scratch);
+        solids.Contains(spaceKey, point, scratch) || targets.AnyContains(spaceKey, point, Remains, scratch);
 
     /// <summary>
     /// The boxes of the obstacles that may come within <paramref name="radius"/> of
@@ -23,18 +19,19 @@ internal sealed class VisibleObstacles(
     /// horizontally farther away.
     /// </summary>
     public List<OrientedBox> FindBoxesNear(FormKey spaceKey, Vector3 point, float radius, SpatialQueryScratch scratch) =>
-        FindNonTargetBoxesNear(spaceKey, point, radius, scratch)
-            .Concat(remainingTargets.FindBoxesNear(spaceKey, point, radius))
+        FindSolidBoxesNear(spaceKey, point, radius, scratch)
+            .Concat(targets.BoxesNear(spaceKey, point, radius, Remains))
             .Where(box => IsHorizontallyWithin(box.WorldAabb(0f), point, radius))
             .ToList();
 
-    private List<OrientedBox> FindNonTargetBoxesNear(FormKey spaceKey, Vector3 point, float radius, SpatialQueryScratch scratch)
+    private bool Remains(TargetId target) => !removed.Contains(target.Index);
+
+    private List<OrientedBox> FindSolidBoxesNear(FormKey spaceKey, Vector3 point, float radius, SpatialQueryScratch scratch)
     {
-        var index = nonTargetObjects.GetSpace(spaceKey);
-        index.Bounds.CollectCandidates(new Box(point, point).Grown(radius), scratch.Slots, scratch.Candidates);
-        return scratch.Candidates
-            .Where(index.IsVisible)
-            .Select(candidate => OrientedBox.FromLocal(shapes.GetLocalBox(index[candidate].Base), index[candidate].Transform))
+        solids.Overlapping(spaceKey, new Box(point, point).Grown(radius), scratch, scratch.Others);
+        return scratch.Others
+            .Select(solids.Get)
+            .Select(solid => OrientedBox.FromLocal(shapes.GetLocalBox(solid.Base), solid.Transform))
             .ToList();
     }
 

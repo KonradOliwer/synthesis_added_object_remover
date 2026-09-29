@@ -35,15 +35,17 @@ internal readonly struct TriangleLease : IDisposable
 
 /// <summary>
 /// Thread-safe store of <see cref="MeshTriangleTree"/> per mesh path. A mesh is built on its first
-/// use and stays resident until the resident estimate exceeds <see cref="MaxResidentBytes"/>; then
+/// use and stays resident until the resident estimate exceeds the maximum resident bytes; then
 /// the least recently used meshes that are not in use are dropped (and rebuilt if needed again).
 /// Builds of large meshes are limited to a few at a time, because reading and indexing
 /// temporarily needs several times the finished tree's memory.
 /// </summary>
-internal sealed class TriangleStore(Func<string, NifGeometry?> readGeometry)
+/// <param name="maxResidentBytes">The resident estimate above which idle trees are evicted, down to three quarters of it.</param>
+internal sealed class TriangleStore(Func<string, NifGeometry?> readGeometry, long maxResidentBytes = TriangleStore.DefaultMaxResidentBytes)
 {
-    private const long MaxResidentBytes = 1L << 30;
-    private const long EvictToBytes = MaxResidentBytes / 4 * 3;
+    public const long DefaultMaxResidentBytes = 1L << 30;
+
+    private readonly long _evictToBytes = maxResidentBytes / 4 * 3;
     private const int LargeMeshTriangles = 20_000;
     private const int MaxConcurrentLargeBuilds = 4;
 
@@ -88,7 +90,7 @@ internal sealed class TriangleStore(Func<string, NifGeometry?> readGeometry)
             EndFailedUse(meshPath, entry);
             throw;
         }
-        if (tree != null && Interlocked.Read(ref _residentBytes) > MaxResidentBytes) EvictLeastRecentlyUsed();
+        if (tree != null && Interlocked.Read(ref _residentBytes) > maxResidentBytes) EvictLeastRecentlyUsed();
         return new TriangleLease(this, entry, tree);
     }
 
@@ -176,14 +178,14 @@ internal sealed class TriangleStore(Func<string, NifGeometry?> readGeometry)
     {
         lock (_lock)
         {
-            if (Interlocked.Read(ref _residentBytes) <= MaxResidentBytes) return;
+            if (Interlocked.Read(ref _residentBytes) <= maxResidentBytes) return;
             var idle = _entries
                 .Where(kv => kv.Value.Users == 0 && kv.Value.Tree is { IsValueCreated: true, Value: not null })
                 .OrderBy(kv => kv.Value.LastUse)
                 .ToList();
             foreach (var (meshPath, entry) in idle)
             {
-                if (Interlocked.Read(ref _residentBytes) <= EvictToBytes) break;
+                if (Interlocked.Read(ref _residentBytes) <= _evictToBytes) break;
                 _entries.Remove(meshPath);
                 Interlocked.Add(ref _residentBytes, -entry.Tree.Value!.EstimatedBytes);
                 Interlocked.Decrement(ref _residentMeshes);

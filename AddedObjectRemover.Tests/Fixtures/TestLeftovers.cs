@@ -15,30 +15,21 @@ internal static class TestLeftovers
         IReadOnlyList<ObjectVisibility> visibility,
         ShapeCatalog shapes,
         IReadOnlyList<OtherObject> others,
-        LeftoverConfig config) =>
-        new(
+        LeftoverConfig config)
+    {
+        var scene = TestScenes.Create(targets, others, shapes);
+        var order = WorkOrder.Of(targets);
+        return new(
             targets,
             visibility,
-            shapes,
-            FindHosts(targets, visibility, shapes, others),
+            scene.VisibleTargets(visibility),
+            Hosts.Find(targets, visibility, scene.ActiveRivals(Replacements.None(others.Count), NpcHandling.OnlyWhenStuckInObject), order, new ParallelOptions()),
             new InvisibleObjectReach(new BaseFactsReader(new SkyrimMod(ReachRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache())),
-            config);
+            config,
+            order);
+    }
 
     /// <summary>The leftover round applied to a fresh ledger, so referenced objects are held.</summary>
     public static LeftoverResult DecideWithLedger(LeftoverResult evaluated, Protection protection, int targetCount) =>
         evaluated.WithVerdicts(Ledger.Start(protection, targetCount).Apply(RoundKind.Leftover, evaluated.Proposals));
-
-    private static Hosts FindHosts(
-        IReadOnlyList<TargetObject> targets,
-        IReadOnlyList<ObjectVisibility> visibility,
-        ShapeCatalog shapes,
-        IReadOnlyList<OtherObject> others)
-    {
-        var indexes = new Dictionary<FormKey, OtherObjectIndex>
-        {
-            [TestTargets.Space] = OtherObjectIndex.CreateUncounted(others, shapes, new ParallelOptions()),
-        };
-        var containment = new ObjectContainment(shapes, new TriangleStore(shapes.ReadGeometry));
-        return Hosts.Find(targets, visibility, indexes, containment, Replacements.None(others.Count), new ParallelOptions());
-    }
 }

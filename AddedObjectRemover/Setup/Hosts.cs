@@ -1,10 +1,7 @@
-using Mutagen.Bethesda.Plugins;
-
 namespace AddedObjectRemover;
 
 /// <summary>
-/// The visible other-mod object each invisible target object sits inside, as far as the target
-/// plugin has not replaced it; the lowest-index one when several contain it.
+/// The active rival each invisible target object sits inside; the lowest-id one when several contain it.
 /// </summary>
 internal sealed class Hosts
 {
@@ -22,38 +19,21 @@ internal sealed class Hosts
         (_hosts ?? throw new InvalidOperationException("The hosts were not computed in this run."))[targetIndex];
 
     /// <param name="visibility">Parallel to <paramref name="targets"/>; only invisible targets have a host.</param>
-    /// <param name="indexes">Must hold every space of an invisible target.</param>
     public static Hosts Find(
         IReadOnlyList<TargetObject> targets,
         IReadOnlyList<ObjectVisibility> visibility,
-        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
-        ObjectContainment containment,
-        Replacements replacements,
+        IActiveRivals rivals,
+        WorkOrder order,
         ParallelOptions options)
     {
-        var hosts = new OtherObject?[targets.Count];
-        Parallel.For(
-            0,
-            targets.Count,
+        return new(ParallelMap.Run(
             options,
+            order,
+            targets.Count,
             () => new SpatialQueryScratch(),
-            (i, _, scratch) =>
-            {
-                if (visibility[i].Kind != null) hosts[i] = FindHost(targets[i], indexes[targets[i].SpaceKey], containment, replacements, scratch);
-                return scratch;
-            },
-            _ => { });
-        return new Hosts(hosts);
+            (i, scratch) => visibility[i].Kind != null ? FindHost(targets[i], rivals, scratch) : null));
     }
 
-    private static OtherObject? FindHost(
-        TargetObject target,
-        OtherObjectIndex index,
-        ObjectContainment containment,
-        Replacements replacements,
-        SpatialQueryScratch scratch)
-    {
-        var match = containment.FindContainingVisible(index, target.Transform.Position, replacements, scratch);
-        return match >= 0 ? index[match] : null;
-    }
+    private static OtherObject? FindHost(TargetObject target, IActiveRivals rivals, SpatialQueryScratch scratch) =>
+        rivals.FirstCovering(target.SpaceKey, target.Transform.Position, scratch) is { } host ? rivals.Get(host) : null;
 }

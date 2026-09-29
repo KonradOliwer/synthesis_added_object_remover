@@ -32,5 +32,12 @@ internal sealed class LedgerReport(Ledger ledger, World world, LeftoverResult le
     };
 
     private static KeptTarget ToKept(TargetId target, Verdict.Held held) =>
-        new(target.Index, held.Reason, held.Cause is Cause.Touching touching ? touching.Touched.Index : null);
+        new(target.Index, held.Reason, TouchedRemovedTarget(held.Cause));
+
+    private static int? TouchedRemovedTarget(Cause cause) => cause switch
+    {
+        Cause.Touching touching => touching.Touched.Index,
+        Cause.LostSupport lost => lost.MainSupporter.Index,
+        _ => null,
+    };
 }

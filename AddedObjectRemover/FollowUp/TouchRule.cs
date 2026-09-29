@@ -9,23 +9,17 @@ namespace AddedObjectRemover;
 /// ledger never lists them as removed.
 /// </summary>
 /// <param name="search">Built once from the seeds; its participants exclude the objects held in the too-close round.</param>
-internal sealed class TouchRule(TouchSearch search, ParallelOptions parallelOptions) : IFollowUpRule
+internal sealed class TouchRule(TouchSearch search, ParallelOptions parallelOptions, IPhaseTimer timer) : IFollowUpRule
 {
-    /// <summary>Time spent listing candidate pairs; for the log only.</summary>
-    public TimeSpan BroadPhase { get; private set; }
-
-    /// <summary>Time spent testing candidate pairs; for the log only.</summary>
-    public TimeSpan NarrowPhase { get; private set; }
-
     public RoundProposals Next(Ledger ledger, ImmutableArray<TargetId> removedLastRound)
     {
         var frontier = removedLastRound.Order().Select(target => target.Index).ToList();
-        var (pairs, broadPhase) = Timing.Measure(() => search.CollectFrontierPairs(frontier, skip: node => ledger.IsDecided(new TargetId(node))));
-        var (reached, narrowPhase) = Timing.Measure(() => search.Tester.FindFirstInContact(pairs, ContactRule.Touch, parallelOptions));
-        BroadPhase += broadPhase;
-        NarrowPhase += narrowPhase;
+        var pairs = timer.Time(
+            TimedPhase.TouchBroadPhase, () => search.CollectFrontierPairs(frontier, skip: node => ledger.IsDecided(new TargetId(node))));
+        var (reached, work) = timer.Time(
+            TimedPhase.TouchNarrowPhase, () => search.Tester.FindFirstInContact(pairs, ContactRule.Touch, parallelOptions));
         return new RoundProposals(
             [.. reached.Select(pair => new Proposal(new TargetId(pair.Second), new Cause.Touching(new TargetId(pair.First))))],
-            new TouchRound([.. reached]));
+            new TouchRound([.. reached], work));
     }
 }

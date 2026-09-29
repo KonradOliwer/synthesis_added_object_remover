@@ -73,6 +73,8 @@ internal sealed class Ledger
 
     public bool IsRemoved(TargetId id) => Of(id) is Verdict.Removed;
 
+    public bool IsProtected(TargetId id) => _store.Protection.IsProtected(id.Index);
+
     /// <summary>The objects the round removed: its proposals in target order, then the linked group members they took along.</summary>
     public ImmutableArray<TargetId> RemovedIn(Round round) => _store.RemovedIn[VisibleIndexOf(round)];
 

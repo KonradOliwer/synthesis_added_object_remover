@@ -129,7 +129,7 @@ public class NpcBodyResolverTests
             PlaceNpc(1, Missing, new P3Float(0, 0, 0)));
 
         Assert.Equal(1, npcs.Count);
-        Assert.Equal(0, npcs.OtherIndexOf(0));
+        Assert.Equal(new OtherId(0), npcs.NpcOf(0).Id);
         Assert.Equal(1, npcs.Counts.WithoutNpc);
         Assert.Equal(1, npcs.Counts.ByBodyMesh);
     }
@@ -148,7 +148,7 @@ public class NpcBodyResolverTests
         new(new NpcBodyResolver(Records.ToImmutableLinkCache(), Shapes, measurer ?? new SkinnedBodyMeasurer(Shapes.ReadGeometry)));
 
     private static PlacedNpcIndex BuildIndex(params OtherObject[] npcs) =>
-        PlacedNpcIndex.Build(OtherObjectIndex.CreateUncounted(npcs, Shapes, new ParallelOptions()), CreateCache(), new ParallelOptions());
+        PlacedNpcIndex.Build(npcs, CreateCache(), new ParallelOptions());
 
     private static OtherObject PlaceNpc(int index, FormKey npc, P3Float rotation) => TestNpcs.Place(Mod, index, npc, Vector3.Zero, rotation);
 

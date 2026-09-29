@@ -1,5 +1,4 @@
 using System.Numerics;
-using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover;
 
@@ -48,52 +47,50 @@ internal sealed class ReplacementMatcher
     private const float SizeSimilarity = 0.75f;
 
     private readonly IReadOnlyList<TargetObject> _targets;
-    private readonly IReadOnlyDictionary<FormKey, OtherObjectIndex> _indexes;
+    private readonly IRivalPositions _rivals;
     private readonly ShapeCatalog _shapes;
 
-    private ReplacementMatcher(
-        IReadOnlyList<TargetObject> targets,
-        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
-        ShapeCatalog shapes)
+    private ReplacementMatcher(IReadOnlyList<TargetObject> targets, IRivalPositions rivals, ShapeCatalog shapes)
     {
         _targets = targets;
-        _indexes = indexes;
+        _rivals = rivals;
         _shapes = shapes;
     }
 
     private readonly record struct Match(OtherId Rival, float Distance, float SizeRatio);
 
-    /// <param name="rivalCount">The number of rivals of the world; the indexes hold rivals only.</param>
+    /// <param name="rivalCount">The number of rivals of the world.</param>
     public static Replacements Find(
         IReadOnlyList<TargetObject> targets,
-        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
+        IRivalPositions rivals,
         int rivalCount,
         ShapeCatalog shapes,
+        WorkOrder order,
         ParallelOptions parallelOptions)
     {
-        var matcher = new ReplacementMatcher(targets, indexes, shapes);
-        var matchesByTarget = new List<Match>?[targets.Count];
-        Parallel.For(0, targets.Count, parallelOptions, t => matchesByTarget[t] = matcher.FindMatches(targets[t]));
+        var matcher = new ReplacementMatcher(targets, rivals, shapes);
+        var matchesByTarget = ParallelMap.Run(
+            parallelOptions,
+            order,
+            targets.Count,
+            () => new List<OtherId>(),
+            (t, nearby) => matcher.FindMatches(targets[t], nearby));
         return matcher.ApplyInTargetOrder(matchesByTarget, rivalCount);
     }
 
-    private List<Match>? FindMatches(TargetObject target)
+    /// <param name="nearby">The calling worker's buffer.</param>
+    private List<Match>? FindMatches(TargetObject target, List<OtherId> nearby)
     {
-        if (!_indexes.TryGetValue(target.SpaceKey, out var index) || index.Count == 0) return null;
         if (ScaledSortedDims(_shapes.GetLocalBox(target.Base), target.Transform.Scale) is not { } targetDims) return null;
 
         var position = target.Transform.Position;
-        var margin = new Vector3(PositionTolerance);
-        var candidates = new List<int>();
-        index.PositionGrid.Collect(new Box(position - margin, position + margin), candidates);
+        _rivals.Within(target.SpaceKey, position, PositionTolerance, nearby);
 
         List<Match>? matches = null;
-        foreach (var slot in candidates)
+        foreach (var id in nearby)
         {
-            var other = index[slot];
+            var other = _rivals.Get(id);
             var distance = Vector3.Distance(other.Position, position);
-            if (distance > PositionTolerance) continue;
-            if (!index.IsVisible(slot)) continue;
             if (ScaledSortedDims(_shapes.GetLocalBox(other.Base), other.Scale) is not { } otherDims) continue;
 
             var ratio = SizeRatio(targetDims, otherDims);

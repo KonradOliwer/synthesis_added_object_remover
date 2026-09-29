@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using System.Collections.Immutable;
 
 namespace AddedObjectRemover;
 
@@ -19,34 +19,48 @@ internal enum ContactRule
 
 internal readonly record struct TargetPair(int First, int Second);
 
-/// <summary>One thread's buffers and counts for <see cref="TouchPairTester.FindFirstInContact"/>.</summary>
+/// <summary>One worker's buffers and counts for the pair tests of <see cref="TouchPairTester"/>.</summary>
 internal sealed class ContactScratch
 {
+    private int _pairsTested;
+    private int _touchingPairs;
+    private int _pairsWithoutGeometry;
+
     public TouchScratch Touch { get; } = new();
     public List<int> Enclosure { get; } = [];
-    public int PairsTested { get; private set; }
-    public int TouchingPairs { get; private set; }
-    public int PairsWithoutGeometry { get; private set; }
 
-    public void Count(PairTouch touch)
+    public PairTouch Count(PairTouch touch)
     {
-        PairsTested++;
-        if (touch == PairTouch.Touching) TouchingPairs++;
-        if (touch == PairTouch.NoGeometry) PairsWithoutGeometry++;
+        _pairsTested++;
+        if (touch == PairTouch.Touching) _touchingPairs++;
+        if (touch == PairTouch.NoGeometry) _pairsWithoutGeometry++;
+        return touch;
     }
+
+    public PairTestStats Harvest() => new(_pairsTested, _touchingPairs, _pairsWithoutGeometry, Touch.TrianglePairsTested);
 }
 
 internal readonly record struct PairTestStats(
     int PairsTested,
     int TouchingPairs,
     int PairsWithoutGeometry,
-    long TrianglePairsTested,
-    TriangleTreeStats Meshes);
+    long TrianglePairsTested) : IWork<PairTestStats>
+{
+    public static PairTestStats Zero => default;
+
+    public static PairTestStats operator +(PairTestStats first, PairTestStats second) => new(
+        first.PairsTested + second.PairsTested,
+        first.TouchingPairs + second.TouchingPairs,
+        first.PairsWithoutGeometry + second.PairsWithoutGeometry,
+        first.TrianglePairsTested + second.TrianglePairsTested);
+
+    public static PairTestStats Sum(IEnumerable<PairTestStats> works) => works.Aggregate(Zero, (total, work) => total + work);
+}
 
 /// <summary>
 /// Narrow phase of the touch search: runs <see cref="MeshTouchTest"/> on target pairs in parallel,
 /// with each mesh's triangle tree taken from one cache shared by all calls. Results are stored per
-/// pair, so they do not depend on scheduling.
+/// pair and each call returns its own work counts, so neither depends on scheduling.
 /// </summary>
 internal sealed class TouchPairTester(
     IReadOnlyList<TargetObject> targets,
@@ -54,54 +68,41 @@ internal sealed class TouchPairTester(
     TriangleStore cache,
     float tolerance)
 {
-    private const int PairsPerChunk = 64;
+    private const int PairsPerRange = 64;
+
+    /// <summary>A group stops at its first pair in contact, so groups differ too much in cost to hand out several at once.</summary>
+    private const int GroupsPerRange = ParallelMap.OneItemPerRange;
+
+    private const int NoPairInContact = -1;
 
     private readonly TriangleStore _cache = cache;
-    private int _pairsTested;
-    private int _touchingPairs;
-    private int _pairsWithoutGeometry;
-    private long _trianglePairsTested;
 
-    public PairTouch[] TestPairs(IReadOnlyList<TargetPair> pairs, ParallelOptions parallelOptions)
-    {
-        var results = new PairTouch[pairs.Count];
-        if (pairs.Count == 0) return results;
-
-        Parallel.ForEach(
-            Partitioner.Create(0, pairs.Count, PairsPerChunk),
+    public (PairTouch[] Results, PairTestStats Work) TestPairs(IReadOnlyList<TargetPair> pairs, ParallelOptions parallelOptions) =>
+        ParallelMap.Run(
             parallelOptions,
-            () => new TouchScratch(),
-            (range, _, scratch) =>
-            {
-                for (var i = range.Item1; i < range.Item2; i++) results[i] = TestPair(pairs[i], scratch);
-                return scratch;
-            },
-            scratch => Interlocked.Add(ref _trianglePairsTested, scratch.TrianglePairsTested));
-        CountResults(results);
-        return results;
-    }
+            pairs.Count,
+            () => new ContactScratch(),
+            (k, scratch) => scratch.Count(TestPair(pairs[k], scratch.Touch)),
+            scratch => scratch.Harvest(),
+            PairsPerRange);
 
     /// <summary>
     /// For each distinct second member, the first of its pairs, in the given order, whose meshes are
     /// in contact: its pairs are tested in that order and the rest are skipped once one is. The found
     /// pairs are returned in the given order.
     /// </summary>
-    public List<TargetPair> FindFirstInContact(IReadOnlyList<TargetPair> pairs, ContactRule rule, ParallelOptions parallelOptions)
+    public (List<TargetPair> Found, PairTestStats Work) FindFirstInContact(IReadOnlyList<TargetPair> pairs, ContactRule rule, ParallelOptions parallelOptions)
     {
         var pairsBySecond = GroupBySecond(pairs);
-        var firstInContact = new int[pairsBySecond.Count];
-        Parallel.For(
-            0,
-            pairsBySecond.Count,
+        var (firstInContact, work) = ParallelMap.Run(
             parallelOptions,
+            pairsBySecond.Count,
             () => new ContactScratch(),
-            (group, _, scratch) =>
-            {
-                firstInContact[group] = FindFirstInContact(pairs, pairsBySecond[group], rule, scratch);
-                return scratch;
-            },
-            AddCounts);
-        return firstInContact.Where(pairIndex => pairIndex >= 0).Order().Select(pairIndex => pairs[pairIndex]).ToList();
+            (group, scratch) => FindFirstInContact(pairs, pairsBySecond[group], rule, scratch),
+            scratch => scratch.Harvest(),
+            GroupsPerRange);
+        var found = firstInContact.Where(pairIndex => pairIndex != NoPairInContact).Order().Select(pairIndex => pairs[pairIndex]).ToList();
+        return (found, work);
     }
 
     /// <returns>Pair indices per distinct second member, each list in the given order.</returns>
@@ -122,28 +123,19 @@ internal sealed class TouchPairTester(
         return groups;
     }
 
-    /// <returns>The index of the first pair in contact; -1 when none is.</returns>
+    /// <returns>The index of the first pair in contact; <see cref="NoPairInContact"/> when none is.</returns>
     private int FindFirstInContact(IReadOnlyList<TargetPair> pairs, List<int> pairIndices, ContactRule rule, ContactScratch scratch)
     {
         foreach (var pairIndex in pairIndices)
         {
-            var touch = TestPair(pairs[pairIndex], scratch.Touch);
-            scratch.Count(touch);
+            var touch = scratch.Count(TestPair(pairs[pairIndex], scratch.Touch));
             if (touch == PairTouch.Touching) return pairIndex;
             if (touch == PairTouch.Apart && rule == ContactRule.TouchOrEnclose && EnclosesCentreOfSecond(pairs[pairIndex], scratch.Enclosure))
             {
                 return pairIndex;
             }
         }
-        return -1;
-    }
-
-    private void AddCounts(ContactScratch scratch)
-    {
-        Interlocked.Add(ref _pairsTested, scratch.PairsTested);
-        Interlocked.Add(ref _touchingPairs, scratch.TouchingPairs);
-        Interlocked.Add(ref _pairsWithoutGeometry, scratch.PairsWithoutGeometry);
-        Interlocked.Add(ref _trianglePairsTested, scratch.Touch.TrianglePairsTested);
+        return NoPairInContact;
     }
 
     /// <summary>Minimum surface distance of a pair known to touch, world units; NaN when either mesh has no usable triangles.</summary>
@@ -155,13 +147,6 @@ internal sealed class TouchPairTester(
         return MeshTouchTest.MinSurfaceDistance(
             first.Tree, targets[pair.First].Transform, second.Tree, targets[pair.Second].Transform, tolerance, scratch);
     }
-
-    public PairTestStats GetStats() => new(
-        _pairsTested,
-        _touchingPairs,
-        _pairsWithoutGeometry,
-        Interlocked.Read(ref _trianglePairsTested),
-        _cache.GetStats());
 
     private PairTouch TestPair(TargetPair pair, TouchScratch scratch)
     {
@@ -181,12 +166,5 @@ internal sealed class TouchPairTester(
 
         var toFirst = RelativeTransform.Create(from: targets[pair.Second].Transform, to: targets[pair.First].Transform);
         return PointContactTest.IsEnclosed(enclosing, toFirst.Apply(enclosed.Bounds.Center), scratch);
-    }
-
-    private void CountResults(PairTouch[] results)
-    {
-        _pairsTested += results.Length;
-        _touchingPairs += results.Count(r => r == PairTouch.Touching);
-        _pairsWithoutGeometry += results.Count(r => r == PairTouch.NoGeometry);
     }
 }

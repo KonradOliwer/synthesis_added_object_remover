@@ -16,8 +16,8 @@ public class FirstContactTests
         var tester = CreateTester(("big.nif", Vector3.Zero), ("small.nif", new Vector3(3, 2, 1)));
         TargetPair[] pairs = [new(0, 1)];
 
-        Assert.Empty(tester.FindFirstInContact(pairs, ContactRule.Touch, new ParallelOptions()));
-        Assert.Equal(pairs, tester.FindFirstInContact(pairs, ContactRule.TouchOrEnclose, new ParallelOptions()));
+        Assert.Empty(tester.FindFirstInContact(pairs, ContactRule.Touch, new ParallelOptions()).Found);
+        Assert.Equal(pairs, tester.FindFirstInContact(pairs, ContactRule.TouchOrEnclose, new ParallelOptions()).Found);
     }
 
     [Fact]
@@ -32,10 +32,11 @@ public class FirstContactTests
             ("small.nif", new Vector3(100, 0, 0)));
         TargetPair[] pairs = [new(1, 3), new(0, 2), new(0, 4), new(1, 2), new(0, 3)];
 
-        var found = tester.FindFirstInContact(pairs, ContactRule.Touch, new ParallelOptions { MaxDegreeOfParallelism = 4 });
+        var (found, work) = tester.FindFirstInContact(pairs, ContactRule.Touch, new ParallelOptions { MaxDegreeOfParallelism = 4 });
 
         Assert.Equal(new[] { new TargetPair(1, 3), new TargetPair(0, 2) }, found);
-        Assert.Equal(3, tester.GetStats().PairsTested);
+        Assert.Equal((PairsTested: 3, TouchingPairs: 2, PairsWithoutGeometry: 0), (work.PairsTested, work.TouchingPairs, work.PairsWithoutGeometry));
+        Assert.True(work.TrianglePairsTested > 0);
     }
 
     private static TouchPairTester CreateTester(params (string Mesh, Vector3 Position)[] objects)

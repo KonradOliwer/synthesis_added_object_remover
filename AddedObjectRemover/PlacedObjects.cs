@@ -81,7 +81,7 @@ internal sealed record LeftoverRemoval(int TargetIndex, LeftoverEvaluation Evalu
 internal sealed record LinkedRemoval(int TargetIndex, int LinkedToTargetIndex) : Removal(TargetIndex);
 
 /// <summary>A target object that would be removed but stays because it, or a member of its linked group, is referenced.</summary>
-/// <param name="TouchedTargetIndex">The removed target it touches, when it was reached by the touch test.</param>
+/// <param name="TouchedTargetIndex">The removed target it touches or rests on most, if any.</param>
 internal sealed record KeptTarget(int TargetIndex, KeepReason Reason, int? TouchedTargetIndex);
 
 internal static class PlacedRecordExtensions

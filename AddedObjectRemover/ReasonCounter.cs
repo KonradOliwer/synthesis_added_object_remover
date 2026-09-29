@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 
 namespace AddedObjectRemover;
 
-/// <summary>Thread-safe count of occurrences per reason, e.g. invisible other objects or mesh failures.</summary>
+/// <summary>Thread-safe count of occurrences per reason, e.g. mesh failures.</summary>
 internal sealed class ReasonCounter
 {
     private readonly ConcurrentDictionary<string, int> _byReason = new(StringComparer.Ordinal);

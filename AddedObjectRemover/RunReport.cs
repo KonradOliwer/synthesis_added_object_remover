@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using Mutagen.Bethesda.Plugins;
 
@@ -122,23 +123,23 @@ internal static class RunReport
         }
     }
 
-    public static void PrintIndexSummary(IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes, TimeSpan elapsed) =>
-        Console.WriteLine(
-            $"Indexed {indexes.Values.Sum(s => s.Count):N0} other objects in {indexes.Count:N0} cells/worldspaces "
-            + $"in {elapsed.TotalSeconds:F1}s.");
-
-    /// <param name="otherObjects">The other-mod object indexes of the target spaces.</param>
-    /// <param name="supporters">The indexes of every plugin's objects built for support and obstacles.</param>
-    public static void PrintBoundsIndexTimes(IEnumerable<OtherObjectIndex> otherObjects, IEnumerable<OtherObjectIndex> supporters)
+    /// <summary>The rivals of the target spaces, which the other steps look at.</summary>
+    public static void PrintIndexSummary(World world, TimeSpan elapsed)
     {
-        static string Describe(IEnumerable<OtherObjectIndex> indexes)
-        {
-            var built = indexes.Where(index => index.BoundsBuildTime > TimeSpan.Zero).ToList();
-            var seconds = built.Sum(index => index.BoundsBuildTime.TotalSeconds);
-            return $"{built.Count:N0} spaces in {seconds:F1}s";
-        }
+        var targetSpaces = world.Targets.Select(target => target.SpaceKey).ToHashSet();
+        var rivals = world.Rivals.Count(rival => targetSpaces.Contains(rival.SpaceKey));
+        Console.WriteLine($"Indexed {rivals:N0} other objects in {targetSpaces.Count:N0} cells/worldspaces in {elapsed.TotalSeconds:F1}s.");
+    }
 
-        Console.WriteLine($"World-bounds indexes built: other mods' objects {Describe(otherObjects)}, supporters and obstacles {Describe(supporters)}.");
+    /// <summary>Per built world-bounds index, how long it took: of the rivals' spaces, and of the spaces of every plugin's objects (support and obstacles).</summary>
+    public static void PrintBoundsIndexTimes(PhaseClock clock)
+    {
+        static string Describe(ImmutableArray<TimeSpan> buildTimes) =>
+            $"{buildTimes.Length:N0} spaces in {buildTimes.Sum(time => time.TotalSeconds):F1}s";
+
+        Console.WriteLine(
+            $"World-bounds indexes built: other mods' objects {Describe(clock.Samples(TimedPhase.RivalBoundsBuild))}, "
+            + $"supporters and obstacles {Describe(clock.Samples(TimedPhase.SolidBoundsBuild))}.");
     }
 
     public static void PrintWarmUpSummary(int targetBaseCount, TimeSpan elapsed) =>
@@ -179,7 +180,7 @@ internal static class RunReport
             + $"in {elapsed.TotalSeconds:F1}s.");
 
     public static void PrintShapeZoneStats(
-        ShapeZoneStats stats,
+        ShapeZoneWork stats,
         int largeOtherObjects,
         TriangleTreeStats meshes,
         int effectOnlyMeshes,
@@ -204,10 +205,10 @@ internal static class RunReport
 
     public static void PrintNpcStuckSummary(
         NpcStuckSummary summary,
-        NpcBodyCacheStats cache,
-        int bodyMeshSetsMeasured,
+        NpcBodyPerf bodies,
         bool detailedLog)
     {
+        var cache = bodies.Cache;
         var sizes = summary.Sizes;
         Console.WriteLine(
             $"NPCs and creatures (only when stuck in the object): {sizes.Evaluated:N0} placed NPCs evaluated: "
@@ -220,7 +221,7 @@ internal static class RunReport
             $"  NPC body cache: {cache.BodiesBuilt:N0} bodies built, {cache.BodiesReused:N0} reused; "
             + $"{cache.BasesResolved:N0} NPC bases resolved, {cache.BasesReused:N0} reused; "
             + $"{cache.ListsResolved:N0} leveled lists resolved, {cache.ListsReused:N0} reused; "
-            + $"{bodyMeshSetsMeasured:N0} body mesh sets measured.");
+            + $"{bodies.BodyMeshSetsMeasured:N0} body mesh sets measured.");
         if (!detailedLog) return;
         foreach (var fallback in summary.PointFallbacks)
         {
@@ -228,14 +229,13 @@ internal static class RunReport
         }
     }
 
-    public static void PrintInvisibleOthers(ReasonCounter invisible, bool verbose)
+    public static void PrintInvisibleOthers(RivalCensus census, bool verbose)
     {
-        var byReason = invisible.Snapshot();
-        var total = byReason.Sum(kv => kv.Value);
+        var total = census.InvisibleByReason.Sum(kv => kv.Value);
         if (total == 0) return;
-        Console.WriteLine($"  Ignored {total:N0} nearby other-mod objects that are invisible (markers, lights, sounds, decals, trigger boxes, ...).");
+        Console.WriteLine($"  Ignored {total:N0} other-mod objects that are invisible (markers, lights, sounds, decals, trigger boxes, ...).");
         if (!verbose) return;
-        foreach (var (reason, count) in byReason)
+        foreach (var (reason, count) in census.InvisibleByReason)
         {
             Console.WriteLine($"    {reason}: {count:N0}");
         }
@@ -270,7 +270,7 @@ internal static class RunReport
         }
     }
 
-    public static void PrintTouchStats(TouchClusters touch)
+    public static void PrintTouchStats(TouchClusters touch, TouchTimes times, TriangleTreeStats meshes)
     {
         var stats = touch.Stats;
         Console.WriteLine(
@@ -278,14 +278,14 @@ internal static class RunReport
             + $"({stats.ComponentsWithRemovals:N0} with follow-up removals, largest {stats.LargestComponent:N0} removed objects, "
             + $"longest chain {stats.MaxDepth:N0} steps); {touch.Kept.Count:N0} kept as referenced.");
         PrintPairStats(stats.Pairs, stats.Levels, "levels");
-        PrintMeshStats(stats.Pairs.Meshes);
+        PrintMeshStats(meshes);
         Console.WriteLine(
-            $"  Timing: setup {stats.Setup.TotalSeconds:F1}s, broad phase {stats.BroadPhase.TotalSeconds:F1}s, "
-            + $"narrow phase {stats.NarrowPhase.TotalSeconds:F1}s"
-            + (touch.Diagnostics != null ? $", diagnostics edges {stats.DiagnosticsEdges.TotalSeconds:F1}s." : "."));
+            $"  Timing: setup {times.Setup.TotalSeconds:F1}s, broad phase {times.BroadPhase.TotalSeconds:F1}s, "
+            + $"narrow phase {times.NarrowPhase.TotalSeconds:F1}s"
+            + (touch.Diagnostics != null ? $", diagnostics edges {times.DiagnosticsEdges.TotalSeconds:F1}s." : "."));
     }
 
-    public static void PrintAnchoringStats(AnchoringResult anchoring)
+    public static void PrintAnchoringStats(AnchoringResult anchoring, AnchoringTimes times, TriangleTreeStats meshes)
     {
         var stats = anchoring.Stats;
         Console.WriteLine(
@@ -293,10 +293,10 @@ internal static class RunReport
             + $"{stats.Candidates:N0} touching objects evaluated ({stats.Evaluations:N0} evaluations), "
             + $"{stats.KeptWithoutContacts:N0} kept without any contact points, {anchoring.Kept.Count:N0} kept as referenced.");
         PrintPairStats(stats.Pairs, stats.Iterations, "iterations");
-        PrintMeshStats(stats.Pairs.Meshes);
+        PrintMeshStats(meshes);
         Console.WriteLine(
-            $"  Timing: setup {stats.Setup.TotalSeconds:F1}s, touch search {stats.TouchSearch.TotalSeconds:F1}s, "
-            + $"contact points {stats.ContactPoints.TotalSeconds:F1}s.");
+            $"  Timing: setup {times.Setup.TotalSeconds:F1}s, touch search {times.TouchSearch.TotalSeconds:F1}s, "
+            + $"contact points {times.ContactPoints.TotalSeconds:F1}s.");
     }
 
     public static void PrintLeftoverStats(LeftoverResult leftovers, TimeSpan elapsed)
@@ -425,14 +425,12 @@ internal static class RunReport
         }
     }
 
-    public static void PrintSpaceSummary(
-        World world,
-        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
-        IReadOnlyList<Removal> removals)
+    public static void PrintSpaceSummary(World world, IReadOnlyList<Removal> removals)
     {
         var removedBySpace = removals
             .GroupBy(r => world.Targets[r.TargetIndex].SpaceKey)
             .ToDictionary(g => g.Key, g => g.Count());
+        var rivalsBySpace = world.Rivals.CountBy(rival => rival.SpaceKey).ToDictionary();
         Console.WriteLine("Per cell/worldspace (target objects / other objects / removed):");
         foreach (var group in world.Targets
                      .GroupBy(t => t.SpaceKey)
@@ -440,7 +438,7 @@ internal static class RunReport
         {
             removedBySpace.TryGetValue(group.Key, out var removedCount);
             Console.WriteLine(
-                $"  {world.SpaceNames[group.Key]}: {group.Count():N0} / {indexes[group.Key].Count:N0} / {removedCount:N0}");
+                $"  {world.SpaceNames[group.Key]}: {group.Count():N0} / {rivalsBySpace.GetValueOrDefault(group.Key):N0} / {removedCount:N0}");
         }
     }
 

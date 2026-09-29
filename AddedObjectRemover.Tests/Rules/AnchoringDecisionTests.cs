@@ -16,7 +16,7 @@ public class AnchoringDecisionTests
     public void PointTouchingSeveralSupportersSplitsItsWeight()
     {
         var first = Supporter.Target(3);
-        var second = Supporter.Placed(0);
+        var second = Supporter.Placed(new OtherId(0));
         var contacts = AnchoringContactFinder.SplitWeightsAmongSupporters(
             [
                 new AnchoringContactFinder.SupporterHits(first, [true, true, false]),

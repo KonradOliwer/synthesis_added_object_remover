@@ -71,6 +71,7 @@ internal static class AnchoringDiagnosticsWriter
     {
         if (evaluation.Removed) return "removed";
         if (evaluation.RemovedAsLinked) return "removed (linked to a removed object)";
+        if (evaluation.Held) return "kept (referenced)";
         return evaluation.Contacts.ContactPoints == 0 ? "kept (no contact points)" : "kept";
     }
 

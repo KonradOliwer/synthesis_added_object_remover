@@ -78,13 +78,15 @@ public class StepDeterminismTests
     {
         var scene = CreateFollowUpScene();
 
-        var sequential = RunAnchoring(scene, SequentialThreads);
-        var parallel = RunAnchoring(scene, ParallelThreads);
+        var sequential = RunSupportCascade(scene, SequentialThreads);
+        var parallel = RunSupportCascade(scene, ParallelThreads);
 
-        Assert.True(sequential.Stats.Iterations > 1);
-        Assert.Equal(sequential.Removals, parallel.Removals);
-        Assert.Equal(sequential.Kept, parallel.Kept);
-        Assert.Equal(DescribeEvaluations(sequential), DescribeEvaluations(parallel));
+        Assert.True(sequential.Anchoring.Stats.Iterations > 1);
+        Assert.Equal(DescribeRounds(sequential.Ledger), DescribeRounds(parallel.Ledger));
+        Assert.Equal(sequential.Ledger.All().ToList(), parallel.Ledger.All().ToList());
+        Assert.Equal(sequential.Anchoring.Removals, parallel.Anchoring.Removals);
+        Assert.Equal(sequential.Anchoring.Kept, parallel.Anchoring.Kept);
+        Assert.Equal(DescribeEvaluations(sequential.Anchoring), DescribeEvaluations(parallel.Anchoring));
     }
 
     [Fact]
@@ -139,20 +141,17 @@ public class StepDeterminismTests
     private static TestTouchCascade.Run RunTouchCascade(FollowUpScene scene, int threads) =>
         TestTouchCascade.Execute(scene.Targets, Shapes, scene.Protection, scene.Seeds, TouchDistance, threads, collectDiagnostics: true);
 
-    private static AnchoringResult RunAnchoring(FollowUpScene scene, int threads) =>
-        AnchoringRemover.Run(
+    private static TestSupportCascade.Run RunSupportCascade(FollowUpScene scene, int threads) =>
+        TestSupportCascade.Execute(
             scene.Targets,
-            AllVisible(scene.Targets),
+            Shapes,
+            scene.Protection,
             scene.Seeds,
-            keptTooClose: [],
             new SupporterIndex(new Dictionary<FormKey, List<OtherObject>>(), Shapes, Options(threads)),
             new TerrainHeights(new Dictionary<ExteriorCell, ILandscapeGetter>(), new Dictionary<FormKey, FormKey>()),
-            Shapes,
-            NewCache(),
-            scene.Protection,
             TouchDistance,
             threshold: 0.5f,
-            Options(threads));
+            threads);
 
     private static (List<TooCloseHit> Hits, string Summary) FindStuckNpcs(List<TargetObject> targets, List<OtherObject> npcs, int threads)
     {
@@ -248,7 +247,7 @@ public class StepDeterminismTests
 
     private static List<string> DescribeEvaluations(AnchoringResult anchoring) =>
         anchoring.Evaluations
-            .Select(evaluation => $"{evaluation.TargetIndex} {evaluation.Iteration} {evaluation.Removed} {evaluation.RemovedAsLinked} {evaluation.RemovedShare}")
+            .Select(evaluation => $"{evaluation.TargetIndex} {evaluation.Iteration} {evaluation.Removed} {evaluation.RemovedAsLinked} {evaluation.Held} {evaluation.RemovedShare}")
             .ToList();
 
     private static List<string> DescribeEvaluations(LeftoverResult leftovers) =>

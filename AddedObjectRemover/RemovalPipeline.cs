@@ -245,7 +245,7 @@ internal sealed class RemovalPipeline
         {
             FollowUpRemovalMode.Nothing => ledger,
             FollowUpRemovalMode.EverythingTouching => DecideTouching(snapshot.World, visibility, seeds, keptTooClose, protection, ledger),
-            FollowUpRemovalMode.ObjectsSupportedByIt => DecideUnanchored(snapshot, visibility, seeds, keptTooClose, supporters, protection, ledger),
+            FollowUpRemovalMode.ObjectsSupportedByIt => DecideUnanchored(snapshot, visibility, seeds, supporters, protection, ledger),
             _ => throw new UnreachableException($"Unknown follow-up removal mode {_config.FollowUpMode}."),
         };
     }
@@ -290,8 +290,20 @@ internal sealed class RemovalPipeline
         return next;
     }
 
-    private static Proposal ProposeTouching(int target, int touched) =>
-        new(new TargetId(target), new Cause.Touching(new TargetId(touched)));
+    private SupportRule CreateSupportRule(
+        GameSnapshot snapshot,
+        IReadOnlyList<ObjectVisibility> visibility,
+        IReadOnlyList<int> seeds,
+        SupporterIndex supporters,
+        Protection protection)
+    {
+        var targets = snapshot.World.Targets;
+        var search = TouchSearch.Create(
+            targets, visibility, protection.Groups.CollectReachableSpaces(targets, seeds), excluded: [], _shapes, _meshCache, _config.TouchDistance, _parallelOptions);
+        var supporterFinder = new AnchoringSupporterFinder(targets, search, supporters, _shapes, _config.TouchDistance);
+        var contactFinder = new AnchoringContactFinder(targets, search.MeshPaths, supporterFinder, snapshot.Terrain, search.Cache, _config.TouchDistance);
+        return new SupportRule(search, contactFinder, _config.AnchoringThreshold, targets.Length, _parallelOptions);
+    }
 
     private void WriteTouchDiagnostics(World world, IReadOnlyList<Removal> seeds, TouchClusters clusters)
     {
@@ -306,37 +318,22 @@ internal sealed class RemovalPipeline
         });
     }
 
+    /// <remarks>Objects held in the too-close round are decided, so they are never candidates, and they keep supporting others.</remarks>
     private Ledger DecideUnanchored(
         GameSnapshot snapshot,
         IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyList<int> seeds,
-        IReadOnlyList<int> keptTooClose,
         SupporterIndex supporters,
         Protection protection,
         Ledger ledger)
     {
         var world = snapshot.World;
-        var anchoring = AnchoringRemover.Run(
-            world.Targets,
-            visibility,
-            seeds,
-            keptTooClose,
-            supporters,
-            snapshot.Terrain,
-            _shapes,
-            _meshCache,
-            protection,
-            _config.TouchDistance,
-            _config.AnchoringThreshold,
-            _parallelOptions);
-        var next = ledger.Apply(RoundKind.FollowUp,
-        [
-            .. anchoring.Removals.OfType<AnchoringRemoval>().Select(removal => new Proposal(
-                new TargetId(removal.TargetIndex),
-                new Cause.LostSupport(removal.RemovedShare, new TargetId(removal.MainRemovedSupporter)))),
-            .. anchoring.Kept.Select(kept => ProposeTouching(kept.TargetIndex, kept.TouchedTargetIndex!.Value)),
-        ]);
-        PrintKept(world, next, RoundsAddedTo(ledger, next));
+        var (rule, setup) = Timing.Measure(() => CreateSupportRule(snapshot, visibility, seeds, supporters, protection));
+        var (next, evidence) = Cascade.Run(ledger, rule);
+        var rounds = RoundsAddedTo(ledger, next);
+        var anchoring = AnchoringOutcome.Create(
+            next, new LedgerReport(next, world, LeftoverResult.None), rounds, evidence, rule, setup);
+        PrintKept(world, next, rounds);
         _meshMessages.PrintAndClear();
         RunReport.PrintAnchoringStats(anchoring);
         WriteAnchoringDiagnostics(world, supporters, anchoring);

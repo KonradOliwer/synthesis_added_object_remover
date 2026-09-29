@@ -46,8 +46,6 @@ public class FollowUpLinkedGroupTests
     private static readonly Protection SceneProtection =
         Protection.Build(Targets, [TestTargets.Link(ItemOnTable, Shelf)], TestTargets.References(Targets.Count));
 
-    private static readonly ObjectVisibility[] AllVisible = Enumerable.Repeat(ObjectVisibility.Visible, Targets.Count).ToArray();
-
     [Fact]
     public void EverythingTouchingFollowsLinkedPartnersIntoTheirOwnTouchSearch()
     {
@@ -80,19 +78,16 @@ public class FollowUpLinkedGroupTests
     [Fact]
     public void AnchoringFollowsLinkedPartnersAndReevaluatesOnlyTheirNeighbours()
     {
-        var anchoring = AnchoringRemover.Run(
+        var anchoring = TestSupportCascade.Execute(
             Targets,
-            AllVisible,
-            seeds: [Table],
-            keptTooClose: [],
+            Shapes,
+            SceneProtection,
+            [Table],
             new SupporterIndex(new Dictionary<FormKey, List<OtherObject>>(), Shapes, Options()),
             NoTerrain(),
-            Shapes,
-            NewCache(),
-            SceneProtection,
             TouchDistance,
             threshold: 0.5f,
-            Options());
+            threads: 4).Anchoring;
 
         Assert.Equal(
             new[] { (ItemOnTable, typeof(AnchoringRemoval)), (Shelf, typeof(LinkedRemoval)), (ItemOnShelf, typeof(AnchoringRemoval)) },
@@ -115,19 +110,16 @@ public class FollowUpLinkedGroupTests
         var protection = Protection.Build(targets, [TestTargets.Link(itemOnTable, crateBesideTable)], TestTargets.References(targets.Count));
         var floor = TestShapes.Placed(OtherMod, 0, FloorModel.Ref, Vector3.Zero);
 
-        var anchoring = AnchoringRemover.Run(
+        var anchoring = TestSupportCascade.Execute(
             targets,
-            Enumerable.Repeat(ObjectVisibility.Visible, targets.Count).ToArray(),
-            seeds: [seedTable],
-            keptTooClose: [],
+            Shapes,
+            protection,
+            [seedTable],
             new SupporterIndex(new Dictionary<FormKey, List<OtherObject>> { [TestTargets.Space] = [floor] }, Shapes, Options()),
             NoTerrain(),
-            Shapes,
-            NewCache(),
-            protection,
             TouchDistance,
             threshold: 0.9f,
-            Options());
+            threads: 4).Anchoring;
 
         Assert.Equal(
             new[] { (itemOnTable, typeof(AnchoringRemoval)), (crateBesideTable, typeof(LinkedRemoval)) },
@@ -147,8 +139,6 @@ public class FollowUpLinkedGroupTests
 
     private static TargetObject Place(int index, TestStatic model, FormKey space, Vector3 position) =>
         TestTargets.Create(index, TestTargets.At(position), model.Ref, space);
-
-    private static TriangleTreeCache NewCache() => new(Shapes.ReadGeometry);
 
     private static TerrainHeights NoTerrain() =>
         new(new Dictionary<ExteriorCell, Mutagen.Bethesda.Skyrim.ILandscapeGetter>(), new Dictionary<FormKey, FormKey>());

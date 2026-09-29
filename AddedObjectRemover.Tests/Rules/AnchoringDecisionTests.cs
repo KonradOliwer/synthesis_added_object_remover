@@ -10,7 +10,7 @@ public class AnchoringDecisionTests
     [InlineData(0.999995f, 1f, true)]
     [InlineData(0f, 0.01f, false)]
     public void RemovedWhenRemovedShareReachesThreshold(float removedShare, float threshold, bool expected) =>
-        Assert.Equal(expected, AnchoringRemover.ReachesThreshold(removedShare, threshold));
+        Assert.Equal(expected, SupportRule.ReachesThreshold(removedShare, threshold));
 
     [Fact]
     public void PointTouchingSeveralSupportersSplitsItsWeight()

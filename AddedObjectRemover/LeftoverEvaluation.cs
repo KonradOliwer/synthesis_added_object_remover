@@ -50,12 +50,31 @@ internal sealed record LeftoverEvaluation(
 }
 
 /// <param name="Evaluations">In target order.</param>
-internal sealed record LeftoverResult(
-    IReadOnlyList<LeftoverRemoval> Removals,
-    IReadOnlyList<KeptTarget> Kept,
-    IReadOnlyList<LeftoverEvaluation> Evaluations)
+internal sealed record LeftoverResult(IReadOnlyList<LeftoverEvaluation> Evaluations)
 {
-    public static LeftoverResult None { get; } = new([], [], []);
+    public static LeftoverResult None { get; } = new([]);
+
+    public int RemovedCount => Evaluations.Count(evaluation => evaluation.IsRemoved);
+
+    /// <summary>A removal proposal for each object the rules would remove.</summary>
+    public IReadOnlyList<Proposal> Proposals =>
+    [
+        .. Evaluations
+            .Where(evaluation => evaluation.IsRemoved)
+            .Select(evaluation => new Proposal(new TargetId(evaluation.TargetIndex), CauseOf(evaluation))),
+    ];
 
     public int CountDecisions(LeftoverDecision decision) => Evaluations.Count(evaluation => evaluation.Decision == decision);
+
+    /// <summary>The evaluations with the ledger's verdicts: an object the leftover round held is kept as referenced.</summary>
+    public LeftoverResult WithVerdicts(Ledger ledger) => new(
+    [
+        .. Evaluations.Select(evaluation =>
+            ledger.Of(new TargetId(evaluation.TargetIndex)) is Verdict.Held { Round.Kind: RoundKind.Leftover } held
+                ? evaluation with { Decision = LeftoverDecision.KeptReferenced, KeepReason = held.Reason }
+                : evaluation),
+    ]);
+
+    private static Cause CauseOf(LeftoverEvaluation evaluation) =>
+        evaluation.ContainingObject is { } host ? new Cause.InsideRival(host.Id) : new Cause.SurroundingsCleared();
 }

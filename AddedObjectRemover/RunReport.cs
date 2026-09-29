@@ -294,8 +294,8 @@ internal static class RunReport
         var decisions = Enum.GetValues<LeftoverDecision>();
         Console.WriteLine(
             $"Leftover invisible objects: {leftovers.Evaluations.Count:N0} evaluated in {elapsed.TotalSeconds:F1}s; "
-            + $"removed {leftovers.Removals.Count:N0} ({DescribeDecisionCounts(leftovers, decisions.Where(decision => decision.IsRemoval()))}); "
-            + $"kept {leftovers.Evaluations.Count - leftovers.Removals.Count:N0} "
+            + $"removed {leftovers.RemovedCount:N0} ({DescribeDecisionCounts(leftovers, decisions.Where(decision => decision.IsRemoval()))}); "
+            + $"kept {leftovers.Evaluations.Count - leftovers.RemovedCount:N0} "
             + $"({DescribeDecisionCounts(leftovers, decisions.Where(decision => !decision.IsRemoval()))}).");
     }
 

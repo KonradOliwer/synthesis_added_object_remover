@@ -23,23 +23,6 @@ public class LinkedGroupTests
     }
 
     [Fact]
-    public void LinkedRemovalsAddEachMissingMemberOnce()
-    {
-        var targets = TestTargets.CreateMany(5);
-        var groups = LinkedGroups.Build(targets.Count,
-        [
-            TestTargets.Link(0, 1),
-            TestTargets.Link(1, 2),
-            TestTargets.Link(3, 4),
-        ]);
-        Removal[] decided = [new TooCloseRemoval(0, default), new TooCloseRemoval(2, default), new TouchingRemoval(4, 0)];
-
-        var linked = groups.CollectLinkedRemovals(decided, new HashSet<int> { 0, 2, 4 });
-
-        Assert.Equal(new[] { new LinkedRemoval(1, 0), new LinkedRemoval(3, 4) }, linked);
-    }
-
-    [Fact]
     public void OneKeptMemberKeepsItsWholeGroup()
     {
         var targets = TestTargets.CreateMany(4);

@@ -15,7 +15,6 @@ internal static class TestLeftovers
         IReadOnlyList<ObjectVisibility> visibility,
         BaseObjectShapeProvider shapes,
         IReadOnlyList<OtherObject> others,
-        Protection protection,
         LeftoverConfig config) =>
         new(
             targets,
@@ -23,8 +22,11 @@ internal static class TestLeftovers
             shapes,
             FindHosts(targets, visibility, shapes, others),
             new InvisibleObjectReach(new SkyrimMod(ReachRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache(), shapes),
-            protection,
             config);
+
+    /// <summary>The leftover round applied to a fresh ledger, so referenced objects are held.</summary>
+    public static LeftoverResult DecideWithLedger(LeftoverResult evaluated, Protection protection, int targetCount) =>
+        evaluated.WithVerdicts(Ledger.Start(protection, targetCount).Apply(RoundKind.Leftover, evaluated.Proposals));
 
     private static Hosts FindHosts(
         IReadOnlyList<TargetObject> targets,

@@ -61,22 +61,6 @@ internal sealed class LinkedGroups
         return spaces;
     }
 
-    /// <param name="decided">The removals one step decided, in its order.</param>
-    /// <param name="removed">Every target index removed so far, <paramref name="decided"/> included.</param>
-    /// <returns>The other members of the decided removals' groups not removed yet.</returns>
-    public List<LinkedRemoval> CollectLinkedRemovals(IEnumerable<Removal> decided, IReadOnlySet<int> removed)
-    {
-        var added = new HashSet<int>();
-        var linked = new List<LinkedRemoval>();
-        foreach (var removal in decided)
-        {
-            foreach (var member in MembersOf(removal.TargetIndex))
-            {
-                if (!removed.Contains(member) && added.Add(member)) linked.Add(new LinkedRemoval(member, removal.TargetIndex));
-            }
-        }
-        return linked;
-    }
 
     private static void Join(int[] roots, int first, int second)
     {

@@ -124,12 +124,11 @@ public class StepDeterminismTests
         var rooms = Enumerable.Range(0, RoomCount)
             .Select(i => TestShapes.Placed(Mod, i, Boulder.Ref, RandomGridPoint(random)))
             .ToList();
-        var protection = Protection.Build(targets, [], TestTargets.References(targets.Count));
 
-        var sequential = SelectLeftovers(targets, visibility, rooms, protection, removed, SequentialThreads);
-        var parallel = SelectLeftovers(targets, visibility, rooms, protection, removed, ParallelThreads);
+        var sequential = SelectLeftovers(targets, visibility, rooms, removed, SequentialThreads);
+        var parallel = SelectLeftovers(targets, visibility, rooms, removed, ParallelThreads);
 
-        Assert.NotEmpty(sequential.Removals);
+        Assert.NotEqual(0, sequential.RemovedCount);
         Assert.Contains(sequential.Evaluations, evaluation => evaluation.ContainingObject != null);
         Assert.Equal(DescribeEvaluations(sequential), DescribeEvaluations(parallel));
     }
@@ -170,8 +169,8 @@ public class StepDeterminismTests
     }
 
     private static LeftoverResult SelectLeftovers(
-        List<TargetObject> targets, List<ObjectVisibility> visibility, List<OtherObject> rooms, Protection protection, HashSet<int> removed, int threads) =>
-        TestLeftovers.CreateSelector(targets, visibility, Shapes, rooms, protection, CreateLeftoverConfig())
+        List<TargetObject> targets, List<ObjectVisibility> visibility, List<OtherObject> rooms, HashSet<int> removed, int threads) =>
+        TestLeftovers.CreateSelector(targets, visibility, Shapes, rooms, CreateLeftoverConfig())
             .SelectRemovals(removed, Options(threads));
 
     /// <summary>A grid of tables close enough that some touch, items (some stacked) on most of them, random links and seeds.</summary>

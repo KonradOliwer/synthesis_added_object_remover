@@ -11,16 +11,6 @@ namespace AddedObjectRemover;
 /// </summary>
 internal sealed class RemovalPipeline
 {
-    private sealed record TooCloseSelection(List<TooCloseRemoval> Removals, List<KeptTarget> Kept)
-    {
-        public List<int> KeptIndices => Kept.Select(kept => kept.TargetIndex).ToList();
-    }
-
-    private sealed record FollowUpRemovals(IReadOnlyList<Removal> Removals, IReadOnlyList<KeptTarget> Kept)
-    {
-        public static FollowUpRemovals None { get; } = new([], []);
-    }
-
     private readonly IPatcherState<ISkyrimMod, ISkyrimModGetter> _state;
     private readonly RunConfig _config;
     private readonly ModFacts _mods;
@@ -75,34 +65,36 @@ internal sealed class RemovalPipeline
         var protection = Protection.Build(world.Targets, world.Links, world.References);
         RunReport.PrintLinkedGroups(protection.Groups, world.Counts.TargetPluginLinks);
         var supporters = new SupporterIndex(GroupSupportersBySpace(world), _shapes, _parallelOptions);
-        var tooClose = SelectTooCloseRemovals(world, visibility, indexes, replacements, protection);
-        List<Removal> removals = [.. tooClose.Removals];
-        AddLinkedRemovals(removals, tooClose.Removals, protection.Groups, "too-close");
-        var followUp = SelectFollowUpRemovals(snapshot, visibility, removals.ToList(), tooClose, supporters, protection);
-        removals.AddRange(followUp.Removals);
-        RunReport.PrintLinkedRemovals(followUp.Removals.Count(removal => removal is LinkedRemoval), "follow-up");
-        var leftovers = SelectLeftoverRemovals(world, visibility, indexes, replacements, removals, protection);
-        removals.AddRange(leftovers.Removals);
-        AddLinkedRemovals(removals, leftovers.Removals, protection.Groups, "leftover invisible object");
-        var relocations = RelocateKeptMarkers(snapshot, visibility, supporters, removals, leftovers);
+        var ledger = Ledger.Start(protection, world.Targets.Length);
+        ledger = DecideTooClose(world, visibility, indexes, replacements, ledger);
+        PrintLinkedRemovals(ledger, "too-close");
+        ledger = DecideFollowUp(snapshot, visibility, supporters, protection, ledger);
+        PrintLinkedRemovals(ledger, "follow-up");
+        var (final, leftovers) = DecideLeftovers(world, visibility, indexes, replacements, ledger);
+        PrintLinkedRemovals(final, "leftover invisible object");
+
+        var report = new LedgerReport(final, world, leftovers);
+        var removals = report.Removals();
+        var relocations = RelocateKeptMarkers(snapshot, visibility, supporters, final, leftovers);
         WriteLeftoverDiagnostics(world, leftovers, relocations);
         WriteOverrides(snapshot, removals, relocations.Moved);
         RunReport.PrintBoundsIndexTimes(indexes.Values, supporters.GetIndexedSpaces());
 
-        List<KeptTarget> kept = [.. tooClose.Kept, .. followUp.Kept, .. leftovers.Kept];
+        var kept = report.Kept();
         PrintFinalReport(world, indexes, removals, kept);
         ReportManualPatchHints(world, visibility, removals, kept, new ManualPatchHints(world.Targets, visibility, protection));
         Console.WriteLine($"Done in {totalTimer.Elapsed.TotalSeconds:F1}s.");
     }
 
-    /// <summary>Removes the rest of the linked groups of one step's removals, so the next steps see them removed.</summary>
-    /// <param name="removals">Every removal so far, <paramref name="decided"/> included; the linked removals are appended.</param>
-    private static void AddLinkedRemovals(List<Removal> removals, IEnumerable<Removal> decided, LinkedGroups groups, string step)
-    {
-        var linked = groups.CollectLinkedRemovals(decided, ToTargetIndices(removals));
-        removals.AddRange(linked);
-        RunReport.PrintLinkedRemovals(linked.Count, step);
-    }
+    /// <summary>How many objects the ledger's newest round removed as linked to its own removals.</summary>
+    private static void PrintLinkedRemovals(Ledger ledger, string step) =>
+        RunReport.PrintLinkedRemovals(LedgerReport.CountLinkedIn(ledger, ledger.Rounds[^1]), step);
+
+    private static void PrintKeptInNewestRound(World world, Ledger ledger) =>
+        RunReport.PrintKept(world, LedgerReport.KeptIn(ledger, ledger.Rounds[^1]));
+
+    private static HashSet<int> CollectRemoved(Ledger ledger) =>
+        ledger.All().Where(entry => entry.Verdict is Verdict.Removed).Select(entry => entry.Target.Index).ToHashSet();
 
     private GameSnapshot ScanLoadOrder()
     {
@@ -164,12 +156,13 @@ internal sealed class RemovalPipeline
         return replacements;
     }
 
-    private TooCloseSelection SelectTooCloseRemovals(
+    /// <returns>The ledger with the too-close round.</returns>
+    private Ledger DecideTooClose(
         World world,
         IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
         Replacements replacements,
-        Protection protection)
+        Ledger ledger)
     {
         var timer = Stopwatch.StartNew();
         var npcRule = CreateNpcClashRule(world, visibility, indexes, replacements);
@@ -185,9 +178,11 @@ internal sealed class RemovalPipeline
         RunReport.PrintInvisibleOthers(_invisibleOthers, _config.DetailedLog);
         PrintNpcHandling(npcRule, indexes);
 
-        var selection = SplitByProtection(hits, protection);
-        RunReport.PrintKept(world, selection.Kept);
-        return selection;
+        var next = ledger.Apply(
+            RoundKind.TooClose,
+            [.. hits.Select(hit => new Proposal(new TargetId(hit.TargetIndex), new Cause.TooClose(hit.TooCloseTo.Id)))]);
+        PrintKeptInNewestRound(world, next);
+        return next;
     }
 
     private NpcClashRule CreateNpcClashRule(
@@ -229,67 +224,65 @@ internal sealed class RemovalPipeline
         return hits;
     }
 
-    private static TooCloseSelection SplitByProtection(IEnumerable<TooCloseHit> hits, Protection protection)
-    {
-        var selection = new TooCloseSelection([], []);
-        foreach (var hit in hits)
-        {
-            if (protection.TryGetKeepReason(hit.TargetIndex, out var reason))
-            {
-                selection.Kept.Add(new KeptTarget(hit.TargetIndex, reason, TouchedTargetIndex: null));
-            }
-            else
-            {
-                selection.Removals.Add(new TooCloseRemoval(hit.TargetIndex, hit.TooCloseTo));
-            }
-        }
-        return selection;
-    }
-
-    /// <param name="seeds">The too-close removals and their linked groups.</param>
-    /// <returns>The follow-up removals, with the linked groups of each.</returns>
-    private FollowUpRemovals SelectFollowUpRemovals(
+    /// <summary>
+    /// The follow-up round, seeded with the too-close round's removals. The follow-up step still
+    /// removes linked groups itself; only its own removals and held objects are proposed, and the
+    /// ledger spreads the removals to their groups.
+    /// </summary>
+    /// <returns>The ledger with the follow-up round.</returns>
+    private Ledger DecideFollowUp(
         GameSnapshot snapshot,
         IReadOnlyList<ObjectVisibility> visibility,
-        IReadOnlyList<Removal> seeds,
-        TooCloseSelection tooClose,
         SupporterIndex supporters,
-        Protection protection)
+        Protection protection,
+        Ledger ledger)
     {
-        if (seeds.Count == 0) return FollowUpRemovals.None;
+        var tooCloseRound = ledger.Rounds[^1];
+        var seeds = ledger.RemovedIn(tooCloseRound).Select(target => target.Index).ToList();
+        var keptTooClose = ledger.HeldIn(tooCloseRound).Select(target => target.Index).ToList();
+        if (seeds.Count == 0) return ledger.Apply(RoundKind.FollowUp, []);
         return _config.FollowUpMode switch
         {
-            FollowUpRemovalMode.Nothing => FollowUpRemovals.None,
-            FollowUpRemovalMode.EverythingTouching => SelectTouchingRemovals(snapshot.World, visibility, seeds, tooClose, protection),
-            FollowUpRemovalMode.ObjectsSupportedByIt => SelectUnanchoredRemovals(snapshot, visibility, seeds, tooClose, supporters, protection),
+            FollowUpRemovalMode.Nothing => ledger.Apply(RoundKind.FollowUp, []),
+            FollowUpRemovalMode.EverythingTouching => DecideTouching(snapshot.World, visibility, seeds, keptTooClose, protection, ledger),
+            FollowUpRemovalMode.ObjectsSupportedByIt => DecideUnanchored(snapshot, visibility, seeds, keptTooClose, supporters, protection, ledger),
             _ => throw new UnreachableException($"Unknown follow-up removal mode {_config.FollowUpMode}."),
         };
     }
 
-    private FollowUpRemovals SelectTouchingRemovals(
+    private Ledger DecideTouching(
         World world,
         IReadOnlyList<ObjectVisibility> visibility,
-        IReadOnlyList<Removal> seeds,
-        TooCloseSelection tooClose,
-        Protection protection)
+        IReadOnlyList<int> seeds,
+        IReadOnlyList<int> keptTooClose,
+        Protection protection,
+        Ledger ledger)
     {
         var clusters = TouchClusterFinder.Find(
             world.Targets,
             visibility,
-            ToTargetIndexList(seeds),
-            tooClose.KeptIndices,
+            seeds,
+            keptTooClose,
             _shapes,
             _meshCache,
             protection,
             _config.TouchDistance,
             _parallelOptions,
             collectDiagnostics: _config.WritesDiagnostics);
-        RunReport.PrintKept(world, clusters.Kept);
+        var next = ledger.Apply(RoundKind.FollowUp,
+        [
+            .. clusters.Removals.OfType<TouchingRemoval>().Select(removal => ProposeTouching(removal.TargetIndex, removal.TouchedTargetIndex)),
+            .. clusters.Kept.Select(kept => ProposeTouching(kept.TargetIndex, kept.TouchedTargetIndex!.Value)),
+        ]);
+        PrintKeptInNewestRound(world, next);
         _meshMessages.PrintAndClear();
         RunReport.PrintTouchStats(clusters);
-        WriteTouchDiagnostics(world, seeds, clusters);
-        return new FollowUpRemovals(clusters.Removals, clusters.Kept);
+        WriteTouchDiagnostics(world, new LedgerReport(next, world, LeftoverResult.None).RemovalsIn(next.Rounds[0]).ToList(), clusters);
+        return next;
     }
+
+    private static Proposal ProposeTouching(int target, int touched) =>
+        new(new TargetId(target), new Cause.Touching(new TargetId(touched)));
 
     private void WriteTouchDiagnostics(World world, IReadOnlyList<Removal> seeds, TouchClusters clusters)
     {
@@ -304,20 +297,21 @@ internal sealed class RemovalPipeline
         });
     }
 
-    private FollowUpRemovals SelectUnanchoredRemovals(
+    private Ledger DecideUnanchored(
         GameSnapshot snapshot,
         IReadOnlyList<ObjectVisibility> visibility,
-        IReadOnlyList<Removal> seeds,
-        TooCloseSelection tooClose,
+        IReadOnlyList<int> seeds,
+        IReadOnlyList<int> keptTooClose,
         SupporterIndex supporters,
-        Protection protection)
+        Protection protection,
+        Ledger ledger)
     {
         var world = snapshot.World;
         var anchoring = AnchoringRemover.Run(
             world.Targets,
             visibility,
-            ToTargetIndexList(seeds),
-            tooClose.KeptIndices,
+            seeds,
+            keptTooClose,
             supporters,
             snapshot.Terrain,
             _shapes,
@@ -326,12 +320,19 @@ internal sealed class RemovalPipeline
             _config.TouchDistance,
             _config.AnchoringThreshold,
             _parallelOptions);
-        RunReport.PrintKept(world, anchoring.Kept);
+        var next = ledger.Apply(RoundKind.FollowUp,
+        [
+            .. anchoring.Removals.OfType<AnchoringRemoval>().Select(removal => new Proposal(
+                new TargetId(removal.TargetIndex),
+                new Cause.LostSupport(removal.RemovedShare, new TargetId(removal.MainRemovedSupporter)))),
+            .. anchoring.Kept.Select(kept => ProposeTouching(kept.TargetIndex, kept.TouchedTargetIndex!.Value)),
+        ]);
+        PrintKeptInNewestRound(world, next);
         _meshMessages.PrintAndClear();
         RunReport.PrintAnchoringStats(anchoring);
         WriteAnchoringDiagnostics(world, supporters, anchoring);
         WriteMeshOrigins(world.Targets);
-        return new FollowUpRemovals(anchoring.Removals, anchoring.Kept);
+        return next;
     }
 
     private void WriteAnchoringDiagnostics(World world, SupporterIndex supporters, AnchoringResult anchoring)
@@ -360,15 +361,15 @@ internal sealed class RemovalPipeline
         });
     }
 
-    private LeftoverResult SelectLeftoverRemovals(
+    /// <returns>The final ledger, with the leftover round, and the leftover evaluations joined with its verdicts.</returns>
+    private (Ledger Final, LeftoverResult Leftovers) DecideLeftovers(
         World world,
         IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
         Replacements replacements,
-        IReadOnlyList<Removal> earlierRemovals,
-        Protection protection)
+        Ledger ledger)
     {
-        if (!_config.Leftovers.Enabled) return LeftoverResult.None;
+        if (!_config.Leftovers.Enabled) return (ledger.Apply(RoundKind.Leftover, []), LeftoverResult.None);
 
         var timer = Stopwatch.StartNew();
         var hosts = Hosts.Find(world.Targets, visibility, indexes, _containment, replacements, _parallelOptions);
@@ -378,34 +379,28 @@ internal sealed class RemovalPipeline
             _shapes,
             hosts,
             new InvisibleObjectReach(_state.LinkCache, _shapes),
-            protection,
             _config.Leftovers);
-        var leftovers = selector.SelectRemovals(ToTargetIndices(earlierRemovals), _parallelOptions);
-        RunReport.PrintKept(world, leftovers.Kept);
+        var evaluated = selector.SelectRemovals(CollectRemoved(ledger), _parallelOptions);
+        var final = ledger.Apply(RoundKind.Leftover, evaluated.Proposals);
+        var leftovers = evaluated.WithVerdicts(final);
+        PrintKeptInNewestRound(world, final);
         _meshMessages.PrintAndClear();
         if (_config.DetailedLog) RunReport.PrintLeftoverDecisions(world, leftovers.Evaluations);
         RunReport.PrintLeftoverStats(leftovers, timer.Elapsed);
-        return leftovers;
+        return (final, leftovers);
     }
 
-    private static HashSet<int> ToTargetIndices(IEnumerable<Removal> removals) =>
-        removals.Select(removal => removal.TargetIndex).ToHashSet();
-
-    private static List<int> ToTargetIndexList(IEnumerable<Removal> removals) =>
-        removals.Select(removal => removal.TargetIndex).ToList();
-
-    /// <param name="removals">Every removal of the run.</param>
     private RelocationResult RelocateKeptMarkers(
         GameSnapshot snapshot,
         IReadOnlyList<ObjectVisibility> visibility,
         SupporterIndex supporters,
-        IReadOnlyList<Removal> removals,
+        Ledger final,
         LeftoverResult leftovers)
     {
         if (!_config.Leftovers.MovesKeptMarkers) return RelocationResult.None;
 
-        var relocator = CreateRelocator(snapshot, CreateObstacles(snapshot.World, visibility, supporters, removals));
-        var removed = ToTargetIndices(removals);
+        var removed = CollectRemoved(final);
+        var relocator = CreateRelocator(snapshot, CreateObstacles(snapshot.World, visibility, supporters, removed));
         var keptEvaluations = leftovers.Evaluations.Where(evaluation => !removed.Contains(evaluation.TargetIndex)).ToList();
         var relocations = relocator.Relocate(keptEvaluations, _parallelOptions);
         _meshMessages.PrintAndClear();
@@ -417,9 +412,9 @@ internal sealed class RemovalPipeline
         World world,
         IReadOnlyList<ObjectVisibility> visibility,
         SupporterIndex supporters,
-        IReadOnlyList<Removal> removals)
+        IReadOnlySet<int> removed)
     {
-        var remainingVisible = ObjectVisibility.VisibleIndices(visibility, except: ToTargetIndices(removals));
+        var remainingVisible = ObjectVisibility.VisibleIndices(visibility, except: removed);
         return new VisibleObstacles(supporters, VisibleTargetIndex.Build(world.Targets, remainingVisible, _shapes), _containment, _shapes);
     }
 

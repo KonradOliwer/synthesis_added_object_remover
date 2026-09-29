@@ -82,8 +82,9 @@ public class LeftoverDecisionTests
                 new Dictionary<int, KeepReason> { [referencedMarkerInRoom] = new(KeepKind.NonPlacedReference, "QUST record", "linked from QUST") }));
         var room = TestShapes.Placed(OtherMod, 0, Room.Ref, inRoom);
 
-        var result = TestLeftovers.CreateSelector(targets, visibility, Shapes, [room], protection, Config(protectedKinds: InvisibleObjectKind.Lights))
+        var evaluated = TestLeftovers.CreateSelector(targets, visibility, Shapes, [room], Config(protectedKinds: InvisibleObjectKind.Lights))
             .SelectRemovals(new HashSet<int>(), new ParallelOptions());
+        var result = TestLeftovers.DecideWithLedger(evaluated, protection, targets.Count);
 
         var decisions = result.Evaluations.ToDictionary(evaluation => evaluation.TargetIndex);
         Assert.Equal(LeftoverDecision.KeptProtectedType, decisions[protectedLightInRoom].Decision);
@@ -92,7 +93,7 @@ public class LeftoverDecisionTests
         Assert.Equal(LeftoverDecision.RemovedInsideOtherObject, decisions[markerInRoom].Decision);
         Assert.Null(decisions[markerInRoom].KeepReason);
         Assert.Equal(LeftoverDecision.KeptTooFewSurroundingObjects, decisions[protectedLightAlone].Decision);
-        Assert.Equal(markerInRoom, Assert.Single(result.Removals).TargetIndex);
+        Assert.Equal(markerInRoom, Assert.Single(result.Evaluations, evaluation => evaluation.IsRemoved).TargetIndex);
     }
 
     /// <summary>The first <paramref name="removed"/> of <paramref name="occupied"/> directions fully removed, the rest fully kept.</summary>

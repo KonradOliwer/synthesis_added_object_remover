@@ -4,7 +4,8 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 
 /// <summary>
 /// Removes what depends on timing, thread count or the machine from a run's output: performance
-/// lines are dropped, durations and the run's temporary folder are replaced by placeholders.
+/// lines are dropped, durations and the run's temporary folder are replaced by placeholders, and path separators are
+/// written as '/' so the text is the same on every platform.
 /// </summary>
 internal static partial class OutputMasks
 {
@@ -49,5 +50,5 @@ internal static partial class OutputMasks
         prefixes.Any(prefix => line.StartsWith(prefix, StringComparison.Ordinal));
 
     private static string MaskRoot(string line, string root) =>
-        line.Replace(root, RootPlaceholder, StringComparison.OrdinalIgnoreCase);
+        line.Replace(root, RootPlaceholder, StringComparison.OrdinalIgnoreCase).Replace('\\', '/');
 }

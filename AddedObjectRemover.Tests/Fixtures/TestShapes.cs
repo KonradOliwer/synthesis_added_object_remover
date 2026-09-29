@@ -45,7 +45,7 @@ internal static class TestShapes
     {
         var nif = TestNifs.CreateWithRoot();
         TestNifs.AddShape(nif, TestNifs.Root(nif), triangles);
-        var meshPath = Path.Combine(dataPath, MeshFileSource.NormalizeMeshPath(model));
+        var meshPath = Path.Combine(dataPath, MeshFileSource.NormalizeMeshPath(model).Replace('\\', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(Path.GetDirectoryName(meshPath)!);
         File.WriteAllBytes(meshPath, TestNifs.Save(nif));
     }

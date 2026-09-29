@@ -43,6 +43,6 @@ internal static class TestNpcs
         };
 
     public static OtherObject Place(ModKey mod, int index, FormKey npc, Vector3 position, P3Float rotation) =>
-        new(new FormKey(mod, 0x900 + (uint)index), mod, EditorId: null, new BaseRef(npc, typeof(INpcGetter)), position, rotation, 1f,
+        new(new OtherId(index), new FormKey(mod, 0x900 + (uint)index), TestTargets.Space, mod, EditorId: null, new BaseRef(npc, typeof(INpcGetter)), position, rotation, 1f,
             IsPrimitive: false, HasMapMarker: false);
 }

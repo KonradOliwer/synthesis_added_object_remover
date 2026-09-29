@@ -15,15 +15,28 @@ internal static class TestLeftovers
         IReadOnlyList<ObjectVisibility> visibility,
         BaseObjectShapeProvider shapes,
         IReadOnlyList<OtherObject> others,
-        KeepReferencedRule keepRule,
+        Protection protection,
         LeftoverConfig config) =>
         new(
             targets,
             visibility,
             shapes,
-            new Dictionary<FormKey, OtherObjectIndex> { [TestTargets.Space] = OtherObjectIndex.CreateUncounted(others, shapes, new ParallelOptions()) },
-            new ObjectContainment(shapes, new TriangleTreeCache(shapes.ReadGeometry)),
+            FindHosts(targets, visibility, shapes, others),
             new InvisibleObjectReach(new SkyrimMod(ReachRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache(), shapes),
-            keepRule,
+            protection,
             config);
+
+    private static Hosts FindHosts(
+        IReadOnlyList<TargetObject> targets,
+        IReadOnlyList<ObjectVisibility> visibility,
+        BaseObjectShapeProvider shapes,
+        IReadOnlyList<OtherObject> others)
+    {
+        var indexes = new Dictionary<FormKey, OtherObjectIndex>
+        {
+            [TestTargets.Space] = OtherObjectIndex.CreateUncounted(others, shapes, new ParallelOptions()),
+        };
+        var containment = new ObjectContainment(shapes, new TriangleTreeCache(shapes.ReadGeometry));
+        return Hosts.Find(targets, visibility, indexes, containment, Replacements.None(others.Count), new ParallelOptions());
+    }
 }

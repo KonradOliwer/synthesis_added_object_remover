@@ -32,6 +32,7 @@ internal sealed class NpcStuckSearch
     private readonly IReadOnlyList<TargetObject> _targets;
     private readonly IReadOnlyDictionary<FormKey, OtherObjectIndex> _indexes;
     private readonly Dictionary<FormKey, PlacedNpcIndex> _npcIndexes;
+    private readonly Replacements _replacements;
     private readonly BaseObjectShapeProvider _shapes;
     private readonly TriangleTreeCache _meshCache;
     private readonly LazyCache<FormKey, MeshTriangleTree> _targetBoxTrees = new();
@@ -44,12 +45,14 @@ internal sealed class NpcStuckSearch
         IReadOnlyList<TargetObject> targets,
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
         Dictionary<FormKey, PlacedNpcIndex> npcIndexes,
+        Replacements replacements,
         BaseObjectShapeProvider shapes,
         TriangleTreeCache meshCache)
     {
         _targets = targets;
         _indexes = indexes;
         _npcIndexes = npcIndexes;
+        _replacements = replacements;
         _shapes = shapes;
         _meshCache = meshCache;
     }
@@ -60,6 +63,7 @@ internal sealed class NpcStuckSearch
         IReadOnlyList<TargetObject> targets,
         IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
+        Replacements replacements,
         NpcBodyCache bodies,
         BaseObjectShapeProvider shapes,
         TriangleTreeCache meshCache,
@@ -72,7 +76,7 @@ internal sealed class NpcStuckSearch
             if (!visibility[i].IsVisible || npcIndexes.ContainsKey(spaceKey)) continue;
             npcIndexes[spaceKey] = PlacedNpcIndex.Build(indexes[spaceKey], bodies, parallelOptions);
         }
-        return new NpcStuckSearch(targets, indexes, npcIndexes, shapes, meshCache);
+        return new NpcStuckSearch(targets, indexes, npcIndexes, replacements, shapes, meshCache);
     }
 
     public NpcStuckSummary GetSummary()
@@ -119,13 +123,13 @@ internal sealed class NpcStuckSearch
     }
 
     /// <summary>Fills <see cref="NpcScratch.Candidates"/> with the not replaced NPC slots whose body box overlaps the target's real box.</summary>
-    private static void CollectCandidates(PlacedNpcIndex npcs, OtherObjectIndex others, OrientedBox realBox, NpcScratch scratch)
+    private void CollectCandidates(PlacedNpcIndex npcs, OtherObjectIndex others, OrientedBox realBox, NpcScratch scratch)
     {
         npcs.Collect(realBox.WorldAabb(0f), scratch.Slots);
         scratch.Candidates.Clear();
         foreach (var slot in scratch.Slots)
         {
-            if (others.IsReplaced(npcs.OtherIndexOf(slot)) || !realBox.Intersects(npcs.WorldBoxOf(slot), 0f)) continue;
+            if (_replacements.IsReplaced(others[npcs.OtherIndexOf(slot)].Id) || !realBox.Intersects(npcs.WorldBoxOf(slot), 0f)) continue;
             scratch.Candidates.Add(slot);
         }
     }

@@ -1,20 +1,16 @@
+using System.Diagnostics.CodeAnalysis;
 using Mutagen.Bethesda.Plugins;
-using Mutagen.Bethesda.Skyrim;
-using Mutagen.Bethesda.Synthesis;
 
 namespace AddedObjectRemover;
 
 /// <summary>Validated settings of one run.</summary>
 /// <param name="AnchoringThreshold">Fraction (0-1) of an object's support that must come from removed objects for ObjectsSupportedByIt to remove it.</param>
 /// <param name="WritesDiagnostics">Whether report files (CSVs) are written; DiagnosticsFolder is resolved regardless so the folder can be shown in the log.</param>
+/// <param name="ExcludedPlugins">As the settings name them, loaded or not.</param>
 internal sealed record RunConfig(
     ModKey Target,
-    ISkyrimModGetter? TargetMod,
-    HashSet<ModKey> IgnoredOrigins,
     IReadOnlyList<ModKey> ExcludedPlugins,
-    IReadOnlyList<ModKey> TargetMasters,
-    bool IgnoreTargetMasters,
-    CompatibilityPatches CompatibilityPatches,
+    StandingOptions Standing,
     NpcHandling NpcHandling,
     float SizeMultiplier,
     ZoneShape ZoneShape,
@@ -45,18 +41,6 @@ internal sealed record LeftoverConfig(
 
 internal static class RunConfigFactory
 {
-    /// <summary>Base game plugins never count as "other mods". Creation Club plugins deliberately are not listed.</summary>
-    private static readonly ModKey[] BaseGamePlugins =
-    [
-        ModKey.FromNameAndExtension("Skyrim.esm"),
-        ModKey.FromNameAndExtension("Update.esm"),
-        ModKey.FromNameAndExtension("Dawnguard.esm"),
-        ModKey.FromNameAndExtension("HearthFires.esm"),
-        ModKey.FromNameAndExtension("Dragonborn.esm"),
-    ];
-
-    private static readonly HashSet<ModKey> BaseGamePluginSet = BaseGamePlugins.ToHashSet();
-
     private const float MaxSizeMultiplier = 5f;
     private const float MaxTouchDistance = 64f;
     private const float MinSearchRadius = 64f;
@@ -67,35 +51,28 @@ internal static class RunConfigFactory
     private const int PercentStep = 10;
 
     /// <summary>Null (after logging why) when the run must make no changes.</summary>
-    public static RunConfig? Create(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, Settings settings)
+    public static RunConfig? Create(Settings settings, ModFacts mods, string outputPath)
     {
         var check = settings.WhatToCheck ?? new CheckSettings();
-        if (!TryFindTarget(state, check.TargetPlugin, out var target, out var targetMod)) return null;
+        if (!TryFindTarget(mods, check.TargetPlugin, out var target, out var targetListing)) return null;
 
         var ignore = settings.WhatToIgnore ?? new IgnoreSettings();
         var excluded = ParseExcludedPlugins(ignore.ExcludedPlugins ?? []);
-        var allTargetMasters = GetTargetMasters(target, targetMod);
-        var masters = ignore.IgnoreTargetMasters ? allTargetMasters : [];
-        var ignored = new HashSet<ModKey>(BaseGamePlugins) { target, state.PatchMod.ModKey };
-        ignored.UnionWith(excluded);
-        ignored.UnionWith(masters);
-
-        var compatibilityPatches = ignore.IgnoreModsPatchedWithTarget
-            ? CompatibilityPatchDetector.Find(
-                state.LoadOrder.ListedOrder, target, state.PatchMod.ModKey, allTargetMasters.ToHashSet(), BaseGamePluginSet,
-                Clamp(ignore.MaxOtherMastersForPatch, MinOtherMastersForPatch, MaxOtherMastersForPatch, "maximum other masters for a patch"))
-            : CompatibilityPatches.None;
-        ignored.UnionWith(compatibilityPatches.CollectIgnoredMods());
+        WarnIfMastersUnreadable(mods, targetListing);
+        var standing = new StandingOptions(
+            targetListing.Mod,
+            [.. excluded.Select(mods.Mods.Find).OfType<ModRef>()],
+            ignore.IgnoreTargetMasters,
+            ignore.IgnoreModsPatchedWithTarget,
+            ignore.IgnoreModsPatchedWithTarget
+                ? Clamp(ignore.MaxOtherMastersForPatch, MinOtherMastersForPatch, MaxOtherMastersForPatch, "maximum other masters for a patch")
+                : ignore.MaxOtherMastersForPatch);
 
         var followUp = settings.FollowUpRemoval ?? new FollowUpRemovalSettings();
         return new RunConfig(
             Target: target,
-            TargetMod: targetMod,
-            IgnoredOrigins: ignored,
             ExcludedPlugins: excluded,
-            TargetMasters: masters,
-            IgnoreTargetMasters: ignore.IgnoreTargetMasters,
-            CompatibilityPatches: compatibilityPatches,
+            Standing: standing,
             NpcHandling: ValidateNpcHandling(ignore.NpcHandling),
             SizeMultiplier: Clamp(check.SizeMultiplier, 0, MaxSizeMultiplier, CheckSettings.DefaultSizeMultiplier, "size multiplier"),
             ZoneShape: ValidateZoneShape(check.ZoneShape),
@@ -107,7 +84,7 @@ internal static class RunConfigFactory
             Leftovers: CreateLeftoverConfig(settings.LeftoverInvisibleObjects ?? new LeftoverInvisibleObjectSettings()),
             DetailedLog: settings.Diagnostics?.DetailedLog ?? false,
             WritesDiagnostics: settings.Diagnostics?.WriteReportFiles ?? false,
-            DiagnosticsFolder: ResolveReportFolder(state, settings));
+            DiagnosticsFolder: ResolveReportFolder(outputPath, settings));
     }
 
     private static LeftoverConfig CreateLeftoverConfig(LeftoverInvisibleObjectSettings leftovers)
@@ -125,11 +102,11 @@ internal static class RunConfigFactory
     }
 
     /// <summary>A rooted path is used as is; a relative one is resolved against the output plugin's folder.</summary>
-    public static string ResolveReportFolder(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, Settings settings)
+    public static string ResolveReportFolder(string outputPath, Settings settings)
     {
         var folder = ValidateFolder(settings.Diagnostics?.DiagnosticsFolder?.Trim());
         if (Path.IsPathRooted(folder)) return folder;
-        var outputDirectory = Path.GetDirectoryName(state.OutputPath.Path) ?? string.Empty;
+        var outputDirectory = Path.GetDirectoryName(outputPath) ?? string.Empty;
         return Path.Combine(outputDirectory, folder);
     }
 
@@ -143,12 +120,12 @@ internal static class RunConfigFactory
     }
 
     private static bool TryFindTarget(
-        IPatcherState<ISkyrimMod, ISkyrimModGetter> state,
+        ModFacts mods,
         string? targetPlugin,
         out ModKey target,
-        out ISkyrimModGetter? targetMod)
+        [NotNullWhen(true)] out ModListing? targetListing)
     {
-        targetMod = null;
+        targetListing = null;
         if (string.IsNullOrWhiteSpace(targetPlugin))
         {
             target = default;
@@ -160,14 +137,12 @@ internal static class RunConfigFactory
             Console.WriteLine($"Target plugin '{targetPlugin}' is not a valid plugin file name. No changes made.");
             return false;
         }
-        var key = target;
-        var listing = state.LoadOrder.ListedOrder.FirstOrDefault(listing => listing.ModKey == key);
-        if (listing == null)
+        targetListing = mods.Mods.Find(target) is { } mod ? mods.Find(mod) : null;
+        if (targetListing == null)
         {
             Console.WriteLine($"Target plugin {target} is not in the load order. No changes made.");
             return false;
         }
-        targetMod = listing.Mod;
         return true;
     }
 
@@ -189,14 +164,9 @@ internal static class RunConfigFactory
         return excluded;
     }
 
-    private static List<ModKey> GetTargetMasters(ModKey target, ISkyrimModGetter? targetMod)
+    private static void WarnIfMastersUnreadable(ModFacts mods, ModListing targetListing)
     {
-        if (targetMod == null)
-        {
-            Console.WriteLine($"Warning: could not read {target} to find its masters.");
-            return [];
-        }
-        return targetMod.MasterReferences.Select(master => master.Master).ToList();
+        if (!targetListing.Loaded) Console.WriteLine($"Warning: could not read {mods.Mods.KeyOf(targetListing.Mod)} to find its masters.");
     }
 
     private static ZoneShape ValidateZoneShape(ZoneShape zoneShape)

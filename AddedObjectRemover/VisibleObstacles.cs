@@ -14,7 +14,7 @@ internal sealed class VisibleObstacles(
     BaseObjectShapeProvider shapes)
 {
     public bool IsInsideAny(FormKey spaceKey, Vector3 point, SpatialQueryScratch scratch) =>
-        containment.FindContainingVisible(nonTargetObjects.GetSpace(spaceKey), point, skipReplaced: false, scratch) >= 0
+        containment.FindContainingVisible(nonTargetObjects.GetSpace(spaceKey), point, replacements: null, scratch) >= 0
         || remainingTargets.AnyContains(spaceKey, point, containment, scratch);
 
     /// <summary>

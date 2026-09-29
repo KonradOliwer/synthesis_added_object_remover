@@ -46,8 +46,7 @@ internal sealed record TouchDiagnosticsData(
 /// </summary>
 internal sealed class TouchClusterFinder
 {
-    private readonly LinkedGroups _groups;
-    private readonly KeepReferencedRule _keepRule;
+    private readonly Protection _protection;
     private readonly TouchSearch _search;
     private readonly ParallelOptions _parallelOptions;
     private readonly bool[] _isSeed;
@@ -69,15 +68,13 @@ internal sealed class TouchClusterFinder
 
     private TouchClusterFinder(
         int targetCount,
-        LinkedGroups groups,
-        KeepReferencedRule keepRule,
+        Protection protection,
         TouchSearch search,
         ParallelOptions parallelOptions,
         bool[] isSeed,
         bool[] visited)
     {
-        _groups = groups;
-        _keepRule = keepRule;
+        _protection = protection;
         _search = search;
         _parallelOptions = parallelOptions;
         _isSeed = isSeed;
@@ -97,10 +94,9 @@ internal sealed class TouchClusterFinder
         IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyList<int> seeds,
         IReadOnlyList<int> keptTooClose,
-        LinkedGroups groups,
         BaseObjectShapeProvider shapes,
         TriangleTreeCache meshCache,
-        KeepReferencedRule keepRule,
+        Protection protection,
         float tolerance,
         ParallelOptions parallelOptions,
         bool collectDiagnostics)
@@ -108,7 +104,7 @@ internal sealed class TouchClusterFinder
         var (search, setup) = Timing.Measure(() => TouchSearch.Create(
             targets,
             visibility,
-            groups.CollectReachableSpaces(targets, seeds),
+            protection.Groups.CollectReachableSpaces(targets, seeds),
             excluded: keptTooClose,
             shapes,
             meshCache,
@@ -116,8 +112,7 @@ internal sealed class TouchClusterFinder
             parallelOptions));
         var finder = new TouchClusterFinder(
             targets.Count,
-            groups,
-            keepRule,
+            protection,
             search,
             parallelOptions,
             MarkAll(targets.Count, seeds),
@@ -190,7 +185,7 @@ internal sealed class TouchClusterFinder
                 continue;
             }
 
-            if (_keepRule.TryGetKeepReason(to, out var keepReason))
+            if (_protection.TryGetKeepReason(to, out var keepReason))
             {
                 _kept.Add(new KeptTarget(to, keepReason, TouchedTargetIndex: from));
                 continue;
@@ -208,7 +203,7 @@ internal sealed class TouchClusterFinder
     /// <remarks>A group shares its keep reason, so the members of a removed node's group are never kept.</remarks>
     private void RemoveLinkedPartners(int removed, int componentId, List<int> next, ref int componentSize)
     {
-        foreach (var partner in _groups.MembersOf(removed))
+        foreach (var partner in _protection.Groups.MembersOf(removed))
         {
             if (_visited[partner] || _isSeed[partner]) continue;
             _visited[partner] = true;

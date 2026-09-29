@@ -4,6 +4,9 @@ using Mutagen.Bethesda.Skyrim;
 
 namespace AddedObjectRemover;
 
+/// <summary>A form link from one target-plugin placed record, a checked target object, to another target-plugin FormKey.</summary>
+internal readonly record struct TargetPluginLink(FormKey Source, FormKey Linked);
+
 /// <summary>
 /// Records the links to target-plugin objects. A link from a checked target object to another
 /// target-plugin FormKey joins a linked group; any other link keeps the linked object: from other
@@ -27,7 +30,7 @@ internal static class TargetReferenceCollector
         bool isTargetObject,
         ModKey target,
         Dictionary<FormKey, KeepReason> references,
-        List<TargetLink> links)
+        List<TargetPluginLink> links)
     {
         var baseKey = record.GetBaseRef()?.FormKey;
         foreach (var link in record.EnumerateFormLinks())
@@ -36,7 +39,7 @@ internal static class TargetReferenceCollector
             if (link.IsNull || formKey.ModKey != target || formKey == record.FormKey || formKey == baseKey) continue;
             if (isTargetObject && !IsTeleportDestination(record, formKey))
             {
-                links.Add(new TargetLink(record.FormKey, formKey));
+                links.Add(new TargetPluginLink(record.FormKey, formKey));
             }
             else if (!references.ContainsKey(formKey))
             {

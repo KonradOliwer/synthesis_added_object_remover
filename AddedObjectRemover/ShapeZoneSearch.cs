@@ -27,6 +27,7 @@ internal sealed class ShapeZoneSearch
 
     private readonly IReadOnlyList<TargetObject> _targets;
     private readonly IReadOnlyDictionary<FormKey, OtherObjectIndex> _indexes;
+    private readonly Replacements _replacements;
     private readonly IReadOnlyList<OtherObjectBoxIndex> _visibleTargetSpaceBounds;
     private readonly BaseObjectShapeProvider _shapes;
     private readonly TriangleTreeCache _meshCache;
@@ -37,6 +38,7 @@ internal sealed class ShapeZoneSearch
     private ShapeZoneSearch(
         IReadOnlyList<TargetObject> targets,
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
+        Replacements replacements,
         IReadOnlyList<OtherObjectBoxIndex> visibleTargetSpaceBounds,
         BaseObjectShapeProvider shapes,
         TriangleTreeCache meshCache,
@@ -45,6 +47,7 @@ internal sealed class ShapeZoneSearch
     {
         _targets = targets;
         _indexes = indexes;
+        _replacements = replacements;
         _visibleTargetSpaceBounds = visibleTargetSpaceBounds;
         _shapes = shapes;
         _meshCache = meshCache;
@@ -62,6 +65,7 @@ internal sealed class ShapeZoneSearch
         IReadOnlyList<TargetObject> targets,
         IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
+        Replacements replacements,
         BaseObjectShapeProvider shapes,
         TriangleTreeCache meshCache,
         float multiplier,
@@ -73,7 +77,7 @@ internal sealed class ShapeZoneSearch
             .Distinct()
             .Select(spaceKey => indexes[spaceKey].Bounds)
             .ToList();
-        return new ShapeZoneSearch(targets, indexes, visibleTargetSpaceBounds, shapes, meshCache, multiplier, npcRule);
+        return new ShapeZoneSearch(targets, indexes, replacements, visibleTargetSpaceBounds, shapes, meshCache, multiplier, npcRule);
     }
 
     /// <param name="visibility">Parallel to the targets.</param>
@@ -140,7 +144,7 @@ internal sealed class ShapeZoneSearch
     private int FindFirstInBoxZone(TargetObject target, OtherObjectIndex others, Scratch scratch)
     {
         scratch.Stats.BoxZoneTargets++;
-        var match = TooCloseSearch.FindFirstCentreInBoxZone(target, others, _shapes, _multiplier, _npcRule, scratch.Slots, scratch.Candidates);
+        var match = TooCloseSearch.FindFirstCentreInBoxZone(target, others, _replacements, _shapes, _multiplier, _npcRule, scratch.Slots, scratch.Candidates);
         if (match >= 0) scratch.Stats.Hits++;
         return match;
     }
@@ -154,7 +158,7 @@ internal sealed class ShapeZoneSearch
         foreach (var otherIndex in scratch.Candidates)
         {
             var other = others[otherIndex];
-            if (others.IsReplaced(otherIndex) || !_npcRule.TestsLikeObject(other) || !others.IsVisible(otherIndex)) continue;
+            if (_replacements.IsReplaced(other.Id) || !_npcRule.TestsLikeObject(other) || !others.IsVisible(otherIndex)) continue;
             if (!zone.Box.Intersects(OrientedBox.FromLocal(_shapes.GetLocalBox(other.Base), other.Transform), 0f)) continue;
             scratch.BoxPassed.Add(otherIndex);
         }

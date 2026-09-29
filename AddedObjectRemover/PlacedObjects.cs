@@ -16,16 +16,22 @@ internal readonly record struct BaseRef(FormKey FormKey, Type LinkType);
 
 /// <summary>Target-plugin object that may be removed.</summary>
 /// <param name="CellName">Null for an interior, whose cell is the space itself.</param>
+/// <param name="Rotation">The placement's Euler angles in radians, as the record stores them.</param>
 /// <param name="HasMapMarker">The placed reference itself carries map marker data (XMRK).</param>
+/// <param name="OwnReach">How far the reference itself says it acts (see <see cref="InvisibleObjectReach"/>); null when it does not say.</param>
 internal sealed record TargetObject(
-    IPlacedGetter Record,
+    TargetId Id,
+    FormKey Key,
+    string? EditorId,
     FormKey SpaceKey,
     string? CellName,
     PlacedTransform Transform,
+    P3Float Rotation,
     BaseRef? Base,
     bool IsTeleportDoor,
     bool IsPrimitive,
-    bool HasMapMarker);
+    bool HasMapMarker,
+    float? OwnReach);
 
 /// <summary>Where a target object's override is written: through its cell's winning context, into the same child list.</summary>
 internal sealed record TargetLocation(
@@ -35,7 +41,9 @@ internal sealed record TargetLocation(
 /// <summary>Compact snapshot of another mod's placed object (winning version).</summary>
 /// <param name="HasMapMarker">The placed reference itself carries map marker data (XMRK), e.g. a fast-travel marker.</param>
 internal readonly record struct OtherObject(
+    OtherId Id,
     FormKey FormKey,
+    FormKey SpaceKey,
     ModKey WinningMod,
     string? EditorId,
     BaseRef? Base,

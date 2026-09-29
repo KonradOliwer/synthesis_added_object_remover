@@ -60,8 +60,7 @@ internal sealed class AnchoringRemover
     /// <summary>Shares are sums of float fractions, so support that is fully removed can add up to slightly less than 1.</summary>
     private const float ShareRoundingTolerance = 1e-5f;
 
-    private readonly LinkedGroups _groups;
-    private readonly KeepReferencedRule _keepRule;
+    private readonly Protection _protection;
     private readonly TouchSearch _search;
     private readonly AnchoringContactFinder _contactFinder;
     private readonly float _threshold;
@@ -82,15 +81,13 @@ internal sealed class AnchoringRemover
 
     private AnchoringRemover(
         int targetCount,
-        LinkedGroups groups,
-        KeepReferencedRule keepRule,
+        Protection protection,
         TouchSearch search,
         AnchoringContactFinder contactFinder,
         float threshold,
         ParallelOptions parallelOptions)
     {
-        _groups = groups;
-        _keepRule = keepRule;
+        _protection = protection;
         _search = search;
         _contactFinder = contactFinder;
         _threshold = threshold;
@@ -110,12 +107,11 @@ internal sealed class AnchoringRemover
         IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyList<int> seeds,
         IReadOnlyList<int> keptTooClose,
-        LinkedGroups groups,
         SupporterIndex supporters,
         TerrainHeights terrain,
         BaseObjectShapeProvider shapes,
         TriangleTreeCache meshCache,
-        KeepReferencedRule keepRule,
+        Protection protection,
         float touchDistance,
         float threshold,
         ParallelOptions parallelOptions)
@@ -123,10 +119,10 @@ internal sealed class AnchoringRemover
         var (remover, setup) = Timing.Measure(() =>
         {
             var search = TouchSearch.Create(
-                targets, visibility, groups.CollectReachableSpaces(targets, seeds), excluded: [], shapes, meshCache, touchDistance, parallelOptions);
+                targets, visibility, protection.Groups.CollectReachableSpaces(targets, seeds), excluded: [], shapes, meshCache, touchDistance, parallelOptions);
             var supporterFinder = new AnchoringSupporterFinder(targets, search, supporters, shapes, touchDistance);
             var contactFinder = new AnchoringContactFinder(targets, search.MeshPaths, supporterFinder, terrain, search.Cache, touchDistance);
-            return new AnchoringRemover(targets.Count, groups, keepRule, search, contactFinder, threshold, parallelOptions);
+            return new AnchoringRemover(targets.Count, protection, search, contactFinder, threshold, parallelOptions);
         });
 
         remover.RemoveUnanchored(seeds, keptTooClose);
@@ -163,7 +159,7 @@ internal sealed class AnchoringRemover
         var candidates = new SortedSet<int>();
         foreach (var (from, to) in pairs)
         {
-            if (_keepRule.TryGetKeepReason(to, out var reason))
+            if (_protection.TryGetKeepReason(to, out var reason))
             {
                 LogKeptOnce(to, reason, from);
                 continue;
@@ -221,7 +217,7 @@ internal sealed class AnchoringRemover
     private List<int> RemoveLinkedPartners(int removed)
     {
         var partners = new List<int>();
-        foreach (var partner in _groups.MembersOf(removed))
+        foreach (var partner in _protection.Groups.MembersOf(removed))
         {
             if (_removed[partner]) continue;
             _removed[partner] = true;

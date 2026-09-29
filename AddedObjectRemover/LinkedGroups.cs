@@ -2,9 +2,6 @@ using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover;
 
-/// <summary>A form link from one target-plugin placed record, a checked target object, to another target-plugin FormKey.</summary>
-internal readonly record struct TargetLink(FormKey Source, FormKey Linked);
-
 /// <summary>
 /// Target objects connected, in either direction, by links between them (Enable Parent, Linked
 /// References, Activate Parents, Attach Ref, ...). A group is removed whole or kept whole.
@@ -21,18 +18,10 @@ internal sealed class LinkedGroups
         _groupOf = groupOf;
     }
 
-    /// <param name="links">Links whose ends are not both target objects are ignored.</param>
-    public static LinkedGroups Build(IReadOnlyList<TargetObject> targets, IEnumerable<TargetLink> links)
+    public static LinkedGroups Build(int targetCount, IEnumerable<TargetLink> links)
     {
-        var indexByFormKey = Enumerable.Range(0, targets.Count).ToDictionary(index => targets[index].Record.FormKey);
-        var roots = Enumerable.Range(0, targets.Count).ToArray();
-        foreach (var link in links)
-        {
-            if (indexByFormKey.TryGetValue(link.Source, out var source) && indexByFormKey.TryGetValue(link.Linked, out var linked))
-            {
-                Join(roots, source, linked);
-            }
-        }
+        var roots = Enumerable.Range(0, targetCount).ToArray();
+        foreach (var link in links) Join(roots, link.From.Index, link.To.Index);
         return CreateGroups(roots);
     }
 

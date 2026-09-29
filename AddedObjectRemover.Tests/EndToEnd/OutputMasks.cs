@@ -1,0 +1,53 @@
+using System.Text.RegularExpressions;
+
+namespace AddedObjectRemover.Tests.EndToEnd;
+
+/// <summary>
+/// Removes what depends on timing, thread count or the machine from a run's output: performance
+/// lines are dropped, durations and the run's temporary folder are replaced by placeholders.
+/// </summary>
+internal static partial class OutputMasks
+{
+    public const string RootPlaceholder = "<root>";
+    private const string DurationPlaceholder = "in <time>";
+
+    /// <summary>Timing, cache, memory and thread-count lines.</summary>
+    private static readonly string[] PerformanceLinePrefixes =
+    [
+        "Bounds warm-up: ",
+        "World-bounds indexes built: ",
+        "  Meshes indexed: ",
+        "  Timing: ",
+        "  NPC body cache: ",
+        "Done in ",
+    ];
+
+    /// <summary>Whether the game INI of the machine running the test can be read.</summary>
+    private static readonly string[] MachineLinePrefixes =
+    [
+        "  Warning: could not read archive list from game INI: ",
+    ];
+
+    [GeneratedRegex(@"^Using \d+ threads\.$")]
+    private static partial Regex ThreadCount();
+
+    [GeneratedRegex(@"\bin \d+\.\d+s\b")]
+    private static partial Regex Duration();
+
+    public static IReadOnlyList<string> MaskLog(IEnumerable<string> lines, string root) =>
+        lines
+            .Where(line => !ThreadCount().IsMatch(line)
+                           && !StartsWithAny(line, PerformanceLinePrefixes)
+                           && !StartsWithAny(line, MachineLinePrefixes))
+            .Select(line => Duration().Replace(MaskRoot(line, root), DurationPlaceholder))
+            .ToList();
+
+    public static IReadOnlyList<string> MaskReport(IEnumerable<string> lines, string root) =>
+        lines.Select(line => MaskRoot(line, root)).ToList();
+
+    private static bool StartsWithAny(string line, IEnumerable<string> prefixes) =>
+        prefixes.Any(prefix => line.StartsWith(prefix, StringComparison.Ordinal));
+
+    private static string MaskRoot(string line, string root) =>
+        line.Replace(root, RootPlaceholder, StringComparison.OrdinalIgnoreCase);
+}

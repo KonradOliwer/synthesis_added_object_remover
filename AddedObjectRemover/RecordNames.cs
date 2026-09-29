@@ -9,6 +9,8 @@ internal static class RecordNames
 {
     public static string Describe(IMajorRecordGetter record) => Describe(record.FormKey, record.EditorID);
 
+    public static string Describe(TargetObject target) => Describe(target.Key, target.EditorId);
+
     public static string Describe(FormKey formKey, string? editorId) =>
         string.IsNullOrEmpty(editorId) ? formKey.ToString() : $"{editorId} [{formKey}]";
 

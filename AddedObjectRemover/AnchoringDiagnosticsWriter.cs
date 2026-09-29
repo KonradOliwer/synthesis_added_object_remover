@@ -24,7 +24,7 @@ internal static class AnchoringDiagnosticsWriter
     /// <returns>The path written to.</returns>
     public static string Write(
         string folder,
-        ScanResult scan,
+        World world,
         BaseObjectShapeProvider shapes,
         SupporterIndex supporters,
         IReadOnlyList<AnchoringEvaluation> evaluations,
@@ -33,28 +33,28 @@ internal static class AnchoringDiagnosticsWriter
         var path = Path.Combine(folder, FileName);
         var rows = evaluations
             .OrderBy(evaluation => evaluation.Iteration)
-            .ThenBy(evaluation => scan.Targets[evaluation.TargetIndex].Record.FormKey.ToString(), StringComparer.Ordinal)
-            .Select(evaluation => FormatRow(evaluation, scan, shapes, supporters, threshold));
+            .ThenBy(evaluation => world.Targets[evaluation.TargetIndex].Key.ToString(), StringComparer.Ordinal)
+            .Select(evaluation => FormatRow(evaluation, world, shapes, supporters, threshold));
         CsvFile.Write(path, Header, rows);
         return path;
     }
 
     private static IEnumerable<string> FormatRow(
         AnchoringEvaluation evaluation,
-        ScanResult scan,
+        World world,
         BaseObjectShapeProvider shapes,
         SupporterIndex supporters,
         float threshold)
     {
-        var target = scan.Targets[evaluation.TargetIndex];
+        var target = world.Targets[evaluation.TargetIndex];
         return
         [
             Num(evaluation.Iteration),
-            Text(target.Record.FormKey.ToString()),
-            Text(target.Record.EditorID ?? string.Empty),
+            Text(target.Key.ToString()),
+            Text(target.EditorId ?? string.Empty),
             Text(RecordNames.DescribeBase(shapes, target.Base)),
             Text(shapes.GetMeshPath(target.Base) ?? string.Empty),
-            Text(scan.SpaceNames[target.SpaceKey]),
+            Text(world.SpaceNames[target.SpaceKey]),
             Num(evaluation.Contacts.ContactPoints),
             Num(evaluation.Contacts.TotalWeight),
             Num(evaluation.RemovedShare),
@@ -63,7 +63,7 @@ internal static class AnchoringDiagnosticsWriter
             Num(evaluation.ShareOf(SupportCategory.Terrain)),
             Num(threshold),
             Text(DescribeDecision(evaluation)),
-            Text(DescribeTopSupporters(evaluation, scan, supporters.GetSpace(target.SpaceKey))),
+            Text(DescribeTopSupporters(evaluation, world, supporters.GetSpace(target.SpaceKey))),
         ];
     }
 
@@ -74,16 +74,16 @@ internal static class AnchoringDiagnosticsWriter
         return evaluation.Contacts.ContactPoints == 0 ? "kept (no contact points)" : "kept";
     }
 
-    private static string DescribeTopSupporters(AnchoringEvaluation evaluation, ScanResult scan, OtherObjectIndex placed) =>
+    private static string DescribeTopSupporters(AnchoringEvaluation evaluation, World world, OtherObjectIndex placed) =>
         string.Join(
             "; ",
             evaluation.Shares
                 .Take(MaxListedSupporters)
-                .Select(share => $"{DescribeSupporter(share.Supporter, scan, placed)} {share.Category} {Num(share.Share)}"));
+                .Select(share => $"{DescribeSupporter(share.Supporter, world, placed)} {share.Category} {Num(share.Share)}"));
 
-    private static string DescribeSupporter(Supporter supporter, ScanResult scan, OtherObjectIndex placed) => supporter.Type switch
+    private static string DescribeSupporter(Supporter supporter, World world, OtherObjectIndex placed) => supporter.Type switch
     {
-        SupporterType.Target => scan.Targets[supporter.Index].Record.FormKey.ToString(),
+        SupporterType.Target => world.Targets[supporter.Index].Key.ToString(),
         SupporterType.PlacedObject => placed[supporter.Index].FormKey.ToString(),
         SupporterType.Terrain => "terrain",
         _ => throw new UnreachableException($"Unknown supporter type {supporter.Type}."),

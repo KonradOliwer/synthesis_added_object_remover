@@ -53,7 +53,7 @@ public class StepDeterminismTests
     private static readonly SkyrimMod Records = CreateRecords();
     private static readonly BaseObjectShapeProvider Shapes = TestShapes.Create(Records, "StepDeterminismData", Table, Item, Boulder, Building);
 
-    private sealed record FollowUpScene(List<TargetObject> Targets, LinkedGroups Groups, List<int> Seeds, KeepReferencedRule KeepRule);
+    private sealed record FollowUpScene(List<TargetObject> Targets, List<int> Seeds, Protection Protection);
 
     [Fact]
     public void EverythingTouchingMatchesForOneAndEightThreads()
@@ -124,10 +124,10 @@ public class StepDeterminismTests
         var rooms = Enumerable.Range(0, RoomCount)
             .Select(i => TestShapes.Placed(Mod, i, Boulder.Ref, RandomGridPoint(random)))
             .ToList();
-        var keepRule = new KeepReferencedRule(targets, new Dictionary<FormKey, KeepReason>(), LinkedGroups.Build(targets, []));
+        var protection = Protection.Build(targets, [], TestTargets.References(targets.Count));
 
-        var sequential = SelectLeftovers(targets, visibility, rooms, keepRule, removed, SequentialThreads);
-        var parallel = SelectLeftovers(targets, visibility, rooms, keepRule, removed, ParallelThreads);
+        var sequential = SelectLeftovers(targets, visibility, rooms, protection, removed, SequentialThreads);
+        var parallel = SelectLeftovers(targets, visibility, rooms, protection, removed, ParallelThreads);
 
         Assert.NotEmpty(sequential.Removals);
         Assert.Contains(sequential.Evaluations, evaluation => evaluation.ContainingObject != null);
@@ -136,7 +136,7 @@ public class StepDeterminismTests
 
     private static TouchClusters FindTouching(FollowUpScene scene, int threads) =>
         TouchClusterFinder.Find(
-            scene.Targets, AllVisible(scene.Targets), scene.Seeds, keptTooClose: [], scene.Groups, Shapes, NewCache(), scene.KeepRule,
+            scene.Targets, AllVisible(scene.Targets), scene.Seeds, keptTooClose: [], Shapes, NewCache(), scene.Protection,
             TouchDistance, Options(threads), collectDiagnostics: false);
 
     private static AnchoringResult RunAnchoring(FollowUpScene scene, int threads) =>
@@ -145,12 +145,11 @@ public class StepDeterminismTests
             AllVisible(scene.Targets),
             scene.Seeds,
             keptTooClose: [],
-            scene.Groups,
             new SupporterIndex(new Dictionary<FormKey, List<OtherObject>>(), Shapes, Options(threads)),
             new TerrainHeights(new Dictionary<ExteriorCell, ILandscapeGetter>(), new Dictionary<FormKey, FormKey>()),
             Shapes,
             NewCache(),
-            scene.KeepRule,
+            scene.Protection,
             TouchDistance,
             threshold: 0.5f,
             Options(threads));
@@ -160,18 +159,19 @@ public class StepDeterminismTests
         var options = Options(threads);
         var visibility = AllVisible(targets);
         var indexes = new Dictionary<FormKey, OtherObjectIndex> { [TestTargets.Space] = OtherObjectIndex.CreateUncounted(npcs, Shapes, options) };
+        var replacements = Replacements.None(npcs.Count);
         var bodies = new NpcBodyCache(new NpcBodyResolver(Records.ToImmutableLinkCache(), Shapes, new SkinnedBodyMeasurer(Shapes.ReadGeometry)));
         var npcRule = NpcClashRule.Create(
             NpcHandling.OnlyWhenStuckInObject,
-            () => NpcStuckSearch.Create(targets, visibility, indexes, bodies, Shapes, NewCache(), options));
-        var hits = TooCloseSearch.FindTooCloseTargets(targets, visibility, indexes, Shapes, multiplier: 0f, npcRule, options);
+            () => NpcStuckSearch.Create(targets, visibility, indexes, replacements, bodies, Shapes, NewCache(), options));
+        var hits = TooCloseSearch.FindTooCloseTargets(targets, visibility, indexes, replacements, Shapes, multiplier: 0f, npcRule, options);
         var summary = npcRule.StuckSearch!.GetSummary();
         return (hits, $"{summary.Sizes} {summary.PairsTested} {summary.CoreTests} {summary.Conflicts} {summary.PointFallbacks.Count}");
     }
 
     private static LeftoverResult SelectLeftovers(
-        List<TargetObject> targets, List<ObjectVisibility> visibility, List<OtherObject> rooms, KeepReferencedRule keepRule, HashSet<int> removed, int threads) =>
-        TestLeftovers.CreateSelector(targets, visibility, Shapes, rooms, keepRule, CreateLeftoverConfig())
+        List<TargetObject> targets, List<ObjectVisibility> visibility, List<OtherObject> rooms, Protection protection, HashSet<int> removed, int threads) =>
+        TestLeftovers.CreateSelector(targets, visibility, Shapes, rooms, protection, CreateLeftoverConfig())
             .SelectRemovals(removed, Options(threads));
 
     /// <summary>A grid of tables close enough that some touch, items (some stacked) on most of them, random links and seeds.</summary>
@@ -191,17 +191,19 @@ public class StepDeterminismTests
         }
 
         var links = Enumerable.Range(0, LinkCount)
-            .Select(_ => new TargetLink(TestTargets.Key(random.Next(targets.Count)), TestTargets.Key(random.Next(targets.Count))))
+            .Select(_ => TestTargets.Link(random.Next(targets.Count), random.Next(targets.Count)))
             .ToList();
-        var groups = LinkedGroups.Build(targets, links);
+        var groups = LinkedGroups.Build(targets.Count, links);
         var seeds = tables.OrderBy(_ => random.Next()).Take(SeedCount)
             .SelectMany(groups.MembersOf)
             .Distinct()
             .Order()
             .ToList();
         var kept = Enumerable.Range(0, targets.Count).Where(index => !seeds.Contains(index)).OrderBy(_ => random.Next()).Take(KeptCount);
-        var references = kept.ToDictionary(index => TestTargets.Key(index), _ => new KeepReason(KeepKind.NonPlacedReference, "QUST record", "linked from QUST"));
-        return new FollowUpScene(targets, groups, seeds, new KeepReferencedRule(targets, references, groups));
+        var references = TestTargets.References(
+            targets.Count,
+            kept.ToDictionary(index => index, _ => new KeepReason(KeepKind.NonPlacedReference, "QUST record", "linked from QUST")));
+        return new FollowUpScene(targets, seeds, Protection.Build(targets, links, references));
     }
 
     private static IEnumerable<Vector3> GridPositions(Random random)

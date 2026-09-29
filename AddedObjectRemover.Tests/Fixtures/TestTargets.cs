@@ -1,12 +1,10 @@
 using System.Numerics;
-using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;
-using Mutagen.Bethesda.Skyrim;
 using Noggog;
 
 namespace AddedObjectRemover.Tests.Fixtures;
 
-/// <summary>Target objects backed by in-memory Mutagen records.</summary>
+/// <summary>Target objects with FormKeys in one target plugin.</summary>
 internal static class TestTargets
 {
     public static readonly ModKey TargetMod = ModKey.FromNameAndExtension("Target.esp");
@@ -14,16 +12,29 @@ internal static class TestTargets
 
     public static FormKey Key(int index) => new(TargetMod, 0x800 + (uint)index);
 
-    public static PlacedObject Record(int index) => new(Key(index), SkyrimRelease.SkyrimSE);
+    public static TargetLink Link(int from, int to) => new(new TargetId(from), new TargetId(to));
+
+    /// <summary>The keep reasons of <paramref name="count"/> targets, by target index; null where nothing depends on the target.</summary>
+    public static KeepReason?[] References(int count, IReadOnlyDictionary<int, KeepReason>? reasons = null) =>
+        Enumerable.Range(0, count).Select(index => reasons?.GetValueOrDefault(index)).ToArray();
 
     public static TargetObject Create(int index, PlacedTransform transform, bool isTeleportDoor = false) =>
-        Create(Record(index), transform, isTeleportDoor);
+        Create(index, transform, baseRef: null, Space, isTeleportDoor);
 
-    public static TargetObject Create(IPlacedGetter record, PlacedTransform transform, bool isTeleportDoor = false) =>
-        new(record, Space, CellName: null, transform, Base: null, isTeleportDoor, IsPrimitive: false, HasMapMarker: false);
-
-    public static TargetObject Create(int index, PlacedTransform transform, BaseRef? baseRef, FormKey space) =>
-        new(Record(index), space, CellName: null, transform, baseRef, IsTeleportDoor: false, IsPrimitive: false, HasMapMarker: false);
+    public static TargetObject Create(int index, PlacedTransform transform, BaseRef? baseRef, FormKey space, bool isTeleportDoor = false) =>
+        new(
+            new TargetId(index),
+            Key(index),
+            EditorId: null,
+            space,
+            CellName: null,
+            transform,
+            Rotation: default,
+            baseRef,
+            isTeleportDoor,
+            IsPrimitive: false,
+            HasMapMarker: false,
+            OwnReach: null);
 
     public static List<TargetObject> CreateMany(int count) =>
         Enumerable.Range(0, count).Select(index => Create(index, At(Vector3.Zero))).ToList();

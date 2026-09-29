@@ -1,5 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover;
 
@@ -30,7 +29,7 @@ internal sealed record KeepReason(KeepKind Kind, string Category, string Detail)
 /// between target objects do not keep them: they form linked groups, which stay together, so a
 /// group stays whole as soon as one member must stay.
 /// </summary>
-internal sealed class KeepReferencedRule
+internal sealed class Protection
 {
     private const string LinkedGroupCategory = "linked to a kept object";
 
@@ -39,12 +38,24 @@ internal sealed class KeepReferencedRule
     private readonly KeepReason?[] _ownReasons;
     private readonly KeepReason?[] _reasons;
 
-    /// <param name="targetReferences">Target FormKey -> why a non-target record depends on it.</param>
-    public KeepReferencedRule(IReadOnlyList<TargetObject> targets, IReadOnlyDictionary<FormKey, KeepReason> targetReferences, LinkedGroups groups)
+    private Protection(LinkedGroups groups, KeepReason?[] ownReasons)
     {
-        _ownReasons = targets.Select(target => FindOwnReason(target, targetReferences)).ToArray();
-        _reasons = new KeepReason?[targets.Count];
-        foreach (var members in groups.All) AssignGroupReasons(members, targets);
+        Groups = groups;
+        _ownReasons = ownReasons;
+        _reasons = new KeepReason?[ownReasons.Length];
+    }
+
+    /// <summary>The linked groups of the target objects.</summary>
+    public LinkedGroups Groups { get; }
+
+    /// <param name="references">By target index: why a non-target record depends on it.</param>
+    public static Protection Build(
+        IReadOnlyList<TargetObject> targets, IEnumerable<TargetLink> links, IReadOnlyList<KeepReason?> references)
+    {
+        var ownReasons = targets.Select((target, index) => target.IsTeleportDoor ? TeleportDoor : references[index]).ToArray();
+        var protection = new Protection(LinkedGroups.Build(targets.Count, links), ownReasons);
+        foreach (var members in protection.Groups.All) protection.AssignGroupReasons(members, targets);
+        return protection;
     }
 
     /// <summary>Why the target stays: its own reason, or that of the first member of its group that has one.</summary>
@@ -57,9 +68,6 @@ internal sealed class KeepReferencedRule
     /// <summary>Why the target itself must stay, ignoring its group; null when nothing depends on it.</summary>
     public KeepReason? GetOwnReason(int targetIndex) => _ownReasons[targetIndex];
 
-    private static KeepReason? FindOwnReason(TargetObject target, IReadOnlyDictionary<FormKey, KeepReason> targetReferences) =>
-        target.IsTeleportDoor ? TeleportDoor : targetReferences.GetValueOrDefault(target.Record.FormKey);
-
     private void AssignGroupReasons(IReadOnlyList<int> members, IReadOnlyList<TargetObject> targets)
     {
         var keeper = members.FirstOrDefault(member => _ownReasons[member] != null, -1);
@@ -69,7 +77,7 @@ internal sealed class KeepReferencedRule
         var linkedReason = new KeepReason(
             KeepKind.LinkedGroup,
             LinkedGroupCategory,
-            $"linked to {RecordNames.Describe(targets[keeper].Record)}, which is kept: {keeperReason.Detail}");
+            $"linked to {RecordNames.Describe(targets[keeper])}, which is kept: {keeperReason.Detail}");
         foreach (var member in members) _reasons[member] = _ownReasons[member] ?? linkedReason;
     }
 }

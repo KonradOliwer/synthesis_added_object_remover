@@ -3,17 +3,34 @@ using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover;
 
-internal readonly record struct ReplacementLogEntry(
-    FormKey OtherFormKey,
-    string? OtherEditorId,
-    ModKey OtherPlugin,
-    FormKey TargetFormKey,
-    string? TargetEditorId,
-    float Distance,
-    float SizeRatio);
+/// <summary>Another mod's object that a target object replaces.</summary>
+/// <param name="By">The first matching target object.</param>
+internal sealed record Replacement(OtherId Rival, TargetId By, float Distance, float SizeRatio);
 
-/// <param name="LogEntries">Empty unless verbose.</param>
-internal sealed record ReplacementResult(int ReplacedCount, IReadOnlyList<ReplacementLogEntry> LogEntries);
+/// <summary>The replaced rivals: objects that stay indexed but never match in the too-close test.</summary>
+internal sealed class Replacements
+{
+    private readonly bool[] _replaced;
+
+    private Replacements(int rivalCount, IReadOnlyList<Replacement> list)
+    {
+        _replaced = new bool[rivalCount];
+        foreach (var replacement in list) _replaced[replacement.Rival.Index] = true;
+        List = list;
+    }
+
+    /// <summary>In <see cref="TargetId"/> order, then in the order the matches were found.</summary>
+    public IReadOnlyList<Replacement> List { get; }
+
+    public int Count => List.Count;
+
+    public static Replacements None(int rivalCount) => new(rivalCount, []);
+
+    public static Replacements Of(int rivalCount, IReadOnlyList<Replacement> list) => new(rivalCount, list);
+
+    /// <summary>False for ids beyond the rivals, such as backdrop objects, which are never replaced.</summary>
+    public bool IsReplaced(OtherId id) => id.Index < _replaced.Length && _replaced[id.Index];
+}
 
 /// <summary>
 /// An other-mod object counts as replaced (and is ignored by the too-close test) when a target
@@ -34,7 +51,7 @@ internal sealed class ReplacementMatcher
     private readonly IReadOnlyDictionary<FormKey, OtherObjectIndex> _indexes;
     private readonly BaseObjectShapeProvider _shapes;
 
-    public ReplacementMatcher(
+    private ReplacementMatcher(
         IReadOnlyList<TargetObject> targets,
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
         BaseObjectShapeProvider shapes)
@@ -44,13 +61,20 @@ internal sealed class ReplacementMatcher
         _shapes = shapes;
     }
 
-    private readonly record struct Match(int OtherIndex, float Distance, float SizeRatio);
+    private readonly record struct Match(OtherId Rival, float Distance, float SizeRatio);
 
-    public ReplacementResult MarkReplacedObjects(bool collectLog, ParallelOptions parallelOptions)
+    /// <param name="rivalCount">The number of rivals of the world; the indexes hold rivals only.</param>
+    public static Replacements Find(
+        IReadOnlyList<TargetObject> targets,
+        IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
+        int rivalCount,
+        BaseObjectShapeProvider shapes,
+        ParallelOptions parallelOptions)
     {
-        var matchesByTarget = new List<Match>?[_targets.Count];
-        Parallel.For(0, _targets.Count, parallelOptions, t => matchesByTarget[t] = FindMatches(_targets[t]));
-        return ApplyInTargetOrder(matchesByTarget, collectLog);
+        var matcher = new ReplacementMatcher(targets, indexes, shapes);
+        var matchesByTarget = new List<Match>?[targets.Count];
+        Parallel.For(0, targets.Count, parallelOptions, t => matchesByTarget[t] = matcher.FindMatches(targets[t]));
+        return matcher.ApplyInTargetOrder(matchesByTarget, rivalCount);
     }
 
     private List<Match>? FindMatches(TargetObject target)
@@ -64,44 +88,35 @@ internal sealed class ReplacementMatcher
         index.PositionGrid.Collect(new Box(position - margin, position + margin), candidates);
 
         List<Match>? matches = null;
-        foreach (var otherIndex in candidates)
+        foreach (var slot in candidates)
         {
-            var other = index[otherIndex];
+            var other = index[slot];
             var distance = Vector3.Distance(other.Position, position);
             if (distance > PositionTolerance) continue;
-            if (!index.IsVisible(otherIndex)) continue;
+            if (!index.IsVisible(slot)) continue;
             if (ScaledSortedDims(_shapes.GetLocalBox(other.Base), other.Scale) is not { } otherDims) continue;
 
             var ratio = SizeRatio(targetDims, otherDims);
             if (ratio < SizeSimilarity) continue;
 
-            (matches ??= []).Add(new Match(otherIndex, distance, ratio));
+            (matches ??= []).Add(new Match(other.Id, distance, ratio));
         }
         return matches;
     }
 
-    private ReplacementResult ApplyInTargetOrder(List<Match>?[] matchesByTarget, bool collectLog)
+    private Replacements ApplyInTargetOrder(List<Match>?[] matchesByTarget, int rivalCount)
     {
-        var replacedCount = 0;
-        var log = new List<ReplacementLogEntry>();
+        var claimed = new HashSet<OtherId>();
+        var list = new List<Replacement>();
         for (var t = 0; t < _targets.Count; t++)
         {
             if (matchesByTarget[t] is not { } matches) continue;
-            var target = _targets[t];
-            var index = _indexes[target.SpaceKey];
             foreach (var match in matches)
             {
-                if (!index.TryMarkReplaced(match.OtherIndex)) continue;
-                replacedCount++;
-                if (!collectLog) continue;
-                var other = index[match.OtherIndex];
-                log.Add(new ReplacementLogEntry(
-                    other.FormKey, other.EditorId, other.WinningMod,
-                    target.Record.FormKey, target.Record.EditorID,
-                    match.Distance, match.SizeRatio));
+                if (claimed.Add(match.Rival)) list.Add(new Replacement(match.Rival, new TargetId(t), match.Distance, match.SizeRatio));
             }
         }
-        return new ReplacementResult(replacedCount, log);
+        return Replacements.Of(rivalCount, list);
     }
 
     /// <summary>

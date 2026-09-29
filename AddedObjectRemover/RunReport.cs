@@ -8,18 +8,22 @@ internal static class RunReport
 {
     private const double BytesPerMegabyte = 1024.0 * 1024.0;
 
-    public static void PrintConfig(RunConfig config)
+    public static void PrintConfig(RunConfig config, ModFacts mods, ModStanding standing)
     {
-        static string Join(IReadOnlyList<ModKey> keys) => keys.Count == 0 ? "(none)" : string.Join(", ", keys);
+        static string Join(IEnumerable<ModKey> keys)
+        {
+            var names = keys.ToList();
+            return names.Count == 0 ? "(none)" : string.Join(", ", names);
+        }
 
         Console.WriteLine($"Target plugin: {config.Target}");
         Console.WriteLine($"Size multiplier: {config.SizeMultiplier}");
         Console.WriteLine($"Removal zone: {config.ZoneShape}");
         Console.WriteLine($"Excluded plugins: {Join(config.ExcludedPlugins)}");
-        Console.WriteLine(config.IgnoreTargetMasters
-            ? $"Ignored masters of target: {Join(config.TargetMasters)}"
+        Console.WriteLine(config.Standing.IgnoreTargetMasters
+            ? $"Ignored masters of target: {Join(standing.IgnoredMasters.Select(mods.Mods.KeyOf))}"
             : "Masters of target are not ignored.");
-        PrintCompatibilityPatches(config.CompatibilityPatches);
+        PrintCompatibilityPatches(standing.Patches, mods.Mods);
         Console.WriteLine($"NPCs and creatures: {config.NpcHandling}");
         Console.WriteLine(DescribeFollowUpRemoval(config));
         Console.WriteLine(DescribeLeftoverRemoval(config));
@@ -28,9 +32,9 @@ internal static class RunReport
         Console.WriteLine($"Report folder: {config.DiagnosticsFolder}");
     }
 
-    private static void PrintCompatibilityPatches(CompatibilityPatches patches)
+    private static void PrintCompatibilityPatches(PatchReport patches, ModTable mods)
     {
-        if (ReferenceEquals(patches, CompatibilityPatches.None))
+        if (!patches.DetectionOn)
         {
             Console.WriteLine("Compatibility patches: detection off.");
             return;
@@ -39,18 +43,18 @@ internal static class RunReport
         foreach (var skipped in patches.SkippedTooManyMasters)
         {
             Console.WriteLine(
-                $"  Plugin {skipped.Patch} skipped: too many masters (likely generated or merged); it masters the target and {skipped.OtherMasters.Count:N0} other mods.");
+                $"  Plugin {mods.KeyOf(skipped.Patch)} skipped: too many masters (likely generated or merged); it masters the target and {skipped.OtherMasters.Length:N0} other mods.");
         }
-        if (patches.Patches.Count == 0)
+        if (patches.Detected.Length == 0)
         {
             Console.WriteLine("Compatibility patches: none detected.");
             return;
         }
-        foreach (var patch in patches.Patches)
+        foreach (var patch in patches.Detected)
         {
-            Console.WriteLine($"  Compatibility patch {patch.Patch}: links target with {string.Join(", ", patch.OtherMasters)}.");
+            Console.WriteLine($"  Compatibility patch {mods.KeyOf(patch.Patch)}: links target with {string.Join(", ", patch.OtherMasters.Select(mods.KeyOf))}.");
         }
-        var ignoredMods = patches.CollectIgnoredMods().OrderBy(mod => mod.ToString(), StringComparer.Ordinal);
+        var ignoredMods = patches.IgnoredMods.Select(mods.KeyOf).OrderBy(mod => mod.ToString(), StringComparer.Ordinal);
         Console.WriteLine($"Ignored because of compatibility patches: {string.Join(", ", ignoredMods)}.");
     }
 
@@ -74,9 +78,9 @@ internal static class RunReport
             + $"kept markers inside other mods' objects {(leftovers.MovesKeptMarkers ? "moved" : "left in place")}.";
     }
 
-    public static void PrintOverriddenOthers(ScanResult scan, ModKey target)
+    public static void PrintOverriddenOthers(World world, ModKey target)
     {
-        foreach (var other in scan.OverriddenOthersLog)
+        foreach (var other in world.OverriddenOthers)
         {
             Console.WriteLine(
                 $"  Ignored other-mod object overridden by {target}: "
@@ -84,35 +88,37 @@ internal static class RunReport
         }
     }
 
-    public static void PrintScanSummary(ScanResult scan, ModKey target, TimeSpan elapsed)
+    public static void PrintScanSummary(World world, ModKey target, TimeSpan elapsed)
     {
+        var counts = world.Counts;
         Console.WriteLine(
-            $"Scanned {scan.RecordsScanned:N0} placed records in {elapsed.TotalSeconds:F1}s: "
-            + $"{scan.Targets.Count:N0} {target} objects to check, "
-            + $"{scan.OtherObjectCount:N0} objects from other mods.");
-        if (scan.TargetsOverriddenLater > 0)
+            $"Scanned {counts.RecordsScanned:N0} placed records in {elapsed.TotalSeconds:F1}s: "
+            + $"{world.Targets.Length:N0} {target} objects to check, "
+            + $"{world.Rivals.Length:N0} objects from other mods.");
+        if (counts.TargetsOverriddenLater > 0)
         {
-            Console.WriteLine($"  Ignored {scan.TargetsOverriddenLater:N0} {target} objects whose winning version comes from a later plugin.");
+            Console.WriteLine($"  Ignored {counts.TargetsOverriddenLater:N0} {target} objects whose winning version comes from a later plugin.");
         }
-        if (scan.TargetsDisabledOrWithoutPlacement > 0)
+        if (counts.TargetsHiddenOrWithoutPlacement > 0)
         {
-            Console.WriteLine($"  Ignored {scan.TargetsDisabledOrWithoutPlacement:N0} {target} objects that are initially disabled or have no valid position or rotation.");
+            Console.WriteLine($"  Ignored {counts.TargetsHiddenOrWithoutPlacement:N0} {target} objects that are initially disabled or have no valid position or rotation.");
         }
-        if (scan.InvalidPlacements > 0)
+        if (counts.OtherInvalidPlacements > 0)
         {
-            Console.WriteLine($"  Ignored {scan.InvalidPlacements:N0} other-mod objects in the spaces of {target} objects whose position or rotation is out of range or not a number.");
+            Console.WriteLine($"  Ignored {counts.OtherInvalidPlacements:N0} other-mod objects in the spaces of {target} objects whose position or rotation is out of range or not a number.");
         }
-        if (scan.OthersOverriddenByTarget > 0)
+        if (counts.OthersOverriddenByTarget > 0)
         {
-            Console.WriteLine($"  Ignored {scan.OthersOverriddenByTarget:N0} other-mod objects that {target} itself overrides.");
+            Console.WriteLine($"  Ignored {counts.OthersOverriddenByTarget:N0} other-mod objects that {target} itself overrides.");
         }
-        if (scan.SupportersBySpace.Count > 0)
+        var supporterCount = world.Backdrop.IsCollected ? world.Rivals.Length + world.Backdrop.Value.Length : 0;
+        if (supporterCount > 0)
         {
-            Console.WriteLine($"  Recorded {scan.SupporterCount:N0} placed objects of any plugin as possible supporters or obstacles.");
+            Console.WriteLine($"  Recorded {supporterCount:N0} placed objects of any plugin as possible supporters or obstacles.");
         }
-        if (scan.NavmeshesBySpace.Count > 0)
+        if (counts.NavmeshCount > 0)
         {
-            Console.WriteLine($"  Recorded {scan.NavmeshCount:N0} navmeshes.");
+            Console.WriteLine($"  Recorded {counts.NavmeshCount:N0} navmeshes.");
         }
     }
 
@@ -138,14 +144,18 @@ internal static class RunReport
     public static void PrintWarmUpSummary(int targetBaseCount, TimeSpan elapsed) =>
         Console.WriteLine($"Bounds warm-up: {targetBaseCount:N0} target base objects in {elapsed.TotalSeconds:F1}s.");
 
-    public static void PrintReplacementLog(IEnumerable<ReplacementLogEntry> entries)
+    public static void PrintReplacementLog(World world, Replacements replacements)
     {
-        foreach (var entry in entries.OrderBy(e => e.OtherFormKey.ToString(), StringComparer.Ordinal))
+        var entries = replacements.List
+            .Select(replacement => (Replacement: replacement, Rival: world.Rivals[replacement.Rival.Index]))
+            .OrderBy(entry => entry.Rival.FormKey.ToString(), StringComparer.Ordinal);
+        foreach (var (replacement, rival) in entries)
         {
+            var target = world.Targets[replacement.By.Index];
             Console.WriteLine(
-                $"  Ignored replaced object {RecordNames.Describe(entry.OtherFormKey, entry.OtherEditorId)} from {entry.OtherPlugin}: "
-                + $"replaced by {RecordNames.Describe(entry.TargetFormKey, entry.TargetEditorId)}, "
-                + $"distance {entry.Distance:F1}, size ratio {entry.SizeRatio:F2}.");
+                $"  Ignored replaced object {RecordNames.Describe(rival.FormKey, rival.EditorId)} from {rival.WinningMod}: "
+                + $"replaced by {RecordNames.Describe(target.Key, target.EditorId)}, "
+                + $"distance {replacement.Distance:F1}, size ratio {replacement.SizeRatio:F2}.");
         }
     }
 
@@ -221,15 +231,15 @@ internal static class RunReport
         }
     }
 
-    public static void PrintKept(ScanResult scan, IEnumerable<KeptTarget> kept)
+    public static void PrintKept(World world, IEnumerable<KeptTarget> kept)
     {
         foreach (var entry in kept)
         {
-            var target = scan.Targets[entry.TargetIndex];
+            var target = world.Targets[entry.TargetIndex];
             var touched = entry.TouchedTargetIndex is { } touchedIndex
-                ? $" (touches removed {RecordNames.Describe(scan.Targets[touchedIndex].Record)})"
+                ? $" (touches removed {RecordNames.Describe(world.Targets[touchedIndex])})"
                 : string.Empty;
-            Console.WriteLine($"  Kept {RecordNames.Describe(target.Record)} in {scan.SpaceNames[target.SpaceKey]}: {entry.Reason.Detail}{touched}.");
+            Console.WriteLine($"  Kept {RecordNames.Describe(target)} in {world.SpaceNames[target.SpaceKey]}: {entry.Reason.Detail}{touched}.");
         }
     }
 
@@ -292,13 +302,13 @@ internal static class RunReport
     private static string DescribeDecisionCounts(LeftoverResult leftovers, IEnumerable<LeftoverDecision> decisions) =>
         string.Join(", ", decisions.Select(decision => $"{leftovers.CountDecisions(decision):N0} {decision.Describe()}"));
 
-    public static void PrintLeftoverDecisions(ScanResult scan, IEnumerable<LeftoverEvaluation> evaluations)
+    public static void PrintLeftoverDecisions(World world, IEnumerable<LeftoverEvaluation> evaluations)
     {
         foreach (var evaluation in evaluations)
         {
-            var target = scan.Targets[evaluation.TargetIndex];
+            var target = world.Targets[evaluation.TargetIndex];
             Console.WriteLine(
-                $"  Leftover {RecordNames.Describe(target.Record)} ({evaluation.Kind}) in {scan.SpaceNames[target.SpaceKey]}: "
+                $"  Leftover {RecordNames.Describe(target)} ({evaluation.Kind}) in {world.SpaceNames[target.SpaceKey]}: "
                 + $"{(evaluation.IsRemoved ? "removed" : "kept")}, {DescribeLeftoverReason(evaluation)}; radius {evaluation.Radius:F0}, "
                 + $"removed/total ground area {evaluation.Surroundings.Describe()}.");
         }
@@ -313,26 +323,26 @@ internal static class RunReport
     private static string DescribeOtherObject(OtherObject other) =>
         $"{RecordNames.Describe(other.FormKey, other.EditorId)} {RecordNames.DescribeOrigin(other.FormKey, other.WinningMod)}";
 
-    public static void PrintRelocations(ScanResult scan, RelocationResult relocations)
+    public static void PrintRelocations(World world, RelocationResult relocations)
     {
         foreach (var move in relocations.Moved)
         {
-            var target = scan.Targets[move.Evaluation.TargetIndex];
+            var target = world.Targets[move.Evaluation.TargetIndex];
             Console.WriteLine(
-                $"  Moved kept {RecordNames.Describe(target.Record)} in {scan.SpaceNames[target.SpaceKey]} "
+                $"  Moved kept {RecordNames.Describe(target)} in {world.SpaceNames[target.SpaceKey]} "
                 + $"out of {DescribeOtherObject(move.Evaluation.ContainingObject!.Value)}: {move.Distance:F0} units onto the {move.Surface.ToString().ToLowerInvariant()}.");
             if (move.LeftHomeCell)
             {
                 Console.WriteLine(
-                    $"  Warning: {RecordNames.Describe(target.Record)} was moved into the neighboring cell "
+                    $"  Warning: {RecordNames.Describe(target)} was moved into the neighboring cell "
                     + $"({ExteriorGrid.CellIndex(move.To.X)}, {ExteriorGrid.CellIndex(move.To.Y)}) because its own cell has no free spot.");
             }
         }
         foreach (var evaluation in relocations.LeftInPlace)
         {
-            var target = scan.Targets[evaluation.TargetIndex];
+            var target = world.Targets[evaluation.TargetIndex];
             Console.WriteLine(
-                $"  Left kept {RecordNames.Describe(target.Record)} in {scan.SpaceNames[target.SpaceKey]} "
+                $"  Left kept {RecordNames.Describe(target)} in {world.SpaceNames[target.SpaceKey]} "
                 + $"inside {DescribeOtherObject(evaluation.ContainingObject!.Value)}: no free navmesh or terrain spot within {KeptObjectRelocator.MaxMoveDistance:F0} units.");
         }
         Console.WriteLine(
@@ -368,25 +378,25 @@ internal static class RunReport
         }
     }
 
-    public static void PrintRemovals(ScanResult scan, BaseObjectShapeProvider shapes, IEnumerable<Removal> removals)
+    public static void PrintRemovals(World world, BaseObjectShapeProvider shapes, IEnumerable<Removal> removals)
     {
         foreach (var removal in removals)
         {
-            var target = scan.Targets[removal.TargetIndex];
+            var target = world.Targets[removal.TargetIndex];
             Console.WriteLine(
-                $"  Removed {RecordNames.Describe(target.Record)} (base {RecordNames.DescribeBase(shapes, target.Base)}) "
-                + $"in {DescribeLocation(scan, target)}; {DescribeRemovalReason(scan, removal)}");
+                $"  Removed {RecordNames.Describe(target)} (base {RecordNames.DescribeBase(shapes, target.Base)}) "
+                + $"in {DescribeLocation(world, target)}; {DescribeRemovalReason(world, removal)}");
         }
     }
 
-    private static string DescribeRemovalReason(ScanResult scan, Removal removal) => removal switch
+    private static string DescribeRemovalReason(World world, Removal removal) => removal switch
     {
         TooCloseRemoval { TooCloseTo: var other } => $"too close to {DescribeOtherObject(other)}",
-        TouchingRemoval touching => $"touches removed {RecordNames.Describe(scan.Targets[touching.TouchedTargetIndex].Record)}",
+        TouchingRemoval touching => $"touches removed {RecordNames.Describe(world.Targets[touching.TouchedTargetIndex])}",
         AnchoringRemoval anchoring =>
-            $"{anchoring.RemovedShare:P0} of its support was removed (mostly {RecordNames.Describe(scan.Targets[anchoring.MainRemovedSupporter].Record)})",
+            $"{anchoring.RemovedShare:P0} of its support was removed (mostly {RecordNames.Describe(world.Targets[anchoring.MainRemovedSupporter])})",
         LeftoverRemoval { Evaluation: var evaluation } => $"invisible, {DescribeLeftoverReason(evaluation)}",
-        LinkedRemoval linked => $"linked to removed {RecordNames.Describe(scan.Targets[linked.LinkedToTargetIndex].Record)}",
+        LinkedRemoval linked => $"linked to removed {RecordNames.Describe(world.Targets[linked.LinkedToTargetIndex])}",
         _ => throw new UnreachableException($"Unknown removal type {removal.GetType().Name}."),
     };
 
@@ -406,25 +416,25 @@ internal static class RunReport
     }
 
     public static void PrintSpaceSummary(
-        ScanResult scan,
+        World world,
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
         IReadOnlyList<Removal> removals)
     {
         var removedBySpace = removals
-            .GroupBy(r => scan.Targets[r.TargetIndex].SpaceKey)
+            .GroupBy(r => world.Targets[r.TargetIndex].SpaceKey)
             .ToDictionary(g => g.Key, g => g.Count());
         Console.WriteLine("Per cell/worldspace (target objects / other objects / removed):");
-        foreach (var group in scan.Targets
+        foreach (var group in world.Targets
                      .GroupBy(t => t.SpaceKey)
-                     .OrderBy(g => scan.SpaceNames[g.Key], StringComparer.OrdinalIgnoreCase))
+                     .OrderBy(g => world.SpaceNames[g.Key], StringComparer.OrdinalIgnoreCase))
         {
             removedBySpace.TryGetValue(group.Key, out var removedCount);
             Console.WriteLine(
-                $"  {scan.SpaceNames[group.Key]}: {group.Count():N0} / {indexes[group.Key].Count:N0} / {removedCount:N0}");
+                $"  {world.SpaceNames[group.Key]}: {group.Count():N0} / {indexes[group.Key].Count:N0} / {removedCount:N0}");
         }
     }
 
-    /// <param name="linkCount">Links from target objects to other target-plugin records, before those not between two target objects are dropped.</param>
+    /// <param name="linkCount">Links from target objects to any target-plugin record, before those not between two target objects are dropped.</param>
     public static void PrintLinkedGroups(LinkedGroups groups, int linkCount)
     {
         var multiMember = groups.MultiMemberGroups.ToList();
@@ -476,19 +486,19 @@ internal static class RunReport
         Console.WriteLine($"Removed markers by type: {(counts.Count == 0 ? "none" : string.Join(", ", counts))}.");
     }
 
-    public static void PrintManualPatchHints(ScanResult scan, IReadOnlyList<ManualPatchHint> hints)
+    public static void PrintManualPatchHints(World world, IReadOnlyList<ManualPatchHint> hints)
     {
         Console.WriteLine($"Possible manual patch needed: {hints.Count:N0} objects to check.");
         foreach (var hint in hints)
         {
-            var target = scan.Targets[hint.TargetIndex];
-            Console.WriteLine($"  {DescribeHintType(hint.Type)} {RecordNames.Describe(target.Record)} in {DescribeLocation(scan, target)}: {hint.Detail}.");
+            var target = world.Targets[hint.TargetIndex];
+            Console.WriteLine($"  {DescribeHintType(hint.Type)} {RecordNames.Describe(target)} in {DescribeLocation(world, target)}: {hint.Detail}.");
         }
     }
 
-    private static string DescribeLocation(ScanResult scan, TargetObject target)
+    private static string DescribeLocation(World world, TargetObject target)
     {
-        var space = scan.SpaceNames[target.SpaceKey];
+        var space = world.SpaceNames[target.SpaceKey];
         return target.CellName == null ? space : $"{space}, cell {target.CellName}";
     }
 

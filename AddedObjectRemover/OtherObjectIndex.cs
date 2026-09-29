@@ -25,13 +25,6 @@ internal sealed class OtherObjectIndex
     private readonly Vector3[] _centers;
     private readonly int[] _state;
 
-    /// <summary>
-    /// 0/1 per object: set when the object is judged a same-position/same-size replacement of a
-    /// target object. Replaced objects stay indexed (they are replacement candidates) but never
-    /// match in the too-close test.
-    /// </summary>
-    private readonly int[] _replaced;
-
     private readonly Lazy<OtherObjectBoxIndex> _bounds;
     private TimeSpan _boundsBuildTime;
 
@@ -44,7 +37,6 @@ internal sealed class OtherObjectIndex
         _invisible = invisible;
         _centers = new Vector3[_objects.Length];
         _state = new int[_objects.Length];
-        _replaced = new int[_objects.Length];
         PositionGrid = SpatialGrid.FromPoints(_objects.Select(o => o.Position).ToArray());
         _bounds = new Lazy<OtherObjectBoxIndex>(() => BuildBounds(parallelOptions), LazyThreadSafetyMode.ExecutionAndPublication);
     }
@@ -56,28 +48,20 @@ internal sealed class OtherObjectIndex
         return bounds;
     }
 
-    /// <summary>
-    /// One index per space containing target objects (empty if it has no other objects). The
-    /// scan's per-space lists are released afterwards.
-    /// </summary>
+    /// <summary>One index per space containing target objects (empty if it has no other objects).</summary>
     public static Dictionary<FormKey, OtherObjectIndex> BuildForTargetSpaces(
-        ScanResult scan,
+        World world,
         BaseObjectShapeProvider shapes,
         ReasonCounter invisible,
         ParallelOptions parallelOptions)
     {
         var indexes = new Dictionary<FormKey, OtherObjectIndex>();
-        foreach (var target in scan.Targets)
+        foreach (var target in world.Targets)
         {
             if (indexes.ContainsKey(target.SpaceKey)) continue;
-            indexes[target.SpaceKey] = new OtherObjectIndex(
-                scan.OthersBySpace.TryGetValue(target.SpaceKey, out var others) ? others : [],
-                shapes,
-                invisible,
-                parallelOptions);
+            var others = world.Rivals.Where(rival => rival.SpaceKey == target.SpaceKey).ToList();
+            indexes[target.SpaceKey] = new OtherObjectIndex(others, shapes, invisible, parallelOptions);
         }
-        scan.OthersBySpace.Clear();
-        scan.OthersBySpace.TrimExcess();
         return indexes;
     }
 
@@ -97,11 +81,6 @@ internal sealed class OtherObjectIndex
     public int Count => _objects.Length;
 
     public OtherObject this[int index] => _objects[index];
-
-    /// <summary>True only for the first caller.</summary>
-    public bool TryMarkReplaced(int index) => Interlocked.CompareExchange(ref _replaced[index], 1, 0) == 0;
-
-    public bool IsReplaced(int index) => Volatile.Read(ref _replaced[index]) != 0;
 
     /// <summary>World-space bounds center of a visible object; false (and no center) for an invisible one.</summary>
     public bool TryGetVisibleCenter(int index, out Vector3 center)

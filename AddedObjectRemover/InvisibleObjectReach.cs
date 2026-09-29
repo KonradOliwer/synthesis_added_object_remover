@@ -18,9 +18,10 @@ internal sealed class InvisibleObjectReach(ILinkCache linkCache, BaseObjectShape
     private readonly LazyCache<FormKey, float?> _byBase = new();
 
     /// <summary>Null when neither the reference nor its base defines a reach.</summary>
-    public float? GetReach(TargetObject target) => GetReferenceReach(target.Record) ?? GetBaseReach(target.Base);
+    public float? GetReach(TargetObject target) => target.OwnReach ?? GetBaseReach(target.Base);
 
-    private static float? GetReferenceReach(IPlacedGetter record) => record switch
+    /// <summary>The reference's own reach, read while scanning; null when the reference does not define one.</summary>
+    public static float? GetReferenceReach(IPlacedGetter record) => record switch
     {
         IPlacedObjectGetter { Radius: { } radius } when radius > 0 => radius,
         IPlacedObjectGetter { Primitive: { } primitive } => GetHorizontalHalfSize(primitive.Bounds),

@@ -14,11 +14,11 @@ public class TargetReferenceTests
     {
         var source = WithEnableParent(TestTargets.Key(0), TestTargets.Key(1));
         var references = new Dictionary<FormKey, KeepReason>();
-        var links = new List<TargetLink>();
+        var links = new List<TargetPluginLink>();
 
         TargetReferenceCollector.CollectFromPlaced(source, isTargetObject: true, TestTargets.TargetMod, references, links);
 
-        Assert.Equal(new[] { new TargetLink(TestTargets.Key(0), TestTargets.Key(1)) }, links);
+        Assert.Equal(new[] { new TargetPluginLink(TestTargets.Key(0), TestTargets.Key(1)) }, links);
         Assert.Empty(references);
     }
 
@@ -27,7 +27,7 @@ public class TargetReferenceTests
     {
         var source = WithEnableParent(new FormKey(OtherMod, 0x900), TestTargets.Key(1));
         var references = new Dictionary<FormKey, KeepReason>();
-        var links = new List<TargetLink>();
+        var links = new List<TargetPluginLink>();
 
         TargetReferenceCollector.CollectFromPlaced(source, isTargetObject: false, TestTargets.TargetMod, references, links);
 
@@ -42,7 +42,7 @@ public class TargetReferenceTests
     {
         var source = WithEnableParent(TestTargets.Key(0), new FormKey(OtherMod, 0x901));
         var references = new Dictionary<FormKey, KeepReason>();
-        var links = new List<TargetLink>();
+        var links = new List<TargetPluginLink>();
 
         TargetReferenceCollector.CollectFromPlaced(source, isTargetObject: true, TestTargets.TargetMod, references, links);
 
@@ -59,7 +59,7 @@ public class TargetReferenceTests
         var fromOther = new PlacedObject(new FormKey(OtherMod, 0x903), SkyrimRelease.SkyrimSE);
         fromOther.Base.SetTo(targetBase);
         var references = new Dictionary<FormKey, KeepReason>();
-        var links = new List<TargetLink>();
+        var links = new List<TargetPluginLink>();
 
         TargetReferenceCollector.CollectFromPlaced(fromTarget, isTargetObject: true, TestTargets.TargetMod, references, links);
         TargetReferenceCollector.CollectFromPlaced(fromOther, isTargetObject: false, TestTargets.TargetMod, references, links);

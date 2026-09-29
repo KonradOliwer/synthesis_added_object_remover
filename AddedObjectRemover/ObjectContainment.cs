@@ -19,14 +19,14 @@ internal sealed class ObjectContainment(BaseObjectShapeProvider shapes, Triangle
         return lease.Tree is { } tree && SurroundingRayTest.IsSurrounded(tree, local, transform.Rotation, scratch.Triangles);
     }
 
-    /// <param name="skipReplaced">Ignore objects the target plugin replaced.</param>
+    /// <param name="replacements">Objects the target plugin replaced are ignored; null ignores none.</param>
     /// <returns>Lowest index of a visible object of <paramref name="index"/> containing the point, or -1.</returns>
-    public int FindContainingVisible(OtherObjectIndex index, Vector3 worldPoint, bool skipReplaced, SpatialQueryScratch scratch)
+    public int FindContainingVisible(OtherObjectIndex index, Vector3 worldPoint, Replacements? replacements, SpatialQueryScratch scratch)
     {
         index.Bounds.CollectCandidates(new Box(worldPoint, worldPoint), scratch.Slots, scratch.Candidates);
         foreach (var otherIndex in scratch.Candidates)
         {
-            if (skipReplaced && index.IsReplaced(otherIndex)) continue;
+            if (replacements?.IsReplaced(index[otherIndex].Id) == true) continue;
             var other = index[otherIndex];
             if (index.IsVisible(otherIndex) && Contains(other.Base, other.Transform, worldPoint, scratch)) return otherIndex;
         }

@@ -31,18 +31,24 @@ public static class Program
         }
     }
 
-    public static void RunPatch(IPatcherState<ISkyrimMod, ISkyrimModGetter> state)
+    public static void RunPatch(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) =>
+        RunPatch(state, LoadSettings, Environment.ProcessorCount);
+
+    /// <param name="loadSettings">Called after the banner, so a settings failure message follows it.</param>
+    internal static void RunPatch(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, Func<Settings> loadSettings, int workers)
     {
         var totalTimer = Stopwatch.StartNew();
         Console.WriteLine("=== Added Object Remover ===");
 
-        var settings = LoadSettings();
-        var config = RunConfigFactory.Create(state, settings);
+        var settings = loadSettings();
+        var mods = ModFactsReader.Read(state);
+        var config = RunConfigFactory.Create(settings, mods, state.OutputPath.Path);
         if (config == null) return;
+        var standing = Standing.Decide(mods, config.Standing);
         DiagnosticsFiles.DeleteEarlierFiles(config.DiagnosticsFolder, config.WritesDiagnostics);
-        RunReport.PrintConfig(config);
+        RunReport.PrintConfig(config, mods, standing);
 
-        new RemovalPipeline(state, config).Run(totalTimer);
+        new RemovalPipeline(state, config, mods, standing, workers).Run(totalTimer);
     }
 
     /// <summary>Settings are read lazily from settings.json; an invalid saved value throws here on first access.</summary>

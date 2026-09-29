@@ -74,13 +74,15 @@ public class LeftoverDecisionTests
             ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers),
             ObjectVisibility.Invisible(InvisibleObjectKind.Lights),
         };
-        var keepRule = new KeepReferencedRule(
+        var protection = Protection.Build(
             targets,
-            new Dictionary<FormKey, KeepReason> { [TestTargets.Key(referencedMarkerInRoom)] = new(KeepKind.NonPlacedReference, "QUST record", "linked from QUST") },
-            LinkedGroups.Build(targets, []));
+            [],
+            TestTargets.References(
+                targets.Count,
+                new Dictionary<int, KeepReason> { [referencedMarkerInRoom] = new(KeepKind.NonPlacedReference, "QUST record", "linked from QUST") }));
         var room = TestShapes.Placed(OtherMod, 0, Room.Ref, inRoom);
 
-        var result = TestLeftovers.CreateSelector(targets, visibility, Shapes, [room], keepRule, Config(protectedKinds: InvisibleObjectKind.Lights))
+        var result = TestLeftovers.CreateSelector(targets, visibility, Shapes, [room], protection, Config(protectedKinds: InvisibleObjectKind.Lights))
             .SelectRemovals(new HashSet<int>(), new ParallelOptions());
 
         var decisions = result.Evaluations.ToDictionary(evaluation => evaluation.TargetIndex);

@@ -20,8 +20,7 @@ internal sealed record ManualPatchHint(ManualPatchHintType Type, int TargetIndex
 internal sealed class ManualPatchHints(
     IReadOnlyList<TargetObject> targets,
     IReadOnlyList<ObjectVisibility> visibility,
-    LinkedGroups groups,
-    KeepReferencedRule keepRule)
+    Protection protection)
 {
     private static readonly HashSet<InvisibleObjectKind> UsedMarkerKinds =
     [
@@ -39,7 +38,7 @@ internal sealed class ManualPatchHints(
             .Concat(CollectKeptByOwnReason(keptIndices, KeepKind.NonPlacedReference, ManualPatchHintType.KeptForNonPlacedReference))
             .Concat(CollectKeptByOwnReason(keptIndices, KeepKind.TeleportDoor, ManualPatchHintType.KeptTeleportDoor))
             .OrderBy(hint => hint.Type)
-            .ThenBy(hint => targets[hint.TargetIndex].Record.FormKey.ToString(), StringComparer.Ordinal)
+            .ThenBy(hint => targets[hint.TargetIndex].Key.ToString(), StringComparer.Ordinal)
             .ThenBy(hint => hint.Detail, StringComparer.Ordinal)
             .ToList();
     }
@@ -52,15 +51,15 @@ internal sealed class ManualPatchHints(
 
     private IEnumerable<ManualPatchHint> CollectKeptLinkedGroups(IEnumerable<int> keptIndices) =>
         keptIndices
-            .Where(groups.IsLinked)
-            .Select(groups.MembersOf)
+            .Where(protection.Groups.IsLinked)
+            .Select(protection.Groups.MembersOf)
             .DistinctBy(members => members[0])
             .Select(members => new ManualPatchHint(ManualPatchHintType.KeptLinkedGroup, members[0], DescribeKeptGroup(members)));
 
     private string DescribeKeptGroup(IReadOnlyList<int> members)
     {
-        var names = members.Select(member => RecordNames.Describe(targets[member].Record));
-        var reasons = WithOwnReasons(members).Select(entry => $"{RecordNames.Describe(targets[entry.Index].Record)}: {entry.Reason.Detail}");
+        var names = members.Select(member => RecordNames.Describe(targets[member]));
+        var reasons = WithOwnReasons(members).Select(entry => $"{RecordNames.Describe(targets[entry.Index])}: {entry.Reason.Detail}");
         return $"members {string.Join(", ", names)}; kept because {string.Join("; ", reasons)}";
     }
 
@@ -72,7 +71,7 @@ internal sealed class ManualPatchHints(
     /// <returns>The objects that must stay themselves, with their reason.</returns>
     private IEnumerable<(int Index, KeepReason Reason)> WithOwnReasons(IEnumerable<int> indices) =>
         indices
-            .Select(index => (Index: index, Reason: keepRule.GetOwnReason(index)))
+            .Select(index => (Index: index, Reason: protection.GetOwnReason(index)))
             .Where(entry => entry.Reason != null)
             .Select(entry => (entry.Index, entry.Reason!));
 }

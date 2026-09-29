@@ -24,7 +24,7 @@ internal static class LeftoverDiagnosticsWriter
     /// <returns>The path written to.</returns>
     public static string Write(
         string folder,
-        ScanResult scan,
+        World world,
         BaseObjectShapeProvider shapes,
         IReadOnlyList<LeftoverEvaluation> evaluations,
         RelocationResult relocations)
@@ -32,26 +32,26 @@ internal static class LeftoverDiagnosticsWriter
         var path = Path.Combine(folder, FileName);
         var movesByTarget = relocations.Moved.ToDictionary(move => move.Evaluation.TargetIndex);
         var rows = evaluations
-            .OrderBy(evaluation => scan.Targets[evaluation.TargetIndex].Record.FormKey.ToString(), StringComparer.Ordinal)
-            .Select(evaluation => FormatRow(evaluation, scan, shapes, movesByTarget.GetValueOrDefault(evaluation.TargetIndex)));
+            .OrderBy(evaluation => world.Targets[evaluation.TargetIndex].Key.ToString(), StringComparer.Ordinal)
+            .Select(evaluation => FormatRow(evaluation, world, shapes, movesByTarget.GetValueOrDefault(evaluation.TargetIndex)));
         CsvFile.Write(path, Header, rows);
         return path;
     }
 
-    private static IEnumerable<string> FormatRow(LeftoverEvaluation evaluation, ScanResult scan, BaseObjectShapeProvider shapes, Relocation? move)
+    private static IEnumerable<string> FormatRow(LeftoverEvaluation evaluation, World world, BaseObjectShapeProvider shapes, Relocation? move)
     {
-        var target = scan.Targets[evaluation.TargetIndex];
+        var target = world.Targets[evaluation.TargetIndex];
         var surroundings = evaluation.Surroundings;
         var position = target.Transform.Position;
         var inside = evaluation.ContainingObject;
         return
         [
-            Text(target.Record.FormKey.ToString()),
-            Text(target.Record.EditorID ?? string.Empty),
+            Text(target.Key.ToString()),
+            Text(target.EditorId ?? string.Empty),
             Text(RecordNames.DescribeBase(shapes, target.Base)),
             Text(DescribeBaseType(shapes, target.Base)),
             Text(evaluation.Kind.ToString()),
-            Text(scan.SpaceNames[target.SpaceKey]),
+            Text(world.SpaceNames[target.SpaceKey]),
             Text(target.CellName ?? string.Empty),
             Num(position.X), Num(position.Y), Num(position.Z),
             Num(evaluation.Radius),

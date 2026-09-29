@@ -37,7 +37,7 @@ internal static class TestShapes
     }
 
     public static OtherObject Placed(ModKey mod, int index, BaseRef baseRef, Vector3 position, float zRadians = 0f) =>
-        new(new FormKey(mod, 0x900 + (uint)index), mod, EditorId: null, baseRef, position, new P3Float(0, 0, zRadians), 1f,
+        new(new OtherId(index), new FormKey(mod, 0x900 + (uint)index), TestTargets.Space, mod, EditorId: null, baseRef, position, new P3Float(0, 0, zRadians), 1f,
             IsPrimitive: false, HasMapMarker: false);
 
     /// <summary>Writes a loose NIF of the triangles at the model path under the Data folder.</summary>

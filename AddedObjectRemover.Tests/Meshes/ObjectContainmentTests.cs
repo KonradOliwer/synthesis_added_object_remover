@@ -22,19 +22,19 @@ public class ObjectContainmentTests
     {
         var (containment, index) = CreateIndex(Place(Room, new Vector3(1000, 0, 0)), Place(Room, Vector3.Zero));
 
-        Assert.Equal(1, containment.FindContainingVisible(index, new Vector3(10, 20, 30), skipReplaced: false, new SpatialQueryScratch()));
-        Assert.Equal(0, containment.FindContainingVisible(index, new Vector3(1010, 20, 30), skipReplaced: false, new SpatialQueryScratch()));
-        Assert.Equal(-1, containment.FindContainingVisible(index, new Vector3(500, 0, 0), skipReplaced: false, new SpatialQueryScratch()));
+        Assert.Equal(1, containment.FindContainingVisible(index, new Vector3(10, 20, 30), replacements: null, new SpatialQueryScratch()));
+        Assert.Equal(0, containment.FindContainingVisible(index, new Vector3(1010, 20, 30), replacements: null, new SpatialQueryScratch()));
+        Assert.Equal(-1, containment.FindContainingVisible(index, new Vector3(500, 0, 0), replacements: null, new SpatialQueryScratch()));
     }
 
     [Fact]
     public void ReplacedObjectsAreSkippedOnRequest()
     {
         var (containment, index) = CreateIndex(Place(Room, Vector3.Zero));
-        Assert.True(index.TryMarkReplaced(0));
+        var replacements = Replacements.Of(rivalCount: 1, [new Replacement(index[0].Id, new TargetId(0), Distance: 0f, SizeRatio: 1f)]);
 
-        Assert.Equal(-1, containment.FindContainingVisible(index, new Vector3(10, 20, 30), skipReplaced: true, new SpatialQueryScratch()));
-        Assert.Equal(0, containment.FindContainingVisible(index, new Vector3(10, 20, 30), skipReplaced: false, new SpatialQueryScratch()));
+        Assert.Equal(-1, containment.FindContainingVisible(index, new Vector3(10, 20, 30), replacements, new SpatialQueryScratch()));
+        Assert.Equal(0, containment.FindContainingVisible(index, new Vector3(10, 20, 30), replacements: null, new SpatialQueryScratch()));
     }
 
     [Fact]
@@ -42,8 +42,8 @@ public class ObjectContainmentTests
     {
         var (containment, index) = CreateIndex(Place(FarRoom, Vector3.Zero));
 
-        Assert.Equal(0, containment.FindContainingVisible(index, FarOffset + new Vector3(10, 20, 30), skipReplaced: false, new SpatialQueryScratch()));
-        Assert.Equal(-1, containment.FindContainingVisible(index, new Vector3(10, 20, 30), skipReplaced: false, new SpatialQueryScratch()));
+        Assert.Equal(0, containment.FindContainingVisible(index, FarOffset + new Vector3(10, 20, 30), replacements: null, new SpatialQueryScratch()));
+        Assert.Equal(-1, containment.FindContainingVisible(index, new Vector3(10, 20, 30), replacements: null, new SpatialQueryScratch()));
     }
 
     [Fact]
@@ -51,7 +51,7 @@ public class ObjectContainmentTests
     {
         var (containment, index) = CreateIndex(Place(Room, new Vector3(60, 0, 0)), Place(Room, new Vector3(-60, 0, 0)));
 
-        Assert.Equal(0, containment.FindContainingVisible(index, new Vector3(0, 20, 30), skipReplaced: false, new SpatialQueryScratch()));
+        Assert.Equal(0, containment.FindContainingVisible(index, new Vector3(0, 20, 30), replacements: null, new SpatialQueryScratch()));
     }
 
     /// <summary>Rooms are turned so the containment test runs in a rotated frame; the far room is not, so its mesh stays at <see cref="FarOffset"/>.</summary>

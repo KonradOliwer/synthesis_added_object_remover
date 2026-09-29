@@ -68,7 +68,7 @@ public class OtherObjectBoundsTests
     private static int FindInBoxZone(OtherObjectIndex index, Vector3 targetPosition)
     {
         var target = TestTargets.Create(0, TestTargets.At(targetPosition)) with { Base = Crate.Ref };
-        return TooCloseSearch.FindFirstCentreInBoxZone(target, index, Shapes, multiplier: 0f, CountNpcsLikeObjects, [], []);
+        return TooCloseSearch.FindFirstCentreInBoxZone(target, index, Replacements.None(rivalCount: 1), Shapes, multiplier: 0f, CountNpcsLikeObjects, [], []);
     }
 
     private static OtherObject Place(TestStatic model, Vector3 position) => TestShapes.Placed(Mod, 0, model.Ref, position);

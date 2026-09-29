@@ -1,13 +1,11 @@
-using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;
-using Mutagen.Bethesda.Plugins.Order;
-using Mutagen.Bethesda.Plugins.Records;
-using Mutagen.Bethesda.Skyrim;
 
 namespace AddedObjectRemover.Tests.LoadOrder;
 
 public class CompatibilityPatchTests
 {
+    private const int PatchMasterLimit = 2;
+
     private static readonly ModKey Skyrim = ModKey.FromNameAndExtension("Skyrim.esm");
     private static readonly ModKey TargetMaster = ModKey.FromNameAndExtension("TargetMaster.esm");
     private static readonly ModKey Target = ModKey.FromNameAndExtension("Target.esp");
@@ -21,11 +19,13 @@ public class CompatibilityPatchTests
     private static readonly ModKey Missing = ModKey.FromNameAndExtension("Missing.esp");
     private static readonly ModKey SynthesisOutput = ModKey.FromNameAndExtension("Synthesis.esp");
 
+    private static readonly ModTable Mods = new(
+        [Skyrim, TargetMaster, Target, OtherA, OtherB, OtherC, Patch, Addon, Merged, Unrelated, Missing, SynthesisOutput]);
+
     [Fact]
     public void PluginMasteringTargetAndFewOtherModsIsAPatch()
     {
-        var loadOrder = new List<IModListingGetter<ISkyrimModGetter>>
-        {
+        var standing = Decide(
             Listing(Skyrim),
             Listing(TargetMaster, Skyrim),
             Listing(Target, Skyrim, TargetMaster),
@@ -34,46 +34,40 @@ public class CompatibilityPatchTests
             Listing(Addon, Skyrim, TargetMaster, Target),
             Listing(Merged, Target, OtherA, OtherB, OtherC),
             Listing(Unrelated, OtherA, OtherB),
-            new ModListing<ISkyrimModGetter>(Missing, mod: null, enabled: true),
-        };
+            new ModListing(Mods.RefOf(Missing), Loaded: false, []));
 
-        var result = Find(loadOrder);
+        var result = standing.Patches;
 
         Assert.Equal(3, result.PluginsMasteringTarget);
-        var patch = Assert.Single(result.Patches);
-        Assert.Equal(Patch, patch.Patch);
-        Assert.Equal(new[] { OtherA }, patch.OtherMasters);
+        var patch = Assert.Single(result.Detected);
+        Assert.Equal(Patch, Mods.KeyOf(patch.Patch));
+        Assert.Equal(new[] { OtherA }, patch.OtherMasters.Select(Mods.KeyOf));
         var skipped = Assert.Single(result.SkippedTooManyMasters);
-        Assert.Equal(Merged, skipped.Patch);
-        Assert.Equal(new[] { Patch, OtherA }.ToHashSet(), result.CollectIgnoredMods());
+        Assert.Equal(Merged, Mods.KeyOf(skipped.Patch));
+        Assert.Equal(new[] { Patch, OtherA }.ToHashSet(), result.IgnoredMods.Select(Mods.KeyOf).ToHashSet());
     }
 
     [Fact]
     public void OutputOfEarlierPatchersIsNeverAPatch()
     {
-        var loadOrder = new List<IModListingGetter<ISkyrimModGetter>>
-        {
+        var standing = Decide(
             Listing(Skyrim),
             Listing(Target, Skyrim),
             Listing(OtherA, Skyrim),
-            Listing(SynthesisOutput, Skyrim, Target, OtherA),
-        };
+            Listing(SynthesisOutput, Skyrim, Target, OtherA));
 
-        var result = Find(loadOrder);
+        var result = standing.Patches;
 
         Assert.Equal(0, result.PluginsMasteringTarget);
-        Assert.Empty(result.Patches);
-        Assert.Empty(result.CollectIgnoredMods());
+        Assert.Empty(result.Detected);
+        Assert.Empty(result.IgnoredMods);
     }
 
-    private static CompatibilityPatches Find(IEnumerable<IModListingGetter<ISkyrimModGetter>> loadOrder) =>
-        CompatibilityPatchDetector.Find(
-            loadOrder, Target, SynthesisOutput, new HashSet<ModKey> { TargetMaster }, new HashSet<ModKey> { Skyrim }, maxOtherMasters: 2);
+    private static ModStanding Decide(params ModListing[] listed) =>
+        Standing.Decide(
+            new ModFacts(Mods, Mods.RefOf(SynthesisOutput), [.. listed]),
+            new StandingOptions(Mods.RefOf(Target), Excluded: [], IgnoreTargetMasters: true, IgnorePatched: true, PatchMasterLimit));
 
-    private static ModListing<ISkyrimModGetter> Listing(ModKey key, params ModKey[] masters)
-    {
-        var mod = new SkyrimMod(key, SkyrimRelease.SkyrimSE);
-        foreach (var master in masters) mod.ModHeader.MasterReferences.Add(new MasterReference { Master = master });
-        return new ModListing<ISkyrimModGetter>(mod);
-    }
+    private static ModListing Listing(ModKey key, params ModKey[] masters) =>
+        new(Mods.RefOf(key), Loaded: true, [.. masters.Select(Mods.RefOf)]);
 }

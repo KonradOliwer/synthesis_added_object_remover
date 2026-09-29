@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Plugins.Cache;
 using Mutagen.Bethesda.Plugins.Records;
@@ -8,71 +9,6 @@ namespace AddedObjectRemover;
 
 /// <summary>An other-mod record skipped because the target plugin overrides it; listed in the verbose log.</summary>
 internal readonly record struct OverriddenOtherRecord(FormKey FormKey, string? EditorId, ModKey WinningMod);
-
-internal sealed class ScanResult
-{
-    public List<TargetObject> Targets { get; } = [];
-
-    /// <summary>Parallel to <see cref="Targets"/>.</summary>
-    public List<TargetLocation> TargetLocations { get; } = [];
-
-    public Dictionary<FormKey, List<OtherObject>> OthersBySpace { get; } = new();
-    public Dictionary<FormKey, string> SpaceNames { get; } = new();
-
-    /// <summary>Target FormKey -> why another record depends on it (first reason found).</summary>
-    public Dictionary<FormKey, KeepReason> TargetReferences { get; } = new();
-
-    /// <summary>Links from target objects to other target-plugin records, which form linked groups.</summary>
-    public List<TargetLink> TargetLinks { get; } = [];
-
-    public List<OverriddenOtherRecord> OverriddenOthersLog { get; } = [];
-
-    /// <summary>
-    /// Placed objects of any plugin in the target spaces that are not target objects (base game,
-    /// masters, excluded plugins, records the target overrides, target records a later plugin
-    /// overrides, other mods): everything physically there that may hold up a target object or
-    /// block a moved one. Collected only for Anchoring and for moving kept markers.
-    /// </summary>
-    public Dictionary<FormKey, List<OtherObject>> SupportersBySpace { get; } = new();
-
-    /// <summary>Target worldspace -> the worldspace whose LAND records it uses; collected only for Anchoring and for moving kept markers.</summary>
-    public Dictionary<FormKey, FormKey> LandWorldspaces { get; } = new();
-
-    /// <summary>Winning LAND record of each exterior cell in a worldspace of <see cref="LandWorldspaces"/>; collected only for Anchoring and for moving kept markers.</summary>
-    public Dictionary<ExteriorCell, ILandscapeGetter> Landscapes { get; } = new();
-
-    /// <summary>The winning navmeshes of each target space, not yet decoded; collected only for moving kept markers.</summary>
-    public Dictionary<FormKey, List<CellNavmesh>> NavmeshesBySpace { get; } = new();
-
-    public int RecordsScanned { get; set; }
-    public int TargetsOverriddenLater { get; set; }
-    public int TargetsDisabledOrWithoutPlacement { get; set; }
-    public int OthersOverriddenByTarget { get; set; }
-
-    /// <summary>Other mods' objects in the target spaces ignored for a position out of range or a position or rotation that is not a number.</summary>
-    public int InvalidPlacements { get; set; }
-
-    public int OtherObjectCount => OthersBySpace.Values.Sum(x => x.Count);
-
-    public int SupporterCount => SupportersBySpace.Values.Sum(x => x.Count);
-
-    public int NavmeshCount => NavmeshesBySpace.Values.Sum(x => x.Count);
-}
-
-/// <summary>Which placed records count as present in the world, and which placements are usable.</summary>
-internal static class PlacementInWorld
-{
-    /// <summary>
-    /// Initially Disabled hides a record, except another mod's record with an Enable Parent: the
-    /// parent's state decides whether the game shows it, so it counts as present.
-    /// </summary>
-    public static bool IsHidden(IPlacedGetter record, bool isTarget) =>
-        record.IsInitiallyDisabled() && (isTarget || record.EnableParent == null);
-
-    /// <summary>A non-finite rotation would make every oriented box test report a hit.</summary>
-    public static bool IsValid(IPlacementGetter placement) =>
-        Geometry.IsWithinLimits(Geometry.ToVector(placement.Position)) && Geometry.IsFinite(Geometry.ToVector(placement.Rotation));
-}
 
 /// <summary>
 /// The spaces (worldspace or interior cell FormKeys) that contain a record created by the target
@@ -89,53 +25,78 @@ internal sealed record TargetPluginFootprint(HashSet<FormKey> SpaceKeys, HashSet
 /// Walks each mod's cell tree once via <c>EnumerateMajorRecordContexts&lt;ICell&gt;</c> (enumerating
 /// IPlaced walks each tree three times) and reads each cell's Persistent and Temporary lists itself.
 /// Mods are visited highest priority first, so the first sighting of a FormKey (record or cell)
-/// is its winner.
+/// is its winner. The objects are then put in <see cref="FormKeyOrder"/>, which gives them their ids.
 /// </summary>
 internal sealed class PlacedRecordScanner
 {
     private enum RecordRole { Target, TargetOverriddenLater, IgnoredOrigin, OverriddenByTarget, Other }
 
+    /// <summary>A target object found by the walk, before it gets its id.</summary>
+    private sealed record FoundTarget(TargetObject Target, IPlacedGetter Record, TargetLocation Location);
+
     private readonly IPatcherState<ISkyrimMod, ISkyrimModGetter> _state;
     private readonly RunConfig _config;
+    private readonly ModTable _mods;
+    private readonly ModStanding _standing;
     private readonly TargetPluginFootprint _footprint;
     private readonly bool _collectsSurroundingsData;
     private readonly bool _collectsNavmeshes;
     private readonly HashSet<FormKey> _landWorldspaces;
-    private readonly ScanResult _scan = new();
     private readonly HashSet<FormKey> _seenRecords = new();
     private readonly HashSet<FormKey> _seenNavmeshes = new();
     private readonly Dictionary<FormKey, IModContext<ISkyrimMod, ISkyrimModGetter, ICell, ICellGetter>> _winningCells = new();
 
+    private readonly List<FoundTarget> _targets = [];
+    private readonly List<OtherObject> _rivals = [];
+    private readonly List<OtherObject> _backdrop = [];
+    private readonly Dictionary<FormKey, KeepReason> _references = new();
+    private readonly List<TargetPluginLink> _links = [];
+    private readonly Dictionary<FormKey, string> _spaceNames = new();
+    private readonly List<OverriddenOtherRecord> _overriddenOthers = [];
+    private readonly Dictionary<FormKey, FormKey> _landWorldspaceOf = new();
+    private readonly Dictionary<ExteriorCell, ILandscapeGetter> _landscapes = new();
+    private readonly Dictionary<FormKey, List<CellNavmesh>> _navmeshes = new();
+
+    private int _recordsScanned;
+    private int _targetsOverriddenLater;
+    private int _targetsHiddenOrWithoutPlacement;
+    private int _othersOverriddenByTarget;
+    private int _otherInvalidPlacements;
+
     private PlacedRecordScanner(
         IPatcherState<ISkyrimMod, ISkyrimModGetter> state,
         RunConfig config,
+        ModTable mods,
+        ModStanding standing,
         TargetPluginFootprint footprint)
     {
         _state = state;
         _config = config;
+        _mods = mods;
+        _standing = standing;
         _footprint = footprint;
         _collectsNavmeshes = config.Leftovers.MovesKeptMarkers;
         _collectsSurroundingsData = config.FollowUpMode == FollowUpRemovalMode.ObjectsSupportedByIt || _collectsNavmeshes;
         if (_collectsSurroundingsData) FindLandWorldspaces();
-        _landWorldspaces = _scan.LandWorldspaces.Values.ToHashSet();
+        _landWorldspaces = _landWorldspaceOf.Values.ToHashSet();
     }
 
-    public static ScanResult Scan(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, RunConfig config)
+    public static GameSnapshot Scan(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, RunConfig config, ModTable mods, ModStanding standing)
     {
-        var footprint = AnalyzeTargetPlugin(state, config);
-        var scan = new PlacedRecordScanner(state, config, footprint).ScanLoadOrder();
-        CollectNonPlacedReferences(state, config, scan);
-        return scan;
+        var scanner = new PlacedRecordScanner(state, config, mods, standing, AnalyzeTargetPlugin(state, config));
+        scanner.ScanLoadOrder();
+        scanner.CollectNonPlacedReferences();
+        return scanner.CreateSnapshot();
     }
 
-    private static void CollectNonPlacedReferences(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, RunConfig config, ScanResult scan)
+    private void CollectNonPlacedReferences()
     {
-        var referencingMods = state.LoadOrder.PriorityOrder
+        var referencingMods = _state.LoadOrder.PriorityOrder
             .Select(listing => listing.Mod)
             .OfType<ISkyrimModGetter>()
-            .Where(mod => MayReferenceTarget(state, config, mod));
-        var targets = scan.Targets.Select(target => target.Record.FormKey).ToHashSet();
-        TargetReferenceCollector.CollectFromNonPlaced(referencingMods, targets, scan.TargetReferences);
+            .Where(MayReferenceTarget);
+        var targets = _targets.Select(found => found.Target.Key).ToHashSet();
+        TargetReferenceCollector.CollectFromNonPlaced(referencingMods, targets, _references);
     }
 
     private void FindLandWorldspaces()
@@ -143,7 +104,7 @@ internal sealed class PlacedRecordScanner
         foreach (var spaceKey in _footprint.SpaceKeys)
         {
             if (!_state.LinkCache.TryResolve<IWorldspaceGetter>(spaceKey, out var worldspace)) continue;
-            _scan.LandWorldspaces[spaceKey] = FollowLandDataParents(worldspace);
+            _landWorldspaceOf[spaceKey] = FollowLandDataParents(worldspace);
         }
     }
 
@@ -161,25 +122,24 @@ internal sealed class PlacedRecordScanner
         return worldspace.FormKey;
     }
 
-    private ScanResult ScanLoadOrder()
+    private void ScanLoadOrder()
     {
         foreach (var listing in _state.LoadOrder.PriorityOrder)
         {
             if (listing.Mod is not { } mod) continue;
-            var collectReferences = MayReferenceTarget(_state, _config, mod);
+            var collectReferences = MayReferenceTarget(mod);
             foreach (var cellContext in mod.EnumerateMajorRecordContexts<ICell, ICellGetter>(_state.LinkCache))
             {
                 ScanCell(cellContext, listing.ModKey, collectReferences);
             }
         }
-        return _scan;
     }
 
     /// <summary>A plugin can only link to a target FormKey if it is the target, has it as a master, or is the patch.</summary>
-    private static bool MayReferenceTarget(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, RunConfig config, ISkyrimModGetter mod) =>
-        mod.ModKey == config.Target
-        || mod.ModKey == state.PatchMod.ModKey
-        || mod.MasterReferences.Any(master => master.Master == config.Target);
+    private bool MayReferenceTarget(ISkyrimModGetter mod) =>
+        mod.ModKey == _config.Target
+        || mod.ModKey == _state.PatchMod.ModKey
+        || mod.MasterReferences.Any(master => master.Master == _config.Target);
 
     /// <summary>
     /// Walks only the target plugin's own cell tree. A FormKey the target overrides is a
@@ -188,7 +148,7 @@ internal sealed class PlacedRecordScanner
     private static TargetPluginFootprint AnalyzeTargetPlugin(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, RunConfig config)
     {
         var footprint = new TargetPluginFootprint([], []);
-        if (config.TargetMod is not { } mod) return footprint;
+        if (state.LoadOrder.ListedOrder.FirstOrDefault(listing => listing.ModKey == config.Target)?.Mod is not { } mod) return footprint;
 
         foreach (var cellContext in mod.EnumerateMajorRecordContexts<ICell, ICellGetter>(state.LinkCache))
         {
@@ -228,7 +188,7 @@ internal sealed class PlacedRecordScanner
     private void CollectLandscape(ICellGetter cell, CellSpace space)
     {
         if (space.SpaceKey == cell.FormKey || cell.Grid is not { } grid || cell.Landscape is not { } landscape) return;
-        _scan.Landscapes.TryAdd(new ExteriorCell(space.SpaceKey, grid.Point.X, grid.Point.Y), landscape);
+        _landscapes.TryAdd(new ExteriorCell(space.SpaceKey, grid.Point.X, grid.Point.Y), landscape);
     }
 
     /// <remarks>Like placed records, the first copy of a navmesh found is its winner.</remarks>
@@ -238,7 +198,7 @@ internal sealed class PlacedRecordScanner
         foreach (var navmesh in cell.NavigationMeshes)
         {
             if (!_seenNavmeshes.Add(navmesh.FormKey) || navmesh.IsDeleted || navmesh.Data is not { } data) continue;
-            GetOrAddSpaceList(_scan.NavmeshesBySpace, space.SpaceKey).Add(new CellNavmesh(grid, data));
+            GetOrAddSpaceList(_navmeshes, space.SpaceKey).Add(new CellNavmesh(grid, data));
         }
     }
 
@@ -252,33 +212,34 @@ internal sealed class PlacedRecordScanner
         bool collectReferences)
     {
         if (!_seenRecords.Add(record.FormKey)) return;
-        _scan.RecordsScanned++;
+        _recordsScanned++;
         if (record.IsDeleted) return;
 
         var role = Classify(record, winningMod);
         // Targets define the target spaces, so no placement outside them can matter.
-        var placement = inTargetSpace ? FindPlacementInWorld(record, role) : null;
+        var presence = inTargetSpace ? PresenceRule.Of(ReadPlacementFacts(record), isWinningTarget: role == RecordRole.Target) : Presence.Hidden;
+        var placement = presence == Presence.Present ? record.Placement : null;
         if (collectReferences)
         {
             var isTargetObject = role == RecordRole.Target && placement != null;
-            TargetReferenceCollector.CollectFromPlaced(record, isTargetObject, _config.Target, _scan.TargetReferences, _scan.TargetLinks);
+            TargetReferenceCollector.CollectFromPlaced(record, isTargetObject, _config.Target, _references, _links);
         }
 
-        if (_collectsSurroundingsData && role != RecordRole.Target && placement != null)
+        if (_collectsSurroundingsData && role is not (RecordRole.Target or RecordRole.Other) && placement != null)
         {
-            AddSupporter(record, placement, space.SpaceKey, winningMod);
+            _backdrop.Add(CreateOtherObject(record, placement, space.SpaceKey, winningMod, editorId: null));
         }
         if (CountIfSkipped(role, record, winningMod) || !inTargetSpace) return;
 
         if (placement == null)
         {
-            if (role == RecordRole.Target) _scan.TargetsDisabledOrWithoutPlacement++;
-            else if (IsShownWithInvalidPlacement(record)) _scan.InvalidPlacements++;
+            if (role == RecordRole.Target) _targetsHiddenOrWithoutPlacement++;
+            else if (presence == Presence.InvalidPlacement) _otherInvalidPlacements++;
             return;
         }
 
         if (role == RecordRole.Target) AddTarget(record, persistent, placement, cell, space);
-        else AddOther(record, placement, space.SpaceKey, winningMod);
+        else _rivals.Add(CreateOtherObject(record, placement, space.SpaceKey, winningMod, _config.DetailedLog ? record.EditorID : null));
     }
 
     /// <returns>True when the record is neither a target nor another mod's object.</returns>
@@ -287,29 +248,24 @@ internal sealed class PlacedRecordScanner
         switch (role)
         {
             case RecordRole.TargetOverriddenLater:
-                _scan.TargetsOverriddenLater++;
+                _targetsOverriddenLater++;
                 return true;
             case RecordRole.IgnoredOrigin:
                 return true;
             case RecordRole.OverriddenByTarget:
-                _scan.OthersOverriddenByTarget++;
-                if (_config.DetailedLog) _scan.OverriddenOthersLog.Add(new OverriddenOtherRecord(record.FormKey, record.EditorID, winningMod));
+                _othersOverriddenByTarget++;
+                if (_config.DetailedLog) _overriddenOthers.Add(new OverriddenOtherRecord(record.FormKey, record.EditorID, winningMod));
                 return true;
             default:
                 return false;
         }
     }
 
-    /// <summary>Null for records the game does not show (see <see cref="PlacementInWorld.IsHidden"/>) or without a valid placement.</summary>
-    private static IPlacementGetter? FindPlacementInWorld(IPlacedGetter record, RecordRole role)
-    {
-        if (PlacementInWorld.IsHidden(record, isTarget: role == RecordRole.Target) || record.Placement is not { } placement) return null;
-        return PlacementInWorld.IsValid(placement) ? placement : null;
-    }
-
-    /// <summary>For another mod's object: shown by the game, but with a position or rotation out of range or not a number.</summary>
-    private static bool IsShownWithInvalidPlacement(IPlacedGetter record) =>
-        !PlacementInWorld.IsHidden(record, isTarget: false) && record.Placement is { } placement && !PlacementInWorld.IsValid(placement);
+    private static PlacementFacts ReadPlacementFacts(IPlacedGetter record) => new(
+        record.IsInitiallyDisabled(),
+        record.EnableParent != null,
+        record.Placement is { } placement ? Geometry.ToVector(placement.Position) : null,
+        record.Placement is { } rotated ? Geometry.ToVector(rotated.Rotation) : null);
 
     private RecordRole Classify(IPlacedGetter record, ModKey winningMod)
     {
@@ -319,37 +275,35 @@ internal sealed class PlacedRecordScanner
             // Also true when an earlier patcher in this run (the patch mod) overrode it.
             return winningMod == _config.Target ? RecordRole.Target : RecordRole.TargetOverriddenLater;
         }
-        if (_config.IgnoredOrigins.Contains(origin)) return RecordRole.IgnoredOrigin;
+        if (_mods.Find(origin) is { } originMod && _standing.IgnoredOrigins.Contains(originMod)) return RecordRole.IgnoredOrigin;
         return _footprint.OverriddenFormKeys.Contains(record.FormKey) ? RecordRole.OverriddenByTarget : RecordRole.Other;
     }
 
     private void AddTarget(IPlacedGetter record, bool persistent, IPlacementGetter placement, ICellGetter cell, CellSpace space)
     {
-        if (!_scan.SpaceNames.ContainsKey(space.SpaceKey))
+        if (!_spaceNames.ContainsKey(space.SpaceKey))
         {
-            _scan.SpaceNames[space.SpaceKey] = RecordNames.DescribeSpace(space.SpaceRecord);
+            _spaceNames[space.SpaceKey] = RecordNames.DescribeSpace(space.SpaceRecord);
         }
 
-        _scan.Targets.Add(new TargetObject(
-            Record: record,
+        var target = new TargetObject(
+            Id: default,
+            Key: record.FormKey,
+            EditorId: record.EditorID,
             SpaceKey: space.SpaceKey,
             CellName: cell.FormKey != space.SpaceKey ? RecordNames.Describe(cell) : null,
             Transform: new PlacedTransform(
                 Geometry.ToVector(placement.Position),
                 Geometry.RotationFromEuler(placement.Rotation),
                 Geometry.NormalizeScale(record.Scale)),
+            Rotation: placement.Rotation,
             Base: record.GetBaseRef(),
             IsTeleportDoor: record is IPlacedObjectGetter { TeleportDestination: not null },
             IsPrimitive: record is IPlacedObjectGetter { Primitive: not null },
-            HasMapMarker: record is IPlacedObjectGetter { MapMarker: not null }));
-        _scan.TargetLocations.Add(new TargetLocation(_winningCells[cell.FormKey], persistent));
+            HasMapMarker: record is IPlacedObjectGetter { MapMarker: not null },
+            OwnReach: InvisibleObjectReach.GetReferenceReach(record));
+        _targets.Add(new FoundTarget(target, record, new TargetLocation(_winningCells[cell.FormKey], persistent)));
     }
-
-    private void AddOther(IPlacedGetter record, IPlacementGetter placement, FormKey spaceKey, ModKey winningMod) =>
-        GetOrAddSpaceList(_scan.OthersBySpace, spaceKey).Add(CreateOtherObject(record, placement, winningMod, _config.DetailedLog ? record.EditorID : null));
-
-    private void AddSupporter(IPlacedGetter record, IPlacementGetter placement, FormKey spaceKey, ModKey winningMod) =>
-        GetOrAddSpaceList(_scan.SupportersBySpace, spaceKey).Add(CreateOtherObject(record, placement, winningMod, editorId: null));
 
     private static List<T> GetOrAddSpaceList<T>(Dictionary<FormKey, List<T>> bySpace, FormKey spaceKey)
     {
@@ -361,8 +315,10 @@ internal sealed class PlacedRecordScanner
         return items;
     }
 
-    private static OtherObject CreateOtherObject(IPlacedGetter record, IPlacementGetter placement, ModKey winningMod, string? editorId) => new(
+    private static OtherObject CreateOtherObject(IPlacedGetter record, IPlacementGetter placement, FormKey spaceKey, ModKey winningMod, string? editorId) => new(
+        default,
         record.FormKey,
+        spaceKey,
         winningMod,
         editorId,
         record.GetBaseRef(),
@@ -371,6 +327,52 @@ internal sealed class PlacedRecordScanner
         Geometry.NormalizeScale(record.Scale),
         record is IPlacedObjectGetter { Primitive: not null },
         record is IPlacedObjectGetter { MapMarker: not null });
+
+    private GameSnapshot CreateSnapshot()
+    {
+        var targets = _targets.OrderBy(found => found.Target.Key, FormKeyOrder.Comparer).ToList();
+        var world = new World(
+            targets.Select((found, index) => found.Target with { Id = new TargetId(index) }).ToImmutableArray(),
+            NumberInFormKeyOrder(_rivals, firstId: 0),
+            _collectsSurroundingsData
+                ? Collected<ImmutableArray<OtherObject>>.Of(NumberInFormKeyOrder(_backdrop, firstId: _rivals.Count))
+                : Collected<ImmutableArray<OtherObject>>.NotCollected,
+            ResolveLinks(targets),
+            targets.Select(found => _references.GetValueOrDefault(found.Target.Key)).ToImmutableArray(),
+            _spaceNames,
+            new ReadCounts(
+                _recordsScanned,
+                _targetsOverriddenLater,
+                _targetsHiddenOrWithoutPlacement,
+                _othersOverriddenByTarget,
+                _otherInvalidPlacements,
+                _links.Count,
+                _navmeshes.Values.Sum(navmeshes => navmeshes.Count)),
+            [.. _overriddenOthers]);
+        return new GameSnapshot(
+            world,
+            new RecordHandles([.. targets.Select(found => found.Record)], [.. targets.Select(found => found.Location)]),
+            new TerrainHeights(_landscapes, _landWorldspaceOf),
+            _navmeshes);
+    }
+
+    private static ImmutableArray<OtherObject> NumberInFormKeyOrder(IEnumerable<OtherObject> others, int firstId) =>
+        others
+            .OrderBy(other => other.FormKey, FormKeyOrder.Comparer)
+            .Select((other, index) => other with { Id = new OtherId(firstId + index) })
+            .ToImmutableArray();
+
+    /// <summary>The links between two target objects; links to other target-plugin records are dropped.</summary>
+    private ImmutableArray<TargetLink> ResolveLinks(IReadOnlyList<FoundTarget> sortedTargets)
+    {
+        var idByKey = Enumerable.Range(0, sortedTargets.Count).ToDictionary(index => sortedTargets[index].Target.Key, index => new TargetId(index));
+        return
+        [
+            .. _links
+                .Where(link => idByKey.ContainsKey(link.Source) && idByKey.ContainsKey(link.Linked))
+                .Select(link => new TargetLink(idByKey[link.Source], idByKey[link.Linked])),
+        ];
+    }
 
     /// <summary>
     /// Comparison space of a cell: its worldspace for exterior cells (including the worldspace's

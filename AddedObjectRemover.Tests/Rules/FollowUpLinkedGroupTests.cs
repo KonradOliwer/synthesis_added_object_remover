@@ -43,7 +43,8 @@ public class FollowUpLinkedGroupTests
         Place(Unrelated, TableModel, TestTargets.Space, new Vector3(-500, 0, 0)),
     ];
 
-    private static readonly LinkedGroups Groups = LinkedGroups.Build(Targets, [new TargetLink(TestTargets.Key(ItemOnTable), TestTargets.Key(Shelf))]);
+    private static readonly Protection SceneProtection =
+        Protection.Build(Targets, [TestTargets.Link(ItemOnTable, Shelf)], TestTargets.References(Targets.Count));
 
     private static readonly ObjectVisibility[] AllVisible = Enumerable.Repeat(ObjectVisibility.Visible, Targets.Count).ToArray();
 
@@ -51,7 +52,7 @@ public class FollowUpLinkedGroupTests
     public void EverythingTouchingFollowsLinkedPartnersIntoTheirOwnTouchSearch()
     {
         var clusters = TouchClusterFinder.Find(
-            Targets, AllVisible, seeds: [Table], keptTooClose: [], Groups, Shapes, NewCache(), NewKeepRule(), TouchDistance, Options(), collectDiagnostics: true);
+            Targets, AllVisible, seeds: [Table], keptTooClose: [], Shapes, NewCache(), SceneProtection, TouchDistance, Options(), collectDiagnostics: true);
 
         Assert.Equal(
             new Removal[]
@@ -76,12 +77,11 @@ public class FollowUpLinkedGroupTests
             AllVisible,
             seeds: [Table],
             keptTooClose: [],
-            Groups,
             new SupporterIndex(new Dictionary<FormKey, List<OtherObject>>(), Shapes, Options()),
             NoTerrain(),
             Shapes,
             NewCache(),
-            NewKeepRule(),
+            SceneProtection,
             TouchDistance,
             threshold: 0.5f,
             Options());
@@ -104,7 +104,7 @@ public class FollowUpLinkedGroupTests
             Place(itemOnTable, ItemModel, TestTargets.Space, new Vector3(5, 5, 10)),
             Place(crateBesideTable, ItemModel, TestTargets.Space, new Vector3(23, 0, 0)),
         ];
-        var groups = LinkedGroups.Build(targets, [new TargetLink(TestTargets.Key(itemOnTable), TestTargets.Key(crateBesideTable))]);
+        var protection = Protection.Build(targets, [TestTargets.Link(itemOnTable, crateBesideTable)], TestTargets.References(targets.Count));
         var floor = TestShapes.Placed(OtherMod, 0, FloorModel.Ref, Vector3.Zero);
 
         var anchoring = AnchoringRemover.Run(
@@ -112,12 +112,11 @@ public class FollowUpLinkedGroupTests
             Enumerable.Repeat(ObjectVisibility.Visible, targets.Count).ToArray(),
             seeds: [seedTable],
             keptTooClose: [],
-            groups,
             new SupporterIndex(new Dictionary<FormKey, List<OtherObject>> { [TestTargets.Space] = [floor] }, Shapes, Options()),
             NoTerrain(),
             Shapes,
             NewCache(),
-            new KeepReferencedRule(targets, new Dictionary<FormKey, KeepReason>(), groups),
+            protection,
             TouchDistance,
             threshold: 0.9f,
             Options());
@@ -134,8 +133,8 @@ public class FollowUpLinkedGroupTests
     [Fact]
     public void ReachableSpacesFollowLinkedGroups()
     {
-        Assert.Equal(new HashSet<FormKey> { TestTargets.Space, OtherSpace }, Groups.CollectReachableSpaces(Targets, [Table]));
-        Assert.Equal(new HashSet<FormKey> { OtherSpace }, LinkedGroups.Build(Targets, []).CollectReachableSpaces(Targets, [Shelf]));
+        Assert.Equal(new HashSet<FormKey> { TestTargets.Space, OtherSpace }, SceneProtection.Groups.CollectReachableSpaces(Targets, [Table]));
+        Assert.Equal(new HashSet<FormKey> { OtherSpace }, LinkedGroups.Build(Targets.Count, []).CollectReachableSpaces(Targets, [Shelf]));
     }
 
     private static TargetObject Place(int index, TestStatic model, FormKey space, Vector3 position) =>
@@ -145,8 +144,6 @@ public class FollowUpLinkedGroupTests
 
     private static TerrainHeights NoTerrain() =>
         new(new Dictionary<ExteriorCell, Mutagen.Bethesda.Skyrim.ILandscapeGetter>(), new Dictionary<FormKey, FormKey>());
-
-    private static KeepReferencedRule NewKeepRule() => new(Targets, new Dictionary<FormKey, KeepReason>(), Groups);
 
     private static ParallelOptions Options() => new() { MaxDegreeOfParallelism = 4 };
 }

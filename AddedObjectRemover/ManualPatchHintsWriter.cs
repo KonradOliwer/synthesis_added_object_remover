@@ -10,22 +10,22 @@ internal static class ManualPatchHintsWriter
     private static readonly string[] Header = ["hint", "formKey", "editorId", "space", "cell", "detail"];
 
     /// <returns>The path written to.</returns>
-    public static string Write(string folder, ScanResult scan, IEnumerable<ManualPatchHint> hints)
+    public static string Write(string folder, World world, IEnumerable<ManualPatchHint> hints)
     {
         var path = Path.Combine(folder, FileName);
-        CsvFile.Write(path, Header, hints.Select(hint => FormatRow(hint, scan)));
+        CsvFile.Write(path, Header, hints.Select(hint => FormatRow(hint, world)));
         return path;
     }
 
-    private static IEnumerable<string> FormatRow(ManualPatchHint hint, ScanResult scan)
+    private static IEnumerable<string> FormatRow(ManualPatchHint hint, World world)
     {
-        var target = scan.Targets[hint.TargetIndex];
+        var target = world.Targets[hint.TargetIndex];
         return
         [
             Text(hint.Type.ToString()),
-            Text(target.Record.FormKey.ToString()),
-            Text(target.Record.EditorID ?? string.Empty),
-            Text(scan.SpaceNames[target.SpaceKey]),
+            Text(target.Key.ToString()),
+            Text(target.EditorId ?? string.Empty),
+            Text(world.SpaceNames[target.SpaceKey]),
             Text(target.CellName ?? string.Empty),
             Text(hint.Detail),
         ];

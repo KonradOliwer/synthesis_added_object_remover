@@ -1,5 +1,3 @@
-using Mutagen.Bethesda.Plugins;
-
 namespace AddedObjectRemover;
 
 /// <summary>
@@ -14,10 +12,9 @@ internal sealed class LeftoverInvisibleObjectSelector(
     IReadOnlyList<TargetObject> targets,
     IReadOnlyList<ObjectVisibility> visibility,
     BaseObjectShapeProvider shapes,
-    IReadOnlyDictionary<FormKey, OtherObjectIndex> otherObjects,
-    ObjectContainment containment,
+    Hosts hosts,
     InvisibleObjectReach reach,
-    KeepReferencedRule keepRule,
+    Protection protection,
     LeftoverConfig config)
 {
     /// <param name="removedTargets">Target indices removed by the earlier steps.</param>
@@ -35,26 +32,16 @@ internal sealed class LeftoverInvisibleObjectSelector(
             .ToArray();
 
         var evaluations = new LeftoverEvaluation[candidates.Length];
-        Parallel.For(
-            0,
-            candidates.Length,
-            options,
-            () => new SpatialQueryScratch(),
-            (i, _, scratch) =>
-            {
-                evaluations[i] = Evaluate(candidates[i], surroundings, removedTargets, scratch);
-                return scratch;
-            },
-            _ => { });
+        Parallel.For(0, candidates.Length, options, i => evaluations[i] = Evaluate(candidates[i], surroundings, removedTargets));
         return evaluations;
     }
 
-    private LeftoverEvaluation Evaluate(int targetIndex, VisibleTargetIndex surroundings, IReadOnlySet<int> removedTargets, SpatialQueryScratch scratch)
+    private LeftoverEvaluation Evaluate(int targetIndex, VisibleTargetIndex surroundings, IReadOnlySet<int> removedTargets)
     {
         var target = targets[targetIndex];
         var kind = visibility[targetIndex].Kind!.Value;
         var radius = GetEffectiveRadius(target);
-        var containingObject = FindContainingOtherObject(target, scratch);
+        var containingObject = hosts.HostOf(targetIndex);
         var areas = MeasureSurroundings(target, radius, surroundings, removedTargets);
         var ruleDecision = containingObject != null ? LeftoverDecision.RemovedInsideOtherObject : DecideByDirections(areas, config);
         var (decision, keepReason) = ApplyKeepRules(targetIndex, kind, ruleDecision);
@@ -63,14 +50,6 @@ internal sealed class LeftoverInvisibleObjectSelector(
 
     private float GetEffectiveRadius(TargetObject target) =>
         reach.GetReach(target) is { } ownReach ? MathF.Min(config.SearchRadius, ownReach) : config.SearchRadius;
-
-    /// <summary>Objects the target plugin replaced do not count, as everywhere else.</summary>
-    private OtherObject? FindContainingOtherObject(TargetObject target, SpatialQueryScratch scratch)
-    {
-        var index = otherObjects[target.SpaceKey];
-        var match = containment.FindContainingVisible(index, target.Transform.Position, skipReplaced: true, scratch);
-        return match >= 0 ? index[match] : null;
-    }
 
     private SectorAreas MeasureSurroundings(
         TargetObject target,
@@ -101,7 +80,7 @@ internal sealed class LeftoverInvisibleObjectSelector(
     {
         if (!ruleDecision.IsRemoval()) return (ruleDecision, null);
         if (config.ProtectedKinds.Contains(kind)) return (LeftoverDecision.KeptProtectedType, null);
-        return keepRule.TryGetKeepReason(targetIndex, out var keepReason)
+        return protection.TryGetKeepReason(targetIndex, out var keepReason)
             ? (LeftoverDecision.KeptReferenced, keepReason)
             : (ruleDecision, null);
     }

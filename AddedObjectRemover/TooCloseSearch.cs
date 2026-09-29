@@ -19,6 +19,7 @@ internal static class TooCloseSearch
         IReadOnlyList<TargetObject> targets,
         IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
+        Replacements replacements,
         BaseObjectShapeProvider shapes,
         float multiplier,
         NpcClashRule npcRule,
@@ -38,7 +39,7 @@ internal static class TooCloseSearch
                     continue;
                 }
                 var objectMatch = FindFirstCentreInBoxZone(
-                    targets[i], indexes[targets[i].SpaceKey], shapes, multiplier, npcRule, slots, candidates);
+                    targets[i], indexes[targets[i].SpaceKey], replacements, shapes, multiplier, npcRule, slots, candidates);
                 matches[i] = npcRule.ThenFirstStuckNpc(objectMatch, i, npcScratch);
             }
             npcRule.AddStats(npcScratch);
@@ -71,6 +72,7 @@ internal static class TooCloseSearch
     public static int FindFirstCentreInBoxZone(
         TargetObject target,
         OtherObjectIndex index,
+        Replacements replacements,
         BaseObjectShapeProvider shapes,
         float multiplier,
         NpcClashRule npcRule,
@@ -85,7 +87,7 @@ internal static class TooCloseSearch
         index.Bounds.CollectCandidates(Geometry.WorldAabb(expanded, position, rotation), slots, candidates);
         foreach (var otherIndex in candidates)
         {
-            if (index.IsReplaced(otherIndex) || !npcRule.TestsLikeObject(index[otherIndex])) continue;
+            if (replacements.IsReplaced(index[otherIndex].Id) || !npcRule.TestsLikeObject(index[otherIndex])) continue;
             if (index.TryGetVisibleCenter(otherIndex, out var center) && Geometry.IsInsideOrientedBox(center, position, rotation, expanded)) return otherIndex;
         }
         return -1;

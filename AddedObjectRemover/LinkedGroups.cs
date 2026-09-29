@@ -20,8 +20,8 @@ internal sealed class LinkedGroups
 
     public static LinkedGroups Build(int targetCount, IEnumerable<TargetLink> links)
     {
-        var roots = Enumerable.Range(0, targetCount).ToArray();
-        foreach (var link in links) Join(roots, link.From.Index, link.To.Index);
+        var roots = new UnionFind(targetCount);
+        foreach (var link in links) roots.Join(link.From.Index, link.To.Index);
         return CreateGroups(roots);
     }
 
@@ -61,34 +61,14 @@ internal sealed class LinkedGroups
         return spaces;
     }
 
-
-    private static void Join(int[] roots, int first, int second)
+    private static LinkedGroups CreateGroups(UnionFind roots)
     {
-        var firstRoot = FindRoot(roots, first);
-        var secondRoot = FindRoot(roots, second);
-        if (firstRoot == secondRoot) return;
-        roots[Math.Max(firstRoot, secondRoot)] = Math.Min(firstRoot, secondRoot);
-    }
-
-    /// <remarks>Halves the path on the way, so chains stay short.</remarks>
-    private static int FindRoot(int[] roots, int node)
-    {
-        while (roots[node] != node)
-        {
-            roots[node] = roots[roots[node]];
-            node = roots[node];
-        }
-        return node;
-    }
-
-    private static LinkedGroups CreateGroups(int[] roots)
-    {
-        var groupOf = new int[roots.Length];
+        var groupOf = new int[roots.Count];
         var groups = new List<List<int>>();
         var groupByRoot = new Dictionary<int, int>();
-        for (var index = 0; index < roots.Length; index++)
+        for (var index = 0; index < roots.Count; index++)
         {
-            var root = FindRoot(roots, index);
+            var root = roots.Find(index);
             if (!groupByRoot.TryGetValue(root, out var group))
             {
                 group = groups.Count;

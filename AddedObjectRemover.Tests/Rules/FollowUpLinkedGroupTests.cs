@@ -51,9 +51,17 @@ public class FollowUpLinkedGroupTests
     [Fact]
     public void EverythingTouchingFollowsLinkedPartnersIntoTheirOwnTouchSearch()
     {
-        var clusters = TouchClusterFinder.Find(
-            Targets, AllVisible, seeds: [Table], keptTooClose: [], Shapes, NewCache(), SceneProtection, TouchDistance, Options(), collectDiagnostics: true);
+        var (ledger, followUpRounds, clusters) =
+            TestTouchCascade.Execute(Targets, Shapes, SceneProtection, [Table], TouchDistance, threads: 4, collectDiagnostics: true);
 
+        Assert.Equal(
+            new (int, Cause)[]
+            {
+                (ItemOnTable, new Cause.Touching(new TargetId(Table))),
+                (Shelf, new Cause.Linked(new TargetId(ItemOnTable))),
+                (ItemOnShelf, new Cause.Touching(new TargetId(Shelf))),
+            },
+            followUpRounds.SelectMany(round => ledger.RemovedIn(round)).Select(target => (target.Index, ledger.Of(target)!.Cause)));
         Assert.Equal(
             new Removal[]
             {

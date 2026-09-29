@@ -35,7 +35,7 @@ NPCs and creatures (only when stuck in the object): 2 placed NPCs evaluated: 0 s
 Linked groups: 1 more objects removed with the too-close removals they are linked to.
   Kept T_TouchReferenced [000816:Target.esp] in interior AorInterior [000800:Skyrim.esm]: Enable Parent of 000811:Rival.esp (touches removed T_TouchLink2 [000815:Target.esp]).
 Touching objects: 4 removed in 17 components (3 with follow-up removals, largest 3 removed objects, longest chain 3 steps); 1 kept as referenced.
-  Pairs: 5 box candidates next to a removal tested over 5 levels, 5 touching, 0 without mesh triangles (never touching); 11 triangle pairs tested exactly.
+  Pairs: 5 box candidates next to a removal tested over 3 levels, 5 touching, 0 without mesh triangles (never touching); 11 triangle pairs tested exactly.
 Touch diagnostics: wrote 5 edges, 17 components in <time> to <root>\Output\AddedObjectRemover Reports\edges.csv / <root>\Output\AddedObjectRemover Reports\components.csv.
 Linked groups: 0 more objects removed with the follow-up removals they are linked to.
   Kept T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
@@ -69,9 +69,9 @@ Wrote 24 overrides (23 removed, 1 moved) in <time>.
   Removed T_ExteriorCrate [00082A:Target.esp] (base T_CrateBase [000800:Target.esp]) in worldspace AorWorld [000801:Skyrim.esm], cell AorExterior [000802:Skyrim.esm]; too close to R_ExteriorCrate_Pad [00081E:Rival.esp] from Rival.esp
   Removed T_LinkedFar [00080E:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; linked to removed T_LinkedNear [00080D:Target.esp]
   Removed T_TouchLink1 [000814:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; touches removed T_TouchSeed [000813:Target.esp]
-  Removed T_TouchLink2 [000815:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; touches removed T_TouchLink1 [000814:Target.esp]
   Removed T_SupportedByOnlyTheSeed [000818:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; touches removed T_SupportSeed [000817:Target.esp]
   Removed T_SupportedPartlyBySeed [00081A:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; touches removed T_SupportSeedPartial [000819:Target.esp]
+  Removed T_TouchLink2 [000815:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; touches removed T_TouchLink1 [000814:Target.esp]
   Removed T_MarkerInsideBuilding [00081B:Target.esp] (base T_XMarkerBase [000804:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; invisible, inside another mod's object (inside R_InsideBuilding [000814:Rival.esp] from Rival.esp)
   Removed T_Light [00081D:Target.esp] (base T_LightBase [000805:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; invisible, surroundings removed
 Bounds: 6 bases from NIF, 0 NIF misses, 4 from OBND, 0 without bounds. Meshes: 4 read, 0 effect-only, 0 failed (4 loose, 0 from 0 archives), 0 with a footer root other than their first node.
@@ -120,26 +120,26 @@ componentId,size,seedCount,removedByTouchCount,keptAsReferencedCount,spaces,worl
 1,1,1,0,0,interior AorInterior [000800:Skyrim.esm],7950,-50,0,8050,50,100,T_BoundsOnlyBase [000802:Target.esp]:1,0,000809:Target.esp,000807:Rival.esp (Rival.esp)
 2,1,1,0,0,interior AorInterior [000800:Skyrim.esm],11950,-50,0,12050,50,100,T_CrateBase [000800:Target.esp]:1,0,00080B:Target.esp,000809:Rival.esp (Rival.esp)
 3,1,1,0,0,interior AorInterior [000800:Skyrim.esm],23950,-50,0,24050,50,100,T_CrateBase [000800:Target.esp]:1,0,00080D:Target.esp,00080B:Rival.esp (Rival.esp)
-4,4,1,2,1,interior AorInterior [000800:Skyrim.esm],39950,-50,0,40362,50,100,T_CrateBase [000800:Target.esp]:4,3,000813:Target.esp -> 000814:Target.esp -> 000815:Target.esp -> 000816:Target.esp,000810:Rival.esp (Rival.esp)
-5,2,1,1,0,interior AorInterior [000800:Skyrim.esm],43950,-50,0,44050,50,200,T_CrateBase [000800:Target.esp]:2,1,000817:Target.esp -> 000818:Target.esp,000812:Rival.esp (Rival.esp)
-6,2,1,1,0,interior AorInterior [000800:Skyrim.esm],43870,950,0,44050,1050,200,T_CrateBase [000800:Target.esp]:2,1,000819:Target.esp -> 00081A:Target.esp,000813:Rival.esp (Rival.esp)
-7,1,1,0,0,interior AorInterior [000800:Skyrim.esm],52350,-50,0,52450,50,100,T_CrateBase [000800:Target.esp]:1,0,00081E:Target.esp,000815:Rival.esp (Rival.esp)
-8,1,1,0,0,interior AorInterior [000800:Skyrim.esm],51950,350,0,52050,450,100,T_CrateBase [000800:Target.esp]:1,0,00081F:Target.esp,000816:Rival.esp (Rival.esp)
-9,1,1,0,0,interior AorInterior [000800:Skyrim.esm],51550,-50,0,51650,50,100,T_CrateBase [000800:Target.esp]:1,0,000820:Target.esp,000817:Rival.esp (Rival.esp)
-10,1,1,0,0,interior AorInterior [000800:Skyrim.esm],51950,-450,0,52050,-350,100,T_CrateBase [000800:Target.esp]:1,0,000821:Target.esp,000818:Rival.esp (Rival.esp)
-11,1,1,0,0,interior AorInterior [000800:Skyrim.esm],56350,-50,0,56450,50,100,T_CrateBase [000800:Target.esp]:1,0,000824:Target.esp,000819:Rival.esp (Rival.esp)
-12,1,1,0,0,interior AorInterior [000800:Skyrim.esm],55950,350,0,56050,450,100,T_CrateBase [000800:Target.esp]:1,0,000825:Target.esp,00081A:Rival.esp (Rival.esp)
-13,1,1,0,0,interior AorInterior [000800:Skyrim.esm],55550,-50,0,55650,50,100,T_CrateBase [000800:Target.esp]:1,0,000826:Target.esp,00081B:Rival.esp (Rival.esp)
-14,1,1,0,0,interior AorInterior [000800:Skyrim.esm],55950,-450,0,56050,-350,100,T_CrateBase [000800:Target.esp]:1,0,000827:Target.esp,00081C:Rival.esp (Rival.esp)
-15,1,1,0,0,worldspace AorWorld [000801:Skyrim.esm],550,550,128,650,650,228,T_CrateBase [000800:Target.esp]:1,0,00082A:Target.esp,00081E:Rival.esp (Rival.esp)
-16,1,1,0,0,interior AorInterior [000800:Skyrim.esm],25450,-50,0,25550,50,100,T_CrateBase [000800:Target.esp]:1,0,00080E:Target.esp,linked to 00080D:Target.esp
+4,1,1,0,0,interior AorInterior [000800:Skyrim.esm],25450,-50,0,25550,50,100,T_CrateBase [000800:Target.esp]:1,0,00080E:Target.esp,linked to 00080D:Target.esp
+5,4,1,2,1,interior AorInterior [000800:Skyrim.esm],39950,-50,0,40362,50,100,T_CrateBase [000800:Target.esp]:4,3,000813:Target.esp -> 000814:Target.esp -> 000815:Target.esp -> 000816:Target.esp,000810:Rival.esp (Rival.esp)
+6,2,1,1,0,interior AorInterior [000800:Skyrim.esm],43950,-50,0,44050,50,200,T_CrateBase [000800:Target.esp]:2,1,000817:Target.esp -> 000818:Target.esp,000812:Rival.esp (Rival.esp)
+7,2,1,1,0,interior AorInterior [000800:Skyrim.esm],43870,950,0,44050,1050,200,T_CrateBase [000800:Target.esp]:2,1,000819:Target.esp -> 00081A:Target.esp,000813:Rival.esp (Rival.esp)
+8,1,1,0,0,interior AorInterior [000800:Skyrim.esm],52350,-50,0,52450,50,100,T_CrateBase [000800:Target.esp]:1,0,00081E:Target.esp,000815:Rival.esp (Rival.esp)
+9,1,1,0,0,interior AorInterior [000800:Skyrim.esm],51950,350,0,52050,450,100,T_CrateBase [000800:Target.esp]:1,0,00081F:Target.esp,000816:Rival.esp (Rival.esp)
+10,1,1,0,0,interior AorInterior [000800:Skyrim.esm],51550,-50,0,51650,50,100,T_CrateBase [000800:Target.esp]:1,0,000820:Target.esp,000817:Rival.esp (Rival.esp)
+11,1,1,0,0,interior AorInterior [000800:Skyrim.esm],51950,-450,0,52050,-350,100,T_CrateBase [000800:Target.esp]:1,0,000821:Target.esp,000818:Rival.esp (Rival.esp)
+12,1,1,0,0,interior AorInterior [000800:Skyrim.esm],56350,-50,0,56450,50,100,T_CrateBase [000800:Target.esp]:1,0,000824:Target.esp,000819:Rival.esp (Rival.esp)
+13,1,1,0,0,interior AorInterior [000800:Skyrim.esm],55950,350,0,56050,450,100,T_CrateBase [000800:Target.esp]:1,0,000825:Target.esp,00081A:Rival.esp (Rival.esp)
+14,1,1,0,0,interior AorInterior [000800:Skyrim.esm],55550,-50,0,55650,50,100,T_CrateBase [000800:Target.esp]:1,0,000826:Target.esp,00081B:Rival.esp (Rival.esp)
+15,1,1,0,0,interior AorInterior [000800:Skyrim.esm],55950,-450,0,56050,-350,100,T_CrateBase [000800:Target.esp]:1,0,000827:Target.esp,00081C:Rival.esp (Rival.esp)
+16,1,1,0,0,worldspace AorWorld [000801:Skyrim.esm],550,550,128,650,650,228,T_CrateBase [000800:Target.esp]:1,0,00082A:Target.esp,00081E:Rival.esp (Rival.esp)
 ## report edges.csv
 componentId,firstFormKey,secondFormKey,firstIsSeed,secondIsSeed,measuredMinSurfaceDistance,tolerance,centerToCenterDistance,first_editorId,first_base,first_modelPath,first_spaceFormKey,first_posX,first_posY,first_posZ,first_rotXDeg,first_rotYDeg,first_rotZDeg,first_scale,first_halfExtentX,first_halfExtentY,first_halfExtentZ,second_editorId,second_base,second_modelPath,second_spaceFormKey,second_posX,second_posY,second_posZ,second_rotXDeg,second_rotYDeg,second_rotZDeg,second_scale,second_halfExtentX,second_halfExtentY,second_halfExtentZ
-4,000813:Target.esp,000814:Target.esp,true,false,4,8,104,T_TouchSeed,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,40000,0,0,0,0,0,1,50,50,50,T_TouchLink1,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,40104,0,0,0,0,0,1,50,50,50
-4,000814:Target.esp,000815:Target.esp,false,false,4,8,104,T_TouchLink1,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,40104,0,0,0,0,0,1,50,50,50,T_TouchLink2,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,40208,0,0,0,0,0,1,50,50,50
-4,000815:Target.esp,000816:Target.esp,false,false,4,8,104,T_TouchLink2,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,40208,0,0,0,0,0,1,50,50,50,T_TouchReferenced,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,40312,0,0,0,0,0,1,50,50,50
-5,000817:Target.esp,000818:Target.esp,true,false,0,8,100,T_SupportSeed,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,44000,0,0,0,0,0,1,50,50,50,T_SupportedByOnlyTheSeed,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,44000,0,100,0,0,0,1,50,50,50
-6,000819:Target.esp,00081A:Target.esp,true,false,0,8,128.06248,T_SupportSeedPartial,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,43920,1000,0,0,0,0,1,50,50,50,T_SupportedPartlyBySeed,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,44000,1000,100,0,0,0,1,50,50,50
+5,000813:Target.esp,000814:Target.esp,true,false,4,8,104,T_TouchSeed,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,40000,0,0,0,0,0,1,50,50,50,T_TouchLink1,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,40104,0,0,0,0,0,1,50,50,50
+5,000814:Target.esp,000815:Target.esp,false,false,4,8,104,T_TouchLink1,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,40104,0,0,0,0,0,1,50,50,50,T_TouchLink2,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,40208,0,0,0,0,0,1,50,50,50
+5,000815:Target.esp,000816:Target.esp,false,false,4,8,104,T_TouchLink2,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,40208,0,0,0,0,0,1,50,50,50,T_TouchReferenced,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,40312,0,0,0,0,0,1,50,50,50
+6,000817:Target.esp,000818:Target.esp,true,false,0,8,100,T_SupportSeed,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,44000,0,0,0,0,0,1,50,50,50,T_SupportedByOnlyTheSeed,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,44000,0,100,0,0,0,1,50,50,50
+7,000819:Target.esp,00081A:Target.esp,true,false,0,8,128.06248,T_SupportSeedPartial,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,43920,1000,0,0,0,0,1,50,50,50,T_SupportedPartlyBySeed,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,44000,1000,100,0,0,0,1,50,50,50
 ## report leftover-invisible-objects.csv
 formKey,editorId,base,baseType,invisibleType,space,cell,x,y,z,radius,insideObject,insideObjectPlugin,EastTotal,EastRemoved,EastState,NorthEastTotal,NorthEastRemoved,NorthEastState,NorthTotal,NorthRemoved,NorthState,NorthWestTotal,NorthWestRemoved,NorthWestState,WestTotal,WestRemoved,WestState,SouthWestTotal,SouthWestRemoved,SouthWestState,SouthTotal,SouthRemoved,SouthState,SouthEastTotal,SouthEastRemoved,SouthEastState,occupiedDirections,removedDirections,decision,reason,movedToX,movedToY,movedToZ,moveDistance,movedOnto
 00081B:Target.esp,T_MarkerInsideBuilding,T_XMarkerBase [000804:Target.esp],Static,XMarkers,interior AorInterior [000800:Skyrim.esm],,48000,0,100,1024,000814:Rival.esp,Rival.esp,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,removed,inside another mod's object,,,,,

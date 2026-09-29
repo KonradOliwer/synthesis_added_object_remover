@@ -60,14 +60,17 @@ public class StepDeterminismTests
     {
         var scene = CreateFollowUpScene();
 
-        var sequential = FindTouching(scene, SequentialThreads);
-        var parallel = FindTouching(scene, ParallelThreads);
+        var sequential = RunTouchCascade(scene, SequentialThreads);
+        var parallel = RunTouchCascade(scene, ParallelThreads);
 
-        Assert.NotEmpty(sequential.Removals);
-        Assert.Contains(sequential.Removals, removal => removal is LinkedRemoval);
-        Assert.Equal(sequential.Removals, parallel.Removals);
-        Assert.Equal(sequential.Kept, parallel.Kept);
-        Assert.Equal(DescribeStats(sequential.Stats), DescribeStats(parallel.Stats));
+        Assert.NotEmpty(sequential.Clusters.Removals);
+        Assert.Contains(sequential.Clusters.Removals, removal => removal is LinkedRemoval);
+        Assert.Equal(DescribeRounds(sequential.Ledger), DescribeRounds(parallel.Ledger));
+        Assert.Equal(sequential.Ledger.All().ToList(), parallel.Ledger.All().ToList());
+        Assert.Equal(sequential.Clusters.Removals, parallel.Clusters.Removals);
+        Assert.Equal(sequential.Clusters.Kept, parallel.Clusters.Kept);
+        Assert.Equal(DescribeStats(sequential.Clusters.Stats), DescribeStats(parallel.Clusters.Stats));
+        Assert.Equal(DescribeDiagnostics(sequential.Clusters.Diagnostics!), DescribeDiagnostics(parallel.Clusters.Diagnostics!));
     }
 
     [Fact]
@@ -133,10 +136,8 @@ public class StepDeterminismTests
         Assert.Equal(DescribeEvaluations(sequential), DescribeEvaluations(parallel));
     }
 
-    private static TouchClusters FindTouching(FollowUpScene scene, int threads) =>
-        TouchClusterFinder.Find(
-            scene.Targets, AllVisible(scene.Targets), scene.Seeds, keptTooClose: [], Shapes, NewCache(), scene.Protection,
-            TouchDistance, Options(threads), collectDiagnostics: false);
+    private static TestTouchCascade.Run RunTouchCascade(FollowUpScene scene, int threads) =>
+        TestTouchCascade.Execute(scene.Targets, Shapes, scene.Protection, scene.Seeds, TouchDistance, threads, collectDiagnostics: true);
 
     private static AnchoringResult RunAnchoring(FollowUpScene scene, int threads) =>
         AnchoringRemover.Run(
@@ -227,6 +228,23 @@ public class StepDeterminismTests
     private static string DescribeStats(TouchStats stats) =>
         $"{stats.Components} {stats.ComponentsWithRemovals} {stats.LargestComponent} {stats.Levels} {stats.MaxDepth} "
         + $"{stats.Pairs.PairsTested} {stats.Pairs.TouchingPairs} {stats.Pairs.TrianglePairsTested}";
+
+    /// <summary>Everything but the edges' distances and the timings.</summary>
+    /// <summary>Each round with what it removed and held, one line per round, so a failure shows where two runs part.</summary>
+    private static List<string> DescribeRounds(Ledger ledger) =>
+    [
+        .. ledger.Rounds.Select(round =>
+            $"{round}: removed {string.Join(" ", ledger.RemovedIn(round).Select(target => target.Index))}; held {string.Join(" ", ledger.HeldIn(round).Select(target => target.Index))}"),
+    ];
+
+    private static string DescribeDiagnostics(TouchDiagnosticsData diagnostics) =>
+        string.Join(
+            "; ",
+            string.Join(' ', diagnostics.ComponentId),
+            string.Join(' ', diagnostics.ParentOf),
+            string.Join(' ', diagnostics.Depth),
+            string.Join(" | ", diagnostics.ComponentMembers.Select(members => string.Join(' ', members))),
+            string.Join(' ', diagnostics.Edges.Select(edge => $"{edge.ComponentId}:{edge.Pair.First}-{edge.Pair.Second}")));
 
     private static List<string> DescribeEvaluations(AnchoringResult anchoring) =>
         anchoring.Evaluations

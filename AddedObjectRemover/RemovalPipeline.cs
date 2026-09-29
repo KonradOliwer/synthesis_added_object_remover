@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Skyrim;
@@ -66,12 +67,12 @@ internal sealed class RemovalPipeline
         RunReport.PrintLinkedGroups(protection.Groups, world.Counts.TargetPluginLinks);
         var supporters = new SupporterIndex(GroupSupportersBySpace(world), _shapes, _parallelOptions);
         var ledger = Ledger.Start(protection, world.Targets.Length);
-        ledger = DecideTooClose(world, visibility, indexes, replacements, ledger);
-        PrintLinkedRemovals(ledger, "too-close");
-        ledger = DecideFollowUp(snapshot, visibility, supporters, protection, ledger);
-        PrintLinkedRemovals(ledger, "follow-up");
-        var (final, leftovers) = DecideLeftovers(world, visibility, indexes, replacements, ledger);
-        PrintLinkedRemovals(final, "leftover invisible object");
+        var tooClose = DecideTooClose(world, visibility, indexes, replacements, ledger);
+        PrintLinkedRemovals(tooClose, RoundsAddedTo(ledger, tooClose), "too-close");
+        var followUp = DecideFollowUp(snapshot, visibility, supporters, protection, tooClose);
+        PrintLinkedRemovals(followUp, RoundsAddedTo(tooClose, followUp), "follow-up");
+        var (final, leftovers) = DecideLeftovers(world, visibility, indexes, replacements, followUp);
+        PrintLinkedRemovals(final, RoundsAddedTo(followUp, final), "leftover invisible object");
 
         var report = new LedgerReport(final, world, leftovers);
         var removals = report.Removals();
@@ -86,12 +87,15 @@ internal sealed class RemovalPipeline
         Console.WriteLine($"Done in {totalTimer.Elapsed.TotalSeconds:F1}s.");
     }
 
-    /// <summary>How many objects the ledger's newest round removed as linked to its own removals.</summary>
-    private static void PrintLinkedRemovals(Ledger ledger, string step) =>
-        RunReport.PrintLinkedRemovals(LedgerReport.CountLinkedIn(ledger, ledger.Rounds[^1]), step);
+    /// <summary>The rounds <paramref name="after"/> has beyond <paramref name="before"/>, an older view of the same run.</summary>
+    private static ImmutableArray<Round> RoundsAddedTo(Ledger before, Ledger after) => [.. after.Rounds.Skip(before.Rounds.Length)];
 
-    private static void PrintKeptInNewestRound(World world, Ledger ledger) =>
-        RunReport.PrintKept(world, LedgerReport.KeptIn(ledger, ledger.Rounds[^1]));
+    /// <summary>How many objects the step's rounds removed as linked to their own removals.</summary>
+    private static void PrintLinkedRemovals(Ledger ledger, IEnumerable<Round> rounds, string step) =>
+        RunReport.PrintLinkedRemovals(rounds.Sum(round => LedgerReport.CountLinkedIn(ledger, round)), step);
+
+    private static void PrintKept(World world, Ledger ledger, IEnumerable<Round> rounds) =>
+        RunReport.PrintKept(world, rounds.SelectMany(round => LedgerReport.KeptIn(ledger, round)));
 
     private static HashSet<int> CollectRemoved(Ledger ledger) =>
         ledger.All().Where(entry => entry.Verdict is Verdict.Removed).Select(entry => entry.Target.Index).ToHashSet();
@@ -181,7 +185,7 @@ internal sealed class RemovalPipeline
         var next = ledger.Apply(
             RoundKind.TooClose,
             [.. hits.Select(hit => new Proposal(new TargetId(hit.TargetIndex), new Cause.TooClose(hit.TooCloseTo.Id)))]);
-        PrintKeptInNewestRound(world, next);
+        PrintKept(world, next, RoundsAddedTo(ledger, next));
         return next;
     }
 
@@ -224,12 +228,8 @@ internal sealed class RemovalPipeline
         return hits;
     }
 
-    /// <summary>
-    /// The follow-up round, seeded with the too-close round's removals. The follow-up step still
-    /// removes linked groups itself; only its own removals and held objects are proposed, and the
-    /// ledger spreads the removals to their groups.
-    /// </summary>
-    /// <returns>The ledger with the follow-up round.</returns>
+    /// <summary>The follow-up rounds, seeded with the too-close round's removals; none without seeds or with follow-up removal off.</summary>
+    /// <returns>The ledger with the follow-up rounds.</returns>
     private Ledger DecideFollowUp(
         GameSnapshot snapshot,
         IReadOnlyList<ObjectVisibility> visibility,
@@ -240,10 +240,10 @@ internal sealed class RemovalPipeline
         var tooCloseRound = ledger.Rounds[^1];
         var seeds = ledger.RemovedIn(tooCloseRound).Select(target => target.Index).ToList();
         var keptTooClose = ledger.HeldIn(tooCloseRound).Select(target => target.Index).ToList();
-        if (seeds.Count == 0) return ledger.Apply(RoundKind.FollowUp, []);
+        if (seeds.Count == 0) return ledger;
         return _config.FollowUpMode switch
         {
-            FollowUpRemovalMode.Nothing => ledger.Apply(RoundKind.FollowUp, []),
+            FollowUpRemovalMode.Nothing => ledger,
             FollowUpRemovalMode.EverythingTouching => DecideTouching(snapshot.World, visibility, seeds, keptTooClose, protection, ledger),
             FollowUpRemovalMode.ObjectsSupportedByIt => DecideUnanchored(snapshot, visibility, seeds, keptTooClose, supporters, protection, ledger),
             _ => throw new UnreachableException($"Unknown follow-up removal mode {_config.FollowUpMode}."),
@@ -258,26 +258,35 @@ internal sealed class RemovalPipeline
         Protection protection,
         Ledger ledger)
     {
-        var clusters = TouchClusterFinder.Find(
+        var (search, setup) = Timing.Measure(() => TouchSearch.Create(
             world.Targets,
             visibility,
-            seeds,
-            keptTooClose,
+            protection.Groups.CollectReachableSpaces(world.Targets, seeds),
+            excluded: keptTooClose,
             _shapes,
             _meshCache,
-            protection,
             _config.TouchDistance,
+            _parallelOptions));
+        var rule = new TouchRule(search, _parallelOptions);
+        var (next, evidence) = Cascade.Run(ledger, rule);
+        var rounds = RoundsAddedTo(ledger, next);
+        var report = new LedgerReport(next, world, LeftoverResult.None);
+        var clusters = TouchComponents.Find(
+            next,
+            report,
+            world.Targets.Length,
+            ledger.Rounds[^1],
+            rounds,
+            evidence,
+            search,
+            search.Tester.GetStats(),
+            new TouchTimes(setup, rule.BroadPhase, rule.NarrowPhase),
             _parallelOptions,
             collectDiagnostics: _config.WritesDiagnostics);
-        var next = ledger.Apply(RoundKind.FollowUp,
-        [
-            .. clusters.Removals.OfType<TouchingRemoval>().Select(removal => ProposeTouching(removal.TargetIndex, removal.TouchedTargetIndex)),
-            .. clusters.Kept.Select(kept => ProposeTouching(kept.TargetIndex, kept.TouchedTargetIndex!.Value)),
-        ]);
-        PrintKeptInNewestRound(world, next);
+        PrintKept(world, next, rounds);
         _meshMessages.PrintAndClear();
         RunReport.PrintTouchStats(clusters);
-        WriteTouchDiagnostics(world, new LedgerReport(next, world, LeftoverResult.None).RemovalsIn(next.Rounds[0]).ToList(), clusters);
+        WriteTouchDiagnostics(world, [.. report.RemovalsIn(ledger.Rounds[^1])], clusters);
         return next;
     }
 
@@ -327,7 +336,7 @@ internal sealed class RemovalPipeline
                 new Cause.LostSupport(removal.RemovedShare, new TargetId(removal.MainRemovedSupporter)))),
             .. anchoring.Kept.Select(kept => ProposeTouching(kept.TargetIndex, kept.TouchedTargetIndex!.Value)),
         ]);
-        PrintKeptInNewestRound(world, next);
+        PrintKept(world, next, RoundsAddedTo(ledger, next));
         _meshMessages.PrintAndClear();
         RunReport.PrintAnchoringStats(anchoring);
         WriteAnchoringDiagnostics(world, supporters, anchoring);
@@ -383,7 +392,7 @@ internal sealed class RemovalPipeline
         var evaluated = selector.SelectRemovals(CollectRemoved(ledger), _parallelOptions);
         var final = ledger.Apply(RoundKind.Leftover, evaluated.Proposals);
         var leftovers = evaluated.WithVerdicts(final);
-        PrintKeptInNewestRound(world, final);
+        PrintKept(world, final, RoundsAddedTo(ledger, final));
         _meshMessages.PrintAndClear();
         if (_config.DetailedLog) RunReport.PrintLeftoverDecisions(world, leftovers.Evaluations);
         RunReport.PrintLeftoverStats(leftovers, timer.Elapsed);

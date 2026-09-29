@@ -33,8 +33,8 @@ internal sealed class NpcStuckSearch
     private readonly IReadOnlyDictionary<FormKey, OtherObjectIndex> _indexes;
     private readonly Dictionary<FormKey, PlacedNpcIndex> _npcIndexes;
     private readonly Replacements _replacements;
-    private readonly BaseObjectShapeProvider _shapes;
-    private readonly TriangleTreeCache _meshCache;
+    private readonly ShapeCatalog _shapes;
+    private readonly TriangleStore _meshCache;
     private readonly LazyCache<FormKey, MeshTriangleTree> _targetBoxTrees = new();
     private readonly object _statsLock = new();
     private long _pairsTested;
@@ -46,8 +46,8 @@ internal sealed class NpcStuckSearch
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
         Dictionary<FormKey, PlacedNpcIndex> npcIndexes,
         Replacements replacements,
-        BaseObjectShapeProvider shapes,
-        TriangleTreeCache meshCache)
+        ShapeCatalog shapes,
+        TriangleStore meshCache)
     {
         _targets = targets;
         _indexes = indexes;
@@ -65,8 +65,8 @@ internal sealed class NpcStuckSearch
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
         Replacements replacements,
         NpcBodyCache bodies,
-        BaseObjectShapeProvider shapes,
-        TriangleTreeCache meshCache,
+        ShapeCatalog shapes,
+        TriangleStore meshCache,
         ParallelOptions parallelOptions)
     {
         var npcIndexes = new Dictionary<FormKey, PlacedNpcIndex>();

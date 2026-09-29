@@ -11,7 +11,7 @@ internal static class TestSupportCascade
 
     public static Run Execute(
         IReadOnlyList<TargetObject> targets,
-        BaseObjectShapeProvider shapes,
+        ShapeCatalog shapes,
         Protection protection,
         IReadOnlyList<int> seeds,
         SupporterIndex supporters,
@@ -31,7 +31,7 @@ internal static class TestSupportCascade
             protection.Groups.CollectReachableSpaces(targets, [.. seeded.RemovedIn(seedRound).Select(target => target.Index)]),
             excluded: [],
             shapes,
-            new TriangleTreeCache(shapes.ReadGeometry),
+            new TriangleStore(shapes.ReadGeometry),
             touchDistance,
             options);
         var supporterFinder = new AnchoringSupporterFinder(targets, search, supporters, shapes, touchDistance);

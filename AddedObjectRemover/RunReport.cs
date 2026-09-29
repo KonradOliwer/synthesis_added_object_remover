@@ -388,13 +388,13 @@ internal static class RunReport
         }
     }
 
-    public static void PrintRemovals(World world, BaseObjectShapeProvider shapes, IEnumerable<Removal> removals)
+    public static void PrintRemovals(World world, IBaseFacts bases, IEnumerable<Removal> removals)
     {
         foreach (var removal in removals)
         {
             var target = world.Targets[removal.TargetIndex];
             Console.WriteLine(
-                $"  Removed {RecordNames.Describe(target)} (base {RecordNames.DescribeBase(shapes, target.Base)}) "
+                $"  Removed {RecordNames.Describe(target)} (base {RecordNames.DescribeBase(bases, target.Base)}) "
                 + $"in {DescribeLocation(world, target)}; {DescribeRemovalReason(world, removal)}");
         }
     }

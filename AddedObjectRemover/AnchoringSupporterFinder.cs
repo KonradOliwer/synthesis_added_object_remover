@@ -11,7 +11,7 @@ internal sealed class AnchoringSupporterFinder(
     IReadOnlyList<TargetObject> targets,
     TouchSearch search,
     SupporterIndex supporters,
-    BaseObjectShapeProvider shapes,
+    ShapeCatalog shapes,
     float touchDistance)
 {
     /// <returns>Target supporters in neighbor order, then placed supporters in index order.</returns>

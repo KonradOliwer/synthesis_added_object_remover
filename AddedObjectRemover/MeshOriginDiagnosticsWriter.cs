@@ -43,8 +43,9 @@ internal static class MeshOriginDiagnosticsWriter
     /// <summary>One row per target mesh with usable triangles, ordered by model path.</summary>
     public static List<MeshOriginRow> CreateRows(
         IReadOnlyList<TargetObject> targets,
-        BaseObjectShapeProvider shapes,
-        TriangleTreeCache meshCache,
+        ShapeCatalog shapes,
+        IBaseFacts bases,
+        TriangleStore meshCache,
         ParallelOptions parallelOptions)
     {
         var users = targets
@@ -57,7 +58,7 @@ internal static class MeshOriginDiagnosticsWriter
         var rows = new List<MeshOriginRow>();
         for (var i = 0; i < users.Count; i++)
         {
-            if (bounds[i] is { } triangleBounds) rows.Add(CreateRow(users[i].Key, users[i].ToList(), triangleBounds, shapes));
+            if (bounds[i] is { } triangleBounds) rows.Add(CreateRow(users[i].Key, users[i].ToList(), triangleBounds, bases));
         }
         return rows;
     }
@@ -77,7 +78,7 @@ internal static class MeshOriginDiagnosticsWriter
     }
 
     /// <returns>Per mesh: the bounds of its triangles, or null when it has no usable triangles.</returns>
-    private static Box?[] MeasureTriangleBounds(IReadOnlyList<string> meshPaths, TriangleTreeCache cache, ParallelOptions parallelOptions)
+    private static Box?[] MeasureTriangleBounds(IReadOnlyList<string> meshPaths, TriangleStore cache, ParallelOptions parallelOptions)
     {
         var bounds = new Box?[meshPaths.Count];
         Parallel.For(0, meshPaths.Count, parallelOptions, i =>
@@ -88,21 +89,24 @@ internal static class MeshOriginDiagnosticsWriter
         return bounds;
     }
 
-    private static MeshOriginRow CreateRow(string modelPath, IReadOnlyList<TargetObject> users, Box triangleBounds, BaseObjectShapeProvider shapes)
+    private static MeshOriginRow CreateRow(string modelPath, IReadOnlyList<TargetObject> users, Box triangleBounds, IBaseFacts bases)
     {
         var fractions = OriginFractions(triangleBounds);
-        return new MeshOriginRow(modelPath, DescribeBases(users, shapes), users.Count, triangleBounds, fractions, Classify(fractions.Z));
+        return new MeshOriginRow(modelPath, DescribeBases(users, bases), users.Count, triangleBounds, fractions, Classify(fractions.Z));
     }
 
-    private static string DescribeBases(IEnumerable<TargetObject> users, BaseObjectShapeProvider shapes) =>
+    private static string DescribeBases(IEnumerable<TargetObject> users, IBaseFacts bases) =>
         string.Join(
             "; ",
             users
                 .Select(user => user.Base)
                 .OfType<BaseRef>()
                 .DistinctBy(reference => reference.FormKey)
-                .Select(reference => shapes.ResolveBaseOrNull(reference)?.EditorID ?? reference.FormKey.ToString())
+                .Select(reference => DescribeBaseEditorId(bases.Of(reference), reference))
                 .Order(StringComparer.OrdinalIgnoreCase));
+
+    private static string DescribeBaseEditorId(BaseFacts facts, BaseRef reference) =>
+        (facts.Resolved ? facts.EditorId : null) ?? reference.FormKey.ToString();
 
     private static Vector3 OriginFractions(Box bounds) => new(
         OriginFraction(bounds.Min.X, bounds.Max.X),

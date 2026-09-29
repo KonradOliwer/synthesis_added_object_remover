@@ -51,12 +51,12 @@ internal readonly record struct PairTestStats(
 internal sealed class TouchPairTester(
     IReadOnlyList<TargetObject> targets,
     TargetMeshPaths meshPaths,
-    TriangleTreeCache cache,
+    TriangleStore cache,
     float tolerance)
 {
     private const int PairsPerChunk = 64;
 
-    private readonly TriangleTreeCache _cache = cache;
+    private readonly TriangleStore _cache = cache;
     private int _pairsTested;
     private int _touchingPairs;
     private int _pairsWithoutGeometry;

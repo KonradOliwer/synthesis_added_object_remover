@@ -15,7 +15,7 @@ internal sealed class TouchSearch
         TargetMeshPaths meshPaths,
         TouchCandidateFinder candidateFinder,
         TouchPairTester tester,
-        TriangleTreeCache cache,
+        TriangleStore cache,
         ParallelOptions parallelOptions)
     {
         MeshPaths = meshPaths;
@@ -31,7 +31,7 @@ internal sealed class TouchSearch
 
     public TouchPairTester Tester { get; }
 
-    public TriangleTreeCache Cache { get; }
+    public TriangleStore Cache { get; }
 
     /// <param name="visibility">Parallel to <paramref name="targets"/>.</param>
     /// <param name="spaces">The spaces whose targets take part.</param>
@@ -41,8 +41,8 @@ internal sealed class TouchSearch
         IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlySet<FormKey> spaces,
         IReadOnlyList<int> excluded,
-        BaseObjectShapeProvider shapes,
-        TriangleTreeCache cache,
+        ShapeCatalog shapes,
+        TriangleStore cache,
         float tolerance,
         ParallelOptions parallelOptions)
     {

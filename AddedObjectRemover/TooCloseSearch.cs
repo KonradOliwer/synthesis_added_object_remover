@@ -20,7 +20,7 @@ internal static class TooCloseSearch
         IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
         Replacements replacements,
-        BaseObjectShapeProvider shapes,
+        ShapeCatalog shapes,
         float multiplier,
         NpcClashRule npcRule,
         ParallelOptions parallelOptions)
@@ -73,7 +73,7 @@ internal static class TooCloseSearch
         TargetObject target,
         OtherObjectIndex index,
         Replacements replacements,
-        BaseObjectShapeProvider shapes,
+        ShapeCatalog shapes,
         float multiplier,
         NpcClashRule npcRule,
         List<int> slots,

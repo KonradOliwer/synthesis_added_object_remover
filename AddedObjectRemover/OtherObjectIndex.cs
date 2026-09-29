@@ -20,7 +20,7 @@ internal sealed class OtherObjectIndex
     private const int Invisible = 2;
 
     private readonly OtherObject[] _objects;
-    private readonly BaseObjectShapeProvider _shapes;
+    private readonly ShapeCatalog _shapes;
     private readonly ReasonCounter? _invisible;
     private readonly Vector3[] _centers;
     private readonly int[] _state;
@@ -30,7 +30,7 @@ internal sealed class OtherObjectIndex
 
     /// <param name="invisible">Counts each invisible object once per reason; null counts nothing.</param>
     private OtherObjectIndex(
-        IReadOnlyList<OtherObject> objects, BaseObjectShapeProvider shapes, ReasonCounter? invisible, ParallelOptions parallelOptions)
+        IReadOnlyList<OtherObject> objects, ShapeCatalog shapes, ReasonCounter? invisible, ParallelOptions parallelOptions)
     {
         _objects = objects.ToArray();
         _shapes = shapes;
@@ -51,7 +51,7 @@ internal sealed class OtherObjectIndex
     /// <summary>One index per space containing target objects (empty if it has no other objects).</summary>
     public static Dictionary<FormKey, OtherObjectIndex> BuildForTargetSpaces(
         World world,
-        BaseObjectShapeProvider shapes,
+        ShapeCatalog shapes,
         ReasonCounter invisible,
         ParallelOptions parallelOptions)
     {
@@ -66,7 +66,7 @@ internal sealed class OtherObjectIndex
     }
 
     public static OtherObjectIndex CreateUncounted(
-        IReadOnlyList<OtherObject> objects, BaseObjectShapeProvider shapes, ParallelOptions parallelOptions) =>
+        IReadOnlyList<OtherObject> objects, ShapeCatalog shapes, ParallelOptions parallelOptions) =>
         new(objects, shapes, invisible: null, parallelOptions);
 
     /// <summary>The objects by raw position: only for matching objects by where they are placed.</summary>

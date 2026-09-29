@@ -25,7 +25,8 @@ internal static class AnchoringDiagnosticsWriter
     public static string Write(
         string folder,
         World world,
-        BaseObjectShapeProvider shapes,
+        ShapeCatalog shapes,
+        IBaseFacts bases,
         SupporterIndex supporters,
         IReadOnlyList<AnchoringEvaluation> evaluations,
         float threshold)
@@ -34,7 +35,7 @@ internal static class AnchoringDiagnosticsWriter
         var rows = evaluations
             .OrderBy(evaluation => evaluation.Iteration)
             .ThenBy(evaluation => world.Targets[evaluation.TargetIndex].Key.ToString(), StringComparer.Ordinal)
-            .Select(evaluation => FormatRow(evaluation, world, shapes, supporters, threshold));
+            .Select(evaluation => FormatRow(evaluation, world, shapes, bases, supporters, threshold));
         CsvFile.Write(path, Header, rows);
         return path;
     }
@@ -42,7 +43,8 @@ internal static class AnchoringDiagnosticsWriter
     private static IEnumerable<string> FormatRow(
         AnchoringEvaluation evaluation,
         World world,
-        BaseObjectShapeProvider shapes,
+        ShapeCatalog shapes,
+        IBaseFacts bases,
         SupporterIndex supporters,
         float threshold)
     {
@@ -52,7 +54,7 @@ internal static class AnchoringDiagnosticsWriter
             Num(evaluation.Iteration),
             Text(target.Key.ToString()),
             Text(target.EditorId ?? string.Empty),
-            Text(RecordNames.DescribeBase(shapes, target.Base)),
+            Text(RecordNames.DescribeBase(bases, target.Base)),
             Text(shapes.GetMeshPath(target.Base) ?? string.Empty),
             Text(world.SpaceNames[target.SpaceKey]),
             Num(evaluation.Contacts.ContactPoints),

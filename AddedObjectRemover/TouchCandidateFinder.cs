@@ -31,7 +31,7 @@ internal sealed class TouchCandidateFinder
         IReadOnlyList<TargetObject> targets,
         IReadOnlySet<FormKey> spaces,
         bool[] excluded,
-        BaseObjectShapeProvider shapes,
+        ShapeCatalog shapes,
         float tolerance,
         ParallelOptions parallelOptions)
     {
@@ -65,7 +65,7 @@ internal sealed class TouchCandidateFinder
     private bool AreBoxesClose(int a, int b) =>
         _boxes[Math.Min(a, b)].Intersects(_boxes[Math.Max(a, b)], _tolerance);
 
-    private void BuildBoxes(IReadOnlySet<FormKey> spaces, bool[] excluded, BaseObjectShapeProvider shapes, ParallelOptions parallelOptions)
+    private void BuildBoxes(IReadOnlySet<FormKey> spaces, bool[] excluded, ShapeCatalog shapes, ParallelOptions parallelOptions)
     {
         Parallel.ForEach(Partitioner.Create(0, _targets.Count), parallelOptions, range =>
         {

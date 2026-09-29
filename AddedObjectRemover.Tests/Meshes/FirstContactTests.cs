@@ -41,7 +41,7 @@ public class FirstContactTests
     private static TouchPairTester CreateTester(params (string Mesh, Vector3 Position)[] objects)
     {
         var targets = objects.Select((entry, i) => TestTargets.Create(i, TestTargets.At(entry.Position))).ToList();
-        var cache = new TriangleTreeCache(path => BoxMesh.CreateGeometry(path == "big.nif" ? Big : Small));
+        var cache = new TriangleStore(path => BoxMesh.CreateGeometry(path == "big.nif" ? Big : Small));
         return new TouchPairTester(targets, new TargetMeshPaths(objects.Select(entry => (string?)entry.Mesh).ToArray()), cache, Tolerance);
     }
 }

@@ -42,7 +42,7 @@ public class NpcBodyResolverTests
     private static readonly FormKey Missing = new(Mod, 0x8FF);
 
     private static readonly SkyrimMod Records = CreateRecords();
-    private static readonly BaseObjectShapeProvider Shapes = CreateShapes();
+    private static readonly ShapeCatalog Shapes = CreateShapes();
 
     [Fact]
     public void BodyMeshOfTheRaceIsSizedByTheFullExtentOfItsMeshes()
@@ -176,7 +176,7 @@ public class NpcBodyResolverTests
         return mod;
     }
 
-    private static BaseObjectShapeProvider CreateShapes()
+    private static ShapeCatalog CreateShapes()
     {
         var dataPath = Path.Combine(AppContext.BaseDirectory, "NpcBodyData");
         TestShapes.WriteMesh(dataPath, BaseRaceBodyMesh, TestBodies.TPose(BaseRaceBodyHeight));
@@ -186,7 +186,7 @@ public class NpcBodyResolverTests
 
         var problems = new AssetProblemLog();
         var meshFiles = new MeshFileSource(dataPath, GameRelease.SkyrimSE, [Mod], problems);
-        return new BaseObjectShapeProvider(Records.ToImmutableLinkCache(), meshFiles, problems);
+        return new ShapeCatalog(new BaseFactsReader(Records.ToImmutableLinkCache()), meshFiles, problems);
     }
 
     private static Armor CreateSkin(FormKey formKey, params FormKey[] addons)

@@ -2,13 +2,13 @@ using AddedObjectRemover.Tests.Fixtures;
 
 namespace AddedObjectRemover.Tests.Meshes;
 
-public class TriangleTreeCacheTests
+public class TriangleStoreTests
 {
     [Fact]
     public void ConcurrentUsesBuildEachMeshOnce()
     {
         var reads = 0;
-        var cache = new TriangleTreeCache(_ =>
+        var cache = new TriangleStore(_ =>
         {
             Interlocked.Increment(ref reads);
             return BoxMesh.CreateGeometry(TestMeshes.UnitCube);
@@ -27,7 +27,7 @@ public class TriangleTreeCacheTests
     [Fact]
     public void PathsDifferingInCaseShareOneTree()
     {
-        var cache = new TriangleTreeCache(_ => BoxMesh.CreateGeometry(TestMeshes.UnitCube));
+        var cache = new TriangleStore(_ => BoxMesh.CreateGeometry(TestMeshes.UnitCube));
         using var first = cache.Acquire(@"Meshes\Box.nif");
         using var second = cache.Acquire(@"meshes\box.nif");
         Assert.Same(first.Tree, second.Tree);
@@ -36,7 +36,7 @@ public class TriangleTreeCacheTests
     [Fact]
     public void MeshWithoutTrianglesHasNoTree()
     {
-        var cache = new TriangleTreeCache(_ => null);
+        var cache = new TriangleStore(_ => null);
         using var lease = cache.Acquire("missing.nif");
         Assert.Null(lease.Tree);
     }
@@ -45,7 +45,7 @@ public class TriangleTreeCacheTests
     public void FailedBuildIsRetriedOnTheNextUse()
     {
         var reads = 0;
-        var cache = new TriangleTreeCache(_ =>
+        var cache = new TriangleStore(_ =>
         {
             reads++;
             if (reads <= 2) throw new IOException("unreadable");
@@ -64,7 +64,7 @@ public class TriangleTreeCacheTests
     [Fact]
     public void DisposingADefaultLeaseDoesNothing()
     {
-        var exception = Record.Exception(() => default(TriangleTreeCache.Lease).Dispose());
+        var exception = Record.Exception(() => default(TriangleLease).Dispose());
         Assert.Null(exception);
     }
 }

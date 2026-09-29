@@ -62,7 +62,8 @@ internal static class TouchDiagnosticsWriter
     public static TouchDiagnosticsWriteResult Write(
         string folder,
         World world,
-        BaseObjectShapeProvider shapes,
+        ShapeCatalog shapes,
+        IBaseFacts bases,
         float tolerance,
         IReadOnlyList<Removal> seeds,
         TouchClusters clusters,
@@ -70,11 +71,11 @@ internal static class TouchDiagnosticsWriter
     {
         var seedReasonByTarget = seeds.ToDictionary(seed => seed.TargetIndex, seed => DescribeSeedReason(seed, world.Targets));
         var edgeRows = CreateEdgeRows(world.Targets, diagnostics, seedReasonByTarget);
-        var componentRows = CreateComponentRows(world, shapes, diagnostics, clusters, seedReasonByTarget);
+        var componentRows = CreateComponentRows(world, shapes, bases, diagnostics, clusters, seedReasonByTarget);
 
         var edgesPath = Path.Combine(folder, EdgesFileName);
         var componentsPath = Path.Combine(folder, ComponentsFileName);
-        CsvFile.Write(edgesPath, EdgeHeader, edgeRows.Select(row => FormatEdge(row, shapes, tolerance)));
+        CsvFile.Write(edgesPath, EdgeHeader, edgeRows.Select(row => FormatEdge(row, shapes, bases, tolerance)));
         CsvFile.Write(componentsPath, ComponentHeader, componentRows.Select(FormatComponent));
         return new TouchDiagnosticsWriteResult(edgeRows.Count, componentRows.Count, edgesPath, componentsPath);
     }
@@ -103,7 +104,8 @@ internal static class TouchDiagnosticsWriter
 
     private static List<ComponentRow> CreateComponentRows(
         World world,
-        BaseObjectShapeProvider shapes,
+        ShapeCatalog shapes,
+        IBaseFacts bases,
         TouchDiagnosticsData diagnostics,
         TouchClusters clusters,
         IReadOnlyDictionary<int, string> seedReasonByTarget)
@@ -123,7 +125,7 @@ internal static class TouchDiagnosticsWriter
                 keptByComponent.GetValueOrDefault(componentId),
                 DescribeSpaces(members, world),
                 ComponentWorldAabb(members, world.Targets, shapes),
-                DescribeTopBases(members, world, shapes),
+                DescribeTopBases(members, world, bases),
                 chainLength,
                 chainFormKeys,
                 DescribeSeedReasons(members, seedReasonByTarget)));
@@ -142,7 +144,7 @@ internal static class TouchDiagnosticsWriter
         return counts;
     }
 
-    private static Box ComponentWorldAabb(IReadOnlyList<int> members, IReadOnlyList<TargetObject> targets, BaseObjectShapeProvider shapes) =>
+    private static Box ComponentWorldAabb(IReadOnlyList<int> members, IReadOnlyList<TargetObject> targets, ShapeCatalog shapes) =>
         members
             .Select(member => OrientedBox.FromLocal(shapes.GetLocalBox(targets[member].Base), targets[member].Transform).WorldAabb(0))
             .Aggregate((a, b) => a.Union(b));
@@ -159,12 +161,12 @@ internal static class TouchDiagnosticsWriter
         return string.Join("; ", listed) + suffix;
     }
 
-    private static string DescribeTopBases(IReadOnlyList<int> members, World world, BaseObjectShapeProvider shapes)
+    private static string DescribeTopBases(IReadOnlyList<int> members, World world, IBaseFacts bases)
     {
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var member in members)
         {
-            var name = RecordNames.DescribeBase(shapes, world.Targets[member].Base);
+            var name = RecordNames.DescribeBase(bases, world.Targets[member].Base);
             counts[name] = counts.GetValueOrDefault(name) + 1;
         }
         return string.Join(
@@ -195,13 +197,13 @@ internal static class TouchDiagnosticsWriter
     private static string DescribeSeedReasons(IReadOnlyList<int> members, IReadOnlyDictionary<int, string> seedReasonByTarget) =>
         string.Join("; ", members.Where(seedReasonByTarget.ContainsKey).Select(member => seedReasonByTarget[member]));
 
-    private static IEnumerable<string> FormatEdge(EdgeRow row, BaseObjectShapeProvider shapes, float tolerance) =>
+    private static IEnumerable<string> FormatEdge(EdgeRow row, ShapeCatalog shapes, IBaseFacts bases, float tolerance) =>
     [
         Num(row.ComponentId), Text(row.First.Key.ToString()), Text(row.Second.Key.ToString()),
         Bool(row.FirstIsSeed), Bool(row.SecondIsSeed),
         Num(row.MinSurfaceDistance), Num(tolerance), Num(Vector3.Distance(row.First.Transform.Position, row.Second.Transform.Position)),
-        .. FormatTargetColumns(row.First, shapes),
-        .. FormatTargetColumns(row.Second, shapes),
+        .. FormatTargetColumns(row.First, shapes, bases),
+        .. FormatTargetColumns(row.Second, shapes, bases),
     ];
 
     private static IEnumerable<string> FormatComponent(ComponentRow row) =>
@@ -213,14 +215,14 @@ internal static class TouchDiagnosticsWriter
         Text(row.TopBases), Num(row.DeepestChainLength), Text(row.DeepestChainFormKeys), Text(row.SeedReasons),
     ];
 
-    private static IEnumerable<string> FormatTargetColumns(TargetObject target, BaseObjectShapeProvider shapes)
+    private static IEnumerable<string> FormatTargetColumns(TargetObject target, ShapeCatalog shapes, IBaseFacts bases)
     {
         var rotation = target.Rotation;
         var halfExtents = shapes.GetLocalBox(target.Base).Scaled(target.Transform.Scale).Size * 0.5f;
         return
         [
             Text(target.EditorId ?? string.Empty),
-            Text(RecordNames.DescribeBase(shapes, target.Base)),
+            Text(RecordNames.DescribeBase(bases, target.Base)),
             Text(shapes.GetMeshPath(target.Base) ?? string.Empty),
             Text(target.SpaceKey.ToString()),
             Num(target.Transform.Position.X), Num(target.Transform.Position.Y), Num(target.Transform.Position.Z),

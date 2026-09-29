@@ -1,6 +1,4 @@
 using Mutagen.Bethesda;
-using Mutagen.Bethesda.Plugins;
-using Mutagen.Bethesda.Plugins.Cache;
 using Mutagen.Bethesda.Skyrim;
 using Noggog;
 
@@ -9,13 +7,11 @@ namespace AddedObjectRemover;
 /// <summary>
 /// How far an invisible object acts, when its record says so: the reference's own radius (XRDS),
 /// else its primitive box's horizontal half-size, else its base light's radius or its base sound's
-/// maximum hearing distance. Thread-safe; base reaches are cached per base.
+/// maximum hearing distance. Thread-safe.
 /// </summary>
-internal sealed class InvisibleObjectReach(ILinkCache linkCache, BaseObjectShapeProvider shapes)
+internal sealed class InvisibleObjectReach(IBaseFacts bases)
 {
     private const float HalfSizeFactor = 0.5f;
-
-    private readonly LazyCache<FormKey, float?> _byBase = new();
 
     /// <summary>Null when neither the reference nor its base defines a reach.</summary>
     public float? GetReach(TargetObject target) => target.OwnReach ?? GetBaseReach(target.Base);
@@ -35,20 +31,10 @@ internal sealed class InvisibleObjectReach(ILinkCache linkCache, BaseObjectShape
         return halfSize > 0 ? halfSize : null;
     }
 
-    private float? GetBaseReach(BaseRef? baseRef) =>
-        baseRef is { } reference ? _byBase.GetOrCreate(reference.FormKey, () => MeasureBaseReach(reference)) : null;
-
-    private float? MeasureBaseReach(BaseRef reference) => shapes.ResolveBaseOrNull(reference) switch
+    private float? GetBaseReach(BaseRef? baseRef)
     {
-        ILightGetter { Radius: > 0 } light => light.Radius,
-        ISoundMarkerGetter marker => GetMaxHearingDistance(marker),
-        _ => null,
-    };
-
-    private float? GetMaxHearingDistance(ISoundMarkerGetter marker) =>
-        marker.SoundDescriptor.TryResolve(linkCache, out var descriptor)
-        && descriptor.OutputModel.TryResolve(linkCache, out var outputModel)
-        && outputModel.Attenuation is { MaxDistance: > 0 } attenuation
-            ? attenuation.MaxDistance
-            : null;
+        if (baseRef is not { } reference) return null;
+        var facts = bases.Of(reference);
+        return facts.LightRadius ?? facts.SoundMaxDistance;
+    }
 }

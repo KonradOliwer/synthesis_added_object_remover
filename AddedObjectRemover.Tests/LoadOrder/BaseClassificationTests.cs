@@ -37,12 +37,9 @@ public class BaseClassificationTests
     [Fact]
     public void PrimitiveOfACritterSpawnerStaysACritterSpawner()
     {
-        var spawner = new Mutagen.Bethesda.Skyrim.Activator(new FormKey(Mod, 0x806), SkyrimRelease.SkyrimSE)
-        {
-            VirtualMachineAdapter = new VirtualMachineAdapter { Scripts = { new ScriptEntry { Name = "CritterSpawnFish" } } },
-        };
+        var spawner = Facts(0x806, BaseRecordKind.Activator) with { HasCritterSpawnScript = true };
 
-        var shape = BaseObjectShapeProvider.ClassifyShape(spawner, Box.Zero, meshPath: null, hasModel: false, meshWithoutGeometry: false);
+        var shape = ShapeCatalog.ClassifyShape(spawner, Box.Zero, meshPath: null, hasModel: false, meshWithoutGeometry: false);
 
         Assert.Equal(InvisibleObjectKind.CritterSpawners, shape.InvisibleKind);
         Assert.False(shape.InvisibleForLackOfGeometry);
@@ -51,9 +48,9 @@ public class BaseClassificationTests
     [Fact]
     public void LightWhoseMeshHasNoRenderGeometryIsALight()
     {
-        var light = new Light(new FormKey(Mod, 0x804), SkyrimRelease.SkyrimSE);
+        var light = Facts(0x804, BaseRecordKind.Light);
 
-        var shape = BaseObjectShapeProvider.ClassifyShape(light, Box.Zero, meshPath: null, hasModel: true, meshWithoutGeometry: true);
+        var shape = ShapeCatalog.ClassifyShape(light, Box.Zero, meshPath: null, hasModel: true, meshWithoutGeometry: true);
 
         Assert.Equal(InvisibleObjectKind.Lights, shape.InvisibleKind);
         Assert.False(shape.InvisibleForLackOfGeometry);
@@ -62,14 +59,17 @@ public class BaseClassificationTests
     [Fact]
     public void LightWithAVisibleMeshIsVisible()
     {
-        var light = new Light(new FormKey(Mod, 0x805), SkyrimRelease.SkyrimSE);
+        var light = Facts(0x805, BaseRecordKind.Light);
 
-        var shape = BaseObjectShapeProvider.ClassifyShape(light, new Box(Vector3.Zero, Vector3.One), "meshes\\lamp.nif", hasModel: true, meshWithoutGeometry: false);
+        var shape = ShapeCatalog.ClassifyShape(light, new Box(Vector3.Zero, Vector3.One), "meshes\\lamp.nif", hasModel: true, meshWithoutGeometry: false);
 
         Assert.Null(shape.InvisibleKind);
     }
 
-    private static BaseObjectShapeProvider CreateShapes()
+    private static BaseFacts Facts(uint id, BaseRecordKind kind) =>
+        new(new FormKey(Mod, id), Resolved: true, kind, kind.ToString(), null, null, null, null, false, null, null);
+
+    private static ShapeCatalog CreateShapes()
     {
         var mod = new SkyrimMod(Mod, SkyrimRelease.SkyrimSE);
         mod.Activators.Add(new Mutagen.Bethesda.Skyrim.Activator(TriggerBase, SkyrimRelease.SkyrimSE));
@@ -81,6 +81,6 @@ public class BaseClassificationTests
 
         var problems = new AssetProblemLog();
         var meshFiles = new MeshFileSource(Path.GetTempPath(), GameRelease.SkyrimSE, [Mod], problems);
-        return new BaseObjectShapeProvider(mod.ToImmutableLinkCache(), meshFiles, problems);
+        return new ShapeCatalog(new BaseFactsReader(mod.ToImmutableLinkCache()), meshFiles, problems);
     }
 }

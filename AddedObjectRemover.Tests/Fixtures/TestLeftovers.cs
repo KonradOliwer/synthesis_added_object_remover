@@ -13,7 +13,7 @@ internal static class TestLeftovers
     public static LeftoverInvisibleObjectSelector CreateSelector(
         IReadOnlyList<TargetObject> targets,
         IReadOnlyList<ObjectVisibility> visibility,
-        BaseObjectShapeProvider shapes,
+        ShapeCatalog shapes,
         IReadOnlyList<OtherObject> others,
         LeftoverConfig config) =>
         new(
@@ -21,7 +21,7 @@ internal static class TestLeftovers
             visibility,
             shapes,
             FindHosts(targets, visibility, shapes, others),
-            new InvisibleObjectReach(new SkyrimMod(ReachRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache(), shapes),
+            new InvisibleObjectReach(new BaseFactsReader(new SkyrimMod(ReachRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache())),
             config);
 
     /// <summary>The leftover round applied to a fresh ledger, so referenced objects are held.</summary>
@@ -31,14 +31,14 @@ internal static class TestLeftovers
     private static Hosts FindHosts(
         IReadOnlyList<TargetObject> targets,
         IReadOnlyList<ObjectVisibility> visibility,
-        BaseObjectShapeProvider shapes,
+        ShapeCatalog shapes,
         IReadOnlyList<OtherObject> others)
     {
         var indexes = new Dictionary<FormKey, OtherObjectIndex>
         {
             [TestTargets.Space] = OtherObjectIndex.CreateUncounted(others, shapes, new ParallelOptions()),
         };
-        var containment = new ObjectContainment(shapes, new TriangleTreeCache(shapes.ReadGeometry));
+        var containment = new ObjectContainment(shapes, new TriangleStore(shapes.ReadGeometry));
         return Hosts.Find(targets, visibility, indexes, containment, Replacements.None(others.Count), new ParallelOptions());
     }
 }

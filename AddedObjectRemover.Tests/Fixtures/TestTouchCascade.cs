@@ -11,7 +11,7 @@ internal static class TestTouchCascade
 
     public static Run Execute(
         IReadOnlyList<TargetObject> targets,
-        BaseObjectShapeProvider shapes,
+        ShapeCatalog shapes,
         Protection protection,
         IReadOnlyList<int> seeds,
         float touchDistance,
@@ -29,7 +29,7 @@ internal static class TestTouchCascade
             protection.Groups.CollectReachableSpaces(targets, [.. seeded.RemovedIn(seedRound).Select(target => target.Index)]),
             excluded: [.. seeded.HeldIn(seedRound).Select(target => target.Index)],
             shapes,
-            new TriangleTreeCache(shapes.ReadGeometry),
+            new TriangleStore(shapes.ReadGeometry),
             touchDistance,
             options);
         var rule = new TouchRule(search, options);

@@ -49,12 +49,12 @@ internal sealed class ReplacementMatcher
 
     private readonly IReadOnlyList<TargetObject> _targets;
     private readonly IReadOnlyDictionary<FormKey, OtherObjectIndex> _indexes;
-    private readonly BaseObjectShapeProvider _shapes;
+    private readonly ShapeCatalog _shapes;
 
     private ReplacementMatcher(
         IReadOnlyList<TargetObject> targets,
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
-        BaseObjectShapeProvider shapes)
+        ShapeCatalog shapes)
     {
         _targets = targets;
         _indexes = indexes;
@@ -68,7 +68,7 @@ internal sealed class ReplacementMatcher
         IReadOnlyList<TargetObject> targets,
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
         int rivalCount,
-        BaseObjectShapeProvider shapes,
+        ShapeCatalog shapes,
         ParallelOptions parallelOptions)
     {
         var matcher = new ReplacementMatcher(targets, indexes, shapes);

@@ -23,7 +23,7 @@ public class OtherObjectBoundsTests
 
     private static readonly TestStatic Cliff = new(new FormKey(Mod, 0x803), @"test\cliff.nif", TestMeshes.BoxTriangles(CliffBox));
 
-    private static readonly BaseObjectShapeProvider Shapes = TestShapes.Create(Mod, "OtherObjectBoundsData", Crate, FarCrate, Cliff);
+    private static readonly ShapeCatalog Shapes = TestShapes.Create(Mod, "OtherObjectBoundsData", Crate, FarCrate, Cliff);
 
     private static readonly NpcClashRule CountNpcsLikeObjects =
         NpcClashRule.Create(NpcHandling.CountLikeObjects, () => throw new InvalidOperationException("Not used."));

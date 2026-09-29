@@ -30,7 +30,7 @@ public class FollowUpLinkedGroupTests
 
     private static readonly ModKey OtherMod = ModKey.FromNameAndExtension("Other.esp");
 
-    private static readonly BaseObjectShapeProvider Shapes =
+    private static readonly ShapeCatalog Shapes =
         TestShapes.Create(TestTargets.TargetMod, "FollowUpLinkedGroupData", TableModel, ItemModel, FloorModel);
 
     /// <summary>A table (the seed) with an item on it, a shelf in another space linked to that item, an item on the shelf, and an unrelated table.</summary>

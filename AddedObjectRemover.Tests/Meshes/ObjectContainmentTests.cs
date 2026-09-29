@@ -61,7 +61,7 @@ public class ObjectContainmentTests
     private static (ObjectContainment Containment, OtherObjectIndex Index) CreateIndex(params OtherObject[] objects)
     {
         var shapes = TestShapes.Create(Mod, "ObjectContainmentData", Room, FarRoom);
-        var containment = new ObjectContainment(shapes, new TriangleTreeCache(shapes.ReadGeometry));
+        var containment = new ObjectContainment(shapes, new TriangleStore(shapes.ReadGeometry));
         return (containment, OtherObjectIndex.CreateUncounted(objects, shapes, new ParallelOptions()));
     }
 }

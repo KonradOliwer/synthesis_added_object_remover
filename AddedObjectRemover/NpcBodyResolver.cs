@@ -19,7 +19,7 @@ namespace AddedObjectRemover;
 /// Each is scaled by the race height for its sex × the NPC height. Race, sex, height and worn
 /// armour come from the template chain while the Traits template flag is set.
 /// </summary>
-internal sealed class NpcBodyResolver(ILinkCache linkCache, BaseObjectShapeProvider shapes, SkinnedBodyMeasurer bodyMeasurer)
+internal sealed class NpcBodyResolver(ILinkCache linkCache, ShapeCatalog shapes, SkinnedBodyMeasurer bodyMeasurer)
 {
     /// <summary>
     /// Humanoid approximation: 64 × 64 units across and 128 tall, standing on the placement point,
@@ -81,7 +81,7 @@ internal sealed class NpcBodyResolver(ILinkCache linkCache, BaseObjectShapeProvi
         {
             return NpcBody.FromBox(NpcSizeSource.BodyMesh, playable ? WithHumanoidHeight(measured) : measured, heightScale);
         }
-        var bounds = BaseObjectShapeProvider.ToBox(npc.ObjectBounds);
+        var bounds = BaseFactsReader.ToBox(npc.ObjectBounds);
         if (HasVolume(bounds)) return NpcBody.FromBox(NpcSizeSource.ObjectBounds, bounds, heightScale);
         if (playable) return NpcBody.FromBox(NpcSizeSource.HumanoidApproximation, HumanoidBox, heightScale);
         return NpcBody.Point($"no body mesh for race {RecordNames.Describe(race)}, no Object Bounds, race not playable");

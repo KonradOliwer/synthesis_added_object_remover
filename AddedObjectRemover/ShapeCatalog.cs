@@ -1,8 +1,5 @@
 using System.Numerics;
 using Mutagen.Bethesda.Plugins;
-using Mutagen.Bethesda.Plugins.Cache;
-using Mutagen.Bethesda.Plugins.Records;
-using Mutagen.Bethesda.Skyrim;
 
 namespace AddedObjectRemover;
 
@@ -27,12 +24,12 @@ internal readonly record struct BoundsStats(
 /// (not cached) the mesh's root-space triangles. Bounds and visibility are cached per base FormKey
 /// and per normalized model path, failures included.
 ///
-/// Thread-safe: each base is resolved and each mesh read exactly once even under concurrent
-/// requests, and Mutagen's load-order link cache is documented as multithread safe.
+/// Thread-safe: each base is measured and each mesh read exactly once even under concurrent
+/// requests.
 /// </summary>
-internal sealed class BaseObjectShapeProvider
+internal sealed class ShapeCatalog
 {
-    private readonly ILinkCache _linkCache;
+    private readonly IBaseFacts _bases;
     private readonly MeshFileSource _meshFiles;
     private readonly AssetProblemLog _problems;
     private readonly LazyCache<FormKey, BaseShape> _byBase = new();
@@ -54,9 +51,9 @@ internal sealed class BaseObjectShapeProvider
     private int _modelsFromArchives;
     private int _modelsWithFooterRoot;
 
-    public BaseObjectShapeProvider(ILinkCache linkCache, MeshFileSource meshFiles, AssetProblemLog problems)
+    public ShapeCatalog(IBaseFacts bases, MeshFileSource meshFiles, AssetProblemLog problems)
     {
-        _linkCache = linkCache;
+        _bases = bases;
         _meshFiles = meshFiles;
         _problems = problems;
     }
@@ -76,9 +73,6 @@ internal sealed class BaseObjectShapeProvider
         bool Resolved = true,
         bool EffectOnlyMesh = false,
         bool InvisibleForLackOfGeometry = false);
-
-    /// <summary>Vanilla critter spawner activators run a script whose name starts with this.</summary>
-    private const string CritterSpawnScriptPrefix = "CritterSpawn";
 
     /// <param name="Box">Null when the mesh is unreadable or has no render geometry.</param>
     private sealed record MeshBounds(Box? Box, NifReadStatus Status);
@@ -147,120 +141,95 @@ internal sealed class BaseObjectShapeProvider
         return result.Geometry is { TriangleCount: > 0 } geometry ? geometry : null;
     }
 
-    /// <summary>
-    /// Resolves by the base link's own type; <see cref="IMajorRecordGetter"/> would make the link
-    /// cache enumerate every record of every mod.
-    /// </summary>
-    public IMajorRecordGetter? ResolveBaseOrNull(BaseRef baseRef) =>
-        _linkCache.TryResolve(baseRef.FormKey, baseRef.LinkType, out var record) ? record : null;
-
     private BaseShape GetBaseShape(BaseRef reference) =>
         _byBase.GetOrCreate(reference.FormKey, () => MeasureBase(reference));
 
     /// <summary>NIF bounds when readable, else OBND, else none.</summary>
     private BaseShape MeasureBase(BaseRef baseRef)
     {
-        if (ResolveBaseOrNull(baseRef) is not { } record)
+        var facts = _bases.Of(baseRef);
+        if (!facts.Resolved)
         {
             Interlocked.Increment(ref _basesUnresolved);
             return new BaseShape(Box.Zero, null, null, Resolved: false);
         }
 
-        var modelPath = GetModelPath(record);
-        var hasModel = modelPath != null;
+        var hasModel = facts.ModelPath != null;
 
-        if (GetMarkerFlagKind(record) is { } markerKind)
+        if (GetMarkerFlagKind(facts) is { } markerKind)
         {
             return new BaseShape(Box.Zero, null, markerKind);
         }
 
         var meshWithoutGeometry = false;
-        if (modelPath != null)
+        if (facts.ModelPath != null)
         {
-            var meshPath = MeshFileSource.NormalizeMeshPath(modelPath);
+            var meshPath = MeshFileSource.NormalizeMeshPath(facts.ModelPath);
             var mesh = GetMeshBounds(meshPath);
             if (mesh.Box is { } nifBox)
             {
                 Interlocked.Increment(ref _basesFromNif);
-                return ClassifyShape(record, nifBox, meshPath, hasModel, meshWithoutGeometry: false);
+                return ClassifyShape(facts, nifBox, meshPath, hasModel, meshWithoutGeometry: false);
             }
             Interlocked.Increment(ref _basesNifFallbackToObnd);
-            if (mesh.Status == NifReadStatus.EffectOnly) return MeasureEffectOnlyBase(record);
+            if (mesh.Status == NifReadStatus.EffectOnly) return MeasureEffectOnlyBase(facts);
             meshWithoutGeometry = mesh.Status == NifReadStatus.NoRenderGeometry;
         }
 
-        if (record is IObjectBoundedOptionalGetter { ObjectBounds: { } bounds })
+        if (facts.ObjectBounds is { } bounds)
         {
             Interlocked.Increment(ref _basesFromObnd);
-            return ClassifyShape(record, ToBox(bounds), meshPath: null, hasModel, meshWithoutGeometry);
+            return ClassifyShape(facts, bounds, meshPath: null, hasModel, meshWithoutGeometry);
         }
 
         Interlocked.Increment(ref _basesWithoutBounds);
-        return ClassifyShape(record, Box.Zero, meshPath: null, hasModel, meshWithoutGeometry);
+        return ClassifyShape(facts, Box.Zero, meshPath: null, hasModel, meshWithoutGeometry);
     }
 
     /// <summary>OBND box when present; a light whose model is only an effect (glow, light rays) stays a light.</summary>
-    private static BaseShape MeasureEffectOnlyBase(IMajorRecordGetter record)
+    private static BaseShape MeasureEffectOnlyBase(BaseFacts facts)
     {
-        var box = record is IObjectBoundedOptionalGetter { ObjectBounds: { } bounds } ? ToBox(bounds) : Box.Zero;
-        var kind = record is ILightGetter ? InvisibleObjectKind.Lights : (InvisibleObjectKind?)null;
-        return new BaseShape(box, null, kind, EffectOnlyMesh: true);
+        var kind = facts.Kind == BaseRecordKind.Light ? InvisibleObjectKind.Lights : (InvisibleObjectKind?)null;
+        return new BaseShape(facts.ObjectBounds ?? Box.Zero, null, kind, EffectOnlyMesh: true);
     }
-
-    private static string? GetModelPath(IMajorRecordGetter record) =>
-        record is IModeledGetter { Model: { } model } && !string.IsNullOrWhiteSpace(model.File.GivenPath)
-            ? model.File.GivenPath
-            : null;
-
-    public static Box ToBox(IObjectBoundsGetter bounds) => Box.FromCorners(
-        new Vector3(bounds.First.X, bounds.First.Y, bounds.First.Z),
-        new Vector3(bounds.Second.X, bounds.Second.Y, bounds.Second.Z));
 
     /// <summary>
     /// Invisible are record types that never render, and bases with a mesh that parsed but has no
     /// visible render geometry (marker meshes) or with no mesh at all and zero-size bounds. NPCs
     /// always count as visible.
     /// </summary>
-    internal static BaseShape ClassifyShape(IMajorRecordGetter record, Box box, string? meshPath, bool hasModel, bool meshWithoutGeometry)
+    internal static BaseShape ClassifyShape(BaseFacts facts, Box box, string? meshPath, bool hasModel, bool meshWithoutGeometry)
     {
-        if (record is INpcGetter) return new BaseShape(box, meshPath, InvisibleKind: null);
-        if (GetRecordTypeInvisibleKind(record, hasModel, meshWithoutGeometry) is { } kind) return new BaseShape(box, meshPath, kind);
+        if (facts.Kind == BaseRecordKind.Npc) return new BaseShape(box, meshPath, InvisibleKind: null);
+        if (GetRecordTypeInvisibleKind(facts.Kind, hasModel, meshWithoutGeometry) is { } kind) return new BaseShape(box, meshPath, kind);
         var hasNoGeometry = meshWithoutGeometry || (!hasModel && box.Size == Vector3.Zero);
         if (!hasNoGeometry) return new BaseShape(box, meshPath, InvisibleKind: null);
-        var markerKind = ClassifyMarker(record);
+        var markerKind = ClassifyMarker(facts);
         return new BaseShape(box, meshPath, markerKind, InvisibleForLackOfGeometry: markerKind == InvisibleObjectKind.OtherMarkers);
     }
 
-    private static InvisibleObjectKind? GetRecordTypeInvisibleKind(IMajorRecordGetter record, bool hasModel, bool meshWithoutGeometry) => record switch
+    private static InvisibleObjectKind? GetRecordTypeInvisibleKind(BaseRecordKind recordKind, bool hasModel, bool meshWithoutGeometry) => recordKind switch
     {
-        ILightGetter when !hasModel || meshWithoutGeometry => InvisibleObjectKind.Lights,
-        ISoundMarkerGetter => InvisibleObjectKind.SoundMarkers,
-        IAcousticSpaceGetter => InvisibleObjectKind.AcousticSpaces,
-        ITextureSetGetter => InvisibleObjectKind.Decals,
-        IIdleMarkerGetter => InvisibleObjectKind.IdleMarkers,
+        BaseRecordKind.Light when !hasModel || meshWithoutGeometry => InvisibleObjectKind.Lights,
+        BaseRecordKind.SoundMarker => InvisibleObjectKind.SoundMarkers,
+        BaseRecordKind.AcousticSpace => InvisibleObjectKind.AcousticSpaces,
+        BaseRecordKind.TextureSet => InvisibleObjectKind.Decals,
+        BaseRecordKind.IdleMarker => InvisibleObjectKind.IdleMarkers,
         _ => null,
     };
 
-    /// <summary>
-    /// The base's own major record flags carry the engine's IsMarker bit (map, XMarkerHeading and
-    /// similar marker bases). Only these four base types define that bit with this meaning; other
-    /// types reuse the same bit value for unrelated flags. Checked before any mesh read.
-    /// </summary>
-    private static InvisibleObjectKind? GetMarkerFlagKind(IMajorRecordGetter record) => record switch
+    /// <summary>Checked before any mesh read.</summary>
+    private static InvisibleObjectKind? GetMarkerFlagKind(BaseFacts facts) => facts.MarkerFlag switch
     {
-        IStaticGetter { MajorFlags: var flags } when flags.HasFlag(Static.MajorFlag.IsMarker) => InvisibleObjectKind.XMarkers,
-        IFurnitureGetter { MajorFlags: var flags } when flags.HasFlag(Furniture.MajorFlag.IsMarker) => InvisibleObjectKind.FurnitureMarkers,
-        IActivatorGetter { MajorFlags: var flags } when flags.HasFlag(Mutagen.Bethesda.Skyrim.Activator.MajorFlag.IsMarker) => ClassifyMarker(record),
-        IDoorGetter { MajorFlags: var flags } when flags.HasFlag(Door.MajorFlag.IsMarker) => InvisibleObjectKind.DoorMarkers,
+        MarkerFlagKind.XMarker => InvisibleObjectKind.XMarkers,
+        MarkerFlagKind.FurnitureMarker => InvisibleObjectKind.FurnitureMarkers,
+        MarkerFlagKind.DoorMarker => InvisibleObjectKind.DoorMarkers,
+        MarkerFlagKind.OtherMarker => ClassifyMarker(facts),
         _ => null,
     };
 
-    private static InvisibleObjectKind ClassifyMarker(IMajorRecordGetter record) =>
-        IsCritterSpawner(record) ? InvisibleObjectKind.CritterSpawners : InvisibleObjectKind.OtherMarkers;
-
-    private static bool IsCritterSpawner(IMajorRecordGetter record) =>
-        record is IActivatorGetter { VirtualMachineAdapter: { } adapter }
-        && adapter.Scripts.Any(script => script.Name.StartsWith(CritterSpawnScriptPrefix, StringComparison.OrdinalIgnoreCase));
+    private static InvisibleObjectKind ClassifyMarker(BaseFacts facts) =>
+        facts.HasCritterSpawnScript ? InvisibleObjectKind.CritterSpawners : InvisibleObjectKind.OtherMarkers;
 
     private MeshBounds GetMeshBounds(string meshPath) =>
         _byMesh.GetOrCreate(meshPath, () => ReadMeshBounds(meshPath));

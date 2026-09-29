@@ -22,7 +22,7 @@ public class SupportProtectionTests
     private static readonly TestStatic FloorModel = new(
         new FormKey(TestTargets.TargetMod, 0x703), @"test\floor.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-200, -200, -10), new Vector3(200, 200, 0))));
 
-    private static readonly BaseObjectShapeProvider Shapes =
+    private static readonly ShapeCatalog Shapes =
         TestShapes.Create(TestTargets.TargetMod, "SupportProtectionData", TableModel, ItemModel, FloorModel);
 
     [Fact]

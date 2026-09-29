@@ -27,9 +27,10 @@ internal static class RecordNames
         _ => Describe(spaceRecord),
     };
 
-    public static string DescribeBase(BaseObjectShapeProvider shapes, BaseRef? baseRef)
+    public static string DescribeBase(IBaseFacts bases, BaseRef? baseRef)
     {
         if (baseRef is not { } reference) return "(none)";
-        return shapes.ResolveBaseOrNull(reference) is { } record ? Describe(record) : reference.FormKey.ToString();
+        var facts = bases.Of(reference);
+        return facts.Resolved ? Describe(facts.FormKey, facts.EditorId) : reference.FormKey.ToString();
     }
 }

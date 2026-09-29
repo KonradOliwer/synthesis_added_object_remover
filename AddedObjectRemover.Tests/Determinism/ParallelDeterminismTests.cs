@@ -45,7 +45,7 @@ public class ParallelDeterminismTests
             paths[i] = i % 11 == 0 ? null : $"mesh{i % MeshKinds}.nif";
         }
 
-        var cache = new TriangleTreeCache(path => BoxMesh.CreateGeometry(MeshBox(path)));
+        var cache = new TriangleStore(path => BoxMesh.CreateGeometry(MeshBox(path)));
         var meshPaths = new TargetMeshPaths(paths);
         var tester = new TouchPairTester(targets, meshPaths, cache, Tolerance);
         var pairs = FindNearbyPairs(targets, meshPaths);

@@ -29,8 +29,8 @@ internal sealed class ShapeZoneSearch
     private readonly IReadOnlyDictionary<FormKey, OtherObjectIndex> _indexes;
     private readonly Replacements _replacements;
     private readonly IReadOnlyList<OtherObjectBoxIndex> _visibleTargetSpaceBounds;
-    private readonly BaseObjectShapeProvider _shapes;
-    private readonly TriangleTreeCache _meshCache;
+    private readonly ShapeCatalog _shapes;
+    private readonly TriangleStore _meshCache;
     private readonly float _multiplier;
     private readonly NpcClashRule _npcRule;
     private readonly object _statsLock = new();
@@ -40,8 +40,8 @@ internal sealed class ShapeZoneSearch
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
         Replacements replacements,
         IReadOnlyList<OtherObjectBoxIndex> visibleTargetSpaceBounds,
-        BaseObjectShapeProvider shapes,
-        TriangleTreeCache meshCache,
+        ShapeCatalog shapes,
+        TriangleStore meshCache,
         float multiplier,
         NpcClashRule npcRule)
     {
@@ -66,8 +66,8 @@ internal sealed class ShapeZoneSearch
         IReadOnlyList<ObjectVisibility> visibility,
         IReadOnlyDictionary<FormKey, OtherObjectIndex> indexes,
         Replacements replacements,
-        BaseObjectShapeProvider shapes,
-        TriangleTreeCache meshCache,
+        ShapeCatalog shapes,
+        TriangleStore meshCache,
         float multiplier,
         NpcClashRule npcRule)
     {

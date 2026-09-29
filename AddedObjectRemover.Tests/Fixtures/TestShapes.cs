@@ -15,12 +15,12 @@ internal sealed record TestStatic(FormKey FormKey, string Model, IReadOnlyList<M
 /// <summary>Base object shapes read through the real mesh pipeline from in-memory statics and loose NIFs.</summary>
 internal static class TestShapes
 {
-    public static BaseObjectShapeProvider Create(ModKey mod, string dataFolderName, params TestStatic[] statics) =>
+    public static ShapeCatalog Create(ModKey mod, string dataFolderName, params TestStatic[] statics) =>
         Create(new SkyrimMod(mod, SkyrimRelease.SkyrimSE), dataFolderName, statics);
 
     /// <param name="skyrimMod">Records the shapes may resolve besides the statics, which are added to it.</param>
     /// <param name="dataFolderName">A Data folder next to the test binaries, one per test class so parallel classes do not share files.</param>
-    public static BaseObjectShapeProvider Create(SkyrimMod skyrimMod, string dataFolderName, params TestStatic[] statics)
+    public static ShapeCatalog Create(SkyrimMod skyrimMod, string dataFolderName, params TestStatic[] statics)
     {
         var mod = skyrimMod.ModKey;
         foreach (var model in statics)
@@ -33,7 +33,7 @@ internal static class TestShapes
 
         var problems = new AssetProblemLog();
         var meshFiles = new MeshFileSource(dataPath, GameRelease.SkyrimSE, [mod], problems);
-        return new BaseObjectShapeProvider(skyrimMod.ToImmutableLinkCache(), meshFiles, problems);
+        return new ShapeCatalog(new BaseFactsReader(skyrimMod.ToImmutableLinkCache()), meshFiles, problems);
     }
 
     public static OtherObject Placed(ModKey mod, int index, BaseRef baseRef, Vector3 position, float zRadians = 0f) =>

@@ -6,7 +6,7 @@ namespace AddedObjectRemover;
 /// Whether a point lies inside a placed object: the object's mesh surrounds it
 /// (<see cref="SurroundingRayTest"/>). Objects without readable mesh triangles contain nothing. Thread-safe.
 /// </summary>
-internal sealed class ObjectContainment(BaseObjectShapeProvider shapes, TriangleTreeCache meshCache)
+internal sealed class ObjectContainment(ShapeCatalog shapes, TriangleStore meshCache)
 {
     /// <param name="scratch">Only its triangle buffer is used.</param>
     public bool Contains(BaseRef? baseRef, PlacedTransform transform, Vector3 worldPoint, SpatialQueryScratch scratch)

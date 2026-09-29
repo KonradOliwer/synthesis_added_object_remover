@@ -11,48 +11,48 @@ internal readonly record struct TriangleTreeStats(
     long PeakResidentMeshes,
     long PeakResidentBytes);
 
+/// <summary>One use of a stored tree; disposing it ends the use. A default lease holds nothing.</summary>
+internal readonly struct TriangleLease : IDisposable
+{
+    private readonly TriangleStore? _store;
+    private readonly TriangleStore.Entry? _entry;
+
+    internal TriangleLease(TriangleStore store, TriangleStore.Entry entry, MeshTriangleTree? tree)
+    {
+        _store = store;
+        _entry = entry;
+        Tree = tree;
+    }
+
+    /// <summary>Null when the mesh has no usable triangles or is too large.</summary>
+    public MeshTriangleTree? Tree { get; }
+
+    public void Dispose()
+    {
+        if (_store != null && _entry != null) _store.EndUse(_entry);
+    }
+}
+
 /// <summary>
-/// Thread-safe cache of <see cref="MeshTriangleTree"/> per mesh path. A mesh is built on its first
+/// Thread-safe store of <see cref="MeshTriangleTree"/> per mesh path. A mesh is built on its first
 /// use and stays resident until the resident estimate exceeds <see cref="MaxResidentBytes"/>; then
 /// the least recently used meshes that are not in use are dropped (and rebuilt if needed again).
 /// Builds of large meshes are limited to a few at a time, because reading and indexing
 /// temporarily needs several times the finished tree's memory.
 /// </summary>
-internal sealed class TriangleTreeCache(Func<string, NifGeometry?> readGeometry)
+internal sealed class TriangleStore(Func<string, NifGeometry?> readGeometry)
 {
     private const long MaxResidentBytes = 1L << 30;
     private const long EvictToBytes = MaxResidentBytes / 4 * 3;
     private const int LargeMeshTriangles = 20_000;
     private const int MaxConcurrentLargeBuilds = 4;
 
-    /// <summary><see cref="Users"/> and <see cref="LastUse"/> are guarded by the cache lock.</summary>
+    /// <summary><see cref="Users"/> and <see cref="LastUse"/> are guarded by the store lock.</summary>
     internal sealed class Entry(Lazy<MeshTriangleTree?> tree)
     {
         public Lazy<MeshTriangleTree?> Tree { get; } = tree;
         public long LastUse;
         public int Users;
-    }
-
-    /// <summary>One use of a cached tree; disposing it ends the use. A default lease holds nothing.</summary>
-    public readonly struct Lease : IDisposable
-    {
-        private readonly TriangleTreeCache? _cache;
-        private readonly Entry? _entry;
-
-        internal Lease(TriangleTreeCache cache, Entry entry, MeshTriangleTree? tree)
-        {
-            _cache = cache;
-            _entry = entry;
-            Tree = tree;
-        }
-
-        /// <summary>Null when the mesh has no usable triangles or is too large.</summary>
-        public MeshTriangleTree? Tree { get; }
-
-        public void Dispose()
-        {
-            if (_cache != null && _entry != null) _cache.EndUse(_entry);
-        }
     }
 
     private readonly Dictionary<string, Entry> _entries = new(StringComparer.OrdinalIgnoreCase);
@@ -75,7 +75,7 @@ internal sealed class TriangleTreeCache(Func<string, NifGeometry?> readGeometry)
     /// The tree stays resident at least until the returned lease is disposed. When the build
     /// throws, the exception passes through and the mesh is built again on its next use.
     /// </summary>
-    public Lease Acquire(string meshPath)
+    public TriangleLease Acquire(string meshPath)
     {
         var entry = BeginUse(meshPath);
         MeshTriangleTree? tree;
@@ -89,7 +89,7 @@ internal sealed class TriangleTreeCache(Func<string, NifGeometry?> readGeometry)
             throw;
         }
         if (tree != null && Interlocked.Read(ref _residentBytes) > MaxResidentBytes) EvictLeastRecentlyUsed();
-        return new Lease(this, entry, tree);
+        return new TriangleLease(this, entry, tree);
     }
 
     public TriangleTreeStats GetStats() => new(
@@ -100,6 +100,11 @@ internal sealed class TriangleTreeCache(Func<string, NifGeometry?> readGeometry)
         Interlocked.Read(ref _triangles),
         Interlocked.Read(ref _peakResidentMeshes),
         Interlocked.Read(ref _peakResidentBytes));
+
+    internal void EndUse(Entry entry)
+    {
+        lock (_lock) entry.Users--;
+    }
 
     private Entry BeginUse(string meshPath)
     {
@@ -114,11 +119,6 @@ internal sealed class TriangleTreeCache(Func<string, NifGeometry?> readGeometry)
             entry.LastUse = ++_clock;
             return entry;
         }
-    }
-
-    private void EndUse(Entry entry)
-    {
-        lock (_lock) entry.Users--;
     }
 
     /// <summary>A lazy value keeps its exception, so the failed entry is dropped (unless another use already replaced it).</summary>

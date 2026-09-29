@@ -25,7 +25,7 @@ internal static class LeftoverDiagnosticsWriter
     public static string Write(
         string folder,
         World world,
-        BaseObjectShapeProvider shapes,
+        IBaseFacts bases,
         IReadOnlyList<LeftoverEvaluation> evaluations,
         RelocationResult relocations)
     {
@@ -33,12 +33,12 @@ internal static class LeftoverDiagnosticsWriter
         var movesByTarget = relocations.Moved.ToDictionary(move => move.Evaluation.TargetIndex);
         var rows = evaluations
             .OrderBy(evaluation => world.Targets[evaluation.TargetIndex].Key.ToString(), StringComparer.Ordinal)
-            .Select(evaluation => FormatRow(evaluation, world, shapes, movesByTarget.GetValueOrDefault(evaluation.TargetIndex)));
+            .Select(evaluation => FormatRow(evaluation, world, bases, movesByTarget.GetValueOrDefault(evaluation.TargetIndex)));
         CsvFile.Write(path, Header, rows);
         return path;
     }
 
-    private static IEnumerable<string> FormatRow(LeftoverEvaluation evaluation, World world, BaseObjectShapeProvider shapes, Relocation? move)
+    private static IEnumerable<string> FormatRow(LeftoverEvaluation evaluation, World world, IBaseFacts bases, Relocation? move)
     {
         var target = world.Targets[evaluation.TargetIndex];
         var surroundings = evaluation.Surroundings;
@@ -48,8 +48,8 @@ internal static class LeftoverDiagnosticsWriter
         [
             Text(target.Key.ToString()),
             Text(target.EditorId ?? string.Empty),
-            Text(RecordNames.DescribeBase(shapes, target.Base)),
-            Text(DescribeBaseType(shapes, target.Base)),
+            Text(RecordNames.DescribeBase(bases, target.Base)),
+            Text(DescribeBaseType(bases, target.Base)),
             Text(evaluation.Kind.ToString()),
             Text(world.SpaceNames[target.SpaceKey]),
             Text(target.CellName ?? string.Empty),
@@ -73,6 +73,6 @@ internal static class LeftoverDiagnosticsWriter
         ? [string.Empty, string.Empty, string.Empty, string.Empty, string.Empty]
         : [Num(move.To.X), Num(move.To.Y), Num(move.To.Z), Num(move.Distance), Text(move.Surface.ToString())];
 
-    private static string DescribeBaseType(BaseObjectShapeProvider shapes, BaseRef? baseRef) =>
-        baseRef is { } reference && shapes.ResolveBaseOrNull(reference) is { } record ? record.Registration.Name : string.Empty;
+    private static string DescribeBaseType(IBaseFacts bases, BaseRef? baseRef) =>
+        baseRef is { } reference && bases.Of(reference) is { Resolved: true } facts ? facts.RecordTypeName! : string.Empty;
 }

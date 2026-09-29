@@ -11,7 +11,7 @@ namespace AddedObjectRemover;
 internal sealed class LeftoverInvisibleObjectSelector(
     IReadOnlyList<TargetObject> targets,
     IReadOnlyList<ObjectVisibility> visibility,
-    BaseObjectShapeProvider shapes,
+    ShapeCatalog shapes,
     Hosts hosts,
     InvisibleObjectReach reach,
     LeftoverConfig config)

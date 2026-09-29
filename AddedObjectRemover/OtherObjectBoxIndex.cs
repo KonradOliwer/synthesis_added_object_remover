@@ -33,7 +33,7 @@ internal sealed class OtherObjectBoxIndex
 
     public int LargeObjectCount => _largeObjects.Length;
 
-    public static OtherObjectBoxIndex Build(IReadOnlyList<OtherObject> objects, BaseObjectShapeProvider shapes, ParallelOptions parallelOptions)
+    public static OtherObjectBoxIndex Build(IReadOnlyList<OtherObject> objects, ShapeCatalog shapes, ParallelOptions parallelOptions)
     {
         var aabbs = MeasureWorldAabbs(objects, shapes, parallelOptions);
         var gridMembers = new List<int>();
@@ -64,7 +64,7 @@ internal sealed class OtherObjectBoxIndex
         if (_aabbs[index].Overlaps(area)) candidates.Add(index);
     }
 
-    private static Box[] MeasureWorldAabbs(IReadOnlyList<OtherObject> objects, BaseObjectShapeProvider shapes, ParallelOptions parallelOptions)
+    private static Box[] MeasureWorldAabbs(IReadOnlyList<OtherObject> objects, ShapeCatalog shapes, ParallelOptions parallelOptions)
     {
         var aabbs = new Box[objects.Count];
         Parallel.For(0, objects.Count, parallelOptions, i =>

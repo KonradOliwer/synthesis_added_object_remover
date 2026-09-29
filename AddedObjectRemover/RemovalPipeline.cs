@@ -19,8 +19,9 @@ internal sealed class RemovalPipeline
     private readonly ParallelOptions _parallelOptions;
     private readonly AssetProblemLog _problems = new();
     private ProblemMark _problemsPrintedUpTo;
-    private readonly BaseObjectShapeProvider _shapes;
-    private readonly TriangleTreeCache _meshCache;
+    private readonly BaseFactsReader _bases;
+    private readonly ShapeCatalog _shapes;
+    private readonly TriangleStore _meshCache;
     private readonly ObjectContainment _containment;
     private readonly SkinnedBodyMeasurer _bodyMeasurer;
     private readonly NpcBodyCache _npcBodies;
@@ -39,8 +40,9 @@ internal sealed class RemovalPipeline
             state.GameRelease,
             state.LoadOrder.ListedOrder.Select(listing => listing.ModKey).ToList(),
             _problems);
-        _shapes = new BaseObjectShapeProvider(state.LinkCache, meshFiles, _problems);
-        _meshCache = new TriangleTreeCache(_shapes.ReadGeometry);
+        _bases = new BaseFactsReader(state.LinkCache);
+        _shapes = new ShapeCatalog(_bases, meshFiles, _problems);
+        _meshCache = new TriangleStore(_shapes.ReadGeometry);
         _containment = new ObjectContainment(_shapes, _meshCache);
         _bodyMeasurer = new SkinnedBodyMeasurer(_shapes.ReadGeometry);
         _npcBodies = new NpcBodyCache(new NpcBodyResolver(state.LinkCache, _shapes, _bodyMeasurer));
@@ -321,7 +323,7 @@ internal sealed class RemovalPipeline
         AccessDiagnosticsFolder($"writing {TouchDiagnosticsWriter.EdgesFileName} / {TouchDiagnosticsWriter.ComponentsFileName}", () =>
         {
             var timer = Stopwatch.StartNew();
-            var written = TouchDiagnosticsWriter.Write(_config.DiagnosticsFolder, world, _shapes, _config.TouchDistance, seeds, clusters, diagnostics);
+            var written = TouchDiagnosticsWriter.Write(_config.DiagnosticsFolder, world, _shapes, _bases, _config.TouchDistance, seeds, clusters, diagnostics);
             Console.WriteLine($"Touch diagnostics: wrote {written.EdgeCount:N0} edges, {written.ComponentCount:N0} components in {timer.Elapsed.TotalSeconds:F1}s "
                 + $"to {written.EdgesPath} / {written.ComponentsPath}.");
         });
@@ -357,7 +359,7 @@ internal sealed class RemovalPipeline
         AccessDiagnosticsFolder($"writing {AnchoringDiagnosticsWriter.FileName}", () =>
         {
             var path = AnchoringDiagnosticsWriter.Write(
-                _config.DiagnosticsFolder, world, _shapes, supporters, anchoring.Evaluations, _config.AnchoringThreshold);
+                _config.DiagnosticsFolder, world, _shapes, _bases, supporters, anchoring.Evaluations, _config.AnchoringThreshold);
             Console.WriteLine($"Anchoring diagnostics: wrote {anchoring.Evaluations.Count:N0} evaluations to {path}.");
         });
     }
@@ -366,7 +368,7 @@ internal sealed class RemovalPipeline
     {
         if (!_config.WritesDiagnostics) return;
 
-        var rows = MeshOriginDiagnosticsWriter.CreateRows(targets, _shapes, _meshCache, _parallelOptions);
+        var rows = MeshOriginDiagnosticsWriter.CreateRows(targets, _shapes, _bases, _meshCache, _parallelOptions);
         PrintProblemsSinceLastPhase();
         RunReport.PrintMeshOriginSummary(MeshOriginDiagnosticsWriter.Summarize(rows));
         AccessDiagnosticsFolder($"writing {MeshOriginDiagnosticsWriter.FileName}", () =>
@@ -393,7 +395,7 @@ internal sealed class RemovalPipeline
             visibility,
             _shapes,
             hosts,
-            new InvisibleObjectReach(_state.LinkCache, _shapes),
+            new InvisibleObjectReach(_bases),
             _config.Leftovers);
         var evaluated = selector.SelectRemovals(CollectRemoved(ledger), _parallelOptions);
         var final = ledger.Apply(RoundKind.Leftover, evaluated.Proposals);
@@ -447,7 +449,7 @@ internal sealed class RemovalPipeline
 
         AccessDiagnosticsFolder($"writing {LeftoverDiagnosticsWriter.FileName}", () =>
         {
-            var path = LeftoverDiagnosticsWriter.Write(_config.DiagnosticsFolder, world, _shapes, leftovers.Evaluations, relocations);
+            var path = LeftoverDiagnosticsWriter.Write(_config.DiagnosticsFolder, world, _bases, leftovers.Evaluations, relocations);
             Console.WriteLine($"Leftover invisible objects diagnostics: wrote {leftovers.Evaluations.Count:N0} evaluations to {path}.");
         });
     }
@@ -483,7 +485,7 @@ internal sealed class RemovalPipeline
         IReadOnlyList<Removal> removals,
         IReadOnlyList<KeptTarget> kept)
     {
-        if (_config.DetailedLog) RunReport.PrintRemovals(world, _shapes, removals);
+        if (_config.DetailedLog) RunReport.PrintRemovals(world, _bases, removals);
         RunReport.PrintBoundsStats(_shapes.GetStats());
         if (_config.DetailedLog) RunReport.PrintSpaceSummary(world, indexes, removals);
         RunReport.PrintRemovalSummary(removals);

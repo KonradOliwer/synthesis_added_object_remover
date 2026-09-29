@@ -47,7 +47,7 @@ internal sealed class AnchoringContactFinder(
     TargetMeshPaths meshPaths,
     AnchoringSupporterFinder supporterFinder,
     TerrainHeights terrain,
-    TriangleTreeCache cache,
+    TriangleStore cache,
     float touchDistance)
 {
     /// <param name="Hits">Per surface sample: whether it is in contact with the supporter.</param>

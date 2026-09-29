@@ -7,7 +7,7 @@ internal sealed class TargetMeshPaths
 {
     private readonly string?[] _paths;
 
-    public TargetMeshPaths(IReadOnlyList<TargetObject> targets, BaseObjectShapeProvider shapes)
+    public TargetMeshPaths(IReadOnlyList<TargetObject> targets, ShapeCatalog shapes)
         : this(targets.Select(target => shapes.GetMeshPath(target.Base)).ToArray())
     {
     }

@@ -12,7 +12,7 @@ public class LeftoverDecisionTests
     private static readonly TestStatic Room = new(
         new FormKey(OtherMod, 0x801), @"test\room.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-100), new Vector3(100))));
 
-    private static readonly BaseObjectShapeProvider Shapes = TestShapes.Create(OtherMod, "LeftoverDecisionData", Room);
+    private static readonly ShapeCatalog Shapes = TestShapes.Create(OtherMod, "LeftoverDecisionData", Room);
 
     private static LeftoverConfig Config(int occupiedPercent = 50, int removedPercent = 60, params InvisibleObjectKind[] protectedKinds) => new(
         Enabled: true,

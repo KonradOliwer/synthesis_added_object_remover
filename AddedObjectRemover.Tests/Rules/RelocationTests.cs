@@ -106,7 +106,7 @@ public class FreeSpotSearchTests
     private static readonly TestStatic Block = new(
         new FormKey(OtherMod, 0x802), @"test\block.nif", TestMeshes.BoxTriangles(new Box(new Vector3(3500, 1500, -100), new Vector3(4600, 2600, 300))));
 
-    private static readonly BaseObjectShapeProvider Shapes = TestShapes.Create(OtherMod, "FreeSpotSearchData", Wall, Block);
+    private static readonly ShapeCatalog Shapes = TestShapes.Create(OtherMod, "FreeSpotSearchData", Wall, Block);
 
     [Fact]
     public void NavmeshSpotKeepsTheClearanceFromObstacles()
@@ -149,7 +149,7 @@ public class FreeSpotSearchTests
         return new VisibleObstacles(
             nonTargets,
             VisibleTargetIndex.Build([], [], Shapes),
-            new ObjectContainment(Shapes, new TriangleTreeCache(Shapes.ReadGeometry)),
+            new ObjectContainment(Shapes, new TriangleStore(Shapes.ReadGeometry)),
             Shapes);
     }
 

@@ -29,7 +29,7 @@ internal sealed class VisibleTargetIndex
     public static VisibleTargetIndex Build(
         IReadOnlyList<TargetObject> targets,
         IEnumerable<int> visibleIndices,
-        BaseObjectShapeProvider shapes)
+        ShapeCatalog shapes)
     {
         var bySpace = visibleIndices
             .GroupBy(index => targets[index].SpaceKey)
@@ -37,7 +37,7 @@ internal sealed class VisibleTargetIndex
         return new VisibleTargetIndex(targets, bySpace);
     }
 
-    private static SpaceEntries CreateSpaceEntries(int[] targetIndices, IReadOnlyList<TargetObject> targets, BaseObjectShapeProvider shapes)
+    private static SpaceEntries CreateSpaceEntries(int[] targetIndices, IReadOnlyList<TargetObject> targets, ShapeCatalog shapes)
     {
         var boxes = targetIndices
             .Select(index => OrientedBox.FromLocal(shapes.GetLocalBox(targets[index].Base), targets[index].Transform))

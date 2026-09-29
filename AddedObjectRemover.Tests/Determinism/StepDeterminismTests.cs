@@ -51,7 +51,7 @@ public class StepDeterminismTests
         TestMeshes.BoxWithoutFace(new Box(new Vector3(-100, -100, 0), new Vector3(100, 100, 150)), v => v.Z == 0));
 
     private static readonly SkyrimMod Records = CreateRecords();
-    private static readonly BaseObjectShapeProvider Shapes = TestShapes.Create(Records, "StepDeterminismData", Table, Item, Boulder, Building);
+    private static readonly ShapeCatalog Shapes = TestShapes.Create(Records, "StepDeterminismData", Table, Item, Boulder, Building);
 
     private sealed record FollowUpScene(List<TargetObject> Targets, List<int> Seeds, Protection Protection);
 
@@ -268,7 +268,7 @@ public class StepDeterminismTests
     private static ObjectVisibility[] AllVisible(IReadOnlyList<TargetObject> targets) =>
         Enumerable.Repeat(ObjectVisibility.Visible, targets.Count).ToArray();
 
-    private static TriangleTreeCache NewCache() => new(Shapes.ReadGeometry);
+    private static TriangleStore NewCache() => new(Shapes.ReadGeometry);
 
     private static ParallelOptions Options(int threads) => new() { MaxDegreeOfParallelism = threads };
 

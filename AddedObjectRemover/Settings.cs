@@ -65,7 +65,7 @@ public class Settings
     public FollowUpRemovalSettings FollowUpRemoval { get; set; } = new();
 
     [SynthesisSettingName("Invisible objects left behind")]
-    [SynthesisTooltip("Sounds, markers, lights and spawners whose surroundings were removed.")]
+    [SynthesisTooltip("Sounds, markers, lights and spawners inside other mods' objects or left without surroundings.")]
     public LeftoverInvisibleObjectSettings LeftoverInvisibleObjects { get; set; } = new();
 
     [SynthesisSettingName("Logs and reports")]
@@ -113,7 +113,7 @@ public class IgnoreSettings
     public int MaxOtherMastersForPatch { get; set; } = DefaultMaxOtherMastersForPatch;
 
     [SynthesisSettingName("NPCs and creatures")]
-    [SynthesisTooltip("Whether other mods' NPCs cause removals. Default: only when they'd stand inside the object.")]
+    [SynthesisTooltip("Whether other mods' NPCs cause removals. Default: only when stuck in the object.")]
     public NpcHandling NpcHandling { get; set; } = DefaultNpcHandling;
 }
 

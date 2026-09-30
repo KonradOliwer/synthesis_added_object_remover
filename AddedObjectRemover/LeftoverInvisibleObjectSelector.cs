@@ -59,6 +59,8 @@ internal sealed class LeftoverInvisibleObjectSelector(
     {
         var areas = new SectorAreas(config.DirectionClearedPercent);
         surroundings.Around(target.SpaceKey, target.Transform.Position, radius, neighbours);
+        // Ascending target id fixes the order of the float sums, so a share right at the threshold
+        // is decided the same way whatever the spatial index's layout.
         foreach (var neighbour in neighbours)
         {
             var removed = removedTargets.Contains(neighbour.Target.Index);

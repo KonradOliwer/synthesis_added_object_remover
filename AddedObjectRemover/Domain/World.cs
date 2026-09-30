@@ -62,6 +62,9 @@ internal sealed record World(
 {
     public TargetObject this[TargetId id] => Targets[id.Index];
 
+    /// <summary>The spaces holding a target object.</summary>
+    public IReadOnlySet<FormKey> TargetSpaces() => Targets.Select(target => target.SpaceKey).ToHashSet();
+
     /// <summary>A rival, or a backdrop object when the backdrop was collected.</summary>
     public OtherObject Other(OtherId id) => id.Index < Rivals.Length ? Rivals[id.Index] : Backdrop.Value[id.Index - Rivals.Length];
 

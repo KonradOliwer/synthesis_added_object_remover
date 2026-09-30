@@ -2,6 +2,8 @@ namespace AddedObjectRemover;
 
 /// <summary>
 /// The active rival each invisible target object sits inside; the lowest-id one when several contain it.
+/// Placed NPCs never host because their bases have no mesh, so whether they are active rivals does
+/// not change the hosts.
 /// </summary>
 internal sealed class Hosts
 {

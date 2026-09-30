@@ -8,20 +8,18 @@ internal sealed class Scene
 {
     private readonly World _world;
     private readonly ShapeCatalog _shapes;
-    private readonly NpcBodyCache _bodies;
     private readonly ObjectContainment _containment;
-    private readonly Execution _execution;
     private readonly PlacedSpaces _rivals;
+    private readonly PlacedNpcSpaces _npcs;
     private readonly Lazy<PlacedSpaces> _solids;
 
     private Scene(World world, ShapeCatalog shapes, TriangleStore triangles, NpcBodyCache bodies, Execution execution, IPhaseTimer timer)
     {
         _world = world;
         _shapes = shapes;
-        _bodies = bodies;
         _containment = new ObjectContainment(shapes, triangles);
-        _execution = execution;
         _rivals = new PlacedSpaces(world.Rivals, shapes, execution, timer, TimedPhase.RivalBoundsBuild);
+        _npcs = new PlacedNpcSpaces(_rivals, bodies, execution);
         _solids = new Lazy<PlacedSpaces>(
             () => new PlacedSpaces([.. world.RivalsAndBackdrop], shapes, execution, timer, TimedPhase.SolidBoundsBuild), LazyThreadSafetyMode.ExecutionAndPublication);
     }
@@ -37,7 +35,7 @@ internal sealed class Scene
             _containment,
             rival => !replaced.IsReplaced(rival.Id) && (npcs == NpcHandling.CountLikeObjects || !rival.IsPlacedNpc));
 
-    public INpcs Npcs(Replacements replaced) => new Npcs(_rivals, _bodies, replaced, _execution);
+    public INpcs Npcs(Replacements replaced) => new Npcs(_npcs, replaced);
 
     /// <summary>Only when the run collected the backdrop.</summary>
     public ISolids Solids() => new Solids(_solids.Value, _containment);
@@ -49,7 +47,7 @@ internal sealed class Scene
     /// <param name="looks">By <see cref="TargetId"/>.</param>
     public RivalCensus Census(TargetLooks looks)
     {
-        var targetSpaces = _world.Targets.Select(target => target.SpaceKey).ToHashSet();
+        var targetSpaces = _world.TargetSpaces();
         var visibleTargetSpaces = _world.Targets
             .Where(target => looks.ByTarget[target.Id.Index].IsVisible)
             .Select(target => target.SpaceKey)

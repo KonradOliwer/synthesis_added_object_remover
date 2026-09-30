@@ -56,31 +56,28 @@ internal sealed class ActiveRivals(PlacedSpaces rivals, ObjectContainment contai
     public int LargeObjectCount(FormKey space) => rivals.IndexOf(space).Bounds.LargeObjectCount;
 }
 
-internal sealed class Npcs(PlacedSpaces rivals, NpcBodyCache bodies, Replacements replaced, Execution execution) : INpcs
+internal sealed class Npcs(PlacedNpcSpaces npcs, Replacements replaced) : INpcs
 {
-    private readonly LazyCache<FormKey, PlacedNpcIndex> _bySpace = new();
-
     public void Overlapping(FormKey space, Box area, List<int> slots)
     {
-        var npcs = IndexOf(space);
-        npcs.Collect(area, slots);
-        slots.RemoveAll(slot => replaced.IsReplaced(npcs.NpcOf(slot).Id));
+        var index = npcs.IndexOf(space);
+        index.Collect(area, slots);
+        slots.RemoveAll(slot => replaced.IsReplaced(index.NpcOf(slot).Id));
     }
 
-    public OtherObject NpcOf(FormKey space, int slot) => IndexOf(space).NpcOf(slot);
+    public OtherObject NpcOf(FormKey space, int slot) => npcs.IndexOf(space).NpcOf(slot);
 
-    public NpcBodySet BodiesOf(FormKey space, int slot) => IndexOf(space).BodiesOf(slot);
+    public NpcBodySet BodiesOf(FormKey space, int slot) => npcs.IndexOf(space).BodiesOf(slot);
 
-    public PlacedTransform TransformOf(FormKey space, int slot) => IndexOf(space).TransformOf(slot);
+    public PlacedTransform TransformOf(FormKey space, int slot) => npcs.IndexOf(space).TransformOf(slot);
 
-    public OrientedBox WorldBoxOf(FormKey space, int slot) => IndexOf(space).WorldBoxOf(slot);
+    public OrientedBox WorldBoxOf(FormKey space, int slot) => npcs.IndexOf(space).WorldBoxOf(slot);
 
-    public NpcSizeCounts SizesIn(FormKey space) => IndexOf(space).Counts;
+    public void MeasureBodiesIn(FormKey space) => npcs.IndexOf(space);
 
-    public IReadOnlyList<PointNpc> PointFallbacksIn(FormKey space) => IndexOf(space).PointFallbacks;
+    public NpcSizeCounts SizesIn(FormKey space) => npcs.IndexOf(space).Counts;
 
-    private PlacedNpcIndex IndexOf(FormKey space) =>
-        _bySpace.GetOrCreate(space, () => PlacedNpcIndex.Build(rivals.ObjectsIn(space), bodies, execution));
+    public IReadOnlyList<PointNpc> PointFallbacksIn(FormKey space) => npcs.IndexOf(space).PointFallbacks;
 }
 
 internal sealed class Solids(PlacedSpaces solids, ObjectContainment containment) : ISolids

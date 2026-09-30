@@ -47,8 +47,6 @@ internal sealed class OtherObjectIndex
     /// <summary>The objects by world bounds: for every question about what an object's bounds reach.</summary>
     public OtherObjectBoxIndex Bounds => _bounds.Value;
 
-    public int Count => _objects.Length;
-
     public OtherObject this[int index] => _objects[index];
 
     /// <summary>World-space bounds center of a visible object; false (and no center) for an invisible one.</summary>

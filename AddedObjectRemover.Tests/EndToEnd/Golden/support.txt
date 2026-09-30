@@ -112,9 +112,9 @@ Manual patch hints: wrote 3 rows to <root>/Output/AddedObjectRemover Reports/man
 00082A:Target.esp in 000802:Skyrim.esm (temporary): disabled True, position (600.00, 600.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
 ## report anchoring.csv
 iteration,formKey,editorId,base,modelPath,space,contactPoints,totalWeight,removedTargetShare,keptTargetShare,otherPluginShare,terrainShare,threshold,decision,topSupporters
-1,000814:Target.esp,T_TouchLink1,T_CrateBase [000800:Target.esp],meshes/aor/crate.nif,interior AorInterior [000800:Skyrim.esm],1573,388.2522,0.49824744,0.5017525,0,0,0.5,kept,000815:Target.esp KeptTarget 0.5017525; 000813:Target.esp RemovedTarget 0.49824744
-1,000818:Target.esp,T_SupportedByOnlyTheSeed,T_CrateBase [000800:Target.esp],meshes/aor/crate.nif,interior AorInterior [000800:Skyrim.esm],897,475.22208,1,0,0,0,0.5,removed,000817:Target.esp RemovedTarget 1
-1,00081A:Target.esp,T_SupportedPartlyBySeed,T_CrateBase [000800:Target.esp],meshes/aor/crate.nif,interior AorInterior [000800:Skyrim.esm],782,402.72208,0.30276707,0,0.69723296,0,0.5,kept,000806:Skyrim.esm OtherPlugin 0.69723296; 000819:Target.esp RemovedTarget 0.30276707
+1,000814:Target.esp,T_TouchLink1,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,interior AorInterior [000800:Skyrim.esm],1573,388.2522,0.49824744,0.5017525,0,0,0.5,kept,000815:Target.esp KeptTarget 0.5017525; 000813:Target.esp RemovedTarget 0.49824744
+1,000818:Target.esp,T_SupportedByOnlyTheSeed,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,interior AorInterior [000800:Skyrim.esm],897,475.22208,1,0,0,0,0.5,removed,000817:Target.esp RemovedTarget 1
+1,00081A:Target.esp,T_SupportedPartlyBySeed,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,interior AorInterior [000800:Skyrim.esm],782,402.72208,0.30276707,0,0.69723296,0,0.5,kept,000806:Skyrim.esm OtherPlugin 0.69723296; 000819:Target.esp RemovedTarget 0.30276707
 ## report leftover-invisible-objects.csv
 formKey,editorId,base,baseType,invisibleType,space,cell,x,y,z,radius,insideObject,insideObjectPlugin,EastTotal,EastRemoved,EastState,NorthEastTotal,NorthEastRemoved,NorthEastState,NorthTotal,NorthRemoved,NorthState,NorthWestTotal,NorthWestRemoved,NorthWestState,WestTotal,WestRemoved,WestState,SouthWestTotal,SouthWestRemoved,SouthWestState,SouthTotal,SouthRemoved,SouthState,SouthEastTotal,SouthEastRemoved,SouthEastState,occupiedDirections,removedDirections,decision,reason,movedToX,movedToY,movedToZ,moveDistance,movedOnto
 00081B:Target.esp,T_MarkerInsideBuilding,T_XMarkerBase [000804:Target.esp],Static,XMarkers,interior AorInterior [000800:Skyrim.esm],,48000,0,100,1024,000814:Rival.esp,Rival.esp,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,removed,inside another mod's object,,,,,
@@ -129,5 +129,5 @@ KeptForNonPlacedReference,000829:Target.esp,T_ExteriorMarkerInBuilding,worldspac
 KeptTeleportDoor,000811:Target.esp,T_TeleportDoorA,interior AorInterior [000800:Skyrim.esm],,teleport door
 ## report mesh-origins.csv
 modelPath,baseEditorIds,referenceCount,localMinX,localMinY,localMinZ,localMaxX,localMaxY,localMaxZ,originFractionX,originFractionY,originFractionZ,classification
-meshes/aor/crate.nif,T_CrateBase; T_DoorBase,33,-50,-50,0,50,50,100,0.5,0.5,-0,origin near bottom
-meshes/aor/twinpillars.nif,T_TwinPillarsBase,1,-150,-20,0,150,20,200,0.5,0.5,-0,origin near bottom
+meshes\aor\crate.nif,T_CrateBase; T_DoorBase,33,-50,-50,0,50,50,100,0.5,0.5,-0,origin near bottom
+meshes\aor\twinpillars.nif,T_TwinPillarsBase,1,-150,-20,0,150,20,200,0.5,0.5,-0,origin near bottom

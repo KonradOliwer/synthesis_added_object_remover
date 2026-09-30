@@ -128,7 +128,7 @@ public class NpcBodyResolverTests
             PlaceNpc(0, BaseRaceMale, new P3Float(0, 0, 0)),
             PlaceNpc(1, Missing, new P3Float(0, 0, 0)));
 
-        Assert.Equal(1, npcs.Count);
+        Assert.Equal(1, npcs.Counts.Evaluated);
         Assert.Equal(new OtherId(0), npcs.NpcOf(0).Id);
         Assert.Equal(1, npcs.Counts.WithoutNpc);
         Assert.Equal(1, npcs.Counts.ByBodyMesh);

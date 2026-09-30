@@ -72,7 +72,7 @@ internal sealed class NpcStuckSearch
             .Select(i => targets[i].SpaceKey)
             .Distinct()
             .ToList();
-        foreach (var space in spaces) npcs.SizesIn(space);
+        foreach (var space in spaces) npcs.MeasureBodiesIn(space);
         return new NpcStuckSearch(targets, npcs, spaces, shapes, meshCache);
     }
 

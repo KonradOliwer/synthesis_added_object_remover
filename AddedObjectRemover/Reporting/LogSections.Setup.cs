@@ -42,7 +42,7 @@ internal static partial class LogSections
     public static LogSection Index(World world, TimeSpan elapsed, ReportContext context)
     {
         if (!context.Detailed) return new LogSection("index", []);
-        var targetSpaces = world.Targets.Select(target => target.SpaceKey).ToHashSet();
+        var targetSpaces = world.TargetSpaces();
         var rivals = world.Rivals.Count(rival => targetSpaces.Contains(rival.SpaceKey));
         return new LogSection(
             "index",

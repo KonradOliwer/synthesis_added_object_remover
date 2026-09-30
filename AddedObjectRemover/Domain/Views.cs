@@ -5,7 +5,8 @@ namespace AddedObjectRemover;
 
 // Narrow read-only views of the placed objects. Each view answers only what its steps may ask,
 // lists ids in ascending order, and gives answers that depend only on the data, never on which
-// questions were asked before. Queries take the calling worker's own scratch buffers.
+// questions were asked before. Queries that list results replace the contents of a list the
+// caller owns, and queries that need scratch space take the calling worker's own buffers.
 
 /// <summary>The visible rivals by where they are placed: only for matching replaced objects.</summary>
 internal interface IRivalPositions
@@ -51,6 +52,9 @@ internal interface INpcs
 
     OrientedBox WorldBoxOf(FormKey space, int slot);
 
+    /// <summary>Finds the possible bodies of every placed NPC of the space now, unless already done.</summary>
+    void MeasureBodiesIn(FormKey space);
+
     /// <summary>How the size of every placed NPC of the space was found, replaced ones included.</summary>
     NpcSizeCounts SizesIn(FormKey space);
 
@@ -77,7 +81,7 @@ internal readonly record struct VisibleNeighbour(TargetId Target, IReadOnlyList<
 /// <summary>The visible target objects, removed or not, as oriented boxes.</summary>
 internal interface IVisibleTargets
 {
-    /// <summary>Replaces <paramref name="into"/> with the visible targets whose box lies within <paramref name="radius"/> of <paramref name="point"/>.</summary>
+    /// <summary>Replaces <paramref name="into"/> with the visible targets whose box lies within <paramref name="radius"/> of <paramref name="point"/>, ascending.</summary>
     void Around(FormKey space, Vector3 point, float radius, List<VisibleNeighbour> into);
 
     /// <summary>Whether the mesh of some included visible target surrounds <paramref name="point"/>.</summary>
@@ -86,8 +90,3 @@ internal interface IVisibleTargets
     /// <summary>The boxes of the included visible targets that may come within <paramref name="radius"/> of <paramref name="point"/>, and possibly a few farther ones.</summary>
     IEnumerable<OrientedBox> BoxesNear(FormKey space, Vector3 point, float radius, Func<TargetId, bool> include);
 }
-
-/// <summary>The rivals the too-close step leaves out as a whole.</summary>
-/// <param name="InvisibleByReason">Invisible rivals of the spaces holding a visible target, most frequent reason first, ties by reason.</param>
-/// <param name="PlacedNpcs">Placed NPCs among the rivals of the target spaces.</param>
-internal sealed record RivalCensus(IReadOnlyList<KeyValuePair<string, int>> InvisibleByReason, int PlacedNpcs);

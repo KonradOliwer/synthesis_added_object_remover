@@ -9,6 +9,7 @@ public class RivalCensusTests
 {
     private static readonly ModKey Mod = ModKey.FromNameAndExtension("Census.esp");
     private static readonly FormKey SpaceWithOnlyInvisibleTargets = new(TestTargets.TargetMod, 0x200);
+    private static readonly FormKey SpaceWithoutTargets = new(TestTargets.TargetMod, 0x201);
     private static readonly BaseRef MissingBase = new(new FormKey(Mod, 0x7FF), typeof(IStaticGetter));
 
     private static readonly TestStatic Crate = new(
@@ -33,13 +34,26 @@ public class RivalCensusTests
             TestShapes.Placed(Mod, 2, Crate.Ref, farAway) with { HasMapMarker = true },
             TestShapes.Placed(Mod, 3, MissingBase, Vector3.Zero) with { SpaceKey = SpaceWithOnlyInvisibleTargets },
             TestNpcs.Place(Mod, 4, MissingBase.FormKey, Vector3.Zero, default) with { SpaceKey = SpaceWithOnlyInvisibleTargets },
+            TestShapes.Placed(Mod, 5, MissingBase, Vector3.Zero) with { SpaceKey = SpaceWithoutTargets },
+            TestNpcs.Place(Mod, 6, MissingBase.FormKey, Vector3.Zero, default) with { SpaceKey = SpaceWithoutTargets },
         ];
+        var scene = TestScenes.Create(targets, rivals, Shapes);
 
-        var census = TestScenes.Create(targets, rivals, Shapes).Census(looks);
+        var census = scene.Census(looks);
 
         Assert.Equal(
             new[] { KeyValuePair.Create("MapMarkers", 1), KeyValuePair.Create("base not found", 1) },
             census.InvisibleByReason);
         Assert.Equal(1, census.PlacedNpcs);
+        QueryEveryRivalOfTheSpace(scene, rivals.Count);
+        Assert.Equal(census.InvisibleByReason, scene.Census(looks).InvisibleByReason);
+    }
+
+    /// <summary>What a too-close search asks, so the census can show it does not depend on those questions.</summary>
+    private static void QueryEveryRivalOfTheSpace(Scene scene, int rivalCount)
+    {
+        var area = new Box(new Vector3(-100000), new Vector3(100000));
+        scene.ActiveRivals(Replacements.None(rivalCount), NpcHandling.CountLikeObjects)
+            .Overlapping(TestTargets.Space, area, new SpatialQueryScratch(), []);
     }
 }

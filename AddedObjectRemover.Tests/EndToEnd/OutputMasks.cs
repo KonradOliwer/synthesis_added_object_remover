@@ -4,12 +4,15 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 
 /// <summary>
 /// Removes what depends on timing, thread count or the machine from a run's output: performance
-/// lines are dropped, durations and the run's temporary folder are replaced by placeholders, and path separators are
-/// written as '/' so the text is the same on every platform.
+/// lines are dropped, durations and the run's temporary folder are replaced by placeholders, and the separators
+/// of paths below that folder are written as '/' so the text is the same on every platform. Game-relative paths
+/// (meshes\aor\crate.nif) are record data and stay untouched.
 /// </summary>
 internal static partial class OutputMasks
 {
     public const string RootPlaceholder = "<root>";
+    private static readonly string PathTailPattern =
+        $@"(?<tail>(?:[\\/](?:{Regex.Escape(DiagnosticsSettings.DefaultReportFolder)}|[^\s\\/,]+))*)";
     private const string DurationPlaceholder = "in <time>";
 
     /// <summary>Timing, cache, memory and thread-count lines.</summary>
@@ -50,5 +53,5 @@ internal static partial class OutputMasks
         prefixes.Any(prefix => line.StartsWith(prefix, StringComparison.Ordinal));
 
     private static string MaskRoot(string line, string root) =>
-        line.Replace(root, RootPlaceholder, StringComparison.OrdinalIgnoreCase).Replace('\\', '/');
+        Regex.Replace(line, Regex.Escape(root) + PathTailPattern, match => RootPlaceholder + match.Groups["tail"].Value.Replace('\\', '/'), RegexOptions.IgnoreCase);
 }

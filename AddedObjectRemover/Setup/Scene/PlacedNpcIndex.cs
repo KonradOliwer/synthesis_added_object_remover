@@ -64,8 +64,6 @@ internal sealed class PlacedNpcIndex
         Counts = NpcSizeCounts.Of(bodies, withoutNpc);
     }
 
-    public int Count => _npcs.Length;
-
     public NpcSizeCounts Counts { get; }
 
     /// <summary>For the detailed log only: the NPCs with a point-sized possible body, with why its real size is unknown.</summary>

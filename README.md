@@ -10,24 +10,24 @@ the same area. By default it also removes the target's objects that were touchin
 and the target's invisible objects (lights, sounds, critter spawners, ...) that sit inside another
 mod's object or are left behind once the objects around them are gone.
 
-Removal never deletes anything: the object is disabled and moved far below the world. The output
-plugin is `AddedObjectRemover.esp`.
+Removal never deletes anything: the object is disabled and moved far below the world, the same way
+xEdit's *Undelete and Disable References* does. If it had an enable parent, that is replaced so the
+object stays disabled. The changes are written to your Synthesis group's output plugin.
 
 Teleport doors, and objects that another mod's objects or any other record links to (quests and
 their aliases, AI packages, locations, factions, navmeshes, dialogue, scripts, ...), are never
 removed by any step, so nothing the game or a script relies on goes missing. Objects of the target
 plugin linked together (enable parent, linked references, ...) are removed together, or all kept.
-A linked object removed with a too-close or follow-up removal gets the same follow-up removal, so
-what it holds up or touches goes too; one removed with a leftover invisible object (see below) does
-not.
+A linked partner of an object removed for being too close, or by *Also remove*, is itself treated
+as removed, so what rests on or touches it can go too.
 
 ## How to use
 
 1. Add this repository to a Synthesis group as a Git patcher, with the group placed after the target plugin.
 2. Set *Mod to clean up*.
-3. Run the group and keep `AddedObjectRemover.esp` enabled after the target plugin.
+3. Run the group and keep the group's output plugin enabled after the target plugin.
 
-The log ends with a *Possible manual patch needed* section listing removed markers and kept objects worth checking by hand, followed by where the report files were written.
+Near the end of the log, a *Possible manual patch needed* section lists removed markers and kept objects worth checking by hand.
 
 ## Settings
 
@@ -45,9 +45,9 @@ The log ends with a *Possible manual patch needed* section listing removed marke
 | --- | --- | --- |
 | Mods to ignore | *(empty)* | Objects from these plugins never cause removals. |
 | Ignore the mod's own masters | `true` | Objects from mods it requires never cause removals. |
-| Ignore mods sharing a patch | `true` | If a patch combines both mods, they don't clash. The log lists every detected patch and the mods it causes to be ignored. |
+| Ignore mods sharing a patch | `true` | The other mods a detected patch requires don't clash with the target. The log lists every detected patch and the mods it causes to be ignored. |
 | NPCs and creatures | `OnlyWhenStuckInObject` | Whether other mods' NPCs and creatures cause removals: `CountLikeObjects` treats them like any other object, `OnlyWhenStuckInObject` only when they are stuck in the object at its real size, `Ignore` never. An NPC is stuck when its body sinks more than 8 units into the object, or when it stands inside the object (for example inside a boulder, or in a room of a building); standing on or leaning against the object does not count. An NPC placed through a leveled list counts when any of the NPCs it can be is stuck. |
-| Patch master limit | `10` | Plugins with more masters than this aren't treated as patches (1-100; the base game and the cleaned mod's masters do not count). Plugins that depend on many mods, such as a merged patch or a Bashed Patch, are therefore not treated as patches; the log lists them as skipped. |
+| Patch master limit | `10` | A patch is a plugin that requires the target plugin and at most this many other mods (1-100; the base game and the target's masters do not count). Only used when *Ignore mods sharing a patch* is on. Plugins that depend on many mods, such as a merged patch or a Bashed Patch, are therefore not treated as patches; the log lists them as skipped. |
 
 ### Objects resting on removed ones
 
@@ -58,8 +58,8 @@ The log ends with a *Possible manual patch needed* section listing removed marke
 | Support lost (%) | `50` | `ObjectsSupportedByIt` only: remove an object once this much of its support is gone (1-100). |
 
 - **Nothing**: only the too-close objects are removed.
-- **EverythingTouching**: every object connected to a removed one through touching objects is removed too, spreading outward one touching object at a time until nothing more is added. This can spread through floors and walls to whole rooms.
-- **ObjectsSupportedByIt**: a touching object is removed only when at least *Support lost (%)* of what it rests on or touches was removed. The ground and objects of any plugin, the base game included, count as support. It works best for objects whose mesh origin is at their base (true for most plants and many props); `mesh-origins.csv` (see *Reports and log*) shows how well that holds for your target plugin.
+- **EverythingTouching**: every object connected to a removed one through touching objects is removed too, spreading outward one touching object at a time until nothing more is added. This can spread through floors and walls to whole rooms. Only the target plugin's visible objects are removed this way; a kept object (see *What is never removed*) is not removed and the spread does not pass through it.
+- **ObjectsSupportedByIt**: a touching object is removed only when at least *Support lost (%)* of what it rests on or touches was removed. The ground and objects of any plugin, the base game included, count as support. It works best for objects whose mesh origin is at their base (true for most free-standing props); `mesh-origins.csv` (see *Reports and log*) shows how well that holds for your target plugin.
 
 ### Invisible objects left behind
 
@@ -72,7 +72,7 @@ The log ends with a *Possible manual patch needed* section listing removed marke
 | Minimum directions with objects (%) | `50` | Of the 8 directions, this share must contain the cleaned mod's objects before deciding. |
 | Never remove | `None` | Invisible object types to always keep (see below). |
 | Types to never remove (Custom) | *(empty)* | Used when *Never remove* is `Custom`: the types to keep. |
-| Move kept markers out of other mods' objects | `false` | Move a kept map, X (including heading), idle or other marker that sits inside another mod's object to the nearest free spot on the navmesh or, failing that, the ground. Only its position changes. Lights, sounds, acoustic spaces, trigger boxes, critter spawners, decals, furniture and door markers are never moved. |
+| Move kept markers out of other mods' objects | `false` | Move a kept map, X (including heading), idle or other marker that sits inside another mod's object to the nearest free spot on the navmesh or, failing that, the ground. Only its position changes. Needs *Remove leftover sounds and markers* on; markers are kept when *Never remove* protects them or something depends on them. Lights, sounds, acoustic spaces, trigger boxes, critter spawners, decals, furniture and door markers are never moved. |
 
 The three percentages take values from 10 to 100 in steps of 10.
 
@@ -100,26 +100,32 @@ types unless they are linked to a removed object. *Never remove* presets:
 | --- | --- | --- |
 | Detailed log | `false` | Lists every removed object and why, plus per-space counts, unreadable meshes, timings and processing statistics. |
 | Write report files | `false` | Saves CSV files for checking the results (see *Reports and log*). |
-| Report folder | `AddedObjectRemover Reports` | Folder for report files: a full path, or relative to the patch output folder. Only used when *Write report files* is on. |
+| Report folder | `AddedObjectRemover Reports` | Folder for report files: a full path, or relative to the folder containing the output plugin. Created if missing; empty means the default. If it can't be used, the log warns and the run continues. Only used when *Write report files* is on. |
 
-Numbers out of range are corrected to the nearest valid value, and percentages are rounded to the
-nearest step of 10, each with a warning in the log. A saved setting that fails to load at all (for
-example a dropdown value that no longer exists) stops the run, and the log names the setting and
-what is allowed there instead of only showing a raw error.
+Numbers out of range are corrected to the nearest valid value (a value that is not a number becomes
+the default), and percentages are rounded to the nearest step of 10, each with a warning in the log.
+A setting with an invalid value (for example text that is not one of the dropdown choices) stops the
+run; the log names the setting and what is allowed there.
 
 ## What is never removed / never counts
 
 - The base game and its official updates (`Skyrim.esm`, `Update.esm`, `Dawnguard.esm`,
   `HearthFires.esm`, `Dragonborn.esm`). Creation Club plugins are **not** ignored automatically;
   add them to *Mods to ignore* if needed.
-- Invisible objects, such as markers, lights without a lamp, sounds and trigger boxes: they never
-  cause a too-close removal.
+- Plugins listed in *Mods to ignore*, and the plugins the target plugin requires (with *Ignore the
+  mod's own masters* on).
+- Invisible objects, such as markers, lights without a lamp, sounds, trigger boxes and decals, and
+  objects whose base record is missing: they never cause removals.
+- Other mods' NPCs and creatures, except as set in *NPCs and creatures*.
 - Effect meshes, such as fog, light rays and water spray: they never cause removals.
 - Objects the target plugin overrides or replaces (e.g. a piece of clutter the target plugin swaps
-  for its own version at the same spot).
-- Objects added by an earlier Added Object Remover run in the same Synthesis group.
-- Mods linked to the target only by a compatibility patch (a plugin that masters both the target
-  and a few other mods), and that patch itself.
+  for its own version of about the same size at the same spot).
+- Objects that start disabled: the target plugin's are never checked or removed; other mods' never
+  cause removals, unless a parent object can enable them in game.
+- Objects added by patchers that run earlier in the same Synthesis group.
+- With *Ignore mods sharing a patch* on: every compatibility patch (a plugin that requires the target
+  plugin and at most *Patch master limit* other mods) and the other mods it requires. A plugin that
+  requires only the target plugin, such as an add-on for it, is not a patch; its objects can cause removals.
 - Teleport doors, and any object linked to by a quest, script, AI package, location, faction,
   navmesh or dialogue.
 
@@ -127,22 +133,15 @@ what is allowed there instead of only showing a raw error.
 
 The normal log shows only what you need: the settings in use, warnings and errors, the final summaries of removed, kept and moved objects, one line per kept object, a summary of unreadable meshes, and where report files were written. Turn on *Detailed log* for every removed object and why, per-space counts, unreadable-mesh details, timings and processing statistics.
 
-The log ends with a *Possible manual patch needed* section, followed by where the report files were written: removed markers actors or the
-map use (door, map, idle and furniture markers), and objects that would have been removed but were
-kept, grouped by why (part of a linked group, kept because something depends on it, or a teleport
-door).
+Near the end of the log, a *Possible manual patch needed* section lists removed door, map, idle and furniture markers (which actors or the map use), and objects that would have been removed but were kept, grouped by why (part of a linked group, kept because something depends on it, or a teleport door). With report files on, the locations of the written files follow.
 
-With *Write report files* on, these CSV files are written to the *Report folder*:
+With *Write report files* on, CSV files (UTF-8, comma-separated, header in the first row) are written to the *Report folder*. At the start of each run the plugin's report files from earlier runs are deleted from that folder. Which files appear depends on your settings:
 
-- **`anchoring.csv`**: with *Also remove* set to `ObjectsSupportedByIt`, check this to see why an
-  object was removed or kept.
-- **`mesh-origins.csv`**: with *Also remove* set to `ObjectsSupportedByIt`, check this if it removes
-  or keeps objects you didn't expect.
-- **`edges.csv`** and **`components.csv`**: with *Also remove* set to `EverythingTouching`, these
-  show which objects were found touching and which chains were removed together.
-- **`leftover-invisible-objects.csv`**: for every invisible object checked, why it was removed or
-  kept, and where it was moved to if it was relocated.
-- **`manual-patch-hints.csv`**: the same rows as the *Possible manual patch needed* log section.
+- **`anchoring.csv`**: why each object was removed or kept. Only with *Also remove* `ObjectsSupportedByIt` and something removed for being too close.
+- **`mesh-origins.csv`**: how each target mesh's origin sits (near the bottom, near the centre, or elsewhere); check it if `ObjectsSupportedByIt` removes or keeps unexpected objects. Same conditions as `anchoring.csv`.
+- **`edges.csv`** and **`components.csv`**: which objects were found touching and which chains were removed together. Only with *Also remove* `EverythingTouching` and something removed for being too close.
+- **`leftover-invisible-objects.csv`**: why each invisible object checked was removed or kept, and where it was moved. Only with *Remove leftover sounds and markers* on.
+- **`manual-patch-hints.csv`**: the rows of the *Possible manual patch needed* section, always written. Columns: hint, formKey, editorId, space, cell, detail.
 
 ## Known limitations
 
@@ -150,7 +149,10 @@ With *Write report files* on, these CSV files are written to the *Report folder*
   large objects that only overlap at their edges may not be detected as too close.
 - Object size comes from the mesh, or its Object Bounds when the mesh can't be read, which can
   differ slightly from what you see in game.
-- Objects a later-loading plugin overrides are skipped, even if they still clip with something in
-  game.
+- The target plugin's objects that a later-loading plugin, or an earlier patcher in the same group,
+  changes are left alone, even if they still clip with something in game.
+- The target plugin's effect-only objects (such as fog or light rays) are never removed unless linked
+  to a removed object. An object whose mesh can't be read is never removed by *Also remove*; the log
+  lists unreadable meshes.
 - A kept marker is moved only up to 2048 units and prefers staying in its own cell; in tight
   interiors a free spot often can't be found, so it may be left where it is (the log says so).

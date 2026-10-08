@@ -42,7 +42,7 @@ internal static class TestNpcs
             })),
         };
 
-    public static OtherObject Place(ModKey mod, int index, FormKey npc, Vector3 position, P3Float rotation) =>
-        new(new OtherId(index), new FormKey(mod, 0x900 + (uint)index), TestTargets.Space, mod, EditorId: null, new BaseRef(npc, typeof(INpcGetter)), position, rotation, 1f,
+    public static OtherObject Place(ModKey mod, int index, FormKey npc, Vector3 position, Vector3 rotation) =>
+        new(new OtherId(index), new FormKey(mod, 0x900 + (uint)index).ToRecordKey(), TestTargets.Space, mod.ToPluginName(), EditorId: null, new BaseKey(npc.ToRecordKey(), BaseLinkKind.Npc), position, rotation, 1f,
             IsPrimitive: false, HasMapMarker: false);
 }

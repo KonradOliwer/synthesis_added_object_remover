@@ -5,7 +5,7 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 /// <summary>Scenes about which object is too close to which, and how the zone shape and mesh decide it.</summary>
 internal static class FixtureShapeScenes
 {
-    /// <summary>A rival crate this close to a target crate replaces it (position tolerance 16).</summary>
+    /// <summary>An other-mod crate this close to a target crate replaces it (position tolerance 16).</summary>
     private static readonly Vector3 ReplacementShift = new(10f, 0f, 0f);
 
     public static void AddAll(FixtureScenery scenery)
@@ -16,7 +16,7 @@ internal static class FixtureShapeScenes
         AddReplacementScene(scenery);
     }
 
-    /// <summary>Removed in every variant: a rival pad reaches into the crate's zone.</summary>
+    /// <summary>Removed in every variant: an other-mod pad reaches into the crate's zone.</summary>
     private static void AddTooCloseScene(FixtureScenery scenery) =>
         scenery.PlaceCratePinnedByPad("TooClose", FixtureLayout.Origin(FixtureSlot.TooClose));
 
@@ -28,7 +28,7 @@ internal static class FixtureShapeScenes
     {
         var origin = FixtureLayout.Origin(FixtureSlot.TwinPillars);
         scenery.Mods.Target.Interior.Place("T_TwinPillars", scenery.Bases.TargetTwinPillars, origin);
-        scenery.Mods.Rival.Interior.Place("R_TwinPillars_GapPad", scenery.Bases.RivalPad, origin);
+        scenery.Mods.OtherMod.Interior.Place("R_TwinPillars_GapPad", scenery.Bases.OtherModPad, origin);
     }
 
     /// <summary>A target without a model is judged by its Object Bounds as a box, whatever the zone shape.</summary>
@@ -39,11 +39,11 @@ internal static class FixtureShapeScenes
         scenery.PlacePinningPad("BoundsOnly", origin, FixtureLayout.PinningPadOffset);
     }
 
-    /// <summary>The rival crate is ignored as a replacement of the target crate, so the target stays.</summary>
+    /// <summary>The other-mod crate is ignored as a replacement of the target crate, so the target stays.</summary>
     private static void AddReplacementScene(FixtureScenery scenery)
     {
         var origin = FixtureLayout.Origin(FixtureSlot.Replacement);
         scenery.PlaceTargetCrate("Replaced", origin);
-        scenery.Mods.Rival.Interior.Place("R_Replacement_Crate", scenery.Bases.RivalCrate, origin + ReplacementShift);
+        scenery.Mods.OtherMod.Interior.Place("R_Replacement_Crate", scenery.Bases.OtherModCrate, origin + ReplacementShift);
     }
 }

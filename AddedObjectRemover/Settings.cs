@@ -1,56 +1,13 @@
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
+using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
+using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 using Mutagen.Bethesda.Synthesis.Settings;
 
 namespace AddedObjectRemover;
 
-/// <summary>The zone around a cleaned mod's object in which another mod's object makes it too close.</summary>
-public enum ZoneShape
-{
-    ObjectShape,
-    BoundingBox,
-}
-
-/// <summary>How other mods' placed NPCs and creatures take part in the too-close step.</summary>
-public enum NpcHandling
-{
-    CountLikeObjects,
-    OnlyWhenStuckInObject,
-    Ignore,
-}
-
-public enum FollowUpRemovalMode
-{
-    Nothing,
-    EverythingTouching,
-    ObjectsSupportedByIt,
-}
-
-/// <summary>Kinds of placed objects that cannot be seen in game.</summary>
-public enum InvisibleObjectKind
-{
-    MapMarkers,
-    XMarkers,
-    IdleMarkers,
-    FurnitureMarkers,
-    DoorMarkers,
-    OtherMarkers,
-    Lights,
-    SoundMarkers,
-    AcousticSpaces,
-    CritterSpawners,
-    TriggerBoxes,
-    Decals,
-}
-
-public enum ProtectedInvisibleObjectsPreset
-{
-    None,
-    Markers,
-    MarkersAndLights,
-    MarkersLightsAndSounds,
-    Custom,
-}
-
-public class Settings
+public class Settings : ISettingsValues
 {
     [SynthesisSettingName("Mod to clean up")]
     [SynthesisTooltip("Which plugin to clean up and when its objects are removed.")]
@@ -71,31 +28,33 @@ public class Settings
     [SynthesisSettingName("Logs and reports")]
     [SynthesisTooltip("Extra output for checking the results.")]
     public DiagnosticsSettings Diagnostics { get; set; } = new();
+
+    ICheckSettingsValues ISettingsValues.WhatToCheck => WhatToCheck ?? new CheckSettings();
+    IIgnoreSettingsValues ISettingsValues.WhatToIgnore => WhatToIgnore ?? new IgnoreSettings();
+    IFollowUpSettingsValues ISettingsValues.FollowUpRemoval => FollowUpRemoval ?? new FollowUpRemovalSettings();
+    ILeftoverSettingsValues ISettingsValues.LeftoverInvisibleObjects => LeftoverInvisibleObjects ?? new LeftoverInvisibleObjectSettings();
+    IDiagnosticsSettingsValues ISettingsValues.Diagnostics => Diagnostics ?? new DiagnosticsSettings();
 }
 
-public class CheckSettings
+public class CheckSettings : ICheckSettingsValues
 {
-    public const float DefaultSizeMultiplier = 0.5f;
-    public const ZoneShape DefaultZoneShape = ZoneShape.ObjectShape;
-
     [SynthesisSettingName("Mod to clean up")]
     [SynthesisTooltip("The plugin whose added objects may be removed.")]
     public string TargetPlugin { get; set; } = string.Empty;
 
     [SynthesisSettingName("Removal distance (× object size)")]
     [SynthesisTooltip("Removes the cleaned mod's object when another mod's object is this close, measured in multiples of the object's own size.")]
-    public float SizeMultiplier { get; set; } = DefaultSizeMultiplier;
+    public float SizeMultiplier { get; set; } = SettingDefaults.SizeMultiplier;
 
     [SynthesisSettingName("Removal zone")]
     [SynthesisTooltip("ObjectShape: the object's own shape, enlarged. BoundingBox: faster, its box.")]
-    public ZoneShape ZoneShape { get; set; } = DefaultZoneShape;
+    public ZoneShape ZoneShape { get; set; } = SettingDefaults.Zone;
+
+    string? ICheckSettingsValues.TargetPlugin => TargetPlugin;
 }
 
-public class IgnoreSettings
+public class IgnoreSettings : IIgnoreSettingsValues
 {
-    public const int DefaultMaxOtherMastersForPatch = 10;
-    public const NpcHandling DefaultNpcHandling = NpcHandling.OnlyWhenStuckInObject;
-
     [SynthesisSettingName("Mods to ignore")]
     [SynthesisTooltip("Objects from these plugins never cause removals.")]
     public List<string> ExcludedPlugins { get; set; } = [];
@@ -110,58 +69,51 @@ public class IgnoreSettings
 
     [SynthesisSettingName("Patch master limit")]
     [SynthesisTooltip("Plugins with more masters than this aren't treated as patches.")]
-    public int MaxOtherMastersForPatch { get; set; } = DefaultMaxOtherMastersForPatch;
+    public int MaxOtherMastersForPatch { get; set; } = SettingDefaults.MaxOtherMastersForPatch;
 
     [SynthesisSettingName("NPCs and creatures")]
     [SynthesisTooltip("Whether other mods' NPCs cause removals. Default: only when stuck in the object.")]
-    public NpcHandling NpcHandling { get; set; } = DefaultNpcHandling;
+    public NpcHandling NpcHandling { get; set; } = SettingDefaults.Npcs;
+
+    IReadOnlyList<string?> IIgnoreSettingsValues.ExcludedPlugins => ExcludedPlugins?.ToArray() ?? [];
 }
 
-public class FollowUpRemovalSettings
+public class FollowUpRemovalSettings : IFollowUpSettingsValues
 {
-    public const FollowUpRemovalMode DefaultMode = FollowUpRemovalMode.EverythingTouching;
-    public const float DefaultTouchDistance = 8f;
-    public const float DefaultAnchoringThresholdPercent = 50f;
-
     [SynthesisSettingName("Also remove")]
     [SynthesisTooltip("What else goes with a removed object.")]
-    public FollowUpRemovalMode Mode { get; set; } = DefaultMode;
+    public FollowUpRemovalMode Mode { get; set; } = SettingDefaults.FollowUpMode;
 
     [SynthesisSettingName("Touch gap")]
     [SynthesisTooltip("Gap still counted as touching, in game units.")]
-    public float TouchDistance { get; set; } = DefaultTouchDistance;
+    public float TouchDistance { get; set; } = SettingDefaults.TouchDistance;
 
     [SynthesisSettingName("Support lost (%)")]
     [SynthesisTooltip("Remove an object once this much of its support is gone.")]
-    public float AnchoringThresholdPercent { get; set; } = DefaultAnchoringThresholdPercent;
+    public float AnchoringThresholdPercent { get; set; } = SettingDefaults.AnchoringThresholdPercent;
 }
 
-public class LeftoverInvisibleObjectSettings
+public class LeftoverInvisibleObjectSettings : ILeftoverSettingsValues
 {
-    public const float DefaultSearchRadius = 1024f;
-    public const int DefaultDirectionThresholdPercent = 50;
-    public const int DefaultRemovedDirectionsPercent = 60;
-    public const int DefaultOccupiedDirectionsPercent = 50;
-
     [SynthesisSettingName("Remove leftover sounds and markers")]
     [SynthesisTooltip("Removes invisible objects whose surroundings were removed.")]
     public bool RemoveLeftoverInvisibleObjects { get; set; } = true;
 
     [SynthesisSettingName("Look-around distance")]
     [SynthesisTooltip("How far around to check, in game units.")]
-    public float SearchRadius { get; set; } = DefaultSearchRadius;
+    public float SearchRadius { get; set; } = SettingDefaults.SearchRadius;
 
     [SynthesisSettingName("Direction cleared at (%)")]
     [SynthesisTooltip("Share removed for a direction to count as cleared.")]
-    public int DirectionThresholdPercent { get; set; } = DefaultDirectionThresholdPercent;
+    public int DirectionThresholdPercent { get; set; } = SettingDefaults.DirectionThresholdPercent;
 
     [SynthesisSettingName("Cleared directions needed (%)")]
     [SynthesisTooltip("Share of directions that must be cleared.")]
-    public int RemovedDirectionsPercent { get; set; } = DefaultRemovedDirectionsPercent;
+    public int RemovedDirectionsPercent { get; set; } = SettingDefaults.RemovedDirectionsPercent;
 
     [SynthesisSettingName("Minimum directions with objects (%)")]
     [SynthesisTooltip("Of the 8 directions, this share must contain the cleaned mod's objects before deciding.")]
-    public int OccupiedDirectionsPercent { get; set; } = DefaultOccupiedDirectionsPercent;
+    public int OccupiedDirectionsPercent { get; set; } = SettingDefaults.OccupiedDirectionsPercent;
 
     [SynthesisSettingName("Never remove")]
     [SynthesisTooltip("Invisible object types to always keep.")]
@@ -174,12 +126,12 @@ public class LeftoverInvisibleObjectSettings
     [SynthesisSettingName("Move kept markers out of other mods' objects")]
     [SynthesisTooltip("Moves kept markers enclosed by another mod's object, e.g. a building or rock.")]
     public bool MoveKeptMarkersOutOfOtherModsObjects { get; set; }
+
+    IReadOnlyList<InvisibleObjectKind> ILeftoverSettingsValues.CustomProtectedTypes => CustomProtectedTypes?.ToArray() ?? [];
 }
 
-public class DiagnosticsSettings
+public class DiagnosticsSettings : IDiagnosticsSettingsValues
 {
-    public const string DefaultReportFolder = "AddedObjectRemover Reports";
-
     [SynthesisSettingName("Detailed log")]
     [SynthesisTooltip("Lists every removed object and why, plus timings and statistics.")]
     public bool DetailedLog { get; set; }
@@ -190,5 +142,7 @@ public class DiagnosticsSettings
 
     [SynthesisSettingName("Report folder")]
     [SynthesisTooltip("Folder for report files: a full path, or relative to the patch output folder.")]
-    public string DiagnosticsFolder { get; set; } = DefaultReportFolder;
+    public string DiagnosticsFolder { get; set; } = SettingDefaults.ReportFolder;
+
+    string? IDiagnosticsSettingsValues.ReportFolder => DiagnosticsFolder;
 }

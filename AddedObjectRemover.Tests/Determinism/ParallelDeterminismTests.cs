@@ -13,8 +13,8 @@ public class ParallelDeterminismTests
 
     private sealed record PairResults(
         PairTouch[] Touches,
-        List<TargetPair> FirstTouching,
-        List<TargetPair> FirstInContact,
+        List<IndexPair> FirstTouching,
+        List<IndexPair> FirstInContact,
         float[] Distances,
         PairTestStats TouchesWork,
         PairTestStats FirstTouchingWork,
@@ -51,15 +51,15 @@ public class ParallelDeterminismTests
             paths[i] = i % 11 == 0 ? null : $"mesh{i % MeshKinds}.nif";
         }
 
-        var cache = new TriangleStore(path => BoxMesh.CreateGeometry(MeshBox(path)));
+        var cache = new TriangleStore(path => BoxMesh.CreateTriangles(MeshBox(path)));
         var meshPaths = new TargetMeshPaths(paths);
-        var tester = new TouchPairTester(targets, meshPaths, cache, Tolerance);
+        var tester = new MeshPairTester(cache, meshPaths.Get, target => targets[target].Transform, Tolerance);
         var pairs = FindNearbyPairs(targets, meshPaths);
         var options = new Execution(maxDegreeOfParallelism);
 
         var (touches, touchesWork) = tester.TestPairs(pairs, options);
-        var (firstTouching, firstTouchingWork) = tester.FindFirstInContact(pairs, ContactRule.Touch, options);
-        var (firstInContact, firstInContactWork) = tester.FindFirstInContact(pairs, ContactRule.TouchOrEnclose, options);
+        var (firstTouching, firstTouchingWork) = tester.FindFirstInContact(pairs, alsoWhenCentreEnclosed: false, options);
+        var (firstInContact, firstInContactWork) = tester.FindFirstInContact(pairs, alsoWhenCentreEnclosed: true, options);
         var scratch = new TouchScratch();
         var distances = pairs.Select((pair, k) => touches[k] == PairTouch.Touching ? tester.MeasureMinSurfaceDistance(pair, scratch) : float.NaN).ToArray();
         return new PairResults(touches, firstTouching, firstInContact, distances, touchesWork, firstTouchingWork, firstInContactWork);
@@ -73,15 +73,15 @@ public class ParallelDeterminismTests
         return new Box(new Vector3(-half), new Vector3(half));
     }
 
-    private static List<TargetPair> FindNearbyPairs(List<TargetObject> targets, TargetMeshPaths meshPaths)
+    private static List<IndexPair> FindNearbyPairs(List<TargetObject> targets, TargetMeshPaths meshPaths)
     {
-        var pairs = new List<TargetPair>();
+        var pairs = new List<IndexPair>();
         for (var i = 0; i < targets.Count; i++)
         {
             for (var j = 0; j < targets.Count; j++)
             {
                 if (i == j || !meshPaths.HasMesh(i) || !meshPaths.HasMesh(j)) continue;
-                if (Vector3.Distance(targets[i].Transform.Position, targets[j].Transform.Position) <= PairRange) pairs.Add(new TargetPair(i, j));
+                if (Vector3.Distance(targets[i].Transform.Position, targets[j].Transform.Position) <= PairRange) pairs.Add(new IndexPair(i, j));
             }
         }
         return pairs;

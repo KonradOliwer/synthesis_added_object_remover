@@ -4,27 +4,45 @@ using NiflySharp.Blocks;
 namespace AddedObjectRemover;
 
 /// <summary>Reads a NIF's render geometry (bounds and optionally triangles) in root-node space with NiflySharp.</summary>
-internal static class NifGeometryReader
+internal sealed class NifGeometryReader
 {
     /// <summary>
-    /// NifFile.Load lazily fills a static, unlocked block-type cache; it is built once under
-    /// LoadLock, after which loads are parallel-safe. If that fails, every load is serialized.
+    /// NifFile.Load lazily fills NiflySharp's own static, unlocked block-type cache, which every reader in the
+    /// process shares, so this lock must be process-wide too. The cache is built once under the lock, after
+    /// which loads are parallel-safe. If that fails, every load is serialized.
     /// </summary>
     private static readonly object LoadLock = new();
-    private static readonly Lazy<WarmUp> LoaderWarmUp = new(TryPrimeBlockTypeCache, LazyThreadSafetyMode.ExecutionAndPublication);
+
+    private readonly ComputedOnce<WarmUp> _loaderWarmUp;
+    private readonly RenderGeometryTypes _renderTypes = new();
+
+    public NifGeometryReader()
+        : this(PrimeBlockTypeCache)
+    {
+    }
+
+    /// <param name="primeBlockTypeCache">Builds the loader's block-type cache; returns why it failed, or null when it worked.</param>
+    internal NifGeometryReader(Func<string?> primeBlockTypeCache)
+    {
+        _loaderWarmUp = new ComputedOnce<WarmUp>(() => new WarmUp(primeBlockTypeCache()));
+    }
+
+    /// <summary>Warms the loader up now, so a failure is known before the first mesh is read.</summary>
+    public void WarmUpLoader() => _ = _loaderWarmUp.Value;
 
     /// <summary>
-    /// Why the process-wide warm-up failed; null when it succeeded or no NIF was read yet. A run reports it
-    /// itself after each read, so the report does not depend on which run in the process read the first NIF.
+    /// Why this reader's warm-up failed; null when it succeeded or has not run yet. Each run reports it
+    /// itself, so the report does not depend on which run in the process warmed up first.
     /// </summary>
-    public static ArchiveProblem? LoaderWarmUpProblem => LoaderWarmUp.IsValueCreated ? LoaderWarmUp.Value.Problem : null;
+    public string? LoaderWarmUpFailure => HasWarmedUp ? _loaderWarmUp.Value.Failure : null;
 
-    private sealed record WarmUp(bool ParallelLoadsSafe, ArchiveProblem? Problem)
+    public bool HasWarmedUp => _loaderWarmUp.IsComputed;
+
+    public int ShapeClassesDecided => _renderTypes.ShapeClassesDecided;
+
+    private sealed record WarmUp(string? Failure)
     {
-        public static WarmUp Succeeded() => new(true, null);
-
-        public static WarmUp Failed(string message) =>
-            new(false, new ArchiveProblem(ArchiveProblemKind.NifLoaderWarmUpFailed, "NIF loader", message));
+        public bool ParallelLoadsSafe => Failure == null;
     }
 
     /// <summary>
@@ -34,24 +52,23 @@ internal static class NifGeometryReader
     /// the root node's own transform: the engine overwrites the root's local transform with the
     /// placed reference's position/rotation/scale, so it has no effect in game. Only shapes
     /// reachable from the root node are counted (orphan blocks are never rendered). Collision and
-    /// particle systems, hidden shapes/nodes, "EditorMarker" shapes/nodes and effect-shader shapes
-    /// (fog, light rays, water spray, mist planes: nothing solid) are skipped.
+    /// particle systems are always skipped; which other shapes count is up to <paramref name="inclusion"/>.
     /// With <paramref name="includeTriangles"/>, also returns the root-space vertices and triangles
     /// of every counted shape (shapes that only have a bounding sphere add to the bounds only).
-    /// A vertex that is non-finite or beyond <see cref="Geometry.MaxCoordinate"/> makes the whole
-    /// mesh <see cref="NifReadStatus.Failed"/>. Malformed files are reported, not thrown.
+    /// A vertex that is non-finite or beyond <see cref="BoundsAccumulator.MaxCoordinate"/> makes the whole
+    /// mesh <see cref="MeshReadStatus.Failed"/>. Malformed files are reported, not thrown.
     /// </summary>
-    public static NifReadResult ReadGeometry(byte[] data, bool includeTriangles)
+    public NifReadResult ReadGeometry(byte[] data, bool includeTriangles, ShapeInclusion inclusion)
     {
         try
         {
-            if (LoaderWarmUp.Value.ParallelLoadsSafe)
+            if (_loaderWarmUp.Value.ParallelLoadsSafe)
             {
-                return ReadGeometryUnlocked(data, includeTriangles);
+                return ReadGeometryUnlocked(data, includeTriangles, inclusion);
             }
             lock (LoadLock)
             {
-                return ReadGeometryUnlocked(data, includeTriangles);
+                return ReadGeometryUnlocked(data, includeTriangles, inclusion);
             }
         }
         catch (MalformedNifException ex)
@@ -64,7 +81,7 @@ internal static class NifGeometryReader
     /// Builds NiflySharp's static block-type cache by saving and re-loading a minimal in-memory NIF
     /// (one root NiNode). Safe if that load read a block, i.e. the cache now exists.
     /// </summary>
-    private static WarmUp TryPrimeBlockTypeCache()
+    private static string? PrimeBlockTypeCache()
     {
         lock (LoadLock)
         {
@@ -75,18 +92,17 @@ internal static class NifGeometryReader
                 var saved = template.Save(stream) == 0;
                 stream.Position = 0;
                 var nif = new NifFile();
-                if (saved && nif.Load(stream) == 0 && nif.Valid && nif.Blocks.Count > 0) return WarmUp.Succeeded();
-                return WarmUp.Failed("Warning: NIF loader warm-up read no blocks; meshes are parsed one at a time (slower).");
+                if (saved && nif.Load(stream) == 0 && nif.Valid && nif.Blocks.Count > 0) return null;
+                return "the minimal NIF it saved and loaded again held no blocks";
             }
-            catch (Exception ex) when (ExpectedFailures.IsMalformedNif(ex))
+            catch (Exception ex) when (Failures.IsRecoverable(ex))
             {
-                return WarmUp.Failed(
-                    $"Warning: NIF loader warm-up failed ({ex.GetType().Name}: {ex.Message}); meshes are parsed one at a time (slower).");
+                return Failures.Describe(ex);
             }
         }
     }
 
-    private static NifReadResult ReadGeometryUnlocked(byte[] data, bool includeTriangles)
+    private NifReadResult ReadGeometryUnlocked(byte[] data, bool includeTriangles, ShapeInclusion inclusion)
     {
         using var stream = new MemoryStream(data, writable: false);
         var nif = new NifFile();
@@ -100,7 +116,7 @@ internal static class NifGeometryReader
             return NifReadResult.Failed(NifReadResult.NoRootNodeKind, "NIF has no root NiNode.");
         }
 
-        var shapes = CollectWithHiddenFallback(nif, root.Index, includeTriangles);
+        var shapes = CollectWithRetry(nif, root.Index, includeTriangles, inclusion);
         return ToResult(shapes) with
         {
             FooterRoot = root.DiffersFromLibraryRoot ? root : null,
@@ -126,9 +142,10 @@ internal static class NifGeometryReader
         var geometry = new NifGeometry(
             shapes.Bounds.Min,
             shapes.Bounds.Max,
-            shapes.Vertices?.ToArray() ?? [],
-            shapes.Indices?.ToArray() ?? [],
-            shapes.PartFirstTriangles?.ToArray() ?? []);
+            new MeshTriangles(
+                shapes.Vertices?.ToArray() ?? [],
+                shapes.Indices?.ToArray() ?? [],
+                shapes.PartFirstTriangles?.ToArray() ?? []));
         var warning = shapes.Stats.MismatchedStrips > 0
             ? $"{shapes.Stats.MismatchedStrips} NiTriStrips shape(s) whose strip lengths do not match their points are used as points."
             : null;
@@ -136,19 +153,20 @@ internal static class NifGeometryReader
     }
 
     /// <summary>
-    /// First honours the hidden flag. If that leaves nothing but some shapes were hidden, a second
-    /// pass ignores the hidden flag: the mesh is certainly rendered somehow, and OBND would be worse.
+    /// First collects as <paramref name="inclusion"/> says. If that leaves nothing but some shapes were hidden and the
+    /// inclusion allows it, a second pass includes the hidden shapes: the mesh is certainly rendered somehow, and OBND would be worse.
     /// </summary>
-    private static ShapeCollection CollectWithHiddenFallback(NifFile nif, int rootIndex, bool includeTriangles)
+    private ShapeCollection CollectWithRetry(NifFile nif, int rootIndex, bool includeTriangles, ShapeInclusion inclusion)
     {
         var blocks = nif.Blocks;
         var parentOf = BuildParentMap(blocks);
         var flags = AvObjectFlags.For(nif);
 
-        var shapes = NifShapeCollector.Collect(blocks, parentOf, rootIndex, flags, includeHidden: false, includeTriangles);
-        if (shapes.Bounds.Invalid == null && !shapes.Bounds.Any && shapes.Stats.Hidden + shapes.Stats.HiddenAncestor > 0)
+        var shapes = NifShapeCollector.Collect(_renderTypes, blocks, parentOf, rootIndex, flags, inclusion, includeTriangles);
+        if (inclusion.RetryIncludingHiddenWhenEmpty
+            && shapes.Bounds.Invalid == null && !shapes.Bounds.Any && shapes.Stats.Hidden + shapes.Stats.HiddenAncestor > 0)
         {
-            shapes = NifShapeCollector.Collect(blocks, parentOf, rootIndex, flags, includeHidden: true, includeTriangles);
+            shapes = NifShapeCollector.Collect(_renderTypes, blocks, parentOf, rootIndex, flags, inclusion.WithHiddenIncluded(), includeTriangles);
         }
         return shapes;
     }

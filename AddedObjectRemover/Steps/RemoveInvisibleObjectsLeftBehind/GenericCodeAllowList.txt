@@ -1,0 +1,4 @@
+# Static methods and local functions of this module that mention no domain type (Ids or a Contracts type), each with its reason.
+# Form: Type.Member | reason  (local function: Type.Method.Local). The test fails when an entry stops being flagged.
+ReachRule.GetPositiveHalfSize | Threshold rule: half the box size when every side is positive.
+ReachRule.GetReferenceReach | Threshold rule: the reach a reference's radius or primitive bounds give.

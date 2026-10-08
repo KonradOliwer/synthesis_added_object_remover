@@ -24,12 +24,12 @@ internal static class FixtureReferenceScenes
         far.EnableParent = FixtureScenery.EnableParentOf(near);
     }
 
-    /// <summary>A rival record is enabled by the too-close crate, so the crate stays.</summary>
+    /// <summary>An other-mod record is enabled by the too-close crate, so the crate stays.</summary>
     private static void AddReferencedByPlacedScene(FixtureScenery scenery)
     {
         var origin = FixtureLayout.Origin(FixtureSlot.ReferencedByPlaced);
         var crate = scenery.PlaceCratePinnedByPad("ReferencedByPlaced", origin);
-        var child = scenery.Mods.Rival.Interior.Place("R_EnableParentChild", scenery.Bases.RivalPad, origin + FixtureLayout.FarEast);
+        var child = scenery.Mods.OtherMod.Interior.Place("R_EnableParentChild", scenery.Bases.OtherModPad, origin + FixtureLayout.FarEast);
         child.EnableParent = FixtureScenery.EnableParentOf(crate);
     }
 

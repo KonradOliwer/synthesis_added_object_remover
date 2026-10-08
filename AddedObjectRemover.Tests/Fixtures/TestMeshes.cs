@@ -8,20 +8,18 @@ internal static class TestMeshes
     public static readonly Box UnitCube = new(Vector3.Zero, Vector3.One);
 
     public static MeshTriangleTree Tree(IReadOnlyList<MeshTriangle> triangles) =>
-        MeshTriangleTree.Build(Geometry(triangles)) ?? throw new InvalidOperationException("Mesh has no triangles.");
-
-    public static NifGeometry Geometry(IReadOnlyList<MeshTriangle> triangles) => Geometry(triangles, [0]);
+        MeshTriangleTree.Build(Triangles(triangles, [0]), MeshLimits.Tree) ?? throw new InvalidOperationException("Mesh has no triangles.");
 
     /// <summary>One mesh made of several parts (NIF shapes), in the given order.</summary>
     public static MeshTriangleTree PartsTree(params IReadOnlyList<MeshTriangle>[] parts)
     {
         var partFirstTriangles = new int[parts.Length];
         for (var p = 1; p < parts.Length; p++) partFirstTriangles[p] = partFirstTriangles[p - 1] + parts[p - 1].Count;
-        return MeshTriangleTree.Build(Geometry(parts.SelectMany(part => part).ToList(), partFirstTriangles))
+        return MeshTriangleTree.Build(Triangles(parts.SelectMany(part => part).ToList(), partFirstTriangles), MeshLimits.Tree)
             ?? throw new InvalidOperationException("Mesh has no triangles.");
     }
 
-    private static NifGeometry Geometry(IReadOnlyList<MeshTriangle> triangles, int[] partFirstTriangles)
+    private static MeshTriangles Triangles(IReadOnlyList<MeshTriangle> triangles, int[] partFirstTriangles)
     {
         var vertices = new Vector3[triangles.Count * 3];
         var indices = new int[triangles.Count * 3];
@@ -34,14 +32,13 @@ internal static class TestMeshes
             indices[3 * t + 1] = 3 * t + 1;
             indices[3 * t + 2] = 3 * t + 2;
         }
-        var bounds = triangles.Select(triangle => triangle.Bounds).Aggregate((a, b) => a.Union(b));
-        return new NifGeometry(bounds.Min, bounds.Max, vertices, indices, partFirstTriangles);
+        return new MeshTriangles(vertices, indices, partFirstTriangles);
     }
 
     /// <summary>The 12 triangles of <see cref="BoxMesh"/> for <paramref name="box"/>.</summary>
     public static List<MeshTriangle> BoxTriangles(Box box)
     {
-        var geometry = BoxMesh.CreateGeometry(box);
+        var geometry = BoxMesh.CreateTriangles(box);
         return Enumerable.Range(0, geometry.TriangleCount)
             .Select(t => geometry.GetTriangle(t))
             .Select(corners => new MeshTriangle(corners.A, corners.B, corners.C))

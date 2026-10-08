@@ -1,4 +1,5 @@
 using System.Numerics;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda.Plugins;
 
@@ -17,63 +18,64 @@ public class ObjectContainmentTests
     private static readonly TestStatic FarRoom = new(
         new FormKey(Mod, 0x802), @"test\farroom.nif", TestMeshes.BoxTriangles(new Box(RoomBox.Min + FarOffset, RoomBox.Max + FarOffset)));
 
-    private static readonly ShapeCatalog Shapes = TestShapes.Create(Mod, "ObjectContainmentData", Room, FarRoom);
+    private static readonly IBaseObjectShapes Shapes = TestShapes.Create(Mod, "ObjectContainmentData", Room, FarRoom);
 
     [Fact]
-    public void FindsTheRivalWhoseMeshSurroundsThePoint()
+    public void FindsTheOtherModObjectWhoseMeshSurroundsThePoint()
     {
-        var rivals = CreateRivals(Place(0, Room, new Vector3(1000, 0, 0)), Place(1, Room, Vector3.Zero));
+        var otherModObjects = CreateOtherModObjects(Place(0, Room, new Vector3(1000, 0, 0)), Place(1, Room, Vector3.Zero));
 
-        Assert.Equal(new OtherId(1), FirstCovering(rivals, new Vector3(10, 20, 30)));
-        Assert.Equal(new OtherId(0), FirstCovering(rivals, new Vector3(1010, 20, 30)));
-        Assert.Null(FirstCovering(rivals, new Vector3(500, 0, 0)));
+        Assert.Equal(new OtherId(1), FirstCovering(otherModObjects, new Vector3(10, 20, 30)));
+        Assert.Equal(new OtherId(0), FirstCovering(otherModObjects, new Vector3(1010, 20, 30)));
+        Assert.Null(FirstCovering(otherModObjects, new Vector3(500, 0, 0)));
     }
 
     [Fact]
-    public void ReplacedRivalsCoverNothing()
+    public void ReplacedOtherModObjectsCoverNothing()
     {
         var room = Place(0, Room, Vector3.Zero);
-        var replacements = Replacements.Of(rivalCount: 1, [new Replacement(room.Id, new TargetId(0), Distance: 0f, SizeRatio: 1f)]);
+        var replacements = Replacements.Of(otherModObjectCount: 1, [new Replacement(room.Id, new TargetId(0), Distance: 0f, SizeRatio: 1f)]);
 
-        Assert.Null(FirstCovering(CreateRivals(replacements, room), new Vector3(10, 20, 30)));
-        Assert.Equal(room.Id, FirstCovering(CreateRivals(room), new Vector3(10, 20, 30)));
+        Assert.Null(FirstCovering(CreateOtherModObjects(replacements, room), new Vector3(10, 20, 30)));
+        Assert.Equal(room.Id, FirstCovering(CreateOtherModObjects(room), new Vector3(10, 20, 30)));
     }
 
     [Fact]
     public void ObjectWhoseMeshLiesFarFromItsOriginIsFoundWhereItsMeshIs()
     {
-        var rivals = CreateRivals(Place(0, FarRoom, Vector3.Zero));
+        var otherModObjects = CreateOtherModObjects(Place(0, FarRoom, Vector3.Zero));
 
-        Assert.Equal(new OtherId(0), FirstCovering(rivals, FarOffset + new Vector3(10, 20, 30)));
-        Assert.Null(FirstCovering(rivals, new Vector3(10, 20, 30)));
+        Assert.Equal(new OtherId(0), FirstCovering(otherModObjects, FarOffset + new Vector3(10, 20, 30)));
+        Assert.Null(FirstCovering(otherModObjects, new Vector3(10, 20, 30)));
     }
 
     [Fact]
-    public void LowestIdWinsWhenSeveralRivalsContainThePoint()
+    public void LowestIdWinsWhenSeveralOtherModObjectsContainThePoint()
     {
-        var rivals = CreateRivals(Place(0, Room, new Vector3(60, 0, 0)), Place(1, Room, new Vector3(-60, 0, 0)));
+        var otherModObjects = CreateOtherModObjects(Place(0, Room, new Vector3(60, 0, 0)), Place(1, Room, new Vector3(-60, 0, 0)));
 
-        Assert.Equal(new OtherId(0), FirstCovering(rivals, new Vector3(0, 20, 30)));
+        Assert.Equal(new OtherId(0), FirstCovering(otherModObjects, new Vector3(0, 20, 30)));
     }
 
     [Fact]
-    public void SolidsContainThePointInsideAnyVisibleMesh()
+    public void VisibleObjectsOfAnyPluginContainThePointInsideAnyVisibleMesh()
     {
-        var solids = TestScenes.CreateWithBackdrop([], [Place(0, Room, Vector3.Zero)], Shapes).Solids();
+        var objectsOfAnyPlugin = TestScenes.CreateWithSupportOnlyObjects([], [Place(0, Room, Vector3.Zero)], Shapes).VisibleObjectsOfAnyPlugin();
 
-        Assert.True(solids.Contains(TestTargets.Space, new Vector3(10, 20, 30), new SpatialQueryScratch()));
-        Assert.False(solids.Contains(TestTargets.Space, new Vector3(500, 0, 0), new SpatialQueryScratch()));
+        Assert.True(objectsOfAnyPlugin.Contains(TestTargets.Space, new Vector3(10, 20, 30), new ObjectQueryScratch()));
+        Assert.False(objectsOfAnyPlugin.Contains(TestTargets.Space, new Vector3(500, 0, 0), new ObjectQueryScratch()));
     }
 
     /// <summary>Rooms are turned so the containment test runs in a rotated frame; the far room is not, so its mesh stays at <see cref="FarOffset"/>.</summary>
     private static OtherObject Place(int id, TestStatic model, Vector3 position) =>
-        TestShapes.Placed(Mod, id, model.Ref, position, zRadians: model == FarRoom ? 0f : 0.7f);
+        TestShapes.Placed(Mod, id, model.Base, position, zRadians: model == FarRoom ? 0f : 0.7f);
 
-    private static IActiveRivals CreateRivals(params OtherObject[] rivals) => CreateRivals(Replacements.None(rivals.Length), rivals);
+    private static IObjectsThatCanCauseRemovals CreateOtherModObjects(params OtherObject[] otherModObjects) =>
+        CreateOtherModObjects(Replacements.None(otherModObjects.Length), otherModObjects);
 
-    private static IActiveRivals CreateRivals(Replacements replacements, params OtherObject[] rivals) =>
-        TestScenes.Create([], rivals, Shapes).ActiveRivals(replacements, NpcHandling.CountLikeObjects);
+    private static IObjectsThatCanCauseRemovals CreateOtherModObjects(Replacements replacements, params OtherObject[] otherModObjects) =>
+        TestScenes.Create([], otherModObjects, Shapes).ObjectsThatCanCauseRemovals(replacements, NpcHandling.CountLikeObjects);
 
-    private static OtherId? FirstCovering(IActiveRivals rivals, Vector3 point) =>
-        rivals.FirstCovering(TestTargets.Space, point, new SpatialQueryScratch());
+    private static OtherId? FirstCovering(IObjectsThatCanCauseRemovals otherModObjects, Vector3 point) =>
+        otherModObjects.FirstCovering(TestTargets.Space, point, new ObjectQueryScratch());
 }

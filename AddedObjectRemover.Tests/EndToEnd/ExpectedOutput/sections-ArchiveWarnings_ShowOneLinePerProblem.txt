@@ -1,0 +1,2 @@
+Warning: archive a.bsa is unreadable.
+Warning: could not list archives in /data: denied

@@ -1,0 +1,49 @@
+# Every named value (const, or static read-only field of a number, text, key, enum or struct, or an array of those) in Tools/.
+# Form: Type.Field | kind | reason
+# Kinds: math, file format, game format, budget (performance or robustness limit), internal (code or text used only inside the tool).
+# A game convention (a naming habit, a rule about what the game's objects mean) is not allowed here: the business caller owns it and passes it in.
+BoxMesh.CornerCount | math | A box has 8 corners.
+BoxMesh.TriangleCount | math | A box surface is 12 triangles.
+BoxMesh.Limits | math | The tree limits for a mesh of exactly the box's 12 triangles.
+BoxMesh.SinglePart | math | A box mesh is one part starting at triangle 0.
+BoxMesh.FaceTriangles | math | The corner triples of the 12 triangles of a box.
+MeshClosedness.SharedEdgeParity | math | A closed surface uses every edge an even number of times.
+MeshPairTester.PairsPerRange | budget | Mesh pairs per parallel work range.
+MeshPairTester.GroupsPerRange | budget | One group per parallel range (ParallelMap.OneItemPerRange).
+SpatialGrid.CellSize | budget | Edge of a grid cell of the spatial index; tunes search speed only.
+SpatialGrid.MaxCellsPerItem | budget | Boxes covering more cells are kept in one overflow list so the grid stays small.
+BoxIndex.MaxGridCellsPerBox | budget | Same limit for the box index.
+PointContactTest.LineAxes | math | The three axes the contact test casts lines along.
+MeshTriangleTree.LeafTriangles | budget | Triangles per tree leaf.
+MeshTriangleTree.StackallocDepth | budget | Tree depth whose traversal stack fits on the thread stack.
+MeshTriangleTree.BytesPerVector3 | math | Size of a Vector3 for the memory estimate.
+MeshTriangleTree.BytesPerInt | math | Size of an int for the memory estimate.
+MeshTriangleTree.BytesPerNode | budget | Estimated size of a tree node for the memory estimate.
+SurfaceSampler.StepOffset | math | Centre of a sample cell.
+SurfaceSampler.SequenceStepU | math | Step of the low-discrepancy (R2) sequence, first axis.
+SurfaceSampler.SequenceStepV | math | Step of the low-discrepancy (R2) sequence, second axis.
+SurfaceSampler.SequenceStart | math | Start of the low-discrepancy sequence.
+TriangleDistance.MinFaceSineSquared | math | Smallest face-angle sine (squared) treated as non-degenerate; float robustness.
+SurroundingRayTest.MinHitSine | math | Smallest angle a ray may graze a triangle; float robustness.
+SurroundingRayTest.WorldDirections | game format | The up, east-west and north-south ray directions of the game's Z-up world axes.
+Percent.PerWhole | math | 100 percent make a whole.
+CsvFormat.CharactersNeedingQuotes | file format | Characters that make a CSV field need quoting.
+CompassDirections.SectorCount | math | Eight compass sectors.
+CompassDirections.NoHorizontalOffset | math | The sector reported for a zero offset (angle zero).
+CompassDirections.FullTurnDegrees | math | Degrees in a turn.
+CompassDirections.SectorDegrees | math | Degrees per sector.
+CompassDirections.CentredSectorShift | math | Half a sector, so sectors are centred on their direction.
+CompassDirections.Sectors | math | All sector values.
+TerrainHeights.VerticesPerSide | game format | A cell's terrain height grid is 33 by 33 vertices.
+TerrainHeights.VertexSpacing | game format | Cell size divided by the 32 gaps between vertices.
+BodyMeshBounds.KeySeparator | internal | Joins the mesh paths of a set into its lookup key.
+NavmeshIndex.SamplesPerSide | budget | Points sampled along a triangle edge when searching for the nearest navmesh point.
+ExteriorGrid.CellSize | game format | An exterior cell is 4096 game units wide.
+TextFormat.SecondsDecimals | internal | Seconds are written with one decimal in log text.
+IndexMemo.NotComputed | internal | Slot state before the value is published.
+IndexMemo.Computed | internal | Slot state after the value is published.
+OrientedBox.ParallelAxisEpsilon | math | Axis lengths below this count as parallel; float robustness.
+OrientedBox.CornerSigns | math | The two sides of each axis when generating box corners.
+ParallelMap.RangesPerWorker | budget | Work ranges per worker for load balancing.
+ParallelMap.OneItemPerRange | budget | Range size for heavy items.
+ParallelMap.AutomaticRangeSize | budget | Range size 0 means: choose from the item and worker counts.

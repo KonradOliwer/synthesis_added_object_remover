@@ -1,2 +1,0 @@
-﻿componentId,size,seedCount,removedByTouchCount,keptAsReferencedCount,spaces,worldAabbMinX,worldAabbMinY,worldAabbMinZ,worldAabbMaxX,worldAabbMaxY,worldAabbMaxZ,topBaseEditorIds,deepestChainLength,deepestChainFormKeys,seedReasons
-0,5,2,2,1,"Tamriel, Test",-20,-41.69934,0,141.69934,41.69934,22,000712:Target.esp:2; Base711 [000711:Target.esp]:2; Base713 [000713:Target.esp]:1,1,000800:Target.esp -> 000801:Target.esp,000010:Other.esp (Other.esp); 000010:Other.esp (Other.esp)

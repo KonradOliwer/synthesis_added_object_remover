@@ -29,14 +29,14 @@ public class LinkedGroupTests
         targets[3] = TestTargets.Create(3, TestTargets.At(Vector3.Zero), isTeleportDoor: true);
         var references = TestTargets.References(targets.Count, new Dictionary<int, KeepReason>
         {
-            [1] = new(KeepKind.NonPlacedReference, "QUST record", "linked from QUST MyQuest"),
+            [1] = TestKeepReasons.Quest,
         });
 
-        var rule = Protection.Build(targets, [TestTargets.Link(0, 1)], references);
+        var rule = ObjectsToKeep.Build(targets, [TestTargets.Link(0, 1)], references);
 
         Assert.True(rule.TryGetKeepReason(0, out var linkedReason));
         Assert.Equal(KeepKind.LinkedGroup, linkedReason.Kind);
-        Assert.Contains(TestTargets.Key(1).ToString(), linkedReason.Detail);
+        Assert.Contains(TestTargets.Key(1).ToString(), KeepReasonText.Detail(linkedReason));
         Assert.Null(rule.GetOwnReason(0));
         Assert.Equal(KeepKind.NonPlacedReference, rule.GetOwnReason(1)?.Kind);
         Assert.False(rule.TryGetKeepReason(2, out _));

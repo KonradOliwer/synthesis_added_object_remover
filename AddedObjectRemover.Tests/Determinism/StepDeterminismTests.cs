@@ -1,4 +1,5 @@
 using System.Numerics;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;
@@ -26,9 +27,9 @@ public class StepDeterminismTests
     private const int NpcTargetCount = 30;
     private const int PlacedNpcCount = 150;
     private const int ShapeZoneTargetCount = 80;
-    private const int ShapeZoneRivalCount = 120;
+    private const int ShapeZoneOtherModObjectCount = 120;
     private const int InvisibleEvery = 5;
-    private const int ObjectRivalEvery = 4;
+    private const int ObjectOtherModEvery = 4;
     private const float ShapeZoneMultiplier = 1.5f;
     private const int MarkerCount = 120;
     private const int RoomCount = 4;
@@ -56,42 +57,42 @@ public class StepDeterminismTests
         TestMeshes.BoxWithoutFace(new Box(new Vector3(-100, -100, 0), new Vector3(100, 100, 150)), v => v.Z == 0));
 
     private static readonly SkyrimMod Records = CreateRecords();
-    private static readonly ShapeCatalog Shapes = TestShapes.Create(Records, "StepDeterminismData", Table, Item, Boulder, Building);
+    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(Records, "StepDeterminismData", Table, Item, Boulder, Building));
 
-    private sealed record FollowUpScene(List<TargetObject> Targets, List<int> Seeds, Protection Protection);
+    private sealed record RestingObjectsScene(List<TargetObject> Targets, List<int> Seeds, ObjectsToKeep Protection);
 
-    private sealed record ShapeZoneScene(List<TargetObject> Targets, TargetLooks Looks, List<OtherObject> Rivals);
+    private sealed record ShapeZoneScene(List<TargetObject> Targets, List<OtherObject> OtherModObjects);
 
     [Fact]
     public void EverythingTouchingMatchesForOneAndEightThreads()
     {
-        var scene = CreateFollowUpScene();
+        var scene = CreateRestingObjectsScene();
 
         var sequential = RunTouchCascade(scene, SequentialThreads);
         var parallel = RunTouchCascade(scene, ParallelThreads);
 
-        Assert.NotEqual(0, sequential.Result.CountRemovedByRule());
+        Assert.NotEqual(0, RestingObjectsRemovals.CountByRule(sequential.Result));
         Assert.Contains(
-            sequential.FollowUpRounds.SelectMany(round => sequential.Ledger.RemovedIn(round)),
-            target => sequential.Ledger.Of(target)!.Cause is Cause.Linked);
-        Assert.Equal(DescribeRounds(sequential.Ledger), DescribeRounds(parallel.Ledger));
-        Assert.Equal(sequential.Ledger.All().ToList(), parallel.Ledger.All().ToList());
+            sequential.AlsoRemoveRounds.SelectMany(round => sequential.RemovalDecisions.RemovedIn(round)),
+            target => sequential.RemovalDecisions.Of(target)!.Reason is RemovalReason.LinkedTo);
+        Assert.Equal(DescribeRounds(sequential.RemovalDecisions), DescribeRounds(parallel.RemovalDecisions));
+        Assert.Equal(sequential.RemovalDecisions.All().ToList(), parallel.RemovalDecisions.All().ToList());
         Assert.Equal(sequential.Result.Work, parallel.Result.Work);
-        Assert.Equal(DescribeStats(sequential.Components.Stats), DescribeStats(parallel.Components.Stats));
+        Assert.Equal(DescribeStats(sequential.TouchChains.Stats), DescribeStats(parallel.TouchChains.Stats));
         Assert.Equal(DescribeComponents(sequential.Explanation!), DescribeComponents(parallel.Explanation!));
     }
 
     [Fact]
     public void AnchoringMatchesForOneAndEightThreads()
     {
-        var scene = CreateFollowUpScene();
+        var scene = CreateRestingObjectsScene();
 
         var sequential = RunSupportCascade(scene, SequentialThreads);
         var parallel = RunSupportCascade(scene, ParallelThreads);
 
         Assert.True(sequential.Result.Work.Rounds > 1);
-        Assert.Equal(DescribeRounds(sequential.Ledger), DescribeRounds(parallel.Ledger));
-        Assert.Equal(sequential.Ledger.All().ToList(), parallel.Ledger.All().ToList());
+        Assert.Equal(DescribeRounds(sequential.RemovalDecisions), DescribeRounds(parallel.RemovalDecisions));
+        Assert.Equal(sequential.RemovalDecisions.All().ToList(), parallel.RemovalDecisions.All().ToList());
         Assert.Equal(DescribeEvaluations(sequential.Result), DescribeEvaluations(parallel.Result));
         Assert.Equal(sequential.Result.Work, parallel.Result.Work);
     }
@@ -101,10 +102,10 @@ public class StepDeterminismTests
     {
         var random = new Random(21);
         var targets = Enumerable.Range(0, NpcTargetCount)
-            .Select(i => TestTargets.Create(i, TestTargets.At(RandomGroundPoint(random), TestMeshes.RandomAngle(random)), (i % 2 == 0 ? Boulder : Building).Ref, TestTargets.Space))
+            .Select(i => TestTargets.Create(i, TestTargets.At(RandomGroundPoint(random), TestMeshes.RandomAngle(random)), (i % 2 == 0 ? Boulder : Building).Base, TestTargets.Space))
             .ToList();
         var npcs = Enumerable.Range(0, PlacedNpcCount)
-            .Select(i => TestNpcs.Place(Mod, i, NpcBases[random.Next(NpcBases.Length)], RandomGroundPoint(random), new P3Float(0, 0, TestMeshes.RandomAngle(random))))
+            .Select(i => TestNpcs.Place(Mod, i, NpcBases[random.Next(NpcBases.Length)], RandomGroundPoint(random), new Vector3(0, 0, TestMeshes.RandomAngle(random))))
             .ToList();
 
         var sequential = FindStuckNpcs(targets, npcs, SequentialThreads);
@@ -121,8 +122,8 @@ public class StepDeterminismTests
     {
         var scene = CreateShapeZoneScene();
 
-        var sequential = FindShapeZoneHits(scene, WorkOrder.Of(scene.Targets), SequentialThreads);
-        var parallel = FindShapeZoneHits(scene, WorkOrder.Of(scene.Targets), ParallelThreads);
+        var sequential = FindShapeZoneHits(scene, TargetWorkOrder.Of(scene.Targets), SequentialThreads);
+        var parallel = FindShapeZoneHits(scene, TargetWorkOrder.Of(scene.Targets), ParallelThreads);
 
         Assert.NotEmpty(sequential.Hits);
         Assert.NotEqual(0, sequential.Work.Zone.NarrowTests);
@@ -136,88 +137,85 @@ public class StepDeterminismTests
     public void ShapeZoneSearchMatchesForAReversedWorkOrder()
     {
         var scene = CreateShapeZoneScene();
-        var order = WorkOrder.Of(scene.Targets);
+        var order = TargetWorkOrder.Of(scene.Targets);
 
         var forward = FindShapeZoneHits(scene, order, ParallelThreads);
-        var reversed = FindShapeZoneHits(scene, new WorkOrder([.. order.TargetsBySpaceAndCell.Reverse()]), ParallelThreads);
+        var reversed = FindShapeZoneHits(scene, new WorkOrder([.. order.ItemsInOrder.Reverse()]), ParallelThreads);
 
         Assert.Equal(forward.Hits, reversed.Hits);
         Assert.Equal(forward.Work, reversed.Work);
     }
 
     [Fact]
-    public void LeftoverSelectionMatchesForOneAndEightThreads()
+    public void LeftBehindSelectionMatchesForOneAndEightThreads()
     {
         var random = new Random(33);
         var targets = new List<TargetObject>();
-        var visibility = new List<ObjectVisibility>();
         foreach (var position in GridPositions(random))
         {
-            targets.Add(TestTargets.Create(targets.Count, TestTargets.At(position), Table.Ref, TestTargets.Space));
-            visibility.Add(ObjectVisibility.Visible);
+            targets.Add(TestTargets.Create(targets.Count, TestTargets.At(position), Table.Base, TestTargets.Space));
         }
         var tableCount = targets.Count;
+        var xMarker = TestVisibility.TaggedBase(ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers));
         for (var i = 0; i < MarkerCount; i++)
         {
-            targets.Add(TestTargets.Create(targets.Count, TestTargets.At(RandomGridPoint(random)), baseRef: null, TestTargets.Space));
-            visibility.Add(ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers));
+            targets.Add(TestTargets.Create(targets.Count, TestTargets.At(RandomGridPoint(random)), xMarker, TestTargets.Space));
         }
         var removed = Enumerable.Range(0, tableCount).Where(_ => random.NextDouble() < 0.5).ToHashSet();
         var rooms = Enumerable.Range(0, RoomCount)
-            .Select(i => TestShapes.Placed(Mod, i, Boulder.Ref, RandomGridPoint(random)))
+            .Select(i => TestShapes.Placed(Mod, i, Boulder.Base, RandomGridPoint(random)))
             .ToList();
 
-        var sequential = SelectLeftovers(targets, new TargetLooks([.. visibility]), rooms, removed, SequentialThreads);
-        var parallel = SelectLeftovers(targets, new TargetLooks([.. visibility]), rooms, removed, ParallelThreads);
+        var sequential = SelectLeftBehind(targets, rooms, removed, SequentialThreads);
+        var parallel = SelectLeftBehind(targets, rooms, removed, ParallelThreads);
 
         Assert.NotEqual(0, sequential.RemovedCount);
         Assert.Contains(sequential.Evaluations, evaluation => evaluation.ContainingObject != null);
         Assert.Equal(DescribeEvaluations(sequential), DescribeEvaluations(parallel));
     }
 
-    private static TestTouchCascade.Run RunTouchCascade(FollowUpScene scene, int threads) =>
+    private static TestTouchCascade.Run RunTouchCascade(RestingObjectsScene scene, int threads) =>
         TestTouchCascade.Execute(scene.Targets, Shapes, scene.Protection, scene.Seeds, TouchDistance, threads, collectDiagnostics: true);
 
-    private static TestSupportCascade.Run RunSupportCascade(FollowUpScene scene, int threads) =>
+    private static TestSupportCascade.Run RunSupportCascade(RestingObjectsScene scene, int threads) =>
         TestSupportCascade.Execute(
             scene.Targets,
             Shapes,
             scene.Protection,
             scene.Seeds,
-            TestScenes.CreateWithBackdrop(scene.Targets, [], Shapes, threads).Solids(),
-            new TerrainHeights(new Dictionary<ExteriorCell, ILandscapeGetter>(), new Dictionary<FormKey, FormKey>()),
+            TestScenes.CreateWithSupportOnlyObjects(scene.Targets, [], Shapes, threads).VisibleObjectsOfAnyPlugin(),
+            TestGround.NoTerrain(),
             TouchDistance,
             threshold: 0.5f,
             threads);
 
-    private static (List<TooCloseHit> Hits, ClashWork Work, string Summary) FindStuckNpcs(List<TargetObject> targets, List<OtherObject> npcs, int threads)
+    private static (List<TooCloseObject> Hits, TooCloseWork Work, string Summary) FindStuckNpcs(List<TargetObject> targets, List<OtherObject> npcs, int threads)
     {
-        var visibility = AllVisible(targets);
         var replacements = Replacements.None(npcs.Count);
         var scene = TestScenes.Create(targets, npcs, Shapes, bodies: NewBodies(), threads: threads);
-        var npcRule = CreateStuckNpcRule(targets, visibility, scene, replacements);
-        var rivals = scene.ActiveRivals(replacements, NpcHandling.OnlyWhenStuckInObject);
+        var npcRule = CreateStuckNpcRule(targets, scene, replacements);
+        var otherModObjects = scene.ObjectsThatCanCauseRemovals(replacements, NpcHandling.OnlyWhenStuckInObject);
         var result = TooCloseSearch.FindTooCloseTargets(
-            targets, visibility, rivals, Shapes, multiplier: 0f, npcRule, WorkOrder.Of(targets), Options(threads));
+            targets, otherModObjects, Shapes, multiplier: 0f, npcRule, TargetWorkOrder.Of(targets), Options(threads));
         var summary = npcRule.StuckSearch!.GetSummary(result.Work.Npcs);
         return (result.Hits, result.Work, $"{summary.Sizes} {summary.PairsTested} {summary.CoreTests} {summary.Conflicts} {summary.PointFallbacks.Count}");
     }
 
-    private static ClashSearchResult FindShapeZoneHits(ShapeZoneScene scene, WorkOrder order, int threads)
+    private static TooCloseSearchResult FindShapeZoneHits(ShapeZoneScene scene, WorkOrder order, int threads)
     {
-        var replacements = Replacements.None(scene.Rivals.Count);
-        var sceneIndex = TestScenes.Create(scene.Targets, scene.Rivals, Shapes, bodies: NewBodies(), threads: threads);
-        var npcRule = CreateStuckNpcRule(scene.Targets, scene.Looks, sceneIndex, replacements);
-        var rivals = sceneIndex.ActiveRivals(replacements, NpcHandling.OnlyWhenStuckInObject);
-        return ShapeZoneSearch.Create(scene.Targets, scene.Looks, rivals, Shapes, NewCache(), ShapeZoneMultiplier, npcRule)
-            .FindTooCloseTargets(scene.Looks, order, Options(threads));
+        var replacements = Replacements.None(scene.OtherModObjects.Count);
+        var sceneIndex = TestScenes.Create(scene.Targets, scene.OtherModObjects, Shapes, bodies: NewBodies(), threads: threads);
+        var npcRule = CreateStuckNpcRule(scene.Targets, sceneIndex, replacements);
+        var otherModObjects = sceneIndex.ObjectsThatCanCauseRemovals(replacements, NpcHandling.OnlyWhenStuckInObject);
+        return ShapeZoneSearch.Create(scene.Targets, sceneIndex.VisibleTargets, otherModObjects, Shapes, NewCache(), ShapeZoneMultiplier, npcRule)
+            .FindTooCloseTargets(order, Options(threads));
     }
 
-    private static NpcClashRule CreateStuckNpcRule(
-        IReadOnlyList<TargetObject> targets, TargetLooks looks, Scene scene, Replacements replacements) =>
-        NpcClashRule.Create(
+    private static NpcTooCloseRule CreateStuckNpcRule(
+        IReadOnlyList<TargetObject> targets, ObjectCaches scene, Replacements replacements) =>
+        NpcTooCloseRule.Create(
             NpcHandling.OnlyWhenStuckInObject,
-            () => NpcStuckSearch.Create(targets, looks, scene.Npcs(replacements), Shapes, NewCache()));
+            () => NpcStuckSearch.Create(targets, scene.VisibleTargets, scene.NpcsThatCanSpawn(replacements), Shapes, NewCache()));
 
     /// <summary>
     /// Targets with and without meshes, every few of them invisible, among other mods' objects with
@@ -226,29 +224,31 @@ public class StepDeterminismTests
     private static ShapeZoneScene CreateShapeZoneScene()
     {
         var random = new Random(45);
-        BaseRef?[] targetBases = [Table.Ref, Boulder.Ref, Building.Ref, null];
+        BaseKey[] targetBases = [Table.Base, Boulder.Base, Building.Base, TestVisibility.TaggedBase(ObjectVisibility.Visible)];
+        var xMarker = TestVisibility.TaggedBase(ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers));
         var targets = Enumerable.Range(0, ShapeZoneTargetCount)
-            .Select(i => TestTargets.Create(i, TestTargets.At(RandomGroundPoint(random), TestMeshes.RandomAngle(random)), targetBases[i % targetBases.Length], TestTargets.Space))
+            .Select(i => TestTargets.Create(
+                i,
+                TestTargets.At(RandomGroundPoint(random), TestMeshes.RandomAngle(random)),
+                i % InvisibleEvery == 0 ? xMarker : targetBases[i % targetBases.Length],
+                TestTargets.Space))
             .ToList();
-        var visibility = Enumerable.Range(0, targets.Count)
-            .Select(i => i % InvisibleEvery == 0 ? ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers) : ObjectVisibility.Visible)
+        BaseKey[] otherModBases = [Item.Base, Table.Base, Boulder.Base];
+        var otherModObjects = Enumerable.Range(0, ShapeZoneOtherModObjectCount)
+            .Select(i => i % ObjectOtherModEvery == 0
+                ? TestShapes.Placed(Mod, i, otherModBases[random.Next(otherModBases.Length)], RandomGroundPoint(random), TestMeshes.RandomAngle(random))
+                : TestNpcs.Place(Mod, i, NpcBases[random.Next(NpcBases.Length)], RandomGroundPoint(random), new Vector3(0, 0, TestMeshes.RandomAngle(random))))
             .ToList();
-        BaseRef[] rivalBases = [Item.Ref, Table.Ref, Boulder.Ref];
-        var rivals = Enumerable.Range(0, ShapeZoneRivalCount)
-            .Select(i => i % ObjectRivalEvery == 0
-                ? TestShapes.Placed(Mod, i, rivalBases[random.Next(rivalBases.Length)], RandomGroundPoint(random), TestMeshes.RandomAngle(random))
-                : TestNpcs.Place(Mod, i, NpcBases[random.Next(NpcBases.Length)], RandomGroundPoint(random), new P3Float(0, 0, TestMeshes.RandomAngle(random))))
-            .ToList();
-        return new ShapeZoneScene(targets, new TargetLooks([.. visibility]), rivals);
+        return new ShapeZoneScene(targets, otherModObjects);
     }
 
-    private static LeftoverResult SelectLeftovers(
-        List<TargetObject> targets, TargetLooks looks, List<OtherObject> rooms, HashSet<int> removed, int threads) =>
-        TestLeftovers.CreateSelector(targets, looks, Shapes, rooms, CreateLeftoverConfig())
+    private static LeftBehindResult SelectLeftBehind(
+        List<TargetObject> targets, List<OtherObject> rooms, HashSet<int> removed, int threads) =>
+        TestLeftBehind.CreateRule(targets, Shapes, rooms, CreateLeftBehindConfig())
             .SelectRemovals(removed, Options(threads));
 
     /// <summary>A grid of tables close enough that some touch, items (some stacked) on most of them, random links and seeds.</summary>
-    private static FollowUpScene CreateFollowUpScene()
+    private static RestingObjectsScene CreateRestingObjectsScene()
     {
         var random = new Random(7);
         var targets = new List<TargetObject>();
@@ -256,11 +256,11 @@ public class StepDeterminismTests
         foreach (var position in GridPositions(random))
         {
             tables.Add(targets.Count);
-            targets.Add(TestTargets.Create(targets.Count, TestTargets.At(position), Table.Ref, TestTargets.Space));
+            targets.Add(TestTargets.Create(targets.Count, TestTargets.At(position), Table.Base, TestTargets.Space));
             if (random.NextDouble() < 0.3) continue;
             var itemPosition = position + new Vector3(RandomOffset(random, 15), RandomOffset(random, 15), 10);
-            targets.Add(TestTargets.Create(targets.Count, TestTargets.At(itemPosition), Item.Ref, TestTargets.Space));
-            if (random.NextDouble() < 0.3) targets.Add(TestTargets.Create(targets.Count, TestTargets.At(itemPosition + new Vector3(0, 0, 6)), Item.Ref, TestTargets.Space));
+            targets.Add(TestTargets.Create(targets.Count, TestTargets.At(itemPosition), Item.Base, TestTargets.Space));
+            if (random.NextDouble() < 0.3) targets.Add(TestTargets.Create(targets.Count, TestTargets.At(itemPosition + new Vector3(0, 0, 6)), Item.Base, TestTargets.Space));
         }
 
         var links = Enumerable.Range(0, LinkCount)
@@ -275,8 +275,8 @@ public class StepDeterminismTests
         var kept = Enumerable.Range(0, targets.Count).Where(index => !seeds.Contains(index)).OrderBy(_ => random.Next()).Take(KeptCount);
         var references = TestTargets.References(
             targets.Count,
-            kept.ToDictionary(index => index, _ => new KeepReason(KeepKind.NonPlacedReference, "QUST record", "linked from QUST")));
-        return new FollowUpScene(targets, seeds, Protection.Build(targets, links, references));
+            kept.ToDictionary(index => index, _ => TestKeepReasons.Quest));
+        return new RestingObjectsScene(targets, seeds, ObjectsToKeep.Build(targets, links, references));
     }
 
     private static IEnumerable<Vector3> GridPositions(Random random)
@@ -298,19 +298,19 @@ public class StepDeterminismTests
 
     private static float RandomOffset(Random random, float extent) => (float)((random.NextDouble() * 2 - 1) * extent);
 
-    private static string DescribeStats(TouchStats stats) =>
+    private static string DescribeStats(TouchChainStatistics stats) =>
         $"{stats.Components} {stats.ComponentsWithRemovals} {stats.LargestComponent} {stats.Levels} {stats.MaxDepth} "
         + $"{stats.Pairs.PairsTested} {stats.Pairs.TouchingPairs} {stats.Pairs.TrianglePairsTested}";
 
-    /// <summary>Each round with what it removed and held, one line per round, so a failure shows where two runs part.</summary>
-    private static List<string> DescribeRounds(Ledger ledger) =>
+    /// <summary>Each round with what it removed and kept, one line per round, so a failure shows where two runs part.</summary>
+    private static List<string> DescribeRounds(IRemovalDecisions decisions) =>
     [
-        .. ledger.Rounds.Select(round =>
-            $"{round}: removed {string.Join(" ", ledger.RemovedIn(round).Select(target => target.Index))}; held {string.Join(" ", ledger.HeldIn(round).Select(target => target.Index))}"),
+        .. decisions.Rounds.Select(round =>
+            $"{round}: removed {string.Join(" ", decisions.RemovedIn(round).Select(target => target.Index))}; kept {string.Join(" ", decisions.KeptIn(round).Select(target => target.Index))}"),
     ];
 
     /// <summary>Everything but the edges' distances.</summary>
-    private static string DescribeComponents(TouchExplanation explanation) =>
+    private static string DescribeComponents(TouchChainEdges explanation) =>
         string.Join(
             "; ",
             string.Join(' ', explanation.Components.ComponentOf),
@@ -319,17 +319,17 @@ public class StepDeterminismTests
             string.Join(" | ", explanation.Components.Members.Select(members => string.Join(' ', members))),
             string.Join(' ', explanation.Edges.Select(edge => $"{edge.ComponentId}:{edge.Pair.First}-{edge.Pair.Second}")));
 
-    private static List<string> DescribeEvaluations(FollowUpResult followUp) =>
-        AnchoringRows.Join(followUp)
+    private static List<string> DescribeEvaluations(RestingObjectsResult alsoRemove) =>
+        AnchoringRows.Join(alsoRemove)
             .Select(evaluation => $"{evaluation.TargetIndex} {evaluation.Iteration} {evaluation.Removed} {evaluation.RemovedAsLinked} {evaluation.Held} {evaluation.RemovedShare}")
             .ToList();
 
-    private static List<string> DescribeEvaluations(LeftoverResult leftovers) =>
-        leftovers.Evaluations
-            .Select(evaluation => $"{evaluation.TargetIndex} {evaluation.Decision} {evaluation.ContainingObject?.FormKey} {evaluation.Radius} {evaluation.Surroundings.Describe()}")
+    private static List<string> DescribeEvaluations(LeftBehindResult leftBehind) =>
+        leftBehind.Evaluations
+            .Select(evaluation => $"{evaluation.TargetIndex} {evaluation.Decision} {evaluation.ContainingObject?.Key} {evaluation.Radius} {SectorAreasText.Describe(evaluation.Surroundings)}")
             .ToList();
 
-    private static LeftoverOptions CreateLeftoverConfig() => new(
+    private static LeftBehindOptions CreateLeftBehindConfig() => new(
         LookAround: 100,
         DirectionClearedPercent: 50,
         ClearedDirectionsPercent: 60,
@@ -337,12 +337,10 @@ public class StepDeterminismTests
         NeverRemove: new HashSet<InvisibleObjectKind>(),
         Preset: ProtectedInvisibleObjectsPreset.None);
 
-    private static TargetLooks AllVisible(IReadOnlyList<TargetObject> targets) => TestSeededLedger.AllVisible(targets.Count);
-
-    private static TriangleStore NewCache() => new(Shapes.ReadGeometry);
+    private static TriangleStore NewCache() => new(Shapes.ReadTriangles);
 
     private static NpcBodyCache NewBodies() =>
-        new(new NpcBodyResolver(Records.ToImmutableLinkCache(), Shapes, new SkinnedBodyMeasurer(Shapes.ReadGeometry)));
+        TestNpcBodies.Create(Records.ToImmutableLinkCache(), Shapes);
 
     private static Execution Options(int threads) => new(threads);
 

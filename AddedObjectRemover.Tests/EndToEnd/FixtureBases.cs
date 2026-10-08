@@ -12,10 +12,10 @@ internal sealed record FixtureBases(
     FormKey TargetMarker,
     FormKey TargetLight,
     FormKey TargetSoundMarker,
-    FormKey RivalPad,
-    FormKey RivalCrate,
-    FormKey RivalBuilding,
-    FormKey RivalNpc,
+    FormKey OtherModPad,
+    FormKey OtherModCrate,
+    FormKey OtherModBuilding,
+    FormKey OtherModNpc,
     FormKey BaseGamePad,
     FormKey BaseGameCrate,
     FormKey PatchedPad,
@@ -27,8 +27,8 @@ internal sealed record FixtureBases(
     public static FixtureBases Create(FixtureMods mods)
     {
         var target = mods.Target;
-        var rival = mods.Rival;
-        var rivalRace = rival.AddRace("Rival_Race");
+        var otherMod = mods.OtherMod;
+        var otherModRace = otherMod.AddRace("Rival_Race");
         return new FixtureBases(
             TargetCrate: target.AddModeledStatic("T_CrateBase", FixtureMeshes.CrateModel),
             TargetTwinPillars: target.AddModeledStatic("T_TwinPillarsBase", FixtureMeshes.TwinPillarsModel),
@@ -37,10 +37,10 @@ internal sealed record FixtureBases(
             TargetMarker: target.AddMarkerStatic("T_XMarkerBase"),
             TargetLight: target.AddModelessLight("T_LightBase"),
             TargetSoundMarker: target.AddSoundMarker("T_SoundMarkerBase"),
-            RivalPad: rival.AddModeledStatic("R_PadBase", FixtureMeshes.PadModel),
-            RivalCrate: rival.AddModeledStatic("R_CrateBase", FixtureMeshes.CrateModel),
-            RivalBuilding: rival.AddModeledStatic("R_BuildingBase", FixtureMeshes.BuildingModel),
-            RivalNpc: rival.AddNpc("R_NpcBase", rivalRace, NpcBounds),
+            OtherModPad: otherMod.AddModeledStatic("R_PadBase", FixtureMeshes.PadModel),
+            OtherModCrate: otherMod.AddModeledStatic("R_CrateBase", FixtureMeshes.CrateModel),
+            OtherModBuilding: otherMod.AddModeledStatic("R_BuildingBase", FixtureMeshes.BuildingModel),
+            OtherModNpc: otherMod.AddNpc("R_NpcBase", otherModRace, NpcBounds),
             BaseGamePad: mods.BaseGame.AddModeledStatic("Sky_PadBase", FixtureMeshes.PadModel),
             BaseGameCrate: mods.BaseGame.AddModeledStatic("Sky_CrateBase", FixtureMeshes.CrateModel),
             PatchedPad: mods.Patched.AddModeledStatic("Patched_PadBase", FixtureMeshes.PadModel),

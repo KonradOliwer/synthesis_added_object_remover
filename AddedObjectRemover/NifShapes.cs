@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Numerics;
 using System.Reflection;
 using NiflySharp;
@@ -35,27 +34,6 @@ internal static class NifShapes
         "NiTriStripsData",
         "Warning: NiTriStripsData._points/_stripLengths not found in this NiflySharp version; "
         + "NiTriStrips shapes are used as points in the touch test.");
-
-    private static readonly ConcurrentDictionary<Type, bool> RenderGeometryTypes = new();
-
-    public static bool IsRenderGeometry(INiShape shape) =>
-        RenderGeometryTypes.GetOrAdd(shape.GetType(), static type => IsRenderGeometryType(type));
-
-    /// <summary>
-    /// Real triangle geometry only: BSTriShape and subclasses, and legacy NiTriShape/NiTriStrips
-    /// (NiTriBasedGeom). The particle families (NiParticles, NiPSParticleSystem, ...) have no
-    /// usable vertices and share no common base class, so they are recognised by class name.
-    /// </summary>
-    private static bool IsRenderGeometryType(Type shapeType)
-    {
-        for (var type = shapeType; type != null && type != typeof(object); type = type.BaseType)
-        {
-            if (type.Name.Contains("Particle", StringComparison.Ordinal)) return false;
-        }
-        if (typeof(BSTriShape).IsAssignableFrom(shapeType) || typeof(NiTriShape).IsAssignableFrom(shapeType)) return true;
-        if (!typeof(NiGeometry).IsAssignableFrom(shapeType)) return true; // Other non-legacy shape families (e.g. BSGeometry).
-        return typeof(NiTriBasedGeom).IsAssignableFrom(shapeType) || typeof(NiTriStrips).IsAssignableFrom(shapeType);
-    }
 
     /// <summary>
     /// Vertex positions in shape space, or null when the shape carries none (the bounding sphere
@@ -134,13 +112,18 @@ internal static class NifShapes
     /// Whether the shape's shader property block is a BSEffectShaderProperty: effect surfaces (fog,
     /// light rays, water spray, mist planes) that are drawn but are nothing solid.
     /// </summary>
-    public static bool HasEffectShader(INiShape shape, List<INiObject> blocks)
+    private static bool HasEffectShader(INiShape shape, List<INiObject> blocks)
     {
         var shaderIndex = NiflyCalls.Call(() => shape.HasShaderProperty ? shape.ShaderPropertyRef.Index : -1);
         return shaderIndex >= 0 && shaderIndex < blocks.Count && blocks[shaderIndex] is BSEffectShaderProperty;
     }
 
-    /// <summary>Editor markers have no dedicated API; they are recognised by the Creation Kit naming convention.</summary>
-    public static bool IsEditorMarker(string? name) =>
-        name != null && name.Contains("EditorMarker", StringComparison.OrdinalIgnoreCase);
+    public static MeshShapeKind KindOf(INiShape shape, List<INiObject> blocks, ShapeInclusion inclusion)
+    {
+        if (inclusion.IsEditorMarkerName(shape.Name?.String)) return MeshShapeKind.EditorMarker;
+        return HasEffectShader(shape, blocks) ? MeshShapeKind.EffectShader : MeshShapeKind.Solid;
+    }
+
+    public static MeshShapeKind KindOf(NiNode node, ShapeInclusion inclusion) =>
+        inclusion.IsEditorMarkerName(node.Name?.String) ? MeshShapeKind.EditorMarker : MeshShapeKind.Solid;
 }

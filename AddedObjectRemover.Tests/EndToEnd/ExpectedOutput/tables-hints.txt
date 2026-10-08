@@ -1,0 +1,3 @@
+﻿hint,formKey,editorId,space,cell,detail
+RemovedMarker,000804:Target.esp,"Item,""4""","worldspace Tamriel, Test [000100:Target.esp]","Cell, one [009000:Target.esp]",DoorMarkers
+KeptLinkedGroup,000801:Target.esp,,"worldspace Tamriel, Test [000100:Target.esp]",,"with ""a"", b"

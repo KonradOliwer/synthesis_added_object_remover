@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AddedObjectRemover</RootNamespace>
+    <Description>Triangle-mesh questions: boxes as meshes, triangle distance and overlap, point containment, contact and touch tests between meshes, and surface sampling. It references only BoxAndTransformMath, OrderIndependentParallelWork and ComputedOnceLookups and holds no packages.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BoxAndTransformMath\BoxAndTransformMath.csproj" />
+    <ProjectReference Include="..\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
+    <ProjectReference Include="..\ComputedOnceLookups\ComputedOnceLookups.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AddedObjectRemover.Tests" />
+  </ItemGroup>
+</Project>

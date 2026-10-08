@@ -1,6 +1,0 @@
-﻿iteration,formKey,editorId,base,modelPath,space,contactPoints,totalWeight,removedTargetShare,keptTargetShare,otherPluginShare,terrainShare,threshold,decision,topSupporters
-1,000800:Target.esp,,Base711 [000711:Target.esp],meshes\test\table.nif,"Tamriel, Test",12,7.5,0.5,0.0625,0.25,0.125,0.5,kept (referenced),000802:Target.esp RemovedTarget 0.5; 000010:Other.esp OtherPlugin 0.25; terrain Terrain 0.125; 000800:Target.esp KeptTarget 0.0625
-1,000801:Target.esp,,Base713 [000713:Target.esp],meshes\test\plank.nif,"Tamriel, Test",12,7.5,0.5,0.0625,0.25,0.125,0.5,removed (linked to a removed object),000802:Target.esp RemovedTarget 0.5; 000010:Other.esp OtherPlugin 0.25; terrain Terrain 0.125; 000800:Target.esp KeptTarget 0.0625
-1,000803:Target.esp,,000712:Target.esp,"meshes\test\item,1.nif","Tamriel, Test",12,7.5,0.5,0.0625,0.25,0.125,0.5,kept,000802:Target.esp RemovedTarget 0.5; 000010:Other.esp OtherPlugin 0.25; terrain Terrain 0.125; 000800:Target.esp KeptTarget 0.0625
-1,000804:Target.esp,"Item,""4""",000712:Target.esp,"meshes\test\item,1.nif","Tamriel, Test",0,0,0,0,0,0,0.5,kept (no contact points),
-2,000802:Target.esp,,Base711 [000711:Target.esp],meshes\test\table.nif,"Tamriel, Test",12,7.5,0.5,0.0625,0.25,0.125,0.5,removed,000802:Target.esp RemovedTarget 0.5; 000010:Other.esp OtherPlugin 0.25; terrain Terrain 0.125; 000800:Target.esp KeptTarget 0.0625

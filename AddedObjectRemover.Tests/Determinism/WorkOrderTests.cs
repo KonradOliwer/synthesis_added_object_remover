@@ -6,8 +6,8 @@ namespace AddedObjectRemover.Tests.Determinism;
 
 public class WorkOrderTests
 {
-    private static readonly FormKey FirstSpace = new(TestTargets.TargetMod, 0x101);
-    private static readonly FormKey SecondSpace = new(TestTargets.TargetMod, 0x102);
+    private static readonly RecordKey FirstSpace = TestTargets.SpaceKey(0x101);
+    private static readonly RecordKey SecondSpace = TestTargets.SpaceKey(0x102);
     private static readonly float Cell = ExteriorGrid.CellSize;
 
     [Fact]
@@ -23,9 +23,9 @@ public class WorkOrderTests
             Place(5, FirstSpace, new Vector3(0, 0, 0)),
         ];
 
-        var order = WorkOrder.Of(targets);
+        var order = TargetWorkOrder.Of(targets);
 
-        Assert.Equal(new[] { 3, 4, 5, 2, 1, 0 }, order.TargetsBySpaceAndCell.ToArray());
+        Assert.Equal(new[] { 3, 4, 5, 2, 1, 0 }, order.ItemsInOrder.ToArray());
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public class WorkOrderTests
             Place(2, FirstSpace, new Vector3(30, 30, 0)),
         ];
 
-        Assert.Equal(new[] { 0, 1, 2 }, WorkOrder.Of(targets).TargetsBySpaceAndCell.ToArray());
+        Assert.Equal(new[] { 0, 1, 2 }, TargetWorkOrder.Of(targets).ItemsInOrder.ToArray());
     }
 
     [Fact]
@@ -73,9 +73,9 @@ public class WorkOrderTests
             Place(4, FirstSpace, new Vector3(0, 0, 0)),
         ];
 
-        var order = WorkOrder.Of(targets);
+        var order = TargetWorkOrder.Of(targets);
 
-        Assert.Equal(new[] { 3, 2, 4, 0, 1 }, order.TargetsBySpaceAndCell.ToArray());
+        Assert.Equal(new[] { 3, 2, 4, 0, 1 }, order.ItemsInOrder.ToArray());
     }
 
     [Fact]
@@ -89,9 +89,9 @@ public class WorkOrderTests
             Place(3, FirstSpace, new Vector3(0, 0, 0)),
         ];
 
-        var order = WorkOrder.Of(targets);
+        var order = TargetWorkOrder.Of(targets);
 
-        Assert.Equal(new[] { 3, 1, 2, 0 }, order.TargetsBySpaceAndCell.ToArray());
+        Assert.Equal(new[] { 3, 1, 2, 0 }, order.ItemsInOrder.ToArray());
         Assert.Equal(new[] { 3, 1, 2, 0 }, order.Among([0, 1, 2, 3]).ToArray());
         Assert.Equal(new[] { 2, 1, 0 }, order.Among([0, 1, 3]).ToArray());
     }
@@ -110,6 +110,6 @@ public class WorkOrderTests
     public void AnOrderThatIsNotAPermutationThrows() =>
         Assert.Throws<ArgumentException>(() => new WorkOrder([0, 0, 1]));
 
-    private static TargetObject Place(int index, FormKey space, Vector3 position) =>
-        TestTargets.Create(index, TestTargets.At(position), baseRef: null, space);
+    private static TargetObject Place(int index, RecordKey space, Vector3 position) =>
+        TestTargets.Create(index, TestTargets.At(position), baseKey: null, space);
 }

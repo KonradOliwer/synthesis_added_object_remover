@@ -12,16 +12,13 @@ internal static partial class OutputMasks
 {
     public const string RootPlaceholder = "<root>";
     private static readonly string PathTailPattern =
-        $@"(?<tail>(?:[\\/](?:{Regex.Escape(DiagnosticsSettings.DefaultReportFolder)}|[^\s\\/,]+))*)";
+        $@"(?<tail>(?:[\\/](?:{Regex.Escape(SettingDefaults.ReportFolder)}|[^\s\\/,]+))*)";
     private const string DurationPlaceholder = "in <time>";
 
     /// <summary>Timing, cache, memory and thread-count lines.</summary>
     public static readonly IReadOnlyList<string> PerformanceLinePrefixes =
     [
-        "Bounds warm-up: ",
-        "World-bounds indexes built: ",
         "  Meshes indexed: ",
-        "  Timing: ",
         "  NPC body cache: ",
         "Done in ",
     ];

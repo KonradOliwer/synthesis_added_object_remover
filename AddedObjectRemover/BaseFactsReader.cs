@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;
@@ -13,12 +14,9 @@ namespace AddedObjectRemover;
 /// </summary>
 internal sealed class BaseFactsReader(ILinkCache linkCache) : IBaseFacts
 {
-    /// <summary>Vanilla critter spawner activators run a script whose name starts with this.</summary>
-    private const string CritterSpawnScriptPrefix = "CritterSpawn";
+    private readonly ComputedOncePerKey<RecordKey, BaseFacts> _byBase = new(Publication.FirstWriteWins, EqualityComparer<RecordKey>.Default);
 
-    private readonly LazyCache<FormKey, BaseFacts> _byBase = new();
-
-    public BaseFacts Of(BaseRef baseRef) => _byBase.GetOrCreate(baseRef.FormKey, () => Read(baseRef));
+    public BaseFacts Of(BaseKey baseKey) => _byBase.Get(baseKey.Record, () => Read(baseKey));
 
     public static Box ToBox(IObjectBoundsGetter bounds) => Box.FromCorners(
         new Vector3(bounds.First.X, bounds.First.Y, bounds.First.Z),
@@ -28,11 +26,11 @@ internal sealed class BaseFactsReader(ILinkCache linkCache) : IBaseFacts
     /// Resolves by the base link's own type; <see cref="IMajorRecordGetter"/> would make the link
     /// cache enumerate every record of every mod.
     /// </summary>
-    private BaseFacts Read(BaseRef baseRef)
+    private BaseFacts Read(BaseKey baseKey)
     {
-        if (!linkCache.TryResolve(baseRef.FormKey, baseRef.LinkType, out var record)) return BaseFacts.Unresolved(baseRef.FormKey);
+        if (!linkCache.TryResolve(baseKey.Record.ToFormKey(), LinkTypeOf(baseKey.Kind), out var record)) return BaseFacts.Unresolved(baseKey.Record);
         return new BaseFacts(
-            record.FormKey,
+            record.FormKey.ToRecordKey(),
             Resolved: true,
             KindOf(record),
             record.Registration.Name,
@@ -40,10 +38,19 @@ internal sealed class BaseFactsReader(ILinkCache linkCache) : IBaseFacts
             ModelPathOf(record),
             record is IObjectBoundedOptionalGetter { ObjectBounds: { } bounds } ? ToBox(bounds) : null,
             MarkerFlagOf(record),
-            IsCritterSpawner(record),
+            ScriptNamesOf(record),
             record is ILightGetter { Radius: > 0 } light ? light.Radius : null,
             record is ISoundMarkerGetter marker ? MaxHearingDistanceOf(marker) : null);
     }
+
+    private static Type LinkTypeOf(BaseLinkKind kind) => kind switch
+    {
+        BaseLinkKind.PlaceableObject => typeof(IPlaceableObjectGetter),
+        BaseLinkKind.Npc => typeof(INpcGetter),
+        BaseLinkKind.Hazard => typeof(IHazardGetter),
+        BaseLinkKind.Projectile => typeof(IProjectileGetter),
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
+    };
 
     private static BaseRecordKind KindOf(IMajorRecordGetter record) => record switch
     {
@@ -79,9 +86,10 @@ internal sealed class BaseFactsReader(ILinkCache linkCache) : IBaseFacts
         _ => null,
     };
 
-    private static bool IsCritterSpawner(IMajorRecordGetter record) =>
+    private static ImmutableArray<string> ScriptNamesOf(IMajorRecordGetter record) =>
         record is IActivatorGetter { VirtualMachineAdapter: { } adapter }
-        && adapter.Scripts.Any(script => script.Name.StartsWith(CritterSpawnScriptPrefix, StringComparison.OrdinalIgnoreCase));
+            ? [.. adapter.Scripts.Select(script => script.Name)]
+            : ImmutableArray<string>.Empty;
 
     private float? MaxHearingDistanceOf(ISoundMarkerGetter marker) =>
         marker.SoundDescriptor.TryResolve(linkCache, out var descriptor)

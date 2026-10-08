@@ -1,10 +1,10 @@
 using System.Numerics;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Plugins.Records;
 using Mutagen.Bethesda.Skyrim;
-using Noggog;
 
 namespace AddedObjectRemover.Tests.Npc;
 
@@ -42,12 +42,12 @@ public class NpcBodyResolverTests
     private static readonly FormKey Missing = new(Mod, 0x8FF);
 
     private static readonly SkyrimMod Records = CreateRecords();
-    private static readonly ShapeCatalog Shapes = CreateShapes();
+    private static readonly IBaseObjectShapes Shapes = CreateShapes();
 
     [Fact]
     public void BodyMeshOfTheRaceIsSizedByTheFullExtentOfItsMeshes()
     {
-        var body = SingleBody(CreateCache().GetBodies(BaseRaceMale));
+        var body = SingleBody(CreateCache().GetBodies(BaseRaceMale.ToRecordKey()));
 
         Assert.Equal(NpcSizeSource.BodyMesh, body.Source);
         Assert.Equal(BaseRaceBodyHeight, body.LocalBox.Size.Z, 3);
@@ -58,21 +58,21 @@ public class NpcBodyResolverTests
     [Fact]
     public void VariantRaceUsesItsArmorRaceAddonsForTheSlotsItHasNoAddonFor()
     {
-        var measurer = new SkinnedBodyMeasurer(Shapes.ReadGeometry);
-        var body = SingleBody(CreateCache(measurer).GetBodies(VariantNpc));
+        var bodyBounds = new BodyMeshBounds(TestShapes.MeshFilesOf(Shapes));
+        var body = SingleBody(CreateCache(bodyBounds).GetBodies(VariantNpc.ToRecordKey()));
 
         Assert.Equal(NpcSizeSource.BodyMesh, body.Source);
         Assert.Equal(VariantBodyHeight, body.LocalBox.Size.Z, 3);
-        var measured = Assert.Single(measurer.GetMeasurements());
-        Assert.Contains(HandsMesh, measured.Meshes, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(VariantBodyMesh, measured.Meshes, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain(BaseRaceBodyMesh, measured.Meshes, StringComparison.OrdinalIgnoreCase);
+        var measured = Assert.Single(bodyBounds.Computed());
+        Assert.Contains(measured.MeshPaths, path => path.Contains(HandsMesh, StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(measured.MeshPaths, path => path.Contains(VariantBodyMesh, StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(measured.MeshPaths, path => path.Contains(BaseRaceBodyMesh, StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
     public void FemaleWithoutAFemaleModelUsesTheMaleModel()
     {
-        var body = SingleBody(CreateCache().GetBodies(BaseRaceFemale));
+        var body = SingleBody(CreateCache().GetBodies(BaseRaceFemale.ToRecordKey()));
 
         Assert.Equal(NpcSizeSource.BodyMesh, body.Source);
         Assert.Equal(BaseRaceBodyHeight, body.LocalBox.Size.Z, 3);
@@ -81,7 +81,7 @@ public class NpcBodyResolverTests
     [Fact]
     public void PlayableRaceBodyIsAtLeastHumanoidHeightBecauseTheHeadIsMissing()
     {
-        var body = SingleBody(CreateCache().GetBodies(ShortNpc));
+        var body = SingleBody(CreateCache().GetBodies(ShortNpc.ToRecordKey()));
 
         Assert.Equal(HumanoidHeight, body.LocalBox.Size.Z, 3);
     }
@@ -89,7 +89,7 @@ public class NpcBodyResolverTests
     [Fact]
     public void LeveledNpcHasEveryDistinctBodyAndACombinedBox()
     {
-        var bodies = CreateCache().GetBodies(LeveledTemplateNpc);
+        var bodies = CreateCache().GetBodies(LeveledTemplateNpc.ToRecordKey());
 
         Assert.NotNull(bodies);
         Assert.Equal(2, bodies.Bodies.Count);
@@ -102,13 +102,12 @@ public class NpcBodyResolverTests
     {
         var cache = CreateCache();
 
-        var first = cache.GetBodies(LeveledTemplateNpc);
-        var second = cache.GetBodies(OtherLeveledTemplateNpc);
+        var first = cache.GetBodies(LeveledTemplateNpc.ToRecordKey());
+        var second = cache.GetBodies(OtherLeveledTemplateNpc.ToRecordKey());
         var stats = cache.GetStats();
 
         Assert.Same(first, second);
         Assert.Equal(1, stats.ListsResolved);
-        Assert.Equal(1, stats.ListsReused);
         Assert.Equal(2, stats.BasesResolved);
     }
 
@@ -117,16 +116,16 @@ public class NpcBodyResolverTests
     {
         var cache = CreateCache();
 
-        Assert.Null(cache.GetBodies(Missing));
-        Assert.Null(cache.GetBodies(EmptyListTemplateNpc));
+        Assert.Null(cache.GetBodies(Missing.ToRecordKey()));
+        Assert.Null(cache.GetBodies(EmptyListTemplateNpc.ToRecordKey()));
     }
 
     [Fact]
     public void PlacedNpcWithoutASpawnableBaseIsSkippedAndCounted()
     {
         var npcs = BuildIndex(
-            PlaceNpc(0, BaseRaceMale, new P3Float(0, 0, 0)),
-            PlaceNpc(1, Missing, new P3Float(0, 0, 0)));
+            PlaceNpc(0, BaseRaceMale, Vector3.Zero),
+            PlaceNpc(1, Missing, Vector3.Zero));
 
         Assert.Equal(1, npcs.Counts.Evaluated);
         Assert.Equal(new OtherId(0), npcs.NpcOf(0).Id);
@@ -137,20 +136,20 @@ public class NpcBodyResolverTests
     [Fact]
     public void PlacedNpcStandsUprightWhateverItsTilt()
     {
-        var tipped = BuildIndex(PlaceNpc(0, BaseRaceMale, new P3Float(MathF.PI / 2, MathF.PI / 3, 0)));
+        var tipped = BuildIndex(PlaceNpc(0, BaseRaceMale, new Vector3(MathF.PI / 2, MathF.PI / 3, 0)));
 
         Assert.Equal(BaseRaceBodyHeight, tipped.WorldBoxOf(0).WorldAabb(0f).Size.Z, 3);
     }
 
     private static NpcBody SingleBody(NpcBodySet? bodies) => Assert.Single(Assert.IsType<NpcBodySet>(bodies).Bodies);
 
-    private static NpcBodyCache CreateCache(SkinnedBodyMeasurer? measurer = null) =>
-        new(new NpcBodyResolver(Records.ToImmutableLinkCache(), Shapes, measurer ?? new SkinnedBodyMeasurer(Shapes.ReadGeometry)));
+    private static NpcBodyCache CreateCache(IBodyMeshBounds? bodyBounds = null) =>
+        TestNpcBodies.Create(Records.ToImmutableLinkCache(), Shapes, bodyBounds);
 
     private static PlacedNpcIndex BuildIndex(params OtherObject[] npcs) =>
         PlacedNpcIndex.Build(npcs, CreateCache(), new Execution(Environment.ProcessorCount));
 
-    private static OtherObject PlaceNpc(int index, FormKey npc, P3Float rotation) => TestNpcs.Place(Mod, index, npc, Vector3.Zero, rotation);
+    private static OtherObject PlaceNpc(int index, FormKey npc, Vector3 rotation) => TestNpcs.Place(Mod, index, npc, Vector3.Zero, rotation);
 
     private static SkyrimMod CreateRecords()
     {
@@ -176,7 +175,7 @@ public class NpcBodyResolverTests
         return mod;
     }
 
-    private static ShapeCatalog CreateShapes()
+    private static IBaseObjectShapes CreateShapes()
     {
         var dataPath = Path.Combine(AppContext.BaseDirectory, "NpcBodyData");
         TestShapes.WriteMesh(dataPath, BaseRaceBodyMesh, TestBodies.TPose(BaseRaceBodyHeight));
@@ -184,9 +183,7 @@ public class NpcBodyResolverTests
         TestShapes.WriteMesh(dataPath, ShortBodyMesh, TestBodies.TPose(ShortBodyHeight));
         TestShapes.WriteMesh(dataPath, HandsMesh, TestMeshes.BoxTriangles(new Box(new Vector3(-5, -5, 60), new Vector3(5, 5, 70))));
 
-        var problems = new AssetProblemLog();
-        var meshFiles = new MeshFileSource(dataPath, GameRelease.SkyrimSE, [Mod], problems);
-        return new ShapeCatalog(new BaseFactsReader(Records.ToImmutableLinkCache()), meshFiles, problems);
+        return TestShapes.Catalog(new BaseFactsReader(Records.ToImmutableLinkCache()), dataPath, Mod);
     }
 
     private static Armor CreateSkin(FormKey formKey, params FormKey[] addons)

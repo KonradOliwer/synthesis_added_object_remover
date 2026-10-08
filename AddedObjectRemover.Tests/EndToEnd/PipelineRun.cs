@@ -1,4 +1,3 @@
-using System.Globalization;
 using Mutagen.Bethesda.Skyrim;
 using Mutagen.Bethesda.Synthesis;
 
@@ -8,11 +7,11 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 internal sealed record ReportFile(string Name, IReadOnlyList<string> Lines);
 
 /// <summary>Everything a run produces, masked so that it depends only on the fixture and the settings.</summary>
-/// <param name="UnmaskedLog">The log as printed, for checks the masks would hide; not part of the golden lines.</param>
+/// <param name="UnmaskedLog">The log as printed, for checks the masks would hide; not part of the expected-output lines.</param>
 internal sealed record RunOutput(IReadOnlyList<string> Log, IReadOnlyList<string> Patch, IReadOnlyList<ReportFile> Reports, IReadOnlyList<string> UnmaskedLog)
 {
     /// <summary>One section per output: the log, the patch overrides, then each report file by name.</summary>
-    public IReadOnlyList<string> ToGoldenLines() =>
+    public IReadOnlyList<string> ToExpectedOutputLines() =>
     [
         "## log", .. Log,
         "## patch", .. Patch,
@@ -46,32 +45,25 @@ internal static class PipelineRun
         var world = FixtureWorld.Create(dataFolder);
         var state = FixturePatcherState.Create(world.LoadOrder, dataFolder, Path.Combine(outputFolder, FixturePatcherState.PatchModKey.FileName));
 
-        var log = CaptureInvariantConsole(() => Program.RunPatch(state, () => settings, workers));
+        var log = CaptureConsole(() => Program.RunPatch(state, () => settings, workers));
         return new RunOutput(
             OutputMasks.MaskLog(log, root),
             PatchDump.Describe(state.PatchMod),
-            ReadReports(OptionsBuilder.ResolveReportFolder(state.OutputPath.Path, settings, []), root),
+            ReadReports(RunSettingsValidation.ResolveReportFolder(state.OutputPath.Path, settings, []), root),
             log);
     }
 
-    /// <remarks>
-    /// Formatting uses the invariant culture so the output does not depend on the machine; the
-    /// culture flows into the parallel workers with the execution context.
-    /// </remarks>
-    private static IReadOnlyList<string> CaptureInvariantConsole(Action run)
+    internal static IReadOnlyList<string> CaptureConsole(Action run)
     {
         var originalOut = Console.Out;
-        var originalCulture = CultureInfo.CurrentCulture;
         using var captured = new StringWriter();
         Console.SetOut(captured);
-        CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
         try
         {
             run();
         }
         finally
         {
-            CultureInfo.CurrentCulture = originalCulture;
             Console.SetOut(originalOut);
         }
         return captured.ToString().Split(Environment.NewLine).SkipLast(1).ToList();

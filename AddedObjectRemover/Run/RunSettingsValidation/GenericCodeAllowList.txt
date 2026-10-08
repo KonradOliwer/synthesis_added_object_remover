@@ -1,0 +1,11 @@
+# Static methods and local functions of this module that mention no domain type (Ids or a Contracts type), each with its reason.
+# Form: Type.Member | reason  (local function: Type.Method.Local). The test fails when an entry stops being flagged.
+SettingsFailureMessage.Describe | Wording for a settings.json failure, over the exception and the settings schema.
+SettingsFailureMessage.DescribeAllowedValues | Wording for a settings.json failure: lists the values a setting allows.
+SettingsFailureMessage.DescribeLocation | Wording for a settings.json failure: names where the value sits.
+SettingsFailureMessage.ElementTypeOrSelf | Wording for a settings.json failure: the element type of a list setting.
+SettingsFailureMessage.ExtractFoundValue | Wording for a settings.json failure: the value found in the exception text.
+SettingsFailureMessage.LocationOf | Wording for a settings.json failure: the location of the bad value.
+SettingsFailureMessage.PathOf | Wording for a settings.json failure: the settings.json path of the bad value.
+SettingsFailureMessage.ResolveSetting | Wording for a settings.json failure: finds the setting a path leads to.
+SettingsLoading.Load | Reads the settings lazily and turns an unreadable settings.json into one explained failure.

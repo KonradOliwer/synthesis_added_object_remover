@@ -17,9 +17,51 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts" />
+    <Using Include="AddedObjectRemover.Caches.RunCaches.Contracts" />
+    <Using Include="AddedObjectRemover.Run.RunAllSteps" />
+    <Using Include="AddedObjectRemover.Run.RunAllSteps.Contracts" />
+    <Using Include="AddedObjectRemover.Run.RunAllSteps.RunCaches" />
+    <Using Include="AddedObjectRemover.Run.RunSettingsValidation.Contracts" />
+    <Using Include="AddedObjectRemover.Steps.BuildLogAndReports" />
+    <Using Include="AddedObjectRemover.Steps.BuildLogAndReports.Contracts" />
+    <Using Include="AddedObjectRemover.Steps.CollectPlacedObjects" />
+    <Using Include="AddedObjectRemover.Steps.CollectPlacedObjects.Contracts" />
+    <Using Include="AddedObjectRemover.Steps.FindTargetObjectsToKeep" />
+    <Using Include="AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts" />
+    <Using Include="AddedObjectRemover.Steps.IdentifyTheMods" />
+    <Using Include="AddedObjectRemover.Steps.IdentifyTheMods.Contracts" />
+    <Using Include="AddedObjectRemover.Steps.RemovalDecisionList" />
+    <Using Include="AddedObjectRemover.Steps.RemovalDecisionList.Contracts" />
+    <Using Include="AddedObjectRemover.Steps.MoveKeptMarkers" />
+    <Using Include="AddedObjectRemover.Steps.MoveKeptMarkers.Contracts" />
+    <Using Include="AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind" />
+    <Using Include="AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts" />
+    <Using Include="AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes" />
+    <Using Include="AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts" />
+    <Using Include="AddedObjectRemover.Steps.RemoveTooCloseObjects" />
+    <Using Include="AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts" />
+    <Using Include="AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals" />
+    <Using Include="AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts" />
+    <Using Include="AddedObjectRemover.Steps.WriteThePatch" />
+    <Using Include="AddedObjectRemover.Steps.WriteThePatch.Contracts" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\AddedObjectRemover\AddedObjectRemover.csproj" />
+    <ProjectReference Include="..\Ids\AddedObjectRemover.Ids.csproj" />
+    <ProjectReference Include="..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
+    <ProjectReference Include="..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
+    <ProjectReference Include="..\Tools\KeyedGroupingInInputOrder\KeyedGroupingInInputOrder.csproj" />
+    <ProjectReference Include="..\Tools\DenseIdTables\DenseIdTables.csproj" />
+    <ProjectReference Include="..\Tools\IndexGraphQueries\IndexGraphQueries.csproj" />
+    <ProjectReference Include="..\Tools\NumericRanges\NumericRanges.csproj" />
+    <ProjectReference Include="..\Tools\FileSystemAccess\FileSystemAccess.csproj" />
+    <ProjectReference Include="..\Tools\ComputedOnceLookups\ComputedOnceLookups.csproj" />
+    <ProjectReference Include="..\Tools\TriangleMeshTests\TriangleMeshTests.csproj" />
+    <ProjectReference Include="..\Tools\BoxSpatialIndex\BoxSpatialIndex.csproj" />
+    <ProjectReference Include="..\Tools\GroundSurfaceQueries\GroundSurfaceQueries.csproj" />
+    <ProjectReference Include="..\Tools\LogTextFormatting\LogTextFormatting.csproj" />
+    <ProjectReference Include="..\Tools\CsvFileWriting\CsvFileWriting.csproj" />
   </ItemGroup>
 </Project>

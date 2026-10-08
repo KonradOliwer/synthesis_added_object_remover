@@ -3,16 +3,12 @@ using Mutagen.Bethesda.Skyrim;
 
 namespace AddedObjectRemover;
 
-/// <summary>A winning navmesh and the exterior cell holding it.</summary>
-/// <param name="Grid">Null for a navmesh of an interior cell or of a worldspace's persistent cell.</param>
-internal readonly record struct CellNavmesh((int X, int Y)? Grid, INavigationMeshDataGetter Data);
-
 internal static class NavmeshTriangles
 {
     /// <summary>Triangles (world space) of one navmesh record; triangles naming a missing vertex (broken data) are skipped.</summary>
     public static IEnumerable<MeshTriangle> Read(INavigationMeshDataGetter data)
     {
-        var vertices = data.Vertices.Select(Geometry.ToVector).ToArray();
+        var vertices = data.Vertices.Select(vertex => new Vector3(vertex.X, vertex.Y, vertex.Z)).ToArray();
         foreach (var triangle in data.Triangles)
         {
             var corners = triangle.Vertices;

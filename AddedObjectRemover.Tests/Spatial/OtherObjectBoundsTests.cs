@@ -1,4 +1,5 @@
 using System.Numerics;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda.Plugins;
 
@@ -23,7 +24,7 @@ public class OtherObjectBoundsTests
 
     private static readonly TestStatic Cliff = new(new FormKey(Mod, 0x803), @"test\cliff.nif", TestMeshes.BoxTriangles(CliffBox));
 
-    private static readonly ShapeCatalog Shapes = TestShapes.Create(Mod, "OtherObjectBoundsData", Crate, FarCrate, Cliff);
+    private static readonly IBaseObjectShapes Shapes = TestShapes.Create(Mod, "OtherObjectBoundsData", Crate, FarCrate, Cliff);
 
     [Fact]
     public void ObjectIsFoundWhereItsMeshIsNotWhereItsOriginIs()
@@ -39,7 +40,7 @@ public class OtherObjectBoundsTests
     {
         var index = CreateIndex(Place(0, Cliff, Vector3.Zero), Place(1, Crate, new Vector3(50000, 0, 0)));
 
-        Assert.Equal(1, index.Bounds.LargeObjectCount);
+        Assert.Equal(1, index.Bounds.LargeItemCount);
         Assert.Equal(new[] { 0 }, Collect(index, new Box(new Vector3(19000, 0, 50), new Vector3(19000, 0, 50))));
         Assert.Equal(new[] { 1 }, Collect(index, new Box(new Vector3(50000, 0, 0), new Vector3(50000, 0, 0))));
         Assert.Empty(Collect(index, new Box(new Vector3(0, 0, 500), new Vector3(0, 0, 500))));
@@ -48,35 +49,37 @@ public class OtherObjectBoundsTests
     [Fact]
     public void BoundingBoxZoneFindsAnObjectWhoseMeshLiesFarFromItsOrigin()
     {
-        OtherObject[] rivals = [Place(0, FarCrate, Vector3.Zero)];
+        OtherObject[] otherModObjects = [Place(0, FarCrate, Vector3.Zero)];
 
-        Assert.Equal(new OtherId(0), FindInBoxZone(rivals, FarOffset));
-        Assert.Null(FindInBoxZone(rivals, Vector3.Zero));
+        Assert.Equal(new OtherId(0), FindInBoxZone(otherModObjects, FarOffset));
+        Assert.Null(FindInBoxZone(otherModObjects, Vector3.Zero));
     }
 
     [Fact]
     public void BoundingBoxZoneReportsTheLowestId()
     {
-        OtherObject[] rivals = [Place(0, Crate, new Vector3(30, 0, 0)), Place(1, Crate, new Vector3(-30, 0, 0))];
+        OtherObject[] otherModObjects = [Place(0, Crate, new Vector3(30, 0, 0)), Place(1, Crate, new Vector3(-30, 0, 0))];
 
-        Assert.Equal(new OtherId(0), FindInBoxZone(rivals, Vector3.Zero));
+        Assert.Equal(new OtherId(0), FindInBoxZone(otherModObjects, Vector3.Zero));
     }
 
-    private static OtherId? FindInBoxZone(OtherObject[] rivals, Vector3 targetPosition)
+    private static OtherId? FindInBoxZone(OtherObject[] otherModObjects, Vector3 targetPosition)
     {
-        var target = TestTargets.Create(0, TestTargets.At(targetPosition)) with { Base = Crate.Ref };
-        var active = TestScenes.Create([target], rivals, Shapes).ActiveRivals(Replacements.None(rivals.Length), NpcHandling.CountLikeObjects);
-        return TooCloseSearch.FindFirstCentreInBoxZone(target, active, Shapes, multiplier: 0f, new SpatialQueryScratch(), []);
+        var target = TestTargets.Create(0, TestTargets.At(targetPosition)) with { Base = Crate.Base };
+        var active = TestScenes.Create([target], otherModObjects, Shapes)
+            .ObjectsThatCanCauseRemovals(Replacements.None(otherModObjects.Length), NpcHandling.CountLikeObjects);
+        return TooCloseSearch.FindFirstCentreInBoxZone(target, active, Shapes, multiplier: 0f, new ObjectQueryScratch());
     }
 
-    private static OtherObject Place(int id, TestStatic model, Vector3 position) => TestShapes.Placed(Mod, id, model.Ref, position);
+    private static OtherObject Place(int id, TestStatic model, Vector3 position) => TestShapes.Placed(Mod, id, model.Base, position);
 
-    private static OtherObjectIndex CreateIndex(params OtherObject[] objects) => OtherObjectIndex.Create(objects, Shapes, new Execution(Environment.ProcessorCount), UntimedPhases.Instance, TimedPhase.RivalBoundsBuild);
+    private static IOtherObjectIndex CreateIndex(params OtherObject[] objects) =>
+        new PlacedSpaces(objects, Shapes, onMeasureFailed: null, new Execution(Environment.ProcessorCount)).IndexOf(objects[0].SpaceKey);
 
-    private static List<int> Collect(OtherObjectIndex index, Box area)
+    private static List<int> Collect(IOtherObjectIndex index, Box area)
     {
-        var candidates = new List<int>();
-        index.Bounds.CollectCandidates(area, [], candidates);
-        return candidates;
+        var slots = new List<int>();
+        index.Bounds.Overlapping(area, _ => true, new SpatialQueryScratch(), slots);
+        return slots;
     }
 }

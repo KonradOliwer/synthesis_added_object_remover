@@ -1,42 +1,41 @@
 using System.Collections.Immutable;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 
 namespace AddedObjectRemover.Tests.Fixtures;
 
 /// <summary>The support cascade over a scene of visible targets, seeded by a too-close round like the pipeline does.</summary>
 internal static class TestSupportCascade
 {
-    public sealed record Run(Ledger Ledger, ImmutableArray<Round> FollowUpRounds)
+    public sealed record Run(IRemovalDecisions RemovalDecisions, ImmutableArray<Round> AlsoRemoveRounds)
     {
-        public required FollowUpResult Result { get; init; }
+        public required RestingObjectsResult Result { get; init; }
 
-        public IEnumerable<KeptTarget> Kept => FollowUpRounds.SelectMany(round => Decisions.KeptIn(Ledger, round));
+        public IEnumerable<KeptObject> Kept => AlsoRemoveRounds.SelectMany(round => RemovalList.KeptIn(RemovalDecisions, round));
 
         public ImmutableArray<AnchoringEvaluation> Evaluations => AnchoringRows.Join(Result);
     }
 
     public static Run Execute(
         IReadOnlyList<TargetObject> targets,
-        ShapeCatalog shapes,
-        Protection protection,
+        IBaseObjectShapes shapes,
+        ObjectsToKeep protection,
         IReadOnlyList<int> seeds,
-        ISolids solids,
+        IVisibleObjectsOfAnyPlugin objectsOfAnyPlugin,
         TerrainHeights terrain,
         float touchDistance,
         float threshold,
         int threads)
     {
-        var seeded = TestSeededLedger.Seed(protection, targets.Count, seeds);
-        var input = new FollowUpInput(
+        var seeded = TestSeededDecisions.Seed(protection, targets.Count, seeds);
+        var input = new RestingObjectsInput(
             [.. targets],
-            TestSeededLedger.AllVisible(targets.Count),
             protection,
-            solids,
+            objectsOfAnyPlugin,
             shapes,
-            new TriangleStore(shapes.ReadGeometry),
+            new TriangleStore(shapes.ReadTriangles),
             terrain,
-            new Execution(threads),
-            UntimedPhases.Instance);
-        var result = FollowUp.Run(seeded, input, new FollowUpOptions(FollowUpRemovalMode.ObjectsSupportedByIt, touchDistance, threshold));
-        return new Run(result.Ledger, result.Rounds) { Result = result };
+            new Execution(threads));
+        var result = TestRestingObjects.Run(seeded, input, new AlsoRemoveSettings(FollowUpRemovalMode.ObjectsSupportedByIt, touchDistance, threshold)).Result;
+        return new Run(result.RemovalDecisions, result.Rounds) { Result = result };
     }
 }

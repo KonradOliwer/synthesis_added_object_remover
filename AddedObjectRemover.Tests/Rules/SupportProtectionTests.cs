@@ -1,4 +1,5 @@
 using System.Numerics;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda.Plugins;
 
@@ -28,7 +29,7 @@ public class SupportProtectionTests
     private static readonly TestStatic FloorModel = new(
         new FormKey(TestTargets.TargetMod, 0x703), @"test\floor.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-200, -200, -10), new Vector3(200, 200, 0))));
 
-    private static readonly ShapeCatalog Shapes =
+    private static readonly IBaseObjectShapes Shapes =
         TestShapes.Create(TestTargets.TargetMod, "SupportProtectionData", TableModel, ItemModel, NeedleModel, FloorModel);
 
     [Fact]
@@ -36,8 +37,8 @@ public class SupportProtectionTests
     {
         var run = Execute(itemPosition: new Vector3(5, 5, 10), otherSupporters: []);
 
-        var held = Assert.IsType<Verdict.Held>(run.Ledger.Of(new TargetId(Protected)));
-        var lost = Assert.IsType<Cause.LostSupport>(held.Cause);
+        var held = Assert.IsType<Decision.Kept>(run.RemovalDecisions.Of(new TargetId(Protected)));
+        var lost = Assert.IsType<RemovalReason.LostSupport>(held.Reason);
         Assert.Equal(new TargetId(SeedTable), lost.MainSupporter);
         var kept = Assert.Single(run.Kept);
         Assert.Equal(Protected, kept.TargetIndex);
@@ -48,11 +49,11 @@ public class SupportProtectionTests
     [Fact]
     public void ProtectedObjectMostlySupportedByOthersIsNeitherHeldNorRemoved()
     {
-        var floor = TestShapes.Placed(OtherMod, 0, FloorModel.Ref, Vector3.Zero);
+        var floor = TestShapes.Placed(OtherMod, 0, FloorModel.Base, Vector3.Zero);
 
         var run = Execute(itemPosition: new Vector3(23, 0, 0), otherSupporters: [floor]);
 
-        Assert.Null(run.Ledger.Of(new TargetId(Protected)));
+        Assert.Null(run.RemovalDecisions.Of(new TargetId(Protected)));
         Assert.Empty(run.Kept);
         var evaluation = Assert.Single(run.Evaluations, evaluation => evaluation.TargetIndex == Protected);
         Assert.False(evaluation.Held);
@@ -76,22 +77,22 @@ public class SupportProtectionTests
     {
         List<TargetObject> targets =
         [
-            TestTargets.Create(SeedTable, TestTargets.At(Vector3.Zero), TableModel.Ref, TestTargets.Space),
-            TestTargets.Create(Protected, TestTargets.At(itemPosition), (itemModel ?? ItemModel).Ref, TestTargets.Space),
+            TestTargets.Create(SeedTable, TestTargets.At(Vector3.Zero), TableModel.Base, TestTargets.Space),
+            TestTargets.Create(Protected, TestTargets.At(itemPosition), (itemModel ?? ItemModel).Base, TestTargets.Space),
         ];
         var references = TestTargets.References(
             targets.Count,
             isProtected
-                ? new Dictionary<int, KeepReason> { [Protected] = new(KeepKind.NonPlacedReference, "QUST record", "linked from QUST") }
+                ? new Dictionary<int, KeepReason> { [Protected] = TestKeepReasons.Quest }
                 : []);
-        var protection = Protection.Build(targets, [], references);
+        var protection = ObjectsToKeep.Build(targets, [], references);
         return TestSupportCascade.Execute(
             targets,
             Shapes,
             protection,
             [SeedTable],
-            TestScenes.CreateWithBackdrop(targets, otherSupporters, Shapes).Solids(),
-            new TerrainHeights(new Dictionary<ExteriorCell, Mutagen.Bethesda.Skyrim.ILandscapeGetter>(), new Dictionary<FormKey, FormKey>()),
+            TestScenes.CreateWithSupportOnlyObjects(targets, otherSupporters, Shapes).VisibleObjectsOfAnyPlugin(),
+            TestGround.NoTerrain(),
             TouchDistance,
             threshold: 0.9f,
             threads: 1);

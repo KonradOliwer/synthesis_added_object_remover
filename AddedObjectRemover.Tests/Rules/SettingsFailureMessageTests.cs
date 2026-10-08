@@ -28,7 +28,7 @@ public class SettingsFailureMessageTests
     {
         var ex = Deserialize("""{"FollowUpRemoval":{"Mode":"Anchoring"}}""");
 
-        var message = SettingsFailureMessage.Describe(ex);
+        var message = SettingsFailureMessage.Describe(ex, Program.SettingsSchema);
 
         Assert.Contains("Also remove", message);
         Assert.Contains("FollowUpRemoval.Mode", message);
@@ -41,7 +41,7 @@ public class SettingsFailureMessageTests
     {
         var ex = Deserialize("""{"WhatToCheck":{"SizeMultiplier":"abc"}}""");
 
-        var message = SettingsFailureMessage.Describe(ex);
+        var message = SettingsFailureMessage.Describe(ex, Program.SettingsSchema);
 
         Assert.Contains("Removal distance", message);
         Assert.Contains("WhatToCheck.SizeMultiplier", message);
@@ -53,7 +53,7 @@ public class SettingsFailureMessageTests
     {
         var ex = Deserialize("""{"WhatToIgnore":{"ExcludedPlugins":"SomeMod.esp"}}""");
 
-        var message = SettingsFailureMessage.Describe(ex);
+        var message = SettingsFailureMessage.Describe(ex, Program.SettingsSchema);
 
         Assert.Contains("WhatToIgnore.ExcludedPlugins", message);
         Assert.Contains("Expected a text value.", message);
@@ -65,7 +65,7 @@ public class SettingsFailureMessageTests
     {
         var ex = Deserialize("{\n,}");
 
-        var message = SettingsFailureMessage.Describe(ex);
+        var message = SettingsFailureMessage.Describe(ex, Program.SettingsSchema);
 
         Assert.Contains("the settings file at line 2, position", message);
     }
@@ -73,7 +73,7 @@ public class SettingsFailureMessageTests
     [Fact]
     public void PathIsMappedToItsDisplayNameBreadcrumb()
     {
-        var setting = SettingsFailureMessage.ResolveSetting("LeftoverInvisibleObjects.CustomProtectedTypes[0]");
+        var setting = SettingsFailureMessage.ResolveSetting("LeftoverInvisibleObjects.CustomProtectedTypes[0]", Program.SettingsSchema);
 
         Assert.NotNull(setting);
         Assert.Equal("Invisible objects left behind > Types to never remove (Custom)", setting.Value.Breadcrumb);
@@ -83,7 +83,7 @@ public class SettingsFailureMessageTests
     [Fact]
     public void AnUnrecognisedPathSegmentIsKeptAsIsWithNoAllowedValues()
     {
-        var setting = SettingsFailureMessage.ResolveSetting("NoLongerAProperty");
+        var setting = SettingsFailureMessage.ResolveSetting("NoLongerAProperty", Program.SettingsSchema);
 
         Assert.NotNull(setting);
         Assert.Equal("NoLongerAProperty", setting.Value.Breadcrumb);

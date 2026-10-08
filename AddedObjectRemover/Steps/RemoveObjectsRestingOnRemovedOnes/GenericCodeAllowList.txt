@@ -1,0 +1,8 @@
+# Static methods and local functions of this module that mention no domain type (Ids or a Contracts type), each with its reason.
+# Form: Type.Member | reason  (local function: Type.Method.Local). The test fails when an entry stops being flagged.
+MeshOriginSurvey.Classify | Threshold rule: where an origin's height fraction sits in the mesh bounds.
+MeshOriginSurvey.MeasureTriangleBounds | Measures the bounds of meshes through the triangle cache (a cache's type).
+SupportRule.ReachesThreshold | Threshold rule: does the removed share reach the support threshold.
+TouchChains.CollectCandidatePairs | Pairs candidate targets through this step's own touch search (a logic type).
+WeightedSurfaceSamples.Create | The anchoring rule's sample weighting over a mesh tree (a tool's type).
+WeightedSurfaceSamples.WeightByOriginDistance | Threshold rule: weights a sample by its distance from the object's origin.

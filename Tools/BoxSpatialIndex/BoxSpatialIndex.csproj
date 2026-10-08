@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AddedObjectRemover</RootNamespace>
+    <Description>A spatial index over boxes: grid candidates, near-pair search, locality ordering and items by space. It references only Ids, BoxAndTransformMath, OrderIndependentParallelWork, KeyedGroupingInInputOrder and ComputedOnceLookups and holds no packages.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
+    <ProjectReference Include="..\BoxAndTransformMath\BoxAndTransformMath.csproj" />
+    <ProjectReference Include="..\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
+    <ProjectReference Include="..\KeyedGroupingInInputOrder\KeyedGroupingInInputOrder.csproj" />
+    <ProjectReference Include="..\ComputedOnceLookups\ComputedOnceLookups.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AddedObjectRemover.Tests" />
+  </ItemGroup>
+</Project>

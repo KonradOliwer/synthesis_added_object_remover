@@ -1,19 +1,19 @@
 using System.Collections.Immutable;
 using System.Numerics;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Tests.EndToEnd;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda.Plugins;
-using P3Float = Noggog.P3Float;
 
 namespace AddedObjectRemover.Tests.Reporting;
 
-/// <summary>The report tables, written by <see cref="ReportFolder"/>, have the file names, headers and formatting of the checked-in golden files.</summary>
+/// <summary>The report tables, written by <see cref="CsvReportOutput"/>, have the file names, headers and formatting of the checked-in expected-output files.</summary>
 public sealed class TablesTests : IDisposable
 {
     private const float TouchDistance = 1f;
     private const float Threshold = 0.5f;
 
-    private static readonly KeepReason QuestReason = new(KeepKind.NonPlacedReference, "QUST record", "linked from QUST");
+    private static readonly KeepReason QuestReason = TestKeepReasons.Quest;
 
     private static readonly TestStatic TableModel = new(
         new FormKey(TestTargets.TargetMod, 0x711), @"test\table.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20, -20, 0), new Vector3(20, 20, 10))));
@@ -24,7 +24,7 @@ public sealed class TablesTests : IDisposable
     private static readonly TestStatic PlankModel = new(
         new FormKey(TestTargets.TargetMod, 0x713), @"test\plank.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-30.5f, -2, 0), new Vector3(30.5f, 2, 4))));
 
-    private static readonly ShapeCatalog Shapes =
+    private static readonly IBaseObjectShapes Shapes =
         TestShapes.Create(TestTargets.TargetMod, "TablesData", TableModel, ItemModel, PlankModel);
 
     private static readonly IBaseFacts Bases = new FakeBases(unresolved: ItemModel.FormKey);
@@ -39,18 +39,18 @@ public sealed class TablesTests : IDisposable
     }
 
     [Fact]
-    public void TouchTables_MatchTheirGoldenFile()
+    public void TouchTables_MatchTheirExpectedOutputFile()
     {
         var scene = TouchScene();
-        var options = new FollowUpOptions(FollowUpRemovalMode.EverythingTouching, TouchDistance, Threshold);
+        var options = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouching, TouchDistance, Threshold);
         var tables = Tables.Build(
-            scene.Outcome, new Explanations(scene.Run.Explanation, null), Reports("new"), null, options, Context);
+            scene.Outcome, new ReportFileDetails(scene.Run.Explanation, null), Reports("new"), null, options, Context);
 
         Assert.NotEmpty(scene.Run.Explanation!.Edges);
-        Assert.Single(scene.Run.Components.Members);
-        Assert.NotEmpty(scene.Run.FollowUpRounds.SelectMany(round => Decisions.KeptIn(scene.Run.Ledger, round)));
-        AssertMatchesGolden("tables-edges", Tables.EdgesFileName, tables);
-        AssertMatchesGolden("tables-components", Tables.ComponentsFileName, tables);
+        Assert.Single(scene.Run.TouchChains.Members);
+        Assert.NotEmpty(scene.Run.AlsoRemoveRounds.SelectMany(round => RemovalList.KeptIn(scene.Run.RemovalDecisions, round)));
+        AssertMatchesExpectedOutput("tables-edges", ReportFileNames.EdgesFileName, tables);
+        AssertMatchesExpectedOutput("tables-components", ReportFileNames.ComponentsFileName, tables);
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public sealed class TablesTests : IDisposable
 
         var table = Tables.Anchoring(world, evaluations, Threshold, Context);
 
-        AssertMatchesGolden("tables-anchoring", Tables.AnchoringFileName, [table]);
+        AssertMatchesExpectedOutput("tables-anchoring", ReportFileNames.AnchoringFileName, [table]);
         Assert.Equal(5, table.Rows.Length);
     }
 
@@ -81,27 +81,28 @@ public sealed class TablesTests : IDisposable
             new(@"test\flat""quoted"".nif", [], 1, new Box(Vector3.Zero, new Vector3(4, 0, 4)), new Vector3(0f, float.NaN, 1.25f), "other"),
         ];
 
-        AssertMatchesGolden("tables-mesh-origins", Tables.MeshOriginsFileName, [Tables.MeshOrigins(origins)]);
+        AssertMatchesExpectedOutput("tables-mesh-origins", ReportFileNames.MeshOriginsFileName, [Tables.MeshOrigins(origins)]);
     }
 
     [Fact]
-    public void LeftoverTable_MatchesTheOldWriterByteForByte()
+    public void LeftBehindTable_MatchesTheOldWriterByteForByte()
     {
-        var world = CreateWorld(CreateTargets(), out var rival);
-        var surroundings = new SectorAreas(50);
-        surroundings.Add(DirectionSector.East, 100f, removed: true);
-        surroundings.Add(DirectionSector.West, 40.5f, removed: false);
-        LeftoverEvaluation[] evaluations =
+        var world = CreateWorld(CreateTargets(), out var otherModObject);
+        var tally = new SectorAreaTally(50);
+        tally.Add(DirectionSector.East, 100f, removed: true);
+        tally.Add(DirectionSector.West, 40.5f, removed: false);
+        var surroundings = tally.Build();
+        LeftBehindCheck[] evaluations =
         [
-            new(3, InvisibleObjectKind.DoorMarkers, 250f, rival, surroundings, LeftoverDecision.RemovedInsideOtherObject, KeepReason: null),
-            new(1, InvisibleObjectKind.IdleMarkers, 100.5f, null, new SectorAreas(50), LeftoverDecision.KeptReferenced, QuestReason),
+            new(3, InvisibleObjectKind.DoorMarkers, 250f, otherModObject, surroundings, LeftBehindOutcome.RemovedInsideOtherObject, KeepReason: null),
+            new(1, InvisibleObjectKind.IdleMarkers, 100.5f, null, new SectorAreaTally(50).Build(), LeftBehindOutcome.KeptReferenced, QuestReason),
         ];
-        var relocations = new RelocationResult(
-            [new Relocation(evaluations[0], new Vector3(1, 2, 3), new Vector3(4, 5, 9), RelocationSurface.Terrain, LeftHomeCell: false)], []);
+        var markerMoves = new MarkerMoves(
+            [new KeptMarkerMove(evaluations[0], new Vector3(1, 2, 3), new Vector3(4, 5, 9), RelocationSurface.Terrain, LeftHomeCell: false)], []);
 
-        var table = Tables.Leftovers(world, evaluations, relocations, Context);
+        var table = Tables.LeftBehind(world, evaluations, markerMoves, Context);
 
-        AssertMatchesGolden("tables-leftovers", Tables.LeftoversFileName, [table]);
+        AssertMatchesExpectedOutput("tables-leftovers", ReportFileNames.LeftBehindFileName, [table]);
         Assert.Equal(2, table.Rows.Length);
     }
 
@@ -115,17 +116,17 @@ public sealed class TablesTests : IDisposable
             new(ManualPatchHintType.KeptLinkedGroup, 1, "with \"a\", b"),
         ];
 
-        AssertMatchesGolden("tables-hints", Tables.HintsFileName, [Tables.Hints(world, hints)]);
+        AssertMatchesExpectedOutput("tables-hints", ReportFileNames.HintsFileName, [Tables.Hints(world, hints)]);
     }
 
     [Fact]
     public void Build_WritesNothingWhenReportFilesAreOff()
     {
         var scene = TouchScene();
-        var options = new FollowUpOptions(FollowUpRemovalMode.EverythingTouching, TouchDistance, Threshold);
+        var options = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouching, TouchDistance, Threshold);
 
         var tables = Tables.Build(
-            scene.Outcome, new Explanations(scene.Run.Explanation, null), new ReportOptions(false, Folder("off")), LeftoverOptionsOn(), options, Context);
+            scene.Outcome, new ReportFileDetails(scene.Run.Explanation, null), new ReportOptions(false, Folder("off")), LeftBehindOptionsOn(), options, Context);
 
         Assert.Empty(tables);
     }
@@ -134,23 +135,23 @@ public sealed class TablesTests : IDisposable
     public void Build_TouchExplanationsGiveEdgesComponentsAndHints()
     {
         var scene = TouchScene();
-        var options = new FollowUpOptions(FollowUpRemovalMode.EverythingTouching, TouchDistance, Threshold);
+        var options = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouching, TouchDistance, Threshold);
 
-        var tables = Tables.Build(scene.Outcome, new Explanations(scene.Run.Explanation, null), Reports("new"), null, options, Context);
+        var tables = Tables.Build(scene.Outcome, new ReportFileDetails(scene.Run.Explanation, null), Reports("new"), null, options, Context);
 
         Assert.Equal(
-            [Tables.EdgesFileName, Tables.ComponentsFileName, Tables.HintsFileName], tables.Select(table => table.FileName));
+            [ReportFileNames.EdgesFileName, ReportFileNames.ComponentsFileName, ReportFileNames.HintsFileName], tables.Select(table => table.FileName));
     }
 
     [Fact]
-    public void Build_WithoutExplanationsLeftoversOrSupportRoundsGivesOnlyHints()
+    public void Build_WithoutExplanationsLeftBehindOrSupportRoundsGivesOnlyHints()
     {
         var scene = TouchScene();
-        var options = new FollowUpOptions(FollowUpRemovalMode.EverythingTouching, TouchDistance, Threshold);
+        var options = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouching, TouchDistance, Threshold);
 
-        var tables = Tables.Build(scene.Outcome, Explanations.None, Reports("new"), null, options, Context);
+        var tables = Tables.Build(scene.Outcome, ReportFileDetails.None, Reports("new"), null, options, Context);
 
-        Assert.Equal([Tables.HintsFileName], tables.Select(table => table.FileName));
+        Assert.Equal([ReportFileNames.HintsFileName], tables.Select(table => table.FileName));
     }
 
     [Theory]
@@ -161,43 +162,43 @@ public sealed class TablesTests : IDisposable
     public void Build_WritesAnchoringOnlyForSupportRoundsWithSeeds(FollowUpRemovalMode mode, bool hadSeeds, bool expected)
     {
         var scene = TouchScene();
-        var followUp = scene.Outcome.FollowUp with { Mode = mode, HadSeeds = hadSeeds, Rounds = [], Evidence = [] };
-        var outcome = scene.Outcome with { FollowUp = followUp };
+        var alsoRemove = scene.Outcome.RestingObjects with { Mode = mode, HadSeeds = hadSeeds, Rounds = [], Evidence = [] };
+        var outcome = scene.Outcome with { RestingObjects = alsoRemove };
 
-        var tables = Tables.Build(outcome, Explanations.None, Reports("new"), null, new FollowUpOptions(mode, TouchDistance, Threshold), Context);
+        var tables = Tables.Build(outcome, ReportFileDetails.None, Reports("new"), null, new AlsoRemoveSettings(mode, TouchDistance, Threshold), Context);
 
-        Assert.Equal(expected, tables.Any(table => table.FileName == Tables.AnchoringFileName));
+        Assert.Equal(expected, tables.Any(table => table.FileName == ReportFileNames.AnchoringFileName));
     }
 
     [Fact]
     public void Build_ListsTheFilesInTheOrderTheStepsRan()
     {
         var scene = TouchScene();
-        var options = new FollowUpOptions(FollowUpRemovalMode.ObjectsSupportedByIt, TouchDistance, Threshold);
-        var outcome = scene.Outcome with { FollowUp = scene.Outcome.FollowUp with { Mode = options.Mode, Rounds = [], Evidence = [] } };
-        var origins = new Explanations(null, [new MeshOrigin("m.nif", [], 1, default, Vector3.Zero, "other")]);
+        var options = new AlsoRemoveSettings(FollowUpRemovalMode.ObjectsSupportedByIt, TouchDistance, Threshold);
+        var outcome = scene.Outcome with { RestingObjects = scene.Outcome.RestingObjects with { Mode = options.Mode, Rounds = [], Evidence = [] } };
+        var origins = new ReportFileDetails(null, [new MeshOrigin("m.nif", [], 1, default, Vector3.Zero, "other")]);
 
-        var tables = Tables.Build(outcome, origins, Reports("new"), LeftoverOptionsOn(), options, Context);
+        var tables = Tables.Build(outcome, origins, Reports("new"), LeftBehindOptionsOn(), options, Context);
 
         Assert.Equal(
-            [Tables.AnchoringFileName, Tables.MeshOriginsFileName, Tables.LeftoversFileName, Tables.HintsFileName],
+            [ReportFileNames.AnchoringFileName, ReportFileNames.MeshOriginsFileName, ReportFileNames.LeftBehindFileName, ReportFileNames.HintsFileName],
             tables.Select(table => table.FileName));
     }
 
-    private sealed record Scene(Outcome Outcome, TestTouchCascade.Run Run);
+    private sealed record Scene(RunOutcome Outcome, TestTouchCascade.Run Run);
 
     /// <summary>Tables 0 and 2 are seeds; the plank 1 and item 4 are removed by touch; the referenced item 3 is held; target 4 has a comma in its Editor ID.</summary>
     private static Scene TouchScene()
     {
         var targets = CreateTargets();
-        var protection = Protection.Build(
+        var protection = ObjectsToKeep.Build(
             [.. targets], [], TestTargets.References(targets.Count, new Dictionary<int, KeepReason> { [3] = QuestReason }));
         var run = TestTouchCascade.Execute(targets, Shapes, protection, [0, 2], TouchDistance, threads: 2, collectDiagnostics: true);
         var world = CreateWorld(targets, out _);
-        var looks = TestSeededLedger.AllVisible(targets.Count);
-        var decided = new Decided(
-            world, looks, null!, null!, protection, null!, null!, run.Result, null, LeftoverResult.None, RelocationResult.None, run.Ledger);
-        var outcome = new Outcome(decided, [.. Decisions.Removals(run.Ledger, world, LeftoverResult.None)], null!, [], [], default);
+        var decided = new StepResults(
+            world, null!, null!, protection, null!, run.Result, null, LeftBehindResult.None, MarkerMoves.None, run.RemovalDecisions);
+        var removals = RemovalList.Removals(run.RemovalDecisions, world, LeftBehindResult.None).ToImmutableArray();
+        var outcome = new RunOutcome(decided, removals, ManualPatchHints.Hints(decided, Shapes, removals), null!, [], default);
         return new Scene(outcome, run);
     }
 
@@ -207,34 +208,33 @@ public sealed class TablesTests : IDisposable
         Place(1, PlankModel, new Vector3(50, 0, 3)),
         Place(2, TableModel, new Vector3(100, 0, 0)),
         Place(3, ItemModel, new Vector3(5, 5, 10)),
-        Place(4, ItemModel, new Vector3(105, 5, 10)) with { EditorId = "Item,\"4\"", CellName = "Cell, one" },
+        Place(4, ItemModel, new Vector3(105, 5, 10)) with { EditorId = "Item,\"4\"", Cell = new CellFact(TestTargets.SpaceKey(0x9000), "Cell, one") },
     ];
 
     private static TargetObject Place(int index, TestStatic model, Vector3 position) =>
-        TestTargets.Create(index, TestTargets.At(position, zRadians: 0.3f * index, scale: 1f + index * 0.25f), model.Ref, TestTargets.Space);
+        TestTargets.Create(index, TestTargets.At(position, zRadians: 0.3f * index, scale: 1f + index * 0.25f), model.Base, TestTargets.Space);
 
-    private static World CreateWorld(List<TargetObject> targets, out OtherObject rival)
+    private static CollectedObjects CreateWorld(List<TargetObject> targets, out OtherObject otherModObject)
     {
-        rival = new OtherObject(
+        otherModObject = new OtherObject(
             new OtherId(0),
-            new FormKey(ModKey.FromNameAndExtension("Other.esp"), 0x10),
+            new FormKey(ModKey.FromNameAndExtension("Other.esp"), 0x10).ToRecordKey(),
             TestTargets.Space,
-            ModKey.FromNameAndExtension("Other.esp"),
+            new PluginName("Other.esp"),
             EditorId: "Rival,1",
             Base: null,
             Vector3.Zero,
-            default(P3Float),
+            default(Vector3),
             Scale: 1f,
             IsPrimitive: false,
             HasMapMarker: false);
-        return new World(
+        return new CollectedObjects(
             [.. targets],
-            [rival],
-            Collected<ImmutableArray<OtherObject>>.NotCollected,
+            [otherModObject],
+            null,
             [],
-            [.. TestTargets.References(targets.Count)],
-            new Dictionary<FormKey, string> { [TestTargets.Space] = "Tamriel, Test" },
-            new ReadCounts(0, 0, 0, 0, 0, 0, 0),
+            new Dictionary<RecordKey, SpaceFact> { [TestTargets.Space] = new(TestTargets.Space, "Tamriel, Test", SpaceKind.Worldspace) },
+            new ReadCounts(0, 0, 0, 0, 0, 0),
             []);
     }
 
@@ -254,25 +254,25 @@ public sealed class TablesTests : IDisposable
         return new AnchoringEvaluation(target, iteration, contacts, supporters, removed, removedAsLinked, held);
     }
 
-    private static LeftoverOptions LeftoverOptionsOn() => new(100f, 50, 50, 50, new HashSet<InvisibleObjectKind>(), default);
+    private static LeftBehindOptions LeftBehindOptionsOn() => new(100f, 50, 50, 50, new HashSet<InvisibleObjectKind>(), default);
 
     private ReportOptions Reports(string name) => new(true, Folder(name));
 
     private string Folder(string name) => Path.Combine(_root, name);
 
-    private void AssertMatchesGolden(string goldenName, string fileName, ImmutableArray<CsvTable> tables)
+    private void AssertMatchesExpectedOutput(string expectedOutputName, string fileName, ImmutableArray<CsvTable> tables)
     {
         var table = tables.Single(candidate => candidate.FileName == fileName);
-        var result = ReportFolder.Write(Reports("new"), [table]);
+        var result = new CsvReportOutput().Write(Reports("new"), [table]);
 
         Assert.Empty(result.Warnings);
-        GoldenFiles.AssertMatches(goldenName, File.ReadAllLines(result.Written.Single().Path));
+        ExpectedOutputFiles.AssertMatches(expectedOutputName, File.ReadAllLines(result.Written.Single().Path));
     }
 
     private sealed class FakeBases(FormKey unresolved) : IBaseFacts
     {
-        public BaseFacts Of(BaseRef baseRef) => baseRef.FormKey == unresolved
-            ? BaseFacts.Unresolved(baseRef.FormKey)
-            : new BaseFacts(baseRef.FormKey, true, BaseRecordKind.Static, "Static", $"Base{baseRef.FormKey.ID:X}", null, null, null, false, null, null);
+        public BaseFacts Of(BaseKey baseKey) => baseKey.Record == unresolved.ToRecordKey()
+            ? BaseFacts.Unresolved(baseKey.Record)
+            : new BaseFacts(baseKey.Record, true, BaseRecordKind.Static, "Static", $"Base{baseKey.Record.Id:X}", null, null, null, ImmutableArray<string>.Empty, null, null);
     }
 }

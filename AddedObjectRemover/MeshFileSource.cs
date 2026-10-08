@@ -5,8 +5,6 @@ using Noggog;
 
 namespace AddedObjectRemover;
 
-internal enum MeshSource { NotFound, LooseFile, Archive }
-
 /// <summary>
 /// Reads mesh files the way the game resolves them: a loose file in the Data folder wins,
 /// otherwise the highest-priority archive containing the path. Thread-safe: BSA file reads open
@@ -22,8 +20,8 @@ internal sealed class MeshFileSource
     private readonly GameRelease _release;
     private readonly IReadOnlyList<ModKey> _loadOrder;
     private readonly AssetProblemLog _problems;
-    private readonly Lazy<Dictionary<string, IArchiveFile>> _archiveIndex;
-    private int _archivesIndexed;
+    private readonly ComputedOnce<Dictionary<string, IArchiveFile>> _archiveIndex;
+    private readonly AtomicCounter _archivesIndexed = new();
 
     public MeshFileSource(string dataPath, GameRelease release, IReadOnlyList<ModKey> loadOrder, AssetProblemLog problems)
     {
@@ -31,10 +29,10 @@ internal sealed class MeshFileSource
         _release = release;
         _loadOrder = loadOrder;
         _problems = problems;
-        _archiveIndex = new Lazy<Dictionary<string, IArchiveFile>>(BuildArchiveIndex, LazyThreadSafetyMode.ExecutionAndPublication);
+        _archiveIndex = new ComputedOnce<Dictionary<string, IArchiveFile>>(BuildArchiveIndex);
     }
 
-    public int ArchivesIndexed => Volatile.Read(ref _archivesIndexed);
+    public int ArchivesIndexed => _archivesIndexed.Value;
 
     /// <summary>Builds the archive index on the calling thread, so its warnings print in order and workers never wait on it.</summary>
     public void BuildArchiveIndexNow() => _ = _archiveIndex.Value;
@@ -71,7 +69,7 @@ internal sealed class MeshFileSource
         {
             return File.Exists(loosePath) ? File.ReadAllBytes(loosePath) : null;
         }
-        catch (Exception ex) when (ExpectedFailures.IsFileAccess(ex))
+        catch (Exception ex) when (FileFailures.IsExpected(ex))
         {
             _problems.Add(new AssetProblem(
                 meshPath, AssetProblemKind.LooseFileUnreadable, $"  [mesh] could not read loose file {loosePath}: {ex.Message}"));
@@ -86,7 +84,7 @@ internal sealed class MeshFileSource
         {
             return archiveFile.GetBytes();
         }
-        catch (Exception ex) when (ExpectedFailures.IsCorruptArchive(ex))
+        catch (Exception ex) when (Failures.IsCorruptArchive(ex))
         {
             _problems.Add(new AssetProblem(
                 meshPath, AssetProblemKind.ArchiveExtractFailed, $"  [mesh] could not extract {meshPath} from archive: {ex.GetType().Name}: {ex.Message}"));
@@ -106,9 +104,9 @@ internal sealed class MeshFileSource
             try
             {
                 AddArchiveMeshes(archivePath, index);
-                Interlocked.Increment(ref _archivesIndexed);
+                _archivesIndexed.Increment();
             }
-            catch (Exception ex) when (ExpectedFailures.IsCorruptArchive(ex))
+            catch (Exception ex) when (Failures.IsCorruptArchive(ex))
             {
                 var archiveName = Path.GetFileName(archivePath);
                 _problems.Add(new ArchiveProblem(
@@ -193,7 +191,7 @@ internal sealed class MeshFileSource
                 .Select(path => Path.GetFileName(path))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
         }
-        catch (Exception ex) when (ExpectedFailures.IsFileAccess(ex))
+        catch (Exception ex) when (FileFailures.IsExpected(ex))
         {
             _problems.Add(new ArchiveProblem(
                 ArchiveProblemKind.DataFolderUnlistable, _dataPath, $"  Warning: could not list archives in {_dataPath}: {ex.Message}"));
@@ -207,7 +205,7 @@ internal sealed class MeshFileSource
         {
             return Archive.GetIniListings(_release).Select(listing => listing.String).ToList();
         }
-        catch (Exception ex) when (ExpectedFailures.IsUnreadableIni(ex))
+        catch (Exception ex) when (Failures.IsUnreadableIni(ex))
         {
             _problems.Add(new ArchiveProblem(
                 ArchiveProblemKind.IniArchiveListUnreadable, "game INI", $"  Warning: could not read archive list from game INI: {ex.Message}"));

@@ -8,29 +8,30 @@ namespace AddedObjectRemover;
 /// </summary>
 internal sealed class PlacedOverrideWriter(ISkyrimMod patchMod)
 {
-    /// <summary>Per overridden child list (by reference): its records by FormKey.</summary>
-    private readonly Dictionary<object, Dictionary<FormKey, IPlaced>> _placedByList = new(ReferenceEqualityComparer.Instance);
+    /// <summary>Per overridden child list (by reference): its records by key.</summary>
+    private readonly Dictionary<object, Dictionary<RecordKey, IPlaced>> _placedByList = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
     /// Mirrors Mutagen's placed-record context: override the winning cell (without its children),
     /// then add a copy of the winning record to the child list it was found in.
     /// </summary>
-    public IPlaced GetOrAddOverride(IPlacedGetter record, TargetLocation location)
+    public IPlaced GetOrAddOverride(IPlacedGetter record, PlacedRecordLocation location)
     {
         var cell = location.WinningCell.GetOrAddAsOverride(patchMod);
         var list = location.InPersistentList ? cell.Persistent : cell.Temporary;
-        if (!_placedByList.TryGetValue(list, out var byFormKey))
+        if (!_placedByList.TryGetValue(list, out var byKey))
         {
-            byFormKey = new Dictionary<FormKey, IPlaced>();
-            foreach (var existing in list) byFormKey.TryAdd(existing.FormKey, existing);
-            _placedByList[list] = byFormKey;
+            byKey = new Dictionary<RecordKey, IPlaced>();
+            foreach (var existing in list) byKey.TryAdd(existing.FormKey.ToRecordKey(), existing);
+            _placedByList[list] = byKey;
         }
 
-        if (!byFormKey.TryGetValue(record.FormKey, out var placed))
+        var key = record.FormKey.ToRecordKey();
+        if (!byKey.TryGetValue(key, out var placed))
         {
             placed = (IPlaced)record.DeepCopy();
             list.Add(placed);
-            byFormKey[record.FormKey] = placed;
+            byKey[key] = placed;
         }
         return placed;
     }

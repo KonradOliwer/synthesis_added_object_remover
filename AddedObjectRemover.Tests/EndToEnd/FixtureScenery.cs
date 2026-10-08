@@ -7,7 +7,7 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 internal sealed class FixtureScenery(FixtureMods mods, FixtureBases bases)
 {
     private const string TargetPrefix = "T_";
-    private const string RivalPrefix = "R_";
+    private const string OtherModPrefix = "R_";
     private const string PadSuffix = "_Pad";
 
     public FixtureMods Mods { get; } = mods;
@@ -17,11 +17,11 @@ internal sealed class FixtureScenery(FixtureMods mods, FixtureBases bases)
     public PlacedObject PlaceTargetCrate(string name, Vector3 position) =>
         Mods.Target.Interior.Place(TargetPrefix + name, Bases.TargetCrate, position);
 
-    /// <summary>A rival pad beside the crate, in the crate's removal zone.</summary>
+    /// <summary>An other-mod pad beside the crate, in the crate's removal zone.</summary>
     public PlacedObject PlacePinningPad(string name, Vector3 cratePosition, Vector3 offset) =>
-        Mods.Rival.Interior.Place(RivalPrefix + name + PadSuffix, Bases.RivalPad, cratePosition + offset);
+        Mods.OtherMod.Interior.Place(OtherModPrefix + name + PadSuffix, Bases.OtherModPad, cratePosition + offset);
 
-    /// <summary>A target crate that a rival pad makes too close.</summary>
+    /// <summary>A target crate that an other-mod pad makes too close.</summary>
     public PlacedObject PlaceCratePinnedByPad(string name, Vector3 position)
     {
         PlacePinningPad(name, position, FixtureLayout.PinningPadOffset);

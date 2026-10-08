@@ -1,0 +1,3 @@
+  Removed 000800:Target.esp (base (none)) in worldspace Tamriel [000100:Target.esp]; too close to 000010:Other.esp from Other.esp
+  Removed 000801:Target.esp (base (none)) in worldspace Tamriel [000100:Target.esp]; touches removed 000800:Target.esp
+  Removed 000802:Target.esp (base (none)) in worldspace Tamriel [000100:Target.esp]; linked to removed 000801:Target.esp

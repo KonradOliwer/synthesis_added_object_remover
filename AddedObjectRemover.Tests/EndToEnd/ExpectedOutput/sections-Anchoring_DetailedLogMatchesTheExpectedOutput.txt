@@ -1,0 +1,6 @@
+  Kept 000804:Target.esp in worldspace Tamriel [000100:Target.esp]: linked from QUST MyQuest [000001:Quest.esp] (touches removed 000800:Target.esp).
+[mesh] m.nif not found.
+Anchoring: 1 removed over 1 iterations; 3 touching objects evaluated (4 evaluations), 1 kept without any contact points, 1 kept as referenced.
+  Pairs: 10 box candidates next to a removal tested over 1 iterations, 4 touching, 1 without mesh triangles (never touching); 77 triangle pairs tested exactly.
+  Meshes indexed: 3 (900 triangles), 2 over 2,000,000 triangles not used.
+Also remove: 1 rounds in 1.5s.

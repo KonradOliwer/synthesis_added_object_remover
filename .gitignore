@@ -31,6 +31,9 @@ Temp/
 # Local test runs (machine-specific paths, generated plugins)
 TestRun/
 
+# Local working notes (designs, plans, progress)
+scratchpad/
+
 # Local agent configuration and notes
 CLAUDE.local.md
 .claude/

@@ -30,7 +30,7 @@ internal static class FixtureStandingScene
     private static void AddOverriddenLater(FixtureScenery scenery, Vector3 position)
     {
         var crate = scenery.PlaceCratePinnedByPad("OverriddenLater", position);
-        scenery.Mods.Rival.Interior.PlaceCopyOf(crate);
+        scenery.Mods.OtherMod.Interior.PlaceCopyOf(crate);
     }
 
     /// <summary>A hidden target record is never checked.</summary>
@@ -40,7 +40,7 @@ internal static class FixtureStandingScene
         crate.MajorRecordFlagsRaw |= (int)SkyrimMajorRecord.SkyrimMajorRecordFlag.InitiallyDisabled;
     }
 
-    /// <summary>The target plugin overrides the rival's pad, which makes it a replacement, not a clash.</summary>
+    /// <summary>The target plugin overrides the other mod's pad, which makes it a replacement, not a clash.</summary>
     private static void AddOverriddenByTarget(FixtureScenery scenery, Vector3 position)
     {
         const string name = "OverriddenByTarget";

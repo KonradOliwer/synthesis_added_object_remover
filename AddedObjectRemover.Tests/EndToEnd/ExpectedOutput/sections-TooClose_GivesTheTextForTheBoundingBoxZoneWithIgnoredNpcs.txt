@@ -1,0 +1,6 @@
+Found 1 of 3 Target.esp objects too close to other mods' objects in 1.5s.
+  Ignored 4 other-mod objects that are invisible (markers, lights, sounds, decals, trigger boxes, ...).
+    Lights: 3
+    Sounds: 1
+NPCs and creatures: ignored; 7 placed NPCs of other mods never cause removals.
+  Kept 000802:Target.esp in worldspace Tamriel [000100:Target.esp]: linked from QUST MyQuest [000001:Quest.esp].

@@ -17,14 +17,14 @@ public class TriangleStoreLimitTests
     private const int BytesPerVertex = 12;
     private const int PaddingVertices = (int)(HeavyTreeBytes / BytesPerVertex);
 
-    private static readonly NifGeometry HeavyGeometry = CreateHeavyGeometry();
+    private static readonly MeshTriangles HeavyTriangles = CreateHeavyTriangles();
 
-    private static NifGeometry CreateHeavyGeometry()
+    private static MeshTriangles CreateHeavyTriangles()
     {
-        var box = BoxMesh.CreateGeometry(TestMeshes.UnitCube);
+        var box = BoxMesh.CreateTriangles(TestMeshes.UnitCube);
         var vertices = new Vector3[PaddingVertices];
         box.Vertices.CopyTo(vertices, 0);
-        return new NifGeometry(box.Min, box.Max, vertices, box.Indices, box.PartFirstTriangles);
+        return new MeshTriangles(vertices, box.Indices, box.PartFirstTriangles);
     }
 
     private static TriangleStore CreateHeavyStore(out Dictionary<string, int> reads)
@@ -35,7 +35,7 @@ public class TriangleStoreLimitTests
             path =>
             {
                 lock (counts) counts[path] = counts.GetValueOrDefault(path) + 1;
-                return HeavyGeometry;
+                return HeavyTriangles;
             },
             ResidentLimitBytes);
     }
@@ -48,13 +48,15 @@ public class TriangleStoreLimitTests
         store.Acquire("b.nif").Dispose();
         using var leasedC = store.Acquire("c.nif");
 
-        Assert.Equal(1, store.GetStats().Evicted);
-        Assert.NotNull(leasedA.Tree);
+        Assert.NotNull(leasedA.Value);
 
         using var againA = store.Acquire("a.nif");
-        Assert.Same(leasedA.Tree, againA.Tree);
+        Assert.Same(leasedA.Value, againA.Value);
         Assert.Equal(1, reads["a.nif"]);
-        Assert.NotNull(leasedC.Tree);
+        Assert.NotNull(leasedC.Value);
+
+        store.Acquire("b.nif").Dispose();
+        Assert.Equal(2, reads["b.nif"]);
     }
 
     [Fact]
@@ -65,7 +67,6 @@ public class TriangleStoreLimitTests
         store.Acquire("b.nif").Dispose();
         using var leasedC = store.Acquire("c.nif");
 
-        Assert.Equal(1, store.GetStats().Evicted);
         store.Acquire("b.nif").Dispose();
         Assert.Equal(1, reads["b.nif"]);
         store.Acquire("a.nif").Dispose();
@@ -73,49 +74,36 @@ public class TriangleStoreLimitTests
     }
 
     [Fact]
-    public void ARebuiltMeshCountsAsBuiltAgainAndRebuilt()
+    public void AnEvictedMeshStaysInTheStatisticsAndIsCountedOnceWhenBuiltAgain()
     {
-        var store = CreateHeavyStore(out _);
+        var store = CreateHeavyStore(out var reads);
         store.Acquire("a.nif").Dispose();
         store.Acquire("b.nif").Dispose();
         using var leasedC = store.Acquire("c.nif");
-        Assert.Equal(0, store.GetStats().Rebuilt);
+        Assert.Equal(3, store.GetStats().Built);
 
         store.Acquire("A.nif").Dispose();
 
+        Assert.Equal(2, reads["a.nif"]);
         var stats = store.GetStats();
-        Assert.Equal(4, stats.Built);
-        Assert.Equal(1, stats.Rebuilt);
-    }
-
-    [Fact]
-    public void PeaksKeepTheirValueAfterEviction()
-    {
-        var store = CreateHeavyStore(out _);
-        store.Acquire("a.nif").Dispose();
-        store.Acquire("b.nif").Dispose();
-        using var leasedC = store.Acquire("c.nif");
-
-        var stats = store.GetStats();
-        Assert.Equal(1, stats.Evicted);
-        Assert.Equal(3, stats.PeakResidentMeshes);
-        Assert.True(stats.PeakResidentBytes > ResidentLimitBytes);
+        Assert.Equal(3, stats.Built);
+        Assert.Equal(3 * 12, stats.Triangles);
     }
 
     [Fact]
     public void AMeshAboveTheTriangleLimitHasNoTreeIsCountedOnceAndNotReadAgain()
     {
         var reads = 0;
-        var indices = new int[3 * (MeshTriangleTree.MaxTriangles + 1)];
-        var geometry = new NifGeometry(Vector3.Zero, Vector3.One, [Vector3.Zero], indices, [0]);
+        var indices = new int[3 * (MeshLimits.Tree.MaxIndexedTriangles + 1)];
+        var triangles = new MeshTriangles([Vector3.Zero], indices, [0]);
         var store = new TriangleStore(_ =>
         {
             reads++;
-            return geometry;
+            return triangles;
         });
 
-        using (var first = store.Acquire("huge.nif")) Assert.Null(first.Tree);
-        using (var second = store.Acquire("huge.nif")) Assert.Null(second.Tree);
+        using (var first = store.Acquire("huge.nif")) Assert.Null(first.Value);
+        using (var second = store.Acquire("huge.nif")) Assert.Null(second.Value);
 
         var stats = store.GetStats();
         Assert.Equal(1, stats.TooLarge);
@@ -127,18 +115,18 @@ public class TriangleStoreLimitTests
     public void ConcurrentBuildsOfLargeMeshesAllCompleteAndBuildEachOnce()
     {
         var indices = new int[3 * 25_000];
-        var geometry = new NifGeometry(Vector3.Zero, Vector3.One, [Vector3.Zero, Vector3.UnitX, Vector3.UnitY], indices, [0]);
+        var triangles = new MeshTriangles([Vector3.Zero, Vector3.UnitX, Vector3.UnitY], indices, [0]);
         var reads = 0;
         var store = new TriangleStore(_ =>
         {
             Interlocked.Increment(ref reads);
-            return geometry;
+            return triangles;
         });
 
         Parallel.For(0, 12, new ParallelOptions { MaxDegreeOfParallelism = 12 }, i =>
         {
             using var lease = store.Acquire($"large{i}.nif");
-            Assert.NotNull(lease.Tree);
+            Assert.NotNull(lease.Value);
         });
 
         Assert.Equal(12, reads);

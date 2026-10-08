@@ -25,7 +25,7 @@ public class ParallelMapTests
     {
         var order = Shuffled(ItemCount);
 
-        var results = ParallelMap.Run(Workers(8), order, () => new CountingScratch(), (item, _) => Square(item));
+        var results = ParallelMap.Run(Workers(8), order, () => new CountingScratch(), (item, _) => Square(item), ParallelMap.AutomaticRangeSize);
 
         Assert.Equal(Enumerable.Range(0, ItemCount).Select(Square), results);
     }
@@ -66,31 +66,68 @@ public class ParallelMapTests
 
         Assert.Empty(results);
         Assert.Equal(default, work);
-        Assert.Empty(ParallelMap.Run(Workers(8), 0, item => item));
+        Assert.Empty(ParallelMap.Run(Workers(8), 0, item => item, ParallelMap.AutomaticRangeSize));
     }
 
     [Fact]
     public void AFailingBodySurfacesAsAnAggregateException() =>
-        AssertSurfaces(() => ParallelMap.Run<int>(Workers(8), ItemCount, item => item == ItemCount / 2 ? throw new InvalidOperationException() : item));
+        AssertSurfaces(() => ParallelMap.Run<int>(Workers(8), ItemCount, item => item == ItemCount / 2 ? throw new InvalidOperationException() : item, ParallelMap.AutomaticRangeSize));
+
+    [Fact]
+    public void SeveralFailingItemsReportTheOneWithTheLowestIndexWhateverTheWorkers()
+    {
+        const int Repeats = 20;
+        const int LowestFailing = 100;
+
+        for (var repeat = 0; repeat < Repeats; repeat++)
+        {
+            var failure = Assert.Throws<AggregateException>(() => ParallelMap.Run<int>(
+                Workers(8),
+                ItemCount,
+                item => item >= LowestFailing ? throw new InvalidOperationException($"item {item}") : item,
+                ParallelMap.OneItemPerRange));
+
+            Assert.Equal($"item {LowestFailing}", Assert.Single(failure.InnerExceptions).Message);
+        }
+    }
+
+    [Fact]
+    public void AnOutOfMemoryFailureIsReportedBeforeALowerFailure()
+    {
+        var failure = Assert.Throws<AggregateException>(() => ParallelMap.Run<int>(
+            Workers(1),
+            ItemCount,
+            item => item switch
+            {
+                1 => throw new InvalidOperationException(),
+                2 => throw new OutOfMemoryException(),
+                _ => item,
+            },
+            ParallelMap.OneItemPerRange));
+
+        Assert.IsType<OutOfMemoryException>(Assert.Single(failure.InnerExceptions));
+    }
 
     [Fact]
     public void ARunOverAWorkOrderThatDoesNotCoverTheTargetsIsRefused()
     {
         var order = new WorkOrder([0, 1]);
 
-        Assert.Throws<ArgumentException>(() => ParallelMap.Run(Workers(2), order, 3, () => 0, (item, _) => item));
-        Assert.Throws<ArgumentException>(() => ParallelMap.Run(Workers(2), order, 3, () => 0, (item, _) => item, _ => new Work(0, 0)));
+        Assert.Throws<ArgumentException>(
+            () => ParallelMap.Run(Workers(2), order, 3, () => 0, (item, _) => item, ParallelMap.AutomaticRangeSize));
+        Assert.Throws<ArgumentException>(
+            () => ParallelMap.Run(Workers(2), order, 3, () => 0, (item, _) => item, _ => new Work(0, 0), ParallelMap.AutomaticRangeSize));
     }
 
     [Fact]
     public void AFailingScratchCreationSurfacesAsAnAggregateException() =>
         AssertSurfaces(() => ParallelMap.Run<int, long, Work>(
-            Workers(4), ItemCount, () => throw new InvalidOperationException(), (item, _) => item, _ => default));
+            Workers(4), ItemCount, () => throw new InvalidOperationException(), (item, _) => item, _ => default, ParallelMap.AutomaticRangeSize));
 
     [Fact]
     public void AFailingHarvestSurfacesAsAnAggregateException() =>
         AssertSurfaces(() => ParallelMap.Run<int, long, Work>(
-            Workers(4), ItemCount, () => 0, (item, _) => item, _ => throw new InvalidOperationException()));
+            Workers(4), ItemCount, () => 0, (item, _) => item, _ => throw new InvalidOperationException(), ParallelMap.AutomaticRangeSize));
 
     [Fact]
     public void AFailingBodyInACountingRunSurfacesAsAnAggregateException() =>
@@ -99,11 +136,13 @@ public class ParallelMapTests
             ItemCount,
             () => new CountingScratch(),
             (item, _) => item == ItemCount / 2 ? throw new InvalidOperationException() : item,
-            scratch => new Work(scratch.ItemsSeen, scratch.IndexSum)));
+            scratch => new Work(scratch.ItemsSeen, scratch.IndexSum),
+            ParallelMap.AutomaticRangeSize));
 
     [Fact]
     public void AFailingSumOfTheWorkSurfacesAsAnAggregateException() =>
-        AssertSurfaces(() => ParallelMap.Run(Workers(4), ItemCount, () => 0, (item, _) => item, _ => new ThrowingWork()));
+        AssertSurfaces(() => ParallelMap.Run(
+            Workers(4), ItemCount, () => 0, (item, _) => item, _ => new ThrowingWork(), ParallelMap.AutomaticRangeSize));
 
     private readonly record struct ThrowingWork : IWork<ThrowingWork>
     {
@@ -113,12 +152,12 @@ public class ParallelMapTests
     }
 
     [Theory]
-    [InlineData(1, null)]
+    [InlineData(1, ParallelMap.AutomaticRangeSize)]
     [InlineData(1, 1)]
     [InlineData(1, 5000)]
     [InlineData(1000, 7)]
     [InlineData(1000, 1000000)]
-    public void AnyRangeSizeGivesTheSameResultsAndWork(int count, int? rangeSize)
+    public void AnyRangeSizeGivesTheSameResultsAndWork(int count, int rangeSize)
     {
         var (expected, expectedWork) = RunCounting(Workers(1), [.. Enumerable.Range(0, count)]);
 
@@ -173,7 +212,8 @@ public class ParallelMapTests
                 scratch.IndexSum += item;
                 return Square(item);
             },
-            scratch => new Work(scratch.ItemsSeen, scratch.IndexSum));
+            scratch => new Work(scratch.ItemsSeen, scratch.IndexSum),
+            ParallelMap.AutomaticRangeSize);
 
     private static long Square(int item) => (long)item * item;
 

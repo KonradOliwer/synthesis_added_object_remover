@@ -41,12 +41,18 @@ internal sealed class BoundsAccumulator
     public Vector3 Max { get; private set; } = new(float.NegativeInfinity);
     public string? Invalid { get; private set; }
 
+    /// <summary>
+    /// Largest accepted absolute mesh coordinate. Real meshes stay far below it; larger values come
+    /// from broken exports and would blow up spatial grids and triangle indexes.
+    /// </summary>
+    public const float MaxCoordinate = 1e6f;
+
     public bool AddPoint(Vector3 p)
     {
-        if (!Geometry.IsWithinLimits(p))
+        if (!Vectors.IsWithinLimit(p, MaxCoordinate))
         {
-            Invalid ??= Geometry.IsFinite(p)
-                ? $"vertex coordinates beyond ±{Geometry.MaxCoordinate:0} units"
+            Invalid ??= Vectors.IsFinite(p)
+                ? $"vertex coordinates beyond ±{MaxCoordinate:0} units"
                 : "non-finite vertex coordinates";
             return false;
         }
@@ -67,10 +73,11 @@ internal sealed record ShapeCollection(
 /// </summary>
 internal sealed class NifShapeCollector
 {
+    private readonly RenderGeometryTypes _renderTypes;
     private readonly List<INiObject> _blocks;
     private readonly IReadOnlyDictionary<int, int> _parentOf;
     private readonly AvObjectFlags _flags;
-    private readonly bool _includeHidden;
+    private readonly ShapeInclusion _inclusion;
     private readonly NodeTransformResolver _nodes;
     private readonly BoundsAccumulator _bounds = new();
     private readonly List<Vector3>? _vertices;
@@ -79,32 +86,35 @@ internal sealed class NifShapeCollector
     private readonly ShapeStats _stats;
 
     private NifShapeCollector(
+        RenderGeometryTypes renderTypes,
         List<INiObject> blocks,
         IReadOnlyDictionary<int, int> parentOf,
         int rootIndex,
         AvObjectFlags flags,
-        bool includeHidden,
+        ShapeInclusion inclusion,
         bool includeTriangles)
     {
+        _renderTypes = renderTypes;
         _blocks = blocks;
         _parentOf = parentOf;
         _flags = flags;
-        _includeHidden = includeHidden;
-        _nodes = new NodeTransformResolver(blocks, parentOf, rootIndex, flags, includeHidden);
+        _inclusion = inclusion;
+        _nodes = new NodeTransformResolver(blocks, parentOf, rootIndex, flags, inclusion);
         _vertices = includeTriangles ? [] : null;
         _indices = includeTriangles ? [] : null;
         _partFirstTriangles = includeTriangles ? [] : null;
-        _stats = new ShapeStats { HiddenIgnored = includeHidden };
+        _stats = new ShapeStats { HiddenIgnored = inclusion.IncludeHidden };
     }
 
     public static ShapeCollection Collect(
+        RenderGeometryTypes renderTypes,
         List<INiObject> blocks,
         IReadOnlyDictionary<int, int> parentOf,
         int rootIndex,
         AvObjectFlags flags,
-        bool includeHidden,
+        ShapeInclusion inclusion,
         bool includeTriangles) =>
-        new NifShapeCollector(blocks, parentOf, rootIndex, flags, includeHidden, includeTriangles).CollectAll();
+        new NifShapeCollector(renderTypes, blocks, parentOf, rootIndex, flags, inclusion, includeTriangles).CollectAll();
 
     private ShapeCollection CollectAll()
     {
@@ -134,23 +144,19 @@ internal sealed class NifShapeCollector
     private bool TryGetShapeToRoot(int blockIndex, INiShape shape, out Similarity toRoot)
     {
         toRoot = Similarity.Identity;
-        if (!NifShapes.IsRenderGeometry(shape))
+        if (!_renderTypes.IsRenderGeometry(shape))
         {
             var name = shape.GetType().Name;
             _stats.Unsupported[name] = _stats.Unsupported.GetValueOrDefault(name) + 1;
             return false;
         }
-        if (NifShapes.IsEditorMarker(shape.Name?.String))
+        var kind = NifShapes.KindOf(shape, _blocks, _inclusion);
+        if (!_inclusion.CountedKinds.Contains(kind))
         {
-            _stats.EditorMarker++;
+            CountSkippedKind(kind);
             return false;
         }
-        if (NifShapes.HasEffectShader(shape, _blocks))
-        {
-            _stats.EffectShader++;
-            return false;
-        }
-        if (!_includeHidden && _flags.IsHiddenWithoutController(shape.Flags_ui, shape.Flags_us, shape.Controller))
+        if (!_inclusion.IncludeHidden && _flags.IsHiddenWithoutController(shape.Flags_ui, shape.Flags_us, shape.Controller))
         {
             _stats.Hidden++;
             return false;
@@ -170,6 +176,16 @@ internal sealed class NifShapeCollector
         }
         toRoot = parent.ToRoot.After(Similarity.From(shape.Translation, shape.Rotation, shape.Scale));
         return true;
+    }
+
+    private void CountSkippedKind(MeshShapeKind kind)
+    {
+        switch (kind)
+        {
+            case MeshShapeKind.EditorMarker: _stats.EditorMarker++; break;
+            case MeshShapeKind.EffectShader: _stats.EffectShader++; break;
+            default: throw new InvalidOperationException($"Shapes of kind {kind} cannot be left out of the geometry.");
+        }
     }
 
     private void AddShapeVertices(INiShape shape, List<Vector3> vertices, Similarity toRoot)

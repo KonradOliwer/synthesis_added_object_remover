@@ -19,7 +19,7 @@ internal static class FixtureNpcScenes
     {
         var origin = FixtureLayout.Origin(FixtureSlot.NpcStuck);
         scenery.PlaceTargetCrate("NpcStuck", origin);
-        scenery.Mods.Rival.Interior.PlaceNpc("R_NpcStuck", scenery.Bases.RivalNpc, origin);
+        scenery.Mods.OtherMod.Interior.PlaceNpc("R_NpcStuck", scenery.Bases.OtherModNpc, origin);
     }
 
     /// <summary>The NPC stands beside the crate: only counts when NPCs count like objects.</summary>
@@ -27,6 +27,6 @@ internal static class FixtureNpcScenes
     {
         var origin = FixtureLayout.Origin(FixtureSlot.NpcClear);
         scenery.PlaceTargetCrate("NpcClear", origin);
-        scenery.Mods.Rival.Interior.PlaceNpc("R_NpcClear", scenery.Bases.RivalNpc, origin + BesideCrate);
+        scenery.Mods.OtherMod.Interior.PlaceNpc("R_NpcClear", scenery.Bases.OtherModNpc, origin + BesideCrate);
     }
 }

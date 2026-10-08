@@ -1,6 +1,5 @@
 using System.Numerics;
 using AddedObjectRemover.Tests.Fixtures;
-using Noggog;
 
 namespace AddedObjectRemover.Tests.Geometry;
 
@@ -11,7 +10,7 @@ public class TransformTests
     [Fact]
     public void HeadingOfQuarterTurnFacesEast()
     {
-        var rotation = AddedObjectRemover.Geometry.RotationFromEuler(new P3Float(0, 0, HalfTurn));
+        var rotation = Mat3.FromEuler(new Vector3(0, 0, HalfTurn));
         VectorAssert.Near(Vector3.UnitX, rotation.Transform(Vector3.UnitY));
         VectorAssert.Near(-Vector3.UnitY, rotation.Transform(Vector3.UnitX));
     }
@@ -19,7 +18,7 @@ public class TransformTests
     [Fact]
     public void QuarterTurnAboutXTiltsForwardDown()
     {
-        var rotation = AddedObjectRemover.Geometry.RotationFromEuler(new P3Float(HalfTurn, 0, 0));
+        var rotation = Mat3.FromEuler(new Vector3(HalfTurn, 0, 0));
         VectorAssert.Near(-Vector3.UnitZ, rotation.Transform(Vector3.UnitY));
     }
 
@@ -30,7 +29,7 @@ public class TransformTests
         for (var i = 0; i < 100; i++)
         {
             var (x, y, z) = (TestMeshes.RandomAngle(random), TestMeshes.RandomAngle(random), TestMeshes.RandomAngle(random));
-            var r = AddedObjectRemover.Geometry.RotationFromEuler(new P3Float(x, y, z));
+            var r = Mat3.FromEuler(new Vector3(x, y, z));
             var product = r * r.Transposed();
             AssertIdentity(product);
             var determinant =
@@ -103,11 +102,11 @@ public class TransformTests
     [InlineData(float.PositiveInfinity, 1f)]
     [InlineData(2.5f, 2.5f)]
     public void ScaleIsNormalized(float? scale, float expected) =>
-        Assert.Equal(expected, AddedObjectRemover.Geometry.NormalizeScale(scale));
+        Assert.Equal(expected, ReferenceScale.Normalize(scale));
 
     internal static PlacedTransform RandomTransform(Random random, float scale) => new(
         TestMeshes.RandomVector(random, 1000),
-        AddedObjectRemover.Geometry.RotationFromEuler(new P3Float(TestMeshes.RandomAngle(random), TestMeshes.RandomAngle(random), TestMeshes.RandomAngle(random))),
+        Mat3.FromEuler(new Vector3(TestMeshes.RandomAngle(random), TestMeshes.RandomAngle(random), TestMeshes.RandomAngle(random))),
         scale);
 
     private static void AssertIdentity(Mat3 m)

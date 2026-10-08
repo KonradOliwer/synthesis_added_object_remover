@@ -14,15 +14,18 @@ public class BaseFactsReaderTests
     private readonly SkyrimMod _mod = new(ModKey.FromNameAndExtension("Bases.esp"), Release);
 
     private BaseFacts Read<TGetter>(IMajorRecordGetter record) where TGetter : class, IMajorRecordGetter =>
-        new BaseFactsReader(_mod.ToImmutableLinkCache()).Of(new BaseRef(record.FormKey, typeof(TGetter)));
+        new BaseFactsReader(_mod.ToImmutableLinkCache()).Of(new BaseKey(record.FormKey.ToRecordKey(), LinkKindOf<TGetter>()));
+
+    private static BaseLinkKind LinkKindOf<TGetter>() =>
+        typeof(TGetter) == typeof(INpcGetter) ? BaseLinkKind.Npc : BaseLinkKind.PlaceableObject;
 
     private static Model ModelOf(string path) => new() { File = path };
 
     [Fact]
     public void AnUnresolvedBaseIsUnresolved()
     {
-        var missing = new FormKey(_mod.ModKey, 0xABC);
-        var facts = new BaseFactsReader(_mod.ToImmutableLinkCache()).Of(new BaseRef(missing, typeof(IStaticGetter)));
+        var missing = new FormKey(_mod.ModKey, 0xABC).ToRecordKey();
+        var facts = new BaseFactsReader(_mod.ToImmutableLinkCache()).Of(new BaseKey(missing, BaseLinkKind.PlaceableObject));
 
         Assert.Equal(BaseFacts.Unresolved(missing), facts);
         Assert.False(facts.Resolved);
@@ -44,7 +47,7 @@ public class BaseFactsReaderTests
         Assert.Equal(@"meshes\sample.nif", facts.ModelPath);
         Assert.Equal(Box.FromCorners(new(-1, -2, -3), new(4, 5, 6)), facts.ObjectBounds);
         Assert.Null(facts.MarkerFlag);
-        Assert.False(facts.HasCritterSpawnScript);
+        Assert.Empty(facts.ScriptNames);
     }
 
     [Fact]
@@ -113,23 +116,21 @@ public class BaseFactsReaderTests
         Assert.Equal(BaseRecordKind.Other, Read<IContainerGetter>(_mod.Containers.AddNew()).Kind);
     }
 
-    [Theory]
-    [InlineData("CritterSpawnFish", true)]
-    [InlineData("crittersPAWNbird", true)]
-    [InlineData("OtherScript", false)]
-    public void OnlyActivatorsRunningACritterSpawnScriptAreCritterSpawners(string script, bool expected)
+    [Fact]
+    public void AnActivatorGivesTheNamesOfItsScripts()
     {
         var activator = _mod.Activators.AddNew();
         activator.VirtualMachineAdapter = new VirtualMachineAdapter();
-        activator.VirtualMachineAdapter.Scripts.Add(new ScriptEntry { Name = script });
+        activator.VirtualMachineAdapter.Scripts.Add(new ScriptEntry { Name = "FirstScript" });
+        activator.VirtualMachineAdapter.Scripts.Add(new ScriptEntry { Name = "SecondScript" });
 
-        Assert.Equal(expected, Read<IActivatorGetter>(activator).HasCritterSpawnScript);
+        Assert.Equal(new[] { "FirstScript", "SecondScript" }, Read<IActivatorGetter>(activator).ScriptNames.ToArray());
     }
 
     [Fact]
-    public void AnActivatorWithoutScriptsIsNoCritterSpawner()
+    public void AnActivatorWithoutScriptsHasNoScriptNames()
     {
-        Assert.False(Read<IActivatorGetter>(_mod.Activators.AddNew()).HasCritterSpawnScript);
+        Assert.Empty(Read<IActivatorGetter>(_mod.Activators.AddNew()).ScriptNames);
     }
 
     [Theory]
@@ -181,12 +182,12 @@ public class BaseFactsReaderTests
     {
         var record = _mod.Statics.AddNew("Shared");
         var reader = new BaseFactsReader(_mod.ToImmutableLinkCache());
-        var baseRef = new BaseRef(record.FormKey, typeof(IStaticGetter));
+        var baseKey = new BaseKey(record.FormKey.ToRecordKey(), BaseLinkKind.PlaceableObject);
         var results = new BaseFacts[32];
 
-        Parallel.For(0, results.Length, new ParallelOptions { MaxDegreeOfParallelism = 8 }, i => results[i] = reader.Of(baseRef));
+        Parallel.For(0, results.Length, new ParallelOptions { MaxDegreeOfParallelism = 8 }, i => results[i] = reader.Of(baseKey));
 
         Assert.All(results, result => Assert.Same(results[0], result));
-        Assert.Same(results[0], reader.Of(baseRef));
+        Assert.Same(results[0], reader.Of(baseKey));
     }
 }

@@ -1,4 +1,5 @@
 using System.Numerics;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind;
 using AddedObjectRemover.NifFooterWorkaround;
 using AddedObjectRemover.Tests.Fixtures;
 using NiflySharp;
@@ -30,20 +31,20 @@ public class NifFooterRootTests
     {
         var data = TestNifs.WithFooter(TestNifs.Save(CreateNestedCrate()), 1, FooterRootNodeIndex);
 
-        var result = NifGeometryReader.ReadGeometry(data, includeTriangles: true);
+        var result = new NifGeometryReader().ReadGeometry(data, includeTriangles: true, BaseObjectRules.SolidShapes);
 
-        Assert.Equal(NifReadStatus.Success, result.Status);
-        Assert.Equal(CrateVertices(InnerOffset), result.Geometry!.Vertices);
+        Assert.Equal(MeshReadStatus.Success, result.Status);
+        Assert.Equal(CrateVertices(InnerOffset), result.Geometry!.Triangles.Vertices);
         Assert.Equal(new NifRoot(FooterRootNodeIndex, 0), result.FooterRoot);
     }
 
     [Fact]
     public void FooterListingBlockZeroKeepsTheFirstNodeAsRoot()
     {
-        var result = NifGeometryReader.ReadGeometry(TestNifs.Save(CreateNestedCrate()), includeTriangles: true);
+        var result = new NifGeometryReader().ReadGeometry(TestNifs.Save(CreateNestedCrate()), includeTriangles: true, BaseObjectRules.SolidShapes);
 
-        Assert.Equal(NifReadStatus.Success, result.Status);
-        Assert.Equal(CrateVertices(OuterOffset + InnerOffset), result.Geometry!.Vertices);
+        Assert.Equal(MeshReadStatus.Success, result.Status);
+        Assert.Equal(CrateVertices(OuterOffset + InnerOffset), result.Geometry!.Triangles.Vertices);
         Assert.Null(result.FooterRoot);
     }
 
@@ -57,10 +58,10 @@ public class NifFooterRootTests
     {
         var data = TestNifs.WithFooter(TestNifs.Save(CreateNestedCrate()), footer);
 
-        var result = NifGeometryReader.ReadGeometry(data, includeTriangles: true);
+        var result = new NifGeometryReader().ReadGeometry(data, includeTriangles: true, BaseObjectRules.SolidShapes);
 
-        Assert.Equal(NifReadStatus.Success, result.Status);
-        Assert.Equal(CrateVertices(OuterOffset + InnerOffset), result.Geometry!.Vertices);
+        Assert.Equal(MeshReadStatus.Success, result.Status);
+        Assert.Equal(CrateVertices(OuterOffset + InnerOffset), result.Geometry!.Triangles.Vertices);
         Assert.Null(result.FooterRoot);
     }
 

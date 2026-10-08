@@ -1,3 +1,0 @@
-Possible manual patch needed: 2 objects to check.
-  Removed marker 000800:Target.esp in Tamriel: DoorMarkers.
-  Kept, referenced by a non-placed record: 000803:Target.esp in Tamriel: linked from QUST.

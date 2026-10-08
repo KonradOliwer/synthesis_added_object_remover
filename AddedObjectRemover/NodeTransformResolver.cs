@@ -11,7 +11,7 @@ internal readonly record struct NodeState(Similarity ToRoot, NodeSkip Skip);
 /// <summary>
 /// Resolves (and memoizes) NiNode states by walking parent links up to the root node. A node is
 /// skipped when it is unreachable from the root (or in a cyclic/implausibly deep chain), hidden,
-/// an editor marker, or has such an ancestor.
+/// of a kind the inclusion skips, or has such an ancestor.
 /// </summary>
 internal sealed class NodeTransformResolver
 {
@@ -23,7 +23,7 @@ internal sealed class NodeTransformResolver
     private readonly List<INiObject> _blocks;
     private readonly IReadOnlyDictionary<int, int> _parentOf;
     private readonly AvObjectFlags _flags;
-    private readonly bool _includeHidden;
+    private readonly ShapeInclusion _inclusion;
     private readonly Dictionary<int, NodeState> _states;
 
     public NodeTransformResolver(
@@ -31,12 +31,12 @@ internal sealed class NodeTransformResolver
         IReadOnlyDictionary<int, int> parentOf,
         int rootIndex,
         AvObjectFlags flags,
-        bool includeHidden)
+        ShapeInclusion inclusion)
     {
         _blocks = blocks;
         _parentOf = parentOf;
         _flags = flags;
-        _includeHidden = includeHidden;
+        _inclusion = inclusion;
         _states = new Dictionary<int, NodeState> { [rootIndex] = RootState(blocks[rootIndex]) };
     }
 
@@ -97,8 +97,8 @@ internal sealed class NodeTransformResolver
 
     private NodeSkip SkipOf(NiNode node)
     {
-        if (NifShapes.IsEditorMarker(node.Name?.String)) return NodeSkip.Marker;
-        if (!_includeHidden && _flags.IsHiddenWithoutController(node.Flags_ui, node.Flags_us, node.Controller)) return NodeSkip.Hidden;
+        if (_inclusion.SkippedAncestorKinds.Contains(NifShapes.KindOf(node, _inclusion))) return NodeSkip.Marker;
+        if (!_inclusion.IncludeHidden && _flags.IsHiddenWithoutController(node.Flags_ui, node.Flags_us, node.Controller)) return NodeSkip.Hidden;
         return NodeSkip.None;
     }
 }

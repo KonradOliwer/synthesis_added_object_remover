@@ -1,7 +1,0 @@
-Warning: archive a.bsa is unreadable.
-[mesh] m.nif not found.
-  Moved kept 000804:Target.esp in Tamriel out of 000010:Other.esp from Other.esp: 200 units onto the navmesh.
-  Moved kept 000804:Target.esp in Tamriel out of 000010:Other.esp from Other.esp: 4904 units onto the terrain.
-  Warning: 000804:Target.esp was moved into the neighboring cell (1, -1) because its own cell has no free spot.
-  Left kept 000804:Target.esp in Tamriel inside 000010:Other.esp from Other.esp: no free navmesh or terrain spot within 2048 units.
-Moved 2 kept markers out of other mods' objects; 1 left in place.

@@ -1,7 +1,11 @@
+using System.Collections.Immutable;
 using System.Numerics;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Skyrim;
+using AddedObjectRemover.Tests.Fixtures;
 
 namespace AddedObjectRemover.Tests.LoadOrder;
 
@@ -16,10 +20,10 @@ public class BaseClassificationTests
     public void PrimitiveOfABaseWithoutGeometryIsATriggerBox()
     {
         var shapes = CreateShapes();
-        var reference = new BaseRef(TriggerBase, typeof(IActivatorGetter));
+        var reference = new BaseKey(TriggerBase.ToRecordKey(), BaseLinkKind.PlaceableObject);
 
-        Assert.Equal(InvisibleObjectKind.TriggerBoxes, shapes.GetVisibility(reference, isPrimitive: true, hasMapMarker: false).Kind);
-        Assert.Equal(InvisibleObjectKind.OtherMarkers, shapes.GetVisibility(reference, isPrimitive: false, hasMapMarker: false).Kind);
+        Assert.Equal(InvisibleObjectKind.TriggerBoxes, shapes.VisibilityOf(reference, isPrimitive: true, hasMapMarker: false).Kind);
+        Assert.Equal(InvisibleObjectKind.OtherMarkers, shapes.VisibilityOf(reference, isPrimitive: false, hasMapMarker: false).Kind);
     }
 
     [Fact]
@@ -27,19 +31,32 @@ public class BaseClassificationTests
     {
         var shapes = CreateShapes();
 
-        var flagged = shapes.GetVisibility(new BaseRef(FlaggedMarkerBase, typeof(IActivatorGetter)), isPrimitive: true, hasMapMarker: false);
-        var acoustic = shapes.GetVisibility(new BaseRef(AcousticSpaceBase, typeof(IAcousticSpaceGetter)), isPrimitive: true, hasMapMarker: false);
+        var flagged = shapes.VisibilityOf(new BaseKey(FlaggedMarkerBase.ToRecordKey(), BaseLinkKind.PlaceableObject), isPrimitive: true, hasMapMarker: false);
+        var acoustic = shapes.VisibilityOf(new BaseKey(AcousticSpaceBase.ToRecordKey(), BaseLinkKind.PlaceableObject), isPrimitive: true, hasMapMarker: false);
 
         Assert.Equal(InvisibleObjectKind.OtherMarkers, flagged.Kind);
         Assert.Equal(InvisibleObjectKind.AcousticSpaces, acoustic.Kind);
     }
 
+    [Theory]
+    [InlineData("CritterSpawnFish", true)]
+    [InlineData("crittersPAWNbird", true)]
+    [InlineData("OtherScript", false)]
+    public void OnlyActivatorsRunningACritterSpawnScriptAreCritterSpawners(string script, bool expected)
+    {
+        var activator = Facts(0x806, BaseRecordKind.Activator) with { ScriptNames = [script] };
+
+        var shape = BaseObjectRules.ClassifyShape(activator, Box.Zero, meshPath: null, hasModel: false, meshWithoutGeometry: false);
+
+        Assert.Equal(expected ? InvisibleObjectKind.CritterSpawners : InvisibleObjectKind.OtherMarkers, shape.InvisibleKind);
+    }
+
     [Fact]
     public void PrimitiveOfACritterSpawnerStaysACritterSpawner()
     {
-        var spawner = Facts(0x806, BaseRecordKind.Activator) with { HasCritterSpawnScript = true };
+        var spawner = Facts(0x806, BaseRecordKind.Activator) with { ScriptNames = ["CritterSpawnFish"] };
 
-        var shape = ShapeCatalog.ClassifyShape(spawner, Box.Zero, meshPath: null, hasModel: false, meshWithoutGeometry: false);
+        var shape = BaseObjectRules.ClassifyShape(spawner, Box.Zero, meshPath: null, hasModel: false, meshWithoutGeometry: false);
 
         Assert.Equal(InvisibleObjectKind.CritterSpawners, shape.InvisibleKind);
         Assert.False(shape.InvisibleForLackOfGeometry);
@@ -50,7 +67,7 @@ public class BaseClassificationTests
     {
         var light = Facts(0x804, BaseRecordKind.Light);
 
-        var shape = ShapeCatalog.ClassifyShape(light, Box.Zero, meshPath: null, hasModel: true, meshWithoutGeometry: true);
+        var shape = BaseObjectRules.ClassifyShape(light, Box.Zero, meshPath: null, hasModel: true, meshWithoutGeometry: true);
 
         Assert.Equal(InvisibleObjectKind.Lights, shape.InvisibleKind);
         Assert.False(shape.InvisibleForLackOfGeometry);
@@ -61,15 +78,15 @@ public class BaseClassificationTests
     {
         var light = Facts(0x805, BaseRecordKind.Light);
 
-        var shape = ShapeCatalog.ClassifyShape(light, new Box(Vector3.Zero, Vector3.One), "meshes\\lamp.nif", hasModel: true, meshWithoutGeometry: false);
+        var shape = BaseObjectRules.ClassifyShape(light, new Box(Vector3.Zero, Vector3.One), "meshes\\lamp.nif", hasModel: true, meshWithoutGeometry: false);
 
         Assert.Null(shape.InvisibleKind);
     }
 
     private static BaseFacts Facts(uint id, BaseRecordKind kind) =>
-        new(new FormKey(Mod, id), Resolved: true, kind, kind.ToString(), null, null, null, null, false, null, null);
+        new(new FormKey(Mod, id).ToRecordKey(), Resolved: true, kind, kind.ToString(), null, null, null, null, ImmutableArray<string>.Empty, null, null);
 
-    private static ShapeCatalog CreateShapes()
+    private static IBaseObjectShapes CreateShapes()
     {
         var mod = new SkyrimMod(Mod, SkyrimRelease.SkyrimSE);
         mod.Activators.Add(new Mutagen.Bethesda.Skyrim.Activator(TriggerBase, SkyrimRelease.SkyrimSE));
@@ -79,8 +96,6 @@ public class BaseClassificationTests
         });
         mod.AcousticSpaces.Add(new AcousticSpace(AcousticSpaceBase, SkyrimRelease.SkyrimSE));
 
-        var problems = new AssetProblemLog();
-        var meshFiles = new MeshFileSource(Path.GetTempPath(), GameRelease.SkyrimSE, [Mod], problems);
-        return new ShapeCatalog(new BaseFactsReader(mod.ToImmutableLinkCache()), meshFiles, problems);
+        return TestShapes.Catalog(new BaseFactsReader(mod.ToImmutableLinkCache()), Path.GetTempPath(), Mod);
     }
 }

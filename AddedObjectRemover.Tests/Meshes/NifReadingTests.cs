@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Reflection;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind;
 using AddedObjectRemover.Tests.Fixtures;
 using NiflySharp.Blocks;
 
@@ -16,15 +17,15 @@ public class NifReadingTests
         var node = TestNifs.AddNode(nif, TestNifs.Root(nif), "Crate", new Vector3(10, 0, 0));
         TestNifs.AddShape(nif, node, TestMeshes.BoxTriangles(Crate));
 
-        var result = NifGeometryReader.ReadGeometry(TestNifs.Save(nif), includeTriangles: true);
+        var result = new NifGeometryReader().ReadGeometry(TestNifs.Save(nif), includeTriangles: true, BaseObjectRules.SolidShapes);
 
-        Assert.Equal(NifReadStatus.Success, result.Status);
+        Assert.Equal(MeshReadStatus.Success, result.Status);
         var geometry = result.Geometry!;
         var shifted = TestMeshes.BoxTriangles(Crate).SelectMany(t => new[] { t.A, t.B, t.C }).Select(v => v + new Vector3(10, 0, 0));
-        Assert.Equal(shifted, geometry.Vertices);
+        Assert.Equal(shifted, geometry.Triangles.Vertices);
         Assert.Equal(Crate.Min + new Vector3(10, 0, 0), geometry.Min);
         Assert.Equal(Crate.Max + new Vector3(10, 0, 0), geometry.Max);
-        Assert.Equal(12, geometry.TriangleCount);
+        Assert.Equal(12, geometry.Triangles.TriangleCount);
     }
 
     [Fact]
@@ -35,11 +36,11 @@ public class NifReadingTests
         TestNifs.AddShape(nif, TestNifs.Root(nif), TestMeshes.BoxTriangles(Crate).Take(5).ToList());
         TestNifs.AddShape(nif, TestNifs.Root(nif), TestMeshes.BoxTriangles(Crate));
 
-        var result = NifGeometryReader.ReadGeometry(TestNifs.Save(nif), includeTriangles: true);
+        var result = new NifGeometryReader().ReadGeometry(TestNifs.Save(nif), includeTriangles: true, BaseObjectRules.SolidShapes);
 
-        Assert.Equal(NifReadStatus.Success, result.Status);
-        Assert.Equal(new[] { 0, 12, 17 }, result.Geometry!.PartFirstTriangles);
-        Assert.Equal(29, result.Geometry.TriangleCount);
+        Assert.Equal(MeshReadStatus.Success, result.Status);
+        Assert.Equal(new[] { 0, 12, 17 }, result.Geometry!.Triangles.PartFirstTriangles);
+        Assert.Equal(29, result.Geometry.Triangles.TriangleCount);
     }
 
     [Fact]
@@ -49,9 +50,38 @@ public class NifReadingTests
         TestNifs.Root(nif).Name = new NiflySharp.NiStringRef("EditorMarker");
         TestNifs.AddShape(nif, TestNifs.Root(nif), TestMeshes.BoxTriangles(Crate));
 
-        var result = NifGeometryReader.ReadGeometry(TestNifs.Save(nif), includeTriangles: false);
+        var result = new NifGeometryReader().ReadGeometry(TestNifs.Save(nif), includeTriangles: false, BaseObjectRules.SolidShapes);
 
-        Assert.Equal(NifReadStatus.NoRenderGeometry, result.Status);
+        Assert.Equal(MeshReadStatus.NoRenderGeometry, result.Status);
+    }
+
+    [Fact]
+    public void AnInclusionNotSkippingEditorMarkerNodesCountsTheirShapes()
+    {
+        var nif = TestNifs.CreateWithRoot();
+        TestNifs.Root(nif).Name = new NiflySharp.NiStringRef("EditorMarker");
+        TestNifs.AddShape(nif, TestNifs.Root(nif), TestMeshes.BoxTriangles(Crate));
+        var inclusion = BaseObjectRules.SolidShapes with { SkippedAncestorKinds = new HashSet<MeshShapeKind>() };
+
+        var result = new NifGeometryReader().ReadGeometry(TestNifs.Save(nif), includeTriangles: false, inclusion);
+
+        Assert.Equal(MeshReadStatus.Success, result.Status);
+    }
+
+    [Fact]
+    public void AnInclusionWithoutTheRetryLeavesAHiddenOnlyMeshEmpty()
+    {
+        var nif = TestNifs.CreateWithRoot();
+        var root = TestNifs.Root(nif);
+        TestNifs.AddShape(nif, root, TestMeshes.BoxTriangles(Crate));
+        root.Flags_ui |= 1;
+        var data = TestNifs.Save(nif);
+
+        var retried = new NifGeometryReader().ReadGeometry(data, includeTriangles: false, BaseObjectRules.SolidShapes);
+        var notRetried = new NifGeometryReader().ReadGeometry(data, includeTriangles: false, BaseObjectRules.SolidShapes with { RetryIncludingHiddenWhenEmpty = false });
+
+        Assert.Equal(MeshReadStatus.Success, retried.Status);
+        Assert.Equal(MeshReadStatus.NoRenderGeometry, notRetried.Status);
     }
 
     [Fact]
@@ -64,8 +94,8 @@ public class NifReadingTests
         var blocks = nif.Blocks;
         var parentOf = new Dictionary<int, int> { [1] = 0 };
 
-        var hidden = NifShapeCollector.Collect(blocks, parentOf, 0, AvObjectFlags.For(nif), includeHidden: false, includeTriangles: false);
-        var shown = NifShapeCollector.Collect(blocks, parentOf, 0, AvObjectFlags.For(nif), includeHidden: true, includeTriangles: false);
+        var hidden = NifShapeCollector.Collect(new RenderGeometryTypes(), blocks, parentOf, 0, AvObjectFlags.For(nif), BaseObjectRules.SolidShapes, includeTriangles: false);
+        var shown = NifShapeCollector.Collect(new RenderGeometryTypes(), blocks, parentOf, 0, AvObjectFlags.For(nif), BaseObjectRules.SolidShapes.WithHiddenIncluded(), includeTriangles: false);
 
         Assert.False(hidden.Bounds.Any);
         Assert.Equal(1, hidden.Stats.HiddenAncestor);

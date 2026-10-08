@@ -9,7 +9,7 @@ public class NormalLogTests
     [Fact]
     public void UnmaskedLogHasNoPerformanceLinesThreadCountOrDurations()
     {
-        var log = PipelineRun.Execute(SettingsVariants.Of(SettingsVariants.TouchWithLeftoversAndRelocationNormalLog), Workers).UnmaskedLog;
+        var log = PipelineRun.Execute(SettingsVariants.Of(SettingsVariants.TouchWithLeftBehindAndMarkerMovesNormalLog), Workers).UnmaskedLog;
 
         Assert.DoesNotContain(log, line => OutputMasks.PerformanceLinePrefixes.Any(prefix => line.StartsWith(prefix, StringComparison.Ordinal)));
         Assert.DoesNotContain(log, line => OutputMasks.ThreadCount().IsMatch(line));

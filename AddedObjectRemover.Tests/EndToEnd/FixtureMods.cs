@@ -12,7 +12,7 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 internal sealed class FixtureMods
 {
     private const string BaseGamePlugin = "Skyrim.esm";
-    private const string RivalPlugin = "Rival.esp";
+    private const string OtherModPlugin = "Rival.esp";
     private const string PatchedPlugin = "Patched.esp";
     private const string TargetPatchPlugin = "TargetPatch.esp";
     private const string KeepListEditorId = "TargetPatch_KeepList";
@@ -23,7 +23,7 @@ internal sealed class FixtureMods
     {
         BaseGame = new FixtureMod(BaseGamePlugin);
         Target = new FixtureMod(FixtureWorld.TargetPlugin, BaseGame);
-        Rival = new FixtureMod(RivalPlugin, BaseGame, Target);
+        OtherMod = new FixtureMod(OtherModPlugin, BaseGame, Target);
         Patched = new FixtureMod(PatchedPlugin, BaseGame);
         TargetPatch = new FixtureMod(TargetPatchPlugin, BaseGame, Target, Patched);
         Excluded = new FixtureMod(FixtureWorld.ExcludedPlugin, BaseGame);
@@ -32,7 +32,7 @@ internal sealed class FixtureMods
 
     public FixtureMod BaseGame { get; }
     public FixtureMod Target { get; }
-    public FixtureMod Rival { get; }
+    public FixtureMod OtherMod { get; }
 
     /// <summary>Another mod that a compatibility patch links to the target, so it is ignored.</summary>
     public FixtureMod Patched { get; }
@@ -43,14 +43,14 @@ internal sealed class FixtureMods
     public FixtureMod Excluded { get; }
 
     /// <summary>Lowest priority first.</summary>
-    public IReadOnlyList<ISkyrimMod> LoadOrder => [BaseGame.Mod, Target.Mod, Rival.Mod, Patched.Mod, TargetPatch.Mod, Excluded.Mod];
+    public IReadOnlyList<ISkyrimMod> LoadOrder => [BaseGame.Mod, Target.Mod, OtherMod.Mod, Patched.Mod, TargetPatch.Mod, Excluded.Mod];
 
     /// <summary>Every plugin that places records, with its copy of the shared spaces.</summary>
     public static FixtureMods Create()
     {
         var mods = new FixtureMods();
         var spaces = FixtureSpaces.CreateIn(mods.BaseGame);
-        foreach (var mod in new[] { mods.Target, mods.Rival, mods.Patched, mods.Excluded }) spaces.AddOverridesTo(mod);
+        foreach (var mod in new[] { mods.Target, mods.OtherMod, mods.Patched, mods.Excluded }) spaces.AddOverridesTo(mod);
         return mods;
     }
 

@@ -3,17 +3,17 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 /// <summary>The settings the end-to-end runs use; every variant writes report files, and all but the normal-log one log in detail.</summary>
 internal static class SettingsVariants
 {
-    public const string TouchWithLeftoversAndRelocation = "touch-leftovers-relocation";
+    public const string TouchWithLeftBehindAndMarkerMoves = "touch-leftovers-relocation";
     public const string Support = "support";
     public const string NothingWithBoxZoneAndNpcsAsObjects = "nothing-box-npcs-as-objects";
-    public const string TouchWithLeftoversAndRelocationNormalLog = "touch-leftovers-relocation-normal";
+    public const string TouchWithLeftBehindAndMarkerMovesNormalLog = "touch-leftovers-relocation-normal";
 
     public static readonly IReadOnlyList<string> Names =
-        [TouchWithLeftoversAndRelocation, Support, NothingWithBoxZoneAndNpcsAsObjects, TouchWithLeftoversAndRelocationNormalLog];
+        [TouchWithLeftBehindAndMarkerMoves, Support, NothingWithBoxZoneAndNpcsAsObjects, TouchWithLeftBehindAndMarkerMovesNormalLog];
 
     public static Settings Of(string name) => name switch
     {
-        TouchWithLeftoversAndRelocation => Create(
+        TouchWithLeftBehindAndMarkerMoves => Create(
             ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInObject, FollowUpRemovalMode.EverythingTouching,
             new LeftoverInvisibleObjectSettings
             {
@@ -28,7 +28,7 @@ internal static class SettingsVariants
         NothingWithBoxZoneAndNpcsAsObjects => Create(
             ZoneShape.BoundingBox, NpcHandling.CountLikeObjects, FollowUpRemovalMode.Nothing,
             new LeftoverInvisibleObjectSettings { RemoveLeftoverInvisibleObjects = false }),
-        TouchWithLeftoversAndRelocationNormalLog => WithNormalLog(Of(TouchWithLeftoversAndRelocation)),
+        TouchWithLeftBehindAndMarkerMovesNormalLog => WithNormalLog(Of(TouchWithLeftBehindAndMarkerMoves)),
         _ => throw new ArgumentOutOfRangeException(nameof(name), name, "Unknown settings variant."),
     };
 

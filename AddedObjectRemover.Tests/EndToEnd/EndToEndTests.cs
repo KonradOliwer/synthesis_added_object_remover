@@ -18,11 +18,11 @@ public class EndToEndTests
 
     [Theory]
     [MemberData(nameof(Variants))]
-    public void OutputMatchesGolden(string variant)
+    public void OutputMatchesExpectedOutput(string variant)
     {
         var output = PipelineRun.Execute(SettingsVariants.Of(variant), ManyWorkers);
 
-        GoldenFiles.AssertMatches(variant, output.ToGoldenLines());
+        ExpectedOutputFiles.AssertMatches(variant, output.ToExpectedOutputLines());
     }
 
     [Theory]
@@ -31,8 +31,8 @@ public class EndToEndTests
     {
         var settings = SettingsVariants.Of(variant);
 
-        var one = PipelineRun.Execute(settings, OneWorker).ToGoldenLines();
-        var many = PipelineRun.Execute(settings, ManyWorkers).ToGoldenLines();
+        var one = PipelineRun.Execute(settings, OneWorker).ToExpectedOutputLines();
+        var many = PipelineRun.Execute(settings, ManyWorkers).ToExpectedOutputLines();
 
         Assert.Equal(one, many);
     }

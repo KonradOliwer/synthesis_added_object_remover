@@ -1,0 +1,155 @@
+## log
+=== Added Object Remover ===
+Target plugin: Target.esp
+Size multiplier: 0.5
+Removal zone: ObjectShape
+Excluded plugins: Excluded.esp
+Ignored masters of target: Skyrim.esm
+Compatibility patch detection: 2 plugins master the target.
+  Compatibility patch TargetPatch.esp: links target with Patched.esp.
+Ignored because of compatibility patches: Patched.esp, TargetPatch.esp.
+NPCs and creatures: OnlyWhenStuckInObject
+Also remove: everything touching, touch distance 8.
+Leftover invisible objects: removed, search radius 1024, removed area per direction 50%, removed directions required 60%, occupied directions required 50%, protected types Custom (SoundMarkers), kept markers inside other mods' objects moved.
+Detailed log: True
+Write report files: True
+Report folder: <root>/Output/AddedObjectRemover Reports
+  Ignored other-mod object overridden by Target.esp: R_OverriddenByTarget_Pad [000821:Rival.esp] from Rival.esp.
+Scanned 75 placed records in <time>: 40 Target.esp objects to check, 28 objects from other mods.
+  Ignored 1 Target.esp objects whose winning version comes from a later plugin.
+  Ignored 1 Target.esp objects that are initially disabled or have no valid position or rotation.
+  Ignored 1 other-mod objects that Target.esp itself overrides.
+  Recorded 34 placed objects of any plugin as possible supporters or obstacles.
+Indexed 28 other objects in 2 cells/worldspaces in <time>.
+  Ignored replaced object R_Replacement_Crate [000808:Rival.esp] from Rival.esp: replaced by T_Replaced [00080A:Target.esp], distance 10.0, size ratio 1.00.
+Replacement matching: 1 other-mod objects excluded in <time>.
+Linked groups: 1 groups of linked target objects (2 objects) from 1 links to target-plugin records.
+Object-shape zones: 21 candidate pairs, 18 passed the box filter, 18 mesh tests, 18 hits, 0 centre-point fallbacks (other object without mesh triangles), 1 targets without mesh triangles used their box; 17 triangle pairs tested exactly.
+  0 large other objects tested against every target of their space; 0 effect-only meshes (fog, light rays, water spray) ignored.
+Found 19 of 40 Target.esp objects too close to other mods' objects in <time>.
+NPCs and creatures (only when stuck in the object): 2 placed NPCs evaluated: 0 sized by body mesh, 2 by Object Bounds, 0 by humanoid approximation, 0 sized as a point; 0 skipped because their base is no NPC; 1 NPC-object pairs tested (1 body boxes), 1 objects with an NPC stuck in them.
+  Kept T_ReferencedByPlaced [00080F:Target.esp] in interior AorInterior [000800:Skyrim.esm]: Enable Parent of 00080D:Rival.esp.
+  Kept T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
+  Kept T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
+Linked groups: 1 more objects removed with the too-close removals they are linked to.
+  Kept T_TouchReferenced [000816:Target.esp] in interior AorInterior [000800:Skyrim.esm]: Enable Parent of 000811:Rival.esp (touches removed T_TouchLink2 [000815:Target.esp]).
+Touching objects: 4 removed in 17 components (3 with follow-up removals, largest 3 removed objects, longest chain 3 steps); 1 kept as referenced.
+  Pairs: 5 box candidates next to a removal tested over 3 levels, 5 touching, 0 without mesh triangles (never touching); 11 triangle pairs tested exactly.
+Also remove: 3 rounds in <time>.
+Linked groups: 0 more objects removed with the follow-up removals they are linked to.
+  Kept T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
+  Leftover T_MarkerInsideBuilding [00081B:Target.esp] (XMarkers) in interior AorInterior [000800:Skyrim.esm]: removed, inside another mod's object (inside R_InsideBuilding [000814:Rival.esp] from Rival.esp); radius 1024, removed/total ground area East -, NorthEast -, North -, NorthWest -, West -, SouthWest -, South -, SouthEast -.
+  Leftover T_SoundInsideBuilding [00081C:Target.esp] (SoundMarkers) in interior AorInterior [000800:Skyrim.esm]: kept, protected type (inside R_InsideBuilding [000814:Rival.esp] from Rival.esp); radius 1024, removed/total ground area East -, NorthEast -, North -, NorthWest -, West -, SouthWest -, South -, SouthEast -.
+  Leftover T_Light [00081D:Target.esp] (Lights) in interior AorInterior [000800:Skyrim.esm]: removed, surroundings removed; radius 1024, removed/total ground area East 10000/10000, NorthEast 0/10000, North 10000/10000, NorthWest -, West 10000/10000, SouthWest -, South 10000/10000, SouthEast -.
+  Leftover T_Sound [000823:Target.esp] (SoundMarkers) in interior AorInterior [000800:Skyrim.esm]: kept, protected type; radius 1024, removed/total ground area East 10000/10000, NorthEast 0/10000, North 10000/10000, NorthWest -, West 10000/10000, SouthWest -, South 10000/10000, SouthEast -.
+  Leftover T_ExteriorMarkerInBuilding [000829:Target.esp] (XMarkers) in worldspace AorWorld [000801:Skyrim.esm]: kept, referenced: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp] (inside R_ExteriorBuilding [00081D:Rival.esp] from Rival.esp); radius 1024, removed/total ground area East -, NorthEast -, North -, NorthWest -, West -, SouthWest -, South -, SouthEast -.
+Leftover invisible objects: 5 evaluated in <time>; removed 2 (1 inside another mod's object, 1 surroundings removed); kept 3 (0 too few surrounding objects, 0 surroundings mostly kept, 2 protected type, 1 referenced).
+Linked groups: 0 more objects removed with the leftover invisible object removals they are linked to.
+  Moved kept T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm] out of R_ExteriorBuilding [00081D:Rival.esp] from Rival.esp: 238 units onto the terrain.
+Moved 1 kept markers out of other mods' objects; 0 left in place.
+Wrote 24 overrides (23 removed, 1 moved) in <time>.
+  1 removed objects had an Enable Parent; it was replaced by the player with "opposite of parent" so they stay disabled.
+  Removed T_TooClose [000807:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_TooClose_Pad [000805:Rival.esp] from Rival.esp
+  Removed T_BoundsOnly [000809:Target.esp] (base T_BoundsOnlyBase [000802:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_BoundsOnly_Pad [000807:Rival.esp] from Rival.esp
+  Removed T_NpcStuck [00080B:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_NpcStuck [000809:Rival.esp] from Rival.esp
+  Removed T_LinkedNear [00080D:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_LinkedNear_Pad [00080B:Rival.esp] from Rival.esp
+  Removed T_TouchSeed [000813:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_TouchSeed_Pad [000810:Rival.esp] from Rival.esp
+  Removed T_SupportSeed [000817:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_SupportSeed_Pad [000812:Rival.esp] from Rival.esp
+  Removed T_SupportSeedPartial [000819:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_SupportSeedPartial_Pad [000813:Rival.esp] from Rival.esp
+  Removed T_LightRing0 [00081E:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_LightRing0_Pad [000815:Rival.esp] from Rival.esp
+  Removed T_LightRing1 [00081F:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_LightRing1_Pad [000816:Rival.esp] from Rival.esp
+  Removed T_LightRing2 [000820:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_LightRing2_Pad [000817:Rival.esp] from Rival.esp
+  Removed T_LightRing3 [000821:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_LightRing3_Pad [000818:Rival.esp] from Rival.esp
+  Removed T_SoundRing0 [000824:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_SoundRing0_Pad [000819:Rival.esp] from Rival.esp
+  Removed T_SoundRing1 [000825:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_SoundRing1_Pad [00081A:Rival.esp] from Rival.esp
+  Removed T_SoundRing2 [000826:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_SoundRing2_Pad [00081B:Rival.esp] from Rival.esp
+  Removed T_SoundRing3 [000827:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_SoundRing3_Pad [00081C:Rival.esp] from Rival.esp
+  Removed T_ExteriorCrate [00082A:Target.esp] (base T_CrateBase [000800:Target.esp]) in worldspace AorWorld [000801:Skyrim.esm], cell AorExterior [000802:Skyrim.esm]; too close to R_ExteriorCrate_Pad [00081E:Rival.esp] from Rival.esp
+  Removed T_LinkedFar [00080E:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; linked to removed T_LinkedNear [00080D:Target.esp]
+  Removed T_TouchLink1 [000814:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; touches removed T_TouchSeed [000813:Target.esp]
+  Removed T_SupportedByOnlyTheSeed [000818:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; touches removed T_SupportSeed [000817:Target.esp]
+  Removed T_SupportedPartlyBySeed [00081A:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; touches removed T_SupportSeedPartial [000819:Target.esp]
+  Removed T_TouchLink2 [000815:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; touches removed T_TouchLink1 [000814:Target.esp]
+  Removed T_MarkerInsideBuilding [00081B:Target.esp] (base T_XMarkerBase [000804:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; invisible, inside another mod's object (inside R_InsideBuilding [000814:Rival.esp] from Rival.esp)
+  Removed T_Light [00081D:Target.esp] (base T_LightBase [000805:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; invisible, surroundings removed
+Bounds: 6 bases from NIF, 0 NIF misses, 4 from OBND, 0 without bounds. Meshes: 4 read, 0 effect-only, 0 failed (4 loose, 0 from 0 archives), 0 with a footer root other than their first node.
+Per cell/worldspace (target objects / other objects / removed):
+  interior AorInterior [000800:Skyrim.esm]: 38 / 26 / 22
+  worldspace AorWorld [000801:Skyrim.esm]: 2 / 2 / 1
+Target objects: 35 visible, 5 invisible (by kind: 2 SoundMarkers, 2 XMarkers, 1 Lights), 1 without placement/disabled.
+Removed 23 objects (16 too close, 4 follow-up removals, 2 leftover invisible objects, 1 linked to removed objects).
+Kept 5 objects that would have been removed because other records depend on them.
+  FormList record: 2
+  placed object: Enable Parent: 2
+  teleport door: 1
+Removed markers by type: 1 XMarkers, 1 Lights.
+Possible manual patch needed: 3 objects to check.
+  Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
+  Kept, referenced by a non-placed record: T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm], cell AorExterior [000802:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
+  Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
+Touch diagnostics: wrote 5 edges, 17 components in <time> to <root>/Output/AddedObjectRemover Reports/edges.csv / <root>/Output/AddedObjectRemover Reports/components.csv.
+Leftover invisible objects diagnostics: wrote 5 evaluations to <root>/Output/AddedObjectRemover Reports/leftover-invisible-objects.csv.
+Manual patch hints: wrote 3 rows to <root>/Output/AddedObjectRemover Reports/manual-patch-hints.csv.
+## patch
+000807:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (0.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+000809:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (8000.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+00080B:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (12000.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+00080D:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (24000.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+00080E:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (25500.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent 000014:Skyrim.esm SetEnableStateToOppositeOfParent
+000813:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (40000.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+000814:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (40104.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+000815:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (40208.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+000817:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (44000.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+000818:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (44000.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+000819:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (43920.00, 1000.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+00081A:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (44000.00, 1000.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+00081B:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (48000.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+00081D:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (52000.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+00081E:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (52400.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+00081F:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (52000.00, 400.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+000820:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (51600.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+000821:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (52000.00, -400.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+000824:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (56400.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+000825:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (56000.00, 400.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+000826:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (55600.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+000827:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (56000.00, -400.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+000829:Target.esp in 000802:Skyrim.esm (temporary): disabled False, position (2048.00, 1832.00, 128.00), rotation (0.00, 0.00, 0.00), enable parent none
+00082A:Target.esp in 000802:Skyrim.esm (temporary): disabled True, position (600.00, 600.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+## report components.csv
+componentId,size,seedCount,removedByTouchCount,keptAsReferencedCount,spaces,worldAabbMinX,worldAabbMinY,worldAabbMinZ,worldAabbMaxX,worldAabbMaxY,worldAabbMaxZ,topBaseEditorIds,deepestChainLength,deepestChainFormKeys,seedReasons
+0,1,1,0,0,interior AorInterior [000800:Skyrim.esm],-50,-50,0,50,50,100,T_CrateBase [000800:Target.esp]:1,0,000807:Target.esp,000805:Rival.esp (Rival.esp)
+1,1,1,0,0,interior AorInterior [000800:Skyrim.esm],7950,-50,0,8050,50,100,T_BoundsOnlyBase [000802:Target.esp]:1,0,000809:Target.esp,000807:Rival.esp (Rival.esp)
+2,1,1,0,0,interior AorInterior [000800:Skyrim.esm],11950,-50,0,12050,50,100,T_CrateBase [000800:Target.esp]:1,0,00080B:Target.esp,000809:Rival.esp (Rival.esp)
+3,1,1,0,0,interior AorInterior [000800:Skyrim.esm],23950,-50,0,24050,50,100,T_CrateBase [000800:Target.esp]:1,0,00080D:Target.esp,00080B:Rival.esp (Rival.esp)
+4,1,1,0,0,interior AorInterior [000800:Skyrim.esm],25450,-50,0,25550,50,100,T_CrateBase [000800:Target.esp]:1,0,00080E:Target.esp,linked to 00080D:Target.esp
+5,4,1,2,1,interior AorInterior [000800:Skyrim.esm],39950,-50,0,40362,50,100,T_CrateBase [000800:Target.esp]:4,3,000813:Target.esp -> 000814:Target.esp -> 000815:Target.esp -> 000816:Target.esp,000810:Rival.esp (Rival.esp)
+6,2,1,1,0,interior AorInterior [000800:Skyrim.esm],43950,-50,0,44050,50,200,T_CrateBase [000800:Target.esp]:2,1,000817:Target.esp -> 000818:Target.esp,000812:Rival.esp (Rival.esp)
+7,2,1,1,0,interior AorInterior [000800:Skyrim.esm],43870,950,0,44050,1050,200,T_CrateBase [000800:Target.esp]:2,1,000819:Target.esp -> 00081A:Target.esp,000813:Rival.esp (Rival.esp)
+8,1,1,0,0,interior AorInterior [000800:Skyrim.esm],52350,-50,0,52450,50,100,T_CrateBase [000800:Target.esp]:1,0,00081E:Target.esp,000815:Rival.esp (Rival.esp)
+9,1,1,0,0,interior AorInterior [000800:Skyrim.esm],51950,350,0,52050,450,100,T_CrateBase [000800:Target.esp]:1,0,00081F:Target.esp,000816:Rival.esp (Rival.esp)
+10,1,1,0,0,interior AorInterior [000800:Skyrim.esm],51550,-50,0,51650,50,100,T_CrateBase [000800:Target.esp]:1,0,000820:Target.esp,000817:Rival.esp (Rival.esp)
+11,1,1,0,0,interior AorInterior [000800:Skyrim.esm],51950,-450,0,52050,-350,100,T_CrateBase [000800:Target.esp]:1,0,000821:Target.esp,000818:Rival.esp (Rival.esp)
+12,1,1,0,0,interior AorInterior [000800:Skyrim.esm],56350,-50,0,56450,50,100,T_CrateBase [000800:Target.esp]:1,0,000824:Target.esp,000819:Rival.esp (Rival.esp)
+13,1,1,0,0,interior AorInterior [000800:Skyrim.esm],55950,350,0,56050,450,100,T_CrateBase [000800:Target.esp]:1,0,000825:Target.esp,00081A:Rival.esp (Rival.esp)
+14,1,1,0,0,interior AorInterior [000800:Skyrim.esm],55550,-50,0,55650,50,100,T_CrateBase [000800:Target.esp]:1,0,000826:Target.esp,00081B:Rival.esp (Rival.esp)
+15,1,1,0,0,interior AorInterior [000800:Skyrim.esm],55950,-450,0,56050,-350,100,T_CrateBase [000800:Target.esp]:1,0,000827:Target.esp,00081C:Rival.esp (Rival.esp)
+16,1,1,0,0,worldspace AorWorld [000801:Skyrim.esm],550,550,128,650,650,228,T_CrateBase [000800:Target.esp]:1,0,00082A:Target.esp,00081E:Rival.esp (Rival.esp)
+## report edges.csv
+componentId,firstFormKey,secondFormKey,firstIsSeed,secondIsSeed,measuredMinSurfaceDistance,tolerance,centerToCenterDistance,first_editorId,first_base,first_modelPath,first_spaceFormKey,first_posX,first_posY,first_posZ,first_rotXDeg,first_rotYDeg,first_rotZDeg,first_scale,first_halfExtentX,first_halfExtentY,first_halfExtentZ,second_editorId,second_base,second_modelPath,second_spaceFormKey,second_posX,second_posY,second_posZ,second_rotXDeg,second_rotYDeg,second_rotZDeg,second_scale,second_halfExtentX,second_halfExtentY,second_halfExtentZ
+5,000813:Target.esp,000814:Target.esp,true,false,4,8,104,T_TouchSeed,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,40000,0,0,0,0,0,1,50,50,50,T_TouchLink1,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,40104,0,0,0,0,0,1,50,50,50
+5,000814:Target.esp,000815:Target.esp,false,false,4,8,104,T_TouchLink1,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,40104,0,0,0,0,0,1,50,50,50,T_TouchLink2,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,40208,0,0,0,0,0,1,50,50,50
+5,000815:Target.esp,000816:Target.esp,false,false,4,8,104,T_TouchLink2,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,40208,0,0,0,0,0,1,50,50,50,T_TouchReferenced,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,40312,0,0,0,0,0,1,50,50,50
+6,000817:Target.esp,000818:Target.esp,true,false,0,8,100,T_SupportSeed,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,44000,0,0,0,0,0,1,50,50,50,T_SupportedByOnlyTheSeed,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,44000,0,100,0,0,0,1,50,50,50
+7,000819:Target.esp,00081A:Target.esp,true,false,0,8,128.06248,T_SupportSeedPartial,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,43920,1000,0,0,0,0,1,50,50,50,T_SupportedPartlyBySeed,T_CrateBase [000800:Target.esp],meshes\aor\crate.nif,000800:Skyrim.esm,44000,1000,100,0,0,0,1,50,50,50
+## report leftover-invisible-objects.csv
+formKey,editorId,base,baseType,invisibleType,space,cell,x,y,z,radius,insideObject,insideObjectPlugin,EastTotal,EastRemoved,EastState,NorthEastTotal,NorthEastRemoved,NorthEastState,NorthTotal,NorthRemoved,NorthState,NorthWestTotal,NorthWestRemoved,NorthWestState,WestTotal,WestRemoved,WestState,SouthWestTotal,SouthWestRemoved,SouthWestState,SouthTotal,SouthRemoved,SouthState,SouthEastTotal,SouthEastRemoved,SouthEastState,occupiedDirections,removedDirections,decision,reason,movedToX,movedToY,movedToZ,moveDistance,movedOnto
+00081B:Target.esp,T_MarkerInsideBuilding,T_XMarkerBase [000804:Target.esp],Static,XMarkers,interior AorInterior [000800:Skyrim.esm],,48000,0,100,1024,000814:Rival.esp,Rival.esp,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,removed,inside another mod's object,,,,,
+00081C:Target.esp,T_SoundInsideBuilding,T_SoundMarkerBase [000806:Target.esp],SoundMarker,SoundMarkers,interior AorInterior [000800:Skyrim.esm],,48060,0,100,1024,000814:Rival.esp,Rival.esp,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,kept,protected type,,,,,
+00081D:Target.esp,T_Light,T_LightBase [000805:Target.esp],Light,Lights,interior AorInterior [000800:Skyrim.esm],,52000,0,100,1024,,,10000,10000,Removed,10000,0,Kept,10000,10000,Removed,0,0,Empty,10000,10000,Removed,0,0,Empty,10000,10000,Removed,0,0,Empty,5,4,removed,surroundings removed,,,,,
+000823:Target.esp,T_Sound,T_SoundMarkerBase [000806:Target.esp],SoundMarker,SoundMarkers,interior AorInterior [000800:Skyrim.esm],,56000,0,100,1024,,,10000,10000,Removed,10000,0,Kept,10000,10000,Removed,0,0,Empty,10000,10000,Removed,0,0,Empty,10000,10000,Removed,0,0,Empty,5,4,kept,protected type,,,,,
+000829:Target.esp,T_ExteriorMarkerInBuilding,T_XMarkerBase [000804:Target.esp],Static,XMarkers,worldspace AorWorld [000801:Skyrim.esm],AorExterior [000802:Skyrim.esm],2048,2048,228,1024,00081D:Rival.esp,Rival.esp,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,kept,referenced: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp],2048,1832,128,238.0252,Terrain
+## report manual-patch-hints.csv
+hint,formKey,editorId,space,cell,detail
+KeptForNonPlacedReference,000810:Target.esp,T_ReferencedByFormList,interior AorInterior [000800:Skyrim.esm],,linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp]
+KeptForNonPlacedReference,000829:Target.esp,T_ExteriorMarkerInBuilding,worldspace AorWorld [000801:Skyrim.esm],AorExterior [000802:Skyrim.esm],linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp]
+KeptTeleportDoor,000811:Target.esp,T_TeleportDoorA,interior AorInterior [000800:Skyrim.esm],,teleport door

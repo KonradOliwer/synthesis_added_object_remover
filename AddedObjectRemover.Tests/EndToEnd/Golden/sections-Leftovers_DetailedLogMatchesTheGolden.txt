@@ -1,6 +1,0 @@
-  Kept 000803:Target.esp in Tamriel: linked from QUST.
-Warning: archive a.bsa is unreadable.
-[mesh] m.nif not found.
-  Leftover 000803:Target.esp (MapMarkers) in Tamriel: kept, protected type; radius 500, removed/total ground area East 400/400, NorthEast -, North 0/100, NorthWest -, West -, SouthWest -, South -, SouthEast -.
-  Leftover 000804:Target.esp (XMarkers) in Tamriel: removed, inside another mod's object (inside 000010:Other.esp from Other.esp); radius 300, removed/total ground area East 400/400, NorthEast -, North 0/100, NorthWest -, West -, SouthWest -, South -, SouthEast -.
-Leftover invisible objects: 2 evaluated in 1.5s; removed 1 (1 inside another mod's object, 0 surroundings removed); kept 1 (0 too few surrounding objects, 0 surroundings mostly kept, 1 protected type, 0 referenced).

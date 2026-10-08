@@ -1,0 +1,13 @@
+# Static methods and local functions of this module that mention no domain type (Ids or a Contracts type), each with its reason.
+# Form: Type.Member | reason  (local function: Type.Method.Local). The test fails when an entry stops being flagged.
+NpcBodyResolver.GetHeightScale | NPC size rule over the plugin's race and NPC traits (tool fact types).
+NpcBodyResolver.HasVolume | NPC size rule: a body box has volume when every side is positive.
+NpcBodyResolver.SelectAddonsWornBy | NPC size rule over the plugin's NPC traits (a tool fact type).
+NpcBodyResolver.WithHumanoidHeight | NPC size rule: the humanoid height assumed for a body box.
+NpcStuckTest.GetCore | NPC stuck rule: the core of a body box.
+NpcStuckTest.IsCoreStuck | NPC stuck rule over boxes and mesh trees.
+NpcStuckTest.IsInside | NPC stuck rule over boxes and mesh trees.
+NpcStuckTest.OverlapsAnyTriangle | NPC stuck rule over boxes and mesh trees.
+ShapeZone.Create | Zone geometry: scales a box and places it with a transform.
+ShapeZoneContact.IsInsideOpenBubbleBox | Zone contact rule over mesh trees and the zone.
+ShapeZoneContact.Reaches | Zone contact rule over mesh trees and the zone.

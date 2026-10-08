@@ -12,9 +12,9 @@ public class TerrainHeightTests
     private const float VertexSpacing = 128f;
     private const float Offset = 10f;
 
-    private static readonly FormKey Worldspace = new(TestTargets.TargetMod, 0x200);
-    private static readonly FormKey ChildWorldspace = new(TestTargets.TargetMod, 0x201);
-    private static readonly FormKey Interior = new(TestTargets.TargetMod, 0x202);
+    private static readonly RecordKey Worldspace = TestTargets.SpaceKey(0x200);
+    private static readonly RecordKey ChildWorldspace = TestTargets.SpaceKey(0x201);
+    private static readonly RecordKey Interior = TestTargets.SpaceKey(0x202);
 
     /// <summary>
     /// Row starts rise by 2 steps per row (the first by 1 over the offset), every vertex by 1 step
@@ -33,13 +33,13 @@ public class TerrainHeightTests
 
     private static float Expected(float vertexX, float vertexY) => (Offset + 1 + 2 * vertexY + vertexX) * 8;
 
-    private static TerrainHeights CreateTerrain() => new(
+    private static TerrainHeights CreateTerrain() => TestGround.Terrain(
         new Dictionary<ExteriorCell, ILandscapeGetter>
         {
             [new ExteriorCell(Worldspace, 0, 0)] = SlopedLandscape(0x300),
             [new ExteriorCell(Worldspace, 1, -1)] = SlopedLandscape(0x301),
         },
-        new Dictionary<FormKey, FormKey> { [Worldspace] = Worldspace, [ChildWorldspace] = Worldspace });
+        new Dictionary<RecordKey, RecordKey> { [Worldspace] = Worldspace, [ChildWorldspace] = Worldspace });
 
     [Theory]
     [InlineData(0f, 0f)]

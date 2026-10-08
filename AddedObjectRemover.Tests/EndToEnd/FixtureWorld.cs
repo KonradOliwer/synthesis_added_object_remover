@@ -32,8 +32,8 @@ internal sealed class FixtureWorld
         FixtureShapeScenes.AddAll(scenery);
         FixtureNpcScenes.AddAll(scenery);
         FixtureReferenceScenes.AddAll(scenery);
-        FixtureFollowUpScenes.AddAll(scenery);
-        FixtureLeftoverScenes.AddAll(scenery);
+        FixtureRestingObjectsScenes.AddAll(scenery);
+        FixtureLeftBehindScenes.AddAll(scenery);
         FixtureStandingScene.Add(scenery);
         return new FixtureWorld(mods.LoadOrder);
     }

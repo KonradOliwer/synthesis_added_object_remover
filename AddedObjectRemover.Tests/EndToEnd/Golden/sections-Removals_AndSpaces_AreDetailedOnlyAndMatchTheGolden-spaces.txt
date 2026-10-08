@@ -1,2 +1,0 @@
-Per cell/worldspace (target objects / other objects / removed):
-  Tamriel: 5 / 1 / 3

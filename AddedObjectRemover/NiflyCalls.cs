@@ -13,7 +13,7 @@ internal static class NiflyCalls
         {
             return libraryCall();
         }
-        catch (Exception ex) when (ExpectedFailures.IsMalformedNif(ex))
+        catch (Exception ex) when (Failures.IsMalformedNif(ex))
         {
             throw new MalformedNifException(ex);
         }

@@ -62,7 +62,7 @@ public class CompatibilityPatchTests
     }
 
     private static IdentifiedMods Decide(params PluginListing[] listed) =>
-        IdentifyTheMods.Decide(
+        ModIdentifier.Identify(
             new LoadOrderPlugins(Mods, SynthesisOutput, [.. listed]),
             new ModIdentificationSettings(Target, Excluded: [], IgnoreTargetMasters: true, IgnorePatched: true, PatchMasterLimit));
 

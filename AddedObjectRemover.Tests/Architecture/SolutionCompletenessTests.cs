@@ -9,12 +9,34 @@ public class SolutionCompletenessTests
         Assert.Equal(SolutionLayout.ProjectFiles(), SolutionLayout.SolutionProjectFiles());
 
     [Fact]
+    public void EveryRowOfTheProjectTableHasAProject()
+    {
+        var projectNames = SolutionLayout.ProjectFiles().Select(SolutionLayout.ProjectName).ToHashSet();
+
+        var rowsWithoutProject = Rules.Projects.Select(rule => rule.Name).Where(name => !projectNames.Contains(name)).ToList();
+
+        Assert.Empty(rowsWithoutProject);
+    }
+
+    [Fact]
     public void EveryProjectHasATargetFrameworkAndAnItemGroup()
     {
         var offenders = SolutionLayout.ProjectFiles()
             .Select(file => (Name: SolutionLayout.ProjectName(file), Project: SolutionLayout.Load(file)))
             .Where(project => string.IsNullOrEmpty(SolutionLayout.Property(project.Project, "TargetFramework")) || !project.Project.Descendants("ItemGroup").Any())
             .Select(project => project.Name)
+            .ToList();
+
+        Assert.Empty(offenders);
+    }
+
+    [Fact]
+    public void EveryProductionProjectHasADescription()
+    {
+        var offenders = SolutionLayout.ProjectFiles()
+            .Where(file => !SolutionLayout.IsTestProject(file))
+            .Where(file => string.IsNullOrWhiteSpace(SolutionLayout.Property(SolutionLayout.Load(file), "Description")))
+            .Select(SolutionLayout.ProjectName)
             .ToList();
 
         Assert.Empty(offenders);

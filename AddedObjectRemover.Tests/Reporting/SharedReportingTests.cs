@@ -20,7 +20,7 @@ public sealed class SharedReportingTests
     {
         var (world, decisions) = RunRounds();
 
-        var removals = RemovalList.Removals(decisions, world, LeftBehindResult.None);
+        var removals = RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(decisions), decisions, world, TestLeftBehind.PerformedWithoutFindings);
 
         Assert.Equal(
             [
@@ -31,6 +31,17 @@ public sealed class SharedReportingTests
             removals.Select(removal => (removal.GetType(), removal.TargetIndex)));
         Assert.Equal(world.OtherModObjects[0], Assert.IsType<TooCloseRemoval>(removals[0]).TooCloseTo);
         Assert.Equal(1, Assert.IsType<LinkedRemoval>(removals[2]).LinkedToTargetIndex);
+    }
+
+    [Fact]
+    public void Removals_ComeInTheOrderTheStepNineResultGives()
+    {
+        var (world, decisions) = RunRounds();
+        TargetId[] writeOrder = [new(2), new(0), new(1)];
+
+        var removals = RemovalList.Removals(writeOrder, decisions, world, TestLeftBehind.PerformedWithoutFindings);
+
+        Assert.Equal([2, 0, 1], removals.Select(removal => removal.TargetIndex));
     }
 
     [Fact]
@@ -67,9 +78,9 @@ public sealed class SharedReportingTests
         };
         var protection = CreateProtection(tagged.Targets);
         var decided = new StepResults(
-            tagged, null!, null!, protection, null!, null!, null, LeftBehindResult.None, null!, decisions);
+            tagged, protection, null!, TestLeftBehind.PerformedWithoutFindings, null!, decisions);
 
-        var hints = ManualPatchHints.Hints(decided, TestVisibility.OfTaggedBasesOnly(), RemovalList.Removals(decided.Final, decided.World, decided.LeftBehind));
+        var hints = ManualPatchHints.FindManualPatchHints(decided, TestVisibility.OfTaggedBasesOnly(), RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(decided.Final), decided.Final, decided.World, decided.LeftBehind));
 
         Assert.Equal(
             [
@@ -81,7 +92,7 @@ public sealed class SharedReportingTests
     }
 
     [Fact]
-    public void Kept_PrintsOneLinePerObjectInBothLogModes()
+    public void Kept_PrintsOneLinePerObject()
     {
         var (world, decisions) = RunRounds();
         var kept = RemovalList.Kept(decisions);
@@ -92,39 +103,49 @@ public sealed class SharedReportingTests
             $"  Kept {RecordNames.Describe(world.Targets[ProtectedTouching])} in {Describe.Space(world, TestTargets.Space)}: {TestKeepReasons.QuestDetail} "
                 + $"(touches removed {RecordNames.Describe(world.Targets[0])}).",
         };
-        Assert.Equal(expected, LogSections.Kept(world, kept, Normal));
-        Assert.Equal(expected, LogSections.Kept(world, kept, Detailed));
+        Assert.Equal(expected, LogSections.BuildKeptLines(world, kept));
     }
 
     [Fact]
     public void LinkedRemovals_IsPrintedOnlyInTheDetailedLog()
     {
-        Assert.Empty(LogSections.LinkedRemovals(3, "follow-up", Normal));
+        Assert.Empty(LogSections.BuildLinkedRemovalLines(3, "follow-up", Normal));
         Assert.Equal(
             new[] { "Linked groups: 3 more objects removed with the follow-up removals they are linked to." },
-            LogSections.LinkedRemovals(3, "follow-up", Detailed).ToArray());
+            LogSections.BuildLinkedRemovalLines(3, "follow-up", Detailed).ToArray());
     }
 
     [Fact]
-    public void Problems_ShowMeshProblemsOnlyInTheDetailedLog()
+    public void MeshProblems_ShowTheMeshProblemsOnlyInTheDetailedLogAndTheMeshErrorsInBoth()
     {
-        var problems = new PhaseProblems([new AssetProblem("m.nif", AssetProblemKind.NotFound, "[mesh] m.nif not found.")]);
+        ImmutableArray<AssetProblem> problems = [AssetProblem.NotFound("m.nif")];
+        var error = new UnexpectedError(
+            "reading mesh triangles", "InvalidDataException: broke", "Objects using the mesh are treated as having no mesh triangles.", new ErrorSubject(SubjectKind.Mesh, "m.nif", Position: 0));
 
-        Assert.Empty(LogSections.Problems(problems, Normal));
-        Assert.Equal(new[] { "[mesh] m.nif not found." }, LogSections.Problems(problems, Detailed).ToArray());
+        var normal = LogSections.BuildMeshProblemsSection(problems, [error], Normal);
+        var detailed = LogSections.BuildMeshProblemsSection(problems, [error], Detailed);
+
+        Assert.Equal("meshProblems", normal.Id);
+        Assert.Equal(UnexpectedErrorLines.Of([error], Normal).ToArray(), normal.Lines.ToArray());
+        Assert.Equal(["  [mesh] not found: m.nif", ..UnexpectedErrorLines.Of([error], Detailed)], detailed.Lines.ToArray());
+        Assert.Empty(LogSections.BuildMeshProblemsSection([], [], Detailed).Lines);
     }
 
     /// <summary>Round 1: target 0 too close, protected target 3 held. Round 2: 1 touches 0 (its linked partner 2 goes along), protected 4 held.</summary>
     private static (CollectedObjects World, RemovalDecisions Decisions) RunRounds()
     {
+        var targets = TestTargets.CreateMany(TargetCount);
         var world = new CollectedObjects(
-            [.. TestTargets.CreateMany(TargetCount)],
+            [.. targets],
             [CreateOtherModObject()],
-            null,
+            [],
+            false,
             [],
             new Dictionary<RecordKey, SpaceFact> { [TestTargets.Space] = new(TestTargets.Space, "Tamriel", SpaceKind.Worldspace) },
             new ReadCounts(0, 0, 0, 0, 0, 0),
-            []);
+            [],
+            TargetWorkOrder.Of(targets),
+            null);
         var decisions = RemovalDecisions.Start(CreateProtection(world.Targets), TargetCount)
             .Apply(RoundKind.TooClose, [Propose(0, new RemovalReason.TooClose(new OtherId(0))), Propose(Protected, new RemovalReason.TooClose(new OtherId(0)))])
             .Apply(RoundKind.AlsoRemove, [Propose(1, new RemovalReason.Touching(new TargetId(0))), Propose(ProtectedTouching, new RemovalReason.Touching(new TargetId(0)))]);

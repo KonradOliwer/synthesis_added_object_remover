@@ -1,5 +1,6 @@
 using System.Numerics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;
@@ -71,7 +72,7 @@ public class StepDeterminismTests
         var sequential = RunTouchCascade(scene, SequentialThreads);
         var parallel = RunTouchCascade(scene, ParallelThreads);
 
-        Assert.NotEqual(0, RestingObjectsRemovals.CountByRule(sequential.Result));
+        Assert.NotEqual(0, RestingObjectsRemovals.CountByRule(sequential.Result, sequential.RemovalDecisions));
         Assert.Contains(
             sequential.AlsoRemoveRounds.SelectMany(round => sequential.RemovalDecisions.RemovedIn(round)),
             target => sequential.RemovalDecisions.Of(target)!.Reason is RemovalReason.LinkedTo);
@@ -83,7 +84,7 @@ public class StepDeterminismTests
     }
 
     [Fact]
-    public void AnchoringMatchesForOneAndEightThreads()
+    public void SupportMatchesForOneAndEightThreads()
     {
         var scene = CreateRestingObjectsScene();
 
@@ -93,7 +94,7 @@ public class StepDeterminismTests
         Assert.True(sequential.Result.Work.Rounds > 1);
         Assert.Equal(DescribeRounds(sequential.RemovalDecisions), DescribeRounds(parallel.RemovalDecisions));
         Assert.Equal(sequential.RemovalDecisions.All().ToList(), parallel.RemovalDecisions.All().ToList());
-        Assert.Equal(DescribeEvaluations(sequential.Result), DescribeEvaluations(parallel.Result));
+        Assert.Equal(DescribeEvaluations(sequential.Evaluations), DescribeEvaluations(parallel.Evaluations));
         Assert.Equal(sequential.Result.Work, parallel.Result.Work);
     }
 
@@ -169,7 +170,7 @@ public class StepDeterminismTests
         var sequential = SelectLeftBehind(targets, rooms, removed, SequentialThreads);
         var parallel = SelectLeftBehind(targets, rooms, removed, ParallelThreads);
 
-        Assert.NotEqual(0, sequential.RemovedCount);
+        Assert.Contains(sequential.Evaluations, evaluation => evaluation.IsRemoved);
         Assert.Contains(sequential.Evaluations, evaluation => evaluation.ContainingObject != null);
         Assert.Equal(DescribeEvaluations(sequential), DescribeEvaluations(parallel));
     }
@@ -319,9 +320,9 @@ public class StepDeterminismTests
             string.Join(" | ", explanation.Components.Members.Select(members => string.Join(' ', members))),
             string.Join(' ', explanation.Edges.Select(edge => $"{edge.ComponentId}:{edge.Pair.First}-{edge.Pair.Second}")));
 
-    private static List<string> DescribeEvaluations(RestingObjectsResult alsoRemove) =>
-        AnchoringRows.Join(alsoRemove)
-            .Select(evaluation => $"{evaluation.TargetIndex} {evaluation.Iteration} {evaluation.Removed} {evaluation.RemovedAsLinked} {evaluation.Held} {evaluation.RemovedShare}")
+    private static List<string> DescribeEvaluations(IEnumerable<SupportEvaluationRow> evaluations) =>
+        evaluations
+            .Select(evaluation => $"{evaluation.TargetIndex} {evaluation.Iteration} {evaluation.Removed} {evaluation.RemovedAsLinked} {evaluation.Held} {SupporterShares.TotalOf(evaluation.Shares, SupportCategory.RemovedTarget)}")
             .ToList();
 
     private static List<string> DescribeEvaluations(LeftBehindResult leftBehind) =>
@@ -329,7 +330,7 @@ public class StepDeterminismTests
             .Select(evaluation => $"{evaluation.TargetIndex} {evaluation.Decision} {evaluation.ContainingObject?.Key} {evaluation.Radius} {SectorAreasText.Describe(evaluation.Surroundings)}")
             .ToList();
 
-    private static LeftBehindOptions CreateLeftBehindConfig() => new(
+    private static LeftBehindSettings CreateLeftBehindConfig() => new(
         LookAround: 100,
         DirectionClearedPercent: 50,
         ClearedDirectionsPercent: 60,

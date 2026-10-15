@@ -44,7 +44,7 @@ public partial class ObjectFailureRunTests
         Assert.NotEmpty(outcome.Removals);
         Assert.True(outcome.Removals.Select(removal => removal.TargetIndex).ToHashSet().IsSubsetOf(healthy.Removals.Select(removal => removal.TargetIndex)));
         Assert.True(outcome.Removals.Length < healthy.Removals.Length);
-        Assert.Equal(outcome.Removals.Length, outcome.Written.Removed);
+        Assert.Equal(outcome.Removals.Select(removal => removal.TargetIndex), outcome.Written.Removed.Select(id => id.Index));
     }
 
     [Fact]
@@ -73,9 +73,9 @@ public partial class ObjectFailureRunTests
 
     private sealed class BrokenTrianglesFactory(IMeshFilesFactory inner, string brokenModel) : IMeshFilesFactory
     {
-        public IMeshFiles Open(ShapeInclusion inclusion)
+        public IMeshFiles Open(ShapeInclusion inclusion, IUnexpectedErrors unexpectedErrors)
         {
-            var files = inner.Open(inclusion);
+            var files = inner.Open(inclusion, unexpectedErrors);
             return new BrokenTriangles(files, files.NormalizeMeshPath(brokenModel));
         }
     }

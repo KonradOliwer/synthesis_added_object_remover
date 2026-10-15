@@ -26,6 +26,21 @@ public class ProjectRulesTests
         Assert.Empty(Rules.FindEntryOnlyReferencedByOthers());
 
     [Fact]
+    public void NoStepContractsReferenceTheRunCachesContracts() =>
+        Assert.Empty(Rules.FindStepContractsReferencingRunCachesContracts());
+
+    [Fact]
+    public void StepContractsReferencingTheRunCachesContractsAreReported()
+    {
+        var bad = Table(
+            new ProjectRule("Step.Contracts", "C", "Steps/Step.Contracts", ["RunCaches.Contracts"], []),
+            new ProjectRule("Other.Contracts", "C", "Run/Other.Contracts", ["RunCaches.Contracts"], []),
+            new ProjectRule("RunCaches.Contracts", "Q", "Caches/RunCaches.Contracts", [], []));
+
+        Assert.Equal(["Step.Contracts -> RunCaches.Contracts"], bad.FindStepContractsReferencingRunCachesContracts());
+    }
+
+    [Fact]
     public void TheReferencesHaveNoCycle() =>
         Assert.Empty(Rules.FindCycles());
 

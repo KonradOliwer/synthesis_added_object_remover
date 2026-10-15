@@ -21,15 +21,30 @@ internal static class TestScenes
         IReadOnlyList<OtherObject>? supportOnlyObjects = null,
         NpcBodyCache? bodies = null,
         int threads = 1,
-        Action<UnexpectedError>? reportUnexpected = null)
+        IUnexpectedErrors? unexpectedErrors = null,
+        ObjectMeasurementRules? measurementRules = null,
+        PlacedNpcRules? placedNpcRules = null)
     {
         var world = CreateWorld(targets, otherModObjects, supportOnlyObjects);
-        var triangles = new TriangleStore(shapes.ReadTriangles);
         return ObjectCaches.Create(
-            world, shapes, triangles, bodies ?? CreateBodiesWithoutRecords(shapes), reportUnexpected ?? ThrowUnexpected, new Execution(threads));
+            world,
+            shapes,
+            new TriangleStore(shapes.ReadTriangles),
+            bodies ?? CreateBodiesWithoutRecords(shapes),
+            measurementRules ?? RemovalCauseSelector.MeasurementRules(unexpectedErrors ?? new ThrowingUnexpectedErrors()),
+            placedNpcRules ?? TooCloseObjects.PlacedNpcRules,
+            new Execution(threads));
     }
 
-    private static void ThrowUnexpected(UnexpectedError error) => throw new InvalidOperationException(error.Message);
+    /// <summary>A channel for scenes that expect no unexpected failure: recording one fails the test.</summary>
+    private sealed class ThrowingUnexpectedErrors : IUnexpectedErrors
+    {
+        public ErrorMark Mark() => default;
+
+        public void Add(PartFailure failure) => throw new InvalidOperationException(failure.Failure);
+
+        public ImmutableArray<PartFailure> Since(ErrorMark mark) => [];
+    }
 
     /// <summary>A scene whose only other objects are support-only objects, as supporters and objects around a marker.</summary>
     public static ObjectCaches CreateWithSupportOnlyObjects(IReadOnlyList<TargetObject> targets, IReadOnlyList<OtherObject> supportOnlyObjects, IBaseObjectShapes shapes, int threads = 1) =>
@@ -39,11 +54,14 @@ internal static class TestScenes
         new(
             [.. targets],
             [.. otherModObjects],
-            supportOnlyObjects?.ToImmutableArray(),
+            supportOnlyObjects is null ? [] : [.. supportOnlyObjects],
+            supportOnlyObjects is not null,
             [],
             new Dictionary<RecordKey, SpaceFact>(),
             new ReadCounts(0, 0, 0, 0, 0, 0),
-            []);
+            [],
+            TargetWorkOrder.Of(targets),
+            null);
 
     private static NpcBodyCache CreateBodiesWithoutRecords(IBaseObjectShapes shapes) =>
         TestNpcBodies.Create(

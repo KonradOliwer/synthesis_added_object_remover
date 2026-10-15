@@ -54,7 +54,7 @@ public class LinkReaderTests
         var facts = new List<LinkFact>();
 
         LinkReader.ReadFromNonPlaced(
-            [mod], new HashSet<RecordKey> { TestTargets.Key(2), TestTargets.Key(3) }, TestTargets.TargetPlugin, new PluginNames(), facts);
+            [mod], new HashSet<RecordKey> { TestTargets.Key(2), TestTargets.Key(3) }, TestTargets.TargetPlugin, CreateNames(), facts);
 
         var fact = Assert.Single(facts);
         Assert.Equal(TestTargets.Key(2), fact.Target);
@@ -73,17 +73,19 @@ public class LinkReaderTests
         var facts = new List<LinkFact>();
 
         LinkReader.ReadFromNonPlaced(
-            [mod], new HashSet<RecordKey> { TestTargets.Key(1) }, TestTargets.TargetPlugin, new PluginNames(), facts);
+            [mod], new HashSet<RecordKey> { TestTargets.Key(1) }, TestTargets.TargetPlugin, CreateNames(), facts);
 
         Assert.True(Assert.Single(facts).SourceIsWorldspace);
         var outcome = LinkRule.DecideLinkOutcome(TestTargets.CreateMany(4), facts);
         Assert.All(outcome.References, Assert.Null);
     }
 
+    private static PluginNames CreateNames() => new(new KnownPluginNames([TestTargets.TargetPlugin, OtherMod.ToPluginName()]));
+
     private static List<LinkFact> ReadFromPlaced(IPlacedGetter record)
     {
         var facts = new List<LinkFact>();
-        LinkReader.ReadFromPlaced(record, record.FormKey.ToRecordKey(), TestTargets.TargetPlugin, new PluginNames(), facts);
+        LinkReader.ReadFromPlaced(record, record.FormKey.ToRecordKey(), TestTargets.TargetPlugin, CreateNames(), facts);
         return facts;
     }
 

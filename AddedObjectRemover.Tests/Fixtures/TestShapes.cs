@@ -41,7 +41,7 @@ internal static class TestShapes
     /// <summary>A catalog over the loose meshes in a Data folder, reading them through the real mesh reader.</summary>
     public static IBaseObjectShapes Catalog(IBaseFacts bases, string dataPath, ModKey mod)
     {
-        var meshFiles = new MeshFilesFactory(dataPath, GameRelease.SkyrimSE, [mod]).Open(BaseObjectRules.SolidShapes);
+        var meshFiles = new MeshFilesFactory(dataPath, GameRelease.SkyrimSE, [mod]).Open(BaseObjectShapes.SolidShapes, new UnexpectedErrors());
         var shapes = new BaseObjectShapes(bases, meshFiles);
         MeshFilesOfCatalog.Add(shapes, meshFiles);
         return shapes;

@@ -57,8 +57,4 @@ public class TextFormatTests
             CultureInfo.CurrentCulture = previous;
         }
     }
-
-    [Fact]
-    public void InSecondsPrefixesTheDurationWithIn() =>
-        Assert.Equal(" in 2.0s", TextFormat.InSeconds(TimeSpan.FromSeconds(2)));
 }

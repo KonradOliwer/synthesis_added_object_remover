@@ -1,0 +1,110 @@
+## warnings
+## archiveWarnings
+## unexpectedErrors
+## config
+Target plugin: Target.esp
+Size multiplier: 0.5
+Removal zone: ObjectShape
+Excluded plugins: Excluded.esp
+Ignored masters of target: Skyrim.esm
+Compatibility patch detection: 2 plugins master the target.
+  Compatibility patch TargetPatch.esp: links target with Patched.esp.
+Ignored because of compatibility patches: Patched.esp, TargetPatch.esp.
+NPCs and creatures: OnlyWhenStuckInObject
+Also remove: objects supported by it, touch distance 8, threshold 50 %.
+Leftover invisible objects: kept.
+Detailed log: True
+Write report files: False
+Report folder: <root>/AddedObjectRemover Reports
+## scan
+  Ignored other-mod object overridden by Target.esp: R_OverriddenByTarget_Pad [000821:Rival.esp] from Rival.esp.
+Scanned 75 placed records in <time>: 40 Target.esp objects to check, 28 objects from other mods.
+  Ignored 1 Target.esp objects whose winning version comes from a later plugin.
+  Ignored 1 Target.esp objects that are initially disabled or have no valid position or rotation.
+  Ignored 1 other-mod objects that Target.esp itself overrides.
+  Recorded 34 placed objects of any plugin as possible supporters or obstacles.
+## threads
+## index
+Indexed 28 other objects in 2 cells/worldspaces in <time>.
+## replacements
+  Ignored replaced object R_Replacement_Crate [000808:Rival.esp] from Rival.esp: replaced by T_Replaced [00080A:Target.esp], distance 10.0, size ratio 1.00.
+Replacement matching: 1 other-mod objects excluded in <time>.
+## unexpectedErrors
+## groups
+Linked groups: 1 groups of linked target objects (2 objects) from 1 links to target-plugin records.
+## unexpectedErrors
+## tooClose
+Object-shape zones: 21 candidate pairs, 18 passed the box filter, 18 mesh tests, 18 hits, 0 centre-point fallbacks (other object without mesh triangles), 1 targets without mesh triangles used their box; 17 triangle pairs tested exactly.
+  0 large other objects tested against every target of their space; 0 effect-only meshes (fog, light rays, water spray) ignored.
+Found 19 of 40 Target.esp objects too close to other mods' objects in <time>.
+NPCs and creatures (only when stuck in the object): 2 placed NPCs evaluated: 0 sized by body mesh, 2 by Object Bounds, 0 by humanoid approximation, 0 sized as a point; 0 skipped because their base is no NPC; 1 NPC-object pairs tested (1 body boxes), 1 objects with an NPC stuck in them.
+  Kept T_ReferencedByPlaced [00080F:Target.esp] in interior AorInterior [000800:Skyrim.esm]: Enable Parent of 00080D:Rival.esp.
+  Kept T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
+  Kept T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
+## linked
+Linked groups: 1 more objects removed with the too-close removals they are linked to.
+## unexpectedErrors
+## anchoring
+Anchoring: 1 removed over 2 iterations; 3 touching objects evaluated (3 evaluations), 0 kept without any contact points, 0 kept as referenced.
+  Pairs: 3 box candidates next to a removal tested over 2 iterations, 3 touching, 0 without mesh triangles (never touching); 9 triangle pairs tested exactly.
+Also remove: 2 rounds in <time>.
+## linked
+Linked groups: 0 more objects removed with the follow-up removals they are linked to.
+## unexpectedErrors
+## leftovers
+## linked
+Linked groups: 0 more objects removed with the leftover invisible object removals they are linked to.
+## unexpectedErrors
+## relocations
+## unexpectedErrors
+## write
+Wrote 18 overrides (18 removed, 0 moved) in <time>.
+  1 removed objects had an Enable Parent; it was replaced by the player with "opposite of parent" so they stay disabled.
+## explanationProblems
+## meshProblems
+## archiveWarnings
+## unexpectedErrors
+## removals
+  Removed T_TooClose [000807:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_TooClose_Pad [000805:Rival.esp] from Rival.esp
+  Removed T_BoundsOnly [000809:Target.esp] (base T_BoundsOnlyBase [000802:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_BoundsOnly_Pad [000807:Rival.esp] from Rival.esp
+  Removed T_NpcStuck [00080B:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_NpcStuck [000809:Rival.esp] from Rival.esp
+  Removed T_LinkedNear [00080D:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_LinkedNear_Pad [00080B:Rival.esp] from Rival.esp
+  Removed T_TouchSeed [000813:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_TouchSeed_Pad [000810:Rival.esp] from Rival.esp
+  Removed T_SupportSeed [000817:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_SupportSeed_Pad [000812:Rival.esp] from Rival.esp
+  Removed T_SupportSeedPartial [000819:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_SupportSeedPartial_Pad [000813:Rival.esp] from Rival.esp
+  Removed T_LightRing0 [00081E:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_LightRing0_Pad [000815:Rival.esp] from Rival.esp
+  Removed T_LightRing1 [00081F:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_LightRing1_Pad [000816:Rival.esp] from Rival.esp
+  Removed T_LightRing2 [000820:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_LightRing2_Pad [000817:Rival.esp] from Rival.esp
+  Removed T_LightRing3 [000821:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_LightRing3_Pad [000818:Rival.esp] from Rival.esp
+  Removed T_SoundRing0 [000824:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_SoundRing0_Pad [000819:Rival.esp] from Rival.esp
+  Removed T_SoundRing1 [000825:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_SoundRing1_Pad [00081A:Rival.esp] from Rival.esp
+  Removed T_SoundRing2 [000826:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_SoundRing2_Pad [00081B:Rival.esp] from Rival.esp
+  Removed T_SoundRing3 [000827:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_SoundRing3_Pad [00081C:Rival.esp] from Rival.esp
+  Removed T_ExteriorCrate [00082A:Target.esp] (base T_CrateBase [000800:Target.esp]) in worldspace AorWorld [000801:Skyrim.esm], cell AorExterior [000802:Skyrim.esm]; too close to R_ExteriorCrate_Pad [00081E:Rival.esp] from Rival.esp
+  Removed T_LinkedFar [00080E:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; linked to removed T_LinkedNear [00080D:Target.esp]
+  Removed T_SupportedByOnlyTheSeed [000818:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; 100 % of its support was removed (mostly T_SupportSeed [000817:Target.esp])
+## bounds
+Bounds: 10 bases from NIF, 0 NIF misses, 4 from OBND, 0 without bounds. Meshes: 4 read, 0 effect-only, 0 failed (4 loose, 0 from 0 archives), 0 with a footer root other than their first node.
+## spaces
+Per cell/worldspace (target objects / other objects / removed):
+  interior AorInterior [000800:Skyrim.esm]: 38 / 26 / 17
+  worldspace AorWorld [000801:Skyrim.esm]: 2 / 2 / 1
+## targetVisibility
+Target objects: 35 visible, 5 invisible (by kind: 2 SoundMarkers, 2 XMarkers, 1 Lights), 1 without placement/disabled.
+## removal-summary
+Removed 18 objects (16 too close, 1 follow-up removals, 0 leftover invisible objects, 1 linked to removed objects).
+## kept-summary
+Kept 3 objects that would have been removed because other records depend on them.
+  FormList record: 1
+  placed object: Enable Parent: 1
+  teleport door: 1
+## markers-by-type
+Removed markers by type: none.
+## hints
+Possible manual patch needed: 2 objects to check.
+  Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
+  Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
+## written
+## reportFileWarnings
+## unexpectedErrors
+## done

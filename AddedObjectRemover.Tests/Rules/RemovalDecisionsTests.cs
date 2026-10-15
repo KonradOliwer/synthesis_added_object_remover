@@ -25,32 +25,83 @@ public class RemovalDecisionsTests
     private static readonly RemovalReason TooClose = new RemovalReason.TooClose(new OtherId(0));
 
     [Fact]
-    public void DroppingTheNewerRoundsMakesAnOlderViewTheNewestAgain()
+    public void RoundsDecidedOnAWorkingCopyLeaveTheRunsDecisionsUnchanged()
     {
-        var older = Start().Apply(RoundKind.TooClose, [Propose(8, TooClose)]);
-        older.Apply(RoundKind.AlsoRemove, [Propose(9, new RemovalReason.Touching(Id(8)))]);
-        Assert.Throws<InvalidOperationException>(() => older.Apply(RoundKind.LeftBehind, []));
+        var afterTooClose = Start().Apply(RoundKind.TooClose, [Propose(8, TooClose)]);
+        var move = new MarkerMove(Id(11), Vector3.Zero, Vector3.One);
+        var withMove = afterTooClose.AddMoves([move]);
 
-        older.DropNewerThanThisView();
-        var again = older.Apply(RoundKind.LeftBehind, [Propose(10, TooClose)]);
+        var (copy, _) = withMove.WorkingCopy().DecideRoundsUntilNothingRemoved(new ScriptedRounds([Propose(9, TooClose)], []));
 
-        Assert.Equal(2, again.Rounds.Length);
-        Assert.False(again.IsDecided(Id(9)));
-        Assert.True(again.IsRemoved(Id(10)));
-        Assert.Equal(RoundKind.LeftBehind, Removed(again, 10).Round.Kind);
-        Assert.Equal(older.Rounds[0], again.Rounds[0]);
+        Assert.Equal(3, copy.Rounds.Length);
+        Assert.True(copy.IsRemoved(Id(9)));
+        Assert.Equal(new[] { move }, copy.Moves.ToArray());
+        Assert.Single(withMove.Rounds);
+        Assert.False(withMove.IsDecided(Id(9)));
+        Assert.True(withMove.Apply(RoundKind.AlsoRemove, [Propose(10, TooClose)]).IsRemoved(Id(10)));
     }
 
     [Fact]
-    public void DroppingTheNewerRoundsAlsoDropsTheNewerMoves()
+    public void AWorkingCopyHoldsOnlyWhatItsViewShows()
     {
-        var older = Start().Apply(RoundKind.TooClose, [Propose(8, TooClose)]);
-        older.AddMoves([new MarkerMove(Id(9), Vector3.Zero, Vector3.One)]);
+        var first = Start().Apply(RoundKind.TooClose, [Propose(8, TooClose)]);
+        first.Apply(RoundKind.AlsoRemove, [Propose(9, TooClose)]);
 
-        older.DropNewerThanThisView();
+        var (copy, _) = first.WorkingCopy().DecideRoundsUntilNothingRemoved(new ScriptedRounds([Propose(10, TooClose)], []));
 
-        Assert.Empty(older.Moves);
-        Assert.Empty(older.AddMoves([]).Moves);
+        Assert.False(copy.IsDecided(Id(9)));
+        Assert.Equal(new[] { new Round(1, RoundKind.TooClose), new Round(2, RoundKind.AlsoRemove), new Round(3, RoundKind.AlsoRemove) }, copy.Rounds.ToArray());
+    }
+
+    /// <summary>Applying the copy's proposals as rounds gives the run the same decisions as the copy: linked members, kept objects and round numbers alike.</summary>
+    [Fact]
+    public void ApplyingTheRoundsOfAWorkingCopyGivesTheSameDecisionsAsTheCopy()
+    {
+        var touching = new RemovalReason.Touching(Id(0));
+        var afterTooClose = Start(new Dictionary<int, KeepReason> { [4] = QuestReason }).Apply(RoundKind.TooClose, [Propose(0, TooClose)]);
+        var rule = new ScriptedRounds([Propose(3, touching), Propose(5, touching)], [Propose(8, touching), Propose(6, touching)], []);
+
+        var (copy, rounds) = afterTooClose.WorkingCopy().DecideRoundsUntilNothingRemoved(rule);
+        var applied = afterTooClose.ApplyRounds(RoundKind.AlsoRemove, [.. rounds.Select(round => round.Proposals)]);
+
+        Assert.Equal(copy.Rounds.ToArray(), applied.Rounds.ToArray());
+        Assert.Equal(copy.All().ToList(), applied.All().ToList());
+        Assert.All(copy.Rounds, round =>
+        {
+            Assert.Equal(copy.RemovedIn(round).ToArray(), applied.RemovedIn(round).ToArray());
+            Assert.Equal(copy.KeptIn(round).ToArray(), applied.KeptIn(round).ToArray());
+        });
+        Assert.IsType<Decision.Kept>(applied.Of(Id(3)));
+        Assert.Equal(new RemovalReason.LinkedTo(Id(5)), Removed(applied, 7).Reason);
+    }
+
+    /// <summary>One round decided on a working copy is the round <see cref="RemovalDecisions.Apply"/> makes on the shared list, and leaves the shared list as it was.</summary>
+    [Fact]
+    public void DecidingOneRoundOnAWorkingCopyGivesTheSameDecisionsAsApplyOnTheSharedList()
+    {
+        var afterTooClose = Start(new Dictionary<int, KeepReason> { [4] = QuestReason }).Apply(RoundKind.TooClose, [Propose(8, TooClose)]);
+        var proposals = new[] { Propose(3, TooClose), Propose(5, TooClose), Propose(10, TooClose) };
+
+        var copy = afterTooClose.WorkingCopy().DecideRound(RoundKind.LeftBehind, proposals);
+        var applied = afterTooClose.Apply(RoundKind.LeftBehind, proposals);
+
+        Assert.Equal(applied.Rounds.ToArray(), copy.Rounds.ToArray());
+        Assert.Equal(applied.All().ToList(), copy.All().ToList());
+        Assert.Equal(applied.RemovedIn(applied.Rounds[^1]).ToArray(), copy.RemovedIn(copy.Rounds[^1]).ToArray());
+        Assert.Equal(applied.KeptIn(applied.Rounds[^1]).ToArray(), copy.KeptIn(copy.Rounds[^1]).ToArray());
+        Assert.IsType<Decision.Kept>(copy.Of(Id(3)));
+        Assert.Equal(new RemovalReason.LinkedTo(Id(5)), Removed(copy, 7).Reason);
+    }
+
+    [Fact]
+    public void ADecidedRoundOnAWorkingCopyLeavesTheSharedListUnchanged()
+    {
+        var afterTooClose = Start().Apply(RoundKind.TooClose, [Propose(8, TooClose)]);
+
+        afterTooClose.WorkingCopy().DecideRound(RoundKind.LeftBehind, [Propose(9, TooClose)]);
+
+        Assert.Single(afterTooClose.Rounds);
+        Assert.False(afterTooClose.IsDecided(Id(9)));
     }
 
     [Fact]
@@ -270,10 +321,10 @@ public class RemovalDecisionsTests
         var rule = new ScriptedRounds();
         var start = Start().Apply(RoundKind.TooClose, []);
 
-        var (decisions, details) = start.ApplyRoundsUntilNothingRemoved(rule);
+        var (decisions, rounds) = start.WorkingCopy().DecideRoundsUntilNothingRemoved(rule);
 
         Assert.Empty(rule.RemovedLastRound);
-        Assert.Empty(details);
+        Assert.Empty(rounds);
         Assert.Single(decisions.Rounds);
     }
 
@@ -283,10 +334,10 @@ public class RemovalDecisionsTests
         var rule = new ScriptedRounds([Propose(8, TooClose)], [], [Propose(9, TooClose)]);
         var start = Start().Apply(RoundKind.TooClose, [Propose(10, TooClose)]);
 
-        var (decisions, details) = start.ApplyRoundsUntilNothingRemoved(rule);
+        var (decisions, rounds) = start.WorkingCopy().DecideRoundsUntilNothingRemoved(rule);
 
         Assert.Equal(2, rule.RemovedLastRound.Count);
-        Assert.Equal(2, details.Length);
+        Assert.Equal(2, rounds.Length);
         Assert.Equal(3, decisions.Rounds.Length);
         Assert.False(decisions.IsDecided(Id(9)));
     }
@@ -297,7 +348,7 @@ public class RemovalDecisionsTests
         var rule = new ScriptedRounds([Propose(8, TooClose)], [Propose(9, TooClose)], []);
         var start = Start().Apply(RoundKind.TooClose, [Propose(10, TooClose)]);
 
-        var (decisions, _) = start.ApplyRoundsUntilNothingRemoved(rule);
+        var (decisions, _) = start.WorkingCopy().DecideRoundsUntilNothingRemoved(rule);
 
         Assert.Equal(
             new[] { new Round(1, RoundKind.TooClose), new Round(2, RoundKind.AlsoRemove), new Round(3, RoundKind.AlsoRemove), new Round(4, RoundKind.AlsoRemove) },
@@ -310,7 +361,7 @@ public class RemovalDecisionsTests
         var rule = new ScriptedRounds([Propose(3, TooClose)], []);
         var start = Start().Apply(RoundKind.TooClose, [Propose(1, TooClose)]);
 
-        start.ApplyRoundsUntilNothingRemoved(rule);
+        start.WorkingCopy().DecideRoundsUntilNothingRemoved(rule);
 
         Assert.Equal(Ids(1, 0, 2), rule.RemovedLastRound[0]);
         Assert.Equal(Ids(3, 4), rule.RemovedLastRound[1]);
@@ -322,9 +373,9 @@ public class RemovalDecisionsTests
         var rule = new ScriptedRounds([Propose(8, TooClose)], [Propose(9, TooClose)], []);
         var start = Start().Apply(RoundKind.TooClose, [Propose(10, TooClose)]);
 
-        var (_, details) = start.ApplyRoundsUntilNothingRemoved(rule);
+        var (_, rounds) = start.WorkingCopy().DecideRoundsUntilNothingRemoved(rule);
 
-        Assert.Equal(new[] { "details 1", "details 2", "details 3" }, details.ToArray());
+        Assert.Equal(new[] { "details 1", "details 2", "details 3" }, rounds.Select(round => round.Details).ToArray());
     }
 
     private static RemovalDecisions Start(IReadOnlyDictionary<int, KeepReason>? references = null) =>

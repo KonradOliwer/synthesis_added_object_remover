@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AddedObjectRemover</RootNamespace>
+    <Description>Reads mesh files (loose files and archives) with Nifly and Mutagen's archive reader. It references MeshFileFacts, UnexpectedFailureHandling, BoxAndTransformMath, TriangleMeshTests, ComputedOnceLookups, FileSystemAccess and OrderIndependentParallelWork and holds the Nifly, Mutagen.Bethesda.Core, SharpZipLib and ini-parser packages; only the entry references it.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Pinned exactly: NifShapes.cs reads Nifly's private _points/_stripLengths fields via reflection,
+         which breaks silently on a library update. -->
+    <PackageReference Include="Nifly" Version="[1.1.0]" />
+    <PackageReference Include="Mutagen.Bethesda.Core" Version="0.54.2" />
+    <!-- Used directly (KnownProblems.cs); otherwise they only arrive transitively through Mutagen. -->
+    <PackageReference Include="SharpZipLib" Version="1.4.2" />
+    <PackageReference Include="ini-parser-netstandard" Version="2.5.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MeshFileFacts\MeshFileFacts.csproj" />
+    <ProjectReference Include="..\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
+    <ProjectReference Include="..\BoxAndTransformMath\BoxAndTransformMath.csproj" />
+    <ProjectReference Include="..\TriangleMeshTests\TriangleMeshTests.csproj" />
+    <ProjectReference Include="..\ComputedOnceLookups\ComputedOnceLookups.csproj" />
+    <ProjectReference Include="..\FileSystemAccess\FileSystemAccess.csproj" />
+    <ProjectReference Include="..\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AddedObjectRemover.Tests" />
+  </ItemGroup>
+</Project>

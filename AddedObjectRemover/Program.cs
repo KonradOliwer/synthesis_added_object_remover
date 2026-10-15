@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Reflection;
 using AddedObjectRemover.Run.RunAllSteps;
 using AddedObjectRemover.Run.RunAllSteps.Contracts;
-using AddedObjectRemover.Steps.BuildLogAndReports;
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Skyrim;
 using Mutagen.Bethesda.Synthesis;
@@ -45,8 +44,8 @@ public static class Program
 
         var settings = loadSettings();
         var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey);
-        var pluginRecords = new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod);
-        var request = RunSettingsValidation.Build(settings, pluginRecords.Open(), plugins, state.OutputPath.Path, workers);
+        var pluginRecords = new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods);
+        var request = SettingsValidator.Build(settings, pluginRecords.Open(), plugins, state.OutputPath.Path, workers);
         var environment = new RunEnvironment(
             plugins,
             pluginRecords,
@@ -56,7 +55,7 @@ public static class Program
             new ConsoleLogSink(),
             new CsvReportOutput(),
             () => totalTimer.Elapsed);
-        RunAllSteps.Run(request, environment);
+        StepRunner.PatchLoadOrder(request, environment);
     }
 
     private static Settings LoadSettings(Lazy<Settings> lazySettings)

@@ -49,7 +49,7 @@ internal static class PipelineRun
         return new RunOutput(
             OutputMasks.MaskLog(log, root),
             PatchDump.Describe(state.PatchMod),
-            ReadReports(RunSettingsValidation.ResolveReportFolder(state.OutputPath.Path, settings, []), root),
+            ReadReports(SettingsValidator.ResolveReportFolder(state.OutputPath.Path, settings, []), root),
             log);
     }
 

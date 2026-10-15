@@ -141,13 +141,31 @@ public class NpcBodyResolverTests
         Assert.Equal(BaseRaceBodyHeight, tipped.WorldBoxOf(0).WorldAabb(0f).Size.Z, 3);
     }
 
+    [Fact]
+    public void TheIndexUsesThePlacedNpcRulesItIsGiven()
+    {
+        var npc = PlaceNpc(0, BaseRaceMale, Vector3.Zero);
+        var shifted = new Vector3(500, 0, 0);
+
+        var noneArePlacedNpcs = BuildIndex(TooCloseObjects.PlacedNpcRules with { IsPlacedNpc = _ => false }, npc);
+        var placedElsewhere = BuildIndex(TooCloseObjects.PlacedNpcRules with { BodyTransform = _ => TestTargets.At(shifted) }, npc);
+        var counted = BuildIndex(TooCloseObjects.PlacedNpcRules with { CountSizes = (_, _) => new NpcSizeCounts(7, 0, 0, 0, 0, 0) }, npc);
+
+        Assert.Equal(0, noneArePlacedNpcs.Counts.Evaluated);
+        Assert.Equal(shifted, placedElsewhere.TransformOf(0).Position);
+        Assert.Equal(7, counted.Counts.Evaluated);
+    }
+
     private static NpcBody SingleBody(NpcBodySet? bodies) => Assert.Single(Assert.IsType<NpcBodySet>(bodies).Bodies);
 
     private static NpcBodyCache CreateCache(IBodyMeshBounds? bodyBounds = null) =>
         TestNpcBodies.Create(Records.ToImmutableLinkCache(), Shapes, bodyBounds);
 
     private static PlacedNpcIndex BuildIndex(params OtherObject[] npcs) =>
-        PlacedNpcIndex.Build(npcs, CreateCache(), new Execution(Environment.ProcessorCount));
+        BuildIndex(TooCloseObjects.PlacedNpcRules, npcs);
+
+    private static PlacedNpcIndex BuildIndex(PlacedNpcRules rules, params OtherObject[] npcs) =>
+        PlacedNpcIndex.Build(npcs, CreateCache(), rules, new Execution(Environment.ProcessorCount));
 
     private static OtherObject PlaceNpc(int index, FormKey npc, Vector3 rotation) => TestNpcs.Place(Mod, index, npc, Vector3.Zero, rotation);
 

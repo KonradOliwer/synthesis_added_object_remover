@@ -17,19 +17,6 @@ public class ProjectScaffoldingTests
         Assert.Empty(rowBreaches.Concat(kindBreaches));
     }
 
-    private const string EntryProject = "AddedObjectRemover";
-
-    /// <summary>
-    /// Temporary: while the entry project still holds the code of the projects not yet split out, it references the
-    /// tools directly. Steps 58-79 delete names from this list; it must be empty when the split is done.
-    /// </summary>
-    private static readonly string[] EntryToolReferencesUntilTheSplitIsDone =
-    [
-        "BoxAndTransformMath", "OrderIndependentParallelWork", "KeyedGroupingInInputOrder", "DenseIdTables",
-        "IndexGraphQueries", "NumericRanges", "FileSystemAccess", "ComputedOnceLookups",
-        "TriangleMeshTests", "BoxSpatialIndex", "GroundSurfaceQueries", "LogTextFormatting", "CsvFileWriting",
-    ];
-
     private static IEnumerable<string> FindRowBreaches(string name, string folder, IReadOnlyList<string> references)
     {
         var row = Rules.Projects.SingleOrDefault(rule => rule.Name == name);
@@ -39,19 +26,15 @@ public class ProjectScaffoldingTests
             yield break;
         }
         if (row.Folder != folder) yield return $"{name} is in {folder}, the table says {row.Folder}";
-        var allowed = name == EntryProject ? row.References.Concat(EntryToolReferencesUntilTheSplitIsDone) : row.References;
-        foreach (var reference in references.Except(allowed)) yield return $"{name} references {reference}, which the table does not allow";
-        if (name != EntryProject) yield break;
-        foreach (var unused in EntryToolReferencesUntilTheSplitIsDone.Except(references)) yield return $"{name} no longer references {unused}: remove it from the temporary list";
+        foreach (var reference in references.Except(row.References)) yield return $"{name} references {reference}, which the table does not allow";
     }
 
-    /// <summary>The table restricted to the projects that exist, each with the references its csproj really has.</summary>
+    /// <summary>The table rows of the projects in the solution, each with the references its csproj really has.</summary>
     private static ProjectRules RulesWithActualReferences(IReadOnlyList<(string Name, string Folder, IReadOnlyList<string> References)> projects)
     {
-        var existing = projects.Select(project => project.Name).Where(name => Rules.Projects.Any(rule => rule.Name == name)).ToList();
         var rows = projects
-            .Where(project => existing.Contains(project.Name))
-            .Select(project => Rules.Find(project.Name) with { References = project.References.Where(existing.Contains).ToList() })
+            .Where(project => Rules.Projects.Any(rule => rule.Name == project.Name))
+            .Select(project => Rules.Find(project.Name) with { References = project.References })
             .ToList();
         return new ProjectRules(Rules.EntryOnlyProjects, rows);
     }
@@ -60,5 +43,6 @@ public class ProjectScaffoldingTests
         actual.FindLogicReferencingLogic().Select(reference => $"{reference}: logic references logic")
             .Concat(actual.FindLogicReferencedByNonRunners().Select(reference => $"{reference}: logic referenced by a non-runner"))
             .Concat(actual.FindEntryOnlyReferencedByOthers().Select(reference => $"{reference}: entry-only project referenced by another project"))
+            .Concat(actual.FindStepContractsReferencingRunCachesContracts().Select(reference => $"{reference}: step contracts reference the run caches"))
             .Concat(actual.FindCycles().Select(cycle => $"{cycle}: reference cycle"));
 }

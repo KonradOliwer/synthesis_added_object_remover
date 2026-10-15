@@ -22,7 +22,7 @@ public class LeftBehindObjectsTests
 
     private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(OtherMod, "LeftBehindObjectsData", Room));
 
-    private static readonly LeftBehindOptions Options = new(
+    private static readonly LeftBehindSettings Settings = new(
         LookAround: 1024,
         DirectionClearedPercent: 50,
         ClearedDirectionsPercent: 60,
@@ -43,21 +43,54 @@ public class LeftBehindObjectsTests
     [Fact]
     public void EvaluateGivesTheSelectorsEvaluations()
     {
-        var expected = TestLeftBehind.CreateRule(Targets, Shapes, Others, Options)
+        var expected = TestLeftBehind.CreateRule(Targets, Shapes, Others, Settings)
             .SelectRemovals(new HashSet<int>(), new Execution(Environment.ProcessorCount));
 
-        var actual = LeftBehindObjects.Evaluate(CreateInput(StartDecisions()), Options);
+        var actual = Find(StartDecisions(), Settings);
 
+        Assert.Equal(StepOutcome.Performed, actual.Outcome);
         Assert.Equal(Summarize(expected), Summarize(actual));
+    }
+
+    [Fact]
+    public void ASwitchedOffStepGivesNoEvaluationsAndNoProposals()
+    {
+        var result = Find(StartDecisions(), settings: null);
+
+        Assert.Equal(StepOutcome.SwitchedOff, result.Outcome);
+        Assert.Empty(result.Evaluations);
+        Assert.Empty(result.Proposals);
+    }
+
+    [Fact]
+    public void TheProposalsAreTheRemovedEvaluations()
+    {
+        var result = Find(StartDecisions(), Settings);
+
+        var proposal = Assert.Single(result.Proposals);
+        Assert.Equal(0, proposal.Target.Index);
+        Assert.Equal(result.Evaluations.Where(evaluation => evaluation.IsRemoved).Select(evaluation => evaluation.TargetIndex), result.Proposals.Select(p => p.Target.Index));
+    }
+
+    [Fact]
+    public void TheStepDecidesItsRoundOnACopyAndLeavesTheGivenDecisionsAsTheyWere()
+    {
+        var decisions = StartDecisions();
+
+        var result = Find(decisions, Settings);
+
+        Assert.NotEmpty(result.Proposals);
+        Assert.Empty(decisions.Rounds);
+        Assert.Empty(decisions.RemovedTargets());
     }
 
     [Fact]
     public void CandidatesAreTheKeptEvaluationsInsideAnotherObject()
     {
-        var evaluated = LeftBehindObjects.Evaluate(CreateInput(StartDecisions()), Options);
+        var evaluated = Find(StartDecisions(), Settings);
         Assert.Equal(0, Assert.Single(evaluated.Evaluations, evaluation => evaluation.ContainingObject != null).TargetIndex);
 
-        var removedDecisions = StartDecisions().Apply(RoundKind.LeftBehind, LeftBehindRound.Proposals(evaluated));
+        var removedDecisions = StartDecisions().Apply(RoundKind.LeftBehind, [.. evaluated.Proposals]);
 
         Assert.Equal(0, Assert.Single(MarkerMovePlanner.Candidates(evaluated, StartDecisions())).TargetIndex);
         Assert.Empty(MarkerMovePlanner.Candidates(evaluated, removedDecisions));
@@ -66,32 +99,138 @@ public class LeftBehindObjectsTests
     [Fact]
     public void PlanMovesAKeptMarkerToTheNearestFreeSpotWithinTheMaxDistance()
     {
-        var evaluated = LeftBehindObjects.Evaluate(CreateInput(StartDecisions()), Options with { NeverRemove = new HashSet<InvisibleObjectKind> { InvisibleObjectKind.XMarkers } });
-        var decisions = StartDecisions();
-        var scene = CreateScene();
-        var navmeshes = TestGround.Navmeshes(new Dictionary<RecordKey, List<CellNavmesh>> { [TestTargets.Space] = [new CellNavmesh((0, 0), SquareNavmesh(1000))] });
-
-        MarkerMoves Plan(float maxDistance) => MarkerMovePlanner.Plan(
-            new MarkerMoveInput(
-                Targets,
-                MarkerMovePlanner.Candidates(evaluated, decisions),
-                new MarkerSurroundings(scene.VisibleObjectsOfAnyPlugin(),scene.VisibleTargets, decisions),
-                new InteriorOnlyPlugin(),
-                navmeshes,
-                TestGround.NoTerrain(),
-                Shapes,
-                new Execution(Environment.ProcessorCount)),
-            new MarkerMoveSettings(maxDistance));
-
         var far = Plan(MarkerMoveLimits.MaxDistance);
+        Assert.Equal(StepOutcome.Performed, far.Outcome);
         Assert.Empty(far.LeftInPlace);
-        var moved = Assert.Single(far.Moved);
-        Assert.Equal(0, moved.Evaluation.TargetIndex);
-        Assert.Equal(RelocationSurface.Navmesh, moved.Surface);
+        Assert.Equal(0, Assert.Single(far.Moves).Target.Index);
+        var detail = Assert.Single(far.Details);
+        Assert.Equal(0, detail.Evaluation.TargetIndex);
+        Assert.Equal(RelocationSurface.Navmesh, detail.Surface);
 
         var near = Plan(1);
-        Assert.Empty(near.Moved);
+        Assert.Empty(near.Moves);
+        Assert.Empty(near.Details);
         Assert.Single(near.LeftInPlace);
+    }
+
+    [Fact]
+    public void ASwitchedOffMarkerMoveStepMovesNothingAndNeverAsksForTheObjectsOfAnyPlugin()
+    {
+        var asked = false;
+
+        var result = Plan(settings: null, () => { asked = true; return CreateScene().VisibleObjectsOfAnyPlugin(); });
+
+        Assert.Equal(StepOutcome.SwitchedOff, result.Outcome);
+        Assert.Empty(result.Moves);
+        Assert.Empty(result.Details);
+        Assert.Empty(result.LeftInPlace);
+        Assert.False(asked);
+    }
+
+    [Fact]
+    public void EveryMoveHasItsDetailInTheSameOrder()
+    {
+        var result = Plan(new MarkerMoveSettings(MarkerMoveLimits.MaxDistance));
+
+        Assert.Equal(new TargetId(Assert.Single(result.Details).Evaluation.TargetIndex), Assert.Single(result.Moves).Target);
+    }
+
+    [Fact]
+    public void AFailureInsideTheLeftBehindStepStopsItWithTheFailureAndNoProposals()
+    {
+        var scene = CreateScene();
+
+        var result = LeftBehindObjects.Find(
+            Targets,
+            scene.ObjectsThatCanCauseRemovals(Replacements.None(Others.Length), NpcHandling.OnlyWhenStuckInObject),
+            StartDecisions(),
+            new FailingSurroundings(scene.VisibleTargets),
+            new BaseFactsReader(new SkyrimMod(ModKey.FromNameAndExtension("Reach.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
+            Shapes,
+            TargetWorkOrder.Of(Targets),
+            new Execution(Environment.ProcessorCount),
+            Settings);
+
+        Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
+        Assert.Equal(new PartFailure(LeftBehindParts.LeftBehind, "InvalidOperationException: it broke", Subject: null), result.Failure);
+        Assert.Empty(result.Evaluations);
+        Assert.Empty(result.Proposals);
+    }
+
+    [Fact]
+    public void AFailureInsideTheMarkerMoveStepStopsItWithTheFailureAndNoMoves()
+    {
+        var result = Plan(new MarkerMoveSettings(MarkerMoveLimits.MaxDistance), () => throw new InvalidOperationException("it broke."));
+
+        Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
+        Assert.Equal(new PartFailure(MarkerMoveParts.MarkerMoves, "InvalidOperationException: it broke", Subject: null), result.Failure);
+        Assert.Empty(result.Moves);
+        Assert.Empty(result.Details);
+        Assert.Empty(result.LeftInPlace);
+    }
+
+    [Fact]
+    public void AStoppedLeftBehindStepMeansTheMarkerMoveStepIsNotPerformedAndAsksForNothing()
+    {
+        var asked = false;
+        var scene = CreateScene();
+
+        var result = MarkerMovePlanner.Plan(
+            Targets,
+            new LeftBehindResult(
+                StepOutcome.StoppedByUnexpectedError, [], [], new PartFailure(LeftBehindParts.LeftBehind, "InvalidOperationException: it broke", Subject: null)),
+            StartDecisions(),
+            () =>
+            {
+                asked = true;
+                return scene.VisibleObjectsOfAnyPlugin();
+            },
+            scene.VisibleTargets,
+            new InteriorOnlyPlugin(),
+            TestGround.Navmeshes(new Dictionary<RecordKey, List<CellNavmesh>>()),
+            TestGround.NoTerrain(),
+            Shapes,
+            new Execution(Environment.ProcessorCount),
+            new MarkerMoveSettings(MarkerMoveLimits.MaxDistance));
+
+        Assert.Equal(StepOutcome.StoppedByEarlierFailure, result.Outcome);
+        Assert.Null(result.Failure);
+        Assert.Empty(result.Moves);
+        Assert.Empty(result.Details);
+        Assert.Empty(result.LeftInPlace);
+        Assert.False(asked);
+    }
+
+    private static MarkerMoves Plan(float maxDistance) => Plan(new MarkerMoveSettings(maxDistance));
+
+    private sealed class FailingSurroundings(IVisibleTargetObjects inner) : IVisibleTargetObjects
+    {
+        public IReadOnlyList<RecordKey> Spaces => inner.Spaces;
+
+        public void Around(RecordKey space, Vector3 point, float radius, List<VisibleTargetNear> into) => throw new InvalidOperationException("it broke.");
+
+        public bool AnyContains(RecordKey space, Vector3 point, Func<TargetId, bool> include, ObjectQueryScratch scratch) => inner.AnyContains(space, point, include, scratch);
+
+        public IEnumerable<OrientedBox> BoxesNear(RecordKey space, Vector3 point, float radius, Func<TargetId, bool> include) =>
+            inner.BoxesNear(space, point, radius, include);
+    }
+
+    private static MarkerMoves Plan(MarkerMoveSettings? settings, Func<IVisibleObjectsOfAnyPlugin>? objectsOfAnyPlugin = null)
+    {
+        var evaluated = Find(StartDecisions(), Settings with { NeverRemove = new HashSet<InvisibleObjectKind> { InvisibleObjectKind.XMarkers } });
+        var scene = CreateScene();
+        return MarkerMovePlanner.Plan(
+            Targets,
+            evaluated,
+            StartDecisions(),
+            objectsOfAnyPlugin ?? scene.VisibleObjectsOfAnyPlugin,
+            scene.VisibleTargets,
+            new InteriorOnlyPlugin(),
+            TestGround.Navmeshes(new Dictionary<RecordKey, List<CellNavmesh>> { [TestTargets.Space] = [new CellNavmesh((0, 0), SquareNavmesh(1000))] }),
+            TestGround.NoTerrain(),
+            Shapes,
+            new Execution(Environment.ProcessorCount),
+            settings);
     }
 
     private static IEnumerable<(int Target, InvisibleObjectKind Kind, float Radius, OtherId? Host, LeftBehindOutcome Decision, int Occupied, int Removed)> Summarize(LeftBehindResult result) =>
@@ -101,20 +240,19 @@ public class LeftBehindObjectsTests
 
     private static ObjectCaches CreateScene() => TestScenes.Create(Targets, Others, Shapes, supportOnlyObjects: []);
 
-    private static LeftBehindInput CreateInput(IRemovalDecisions decisions)
+    private static LeftBehindResult Find(IRemovalDecisions decisions, LeftBehindSettings? settings)
     {
         var scene = CreateScene();
-        var order = TargetWorkOrder.Of(Targets);
-        var execution = new Execution(Environment.ProcessorCount);
-        return new LeftBehindInput(
+        return LeftBehindObjects.Find(
             Targets,
-            Hosts.Find(Targets, Shapes, scene.ObjectsThatCanCauseRemovals(Replacements.None(Others.Length), NpcHandling.OnlyWhenStuckInObject), order, execution),
+            scene.ObjectsThatCanCauseRemovals(Replacements.None(Others.Length), NpcHandling.OnlyWhenStuckInObject),
             decisions,
             scene.VisibleTargets,
             new BaseFactsReader(new SkyrimMod(ModKey.FromNameAndExtension("Reach.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
             Shapes,
-            order,
-            execution);
+            TargetWorkOrder.Of(Targets),
+            new Execution(Environment.ProcessorCount),
+            settings);
     }
 
     /// <summary>Every target stands in an interior cell, so it may move anywhere and its home cell is never asked for.</summary>

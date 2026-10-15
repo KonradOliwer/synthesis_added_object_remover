@@ -61,6 +61,10 @@ public class PerObjectGuardTests
 
     private static Vector3 Position(int index) => new(index * Spacing, 0, 0);
 
+    /// <summary>The failure the step itself returns for the faulty target, keyed by the step's own part.</summary>
+    private static PartFailure TargetFailure(PartKey part, TargetObject target) =>
+        new(part, "InvalidDataException: " + FailureMessage, new FailureSubject(target.Key.ToString(), target.EditorId, Faulty));
+
     private static TooCloseResult FindTooClose(
         List<TargetObject> targets, ObjectCaches world, IBaseObjectShapes shapes, int threads, Replacements replacements) =>
         TooCloseObjects.Find(
@@ -69,11 +73,11 @@ public class PerObjectGuardTests
                 world.VisibleTargets,
                 TargetWorkOrder.Of(targets),
                 world.ObjectsThatCanCauseRemovals(replacements, NpcHandling.Ignore),
-                Npcs: null,
+                world.NpcsThatCanSpawn(replacements),
                 shapes,
                 new TriangleStore(shapes.ReadTriangles),
                 new Execution(threads)),
-            new TooCloseOptions(Multiplier, ZoneShape.BoundingBox, NpcHandling.Ignore));
+            new TooCloseSettings(Multiplier, ZoneShape.BoundingBox, NpcHandling.Ignore));
 
     [Theory]
     [InlineData(1)]
@@ -88,7 +92,7 @@ public class PerObjectGuardTests
 
         Assert.Equal([Healthy, AlsoHealthy], result.Hits.Select(hit => hit.TargetIndex));
         Assert.Equal([Healthy, AlsoHealthy], result.Proposals.Select(proposal => proposal.Target.Index));
-        Assert.Equal(new TargetFailure(Faulty, "InvalidDataException: " + FailureMessage), Assert.Single(result.Failures));
+        Assert.Equal(TargetFailure(TooCloseParts.TooCloseCheck, targets[Faulty]), Assert.Single(result.Failures));
     }
 
     [Fact]
@@ -109,19 +113,21 @@ public class PerObjectGuardTests
     public void AnOtherModObjectThatCannotBeMeasuredIsReportedAndCausesNoRemovals(int threads)
     {
         var (targets, others) = CreateScene(middleTargetBase: Table.Base, middleOtherBase: Boulder.Base);
-        var reported = new System.Collections.Concurrent.ConcurrentBag<UnexpectedError>();
+        var errors = new UnexpectedErrors();
         var shapes = FaultyWhenAskedAbout(Boulder.Base);
-        var world = TestScenes.Create(targets, others, shapes, threads: threads, reportUnexpected: reported.Add);
+        var world = TestScenes.Create(targets, others, shapes, threads: threads, unexpectedErrors: errors);
 
         var result = FindTooClose(targets, world, shapes, threads, Replacements.None(others.Count));
 
         Assert.Equal([Healthy, AlsoHealthy], result.Hits.Select(hit => hit.TargetIndex));
         Assert.Empty(result.Failures);
-        var error = Assert.Single(reported.Distinct());
-        Assert.Equal("selecting the objects that can cause removals", error.Part);
-        Assert.Equal("InvalidDataException: " + FailureMessage, error.Failure);
-        Assert.Equal("They were not used to remove target objects.", error.Consequence);
-        Assert.Equal(new ErrorSubject(SubjectKind.Object, others[Faulty].Key.ToString(), Position: Faulty), error.Subject);
+        var failure = Assert.Single(errors.Since(default));
+        Assert.Equal(
+            new PartFailure(
+                SelectionParts.RemovalCauseSelection,
+                "InvalidDataException: " + FailureMessage,
+                new FailureSubject(others[Faulty].Key.ToString(), others[Faulty].EditorId, Faulty)),
+            failure);
     }
 
     [Fact]
@@ -132,7 +138,7 @@ public class PerObjectGuardTests
 
         var protection = ObjectsToKeep.Build(targets, [], reasons);
 
-        Assert.Equal(new TargetFailure(Faulty, "InvalidDataException: " + FailureMessage), Assert.Single(protection.CheckFailures));
+        Assert.Equal(TargetFailure(KeepParts.KeepCheck, targets[Faulty]), Assert.Single(protection.CheckFailures));
         Assert.True(protection.TryGetKeepReason(Faulty, out var reason));
         Assert.Equal(KeepKind.CheckFailed, reason.Kind);
         Assert.False(protection.IsProtected(Healthy));
@@ -153,22 +159,21 @@ public class PerObjectGuardTests
     }
 
     [Fact]
-    public void TouchExplanationsAreQuietlySkippedWhenTheTouchChainsAreMissing()
+    public void TouchExplanationsWithoutTheTouchChainsAreABug()
     {
         var (targets, _) = CreateScene(middleTargetBase: Table.Base, middleOtherBase: Table.Base);
         var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Count));
         var seeded = TestSeededDecisions.Seed(protection, targets.Count, [Healthy]);
         var triangles = new TriangleStore(Shapes.ReadTriangles);
-        var input = new RestingObjectsInput(
+        var input = new RoundsInput(
             [.. targets], protection, ObjectsOfAnyPlugin: null, Shapes, triangles, TestGround.NoTerrain(), new Execution(1));
-        var restingObjects = TestRestingObjects.Run(seeded, input, new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouching, 1f, SupportLostFraction: 1f));
-
-        var details = ExplanationFinder.Compute(
-            new ReportFileDetailsInput(restingObjects, TouchChains: null, [.. targets], Shapes, triangles, Bases: null!, new Execution(1)));
+        var restingObjects = TestRestingObjects.Run(
+            seeded, input, new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouching, 1f, SupportLostFraction: 1f, TouchChainsShown: false));
 
         Assert.True(restingObjects.Result.HadSeeds);
-        Assert.Null(details.Touch);
-        Assert.Null(details.MeshOrigins);
+        Assert.Throws<InvalidOperationException>(
+            () => ExplanationFinder.Compute(
+                new ReportFileDetailsInput(restingObjects, TouchChains: null, [.. targets], Shapes, triangles, Bases: null!, new Execution(1))));
     }
 
     /// <summary>Reasons by target index; reading the faulty target's fails.</summary>

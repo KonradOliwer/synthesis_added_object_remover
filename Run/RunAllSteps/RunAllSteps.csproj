@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AddedObjectRemover</RootNamespace>
+    <Description>Runs one patch run: creates the run's caches and runs the ten steps in order, handing each its inputs and applying the removal decisions. It holds no domain rules and knows nothing about Synthesis, JSON or the command line. It references every step's logic and contracts, the base object shapes, the run caches' contracts and the tools for ids, plugin and mesh facts, math, spatial indexes, parallel work, lookups, ground queries and CSV tables, and holds no packages.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\RunAllSteps.Contracts\RunAllSteps.Contracts.csproj" />
+    <ProjectReference Include="..\RunSettingsValidation.Contracts\RunSettingsValidation.Contracts.csproj" />
+    <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
+    <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind\BaseObjectShapeAndKind.csproj" />
+    <ProjectReference Include="..\..\Caches\RunCaches.Contracts\RunCaches.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\IdentifyTheMods.Contracts\IdentifyTheMods.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\IdentifyTheMods\IdentifyTheMods.csproj" />
+    <ProjectReference Include="..\..\Steps\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\CollectPlacedObjects\CollectPlacedObjects.csproj" />
+    <ProjectReference Include="..\..\Steps\SelectObjectsThatCanCauseRemovals.Contracts\SelectObjectsThatCanCauseRemovals.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\SelectObjectsThatCanCauseRemovals\SelectObjectsThatCanCauseRemovals.csproj" />
+    <ProjectReference Include="..\..\Steps\FindTargetObjectsToKeep.Contracts\FindTargetObjectsToKeep.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\FindTargetObjectsToKeep\FindTargetObjectsToKeep.csproj" />
+    <ProjectReference Include="..\..\Steps\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\RemovalDecisionList\RemovalDecisionList.csproj" />
+    <ProjectReference Include="..\..\Steps\RemoveTooCloseObjects.Contracts\RemoveTooCloseObjects.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\RemoveTooCloseObjects\RemoveTooCloseObjects.csproj" />
+    <ProjectReference Include="..\..\Steps\RemoveObjectsRestingOnRemovedOnes.Contracts\RemoveObjectsRestingOnRemovedOnes.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\RemoveObjectsRestingOnRemovedOnes\RemoveObjectsRestingOnRemovedOnes.csproj" />
+    <ProjectReference Include="..\..\Steps\RemoveInvisibleObjectsLeftBehind.Contracts\RemoveInvisibleObjectsLeftBehind.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\RemoveInvisibleObjectsLeftBehind\RemoveInvisibleObjectsLeftBehind.csproj" />
+    <ProjectReference Include="..\..\Steps\MoveKeptMarkers.Contracts\MoveKeptMarkers.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\MoveKeptMarkers\MoveKeptMarkers.csproj" />
+    <ProjectReference Include="..\..\Steps\WriteThePatch.Contracts\WriteThePatch.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\WriteThePatch\WriteThePatch.csproj" />
+    <ProjectReference Include="..\..\Steps\BuildLogAndReports.Contracts\BuildLogAndReports.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\BuildLogAndReports\BuildLogAndReports.csproj" />
+    <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
+    <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
+    <ProjectReference Include="..\..\Tools\PluginRecordFacts\PluginRecordFacts.csproj" />
+    <ProjectReference Include="..\..\Tools\MeshFileFacts\MeshFileFacts.csproj" />
+    <ProjectReference Include="..\..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
+    <ProjectReference Include="..\..\Tools\TriangleMeshTests\TriangleMeshTests.csproj" />
+    <ProjectReference Include="..\..\Tools\BoxSpatialIndex\BoxSpatialIndex.csproj" />
+    <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
+    <ProjectReference Include="..\..\Tools\ComputedOnceLookups\ComputedOnceLookups.csproj" />
+    <ProjectReference Include="..\..\Tools\GroundSurfaceQueries\GroundSurfaceQueries.csproj" />
+    <ProjectReference Include="..\..\Tools\CsvFileWriting\CsvFileWriting.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AddedObjectRemover.Tests" />
+  </ItemGroup>
+</Project>

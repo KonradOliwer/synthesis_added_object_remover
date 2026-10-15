@@ -5,13 +5,12 @@ namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
 /// One row of the project table: where the project is, what kind it is, which projects it may reference
-/// and which packages ("name version") it may use. The row may list projects that do not exist yet.
+/// and which packages ("name version") it may use.
 /// </summary>
 internal sealed record ProjectRule(string Name, string Kind, string Folder, IReadOnlyList<string> References, IReadOnlyList<string> Packages);
 
 /// <summary>
-/// The project table from ProjectRules.json: one row per project of the finished layout, so a row can exist before its
-/// project does. Kinds: E entry, X test, R runner, L logic, B cache builder,
+/// The project table from ProjectRules.json: one row per project. Kinds: E entry, X test, R runner, L logic, B cache builder,
 /// V settings validation; the other kinds (contracts, tools, cache catalog) have no rule of their own.
 /// </summary>
 internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IReadOnlyList<ProjectRule> Projects)
@@ -20,6 +19,10 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
     public const string TestKind = "X";
     public const string RunnerKind = "R";
     public const string ValidationKind = "V";
+
+    public const string ContractsKind = "C";
+    private const string StepsFolderPrefix = "Steps/";
+    private const string RunCachesContractsName = "RunCaches.Contracts";
 
     public static readonly IReadOnlyList<string> LogicKinds = ["L", "B"];
 
@@ -32,6 +35,9 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
 
     public bool IsLogic(ProjectRule project) => LogicKinds.Contains(project.Kind);
 
+    private static bool IsStepContracts(ProjectRule project) =>
+        project.Kind == ContractsKind && project.Folder.StartsWith(StepsFolderPrefix, StringComparison.Ordinal);
+
     /// <summary>Projects that only the entry and the tests may reference.</summary>
     public bool IsEntryOnly(ProjectRule project) => project.Kind == ValidationKind || EntryOnlyProjects.Contains(project.Name);
 
@@ -42,6 +48,9 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
 
     public IReadOnlyList<string> FindEntryOnlyReferencedByOthers() =>
         FindReferences(project => project.Kind != EntryKind && project.Kind != TestKind, IsEntryOnly);
+
+    public IReadOnlyList<string> FindStepContractsReferencingRunCachesContracts() =>
+        FindReferences(IsStepContracts, project => project.Name == RunCachesContractsName);
 
     /// <summary>One line per reference that closes a loop, written as the loop's path, e.g. "A -> B -> A".</summary>
     public IReadOnlyList<string> FindCycles()

@@ -29,7 +29,7 @@ public class LeftBehindOrderDeterminismTests
 
     private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(Mod, "LeftoverOrderData", Table, Room));
 
-    private static readonly LeftBehindOptions Options = new(
+    private static readonly LeftBehindSettings Settings = new(
         LookAround: 100,
         DirectionClearedPercent: 50,
         ClearedDirectionsPercent: 60,
@@ -61,7 +61,7 @@ public class LeftBehindOrderDeterminismTests
         {
             var actual = Evaluate(targets, rooms, scene, removedTables, order);
             Assert.Equal(Describe(expected), Describe(actual));
-            Assert.Equal(LeftBehindRound.Proposals(expected).Select(proposal => proposal.Target.Index), LeftBehindRound.Proposals(actual).Select(proposal => proposal.Target.Index));
+            Assert.Equal(expected.Proposals.Select(proposal => proposal.Target.Index), actual.Proposals.Select(proposal => proposal.Target.Index));
         }
     }
 
@@ -73,16 +73,16 @@ public class LeftBehindOrderDeterminismTests
         var protection = ObjectsToKeep.Build(immutableTargets, [], TestTargets.References(targets.Count));
         var decisions = TestSeededDecisions.Seed(protection, targets.Count, removedTables);
         var otherModObjects = scene.ObjectsThatCanCauseRemovals(Replacements.None(rooms.Count), NpcHandling.OnlyWhenStuckInObject);
-        var input = new LeftBehindInput(
+        return LeftBehindObjects.Find(
             immutableTargets,
-            Hosts.Find(immutableTargets, Shapes, otherModObjects, order, execution),
+            otherModObjects,
             decisions,
             scene.VisibleTargets,
             new BaseFactsReader(new SkyrimMod(ModKey.FromNameAndExtension("Facts.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
             Shapes,
             order,
-            execution);
-        return LeftBehindObjects.Evaluate(input, Options);
+            execution,
+            Settings);
     }
 
     private static Vector3 RandomPoint(Random random) =>

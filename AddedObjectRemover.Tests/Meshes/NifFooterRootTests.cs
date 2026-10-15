@@ -31,7 +31,7 @@ public class NifFooterRootTests
     {
         var data = TestNifs.WithFooter(TestNifs.Save(CreateNestedCrate()), 1, FooterRootNodeIndex);
 
-        var result = new NifGeometryReader().ReadGeometry(data, includeTriangles: true, BaseObjectRules.SolidShapes);
+        var result = new NifGeometryReader().ReadGeometry(data, includeTriangles: true, BaseObjectShapes.SolidShapes);
 
         Assert.Equal(MeshReadStatus.Success, result.Status);
         Assert.Equal(CrateVertices(InnerOffset), result.Geometry!.Triangles.Vertices);
@@ -41,7 +41,7 @@ public class NifFooterRootTests
     [Fact]
     public void FooterListingBlockZeroKeepsTheFirstNodeAsRoot()
     {
-        var result = new NifGeometryReader().ReadGeometry(TestNifs.Save(CreateNestedCrate()), includeTriangles: true, BaseObjectRules.SolidShapes);
+        var result = new NifGeometryReader().ReadGeometry(TestNifs.Save(CreateNestedCrate()), includeTriangles: true, BaseObjectShapes.SolidShapes);
 
         Assert.Equal(MeshReadStatus.Success, result.Status);
         Assert.Equal(CrateVertices(OuterOffset + InnerOffset), result.Geometry!.Triangles.Vertices);
@@ -58,7 +58,7 @@ public class NifFooterRootTests
     {
         var data = TestNifs.WithFooter(TestNifs.Save(CreateNestedCrate()), footer);
 
-        var result = new NifGeometryReader().ReadGeometry(data, includeTriangles: true, BaseObjectRules.SolidShapes);
+        var result = new NifGeometryReader().ReadGeometry(data, includeTriangles: true, BaseObjectShapes.SolidShapes);
 
         Assert.Equal(MeshReadStatus.Success, result.Status);
         Assert.Equal(CrateVertices(OuterOffset + InnerOffset), result.Geometry!.Triangles.Vertices);

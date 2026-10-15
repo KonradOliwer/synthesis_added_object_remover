@@ -5,10 +5,11 @@ public static class FileFailures
 {
     public static bool IsExpected(Exception exception) => exception is IOException or UnauthorizedAccessException;
 
-    /// <summary>Runs the action; an expected failure is caught and reported with the caller's message.</summary>
-    /// <param name="failureMessage">The caller's wording for the failure.</param>
-    /// <returns>The failure message; null when the action succeeded.</returns>
-    public static string? Guard(Action action, Func<Exception, string> failureMessage)
+    /// <summary>Runs the action; an expected failure is caught and reported as the caller's failure value.</summary>
+    /// <param name="createFailure">The caller's value for the failure.</param>
+    /// <returns>The failure value; null when the action succeeded.</returns>
+    public static TFailure? Guard<TFailure>(Action action, Func<Exception, TFailure> createFailure)
+        where TFailure : class
     {
         try
         {
@@ -17,7 +18,7 @@ public static class FileFailures
         }
         catch (Exception exception) when (IsExpected(exception))
         {
-            return failureMessage(exception);
+            return createFailure(exception);
         }
     }
 }

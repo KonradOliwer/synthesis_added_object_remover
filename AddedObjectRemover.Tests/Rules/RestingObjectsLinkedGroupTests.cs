@@ -69,7 +69,7 @@ public class RestingObjectsLinkedGroupTests
     }
 
     [Fact]
-    public void AnchoringFollowsLinkedPartnersAndReevaluatesOnlyTheirNeighbours()
+    public void SupportFollowsLinkedPartnersAndReevaluatesOnlyTheirNeighbours()
     {
         var run = TestSupportCascade.Execute(
             Targets,
@@ -87,7 +87,7 @@ public class RestingObjectsLinkedGroupTests
             DescribeRemovals(run));
         Assert.Equal(
             new[] { (ItemOnTable, 1), (ItemOnShelf, 2) },
-            AnchoringRows.Join(run.Result).Select(evaluation => (evaluation.TargetIndex, evaluation.Iteration)));
+            run.Evaluations.Select(evaluation => (evaluation.TargetIndex, evaluation.Iteration)));
     }
 
     [Fact]
@@ -117,7 +117,7 @@ public class RestingObjectsLinkedGroupTests
             threads: 4);
 
         Assert.Equal(new[] { (itemOnTable, typeof(RemovalReason.LostSupport)), (crateBesideTable, typeof(RemovalReason.LinkedTo)) }, DescribeRemovals(run));
-        var evaluations = AnchoringRows.Join(run.Result);
+        var evaluations = run.Evaluations;
         var crate = Assert.Single(evaluations, evaluation => evaluation.TargetIndex == crateBesideTable);
         Assert.False(crate.Removed);
         Assert.True(crate.RemovedAsLinked);

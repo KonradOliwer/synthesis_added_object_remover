@@ -1,5 +1,7 @@
 using System.Numerics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
+using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
+using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;
@@ -23,9 +25,9 @@ public class MarkerMoveTests
             new FakeSurface(RelocationSurface.Navmesh, new Vector3(4200, 100, 0)),
             new FakeSurface(RelocationSurface.Terrain, new Vector3(3000, 100, 0)));
 
-        Assert.Equal(new Vector3(3000, 100, 0), moved.To);
-        Assert.Equal(RelocationSurface.Terrain, moved.Surface);
-        Assert.False(moved.LeftHomeCell);
+        Assert.Equal(new Vector3(3000, 100, 0), moved.Move.To);
+        Assert.Equal(RelocationSurface.Terrain, moved.Detail.Surface);
+        Assert.False(moved.Detail.LeftHomeCell);
     }
 
     [Fact]
@@ -36,9 +38,9 @@ public class MarkerMoveTests
             new FakeSurface(RelocationSurface.Navmesh, new Vector3(4200, 100, 0)),
             new FakeSurface(RelocationSurface.Terrain));
 
-        Assert.Equal(new Vector3(4200, 100, 0), moved.To);
-        Assert.Equal(RelocationSurface.Navmesh, moved.Surface);
-        Assert.True(moved.LeftHomeCell);
+        Assert.Equal(new Vector3(4200, 100, 0), moved.Move.To);
+        Assert.Equal(RelocationSurface.Navmesh, moved.Detail.Surface);
+        Assert.True(moved.Detail.LeftHomeCell);
     }
 
     [Fact]
@@ -48,8 +50,8 @@ public class MarkerMoveTests
             homeCell: null,
             new FakeSurface(RelocationSurface.Navmesh, new Vector3(4200, 100, 0), new Vector3(3000, 100, 0)));
 
-        Assert.Equal(new Vector3(4200, 100, 0), moved.To);
-        Assert.False(moved.LeftHomeCell);
+        Assert.Equal(new Vector3(4200, 100, 0), moved.Move.To);
+        Assert.False(moved.Detail.LeftHomeCell);
     }
 
     [Fact]
@@ -58,12 +60,16 @@ public class MarkerMoveTests
         var result = CreateMover(HomeCell, new FakeSurface(RelocationSurface.Navmesh, new Vector3(9000, 100, 0)))
             .Move([KeptMarkerInsideOtherObject()], new Execution(Environment.ProcessorCount));
 
-        Assert.Empty(result.Moved);
+        Assert.Empty(result.Moves);
+        Assert.Empty(result.Details);
         Assert.Single(result.LeftInPlace);
     }
 
-    private static KeptMarkerMove Move(CellArea? homeCell, params IFreeSpotSearch[] surfaces) =>
-        Assert.Single(CreateMover(homeCell, surfaces).Move([KeptMarkerInsideOtherObject()], new Execution(Environment.ProcessorCount)).Moved);
+    private static (MarkerMove Move, MarkerMoveDetail Detail) Move(CellArea? homeCell, params IFreeSpotSearch[] surfaces)
+    {
+        var result = CreateMover(homeCell, surfaces).Move([KeptMarkerInsideOtherObject()], new Execution(Environment.ProcessorCount));
+        return (Assert.Single(result.Moves), Assert.Single(result.Details));
+    }
 
     private static KeptMarkerMover CreateMover(CellArea? homeCell, params IFreeSpotSearch[] surfaces) =>
         new([TestTargets.Create(0, TestTargets.At(Marker))], _ => homeCell, surfaces, MarkerMoveLimits.MaxDistance);
@@ -145,7 +151,7 @@ public class FreeSpotSearchTests
     private static OtherObjectsAroundMarker CreateObjectsAroundMarker(TestStatic model)
     {
         var scene = TestScenes.CreateWithSupportOnlyObjects([], [TestShapes.Placed(OtherMod, 0, model.Base, Vector3.Zero)], Shapes);
-        return new OtherObjectsAroundMarker(scene.VisibleObjectsOfAnyPlugin(),scene.VisibleTargets, new HashSet<int>(), Shapes);
+        return new OtherObjectsAroundMarker(scene.VisibleObjectsOfAnyPlugin(), scene.VisibleTargets, new HashSet<int>(), Shapes);
     }
 
     /// <summary>Two triangles covering [0, size] x [0, size] at height 0.</summary>

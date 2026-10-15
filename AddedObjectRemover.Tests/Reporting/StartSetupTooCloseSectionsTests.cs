@@ -15,8 +15,6 @@ public sealed class StartSetupTooCloseSectionsTests
 {
     private const string OutputPath = "/out/Patch.esp";
     private const int Workers = 4;
-    private const string ArchiveWarning = "Warning: archive a.bsa is unreadable.";
-    private const string MeshProblem = "[mesh] m.nif not found.";
 
     private static readonly TimeSpan Elapsed = TimeSpan.FromSeconds(1.5);
     private static readonly ModKey Target = TestTargets.TargetMod;
@@ -31,10 +29,6 @@ public sealed class StartSetupTooCloseSectionsTests
     private static readonly ReportContext Normal = new(null!, null!, Detailed: false);
     private static readonly ReportContext Detailed = new(null!, null!, Detailed: true);
 
-    private static readonly PhaseProblems Problems = new([new AssetProblem("m.nif", AssetProblemKind.NotFound, MeshProblem)]);
-
-    private static readonly PhaseProblems NoProblems = new([]);
-
     [Theory]
     [InlineData(null)]
     [InlineData("NoExtension")]
@@ -42,9 +36,9 @@ public sealed class StartSetupTooCloseSectionsTests
     public void Stop_GivesTheTextOfEveryUnusableTarget(string? target)
     {
         var settings = SettingsFor(target);
-        var stop = Assert.IsType<RunRequest.Stop>(RunSettingsValidation.Build(settings, new PluginNameParsingPlugin(), Facts(), OutputPath, Workers));
+        var stop = Assert.IsType<RunRequest.Stop>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), Facts(), OutputPath, Workers));
 
-        AssertExpectedOutput(LogSections.Stop(stop.Reason).Lines.ToArray(), "Stop_GivesTheTextOfEveryUnusableTarget", $"{target ?? "null"}");
+        AssertExpectedOutput(LogSections.BuildStopSection(stop.Reason).Lines.ToArray(), "Stop_GivesTheTextOfEveryUnusableTarget", $"{target ?? "null"}");
     }
 
     [Fact]
@@ -52,7 +46,7 @@ public sealed class StartSetupTooCloseSectionsTests
     {
         Assert.Equal(
             ["Nothing to check. No changes made."],
-            LogSections.Stop(new StopReason(StopKind.NoTargetObjects, null)).Lines.ToArray());
+            LogSections.BuildStopSection(new StopReason(StopKind.NoTargetObjects, null)).Lines.ToArray());
     }
 
     [Fact]
@@ -63,20 +57,35 @@ public sealed class StartSetupTooCloseSectionsTests
         settings.WhatToCheck.SizeMultiplier = 9f;
         settings.LeftoverInvisibleObjects = new LeftoverInvisibleObjectSettings { SearchRadius = 1f };
         settings.Diagnostics = new DiagnosticsSettings { DiagnosticsFolder = "bad\0folder" };
-        var ready = Assert.IsType<RunRequest.Ready>(RunSettingsValidation.Build(settings, new PluginNameParsingPlugin(), Facts(), OutputPath, Workers));
+        var ready = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), Facts(), OutputPath, Workers));
 
-        var lines = LogSections.Warnings(ready.Warnings).Lines.ToArray();
+        var lines = LogSections.BuildWarningsSection(ready.Warnings).Lines.ToArray();
 
         Assert.Equal(ready.Warnings.Select(warning => warning.Message), lines);
         AssertExpectedOutput(lines, "Warnings_GiveTheTextInTheOrderTheOptionsBuilderFoundThem");
     }
 
     [Fact]
-    public void ReportFolderWarning_PrintsTheMessageAsIs()
+    public void ReportFolderWarning_WordsTheFailedDeletion()
     {
-        var section = LogSections.ReportFolderWarning("  Warning: deleting earlier diagnostics files in /r failed: denied");
+        var section = LogSections.BuildReportFolderWarningSection(
+            new ReportFileProblem(ReportFileAction.DeletingEarlierFiles, "/r", FileName: null, "denied"));
 
         Assert.Equal(["  Warning: deleting earlier diagnostics files in /r failed: denied"], section.Lines.ToArray());
+    }
+
+    [Fact]
+    public void ReportFileWarnings_WordEachFailedWriteInOrder()
+    {
+        var section = LogSections.BuildReportFileWarningsSection(
+        [
+            new ReportFileProblem(ReportFileAction.WritingFile, "/r", "a.csv", "denied"),
+            new ReportFileProblem(ReportFileAction.WritingFile, "/r", "b.csv", "in use"),
+        ]);
+
+        Assert.Equal(
+            ["  Warning: writing a.csv in /r failed: denied", "  Warning: writing b.csv in /r failed: in use"],
+            section.Lines.ToArray());
     }
 
     [Theory]
@@ -103,10 +112,10 @@ public sealed class StartSetupTooCloseSectionsTests
         };
         settings.Diagnostics = new DiagnosticsSettings { DetailedLog = everythingOn, WriteReportFiles = everythingOn };
         var mods = Facts();
-        var options = Assert.IsType<RunRequest.Ready>(RunSettingsValidation.Build(settings, new PluginNameParsingPlugin(), mods, OutputPath, Workers)).Options;
-        var standing = IdentifyTheMods.Decide(mods, options.ModIdentification);
+        var runSettings = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), mods, OutputPath, Workers)).Settings;
+        var standing = ModIdentifier.Identify(mods, runSettings.ModIdentification);
 
-        var lines = LogSections.Config(options, standing).Lines.Select(line => line.Replace('\\', '/')).ToArray();
+        var lines = LogSections.BuildConfigSection(runSettings, standing).Lines.Select(line => line.Replace('\\', '/')).ToArray();
 
         AssertExpectedOutput(lines, "Config_GivesTheTextWithAndWithoutPatchesAndLeftovers", $"{everythingOn}");
     }
@@ -117,9 +126,9 @@ public sealed class StartSetupTooCloseSectionsTests
         var settings = SettingsFor("Target.esp");
         settings.WhatToIgnore = new IgnoreSettings { MaxOtherMastersForPatch = 1 };
         var mods = Facts();
-        var options = Assert.IsType<RunRequest.Ready>(RunSettingsValidation.Build(settings, new PluginNameParsingPlugin(), mods, OutputPath, Workers)).Options;
+        var runSettings = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), mods, OutputPath, Workers)).Settings;
 
-        var lines = LogSections.Config(options, IdentifyTheMods.Decide(mods, options.ModIdentification)).Lines.ToArray();
+        var lines = LogSections.BuildConfigSection(runSettings, ModIdentifier.Identify(mods, runSettings.ModIdentification)).Lines.ToArray();
 
         Assert.Contains("Compatibility patch detection: 2 plugins master the target.", lines);
         Assert.Contains(lines, line => line.StartsWith("  Plugin Merged.esp skipped: too many masters"));
@@ -132,7 +141,7 @@ public sealed class StartSetupTooCloseSectionsTests
     {
         var world = CreateWorld();
 
-        var lines = LogSections.Scan(world, Target.ToPluginName(), Elapsed, Detailed).Lines.ToArray();
+        var lines = LogSections.BuildScanSection(world, Target.ToPluginName(), Elapsed, Detailed).Lines.ToArray();
 
         AssertExpectedOutput(lines, "Scan_GivesTheTextWithTheDetailedLog");
         Assert.Contains("Scanned 9 placed records in 1.5s: 3 Target.esp objects to check, 2 objects from other mods.", lines);
@@ -141,7 +150,7 @@ public sealed class StartSetupTooCloseSectionsTests
     [Fact]
     public void Scan_ForTheNormalLogDropsTheTimingAndTheInternalCounts()
     {
-        var lines = LogSections.Scan(CreateWorld(), Target.ToPluginName(), Elapsed, Normal).Lines.ToArray();
+        var lines = LogSections.BuildScanSection(CreateWorld(), Target.ToPluginName(), Elapsed, Normal).Lines.ToArray();
 
         Assert.Equal(
             [
@@ -158,8 +167,8 @@ public sealed class StartSetupTooCloseSectionsTests
     {
         var execution = new Execution(Workers);
 
-        Assert.Equal(["Using 4 threads."], LogSections.Threads(execution, Detailed).Lines.ToArray());
-        Assert.Empty(LogSections.Threads(execution, Normal).Lines);
+        Assert.Equal(["Using 4 threads."], LogSections.BuildThreadsSection(execution, Detailed).Lines.ToArray());
+        Assert.Empty(LogSections.BuildThreadsSection(execution, Normal).Lines);
     }
 
     [Fact]
@@ -167,8 +176,8 @@ public sealed class StartSetupTooCloseSectionsTests
     {
         var world = CreateWorld();
 
-        AssertExpectedOutput(LogSections.Index(world, Elapsed, Detailed).Lines.ToArray(), "Index_GivesTheTextWithTheDetailedLogAndNothingWithout");
-        Assert.Empty(LogSections.Index(world, Elapsed, Normal).Lines);
+        AssertExpectedOutput(LogSections.BuildIndexSection(world, Elapsed, Detailed).Lines.ToArray(), "Index_GivesTheTextWithTheDetailedLogAndNothingWithout");
+        Assert.Empty(LogSections.BuildIndexSection(world, Elapsed, Normal).Lines);
     }
 
     [Fact]
@@ -176,12 +185,12 @@ public sealed class StartSetupTooCloseSectionsTests
     {
         ArchiveProblem[] problems =
         [
-            new(ArchiveProblemKind.ArchiveUnreadable, "a.bsa", ArchiveWarning),
-            new(ArchiveProblemKind.DataFolderUnlistable, "/data", "Warning: could not list archives in /data: denied"),
+            new(ArchiveProblemKind.ArchiveUnreadable, "a.bsa", "unreadable"),
+            new(ArchiveProblemKind.DataFolderUnlistable, "/data", "denied"),
         ];
 
-        AssertExpectedOutput(LogSections.ArchiveWarnings(problems).Lines.ToArray(), "ArchiveWarnings_ShowOneLinePerProblem");
-        Assert.Empty(LogSections.ArchiveWarnings([]).Lines);
+        AssertExpectedOutput(LogSections.BuildArchiveWarningsSection(problems).Lines.ToArray(), "ArchiveWarnings_ShowOneLinePerProblem");
+        Assert.Empty(LogSections.BuildArchiveWarningsSection([]).Lines);
     }
 
     [Fact]
@@ -195,30 +204,30 @@ public sealed class StartSetupTooCloseSectionsTests
         var groups = LinkedGroups.Build(3, [TestTargets.Link(0, 1)]);
 
         AssertExpectedOutput(
-            [.. LogSections.TargetVisibility(targets, 5, Detailed with { Shapes = shapes }).Lines, .. LogSections.Groups(groups, 2, Detailed).Lines],
+            [.. LogSections.BuildTargetVisibilitySection(targets, 5, Detailed with { Shapes = shapes }).Lines, .. LogSections.BuildGroupsSection(groups, 2, Detailed).Lines],
             "TargetVisibilityAndGroups_GiveTheTextWithTheDetailedLogAndNothingWithout");
-        Assert.Empty(LogSections.TargetVisibility(targets, 5, Normal).Lines);
-        Assert.Empty(LogSections.Groups(groups, 2, Normal).Lines);
+        Assert.Empty(LogSections.BuildTargetVisibilitySection(targets, 5, Normal).Lines);
+        Assert.Empty(LogSections.BuildGroupsSection(groups, 2, Normal).Lines);
     }
 
     [Fact]
-    public void Replacements_PutTheListThenTheProblemsThenTheSummary()
+    public void Replacements_PutTheListThenTheSummary()
     {
         var world = CreateWorld();
         var replacements = Replacements.Of(world.OtherModObjects.Length, [new Replacement(new OtherId(0), new TargetId(1), 3.5f, 0.9f)]);
 
-        AssertExpectedOutput(LogSections.Replacements(world, replacements, Problems, Elapsed, Detailed).Lines.ToArray(), "Replacements_PutTheListThenTheProblemsThenTheSummary");
+        AssertExpectedOutput(LogSections.BuildReplacementsSection(world, replacements, Elapsed, Detailed).Lines.ToArray(), "Replacements_PutTheListThenTheSummary");
         Assert.Equal(
             ["Replacement matching: 1 other-mod objects excluded."],
-            LogSections.Replacements(world, replacements, Problems, Elapsed, Normal).Lines.ToArray());
+            LogSections.BuildReplacementsSection(world, replacements, Elapsed, Normal).Lines.ToArray());
     }
 
     [Fact]
     public void TooClose_GivesTheTextForTheObjectShapeZoneWithStuckNpcs()
     {
-        var report = CreateTooCloseSection(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInObject, Problems);
+        var report = CreateTooCloseSection(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInObject);
 
-        var lines = LogSections.TooClose(report, Detailed).Lines.ToArray();
+        var lines = LogSections.BuildTooCloseSection(report, Detailed).Lines.ToArray();
 
         AssertExpectedOutput(lines, "TooClose_GivesTheTextForTheObjectShapeZoneWithStuckNpcs");
         Assert.Equal(1, lines.Count(line => line.StartsWith("Object-shape zones:")));
@@ -228,32 +237,58 @@ public sealed class StartSetupTooCloseSectionsTests
     [Fact]
     public void TooClose_GivesTheTextForTheBoundingBoxZoneWithIgnoredNpcs()
     {
-        var report = CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.Ignore, NoProblems);
+        var report = CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.Ignore);
 
-        var lines = LogSections.TooClose(report, Detailed).Lines.ToArray();
+        var lines = LogSections.BuildTooCloseSection(report, Detailed).Lines.ToArray();
 
         AssertExpectedOutput(lines, "TooClose_GivesTheTextForTheBoundingBoxZoneWithIgnoredNpcs");
         Assert.Contains(lines, line => line.StartsWith("NPCs and creatures: ignored;"));
     }
 
     [Fact]
-    public void TooClose_PutsTheShapeZoneStatisticsThenTheProblemsThenTheSummary()
+    public void TooClose_PutsTheShapeZoneStatisticsBeforeTheSummary()
     {
-        var lines = LogSections.TooClose(CreateTooCloseSection(ZoneShape.ObjectShape, NpcHandling.CountLikeObjects, Problems), Detailed).Lines;
+        var lines = LogSections.BuildTooCloseSection(CreateTooCloseSection(ZoneShape.ObjectShape, NpcHandling.CountLikeObjects), Detailed).Lines;
 
-        var order = new[] { "Object-shape zones:", MeshProblem, "Found " }
+        var order = new[] { "Object-shape zones:", "Found " }
             .Select(prefix => lines.ToList().FindIndex(line => line.StartsWith(prefix)))
             .ToArray();
         Assert.Equal(order.Order(), order);
         Assert.DoesNotContain(-1, order);
     }
 
+    /// <summary>The zone and NPC lines follow what the step reports it used, for every pair.</summary>
+    [Theory]
+    [InlineData(ZoneShape.BoundingBox, NpcHandling.CountLikeObjects, false, false, false)]
+    [InlineData(ZoneShape.BoundingBox, NpcHandling.OnlyWhenStuckInObject, false, true, false)]
+    [InlineData(ZoneShape.BoundingBox, NpcHandling.Ignore, false, false, true)]
+    [InlineData(ZoneShape.ObjectShape, NpcHandling.CountLikeObjects, true, false, false)]
+    [InlineData(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInObject, true, true, false)]
+    [InlineData(ZoneShape.ObjectShape, NpcHandling.Ignore, true, false, true)]
+    public void TooClose_PrintsTheZoneAndNpcLinesTheResultSays(ZoneShape zone, NpcHandling npcs, bool zoneLines, bool stuckLines, bool ignoredLine)
+    {
+        var lines = LogSections.BuildTooCloseSection(CreateTooCloseSection(zone, npcs), Detailed).Lines.ToArray();
+
+        Assert.Equal(zoneLines, lines.Any(line => line.StartsWith("Object-shape zones:")));
+        Assert.Equal(stuckLines, lines.Any(line => line.StartsWith("NPCs and creatures (only when stuck")));
+        Assert.Equal(ignoredLine, lines.Any(line => line.StartsWith("NPCs and creatures: ignored;")));
+    }
+
+    [Fact]
+    public void TooClose_ThrowsWhenTheStepHandledNpcsOnlyWhenStuckButGaveNoSummary()
+    {
+        var report = CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.CountLikeObjects);
+        var inconsistent = report with { Result = report.Result with { Npcs = NpcHandling.OnlyWhenStuckInObject } };
+
+        Assert.Throws<InvalidOperationException>(() => LogSections.BuildTooCloseSection(inconsistent, Detailed));
+    }
+
     [Fact]
     public void TooClose_ForTheNormalLogKeepsTheResultAndTheKeptObjectsOnly()
     {
-        var report = CreateTooCloseSection(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInObject, Problems);
+        var report = CreateTooCloseSection(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInObject);
 
-        var lines = LogSections.TooClose(report, Normal).Lines.ToArray();
+        var lines = LogSections.BuildTooCloseSection(report, Normal).Lines.ToArray();
 
         Assert.Equal(
             [
@@ -263,7 +298,7 @@ public sealed class StartSetupTooCloseSectionsTests
             lines);
     }
 
-    private static TooCloseSection CreateTooCloseSection(ZoneShape zone, NpcHandling npcs, PhaseProblems problems)
+    private static TooCloseSection CreateTooCloseSection(ZoneShape zone, NpcHandling npcs)
     {
         var world = CreateWorld();
         var zoneWork = zone == ZoneShape.ObjectShape ? new ShapeZoneWork(10, 8, 6, 3, 2, 1, 40) : default;
@@ -276,17 +311,17 @@ public sealed class StartSetupTooCloseSectionsTests
             new TooCloseWork(zoneWork, default),
             stuck,
             LargeOtherObjects: 2,
-            Failures: []);
+            Failures: [],
+            zone,
+            npcs);
         var census = new InvisibleOtherObjectCounts([new("Lights", 3), new("Sounds", 1)], PlacedNpcs: 7);
         var kept = new KeptObject(2, TestKeepReasons.Quest, null);
         return new TooCloseSection(
             world,
             Target.ToPluginName(),
-            new TooCloseOptions(1.5f, zone, npcs),
             result,
             census,
             [kept],
-            problems,
             MeshesIndexed: 4,
             MeshTriangles: 900,
             BodiesBuilt: 3,
@@ -300,14 +335,18 @@ public sealed class StartSetupTooCloseSectionsTests
     private static CollectedObjects CreateWorld()
     {
         var space = TestTargets.Space;
+        var targets = TestTargets.CreateMany(3);
         return new CollectedObjects(
-            [.. TestTargets.CreateMany(3)],
+            [.. targets],
             [CreateOtherModObject(0, "Alpha"), CreateOtherModObject(1, "Beta")],
             ImmutableArray.Create(CreateOtherModObject(2, "Gamma")),
+            true,
             [],
             new Dictionary<RecordKey, SpaceFact> { [space] = new(space, "Tamriel", SpaceKind.Worldspace) },
             new ReadCounts(RecordsScanned: 9, TargetsOverriddenLater: 4, TargetsHiddenOrWithoutPlacement: 5, OthersOverriddenByTarget: 7, OtherInvalidPlacements: 6, NavmeshCount: 8),
-            [new OverriddenOtherRecord(new FormKey(Other, 0x50).ToRecordKey(), "Overridden", Other.ToPluginName())]);
+            [new OverriddenOtherRecord(new FormKey(Other, 0x50).ToRecordKey(), "Overridden", Other.ToPluginName())],
+            TargetWorkOrder.Of(targets),
+            null);
     }
 
     private static OtherObject CreateOtherModObject(int index, string editorId) =>

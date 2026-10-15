@@ -30,9 +30,10 @@ internal static class TestTouchCascade
         var execution = new Execution(threads);
         var seeded = TestSeededDecisions.Seed(protection, targets.Count, seeds);
         var triangles = new TriangleStore(shapes.ReadTriangles);
-        var input = new RestingObjectsInput(
+        var input = new RoundsInput(
             [.. targets], protection, ObjectsOfAnyPlugin: null, shapes, triangles, NoTerrain(), execution);
-        var result = TestRestingObjects.Run(seeded, input, new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouching, touchDistance, SupportLostFraction: 1f));
+        var result = TestRestingObjects.Run(
+            seeded, input, new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouching, touchDistance, SupportLostFraction: 1f, TouchChainsShown: false));
         return Explain(targets, shapes, triangles, result, execution, collectDiagnostics);
     }
 
@@ -67,12 +68,12 @@ internal static class TestTouchCascade
         IReadOnlyList<TargetObject> targets, IBaseObjectShapes shapes, TriangleStore triangles, RestingObjectsRun restingObjects, Execution execution, bool collectDiagnostics)
     {
         var result = restingObjects.Result;
-        var touchChains = RestingObjects.FindTouchChains(restingObjects, targets.Count, execution);
+        var touchChains = TouchChains.Find(restingObjects, targets.Count, execution);
         // Touch explanations never read base facts.
         var explanation = collectDiagnostics
             ? ExplanationFinder.Compute(new ReportFileDetailsInput(restingObjects, touchChains, [.. targets], shapes, triangles, Bases: null!, execution)).Touch
             : null;
-        return new Run(result.RemovalDecisions, result.Rounds)
+        return new Run(restingObjects.Decisions, result.Rounds)
         {
             Result = result,
             TouchChains = touchChains,

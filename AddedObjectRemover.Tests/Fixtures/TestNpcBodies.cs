@@ -10,9 +10,11 @@ internal static class TestNpcBodies
     public static NpcBodyCache Create(ILinkCache linkCache, IBaseObjectShapes shapes, IBodyMeshBounds? bodyBounds = null)
     {
         var meshFiles = TestShapes.MeshFilesOf(shapes);
+        var rules = TooCloseObjects.NpcBodyRules;
         return new(
             new NpcRecordsPlugin(linkCache),
-            NpcTemplateFlag.Traits,
-            new NpcBodyResolver(meshFiles, bodyBounds ?? new BodyMeshBounds(meshFiles)));
+            rules.TemplateFlag,
+            rules.CreateOwnBodyResolver(meshFiles, bodyBounds ?? new BodyMeshBounds(meshFiles)),
+            rules.DistinctBodies);
     }
 }

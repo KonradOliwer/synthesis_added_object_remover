@@ -1,0 +1,24 @@
+# Static methods and local functions of this module that mention no domain type (Ids or a Contracts type), each with its reason.
+# Form: Type.Member | reason  (local function: Type.Method.Local). The test fails when an entry stops being flagged.
+Describe.Cell | Report wording: labels a cell fact (a plugin-facts type outside the domain list).
+Describe.Space | Report wording: labels a space fact (a plugin-facts type outside the domain list).
+KeepReasonText.Relation | Report wording: names a link relation.
+LogAndReports.IsAboutMesh | Report filter: tells whether a failure's part key is a mesh reader's per-mesh part (an error-channel record, not a domain type).
+LogAndReports.Present | Report filter: keeps the failures a step result carries and drops the absent ones (an error-channel record, not a domain type).
+LogAndReports.WithPrintedMesh | Report wording: replaces a mesh error's subject with the spelling the mesh reader says to print (a tool's key and record types, not domain types).
+LogSections.AlsoRemoveMeshes | Report wording: prints mesh statistics (a tool's statistics type).
+LogSections.AlsoRemovePairs | Report wording: prints mesh-pair statistics (a tool's statistics type).
+LogSections.BuildNotPerformedLine | Report wording: the one line of a step or report files that an unexpected error stopped; it takes only the section's name.
+LogSections.BuildNotPerformedBecauseEarlierLine | Report wording: the one line of a step that an earlier section's step not being performed stopped; it takes only the two section names.
+LogSections.JoinOrNone | Report wording: joins names or prints "(none)".
+LogSections.MeshProblemLinesInOrder | Report ordering: sorts the mesh problems by mesh, then by their worded line (a mesh tool's problem record, not a domain type).
+MeshProblemText.Line | Report wording: the line of one mesh or archive problem (a mesh tool's problem record, not a domain type).
+MeshProblemText.FooterRootLine | Report wording: the line of a footer root problem (a mesh tool's problem record, not a domain type).
+MeshProblemText.ReadFailure | Report wording: why one mesh read failed (a mesh tool's failure record, not a domain type).
+MeshProblemText.FailureCategory | Report wording: a mesh failure as the "Mesh failures" line counts it (a mesh tool's category, not a domain type).
+MeshProblemText.InvalidCoordinatesText | Report wording: the invalid-coordinates text (a mesh tool's fact, not a domain type).
+MeshProblemText.ShapeCountsText | Report wording: the shape counts of a mesh without geometry (a mesh tool's fact, not a domain type).
+MeshProblemText.Required | Report check: a mesh fact the kind needs is present; a missing one is a bug.
+RunPartText.Unknown | Report check: the bug exception for a part key without wording (a tool's key type, not a domain type).
+Tables.CountByComponent | Report counting: how many targets each touching chain holds; plain integers.
+Tables.DescribeSeedReasons | Report wording: joins the seed reasons of a chain (a tool's table type).

@@ -6,7 +6,7 @@ namespace AddedObjectRemover.Tests.Fixtures;
 /// <summary>Answers the NPC reads from in-memory records through the real readers; nothing else is read.</summary>
 internal sealed class NpcRecordsPlugin(ILinkCache linkCache) : IPluginRecords
 {
-    private readonly NpcRecordReads _npcReads = new(linkCache);
+    private readonly NpcRecordReads _npcReads = new(linkCache, new KnownPluginNames(linkCache.ListedOrder.Select(mod => mod.ModKey.ToPluginName())));
 
     public NpcTraits? NpcTraitsOf(BaseKey npc) => _npcReads.NpcTraitsOf(npc);
 

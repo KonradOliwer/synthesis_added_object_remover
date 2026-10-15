@@ -6,7 +6,7 @@ internal static class PlacementCheck
     /// Fails unless the code is used only inside <paramref name="allowedPlaces"/>, apart from the listed exceptions.
     /// Also fails when an allowed place matches no file or an exception is no longer needed, so the lists cannot go stale.
     /// </summary>
-    /// <param name="exceptions">Files outside the allowed places that may use it for now, each with the reason.</param>
+    /// <param name="exceptions">Files outside the allowed places that may use it, each with the reason.</param>
     public static void AssertUsedOnlyIn(
         Func<SourceFile, bool> uses,
         IReadOnlyList<string> allowedPlaces,

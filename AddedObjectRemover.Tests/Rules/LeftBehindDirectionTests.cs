@@ -22,7 +22,7 @@ public class LeftBehindDirectionTests
         var box = Place(Table, position, zRadians: 0.7f);
         var point = position + TestTargets.At(Vector3.Zero, 0.7f).ToWorld(new Vector3(x, y, z));
 
-        Assert.Equal(CompassDirections.All, VisibleTargetObjects.FindSectors(box, point));
+        Assert.Equal(CompassDirections.All, LeftBehindRule.FindSectors(box, point));
     }
 
     [Theory]
@@ -35,8 +35,8 @@ public class LeftBehindDirectionTests
         var box = Place(Table, Vector3.Zero);
         var sector = Enum.Parse<DirectionSector>(expected);
 
-        AssertOnly(sector, VisibleTargetObjects.FindSectors(box, new Vector3(pointX, pointY, 41f)));
-        AssertOnly(sector, VisibleTargetObjects.FindSectors(box, new Vector3(pointX, pointY, -500f)));
+        AssertOnly(sector, LeftBehindRule.FindSectors(box, new Vector3(pointX, pointY, 41f)));
+        AssertOnly(sector, LeftBehindRule.FindSectors(box, new Vector3(pointX, pointY, -500f)));
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public class LeftBehindDirectionTests
     {
         var box = Place(Table, new Vector3(300, 400, 0));
 
-        AssertOnly(CompassDirections.NoHorizontalOffset, VisibleTargetObjects.FindSectors(box, new Vector3(300, 400, 41f)));
+        AssertOnly(CompassDirections.NoHorizontalOffset, LeftBehindRule.FindSectors(box, new Vector3(300, 400, 41f)));
     }
 
     [Fact]
@@ -56,9 +56,9 @@ public class LeftBehindDirectionTests
         var besideTheBeam = new Vector3(50, 50, 20);
 
         Assert.True(beam.IsCrossedByVerticalLine(overTheBeam));
-        AssertOnly(DirectionSector.NorthWest, VisibleTargetObjects.FindSectors(beam, overTheBeam));
+        AssertOnly(DirectionSector.NorthWest, LeftBehindRule.FindSectors(beam, overTheBeam));
         Assert.False(beam.IsCrossedByVerticalLine(besideTheBeam));
-        AssertOnly(DirectionSector.SouthWest, VisibleTargetObjects.FindSectors(beam, besideTheBeam));
+        AssertOnly(DirectionSector.SouthWest, LeftBehindRule.FindSectors(beam, besideTheBeam));
     }
 
     [Fact]
@@ -66,8 +66,8 @@ public class LeftBehindDirectionTests
     {
         var box = Place(Table, new Vector3(100, 60, 0));
 
-        AssertOnly(DirectionSector.East, VisibleTargetObjects.FindSectors(box, new Vector3(0, 40, 20)));
-        AssertOnly(DirectionSector.NorthEast, VisibleTargetObjects.FindSectors(box, new Vector3(0, 0, 20)));
+        AssertOnly(DirectionSector.East, LeftBehindRule.FindSectors(box, new Vector3(0, 40, 20)));
+        AssertOnly(DirectionSector.NorthEast, LeftBehindRule.FindSectors(box, new Vector3(0, 0, 20)));
     }
 
     private static void AssertOnly(DirectionSector expected, IReadOnlyList<DirectionSector> actual) =>

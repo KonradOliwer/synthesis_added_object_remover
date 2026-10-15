@@ -63,6 +63,28 @@ public class OtherObjectBoundsTests
         Assert.Equal(new OtherId(0), FindInBoxZone(otherModObjects, Vector3.Zero));
     }
 
+    [Fact]
+    public void TheCachesUseTheMeasurementRuleTheyAreGiven()
+    {
+        var crate = Place(0, Crate, Vector3.Zero);
+        var givenCentre = new Vector3(1, 2, 3);
+
+        var given = TestScenes.Create([], [crate], Shapes, measurementRules: RulesMeasuring(new ObjectMeasurement(IsVisible: true, givenCentre)))
+            .OtherModObjects.IndexOf(crate.SpaceKey);
+        var invisible = TestScenes.Create([], [crate], Shapes, measurementRules: RulesMeasuring(new ObjectMeasurement(IsVisible: false, default)))
+            .OtherModObjects.IndexOf(crate.SpaceKey);
+        var selectRule = TestScenes.Create([], [crate], Shapes).OtherModObjects.IndexOf(crate.SpaceKey);
+
+        Assert.True(given.TryGetVisibleCenter(0, out var centre));
+        Assert.Equal(givenCentre, centre);
+        Assert.False(invisible.IsVisible(0));
+        Assert.True(selectRule.TryGetVisibleCenter(0, out var ruleCentre));
+        Assert.Equal(Vector3.Zero, ruleCentre);
+    }
+
+    private static ObjectMeasurementRules RulesMeasuring(ObjectMeasurement measurement) =>
+        RemovalCauseSelector.MeasurementRules(new UnexpectedErrors()) with { OtherModObjects = (_, _) => measurement };
+
     private static OtherId? FindInBoxZone(OtherObject[] otherModObjects, Vector3 targetPosition)
     {
         var target = TestTargets.Create(0, TestTargets.At(targetPosition)) with { Base = Crate.Base };
@@ -74,7 +96,8 @@ public class OtherObjectBoundsTests
     private static OtherObject Place(int id, TestStatic model, Vector3 position) => TestShapes.Placed(Mod, id, model.Base, position);
 
     private static IOtherObjectIndex CreateIndex(params OtherObject[] objects) =>
-        new PlacedSpaces(objects, Shapes, onMeasureFailed: null, new Execution(Environment.ProcessorCount)).IndexOf(objects[0].SpaceKey);
+        new PlacedSpaces(objects, Shapes, RemovalCauseSelector.MeasurementRules(new UnexpectedErrors()).ObjectsOfAnyPlugin, new ObjectContainment(Shapes, new TriangleStore(Shapes.ReadTriangles)), new Execution(Environment.ProcessorCount))
+            .IndexOf(objects[0].SpaceKey);
 
     private static List<int> Collect(IOtherObjectIndex index, Box area)
     {

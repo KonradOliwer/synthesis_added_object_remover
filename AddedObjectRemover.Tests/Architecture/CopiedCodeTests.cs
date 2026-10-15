@@ -13,24 +13,34 @@ public class CopiedCodeTests
     private const string EnumTextArms = "Enum-to-text switch arms ending in the same unreachable-case throw; each switch lists the values of its own enum.";
     private const string CsvColumnNames = "CSV header column names; each table lists its own columns.";
     private const string CounterRecord = "Counter records: each lists its own counters and its sum, which only repeat in shape.";
-    private const string SectionOneLiners = "One-line log section factories (a name and the message lines of their input); no logic to share.";
-
+    private const string PartKeyLines = "One line per part key: Report's own keys and the wording table; each line names its own part, so there is no logic to share.";
+    private const string ViewForwarders ="One-line members of a read-only view, each forwarding one question of the index to its caller; no logic to share.";
     private static readonly Dictionary<string, string> Allowed = new()
     {
+        ["381097ef"] = ViewForwarders,
         ["69c3a048"] = CountLines,
         ["3c3e351b"] = CountLines,
-        ["838dc0ce"] = "Setting-by-setting check lines; each reads another setting with its own default, limit and wording.",
+        ["ad72ce4a"] = "Setting-by-setting check lines; each reads another setting with its own default, limit and wording.",
         ["51c0267e"] = EnumTextArms,
         ["38364156"] = EnumTextArms,
         ["41674f6a"] = EnumTextArms,
         ["02151952"] = EnumTextArms,
         ["6133e948"] = EnumTextArms,
-        ["4a06039b"] = SectionOneLiners,
+        ["f2b48187"] = EnumTextArms,
+        ["d88de8fa"] = EnumTextArms,
+        ["36669ab4"] = EnumTextArms,
+        ["77582c33"] = EnumTextArms,
+        ["1af3a0e9"] = EnumTextArms,
+        ["a2d271eb"] = EnumTextArms,
+        ["85655c0e"] = EnumTextArms,
         ["a1996b85"] = "Declaration of a report class with a constant or header list; the tables share only the shape of the declaration.",
         ["cc66e963"] = CsvColumnNames,
         ["495d7d50"] = CsvColumnNames,
         ["32074483"] = CounterRecord,
         ["4562028d"] = CounterRecord,
+        ["2f9e9dfc"] = "Per-object error boundary of two steps: each catches the failure of its own kind of object under its own part key and recovers in its own way; they share only the shape.",
+        ["cc8ed741"] = PartKeyLines,
+        ["463ce630"] = PartKeyLines,
     };
 
     [Fact]

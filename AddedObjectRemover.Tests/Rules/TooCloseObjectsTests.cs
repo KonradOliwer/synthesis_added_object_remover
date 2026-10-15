@@ -47,10 +47,10 @@ public class TooCloseObjectsTests
     public void FindGivesTheSameResultAsTheSearches(ZoneShape zone, NpcHandling npcs)
     {
         var scene = CreateScene();
-        var options = new TooCloseOptions(Multiplier, zone, npcs);
+        var settings = new TooCloseSettings(Multiplier, zone, npcs);
 
-        var expected = FindWithSearches(scene, options);
-        var actual = FindWithFacade(scene, options);
+        var expected = FindWithSearches(scene, settings);
+        var actual = FindWithFacade(scene, settings);
 
         Assert.NotEmpty(expected.Search.Hits);
         Assert.Equal(expected.Search.Hits, actual.Hits);
@@ -61,49 +61,48 @@ public class TooCloseObjectsTests
         if (expected.Summary is { } summary) Assert.Equal(Describe(summary), Describe(actual.Npc!));
     }
 
-    private static (TooCloseSearchResult Search, int LargeOtherObjects, NpcStuckSummary? Summary) FindWithSearches(TooCloseScene scene, TooCloseOptions options)
+    private static (TooCloseSearchResult Search, int LargeOtherObjects, NpcStuckSummary? Summary) FindWithSearches(TooCloseScene scene, TooCloseSettings settings)
     {
         var replacements = Replacements.None(scene.OtherModObjects.Count);
         var world = CreateWorld(scene);
-        var otherModObjects = world.ObjectsThatCanCauseRemovals(replacements, options.Npcs);
+        var otherModObjects = world.ObjectsThatCanCauseRemovals(replacements, settings.Npcs);
         var npcRule = NpcTooCloseRule.Create(
-            options.Npcs,
+            settings.Npcs,
             () => NpcStuckSearch.Create(scene.Targets, world.VisibleTargets, world.NpcsThatCanSpawn(replacements), Shapes, NewTriangles()));
         var order = TargetWorkOrder.Of(scene.Targets);
         var execution = new Execution(Threads);
         var largeOtherObjects = 0;
-        var search = options.Zone switch
+        var search = settings.Zone switch
         {
             ZoneShape.BoundingBox => TooCloseSearch.FindTooCloseTargets(
-                scene.Targets, otherModObjects, Shapes, options.Multiplier, npcRule, order, execution),
-            _ => FindInShapeZone(scene, options, world.VisibleTargets, otherModObjects, npcRule, order, execution, out largeOtherObjects),
+                scene.Targets, otherModObjects, Shapes, settings.Multiplier, npcRule, order, execution),
+            _ => FindInShapeZone(scene, settings, world.VisibleTargets, otherModObjects, npcRule, order, execution, out largeOtherObjects),
         };
         return (search, largeOtherObjects, npcRule.StuckSearch?.GetSummary(search.Work.Npcs));
     }
 
     private static TooCloseSearchResult FindInShapeZone(
-        TooCloseScene scene, TooCloseOptions options, IVisibleTargetObjects visibleTargets, IObjectsThatCanCauseRemovals otherModObjects, NpcTooCloseRule npcRule, WorkOrder order, Execution execution, out int largeOtherObjects)
+        TooCloseScene scene, TooCloseSettings settings, IVisibleTargetObjects visibleTargets, IObjectsThatCanCauseRemovals otherModObjects, NpcTooCloseRule npcRule, WorkOrder order, Execution execution, out int largeOtherObjects)
     {
-        var zone = ShapeZoneSearch.Create(scene.Targets, visibleTargets, otherModObjects, Shapes, NewTriangles(), options.Multiplier, npcRule);
+        var zone = ShapeZoneSearch.Create(scene.Targets, visibleTargets, otherModObjects, Shapes, NewTriangles(), settings.Multiplier, npcRule);
         largeOtherObjects = zone.LargeOtherObjects;
         return zone.FindTooCloseTargets(order, execution);
     }
 
-    private static TooCloseResult FindWithFacade(TooCloseScene scene, TooCloseOptions options)
+    private static TooCloseResult FindWithFacade(TooCloseScene scene, TooCloseSettings settings)
     {
         var replacements = Replacements.None(scene.OtherModObjects.Count);
-        var world = CreateWorld(scene);
+        var caches = CreateWorld(scene);
         return TooCloseObjects.Find(
-            new TooCloseInput(
-                [.. scene.Targets],
-                world.VisibleTargets,
-                TargetWorkOrder.Of(scene.Targets),
-                world.ObjectsThatCanCauseRemovals(replacements, options.Npcs),
-                options.Npcs == NpcHandling.OnlyWhenStuckInObject ? world.NpcsThatCanSpawn(replacements) : null,
-                Shapes,
-                NewTriangles(),
-                new Execution(Threads)),
-            options);
+            TestScenes.CreateWorld(scene.Targets, scene.OtherModObjects),
+            caches.VisibleTargets,
+            caches.ObjectsThatCanCauseRemovals(replacements, settings.Npcs),
+            caches.PlacedNpcs,
+            replacements,
+            Shapes,
+            NewTriangles(),
+            new Execution(Threads),
+            settings);
     }
 
     /// <summary>Visible targets with and without meshes, every few of them invisible, among other mods' objects and placed NPCs.</summary>

@@ -17,7 +17,4 @@ public static class TextFormat
     public static string Percent<T>(T share) where T : IFormattable => share.ToString("P0", null);
 
     public static string Seconds(TimeSpan elapsed) => Fixed(elapsed.TotalSeconds, SecondsDecimals) + "s";
-
-    /// <summary>The duration as a suffix, like " in 1.2s".</summary>
-    public static string InSeconds(TimeSpan elapsed) => $" in {Seconds(elapsed)}";
 }

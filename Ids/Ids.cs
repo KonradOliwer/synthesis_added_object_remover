@@ -44,10 +44,22 @@ public readonly struct PluginName: IEquatable<PluginName>
     public static bool operator !=(PluginName first, PluginName second) => !first.Equals(second);
 }
 
-/// <summary>A record's identity: the plugin that first defines it and its local FormID. Prints as "00ABCD:Example.esp".</summary>
+/// <summary>
+/// A record's identity: the plugin that first defines it and its local FormID. Prints as "00ABCD:Example.esp".
+/// <see cref="Null"/> is the key of a link that points at no record and prints as "Null"; <see cref="None"/> is the
+/// key of a link that is explicitly empty and prints as "None".
+/// </summary>
 public readonly record struct RecordKey(PluginName Plugin, uint Id)
 {
-    public override string ToString() => $"{Id:X6}:{Plugin}";
+    private const string NullText = "Null";
+    private const string NoneText = "None";
+    private const uint NoneId = 0xFFFFFF;
+
+    public static RecordKey Null => default;
+
+    public static RecordKey None => new(default, NoneId);
+
+    public override string ToString() => this == Null ? NullText : this == None ? NoneText : $"{Id:X6}:{Plugin}";
 }
 
 /// <summary>The kind of record a placed record's base link expects.</summary>

@@ -15,11 +15,9 @@ public class RestingObjectsCountsTests
     [InlineData(SettingsVariants.Support, 1, 0)]
     public void TheRestingObjectsResultHoldsTheExpectedCounts(string variant, int removed, int held)
     {
-        var alsoRemove = RunRestingObjects(SettingsVariants.Of(variant));
+        var outcome = FixtureRun.Execute(SettingsVariants.Of(variant), Workers);
 
-        Assert.Equal(removed, RestingObjectsRemovals.CountByRule(alsoRemove));
-        Assert.Equal(held, alsoRemove.CountKept());
+        Assert.Equal(removed, RestingObjectsRemovals.CountByRule(outcome.RestingObjects, outcome.Final));
+        Assert.Equal(held, RestingObjectsRemovals.CountKept(outcome.RestingObjects, outcome.Final));
     }
-
-    private static RestingObjectsResult RunRestingObjects(Settings settings) => FixtureRun.Execute(settings, Workers).RestingObjects;
 }

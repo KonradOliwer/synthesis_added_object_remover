@@ -11,6 +11,8 @@ internal static partial class SolutionLayout
 
     public static string Root() => RootFrom();
 
+    public static string ProductionFolder() => Path.Combine(Root(), "AddedObjectRemover");
+
     /// <summary>Every csproj under the repository root except those in build output, as full paths.</summary>
     public static IReadOnlyList<string> ProjectFiles() =>
         Directory.EnumerateFiles(Root(), "*.csproj", SearchOption.AllDirectories)

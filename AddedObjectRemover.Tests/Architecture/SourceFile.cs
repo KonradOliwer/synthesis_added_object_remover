@@ -3,8 +3,7 @@ using System.Text.RegularExpressions;
 namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
-/// One production source file, located by its path inside its project. The project split replaces the
-/// folder and file lists the scans use with project boundaries.
+/// One production source file, located by its path inside its project.
 /// </summary>
 /// <param name="Path">With '/' separators; relative to the entry project folder for its files, otherwise to the solution folder (such as "Tools/BoxAndTransformMath/Box.cs").</param>
 internal sealed partial record SourceFile(string Project, string Path, string FullPath)
@@ -17,11 +16,14 @@ internal sealed partial record SourceFile(string Project, string Path, string Fu
     /// <summary>Like <see cref="Code"/>, but the expressions inside interpolated strings are kept, because the names they use count as uses.</summary>
     public string CodeWithInterpolatedExpressions { get; } = CodeWithExpressionsOf(File.ReadAllText(FullPath));
 
+    /// <summary>The text of every string literal as written between its quotes (interpolation holes included), comments excluded.</summary>
+    public IReadOnlyList<string> StringLiterals { get; } = StringLiteralsOf(File.ReadAllText(FullPath));
+
     public string Description => $"{Project}: {Path}";
 
-    /// <summary>The file is one of the listed files or inside one of the listed folders.</summary>
+    /// <summary>The file is one of the listed files, inside one of the listed folders, or in one of the listed projects.</summary>
     public bool IsIn(IEnumerable<string> places) =>
-        places.Any(place => Path == place || Path.StartsWith(place + "/", StringComparison.Ordinal));
+        places.Any(place => Project == place || Path == place || Path.StartsWith(place + "/", StringComparison.Ordinal));
 
     public static IReadOnlyList<SourceFile> All() => Files.Value;
 
@@ -30,6 +32,14 @@ internal sealed partial record SourceFile(string Project, string Path, string Fu
 
     public static string CodeOf(string text) =>
         CommentsAndLiteralsPattern().Replace(text, match => match.Value.StartsWith('/') ? "" : "\"\"");
+
+    public static IReadOnlyList<string> StringLiteralsOf(string text) =>
+    [
+        .. CommentsAndLiteralsPattern().Matches(text)
+            .Select(match => match.Value)
+            .Where(value => value[0] is '"' or '@' or '$')
+            .Select(value => value.TrimStart('$', '@')[1..^1]),
+    ];
 
     public static string CodeWithExpressionsOf(string text) =>
         CommentsAndLiteralsPattern().Replace(text, match => match.Value[0] switch
@@ -45,8 +55,8 @@ internal sealed partial record SourceFile(string Project, string Path, string Fu
                 project.Project, System.IO.Path.GetRelativePath(PathBase(project), file).Replace('\\', '/'), file)))
             .ToList();
 
-    private static string PathBase(ProjectSources project) =>
-        project.Folder == BusinessCode.ProductionFolder() ? project.Folder : SolutionLayout.Root();
+    public static string PathBase(ProjectSources project) =>
+        project.Folder == SolutionLayout.ProductionFolder() ? project.Folder : SolutionLayout.Root();
 
     /// <summary>Top-level types only (declared at the start of a line, in a file-scoped namespace); a nested type is reached through its outer type.</summary>
     [GeneratedRegex(@"^(?:\w+\s+)*?(?:class|struct|interface|enum|record)\s+(?:(?:class|struct)\s+)?(?<name>[A-Z]\w*)", RegexOptions.Multiline)]

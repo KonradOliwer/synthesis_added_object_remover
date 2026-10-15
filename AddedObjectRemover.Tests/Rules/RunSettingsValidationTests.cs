@@ -19,7 +19,7 @@ public class RunSettingsValidationTests
         new() { WhatToCheck = new CheckSettings { TargetPlugin = target! } };
 
     private static RunRequest.Ready BuildReady(Settings settings, LoadOrderPlugins? facts = null, int workers = 3) =>
-        Assert.IsType<RunRequest.Ready>(RunSettingsValidation.Build(settings, new PluginNameParsingPlugin(), facts ?? Facts(), OutputPath, workers));
+        Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), facts ?? Facts(), OutputPath, workers));
 
     [Theory]
     [InlineData(null, (int)StopKind.NoTargetSet, null)]
@@ -28,7 +28,7 @@ public class RunSettingsValidationTests
     [InlineData("Missing.esp", (int)StopKind.TargetNotInLoadOrder, "Missing.esp")]
     public void ATargetThatCannotBeUsedStopsTheRun(string? target, int kind, string? name)
     {
-        var stop = Assert.IsType<RunRequest.Stop>(RunSettingsValidation.Build(SettingsFor(target), new PluginNameParsingPlugin(), Facts(), OutputPath, 1));
+        var stop = Assert.IsType<RunRequest.Stop>(SettingsValidator.Build(SettingsFor(target), new PluginNameParsingPlugin(), Facts(), OutputPath, 1));
         Assert.Equal(new StopReason((StopKind)kind, name), stop.Reason);
     }
 
@@ -37,8 +37,8 @@ public class RunSettingsValidationTests
     {
         var ready = BuildReady(SettingsFor());
         Assert.Empty(ready.Warnings);
-        Assert.Equal(Target, ready.Options.Target);
-        Assert.Equal(3, ready.Options.Execution.Workers);
+        Assert.Equal(Target, ready.Settings.Target);
+        Assert.Equal(3, ready.Settings.Execution.Workers);
     }
 
     [Fact]
@@ -110,16 +110,16 @@ public class RunSettingsValidationTests
     {
         var settings = SettingsFor();
         settings.WhatToIgnore = new IgnoreSettings { ExcludedPlugins = [" Other.esp ", "bad", ""] };
-        Assert.Equal("Other.esp", Assert.Single(BuildReady(settings).Options.ExcludedNames));
+        Assert.Equal("Other.esp", Assert.Single(BuildReady(settings).Settings.ExcludedNames));
     }
 
     [Fact]
     public void TheTargetIsComparedAsTheLoadOrderSpellsItAndPrintedAsTheSettingsSpellIt()
     {
         var ready = BuildReady(SettingsFor(" TARGET.ESP "));
-        Assert.Equal("Target.esp", ready.Options.Target.FileName);
-        Assert.Equal("Target.esp", ready.Options.ModIdentification.Target.FileName);
-        Assert.Equal("TARGET.esp", ready.Options.TargetAsTyped.FileName);
+        Assert.Equal("Target.esp", ready.Settings.Target.FileName);
+        Assert.Equal("Target.esp", ready.Settings.ModIdentification.Target.FileName);
+        Assert.Equal("TARGET.esp", ready.Settings.TargetAsTyped.FileName);
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public class RunSettingsValidationTests
     {
         var settings = SettingsFor();
         settings.WhatToIgnore = new IgnoreSettings { ExcludedPlugins = ["PATCH.ESP", "Unknown.esp"] };
-        Assert.Equal("Patch.esp", Assert.Single(BuildReady(settings).Options.ModIdentification.Excluded).FileName);
+        Assert.Equal("Patch.esp", Assert.Single(BuildReady(settings).Settings.ModIdentification.Excluded).FileName);
     }
 
     [Theory]
@@ -137,9 +137,49 @@ public class RunSettingsValidationTests
     {
         var settings = SettingsFor();
         settings.Diagnostics = new DiagnosticsSettings { DetailedLog = detailed };
-        var plan = BuildReady(settings).Options.Read;
+        var plan = BuildReady(settings).Settings.Read;
         Assert.Equal(expected, plan.OtherEditorIds);
         Assert.Equal(expected, plan.OverriddenOthersList);
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]
+    public void TouchChainsAreShownForTheDetailedLogOrTheReportFiles(bool detailed, bool reports, bool expected)
+    {
+        var settings = SettingsFor();
+        settings.Diagnostics = new DiagnosticsSettings { DetailedLog = detailed, WriteReportFiles = reports };
+
+        Assert.Equal(expected, BuildReady(settings).Settings.AlsoRemove.TouchChainsShown);
+    }
+
+    [Theory]
+    [InlineData(nameof(NpcHandling.Ignore))]
+    [InlineData(nameof(NpcHandling.OnlyWhenStuckInObject))]
+    [InlineData(nameof(NpcHandling.CountLikeObjects))]
+    public void TheSelectStepHandlesNpcsAsTheTooCloseStepDoes(string handling)
+    {
+        var settings = SettingsFor();
+        settings.WhatToIgnore = new IgnoreSettings { NpcHandling = Enum.Parse<NpcHandling>(handling) };
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(Enum.Parse<NpcHandling>(handling), ready.Settings.Selection.Npcs);
+        Assert.Equal(ready.Settings.TooClose.Npcs, ready.Settings.Selection.Npcs);
+    }
+
+    [Fact]
+    public void AnInvalidNpcSettingGivesBothStepsTheDefault()
+    {
+        var settings = SettingsFor();
+        settings.WhatToIgnore = new IgnoreSettings { NpcHandling = (NpcHandling)99 };
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(SettingDefaults.Npcs, ready.Settings.Selection.Npcs);
+        Assert.Equal(SettingDefaults.Npcs, ready.Settings.TooClose.Npcs);
     }
 
     [Fact]
@@ -147,7 +187,7 @@ public class RunSettingsValidationTests
     {
         var supportOnly = SettingsFor();
         supportOnly.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.ObjectsSupportedByIt };
-        Assert.Equal(new WhatToCollect(true, true, false, false, false), BuildReady(supportOnly).Options.Read);
+        Assert.Equal(new WhatToCollect(true, true, false, false, false), BuildReady(supportOnly).Settings.Read);
 
         var relocating = SettingsFor();
         relocating.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.EverythingTouching };
@@ -156,13 +196,13 @@ public class RunSettingsValidationTests
             RemoveLeftoverInvisibleObjects = true,
             MoveKeptMarkersOutOfOtherModsObjects = true,
         };
-        var options = BuildReady(relocating).Options;
-        Assert.Equal(new WhatToCollect(true, true, true, false, false), options.Read);
-        Assert.NotNull(options.MarkerMoves);
+        var runSettings = BuildReady(relocating).Settings;
+        Assert.Equal(new WhatToCollect(true, true, true, false, false), runSettings.Read);
+        Assert.NotNull(runSettings.MarkerMoves);
 
         var neither = SettingsFor();
         neither.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.EverythingTouching };
-        Assert.Equal(new WhatToCollect(false, false, false, false, false), BuildReady(neither).Options.Read);
+        Assert.Equal(new WhatToCollect(false, false, false, false, false), BuildReady(neither).Settings.Read);
     }
 
     [Fact]
@@ -174,17 +214,17 @@ public class RunSettingsValidationTests
             RemoveLeftoverInvisibleObjects = false,
             MoveKeptMarkersOutOfOtherModsObjects = true,
         };
-        var options = BuildReady(settings).Options;
-        Assert.Null(options.MarkerMoves);
-        Assert.Null(options.LeftBehind);
+        var runSettings = BuildReady(settings).Settings;
+        Assert.Null(runSettings.MarkerMoves);
+        Assert.Null(runSettings.LeftBehind);
     }
 
     [Fact]
-    public void AnchoringThresholdBecomesAFraction()
+    public void SupportThresholdBecomesAFraction()
     {
         var settings = SettingsFor();
         settings.FollowUpRemoval = new FollowUpRemovalSettings { AnchoringThresholdPercent = 25f };
-        Assert.Equal(0.25f, BuildReady(settings).Options.AlsoRemove.SupportLostFraction);
+        Assert.Equal(0.25f, BuildReady(settings).Settings.AlsoRemove.SupportLostFraction);
     }
 
     [Fact]
@@ -193,7 +233,7 @@ public class RunSettingsValidationTests
         var warnings = new List<SettingWarning>();
         var settings = SettingsFor();
         settings.Diagnostics = new DiagnosticsSettings { DiagnosticsFolder = "Reports" };
-        Assert.Equal(Path.Combine(Path.GetDirectoryName(OutputPath)!, "Reports"), RunSettingsValidation.ResolveReportFolder(OutputPath, settings, warnings));
+        Assert.Equal(Path.Combine(Path.GetDirectoryName(OutputPath)!, "Reports"), SettingsValidator.ResolveReportFolder(OutputPath, settings, warnings));
         Assert.Empty(warnings);
     }
 

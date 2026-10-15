@@ -118,8 +118,8 @@ public class SetupDeterminismTests
     {
         var world = CreateWorld(scene, workers);
         var otherModObjects = world.ObjectsThatCanCauseRemovals(Replacements.None(scene.OtherModObjects.Count), NpcHandling.OnlyWhenStuckInObject);
-        var hosts = Hosts.Find(scene.Targets, Shapes, otherModObjects, order, Options(workers));
-        return [.. Enumerable.Range(0, scene.Targets.Count).Select(index => hosts.HostOf(index)?.Id)];
+        var containingObjects = ContainingObjectFinder.Find(scene.Targets, Shapes, otherModObjects, order, Options(workers));
+        return [.. Enumerable.Range(0, scene.Targets.Count).Select(index => containingObjects.Of(index)?.Id)];
     }
 
     private static ObjectCaches CreateWorld(Scene scene, int workers) =>

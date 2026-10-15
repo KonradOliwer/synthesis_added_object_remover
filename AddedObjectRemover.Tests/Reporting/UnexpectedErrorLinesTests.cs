@@ -74,7 +74,7 @@ public class UnexpectedErrorLinesTests
     [Fact]
     public void AnErrorThatStoppedAWholePartKeepsItsOwnLine()
     {
-        var error = new UnexpectedError("the also-remove step", "InvalidOperationException: broke", "Nothing was removed by it.");
+        var error = new UnexpectedError("the also-remove step", "InvalidOperationException: broke", "Nothing was removed by it.", Subject: null);
 
         var lines = UnexpectedErrorLines.Of([error], Context(detailed: true));
 
@@ -92,5 +92,45 @@ public class UnexpectedErrorLinesTests
         Assert.Equal(
             @"  Unexpected error while reading mesh shapes (InvalidDataException: broke): 2 meshes, e.g. meshes\a.nif, meshes\b.nif. Objects using the mesh have no shape.",
             Assert.Single(lines));
+    }
+
+    [Fact]
+    public void LinesAreOrderedByPartWhateverTheRecordingOrderAndEqualErrorsAppearOnce()
+    {
+        static UnexpectedError Whole(string part) => new(part, "InvalidOperationException: boom", "Something is missing.", Subject: null);
+
+        var lines = UnexpectedErrorLines.Of([Whole("mesh b"), Whole("mesh a"), Whole("mesh a")], Context(detailed: false));
+
+        Assert.Equal(
+            [
+                "  Unexpected error in mesh a (InvalidOperationException: boom). Something is missing.",
+                "  Unexpected error in mesh b (InvalidOperationException: boom). Something is missing.",
+            ],
+            lines.AsEnumerable());
+    }
+
+    [Fact]
+    public void ErrorsEqualOnTheFirstKeysButOfDifferentSubjectKindsComeOutInOneOrder()
+    {
+        var asObject = new UnexpectedError("checking", "InvalidOperationException: boom", "Missing.", new ErrorSubject(SubjectKind.Object, "same", 1));
+        var asMesh = asObject with { Subject = new ErrorSubject(SubjectKind.Mesh, "same", 1) };
+
+        var oneWay = UnexpectedErrorLines.Of([asObject, asMesh], Context(detailed: false));
+        var otherWay = UnexpectedErrorLines.Of([asMesh, asObject], Context(detailed: false));
+
+        Assert.Equal(oneWay.AsEnumerable(), otherWay.AsEnumerable());
+        Assert.Contains("1 mesh", oneWay[0], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ErrorsEqualOnEveryKeyButTheConsequenceComeOutInOneOrder()
+    {
+        var first = ForObject(1);
+        var second = first with { Consequence = "They were kept." };
+
+        var oneWay = UnexpectedErrorLines.Of([first, second], Context(detailed: false));
+        var otherWay = UnexpectedErrorLines.Of([second, first], Context(detailed: false));
+
+        Assert.Equal(oneWay.AsEnumerable(), otherWay.AsEnumerable());
     }
 }

@@ -5,35 +5,26 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
+    <Description>The Synthesis entry. It reads the settings, builds the plugin and mesh readers and the report output, calls the runner, and prints the log. The only project that uses the console and the Synthesis packages.</Description>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Mutagen.Bethesda" Version="0.54.2" />
-    <PackageReference Include="Mutagen.Bethesda.Skyrim" Version="0.54.2" />
     <PackageReference Include="Mutagen.Bethesda.Synthesis" Version="0.36.5" />
-    <PackageReference Include="NetTopologySuite" Version="2.6.0" />
-    <!-- Pinned exactly: NifShapes.cs reads Nifly's private _points/_stripLengths fields via reflection,
-         which breaks silently on a library update. -->
-    <PackageReference Include="Nifly" Version="[1.1.0]" />
-    <!-- Used directly (Failures.cs, SettingsLoading.cs, SettingsFailureMessage.cs); otherwise they only arrive transitively through Mutagen and Synthesis. -->
-    <PackageReference Include="SharpZipLib" Version="1.4.2" />
-    <PackageReference Include="ini-parser-netstandard" Version="2.5.3" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Ids\AddedObjectRemover.Ids.csproj" />
-    <ProjectReference Include="..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
-    <ProjectReference Include="..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
-    <ProjectReference Include="..\Tools\KeyedGroupingInInputOrder\KeyedGroupingInInputOrder.csproj" />
-    <ProjectReference Include="..\Tools\DenseIdTables\DenseIdTables.csproj" />
-    <ProjectReference Include="..\Tools\IndexGraphQueries\IndexGraphQueries.csproj" />
-    <ProjectReference Include="..\Tools\NumericRanges\NumericRanges.csproj" />
     <ProjectReference Include="..\Tools\FileSystemAccess\FileSystemAccess.csproj" />
-    <ProjectReference Include="..\Tools\ComputedOnceLookups\ComputedOnceLookups.csproj" />
-    <ProjectReference Include="..\Tools\TriangleMeshTests\TriangleMeshTests.csproj" />
-    <ProjectReference Include="..\Tools\BoxSpatialIndex\BoxSpatialIndex.csproj" />
-    <ProjectReference Include="..\Tools\GroundSurfaceQueries\GroundSurfaceQueries.csproj" />
-    <ProjectReference Include="..\Tools\LogTextFormatting\LogTextFormatting.csproj" />
     <ProjectReference Include="..\Tools\CsvFileWriting\CsvFileWriting.csproj" />
+    <ProjectReference Include="..\Tools\PluginRecordReadingAndWriting\PluginRecordReadingAndWriting.csproj" />
+    <ProjectReference Include="..\Tools\MeshFileReading\MeshFileReading.csproj" />
+    <ProjectReference Include="..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
+    <ProjectReference Include="..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
+    <ProjectReference Include="..\Steps\SelectObjectsThatCanCauseRemovals.Contracts\SelectObjectsThatCanCauseRemovals.Contracts.csproj" />
+    <ProjectReference Include="..\Steps\RemoveTooCloseObjects.Contracts\RemoveTooCloseObjects.Contracts.csproj" />
+    <ProjectReference Include="..\Steps\RemoveObjectsRestingOnRemovedOnes.Contracts\RemoveObjectsRestingOnRemovedOnes.Contracts.csproj" />
+    <ProjectReference Include="..\Steps\RemoveInvisibleObjectsLeftBehind.Contracts\RemoveInvisibleObjectsLeftBehind.Contracts.csproj" />
+    <ProjectReference Include="..\Steps\BuildLogAndReports.Contracts\BuildLogAndReports.Contracts.csproj" />
+    <ProjectReference Include="..\Run\RunAllSteps.Contracts\RunAllSteps.Contracts.csproj" />
+    <ProjectReference Include="..\Run\RunSettingsValidation\RunSettingsValidation.csproj" />
+    <ProjectReference Include="..\Run\RunAllSteps\RunAllSteps.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />

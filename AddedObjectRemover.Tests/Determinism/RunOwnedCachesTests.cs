@@ -45,14 +45,14 @@ public class RunOwnedCachesTests
         var nif = TestNifs.CreateWithRoot();
         TestNifs.AddShape(nif, TestNifs.Root(nif), TestMeshes.BoxTriangles(Crate));
 
-        first.ReadGeometry(TestNifs.Save(nif), includeTriangles: false, BaseObjectRules.SolidShapes);
+        first.ReadGeometry(TestNifs.Save(nif), includeTriangles: false, BaseObjectShapes.SolidShapes);
 
         Assert.True(first.HasWarmedUp);
         Assert.True(first.ShapeClassesDecided > 0);
         Assert.False(second.HasWarmedUp);
         Assert.Equal(0, second.ShapeClassesDecided);
 
-        second.ReadGeometry(TestNifs.Save(nif), includeTriangles: false, BaseObjectRules.SolidShapes);
+        second.ReadGeometry(TestNifs.Save(nif), includeTriangles: false, BaseObjectShapes.SolidShapes);
 
         Assert.True(second.HasWarmedUp);
         Assert.Equal(first.ShapeClassesDecided, second.ShapeClassesDecided);

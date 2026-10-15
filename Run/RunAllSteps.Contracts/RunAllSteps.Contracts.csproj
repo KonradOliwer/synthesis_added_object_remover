@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AddedObjectRemover</RootNamespace>
+    <Description>What the entry gives a run and what a run returns: the load order's facts, the factories of the plugin and mesh readers, the log and report outputs, and how the run ended. It references RunSettingsValidation.Contracts, PluginRecordFacts, MeshFileFacts, CsvFileWriting and the Resting and Report contracts, and holds no packages.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\RunSettingsValidation.Contracts\RunSettingsValidation.Contracts.csproj" />
+    <ProjectReference Include="..\..\Tools\PluginRecordFacts\PluginRecordFacts.csproj" />
+    <ProjectReference Include="..\..\Tools\MeshFileFacts\MeshFileFacts.csproj" />
+    <ProjectReference Include="..\..\Tools\CsvFileWriting\CsvFileWriting.csproj" />
+    <ProjectReference Include="..\..\Steps\RemoveObjectsRestingOnRemovedOnes.Contracts\RemoveObjectsRestingOnRemovedOnes.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\BuildLogAndReports.Contracts\BuildLogAndReports.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AddedObjectRemover.Tests" />
+  </ItemGroup>
+</Project>

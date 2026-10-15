@@ -15,7 +15,7 @@ public class LeftBehindOutcomeTests
 
     private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(OtherMod, "LeftBehindOutcomeData", Room));
 
-    private static LeftBehindOptions Config(int occupiedPercent = 50, int removedPercent = 60, params InvisibleObjectKind[] protectedKinds) => new(
+    private static LeftBehindSettings Config(int occupiedPercent = 50, int removedPercent = 60, params InvisibleObjectKind[] protectedKinds) => new(
         LookAround: 1024,
         DirectionClearedPercent: 50,
         ClearedDirectionsPercent: removedPercent,
@@ -76,9 +76,7 @@ public class LeftBehindOutcomeTests
                 new Dictionary<int, KeepReason> { [referencedMarkerInRoom] = TestKeepReasons.Quest }));
         var room = TestShapes.Placed(OtherMod, 0, Room.Base, inRoom);
 
-        var evaluated = TestLeftBehind.CreateRule(targets, Shapes, [room], Config(protectedKinds: InvisibleObjectKind.Lights))
-            .SelectRemovals(new HashSet<int>(), new Execution(Environment.ProcessorCount));
-        var result = TestLeftBehind.DecideWithRemovalDecisions(evaluated, protection, targets.Count);
+        var result = TestLeftBehind.Find(targets, Shapes, [room], Config(protectedKinds: InvisibleObjectKind.Lights), protection);
 
         var decisions = PerIndexTable<LeftBehindCheck>.From(result.Evaluations, evaluation => evaluation.TargetIndex);
         Assert.Equal(LeftBehindOutcome.KeptProtectedType, decisions.Get(protectedLightInRoom).Decision);
@@ -88,6 +86,34 @@ public class LeftBehindOutcomeTests
         Assert.Null(decisions.Get(markerInRoom).KeepReason);
         Assert.Equal(LeftBehindOutcome.KeptTooFewSurroundingObjects, decisions.Get(protectedLightAlone).Decision);
         Assert.Equal(markerInRoom, Assert.Single(result.Evaluations, evaluation => evaluation.IsRemoved).TargetIndex);
+    }
+
+    [Fact]
+    public void ALinkedTargetOfAReferencedOneIsKeptAsReferencedByTheStepItself()
+    {
+        const int referencedMarker = 0;
+        const int linkedMarker = 1;
+        var inRoom = Vector3.Zero;
+        var xMarker = TestVisibility.TaggedBase(ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers));
+        var targets = new List<TargetObject>
+        {
+            TestTargets.Create(referencedMarker, TestTargets.At(inRoom), xMarker, TestTargets.Space),
+            TestTargets.Create(linkedMarker, TestTargets.At(inRoom), xMarker, TestTargets.Space),
+        };
+        var protection = ObjectsToKeep.Build(
+            targets,
+            [TestTargets.Link(referencedMarker, linkedMarker)],
+            TestTargets.References(targets.Count, new Dictionary<int, KeepReason> { [referencedMarker] = TestKeepReasons.Quest }));
+        var room = TestShapes.Placed(OtherMod, 0, Room.Base, inRoom);
+
+        var result = TestLeftBehind.Find(targets, Shapes, [room], Config(), protection);
+
+        Assert.All(result.Evaluations, evaluation =>
+        {
+            Assert.Equal(LeftBehindOutcome.KeptReferenced, evaluation.Decision);
+            Assert.NotNull(evaluation.KeepReason);
+        });
+        Assert.Equal(2, result.Evaluations.Count);
     }
 
     /// <summary>The first <paramref name="removed"/> of <paramref name="occupied"/> directions fully removed, the rest fully kept.</summary>

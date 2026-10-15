@@ -76,6 +76,15 @@ public partial class GenericCodeTests
     }
 
     [Fact]
+    public void ReportsInternalRecordsAreDomainTypesButItsPublicToolTypesAreNot()
+    {
+        Assert.True(BusinessCode.IsDomainType(typeof(Steps.BuildLogAndReports.UnexpectedError)));
+        Assert.True(BusinessCode.IsDomainType(typeof(Steps.BuildLogAndReports.ReportedMove)));
+        Assert.False(BusinessCode.IsDomainType(typeof(PartFailure)));
+        Assert.False(BusinessCode.IsDomainType(typeof(AssetProblem)));
+    }
+
+    [Fact]
     public void TheBusinessModulesAreFound()
     {
         var modules = BusinessCode.WrittenTypes().Select(BusinessCode.ModuleFolder).ToHashSet();
@@ -115,11 +124,14 @@ public partial class GenericCodeTests
 
     private static Dictionary<(string Module, string Key), string> ReadAllowLists()
     {
-        var production = BusinessCode.ProductionFolder();
         var entries = new Dictionary<(string Module, string Key), string>();
-        foreach (var file in Directory.EnumerateFiles(production, AllowListFile, SearchOption.AllDirectories).Where(file => !SolutionLayout.IsInGeneratedFolder(production, file)))
+        var allowLists = ProductionSources.Projects().SelectMany(project => Directory
+            .EnumerateFiles(project.Folder, AllowListFile, SearchOption.AllDirectories)
+            .Where(file => !SolutionLayout.IsInGeneratedFolder(project.Folder, file))
+            .Select(file => (File: file, Base: SourceFile.PathBase(project))));
+        foreach (var (file, pathBase) in allowLists)
         {
-            var module = Path.GetRelativePath(production, Path.GetDirectoryName(file)!).Replace('\\', '/');
+            var module = Path.GetRelativePath(pathBase, Path.GetDirectoryName(file)!).Replace('\\', '/');
             foreach (var line in File.ReadAllLines(file).Select(line => line.Trim()).Where(line => line.Length > 0 && !line.StartsWith('#')))
             {
                 var separator = line.IndexOf(ReasonSeparator, StringComparison.Ordinal);

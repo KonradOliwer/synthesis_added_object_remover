@@ -104,9 +104,9 @@ public sealed class TwoRunsTests : IDisposable
             var outputPath = Path.Combine(_folder, FixturePatcherState.PatchModKey.FileName);
             var state = FixturePatcherState.Create(world.LoadOrder, dataFolder, outputPath);
             var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey);
-            var request = RunSettingsValidation.Build(
-                settings, new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod).Open(), plugins, outputPath, Workers);
-            var log = PipelineRun.CaptureConsole(() => RunAllSteps.Run(request, BuildEnvironment(state, plugins)));
+            var request = SettingsValidator.Build(
+                settings, new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods).Open(), plugins, outputPath, Workers);
+            var log = PipelineRun.CaptureConsole(() => StepRunner.PatchLoadOrder(request, BuildEnvironment(state, plugins)));
             return new RunOutput(
                 MaskLog(log),
                 PatchDump.Describe(state.PatchMod),
@@ -117,7 +117,7 @@ public sealed class TwoRunsTests : IDisposable
         private static RunEnvironment BuildEnvironment(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, LoadOrderPlugins plugins) =>
             new(
                 plugins,
-                new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod),
+                new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods),
                 new MeshFilesFactory(
                     state.DataFolderPath.Path, state.GameRelease, [.. state.LoadOrder.ListedOrder.Select(listing => listing.ModKey)]),
                 new BaseFactsReader(state.LinkCache),

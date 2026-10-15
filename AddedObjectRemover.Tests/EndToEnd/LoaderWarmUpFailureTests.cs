@@ -46,11 +46,15 @@ public class LoaderWarmUpFailureTests
 
     private sealed class FailingLoaderMeshFilesFactory(string dataFolder, GameRelease release, IReadOnlyList<ModKey> listedPlugins) : IMeshFilesFactory
     {
-        public IMeshFiles Open(ShapeInclusion inclusion)
+        public IMeshFiles Open(ShapeInclusion inclusion, IUnexpectedErrors unexpectedErrors)
         {
             var problems = new AssetProblemLog();
             return new MeshFiles(
-                new MeshFileSource(dataFolder, release, listedPlugins, problems), new NifGeometryReader(() => LoaderFailure), problems, inclusion);
+                new MeshFileSource(dataFolder, release, listedPlugins, problems),
+                new NifGeometryReader(() => LoaderStartUp.Threw(LoaderFailure)),
+                problems,
+                unexpectedErrors,
+                inclusion);
         }
     }
 }

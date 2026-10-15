@@ -108,7 +108,7 @@ public class ToolConstantsTests
 
     private static Dictionary<string, string> ReadList()
     {
-        var path = Path.Combine(BusinessCode.ProductionFolder(), ListFile);
+        var path = Path.Combine(SolutionLayout.Root(), ListFile);
         var entries = new Dictionary<string, string>();
         foreach (var line in File.ReadAllLines(path).Select(line => line.Trim()).Where(line => line.Length > 0 && !line.StartsWith('#')))
         {

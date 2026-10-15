@@ -12,7 +12,7 @@ internal static class TestSupportCascade
 
         public IEnumerable<KeptObject> Kept => AlsoRemoveRounds.SelectMany(round => RemovalList.KeptIn(RemovalDecisions, round));
 
-        public ImmutableArray<AnchoringEvaluation> Evaluations => AnchoringRows.Join(Result);
+        public ImmutableArray<SupportEvaluationRow> Evaluations => SupportEvaluationRows.Join(Result, RemovalDecisions);
     }
 
     public static Run Execute(
@@ -27,7 +27,7 @@ internal static class TestSupportCascade
         int threads)
     {
         var seeded = TestSeededDecisions.Seed(protection, targets.Count, seeds);
-        var input = new RestingObjectsInput(
+        var input = new RoundsInput(
             [.. targets],
             protection,
             objectsOfAnyPlugin,
@@ -35,7 +35,7 @@ internal static class TestSupportCascade
             new TriangleStore(shapes.ReadTriangles),
             terrain,
             new Execution(threads));
-        var result = TestRestingObjects.Run(seeded, input, new AlsoRemoveSettings(FollowUpRemovalMode.ObjectsSupportedByIt, touchDistance, threshold)).Result;
-        return new Run(result.RemovalDecisions, result.Rounds) { Result = result };
+        var run = TestRestingObjects.Run(seeded, input, new AlsoRemoveSettings(FollowUpRemovalMode.ObjectsSupportedByIt, touchDistance, threshold, TouchChainsShown: false));
+        return new Run(run.Decisions, run.Result.Rounds) { Result = run.Result };
     }
 }

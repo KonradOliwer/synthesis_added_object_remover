@@ -17,7 +17,7 @@ public class NifReadingTests
         var node = TestNifs.AddNode(nif, TestNifs.Root(nif), "Crate", new Vector3(10, 0, 0));
         TestNifs.AddShape(nif, node, TestMeshes.BoxTriangles(Crate));
 
-        var result = new NifGeometryReader().ReadGeometry(TestNifs.Save(nif), includeTriangles: true, BaseObjectRules.SolidShapes);
+        var result = new NifGeometryReader().ReadGeometry(TestNifs.Save(nif), includeTriangles: true, BaseObjectShapes.SolidShapes);
 
         Assert.Equal(MeshReadStatus.Success, result.Status);
         var geometry = result.Geometry!;
@@ -36,7 +36,7 @@ public class NifReadingTests
         TestNifs.AddShape(nif, TestNifs.Root(nif), TestMeshes.BoxTriangles(Crate).Take(5).ToList());
         TestNifs.AddShape(nif, TestNifs.Root(nif), TestMeshes.BoxTriangles(Crate));
 
-        var result = new NifGeometryReader().ReadGeometry(TestNifs.Save(nif), includeTriangles: true, BaseObjectRules.SolidShapes);
+        var result = new NifGeometryReader().ReadGeometry(TestNifs.Save(nif), includeTriangles: true, BaseObjectShapes.SolidShapes);
 
         Assert.Equal(MeshReadStatus.Success, result.Status);
         Assert.Equal(new[] { 0, 12, 17 }, result.Geometry!.Triangles.PartFirstTriangles);
@@ -50,9 +50,24 @@ public class NifReadingTests
         TestNifs.Root(nif).Name = new NiflySharp.NiStringRef("EditorMarker");
         TestNifs.AddShape(nif, TestNifs.Root(nif), TestMeshes.BoxTriangles(Crate));
 
-        var result = new NifGeometryReader().ReadGeometry(TestNifs.Save(nif), includeTriangles: false, BaseObjectRules.SolidShapes);
+        var result = new NifGeometryReader().ReadGeometry(TestNifs.Save(nif), includeTriangles: false, BaseObjectShapes.SolidShapes);
 
         Assert.Equal(MeshReadStatus.NoRenderGeometry, result.Status);
+        Assert.Equal(MeshReadError.NoRenderGeometry, result.Failure!.Kind);
+        Assert.Equal(1, result.Failure.Shapes!.Shapes);
+        Assert.Equal(0, result.Failure.Shapes.Counted);
+    }
+
+    [Fact]
+    public void AVertexBeyondTheLimitFailsTheReadWithTheLimit()
+    {
+        var nif = TestNifs.CreateWithRoot();
+        TestNifs.AddShape(nif, TestNifs.Root(nif), TestMeshes.BoxTriangles(new Box(Vector3.Zero, new Vector3(2e6f, 1, 1))));
+
+        var result = new NifGeometryReader().ReadGeometry(TestNifs.Save(nif), includeTriangles: false, BaseObjectShapes.SolidShapes);
+
+        Assert.Equal(MeshReadStatus.Failed, result.Status);
+        Assert.Equal(MeshReadFailure.InvalidCoordinates(new CoordinateFault(NonFinite: false, BoundsAccumulator.MaxCoordinate)), result.Failure);
     }
 
     [Fact]
@@ -61,7 +76,7 @@ public class NifReadingTests
         var nif = TestNifs.CreateWithRoot();
         TestNifs.Root(nif).Name = new NiflySharp.NiStringRef("EditorMarker");
         TestNifs.AddShape(nif, TestNifs.Root(nif), TestMeshes.BoxTriangles(Crate));
-        var inclusion = BaseObjectRules.SolidShapes with { SkippedAncestorKinds = new HashSet<MeshShapeKind>() };
+        var inclusion = BaseObjectShapes.SolidShapes with { SkippedAncestorKinds = new HashSet<MeshShapeKind>() };
 
         var result = new NifGeometryReader().ReadGeometry(TestNifs.Save(nif), includeTriangles: false, inclusion);
 
@@ -77,8 +92,8 @@ public class NifReadingTests
         root.Flags_ui |= 1;
         var data = TestNifs.Save(nif);
 
-        var retried = new NifGeometryReader().ReadGeometry(data, includeTriangles: false, BaseObjectRules.SolidShapes);
-        var notRetried = new NifGeometryReader().ReadGeometry(data, includeTriangles: false, BaseObjectRules.SolidShapes with { RetryIncludingHiddenWhenEmpty = false });
+        var retried = new NifGeometryReader().ReadGeometry(data, includeTriangles: false, BaseObjectShapes.SolidShapes);
+        var notRetried = new NifGeometryReader().ReadGeometry(data, includeTriangles: false, BaseObjectShapes.SolidShapes with { RetryIncludingHiddenWhenEmpty = false });
 
         Assert.Equal(MeshReadStatus.Success, retried.Status);
         Assert.Equal(MeshReadStatus.NoRenderGeometry, notRetried.Status);
@@ -94,8 +109,8 @@ public class NifReadingTests
         var blocks = nif.Blocks;
         var parentOf = new Dictionary<int, int> { [1] = 0 };
 
-        var hidden = NifShapeCollector.Collect(new RenderGeometryTypes(), blocks, parentOf, 0, AvObjectFlags.For(nif), BaseObjectRules.SolidShapes, includeTriangles: false);
-        var shown = NifShapeCollector.Collect(new RenderGeometryTypes(), blocks, parentOf, 0, AvObjectFlags.For(nif), BaseObjectRules.SolidShapes.WithHiddenIncluded(), includeTriangles: false);
+        var hidden = NifShapeCollector.Collect(new RenderGeometryTypes(), blocks, parentOf, 0, AvObjectFlags.For(nif), BaseObjectShapes.SolidShapes, includeTriangles: false);
+        var shown = NifShapeCollector.Collect(new RenderGeometryTypes(), blocks, parentOf, 0, AvObjectFlags.For(nif), BaseObjectShapes.SolidShapes.WithHiddenIncluded(), includeTriangles: false);
 
         Assert.False(hidden.Bounds.Any);
         Assert.Equal(1, hidden.Stats.HiddenAncestor);

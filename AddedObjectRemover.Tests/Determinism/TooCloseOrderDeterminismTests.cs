@@ -44,15 +44,15 @@ public class TooCloseOrderDeterminismTests
     public void FindMatchesForReversedAndShuffledWorkOrders(ZoneShape zone, NpcHandling npcs)
     {
         var scene = CreateScene();
-        var options = new TooCloseOptions(Multiplier, zone, npcs);
+        var settings = new TooCloseSettings(Multiplier, zone, npcs);
         var normal = TargetWorkOrder.Of(scene.Targets);
 
-        var expected = Find(scene, options, normal);
+        var expected = Find(scene, settings, normal);
 
         Assert.NotEmpty(expected.Hits);
         foreach (var order in ShuffledWorkOrders.Variants(normal))
         {
-            var actual = Find(scene, options, order);
+            var actual = Find(scene, settings, order);
             Assert.Equal(expected.Hits.ToList(), actual.Hits.ToList());
             Assert.Equal(expected.Work, actual.Work);
             Assert.Equal(expected.LargeOtherObjects, actual.LargeOtherObjects);
@@ -61,7 +61,7 @@ public class TooCloseOrderDeterminismTests
         }
     }
 
-    private static TooCloseResult Find(TooCloseScene scene, TooCloseOptions options, WorkOrder order)
+    private static TooCloseResult Find(TooCloseScene scene, TooCloseSettings settings, WorkOrder order)
     {
         var replacements = Replacements.None(scene.OtherModObjects.Count);
         var world = TestScenes.Create(scene.Targets, scene.OtherModObjects, Shapes, bodies: NewBodies(), threads: Threads);
@@ -70,12 +70,12 @@ public class TooCloseOrderDeterminismTests
                 [.. scene.Targets],
                 world.VisibleTargets,
                 order,
-                world.ObjectsThatCanCauseRemovals(replacements, options.Npcs),
-                options.Npcs == NpcHandling.OnlyWhenStuckInObject ? world.NpcsThatCanSpawn(replacements) : null,
+                world.ObjectsThatCanCauseRemovals(replacements, settings.Npcs),
+                world.NpcsThatCanSpawn(replacements),
                 Shapes,
                 new TriangleStore(Shapes.ReadTriangles),
                 new Execution(Threads)),
-            options);
+            settings);
     }
 
     private static TooCloseScene CreateScene()

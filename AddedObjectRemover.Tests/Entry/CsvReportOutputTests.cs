@@ -25,7 +25,7 @@ public sealed class CsvReportOutputTests : IDisposable
         File.WriteAllText(known, "old");
         File.WriteAllText(other, "mine");
 
-        Assert.Null(_output.Prepare(new ReportOptions(true, _folder)));
+        Assert.Equal(new ReportFolderPrepared(StepOutcome.Performed, Warning: null), _output.Prepare(new ReportFileSettings(true, _folder)));
 
         Assert.False(File.Exists(known));
         Assert.True(File.Exists(other));
@@ -38,15 +38,17 @@ public sealed class CsvReportOutputTests : IDisposable
         var known = Path.Combine(_folder, ReportFileNames.EdgesFileName);
         File.WriteAllText(known, "old");
 
-        Assert.Null(_output.Prepare(new ReportOptions(false, _folder)));
+        Assert.Equal(new ReportFolderPrepared(StepOutcome.SwitchedOff, Warning: null), _output.Prepare(new ReportFileSettings(false, _folder)));
 
         Assert.True(File.Exists(known));
     }
 
+    private static ReportTables Performed(params CsvTable[] tables) => new(StepOutcome.Performed, [.. tables], Failure: null);
+
     [Fact]
     public void WriteCreatesTheFolderAndReportsEachFile()
     {
-        var result = _output.Write(new ReportOptions(true, _folder), [Table("x.csv", ["1", "2"], ["3", "4"]), Table("y.csv")]);
+        var result = _output.Write(new ReportFileSettings(true, _folder), Performed(Table("x.csv", ["1", "2"], ["3", "4"]), Table("y.csv")));
 
         Assert.Empty(result.Warnings);
         Assert.Equal(["x.csv", "y.csv"], result.Written.Select(table => table.FileName));
@@ -56,12 +58,41 @@ public sealed class CsvReportOutputTests : IDisposable
     }
 
     [Fact]
-    public void WriteDoesNothingWhenWritingIsOff()
+    public void WriteGivenSwitchedOffTablesWritesNothingAndReturnsSwitchedOff()
     {
-        var result = _output.Write(new ReportOptions(false, _folder), [Table("x.csv")]);
+        var result = _output.Write(new ReportFileSettings(true, _folder), ReportTables.SwitchedOff);
 
+        Assert.Equal(StepOutcome.SwitchedOff, result.Outcome);
         Assert.Empty(result.Written);
         Assert.False(Directory.Exists(_folder));
+    }
+
+    [Fact]
+    public void TablesThatWereNotBuiltAreNotWrittenAndTheirOutcomeIsPassedOn()
+    {
+        var stopped = new ReportTables(
+            StepOutcome.StoppedByUnexpectedError, [], new PartFailure(ReportFileParts.ReportFiles, "InvalidOperationException: it broke", Subject: null));
+
+        var result = _output.Write(new ReportFileSettings(true, _folder), stopped);
+
+        Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
+        Assert.Empty(result.Written);
+        Assert.Null(result.Failure);
+        Assert.False(Directory.Exists(_folder));
+    }
+
+    [Fact]
+    public void AFailureOfTheWritingAsAWholeIsReturnedNotThrown()
+    {
+        var brokenTable = new CsvTable("x.csv", ["a", "b"], default);
+
+        var result = _output.Write(new ReportFileSettings(true, _folder), Performed(brokenTable));
+
+        Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
+        Assert.Empty(result.Written);
+        Assert.Empty(result.Warnings);
+        Assert.Equal(ReportFileParts.ReportFiles, result.Failure?.Part);
+        Assert.StartsWith("NullReferenceException", result.Failure?.Failure);
     }
 
     [Fact]
@@ -69,9 +100,39 @@ public sealed class CsvReportOutputTests : IDisposable
     {
         Directory.CreateDirectory(Path.Combine(_folder, "x.csv"));
 
-        var result = _output.Write(new ReportOptions(true, _folder), [Table("x.csv"),Table("y.csv")]);
+        var result = _output.Write(new ReportFileSettings(true, _folder), Performed(Table("x.csv"), Table("y.csv")));
 
         Assert.Equal("y.csv", Assert.Single(result.Written).FileName);
-        Assert.StartsWith($"  Warning: writing x.csv in {_folder} failed: ", Assert.Single(result.Warnings));
+        var problem = Assert.Single(result.Warnings);
+        Assert.Equal(ReportFileAction.WritingFile, problem.Action);
+        Assert.Equal(_folder, problem.Folder);
+        Assert.Equal("x.csv", problem.FileName);
+        Assert.NotEmpty(problem.ExceptionMessage);
+    }
+
+    [Fact]
+    public void EarlierFilesThatCannotBeDeletedBecomeAProblemAndTheOutcomeIsStillPerformed()
+    {
+        Directory.CreateDirectory(_folder);
+        var readOnly = Path.Combine(_folder, ReportFileNames.EdgesFileName);
+        File.WriteAllText(readOnly, "old");
+        File.SetAttributes(readOnly, FileAttributes.ReadOnly);
+
+        ReportFolderPrepared prepared;
+        try
+        {
+            prepared = _output.Prepare(new ReportFileSettings(true, _folder));
+        }
+        finally
+        {
+            File.SetAttributes(readOnly, FileAttributes.Normal);
+        }
+
+        Assert.Equal(StepOutcome.Performed, prepared.Outcome);
+        var problem = Assert.IsType<ReportFileProblem>(prepared.Warning);
+        Assert.Equal(ReportFileAction.DeletingEarlierFiles, problem.Action);
+        Assert.Equal(_folder, problem.Folder);
+        Assert.Null(problem.FileName);
+        Assert.NotEmpty(problem.ExceptionMessage);
     }
 }

@@ -80,7 +80,7 @@ public sealed class SharedReportingTests
         var decided = new StepResults(
             tagged, protection, null!, TestLeftBehind.PerformedWithoutFindings, null!, decisions);
 
-        var hints = ManualPatchHints.FindManualPatchHints(decided, TestVisibility.OfTaggedBasesOnly(), RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(decided.Final), decided.Final, decided.World, decided.LeftBehind));
+        var hints = ManualPatchHints.FindManualPatchHints(decided, TestVisibility.OfTaggedBasesOnly(), RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(decided.Final), decided.Final, decided.Collected, decided.LeftBehind));
 
         Assert.Equal(
             [

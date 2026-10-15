@@ -14,7 +14,7 @@ public partial class ObjectFailureRunTests
     private const string TooCloseLinePrefix = "  Unexpected error while checking objects for being too close (InvalidOperationException: crate triangles broke): ";
     private const string DetailedListIndent = "    ";
 
-    [GeneratedRegex(@"^(?<count>[\d,]+) objects?, e\.g\. .+\. They were not removed\.$")]
+    [GeneratedRegex(@"^(?<count>\d+) objects?, e\.g\. .+\. They were not removed\.$")]
     private static partial Regex TooCloseGroup();
 
     private static Func<string, GameRelease, IReadOnlyList<ModKey>, IMeshFilesFactory> BrokenCrate =>
@@ -40,7 +40,7 @@ public partial class ObjectFailureRunTests
         var groupLine = Assert.Single(errorLines, line => line.StartsWith(TooCloseLinePrefix, StringComparison.Ordinal));
         var group = TooCloseGroup().Match(groupLine[TooCloseLinePrefix.Length..]);
         Assert.True(group.Success, groupLine);
-        Assert.True(int.Parse(group.Groups["count"].Value.Replace(",", string.Empty), System.Globalization.CultureInfo.InvariantCulture) > 1);
+        Assert.True(int.Parse(group.Groups["count"].Value, System.Globalization.CultureInfo.InvariantCulture) > 1);
         Assert.NotEmpty(outcome.Removals);
         Assert.True(outcome.Removals.Select(removal => removal.TargetIndex).ToHashSet().IsSubsetOf(healthy.Removals.Select(removal => removal.TargetIndex)));
         Assert.True(outcome.Removals.Length < healthy.Removals.Length);
@@ -54,7 +54,7 @@ public partial class ObjectFailureRunTests
 
         var groupIndex = errorLines.ToList().FindIndex(line => line.StartsWith(TooCloseLinePrefix, StringComparison.Ordinal));
         var count = int.Parse(
-            TooCloseGroup().Match(errorLines[groupIndex][TooCloseLinePrefix.Length..]).Groups["count"].Value.Replace(",", string.Empty), System.Globalization.CultureInfo.InvariantCulture);
+            TooCloseGroup().Match(errorLines[groupIndex][TooCloseLinePrefix.Length..]).Groups["count"].Value, System.Globalization.CultureInfo.InvariantCulture);
         var listed = errorLines.Skip(groupIndex + 1).TakeWhile(line => line.StartsWith(DetailedListIndent, StringComparison.Ordinal)).ToList();
         Assert.True(count > UnexpectedErrorLines.ExampleCount);
         Assert.Equal(count, listed.Count);

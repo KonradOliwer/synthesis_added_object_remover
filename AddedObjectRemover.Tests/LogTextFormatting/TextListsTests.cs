@@ -23,9 +23,9 @@ public class TextListsTests
         Assert.Equal("a; b; (+3 more)", TextLists.Capped(["a", "b", "c", "d", "e"], 2, "; ", hidden => $"(+{hidden} more)"));
 
     [Fact]
-    public void CountsWriteTheNumberBeforeTheNameWithDigitGrouping() =>
+    public void CountsWriteTheNumberBeforeTheNameWithoutDigitGrouping() =>
         Assert.Equal(
-            ["1,234 Lights", "2 Markers"],
+            ["1234 Lights", "2 Markers"],
             TextLists.Counts(new[] { KeyValuePair.Create("Lights", 1234), KeyValuePair.Create("Markers", 2) }));
 
     [Fact]

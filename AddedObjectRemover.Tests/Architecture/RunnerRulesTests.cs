@@ -20,9 +20,9 @@ public class RunnerRulesTests
     /// <summary>"file: condition line (whitespace collapsed)" in the runner, and why the runner decides it.</summary>
     private static readonly Dictionary<string, string> AllowedConditions = new()
     {
-        ["StepRunner.cs: if (request is not RunRequest.Ready ready) return new RunResult.Stopped(((RunRequest.Stop)request).Reason);"] =
+        ["StepRunner.cs: return request switch"] =
             "The settings validation may have ended the run before any step; the runner passes its stop on.",
-        ["StepRunner.cs: if (world.Stop is { } stop) return StopRun(stop, log);"] =
+        ["StepRunner.cs: if (collected.Stop is { } stop)"] =
             "Step 2 returns the stop for a run without target objects; the runner ends the run on any stop a step returns.",
     };
 

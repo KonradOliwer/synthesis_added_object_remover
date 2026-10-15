@@ -23,8 +23,8 @@ public class UnexpectedErrorLinesTests
         var lines = UnexpectedErrorLines.Of(errors, Context(detailed: false));
 
         Assert.Equal(
-            $"  Unexpected error while {Part} ({Failure}): 3,124 objects, e.g. Object0000 [000000:Target.esp], "
-            + "Object0001 [000001:Target.esp], Object0002 [000002:Target.esp] (+3,121 more). " + Consequence,
+            $"  Unexpected error while {Part} ({Failure}): 3124 objects, e.g. Object0000 [000000:Target.esp], "
+            + "Object0001 [000001:Target.esp], Object0002 [000002:Target.esp] (+3121 more). " + Consequence,
             Assert.Single(lines));
     }
 

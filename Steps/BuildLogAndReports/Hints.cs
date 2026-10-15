@@ -26,7 +26,7 @@ internal sealed class ManualPatchHints(
     ];
 
     public static ImmutableArray<ManualPatchHint> FindManualPatchHints(StepResults decided, IBaseObjectShapes shapes, IEnumerable<RemovedObject> removals) =>
-        [.. new ManualPatchHints(decided.World.Targets, shapes, decided.Protection).Collect(removals, RemovalList.Kept(decided.Final))];
+        [.. new ManualPatchHints(decided.Collected.Targets, shapes, decided.ObjectsToKeep).Collect(removals, RemovalList.Kept(decided.Final))];
 
     public List<ManualPatchHint> Collect(IEnumerable<RemovedObject> removals, IEnumerable<KeptObject> kept)
     {

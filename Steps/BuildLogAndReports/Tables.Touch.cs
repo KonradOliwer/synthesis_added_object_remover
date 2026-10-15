@@ -39,13 +39,13 @@ internal static partial class Tables
     {
         var (alsoRemove, final) = (outcome.RestingObjects, outcome.Final);
         var seedRound = final.Rounds.Single(round => round.Kind == RoundKind.TooClose);
-        var seeds = RemovalList.RemovalsIn(final, outcome.World, seedRound).ToList();
-        var removals = alsoRemove.Rounds.SelectMany(round => RemovalList.RemovalsIn(final, outcome.World, round)).ToList();
+        var seeds = RemovalList.RemovalsIn(final, outcome.Collected, seedRound).ToList();
+        var removals = alsoRemove.Rounds.SelectMany(round => RemovalList.RemovalsIn(final, outcome.Collected, round)).ToList();
         var kept = alsoRemove.Rounds.SelectMany(round => RemovalList.KeptIn(final, round)).ToList();
         return
         [
-            BuildEdgesTable(outcome.World, seeds, touch, tolerance, context),
-            BuildComponentsTable(outcome.World, seeds, removals, kept, touch, context),
+            BuildEdgesTable(outcome.Collected, seeds, touch, tolerance, context),
+            BuildComponentsTable(outcome.Collected, seeds, removals, kept, touch, context),
         ];
     }
 

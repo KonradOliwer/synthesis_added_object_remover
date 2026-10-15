@@ -10,8 +10,8 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 /// <summary>Every decision of a run, from the setup through the relocations.</summary>
 /// <param name="Final">The removal decisions with every round and every move.</param>
 public record StepResults(
-    CollectedObjects World,
-    IObjectsToKeep Protection,
+    CollectedObjects Collected,
+    IObjectsToKeep ObjectsToKeep,
     RestingObjectsResult RestingObjects,
     LeftBehindResult LeftBehind,
     MarkerMoves MarkerMoves,

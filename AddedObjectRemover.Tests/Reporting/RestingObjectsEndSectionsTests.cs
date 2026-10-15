@@ -615,7 +615,7 @@ public sealed class RestingObjectsEndSectionsTests
     private static (CollectedObjects World, RestingObjectsResult AlsoRemove, IRemovalDecisions Decisions) RunFixture(Settings settings)
     {
         var outcome = FixtureRun.Execute(settings, workers: 1);
-        return (outcome.World, outcome.RestingObjects, outcome.Final);
+        return (outcome.Collected, outcome.RestingObjects, outcome.Final);
     }
 
     private static void AssertExpectedOutput(IReadOnlyList<string> actual, string name, string part = "") =>

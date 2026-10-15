@@ -245,7 +245,7 @@ public sealed class LogAndReports
 
     private RunOutcome BuildOutcome(StepResults decided, WriteSummary written)
     {
-        ImmutableArray<RemovedObject> removals = [.. RemovalList.Removals(written.Removed, decided.Final, decided.World, decided.LeftBehind)];
+        ImmutableArray<RemovedObject> removals = [.. RemovalList.Removals(written.Removed, decided.Final, decided.Collected, decided.LeftBehind)];
         var hints = ManualPatchHints.FindManualPatchHints(decided, _caches.Shapes, removals);
         return new RunOutcome(decided, removals, hints, written, _caches.CountBounds());
     }
@@ -253,7 +253,7 @@ public sealed class LogAndReports
     /// <summary>What was removed and kept, and what may need a manual patch.</summary>
     private ImmutableArray<LogSection> BuildClosingSections(RunOutcome outcome)
     {
-        var world = outcome.World;
+        var world = outcome.Collected;
         var removals = outcome.Removals;
         return
         [

@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Run.RunAllSteps.Contracts;
 using AddedObjectRemover.Run.RunAllSteps.RunCaches;
@@ -10,6 +11,7 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods;
+using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList;
@@ -34,49 +36,62 @@ namespace AddedObjectRemover.Run.RunAllSteps;
 /// </summary>
 public static class StepRunner
 {
+    /// <remarks>The start sections of a stop request already hold its stop line.</remarks>
     public static RunResult PatchLoadOrder(RunRequest request, RunEnvironment environment)
     {
-        var unexpectedErrors = new UnexpectedErrors();
-        var log = environment.Log;
-        Print(log, LogAndReports.BuildStartSections(request));
-        if (request is not RunRequest.Ready ready) return new RunResult.Stopped(((RunRequest.Stop)request).Reason);
+        Print(environment.Log, LogAndReports.BuildStartSections(request));
+        return request switch
+        {
+            RunRequest.Ready ready => PatchWithSettings(ready.Settings, environment),
+            RunRequest.Stop stop => new RunResult.Stopped(stop.Reason),
+            _ => throw new UnreachableException(),
+        };
+    }
 
-        var settings = ready.Settings;
-        var reportFolder = environment.ReportOutput.Prepare(settings.Reports);
-        Print(log, LogAndReports.BuildReportFolderSections(reportFolder));
+    private static RunResult PatchWithSettings(RunSettings settings, RunEnvironment environment)
+    {
+        var scope = SetUpRun(settings, environment);
+        return CollectDecideAndWrite(scope);
+    }
+
+    private static RunScope SetUpRun(RunSettings settings, RunEnvironment environment)
+    {
+        var unexpectedErrors = new UnexpectedErrors();
+        var reportFolder = PrepareReportFolder(settings, environment);
         var plugin = environment.PluginRecords.Open();
-        var caches = LoadOrderCaches.Create(
+        var loadOrderCaches = LoadOrderCaches.Create(
             environment.MeshFiles,
             unexpectedErrors,
             plugin,
             environment.Bases,
             TooCloseObjects.NpcBodyRules,
             TooCloseObjects.PlacedNpcRules);
-        var report = new LogAndReports(settings, reportFolder, caches, unexpectedErrors);
-        return RunSteps(new RunScope(settings, environment, plugin, caches, report, reportFolder), unexpectedErrors);
+        var report = new LogAndReports(settings, reportFolder, loadOrderCaches, unexpectedErrors);
+        return new RunScope(settings, environment, plugin, loadOrderCaches, unexpectedErrors, report, reportFolder);
     }
 
-    private static RunResult RunSteps(RunScope scope, IUnexpectedErrors unexpectedErrors)
+    private static ReportFolderPrepared PrepareReportFolder(RunSettings settings, RunEnvironment environment)
     {
-        var (settings, environment, plugin, loadOrder, report, _) = scope;
-        var log = environment.Log;
-        loadOrder.PrepareMeshReading();
-        Print(log, report.BuildArchiveSections());
-        var mods = ModIdentifier.Identify(environment.Plugins, settings.ModIdentification);
-        Print(log, report.BuildStepSections(mods));
-        var world = log.Timed(() => PlacedObjectCollector.Collect(plugin, mods, settings.Read), report.BuildStepSections);
-        if (world.Stop is { } stop) return StopRun(stop, log);
+        var reportFolder = environment.ReportOutput.Prepare(settings.Reports);
+        Print(environment.Log, LogAndReports.BuildReportFolderSections(reportFolder));
+        return reportFolder;
+    }
 
-        var caches = log.Timed(
-            () => loadOrder.AddObjectCaches(world, RemovalCauseSelector.MeasurementRules(unexpectedErrors), settings.Execution),
-            (_, elapsed) => report.BuildIndexSections(world, elapsed));
-        var decided = Decide(scope, caches, world);
-        var written = log.Timed(() => PatchWriter.Write(decided.Final, world.Targets, plugin), report.BuildStepSections);
-        var ended = report.BuildEndOfRun(decided, written);
-        Print(log, ended.Sections);
-        var files = environment.ReportOutput.Write(settings.Reports, ended.Tables);
-        Print(log, report.BuildFilesWrittenSections(ended, files, environment.TimeSinceStart()));
-        return new RunResult.Done(ended.Outcome);
+    private static RunResult CollectDecideAndWrite(RunScope scope)
+    {
+        PrepareMeshReading(scope);
+        var mods = IdentifyMods(scope);
+        var collected = CollectPlacedObjects(scope, mods);
+        if (collected.Stop is { } stop)
+        {
+            // A stopped run writes no report files.
+            return StopAfterStep(scope.Environment.Log, stop);
+        }
+
+        var runCaches = AddObjectCaches(scope, collected);
+        var decided = Decide(scope, runCaches, collected);
+        var written = WritePatch(scope, decided);
+        return FinishReports(scope, decided, written);
     }
 
     private static void Print(ILogSink log, ImmutableArray<LogSection> sections)
@@ -84,130 +99,230 @@ public static class StepRunner
         foreach (var section in sections) log.Print(section);
     }
 
-    private static RunResult.Stopped StopRun(StopReason reason, ILogSink log)
+    private static RunResult.Stopped StopAfterStep(ILogSink log, StopReason reason)
     {
         Print(log, LogAndReports.BuildStopSections(reason));
         return new RunResult.Stopped(reason);
     }
 
-    /// <summary>Every decision of the run, from the setup through the marker moves.</summary>
-    private static StepResults Decide(RunScope scope, IRunCaches caches, CollectedObjects world)
+    private static void PrepareMeshReading(RunScope scope)
     {
-        var (settings, environment, _, _, report, _) = scope;
-        var log = environment.Log;
-        var selected = log.Timed(
-            () => RemovalCauseSelector.Select(world, caches.OtherModObjects, caches.Shapes, settings.Selection, settings.Execution),
-            (found, elapsed) => report.BuildStepSections(found.Replacements, world, elapsed));
-        var replacements = selected.Replacements;
-        var kept = ObjectsToKeepFinder.Find(world.Targets, world.Links);
-        var protection = kept.ObjectsToKeep;
-        Print(log, report.BuildStepSections(kept));
-        var otherModObjects = selected.ObjectsThatCanCauseRemovals;
+        scope.LoadOrderCaches.PrepareMeshReading();
+        Print(scope.Environment.Log, scope.Report.BuildArchiveSections());
+    }
 
-        var tooClose = FindTooCloseObjects(scope, caches, world, otherModObjects, replacements, protection);
-        var restingObjects = RemoveRestingObjects(scope, caches, world, protection, tooClose.Decisions);
-        var leftBehind = DecideLeftBehind(scope, caches, world, otherModObjects, restingObjects.Decisions);
-        var markerMoves = MoveKeptMarkers(scope, caches, world, leftBehind);
+    private static IdentifiedMods IdentifyMods(RunScope scope)
+    {
+        var mods = ModIdentifier.Identify(scope.Environment.Plugins, scope.Settings.ModIdentification);
+        Print(scope.Environment.Log, scope.Report.BuildStepSections(mods));
+        return mods;
+    }
+
+    private static CollectedObjects CollectPlacedObjects(RunScope scope, IdentifiedMods mods) =>
+        scope.Environment.Log.Timed(
+            () => PlacedObjectCollector.Collect(scope.Plugin, mods, scope.Settings.Read),
+            scope.Report.BuildStepSections);
+
+    private static IRunCaches AddObjectCaches(RunScope scope, CollectedObjects collected) =>
+        scope.Environment.Log.Timed(
+            () => scope.LoadOrderCaches.AddObjectCaches(
+                collected,
+                RemovalCauseSelector.MeasurementRules(scope.UnexpectedErrors),
+                scope.Settings.Execution),
+            (_, elapsed) => scope.Report.BuildIndexSections(collected, elapsed));
+
+    private static WriteSummary WritePatch(RunScope scope, StepResults decided) =>
+        scope.Environment.Log.Timed(
+            () => PatchWriter.Write(decided.Final, decided.Collected.Targets, scope.Plugin),
+            scope.Report.BuildStepSections);
+
+    private static RunResult FinishReports(RunScope scope, StepResults decided, WriteSummary written)
+    {
+        var log = scope.Environment.Log;
+        var ended = scope.Report.BuildEndOfRun(decided, written);
+        Print(log, ended.Sections);
+        var files = scope.Environment.ReportOutput.Write(scope.Settings.Reports, ended.Tables);
+        Print(log, scope.Report.BuildFilesWrittenSections(ended, files, scope.Environment.TimeSinceStart()));
+        return new RunResult.Done(ended.Outcome);
+    }
+
+    /// <summary>
+    /// Selects the objects that can cause removals and finds the objects to keep, then decides the removal rounds in
+    /// order (too close, also remove, leftover invisible objects) and the moves of the kept markers.
+    /// </summary>
+    /// <remarks>
+    /// The runner holds no error boundary: each step catches its own errors inside the step. Applying a step's
+    /// proposals to the shared decisions happens here, inside no step's boundary, so a bug there ends the run. The
+    /// apply calls run inside the timed sections, so the printed times include them.
+    /// </remarks>
+    private static StepResults Decide(RunScope scope, IRunCaches runCaches, CollectedObjects collected)
+    {
+        var selected = RunSelection(scope, runCaches, collected);
+        var kept = RunKeepCheck(scope, collected);
+        var started = RemovalDecisions.Start(kept.ObjectsToKeep, collected.Targets.Length);
+        var tooClose = RunTooClose(scope, runCaches, collected, selected, started);
+        var alsoRemove = RunAlsoRemove(scope, runCaches, collected, kept.ObjectsToKeep, tooClose.Decisions);
+        var leftBehind = RunLeftBehind(scope, runCaches, collected, selected.ObjectsThatCanCauseRemovals, alsoRemove.Decisions);
+        var markerMoves = RunMarkerMoves(scope, runCaches, collected, leftBehind);
+        var final = leftBehind.Decisions.AddMoves(markerMoves.Moves);
         return new StepResults(
-            world, protection, restingObjects.Result, leftBehind.Result, markerMoves, leftBehind.Final.AddMoves(markerMoves.Moves));
+            Collected: collected,
+            ObjectsToKeep: kept.ObjectsToKeep,
+            RestingObjects: alsoRemove.Result,
+            LeftBehind: leftBehind.Result,
+            MarkerMoves: markerMoves,
+            Final: final);
     }
 
-    private static TooClosePhase FindTooCloseObjects(
-        RunScope scope, IRunCaches caches, CollectedObjects world, IObjectsThatCanCauseRemovals otherModObjects, Replacements replacements, IObjectsToKeep protection)
+    private static SelectedObjects RunSelection(RunScope scope, IRunCaches runCaches, CollectedObjects collected) =>
+        scope.Environment.Log.Timed(
+            () => RemovalCauseSelector.Select(
+                collected,
+                runCaches.OtherModObjects,
+                runCaches.Shapes,
+                scope.Settings.Selection,
+                scope.Settings.Execution),
+            (selected, elapsed) => scope.Report.BuildStepSections(selected.Replacements, collected, elapsed));
+
+    private static ObjectsToKeepResult RunKeepCheck(RunScope scope, CollectedObjects collected)
     {
-        var (_, environment, _, _, report, _) = scope;
-        return environment.Log.Timed(
-            () => DecideTooClose(scope, caches, world, otherModObjects, replacements, protection),
-            (decided, elapsed) => report.BuildStepSections(decided.Result, decided.Decisions, world, caches.VisibleTargets, elapsed));
+        var kept = ObjectsToKeepFinder.Find(collected.Targets, collected.Links);
+        Print(scope.Environment.Log, scope.Report.BuildStepSections(kept));
+        return kept;
     }
 
-    private static TooClosePhase DecideTooClose(
-        RunScope scope, IRunCaches caches, CollectedObjects world, IObjectsThatCanCauseRemovals otherModObjects, Replacements replacements, IObjectsToKeep protection)
+    private static TooClosePhase RunTooClose(
+        RunScope scope,
+        IRunCaches runCaches,
+        CollectedObjects collected,
+        SelectedObjects selected,
+        RemovalDecisions started) =>
+        scope.Environment.Log.Timed(
+            () => FindAndApplyTooCloseRound(scope, runCaches, collected, selected, started),
+            (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, runCaches.VisibleTargets, elapsed));
+
+    private static TooClosePhase FindAndApplyTooCloseRound(
+        RunScope scope,
+        IRunCaches runCaches,
+        CollectedObjects collected,
+        SelectedObjects selected,
+        RemovalDecisions started)
     {
-        var settings = scope.Settings;
         var result = TooCloseObjects.Find(
-            world,
-            caches.VisibleTargets,
-            otherModObjects,
-            caches.PlacedNpcs,
-            replacements,
-            caches.Shapes,
-            caches.Triangles,
-            settings.Execution,
-            settings.TooClose);
-        return new TooClosePhase(result, RemovalDecisions.Start(protection, world.Targets.Length).Apply(RoundKind.TooClose, result.Proposals));
+            collected,
+            runCaches.VisibleTargets,
+            selected.ObjectsThatCanCauseRemovals,
+            runCaches.PlacedNpcs,
+            selected.Replacements,
+            runCaches.Shapes,
+            runCaches.Triangles,
+            scope.Settings.Execution,
+            scope.Settings.TooClose);
+        return new TooClosePhase(result, started.Apply(RoundKind.TooClose, result.Proposals));
     }
 
-    /// <param name="afterTooClose">The decisions whose last round is the too-close round.</param>
-    private static RestingObjectsPhase RemoveRestingObjects(
-        RunScope scope, IRunCaches caches, CollectedObjects world, IObjectsToKeep protection, RemovalDecisions afterTooClose)
+    /// <remarks>Not timed here: the step times its rounds itself, through the run's clock.</remarks>
+    private static AlsoRemovePhase RunAlsoRemove(
+        RunScope scope,
+        IRunCaches runCaches,
+        CollectedObjects collected,
+        IObjectsToKeep objectsToKeep,
+        RemovalDecisions afterTooClose)
     {
-        var (settings, environment, _, _, report, reportFolder) = scope;
+        var phase = FindAndApplyAlsoRemoveRounds(scope, runCaches, collected, objectsToKeep, afterTooClose);
+        Print(scope.Environment.Log, scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected));
+        return phase;
+    }
+
+    private static AlsoRemovePhase FindAndApplyAlsoRemoveRounds(
+        RunScope scope,
+        IRunCaches runCaches,
+        CollectedObjects collected,
+        IObjectsToKeep objectsToKeep,
+        RemovalDecisions afterTooClose)
+    {
         var result = RestingObjects.Find(
             new RestingObjectsInput(
-                world.Targets, protection, afterTooClose, settings.AlsoRemove, settings.Execution, environment.TimeSinceStart, reportFolder.Outcome),
-            caches.Bases,
-            caches.Shapes,
-            caches.Triangles,
-            caches.Terrain,
-            caches.VisibleObjectsOfAnyPlugin);
-        var decisions = afterTooClose.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds);
-        Print(environment.Log, report.BuildStepSections(result, decisions, world));
-        return new RestingObjectsPhase(result, decisions);
+                collected.Targets,
+                objectsToKeep,
+                afterTooClose,
+                scope.Settings.AlsoRemove,
+                scope.Settings.Execution,
+                scope.Environment.TimeSinceStart,
+                scope.ReportFolder.Outcome),
+            runCaches.Bases,
+            runCaches.Shapes,
+            runCaches.Triangles,
+            runCaches.Terrain,
+            runCaches.VisibleObjectsOfAnyPlugin);
+        return new AlsoRemovePhase(result, afterTooClose.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds));
     }
 
-    /// <param name="afterRestingObjects">The decisions after the also-remove rounds.</param>
-    private static LeftBehindPhase DecideLeftBehind(
-        RunScope scope, IRunCaches caches, CollectedObjects world, IObjectsThatCanCauseRemovals otherModObjects, RemovalDecisions afterRestingObjects)
+    private static LeftBehindPhase RunLeftBehind(
+        RunScope scope,
+        IRunCaches runCaches,
+        CollectedObjects collected,
+        IObjectsThatCanCauseRemovals objectsThatCanCauseRemovals,
+        RemovalDecisions afterAlsoRemove) =>
+        scope.Environment.Log.Timed(
+            () => FindAndApplyLeftBehindRound(scope, runCaches, collected, objectsThatCanCauseRemovals, afterAlsoRemove),
+            (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
+
+    private static LeftBehindPhase FindAndApplyLeftBehindRound(
+        RunScope scope,
+        IRunCaches runCaches,
+        CollectedObjects collected,
+        IObjectsThatCanCauseRemovals objectsThatCanCauseRemovals,
+        RemovalDecisions afterAlsoRemove)
     {
-        var report = scope.Report;
-        return scope.Environment.Log.Timed(
-            () => ApplyLeftBehind(afterRestingObjects, FindLeftBehind(scope, caches, world, otherModObjects, afterRestingObjects)),
-            (found, elapsed) => report.BuildStepSections(found.Result, found.Final, world, elapsed));
+        var result = LeftBehindObjects.Find(
+            collected.Targets,
+            objectsThatCanCauseRemovals,
+            afterAlsoRemove,
+            runCaches.VisibleTargets,
+            runCaches.Bases,
+            runCaches.Shapes,
+            collected.Order,
+            scope.Settings.Execution,
+            scope.Settings.LeftBehind);
+        return new LeftBehindPhase(result, afterAlsoRemove.Apply(RoundKind.LeftBehind, result.Proposals));
     }
 
-    private static LeftBehindResult FindLeftBehind(
-        RunScope scope, IRunCaches caches, CollectedObjects world, IObjectsThatCanCauseRemovals otherModObjects, RemovalDecisions afterRestingObjects)
+    private static MarkerMoves RunMarkerMoves(RunScope scope, IRunCaches runCaches, CollectedObjects collected, LeftBehindPhase leftBehind)
     {
-        var settings = scope.Settings;
-        return LeftBehindObjects.Find(
-            world.Targets, otherModObjects, afterRestingObjects, caches.VisibleTargets, caches.Bases, caches.Shapes, world.Order, settings.Execution, settings.LeftBehind);
-    }
-
-    /// <remarks>Adding the round to the shared decisions is outside the step's own error boundary; it must not fail halfway, so a bug there ends the run.</remarks>
-    private static LeftBehindPhase ApplyLeftBehind(RemovalDecisions afterRestingObjects, LeftBehindResult found) =>
-        new(found, afterRestingObjects.Apply(RoundKind.LeftBehind, [.. found.Proposals]));
-
-    private static MarkerMoves MoveKeptMarkers(RunScope scope, IRunCaches caches, CollectedObjects world, LeftBehindPhase leftBehind)
-    {
-        var (settings, environment, plugin, _, report, _) = scope;
         var markerMoves = MarkerMovePlanner.Plan(
-            world.Targets,
+            collected.Targets,
             leftBehind.Result,
-            leftBehind.Final,
-            caches.VisibleObjectsOfAnyPlugin,
-            caches.VisibleTargets,
-            plugin,
-            caches.Navmeshes,
-            caches.Terrain,
-            caches.Shapes,
-            settings.Execution,
-            settings.MarkerMoves);
-        Print(environment.Log, report.BuildStepSections(markerMoves, world));
+            leftBehind.Decisions,
+            runCaches.VisibleObjectsOfAnyPlugin,
+            runCaches.VisibleTargets,
+            scope.Plugin,
+            runCaches.Navmeshes,
+            runCaches.Terrain,
+            runCaches.Shapes,
+            scope.Settings.Execution,
+            scope.Settings.MarkerMoves);
+        Print(scope.Environment.Log, scope.Report.BuildStepSections(markerMoves, collected));
         return markerMoves;
     }
 
-    /// <summary>What every phase function reads besides its own inputs.</summary>
+    /// <summary>What every phase method reads besides its own inputs.</summary>
     /// <param name="ReportFolder">What the report writer prepared, which says whether the report files are written.</param>
     private sealed record RunScope(
-        RunSettings Settings, RunEnvironment Environment, IPluginRecords Plugin, LoadOrderCaches LoadOrder, LogAndReports Report, ReportFolderPrepared ReportFolder);
+        RunSettings Settings,
+        RunEnvironment Environment,
+        IPluginRecords Plugin,
+        LoadOrderCaches LoadOrderCaches,
+        IUnexpectedErrors UnexpectedErrors,
+        LogAndReports Report,
+        ReportFolderPrepared ReportFolder);
 
     /// <param name="Decisions">The decisions with the too-close round.</param>
     private sealed record TooClosePhase(TooCloseResult Result, RemovalDecisions Decisions);
 
     /// <param name="Decisions">The decisions with the also-remove rounds.</param>
-    private sealed record RestingObjectsPhase(RestingObjectsResult Result, RemovalDecisions Decisions);
+    private sealed record AlsoRemovePhase(RestingObjectsResult Result, RemovalDecisions Decisions);
 
-    /// <param name="Final">The decisions with every round.</param>
-    private sealed record LeftBehindPhase(LeftBehindResult Result, RemovalDecisions Final);
+    /// <param name="Decisions">The decisions with every round.</param>
+    private sealed record LeftBehindPhase(LeftBehindResult Result, RemovalDecisions Decisions);
 }

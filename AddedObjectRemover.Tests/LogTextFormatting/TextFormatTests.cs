@@ -7,12 +7,13 @@ public class TextFormatTests
     [Theory]
     [InlineData(0, "0")]
     [InlineData(999, "999")]
-    [InlineData(1234567, "1,234,567")]
-    [InlineData(-1500, "-1,500")]
-    public void CountGroupsDigits(int value, string expected) => Assert.Equal(expected, TextFormat.Count(value));
+    [InlineData(8199, "8199")]
+    [InlineData(1234567, "1234567")]
+    [InlineData(-1500, "-1500")]
+    public void CountWritesPlainDigitsWithoutGrouping(int value, string expected) => Assert.Equal(expected, TextFormat.Count(value));
 
     [Fact]
-    public void CountAcceptsLongNumbers() => Assert.Equal("5,000,000,000", TextFormat.Count(5_000_000_000L));
+    public void CountAcceptsLongNumbers() => Assert.Equal("5000000000", TextFormat.Count(5_000_000_000L));
 
     [Theory]
     [InlineData(1.25, 0, "1")]
@@ -43,13 +44,13 @@ public class TextFormatTests
         Assert.Equal(expected, TextFormat.Seconds(TimeSpan.FromMilliseconds(milliseconds)));
 
     [Fact]
-    public void NumbersFollowTheCurrentCulture()
+    public void DecimalsFollowTheCurrentCultureButCountsDoNot()
     {
         var previous = CultureInfo.CurrentCulture;
         CultureInfo.CurrentCulture = new CultureInfo("de-DE");
         try
         {
-            Assert.Equal("1.234.567", TextFormat.Count(1234567));
+            Assert.Equal("8199", TextFormat.Count(8199));
             Assert.Equal("1,5s", TextFormat.Seconds(TimeSpan.FromMilliseconds(1500)));
         }
         finally

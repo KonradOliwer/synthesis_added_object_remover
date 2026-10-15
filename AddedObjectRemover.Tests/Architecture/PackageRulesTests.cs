@@ -37,6 +37,18 @@ public class PackageRulesTests
         Assert.Contains("Mutagen.Bethesda.Skyrim", ProjectPackages.CompiledAgainst(EntryProjectFile()));
     }
 
+    [Fact]
+    public void TheEntryListsTheSameMutagenVersionAsThePluginTools()
+    {
+        var toolsFile = SolutionLayout.ProjectFiles()
+            .Single(file => SolutionLayout.ProjectName(file) == "PluginRecordReadingAndWriting");
+
+        Assert.Equal(MutagenSkyrimPackage(toolsFile), MutagenSkyrimPackage(EntryProjectFile()));
+    }
+
+    private static string MutagenSkyrimPackage(string projectFile) =>
+        ProjectPackages.Declared(projectFile).Single(package => package.StartsWith("Mutagen.Bethesda.Skyrim ", StringComparison.Ordinal));
+
     private static IEnumerable<string> FindUnlistedPackages(string projectFile)
     {
         var name = SolutionLayout.ProjectName(projectFile);

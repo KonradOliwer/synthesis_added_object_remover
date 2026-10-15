@@ -9,6 +9,8 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Mutagen.Bethesda.Synthesis" Version="0.36.5" />
+    <!-- Synthesis reads the Mutagen version only from this project's own references, so it must match the version the tools use. -->
+    <PackageReference Include="Mutagen.Bethesda.Skyrim" Version="0.54.2" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Tools\FileSystemAccess\FileSystemAccess.csproj" />

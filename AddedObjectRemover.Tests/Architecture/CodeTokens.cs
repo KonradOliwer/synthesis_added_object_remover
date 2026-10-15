@@ -2,7 +2,8 @@ using System.Text;
 
 namespace AddedObjectRemover.Tests.Architecture;
 
-internal readonly record struct CodeToken(string Text, int Line);
+/// <summary>A token with the placeholder the scan compares (<see cref="Text"/>) and, for a word, the name as written.</summary>
+internal readonly record struct CodeToken(string Text, int Line, string Word = "");
 
 /// <summary>
 /// Reads C# source into tokens for the copied-code scan. Comments are dropped, every string or character
@@ -68,7 +69,7 @@ internal static class CodeTokens
             {
                 var end = EndOfWord(source, position + 1);
                 var word = source[position..end];
-                tokens.Add(new CodeToken(Keywords.Contains(word) ? word : Name, line));
+                tokens.Add(new CodeToken(Keywords.Contains(word) ? word : Name, line, word));
                 position = end;
             }
             else if (char.IsDigit(current))

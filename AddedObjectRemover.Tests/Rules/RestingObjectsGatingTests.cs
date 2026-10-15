@@ -22,6 +22,7 @@ public class RestingObjectsGatingTests
             hadSeeds,
             [],
             [],
+            [],
             ImmutableArray<RoundDetails>.Empty,
             new RestingObjectsWork(0, 0, 0, 0, PairTestStats.Zero),
             TimeSpan.Zero,

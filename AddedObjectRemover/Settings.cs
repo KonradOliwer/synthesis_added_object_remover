@@ -1,5 +1,6 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
@@ -10,8 +11,16 @@ namespace AddedObjectRemover;
 public class Settings : ISettingsValues
 {
     [SynthesisSettingName("Mod to clean up")]
-    [SynthesisTooltip("Which plugin to clean up and when its objects are removed.")]
+    [SynthesisTooltip("Which plugin to clean up.")]
     public CheckSettings WhatToCheck { get; set; } = new();
+
+    [SynthesisSettingName("Terrain changed by other mods")]
+    [SynthesisTooltip("Removes the cleaned mod's objects where another mod changed the terrain under or near them.")]
+    public TerrainChangeSettings TerrainChange { get; set; } = new();
+
+    [SynthesisSettingName("Too close to other mods' objects")]
+    [SynthesisTooltip("Removes the cleaned mod's objects that sit too close to another mod's objects.")]
+    public TooCloseRemovalSettings TooClose { get; set; } = new();
 
     [SynthesisSettingName("Mods that never count as clashing")]
     [SynthesisTooltip("Objects from these mods never cause removals.")]
@@ -30,6 +39,8 @@ public class Settings : ISettingsValues
     public DiagnosticsSettings Diagnostics { get; set; } = new();
 
     ICheckSettingsValues ISettingsValues.WhatToCheck => WhatToCheck ?? new CheckSettings();
+    ITerrainChangeSettingsValues ISettingsValues.TerrainChange => TerrainChange ?? new TerrainChangeSettings();
+    ITooCloseSettingsValues ISettingsValues.TooClose => TooClose ?? new TooCloseRemovalSettings();
     IIgnoreSettingsValues ISettingsValues.WhatToIgnore => WhatToIgnore ?? new IgnoreSettings();
     IFollowUpSettingsValues ISettingsValues.FollowUpRemoval => FollowUpRemoval ?? new FollowUpRemovalSettings();
     ILeftoverSettingsValues ISettingsValues.LeftoverInvisibleObjects => LeftoverInvisibleObjects ?? new LeftoverInvisibleObjectSettings();
@@ -42,15 +53,65 @@ public class CheckSettings : ICheckSettingsValues
     [SynthesisTooltip("The plugin whose added objects may be removed.")]
     public string TargetPlugin { get; set; } = string.Empty;
 
+    string? ICheckSettingsValues.TargetPlugin => TargetPlugin;
+}
+
+public class TooCloseRemovalSettings : ITooCloseSettingsValues
+{
+    [SynthesisSettingName("Remove when too close (× object size)")]
+    [SynthesisTooltip("Removes the cleaned mod's object when another mod's object is within the removal distance, measured in multiples of the object's own size.")]
+    public bool RemoveTooCloseBySize { get; set; } = SettingDefaults.RemoveTooCloseBySize;
+
     [SynthesisSettingName("Removal distance (× object size)")]
-    [SynthesisTooltip("Removes the cleaned mod's object when another mod's object is this close, measured in multiples of the object's own size.")]
+    [SynthesisTooltip("How close counts as too close, in multiples of the object's own size. Only used when \"Remove when too close (× object size)\" is on.")]
     public float SizeMultiplier { get; set; } = SettingDefaults.SizeMultiplier;
 
-    [SynthesisSettingName("Removal zone")]
-    [SynthesisTooltip("ObjectShape: the object's own shape, enlarged. BoundingBox: faster, its box.")]
-    public ZoneShape ZoneShape { get; set; } = SettingDefaults.Zone;
+    [SynthesisSettingName("Remove when too close (game units)")]
+    [SynthesisTooltip("Removes the cleaned mod's object when another mod's object comes within the removal distance, measured in game units.")]
+    public bool RemoveTooCloseByDistance { get; set; } = SettingDefaults.RemoveTooCloseByDistance;
 
-    string? ICheckSettingsValues.TargetPlugin => TargetPlugin;
+    [SynthesisSettingName("Removal distance (game units)")]
+    [SynthesisTooltip("How close counts as too close, in game units. 0 means only touching or overlapping objects. Only used when \"Remove when too close (game units)\" is on.")]
+    public float RemovalDistanceInUnits { get; set; } = SettingDefaults.RemovalDistanceInUnits;
+
+    [SynthesisSettingName("Removal zone")]
+    [SynthesisTooltip("ObjectShape: the object's own shape, enlarged or with the distance around it. BoundingBox: faster, its box. Applies to both removal distances.")]
+    public ZoneShape ZoneShape { get; set; } = SettingDefaults.Zone;
+}
+
+public class TerrainChangeSettings : ITerrainChangeSettingsValues
+{
+    [SynthesisSettingName("Remove objects on changed terrain")]
+    [SynthesisTooltip("Removes the cleaned mod's objects when another mod changed the terrain under or near them.")]
+    public bool RemoveOnChangedTerrain { get; set; } = SettingDefaults.RemoveOnChangedTerrain;
+
+    [SynthesisSettingName("Objects checked")]
+    [SynthesisTooltip("VisibleObjectsOnTheGround: visible objects that reach the ground. AllVisibleObjects: every visible object, at any height. AllObjects: also invisible ones, such as markers and sounds.")]
+    public TerrainCheckedObjects TerrainCheckedObjects { get; set; } = SettingDefaults.TerrainChecked;
+
+    [SynthesisSettingName("Count height changes")]
+    [SynthesisTooltip("Whether a change of terrain height counts.")]
+    public bool CountHeightChanges { get; set; } = SettingDefaults.CountHeightChanges;
+
+    [SynthesisSettingName("Height change tolerance")]
+    [SynthesisTooltip("A height change up to this many game units is ignored. 0 counts every change.")]
+    public float HeightChangeTolerance { get; set; } = SettingDefaults.HeightChangeTolerance;
+
+    [SynthesisSettingName("Count terrain type changes")]
+    [SynthesisTooltip("Whether a change of ground type counts, for example grass becoming road or stone. A different texture of the same type does not count.")]
+    public bool CountTerrainTypeChanges { get; set; } = SettingDefaults.CountTerrainTypeChanges;
+
+    [SynthesisSettingName("Terrain distance measured in")]
+    [SynthesisTooltip("GameUnits: \"Terrain distance (game units)\" is used. ObjectSize: \"Terrain distance (× object size)\" is used.")]
+    public TerrainDistanceMode TerrainDistanceMode { get; set; } = SettingDefaults.TerrainDistance;
+
+    [SynthesisSettingName("Terrain distance (game units)")]
+    [SynthesisTooltip("How far around the object the terrain is checked, in game units. The terrain points around the object are always checked.")]
+    public float TerrainDistanceInUnits { get; set; } = SettingDefaults.TerrainDistanceInUnits;
+
+    [SynthesisSettingName("Terrain distance (× object size)")]
+    [SynthesisTooltip("How far around the object the terrain is checked, in multiples of the object's own size.")]
+    public float TerrainDistanceSizeMultiplier { get; set; } = SettingDefaults.TerrainDistanceSizeMultiplier;
 }
 
 public class IgnoreSettings : IIgnoreSettingsValues

@@ -38,7 +38,7 @@ public sealed class PlacedObjectCollector
 
     public static CollectedObjects Collect(IPluginRecords plugin, IdentifiedMods standing, WhatToCollect plan)
     {
-        var facts = plugin.ReadPlacedRecords(new PlacedReadScope(standing.Target, plan.Terrain, plan.Navmesh));
+        var facts = plugin.ReadPlacedRecords(new PlacedReadScope(standing.Target, plan.Terrain, plan.Navmesh, plan.TerrainVersions, plan.TerrainLayers));
         var collector = new PlacedObjectCollector(standing, plan, facts);
         foreach (var record in facts.Records) collector.Collect(record);
 

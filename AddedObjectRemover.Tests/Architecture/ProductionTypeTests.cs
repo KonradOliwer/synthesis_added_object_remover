@@ -30,6 +30,7 @@ public class ProductionTypeTests
         ["SelectionParts"] = "named constants: the part key the select step records its unexpected errors under",
         ["KeepParts"] = "named constants: the part key the keep step records its unexpected errors under",
         ["TooCloseParts"] = "named constants: the part key the too-close step records its unexpected errors under",
+        ["ChangedTerrainParts"] = "named constants: the part key the changed-terrain step records its unexpected errors under",
         ["RestingObjectsParts"] = "named constants: the part keys the also-remove step records its unexpected errors under",
         ["LeftBehindParts"] = "named constants: the part key the left-behind step records its unexpected errors under",
         ["MarkerMoveParts"] = "named constants: the part key the marker-move step records its unexpected errors under",

@@ -4,6 +4,7 @@ using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
@@ -26,6 +27,7 @@ internal static class RunPartText
         [LeftBehindParts.LeftBehind] = new("the left-behind step", "The left-behind step did not run, so invisible objects whose surroundings were removed were not removed.", Subjects: null),
         [MarkerMoveParts.MarkerMoves] = new("the marker moves", "No kept marker was moved, so markers inside other mods' objects stay where they are.", Subjects: null),
         [RestingObjectsParts.ReportFileDetails] = new("the report-file details", "The touching pairs or mesh origins that the report files list are missing from them.", Subjects: null),
+        [ChangedTerrainParts.TerrainCheck] = new("checking objects for changed terrain", "They were not removed.", SubjectKind.Object),
         [TooCloseParts.TooCloseCheck] = new("checking objects for being too close", "They were not removed.", SubjectKind.Object),
         [KeepParts.KeepCheck] = new("finding the target objects to keep", "They were kept.", SubjectKind.Object),
         [SelectionParts.RemovalCauseSelection] = new("selecting the objects that can cause removals", "They were not used to remove target objects.", SubjectKind.Object),
@@ -55,6 +57,7 @@ internal static class RunPartText
     public static string LinkedStep(RoundKind kind) =>
         kind switch
         {
+            RoundKind.ChangedTerrain => "changed-terrain",
             RoundKind.TooClose => "too-close",
             RoundKind.AlsoRemove => "follow-up",
             RoundKind.LeftBehind => "leftover invisible object",

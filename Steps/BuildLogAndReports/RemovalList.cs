@@ -39,7 +39,8 @@ internal static class RemovalList
     private static RemovedObject ToRemoval(
         TargetId target, RemovalReason reason, CollectedObjects world, PerIndexTable<LeftBehindCheck> leftBehindByTarget) => reason switch
     {
-        RemovalReason.TooClose tooClose => new TooCloseRemoval(target.Index, world.OtherModObjects[tooClose.Other.Index]),
+        RemovalReason.TerrainChanged changed => new TerrainChangedRemoval(target.Index, changed.ChangedBy, changed.Kind),
+        RemovalReason.TooClose tooClose => new TooCloseRemoval(target.Index, world.OtherModObjects[tooClose.Other.Index], tooClose.Cause),
         RemovalReason.Touching touching => new TouchingRemoval(target.Index, touching.Touched.Index),
         RemovalReason.LostSupport lost => new SupportRemoval(target.Index, lost.RemovedShare, lost.MainSupporter.Index),
         RemovalReason.InsideAnotherModsObject or RemovalReason.SurroundingsRemoved => new LeftBehindRemoval(target.Index, leftBehindByTarget.Get(target.Index)),

@@ -12,6 +12,9 @@ public sealed class SharedReportingTests
     private const int ProtectedTouching = 4;
 
     private static readonly KeepReason QuestReason = TestKeepReasons.Quest;
+    private static readonly TooCloseCause BySize = new TooCloseCause.ObjectSize();
+    private static readonly TooCloseCause WithinDistance = new TooCloseCause.Distance(32f);
+
     private static readonly ReportContext Normal = new(null!, null!, Detailed: false);
     private static readonly ReportContext Detailed = new(null!, null!, Detailed: true);
 
@@ -31,6 +34,75 @@ public sealed class SharedReportingTests
             removals.Select(removal => (removal.GetType(), removal.TargetIndex)));
         Assert.Equal(world.OtherModObjects[0], Assert.IsType<TooCloseRemoval>(removals[0]).TooCloseTo);
         Assert.Equal(1, Assert.IsType<LinkedRemoval>(removals[2]).LinkedToTargetIndex);
+    }
+
+    [Fact]
+    public void Removals_NameTheChangedTerrainAndTheDistanceCauses()
+    {
+        var world = CreateWorld();
+        var changedBy = new PluginName("Other.esp");
+        var decisions = RemovalDecisions.Start(ObjectsToKeep.Build(world.Targets, [], TestTargets.References(TargetCount)), TargetCount)
+            .Apply(RoundKind.ChangedTerrain, [Propose(0, new RemovalReason.TerrainChanged(changedBy, TerrainChangeKind.HeightAndTerrainType))])
+            .Apply(RoundKind.TooClose, [Propose(1, new RemovalReason.TooClose(new OtherId(0), BySize)), Propose(2, new RemovalReason.TooClose(new OtherId(0), WithinDistance))]);
+
+        var removals = RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(decisions), decisions, world, TestLeftBehind.PerformedWithoutFindings);
+
+        var other = world.OtherModObjects[0];
+        Assert.Equal(
+            [new TerrainChangedRemoval(0, changedBy, TerrainChangeKind.HeightAndTerrainType), new TooCloseRemoval(1, other, BySize), new TooCloseRemoval(2, other, WithinDistance)],
+            removals);
+    }
+
+    [Fact]
+    public void TheSummaryCountsBothTooCloseCausesAsTooClose()
+    {
+        RemovedObject[] removals = [new TooCloseRemoval(0, CreateOtherModObject(), BySize), new TooCloseRemoval(1, CreateOtherModObject(), WithinDistance)];
+
+        var summary = LogSections.BuildRemovalSummarySection(removals, StepOutcome.SwitchedOff);
+
+        Assert.Equal(
+            "Removed 2 objects (2 too close, 0 follow-up removals, 0 leftover invisible objects, 0 linked to removed objects).",
+            Assert.Single(summary.Lines));
+    }
+
+    [Theory]
+    [InlineData(StepOutcome.Performed, 1, "Removed 2 objects (1 on changed terrain, 1 too close, 0 follow-up removals, 0 leftover invisible objects, 0 linked to removed objects).")]
+    [InlineData(StepOutcome.Performed, 0, "Removed 1 objects (0 on changed terrain, 1 too close, 0 follow-up removals, 0 leftover invisible objects, 0 linked to removed objects).")]
+    [InlineData(StepOutcome.SwitchedOff, 0, "Removed 1 objects (1 too close, 0 follow-up removals, 0 leftover invisible objects, 0 linked to removed objects).")]
+    [InlineData(StepOutcome.StoppedByUnexpectedError, 0, "Removed 1 objects (1 too close, 0 follow-up removals, 0 leftover invisible objects, 0 linked to removed objects).")]
+    public void TheSummaryShowsTheChangedTerrainItemOnlyWhenTheStepWasPerformed(StepOutcome outcome, int onChangedTerrain, string expected)
+    {
+        List<RemovedObject> removals = [new TooCloseRemoval(0, CreateOtherModObject(), BySize)];
+        if (onChangedTerrain > 0) removals.Add(new TerrainChangedRemoval(1, new PluginName("Other.esp"), TerrainChangeKind.Height));
+
+        Assert.Equal(expected, Assert.Single(LogSections.BuildRemovalSummarySection(removals, outcome).Lines));
+    }
+
+    [Theory]
+    [InlineData(TerrainChangeKind.Height, "terrain changed by Other.esp (height)")]
+    [InlineData(TerrainChangeKind.TerrainType, "terrain changed by Other.esp (terrain type)")]
+    [InlineData(TerrainChangeKind.HeightAndTerrainType, "terrain changed by Other.esp (height and terrain type)")]
+    public void ATerrainChangeNamesTheModAndWhatChanged(TerrainChangeKind kind, string expected)
+    {
+        Assert.Equal(expected, Describe.RemovalReason(null!, new TerrainChangedRemoval(0, new PluginName("Other.esp"), kind)));
+    }
+
+    [Fact]
+    public void ADistanceRemovalNamesTheDistanceAndTheOtherObject()
+    {
+        var other = CreateOtherModObject();
+
+        var text = Describe.RemovalReason(null!, new TooCloseRemoval(0, other, WithinDistance));
+
+        Assert.Equal($"within 32 units of {Describe.OtherObject(other)}", text);
+    }
+
+    [Fact]
+    public void ASizeRemovalNamesTheOtherObjectWithoutADistance()
+    {
+        var other = CreateOtherModObject();
+
+        Assert.Equal($"too close to {Describe.OtherObject(other)}", Describe.RemovalReason(null!, new TooCloseRemoval(0, other, BySize)));
     }
 
     [Fact]
@@ -78,7 +150,7 @@ public sealed class SharedReportingTests
         };
         var protection = CreateProtection(tagged.Targets);
         var decided = new StepResults(
-            tagged, protection, null!, TestLeftBehind.PerformedWithoutFindings, null!, decisions);
+            tagged, protection, ChangedTerrainResult.SwitchedOff, null!, TestLeftBehind.PerformedWithoutFindings, null!, decisions);
 
         var hints = ManualPatchHints.FindManualPatchHints(decided, TestVisibility.OfTaggedBasesOnly(), RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(decided.Final), decided.Final, decided.Collected, decided.LeftBehind));
 
@@ -134,8 +206,17 @@ public sealed class SharedReportingTests
     /// <summary>Round 1: target 0 too close, protected target 3 held. Round 2: 1 touches 0 (its linked partner 2 goes along), protected 4 held.</summary>
     private static (CollectedObjects World, RemovalDecisions Decisions) RunRounds()
     {
+        var world = CreateWorld();
+        var decisions = RemovalDecisions.Start(CreateProtection(world.Targets), TargetCount)
+            .Apply(RoundKind.TooClose, [Propose(0, new RemovalReason.TooClose(new OtherId(0), BySize)), Propose(Protected, new RemovalReason.TooClose(new OtherId(0), BySize))])
+            .Apply(RoundKind.AlsoRemove, [Propose(1, new RemovalReason.Touching(new TargetId(0))), Propose(ProtectedTouching, new RemovalReason.Touching(new TargetId(0)))]);
+        return (world, decisions);
+    }
+
+    private static CollectedObjects CreateWorld()
+    {
         var targets = TestTargets.CreateMany(TargetCount);
-        var world = new CollectedObjects(
+        return new CollectedObjects(
             [.. targets],
             [CreateOtherModObject()],
             [],
@@ -146,10 +227,6 @@ public sealed class SharedReportingTests
             [],
             TargetWorkOrder.Of(targets),
             null);
-        var decisions = RemovalDecisions.Start(CreateProtection(world.Targets), TargetCount)
-            .Apply(RoundKind.TooClose, [Propose(0, new RemovalReason.TooClose(new OtherId(0))), Propose(Protected, new RemovalReason.TooClose(new OtherId(0)))])
-            .Apply(RoundKind.AlsoRemove, [Propose(1, new RemovalReason.Touching(new TargetId(0))), Propose(ProtectedTouching, new RemovalReason.Touching(new TargetId(0)))]);
-        return (world, decisions);
     }
 
     private static ObjectsToKeep CreateProtection(IReadOnlyList<TargetObject> targets) =>

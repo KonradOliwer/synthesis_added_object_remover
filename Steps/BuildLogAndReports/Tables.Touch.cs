@@ -38,8 +38,7 @@ internal static partial class Tables
     private static ImmutableArray<CsvTable> BuildTouchTables(RunOutcome outcome, TouchChainEdges touch, float tolerance, ReportContext context)
     {
         var (alsoRemove, final) = (outcome.RestingObjects, outcome.Final);
-        var seedRound = final.Rounds.Single(round => round.Kind == RoundKind.TooClose);
-        var seeds = RemovalList.RemovalsIn(final, outcome.Collected, seedRound).ToList();
+        var seeds = alsoRemove.SeedRounds.SelectMany(round => RemovalList.RemovalsIn(final, outcome.Collected, round)).ToList();
         var removals = alsoRemove.Rounds.SelectMany(round => RemovalList.RemovalsIn(final, outcome.Collected, round)).ToList();
         var kept = alsoRemove.Rounds.SelectMany(round => RemovalList.KeptIn(final, round)).ToList();
         return
@@ -49,7 +48,7 @@ internal static partial class Tables
         ];
     }
 
-    /// <param name="seeds">The too-close round's removals.</param>
+    /// <param name="seeds">The removals of the seed rounds (changed terrain, too close).</param>
     public static CsvTable BuildEdgesTable(
         CollectedObjects world, IEnumerable<RemovedObject> seeds, TouchChainEdges touch, float tolerance, ReportContext context)
     {
@@ -69,7 +68,7 @@ internal static partial class Tables
         return new CsvTable(ReportFileNames.EdgesFileName, EdgeHeader, [.. rows]);
     }
 
-    /// <param name="seeds">The too-close round's removals.</param>
+    /// <param name="seeds">The removals of the seed rounds (changed terrain, too close).</param>
     /// <param name="removals">The follow-up rounds' removals.</param>
     /// <param name="kept">The objects the follow-up rounds held.</param>
     public static CsvTable BuildComponentsTable(
@@ -124,6 +123,7 @@ internal static partial class Tables
 
     private static string DescribeSeedReason(RemovedObject seed, IReadOnlyList<TargetObject> targets) => seed switch
     {
+        TerrainChangedRemoval changed => $"terrain changed by {changed.ChangedBy}",
         TooCloseRemoval { TooCloseTo: var other } => $"{other.Key} ({other.WinningMod})",
         LinkedRemoval linked => $"linked to {targets[linked.LinkedToTargetIndex].Key}",
         _ => throw new UnreachableException($"Unexpected seed removal type {seed.GetType().Name}."),

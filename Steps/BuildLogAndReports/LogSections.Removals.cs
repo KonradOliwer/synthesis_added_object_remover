@@ -3,6 +3,7 @@ using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
+using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
@@ -40,8 +41,12 @@ internal static partial class LogSections
             ]);
     }
 
-    public static LogSection BuildRemovalSummarySection(IReadOnlyList<RemovedObject> removals)
+    /// <param name="changedTerrain">The changed-terrain step's outcome; the "on changed terrain" item only shows when the step was performed.</param>
+    public static LogSection BuildRemovalSummarySection(IReadOnlyList<RemovedObject> removals, StepOutcome changedTerrain)
     {
+        var onChangedTerrain = changedTerrain == StepOutcome.Performed
+            ? $"{TextFormat.Count(removals.Count(removal => removal is TerrainChangedRemoval))} on changed terrain, "
+            : string.Empty;
         var tooClose = removals.Count(removal => removal is TooCloseRemoval);
         var alsoRemoved = removals.Count(removal => removal is TouchingRemoval or SupportRemoval);
         var leftBehind = removals.Count(removal => removal is LeftBehindRemoval);
@@ -49,7 +54,7 @@ internal static partial class LogSections
         return new LogSection(
             "removal-summary",
             [
-                $"Removed {TextFormat.Count(removals.Count)} objects ({TextFormat.Count(tooClose)} too close, {TextFormat.Count(alsoRemoved)} follow-up removals, "
+                $"Removed {TextFormat.Count(removals.Count)} objects ({onChangedTerrain}{TextFormat.Count(tooClose)} too close, {TextFormat.Count(alsoRemoved)} follow-up removals, "
                 + $"{TextFormat.Count(leftBehind)} leftover invisible objects, {TextFormat.Count(linked)} linked to removed objects).",
             ]);
     }

@@ -22,6 +22,8 @@
     <ProjectReference Include="..\..\Steps\FindTargetObjectsToKeep\FindTargetObjectsToKeep.csproj" />
     <ProjectReference Include="..\..\Steps\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\RemovalDecisionList\RemovalDecisionList.csproj" />
+    <ProjectReference Include="..\..\Steps\RemoveObjectsOnChangedTerrain.Contracts\RemoveObjectsOnChangedTerrain.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\RemoveObjectsOnChangedTerrain\RemoveObjectsOnChangedTerrain.csproj" />
     <ProjectReference Include="..\..\Steps\RemoveTooCloseObjects.Contracts\RemoveTooCloseObjects.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\RemoveTooCloseObjects\RemoveTooCloseObjects.csproj" />
     <ProjectReference Include="..\..\Steps\RemoveObjectsRestingOnRemovedOnes.Contracts\RemoveObjectsRestingOnRemovedOnes.Contracts.csproj" />

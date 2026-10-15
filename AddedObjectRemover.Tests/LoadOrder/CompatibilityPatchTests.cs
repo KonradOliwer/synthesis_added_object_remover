@@ -61,6 +61,46 @@ public class CompatibilityPatchTests
         Assert.Empty(result.IgnoredMods);
     }
 
+    [Fact]
+    public void DependantsAreTheLoadedPluginsMasteringTheTargetInLoadOrderWithoutThePatchPlugin()
+    {
+        var standing = Decide(
+            Listing(Skyrim),
+            Listing(Target, Skyrim),
+            Listing(Patch, Skyrim, Target, OtherA),
+            Listing(OtherA, Skyrim),
+            Listing(Addon, Skyrim, Target),
+            Listing(Unrelated, OtherA),
+            new PluginListing(Missing, Loaded: false, [Target]),
+            Listing(SynthesisOutput, Skyrim, Target));
+
+        Assert.Equal(new[] { Patch, Addon }, standing.Dependants);
+    }
+
+    [Fact]
+    public void DependantsAreListedWhenPatchDetectionIsOff()
+    {
+        var standing = ModIdentifier.Identify(
+            new LoadOrderPlugins(Mods, SynthesisOutput, [Listing(Skyrim), Listing(Target, Skyrim), Listing(Addon, Skyrim, Target)]),
+            new ModIdentificationSettings(Target, Excluded: [], IgnoreTargetMasters: true, IgnorePatched: false, PatchMasterLimit));
+
+        Assert.Equal(new[] { Addon }, standing.Dependants);
+        Assert.False(standing.Patches.DetectionOn);
+    }
+
+    [Fact]
+    public void BaseGameIsTheKnownBaseGamePluginsWithoutCreationClubContent()
+    {
+        var dawnguard = new PluginName("Dawnguard.esm");
+        var creationClub = new PluginName("ccBGSSSE001-Fish.esm");
+        var standing = ModIdentifier.Identify(
+            new LoadOrderPlugins(new KnownPluginNames([Skyrim, dawnguard, creationClub, Target, SynthesisOutput]), SynthesisOutput,
+                [Listing(Skyrim), Listing(dawnguard, Skyrim), Listing(creationClub, Skyrim), Listing(Target, Skyrim)]),
+            new ModIdentificationSettings(Target, Excluded: [], IgnoreTargetMasters: true, IgnorePatched: true, PatchMasterLimit));
+
+        Assert.Equal(new[] { Skyrim, dawnguard }, standing.BaseGame);
+    }
+
     private static IdentifiedMods Decide(params PluginListing[] listed) =>
         ModIdentifier.Identify(
             new LoadOrderPlugins(Mods, SynthesisOutput, [.. listed]),

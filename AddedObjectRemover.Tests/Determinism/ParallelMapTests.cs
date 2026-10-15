@@ -117,6 +117,8 @@ public class ParallelMapTests
             () => ParallelMap.Run(Workers(2), order, 3, () => 0, (item, _) => item, ParallelMap.AutomaticRangeSize));
         Assert.Throws<ArgumentException>(
             () => ParallelMap.Run(Workers(2), order, 3, () => 0, (item, _) => item, _ => new Work(0, 0), ParallelMap.AutomaticRangeSize));
+        Assert.Throws<ArgumentException>(
+            () => ParallelMap.Run(Workers(2), order, 3, item => item, ParallelMap.AutomaticRangeSize));
     }
 
     [Fact]

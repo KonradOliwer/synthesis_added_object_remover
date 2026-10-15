@@ -1,12 +1,13 @@
 namespace AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 
-/// <summary>Work counts of the ObjectShape too-close search.</summary>
-/// <param name="CandidatePairs">Other objects found by the AABB grid query of a target's zone.</param>
+/// <summary>Work counts of the ObjectShape too-close search. A target tested with both removal zones counts once, and so does each of its pairs.</summary>
+/// <param name="CandidatePairs">Other objects found by the AABB grid query of a target's zone; with both zones tested, by the query that found more.</param>
 /// <param name="BoxFilterPasses">Candidate pairs whose oriented boxes overlap.</param>
 /// <param name="NarrowTests">Pairs tested mesh against mesh.</param>
 /// <param name="Hits">Pairs where the other object reached the zone.</param>
 /// <param name="CentrePointFallbacks">Pairs decided by the other object's bounds centre because it has no mesh triangles.</param>
 /// <param name="BoxZoneTargets">Targets without mesh triangles, tested with the BoundingBox zone instead.</param>
+/// <param name="TrianglePairsTested">Triangle pairs tested exactly, in every zone a pair was tested with.</param>
 public readonly record struct ShapeZoneWork(
     long CandidatePairs,
     long BoxFilterPasses,

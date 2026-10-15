@@ -20,7 +20,7 @@ public sealed class TerrainHeights(
     Func<RecordKey, RecordKey?> findLandWorldspace) : ITerrainHeights
 {
     public const int VerticesPerSide = 33;
-    private const float VertexSpacing = ExteriorGrid.CellSize / (VerticesPerSide - 1);
+    private const float VertexSpacing = TerrainGrid.VertexSpacing;
 
     private readonly ComputedOncePerKey<ExteriorCell, float[]?> _heightsByCell = new(Publication.FirstWriteWins, EqualityComparer<ExteriorCell>.Default);
 

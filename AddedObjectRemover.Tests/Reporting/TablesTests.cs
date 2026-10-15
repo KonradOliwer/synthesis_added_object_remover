@@ -53,6 +53,24 @@ public sealed class TablesTests : IDisposable
     }
 
     [Fact]
+    public void TouchTables_TakeTheChangedTerrainRoundsRemovalsAsSeedsToo()
+    {
+        var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouching, TouchDistance, Threshold, TouchChainsShown: true);
+        var plain = TouchScene();
+        var withTerrain = TouchScene(terrainSeeds: [0]);
+
+        var plainRow = ComponentRow(Tables.BuildTables(WithDetails(plain.Outcome, TouchDetails(plain)), settings, Context));
+        var terrainRow = ComponentRow(Tables.BuildTables(WithDetails(withTerrain.Outcome, TouchDetails(withTerrain)), settings, Context));
+
+        Assert.Equal(
+            new[] { new Round(1, RoundKind.ChangedTerrain), new Round(2, RoundKind.TooClose) },
+            withTerrain.Outcome.RestingObjects.SeedRounds.ToArray());
+        Assert.Equal(plainRow.Take(5), terrainRow.Take(5));
+        Assert.Contains("terrain changed by Other.esp", terrainRow[^1]);
+        Assert.DoesNotContain("terrain changed by", plainRow[^1]);
+    }
+
+    [Fact]
     public void SupportTable_MatchesTheOldWriterByteForByte()
     {
         var world = CreateWorld(CreateTargets(), out _);
@@ -230,6 +248,9 @@ public sealed class TablesTests : IDisposable
             tables.Select(table => table.FileName));
     }
 
+    private static ImmutableArray<string> ComponentRow(ImmutableArray<CsvTable> tables) =>
+        tables.Single(table => table.FileName == ReportFileNames.ComponentsFileName).Rows.Single();
+
     private static RunOutcome WithDetails(RunOutcome outcome, ReportFileDetails details) =>
         outcome with { RestingObjects = outcome.RestingObjects with { ReportFileDetails = details } };
 
@@ -239,15 +260,17 @@ public sealed class TablesTests : IDisposable
     private sealed record Scene(RunOutcome Outcome, TestTouchCascade.Run Run);
 
     /// <summary>Tables 0 and 2 are seeds; the plank 1 and item 4 are removed by touch; the referenced item 3 is held; target 4 has a comma in its Editor ID.</summary>
-    private static Scene TouchScene()
+    /// <param name="terrainSeeds">Seeds removed by the changed-terrain round instead of the too-close round; none by default.</param>
+    private static Scene TouchScene(IReadOnlyList<int>? terrainSeeds = null)
     {
         var targets = CreateTargets();
         var protection = ObjectsToKeep.Build(
             [.. targets], [], TestTargets.References(targets.Count, new Dictionary<int, KeepReason> { [3] = QuestReason }));
-        var run = TestTouchCascade.Execute(targets, Shapes, protection, [0, 2], TouchDistance, threads: 2, collectDiagnostics: true);
+        var run = TestTouchCascade.Execute(
+            targets, Shapes, protection, terrainSeeds is null ? [0, 2] : [2], TouchDistance, threads: 2, collectDiagnostics: true, terrainSeeds);
         var world = CreateWorld(targets, out _);
         var decided = new StepResults(
-            world, protection, run.Result, LeftBehindResult.SwitchedOff, MarkerMoves.SwitchedOff, run.RemovalDecisions);
+            world, protection, ChangedTerrainResult.SwitchedOff, run.Result, LeftBehindResult.SwitchedOff, MarkerMoves.SwitchedOff, run.RemovalDecisions);
         var removals = RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(run.RemovalDecisions), run.RemovalDecisions, world, TestLeftBehind.PerformedWithoutFindings).ToImmutableArray();
         var outcome = new RunOutcome(decided, removals, ManualPatchHints.FindManualPatchHints(decided, Shapes, removals), null!, default);
         return new Scene(outcome, run);

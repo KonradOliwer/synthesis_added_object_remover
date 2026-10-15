@@ -4,6 +4,7 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
@@ -15,6 +16,9 @@ namespace AddedObjectRemover;
 public static class SettingsValidator
 {
     private const float MaxSizeMultiplier = 5f;
+    private const float MaxRemovalDistanceInUnits = 1024f;
+    private const float MaxHeightChangeTolerance = 256f;
+    private const float MaxTerrainDistanceInUnits = 1024f;
     private const float MaxTouchDistance = 64f;
     private const float MinSearchRadius = 64f;
     private const float MaxSearchRadius = 8192f;
@@ -36,7 +40,8 @@ public static class SettingsValidator
         var excluded = ParseExcludedPlugins(records, ignore.ExcludedPlugins, warnings);
         WarnIfMastersUnreadable(targetListing, warnings);
         var modIdentification = CreateModIdentificationSettings(mods, targetListing, excluded, ignore, warnings);
-        var tooClose = CreateTooCloseSettings(check, ignore, warnings);
+        var tooClose = CreateTooCloseSettings(settings.TooClose, ignore, warnings);
+        var changedTerrain = CreateChangedTerrainSettings(settings.TerrainChange, warnings);
         var detailedLog = settings.Diagnostics.DetailedLog;
         var writeReportFiles = settings.Diagnostics.WriteReportFiles;
         var alsoRemove = CreateAlsoRemoveSettings(settings.FollowUpRemoval, touchChainsShown: detailedLog || writeReportFiles, warnings);
@@ -50,8 +55,9 @@ public static class SettingsValidator
             targetAsTyped,
             [.. excluded.Select(name => name.ToString())],
             modIdentification,
-            CreateWhatToCollect(alsoRemove.Mode, markerMoves, detailedLog),
+            CreateWhatToCollect(alsoRemove.Mode, markerMoves, changedTerrain, detailedLog),
             new SelectionSettings(tooClose.Npcs),
+            changedTerrain,
             tooClose,
             alsoRemove,
             leftoverSettings.RemoveLeftoverInvisibleObjects ? leftBehind : null,
@@ -73,12 +79,46 @@ public static class SettingsValidator
                 ? Clamp(ignore.MaxOtherMastersForPatch, MinOtherMastersForPatch, MaxOtherMastersForPatch, "maximum other masters for a patch", warnings)
                 : ignore.MaxOtherMastersForPatch);
 
-    private static TooCloseSettings CreateTooCloseSettings(ICheckSettingsValues check, IIgnoreSettingsValues ignore, ICollection<SettingWarning> warnings)
+    private static TooCloseSettings CreateTooCloseSettings(ITooCloseSettingsValues values, IIgnoreSettingsValues ignore, ICollection<SettingWarning> warnings)
     {
         var npcs = ValidateDefined(ignore.NpcHandling, SettingDefaults.Npcs, "NPCs and creatures setting", warnings);
-        var sizeMultiplier = Clamp(check.SizeMultiplier, 0, MaxSizeMultiplier, SettingDefaults.SizeMultiplier, "size multiplier", warnings);
-        var zoneShape = ValidateDefined(check.ZoneShape, SettingDefaults.Zone, "removal zone", warnings);
-        return new TooCloseSettings(sizeMultiplier, zoneShape, npcs);
+        var sizeMultiplier = Clamp(values.SizeMultiplier, 0, MaxSizeMultiplier, SettingDefaults.SizeMultiplier, "size multiplier", warnings);
+        var zoneShape = ValidateDefined(values.ZoneShape, SettingDefaults.Zone, "removal zone", warnings);
+        var distanceInUnits = Clamp(
+            values.RemovalDistanceInUnits, 0, MaxRemovalDistanceInUnits, SettingDefaults.RemovalDistanceInUnits, "removal distance in game units", warnings);
+        return new TooCloseSettings(values.RemoveTooCloseBySize, sizeMultiplier, values.RemoveTooCloseByDistance, distanceInUnits, zoneShape, npcs);
+    }
+
+    /// <summary>
+    /// Built (and its settings validated) even when the step is off, so invalid values are always reported. Switched on with
+    /// neither height nor terrain type changes counted, it is passed as off, with a warning, because it could remove nothing.
+    /// </summary>
+    private static ChangedTerrainSettings CreateChangedTerrainSettings(ITerrainChangeSettingsValues terrain, ICollection<SettingWarning> warnings)
+    {
+        var objects = ValidateDefined(terrain.TerrainCheckedObjects, SettingDefaults.TerrainChecked, "objects checked for changed terrain", warnings);
+        var tolerance = Clamp(
+            terrain.HeightChangeTolerance, 0, MaxHeightChangeTolerance, SettingDefaults.HeightChangeTolerance, "height change tolerance", warnings);
+        var mode = ValidateDefined(terrain.TerrainDistanceMode, SettingDefaults.TerrainDistance, "terrain distance mode", warnings);
+        var distanceInUnits = Clamp(
+            terrain.TerrainDistanceInUnits, 0, MaxTerrainDistanceInUnits, SettingDefaults.TerrainDistanceInUnits, "terrain distance in game units", warnings);
+        var sizeMultiplier = Clamp(
+            terrain.TerrainDistanceSizeMultiplier, 0, MaxSizeMultiplier, SettingDefaults.TerrainDistanceSizeMultiplier, "terrain distance size multiplier", warnings);
+        var countsAChange = terrain.CountHeightChanges || terrain.CountTerrainTypeChanges;
+        if (terrain.RemoveOnChangedTerrain && !countsAChange)
+        {
+            warnings.Add(new SettingWarning(
+                "changed terrain",
+                "Warning: changed terrain is on, but neither height nor terrain type changes are counted; no object is removed for changed terrain."));
+        }
+        return new ChangedTerrainSettings(
+            terrain.RemoveOnChangedTerrain && countsAChange,
+            objects,
+            terrain.CountHeightChanges,
+            tolerance,
+            terrain.CountTerrainTypeChanges,
+            mode,
+            distanceInUnits,
+            sizeMultiplier);
     }
 
     /// <param name="touchChainsShown">Whether the Detailed log or the report files show the touch chains.</param>
@@ -103,11 +143,21 @@ public static class SettingsValidator
         return FolderPaths.ResolveAgainst(Path.GetDirectoryName(outputPath) ?? string.Empty, folder);
     }
 
-    /// <summary>The surroundings are read only when follow-up removal or relocation needs them; the Editor ID lists only when the detailed log prints them.</summary>
-    private static WhatToCollect CreateWhatToCollect(FollowUpRemovalMode mode, MarkerMoveSettings? markerMoves, bool detailedLog)
+    /// <summary>
+    /// The surroundings are read only when follow-up removal or relocation needs them; the Editor ID lists only when the detailed
+    /// log prints them; every plugin's terrain only when the changed-terrain step runs, and its texture layers only when it counts terrain types.
+    /// </summary>
+    private static WhatToCollect CreateWhatToCollect(FollowUpRemovalMode mode, MarkerMoveSettings? markerMoves, ChangedTerrainSettings changedTerrain, bool detailedLog)
     {
         var needsSurroundings = mode == FollowUpRemovalMode.ObjectsSupportedByIt || markerMoves != null;
-        return new WhatToCollect(needsSurroundings, needsSurroundings, markerMoves != null, detailedLog, detailedLog);
+        return new WhatToCollect(
+            needsSurroundings,
+            needsSurroundings,
+            markerMoves != null,
+            detailedLog,
+            detailedLog,
+            changedTerrain.On,
+            changedTerrain.On && changedTerrain.CountTerrainTypeChanges);
     }
 
     /// <summary>Built (and its settings validated) even when the step is off, so invalid values are always reported.</summary>

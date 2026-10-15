@@ -33,10 +33,11 @@ public sealed class RemovalDecisions : IRemovalDecisions
             return _newest;
         }
 
-        public (IRemovalDecisions Decisions, ImmutableArray<RoundProposals<TDetails>> Rounds) DecideRoundsUntilNothingRemoved<TDetails>(IRemovalRounds<TDetails> rounds)
+        public (IRemovalDecisions Decisions, ImmutableArray<RoundProposals<TDetails>> Rounds) DecideRoundsUntilNothingRemoved<TDetails>(
+            IRemovalRounds<TDetails> rounds, ImmutableArray<TargetId> seeds)
         {
             var decided = ImmutableArray.CreateBuilder<RoundProposals<TDetails>>();
-            var removedLastRound = _newest.RemovedIn(_newest.Rounds[^1]);
+            var removedLastRound = seeds;
             while (!removedLastRound.IsEmpty)
             {
                 var next = rounds.Next(_newest, removedLastRound);

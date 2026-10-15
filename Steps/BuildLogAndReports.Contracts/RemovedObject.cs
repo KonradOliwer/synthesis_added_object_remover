@@ -1,4 +1,5 @@
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
@@ -6,7 +7,10 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 /// <summary>A target object to remove (index into the scanned targets).</summary>
 public abstract record RemovedObject(int TargetIndex);
 
-public sealed record TooCloseRemoval(int TargetIndex, OtherObject TooCloseTo) : RemovedObject(TargetIndex);
+/// <param name="ChangedBy">The plugin whose terrain change the game shows.</param>
+public sealed record TerrainChangedRemoval(int TargetIndex, PluginName ChangedBy, TerrainChangeKind Kind) : RemovedObject(TargetIndex);
+
+public sealed record TooCloseRemoval(int TargetIndex, OtherObject TooCloseTo, TooCloseCause Cause) : RemovedObject(TargetIndex);
 
 public sealed record TouchingRemoval(int TargetIndex, int TouchedTargetIndex) : RemovedObject(TargetIndex);
 

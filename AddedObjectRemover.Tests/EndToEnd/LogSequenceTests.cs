@@ -60,7 +60,8 @@ public class LogSequenceTests
 
     private static Settings Create(FollowUpRemovalMode mode, Leftovers leftovers, bool writeReportFiles, bool detailedLog) => new()
     {
-        WhatToCheck = new CheckSettings { TargetPlugin = FixtureWorld.TargetPlugin, ZoneShape = ZoneShape.ObjectShape },
+        WhatToCheck = new CheckSettings { TargetPlugin = FixtureWorld.TargetPlugin },
+        TooClose = new TooCloseRemovalSettings { ZoneShape = ZoneShape.ObjectShape },
         WhatToIgnore = new IgnoreSettings
         {
             ExcludedPlugins = [FixtureWorld.ExcludedPlugin],

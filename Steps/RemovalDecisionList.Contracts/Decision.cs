@@ -2,7 +2,7 @@ using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 
 namespace AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
-public enum RoundKind { TooClose, AlsoRemove, LeftBehind }
+public enum RoundKind { ChangedTerrain, TooClose, AlsoRemove, LeftBehind }
 
 /// <param name="Number">1 for the first round of a run, counting up.</param>
 public readonly record struct Round(int Number, RoundKind Kind);

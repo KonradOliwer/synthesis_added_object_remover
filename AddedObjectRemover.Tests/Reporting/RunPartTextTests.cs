@@ -34,6 +34,7 @@ public class RunPartTextTests
     public static TheoryData<string, string> PerSubjectParts { get; } = new()
     {
         { "TooCloseCheck", "  Unexpected error while checking objects for being too close (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were not removed." },
+        { "TerrainCheck", "  Unexpected error while checking objects for changed terrain (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were not removed." },
         { "KeepCheck", "  Unexpected error while finding the target objects to keep (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were kept." },
         { "RemovalCauseSelection", "  Unexpected error while selecting the objects that can cause removals (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were not used to remove target objects." },
         { "MeshShapes", @"  Unexpected error while reading mesh shapes (InvalidOperationException: broke): 1 mesh, e.g. meshes\crate.nif. Objects using the mesh are treated as having no mesh shape." },
@@ -65,6 +66,7 @@ public class RunPartTextTests
     }
 
     [Theory]
+    [InlineData(RoundKind.ChangedTerrain, "changed-terrain")]
     [InlineData(RoundKind.TooClose, "too-close")]
     [InlineData(RoundKind.AlsoRemove, "follow-up")]
     [InlineData(RoundKind.LeftBehind, "leftover invisible object")]
@@ -109,7 +111,7 @@ public class RunPartTextTests
         new[]
         {
             ReportFileParts.ReportFiles, RestingObjectsParts.AlsoRemove, RestingObjectsParts.TouchChains, LeftBehindParts.LeftBehind, MarkerMoveParts.MarkerMoves,
-            RestingObjectsParts.ReportFileDetails, TooCloseParts.TooCloseCheck, KeepParts.KeepCheck, SelectionParts.RemovalCauseSelection,
+            RestingObjectsParts.ReportFileDetails, ChangedTerrainParts.TerrainCheck, TooCloseParts.TooCloseCheck, KeepParts.KeepCheck, SelectionParts.RemovalCauseSelection,
             MeshReadingParts.MeshShapes, MeshReadingParts.MeshTriangles, MeshReadingParts.LoaderStartUp,
         }.Single(key => key.Name == name);
 }

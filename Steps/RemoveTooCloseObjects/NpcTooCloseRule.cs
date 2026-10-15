@@ -1,3 +1,5 @@
+using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
+using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveTooCloseObjects;
@@ -29,6 +31,7 @@ internal sealed class NpcTooCloseRule
         StuckSearch?.FindFirstStuckNpc(targetIndex, scratch);
 
     /// <summary>The first object match wins; NPCs are only looked at when no object matched.</summary>
-    public OtherId? ThenFirstStuckNpc(OtherId? objectMatch, int targetIndex, NpcScratch scratch) =>
-        objectMatch ?? FindFirstStuckNpc(targetIndex, scratch);
+    /// <remarks>An NPC stuck in the target is within the target's own size, whichever zones are on.</remarks>
+    public ZoneHit? ThenFirstStuckNpc(ZoneHit? objectMatch, int targetIndex, NpcScratch scratch) =>
+        objectMatch ?? (FindFirstStuckNpc(targetIndex, scratch) is { } npc ? new ZoneHit(npc, new TooCloseCause.ObjectSize()) : null);
 }

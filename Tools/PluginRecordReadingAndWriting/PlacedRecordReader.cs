@@ -43,6 +43,7 @@ internal sealed class PlacedRecordReader
     private readonly List<LinkFact> _links = [];
     private readonly Dictionary<RecordKey, RecordKey> _landWorldspaceOf = new();
     private readonly Dictionary<ExteriorCell, ILandscapeGetter> _landscapes = new();
+    private readonly Dictionary<ExteriorCell, List<LandscapeVersion>> _landscapeVersions = new();
     private readonly Dictionary<RecordKey, List<CellNavmesh>> _navmeshes = new();
 
     private int _recordsScanned;
@@ -60,7 +61,7 @@ internal sealed class PlacedRecordReader
         _names = names;
         _scope = scope;
         _footprint = AnalyzeTargetPlugin();
-        if (scope.Terrain) FindLandWorldspaces();
+        if (scope.Terrain || scope.TerrainVersions) FindLandWorldspaces();
         _landWorldspaces = _landWorldspaceOf.Values.ToHashSet();
     }
 
@@ -152,7 +153,7 @@ internal sealed class PlacedRecordReader
         var cellFact = new CellFact(_names.KeyOf(cell.FormKey), cell.EditorID);
         var inTargetSpace = _footprint.SpaceKeys.Contains(space.Key);
         if (inTargetSpace) _winningCells.TryAdd(cellFact.Key, cellContext);
-        if (_landWorldspaces.Contains(space.Key)) CollectLandscape(cell, cellFact.Key, space);
+        if (_landWorldspaces.Contains(space.Key)) CollectLandscape(cell, cellFact.Key, space, winningMod);
         if (_scope.Navmeshes && inTargetSpace) CollectNavmeshes(cell, cellFact.Key, space);
 
         foreach (var (record, persistent) in cell.EnumeratePlaced())
@@ -164,11 +165,14 @@ internal sealed class PlacedRecordReader
     /// <remarks>
     /// LAND is a record of its own inside the cell, so a cell override without it leaves the
     /// terrain to a lower-priority plugin; the first cell copy found that carries one is the winner.
+    /// With the terrain versions asked for, each plugin's copy is also kept, undecoded, in the order found.
     /// </remarks>
-    private void CollectLandscape(ICellGetter cell, RecordKey cellKey, SpaceFact space)
+    private void CollectLandscape(ICellGetter cell, RecordKey cellKey, SpaceFact space, PluginName plugin)
     {
         if (space.Key == cellKey || cell.Grid is not { } grid || cell.Landscape is not { } landscape) return;
-        _landscapes.TryAdd(new ExteriorCell(space.Key, grid.Point.X, grid.Point.Y), landscape);
+        var exteriorCell = new ExteriorCell(space.Key, grid.Point.X, grid.Point.Y);
+        _landscapes.TryAdd(exteriorCell, landscape);
+        if (_scope.TerrainVersions) KeyedGroups.GetOrAddList(_landscapeVersions, exteriorCell).Add(new LandscapeVersion(plugin, landscape));
     }
 
     /// <remarks>Like placed records, the first copy of a navmesh found is its winner.</remarks>
@@ -221,7 +225,7 @@ internal sealed class PlacedRecordReader
 
     private ScannedRecords CreateScannedRecords()
     {
-        var terrain = new LandscapeTerrain(_landscapes, _landWorldspaceOf);
+        var terrain = new LandscapeTerrain(_landscapes, _landWorldspaceOf, _scope.TerrainVersions ? _landscapeVersions : null, _scope.TerrainLayers ? _names : null);
         var facts = new PlacedRecordFacts(
             [.. _records],
             _recordsScanned,

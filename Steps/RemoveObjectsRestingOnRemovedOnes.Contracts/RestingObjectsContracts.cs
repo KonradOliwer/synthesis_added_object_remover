@@ -13,7 +13,8 @@ public sealed record RestingObjectsWork(int Rounds, int Candidates, int Evaluati
 
 /// <summary>What the also-remove step did: its rounds, proposed to the run's decisions as one proposal, and what explains them.</summary>
 /// <param name="Outcome">Switched off in mode Nothing; stopped by an unexpected error when the rounds failed, which then propose nothing.</param>
-/// <param name="HadSeeds">The too-close round removed at least one object.</param>
+/// <param name="HadSeeds">The changed-terrain and too-close rounds together removed at least one object.</param>
+/// <param name="SeedRounds">The rounds whose removals the also-remove rounds start from, in round order; empty when the step ran no rounds.</param>
 /// <param name="Rounds">The also-remove rounds, in order.</param>
 /// <param name="ProposedRounds">Each round's proposals, in round order, for the run's decisions to apply as rounds.</param>
 /// <param name="Evidence">One per also-remove round, in round order.</param>
@@ -29,6 +30,7 @@ public sealed record RestingObjectsResult(
     StepOutcome Outcome,
     FollowUpRemovalMode Mode,
     bool HadSeeds,
+    ImmutableArray<Round> SeedRounds,
     ImmutableArray<Round> Rounds,
     ImmutableArray<IReadOnlyList<ProposedRemoval>> ProposedRounds,
     ImmutableArray<RoundDetails> Evidence,

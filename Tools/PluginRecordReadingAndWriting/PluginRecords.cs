@@ -10,20 +10,20 @@ internal sealed class PluginRecords(
     ILoadOrder<IModListing<ISkyrimModGetter>> loadOrder,
     ILinkCache<ISkyrimMod, ISkyrimModGetter> linkCache,
     ISkyrimMod patchMod,
-    KnownPluginNames knownPlugins) : IPluginRecords
+    PluginNames names) : IPluginRecords
 {
     private const string NotReadMessage = "The placed records must be read before they are used.";
 
-    private readonly PluginNames _names = new(knownPlugins);
-    private readonly NpcRecordReads _npcReads = new(linkCache, knownPlugins);
+    private readonly NpcRecordReads _npcReads = new(linkCache, names);
+    private readonly LandscapeMaterials _materials = new(linkCache, names);
     private PlacedRecordWriter? _writer;
     private ScannedRecords? _scanned;
 
     public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope)
     {
-        var scanned = PlacedRecordReader.Read(loadOrder, linkCache, patchMod.ModKey, _names, scope);
+        var scanned = PlacedRecordReader.Read(loadOrder, linkCache, patchMod.ModKey, names, scope);
         _scanned = scanned;
-        _writer = new PlacedRecordWriter(new PlacedOverrideWriter(patchMod, _names), scanned.Handles);
+        _writer = new PlacedRecordWriter(new PlacedOverrideWriter(patchMod, names), scanned.Handles);
         return scanned.Facts;
     }
 
@@ -32,9 +32,9 @@ internal sealed class PluginRecords(
         var referencingMods = loadOrder.PriorityOrder
             .Select(listing => listing.Mod)
             .OfType<ISkyrimModGetter>()
-            .Where(mod => PlacedRecordReader.MayReferenceTarget(mod, target, patchMod.ModKey, _names));
+            .Where(mod => PlacedRecordReader.MayReferenceTarget(mod, target, patchMod.ModKey, names));
         var facts = new List<LinkFact>();
-        LinkReader.ReadFromNonPlaced(referencingMods, targets, target, _names, facts);
+        LinkReader.ReadFromNonPlaced(referencingMods, targets, target, names, facts);
         return [.. facts];
     }
 
@@ -46,6 +46,10 @@ internal sealed class PluginRecords(
         Scanned.Handles.LocationOf(record).WinningCell.Record.Grid is { } grid ? new CellGridPoint(grid.Point.X, grid.Point.Y) : null;
 
     public float[]? ReadTerrain(ExteriorCell cell) => Scanned.Terrain.ReadHeights(cell);
+
+    public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => Scanned.Terrain.ReadVersions(cell);
+
+    public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => _materials.ChainOf(texture);
 
     public RecordKey? FindLandWorldspace(RecordKey space) => Scanned.Terrain.FindLandWorldspace(space);
 

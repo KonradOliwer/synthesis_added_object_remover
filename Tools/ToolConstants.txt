@@ -35,7 +35,12 @@ CompassDirections.SectorDegrees | math | Degrees per sector.
 CompassDirections.CentredSectorShift | math | Half a sector, so sectors are centred on their direction.
 CompassDirections.Sectors | math | All sector values.
 TerrainHeights.VerticesPerSide | game format | A cell's terrain height grid is 33 by 33 vertices.
-TerrainHeights.VertexSpacing | game format | Cell size divided by the 32 gaps between vertices.
+TerrainHeights.VertexSpacing | game format | Cell size divided by the 32 gaps between vertices (the same value as TerrainGrid.VertexSpacing).
+TerrainQuadrants.PerSide | game format | A cell's terrain textures are split into 2 by 2 quadrants.
+TerrainQuadrants.VerticesPerSide | game format | Each texture quadrant covers 17 by 17 vertices (the quadrants share their edge vertices).
+TerrainQuadrants.VertexCount | game format | The vertices of one texture quadrant (17 by 17); alpha layer positions run 0 to 288.
+TerrainGrid.SquaresPerSide | game format | A cell's terrain has 32 squares across, one fewer than its vertices.
+TerrainGrid.VertexSpacing | game format | Cell size divided by the 32 squares across a cell.
 BodyMeshBounds.KeySeparator | internal | Joins the mesh paths of a set into its lookup key.
 NavmeshIndex.SamplesPerSide | budget | Points sampled along a triangle edge when searching for the nearest navmesh point.
 ExteriorGrid.CellSize | game format | An exterior cell is 4096 game units wide.
@@ -49,6 +54,7 @@ ParallelMap.OneItemPerRange | budget | Range size for heavy items.
 ParallelMap.AutomaticRangeSize | budget | Range size 0 means: choose from the item and worker counts.
 LandHeightReader.VerticesPerSide | game format | A cell's terrain height grid is 33 by 33 vertices (the same value as TerrainHeights.VerticesPerSide).
 LandHeightReader.UnitsPerHeightStep | game format | One step of a stored terrain height is 8 game units.
+LandLayerReader.QuadrantPlaces | game format | The column and row of each texture quadrant of a LAND record in its cell.
 PluginRecords.NotReadMessage | internal | Error text for using the records before they were read.
 MeshFileSource.MeshesPrefix | game format | Mesh paths in the game's data start with "meshes\".
 MeshFileSource.DataPrefix | game format | A model path may carry a leading "data\" folder name, which is not part of the archive path.

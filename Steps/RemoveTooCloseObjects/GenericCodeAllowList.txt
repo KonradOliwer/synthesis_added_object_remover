@@ -8,6 +8,7 @@ NpcStuckTest.GetCore | NPC stuck rule: the core of a body box.
 NpcStuckTest.IsCoreStuck | NPC stuck rule over boxes and mesh trees.
 NpcStuckTest.IsInside | NPC stuck rule over boxes and mesh trees.
 NpcStuckTest.OverlapsAnyTriangle | NPC stuck rule over boxes and mesh trees.
-ShapeZone.Create | Zone geometry: scales a box and places it with a transform.
+TooCloseObjects.FindInBoxZone | Runs the box-zone search over the step's own input and zone list (internal types).
+TooCloseObjects.FindInShapeZone | Runs the shape-zone search over the step's own input and zone list (internal types).
 ShapeZoneContact.IsInsideOpenBubbleBox | Zone contact rule over mesh trees and the zone.
 ShapeZoneContact.Reaches | Zone contact rule over mesh trees and the zone.

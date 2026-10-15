@@ -26,7 +26,7 @@ public sealed class PatchWriterTests
         Assert.Equal(0, written.Moved);
     }
 
-    private static ProposedRemoval Propose(int index) => new(new TargetId(index), new RemovalReason.TooClose(new OtherId(0)));
+    private static ProposedRemoval Propose(int index) => new(new TargetId(index), new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()));
 
     private sealed class RecordingPlugin : IPluginRecords
     {
@@ -45,6 +45,9 @@ public sealed class PatchWriterTests
         public CellGridPoint? ReadHomeCellGrid(RecordKey record) => throw new NotSupportedException();
 
         public float[]? ReadTerrain(ExteriorCell cell) => throw new NotSupportedException();
+
+        public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new NotSupportedException();
+        public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => throw new NotSupportedException();
 
         public RecordKey? FindLandWorldspace(RecordKey space) => throw new NotSupportedException();
 

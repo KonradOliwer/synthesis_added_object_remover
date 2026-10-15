@@ -379,7 +379,7 @@ public sealed class RestingObjectsEndSectionsTests
             })
             .ToList();
 
-        AssertExpectedOutput(LogSections.BuildRemovalSummarySection(removals).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "removal-summary");
+        AssertExpectedOutput(LogSections.BuildRemovalSummarySection(removals, StepOutcome.SwitchedOff).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "removal-summary");
         AssertExpectedOutput(LogSections.BuildKeptSummarySection(kept).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "kept-summary");
         AssertExpectedOutput(LogSections.BuildMarkersByTypeSection(targets, removals, context).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "markers");
         Assert.Equal(["Removed markers by type: 1 DoorMarkers."], LogSections.BuildMarkersByTypeSection(targets, removals, context).Lines.ToList());
@@ -522,6 +522,7 @@ public sealed class RestingObjectsEndSectionsTests
             StepOutcome.Performed,
             mode,
             HadSeeds: true,
+            [decisions.Rounds[0]],
             [decisions.Rounds[^1]],
             [],
             [],
@@ -591,7 +592,7 @@ public sealed class RestingObjectsEndSectionsTests
             TargetWorkOrder.Of(targets),
             null);
         var decisions = RemovalDecisions.Start(protection, TargetCount)
-            .Apply(RoundKind.TooClose, [Propose(0, new RemovalReason.TooClose(new OtherId(0))), Propose(Protected, new RemovalReason.TooClose(new OtherId(0)))])
+            .Apply(RoundKind.TooClose, [Propose(0, new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize())), Propose(Protected, new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()))])
             .Apply(RoundKind.AlsoRemove, [Propose(1, reasonOf(1)), Propose(ProtectedAlsoRemove, reasonOf(ProtectedAlsoRemove))]);
         return (world, decisions);
     }

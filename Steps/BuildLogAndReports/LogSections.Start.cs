@@ -3,7 +3,9 @@ using System.Diagnostics;
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
@@ -22,8 +24,10 @@ internal static partial class LogSections
         new("config",
         [
             $"Target plugin: {settings.TargetAsTyped}",
-            $"Size multiplier: {settings.TooClose.Multiplier}",
+            settings.TooClose.BySize ? $"Size multiplier: {settings.TooClose.Multiplier}" : "Size multiplier: off",
+            .. DescribeDistanceZone(settings.TooClose),
             $"Removal zone: {settings.TooClose.Zone}",
+            .. DescribeChangedTerrain(settings.ChangedTerrain),
             $"Excluded plugins: {JoinOrNone(settings.ExcludedNames)}",
             settings.ModIdentification.IgnoreTargetMasters
                 ? $"Ignored masters of target: {JoinOrNone(standing.IgnoredMasters.Select(mod => mod.ToString()))}"
@@ -36,6 +40,38 @@ internal static partial class LogSections
             $"Write report files: {settings.Reports.WriteFiles}",
             $"Report folder: {settings.Reports.Folder}",
         ]);
+
+    private static ImmutableArray<string> DescribeDistanceZone(TooCloseSettings tooClose) =>
+        tooClose.ByDistance ? [$"Removal distance (game units): {tooClose.DistanceInUnits}"] : [];
+
+    /// <summary>The changed-terrain settings in one line; the parts of a check that is switched off are left out.</summary>
+    private static ImmutableArray<string> DescribeChangedTerrain(ChangedTerrainSettings terrain)
+    {
+        if (!terrain.On) return [];
+
+        List<string> parts =
+        [
+            "Changed terrain: removed",
+            $"objects checked: {CheckedObjectsText(terrain.Objects)}",
+            terrain.DistanceMode switch
+            {
+                TerrainDistanceMode.GameUnits => $"distance {terrain.DistanceInUnits} units",
+                TerrainDistanceMode.ObjectSize => $"distance {terrain.DistanceSizeMultiplier} times the object size",
+                _ => throw new UnreachableException($"Unknown terrain distance mode {terrain.DistanceMode}."),
+            },
+        ];
+        if (terrain.CountHeightChanges) parts.Add($"height changes over {terrain.HeightTolerance} units");
+        if (terrain.CountTerrainTypeChanges) parts.Add("terrain type changes counted");
+        return [$"{string.Join("; ", parts)}."];
+    }
+
+    private static string CheckedObjectsText(TerrainCheckedObjects objects) => objects switch
+    {
+        TerrainCheckedObjects.VisibleObjectsOnTheGround => "visible objects on the ground",
+        TerrainCheckedObjects.AllVisibleObjects => "all visible objects",
+        TerrainCheckedObjects.AllObjects => "all objects",
+        _ => throw new UnreachableException($"Unknown checked objects {objects}."),
+    };
 
     private static string StopMessage(StopReason reason) => reason.Kind switch
     {

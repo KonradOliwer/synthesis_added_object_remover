@@ -11,5 +11,5 @@ public sealed class PluginRecordsFactory(
     ISkyrimMod patchMod,
     KnownPluginNames knownPlugins) : IPluginRecordsFactory
 {
-    public IPluginRecords Open() => new PluginRecords(loadOrder, linkCache, patchMod, knownPlugins);
+    public IPluginRecords Open() => new PluginRecords(loadOrder, linkCache, patchMod, new PluginNames(knownPlugins));
 }

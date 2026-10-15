@@ -22,7 +22,7 @@ public class RemovalDecisionsTests
         TestTargets.Link(6, 7),
     ];
 
-    private static readonly RemovalReason TooClose = new RemovalReason.TooClose(new OtherId(0));
+    private static readonly RemovalReason TooClose = new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize());
 
     [Fact]
     public void RoundsDecidedOnAWorkingCopyLeaveTheRunsDecisionsUnchanged()
@@ -31,7 +31,7 @@ public class RemovalDecisionsTests
         var move = new MarkerMove(Id(11), Vector3.Zero, Vector3.One);
         var withMove = afterTooClose.AddMoves([move]);
 
-        var (copy, _) = withMove.WorkingCopy().DecideRoundsUntilNothingRemoved(new ScriptedRounds([Propose(9, TooClose)], []));
+        var (copy, _) = withMove.WorkingCopy().DecideRoundsUntilNothingRemoved(new ScriptedRounds([Propose(9, TooClose)], []), LastRoundRemovals(withMove));
 
         Assert.Equal(3, copy.Rounds.Length);
         Assert.True(copy.IsRemoved(Id(9)));
@@ -47,7 +47,7 @@ public class RemovalDecisionsTests
         var first = Start().Apply(RoundKind.TooClose, [Propose(8, TooClose)]);
         first.Apply(RoundKind.AlsoRemove, [Propose(9, TooClose)]);
 
-        var (copy, _) = first.WorkingCopy().DecideRoundsUntilNothingRemoved(new ScriptedRounds([Propose(10, TooClose)], []));
+        var (copy, _) = first.WorkingCopy().DecideRoundsUntilNothingRemoved(new ScriptedRounds([Propose(10, TooClose)], []), LastRoundRemovals(first));
 
         Assert.False(copy.IsDecided(Id(9)));
         Assert.Equal(new[] { new Round(1, RoundKind.TooClose), new Round(2, RoundKind.AlsoRemove), new Round(3, RoundKind.AlsoRemove) }, copy.Rounds.ToArray());
@@ -61,7 +61,7 @@ public class RemovalDecisionsTests
         var afterTooClose = Start(new Dictionary<int, KeepReason> { [4] = QuestReason }).Apply(RoundKind.TooClose, [Propose(0, TooClose)]);
         var rule = new ScriptedRounds([Propose(3, touching), Propose(5, touching)], [Propose(8, touching), Propose(6, touching)], []);
 
-        var (copy, rounds) = afterTooClose.WorkingCopy().DecideRoundsUntilNothingRemoved(rule);
+        var (copy, rounds) = afterTooClose.WorkingCopy().DecideRoundsUntilNothingRemoved(rule, LastRoundRemovals(afterTooClose));
         var applied = afterTooClose.ApplyRounds(RoundKind.AlsoRemove, [.. rounds.Select(round => round.Proposals)]);
 
         Assert.Equal(copy.Rounds.ToArray(), applied.Rounds.ToArray());
@@ -321,7 +321,7 @@ public class RemovalDecisionsTests
         var rule = new ScriptedRounds();
         var start = Start().Apply(RoundKind.TooClose, []);
 
-        var (decisions, rounds) = start.WorkingCopy().DecideRoundsUntilNothingRemoved(rule);
+        var (decisions, rounds) = start.WorkingCopy().DecideRoundsUntilNothingRemoved(rule, LastRoundRemovals(start));
 
         Assert.Empty(rule.RemovedLastRound);
         Assert.Empty(rounds);
@@ -334,7 +334,7 @@ public class RemovalDecisionsTests
         var rule = new ScriptedRounds([Propose(8, TooClose)], [], [Propose(9, TooClose)]);
         var start = Start().Apply(RoundKind.TooClose, [Propose(10, TooClose)]);
 
-        var (decisions, rounds) = start.WorkingCopy().DecideRoundsUntilNothingRemoved(rule);
+        var (decisions, rounds) = start.WorkingCopy().DecideRoundsUntilNothingRemoved(rule, LastRoundRemovals(start));
 
         Assert.Equal(2, rule.RemovedLastRound.Count);
         Assert.Equal(2, rounds.Length);
@@ -348,7 +348,7 @@ public class RemovalDecisionsTests
         var rule = new ScriptedRounds([Propose(8, TooClose)], [Propose(9, TooClose)], []);
         var start = Start().Apply(RoundKind.TooClose, [Propose(10, TooClose)]);
 
-        var (decisions, _) = start.WorkingCopy().DecideRoundsUntilNothingRemoved(rule);
+        var (decisions, _) = start.WorkingCopy().DecideRoundsUntilNothingRemoved(rule, LastRoundRemovals(start));
 
         Assert.Equal(
             new[] { new Round(1, RoundKind.TooClose), new Round(2, RoundKind.AlsoRemove), new Round(3, RoundKind.AlsoRemove), new Round(4, RoundKind.AlsoRemove) },
@@ -361,10 +361,25 @@ public class RemovalDecisionsTests
         var rule = new ScriptedRounds([Propose(3, TooClose)], []);
         var start = Start().Apply(RoundKind.TooClose, [Propose(1, TooClose)]);
 
-        start.WorkingCopy().DecideRoundsUntilNothingRemoved(rule);
+        start.WorkingCopy().DecideRoundsUntilNothingRemoved(rule, LastRoundRemovals(start));
 
         Assert.Equal(Ids(1, 0, 2), rule.RemovedLastRound[0]);
         Assert.Equal(Ids(3, 4), rule.RemovedLastRound[1]);
+    }
+
+    [Fact]
+    public void RoundLoopStartsFromTheSeedsItIsGiven()
+    {
+        var rule = new ScriptedRounds([Propose(9, TooClose)], []);
+        var start = Start()
+            .Apply(RoundKind.ChangedTerrain, [Propose(8, TooClose)])
+            .Apply(RoundKind.TooClose, [Propose(10, TooClose)]);
+
+        var (decisions, _) = start.WorkingCopy().DecideRoundsUntilNothingRemoved(rule, [.. Ids(8, 10)]);
+
+        Assert.Equal(Ids(8, 10), rule.RemovedLastRound[0]);
+        Assert.Equal(Ids(9), rule.RemovedLastRound[1]);
+        Assert.Equal(new Round(3, RoundKind.AlsoRemove), decisions.Rounds[2]);
     }
 
     [Fact]
@@ -373,13 +388,15 @@ public class RemovalDecisionsTests
         var rule = new ScriptedRounds([Propose(8, TooClose)], [Propose(9, TooClose)], []);
         var start = Start().Apply(RoundKind.TooClose, [Propose(10, TooClose)]);
 
-        var (_, rounds) = start.WorkingCopy().DecideRoundsUntilNothingRemoved(rule);
+        var (_, rounds) = start.WorkingCopy().DecideRoundsUntilNothingRemoved(rule, LastRoundRemovals(start));
 
         Assert.Equal(new[] { "details 1", "details 2", "details 3" }, rounds.Select(round => round.Details).ToArray());
     }
 
     private static RemovalDecisions Start(IReadOnlyDictionary<int, KeepReason>? references = null) =>
         RemovalDecisions.Start(ObjectsToKeep.Build(TestTargets.CreateMany(TargetCount), Links, TestTargets.References(TargetCount, references)), TargetCount);
+
+    private static ImmutableArray<TargetId> LastRoundRemovals(IRemovalDecisions decisions) => decisions.RemovedIn(decisions.Rounds[^1]);
 
     private static TargetId Id(int index) => new(index);
 

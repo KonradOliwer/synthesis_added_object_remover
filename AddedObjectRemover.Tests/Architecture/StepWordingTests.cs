@@ -44,12 +44,18 @@ public class StepWordingTests
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: excluded plugin '{name}' is not a valid plugin file name and was ignored.")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: report folder '{configured}' contains characters not allowed in a path; using '{SettingDefaults.ReportFolder}'.")] =
             SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: changed terrain is on, but neither height nor terrain type changes are counted; no object is removed for changed terrain.")] =
+            SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "anchoring threshold")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "changed terrain")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "excluded plugins")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "follow-up removal mode")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "height change tolerance")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "maximum other masters for a patch")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "objects checked for changed terrain")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "occupied directions required")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "protected types")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "removal distance in game units")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "removal zone")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "removed area per direction")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "removed directions required")] = SettingsWarning,
@@ -57,6 +63,9 @@ public class StepWordingTests
         [("Run/RunSettingsValidation/SettingsValidator.cs", "search radius")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "size multiplier")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "target plugin")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "terrain distance in game units")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "terrain distance mode")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "terrain distance size multiplier")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "touch distance")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValues.cs", "AddedObjectRemover Reports")] =
             "The default report folder name: a setting's value, not log wording.",
@@ -73,6 +82,8 @@ public class StepWordingTests
         [("Steps/RemoveObjectsRestingOnRemovedOnes/TargetMeshPaths.cs", "Target {target} has no mesh but was used as a mesh.")] = BugMessage,
         [("Steps/RemoveObjectsRestingOnRemovedOnes/TouchChains.cs", "A touch round has no cause {reason}.")] = BugMessage,
         [("Steps/RemoveObjectsRestingOnRemovedOnes/TouchChains.cs", "Touch chains need the touch rounds' search.")] = BugMessage,
+        [("Steps/RemoveObjectsOnChangedTerrain/CheckArea.cs", "Unknown terrain distance mode {settings.DistanceMode}.")] = BugMessage,
+        [("Steps/RemoveObjectsOnChangedTerrain/TerrainDifference.cs", "A terrain change without a kind.")] = BugMessage,
         [("Steps/RemoveTooCloseObjects/TooCloseObjects.cs", "Unknown removal zone {settings.Zone}.")] = BugMessage,
         [("Steps/SelectObjectsThatCanCauseRemovals/OtherObjectViews.cs", "Other-mod object {index[slot].Key} is invisible, so it is not active.")] = BugMessage,
     };

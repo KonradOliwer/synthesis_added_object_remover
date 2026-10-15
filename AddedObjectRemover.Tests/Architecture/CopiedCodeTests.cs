@@ -3,7 +3,8 @@ namespace AddedObjectRemover.Tests.Architecture;
 /// <summary>
 /// No business code is copied: no 40 consecutive tokens (names and numbers normalised, comments ignored) appear
 /// twice. Limit: shorter copies that the known-idiom list does not name are not found. Repetition that is
-/// structure rather than logic is listed with its reason, by the key printed for it.
+/// structure rather than logic is listed with its reason, by the places it occurs in (file and type.member), which
+/// the failure message prints with the lines of each copy.
 /// </summary>
 public class CopiedCodeTests
 {
@@ -15,45 +16,68 @@ public class CopiedCodeTests
     private const string CounterRecord = "Counter records: each lists its own counters and its sum, which only repeat in shape.";
     private const string PartKeyLines = "One line per part key: Report's own keys and the wording table; each line names its own part, so there is no logic to share.";
     private const string ViewForwarders ="One-line members of a read-only view, each forwarding one question of the index to its caller; no logic to share.";
+    private const string SettingChecks = "Setting-by-setting check lines; each reads another setting with its own default, limit and wording.";
+    private const string TableDeclarations = "Declaration of a report class with a constant or header list; the tables share only the shape of the declaration.";
+    private const string ErrorBoundary = "Per-object error boundary of two steps: each catches the failure of its own kind of object under its own part key and recovers in its own way; they share only the shape.";
+
+    private const string Shapes = "Caches/BaseObjectShapeAndKind/BaseObjectShapes.cs:BaseObjectShapes.";
+    private const string TooClose = "Steps/RemoveTooCloseObjects/";
+    private const string TooCloseContracts = "Steps/RemoveTooCloseObjects.Contracts/";
+    private const string Settings = "Run/RunSettingsValidation/SettingsValidator.cs:SettingsValidator.";
+    private const string Report = "Steps/BuildLogAndReports/";
+    private const string Describe = Report + "Describe.cs:Describe.";
+    private const string LogSections = Report + "LogSections.Start.cs:LogSections.";
+    private const string LeftBehindText = Report + "LeftBehindOutcomeText.cs:LeftBehindOutcomeText.";
+    private const string MeshText = Report + "MeshProblemText.cs:MeshProblemText.";
+    private const string KeepText = Report + "KeepReasonText.cs:KeepReasonText.";
+    private const string PartText = Report + "RunPartText.cs:RunPartText.";
+
+    /// <summary>Each copy by the places it occurs in (see <see cref="CopyFamily.Key"/>), with the reason it is not shared.</summary>
     private static readonly Dictionary<string, string> Allowed = new()
     {
-        ["381097ef"] = ViewForwarders,
-        ["69c3a048"] = CountLines,
-        ["3c3e351b"] = CountLines,
-        ["ad72ce4a"] = "Setting-by-setting check lines; each reads another setting with its own default, limit and wording.",
-        ["51c0267e"] = EnumTextArms,
-        ["38364156"] = EnumTextArms,
-        ["41674f6a"] = EnumTextArms,
-        ["02151952"] = EnumTextArms,
-        ["6133e948"] = EnumTextArms,
-        ["f2b48187"] = EnumTextArms,
-        ["d88de8fa"] = EnumTextArms,
-        ["36669ab4"] = EnumTextArms,
-        ["77582c33"] = EnumTextArms,
-        ["1af3a0e9"] = EnumTextArms,
-        ["a2d271eb"] = EnumTextArms,
-        ["85655c0e"] = EnumTextArms,
-        ["a1996b85"] = "Declaration of a report class with a constant or header list; the tables share only the shape of the declaration.",
-        ["cc66e963"] = CsvColumnNames,
-        ["495d7d50"] = CsvColumnNames,
-        ["32074483"] = CounterRecord,
-        ["4562028d"] = CounterRecord,
-        ["2f9e9dfc"] = "Per-object error boundary of two steps: each catches the failure of its own kind of object under its own part key and recovers in its own way; they share only the shape.",
-        ["cc8ed741"] = PartKeyLines,
-        ["463ce630"] = PartKeyLines,
+        [CopyFamily.KeyOf([Shapes + "CountBounds", TooClose + "TooCloseObjects.cs:TooCloseObjects.CountSizes"])] = CountLines + " " + CounterRecord,
+        [CopyFamily.KeyOf([Settings + "CreateAlsoRemoveSettings", Settings + "CreateChangedTerrainSettings", Settings + "CreateTooCloseSettings"])] = SettingChecks,
+        [CopyFamily.KeyOf([Describe + "PointReason", Describe + "RemovalReason", Describe + "Space"])] = EnumTextArms,
+        [CopyFamily.KeyOf([Describe + "OriginPlace", Describe + "TerrainChange", LogSections + "CheckedObjectsText"])] = EnumTextArms,
+        [CopyFamily.KeyOf([
+            Describe + "HintType", Describe + "LeftBehindReason", Describe + "TerrainChange", Describe + "TimedSuffix",
+            LeftBehindText + "Describe", LeftBehindText + "DescribeReason", MeshText + "FailureCategory", MeshText + "ReadFailure"])] = EnumTextArms,
+        [CopyFamily.KeyOf([
+            Describe + "HintType", Describe + "LeftBehindReason", KeepText + "Relation", LeftBehindText + "Describe", LogSections + "StopMessage",
+            MeshText + "FailureCategory", MeshText + "Line", MeshText + "ReadFailure", PartText + "LinkedStep", PartText + "Word"])] = EnumTextArms,
+        [CopyFamily.KeyOf([Describe + "HintType", LogSections + "StopMessage"])] = EnumTextArms,
+        [CopyFamily.KeyOf([KeepText + "Relation", PartText + "LinkedStep"])] = EnumTextArms,
+        [CopyFamily.KeyOf([LogSections + "CheckedObjectsText", LogSections + "DescribeAlsoRemove", LogSections + "DescribeLeftBehind", LogSections + "StopMessage"])] = EnumTextArms,
+        [CopyFamily.KeyOf([PartText + "Wordings"])] = PartKeyLines,
+        [CopyFamily.KeyOf([
+            Report + "Tables.LeftBehind.cs", Report + "Tables.LeftBehind.cs:Tables", Report + "Tables.LeftBehind.cs:Tables.LeftBehindHeader",
+            Report + "Tables.LeftBehind.cs:Tables.MoveColumnCount", Report + "Tables.Support.cs", Report + "Tables.Support.cs:Tables",
+            Report + "Tables.Support.cs:Tables.MaxListedSupporters", Report + "Tables.Support.cs:Tables.SupportHeader",
+            Report + "Tables.Touch.cs:Tables.ComponentHeader", Report + "Tables.Touch.cs:Tables.EdgeHeader", Report + "Tables.Touch.cs:Tables.MaxTopBases"])] = TableDeclarations + " " + CsvColumnNames,
+        [CopyFamily.KeyOf([
+            "Steps/FindTargetObjectsToKeep/ObjectsToKeep.cs:ObjectsToKeep.FindOwnReason",
+            "Steps/SelectObjectsThatCanCauseRemovals/RemovalCauseSelector.cs:RemovalCauseSelector.MeasureCountingFailuresAsInvisible"])] = ErrorBoundary,
+        [CopyFamily.KeyOf([
+            TooCloseContracts + "NpcWork.cs:NpcWork", TooCloseContracts + "NpcWork.cs:NpcWork.Zero", TooCloseContracts + "NpcWork.cs:NpcWork.operator",
+            TooCloseContracts + "ShapeZoneStats.cs:ShapeZoneWork", TooCloseContracts + "ShapeZoneStats.cs:ShapeZoneWork.Zero", TooCloseContracts + "ShapeZoneStats.cs:ShapeZoneWork.operator",
+            TooCloseContracts + "TooCloseWork.cs:TooCloseWork", TooCloseContracts + "TooCloseWork.cs:TooCloseWork.Zero", TooCloseContracts + "TooCloseWork.cs:TooCloseWork.operator"])] = CounterRecord,
+        [CopyFamily.KeyOf([
+            TooClose + "NpcsThatCanSpawn.cs:NpcsThatCanSpawn.BodiesOf", TooClose + "NpcsThatCanSpawn.cs:NpcsThatCanSpawn.MeasureBodiesIn",
+            TooClose + "NpcsThatCanSpawn.cs:NpcsThatCanSpawn.NpcOf", TooClose + "NpcsThatCanSpawn.cs:NpcsThatCanSpawn.Overlapping",
+            TooClose + "NpcsThatCanSpawn.cs:NpcsThatCanSpawn.TransformOf", TooClose + "NpcsThatCanSpawn.cs:NpcsThatCanSpawn.WorldBoxOf"])] = ViewForwarders,
     };
 
     [Fact]
     public void NoBusinessCodeIsCopiedExceptTheListed()
     {
-        var files = BusinessCode.SourceFiles().Select(file => (file.Description, File.ReadAllText(file.FullPath))).ToList();
+        var files = BusinessCode.SourceFiles().Select(file => (file.Path, File.ReadAllText(file.FullPath))).ToList();
 
-        var runs = CodeCopies.Find(files, WindowLength);
+        var families = CodeCopies.Find(files, WindowLength);
 
-        var unlisted = runs.Where(run => !Allowed.ContainsKey(run.Key)).Select(run => run.ToString()).ToList();
-        var stale = Allowed.Keys.Except(runs.Select(run => run.Key)).Order(StringComparer.Ordinal).ToList();
+        var unlisted = families.Where(family => !Allowed.ContainsKey(family.Key)).Select(family => family.ToString()).ToList();
+        var stale = Allowed.Keys.Except(families.Select(family => family.Key)).Order(StringComparer.Ordinal).ToList();
 
-        Assert.True(unlisted.Count == 0, $"Copied code (reuse a tool or share one method, or list its key with a reason):{Environment.NewLine}{string.Join(Environment.NewLine, unlisted)}");
+        Assert.True(unlisted.Count == 0, $"Copied code (reuse a tool or share one method, or list its places with a reason):{Environment.NewLine}{string.Join(Environment.NewLine, unlisted)}");
         Assert.True(stale.Count == 0, $"Listed but no longer copied:{Environment.NewLine}{string.Join(Environment.NewLine, stale)}");
     }
 
@@ -80,12 +104,114 @@ public class CopiedCodeTests
             }
             """;
 
-        var runs = CodeCopies.Find([("a", first), ("b", second)], windowLength: 20);
+        var family = Assert.Single(CodeCopies.Find([("a", first), ("b", second)], windowLength: 20));
 
+        var runs = family.Runs;
         Assert.Equal(["a", "b"], runs.Select(run => run.File));
-        Assert.Equal(runs[0].Key, runs[1].Key);
         Assert.Equal((2, 6), (runs[0].FirstLine, runs[0].LastLine));
         Assert.Equal((3, 7), (runs[1].FirstLine, runs[1].LastLine));
+        Assert.Equal("a:Total | b:Count", family.Key);
+    }
+
+    private const string TwoMemberCopyFirst = """
+        class A
+        {
+            void X()
+            {
+                Run(a);
+                if (c > 2) Stop(c);
+            }
+            void Y()
+            {
+                foreach (var d in c) Use(d);
+                Finish(a);
+            }
+        }
+        """;
+
+    private const string TwoMemberCopySecond = """
+        class B
+        {
+            void P()
+            {
+                Other(a, b);
+                if (c > 2) Stop(c);
+            }
+            void Q()
+            {
+                foreach (var d in c) Use(d);
+                Done(a, b, d);
+            }
+        }
+        """;
+
+    [Fact]
+    public void ACopyThatSpansTwoMembersIsPlacedInBoth()
+    {
+        var family = Assert.Single(CodeCopies.Find([("a", TwoMemberCopyFirst), ("b", TwoMemberCopySecond)], windowLength: 12));
+
+        Assert.Equal("a:A.X | a:A.Y | b:B.P | b:B.Q", family.Key);
+    }
+
+    [Fact]
+    public void TheKeyOfACopyStaysTheSameWhenOtherCodeNextToItChanges()
+    {
+        const string changed = """
+            class A
+            {
+                int Unrelated() => 5;
+                void X()
+                {
+                    Run(a);
+                    Extra(c);
+                    if (c > 2) Stop(c);
+                }
+                void Y()
+                {
+                    foreach (var d in c) Use(d);
+                    Finish(a);
+                    Finish(b);
+                }
+            }
+            """;
+
+        var family = Assert.Single(CodeCopies.Find([("a", changed), ("b", TwoMemberCopySecond)], windowLength: 12));
+
+        Assert.Equal("a:A.X | a:A.Y | b:B.P | b:B.Q", family.Key);
+    }
+
+    [Fact]
+    public void TheOutlineNamesMembersTypesAndCodeOutsideThem()
+    {
+        const string source = """
+            namespace N;
+            class Outer
+            {
+                int field = 1;
+                public Outer() { }
+                int Prop { get; set; } = 3;
+                int Expr(int x) => x + 1;
+                void Method<T>(T a) where T : class
+                {
+                    var f = () => { return 1; };
+                }
+                class Inner { void Deep() { } }
+            }
+            record Point(int X, int Y);
+            """;
+
+        var outline = CodeOutline.Of(source);
+
+        Assert.Empty(outline.PlacesOfLine(1));
+        Assert.Equal(["Outer"], outline.PlacesOfLine(2));
+        Assert.Equal(["Outer.field"], outline.PlacesOfLine(4));
+        Assert.Equal(["Outer.Outer"], outline.PlacesOfLine(5));
+        Assert.Equal(["Outer.Prop"], outline.PlacesOfLine(6));
+        Assert.Equal(["Outer.Expr"], outline.PlacesOfLine(7));
+        Assert.Equal(["Outer.Method"], outline.PlacesOfLine(8));
+        Assert.Equal(["Outer.Method"], outline.PlacesOfLine(10));
+        Assert.Equal(["Outer.Inner.Deep"], outline.PlacesOfLine(12));
+        Assert.Equal(["Point"], outline.PlacesOfLine(14));
     }
 
     [Fact]
@@ -94,7 +220,7 @@ public class CopiedCodeTests
         const string copiedTwice = "int A(int x) { return x + 1 * 2 - 3; } int B(int y) { return y + 1 * 2 - 3; }";
         const string repeatingPattern = "a(); a(); a(); a();";
 
-        Assert.Equal(2, CodeCopies.Find([("a", copiedTwice)], windowLength: 10).Count);
+        Assert.Equal(2, Assert.Single(CodeCopies.Find([("a", copiedTwice)], windowLength: 10)).Runs.Count);
         Assert.Empty(CodeCopies.Find([("a", repeatingPattern)], windowLength: 10));
     }
 

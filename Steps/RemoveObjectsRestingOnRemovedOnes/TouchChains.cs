@@ -6,10 +6,10 @@ namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
 /// <summary>
 /// The connected chains of the touch cascade, read from the removal decisions. Nodes are the seeds (every
-/// removal of the too-close round) and every object the also-remove rounds removed or kept. Edges
+/// removal of the changed-terrain and too-close rounds) and every object the also-remove rounds removed or kept. Edges
 /// join every touching pair of removed objects, whether or not the touch was an object's cause,
 /// and each also-remove removal to its cause: the object it touched or the member of its group it
-/// was linked to. The too-close round's linked removals are seeds of their own. Kept objects are
+/// was linked to. The seed rounds' linked removals are seeds of their own. Kept objects are
 /// leaves in the chain of the object they touch and join nothing. Chains are numbered by
 /// their lowest seed.
 /// </summary>
@@ -36,16 +36,16 @@ internal sealed class TouchChains
         _depth = new int[targetCount];
     }
 
-    /// <param name="run">A run of the touch rounds; its decisions end with them, right after the too-close round.</param>
+    /// <param name="run">A run of the touch rounds; its decisions end with them, right after the seed rounds.</param>
     public static TouchChainSet Find(RestingObjectsRun run, int targetCount, Execution execution)
     {
         var search = run.Search ?? throw new ArgumentException("Touch chains need the touch rounds' search.", nameof(run));
         var alsoRemove = run.Result;
         var decisions = run.Decisions;
-        var seedRound = decisions.Rounds[decisions.Rounds.Length - alsoRemove.Rounds.Length - 1];
+        ImmutableArray<TargetId> seeds = [.. alsoRemove.SeedRounds.SelectMany(round => decisions.RemovedIn(round))];
         var chains = new TouchChains(decisions, targetCount, search, execution);
-        chains.RecordDiscovery(seedRound, alsoRemove.Rounds);
-        chains.AssignComponents(decisions.RemovedIn(seedRound), alsoRemove.Rounds);
+        chains.RecordDiscovery(seeds, alsoRemove.Rounds);
+        chains.AssignComponents(seeds, alsoRemove.Rounds);
         return chains.CreateSet([.. alsoRemove.Evidence.Cast<TouchRoundDetails>()]);
     }
 
@@ -57,9 +57,9 @@ internal sealed class TouchChains
     }
 
     /// <summary>Seeds in target order at depth 0, then each also-remove round's objects in target order, one step beyond their cause.</summary>
-    private void RecordDiscovery(Round seedRound, ImmutableArray<Round> alsoRemoveRounds)
+    private void RecordDiscovery(ImmutableArray<TargetId> seeds, ImmutableArray<Round> alsoRemoveRounds)
     {
-        foreach (var seed in _decisions.RemovedIn(seedRound).Order()) _nodes.Add(seed.Index);
+        foreach (var seed in seeds.Order()) _nodes.Add(seed.Index);
         foreach (var round in alsoRemoveRounds)
         {
             var reached = _decisions.RemovedIn(round).Concat(_decisions.KeptIn(round)).ToList();

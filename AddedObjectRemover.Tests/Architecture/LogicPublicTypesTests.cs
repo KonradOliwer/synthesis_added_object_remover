@@ -19,6 +19,7 @@ public class LogicPublicTypesTests
         ["SelectObjectsThatCanCauseRemovals"] = "RemovalCauseSelector",
         ["FindTargetObjectsToKeep"] = "ObjectsToKeepFinder",
         ["RemovalDecisionList"] = "RemovalDecisions",
+        ["RemoveObjectsOnChangedTerrain"] = "ChangedTerrainObjects",
         ["RemoveTooCloseObjects"] = "TooCloseObjects",
         ["RemoveObjectsRestingOnRemovedOnes"] = "RestingObjects",
         ["RemoveInvisibleObjectsLeftBehind"] = "LeftBehindObjects",
@@ -66,6 +67,10 @@ public class LogicPublicTypesTests
             "RemovalDecisions ApplyRounds(RoundKind, IReadOnlyList<IReadOnlyList<ProposedRemoval>>)",
             "static RemovalDecisions Start(IObjectsToKeep, Int32)",
         ],
+        ["RemoveObjectsOnChangedTerrain"] =
+        [
+            "static ChangedTerrainResult Find(CollectedObjects, IdentifiedMods, LoadOrderPlugins, IPluginRecords, IBaseObjectShapes, Execution, ChangedTerrainSettings)",
+        ],
         ["RemoveTooCloseObjects"] =
         [
             "static NpcBodyRules NpcBodyRules { get; }",
@@ -97,6 +102,7 @@ public class LogicPublicTypesTests
             "ImmutableArray<LogSection> BuildStepSections(CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(Replacements, CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(ObjectsToKeepResult)",
+            "ImmutableArray<LogSection> BuildStepSections(ChangedTerrainResult, IRemovalDecisions, CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(TooCloseResult, IRemovalDecisions, CollectedObjects, IVisibleTargetObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(RestingObjectsResult, IRemovalDecisions, CollectedObjects)",
             "ImmutableArray<LogSection> BuildStepSections(LeftBehindResult, IRemovalDecisions, CollectedObjects, TimeSpan)",

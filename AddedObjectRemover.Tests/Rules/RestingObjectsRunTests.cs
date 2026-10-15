@@ -71,6 +71,39 @@ public class RestingObjectsRunTests
         Assert.Single(afterTooClose.Rounds);
         Assert.True(applied.IsRemoved(new TargetId(ItemOnTable)));
         Assert.Equal(result.Rounds.ToArray(), applied.RoundsAfter(afterTooClose).ToArray());
+        Assert.Equal(new[] { new Round(1, RoundKind.TooClose) }, result.SeedRounds.ToArray());
+    }
+
+    /// <summary>The table is removed in the changed-terrain round and the too-close round removes nothing, so only the first holds a seed.</summary>
+    [Theory]
+    [InlineData(FollowUpRemovalMode.EverythingTouching)]
+    [InlineData(FollowUpRemovalMode.ObjectsSupportedByIt)]
+    public void TheChangedTerrainRoundsRemovalsSeedTheRoundsToo(FollowUpRemovalMode mode)
+    {
+        var afterTooClose = TestSeededDecisions.Seed(
+            ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Count)), Targets.Count, seeds: [], terrainSeeds: [Table]);
+
+        var result = Run(new Probe(), mode, afterTooClose);
+        var applied = afterTooClose.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds);
+
+        Assert.True(result.HadSeeds);
+        Assert.Equal(new[] { new Round(1, RoundKind.ChangedTerrain), new Round(2, RoundKind.TooClose) }, result.SeedRounds.ToArray());
+        Assert.True(applied.IsRemoved(new TargetId(ItemOnTable)));
+        Assert.False(applied.IsDecided(new TargetId(2)));
+    }
+
+    [Fact]
+    public void AnObjectKeptInTheChangedTerrainRoundIsNotRemovedByTheRounds()
+    {
+        var protection = ObjectsToKeep.Build(
+            Targets, [], TestTargets.References(Targets.Count, new Dictionary<int, KeepReason> { [ItemOnTable] = TestKeepReasons.Quest }));
+        var afterTooClose = TestSeededDecisions.Seed(protection, Targets.Count, seeds: [], terrainSeeds: [Table, ItemOnTable]);
+
+        var result = Run(new Probe(), FollowUpRemovalMode.EverythingTouching, afterTooClose);
+
+        Assert.True(result.HadSeeds);
+        Assert.Empty(result.ProposedRounds.SelectMany(round => round));
+        Assert.IsType<Decision.Kept>(afterTooClose.Of(new TargetId(ItemOnTable)));
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
@@ -9,16 +10,30 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
 internal static partial class LogSections
 {
+    /// <summary>The too-close section when the step is switched off: it prints nothing.</summary>
+    public static LogSection BuildSwitchedOffTooCloseSection() => new("tooClose", []);
+
     public static LogSection BuildTooCloseSection(TooCloseSection report, ReportContext context) =>
         new("tooClose",
         [
             .. context.Detailed && report.Result.Zone == ZoneShape.ObjectShape ? ShapeZoneLines(report) : [],
-            $"Found {TextFormat.Count(report.Result.Hits.Length)} of {TextFormat.Count(report.World.Targets.Length)} {report.Target} objects too close to other mods' objects"
+            $"Found {TextFormat.Count(report.Result.Hits.Length)} of {TextFormat.Count(report.World.Targets.Length)} {report.Target} objects {DescribeDistance(report.Result)}"
                 + $"{Describe.TimedSuffix(report.Elapsed, context)}.",
             .. context.Detailed ? InvisibleOthers(report.Census) : [],
             .. context.Detailed ? NpcLines(report) : [],
             .. BuildKeptLines(report.World, report.Kept),
         ]);
+
+    /// <summary>How close the found objects are to other mods' objects; with both removal zones on, how many each zone found.</summary>
+    private static string DescribeDistance(TooCloseResult result)
+    {
+        if (result.ZonesTested is [TooCloseCause.Distance { Units: var units }]) return $"within {units} units of other mods' objects";
+        if (result.ZonesTested.Length == 1) return "too close to other mods' objects";
+
+        var byDistance = result.Hits.Count(hit => hit.Cause is TooCloseCause.Distance);
+        var bySize = result.Hits.Length - byDistance;
+        return $"too close to other mods' objects ({TextFormat.Count(bySize)} by object size, {TextFormat.Count(byDistance)} by distance)";
+    }
 
     private static ImmutableArray<string> ShapeZoneLines(TooCloseSection report)
     {

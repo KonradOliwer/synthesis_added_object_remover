@@ -58,8 +58,8 @@ public class RunSettingsValidationTests
             MaxOtherMastersForPatch = 500,
             NpcHandling = (NpcHandling)99,
         };
-        settings.WhatToCheck.SizeMultiplier = 9f;
-        settings.WhatToCheck.ZoneShape = (ZoneShape)99;
+        settings.TooClose.SizeMultiplier = 9f;
+        settings.TooClose.ZoneShape = (ZoneShape)99;
         settings.FollowUpRemoval = new FollowUpRemovalSettings
         {
             Mode = (FollowUpRemovalMode)99,
@@ -187,7 +187,7 @@ public class RunSettingsValidationTests
     {
         var supportOnly = SettingsFor();
         supportOnly.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.ObjectsSupportedByIt };
-        Assert.Equal(new WhatToCollect(true, true, false, false, false), BuildReady(supportOnly).Settings.Read);
+        Assert.Equal(new WhatToCollect(true, true, false, false, false, false, false), BuildReady(supportOnly).Settings.Read);
 
         var relocating = SettingsFor();
         relocating.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.EverythingTouching };
@@ -197,12 +197,101 @@ public class RunSettingsValidationTests
             MoveKeptMarkersOutOfOtherModsObjects = true,
         };
         var runSettings = BuildReady(relocating).Settings;
-        Assert.Equal(new WhatToCollect(true, true, true, false, false), runSettings.Read);
+        Assert.Equal(new WhatToCollect(true, true, true, false, false, false, false), runSettings.Read);
         Assert.NotNull(runSettings.MarkerMoves);
 
         var neither = SettingsFor();
         neither.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.EverythingTouching };
-        Assert.Equal(new WhatToCollect(false, false, false, false, false), BuildReady(neither).Settings.Read);
+        Assert.Equal(new WhatToCollect(false, false, false, false, false, false, false), BuildReady(neither).Settings.Read);
+    }
+
+    [Theory]
+    [InlineData(false, true, false, false)]
+    [InlineData(true, false, true, false)]
+    [InlineData(true, true, true, true)]
+    public void TerrainVersionsAreReadOnlyForTheChangedTerrainStepAndLayersOnlyForTerrainTypes(bool on, bool types, bool versions, bool layers)
+    {
+        var settings = SettingsFor();
+        settings.TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = on, CountTerrainTypeChanges = types };
+
+        var read = BuildReady(settings).Settings.Read;
+
+        Assert.Equal((versions, layers), (read.TerrainVersions, read.TerrainLayers));
+    }
+
+    [Fact]
+    public void TheChangedTerrainSettingsAreOffByDefaultAndPassedThrough()
+    {
+        var defaults = BuildReady(SettingsFor()).Settings.ChangedTerrain;
+        Assert.Equal(
+            new ChangedTerrainSettings(
+                On: false, TerrainCheckedObjects.VisibleObjectsOnTheGround, CountHeightChanges: true, HeightTolerance: 16f, CountTerrainTypeChanges: true,
+                TerrainDistanceMode.GameUnits, DistanceInUnits: 64f, DistanceSizeMultiplier: 0.5f),
+            defaults);
+
+        var settings = SettingsFor();
+        settings.TerrainChange = new TerrainChangeSettings
+        {
+            RemoveOnChangedTerrain = true,
+            TerrainCheckedObjects = TerrainCheckedObjects.AllObjects,
+            CountHeightChanges = false,
+            HeightChangeTolerance = 0f,
+            TerrainDistanceMode = TerrainDistanceMode.ObjectSize,
+            TerrainDistanceInUnits = 128f,
+            TerrainDistanceSizeMultiplier = 2f,
+        };
+        var ready = BuildReady(settings);
+
+        Assert.Empty(ready.Warnings);
+        Assert.Equal(
+            new ChangedTerrainSettings(On: true, TerrainCheckedObjects.AllObjects, false, 0f, true, TerrainDistanceMode.ObjectSize, 128f, 2f),
+            ready.Settings.ChangedTerrain);
+    }
+
+    [Fact]
+    public void ChangedTerrainCountingNoChangeIsSwitchedOffWithAWarning()
+    {
+        var settings = SettingsFor();
+        settings.TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = true, CountHeightChanges = false, CountTerrainTypeChanges = false };
+
+        var ready = BuildReady(settings);
+
+        Assert.False(ready.Settings.ChangedTerrain.On);
+        Assert.False(ready.Settings.Read.TerrainVersions);
+        Assert.Equal(
+            "Warning: changed terrain is on, but neither height nor terrain type changes are counted; no object is removed for changed terrain.",
+            Assert.Single(ready.Warnings).Message);
+    }
+
+    [Fact]
+    public void InvalidChangedTerrainValuesAreCorrectedEvenWhenTheStepIsOff()
+    {
+        var settings = SettingsFor();
+        settings.TerrainChange = new TerrainChangeSettings
+        {
+            TerrainCheckedObjects = (TerrainCheckedObjects)99,
+            HeightChangeTolerance = 300f,
+            TerrainDistanceMode = (TerrainDistanceMode)99,
+            TerrainDistanceInUnits = -1f,
+            TerrainDistanceSizeMultiplier = float.NaN,
+        };
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(
+            new ChangedTerrainSettings(
+                On: false, TerrainCheckedObjects.VisibleObjectsOnTheGround, true, 256f, true, TerrainDistanceMode.GameUnits, 0f, 0.5f),
+            ready.Settings.ChangedTerrain);
+        string[] expectedStarts =
+        [
+            "Warning: objects checked for changed terrain",
+            "Warning: height change tolerance 300",
+            "Warning: terrain distance mode",
+            "Warning: terrain distance in game units -1",
+            "Warning: terrain distance size multiplier is not a valid number",
+        ];
+        Assert.Equal(expectedStarts.Length, ready.Warnings.Length);
+        Assert.All(expectedStarts.Zip(ready.Warnings), pair => Assert.StartsWith(pair.First, pair.Second.Message));
     }
 
     [Fact]

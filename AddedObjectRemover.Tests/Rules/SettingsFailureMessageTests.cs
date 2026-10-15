@@ -39,12 +39,12 @@ public class SettingsFailureMessageTests
     [Fact]
     public void WrongJsonTypeNamesTheSettingAndTheValueFound()
     {
-        var ex = Deserialize("""{"WhatToCheck":{"SizeMultiplier":"abc"}}""");
+        var ex = Deserialize("""{"TooClose":{"SizeMultiplier":"abc"}}""");
 
         var message = SettingsFailureMessage.Describe(ex, Program.SettingsSchema);
 
         Assert.Contains("Removal distance", message);
-        Assert.Contains("WhatToCheck.SizeMultiplier", message);
+        Assert.Contains("TooClose.SizeMultiplier", message);
         Assert.Contains("abc", message);
     }
 

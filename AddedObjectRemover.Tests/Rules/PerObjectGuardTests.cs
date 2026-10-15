@@ -77,7 +77,7 @@ public class PerObjectGuardTests
                 shapes,
                 new TriangleStore(shapes.ReadTriangles),
                 new Execution(threads)),
-            new TooCloseSettings(Multiplier, ZoneShape.BoundingBox, NpcHandling.Ignore));
+            new TooCloseSettings(BySize: true, Multiplier, ByDistance: false, DistanceInUnits: 0f, ZoneShape.BoundingBox, NpcHandling.Ignore));
 
     [Theory]
     [InlineData(1)]

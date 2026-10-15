@@ -8,7 +8,7 @@ public interface IPluginRecordsFactory
     IPluginRecords Open();
 }
 
-/// <summary>Reads the load order's plugin records and writes override records into the patch plugin. Not thread-safe, except <see cref="ReadHomeCellGrid"/>, <see cref="ReadTerrain"/>, <see cref="FindLandWorldspace"/>, <see cref="ReadNavmeshes"/>, <see cref="NpcTraitsOf"/>, <see cref="TraitSupplierOf"/>, <see cref="LeveledEntriesOf"/> and <see cref="TryParsePluginName"/>.</summary>
+/// <summary>Reads the load order's plugin records and writes override records into the patch plugin. Not thread-safe, except <see cref="ReadHomeCellGrid"/>, <see cref="ReadTerrain"/>, <see cref="ReadTerrainVersions"/>, <see cref="ReadTextureMaterialChain"/>, <see cref="FindLandWorldspace"/>, <see cref="ReadNavmeshes"/>, <see cref="NpcTraitsOf"/>, <see cref="TraitSupplierOf"/>, <see cref="LeveledEntriesOf"/> and <see cref="TryParsePluginName"/>.</summary>
 public interface IPluginRecords
 {
     /// <summary>Walks every plugin's cells once; the records the later reads and writes need are remembered until the reader is dropped.</summary>
@@ -32,6 +32,14 @@ public interface IPluginRecords
     /// <summary>The terrain heights of an exterior cell, row by row (<see cref="TerrainHeights.VerticesPerSide"/> per row); the placed records must have been read before.</summary>
     /// <returns>Null where the cell has no terrain (no, a deleted, or an empty land record).</returns>
     float[]? ReadTerrain(ExteriorCell cell);
+
+    /// <summary>Every plugin's own land record of an exterior cell, decoded; the placed records must have been read before, with the terrain versions asked for. Thread-safe.</summary>
+    /// <returns>In load order (lowest priority first); empty where no plugin has a land record for the cell.</returns>
+    TerrainVersion[] ReadTerrainVersions(ExteriorCell cell);
+
+    /// <summary>The material records of a landscape texture, from its own material up through each parent to the root, in the winning records. Thread-safe.</summary>
+    /// <returns>Empty where the texture or its material link does not resolve; a parent loop ends the chain at the first repeat.</returns>
+    RecordKey[] ReadTextureMaterialChain(RecordKey texture);
 
     /// <summary>
     /// The worldspace whose land data a target worldspace uses (itself, or a parent whose land data it uses); the placed records

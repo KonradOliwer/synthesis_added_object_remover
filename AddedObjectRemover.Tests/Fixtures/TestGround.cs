@@ -10,7 +10,7 @@ internal static class TestGround
     public static TerrainHeights Terrain(
         IReadOnlyDictionary<ExteriorCell, ILandscapeGetter> landscapes, IReadOnlyDictionary<RecordKey, RecordKey> landWorldspaces)
     {
-        var terrain = new LandscapeTerrain(landscapes, landWorldspaces);
+        var terrain = new LandscapeTerrain(landscapes, landWorldspaces, versions: null, layerNames: null);
         return new TerrainHeights(terrain.ReadHeights, terrain.FindLandWorldspace);
     }
 

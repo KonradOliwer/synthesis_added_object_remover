@@ -6,8 +6,8 @@ namespace AddedObjectRemover.Tests.LoadOrder;
 
 public class PlacedObjectCollectorStopTests
 {
-    private static readonly WhatToCollect Plan = new(SupportOnlyObjects: false, Terrain: false, Navmesh: false, OtherEditorIds: false, OverriddenOthersList: false);
-    private static readonly IdentifiedMods Mods = new(TestTargets.TargetPlugin, new HashSet<PluginName>(), [], [], DetectedPatches.Off);
+    private static readonly WhatToCollect Plan = new(SupportOnlyObjects: false, Terrain: false, Navmesh: false, OtherEditorIds: false, OverriddenOthersList: false, TerrainVersions: false, TerrainLayers: false);
+    private static readonly IdentifiedMods Mods = new(TestTargets.TargetPlugin, new HashSet<PluginName>(), [], [], DetectedPatches.Off, [], []);
 
     [Fact]
     public void NoTargetObjectsStopsTheRun()
@@ -79,6 +79,9 @@ public class PlacedObjectCollectorStopTests
         public CellGridPoint? ReadHomeCellGrid(RecordKey record) => throw new NotSupportedException();
 
         public float[]? ReadTerrain(ExteriorCell cell) => throw new NotSupportedException();
+
+        public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new NotSupportedException();
+        public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => throw new NotSupportedException();
 
         public RecordKey? FindLandWorldspace(RecordKey space) => throw new NotSupportedException();
 

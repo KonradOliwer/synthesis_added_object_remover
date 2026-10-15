@@ -7,7 +7,7 @@ namespace AddedObjectRemover.Tests.Meshes;
 public class ShapeZoneContactTests
 {
     private static readonly Box Room = new(new Vector3(-10), new Vector3(10));
-    private static readonly ShapeZone Zone = ShapeZone.Create(Room, TestTargets.At(Vector3.Zero), multiplier: 0f);
+    private static readonly ShapeZone Zone = new ZoneGrowth.BySize(0f).CreateShapeZone(Room, TestTargets.At(Vector3.Zero));
     private static readonly PlacedTransform Identity = TestTargets.At(Vector3.Zero);
 
     private static readonly List<MeshTriangle> PieceOutside = TestMeshes.BoxTriangles(new Box(new Vector3(40, -1, -1), new Vector3(42, 1, 1)));

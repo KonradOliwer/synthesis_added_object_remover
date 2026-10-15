@@ -22,6 +22,9 @@ internal sealed class FailingHomeCellPlugin(IPluginRecords inner) : IPluginRecor
 
     public float[]? ReadTerrain(ExteriorCell cell) => inner.ReadTerrain(cell);
 
+    public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => inner.ReadTerrainVersions(cell);
+    public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => inner.ReadTextureMaterialChain(texture);
+
     public RecordKey? FindLandWorldspace(RecordKey space) => inner.FindLandWorldspace(space);
 
     public MeshTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => inner.ReadNavmeshes(bucket);

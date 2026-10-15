@@ -81,10 +81,10 @@ public class RunnerRulesTests
         var settings = SettingsOfRunSettings();
 
         Assert.Equal(
-            ["AlsoRemoveSettings", "Execution", "LeftBehindSettings", "MarkerMoveSettings", "ModIdentificationSettings", "ReportFileSettings", "SelectionSettings", "TooCloseSettings", "WhatToCollect"],
+            ["AlsoRemoveSettings", "ChangedTerrainSettings", "Execution", "LeftBehindSettings", "MarkerMoveSettings", "ModIdentificationSettings", "ReportFileSettings", "SelectionSettings", "TooCloseSettings", "WhatToCollect"],
             settings.RecordTypes.Order(StringComparer.Ordinal));
         Assert.Equal(
-            ["AlsoRemove", "Execution", "LeftBehind", "MarkerMoves", "ModIdentification", "Read", "Reports", "Selection", "TooClose"],
+            ["AlsoRemove", "ChangedTerrain", "Execution", "LeftBehind", "MarkerMoves", "ModIdentification", "Read", "Reports", "Selection", "TooClose"],
             settings.RecordProperties.Order(StringComparer.Ordinal));
         Assert.Equal(
             ["DetailedLog", "ExcludedNames", "Target", "TargetAsTyped"],

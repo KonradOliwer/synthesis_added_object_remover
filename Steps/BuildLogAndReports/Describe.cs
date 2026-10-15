@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
@@ -58,13 +59,23 @@ internal static class Describe
 
     public static string RemovalReason(CollectedObjects world, RemovedObject removal) => removal switch
     {
-        TooCloseRemoval { TooCloseTo: var other } => $"too close to {OtherObject(other)}",
+        TerrainChangedRemoval changed => $"terrain changed by {changed.ChangedBy} ({TerrainChange(changed.Kind)})",
+        TooCloseRemoval { TooCloseTo: var other, Cause: TooCloseCause.ObjectSize } => $"too close to {OtherObject(other)}",
+        TooCloseRemoval { TooCloseTo: var other, Cause: TooCloseCause.Distance distance } => $"within {distance.Units} units of {OtherObject(other)}",
         TouchingRemoval touching => $"touches removed {RecordNames.Describe(world.Targets[touching.TouchedTargetIndex])}",
         SupportRemoval support =>
             $"{TextFormat.Percent(support.RemovedShare)} of its support was removed (mostly {RecordNames.Describe(world.Targets[support.MainRemovedSupporter])})",
         LeftBehindRemoval { Evaluation: var evaluation } => $"invisible, {LeftBehindReason(evaluation)}",
         LinkedRemoval linked => $"linked to removed {RecordNames.Describe(world.Targets[linked.LinkedToTargetIndex])}",
         _ => throw new UnreachableException($"Unknown removal type {removal.GetType().Name}."),
+    };
+
+    private static string TerrainChange(TerrainChangeKind kind) => kind switch
+    {
+        TerrainChangeKind.Height => "height",
+        TerrainChangeKind.TerrainType => "terrain type",
+        TerrainChangeKind.HeightAndTerrainType => "height and terrain type",
+        _ => throw new UnreachableException($"Unknown terrain change kind {kind}."),
     };
 
     /// <summary>The reason, naming the other mod's object the invisible object sits inside, if any.</summary>

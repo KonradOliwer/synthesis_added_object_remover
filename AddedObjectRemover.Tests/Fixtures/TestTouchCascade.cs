@@ -25,10 +25,11 @@ internal static class TestTouchCascade
         IReadOnlyList<int> seeds,
         float touchDistance,
         int threads,
-        bool collectDiagnostics)
+        bool collectDiagnostics,
+        IReadOnlyList<int>? terrainSeeds = null)
     {
         var execution = new Execution(threads);
-        var seeded = TestSeededDecisions.Seed(protection, targets.Count, seeds);
+        var seeded = TestSeededDecisions.Seed(protection, targets.Count, seeds, terrainSeeds);
         var triangles = new TriangleStore(shapes.ReadTriangles);
         var input = new RoundsInput(
             [.. targets], protection, ObjectsOfAnyPlugin: null, shapes, triangles, NoTerrain(), execution);

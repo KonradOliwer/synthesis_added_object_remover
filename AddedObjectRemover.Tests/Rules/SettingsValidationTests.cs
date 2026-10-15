@@ -34,7 +34,7 @@ public class SettingsValidationTests
         Assert.Equal(leftovers.DirectionThresholdPercent, SettingCorrections.WholeTens(leftovers.DirectionThresholdPercent, "direction", []));
         Assert.Equal(leftovers.RemovedDirectionsPercent, SettingCorrections.WholeTens(leftovers.RemovedDirectionsPercent, "removed", []));
         Assert.Equal(leftovers.OccupiedDirectionsPercent, SettingCorrections.WholeTens(leftovers.OccupiedDirectionsPercent, "occupied", []));
-        Assert.Equal(ZoneShape.ObjectShape, new CheckSettings().ZoneShape);
+        Assert.Equal(ZoneShape.ObjectShape, new TooCloseRemovalSettings().ZoneShape);
         Assert.Equal(NpcHandling.OnlyWhenStuckInObject, new IgnoreSettings().NpcHandling);
         Assert.Equal(FollowUpRemovalMode.EverythingTouching, new FollowUpRemovalSettings().Mode);
     }

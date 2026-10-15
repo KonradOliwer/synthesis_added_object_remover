@@ -5,13 +5,13 @@ using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 
-/// <param name="AfterTooClose">The run's decisions whose last round is the too-close round; the step never adds to them.</param>
+/// <param name="EarlierRounds">The run's decisions with the removal rounds of the steps before this one; every one of those rounds seeds the step, which never adds to them.</param>
 /// <param name="TimeSinceStart">The run's clock, which measures the rounds.</param>
 /// <param name="ReportFiles">Whether the report files are written; the report-file details are computed only when they are performed.</param>
 public sealed record RestingObjectsInput(
     ImmutableArray<TargetObject> Targets,
     IObjectsToKeep ObjectsToKeep,
-    IRemovalDecisions AfterTooClose,
+    IRemovalDecisions EarlierRounds,
     AlsoRemoveSettings Settings,
     Execution Execution,
     Func<TimeSpan> TimeSinceStart,

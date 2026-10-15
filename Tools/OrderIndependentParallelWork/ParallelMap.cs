@@ -66,6 +66,10 @@ public static class ParallelMap
         return Run(execution, order.ItemsInOrder, newScratch, body, rangeSize);
     }
 
+    /// <summary>Runs every item, in the work order; throws unless the order covers exactly <paramref name="itemCount"/> items.</summary>
+    public static TOut[] Run<TOut>(Execution execution, WorkOrder order, int itemCount, Func<int, TOut> body, int rangeSize) =>
+        Run(execution, order, itemCount, static () => (object?)null, (item, _) => body(item), rangeSize);
+
     /// <summary>Starts the items in index order.</summary>
     public static (TOut[] Results, TWork Work) Run<TScratch, TOut, TWork>(
         Execution execution,

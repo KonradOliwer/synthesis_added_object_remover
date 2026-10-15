@@ -4,6 +4,7 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
@@ -23,6 +24,7 @@ public sealed record RunSettings(
     ModIdentificationSettings ModIdentification,
     WhatToCollect Read,
     SelectionSettings Selection,
+    ChangedTerrainSettings ChangedTerrain,
     TooCloseSettings TooClose,
     AlsoRemoveSettings AlsoRemove,
     LeftBehindSettings? LeftBehind,

@@ -9,6 +9,7 @@ using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
@@ -83,15 +84,36 @@ public sealed class LogAndReports
         return [groups, TakeUnexpectedErrors(found.CheckFailures)];
     }
 
+    /// <param name="decisions">The decisions whose last round is the changed-terrain round.</param>
+    /// <remarks>A switched-off step prints nothing, not even an empty section.</remarks>
+    public ImmutableArray<LogSection> BuildStepSections(ChangedTerrainResult found, IRemovalDecisions decisions, CollectedObjects world, TimeSpan elapsed)
+    {
+        if (found.Outcome == StepOutcome.SwitchedOff) return [];
+
+        var kept = RemovalList.KeptIn(decisions, decisions.Rounds[^1]);
+        var section = LogSections.BuildChangedTerrainSection(world, _settings.TargetAsTyped, found, kept, elapsed, _context);
+        return BuildRoundSections(section, decisions, RoundKind.ChangedTerrain, found.Failures);
+    }
+
     /// <param name="decisions">The decisions whose last round is the too-close round.</param>
     /// <param name="visibleTargets">The visible target objects (C12), which the invisible other-mod objects are counted against.</param>
     public ImmutableArray<LogSection> BuildStepSections(
         TooCloseResult found, IRemovalDecisions decisions, CollectedObjects world, IVisibleTargetObjects visibleTargets, TimeSpan elapsed)
     {
+        if (found.Outcome == StepOutcome.SwitchedOff) return [LogSections.BuildSwitchedOffTooCloseSection(), TakeUnexpectedErrors()];
+
         var census = InvisibleOtherObjectCounter.Take(world, _caches.Shapes, visibleTargets);
         var tooClose = LogSections.BuildTooCloseSection(BuildTooCloseSection(found, decisions, world, census, elapsed), _context);
-        var linked = LogSections.BuildLinkedSection(decisions, [decisions.Rounds[^1]], RoundKind.TooClose, _context);
-        return [tooClose, linked, TakeUnexpectedErrors(found.Failures)];
+        return BuildRoundSections(tooClose, decisions, RoundKind.TooClose, found.Failures);
+    }
+
+    /// <summary>The step's section, the line for the removals linked to its own, then the step's unexpected errors.</summary>
+    /// <param name="decisions">The decisions whose last round is the step's round.</param>
+    private ImmutableArray<LogSection> BuildRoundSections(
+        LogSection section, IRemovalDecisions decisions, RoundKind kind, IEnumerable<PartFailure> failures)
+    {
+        var linked = LogSections.BuildLinkedSection(decisions, [decisions.Rounds[^1]], kind, _context);
+        return [section, linked, TakeUnexpectedErrors(failures)];
     }
 
     /// <param name="decisions">The run's decisions with the also-remove rounds applied.</param>
@@ -261,7 +283,7 @@ public sealed class LogAndReports
             LogSections.BuildBoundsSection(outcome.Shapes, _context),
             LogSections.BuildSpacesSection(world, removals, _context),
             LogSections.BuildTargetVisibilitySection(world.Targets, world.Counts.TargetsHiddenOrWithoutPlacement, _context),
-            LogSections.BuildRemovalSummarySection(removals),
+            LogSections.BuildRemovalSummarySection(removals, outcome.ChangedTerrain.Outcome),
             LogSections.BuildKeptSummarySection(RemovalList.Kept(outcome.Final)),
             LogSections.BuildMarkersByTypeSection(world.Targets, removals, _context),
             LogSections.BuildHintsSection(world, outcome.Hints),

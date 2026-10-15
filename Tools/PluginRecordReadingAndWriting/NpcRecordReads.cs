@@ -8,9 +8,8 @@ internal sealed class NpcRecordReads
     private readonly NpcTemplateChain _templateChain;
     private readonly NpcTraitsReader _npcTraits;
 
-    public NpcRecordReads(ILinkCache linkCache, KnownPluginNames knownPlugins)
+    public NpcRecordReads(ILinkCache linkCache, PluginNames names)
     {
-        var names = new PluginNames(knownPlugins);
         _templateChain = new NpcTemplateChain(linkCache, names);
         _npcTraits = new NpcTraitsReader(linkCache, names);
     }

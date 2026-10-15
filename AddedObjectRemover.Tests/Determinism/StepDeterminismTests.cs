@@ -197,7 +197,7 @@ public class StepDeterminismTests
         var npcRule = CreateStuckNpcRule(targets, scene, replacements);
         var otherModObjects = scene.ObjectsThatCanCauseRemovals(replacements, NpcHandling.OnlyWhenStuckInObject);
         var result = TooCloseSearch.FindTooCloseTargets(
-            targets, otherModObjects, Shapes, multiplier: 0f, npcRule, TargetWorkOrder.Of(targets), Options(threads));
+            targets, otherModObjects, Shapes, [new ZoneGrowth.BySize(0f)], npcRule, TargetWorkOrder.Of(targets), Options(threads));
         var summary = npcRule.StuckSearch!.GetSummary(result.Work.Npcs);
         return (result.Hits, result.Work, $"{summary.Sizes} {summary.PairsTested} {summary.CoreTests} {summary.Conflicts} {summary.PointFallbacks.Count}");
     }
@@ -208,7 +208,7 @@ public class StepDeterminismTests
         var sceneIndex = TestScenes.Create(scene.Targets, scene.OtherModObjects, Shapes, bodies: NewBodies(), threads: threads);
         var npcRule = CreateStuckNpcRule(scene.Targets, sceneIndex, replacements);
         var otherModObjects = sceneIndex.ObjectsThatCanCauseRemovals(replacements, NpcHandling.OnlyWhenStuckInObject);
-        return ShapeZoneSearch.Create(scene.Targets, sceneIndex.VisibleTargets, otherModObjects, Shapes, NewCache(), ShapeZoneMultiplier, npcRule)
+        return ShapeZoneSearch.Create(scene.Targets, sceneIndex.VisibleTargets, otherModObjects, Shapes, NewCache(), [new ZoneGrowth.BySize(ShapeZoneMultiplier)], npcRule)
             .FindTooCloseTargets(order, Options(threads));
     }
 

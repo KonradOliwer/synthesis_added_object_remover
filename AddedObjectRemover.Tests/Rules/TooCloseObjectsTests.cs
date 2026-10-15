@@ -14,6 +14,7 @@ public class TooCloseObjectsTests
 {
     private const int Threads = 4;
     private const float Multiplier = 1.5f;
+    private const float Distance = 40f;
     private const int TargetCount = 60;
     private const int OtherModObjectCount = 90;
     private const int InvisibleEvery = 5;
@@ -47,7 +48,7 @@ public class TooCloseObjectsTests
     public void FindGivesTheSameResultAsTheSearches(ZoneShape zone, NpcHandling npcs)
     {
         var scene = CreateScene();
-        var settings = new TooCloseSettings(Multiplier, zone, npcs);
+        var settings = new TooCloseSettings(BySize: true, Multiplier, ByDistance: false, DistanceInUnits: 0f, zone, npcs);
 
         var expected = FindWithSearches(scene, settings);
         var actual = FindWithFacade(scene, settings);
@@ -59,6 +60,65 @@ public class TooCloseObjectsTests
         Assert.Equal(expected.LargeOtherObjects, actual.LargeOtherObjects);
         Assert.Equal(expected.Summary is null, actual.Npc is null);
         if (expected.Summary is { } summary) Assert.Equal(Describe(summary), Describe(actual.Npc!));
+    }
+
+    [Theory]
+    [InlineData(ZoneShape.BoundingBox)]
+    [InlineData(ZoneShape.ObjectShape)]
+    public void FindIsSwitchedOffAndLooksAtNothingWhenNoZoneIsOn(ZoneShape zone)
+    {
+        var settings = new TooCloseSettings(BySize: false, Multiplier, ByDistance: false, DistanceInUnits: Distance, zone, NpcHandling.OnlyWhenStuckInObject);
+
+        var result = FindWithFacade(CreateScene(), settings);
+
+        Assert.Equal(StepOutcome.SwitchedOff, result.Outcome);
+        Assert.Empty(result.Hits);
+        Assert.Empty(result.Proposals);
+        Assert.Empty(result.Failures);
+        Assert.Equal(default, result.Work);
+        Assert.Null(result.Npc);
+        Assert.Equal(0, result.LargeOtherObjects);
+    }
+
+    [Theory]
+    [InlineData(ZoneShape.BoundingBox)]
+    [InlineData(ZoneShape.ObjectShape)]
+    public void AStuckNpcIsFoundByTheObjectsOwnSizeWhicheverZonesAreOn(ZoneShape zone)
+    {
+        var settings = new TooCloseSettings(BySize: false, Multiplier, ByDistance: true, DistanceInUnits: 0f, zone, NpcHandling.OnlyWhenStuckInObject);
+
+        var result = FindWithFacade(CreateScene(), settings);
+
+        var npcHits = result.Hits.Where(hit => hit.TooCloseTo.IsPlacedNpc).ToList();
+        Assert.NotEmpty(npcHits);
+        Assert.All(npcHits, hit => Assert.Equal(new TooCloseCause.ObjectSize(), hit.Cause));
+        Assert.All(result.Hits.Where(hit => !hit.TooCloseTo.IsPlacedNpc), hit => Assert.Equal(new TooCloseCause.Distance(0f), hit.Cause));
+    }
+
+    [Fact]
+    public void TheResultNamesTheZonesItTestedInOrder()
+    {
+        var both = new TooCloseSettings(BySize: true, Multiplier, ByDistance: true, Distance, ZoneShape.BoundingBox, NpcHandling.Ignore);
+
+        var result = FindWithFacade(CreateScene(), both);
+
+        TooCloseCause[] expected = [new TooCloseCause.ObjectSize(), new TooCloseCause.Distance(Distance)];
+        Assert.Equal(expected, result.ZonesTested.ToArray());
+        Assert.Empty(FindWithFacade(CreateScene(), both with { BySize = false, ByDistance = false }).ZonesTested);
+    }
+
+    /// <summary>A target without mesh triangles uses its box in each zone it is tested with, and still counts once.</summary>
+    [Fact]
+    public void WithBothZonesOnEachTargetWithoutMeshTrianglesCountsOnce()
+    {
+        var scene = CreateScene();
+        var sizeOnly = new TooCloseSettings(BySize: true, Multiplier: 0f, ByDistance: false, Distance, ZoneShape.ObjectShape, NpcHandling.Ignore);
+        var withoutMesh = TestVisibility.TaggedBase(ObjectVisibility.Visible);
+
+        var both = FindWithFacade(scene, sizeOnly with { ByDistance = true }).Work.Zone;
+
+        Assert.Equal(scene.Targets.Count(target => target.Base == withoutMesh), both.BoxZoneTargets);
+        Assert.Equal(FindWithFacade(scene, sizeOnly).Work.Zone.BoxZoneTargets, both.BoxZoneTargets);
     }
 
     private static (TooCloseSearchResult Search, int LargeOtherObjects, NpcStuckSummary? Summary) FindWithSearches(TooCloseScene scene, TooCloseSettings settings)
@@ -75,7 +135,7 @@ public class TooCloseObjectsTests
         var search = settings.Zone switch
         {
             ZoneShape.BoundingBox => TooCloseSearch.FindTooCloseTargets(
-                scene.Targets, otherModObjects, Shapes, settings.Multiplier, npcRule, order, execution),
+                scene.Targets, otherModObjects, Shapes, ZoneGrowth.Active(settings), npcRule, order, execution),
             _ => FindInShapeZone(scene, settings, world.VisibleTargets, otherModObjects, npcRule, order, execution, out largeOtherObjects),
         };
         return (search, largeOtherObjects, npcRule.StuckSearch?.GetSummary(search.Work.Npcs));
@@ -84,7 +144,7 @@ public class TooCloseObjectsTests
     private static TooCloseSearchResult FindInShapeZone(
         TooCloseScene scene, TooCloseSettings settings, IVisibleTargetObjects visibleTargets, IObjectsThatCanCauseRemovals otherModObjects, NpcTooCloseRule npcRule, WorkOrder order, Execution execution, out int largeOtherObjects)
     {
-        var zone = ShapeZoneSearch.Create(scene.Targets, visibleTargets, otherModObjects, Shapes, NewTriangles(), settings.Multiplier, npcRule);
+        var zone = ShapeZoneSearch.Create(scene.Targets, visibleTargets, otherModObjects, Shapes, NewTriangles(), ZoneGrowth.Active(settings), npcRule);
         largeOtherObjects = zone.LargeOtherObjects;
         return zone.FindTooCloseTargets(order, execution);
     }

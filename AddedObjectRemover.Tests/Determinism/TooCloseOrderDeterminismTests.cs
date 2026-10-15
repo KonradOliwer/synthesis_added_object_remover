@@ -44,7 +44,7 @@ public class TooCloseOrderDeterminismTests
     public void FindMatchesForReversedAndShuffledWorkOrders(ZoneShape zone, NpcHandling npcs)
     {
         var scene = CreateScene();
-        var settings = new TooCloseSettings(Multiplier, zone, npcs);
+        var settings = new TooCloseSettings(BySize: true, Multiplier, ByDistance: false, DistanceInUnits: 0f, zone, npcs);
         var normal = TargetWorkOrder.Of(scene.Targets);
 
         var expected = Find(scene, settings, normal);

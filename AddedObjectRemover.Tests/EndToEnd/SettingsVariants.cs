@@ -34,7 +34,8 @@ internal static class SettingsVariants
 
     private static Settings Create(ZoneShape zone, NpcHandling npcs, FollowUpRemovalMode followUp, LeftoverInvisibleObjectSettings leftovers) => new()
     {
-        WhatToCheck = new CheckSettings { TargetPlugin = FixtureWorld.TargetPlugin, ZoneShape = zone },
+        WhatToCheck = new CheckSettings { TargetPlugin = FixtureWorld.TargetPlugin },
+        TooClose = new TooCloseRemovalSettings { ZoneShape = zone },
         WhatToIgnore = new IgnoreSettings
         {
             ExcludedPlugins = [FixtureWorld.ExcludedPlugin],

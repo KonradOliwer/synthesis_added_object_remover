@@ -28,6 +28,8 @@ public sealed class StartSetupTooCloseSectionsTests
 
     private static readonly ReportContext Normal = new(null!, null!, Detailed: false);
     private static readonly ReportContext Detailed = new(null!, null!, Detailed: true);
+    private static readonly TooCloseCause BySize = new TooCloseCause.ObjectSize();
+    private static readonly TooCloseCause WithinDistance = new TooCloseCause.Distance(32f);
 
     [Theory]
     [InlineData(null)]
@@ -54,7 +56,7 @@ public sealed class StartSetupTooCloseSectionsTests
     {
         var settings = SettingsFor("Target.esp");
         settings.WhatToIgnore = new IgnoreSettings { ExcludedPlugins = ["bad"], NpcHandling = (NpcHandling)99 };
-        settings.WhatToCheck.SizeMultiplier = 9f;
+        settings.TooClose.SizeMultiplier = 9f;
         settings.LeftoverInvisibleObjects = new LeftoverInvisibleObjectSettings { SearchRadius = 1f };
         settings.Diagnostics = new DiagnosticsSettings { DiagnosticsFolder = "bad\0folder" };
         var ready = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), Facts(), OutputPath, Workers));
@@ -284,6 +286,134 @@ public sealed class StartSetupTooCloseSectionsTests
     }
 
     [Fact]
+    public void TooClose_PrintsNothingWhenTheStepIsSwitchedOff()
+    {
+        Assert.Empty(LogSections.BuildSwitchedOffTooCloseSection().Lines);
+    }
+
+    [Theory]
+    [InlineData(true, "Size multiplier: 0.5")]
+    [InlineData(false, "Size multiplier: off")]
+    public void Config_SaysWhetherTheSizeZoneIsOn(bool bySize, string expectedLine)
+    {
+        var settings = SettingsFor("Target.esp");
+        settings.TooClose.RemoveTooCloseBySize = bySize;
+        var mods = Facts();
+        var runSettings = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), mods, OutputPath, Workers)).Settings;
+
+        var lines = LogSections.BuildConfigSection(runSettings, ModIdentifier.Identify(mods, runSettings.ModIdentification)).Lines;
+
+        Assert.Contains(expectedLine, lines);
+    }
+
+    [Fact]
+    public void Settings_RemoveTooCloseBySizeIsOnByDefaultAndPassesThrough()
+    {
+        Assert.True(new TooCloseRemovalSettings().RemoveTooCloseBySize);
+        var settings = SettingsFor("Target.esp");
+        settings.TooClose.RemoveTooCloseBySize = false;
+
+        var ready = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), Facts(), OutputPath, Workers));
+
+        Assert.False(ready.Settings.TooClose.BySize);
+        Assert.Empty(ready.Warnings);
+    }
+
+    [Fact]
+    public void TooClose_FoundLineNamesTheDistanceWhenOnlyTheDistanceZoneIsOn()
+    {
+        var report = CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.Ignore, [WithinDistance], WithinDistance);
+
+        var lines = LogSections.BuildTooCloseSection(report, Normal).Lines;
+
+        Assert.Equal("Found 1 of 3 Target.esp objects within 32 units of other mods' objects.", lines[0]);
+    }
+
+    [Fact]
+    public void TooClose_FoundLineCountsEachZoneWhenBothZonesAreOn()
+    {
+        var report = CreateTooCloseSection(
+            ZoneShape.BoundingBox, NpcHandling.Ignore, [BySize, WithinDistance], BySize, WithinDistance, WithinDistance);
+
+        var lines = LogSections.BuildTooCloseSection(report, Normal).Lines;
+
+        Assert.Equal("Found 3 of 3 Target.esp objects too close to other mods' objects (1 by object size, 2 by distance).", lines[0]);
+    }
+
+    [Fact]
+    public void Config_ShowsTheRemovalDistanceOnlyWhenTheDistanceZoneIsOn()
+    {
+        Assert.DoesNotContain(ConfigLines(byDistance: false), line => line.StartsWith("Removal distance"));
+        Assert.Contains("Removal distance (game units): 32", ConfigLines(byDistance: true));
+    }
+
+    [Fact]
+    public void Settings_TheDistanceZoneIsOffByDefaultAndPassesThroughClamped()
+    {
+        var defaults = new TooCloseRemovalSettings();
+        Assert.False(defaults.RemoveTooCloseByDistance);
+        Assert.Equal(32f, defaults.RemovalDistanceInUnits);
+        var settings = SettingsFor("Target.esp");
+        settings.TooClose.RemoveTooCloseByDistance = true;
+        settings.TooClose.RemovalDistanceInUnits = 5000f;
+
+        var ready = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), Facts(), OutputPath, Workers));
+
+        Assert.True(ready.Settings.TooClose.ByDistance);
+        Assert.Equal(1024f, ready.Settings.TooClose.DistanceInUnits);
+        Assert.Single(ready.Warnings);
+    }
+
+    [Fact]
+    public void Config_SaysNothingAboutChangedTerrainWhileItIsOff()
+    {
+        Assert.DoesNotContain(ConfigLines(settings => settings.TerrainChange.HeightChangeTolerance = 0f), line => line.StartsWith("Changed terrain"));
+    }
+
+    [Fact]
+    public void Config_GivesTheChangedTerrainChecksThatAreOn()
+    {
+        var lines = ConfigLines(settings => settings.TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = true });
+
+        Assert.Contains(
+            "Changed terrain: removed; objects checked: visible objects on the ground; distance 64 units; height changes over 16 units; terrain type changes counted.",
+            lines);
+    }
+
+    [Fact]
+    public void Config_LeavesOutTheChecksThatAreSwitchedOff()
+    {
+        var noHeight = ConfigLines(settings => settings.TerrainChange = new TerrainChangeSettings
+        {
+            RemoveOnChangedTerrain = true,
+            TerrainCheckedObjects = TerrainCheckedObjects.AllObjects,
+            CountHeightChanges = false,
+            TerrainDistanceMode = TerrainDistanceMode.ObjectSize,
+        });
+        var noType = ConfigLines(settings => settings.TerrainChange = new TerrainChangeSettings
+        {
+            RemoveOnChangedTerrain = true,
+            TerrainCheckedObjects = TerrainCheckedObjects.AllVisibleObjects,
+            CountTerrainTypeChanges = false,
+        });
+
+        Assert.Contains("Changed terrain: removed; objects checked: all objects; distance 0.5 times the object size; terrain type changes counted.", noHeight);
+        Assert.Contains("Changed terrain: removed; objects checked: all visible objects; distance 64 units; height changes over 16 units.", noType);
+    }
+
+    private ImmutableArray<string> ConfigLines(bool byDistance) =>
+        ConfigLines(settings => settings.TooClose.RemoveTooCloseByDistance = byDistance);
+
+    private ImmutableArray<string> ConfigLines(Action<Settings> change)
+    {
+        var settings = SettingsFor("Target.esp");
+        change(settings);
+        var mods = Facts();
+        var runSettings = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), mods, OutputPath, Workers)).Settings;
+        return LogSections.BuildConfigSection(runSettings, ModIdentifier.Identify(mods, runSettings.ModIdentification)).Lines;
+    }
+
+    [Fact]
     public void TooClose_ForTheNormalLogKeepsTheResultAndTheKeptObjectsOnly()
     {
         var report = CreateTooCloseSection(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInObject);
@@ -298,7 +428,11 @@ public sealed class StartSetupTooCloseSectionsTests
             lines);
     }
 
-    private static TooCloseSection CreateTooCloseSection(ZoneShape zone, NpcHandling npcs)
+    private static TooCloseSection CreateTooCloseSection(ZoneShape zone, NpcHandling npcs) => CreateTooCloseSection(zone, npcs, [BySize], BySize);
+
+    /// <param name="zonesTested">The zones the step reports it tested.</param>
+    /// <param name="causes">One hit for each.</param>
+    private static TooCloseSection CreateTooCloseSection(ZoneShape zone, NpcHandling npcs, TooCloseCause[] zonesTested, params TooCloseCause[] causes)
     {
         var world = CreateWorld();
         var zoneWork = zone == ZoneShape.ObjectShape ? new ShapeZoneWork(10, 8, 6, 3, 2, 1, 40) : default;
@@ -306,12 +440,14 @@ public sealed class StartSetupTooCloseSectionsTests
             ? new NpcStuckSummary(new NpcSizeCounts(5, 2, 1, 1, 1, 3), 12, 30, 4, [new PointNpc(world.OtherModObjects[1], new PointReason(PointReasonKind.NoBodyMeshNoBoundsNotPlayable, TestTargets.SpaceKey(0x7000), "TestRace"))])
             : null;
         var result = new TooCloseResult(
-            [new TooCloseObject(0, world.OtherModObjects[0])],
+            StepOutcome.Performed,
+            [.. causes.Select(cause => new TooCloseObject(0, world.OtherModObjects[0], cause))],
             [],
             new TooCloseWork(zoneWork, default),
             stuck,
             LargeOtherObjects: 2,
             Failures: [],
+            [.. zonesTested],
             zone,
             npcs);
         var census = new InvisibleOtherObjectCounts([new("Lights", 3), new("Sounds", 1)], PlacedNpcs: 7);

@@ -90,7 +90,7 @@ public class OtherObjectBoundsTests
         var target = TestTargets.Create(0, TestTargets.At(targetPosition)) with { Base = Crate.Base };
         var active = TestScenes.Create([target], otherModObjects, Shapes)
             .ObjectsThatCanCauseRemovals(Replacements.None(otherModObjects.Length), NpcHandling.CountLikeObjects);
-        return TooCloseSearch.FindFirstCentreInBoxZone(target, active, Shapes, multiplier: 0f, new ObjectQueryScratch());
+        return TooCloseSearch.FindFirstCentreInBoxZone(target, active, Shapes, new ZoneGrowth.BySize(0f), new ObjectQueryScratch());
     }
 
     private static OtherObject Place(int id, TestStatic model, Vector3 position) => TestShapes.Placed(Mod, id, model.Base, position);

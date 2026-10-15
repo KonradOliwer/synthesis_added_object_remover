@@ -270,6 +270,9 @@ public class LeftBehindObjectsTests
 
         public float[]? ReadTerrain(ExteriorCell cell) => throw new NotSupportedException();
 
+        public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new NotSupportedException();
+        public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => throw new NotSupportedException();
+
         public RecordKey? FindLandWorldspace(RecordKey space) => throw new NotSupportedException();
 
         public MeshTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => throw new NotSupportedException();

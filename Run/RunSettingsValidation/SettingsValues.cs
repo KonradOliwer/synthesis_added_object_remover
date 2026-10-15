@@ -1,5 +1,6 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
@@ -13,6 +14,8 @@ namespace AddedObjectRemover;
 public interface ISettingsValues
 {
     ICheckSettingsValues WhatToCheck { get; }
+    ITerrainChangeSettingsValues TerrainChange { get; }
+    ITooCloseSettingsValues TooClose { get; }
     IIgnoreSettingsValues WhatToIgnore { get; }
     IFollowUpSettingsValues FollowUpRemoval { get; }
     ILeftoverSettingsValues LeftoverInvisibleObjects { get; }
@@ -22,8 +25,27 @@ public interface ISettingsValues
 public interface ICheckSettingsValues
 {
     string? TargetPlugin { get; }
+}
+
+public interface ITooCloseSettingsValues
+{
+    bool RemoveTooCloseBySize { get; }
     float SizeMultiplier { get; }
+    bool RemoveTooCloseByDistance { get; }
+    float RemovalDistanceInUnits { get; }
     ZoneShape ZoneShape { get; }
+}
+
+public interface ITerrainChangeSettingsValues
+{
+    bool RemoveOnChangedTerrain { get; }
+    TerrainCheckedObjects TerrainCheckedObjects { get; }
+    bool CountHeightChanges { get; }
+    float HeightChangeTolerance { get; }
+    bool CountTerrainTypeChanges { get; }
+    TerrainDistanceMode TerrainDistanceMode { get; }
+    float TerrainDistanceInUnits { get; }
+    float TerrainDistanceSizeMultiplier { get; }
 }
 
 public interface IIgnoreSettingsValues
@@ -64,8 +86,19 @@ public interface IDiagnosticsSettingsValues
 /// <summary>The value each setting has until the user changes it; also what an invalid value is replaced with.</summary>
 public static class SettingDefaults
 {
+    public const bool RemoveTooCloseBySize = true;
     public const float SizeMultiplier = 0.5f;
+    public const bool RemoveTooCloseByDistance = false;
+    public const float RemovalDistanceInUnits = 32f;
     public const ZoneShape Zone = ZoneShape.ObjectShape;
+    public const bool RemoveOnChangedTerrain = false;
+    public const TerrainCheckedObjects TerrainChecked = TerrainCheckedObjects.VisibleObjectsOnTheGround;
+    public const bool CountHeightChanges = true;
+    public const float HeightChangeTolerance = 16f;
+    public const bool CountTerrainTypeChanges = true;
+    public const TerrainDistanceMode TerrainDistance = TerrainDistanceMode.GameUnits;
+    public const float TerrainDistanceInUnits = 64f;
+    public const float TerrainDistanceSizeMultiplier = 0.5f;
     public const int MaxOtherMastersForPatch = 10;
     public const NpcHandling Npcs = NpcHandling.OnlyWhenStuckInObject;
     public const FollowUpRemovalMode FollowUpMode = FollowUpRemovalMode.EverythingTouching;

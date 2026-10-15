@@ -18,6 +18,8 @@ using AddedObjectRemover.Steps.RemovalDecisionList;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
+using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects;
@@ -89,7 +91,7 @@ public static class StepRunner
         }
 
         var runCaches = AddObjectCaches(scope, collected);
-        var decided = Decide(scope, runCaches, collected);
+        var decided = Decide(scope, runCaches, mods, collected);
         var written = WritePatch(scope, decided);
         return FinishReports(scope, decided, written);
     }
@@ -148,19 +150,20 @@ public static class StepRunner
 
     /// <summary>
     /// Selects the objects that can cause removals and finds the objects to keep, then decides the removal rounds in
-    /// order (too close, also remove, leftover invisible objects) and the moves of the kept markers.
+    /// order (changed terrain, too close, also remove, leftover invisible objects) and the moves of the kept markers.
     /// </summary>
     /// <remarks>
     /// The runner holds no error boundary: each step catches its own errors inside the step. Applying a step's
     /// proposals to the shared decisions happens here, inside no step's boundary, so a bug there ends the run. The
     /// apply calls run inside the timed sections, so the printed times include them.
     /// </remarks>
-    private static StepResults Decide(RunScope scope, IRunCaches runCaches, CollectedObjects collected)
+    private static StepResults Decide(RunScope scope, IRunCaches runCaches, IdentifiedMods mods, CollectedObjects collected)
     {
         var selected = RunSelection(scope, runCaches, collected);
         var kept = RunKeepCheck(scope, collected);
         var started = RemovalDecisions.Start(kept.ObjectsToKeep, collected.Targets.Length);
-        var tooClose = RunTooClose(scope, runCaches, collected, selected, started);
+        var changedTerrain = RunChangedTerrain(scope, runCaches, mods, collected, started);
+        var tooClose = RunTooClose(scope, runCaches, collected, selected, changedTerrain.Decisions);
         var alsoRemove = RunAlsoRemove(scope, runCaches, collected, kept.ObjectsToKeep, tooClose.Decisions);
         var leftBehind = RunLeftBehind(scope, runCaches, collected, selected.ObjectsThatCanCauseRemovals, alsoRemove.Decisions);
         var markerMoves = RunMarkerMoves(scope, runCaches, collected, leftBehind);
@@ -168,6 +171,7 @@ public static class StepRunner
         return new StepResults(
             Collected: collected,
             ObjectsToKeep: kept.ObjectsToKeep,
+            ChangedTerrain: changedTerrain.Result,
             RestingObjects: alsoRemove.Result,
             LeftBehind: leftBehind.Result,
             MarkerMoves: markerMoves,
@@ -191,14 +195,42 @@ public static class StepRunner
         return kept;
     }
 
+    private static ChangedTerrainPhase RunChangedTerrain(
+        RunScope scope,
+        IRunCaches runCaches,
+        IdentifiedMods mods,
+        CollectedObjects collected,
+        RemovalDecisions started) =>
+        scope.Environment.Log.Timed(
+            () => FindAndApplyChangedTerrainRound(scope, runCaches, mods, collected, started),
+            (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
+
+    private static ChangedTerrainPhase FindAndApplyChangedTerrainRound(
+        RunScope scope,
+        IRunCaches runCaches,
+        IdentifiedMods mods,
+        CollectedObjects collected,
+        RemovalDecisions started)
+    {
+        var result = ChangedTerrainObjects.Find(
+            collected,
+            mods,
+            scope.Environment.Plugins,
+            scope.Plugin,
+            runCaches.Shapes,
+            scope.Settings.Execution,
+            scope.Settings.ChangedTerrain);
+        return new ChangedTerrainPhase(result, started.Apply(RoundKind.ChangedTerrain, result.Proposals));
+    }
+
     private static TooClosePhase RunTooClose(
         RunScope scope,
         IRunCaches runCaches,
         CollectedObjects collected,
         SelectedObjects selected,
-        RemovalDecisions started) =>
+        RemovalDecisions afterChangedTerrain) =>
         scope.Environment.Log.Timed(
-            () => FindAndApplyTooCloseRound(scope, runCaches, collected, selected, started),
+            () => FindAndApplyTooCloseRound(scope, runCaches, collected, selected, afterChangedTerrain),
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, runCaches.VisibleTargets, elapsed));
 
     private static TooClosePhase FindAndApplyTooCloseRound(
@@ -206,7 +238,7 @@ public static class StepRunner
         IRunCaches runCaches,
         CollectedObjects collected,
         SelectedObjects selected,
-        RemovalDecisions started)
+        RemovalDecisions afterChangedTerrain)
     {
         var result = TooCloseObjects.Find(
             collected,
@@ -218,7 +250,7 @@ public static class StepRunner
             runCaches.Triangles,
             scope.Settings.Execution,
             scope.Settings.TooClose);
-        return new TooClosePhase(result, started.Apply(RoundKind.TooClose, result.Proposals));
+        return new TooClosePhase(result, afterChangedTerrain.Apply(RoundKind.TooClose, result.Proposals));
     }
 
     /// <remarks>Not timed here: the step times its rounds itself, through the run's clock.</remarks>
@@ -316,6 +348,9 @@ public static class StepRunner
         IUnexpectedErrors UnexpectedErrors,
         LogAndReports Report,
         ReportFolderPrepared ReportFolder);
+
+    /// <param name="Decisions">The decisions with the changed-terrain round.</param>
+    private sealed record ChangedTerrainPhase(ChangedTerrainResult Result, RemovalDecisions Decisions);
 
     /// <param name="Decisions">The decisions with the too-close round.</param>
     private sealed record TooClosePhase(TooCloseResult Result, RemovalDecisions Decisions);

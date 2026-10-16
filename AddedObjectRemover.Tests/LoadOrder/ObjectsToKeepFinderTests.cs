@@ -8,7 +8,8 @@ public class ObjectsToKeepFinderTests
 {
     private static readonly RecordKey OtherPlaced = new FormKey(ModKey.FromNameAndExtension("Other.esp"), 0x900).ToRecordKey();
     private static readonly RecordKey BaseGameQuest = new FormKey(ModKey.FromNameAndExtension("Skyrim.esm"), 0x123).ToRecordKey();
-    private static readonly BaseKey ScriptedBase = new(new FormKey(ModKey.FromNameAndExtension("Other.esp"), 0x901).ToRecordKey(), BaseLinkKind.PlaceableObject);
+    private static readonly BaseKey TargetScriptedBase = new(new FormKey(TestTargets.TargetMod, 0x901).ToRecordKey(), BaseLinkKind.PlaceableObject);
+    private static readonly BaseKey OtherScriptedBase = new(new FormKey(ModKey.FromNameAndExtension("Other.esp"), 0x901).ToRecordKey(), BaseLinkKind.PlaceableObject);
 
     [Fact]
     public void TheLinksDecideTheGroupsTheKeptTargetsAndTheLinkCount()
@@ -38,8 +39,8 @@ public class ObjectsToKeepFinderTests
         var found = ObjectsToKeepFinder.Find(targets, [Placed(TestTargets.Key(1), TestTargets.Key(0))], TestBaseFacts.Unresolved);
 
         var reason = found.ObjectsToKeep.GetOwnReason(0)!;
-        Assert.Equal(KeepKind.ScriptNamesQuestSceneOrGlobal, reason.Kind);
-        Assert.Equal("script names a quest, scene or global", KeepReasonText.Category(reason));
+        Assert.Equal(KeepKind.ScriptNamesQuestOrScene, reason.Kind);
+        Assert.Equal("script names a quest or scene", KeepReasonText.Category(reason));
         Assert.Equal($"its own script names Quest SomeQuest [{BaseGameQuest}]", KeepReasonText.Detail(reason));
         Assert.True(found.ObjectsToKeep.TryGetKeepReason(1, out var linked));
         Assert.Equal(KeepKind.LinkedGroup, linked.Kind);
@@ -47,17 +48,27 @@ public class ObjectsToKeepFinderTests
     }
 
     [Fact]
-    public void AnObjectWhoseBaseScriptNamesAGlobalIsKept()
+    public void AnObjectWhoseTargetPluginBaseScriptNamesAQuestIsKept()
     {
         var targets = TestTargets.CreateMany(2);
-        targets[0] = TestTargets.Create(0, TestTargets.At(default), ScriptedBase, TestTargets.Space);
+        targets[0] = TestTargets.Create(0, TestTargets.At(default), TargetScriptedBase, TestTargets.Space);
 
         var found = ObjectsToKeepFinder.Find(targets, [], new ScriptedBases());
 
         var reason = found.ObjectsToKeep.GetOwnReason(0)!;
-        Assert.Equal(KeepKind.ScriptNamesQuestSceneOrGlobal, reason.Kind);
-        Assert.Equal($"its base object's script names Global SomeGlobal [{BaseGameQuest}]", KeepReasonText.Detail(reason));
+        Assert.Equal(KeepKind.ScriptNamesQuestOrScene, reason.Kind);
+        Assert.Equal($"its base object's script names Quest SomeQuest [{BaseGameQuest}]", KeepReasonText.Detail(reason));
         Assert.False(found.ObjectsToKeep.IsProtected(1));
+    }
+
+    [Fact]
+    public void AnObjectWhoseOtherPluginBaseScriptNamesAQuestStaysRemovable()
+    {
+        List<TargetObject> targets = [TestTargets.Create(0, TestTargets.At(default), OtherScriptedBase, TestTargets.Space)];
+
+        var found = ObjectsToKeepFinder.Find(targets, [], new ScriptedBases());
+
+        Assert.False(found.ObjectsToKeep.IsProtected(0));
     }
 
     [Fact]
@@ -97,9 +108,9 @@ public class ObjectsToKeepFinderTests
             TestTargets.Create(1, TestTargets.At(default), npcBase, TestTargets.Space),
             TestTargets.Create(2, TestTargets.At(default)),
         ];
-        var firstQuest = new LinkFact(BaseGameQuest, "FirstQuest", "Quest", npcBase.Record, RelationKind.UniqueActor, SourceIsPlaced: false, SourceIsWorldspace: false);
+        var firstQuest = new LinkFact(BaseGameQuest, "FirstQuest", "Quest", npcBase.Record, RelationKind.UniqueActor, SourceIsPlaced: false, SourceIsWorldspace: false, AliasFillFlags.None);
         var secondQuest = firstQuest with { SourceEditorId = "SecondQuest" };
-        var largeReference = new LinkFact(OtherPlaced, "World", "Worldspace", TestTargets.Key(2), RelationKind.Other, SourceIsPlaced: false, SourceIsWorldspace: true);
+        var largeReference = new LinkFact(OtherPlaced, "World", "Worldspace", TestTargets.Key(2), RelationKind.Other, SourceIsPlaced: false, SourceIsWorldspace: true, AliasFillFlags.None);
 
         var found = ObjectsToKeepFinder.Find(targets, [firstQuest, secondQuest, largeReference], TestBaseFacts.Unresolved);
 
@@ -108,14 +119,29 @@ public class ObjectsToKeepFinderTests
         Assert.All(Enumerable.Range(0, 3), index => Assert.False(found.ObjectsToKeep.IsProtected(index)));
     }
 
+    [Theory]
+    [InlineData(AliasFillFlags.Optional)]
+    [InlineData(AliasFillFlags.AllowDisabled)]
+    public void AUniqueActorAliasThatCanStayEmptyOrFillWithADisabledNpcIsNoRisk(AliasFillFlags flags)
+    {
+        var npcBase = new BaseKey(new FormKey(ModKey.FromNameAndExtension("Target.esp"), 0x700).ToRecordKey(), BaseLinkKind.Npc);
+        List<TargetObject> targets = [TestTargets.Create(0, TestTargets.At(default), npcBase, TestTargets.Space)];
+        var lenientQuest = new LinkFact(
+            BaseGameQuest, "LenientQuest", "Quest", npcBase.Record, RelationKind.UniqueActor, SourceIsPlaced: false, SourceIsWorldspace: false, flags);
+        var requiredQuest = lenientQuest with { SourceEditorId = "RequiredQuest", AliasFlags = AliasFillFlags.None };
+
+        Assert.Empty(ObjectsToKeepFinder.Find(targets, [lenientQuest], TestBaseFacts.Unresolved).Risks.UniqueActors);
+        Assert.Equal(
+            [new UniqueActorRole(new TargetId(0), requiredQuest)],
+            ObjectsToKeepFinder.Find(targets, [lenientQuest, requiredQuest], TestBaseFacts.Unresolved).Risks.UniqueActors.ToArray());
+    }
+
     private static LinkFact Placed(RecordKey source, RecordKey target) =>
-        new(source, null, "PlacedObject", target, RelationKind.EnableParent, SourceIsPlaced: true, SourceIsWorldspace: false);
+        new(source, null, "PlacedObject", target, RelationKind.EnableParent, SourceIsPlaced: true, SourceIsWorldspace: false, AliasFillFlags.None);
 
     private sealed class ScriptedBases : IBaseFacts
     {
         public BaseFacts Of(BaseKey baseKey) =>
-            baseKey == ScriptedBase
-                ? BaseFacts.Unresolved(baseKey.Record) with { NamedByScript = new ScriptNamedRecord(BaseGameQuest, "SomeGlobal", ScriptNamedKind.Global) }
-                : BaseFacts.Unresolved(baseKey.Record);
+            BaseFacts.Unresolved(baseKey.Record) with { NamedByScript = new ScriptNamedRecord(BaseGameQuest, "SomeQuest", ScriptNamedKind.Quest) };
     }
 }

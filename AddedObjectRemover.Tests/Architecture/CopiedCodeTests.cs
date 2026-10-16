@@ -39,18 +39,17 @@ public class CopiedCodeTests
         [CopyFamily.KeyOf([Settings + "ClampMarginInUnits", Settings + "CreateChangedTerrainSettings", Settings + "CreateModIdentificationSettings", Settings + "CreateTooCloseSettings"])] = SettingChecks,
         [CopyFamily.KeyOf([Settings + "CreateChangedTerrainSettings", Settings + "CreateTooCloseSettings"])] = SettingChecks,
         [CopyFamily.KeyOf([Settings + "CreateAlsoRemoveSettings", Settings + "CreateChangedTerrainSettings"])] = SettingChecks,
-        [CopyFamily.KeyOf([Describe + "PointReason", Describe + "RemovalReason", Describe + "Space"])] = EnumTextArms,
-        [CopyFamily.KeyOf([Describe + "OriginPlace", Describe + "TerrainChange", LogSections + "CheckedObjectsText"])] = EnumTextArms,
+        [CopyFamily.KeyOf([Describe + "HintType", Describe + "PointReason", Describe + "RemovalReason", Describe + "TimedSuffix"])] = EnumTextArms,
+        [CopyFamily.KeyOf([Describe + "OriginPlace", Describe + "TerrainChange"])] = EnumTextArms,
         [CopyFamily.KeyOf([
             Describe + "HintType", Describe + "LeftBehindReason", Describe + "TerrainChange", Describe + "TimedSuffix",
             LeftBehindText + "Describe", LeftBehindText + "DescribeReason", MeshText + "FailureCategory", MeshText + "ReadFailure"])] = EnumTextArms,
         [CopyFamily.KeyOf([
             Describe + "HintType", Describe + "LeftBehindReason", KeepText + "Relation", LeftBehindText + "Describe",
-            MeshText + "FailureCategory", MeshText + "Line", MeshText + "ReadFailure", PartText + "LinkedStep", PartText + "Word"])] = EnumTextArms,
+            MeshText + "FailureCategory", MeshText + "Line", PartText + "LinkedStep", PartText + "Word"])] = EnumTextArms,
+        [CopyFamily.KeyOf([MeshText + "FailureCategory", MeshText + "Line", MeshText + "ReadFailure"])] = EnumTextArms,
         [CopyFamily.KeyOf([KeepText + "Relation", PartText + "LinkedStep"])] = EnumTextArms,
-        [CopyFamily.KeyOf([
-            LogSections + "CheckedObjectsText", LogSections + "DescribeAlsoRemove", LogSections + "DescribeLeftBehind", LogSections + "JoinOrNone",
-            LogSections + "StopMessage"])] = EnumTextArms,
+        [CopyFamily.KeyOf([LogSections + "DescribeAlsoRemove", LogSections + "DescribeLeftBehind", LogSections + "JoinOrNone", LogSections + "StopMessage"])] = EnumTextArms,
         [CopyFamily.KeyOf([PartText + "Wordings"])] = PartKeyLines,
         [CopyFamily.KeyOf([
             Report + "Tables.LeftBehind.cs", Report + "Tables.LeftBehind.cs:Tables", Report + "Tables.LeftBehind.cs:Tables.LeftBehindHeader",

@@ -15,8 +15,8 @@ public class Settings : ISettingsValues
         "The plugin whose added objects are checked. Its objects that clash with other mods are removed in this patch.\n"
         + "Nothing is deleted: a removed object is disabled; one that is not persistent is also moved below the world.\n"
         + "Always kept, whatever the settings: teleport doors and their destinations; anything another mod's object, a quest, a package,\n"
-        + "a scene, a location or a navmesh points to; objects whose own or base object's script names a quest, scene or global;\n"
-        + "objects with a location role (except map markers). Linked objects are always removed or kept together.\n"
+        + "a scene, a location or a navmesh points to; objects whose own script names a quest or scene, or whose base object\n"
+        + "is this plugin's own and has a script that does; objects with a location role (except map markers). Linked objects are always removed or kept together.\n"
         + "Pick it from your load order.")]
     public ModKey TargetPlugin { get; set; } = ModKey.Null;
 
@@ -288,9 +288,10 @@ public class LeftoverInvisibleObjectSettings : ILeftoverSettingsValues
     public SurroundingObjectsSettings SurroundingObjects { get; set; } = new();
 
     [SynthesisOrder]
-    [SynthesisSettingName("Also keep these invisible objects")]
+    [SynthesisSettingName("Never remove these as left behind (ticked = kept)")]
     [SynthesisTooltip(
-        "Ticked kinds are never removed by this step, unless they are linked to a removed object.\n"
+        "Ticked kinds are kept by this step (unless linked to a removed object); unticked kinds can be removed by it. "
+        + "Only this left-behind step is affected, not the too-close or changed-terrain removals.\n"
         + "What \"Mod to clean up\" lists as always kept stays kept, ticked or not.")]
     public KeptInvisibleObjectSettings AlwaysKeep { get; set; } = new();
 
@@ -401,7 +402,8 @@ public class KeptInvisibleObjectSettings
     [SynthesisSettingName("Invisible trigger areas")]
     [SynthesisTooltip(
         "Invisible boxes without a model that start something when entered or left, such as a script, a quest stage or a trap.\n"
-        + "Disabling one can stop whatever it starts; those whose script names a quest, scene or global are always kept.")]
+        + "Disabling one can stop whatever it starts. Always kept: those with a script that names a quest or scene, on the trigger itself\n"
+        + "or on a base object the mod to clean up defines.")]
     public bool TriggerBoxes { get; set; }
 
     [SynthesisOrder]

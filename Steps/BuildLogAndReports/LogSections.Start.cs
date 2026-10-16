@@ -23,56 +23,55 @@ internal static partial class LogSections
     public static LogSection BuildConfigSection(RunSettings settings, IdentifiedMods standing) =>
         new("config",
         [
-            $"Target plugin: {settings.TargetAsTyped}",
-            settings.TooClose.BySize ? $"Size multiplier: {settings.TooClose.Multiplier}" : "Size multiplier: off",
-            .. DescribeDistanceZone(settings.TooClose),
-            $"Removal zone: {settings.TooClose.Zone}",
-            .. DescribeChangedTerrain(settings.ChangedTerrain),
-            $"Excluded plugins: {JoinOrNone(settings.ExcludedNames)}",
-            settings.ModIdentification.IgnoreTargetMasters
-                ? $"Ignored masters of target: {JoinOrNone(standing.IgnoredMasters.Select(mod => mod.ToString()))}"
-                : "Masters of target are not ignored.",
+            $"Mod to clean up: {settings.TargetAsTyped}",
+            DescribeOtherModsThatNeverCauseRemovals(settings, standing),
             .. CompatibilityPatches(standing.Patches),
-            $"NPCs and creatures: {settings.TooClose.Npcs}",
+            DescribeTooClose(settings.TooClose),
+            DescribeChangedTerrain(settings.ChangedTerrain),
             DescribeAlsoRemove(settings.AlsoRemove),
             DescribeLeftBehind(settings),
-            $"Detailed log: {settings.DetailedLog}",
-            $"Write report files: {settings.Reports.WriteFiles}",
-            $"Report folder: {settings.Reports.Folder}",
+            DescribeDiagnostics(settings),
         ]);
 
-    private static ImmutableArray<string> DescribeDistanceZone(TooCloseSettings tooClose) =>
-        tooClose.ByDistance ? [$"Removal distance (game units): {tooClose.DistanceInUnits}"] : [];
+    private static string OnOff(bool on) => on ? "on" : "off";
 
-    /// <summary>The changed-terrain settings in one line; the parts of a check that is switched off are left out.</summary>
-    private static ImmutableArray<string> DescribeChangedTerrain(ChangedTerrainSettings terrain)
+    /// <summary>"off", or "on" with the detail that only matters when it is on.</summary>
+    private static string OnWith(bool on, string detail) => on ? $"on, {detail}" : "off";
+
+    private static string DescribeOtherModsThatNeverCauseRemovals(RunSettings settings, IdentifiedMods standing)
     {
-        if (!terrain.On) return [];
-
-        List<string> parts =
-        [
-            "Changed terrain: removed",
-            $"objects checked: {CheckedObjectsText(terrain.Objects)}",
-            $"distance {string.Join(" and ", TerrainDistances(terrain))}",
-        ];
-        if (terrain.CountHeightChanges) parts.Add($"height changes over {terrain.HeightTolerance} units");
-        if (terrain.CountTerrainTypeChanges) parts.Add("terrain type changes counted");
-        return [$"{string.Join("; ", parts)}."];
+        var identification = settings.ModIdentification;
+        var requiredMods = identification.IgnoreTargetMasters
+            ? JoinOrNone(standing.IgnoredMasters.Select(mod => mod.ToString()))
+            : "off";
+        var patchedMods = identification.IgnorePatched ? $"on, a patch requires at most {identification.PatchMasterLimit} other mods" : "off";
+        return $"Other mods that never cause removals: Never count these mods: {JoinOrNone(settings.ExcludedNames)}; "
+            + $"Never count the mods the cleaned mod requires: {requiredMods}; "
+            + $"Never count mods that have a compatibility patch with it: {patchedMods}.";
     }
 
-    private static IEnumerable<string> TerrainDistances(ChangedTerrainSettings terrain)
+    private static string DescribeTooClose(TooCloseSettings tooClose) =>
+        "Remove objects too close to other mods' objects: "
+        + $"Margin by object size: {OnWith(tooClose.BySize, $"{tooClose.Multiplier} x object size")}; "
+        + $"Margin by fixed distance: {OnWith(tooClose.ByDistance, $"{tooClose.DistanceInUnits} units")}; "
+        + $"Use rough boxes instead of exact shapes (faster): {OnOff(tooClose.Zone == ZoneShape.BoundingBox)}; "
+        + $"Other mods' NPCs and creatures cause removal: {tooClose.Npcs}.";
+
+    private static string DescribeChangedTerrain(ChangedTerrainSettings terrain)
     {
-        if (terrain.AreaBySize) yield return $"{terrain.AreaMultiplier} times the object size";
-        if (terrain.AreaByDistance) yield return $"{terrain.AreaDistanceInUnits} units";
+        const string group = "Remove objects on terrain changed by other mods";
+        if (!terrain.On) return $"{group}: off.";
+
+        return $"{group}: on; Which of the cleaned mod's objects are checked: {terrain.Objects}; "
+            + $"Margin by object size: {OnWith(terrain.AreaBySize, $"{terrain.AreaMultiplier} x object size")}; "
+            + $"Margin by fixed distance: {OnWith(terrain.AreaByDistance, $"{terrain.AreaDistanceInUnits} units")}; "
+            + $"Count height changes: {OnWith(terrain.CountHeightChanges, $"ignoring changes up to {terrain.HeightTolerance} units")}; "
+            + $"Count ground type changes: {OnOff(terrain.CountTerrainTypeChanges)}.";
     }
 
-    private static string CheckedObjectsText(TerrainCheckedObjects objects) => objects switch
-    {
-        TerrainCheckedObjects.VisibleObjectsOnTheGround => "visible objects on the ground",
-        TerrainCheckedObjects.VisibleObjectsAtAnyHeight => "all visible objects",
-        TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes => "all objects",
-        _ => throw new UnreachableException($"Unknown checked objects {objects}."),
-    };
+    private static string DescribeDiagnostics(RunSettings settings) =>
+        $"Logs and reports: Detailed log: {OnOff(settings.DetailedLog)}; Write report files (CSV): {OnOff(settings.Reports.WriteFiles)}; "
+        + $"Folder for report files: {settings.Reports.Folder}.";
 
     private static string StopMessage(StopReason reason) => reason.Kind switch
     {
@@ -86,7 +85,7 @@ internal static partial class LogSections
 
     private static ImmutableArray<string> CompatibilityPatches(DetectedPatches patches)
     {
-        if (!patches.DetectionOn) return ["Compatibility patches: detection off."];
+        if (!patches.DetectionOn) return [];
         var lines = ImmutableArray.CreateBuilder<string>();
         lines.Add($"Compatibility patch detection: {TextFormat.Count(patches.PluginsMasteringTarget)} plugins master the target.");
         lines.AddRange(patches.SkippedTooManyMasters.Select(skipped =>
@@ -103,22 +102,30 @@ internal static partial class LogSections
         return lines.ToImmutable();
     }
 
-    private static string DescribeAlsoRemove(AlsoRemoveSettings settings) => settings.Mode switch
+    private static string DescribeAlsoRemove(AlsoRemoveSettings settings)
     {
-        FollowUpRemovalMode.Nothing => "Also remove: nothing.",
-        FollowUpRemovalMode.EverythingTouchingIt => $"Also remove: everything touching, touch distance {settings.TouchGap}.",
-        FollowUpRemovalMode.OnlyWhatLosesItsSupport =>
-            $"Also remove: objects supported by it, touch distance {settings.TouchGap}, threshold {TextFormat.Percent(settings.SupportLostFraction)}.",
-        _ => throw new UnreachableException($"Unknown follow-up removal mode {settings.Mode}."),
-    };
+        const string group = "Also remove what rests on removed objects";
+        var touchGap = $"Gap that still counts as touching: {settings.TouchGap} units";
+        return settings.Mode switch
+        {
+            FollowUpRemovalMode.Nothing => $"{group}: {settings.Mode}.",
+            FollowUpRemovalMode.EverythingTouchingIt => $"{group}: {settings.Mode}; {touchGap}.",
+            FollowUpRemovalMode.OnlyWhatLosesItsSupport =>
+                $"{group}: {settings.Mode}; {touchGap}; Remove when this much support is gone: {TextFormat.Percent(settings.SupportLostFraction)}.",
+            _ => throw new UnreachableException($"Unknown follow-up removal mode {settings.Mode}."),
+        };
+    }
 
     private static string DescribeLeftBehind(RunSettings settings)
     {
-        if (settings.LeftBehind is not { } leftovers) return "Leftover invisible objects: kept.";
+        const string group = "Invisible objects left behind";
+        if (settings.LeftBehind is not { } leftovers) return $"{group}: off.";
         var protectedKinds = TextLists.JoinOr(leftovers.NeverRemove.Order().Select(kind => kind.ToString()), Describe.ListSeparator, Describe.NoEntries);
-        return $"Leftover invisible objects: removed, search radius {leftovers.LookAround}, "
-            + $"removed area per direction {leftovers.DirectionClearedPercent}%, removed directions required {leftovers.ClearedDirectionsPercent}%, "
-            + $"occupied directions required {leftovers.OccupiedDirectionsPercent}%, never removed ({protectedKinds}), "
-            + $"kept markers inside other mods' objects {(settings.MarkerMoves != null ? "moved" : "left in place")}.";
+        return $"{group}: on; Look this far around it: {leftovers.LookAround} units; "
+            + $"Decide only if this share of the 8 directions has objects: {leftovers.OccupiedDirectionsPercent}%; "
+            + $"A direction is cleared when this much of it was removed: {leftovers.DirectionClearedPercent}%; "
+            + $"Remove when this share of those directions is cleared: {leftovers.ClearedDirectionsPercent}%; "
+            + $"Never remove these as left behind: {protectedKinds}; "
+            + $"Move kept markers out of other mods' objects: {OnOff(settings.MarkerMoves != null)}.";
     }
 }

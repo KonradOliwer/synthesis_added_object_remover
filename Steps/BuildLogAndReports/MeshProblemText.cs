@@ -8,6 +8,8 @@ internal static class MeshProblemText
     public static string Line(AssetProblem problem) => problem.Kind switch
     {
         AssetProblemKind.NotFound => $"  [mesh] not found: {problem.Mesh}",
+        AssetProblemKind.Unreadable or AssetProblemKind.TrianglesUnreadable when Required(problem.ReadFailure).Kind == MeshReadError.NoRenderGeometry =>
+            $"  [mesh] no visible geometry (normal for markers and dummy items): {problem.Mesh} ({ShapeCountsText(Required(Required(problem.ReadFailure).Shapes))})",
         AssetProblemKind.Unreadable => $"  [mesh] unreadable: {problem.Mesh} ({ReadFailure(Required(problem.ReadFailure))})",
         AssetProblemKind.TrianglesUnreadable => $"  [mesh] triangles unreadable: {problem.Mesh} ({ReadFailure(Required(problem.ReadFailure))})",
         AssetProblemKind.ReadWarning =>
@@ -50,7 +52,7 @@ internal static class MeshProblemText
         MeshReadError.NotLoadable => "not loadable",
         MeshReadError.NoRootNode => "no root node",
         MeshReadError.InvalidCoordinates => "invalid vertex coordinates",
-        MeshReadError.NoRenderGeometry => "no visible render geometry",
+        MeshReadError.NoRenderGeometry => "no visible geometry (normal for markers and dummy items)",
         MeshReadError.Malformed => Required(category.ExceptionType),
         MeshReadError.UnexpectedException => "unexpected error",
         _ => throw new UnreachableException($"A mesh read of kind {category.Kind} is not counted as a mesh failure."),

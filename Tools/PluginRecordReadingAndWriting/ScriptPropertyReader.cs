@@ -12,11 +12,10 @@ internal static class ScriptPropertyReader
     [
         (typeof(IQuestGetter), ScriptNamedKind.Quest),
         (typeof(ISceneGetter), ScriptNamedKind.Scene),
-        (typeof(IGlobalGetter), ScriptNamedKind.Global),
     ];
 
-    /// <returns>The first quest, scene or global variable a script property names, in script and property order; null when none does.</returns>
-    public static ScriptNamedRecord? FindQuestSceneOrGlobal(IAVirtualMachineAdapterGetter? adapter, ILinkCache linkCache, PluginNames names)
+    /// <returns>The first quest or scene a script property names, in script and property order; null when none does.</returns>
+    public static ScriptNamedRecord? FindQuestOrScene(IAVirtualMachineAdapterGetter? adapter, ILinkCache linkCache, PluginNames names)
     {
         if (adapter is null) return null;
         foreach (var link in adapter.Scripts.SelectMany(script => script.EnumerateFormLinks()))

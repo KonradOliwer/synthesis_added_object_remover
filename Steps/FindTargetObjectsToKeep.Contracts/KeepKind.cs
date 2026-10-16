@@ -12,12 +12,12 @@ public enum KeepKind
     /// <summary>A quest, package, location, script, ... links to it.</summary>
     NonPlacedReference,
 
-    /// <summary>A script on it, or on its base object, names a quest, scene or global variable.</summary>
-    ScriptNamesQuestSceneOrGlobal,
+    /// <summary>A script on it, or on its base object that the target plugin defines, names a quest or scene.</summary>
+    ScriptNamesQuestOrScene,
 
     /// <summary>
-    /// It is not a map marker and has a location role: a location ref type of its own, or a location lists it with one.
-    /// A quest alias that picks a reference by that role does not fill with a disabled one.
+    /// It is not a map marker and has a location ref type of its own (XLRT); a location listing it with one is a
+    /// <see cref="NonPlacedReference"/>. A quest alias that picks a reference by that role does not fill with a disabled one.
     /// </summary>
     LocationRole,
 

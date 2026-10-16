@@ -9,14 +9,14 @@ public class LoaderWarmUpFailureTests
     private const string LoaderFailure = "InvalidOperationException: warm-up broke";
 
     [Fact]
-    public void AFailedWarmUpIsReportedOnceBeforeTheTargetPluginLineAndTheRunCompletes()
+    public void AFailedWarmUpIsReportedOnceBeforeTheModToCleanUpLineAndTheRunCompletes()
     {
         var log = new RecordingLogSink();
 
         var result = FixtureRun.Run(SettingsVariants.Of(SettingsVariants.Support), workers: 1, log, FailingLoader);
 
         Assert.IsType<RunResult.Done>(result);
-        var configIndex = log.Sections.FindIndex(section => section.Lines.Any(line => line.StartsWith("Target plugin:", StringComparison.Ordinal)));
+        var configIndex = log.Sections.FindIndex(section => section.Lines.Any(line => line.StartsWith("Mod to clean up:",StringComparison.Ordinal)));
         var errorIndexes = log.Sections
             .Select((section, index) => (section, index))
             .Where(entry => entry.section.Lines.Any(line => line.Contains(LoaderFailure, StringComparison.Ordinal)))

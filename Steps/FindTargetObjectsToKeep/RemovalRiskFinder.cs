@@ -10,17 +10,22 @@ namespace AddedObjectRemover.Steps.FindTargetObjectsToKeep;
 /// </summary>
 internal static class RemovalRiskFinder
 {
+    private const AliasFillFlags HarmlessAliasFlags = AliasFillFlags.Optional | AliasFillFlags.AllowDisabled;
+
     public static RemovalRisks Find(IReadOnlyList<TargetObject> targets, IReadOnlyList<LinkFact> links) =>
         new(FindUniqueActorRoles(targets, links), FindLargeReferences(targets, links));
 
     /// <remarks>
     /// A Unique Actor alias names the NPC base, so it never keeps the placed NPC: without "Allow Disabled" the alias does
-    /// not fill with a disabled actor, and a quest whose required alias cannot fill does not start.
+    /// not fill with a disabled actor, and a quest whose required alias cannot fill does not start. An optional alias
+    /// lets the quest start anyway. One that allows disabled actors fills with the disabled NPC, and a unique NPC is
+    /// persistent, so it is disabled in place rather than deleted. Only the other aliases are a risk.
     /// </remarks>
     private static ImmutableArray<UniqueActorRole> FindUniqueActorRoles(IReadOnlyList<TargetObject> targets, IReadOnlyList<LinkFact> links)
     {
         var aliasByNpc = new Dictionary<RecordKey, LinkFact>();
-        foreach (var fact in links.Where(fact => fact.Relation == RelationKind.UniqueActor)) aliasByNpc.TryAdd(fact.Target, fact);
+        var required = links.Where(fact => fact.Relation == RelationKind.UniqueActor && (fact.AliasFlags & HarmlessAliasFlags) == AliasFillFlags.None);
+        foreach (var fact in required) aliasByNpc.TryAdd(fact.Target, fact);
         return
         [
             .. from target in targets

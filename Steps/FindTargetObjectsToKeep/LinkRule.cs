@@ -38,7 +38,7 @@ internal static class LinkRule
             }
             else if (idByKey.TryGetValue(fact.Target, out var kept))
             {
-                reasons.TryAdd(kept, CreateReason(fact, targets[kept.Index]));
+                reasons.TryAdd(kept, CreateReason(fact));
             }
         }
         return new LinkOutcome(
@@ -47,10 +47,13 @@ internal static class LinkRule
             targetObjectLinkCount);
     }
 
-    /// <remarks>A map marker a location lists is kept as any other linked object, not for a location role.</remarks>
-    private static KeepReason CreateReason(LinkFact fact, TargetObject target)
+    /// <remarks>
+    /// A location that lists the object with a location ref type is a non-placed record like any other: the location
+    /// role is a reason of the object's own only when the object has the ref type itself.
+    /// </remarks>
+    private static KeepReason CreateReason(LinkFact fact)
     {
         if (fact.SourceIsPlaced) return new KeepReason(fact.Relation == RelationKind.TeleportDestination ? KeepKind.TeleportDoor : KeepKind.PlacedReference, fact);
-        return new KeepReason(fact.Relation == RelationKind.LocationRefType && !target.HasMapMarker ? KeepKind.LocationRole : KeepKind.NonPlacedReference, fact);
+        return new KeepReason(KeepKind.NonPlacedReference, fact);
     }
 }

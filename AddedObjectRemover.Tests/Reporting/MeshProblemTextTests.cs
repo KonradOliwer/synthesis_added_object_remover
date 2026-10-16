@@ -19,6 +19,16 @@ public class MeshProblemTextTests
             @"  [mesh] triangles unreadable: meshes\a.nif (mesh file not found)"
         },
         {
+            AssetProblem.Unreadable(Mesh, MeshReadFailure.NoRenderGeometry(Shapes([], hiddenIgnored: false))),
+            @"  [mesh] no visible geometry (normal for markers and dummy items): meshes\a.nif (20 shapes: counted=1, hidden=2, editorMarker=3, effectShader=4, "
+            + "unsupported=0, noVertices=5, unreachable=6, hiddenAncestor=7, markerAncestor=8, mismatchedStrips=9)"
+        },
+        {
+            AssetProblem.TrianglesUnreadable(Mesh, MeshReadFailure.NoRenderGeometry(Shapes([], hiddenIgnored: false))),
+            @"  [mesh] no visible geometry (normal for markers and dummy items): meshes\a.nif (20 shapes: counted=1, hidden=2, editorMarker=3, effectShader=4, "
+            + "unsupported=0, noVertices=5, unreachable=6, hiddenAncestor=7, markerAncestor=8, mismatchedStrips=9)"
+        },
+        {
             AssetProblem.ReadWarning(Mesh, 2),
             @"  [mesh] meshes\a.nif: 2 NiTriStrips shape(s) whose strip lengths do not match their points are used as points."
         },
@@ -80,7 +90,7 @@ public class MeshProblemTextTests
         { new MeshFailureCategory(MeshReadError.NotLoadable, null), "not loadable" },
         { new MeshFailureCategory(MeshReadError.NoRootNode, null), "no root node" },
         { new MeshFailureCategory(MeshReadError.InvalidCoordinates, null), "invalid vertex coordinates" },
-        { new MeshFailureCategory(MeshReadError.NoRenderGeometry, null), "no visible render geometry" },
+        { new MeshFailureCategory(MeshReadError.NoRenderGeometry, null), "no visible geometry (normal for markers and dummy items)" },
         { new MeshFailureCategory(MeshReadError.Malformed, "EndOfStreamException"), "EndOfStreamException" },
         { new MeshFailureCategory(MeshReadError.UnexpectedException, null), "unexpected error" },
     };

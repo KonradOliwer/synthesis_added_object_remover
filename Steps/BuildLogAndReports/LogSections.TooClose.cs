@@ -18,7 +18,7 @@ internal static partial class LogSections
         [
             .. context.Detailed && report.Result.Zone == ZoneShape.ObjectShape ? ShapeZoneLines(report) : [],
             $"Found {TextFormat.Count(report.Result.Hits.Length)} of {TextFormat.Count(report.World.Targets.Length)} {report.Target} objects {DescribeDistance(report.Result)}"
-                + $"{Describe.TimedSuffix(report.Elapsed, context)}.",
+                + $"{Describe.TimedSuffix(report.Elapsed, context)}{DescribeAlreadyRemoved(report.AlreadyRemoved)}.",
             .. context.Detailed ? InvisibleOthers(report.Census) : [],
             .. context.Detailed ? NpcLines(report) : [],
             .. BuildKeptLines(report.World, report.Kept),
@@ -34,6 +34,9 @@ internal static partial class LogSections
         var bySize = result.Hits.Length - byDistance;
         return $"too close to other mods' objects ({TextFormat.Count(bySize)} by object size, {TextFormat.Count(byDistance)} by distance)";
     }
+
+    private static string DescribeAlreadyRemoved(int count) =>
+        count > 0 ? $"; {TextFormat.Count(count)} of them were already removed on changed terrain" : string.Empty;
 
     private static ImmutableArray<string> ShapeZoneLines(TooCloseSection report)
     {

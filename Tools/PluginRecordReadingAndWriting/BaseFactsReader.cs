@@ -41,7 +41,7 @@ public sealed class BaseFactsReader(ILinkCache linkCache, KnownPluginNames known
             record is IObjectBoundedOptionalGetter { ObjectBounds: { } bounds } ? ToBox(bounds) : null,
             MarkerFlagOf(record),
             ScriptNamesOf(record),
-            ScriptPropertyReader.FindQuestSceneOrGlobal((record as IHaveVirtualMachineAdapterGetter)?.VirtualMachineAdapter, linkCache, _names),
+            ScriptPropertyReader.FindQuestOrScene((record as IHaveVirtualMachineAdapterGetter)?.VirtualMachineAdapter, linkCache, _names),
             record is ILightGetter { Radius: > 0 } light ? light.Radius : null,
             record is ISoundMarkerGetter marker ? MaxHearingDistanceOf(marker) : null);
     }

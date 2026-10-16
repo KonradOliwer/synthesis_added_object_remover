@@ -121,7 +121,7 @@ public sealed class SharedReportingTests
     {
         var world = CreateWorld();
         var questKey = new RecordKey(new PluginName("Other.esp"), 0x950);
-        var quest = new LinkFact(questKey, "SomeQuest", "Quest", TestTargets.Key(7), RelationKind.UniqueActor, SourceIsPlaced: false, SourceIsWorldspace: false);
+        var quest = new LinkFact(questKey, "SomeQuest", "Quest", TestTargets.Key(7), RelationKind.UniqueActor, SourceIsPlaced: false, SourceIsWorldspace: false, AliasFillFlags.None);
         var risks = new RemovalRisks(
             [new UniqueActorRole(new TargetId(0), quest), new UniqueActorRole(new TargetId(3), quest)],
             [new TargetId(1), new TargetId(2), new TargetId(4)]);
@@ -189,18 +189,18 @@ public sealed class SharedReportingTests
     }
 
     [Fact]
-    public void Hints_ListAnObjectALocationListsWithARefTypeAsKeptForANonPlacedReference()
+    public void Hints_ListAnObjectALocationListsWithARefTypeOnlyAsKeptForANonPlacedReference()
     {
         var (world, decisions) = RunRounds();
         var visible = world with { Targets = [.. world.Targets.Select(target => target with { Base = TestVisibility.TaggedBase(ObjectVisibility.Visible) })] };
         var location = new LinkFact(
             new RecordKey(new PluginName("Other.esp"), 0x960), "SomeLocation", "Location", TestTargets.Key(ProtectedTouching), RelationKind.LocationRefType,
-            SourceIsPlaced: false, SourceIsWorldspace: false);
+            SourceIsPlaced: false, SourceIsWorldspace: false, AliasFillFlags.None);
+        var listed = LinkRule.DecideLinkOutcome(visible.Targets, [location]).References[ProtectedTouching]!;
         var protection = ObjectsToKeep.Build(
             visible.Targets,
             [TestTargets.Link(1, 2)],
-            TestTargets.References(
-                TargetCount, new Dictionary<int, KeepReason> { [Protected] = QuestReason, [ProtectedTouching] = new(KeepKind.LocationRole, location) }),
+            TestTargets.References(TargetCount, new Dictionary<int, KeepReason> { [Protected] = QuestReason, [ProtectedTouching] = listed }),
             TestBaseFacts.Unresolved);
         var decided = new StepResults(
             visible, protection, new RemovalRisks([], []), ChangedTerrainResult.SwitchedOff, null!, TestLeftBehind.PerformedWithoutFindings, null!, decisions);
@@ -210,6 +210,7 @@ public sealed class SharedReportingTests
         Assert.Equal(
             [(ManualPatchHintType.KeptForNonPlacedReference, Protected), (ManualPatchHintType.KeptForNonPlacedReference, ProtectedTouching)],
             hints.Select(hint => (hint.Type, hint.TargetIndex)));
+        Assert.Empty(LogSections.BuildKeptOnPurposeSection(visible, [new KeptObject(ProtectedTouching, listed, null)]).Lines);
     }
 
     [Fact]
@@ -225,6 +226,28 @@ public sealed class SharedReportingTests
                 + $"(touches removed {RecordNames.Describe(world.Targets[0])}).",
         };
         Assert.Equal(expected, LogSections.BuildKeptLines(world, kept));
+    }
+
+    [Fact]
+    public void KeptOnPurpose_ListsOnlyTheScriptAndLocationRoleKeepsUnderTheirOwnHeaders()
+    {
+        var (world, _) = RunRounds();
+        var locationRole = new KeepReason(KeepKind.LocationRole);
+        var script = new KeepReason(
+            KeepKind.ScriptNamesQuestOrScene,
+            Script: new ScriptFinding(new ScriptNamedRecord(new RecordKey(new PluginName("Other.esp"), 0x970), "SomeQuest", ScriptNamedKind.Quest), OnBase: false));
+        KeptObject[] kept = [new(Protected, TestKeepReasons.Quest, null), new(ProtectedTouching, locationRole, null), new(1, script, null)];
+
+        var lines = LogSections.BuildKeptOnPurposeSection(world, kept).Lines;
+
+        Assert.Equal(
+            [
+                $"  Kept, script names a quest or scene: {RecordNames.Describe(world.Targets[1])} in {Describe.Location(world, world.Targets[1])}: "
+                    + $"{KeepReasonText.Detail(script)}.",
+                $"  Kept, location role: {RecordNames.Describe(world.Targets[ProtectedTouching])} in {Describe.Location(world, world.Targets[ProtectedTouching])}: "
+                    + $"{KeepReasonText.Detail(locationRole)}.",
+            ],
+            lines.ToArray());
     }
 
     [Fact]

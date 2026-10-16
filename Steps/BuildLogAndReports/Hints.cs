@@ -61,7 +61,6 @@ internal sealed class ManualPatchHints(
         return $"members {string.Join(", ", names)}; kept because {string.Join("; ", reasons)}";
     }
 
-    /// <remarks>A location that lists the object with a location ref type is such a record too, though its reason is the location role.</remarks>
     private static bool IsReferencedByNonPlacedRecord(KeepReason reason) => reason.Link is { SourceIsPlaced: false };
 
     private IEnumerable<ManualPatchHint> CollectKeptByOwnReason(IEnumerable<int> keptIndices, Func<KeepReason, bool> belongs, ManualPatchHintType type) =>

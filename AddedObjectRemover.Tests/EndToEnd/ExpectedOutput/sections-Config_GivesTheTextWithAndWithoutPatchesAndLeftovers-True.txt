@@ -1,15 +1,11 @@
-Target plugin: Target.esp
-Size multiplier: 0.5
-Removal zone: ObjectShape
-Excluded plugins: Extra.esp, Second.esp
-Ignored masters of target: Skyrim.esm
+Mod to clean up: Target.esp
+Other mods that never cause removals: Never count these mods: Extra.esp, Second.esp; Never count the mods the cleaned mod requires: Skyrim.esm; Never count mods that have a compatibility patch with it: on, a patch requires at most 1 other mods.
 Compatibility patch detection: 2 plugins master the target.
   Plugin Merged.esp skipped: too many masters (likely generated or merged); it masters the target and 3 other mods.
   Compatibility patch Compat.esp: links target with Other.esp.
 Ignored because of compatibility patches: Compat.esp, Other.esp.
-NPCs and creatures: OnlyWhenStuckInsideTheObject
-Also remove: objects supported by it, touch distance 8, threshold 50 %.
-Leftover invisible objects: removed, search radius 1024, removed area per direction 50%, removed directions required 60%, occupied directions required 50%, never removed (none), kept markers inside other mods' objects moved.
-Detailed log: True
-Write report files: True
-Report folder: /out/AddedObjectRemover Reports
+Remove objects too close to other mods' objects: Margin by object size: on, 0.5 x object size; Margin by fixed distance: off; Use rough boxes instead of exact shapes (faster): off; Other mods' NPCs and creatures cause removal: OnlyWhenStuckInsideTheObject.
+Remove objects on terrain changed by other mods: off.
+Also remove what rests on removed objects: OnlyWhatLosesItsSupport; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %.
+Invisible objects left behind: on; Look this far around it: 1024 units; Decide only if this share of the 8 directions has objects: 50%; A direction is cleared when this much of it was removed: 50%; Remove when this share of those directions is cleared: 60%; Never remove these as left behind: none; Move kept markers out of other mods' objects: on.
+Logs and reports: Detailed log: on; Write report files (CSV): on; Folder for report files: /out/AddedObjectRemover Reports.

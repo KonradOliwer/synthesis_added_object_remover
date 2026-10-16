@@ -1,2 +1,2 @@
-Kept 2 objects that would have been removed because other records depend on them.
+Kept 2 objects that would have been removed, because other records depend on them or because of their own script or location ref type.
   QUST record: 2

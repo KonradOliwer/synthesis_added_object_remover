@@ -16,7 +16,7 @@ public sealed record PlacedReadScope(PluginName Target, bool Terrain, bool Navme
 /// <param name="InTargetSpace">The record's space holds a record created by the target plugin.</param>
 /// <param name="Scale">As the record stores it; null when it has none.</param>
 /// <param name="IsPersistent">The record's own Persistent flag is set.</param>
-/// <param name="NamedByScript">The first quest, scene or global variable that a script on the record itself names; null when none does.</param>
+/// <param name="NamedByScript">The first quest or scene that a script on the record itself names; null when none does.</param>
 /// <param name="HasLocationRefType">The record itself has at least one location ref type (XLRT).</param>
 /// <param name="ReferenceRadius">The reference's own radius (XRDS) as the record stores it; null when it has none.</param>
 /// <param name="PrimitiveBounds">The reference's primitive box, full sizes as the record exposes them; null when it is not a primitive.</param>

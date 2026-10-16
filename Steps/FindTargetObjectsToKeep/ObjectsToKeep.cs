@@ -8,8 +8,7 @@ namespace AddedObjectRemover.Steps.FindTargetObjectsToKeep;
 /// <summary>
 /// Teleport doors and targets that a non-placed record or a placed object other than the checked
 /// target objects links to are never removed, because the game may crash or break on them. Nor are
-/// targets whose own or base object's script names a quest, scene or global variable: a disabled
-/// object's script can stop doing its part (OnLoad does not fire on it), so that quest or scene can stall.
+/// targets whose script names a quest or scene, see <see cref="FindScriptReason"/>.
 /// Nor are targets with a location role, which a quest alias can pick them by.
 /// Links between target objects do not keep them: they form linked groups, which stay together, so
 /// a group stays whole as soon as one member must stay.
@@ -68,15 +67,28 @@ internal sealed class ObjectsToKeep : IObjectsToKeep
         }
     }
 
-    /// <remarks>A script that names only target objects puts them in its object's linked group instead.</remarks>
+    /// <remarks>
+    /// Only what depends on the object counts, and what the object's script merely reads cannot depend on it. A disabled
+    /// object's script can stop doing its part (OnLoad does not fire on it), and only a quest or scene can stall on that:
+    /// its stage or start may be waiting for this script. Property data cannot tell such a call from a mere read, and a
+    /// stalled quest is far worse than a kept object, so a named quest or scene keeps the object. Other forms do not:
+    /// a global, message, item or spell a script names holds no progress that waits on one object, even when it writes to
+    /// it. Placed references a script names are linked to it, and records that point back at the object keep it already.
+    /// A script on the reference was set up for this one object. A script on a base another plugin defines also runs on
+    /// that plugin's own placements, so its quest or scene was made to work without the copies the target plugin added,
+    /// unless something points at the copy, which keeps it already; such a base's script keeps nothing.
+    /// A script that names only target objects puts them in its object's linked group instead.
+    /// </remarks>
     private static KeepReason? FindScriptReason(TargetObject target, IBaseFacts bases)
     {
         if (target.NamedByScript is { } own) return ScriptReason(own, onBase: false);
-        return target.Base is { } baseKey && bases.Of(baseKey).NamedByScript is { } onBase ? ScriptReason(onBase, onBase: true) : null;
+        return target.Base is { } baseKey && baseKey.Record.Plugin == target.Key.Plugin && bases.Of(baseKey).NamedByScript is { } onBase
+            ? ScriptReason(onBase, onBase: true)
+            : null;
     }
 
     private static KeepReason ScriptReason(ScriptNamedRecord named, bool onBase) =>
-        new(KeepKind.ScriptNamesQuestSceneOrGlobal, Script: new ScriptFinding(named, onBase));
+        new(KeepKind.ScriptNamesQuestOrScene, Script: new ScriptFinding(named, onBase));
 
     /// <remarks>
     /// A map marker's ref type only lets a quest show its location on the map, and a disabled marker leaves the quest

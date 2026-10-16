@@ -70,16 +70,56 @@ public class LinkReaderTests
         var location = new Location(new FormKey(OtherMod, 0x905), SkyrimRelease.SkyrimSE)
         {
             LocationRefTypeReferencesStatic = [new LocationRefTypeReference { Ref = new FormLink<IPlacedGetter>(TestTargets.FormKeyOf(1)) }],
-            PersistentActorReferencesStatic = [new PersistentActorReference { Actor = new FormLink<IPlacedNpcGetter>(TestTargets.FormKeyOf(2)) }],
         };
+        mod.Locations.Add(location);
+        var facts = new List<LinkFact>();
+
+        LinkReader.ReadFromNonPlaced([mod], new HashSet<RecordKey> { TestTargets.Key(1) }, TestTargets.TargetPlugin, CreateNames(), facts);
+
+        Assert.Equal(RelationKind.LocationRefType, Assert.Single(facts).Relation);
+    }
+
+    [Fact]
+    public void ALocationsWorldAndHorseMarkersAreReadAsOtherLinks()
+    {
+        var mod = new SkyrimMod(OtherMod, SkyrimRelease.SkyrimSE);
+        var location = new Location(new FormKey(OtherMod, 0x905), SkyrimRelease.SkyrimSE);
+        location.WorldLocationMarkerRef.SetTo(TestTargets.FormKeyOf(1));
+        location.HorseMarkerRef.SetTo(TestTargets.FormKeyOf(2));
         mod.Locations.Add(location);
         var facts = new List<LinkFact>();
 
         LinkReader.ReadFromNonPlaced(
             [mod], new HashSet<RecordKey> { TestTargets.Key(1), TestTargets.Key(2) }, TestTargets.TargetPlugin, CreateNames(), facts);
 
-        Assert.Equal(RelationKind.LocationRefType, Assert.Single(facts, fact => fact.Target == TestTargets.Key(1)).Relation);
-        Assert.Equal(RelationKind.Other, Assert.Single(facts, fact => fact.Target == TestTargets.Key(2)).Relation);
+        Assert.Equal([TestTargets.Key(1), TestTargets.Key(2)], facts.Select(fact => fact.Target).ToArray());
+        Assert.All(facts, fact => Assert.Equal(RelationKind.Other, fact.Relation));
+    }
+
+    [Fact]
+    public void ALocationsAutomaticAndRemovedListsAreNotRead()
+    {
+        var mod = new SkyrimMod(OtherMod, SkyrimRelease.SkyrimSE);
+        var listed = TestTargets.FormKeyOf(1);
+        var location = new Location(new FormKey(OtherMod, 0x905), SkyrimRelease.SkyrimSE)
+        {
+            PersistentActorReferencesAdded = [new PersistentActorReference { Actor = new FormLink<IPlacedNpcGetter>(listed) }],
+            PersistentActorReferencesStatic = [new PersistentActorReference { Actor = new FormLink<IPlacedNpcGetter>(listed) }],
+            PersistentActorReferencesRemoved = [new FormLink<IPlacedSimpleGetter>(listed)],
+            UniqueActorReferencesAdded = [new UniqueActorReference { Ref = new FormLink<IPlacedNpcGetter>(listed) }],
+            UniqueActorReferencesStatic = [new UniqueActorReference { Ref = new FormLink<IPlacedNpcGetter>(listed) }],
+            LocationRefTypeReferencesRemoved = [new FormLink<IPlacedSimpleGetter>(listed)],
+            InitiallyDisabledReferencesAdded = [new FormLink<IPlacedGetter>(listed)],
+            InitiallyDisabledReferencesStatic = [new FormLink<IPlacedGetter>(listed)],
+            EnableParentReferencesAdded = [new EnableParentReference { Actor = new FormLink<IPlacedGetter>(listed), Ref = new FormLink<IPlacedGetter>(listed) }],
+            EnableParentReferencesStatic = [new EnableParentReference { Actor = new FormLink<IPlacedGetter>(listed), Ref = new FormLink<IPlacedGetter>(listed) }],
+        };
+        mod.Locations.Add(location);
+        var facts = new List<LinkFact>();
+
+        LinkReader.ReadFromNonPlaced([mod], new HashSet<RecordKey> { TestTargets.Key(1) }, TestTargets.TargetPlugin, CreateNames(), facts);
+
+        Assert.Empty(facts);
     }
 
     [Fact]
@@ -115,6 +155,24 @@ public class LinkReaderTests
         Assert.Equal(RelationKind.UniqueActor, fact.Relation);
         Assert.Equal(npcBase.ToRecordKey(), fact.Target);
         Assert.Equal("SomeQuest", fact.SourceEditorId);
+        Assert.Equal(AliasFillFlags.None, fact.AliasFlags);
+    }
+
+    [Theory]
+    [InlineData(QuestAlias.Flag.Optional, AliasFillFlags.Optional)]
+    [InlineData(QuestAlias.Flag.AllowDisabled, AliasFillFlags.AllowDisabled)]
+    [InlineData(QuestAlias.Flag.Optional | QuestAlias.Flag.AllowDisabled | QuestAlias.Flag.Essential, AliasFillFlags.Optional | AliasFillFlags.AllowDisabled)]
+    public void AUniqueActorAliasIsReadWithItsOptionalAndAllowDisabledFlags(QuestAlias.Flag aliasFlags, AliasFillFlags expected)
+    {
+        var mod = new SkyrimMod(OtherMod, SkyrimRelease.SkyrimSE);
+        var quest = new Quest(new FormKey(OtherMod, 0x906), SkyrimRelease.SkyrimSE);
+        quest.Aliases.Add(new QuestAlias { UniqueActor = new FormLinkNullable<INpcGetter>(new FormKey(TestTargets.TargetMod, 0x700)), Flags = aliasFlags });
+        mod.Quests.Add(quest);
+        var facts = new List<LinkFact>();
+
+        LinkReader.ReadFromNonPlaced([mod], new HashSet<RecordKey>(), TestTargets.TargetPlugin, CreateNames(), facts);
+
+        Assert.Equal(expected, Assert.Single(facts).AliasFlags);
     }
 
     [Fact]

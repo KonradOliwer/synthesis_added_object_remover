@@ -66,7 +66,7 @@ public class LinkRuleTests
     [Fact]
     public void NonPlacedRecordLinkKeepsTheTarget()
     {
-        var link = new LinkFact(OtherPlaced, "OtherList", "FormList", TestTargets.Key(2), RelationKind.Other, SourceIsPlaced: false, SourceIsWorldspace: false);
+        var link = new LinkFact(OtherPlaced, "OtherList", "FormList", TestTargets.Key(2), RelationKind.Other, SourceIsPlaced: false, SourceIsWorldspace: false, AliasFillFlags.None);
 
         var outcome = LinkRule.DecideLinkOutcome(Targets, [link]);
 
@@ -79,7 +79,7 @@ public class LinkRuleTests
     [Fact]
     public void WorldspaceLinkCountsForNothing()
     {
-        var link = new LinkFact(OtherPlaced, "OtherWorld", "Worldspace", TestTargets.Key(1), RelationKind.Other, SourceIsPlaced: false, SourceIsWorldspace: true);
+        var link = new LinkFact(OtherPlaced, "OtherWorld", "Worldspace", TestTargets.Key(1), RelationKind.Other, SourceIsPlaced: false, SourceIsWorldspace: true, AliasFillFlags.None);
 
         var outcome = LinkRule.DecideLinkOutcome(Targets, [link]);
 
@@ -87,34 +87,22 @@ public class LinkRuleTests
     }
 
     [Fact]
-    public void ALocationListingTheTargetWithARefTypeKeepsItForItsLocationRole()
+    public void ALocationListingTheTargetWithARefTypeKeepsItAsAnyNonPlacedRecordLinkingToIt()
     {
-        var link = new LinkFact(OtherPlaced, "SomeLocation", "Location", TestTargets.Key(2), RelationKind.LocationRefType, SourceIsPlaced: false, SourceIsWorldspace: false);
+        var link = new LinkFact(OtherPlaced, "SomeLocation", "Location", TestTargets.Key(2), RelationKind.LocationRefType, SourceIsPlaced: false, SourceIsWorldspace: false, AliasFillFlags.None);
 
         var outcome = LinkRule.DecideLinkOutcome(Targets, [link]);
 
         var reason = outcome.References[2]!;
-        Assert.Equal(KeepKind.LocationRole, reason.Kind);
-        Assert.Equal("location role", KeepReasonText.Category(reason));
+        Assert.Equal(KeepKind.NonPlacedReference, reason.Kind);
+        Assert.Equal("Location record", KeepReasonText.Category(reason));
         Assert.Equal($"listed with a location ref type by Location SomeLocation [{OtherPlaced}]", KeepReasonText.Detail(reason));
-    }
-
-    [Fact]
-    public void AMapMarkerALocationListsWithARefTypeIsKeptAsAnyLinkedObject()
-    {
-        var targets = TestTargets.CreateMany(3);
-        targets[2] = targets[2] with { HasMapMarker = true };
-        var link = new LinkFact(OtherPlaced, "SomeLocation", "Location", TestTargets.Key(2), RelationKind.LocationRefType, SourceIsPlaced: false, SourceIsWorldspace: false);
-
-        var outcome = LinkRule.DecideLinkOutcome(targets, [link]);
-
-        Assert.Equal(KeepKind.NonPlacedReference, outcome.References[2]!.Kind);
     }
 
     [Fact]
     public void TheFirstLinkFoundKeepsItsReason()
     {
-        var nonPlaced = new LinkFact(OtherPlaced, null, "FormList", TestTargets.Key(1), RelationKind.Other, SourceIsPlaced: false, SourceIsWorldspace: false);
+        var nonPlaced = new LinkFact(OtherPlaced, null, "FormList", TestTargets.Key(1), RelationKind.Other, SourceIsPlaced: false, SourceIsWorldspace: false, AliasFillFlags.None);
 
         var outcome = LinkRule.DecideLinkOutcome(Targets, [Placed(OtherPlaced, TestTargets.Key(1), RelationKind.AttachRef), nonPlaced]);
 
@@ -122,5 +110,5 @@ public class LinkRuleTests
     }
 
     private static LinkFact Placed(RecordKey source, RecordKey target, RelationKind relation) =>
-        new(source, null, "PlacedObject", target, relation, SourceIsPlaced: true, SourceIsWorldspace: false);
+        new(source, null, "PlacedObject", target, relation, SourceIsPlaced: true, SourceIsWorldspace: false, AliasFillFlags.None);
 }

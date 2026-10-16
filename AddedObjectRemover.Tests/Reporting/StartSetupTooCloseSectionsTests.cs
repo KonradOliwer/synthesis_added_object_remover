@@ -290,18 +290,13 @@ public sealed class StartSetupTooCloseSectionsTests
     }
 
     [Theory]
-    [InlineData(true, "Size multiplier: 0.5")]
-    [InlineData(false, "Size multiplier: off")]
-    public void Config_SaysWhetherTheSizeZoneIsOn(bool bySize, string expectedLine)
+    [InlineData(true, "Margin by object size: on, 0.5 x object size;")]
+    [InlineData(false, "Margin by object size: off;")]
+    public void Config_SaysWhetherTheSizeMarginIsOn(bool bySize, string expectedPart)
     {
-        var settings = SettingsFor();
-        settings.TooClose.BySize.Use = bySize;
-        var mods = Facts();
-        var runSettings = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), mods, OutputPath, Workers)).Settings;
+        var lines = ConfigLines(settings => settings.TooClose.BySize.Use = bySize);
 
-        var lines = LogSections.BuildConfigSection(runSettings, ModIdentifier.Identify(mods, runSettings.ModIdentification)).Lines;
-
-        Assert.Contains(expectedLine, lines);
+        Assert.Contains(expectedPart, TooCloseConfigLine(lines));
     }
 
     [Fact]
@@ -329,6 +324,16 @@ public sealed class StartSetupTooCloseSectionsTests
     }
 
     [Fact]
+    public void TooClose_FoundLineSaysHowManyWereAlreadyRemovedOnChangedTerrain()
+    {
+        var report = CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.Never) with { AlreadyRemoved = 1 };
+
+        var lines = LogSections.BuildTooCloseSection(report, Normal).Lines;
+
+        Assert.Equal("Found 1 of 3 Target.esp objects too close to other mods' objects; 1 of them were already removed on changed terrain.", lines[0]);
+    }
+
+    [Fact]
     public void TooClose_FoundLineCountsEachZoneWhenBothZonesAreOn()
     {
         var report = CreateTooCloseSection(
@@ -340,11 +345,24 @@ public sealed class StartSetupTooCloseSectionsTests
     }
 
     [Fact]
-    public void Config_ShowsTheRemovalDistanceOnlyWhenTheDistanceZoneIsOn()
+    public void Config_ShowsTheFixedDistanceOnlyWhenTheDistanceMarginIsOn()
     {
-        Assert.DoesNotContain(ConfigLines(byDistance: false), line => line.StartsWith("Removal distance"));
-        Assert.Contains("Removal distance (game units): 32", ConfigLines(byDistance: true));
+        Assert.Contains("Margin by fixed distance: off;", TooCloseConfigLine(ConfigLines(byDistance: false)));
+        Assert.Contains("Margin by fixed distance: on, 32 units;", TooCloseConfigLine(ConfigLines(byDistance: true)));
     }
+
+    [Theory]
+    [InlineData(false, "Use rough boxes instead of exact shapes (faster): off;")]
+    [InlineData(true, "Use rough boxes instead of exact shapes (faster): on;")]
+    public void Config_SaysWhetherRoughBoxesAreUsed(bool roughBoxes, string expectedPart)
+    {
+        var lines = ConfigLines(settings => settings.TooClose.UseRoughBoxes = roughBoxes);
+
+        Assert.Contains(expectedPart, TooCloseConfigLine(lines));
+    }
+
+    private static string TooCloseConfigLine(ImmutableArray<string> lines) =>
+        Assert.Single(lines, line => line.StartsWith("Remove objects too close to other mods' objects:"));
 
     [Fact]
     public void Settings_TheDistanceZoneIsOffByDefaultAndPassesThroughClamped()
@@ -364,9 +382,11 @@ public sealed class StartSetupTooCloseSectionsTests
     }
 
     [Fact]
-    public void Config_SaysNothingAboutChangedTerrainWhileItIsOff()
+    public void Config_SaysOnlyThatChangedTerrainIsOffWhileItIsOff()
     {
-        Assert.DoesNotContain(ConfigLines(settings => settings.TerrainChange.HeightChangeTolerance = 0f), line => line.StartsWith("Changed terrain"));
+        var lines = ConfigLines(settings => settings.TerrainChange.HeightChangeTolerance = 0f);
+
+        Assert.Contains("Remove objects on terrain changed by other mods: off.", lines);
     }
 
     [Fact]
@@ -375,7 +395,8 @@ public sealed class StartSetupTooCloseSectionsTests
         var lines = ConfigLines(settings => settings.TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = true });
 
         Assert.Contains(
-            "Changed terrain: removed; objects checked: visible objects on the ground; distance 64 units; height changes over 16 units; terrain type changes counted.",
+            "Remove objects on terrain changed by other mods: on; Which of the cleaned mod's objects are checked: VisibleObjectsOnTheGround; "
+            + "Margin by object size: off; Margin by fixed distance: on, 64 units; Count height changes: on, ignoring changes up to 16 units; Count ground type changes: on.",
             lines);
     }
 
@@ -397,12 +418,18 @@ public sealed class StartSetupTooCloseSectionsTests
             CountTerrainTypeChanges = false,
         });
 
-        Assert.Contains("Changed terrain: removed; objects checked: all objects; distance 0.5 times the object size; terrain type changes counted.", noHeight);
-        Assert.Contains("Changed terrain: removed; objects checked: all visible objects; distance 64 units; height changes over 16 units.", noType);
+        Assert.Contains(
+            "Remove objects on terrain changed by other mods: on; Which of the cleaned mod's objects are checked: AllObjectsIncludingInvisibleOnes; "
+            + "Margin by object size: on, 0.5 x object size; Margin by fixed distance: off; Count height changes: off; Count ground type changes: on.",
+            noHeight);
+        Assert.Contains(
+            "Remove objects on terrain changed by other mods: on; Which of the cleaned mod's objects are checked: VisibleObjectsAtAnyHeight; "
+            + "Margin by object size: off; Margin by fixed distance: on, 64 units; Count height changes: on, ignoring changes up to 16 units; Count ground type changes: off.",
+            noType);
     }
 
     [Fact]
-    public void Config_JoinsTheTerrainMarginsThatAreOnWithAnd()
+    public void Config_ShowsBothTerrainMarginsWhenBothAreOn()
     {
         var lines = ConfigLines(settings => settings.TerrainChange = new TerrainChangeSettings
         {
@@ -412,8 +439,9 @@ public sealed class StartSetupTooCloseSectionsTests
         });
 
         Assert.Contains(
-            "Changed terrain: removed; objects checked: visible objects on the ground; distance 0.5 times the object size and 64 units; "
-            + "height changes over 16 units; terrain type changes counted.",
+            "Remove objects on terrain changed by other mods: on; Which of the cleaned mod's objects are checked: VisibleObjectsOnTheGround; "
+            + "Margin by object size: on, 0.5 x object size; Margin by fixed distance: on, 64 units; Count height changes: on, ignoring changes up to 16 units; "
+            + "Count ground type changes: on.",
             lines);
     }
 

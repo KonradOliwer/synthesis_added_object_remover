@@ -27,7 +27,8 @@ internal static class LinkReader
             if (link.IsNull || names.Of(link.FormKey.ModKey) != target) continue;
             var linkedKey = names.KeyOf(link.FormKey);
             var relation = linkedKey == baseKey ? RelationKind.BaseObject : DescribeRelation(record, link.FormKey);
-            facts.Add(new LinkFact(recordKey, record.EditorID, record.Registration.Name, linkedKey, relation, SourceIsPlaced: true, SourceIsWorldspace: false));
+            facts.Add(new LinkFact(
+                recordKey, record.EditorID, record.Registration.Name, linkedKey, relation, SourceIsPlaced: true, SourceIsWorldspace: false, AliasFillFlags.None));
         }
     }
 
@@ -57,25 +58,51 @@ internal static class LinkReader
 
     private static void ReadLinksToTargets(IMajorRecordGetter record, IReadOnlySet<RecordKey> targets, PluginName target, PluginNames names, List<LinkFact> facts)
     {
-        foreach (var link in record.EnumerateFormLinks(iterateNestedRecords: false))
+        foreach (var link in EnumerateDependencyLinks(record))
         {
             if (link.IsNull || names.Of(link.FormKey.ModKey) != target) continue;
             var linkedKey = names.KeyOf(link.FormKey);
             if (!targets.Contains(linkedKey)) continue;
-            facts.Add(CreateNonPlacedFact(record, linkedKey, DescribeNonPlacedRelation(record, link.FormKey), names));
+            facts.Add(CreateNonPlacedFact(record, linkedKey, DescribeNonPlacedRelation(record, link.FormKey), AliasFillFlags.None, names));
         }
     }
+
+    private static IEnumerable<IFormLinkGetter> EnumerateDependencyLinks(IMajorRecordGetter record) =>
+        record is ILocationGetter location ? EnumerateLocationDependencyLinks(location) : record.EnumerateFormLinks(iterateNestedRecords: false);
+
+    /// <remarks>
+    /// Of a location, only what someone set as a role counts: the references listed with a location ref type (ACSR, LCSR),
+    /// by which quest aliases pick them, and the world location marker (MNAM) and horse marker (NAM0). The Creation Kit
+    /// builds the other reference lists from the references' own data: persistent refs (ACPR, LCPR) from their persist
+    /// location, unique actors (ACUN, LCUN) from the placed unique NPCs, enable-parent refs (ACEP, LCEP) from their Enable
+    /// Parent, initially disabled refs (ACID, LCID) from their flag. They say nothing the reference does not say itself,
+    /// so nothing depends on the reference through them. The removed lists (RCPR, RCUN, RCSR) name what an override
+    /// takes out of the master's lists. The location's other fields name no placed record.
+    /// </remarks>
+    private static IEnumerable<IFormLinkGetter> EnumerateLocationDependencyLinks(ILocationGetter location) =>
+        ListsWithRefType(location)
+            .Select(entry => (IFormLinkGetter)entry.Ref)
+            .Append(location.WorldLocationMarkerRef)
+            .Append(location.HorseMarkerRef);
 
     private static void ReadUniqueActors(IQuestGetter quest, PluginName target, PluginNames names, List<LinkFact> facts)
     {
         foreach (var alias in quest.Aliases)
         {
             if (alias.UniqueActor.IsNull || names.Of(alias.UniqueActor.FormKey.ModKey) != target) continue;
-            facts.Add(CreateNonPlacedFact(quest, names.KeyOf(alias.UniqueActor.FormKey), RelationKind.UniqueActor, names));
+            facts.Add(CreateNonPlacedFact(quest, names.KeyOf(alias.UniqueActor.FormKey), RelationKind.UniqueActor, ReadFillFlags(alias), names));
         }
     }
 
-    private static LinkFact CreateNonPlacedFact(IMajorRecordGetter record, RecordKey linkedKey, RelationKind relation, PluginNames names) =>
+    private static AliasFillFlags ReadFillFlags(IQuestAliasGetter alias)
+    {
+        var flags = alias.Flags ?? 0;
+        return (flags.HasFlag(QuestAlias.Flag.Optional) ? AliasFillFlags.Optional : AliasFillFlags.None)
+            | (flags.HasFlag(QuestAlias.Flag.AllowDisabled) ? AliasFillFlags.AllowDisabled : AliasFillFlags.None);
+    }
+
+    private static LinkFact CreateNonPlacedFact(
+        IMajorRecordGetter record, RecordKey linkedKey, RelationKind relation, AliasFillFlags aliasFlags, PluginNames names) =>
         new(
             names.KeyOf(record.FormKey),
             record.EditorID,
@@ -83,7 +110,8 @@ internal static class LinkReader
             linkedKey,
             relation,
             SourceIsPlaced: false,
-            SourceIsWorldspace: record is IWorldspaceGetter);
+            SourceIsWorldspace: record is IWorldspaceGetter,
+            aliasFlags);
 
     private static RelationKind DescribeNonPlacedRelation(IMajorRecordGetter record, FormKey linked) =>
         record is ILocationGetter location && ListsWithRefType(location).Any(entry => entry.Ref.FormKey == linked)

@@ -5,6 +5,7 @@ using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 namespace AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 
 /// <param name="Kept">The objects the too-close round left standing, in round order.</param>
+/// <param name="AlreadyRemoved">The found objects that the changed-terrain round had removed before this round; they count under that step.</param>
 /// <param name="MeshesIndexed">Meshes held when the phase ended.</param>
 /// <param name="MeshTriangles">Triangles in those meshes.</param>
 /// <param name="BodiesBuilt">NPC bodies built when the phase ended.</param>
@@ -25,4 +26,5 @@ public sealed record TooCloseSection(
     int LeveledListsResolved,
     int BodyMeshSetsMeasured,
     int EffectOnlyMeshes,
-    TimeSpan Elapsed);
+    TimeSpan Elapsed,
+    int AlreadyRemoved = 0);

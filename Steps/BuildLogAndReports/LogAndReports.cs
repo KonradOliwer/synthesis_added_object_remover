@@ -262,7 +262,14 @@ public sealed class LogAndReports
             bodies.ListsResolved,
             _caches.CountBodyMeshSets(),
             _caches.CountEffectOnlyMeshes(),
-            elapsed);
+            elapsed,
+            CountRemovedBeforeThisRound(found, decisions));
+    }
+
+    private static int CountRemovedBeforeThisRound(TooCloseResult found, IRemovalDecisions decisions)
+    {
+        var thisRound = decisions.Rounds[^1];
+        return found.Hits.Count(hit => decisions.Of(new TargetId(hit.TargetIndex)) is Decision.Removed { Round: var round } && round != thisRound);
     }
 
     private RunOutcome BuildOutcome(StepResults decided, WriteSummary written)
@@ -279,6 +286,8 @@ public sealed class LogAndReports
         var world = outcome.Collected;
         var removals = outcome.Removals;
         var warnings = LogSections.BuildRemovalWarningsSection(world, removals, outcome.RemovalRisks);
+        var kept = RemovalList.Kept(outcome.Final);
+        var keptOnPurpose = LogSections.BuildKeptOnPurposeSection(world, kept);
         return
         [
             LogSections.BuildRemovalsSection(world, removals, _context),
@@ -286,7 +295,8 @@ public sealed class LogAndReports
             LogSections.BuildSpacesSection(world, removals, _context),
             LogSections.BuildTargetVisibilitySection(world.Targets, world.Counts.TargetsHiddenOrWithoutPlacement, _context),
             LogSections.BuildRemovalSummarySection(removals, outcome.ChangedTerrain.Outcome),
-            LogSections.BuildKeptSummarySection(RemovalList.Kept(outcome.Final)),
+            LogSections.BuildKeptSummarySection(kept),
+            .. keptOnPurpose.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [keptOnPurpose],
             LogSections.BuildMarkersByTypeSection(world.Targets, removals, _context),
             .. warnings.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [warnings],
             LogSections.BuildHintsSection(world, outcome.Hints),

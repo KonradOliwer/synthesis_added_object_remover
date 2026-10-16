@@ -124,8 +124,8 @@ height changes over 16 units and for ground type changes.
 | When the cleaned mod's visible objects around it were removed: Decide only if this share of the 8 directions has objects (%) | `50` | Of the 8 directions, this share must contain the cleaned mod's visible objects before deciding. |
 | When the cleaned mod's visible objects around it were removed: A direction is cleared when this much of it was removed (%) | `50` | Share removed for a direction to count as cleared. |
 | When the cleaned mod's visible objects around it were removed: Remove when this share of those directions is cleared (%) | `60` | Share of the directions with objects that must be cleared. |
-| Also keep these invisible objects | *(none ticked)* | One tick box per kind (see below); ticked kinds are never removed by this step. |
-| Move kept markers out of other mods' objects | `false` | Move a kept map, X (including heading), idle or other marker that sits inside another mod's object to the nearest free spot on the navmesh or, failing that, the ground. Only its position changes. Needs *Remove invisible objects left inside other mods' objects or alone* on; markers are kept when *Also keep these invisible objects* ticks them or something depends on them. Lights, sounds, acoustic spaces, trigger boxes, critter spawners, decals, furniture and door markers are never moved. |
+| Never remove these as left behind (ticked = kept) | *(none ticked)* | One tick box per kind (see below). A ticked kind is kept by this step, an unticked kind can be removed by it. Does not affect the too-close or changed-terrain removals. |
+| Move kept markers out of other mods' objects | `false` | Move a kept map, X (including heading), idle or other marker that sits inside another mod's object to the nearest free spot on the navmesh or, failing that, the ground. Only its position changes. Needs *Remove invisible objects left inside other mods' objects or alone* on; markers are kept when *Never remove these as left behind* ticks them or something depends on them. Lights, sounds, acoustic spaces, trigger boxes, critter spawners, decals, furniture and door markers are never moved. |
 
 The three percentages take values from 10 to 100 in steps of 10.
 
@@ -137,7 +137,7 @@ An invisible object is removed when:
   when this much of it was removed (%)* of their ground area. A target object the invisible object sits in counts in every direction.
 
 Only the target plugin's own objects count as surroundings. The objects listed under *What is always
-kept* are kept in any case, and so are the kinds ticked under *Also keep these invisible objects*,
+kept* are kept in any case, and so are the kinds ticked under *Never remove these as left behind*,
 unless they are linked to a removed object.
 The tick boxes are: map markers, position markers (XMarker, XMarkerHeading), idle animation spots, furniture use spots,
 invisible marker doors (doors flagged as markers that lead nowhere), lights without a model, sound sources, echo areas (acoustic spaces), critter spawners,
@@ -183,9 +183,10 @@ Whatever the settings, the target plugin's objects of these kinds are never remo
 - teleport doors, and the doors they lead to;
 - anything another mod's object, a quest, an AI package, a scene, a location or a navmesh points to
   (or any other record, such as a faction, a form list or dialogue);
-- objects whose own script, or whose base object's script, names a quest, a scene or a global variable;
-- objects with a location role: a location ref type of their own, or a location that lists them with one.
-  Map markers are not kept for this reason alone.
+- objects whose own script names a quest or a scene, or whose base object comes from the target plugin and
+  has a script that names one. A base object from another plugin also serves that plugin's own copies, so
+  its script does not keep the target plugin's copies;
+- objects with a location role: a location ref type of their own. Map markers are not kept for this reason alone.
 
 Objects of the target plugin that are linked to each other (enable parent, linked references, script
 properties, ...) are always removed together or kept together. The log names the reason each object was kept.
@@ -197,10 +198,12 @@ moved, so it is hidden from the world map. Markers a location or quest uses are 
 
 The normal log shows only what you need: the settings in use, warnings and errors, the final summaries of removed, kept and moved objects, one line per kept object, a summary of unreadable meshes, and where report files were written. Turn on *Detailed log* for every removed object and why, per-space counts, unreadable-mesh details, timings and processing statistics. Unreadable meshes are listed together near the end of the log, after the patch is written.
 
+Right after the kept summary, each object kept for a reason of its own gets a line saying why: *Kept, script names a quest or scene* (its own script, or its base object's from the target plugin) or *Kept, location role* (a location ref type of its own). They are kept on purpose and need no manual patch.
+
 Near the end of the log, a *Possible manual patch needed* section lists removed door, map, idle and furniture markers (which actors or the map use), and objects that would have been removed but were kept, grouped by why (part of a linked group, kept because something depends on it, or a teleport door). With report files on, the locations of the written files follow.
 
 Before that section, the log warns about removed objects that can still affect the game:
-- each removed unique NPC that a quest fills an alias with (as its *Unique Actor*): that quest role may not fill, or the quest may not start;
+- each removed unique NPC that a quest fills an alias with (as its *Unique Actor*), when that alias is neither *Optional* nor *Allow Disabled*: that quest role may not fill, or the quest may not start;
 - the number of removed objects in their worldspace's large-reference list: distant LOD may flicker, or full models may not load, in those cells until LOD is generated again (for example with DynDOLOD).
 
 If something goes wrong that the patcher did not expect, the log shows a line starting with "Unexpected error" that names the part that failed, the error, and what is missing from the results because of it. The run carries on and the patch is still written. When it happens for single objects (a target object that is too close or on changed terrain, an other-mod object that can cause removals, or a target object that might have to be kept), only that object is skipped: a target object whose check failed is kept and not removed, and an other-mod object that failed causes no removals. Objects with the same error are grouped into one line with their number and a few examples; turn on the detailed log to list all of them. The run stops only if the load order can't be read, the target plugin is unusable, or the patch can't be written.

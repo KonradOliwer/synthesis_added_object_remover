@@ -44,7 +44,7 @@ public class TooCloseBothZonesRunTests
 
         FixtureRun.Run(settings, Workers, log, DefaultMeshFiles, createLoadOrder: CrateWorld.Create);
 
-        Assert.Contains("Removal distance (game units): 32", SectionLines(log, "config"));
+        Assert.Contains("Margin by fixed distance: on, 32 units;", Assert.Single(SectionLines(log, "config"), line => line.StartsWith("Remove objects too close")));
         var tooClose = SectionLines(log, "tooClose");
         Assert.StartsWith(
             "Object-shape zones: 2 candidate pairs, 2 passed the box filter, 2 mesh tests, 2 hits, 0 centre-point fallbacks (other object without mesh triangles), "

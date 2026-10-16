@@ -51,6 +51,7 @@ internal static class Describe
 
     public static string PointReason(PointReason reason) => reason.Kind switch
     {
+        PointReasonKind.RaceNotFound when reason.Race == RecordKey.Null || reason.Race == RecordKey.None => "has no race set",
         PointReasonKind.RaceNotFound => $"race {reason.Race} not found",
         PointReasonKind.NoBodyMeshNoBoundsNotPlayable =>
             $"no body mesh for race {RecordLabels.Of(reason.Race, reason.RaceEditorId)}, no Object Bounds, race not playable",

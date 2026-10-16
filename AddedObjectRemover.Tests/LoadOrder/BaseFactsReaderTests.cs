@@ -129,15 +129,16 @@ public class BaseFactsReaderTests
     }
 
     [Fact]
-    public void ABaseOfAnyTypeGivesTheFirstQuestSceneOrGlobalItsScriptsName()
+    public void ABaseOfAnyTypeGivesTheFirstQuestOrSceneItsScriptsNamePassingOverGlobals()
     {
         var clutter = _mod.Statics.AddNew("Clutter");
         var global = new GlobalShort(_mod.GetNextFormKey(), Release) { EditorID = "SomeGlobal" };
         _mod.Globals.Add(global);
+        var quest = _mod.Quests.AddNew("SomeQuest");
         var door = _mod.Doors.AddNew();
-        door.VirtualMachineAdapter = TestScripts.Naming(clutter.FormKey, global.FormKey);
+        door.VirtualMachineAdapter = TestScripts.Naming(clutter.FormKey, global.FormKey, quest.FormKey);
 
-        Assert.Equal(new ScriptNamedRecord(global.FormKey.ToRecordKey(), "SomeGlobal", ScriptNamedKind.Global), Read<IDoorGetter>(door).NamedByScript);
+        Assert.Equal(new ScriptNamedRecord(quest.FormKey.ToRecordKey(), "SomeQuest", ScriptNamedKind.Quest), Read<IDoorGetter>(door).NamedByScript);
     }
 
     [Fact]
@@ -158,7 +159,7 @@ public class BaseFactsReaderTests
     }
 
     [Fact]
-    public void ABaseWhoseScriptsNameNoQuestSceneOrGlobalNamesNothing()
+    public void ABaseWhoseScriptsNameNoQuestOrSceneNamesNothing()
     {
         var clutter = _mod.Statics.AddNew("Clutter");
         var activator = _mod.Activators.AddNew();

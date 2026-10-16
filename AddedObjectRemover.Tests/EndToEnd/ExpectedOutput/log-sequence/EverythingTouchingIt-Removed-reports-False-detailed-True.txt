@@ -2,20 +2,16 @@
 ## archiveWarnings
 ## unexpectedErrors
 ## config
-Target plugin: Target.esp
-Size multiplier: 0.5
-Removal zone: ObjectShape
-Excluded plugins: Excluded.esp
-Ignored masters of target: Skyrim.esm
+Mod to clean up: Target.esp
+Other mods that never cause removals: Never count these mods: Excluded.esp; Never count the mods the cleaned mod requires: Skyrim.esm; Never count mods that have a compatibility patch with it: on, a patch requires at most 10 other mods.
 Compatibility patch detection: 2 plugins master the target.
   Compatibility patch TargetPatch.esp: links target with Patched.esp.
 Ignored because of compatibility patches: Patched.esp, TargetPatch.esp.
-NPCs and creatures: OnlyWhenStuckInsideTheObject
-Also remove: everything touching, touch distance 8.
-Leftover invisible objects: removed, search radius 1024, removed area per direction 50%, removed directions required 60%, occupied directions required 50%, never removed (none), kept markers inside other mods' objects left in place.
-Detailed log: True
-Write report files: False
-Report folder: <root>/AddedObjectRemover Reports
+Remove objects too close to other mods' objects: Margin by object size: on, 0.5 x object size; Margin by fixed distance: off; Use rough boxes instead of exact shapes (faster): off; Other mods' NPCs and creatures cause removal: OnlyWhenStuckInsideTheObject.
+Remove objects on terrain changed by other mods: off.
+Also remove what rests on removed objects: EverythingTouchingIt; Gap that still counts as touching: 8 units.
+Invisible objects left behind: on; Look this far around it: 1024 units; Decide only if this share of the 8 directions has objects: 50%; A direction is cleared when this much of it was removed: 50%; Remove when this share of those directions is cleared: 60%; Never remove these as left behind: none; Move kept markers out of other mods' objects: off.
+Logs and reports: Detailed log: on; Write report files (CSV): off; Folder for report files: <root>/AddedObjectRemover Reports.
 ## scan
   Ignored other-mod object overridden by Target.esp: R_OverriddenByTarget_Pad [000821:Rival.esp] from Rival.esp.
 Scanned 75 placed records in <time>: 40 Target.esp objects to check, 28 objects from other mods.
@@ -108,7 +104,7 @@ Target objects: 35 visible, 5 invisible (by kind: 2 SoundMarkers, 2 XMarkers, 1 
 ## removal-summary
 Removed 25 objects (16 too close, 4 follow-up removals, 4 leftover invisible objects, 1 linked to removed objects).
 ## kept-summary
-Kept 5 objects that would have been removed because other records depend on them.
+Kept 5 objects that would have been removed, because other records depend on them or because of their own script or location ref type.
   FormList record: 2
   placed object: Enable Parent: 2
   teleport door: 1

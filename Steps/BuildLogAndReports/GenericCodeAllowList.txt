@@ -10,6 +10,9 @@ LogSections.AlsoRemoveMeshes | Report wording: prints mesh statistics (a tool's 
 LogSections.AlsoRemovePairs | Report wording: prints mesh-pair statistics (a tool's statistics type).
 LogSections.BuildNotPerformedLine | Report wording: the one line of a step or report files that an unexpected error stopped; it takes only the section's name.
 LogSections.BuildNotPerformedBecauseEarlierLine | Report wording: the one line of a step that an earlier section's step not being performed stopped; it takes only the two section names.
+LogSections.DescribeAlreadyRemoved | Report wording: the "of them already removed on changed terrain" part of the too-close line; it takes only the count.
+LogSections.OnOff | Report wording: prints a setting's switch as on or off.
+LogSections.OnWith | Report wording: prints a setting's switch as off, or as on with the detail that matters when it is on.
 LogSections.JoinOrNone | Report wording: joins names or prints "(none)".
 LogSections.MeshProblemLinesInOrder | Report ordering: sorts the mesh problems by mesh, then by their worded line (a mesh tool's problem record, not a domain type).
 MeshProblemText.Line | Report wording: the line of one mesh or archive problem (a mesh tool's problem record, not a domain type).

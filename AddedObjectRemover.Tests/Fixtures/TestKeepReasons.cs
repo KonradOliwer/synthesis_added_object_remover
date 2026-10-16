@@ -20,5 +20,6 @@ internal static class TestKeepReasons
                 TestTargets.Key(0),
                 RelationKind.Other,
                 SourceIsPlaced: false,
-                SourceIsWorldspace: false));
+                SourceIsWorldspace: false,
+                AliasFillFlags.None));
 }

@@ -221,7 +221,7 @@ internal sealed class PlacedRecordReader
         record is IPlacedObjectGetter { Primitive: not null },
         record is IPlacedObjectGetter { MapMarker: not null },
         record.IsPersistent(),
-        ScriptPropertyReader.FindQuestSceneOrGlobal(record.VirtualMachineAdapter, _linkCache, _names),
+        ScriptPropertyReader.FindQuestOrScene(record.VirtualMachineAdapter, _linkCache, _names),
         record.LocationRefTypes is { Count: > 0 },
         record.GetReferenceRadius(),
         record.GetPrimitiveBounds());

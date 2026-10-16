@@ -69,6 +69,7 @@ internal static partial class LogSections
                 entry => KeepReasonText.Category(entry.Reason),
                 StringComparer.Ordinal),
             StringComparer.Ordinal);
+        if (byCategory.Count == 0) return new LogSection("kept-summary", []);
         return new LogSection(
             "kept-summary",
             [
@@ -105,7 +106,9 @@ internal static partial class LogSections
     {
         var counts = KeyedGroups
             .CountBy(removals.Select(removal => context.Shapes.VisibilityOf(targets[removal.TargetIndex]).Kind).OfType<InvisibleObjectKind>(), kind => kind, EqualityComparer<InvisibleObjectKind>.Default)
-            .OrderBy(group => group.Key);
-        return new LogSection("markers-by-type", [$"Removed markers by type: {TextLists.JoinOr(TextLists.Counts(counts), Describe.ListSeparator, Describe.NoEntries)}."]);
+            .OrderBy(group => group.Key)
+            .ToList();
+        if (counts.Count == 0) return new LogSection("markers-by-type", []);
+        return new LogSection("markers-by-type", [$"Removed markers by type: {string.Join(Describe.ListSeparator, TextLists.Counts(counts))}."]);
     }
 }

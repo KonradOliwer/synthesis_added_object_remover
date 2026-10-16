@@ -17,13 +17,14 @@ internal static class Describe
     public const string NoEntries = "none";
 
     public static string OtherObject(OtherObject other) =>
-        $"{RecordLabels.Of(other.Key, other.EditorId)} {OriginLabel(other.Key, other.WinningMod)}";
+        LabelWithOverride(other.Key, other.EditorId, other.WinningMod);
 
-    /// <summary>"from Origin.esp", plus the winning plugin when a later plugin overrides the record.</summary>
-    public static string OriginLabel(RecordKey key, PluginName winningMod) =>
-        key.Plugin == winningMod
-            ? $"from {key.Plugin}"
-            : $"from {key.Plugin} (winning override in {winningMod})";
+    /// <summary>The record label; the key already names the origin plugin, so only a later overriding plugin is added.</summary>
+    public static string LabelWithOverride(RecordKey key, string? editorId, PluginName winningMod)
+    {
+        var label = RecordLabels.Of(key, editorId);
+        return key.Plugin == winningMod ? label : $"{label} (winning override in {winningMod})";
+    }
 
     public static string Space(SpaceFact space)
     {

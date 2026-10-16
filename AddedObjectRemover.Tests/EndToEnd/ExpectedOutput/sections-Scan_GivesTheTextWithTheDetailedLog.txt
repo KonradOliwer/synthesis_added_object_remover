@@ -1,4 +1,4 @@
-  Ignored other-mod object overridden by Target.esp: Overridden [000050:Other.esp] from Other.esp.
+  Ignored other-mod object overridden by Target.esp: Overridden [000050:Other.esp].
 Scanned 9 placed records in 1.5s: 3 Target.esp objects to check, 2 objects from other mods.
   Ignored 4 Target.esp objects whose winning version comes from a later plugin.
   Ignored 5 Target.esp objects that are initially disabled or have no valid position or rotation.

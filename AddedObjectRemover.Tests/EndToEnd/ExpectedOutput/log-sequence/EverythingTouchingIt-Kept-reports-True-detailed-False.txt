@@ -4,9 +4,9 @@
 ## config
 Mod to clean up: Target.esp
 Other mods that never cause removals: Never count these mods: Excluded.esp; Never count the mods the cleaned mod requires: Skyrim.esm; Never count mods that have a compatibility patch with it: on, a patch requires at most 10 other mods.
-Compatibility patch detection: 2 plugins master the target.
+Compatibility patch detection: 2 plugins master the target, 1 of them compatibility patches.
   Compatibility patch TargetPatch.esp: links target with Patched.esp.
-Ignored because of compatibility patches: Patched.esp, TargetPatch.esp.
+Ignored because of compatibility patches (the patches and the other mods they link to the target): Patched.esp, TargetPatch.esp.
 Remove objects too close to other mods' objects: Margin by object size: on, 0.5 x object size; Margin by fixed distance: off; Use rough boxes instead of exact shapes (faster): off; Other mods' NPCs and creatures cause removal: OnlyWhenStuckInsideTheObject.
 Remove objects on terrain changed by other mods: off.
 Also remove what rests on removed objects: EverythingTouchingIt; Gap that still counts as touching: 8 units.
@@ -58,8 +58,6 @@ Kept 4 objects that would have been removed, because other records depend on the
   placed object: Enable Parent: 2
   FormList record: 1
   teleport door: 1
-## markers-by-type
-Removed markers by type: none.
 ## hints
 Possible manual patch needed: 2 objects to check.
   Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].

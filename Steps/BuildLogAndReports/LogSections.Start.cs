@@ -87,7 +87,7 @@ internal static partial class LogSections
     {
         if (!patches.DetectionOn) return [];
         var lines = ImmutableArray.CreateBuilder<string>();
-        lines.Add($"Compatibility patch detection: {TextFormat.Count(patches.PluginsMasteringTarget)} plugins master the target.");
+        lines.Add($"Compatibility patch detection: {TextFormat.Count(patches.PluginsMasteringTarget)} plugins master the target, {TextFormat.Count(patches.Detected.Length)} of them compatibility patches.");
         lines.AddRange(patches.SkippedTooManyMasters.Select(skipped =>
             $"  Plugin {skipped.Patch} skipped: too many masters (likely generated or merged); it masters the target and {TextFormat.Count(skipped.OtherMasters.Length)} other mods."));
         if (patches.Detected.Length == 0)
@@ -98,7 +98,7 @@ internal static partial class LogSections
         lines.AddRange(patches.Detected.Select(patch =>
             $"  Compatibility patch {patch.Patch}: links target with {string.Join(", ", patch.OtherMasters)}."));
         var ignoredMods = patches.IgnoredMods.OrderBy(mod => mod.ToString(), StringComparer.Ordinal);
-        lines.Add($"Ignored because of compatibility patches: {string.Join(", ", ignoredMods)}.");
+        lines.Add($"Ignored because of compatibility patches (the patches and the other mods they link to the target): {string.Join(", ", ignoredMods)}.");
         return lines.ToImmutable();
     }
 

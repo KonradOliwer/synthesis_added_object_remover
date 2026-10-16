@@ -7,5 +7,5 @@ Found 1 of 3 Target.esp objects too close to other mods' objects in 1.5s.
     Sounds: 1
 NPCs and creatures (only when stuck in the object): 5 placed NPCs evaluated: 2 sized by body mesh, 1 by Object Bounds, 1 by humanoid approximation, 1 sized as a point; 3 skipped because their base is no NPC; 12 NPC-object pairs tested (30 body boxes), 4 objects with an NPC stuck in them.
   NPC body cache: 3 bodies built; 4 NPC bases resolved; 6 leveled lists resolved; 8 body mesh sets measured.
-  Sized as a point Beta [000011:Other.esp] from Other.esp: no body mesh for race TestRace [007000:Target.esp], no Object Bounds, race not playable.
+  Sized as a point Beta [000011:Other.esp]: no body mesh for race TestRace [007000:Target.esp], no Object Bounds, race not playable.
   Kept 000802:Target.esp in worldspace Tamriel [000100:Target.esp]: linked from QUST MyQuest [000001:Quest.esp].

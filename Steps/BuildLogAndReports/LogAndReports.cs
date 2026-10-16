@@ -288,6 +288,8 @@ public sealed class LogAndReports
         var warnings = LogSections.BuildRemovalWarningsSection(world, removals, outcome.RemovalRisks);
         var kept = RemovalList.Kept(outcome.Final);
         var keptOnPurpose = LogSections.BuildKeptOnPurposeSection(world, kept);
+        var keptSummary = LogSections.BuildKeptSummarySection(kept);
+        var markersByType = LogSections.BuildMarkersByTypeSection(world.Targets, removals, _context);
         return
         [
             LogSections.BuildRemovalsSection(world, removals, _context),
@@ -295,9 +297,9 @@ public sealed class LogAndReports
             LogSections.BuildSpacesSection(world, removals, _context),
             LogSections.BuildTargetVisibilitySection(world.Targets, world.Counts.TargetsHiddenOrWithoutPlacement, _context),
             LogSections.BuildRemovalSummarySection(removals, outcome.ChangedTerrain.Outcome),
-            LogSections.BuildKeptSummarySection(kept),
+            .. keptSummary.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [keptSummary],
             .. keptOnPurpose.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [keptOnPurpose],
-            LogSections.BuildMarkersByTypeSection(world.Targets, removals, _context),
+            .. markersByType.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [markersByType],
             .. warnings.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [warnings],
             LogSections.BuildHintsSection(world, outcome.Hints),
         ];

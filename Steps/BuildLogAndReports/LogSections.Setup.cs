@@ -76,7 +76,7 @@ internal static partial class LogSections
     private static IEnumerable<string> OverriddenOthers(CollectedObjects world, PluginName target) =>
         world.OverriddenOthers.Select(other =>
             $"  Ignored other-mod object overridden by {target}: "
-            + $"{RecordLabels.Of(other.Key, other.EditorId)} {Describe.OriginLabel(other.Key, other.WinningMod)}.");
+            + $"{Describe.LabelWithOverride(other.Key, other.EditorId, other.WinningMod)}.");
 
     private static IEnumerable<string> RecordedCounts(CollectedObjects world)
     {

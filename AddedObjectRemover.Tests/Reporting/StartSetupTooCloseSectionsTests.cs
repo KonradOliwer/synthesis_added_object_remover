@@ -130,10 +130,10 @@ public sealed class StartSetupTooCloseSectionsTests
 
         var lines = LogSections.BuildConfigSection(runSettings, ModIdentifier.Identify(mods, runSettings.ModIdentification)).Lines.ToArray();
 
-        Assert.Contains("Compatibility patch detection: 2 plugins master the target.", lines);
+        Assert.Contains("Compatibility patch detection: 2 plugins master the target, 1 of them compatibility patches.", lines);
         Assert.Contains(lines, line => line.StartsWith("  Plugin Merged.esp skipped: too many masters"));
         Assert.Contains("  Compatibility patch Compat.esp: links target with Other.esp.", lines);
-        Assert.Contains("Ignored because of compatibility patches: Compat.esp, Other.esp.", lines);
+        Assert.Contains("Ignored because of compatibility patches (the patches and the other mods they link to the target): Compat.esp, Other.esp.", lines);
     }
 
     [Fact]

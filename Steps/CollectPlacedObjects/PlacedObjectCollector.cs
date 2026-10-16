@@ -117,6 +117,9 @@ public sealed class PlacedObjectCollector
             IsTeleportDoor: record.IsTeleportDoor,
             IsPrimitive: record.IsPrimitive,
             HasMapMarker: record.HasMapMarker,
+            IsPersistent: record.IsPersistent,
+            NamedByScript: record.NamedByScript,
+            HasLocationRefType: record.HasLocationRefType,
             ReferenceRadius: record.ReferenceRadius,
             PrimitiveBounds: record.PrimitiveBounds));
     }

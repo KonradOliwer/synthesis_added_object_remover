@@ -30,10 +30,10 @@ public class SettingsValidationTests
     [Fact]
     public void DefaultsAreWithinTheirValidRanges()
     {
-        var alone = new LeftoverInvisibleObjectSettings().WhenAlone;
-        Assert.Equal(alone.DirectionThresholdPercent, SettingCorrections.WholeTens(alone.DirectionThresholdPercent, "direction", []));
-        Assert.Equal(alone.RemovedDirectionsPercent, SettingCorrections.WholeTens(alone.RemovedDirectionsPercent, "removed", []));
-        Assert.Equal(alone.OccupiedDirectionsPercent, SettingCorrections.WholeTens(alone.OccupiedDirectionsPercent, "occupied", []));
+        var surroundings = new LeftoverInvisibleObjectSettings().SurroundingObjects;
+        Assert.Equal(surroundings.DirectionThresholdPercent, SettingCorrections.WholeTens(surroundings.DirectionThresholdPercent, "direction", []));
+        Assert.Equal(surroundings.RemovedDirectionsPercent, SettingCorrections.WholeTens(surroundings.RemovedDirectionsPercent, "removed", []));
+        Assert.Equal(surroundings.OccupiedDirectionsPercent, SettingCorrections.WholeTens(surroundings.OccupiedDirectionsPercent, "occupied", []));
         Assert.False(new TooCloseRemovalSettings().UseRoughBoxes);
         Assert.Equal(NpcHandling.OnlyWhenStuckInsideTheObject, new TooCloseRemovalSettings().NpcHandling);
         Assert.Equal(FollowUpRemovalMode.EverythingTouchingIt, new FollowUpRemovalSettings().Mode);

@@ -12,9 +12,11 @@ namespace AddedObjectRemover;
 /// Reads base records from the load order into <see cref="BaseFacts"/>, once per base. Thread-safe:
 /// Mutagen's load-order link cache is documented as multithread safe.
 /// </summary>
-public sealed class BaseFactsReader(ILinkCache linkCache) : IBaseFacts
+/// <param name="knownPlugins">The run's known plugin names, which spell the keys of the records the bases' scripts name.</param>
+public sealed class BaseFactsReader(ILinkCache linkCache, KnownPluginNames knownPlugins) : IBaseFacts
 {
     private readonly ComputedOncePerKey<RecordKey, BaseFacts> _byBase = new(Publication.FirstWriteWins, EqualityComparer<RecordKey>.Default);
+    private readonly PluginNames _names = new(knownPlugins);
 
     public BaseFacts Of(BaseKey baseKey) => _byBase.Get(baseKey.Record, () => Read(baseKey));
 
@@ -39,6 +41,7 @@ public sealed class BaseFactsReader(ILinkCache linkCache) : IBaseFacts
             record is IObjectBoundedOptionalGetter { ObjectBounds: { } bounds } ? ToBox(bounds) : null,
             MarkerFlagOf(record),
             ScriptNamesOf(record),
+            ScriptPropertyReader.FindQuestSceneOrGlobal((record as IHaveVirtualMachineAdapterGetter)?.VirtualMachineAdapter, linkCache, _names),
             record is ILightGetter { Radius: > 0 } light ? light.Radius : null,
             record is ISoundMarkerGetter marker ? MaxHearingDistanceOf(marker) : null);
     }

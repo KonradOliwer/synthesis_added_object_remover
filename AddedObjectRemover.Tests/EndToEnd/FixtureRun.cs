@@ -1,3 +1,4 @@
+using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Skyrim;
@@ -41,7 +42,7 @@ internal static class FixtureRun
                 new WrappedPluginRecordsFactory(pluginRecords, wrapPlugin),
                 openMeshFiles(
                     state.DataFolderPath.Path, state.GameRelease, [.. state.LoadOrder.ListedOrder.Select(listing => listing.ModKey)]),
-                wrapBases is null ? new BaseFactsReader(state.LinkCache) : wrapBases(new BaseFactsReader(state.LinkCache)),
+                wrapBases is null ? TestBaseFacts.Reader(state.LinkCache) : wrapBases(TestBaseFacts.Reader(state.LinkCache)),
                 log,
                 new CsvReportOutput(),
                 timeSinceStart ?? (() => TimeSpan.Zero));

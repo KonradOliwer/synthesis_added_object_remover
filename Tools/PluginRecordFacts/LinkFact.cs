@@ -9,6 +9,12 @@ public enum RelationKind
     AttachRef,
     TeleportDestination,
     BaseObject,
+
+    /// <summary>A location lists the record together with a location ref type (LCSR, ACSR).</summary>
+    LocationRefType,
+
+    /// <summary>A quest alias fills with the NPC as its Unique Actor (ALUA); the linked record is the NPC base, not a placed one.</summary>
+    UniqueActor,
     Other,
 }
 

@@ -6,6 +6,9 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 /// <param name="Cell">Null for an interior, whose cell is the space itself.</param>
 /// <param name="Rotation">The placement's Euler angles in radians, as the record stores them.</param>
 /// <param name="HasMapMarker">The placed reference itself carries map marker data (XMRK).</param>
+/// <param name="IsPersistent">The reference's own Persistent flag is set.</param>
+/// <param name="NamedByScript">The first quest, scene or global variable that a script on the reference itself names; null when none does.</param>
+/// <param name="HasLocationRefType">The reference itself has at least one location ref type (XLRT).</param>
 /// <param name="ReferenceRadius">The reference's own radius (XRDS) as the record stores it; null when it has none.</param>
 /// <param name="PrimitiveBounds">The reference's primitive box, full sizes as the record exposes them; null when it is not a primitive.</param>
 public sealed record TargetObject(
@@ -20,6 +23,9 @@ public sealed record TargetObject(
     bool IsTeleportDoor,
     bool IsPrimitive,
     bool HasMapMarker,
+    bool IsPersistent,
+    ScriptNamedRecord? NamedByScript,
+    bool HasLocationRefType,
     float? ReferenceRadius,
     Vector3? PrimitiveBounds);
 

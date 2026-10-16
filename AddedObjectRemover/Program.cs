@@ -52,7 +52,7 @@ public static class Program
             pluginRecords,
             new MeshFilesFactory(
                 state.DataFolderPath.Path, state.GameRelease, [.. state.LoadOrder.ListedOrder.Select(listing => listing.ModKey)]),
-            new BaseFactsReader(state.LinkCache),
+            new BaseFactsReader(state.LinkCache, plugins.Mods),
             new ConsoleLogSink(),
             new CsvReportOutput(),
             () => totalTimer.Elapsed);

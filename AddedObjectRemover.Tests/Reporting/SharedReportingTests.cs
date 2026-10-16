@@ -41,7 +41,7 @@ public sealed class SharedReportingTests
     {
         var world = CreateWorld();
         var changedBy = new PluginName("Other.esp");
-        var decisions = RemovalDecisions.Start(ObjectsToKeep.Build(world.Targets, [], TestTargets.References(TargetCount)), TargetCount)
+        var decisions = RemovalDecisions.Start(ObjectsToKeep.Build(world.Targets, [], TestTargets.References(TargetCount), TestBaseFacts.Unresolved), TargetCount)
             .Apply(RoundKind.ChangedTerrain, [Propose(0, new RemovalReason.TerrainChanged(changedBy, TerrainChangeKind.HeightAndTerrainType))])
             .Apply(RoundKind.TooClose, [Propose(1, new RemovalReason.TooClose(new OtherId(0), BySize)), Propose(2, new RemovalReason.TooClose(new OtherId(0), WithinDistance))]);
 
@@ -117,6 +117,31 @@ public sealed class SharedReportingTests
     }
 
     [Fact]
+    public void RemovalWarnings_NameEachRemovedUniqueNpcAndCountTheRemovedLargeReferences()
+    {
+        var world = CreateWorld();
+        var questKey = new RecordKey(new PluginName("Other.esp"), 0x950);
+        var quest = new LinkFact(questKey, "SomeQuest", "Quest", TestTargets.Key(7), RelationKind.UniqueActor, SourceIsPlaced: false, SourceIsWorldspace: false);
+        var risks = new RemovalRisks(
+            [new UniqueActorRole(new TargetId(0), quest), new UniqueActorRole(new TargetId(3), quest)],
+            [new TargetId(1), new TargetId(2), new TargetId(4)]);
+        RemovedObject[] removals = [.. Enumerable.Range(0, 3).Select(index => new TooCloseRemoval(index, CreateOtherModObject(), BySize))];
+
+        var section = LogSections.BuildRemovalWarningsSection(world, removals, risks);
+
+        var npc = world.Targets[0];
+        Assert.Equal(
+            [
+                $"Warning: removed unique NPC {RecordNames.Describe(npc)} in {Describe.Location(world, npc)}: Quest SomeQuest [{questKey}] fills an alias "
+                + "with it as a Unique Actor. That quest role may not fill, or the quest may not start.",
+                "Warning: 2 removed objects are in their worldspace's large-reference list. Distant LOD may flicker, or full models may not load, "
+                + "in their cells until LOD is generated again (for example with DynDOLOD).",
+            ],
+            section.Lines.ToArray());
+        Assert.Empty(LogSections.BuildRemovalWarningsSection(world, [], risks).Lines);
+    }
+
+    [Fact]
     public void Kept_ListsHeldObjectsWithTheRemovedObjectTheyTouch()
     {
         var (_, decisions) = RunRounds();
@@ -150,7 +175,7 @@ public sealed class SharedReportingTests
         };
         var protection = CreateProtection(tagged.Targets);
         var decided = new StepResults(
-            tagged, protection, ChangedTerrainResult.SwitchedOff, null!, TestLeftBehind.PerformedWithoutFindings, null!, decisions);
+            tagged, protection, new RemovalRisks([], []), ChangedTerrainResult.SwitchedOff, null!, TestLeftBehind.PerformedWithoutFindings, null!, decisions);
 
         var hints = ManualPatchHints.FindManualPatchHints(decided, TestVisibility.OfTaggedBasesOnly(), RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(decided.Final), decided.Final, decided.Collected, decided.LeftBehind));
 
@@ -160,6 +185,30 @@ public sealed class SharedReportingTests
                 (ManualPatchHintType.KeptForNonPlacedReference, Protected),
                 (ManualPatchHintType.KeptForNonPlacedReference, ProtectedTouching),
             ],
+            hints.Select(hint => (hint.Type, hint.TargetIndex)));
+    }
+
+    [Fact]
+    public void Hints_ListAnObjectALocationListsWithARefTypeAsKeptForANonPlacedReference()
+    {
+        var (world, decisions) = RunRounds();
+        var visible = world with { Targets = [.. world.Targets.Select(target => target with { Base = TestVisibility.TaggedBase(ObjectVisibility.Visible) })] };
+        var location = new LinkFact(
+            new RecordKey(new PluginName("Other.esp"), 0x960), "SomeLocation", "Location", TestTargets.Key(ProtectedTouching), RelationKind.LocationRefType,
+            SourceIsPlaced: false, SourceIsWorldspace: false);
+        var protection = ObjectsToKeep.Build(
+            visible.Targets,
+            [TestTargets.Link(1, 2)],
+            TestTargets.References(
+                TargetCount, new Dictionary<int, KeepReason> { [Protected] = QuestReason, [ProtectedTouching] = new(KeepKind.LocationRole, location) }),
+            TestBaseFacts.Unresolved);
+        var decided = new StepResults(
+            visible, protection, new RemovalRisks([], []), ChangedTerrainResult.SwitchedOff, null!, TestLeftBehind.PerformedWithoutFindings, null!, decisions);
+
+        var hints = ManualPatchHints.FindManualPatchHints(decided, TestVisibility.OfTaggedBasesOnly(), RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(decided.Final), decided.Final, decided.Collected, decided.LeftBehind));
+
+        Assert.Equal(
+            [(ManualPatchHintType.KeptForNonPlacedReference, Protected), (ManualPatchHintType.KeptForNonPlacedReference, ProtectedTouching)],
             hints.Select(hint => (hint.Type, hint.TargetIndex)));
     }
 
@@ -234,7 +283,8 @@ public sealed class SharedReportingTests
             targets,
             [TestTargets.Link(1, 2)],
             TestTargets.References(
-                TargetCount, new Dictionary<int, KeepReason> { [Protected] = QuestReason, [ProtectedTouching] = QuestReason }));
+                TargetCount, new Dictionary<int, KeepReason> { [Protected] = QuestReason, [ProtectedTouching] = QuestReason }),
+            TestBaseFacts.Unresolved);
 
     private static ProposedRemoval Propose(int index, RemovalReason reason) => new(new TargetId(index), reason);
 

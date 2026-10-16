@@ -144,7 +144,7 @@ public class LeftBehindObjectsTests
             scene.ObjectsThatCanCauseRemovals(Replacements.None(Others.Length), NpcHandling.OnlyWhenStuckInsideTheObject),
             StartDecisions(),
             new FailingSurroundings(scene.VisibleTargets),
-            new BaseFactsReader(new SkyrimMod(ModKey.FromNameAndExtension("Reach.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
+            TestBaseFacts.Reader(new SkyrimMod(ModKey.FromNameAndExtension("Reach.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
             Shapes,
             TargetWorkOrder.Of(Targets),
             new Execution(Environment.ProcessorCount),
@@ -235,7 +235,7 @@ public class LeftBehindObjectsTests
     private static IEnumerable<(int Target, InvisibleObjectKind Kind, float Radius, OtherId? Host, LeftBehindOutcome Decision, int Occupied, int Removed)> Summarize(LeftBehindResult result) =>
         result.Evaluations.Select(e => (e.TargetIndex, e.Kind, e.Radius, e.ContainingObject?.Id, e.Decision, e.Surroundings.OccupiedCount, e.Surroundings.RemovedCount));
 
-    private static RemovalDecisions StartDecisions() => RemovalDecisions.Start(ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Length)), Targets.Length);
+    private static RemovalDecisions StartDecisions() => RemovalDecisions.Start(ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Length), TestBaseFacts.Unresolved), Targets.Length);
 
     private static ObjectCaches CreateScene() => TestScenes.Create(Targets, Others, Shapes, supportOnlyObjects: []);
 
@@ -247,7 +247,7 @@ public class LeftBehindObjectsTests
             scene.ObjectsThatCanCauseRemovals(Replacements.None(Others.Length), NpcHandling.OnlyWhenStuckInsideTheObject),
             decisions,
             scene.VisibleTargets,
-            new BaseFactsReader(new SkyrimMod(ModKey.FromNameAndExtension("Reach.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
+            TestBaseFacts.Reader(new SkyrimMod(ModKey.FromNameAndExtension("Reach.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
             Shapes,
             TargetWorkOrder.Of(Targets),
             new Execution(Environment.ProcessorCount),

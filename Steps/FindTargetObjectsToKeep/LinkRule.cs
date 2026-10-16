@@ -14,7 +14,9 @@ internal sealed record LinkOutcome(ImmutableArray<TargetLink> GroupLinks, Immuta
 /// target-plugin record joins a linked group, except one to a teleport destination, which keeps it;
 /// any other link from another record keeps the linked target object. Links to the record itself and
 /// base object links count for nothing. A worldspace links placed objects only through its
-/// large-reference list, which only speeds up loading, so its links count for nothing too.
+/// large-reference list, which the engine builds its distant LOD handling from; no script or quest uses it,
+/// so its links keep nothing (a removed large reference gets a log warning instead). Unique Actor links
+/// name an NPC base, never a placed object, so they keep nothing either.
 /// </summary>
 internal static class LinkRule
 {
@@ -36,7 +38,7 @@ internal static class LinkRule
             }
             else if (idByKey.TryGetValue(fact.Target, out var kept))
             {
-                reasons.TryAdd(kept, CreateReason(fact));
+                reasons.TryAdd(kept, CreateReason(fact, targets[kept.Index]));
             }
         }
         return new LinkOutcome(
@@ -45,8 +47,10 @@ internal static class LinkRule
             targetObjectLinkCount);
     }
 
-    private static KeepReason CreateReason(LinkFact fact) =>
-        fact.SourceIsPlaced
-            ? new KeepReason(fact.Relation == RelationKind.TeleportDestination ? KeepKind.TeleportDoor : KeepKind.PlacedReference, fact)
-            : new KeepReason(KeepKind.NonPlacedReference, fact);
+    /// <remarks>A map marker a location lists is kept as any other linked object, not for a location role.</remarks>
+    private static KeepReason CreateReason(LinkFact fact, TargetObject target)
+    {
+        if (fact.SourceIsPlaced) return new KeepReason(fact.Relation == RelationKind.TeleportDestination ? KeepKind.TeleportDoor : KeepKind.PlacedReference, fact);
+        return new KeepReason(fact.Relation == RelationKind.LocationRefType && !target.HasMapMarker ? KeepKind.LocationRole : KeepKind.NonPlacedReference, fact);
+    }
 }

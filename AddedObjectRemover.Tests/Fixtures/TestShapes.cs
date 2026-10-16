@@ -35,7 +35,7 @@ internal static class TestShapes
         var dataPath = Path.Combine(AppContext.BaseDirectory, dataFolderName);
         foreach (var model in statics) WriteMesh(dataPath, model.Model, model.Triangles);
 
-        return Catalog(new BaseFactsReader(skyrimMod.ToImmutableLinkCache()), dataPath, mod);
+        return Catalog(TestBaseFacts.Reader(skyrimMod.ToImmutableLinkCache()), dataPath, mod);
     }
 
     /// <summary>A catalog over the loose meshes in a Data folder, reading them through the real mesh reader.</summary>

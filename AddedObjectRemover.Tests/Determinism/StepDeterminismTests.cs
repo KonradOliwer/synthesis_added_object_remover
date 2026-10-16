@@ -277,7 +277,7 @@ public class StepDeterminismTests
         var references = TestTargets.References(
             targets.Count,
             kept.ToDictionary(index => index, _ => TestKeepReasons.Quest));
-        return new RestingObjectsScene(targets, seeds, ObjectsToKeep.Build(targets, links, references));
+        return new RestingObjectsScene(targets, seeds, ObjectsToKeep.Build(targets, links, references, TestBaseFacts.Unresolved));
     }
 
     private static IEnumerable<Vector3> GridPositions(Random random)

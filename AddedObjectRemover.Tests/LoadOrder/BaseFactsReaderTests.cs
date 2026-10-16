@@ -1,3 +1,4 @@
+using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Plugins.Cache;
@@ -14,7 +15,7 @@ public class BaseFactsReaderTests
     private readonly SkyrimMod _mod = new(ModKey.FromNameAndExtension("Bases.esp"), Release);
 
     private BaseFacts Read<TGetter>(IMajorRecordGetter record) where TGetter : class, IMajorRecordGetter =>
-        new BaseFactsReader(_mod.ToImmutableLinkCache()).Of(new BaseKey(record.FormKey.ToRecordKey(), LinkKindOf<TGetter>()));
+        TestBaseFacts.Reader(_mod.ToImmutableLinkCache()).Of(new BaseKey(record.FormKey.ToRecordKey(), LinkKindOf<TGetter>()));
 
     private static BaseLinkKind LinkKindOf<TGetter>() =>
         typeof(TGetter) == typeof(INpcGetter) ? BaseLinkKind.Npc : BaseLinkKind.PlaceableObject;
@@ -25,7 +26,7 @@ public class BaseFactsReaderTests
     public void AnUnresolvedBaseIsUnresolved()
     {
         var missing = new FormKey(_mod.ModKey, 0xABC).ToRecordKey();
-        var facts = new BaseFactsReader(_mod.ToImmutableLinkCache()).Of(new BaseKey(missing, BaseLinkKind.PlaceableObject));
+        var facts = TestBaseFacts.Reader(_mod.ToImmutableLinkCache()).Of(new BaseKey(missing, BaseLinkKind.PlaceableObject));
 
         Assert.Equal(BaseFacts.Unresolved(missing), facts);
         Assert.False(facts.Resolved);
@@ -128,6 +129,46 @@ public class BaseFactsReaderTests
     }
 
     [Fact]
+    public void ABaseOfAnyTypeGivesTheFirstQuestSceneOrGlobalItsScriptsName()
+    {
+        var clutter = _mod.Statics.AddNew("Clutter");
+        var global = new GlobalShort(_mod.GetNextFormKey(), Release) { EditorID = "SomeGlobal" };
+        _mod.Globals.Add(global);
+        var door = _mod.Doors.AddNew();
+        door.VirtualMachineAdapter = TestScripts.Naming(clutter.FormKey, global.FormKey);
+
+        Assert.Equal(new ScriptNamedRecord(global.FormKey.ToRecordKey(), "SomeGlobal", ScriptNamedKind.Global), Read<IDoorGetter>(door).NamedByScript);
+    }
+
+    [Fact]
+    public void ASceneInAnArrayPropertyIsNamed()
+    {
+        var scene = new Scene(_mod.GetNextFormKey(), Release) { EditorID = "SomeScene" };
+        _mod.Scenes.Add(scene);
+        var activator = _mod.Activators.AddNew();
+        var script = new ScriptEntry { Name = "SomeScript" };
+        script.Properties.Add(new ScriptObjectListProperty
+        {
+            Name = "Scenes",
+            Objects = [new ScriptObjectProperty { Object = new FormLink<ISkyrimMajorRecordGetter>(scene.FormKey) }],
+        });
+        activator.VirtualMachineAdapter = new VirtualMachineAdapter { Scripts = [script] };
+
+        Assert.Equal(new ScriptNamedRecord(scene.FormKey.ToRecordKey(), "SomeScene", ScriptNamedKind.Scene), Read<IActivatorGetter>(activator).NamedByScript);
+    }
+
+    [Fact]
+    public void ABaseWhoseScriptsNameNoQuestSceneOrGlobalNamesNothing()
+    {
+        var clutter = _mod.Statics.AddNew("Clutter");
+        var activator = _mod.Activators.AddNew();
+        activator.VirtualMachineAdapter = TestScripts.Naming(clutter.FormKey);
+
+        Assert.Null(Read<IActivatorGetter>(activator).NamedByScript);
+        Assert.Null(Read<IStaticGetter>(clutter).NamedByScript);
+    }
+
+    [Fact]
     public void AnActivatorWithoutScriptsHasNoScriptNames()
     {
         Assert.Empty(Read<IActivatorGetter>(_mod.Activators.AddNew()).ScriptNames);
@@ -181,7 +222,7 @@ public class BaseFactsReaderTests
     public void RepeatedAndConcurrentReadsOfOneBaseShareOneResult()
     {
         var record = _mod.Statics.AddNew("Shared");
-        var reader = new BaseFactsReader(_mod.ToImmutableLinkCache());
+        var reader = TestBaseFacts.Reader(_mod.ToImmutableLinkCache());
         var baseKey = new BaseKey(record.FormKey.ToRecordKey(), BaseLinkKind.PlaceableObject);
         var results = new BaseFacts[32];
 

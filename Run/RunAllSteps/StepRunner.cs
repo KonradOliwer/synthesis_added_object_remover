@@ -160,7 +160,7 @@ public static class StepRunner
     private static StepResults Decide(RunScope scope, IRunCaches runCaches, IdentifiedMods mods, CollectedObjects collected)
     {
         var selected = RunSelection(scope, runCaches, collected);
-        var kept = RunKeepCheck(scope, collected);
+        var kept = RunKeepCheck(scope, runCaches, collected);
         var started = RemovalDecisions.Start(kept.ObjectsToKeep, collected.Targets.Length);
         var changedTerrain = RunChangedTerrain(scope, runCaches, mods, collected, started);
         var tooClose = RunTooClose(scope, runCaches, collected, selected, changedTerrain.Decisions);
@@ -171,6 +171,7 @@ public static class StepRunner
         return new StepResults(
             Collected: collected,
             ObjectsToKeep: kept.ObjectsToKeep,
+            RemovalRisks: kept.Risks,
             ChangedTerrain: changedTerrain.Result,
             RestingObjects: alsoRemove.Result,
             LeftBehind: leftBehind.Result,
@@ -188,9 +189,9 @@ public static class StepRunner
                 scope.Settings.Execution),
             (selected, elapsed) => scope.Report.BuildStepSections(selected.Replacements, collected, elapsed));
 
-    private static ObjectsToKeepResult RunKeepCheck(RunScope scope, CollectedObjects collected)
+    private static ObjectsToKeepResult RunKeepCheck(RunScope scope, IRunCaches runCaches, CollectedObjects collected)
     {
-        var kept = ObjectsToKeepFinder.Find(collected.Targets, collected.Links);
+        var kept = ObjectsToKeepFinder.Find(collected.Targets, collected.Links, runCaches.Bases);
         Print(scope.Environment.Log, scope.Report.BuildStepSections(kept));
         return kept;
     }

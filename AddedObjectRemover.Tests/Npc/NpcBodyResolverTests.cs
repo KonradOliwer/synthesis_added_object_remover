@@ -201,7 +201,7 @@ public class NpcBodyResolverTests
         TestShapes.WriteMesh(dataPath, ShortBodyMesh, TestBodies.TPose(ShortBodyHeight));
         TestShapes.WriteMesh(dataPath, HandsMesh, TestMeshes.BoxTriangles(new Box(new Vector3(-5, -5, 60), new Vector3(5, 5, 70))));
 
-        return TestShapes.Catalog(new BaseFactsReader(Records.ToImmutableLinkCache()), dataPath, Mod);
+        return TestShapes.Catalog(TestBaseFacts.Reader(Records.ToImmutableLinkCache()), dataPath, Mod);
     }
 
     private static Armor CreateSkin(FormKey formKey, params FormKey[] addons)

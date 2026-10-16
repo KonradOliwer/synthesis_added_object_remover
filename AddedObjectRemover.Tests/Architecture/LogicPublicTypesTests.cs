@@ -47,7 +47,7 @@ public class LogicPublicTypesTests
             "static ObjectMeasurementRules MeasurementRules(IUnexpectedErrors)",
             "static SelectedObjects Select(CollectedObjects, IOtherModObjectsBySpace, IBaseObjectShapes, SelectionSettings, Execution)",
         ],
-        ["FindTargetObjectsToKeep"] = ["static ObjectsToKeepResult Find(IReadOnlyList<TargetObject>, IEnumerable<LinkFact>)"],
+        ["FindTargetObjectsToKeep"] = ["static ObjectsToKeepResult Find(IReadOnlyList<TargetObject>, IReadOnlyList<LinkFact>, IBaseFacts)"],
         ["RemovalDecisionList"] =
         [
             "IEnumerable<ValueTuple<TargetId, Decision>> All()",

@@ -56,7 +56,7 @@ public sealed class StartSetupTooCloseSectionsTests
         var settings = SettingsFor();
         settings.TooClose.NpcHandling = (NpcHandling)99;
         settings.TooClose.BySize.SizeMultiplier = 9f;
-        settings.LeftoverInvisibleObjects = new LeftoverInvisibleObjectSettings { WhenAlone = new AloneSettings { SearchRadius = 1f } };
+        settings.LeftoverInvisibleObjects = new LeftoverInvisibleObjectSettings { SurroundingObjects = new SurroundingObjectsSettings { SearchRadius = 1f } };
         settings.Diagnostics = new DiagnosticsSettings { DiagnosticsFolder = "bad\0folder" };
         var ready = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), Facts(), OutputPath, Workers));
 

@@ -33,8 +33,8 @@ internal sealed class ManualPatchHints(
         var keptIndices = kept.Select(entry => entry.TargetIndex).Distinct().ToList();
         return CollectRemovedMarkers(removals)
             .Concat(CollectKeptLinkedGroups(keptIndices))
-            .Concat(CollectKeptByOwnReason(keptIndices, KeepKind.NonPlacedReference, ManualPatchHintType.KeptForNonPlacedReference))
-            .Concat(CollectKeptByOwnReason(keptIndices, KeepKind.TeleportDoor, ManualPatchHintType.KeptTeleportDoor))
+            .Concat(CollectKeptByOwnReason(keptIndices, IsReferencedByNonPlacedRecord, ManualPatchHintType.KeptForNonPlacedReference))
+            .Concat(CollectKeptByOwnReason(keptIndices, reason => reason.Kind == KeepKind.TeleportDoor, ManualPatchHintType.KeptTeleportDoor))
             .OrderBy(hint => hint.Type)
             .ThenBy(hint => targets[hint.TargetIndex].Key, RecordKeyTextOrder.Comparer)
             .ThenBy(hint => hint.Detail, StringComparer.Ordinal)
@@ -61,9 +61,12 @@ internal sealed class ManualPatchHints(
         return $"members {string.Join(", ", names)}; kept because {string.Join("; ", reasons)}";
     }
 
-    private IEnumerable<ManualPatchHint> CollectKeptByOwnReason(IEnumerable<int> keptIndices, KeepKind kind, ManualPatchHintType type) =>
+    /// <remarks>A location that lists the object with a location ref type is such a record too, though its reason is the location role.</remarks>
+    private static bool IsReferencedByNonPlacedRecord(KeepReason reason) => reason.Link is { SourceIsPlaced: false };
+
+    private IEnumerable<ManualPatchHint> CollectKeptByOwnReason(IEnumerable<int> keptIndices, Func<KeepReason, bool> belongs, ManualPatchHintType type) =>
         WithOwnReasons(keptIndices)
-            .Where(entry => entry.Reason.Kind == kind)
+            .Where(entry => belongs(entry.Reason))
             .Select(entry => new ManualPatchHint(type, entry.Index, KeepReasonText.Detail(entry.Reason)));
 
     /// <returns>The objects that must stay themselves, with their reason.</returns>

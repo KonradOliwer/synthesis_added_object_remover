@@ -72,7 +72,8 @@ public class LeftBehindOutcomeTests
             [],
             TestTargets.References(
                 targets.Count,
-                new Dictionary<int, KeepReason> { [referencedMarkerInRoom] = TestKeepReasons.Quest }));
+                new Dictionary<int, KeepReason> { [referencedMarkerInRoom] = TestKeepReasons.Quest }),
+            TestBaseFacts.Unresolved);
         var room = TestShapes.Placed(OtherMod, 0, Room.Base, inRoom);
 
         var result = TestLeftBehind.Find(targets, Shapes, [room], Config(protectedKinds: InvisibleObjectKind.Lights), protection);
@@ -102,7 +103,8 @@ public class LeftBehindOutcomeTests
         var protection = ObjectsToKeep.Build(
             targets,
             [TestTargets.Link(referencedMarker, linkedMarker)],
-            TestTargets.References(targets.Count, new Dictionary<int, KeepReason> { [referencedMarker] = TestKeepReasons.Quest }));
+            TestTargets.References(targets.Count, new Dictionary<int, KeepReason> { [referencedMarker] = TestKeepReasons.Quest }),
+            TestBaseFacts.Unresolved);
         var room = TestShapes.Placed(OtherMod, 0, Room.Base, inRoom);
 
         var result = TestLeftBehind.Find(targets, Shapes, [room], Config(), protection);

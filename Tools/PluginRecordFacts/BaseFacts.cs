@@ -14,6 +14,7 @@ public enum MarkerFlagKind { XMarker, FurnitureMarker, DoorMarker, OtherMarker }
 /// <param name="ModelPath">The model path as the record gives it; null without a model.</param>
 /// <param name="ObjectBounds">The record's Object Bounds; null when the record type has none or they are missing.</param>
 /// <param name="ScriptNames">The names of the scripts an activator runs; empty for other record types.</param>
+/// <param name="NamedByScript">The first quest, scene or global variable that a script on the base names, for any record type; null when none does.</param>
 /// <param name="LightRadius">A light's radius when above zero.</param>
 /// <param name="SoundMaxDistance">A sound marker's maximum hearing distance when above zero.</param>
 public sealed record BaseFacts(
@@ -26,11 +27,12 @@ public sealed record BaseFacts(
     Box? ObjectBounds,
     MarkerFlagKind? MarkerFlag,
     ImmutableArray<string> ScriptNames,
+    ScriptNamedRecord? NamedByScript,
     float? LightRadius,
     float? SoundMaxDistance)
 {
     public static BaseFacts Unresolved(RecordKey record) =>
-        new(record, false, BaseRecordKind.Other, null, null, null, null, null, ImmutableArray<string>.Empty, null, null);
+        new(record, false, BaseRecordKind.Other, null, null, null, null, null, ImmutableArray<string>.Empty, null, null, null);
 }
 
 /// <summary>The base records of the load order, by base; each value depends only on its key.</summary>

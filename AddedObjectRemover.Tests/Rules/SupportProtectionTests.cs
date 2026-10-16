@@ -85,7 +85,7 @@ public class SupportProtectionTests
             isProtected
                 ? new Dictionary<int, KeepReason> { [Protected] = TestKeepReasons.Quest }
                 : []);
-        var protection = ObjectsToKeep.Build(targets, [], references);
+        var protection = ObjectsToKeep.Build(targets, [], references, TestBaseFacts.Unresolved);
         return TestSupportCascade.Execute(
             targets,
             Shapes,

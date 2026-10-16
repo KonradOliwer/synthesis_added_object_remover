@@ -13,7 +13,7 @@ public class RestingObjectsGatingTests
         new(mode, TouchGap, SupportLost, touchChainsShown);
 
     private static RemovalDecisions AfterTooClose(IReadOnlyList<int> seeds) =>
-        TestSeededDecisions.Seed(ObjectsToKeep.Build(TestTargets.CreateMany(TargetCount), [], TestTargets.References(TargetCount)), TargetCount, seeds);
+        TestSeededDecisions.Seed(ObjectsToKeep.Build(TestTargets.CreateMany(TargetCount), [], TestTargets.References(TargetCount), TestBaseFacts.Unresolved), TargetCount, seeds);
 
     private static RestingObjectsResult Result(FollowUpRemovalMode mode, bool hadSeeds) =>
         new(

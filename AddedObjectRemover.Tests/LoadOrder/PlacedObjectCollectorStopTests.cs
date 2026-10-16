@@ -48,6 +48,19 @@ public class PlacedObjectCollectorStopTests
         Assert.Throws<InvalidOperationException>(() => world.RequireSupportOnlyObjects());
     }
 
+    [Fact]
+    public void ThePersistentFlagTheScriptNamedRecordAndTheOwnLocationRefTypeAreCopiedToTheTargetObject()
+    {
+        var named = new ScriptNamedRecord(TestTargets.Key(1), "SomeQuest", ScriptNamedKind.Quest);
+        var record = CreateTargetRecord() with { IsPersistent = true, NamedByScript = named, HasLocationRefType = true };
+
+        var target = Assert.Single(PlacedObjectCollector.Collect(new FixedFactsPlugin([record]), Mods, Plan).Targets);
+
+        Assert.True(target.IsPersistent);
+        Assert.Equal(named, target.NamedByScript);
+        Assert.True(target.HasLocationRefType);
+    }
+
     private static PlacedRecordFact CreateTargetRecord() =>
         new(
             TestTargets.Key(0),
@@ -62,6 +75,9 @@ public class PlacedObjectCollectorStopTests
             IsTeleportDoor: false,
             IsPrimitive: false,
             HasMapMarker: false,
+            IsPersistent: false,
+            NamedByScript: null,
+            HasLocationRefType: false,
             ReferenceRadius: null,
             PrimitiveBounds: null);
 

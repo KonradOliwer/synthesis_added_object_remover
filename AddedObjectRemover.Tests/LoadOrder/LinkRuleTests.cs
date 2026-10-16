@@ -87,6 +87,31 @@ public class LinkRuleTests
     }
 
     [Fact]
+    public void ALocationListingTheTargetWithARefTypeKeepsItForItsLocationRole()
+    {
+        var link = new LinkFact(OtherPlaced, "SomeLocation", "Location", TestTargets.Key(2), RelationKind.LocationRefType, SourceIsPlaced: false, SourceIsWorldspace: false);
+
+        var outcome = LinkRule.DecideLinkOutcome(Targets, [link]);
+
+        var reason = outcome.References[2]!;
+        Assert.Equal(KeepKind.LocationRole, reason.Kind);
+        Assert.Equal("location role", KeepReasonText.Category(reason));
+        Assert.Equal($"listed with a location ref type by Location SomeLocation [{OtherPlaced}]", KeepReasonText.Detail(reason));
+    }
+
+    [Fact]
+    public void AMapMarkerALocationListsWithARefTypeIsKeptAsAnyLinkedObject()
+    {
+        var targets = TestTargets.CreateMany(3);
+        targets[2] = targets[2] with { HasMapMarker = true };
+        var link = new LinkFact(OtherPlaced, "SomeLocation", "Location", TestTargets.Key(2), RelationKind.LocationRefType, SourceIsPlaced: false, SourceIsWorldspace: false);
+
+        var outcome = LinkRule.DecideLinkOutcome(targets, [link]);
+
+        Assert.Equal(KeepKind.NonPlacedReference, outcome.References[2]!.Kind);
+    }
+
+    [Fact]
     public void TheFirstLinkFoundKeepsItsReason()
     {
         var nonPlaced = new LinkFact(OtherPlaced, null, "FormList", TestTargets.Key(1), RelationKind.Other, SourceIsPlaced: false, SourceIsWorldspace: false);

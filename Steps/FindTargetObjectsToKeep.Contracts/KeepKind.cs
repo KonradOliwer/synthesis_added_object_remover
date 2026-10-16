@@ -12,6 +12,15 @@ public enum KeepKind
     /// <summary>A quest, package, location, script, ... links to it.</summary>
     NonPlacedReference,
 
+    /// <summary>A script on it, or on its base object, names a quest, scene or global variable.</summary>
+    ScriptNamesQuestSceneOrGlobal,
+
+    /// <summary>
+    /// It is not a map marker and has a location role: a location ref type of its own, or a location lists it with one.
+    /// A quest alias that picks a reference by that role does not fill with a disabled one.
+    /// </summary>
+    LocationRole,
+
     /// <summary>Another member of its linked group must stay.</summary>
     LinkedGroup,
 

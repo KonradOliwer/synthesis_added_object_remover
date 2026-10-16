@@ -84,7 +84,7 @@ public class BaseClassificationTests
     }
 
     private static BaseFacts Facts(uint id, BaseRecordKind kind) =>
-        new(new FormKey(Mod, id).ToRecordKey(), Resolved: true, kind, kind.ToString(), null, null, null, null, ImmutableArray<string>.Empty, null, null);
+        new(new FormKey(Mod, id).ToRecordKey(), Resolved: true, kind, kind.ToString(), null, null, null, null, ImmutableArray<string>.Empty, null, null, null);
 
     private static IBaseObjectShapes CreateShapes()
     {
@@ -96,6 +96,6 @@ public class BaseClassificationTests
         });
         mod.AcousticSpaces.Add(new AcousticSpace(AcousticSpaceBase, SkyrimRelease.SkyrimSE));
 
-        return TestShapes.Catalog(new BaseFactsReader(mod.ToImmutableLinkCache()), Path.GetTempPath(), Mod);
+        return TestShapes.Catalog(TestBaseFacts.Reader(mod.ToImmutableLinkCache()), Path.GetTempPath(), Mod);
     }
 }

@@ -579,7 +579,8 @@ public sealed class RestingObjectsEndSectionsTests
             [.. targets],
             [TestTargets.Link(1, LinkedPartner)],
             TestTargets.References(
-                TargetCount, new Dictionary<int, KeepReason> { [Protected] = QuestReason, [ProtectedAlsoRemove] = QuestReason }));
+                TargetCount, new Dictionary<int, KeepReason> { [Protected] = QuestReason, [ProtectedAlsoRemove] = QuestReason }),
+            TestBaseFacts.Unresolved);
         var world = new CollectedObjects(
             [.. targets],
             [CreateOtherModObject()],

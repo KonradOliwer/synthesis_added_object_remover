@@ -265,12 +265,12 @@ public sealed class TablesTests : IDisposable
     {
         var targets = CreateTargets();
         var protection = ObjectsToKeep.Build(
-            [.. targets], [], TestTargets.References(targets.Count, new Dictionary<int, KeepReason> { [3] = QuestReason }));
+            [.. targets], [], TestTargets.References(targets.Count, new Dictionary<int, KeepReason> { [3] = QuestReason }), TestBaseFacts.Unresolved);
         var run = TestTouchCascade.Execute(
             targets, Shapes, protection, terrainSeeds is null ? [0, 2] : [2], TouchDistance, threads: 2, collectDiagnostics: true, terrainSeeds);
         var world = CreateWorld(targets, out _);
         var decided = new StepResults(
-            world, protection, ChangedTerrainResult.SwitchedOff, run.Result, LeftBehindResult.SwitchedOff, MarkerMoves.SwitchedOff, run.RemovalDecisions);
+            world, protection, new RemovalRisks([], []), ChangedTerrainResult.SwitchedOff, run.Result, LeftBehindResult.SwitchedOff, MarkerMoves.SwitchedOff, run.RemovalDecisions);
         var removals = RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(run.RemovalDecisions), run.RemovalDecisions, world, TestLeftBehind.PerformedWithoutFindings).ToImmutableArray();
         var outcome = new RunOutcome(decided, removals, ManualPatchHints.FindManualPatchHints(decided, Shapes, removals), null!, default);
         return new Scene(outcome, run);
@@ -348,6 +348,6 @@ public sealed class TablesTests : IDisposable
     {
         public BaseFacts Of(BaseKey baseKey) => baseKey.Record == unresolved.ToRecordKey()
             ? BaseFacts.Unresolved(baseKey.Record)
-            : new BaseFacts(baseKey.Record, true, BaseRecordKind.Static, "Static", $"Base{baseKey.Record.Id:X}", null, null, null, ImmutableArray<string>.Empty, null, null);
+            : new BaseFacts(baseKey.Record, true, BaseRecordKind.Static, "Static", $"Base{baseKey.Record.Id:X}", null, null, null, ImmutableArray<string>.Empty, null, null, null);
     }
 }

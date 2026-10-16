@@ -64,6 +64,60 @@ public class LinkReaderTests
     }
 
     [Fact]
+    public void ALocationListingARecordWithARefTypeIsReadAsALocationRefTypeRelation()
+    {
+        var mod = new SkyrimMod(OtherMod, SkyrimRelease.SkyrimSE);
+        var location = new Location(new FormKey(OtherMod, 0x905), SkyrimRelease.SkyrimSE)
+        {
+            LocationRefTypeReferencesStatic = [new LocationRefTypeReference { Ref = new FormLink<IPlacedGetter>(TestTargets.FormKeyOf(1)) }],
+            PersistentActorReferencesStatic = [new PersistentActorReference { Actor = new FormLink<IPlacedNpcGetter>(TestTargets.FormKeyOf(2)) }],
+        };
+        mod.Locations.Add(location);
+        var facts = new List<LinkFact>();
+
+        LinkReader.ReadFromNonPlaced(
+            [mod], new HashSet<RecordKey> { TestTargets.Key(1), TestTargets.Key(2) }, TestTargets.TargetPlugin, CreateNames(), facts);
+
+        Assert.Equal(RelationKind.LocationRefType, Assert.Single(facts, fact => fact.Target == TestTargets.Key(1)).Relation);
+        Assert.Equal(RelationKind.Other, Assert.Single(facts, fact => fact.Target == TestTargets.Key(2)).Relation);
+    }
+
+    [Fact]
+    public void ALocationAddingARecordWithARefTypeIsReadAsALocationRefTypeRelation()
+    {
+        var mod = new SkyrimMod(OtherMod, SkyrimRelease.SkyrimSE);
+        var location = new Location(new FormKey(OtherMod, 0x905), SkyrimRelease.SkyrimSE)
+        {
+            LocationRefTypeReferencesAdded = [new LocationRefTypeReference { Ref = new FormLink<IPlacedGetter>(TestTargets.FormKeyOf(1)) }],
+        };
+        mod.Locations.Add(location);
+        var facts = new List<LinkFact>();
+
+        LinkReader.ReadFromNonPlaced([mod], new HashSet<RecordKey> { TestTargets.Key(1) }, TestTargets.TargetPlugin, CreateNames(), facts);
+
+        Assert.Equal(RelationKind.LocationRefType, Assert.Single(facts).Relation);
+    }
+
+    [Fact]
+    public void AQuestAliasFillingWithATargetNpcAsUniqueActorIsReadForTheNpcBase()
+    {
+        var mod = new SkyrimMod(OtherMod, SkyrimRelease.SkyrimSE);
+        var npcBase = new FormKey(TestTargets.TargetMod, 0x700);
+        var quest = new Quest(new FormKey(OtherMod, 0x906), SkyrimRelease.SkyrimSE) { EditorID = "SomeQuest" };
+        quest.Aliases.Add(new QuestAlias { UniqueActor = new FormLinkNullable<INpcGetter>(npcBase) });
+        quest.Aliases.Add(new QuestAlias { UniqueActor = new FormLinkNullable<INpcGetter>(new FormKey(OtherMod, 0x907)) });
+        mod.Quests.Add(quest);
+        var facts = new List<LinkFact>();
+
+        LinkReader.ReadFromNonPlaced([mod], new HashSet<RecordKey>(), TestTargets.TargetPlugin, CreateNames(), facts);
+
+        var fact = Assert.Single(facts);
+        Assert.Equal(RelationKind.UniqueActor, fact.Relation);
+        Assert.Equal(npcBase.ToRecordKey(), fact.Target);
+        Assert.Equal("SomeQuest", fact.SourceEditorId);
+    }
+
+    [Fact]
     public void WorldspaceLinkIsReadAsAWorldspaceSourceAndKeepsNothing()
     {
         var mod = new SkyrimMod(OtherMod, SkyrimRelease.SkyrimSE);

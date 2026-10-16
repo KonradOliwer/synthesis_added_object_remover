@@ -45,7 +45,7 @@ public class RestingObjectsLinkedGroupTests
     ];
 
     private static readonly ObjectsToKeep SceneProtection =
-        ObjectsToKeep.Build(Targets, [TestTargets.Link(ItemOnTable, Shelf)], TestTargets.References(Targets.Count));
+        ObjectsToKeep.Build(Targets, [TestTargets.Link(ItemOnTable, Shelf)], TestTargets.References(Targets.Count), TestBaseFacts.Unresolved);
 
     [Fact]
     public void EverythingTouchingFollowsLinkedPartnersIntoTheirOwnTouchSearch()
@@ -102,7 +102,7 @@ public class RestingObjectsLinkedGroupTests
             Place(itemOnTable, ItemModel, TestTargets.Space, new Vector3(5, 5, 10)),
             Place(crateBesideTable, ItemModel, TestTargets.Space, new Vector3(23, 0, 0)),
         ];
-        var protection = ObjectsToKeep.Build(targets, [TestTargets.Link(itemOnTable, crateBesideTable)], TestTargets.References(targets.Count));
+        var protection = ObjectsToKeep.Build(targets, [TestTargets.Link(itemOnTable, crateBesideTable)], TestTargets.References(targets.Count), TestBaseFacts.Unresolved);
         var floor = TestShapes.Placed(OtherMod, 0, FloorModel.Base, Vector3.Zero);
 
         var run = TestSupportCascade.Execute(

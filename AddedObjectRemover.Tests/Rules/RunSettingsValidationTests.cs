@@ -85,7 +85,7 @@ public class RunSettingsValidationTests
         };
         settings.LeftoverInvisibleObjects = new LeftoverInvisibleObjectSettings
         {
-            WhenAlone = new AloneSettings
+            SurroundingObjects = new SurroundingObjectsSettings
             {
                 SearchRadius = 1f,
                 DirectionThresholdPercent = 45,

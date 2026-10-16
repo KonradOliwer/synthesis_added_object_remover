@@ -16,7 +16,8 @@ public interface IPluginRecords
 
     /// <summary>
     /// The links into the given target-plugin records from every version of every record that is not a placed record, in the plugins
-    /// that can link to the target plugin. The links of placed records are in <see cref="PlacedRecordFacts.Links"/>.
+    /// that can link to the target plugin, and the quest aliases that fill with a target-plugin NPC as their Unique Actor
+    /// (<see cref="RelationKind.UniqueActor"/>, linking the NPC base). The links of placed records are in <see cref="PlacedRecordFacts.Links"/>.
     /// </summary>
     ImmutableArray<LinkFact> ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets);
 

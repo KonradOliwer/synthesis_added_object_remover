@@ -1,3 +1,4 @@
+using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda.Skyrim;
 using Mutagen.Bethesda.Synthesis;
 
@@ -120,7 +121,7 @@ public sealed class TwoRunsTests : IDisposable
                 new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods),
                 new MeshFilesFactory(
                     state.DataFolderPath.Path, state.GameRelease, [.. state.LoadOrder.ListedOrder.Select(listing => listing.ModKey)]),
-                new BaseFactsReader(state.LinkCache),
+                TestBaseFacts.Reader(state.LinkCache),
                 new ConsoleLogSink(),
                 new CsvReportOutput(),
                 () => TimeSpan.Zero);

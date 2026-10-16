@@ -29,6 +29,10 @@ internal static class PlacedRecordExtensions
     public static bool IsInitiallyDisabled(this IPlacedGetter record) =>
         (record.MajorRecordFlagsRaw & (int)SkyrimMajorRecord.SkyrimMajorRecordFlag.InitiallyDisabled) != 0;
 
+    /// <remarks>Every placed record type (REFR, ACHR and the placed traps) uses this same bit for Persistent.</remarks>
+    public static bool IsPersistent(this IPlacedGetter record) =>
+        (record.MajorRecordFlagsRaw & (int)PlacedObject.DefaultMajorFlag.Persistent) != 0;
+
     /// <summary>Base object of any placed record type, with the kind of record the base link expects.</summary>
     public static BaseKey? GetBaseKey(this IPlacedGetter record, PluginNames names) => record switch
     {

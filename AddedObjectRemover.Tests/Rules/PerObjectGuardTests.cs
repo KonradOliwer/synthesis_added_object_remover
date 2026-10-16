@@ -136,7 +136,7 @@ public class PerObjectGuardTests
         var targets = TestTargets.CreateMany(3);
         var reasons = new FaultyReferences(TestTargets.References(3), Faulty);
 
-        var protection = ObjectsToKeep.Build(targets, [], reasons);
+        var protection = ObjectsToKeep.Build(targets, [], reasons, TestBaseFacts.Unresolved);
 
         Assert.Equal(TargetFailure(KeepParts.KeepCheck, targets[Faulty]), Assert.Single(protection.CheckFailures));
         Assert.True(protection.TryGetKeepReason(Faulty, out var reason));
@@ -151,7 +151,7 @@ public class PerObjectGuardTests
         var targets = TestTargets.CreateMany(3);
         var reasons = new FaultyReferences(TestTargets.References(3), Faulty);
 
-        var protection = ObjectsToKeep.Build(targets, [TestTargets.Link(Healthy, Faulty)], reasons);
+        var protection = ObjectsToKeep.Build(targets, [TestTargets.Link(Healthy, Faulty)], reasons, TestBaseFacts.Unresolved);
 
         Assert.True(protection.IsProtected(Healthy));
         Assert.True(protection.IsProtected(Faulty));
@@ -162,7 +162,7 @@ public class PerObjectGuardTests
     public void TouchExplanationsWithoutTheTouchChainsAreABug()
     {
         var (targets, _) = CreateScene(middleTargetBase: Table.Base, middleOtherBase: Table.Base);
-        var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Count));
+        var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Count), TestBaseFacts.Unresolved);
         var seeded = TestSeededDecisions.Seed(protection, targets.Count, [Healthy]);
         var triangles = new TriangleStore(Shapes.ReadTriangles);
         var input = new RoundsInput(

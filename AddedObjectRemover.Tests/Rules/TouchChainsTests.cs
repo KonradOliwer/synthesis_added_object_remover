@@ -35,7 +35,7 @@ public class TouchChainsTests
             Place(reached, TableModel, TestTargets.Space, new Vector3(500, 0, 0)),
             Place(seed, TableModel, TestTargets.Space, Vector3.Zero),
         ];
-        var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Count));
+        var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Count), TestBaseFacts.Unresolved);
 
         var components = TestTouchCascade.Execute(
             targets,
@@ -64,7 +64,7 @@ public class TouchChainsTests
             Place(seedTable, TableModel, TestTargets.Space, Vector3.Zero),
             Place(itemOnTable, ItemModel, TestTargets.Space, new Vector3(5, 5, 10)),
         ];
-        var protection = ObjectsToKeep.Build(targets, [TestTargets.Link(itemOnTable, partner)], TestTargets.References(targets.Count));
+        var protection = ObjectsToKeep.Build(targets, [TestTargets.Link(itemOnTable, partner)], TestTargets.References(targets.Count), TestBaseFacts.Unresolved);
 
         var run = TestTouchCascade.Execute(targets, Shapes, protection, [seedTable], TouchDistance, threads: 4, collectDiagnostics: true);
         var (decisions, components) = (run.RemovalDecisions, run.TouchChains);
@@ -87,7 +87,7 @@ public class TouchChainsTests
             Place(plank, PlankModel, TestTargets.Space, new Vector3(50, 0, 3)),
             Place(secondSeed, TableModel, TestTargets.Space, new Vector3(100, 0, 0)),
         ];
-        var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Count));
+        var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Count), TestBaseFacts.Unresolved);
 
         var run = TestTouchCascade.Execute(targets, Shapes, protection, [firstSeed, secondSeed], TouchDistance, threads: 4, collectDiagnostics: true);
         var (decisions, components) = (run.RemovalDecisions, run.TouchChains);

@@ -32,7 +32,7 @@ public class LinkedGroupTests
             [1] = TestKeepReasons.Quest,
         });
 
-        var rule = ObjectsToKeep.Build(targets, [TestTargets.Link(0, 1)], references);
+        var rule = ObjectsToKeep.Build(targets, [TestTargets.Link(0, 1)], references, TestBaseFacts.Unresolved);
 
         Assert.True(rule.TryGetKeepReason(0, out var linkedReason));
         Assert.Equal(KeepKind.LinkedGroup, linkedReason.Kind);

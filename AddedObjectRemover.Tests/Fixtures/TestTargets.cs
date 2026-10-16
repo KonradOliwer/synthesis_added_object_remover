@@ -38,6 +38,9 @@ internal static class TestTargets
             isTeleportDoor,
             IsPrimitive: false,
             HasMapMarker: false,
+            IsPersistent: false,
+            NamedByScript: null,
+            HasLocationRefType: false,
             ReferenceRadius: null,
             PrimitiveBounds: null);
 

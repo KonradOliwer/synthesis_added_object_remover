@@ -81,7 +81,7 @@ public class RestingObjectsRunTests
     public void TheChangedTerrainRoundsRemovalsSeedTheRoundsToo(FollowUpRemovalMode mode)
     {
         var afterTooClose = TestSeededDecisions.Seed(
-            ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Count)), Targets.Count, seeds: [], terrainSeeds: [Table]);
+            ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Count), TestBaseFacts.Unresolved), Targets.Count, seeds: [], terrainSeeds: [Table]);
 
         var result = Run(new Probe(), mode, afterTooClose);
         var applied = afterTooClose.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds);
@@ -96,7 +96,7 @@ public class RestingObjectsRunTests
     public void AnObjectKeptInTheChangedTerrainRoundIsNotRemovedByTheRounds()
     {
         var protection = ObjectsToKeep.Build(
-            Targets, [], TestTargets.References(Targets.Count, new Dictionary<int, KeepReason> { [ItemOnTable] = TestKeepReasons.Quest }));
+            Targets, [], TestTargets.References(Targets.Count, new Dictionary<int, KeepReason> { [ItemOnTable] = TestKeepReasons.Quest }), TestBaseFacts.Unresolved);
         var afterTooClose = TestSeededDecisions.Seed(protection, Targets.Count, seeds: [], terrainSeeds: [Table, ItemOnTable]);
 
         var result = Run(new Probe(), FollowUpRemovalMode.EverythingTouchingIt, afterTooClose);
@@ -200,7 +200,7 @@ public class RestingObjectsRunTests
     [Fact]
     public void RoundsWithoutSeedsGiveDetailsThatArePerformedWithNothingToShow()
     {
-        var withoutSeeds = TestSeededDecisions.Seed(ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Count)), Targets.Count, []);
+        var withoutSeeds = TestSeededDecisions.Seed(ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Count), TestBaseFacts.Unresolved), Targets.Count, []);
 
         var result = Run(new Probe(), FollowUpRemovalMode.EverythingTouchingIt, withoutSeeds);
 
@@ -237,7 +237,7 @@ public class RestingObjectsRunTests
     }
 
     private static RemovalDecisions AfterTooClose() =>
-        TestSeededDecisions.Seed(ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Count)), Targets.Count, [Table]);
+        TestSeededDecisions.Seed(ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Count), TestBaseFacts.Unresolved), Targets.Count, [Table]);
 
     /// <param name="touchChainsShown">Report files show the touch chains too, as the settings check sets it.</param>
     private static RestingObjectsResult Run(
@@ -261,7 +261,7 @@ public class RestingObjectsRunTests
             });
         var input = new RestingObjectsInput(
             [.. Targets],
-            ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Count)),
+            ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Count), TestBaseFacts.Unresolved),
             decisions,
             new AlsoRemoveSettings(mode, TouchDistance, Threshold, touchChainsShown || reportFiles == StepOutcome.Performed),
             new Execution(1),

@@ -13,7 +13,10 @@ public class Settings : ISettingsValues
     [SynthesisSettingName("Mod to clean up")]
     [SynthesisTooltip(
         "The plugin whose added objects are checked. Its objects that clash with other mods are removed in this patch.\n"
-        + "Nothing is deleted: a removed object is disabled and moved below the world.\n"
+        + "Nothing is deleted: a removed object is disabled; one that is not persistent is also moved below the world.\n"
+        + "Always kept, whatever the settings: teleport doors and their destinations; anything another mod's object, a quest, a package,\n"
+        + "a scene, a location or a navmesh points to; objects whose own or base object's script names a quest, scene or global;\n"
+        + "objects with a location role (except map markers). Linked objects are always removed or kept together.\n"
         + "Pick it from your load order.")]
     public ModKey TargetPlugin { get; set; } = ModKey.Null;
 
@@ -277,15 +280,18 @@ public class LeftoverInvisibleObjectSettings : ILeftoverSettingsValues
     public bool RemoveLeftoverInvisibleObjects { get; set; } = true;
 
     [SynthesisOrder]
-    [SynthesisSettingName("When an invisible object counts as alone")]
+    [SynthesisSettingName("When the cleaned mod's visible objects around it were removed")]
     [SynthesisTooltip(
-        "The area around it is split into 8 directions (north, north-east, ...). Only the cleaned mod's visible objects count.\n"
-        + "The three percentages are applied in the order listed, in steps of 10.")]
-    public AloneSettings WhenAlone { get; set; } = new();
+        "For each invisible object, the cleaned mod's visible objects around it (never other mods' objects) are sorted into 8 directions\n"
+        + "(north, north-east, ...) and measured by the ground area they cover. Objects removed by the earlier steps count as removed.\n"
+        + "The invisible object is removed when enough of those directions were mostly cleared. The percentages are applied in the order listed, in steps of 10.")]
+    public SurroundingObjectsSettings SurroundingObjects { get; set; } = new();
 
     [SynthesisOrder]
-    [SynthesisSettingName("Always keep these invisible objects")]
-    [SynthesisTooltip("Ticked kinds are never removed by this step, unless they are linked to a removed object.")]
+    [SynthesisSettingName("Also keep these invisible objects")]
+    [SynthesisTooltip(
+        "Ticked kinds are never removed by this step, unless they are linked to a removed object.\n"
+        + "What \"Mod to clean up\" lists as always kept stays kept, ticked or not.")]
     public KeptInvisibleObjectSettings AlwaysKeep { get; set; } = new();
 
     [SynthesisOrder]
@@ -295,33 +301,33 @@ public class LeftoverInvisibleObjectSettings : ILeftoverSettingsValues
         + "Only its position changes. Lights, sounds, furniture and door markers are never moved. Needs the switch at the top of this group.")]
     public bool MoveKeptMarkersOutOfOtherModsObjects { get; set; }
 
-    float ILeftoverSettingsValues.SearchRadius => (WhenAlone ?? new()).SearchRadius;
-    int ILeftoverSettingsValues.OccupiedDirectionsPercent => (WhenAlone ?? new()).OccupiedDirectionsPercent;
-    int ILeftoverSettingsValues.DirectionThresholdPercent => (WhenAlone ?? new()).DirectionThresholdPercent;
-    int ILeftoverSettingsValues.RemovedDirectionsPercent => (WhenAlone ?? new()).RemovedDirectionsPercent;
+    float ILeftoverSettingsValues.SearchRadius => (SurroundingObjects ?? new()).SearchRadius;
+    int ILeftoverSettingsValues.OccupiedDirectionsPercent => (SurroundingObjects ?? new()).OccupiedDirectionsPercent;
+    int ILeftoverSettingsValues.DirectionThresholdPercent => (SurroundingObjects ?? new()).DirectionThresholdPercent;
+    int ILeftoverSettingsValues.RemovedDirectionsPercent => (SurroundingObjects ?? new()).RemovedDirectionsPercent;
     IReadOnlyList<InvisibleObjectKind> ILeftoverSettingsValues.NeverRemove => (AlwaysKeep ?? new()).Kinds();
 }
 
-public class AloneSettings
+public class SurroundingObjectsSettings
 {
     [SynthesisOrder]
     [SynthesisSettingName("Look this far around it (game units)")]
-    [SynthesisTooltip("A light, sound or trigger box that reaches less far uses its own reach. 64-8192.")]
+    [SynthesisTooltip("Visible objects of the cleaned mod within this distance are its surroundings. A light, sound or trigger box that reaches less far uses its own reach. 64-8192.")]
     public float SearchRadius { get; set; } = SettingDefaults.SearchRadius;
 
     [SynthesisOrder]
     [SynthesisSettingName("Decide only if this share of the 8 directions has objects (%)")]
-    [SynthesisTooltip("10-100, in steps of 10.")]
+    [SynthesisTooltip("A direction has objects when a visible object of the cleaned mod lies that way. With fewer such directions the invisible object is kept. 10-100, in steps of 10.")]
     public int OccupiedDirectionsPercent { get; set; } = SettingDefaults.OccupiedDirectionsPercent;
 
     [SynthesisOrder]
     [SynthesisSettingName("A direction is cleared when this much of it was removed (%)")]
-    [SynthesisTooltip("Measured by the ground area the cleaned mod's objects cover in that direction. 10-100, in steps of 10.")]
+    [SynthesisTooltip("Measured by the ground area the cleaned mod's visible objects cover in that direction. 10-100, in steps of 10.")]
     public int DirectionThresholdPercent { get; set; } = SettingDefaults.DirectionThresholdPercent;
 
     [SynthesisOrder]
     [SynthesisSettingName("Remove when this share of those directions is cleared (%)")]
-    [SynthesisTooltip("10-100, in steps of 10.")]
+    [SynthesisTooltip("Counted among the directions that have objects. 10-100, in steps of 10.")]
     public int RemovedDirectionsPercent { get; set; } = SettingDefaults.RemovedDirectionsPercent;
 }
 
@@ -329,63 +335,88 @@ public class KeptInvisibleObjectSettings
 {
     [SynthesisOrder]
     [SynthesisSettingName("Map markers")]
-    [SynthesisTooltip("The icons on the world map.")]
+    [SynthesisTooltip(
+        "The icons on the world map. A removed one is disabled where it stands, so it is hidden from the map.\n"
+        + "Markers a location or quest uses are always kept.")]
     public bool MapMarkers { get; set; }
 
     [SynthesisOrder]
-    [SynthesisSettingName("X markers")]
-    [SynthesisTooltip("Invisible reference points, including those with a heading.")]
+    [SynthesisSettingName("Position markers (XMarker, XMarkerHeading)")]
+    [SynthesisTooltip(
+        "Invisible objects without a model that mark a position, or a position and a direction (XMarker and XMarkerHeading in the editor).\n"
+        + "Scripts, quests and other objects use them as a place to stand, face or move to; those a quest, a script or another mod's object\n"
+        + "points to are always kept.")]
     public bool XMarkers { get; set; }
 
     [SynthesisOrder]
-    [SynthesisSettingName("Idle markers")]
-    [SynthesisTooltip("Spots where characters play an idle animation.")]
+    [SynthesisSettingName("Idle animation spots")]
+    [SynthesisTooltip(
+        "Spots where a character plays an idle animation, such as leaning on a wall or warming hands at a fire (idle marker objects).\n"
+        + "Disabling one makes the characters who use it stop doing that there.")]
     public bool IdleMarkers { get; set; }
 
     [SynthesisOrder]
-    [SynthesisSettingName("Furniture markers")]
-    [SynthesisTooltip("Positions where characters use furniture.")]
+    [SynthesisSettingName("Furniture use spots")]
+    [SynthesisTooltip(
+        "Invisible furniture that marks where a character sits, sleeps, leans or works (furniture flagged as a marker).\n"
+        + "Disabling one removes that spot; characters scheduled to use it may stand or walk about instead.")]
     public bool FurnitureMarkers { get; set; }
 
     [SynthesisOrder]
-    [SynthesisSettingName("Door markers")]
-    [SynthesisTooltip("The spots where doors place whoever uses them.")]
+    [SynthesisSettingName("Invisible marker doors")]
+    [SynthesisTooltip(
+        "Invisible doors flagged as markers in the editor that lead nowhere. Doors that teleport are always kept, and so are\n"
+        + "the doors they lead to; the spot a door puts you at is part of the door itself, not a separate object.")]
     public bool DoorMarkers { get; set; }
 
     [SynthesisOrder]
-    [SynthesisSettingName("Other markers")]
-    [SynthesisTooltip("Any other invisible marker.")]
-    public bool OtherMarkers { get; set; }
-
-    [SynthesisOrder]
-    [SynthesisSettingName("Lights")]
-    [SynthesisTooltip("Light sources that have no visible model.")]
+    [SynthesisSettingName("Lights without a model")]
+    [SynthesisTooltip(
+        "Light sources with no visible model, or whose model is only a glow effect.\n"
+        + "Disabling one makes that spot darker.")]
     public bool Lights { get; set; }
 
     [SynthesisOrder]
-    [SynthesisSettingName("Sound markers")]
-    [SynthesisTooltip("Spots that play a sound.")]
+    [SynthesisSettingName("Sound sources")]
+    [SynthesisTooltip(
+        "Invisible points that play a sound, such as wind, water or an ambient hum (sound markers).\n"
+        + "Disabling one silences that sound at that place.")]
     public bool SoundMarkers { get; set; }
 
     [SynthesisOrder]
-    [SynthesisSettingName("Acoustic spaces")]
-    [SynthesisTooltip("Areas that change how sound echoes.")]
+    [SynthesisSettingName("Echo areas")]
+    [SynthesisTooltip(
+        "Areas that change how sound echoes or is muffled, as in caves and halls (acoustic spaces).\n"
+        + "Disabling one makes that area sound like the space around it.")]
     public bool AcousticSpaces { get; set; }
 
     [SynthesisOrder]
     [SynthesisSettingName("Critter spawners")]
-    [SynthesisTooltip("Spots where small animals appear.")]
+    [SynthesisTooltip(
+        "Invisible markers that make small animals such as birds, butterflies or fish appear. They are recognised by their critter spawn script.\n"
+        + "Disabling one removes the animals it would spawn.")]
     public bool CritterSpawners { get; set; }
 
     [SynthesisOrder]
-    [SynthesisSettingName("Trigger boxes")]
-    [SynthesisTooltip("Invisible areas that start something when entered.")]
+    [SynthesisSettingName("Invisible trigger areas")]
+    [SynthesisTooltip(
+        "Invisible boxes without a model that start something when entered or left, such as a script, a quest stage or a trap.\n"
+        + "Disabling one can stop whatever it starts; those whose script names a quest, scene or global are always kept.")]
     public bool TriggerBoxes { get; set; }
 
     [SynthesisOrder]
-    [SynthesisSettingName("Decals")]
-    [SynthesisTooltip("Marks painted onto surfaces, such as dirt or blood.")]
+    [SynthesisSettingName("Surface decals (dirt, blood)")]
+    [SynthesisTooltip(
+        "Marks painted onto a surface, such as dirt or blood (objects placed from a texture set).\n"
+        + "Cosmetic only: disabling one removes the mark.")]
     public bool Decals { get; set; }
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Other invisible objects")]
+    [SynthesisTooltip(
+        "Every other object without visible geometry that is none of the kinds above, such as a marker-flagged activator\n"
+        + "or an object whose model is empty. Their purpose varies, so disabling one can affect whatever uses it.")]
+    public bool OtherMarkers { get; set; }
 
     /// <summary>The ticked kinds, in the order of <see cref="InvisibleObjectKind"/>.</summary>
     public IReadOnlyList<InvisibleObjectKind> Kinds() =>

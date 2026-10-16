@@ -77,7 +77,7 @@ public class TwoCreationPointsOfCachesTests
             new MeshFilesFactory(dataFolder, GameRelease.SkyrimSE, [Mod]),
             new UnexpectedErrors(),
             new NpcRecordsPlugin(linkCache),
-            new BaseFactsReader(linkCache),
+            TestBaseFacts.Reader(linkCache),
             npcBodyRules,
             TooCloseObjects.PlacedNpcRules);
     }

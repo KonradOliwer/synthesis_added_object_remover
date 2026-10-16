@@ -1,4 +1,5 @@
 using Mutagen.Bethesda.Plugins;
+using Mutagen.Bethesda.Plugins.Records;
 using Mutagen.Bethesda.Skyrim;
 
 namespace AddedObjectRemover;
@@ -33,7 +34,8 @@ internal static class LinkReader
     /// <summary>
     /// Every version of every non-placed record of the given plugins is checked. Overridden versions,
     /// which the game does not use, are included as well; this is conservative. Placed records are
-    /// left out because <see cref="ReadFromPlaced"/> covers their winning versions.
+    /// left out because <see cref="ReadFromPlaced"/> covers their winning versions. Besides the links to
+    /// the given records, each quest alias that fills with a target-plugin NPC as its Unique Actor is read.
     /// </summary>
     public static void ReadFromNonPlaced(
         IEnumerable<ISkyrimModGetter> mods,
@@ -47,23 +49,49 @@ internal static class LinkReader
             foreach (var record in mod.EnumerateMajorRecords())
             {
                 if (record is IPlacedGetter) continue;
-                foreach (var link in record.EnumerateFormLinks(iterateNestedRecords: false))
-                {
-                    if (link.IsNull || names.Of(link.FormKey.ModKey) != target) continue;
-                    var linkedKey = names.KeyOf(link.FormKey);
-                    if (!targets.Contains(linkedKey)) continue;
-                    facts.Add(new LinkFact(
-                        names.KeyOf(record.FormKey),
-                        record.EditorID,
-                        record.Registration.Name,
-                        linkedKey,
-                        RelationKind.Other,
-                        SourceIsPlaced: false,
-                        SourceIsWorldspace: record is IWorldspaceGetter));
-                }
+                ReadLinksToTargets(record, targets, target, names, facts);
+                if (record is IQuestGetter quest) ReadUniqueActors(quest, target, names, facts);
             }
         }
     }
+
+    private static void ReadLinksToTargets(IMajorRecordGetter record, IReadOnlySet<RecordKey> targets, PluginName target, PluginNames names, List<LinkFact> facts)
+    {
+        foreach (var link in record.EnumerateFormLinks(iterateNestedRecords: false))
+        {
+            if (link.IsNull || names.Of(link.FormKey.ModKey) != target) continue;
+            var linkedKey = names.KeyOf(link.FormKey);
+            if (!targets.Contains(linkedKey)) continue;
+            facts.Add(CreateNonPlacedFact(record, linkedKey, DescribeNonPlacedRelation(record, link.FormKey), names));
+        }
+    }
+
+    private static void ReadUniqueActors(IQuestGetter quest, PluginName target, PluginNames names, List<LinkFact> facts)
+    {
+        foreach (var alias in quest.Aliases)
+        {
+            if (alias.UniqueActor.IsNull || names.Of(alias.UniqueActor.FormKey.ModKey) != target) continue;
+            facts.Add(CreateNonPlacedFact(quest, names.KeyOf(alias.UniqueActor.FormKey), RelationKind.UniqueActor, names));
+        }
+    }
+
+    private static LinkFact CreateNonPlacedFact(IMajorRecordGetter record, RecordKey linkedKey, RelationKind relation, PluginNames names) =>
+        new(
+            names.KeyOf(record.FormKey),
+            record.EditorID,
+            record.Registration.Name,
+            linkedKey,
+            relation,
+            SourceIsPlaced: false,
+            SourceIsWorldspace: record is IWorldspaceGetter);
+
+    private static RelationKind DescribeNonPlacedRelation(IMajorRecordGetter record, FormKey linked) =>
+        record is ILocationGetter location && ListsWithRefType(location).Any(entry => entry.Ref.FormKey == linked)
+            ? RelationKind.LocationRefType
+            : RelationKind.Other;
+
+    private static IEnumerable<ILocationRefTypeReferenceGetter> ListsWithRefType(ILocationGetter location) =>
+        (location.LocationRefTypeReferencesAdded ?? []).Concat(location.LocationRefTypeReferencesStatic ?? []);
 
     private static RelationKind DescribeRelation(IPlacedGetter record, FormKey linked)
     {

@@ -394,7 +394,7 @@ public class RemovalDecisionsTests
     }
 
     private static RemovalDecisions Start(IReadOnlyDictionary<int, KeepReason>? references = null) =>
-        RemovalDecisions.Start(ObjectsToKeep.Build(TestTargets.CreateMany(TargetCount), Links, TestTargets.References(TargetCount, references)), TargetCount);
+        RemovalDecisions.Start(ObjectsToKeep.Build(TestTargets.CreateMany(TargetCount), Links, TestTargets.References(TargetCount, references), TestBaseFacts.Unresolved), TargetCount);
 
     private static ImmutableArray<TargetId> LastRoundRemovals(IRemovalDecisions decisions) => decisions.RemovedIn(decisions.Rounds[^1]);
 

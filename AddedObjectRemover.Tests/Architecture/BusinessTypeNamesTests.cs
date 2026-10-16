@@ -39,7 +39,6 @@ public partial class BusinessTypeNamesTests
     [InlineData("LabelFormatting", true)]
     [InlineData("ObjectCollection", true)]
     [InlineData("SpotScratch", true)]
-    [InlineData("ProtectedInvisibleObjectsPreset", false)]
     [InlineData("Settings", false)]
     [InlineData("IndexedObject", false)]
     public void TheNamePatternMatchesTheBannedSuffixesAndWords(string name, bool banned) =>

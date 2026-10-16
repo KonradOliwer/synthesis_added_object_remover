@@ -5,7 +5,7 @@ namespace AddedObjectRemover.Tests.Architecture;
 /// <summary>
 /// The settings property names are the keys of users' saved settings.json, and the enum names are the values
 /// stored in it, so renaming any of them resets what users saved. The class names are not stored, so only the
-/// property paths (such as WhatToCheck.ZoneShape) and the enum types with their values are frozen.
+/// property paths (such as TooClose.UseRoughBoxes) and the enum types with their values are frozen.
 /// A deliberate change edits SettingsFreeze.txt.
 /// </summary>
 public class SettingsFreezeTests

@@ -38,7 +38,7 @@ public class TooCloseByDistanceTests
                 [.. targets],
                 world.VisibleTargets,
                 TargetWorkOrder.Of(targets),
-                world.ObjectsThatCanCauseRemovals(replacements, NpcHandling.Ignore),
+                world.ObjectsThatCanCauseRemovals(replacements, NpcHandling.Never),
                 world.NpcsThatCanSpawn(replacements),
                 Shapes,
                 new TriangleStore(Shapes.ReadTriangles),
@@ -47,10 +47,10 @@ public class TooCloseByDistanceTests
     }
 
     private static TooCloseSettings DistanceOnly(ZoneShape zone, float units) =>
-        new(BySize: false, Multiplier: 0f, ByDistance: true, units, zone, NpcHandling.Ignore);
+        new(BySize: false, Multiplier: 0f, ByDistance: true, units, zone, NpcHandling.Never);
 
     private static TooCloseSettings BothZones(ZoneShape zone, float multiplier) =>
-        new(BySize: true, multiplier, ByDistance: true, Distance, zone, NpcHandling.Ignore);
+        new(BySize: true, multiplier, ByDistance: true, Distance, zone, NpcHandling.Never);
 
     [Theory]
     [InlineData(ZoneShape.BoundingBox)]
@@ -127,7 +127,7 @@ public class TooCloseByDistanceTests
     [InlineData(ZoneShape.ObjectShape)]
     public void TheSizeZoneAloneNeverUsesTheDistance(ZoneShape zone)
     {
-        var settings = new TooCloseSettings(BySize: true, Multiplier: 0.1f, ByDistance: false, Distance, zone, NpcHandling.Ignore);
+        var settings = new TooCloseSettings(BySize: true, Multiplier: 0.1f, ByDistance: false, Distance, zone, NpcHandling.Never);
 
         var result = Find(settings, 45f);
 

@@ -42,17 +42,22 @@ internal sealed class ObjectTerrainCheck(IPluginRecords records, IBaseObjectShap
     }
 
     private bool IsCovered(TargetObject target) =>
-        settings.Objects == TerrainCheckedObjects.AllObjects || shapes.VisibilityOf(target).IsVisible;
+        settings.Objects == TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes || shapes.VisibilityOf(target).IsVisible;
 
+    /// <remarks>The first area that holds a change gives the finding, as the first removal zone that finds an object does in the too-close step.</remarks>
     private ObjectCheck CompareTerrain(TargetObject target)
     {
         if (records.FindLandWorldspace(target.SpaceKey) is not { } landWorldspace) return ObjectCheck.NoTerrain;
-        var area = _area.Around(target);
-        var cells = CellsUnder(landWorldspace, area);
-        if (cells.Count == 0) return ObjectCheck.NoTerrain;
-        if (settings.Objects == TerrainCheckedObjects.VisibleObjectsOnTheGround && !ReachesTheGround(area, cells)) return ObjectCheck.NothingFound;
-
-        return FindChange(target, cells) is { } hit ? new ObjectCheck(hit, WithoutTerrain: false, Failure: null) : ObjectCheck.NothingFound;
+        var anyAreaHasTerrain = false;
+        foreach (var area in _area.Around(target))
+        {
+            var cells = CellsUnder(landWorldspace, area);
+            if (cells.Count == 0) continue;
+            anyAreaHasTerrain = true;
+            if (settings.Objects == TerrainCheckedObjects.VisibleObjectsOnTheGround && !ReachesTheGround(area, cells)) continue;
+            if (FindChange(target, cells) is { } hit) return new ObjectCheck(hit, WithoutTerrain: false, Failure: null);
+        }
+        return anyAreaHasTerrain ? ObjectCheck.NothingFound : ObjectCheck.NoTerrain;
     }
 
     /// <summary>The cells under the area that have a reference terrain; a cell without one is not checked.</summary>

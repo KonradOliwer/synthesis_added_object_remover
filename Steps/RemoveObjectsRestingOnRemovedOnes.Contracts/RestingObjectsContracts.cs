@@ -5,9 +5,9 @@ namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 
 /// <summary>Work counts of the also-remove rounds.</summary>
 /// <param name="Rounds">The also-remove rounds run.</param>
-/// <param name="Candidates">ObjectsSupportedByIt only: distinct candidates evaluated at least once.</param>
-/// <param name="Evaluations">ObjectsSupportedByIt only: candidate evaluations over all rounds.</param>
-/// <param name="KeptWithoutContacts">ObjectsSupportedByIt only: candidates kept because no surface sample touched any supporter.</param>
+/// <param name="Candidates">OnlyWhatLosesItsSupport only: distinct candidates evaluated at least once.</param>
+/// <param name="Evaluations">OnlyWhatLosesItsSupport only: candidate evaluations over all rounds.</param>
+/// <param name="KeptWithoutContacts">OnlyWhatLosesItsSupport only: candidates kept because no surface sample touched any supporter.</param>
 /// <param name="Pairs">The rounds' pair tests.</param>
 public sealed record RestingObjectsWork(int Rounds, int Candidates, int Evaluations, int KeptWithoutContacts, PairTestStats Pairs);
 

@@ -195,7 +195,7 @@ public class StepDeterminismTests
         var replacements = Replacements.None(npcs.Count);
         var scene = TestScenes.Create(targets, npcs, Shapes, bodies: NewBodies(), threads: threads);
         var npcRule = CreateStuckNpcRule(targets, scene, replacements);
-        var otherModObjects = scene.ObjectsThatCanCauseRemovals(replacements, NpcHandling.OnlyWhenStuckInObject);
+        var otherModObjects = scene.ObjectsThatCanCauseRemovals(replacements, NpcHandling.OnlyWhenStuckInsideTheObject);
         var result = TooCloseSearch.FindTooCloseTargets(
             targets, otherModObjects, Shapes, [new ZoneGrowth.BySize(0f)], npcRule, TargetWorkOrder.Of(targets), Options(threads));
         var summary = npcRule.StuckSearch!.GetSummary(result.Work.Npcs);
@@ -207,7 +207,7 @@ public class StepDeterminismTests
         var replacements = Replacements.None(scene.OtherModObjects.Count);
         var sceneIndex = TestScenes.Create(scene.Targets, scene.OtherModObjects, Shapes, bodies: NewBodies(), threads: threads);
         var npcRule = CreateStuckNpcRule(scene.Targets, sceneIndex, replacements);
-        var otherModObjects = sceneIndex.ObjectsThatCanCauseRemovals(replacements, NpcHandling.OnlyWhenStuckInObject);
+        var otherModObjects = sceneIndex.ObjectsThatCanCauseRemovals(replacements, NpcHandling.OnlyWhenStuckInsideTheObject);
         return ShapeZoneSearch.Create(scene.Targets, sceneIndex.VisibleTargets, otherModObjects, Shapes, NewCache(), [new ZoneGrowth.BySize(ShapeZoneMultiplier)], npcRule)
             .FindTooCloseTargets(order, Options(threads));
     }
@@ -215,7 +215,7 @@ public class StepDeterminismTests
     private static NpcTooCloseRule CreateStuckNpcRule(
         IReadOnlyList<TargetObject> targets, ObjectCaches scene, Replacements replacements) =>
         NpcTooCloseRule.Create(
-            NpcHandling.OnlyWhenStuckInObject,
+            NpcHandling.OnlyWhenStuckInsideTheObject,
             () => NpcStuckSearch.Create(targets, scene.VisibleTargets, scene.NpcsThatCanSpawn(replacements), Shapes, NewCache()));
 
     /// <summary>
@@ -335,8 +335,7 @@ public class StepDeterminismTests
         DirectionClearedPercent: 50,
         ClearedDirectionsPercent: 60,
         OccupiedDirectionsPercent: 50,
-        NeverRemove: new HashSet<InvisibleObjectKind>(),
-        Preset: ProtectedInvisibleObjectsPreset.None);
+        NeverRemove: new HashSet<InvisibleObjectKind>());
 
     private static TriangleStore NewCache() => new(Shapes.ReadTriangles);
 

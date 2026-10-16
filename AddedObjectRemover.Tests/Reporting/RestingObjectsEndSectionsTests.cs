@@ -508,13 +508,13 @@ public sealed class RestingObjectsEndSectionsTests
     private static (CollectedObjects World, RestingObjectsResult AlsoRemove, RemovalDecisions Decisions) TouchScene()
     {
         var (world, decisions) = RunRounds(alsoRemoveReason: index => new RemovalReason.Touching(new TargetId(0)));
-        return (world, AlsoRemoveOf(FollowUpRemovalMode.EverythingTouching, decisions), decisions);
+        return (world, AlsoRemoveOf(FollowUpRemovalMode.EverythingTouchingIt, decisions), decisions);
     }
 
     private static (CollectedObjects World, RestingObjectsResult AlsoRemove, RemovalDecisions Decisions) SupportScene()
     {
         var (world, decisions) = RunRounds(alsoRemoveReason: index => new RemovalReason.LostSupport(0.6f, new TargetId(0)));
-        return (world, AlsoRemoveOf(FollowUpRemovalMode.ObjectsSupportedByIt, decisions), decisions);
+        return (world, AlsoRemoveOf(FollowUpRemovalMode.OnlyWhatLosesItsSupport, decisions), decisions);
     }
 
     private static RestingObjectsResult AlsoRemoveOf(FollowUpRemovalMode mode, RemovalDecisions decisions) =>

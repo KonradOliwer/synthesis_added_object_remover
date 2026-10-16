@@ -3,6 +3,7 @@ using System.Reflection;
 using AddedObjectRemover.Run.RunAllSteps;
 using AddedObjectRemover.Run.RunAllSteps.Contracts;
 using Mutagen.Bethesda;
+using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Skyrim;
 using Mutagen.Bethesda.Synthesis;
 using Mutagen.Bethesda.Synthesis.Settings;
@@ -12,7 +13,7 @@ namespace AddedObjectRemover;
 public static class Program
 {
     internal static readonly SettingsSchema SettingsSchema = new(
-        typeof(Settings), property => property.GetCustomAttribute<SynthesisSettingName>()?.Name);
+        typeof(Settings), property => property.GetCustomAttribute<SynthesisSettingName>()?.Name, typeof(ModKey));
 
     public static async Task<int> Main(string[] args)
     {

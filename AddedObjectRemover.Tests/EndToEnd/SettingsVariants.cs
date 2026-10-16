@@ -1,3 +1,5 @@
+using Mutagen.Bethesda.Plugins;
+
 namespace AddedObjectRemover.Tests.EndToEnd;
 
 /// <summary>The settings the end-to-end runs use; every variant writes report files, and all but the normal-log one log in detail.</summary>
@@ -14,34 +16,32 @@ internal static class SettingsVariants
     public static Settings Of(string name) => name switch
     {
         TouchWithLeftBehindAndMarkerMoves => Create(
-            ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInObject, FollowUpRemovalMode.EverythingTouching,
+            useRoughBoxes: false, NpcHandling.OnlyWhenStuckInsideTheObject, FollowUpRemovalMode.EverythingTouchingIt,
             new LeftoverInvisibleObjectSettings
             {
                 RemoveLeftoverInvisibleObjects = true,
                 MoveKeptMarkersOutOfOtherModsObjects = true,
-                ProtectedTypes = ProtectedInvisibleObjectsPreset.Custom,
-                CustomProtectedTypes = [InvisibleObjectKind.SoundMarkers],
+                AlwaysKeep = new KeptInvisibleObjectSettings { SoundMarkers = true },
             }),
         Support => Create(
-            ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInObject, FollowUpRemovalMode.ObjectsSupportedByIt,
+            useRoughBoxes: false, NpcHandling.OnlyWhenStuckInsideTheObject, FollowUpRemovalMode.OnlyWhatLosesItsSupport,
             new LeftoverInvisibleObjectSettings { RemoveLeftoverInvisibleObjects = true }),
         NothingWithBoxZoneAndNpcsAsObjects => Create(
-            ZoneShape.BoundingBox, NpcHandling.CountLikeObjects, FollowUpRemovalMode.Nothing,
+            useRoughBoxes: true, NpcHandling.AlwaysLikeAnyObject, FollowUpRemovalMode.Nothing,
             new LeftoverInvisibleObjectSettings { RemoveLeftoverInvisibleObjects = false }),
         TouchWithLeftBehindAndMarkerMovesNormalLog => WithNormalLog(Of(TouchWithLeftBehindAndMarkerMoves)),
         _ => throw new ArgumentOutOfRangeException(nameof(name), name, "Unknown settings variant."),
     };
 
-    private static Settings Create(ZoneShape zone, NpcHandling npcs, FollowUpRemovalMode followUp, LeftoverInvisibleObjectSettings leftovers) => new()
+    private static Settings Create(bool useRoughBoxes, NpcHandling npcs, FollowUpRemovalMode followUp, LeftoverInvisibleObjectSettings leftovers) => new()
     {
-        WhatToCheck = new CheckSettings { TargetPlugin = FixtureWorld.TargetPlugin },
-        TooClose = new TooCloseRemovalSettings { ZoneShape = zone },
+        TargetPlugin = ModKey.FromNameAndExtension(FixtureWorld.TargetPlugin),
+        TooClose = new TooCloseRemovalSettings { UseRoughBoxes = useRoughBoxes, NpcHandling = npcs },
         WhatToIgnore = new IgnoreSettings
         {
-            ExcludedPlugins = [FixtureWorld.ExcludedPlugin],
+            ExcludedPlugins = [ModKey.FromNameAndExtension(FixtureWorld.ExcludedPlugin)],
             IgnoreTargetMasters = true,
-            IgnoreModsPatchedWithTarget = true,
-            NpcHandling = npcs,
+            CompatibilityPatches = new CompatibilityPatchSettings { IgnoreModsPatchedWithTarget = true },
         },
         FollowUpRemoval = new FollowUpRemovalSettings { Mode = followUp },
         LeftoverInvisibleObjects = leftovers,

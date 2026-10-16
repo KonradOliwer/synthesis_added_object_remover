@@ -72,12 +72,12 @@ public class PerObjectGuardTests
                 [.. targets],
                 world.VisibleTargets,
                 TargetWorkOrder.Of(targets),
-                world.ObjectsThatCanCauseRemovals(replacements, NpcHandling.Ignore),
+                world.ObjectsThatCanCauseRemovals(replacements, NpcHandling.Never),
                 world.NpcsThatCanSpawn(replacements),
                 shapes,
                 new TriangleStore(shapes.ReadTriangles),
                 new Execution(threads)),
-            new TooCloseSettings(BySize: true, Multiplier, ByDistance: false, DistanceInUnits: 0f, ZoneShape.BoundingBox, NpcHandling.Ignore));
+            new TooCloseSettings(BySize: true, Multiplier, ByDistance: false, DistanceInUnits: 0f, ZoneShape.BoundingBox, NpcHandling.Never));
 
     [Theory]
     [InlineData(1)]
@@ -168,7 +168,7 @@ public class PerObjectGuardTests
         var input = new RoundsInput(
             [.. targets], protection, ObjectsOfAnyPlugin: null, Shapes, triangles, TestGround.NoTerrain(), new Execution(1));
         var restingObjects = TestRestingObjects.Run(
-            seeded, input, new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouching, 1f, SupportLostFraction: 1f, TouchChainsShown: false));
+            seeded, input, new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouchingIt, 1f, SupportLostFraction: 1f, TouchChainsShown: false));
 
         Assert.True(restingObjects.Result.HadSeeds);
         Assert.Throws<InvalidOperationException>(

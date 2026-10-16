@@ -27,8 +27,7 @@ public class LeftBehindObjectsTests
         DirectionClearedPercent: 50,
         ClearedDirectionsPercent: 60,
         OccupiedDirectionsPercent: 50,
-        NeverRemove: new HashSet<InvisibleObjectKind>(),
-        Preset: ProtectedInvisibleObjectsPreset.Custom);
+        NeverRemove: new HashSet<InvisibleObjectKind>());
 
     private static readonly BaseKey XMarker = TestVisibility.TaggedBase(ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers));
 
@@ -142,7 +141,7 @@ public class LeftBehindObjectsTests
 
         var result = LeftBehindObjects.Find(
             Targets,
-            scene.ObjectsThatCanCauseRemovals(Replacements.None(Others.Length), NpcHandling.OnlyWhenStuckInObject),
+            scene.ObjectsThatCanCauseRemovals(Replacements.None(Others.Length), NpcHandling.OnlyWhenStuckInsideTheObject),
             StartDecisions(),
             new FailingSurroundings(scene.VisibleTargets),
             new BaseFactsReader(new SkyrimMod(ModKey.FromNameAndExtension("Reach.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
@@ -245,7 +244,7 @@ public class LeftBehindObjectsTests
         var scene = CreateScene();
         return LeftBehindObjects.Find(
             Targets,
-            scene.ObjectsThatCanCauseRemovals(Replacements.None(Others.Length), NpcHandling.OnlyWhenStuckInObject),
+            scene.ObjectsThatCanCauseRemovals(Replacements.None(Others.Length), NpcHandling.OnlyWhenStuckInsideTheObject),
             decisions,
             scene.VisibleTargets,
             new BaseFactsReader(new SkyrimMod(ModKey.FromNameAndExtension("Reach.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),

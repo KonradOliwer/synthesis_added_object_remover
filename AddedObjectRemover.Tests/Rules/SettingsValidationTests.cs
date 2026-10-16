@@ -30,12 +30,12 @@ public class SettingsValidationTests
     [Fact]
     public void DefaultsAreWithinTheirValidRanges()
     {
-        var leftovers = new LeftoverInvisibleObjectSettings();
-        Assert.Equal(leftovers.DirectionThresholdPercent, SettingCorrections.WholeTens(leftovers.DirectionThresholdPercent, "direction", []));
-        Assert.Equal(leftovers.RemovedDirectionsPercent, SettingCorrections.WholeTens(leftovers.RemovedDirectionsPercent, "removed", []));
-        Assert.Equal(leftovers.OccupiedDirectionsPercent, SettingCorrections.WholeTens(leftovers.OccupiedDirectionsPercent, "occupied", []));
-        Assert.Equal(ZoneShape.ObjectShape, new TooCloseRemovalSettings().ZoneShape);
-        Assert.Equal(NpcHandling.OnlyWhenStuckInObject, new IgnoreSettings().NpcHandling);
-        Assert.Equal(FollowUpRemovalMode.EverythingTouching, new FollowUpRemovalSettings().Mode);
+        var alone = new LeftoverInvisibleObjectSettings().WhenAlone;
+        Assert.Equal(alone.DirectionThresholdPercent, SettingCorrections.WholeTens(alone.DirectionThresholdPercent, "direction", []));
+        Assert.Equal(alone.RemovedDirectionsPercent, SettingCorrections.WholeTens(alone.RemovedDirectionsPercent, "removed", []));
+        Assert.Equal(alone.OccupiedDirectionsPercent, SettingCorrections.WholeTens(alone.OccupiedDirectionsPercent, "occupied", []));
+        Assert.False(new TooCloseRemovalSettings().UseRoughBoxes);
+        Assert.Equal(NpcHandling.OnlyWhenStuckInsideTheObject, new TooCloseRemovalSettings().NpcHandling);
+        Assert.Equal(FollowUpRemovalMode.EverythingTouchingIt, new FollowUpRemovalSettings().Mode);
     }
 }

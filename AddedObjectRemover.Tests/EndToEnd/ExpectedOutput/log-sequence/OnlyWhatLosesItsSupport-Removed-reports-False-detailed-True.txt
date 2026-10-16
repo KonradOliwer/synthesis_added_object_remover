@@ -10,11 +10,11 @@ Ignored masters of target: Skyrim.esm
 Compatibility patch detection: 2 plugins master the target.
   Compatibility patch TargetPatch.esp: links target with Patched.esp.
 Ignored because of compatibility patches: Patched.esp, TargetPatch.esp.
-NPCs and creatures: OnlyWhenStuckInObject
+NPCs and creatures: OnlyWhenStuckInsideTheObject
 Also remove: objects supported by it, touch distance 8, threshold 50 %.
-Leftover invisible objects: removed, search radius 1024, removed area per direction 50%, removed directions required 60%, occupied directions required 50%, protected types None (none), kept markers inside other mods' objects moved.
+Leftover invisible objects: removed, search radius 1024, removed area per direction 50%, removed directions required 60%, occupied directions required 50%, never removed (none), kept markers inside other mods' objects left in place.
 Detailed log: True
-Write report files: True
+Write report files: False
 Report folder: <root>/AddedObjectRemover Reports
 ## scan
   Ignored other-mod object overridden by Target.esp: R_OverriddenByTarget_Pad [000821:Rival.esp] from Rival.esp.
@@ -63,11 +63,9 @@ Leftover invisible objects: 5 evaluated in <time>; removed 4 (2 inside another m
 Linked groups: 0 more objects removed with the leftover invisible object removals they are linked to.
 ## unexpectedErrors
 ## relocations
-  Moved kept T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm] out of R_ExteriorBuilding [00081D:Rival.esp] from Rival.esp: 238 units onto the terrain.
-Moved 1 kept markers out of other mods' objects; 0 left in place.
 ## unexpectedErrors
 ## write
-Wrote 23 overrides (22 removed, 1 moved) in <time>.
+Wrote 22 overrides (22 removed, 0 moved) in <time>.
   1 removed objects had an Enable Parent; it was replaced by the player with "opposite of parent" so they stay disabled.
 ## explanationProblems
 ## meshProblems
@@ -119,11 +117,6 @@ Possible manual patch needed: 3 objects to check.
   Kept, referenced by a non-placed record: T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm], cell AorExterior [000802:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
 ## written
-Anchoring diagnostics: wrote 3 evaluations to <root>/AddedObjectRemover Reports/anchoring.csv.
-Mesh origins: 2 target meshes, 2 origin near bottom, 0 origin near centre, 0 other.
-  Wrote 2 mesh origins to <root>/AddedObjectRemover Reports/mesh-origins.csv.
-Leftover invisible objects diagnostics: wrote 5 evaluations to <root>/AddedObjectRemover Reports/leftover-invisible-objects.csv.
-Manual patch hints: wrote 3 rows to <root>/AddedObjectRemover Reports/manual-patch-hints.csv.
 ## reportFileWarnings
 ## unexpectedErrors
 ## done

@@ -112,7 +112,7 @@ public class ChangedTerrainRunTests
 
     private static Settings SettingsWithTerrain(bool on) => new()
     {
-        WhatToCheck = new CheckSettings { TargetPlugin = FixtureWorld.TargetPlugin },
+        TargetPlugin = ModKey.FromNameAndExtension(FixtureWorld.TargetPlugin),
         TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = on },
     };
 

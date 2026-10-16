@@ -33,11 +33,10 @@ public sealed class StartSetupTooCloseSectionsTests
 
     [Theory]
     [InlineData(null)]
-    [InlineData("NoExtension")]
     [InlineData("Missing.esp")]
     public void Stop_GivesTheTextOfEveryUnusableTarget(string? target)
     {
-        var settings = SettingsFor(target);
+        var settings = new Settings { TargetPlugin = target == null ? ModKey.Null : ModKey.FromNameAndExtension(target) };
         var stop = Assert.IsType<RunRequest.Stop>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), Facts(), OutputPath, Workers));
 
         AssertExpectedOutput(LogSections.BuildStopSection(stop.Reason).Lines.ToArray(), "Stop_GivesTheTextOfEveryUnusableTarget", $"{target ?? "null"}");
@@ -54,10 +53,10 @@ public sealed class StartSetupTooCloseSectionsTests
     [Fact]
     public void Warnings_GiveTheTextInTheOrderTheOptionsBuilderFoundThem()
     {
-        var settings = SettingsFor("Target.esp");
-        settings.WhatToIgnore = new IgnoreSettings { ExcludedPlugins = ["bad"], NpcHandling = (NpcHandling)99 };
-        settings.TooClose.SizeMultiplier = 9f;
-        settings.LeftoverInvisibleObjects = new LeftoverInvisibleObjectSettings { SearchRadius = 1f };
+        var settings = SettingsFor();
+        settings.TooClose.NpcHandling = (NpcHandling)99;
+        settings.TooClose.BySize.SizeMultiplier = 9f;
+        settings.LeftoverInvisibleObjects = new LeftoverInvisibleObjectSettings { WhenAlone = new AloneSettings { SearchRadius = 1f } };
         settings.Diagnostics = new DiagnosticsSettings { DiagnosticsFolder = "bad\0folder" };
         var ready = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), Facts(), OutputPath, Workers));
 
@@ -95,17 +94,16 @@ public sealed class StartSetupTooCloseSectionsTests
     [InlineData(false)]
     public void Config_GivesTheTextWithAndWithoutPatchesAndLeftovers(bool everythingOn)
     {
-        var settings = SettingsFor("Target.esp");
+        var settings = SettingsFor();
         settings.WhatToIgnore = new IgnoreSettings
         {
             IgnoreTargetMasters = everythingOn,
-            IgnoreModsPatchedWithTarget = everythingOn,
-            MaxOtherMastersForPatch = 1,
-            ExcludedPlugins = everythingOn ? ["Extra.esp", "Second.esp"] : [],
+            CompatibilityPatches = new CompatibilityPatchSettings { IgnoreModsPatchedWithTarget = everythingOn, MaxOtherMastersForPatch = 1 },
+            ExcludedPlugins = everythingOn ? [ModKey.FromNameAndExtension("Extra.esp"), ModKey.FromNameAndExtension("Second.esp")] : [],
         };
         settings.FollowUpRemoval = new FollowUpRemovalSettings
         {
-            Mode = everythingOn ? FollowUpRemovalMode.ObjectsSupportedByIt : FollowUpRemovalMode.Nothing,
+            Mode = everythingOn ? FollowUpRemovalMode.OnlyWhatLosesItsSupport : FollowUpRemovalMode.Nothing,
         };
         settings.LeftoverInvisibleObjects = new LeftoverInvisibleObjectSettings
         {
@@ -125,8 +123,8 @@ public sealed class StartSetupTooCloseSectionsTests
     [Fact]
     public void Config_ListsSkippedPluginsAndDetectedPatchesWhenDetectionIsOn()
     {
-        var settings = SettingsFor("Target.esp");
-        settings.WhatToIgnore = new IgnoreSettings { MaxOtherMastersForPatch = 1 };
+        var settings = SettingsFor();
+        settings.WhatToIgnore = new IgnoreSettings { CompatibilityPatches = new CompatibilityPatchSettings { MaxOtherMastersForPatch = 1 } };
         var mods = Facts();
         var runSettings = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), mods, OutputPath, Workers)).Settings;
 
@@ -227,7 +225,7 @@ public sealed class StartSetupTooCloseSectionsTests
     [Fact]
     public void TooClose_GivesTheTextForTheObjectShapeZoneWithStuckNpcs()
     {
-        var report = CreateTooCloseSection(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInObject);
+        var report = CreateTooCloseSection(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInsideTheObject);
 
         var lines = LogSections.BuildTooCloseSection(report, Detailed).Lines.ToArray();
 
@@ -239,7 +237,7 @@ public sealed class StartSetupTooCloseSectionsTests
     [Fact]
     public void TooClose_GivesTheTextForTheBoundingBoxZoneWithIgnoredNpcs()
     {
-        var report = CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.Ignore);
+        var report = CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.Never);
 
         var lines = LogSections.BuildTooCloseSection(report, Detailed).Lines.ToArray();
 
@@ -250,7 +248,7 @@ public sealed class StartSetupTooCloseSectionsTests
     [Fact]
     public void TooClose_PutsTheShapeZoneStatisticsBeforeTheSummary()
     {
-        var lines = LogSections.BuildTooCloseSection(CreateTooCloseSection(ZoneShape.ObjectShape, NpcHandling.CountLikeObjects), Detailed).Lines;
+        var lines = LogSections.BuildTooCloseSection(CreateTooCloseSection(ZoneShape.ObjectShape, NpcHandling.AlwaysLikeAnyObject), Detailed).Lines;
 
         var order = new[] { "Object-shape zones:", "Found " }
             .Select(prefix => lines.ToList().FindIndex(line => line.StartsWith(prefix)))
@@ -261,12 +259,12 @@ public sealed class StartSetupTooCloseSectionsTests
 
     /// <summary>The zone and NPC lines follow what the step reports it used, for every pair.</summary>
     [Theory]
-    [InlineData(ZoneShape.BoundingBox, NpcHandling.CountLikeObjects, false, false, false)]
-    [InlineData(ZoneShape.BoundingBox, NpcHandling.OnlyWhenStuckInObject, false, true, false)]
-    [InlineData(ZoneShape.BoundingBox, NpcHandling.Ignore, false, false, true)]
-    [InlineData(ZoneShape.ObjectShape, NpcHandling.CountLikeObjects, true, false, false)]
-    [InlineData(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInObject, true, true, false)]
-    [InlineData(ZoneShape.ObjectShape, NpcHandling.Ignore, true, false, true)]
+    [InlineData(ZoneShape.BoundingBox, NpcHandling.AlwaysLikeAnyObject, false, false, false)]
+    [InlineData(ZoneShape.BoundingBox, NpcHandling.OnlyWhenStuckInsideTheObject, false, true, false)]
+    [InlineData(ZoneShape.BoundingBox, NpcHandling.Never, false, false, true)]
+    [InlineData(ZoneShape.ObjectShape, NpcHandling.AlwaysLikeAnyObject, true, false, false)]
+    [InlineData(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInsideTheObject, true, true, false)]
+    [InlineData(ZoneShape.ObjectShape, NpcHandling.Never, true, false, true)]
     public void TooClose_PrintsTheZoneAndNpcLinesTheResultSays(ZoneShape zone, NpcHandling npcs, bool zoneLines, bool stuckLines, bool ignoredLine)
     {
         var lines = LogSections.BuildTooCloseSection(CreateTooCloseSection(zone, npcs), Detailed).Lines.ToArray();
@@ -279,8 +277,8 @@ public sealed class StartSetupTooCloseSectionsTests
     [Fact]
     public void TooClose_ThrowsWhenTheStepHandledNpcsOnlyWhenStuckButGaveNoSummary()
     {
-        var report = CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.CountLikeObjects);
-        var inconsistent = report with { Result = report.Result with { Npcs = NpcHandling.OnlyWhenStuckInObject } };
+        var report = CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.AlwaysLikeAnyObject);
+        var inconsistent = report with { Result = report.Result with { Npcs = NpcHandling.OnlyWhenStuckInsideTheObject } };
 
         Assert.Throws<InvalidOperationException>(() => LogSections.BuildTooCloseSection(inconsistent, Detailed));
     }
@@ -296,8 +294,8 @@ public sealed class StartSetupTooCloseSectionsTests
     [InlineData(false, "Size multiplier: off")]
     public void Config_SaysWhetherTheSizeZoneIsOn(bool bySize, string expectedLine)
     {
-        var settings = SettingsFor("Target.esp");
-        settings.TooClose.RemoveTooCloseBySize = bySize;
+        var settings = SettingsFor();
+        settings.TooClose.BySize.Use = bySize;
         var mods = Facts();
         var runSettings = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), mods, OutputPath, Workers)).Settings;
 
@@ -307,11 +305,12 @@ public sealed class StartSetupTooCloseSectionsTests
     }
 
     [Fact]
-    public void Settings_RemoveTooCloseBySizeIsOnByDefaultAndPassesThrough()
+    public void Settings_TheSizeMarginIsOnByDefaultAndPassesThrough()
     {
-        Assert.True(new TooCloseRemovalSettings().RemoveTooCloseBySize);
-        var settings = SettingsFor("Target.esp");
-        settings.TooClose.RemoveTooCloseBySize = false;
+        Assert.True(new TooCloseRemovalSettings().BySize.Use);
+        var settings = SettingsFor();
+        settings.TooClose.BySize.Use = false;
+        settings.TooClose.ByDistance.Use = true;
 
         var ready = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), Facts(), OutputPath, Workers));
 
@@ -322,7 +321,7 @@ public sealed class StartSetupTooCloseSectionsTests
     [Fact]
     public void TooClose_FoundLineNamesTheDistanceWhenOnlyTheDistanceZoneIsOn()
     {
-        var report = CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.Ignore, [WithinDistance], WithinDistance);
+        var report = CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.Never, [WithinDistance], WithinDistance);
 
         var lines = LogSections.BuildTooCloseSection(report, Normal).Lines;
 
@@ -333,7 +332,7 @@ public sealed class StartSetupTooCloseSectionsTests
     public void TooClose_FoundLineCountsEachZoneWhenBothZonesAreOn()
     {
         var report = CreateTooCloseSection(
-            ZoneShape.BoundingBox, NpcHandling.Ignore, [BySize, WithinDistance], BySize, WithinDistance, WithinDistance);
+            ZoneShape.BoundingBox, NpcHandling.Never, [BySize, WithinDistance], BySize, WithinDistance, WithinDistance);
 
         var lines = LogSections.BuildTooCloseSection(report, Normal).Lines;
 
@@ -351,11 +350,11 @@ public sealed class StartSetupTooCloseSectionsTests
     public void Settings_TheDistanceZoneIsOffByDefaultAndPassesThroughClamped()
     {
         var defaults = new TooCloseRemovalSettings();
-        Assert.False(defaults.RemoveTooCloseByDistance);
-        Assert.Equal(32f, defaults.RemovalDistanceInUnits);
-        var settings = SettingsFor("Target.esp");
-        settings.TooClose.RemoveTooCloseByDistance = true;
-        settings.TooClose.RemovalDistanceInUnits = 5000f;
+        Assert.False(defaults.ByDistance.Use);
+        Assert.Equal(32f, defaults.ByDistance.DistanceInUnits);
+        var settings = SettingsFor();
+        settings.TooClose.ByDistance.Use = true;
+        settings.TooClose.ByDistance.DistanceInUnits = 5000f;
 
         var ready = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), Facts(), OutputPath, Workers));
 
@@ -386,14 +385,15 @@ public sealed class StartSetupTooCloseSectionsTests
         var noHeight = ConfigLines(settings => settings.TerrainChange = new TerrainChangeSettings
         {
             RemoveOnChangedTerrain = true,
-            TerrainCheckedObjects = TerrainCheckedObjects.AllObjects,
+            TerrainCheckedObjects = TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes,
             CountHeightChanges = false,
-            TerrainDistanceMode = TerrainDistanceMode.ObjectSize,
+            BySize = new TerrainBySizeSettings { Use = true, SizeMultiplier = 0.5f },
+            ByDistance = new TerrainByDistanceSettings { Use = false },
         });
         var noType = ConfigLines(settings => settings.TerrainChange = new TerrainChangeSettings
         {
             RemoveOnChangedTerrain = true,
-            TerrainCheckedObjects = TerrainCheckedObjects.AllVisibleObjects,
+            TerrainCheckedObjects = TerrainCheckedObjects.VisibleObjectsAtAnyHeight,
             CountTerrainTypeChanges = false,
         });
 
@@ -401,12 +401,28 @@ public sealed class StartSetupTooCloseSectionsTests
         Assert.Contains("Changed terrain: removed; objects checked: all visible objects; distance 64 units; height changes over 16 units.", noType);
     }
 
+    [Fact]
+    public void Config_JoinsTheTerrainMarginsThatAreOnWithAnd()
+    {
+        var lines = ConfigLines(settings => settings.TerrainChange = new TerrainChangeSettings
+        {
+            RemoveOnChangedTerrain = true,
+            BySize = new TerrainBySizeSettings { Use = true, SizeMultiplier = 0.5f },
+            ByDistance = new TerrainByDistanceSettings { Use = true, DistanceInUnits = 64f },
+        });
+
+        Assert.Contains(
+            "Changed terrain: removed; objects checked: visible objects on the ground; distance 0.5 times the object size and 64 units; "
+            + "height changes over 16 units; terrain type changes counted.",
+            lines);
+    }
+
     private ImmutableArray<string> ConfigLines(bool byDistance) =>
-        ConfigLines(settings => settings.TooClose.RemoveTooCloseByDistance = byDistance);
+        ConfigLines(settings => settings.TooClose.ByDistance.Use = byDistance);
 
     private ImmutableArray<string> ConfigLines(Action<Settings> change)
     {
-        var settings = SettingsFor("Target.esp");
+        var settings = SettingsFor();
         change(settings);
         var mods = Facts();
         var runSettings = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), mods, OutputPath, Workers)).Settings;
@@ -416,7 +432,7 @@ public sealed class StartSetupTooCloseSectionsTests
     [Fact]
     public void TooClose_ForTheNormalLogKeepsTheResultAndTheKeptObjectsOnly()
     {
-        var report = CreateTooCloseSection(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInObject);
+        var report = CreateTooCloseSection(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInsideTheObject);
 
         var lines = LogSections.BuildTooCloseSection(report, Normal).Lines.ToArray();
 
@@ -436,7 +452,7 @@ public sealed class StartSetupTooCloseSectionsTests
     {
         var world = CreateWorld();
         var zoneWork = zone == ZoneShape.ObjectShape ? new ShapeZoneWork(10, 8, 6, 3, 2, 1, 40) : default;
-        var stuck = npcs == NpcHandling.OnlyWhenStuckInObject
+        var stuck = npcs == NpcHandling.OnlyWhenStuckInsideTheObject
             ? new NpcStuckSummary(new NpcSizeCounts(5, 2, 1, 1, 1, 3), 12, 30, 4, [new PointNpc(world.OtherModObjects[1], new PointReason(PointReasonKind.NoBodyMeshNoBoundsNotPlayable, TestTargets.SpaceKey(0x7000), "TestRace"))])
             : null;
         var result = new TooCloseResult(
@@ -499,7 +515,7 @@ public sealed class StartSetupTooCloseSectionsTests
             IsPrimitive: false,
             HasMapMarker: false);
 
-    private static Settings SettingsFor(string? target) => new() { WhatToCheck = new CheckSettings { TargetPlugin = target! } };
+    private static Settings SettingsFor() => new() { TargetPlugin = Target };
 
     private static LoadOrderPlugins Facts()
     {

@@ -1,8 +1,6 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
-using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
-using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover;
@@ -13,48 +11,44 @@ namespace AddedObjectRemover;
 /// </summary>
 public interface ISettingsValues
 {
-    ICheckSettingsValues WhatToCheck { get; }
-    ITerrainChangeSettingsValues TerrainChange { get; }
-    ITooCloseSettingsValues TooClose { get; }
+    string? TargetPlugin { get; }
     IIgnoreSettingsValues WhatToIgnore { get; }
+    ITooCloseSettingsValues TooClose { get; }
+    ITerrainChangeSettingsValues TerrainChange { get; }
     IFollowUpSettingsValues FollowUpRemoval { get; }
     ILeftoverSettingsValues LeftoverInvisibleObjects { get; }
     IDiagnosticsSettingsValues Diagnostics { get; }
 }
 
-public interface ICheckSettingsValues
-{
-    string? TargetPlugin { get; }
-}
-
 public interface ITooCloseSettingsValues
 {
-    bool RemoveTooCloseBySize { get; }
+    bool BySize { get; }
     float SizeMultiplier { get; }
-    bool RemoveTooCloseByDistance { get; }
-    float RemovalDistanceInUnits { get; }
-    ZoneShape ZoneShape { get; }
+    bool ByDistance { get; }
+    float DistanceInUnits { get; }
+    bool UseRoughBoxes { get; }
+    NpcHandling Npcs { get; }
 }
 
 public interface ITerrainChangeSettingsValues
 {
     bool RemoveOnChangedTerrain { get; }
     TerrainCheckedObjects TerrainCheckedObjects { get; }
+    bool AreaBySize { get; }
+    float AreaSizeMultiplier { get; }
+    bool AreaByDistance { get; }
+    float AreaDistanceInUnits { get; }
     bool CountHeightChanges { get; }
     float HeightChangeTolerance { get; }
     bool CountTerrainTypeChanges { get; }
-    TerrainDistanceMode TerrainDistanceMode { get; }
-    float TerrainDistanceInUnits { get; }
-    float TerrainDistanceSizeMultiplier { get; }
 }
 
 public interface IIgnoreSettingsValues
 {
-    IReadOnlyList<string?> ExcludedPlugins { get; }
+    IReadOnlyList<string> ExcludedPlugins { get; }
     bool IgnoreTargetMasters { get; }
     bool IgnoreModsPatchedWithTarget { get; }
     int MaxOtherMastersForPatch { get; }
-    NpcHandling NpcHandling { get; }
 }
 
 public interface IFollowUpSettingsValues
@@ -71,8 +65,7 @@ public interface ILeftoverSettingsValues
     int DirectionThresholdPercent { get; }
     int RemovedDirectionsPercent { get; }
     int OccupiedDirectionsPercent { get; }
-    ProtectedInvisibleObjectsPreset ProtectedTypes { get; }
-    IReadOnlyList<InvisibleObjectKind> CustomProtectedTypes { get; }
+    IReadOnlyList<InvisibleObjectKind> NeverRemove { get; }
     bool MoveKeptMarkersOutOfOtherModsObjects { get; }
 }
 
@@ -90,18 +83,18 @@ public static class SettingDefaults
     public const float SizeMultiplier = 0.5f;
     public const bool RemoveTooCloseByDistance = false;
     public const float RemovalDistanceInUnits = 32f;
-    public const ZoneShape Zone = ZoneShape.ObjectShape;
+    public const bool UseRoughBoxes = false;
     public const bool RemoveOnChangedTerrain = false;
     public const TerrainCheckedObjects TerrainChecked = TerrainCheckedObjects.VisibleObjectsOnTheGround;
+    public const bool TerrainAreaBySize = false;
+    public const bool TerrainAreaByDistance = true;
+    public const float TerrainAreaDistanceInUnits = 64f;
     public const bool CountHeightChanges = true;
     public const float HeightChangeTolerance = 16f;
     public const bool CountTerrainTypeChanges = true;
-    public const TerrainDistanceMode TerrainDistance = TerrainDistanceMode.GameUnits;
-    public const float TerrainDistanceInUnits = 64f;
-    public const float TerrainDistanceSizeMultiplier = 0.5f;
     public const int MaxOtherMastersForPatch = 10;
-    public const NpcHandling Npcs = NpcHandling.OnlyWhenStuckInObject;
-    public const FollowUpRemovalMode FollowUpMode = FollowUpRemovalMode.EverythingTouching;
+    public const NpcHandling Npcs = NpcHandling.OnlyWhenStuckInsideTheObject;
+    public const FollowUpRemovalMode FollowUpMode = FollowUpRemovalMode.EverythingTouchingIt;
     public const float TouchDistance = 8f;
     public const float AnchoringThresholdPercent = 50f;
     public const float SearchRadius = 1024f;

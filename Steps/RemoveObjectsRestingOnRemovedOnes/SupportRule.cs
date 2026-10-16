@@ -7,7 +7,7 @@ using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
 /// <summary>
-/// ObjectsSupportedByIt. Candidates are the undecided target objects with a mesh that touch an
+/// OnlyWhatLosesItsSupport. Candidates are the undecided target objects with a mesh that touch an
 /// object removed in the previous round, or whose mesh centre area that object's mesh encloses:
 /// support also counts enclosed samples, so an object buried inside a removed one must become a
 /// candidate although no surfaces come close. Each candidate's support is split among its

@@ -1,4 +1,3 @@
-using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 
 namespace AddedObjectRemover;
@@ -13,25 +12,6 @@ internal static class SettingCorrections
         if (Enum.IsDefined(value)) return value;
         warnings.Add(new SettingWarning(label, $"Warning: {label} {value} is invalid; using {fallback}."));
         return fallback;
-    }
-
-    public static List<InvisibleObjectKind> ValidateKinds(IEnumerable<InvisibleObjectKind> kinds, ICollection<SettingWarning> warnings)
-    {
-        var valid = new List<InvisibleObjectKind>();
-        foreach (var kind in kinds)
-        {
-            if (Enum.IsDefined(kind))
-            {
-                valid.Add(kind);
-            }
-            else
-            {
-                warnings.Add(new SettingWarning(
-                    "custom protected types",
-                    $"Warning: custom protected type {kind} is invalid and was ignored."));
-            }
-        }
-        return valid;
     }
 
     /// <summary>A percentage limited to 10-100 and rounded to the nearest ten.</summary>

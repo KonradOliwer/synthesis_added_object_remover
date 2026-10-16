@@ -1,4 +1,5 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
+using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover.Tests.Fixtures;
 
@@ -12,7 +13,7 @@ internal sealed class TestReport
 
     public TestReport(IMeshFiles meshFiles, IUnexpectedErrors unexpectedErrors)
     {
-        var settings = new Settings { WhatToCheck = new CheckSettings { TargetPlugin = Target.ToString() }, Diagnostics = new DiagnosticsSettings { DetailedLog = true } };
+        var settings = new Settings { TargetPlugin = ModKey.FromNameAndExtension(Target.ToString()), Diagnostics = new DiagnosticsSettings { DetailedLog = true } };
         var plugins = new LoadOrderPlugins(
             new KnownPluginNames([Target, Patch]),
             Patch,

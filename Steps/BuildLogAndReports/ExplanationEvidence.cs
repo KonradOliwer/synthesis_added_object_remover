@@ -9,12 +9,12 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 /// </summary>
 internal static class ExplanationEvidence
 {
-    public static bool HasTouch(RestingObjectsResult alsoRemove) => IsPromised(alsoRemove, FollowUpRemovalMode.EverythingTouching);
+    public static bool HasTouch(RestingObjectsResult alsoRemove) => IsPromised(alsoRemove, FollowUpRemovalMode.EverythingTouchingIt);
 
     public static TouchChainEdges Touch(RestingObjectsResult alsoRemove) =>
         alsoRemove.ReportFileDetails.Touch ?? throw new InvalidOperationException("The report-file details were performed but hold no touch edges.");
 
-    public static bool HasMeshOrigins(RestingObjectsResult alsoRemove) => IsPromised(alsoRemove, FollowUpRemovalMode.ObjectsSupportedByIt);
+    public static bool HasMeshOrigins(RestingObjectsResult alsoRemove) => IsPromised(alsoRemove, FollowUpRemovalMode.OnlyWhatLosesItsSupport);
 
     public static ImmutableArray<MeshOrigin> MeshOrigins(RestingObjectsResult alsoRemove) =>
         alsoRemove.ReportFileDetails.MeshOrigins ?? throw new InvalidOperationException("The report-file details were performed but hold no mesh origins.");

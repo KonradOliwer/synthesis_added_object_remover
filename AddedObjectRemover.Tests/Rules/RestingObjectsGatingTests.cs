@@ -32,9 +32,9 @@ public class RestingObjectsGatingTests
             ReportFileDetails.SwitchedOff);
 
     [Theory]
-    [InlineData((int)FollowUpRemovalMode.ObjectsSupportedByIt, true, true)]
-    [InlineData((int)FollowUpRemovalMode.ObjectsSupportedByIt, false, false)]
-    [InlineData((int)FollowUpRemovalMode.EverythingTouching, true, false)]
+    [InlineData((int)FollowUpRemovalMode.OnlyWhatLosesItsSupport, true, true)]
+    [InlineData((int)FollowUpRemovalMode.OnlyWhatLosesItsSupport, false, false)]
+    [InlineData((int)FollowUpRemovalMode.EverythingTouchingIt, true, false)]
     [InlineData((int)FollowUpRemovalMode.Nothing, true, false)]
     public void TheObjectsOfAnyPluginAreNeededOnlyForSupportRoundsWithSeeds(int mode, bool seeded, bool expected)
     {
@@ -44,10 +44,10 @@ public class RestingObjectsGatingTests
     }
 
     [Theory]
-    [InlineData((int)FollowUpRemovalMode.EverythingTouching, true, true, true)]
-    [InlineData((int)FollowUpRemovalMode.EverythingTouching, true, false, false)]
-    [InlineData((int)FollowUpRemovalMode.EverythingTouching, false, true, false)]
-    [InlineData((int)FollowUpRemovalMode.ObjectsSupportedByIt, true, true, false)]
+    [InlineData((int)FollowUpRemovalMode.EverythingTouchingIt, true, true, true)]
+    [InlineData((int)FollowUpRemovalMode.EverythingTouchingIt, true, false, false)]
+    [InlineData((int)FollowUpRemovalMode.EverythingTouchingIt, false, true, false)]
+    [InlineData((int)FollowUpRemovalMode.OnlyWhatLosesItsSupport, true, true, false)]
     [InlineData((int)FollowUpRemovalMode.Nothing, true, true, false)]
     public void TheTouchChainsAreNeededOnlyForTouchRoundsWithSeedsThatAreShown(int mode, bool hadSeeds, bool shown, bool expected)
     {

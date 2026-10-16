@@ -62,8 +62,12 @@ public class TooCloseBothZonesRunTests
 
     private static Settings BothZones() => new()
     {
-        WhatToCheck = new CheckSettings { TargetPlugin = FixtureWorld.TargetPlugin },
-        TooClose = new TooCloseRemovalSettings { SizeMultiplier = SizeMultiplier, RemoveTooCloseByDistance = true },
+        TargetPlugin = ModKey.FromNameAndExtension(FixtureWorld.TargetPlugin),
+        TooClose = new TooCloseRemovalSettings
+        {
+            BySize = new TooCloseBySizeSettings { Use = true, SizeMultiplier = SizeMultiplier },
+            ByDistance = new TooCloseByDistanceSettings { Use = true, DistanceInUnits = DefaultDistance },
+        },
     };
 
     private static IMeshFilesFactory DefaultMeshFiles(string dataFolder, GameRelease release, IReadOnlyList<ModKey> listedPlugins) =>

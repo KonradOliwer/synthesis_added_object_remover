@@ -117,7 +117,7 @@ public class SetupDeterminismTests
     private static List<OtherId?> FindHosts(Scene scene, WorkOrder order, int workers)
     {
         var world = CreateWorld(scene, workers);
-        var otherModObjects = world.ObjectsThatCanCauseRemovals(Replacements.None(scene.OtherModObjects.Count), NpcHandling.OnlyWhenStuckInObject);
+        var otherModObjects = world.ObjectsThatCanCauseRemovals(Replacements.None(scene.OtherModObjects.Count), NpcHandling.OnlyWhenStuckInsideTheObject);
         var containingObjects = ContainingObjectFinder.Find(scene.Targets, Shapes, otherModObjects, order, Options(workers));
         return [.. Enumerable.Range(0, scene.Targets.Count).Select(index => containingObjects.Of(index)?.Id)];
     }

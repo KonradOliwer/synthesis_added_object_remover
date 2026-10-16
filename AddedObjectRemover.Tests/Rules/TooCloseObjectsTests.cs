@@ -39,12 +39,12 @@ public class TooCloseObjectsTests
     private sealed record TooCloseScene(List<TargetObject> Targets, List<OtherObject> OtherModObjects);
 
     [Theory]
-    [InlineData(ZoneShape.BoundingBox, NpcHandling.CountLikeObjects)]
-    [InlineData(ZoneShape.BoundingBox, NpcHandling.OnlyWhenStuckInObject)]
-    [InlineData(ZoneShape.BoundingBox, NpcHandling.Ignore)]
-    [InlineData(ZoneShape.ObjectShape, NpcHandling.CountLikeObjects)]
-    [InlineData(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInObject)]
-    [InlineData(ZoneShape.ObjectShape, NpcHandling.Ignore)]
+    [InlineData(ZoneShape.BoundingBox, NpcHandling.AlwaysLikeAnyObject)]
+    [InlineData(ZoneShape.BoundingBox, NpcHandling.OnlyWhenStuckInsideTheObject)]
+    [InlineData(ZoneShape.BoundingBox, NpcHandling.Never)]
+    [InlineData(ZoneShape.ObjectShape, NpcHandling.AlwaysLikeAnyObject)]
+    [InlineData(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInsideTheObject)]
+    [InlineData(ZoneShape.ObjectShape, NpcHandling.Never)]
     public void FindGivesTheSameResultAsTheSearches(ZoneShape zone, NpcHandling npcs)
     {
         var scene = CreateScene();
@@ -67,7 +67,7 @@ public class TooCloseObjectsTests
     [InlineData(ZoneShape.ObjectShape)]
     public void FindIsSwitchedOffAndLooksAtNothingWhenNoZoneIsOn(ZoneShape zone)
     {
-        var settings = new TooCloseSettings(BySize: false, Multiplier, ByDistance: false, DistanceInUnits: Distance, zone, NpcHandling.OnlyWhenStuckInObject);
+        var settings = new TooCloseSettings(BySize: false, Multiplier, ByDistance: false, DistanceInUnits: Distance, zone, NpcHandling.OnlyWhenStuckInsideTheObject);
 
         var result = FindWithFacade(CreateScene(), settings);
 
@@ -85,7 +85,7 @@ public class TooCloseObjectsTests
     [InlineData(ZoneShape.ObjectShape)]
     public void AStuckNpcIsFoundByTheObjectsOwnSizeWhicheverZonesAreOn(ZoneShape zone)
     {
-        var settings = new TooCloseSettings(BySize: false, Multiplier, ByDistance: true, DistanceInUnits: 0f, zone, NpcHandling.OnlyWhenStuckInObject);
+        var settings = new TooCloseSettings(BySize: false, Multiplier, ByDistance: true, DistanceInUnits: 0f, zone, NpcHandling.OnlyWhenStuckInsideTheObject);
 
         var result = FindWithFacade(CreateScene(), settings);
 
@@ -98,7 +98,7 @@ public class TooCloseObjectsTests
     [Fact]
     public void TheResultNamesTheZonesItTestedInOrder()
     {
-        var both = new TooCloseSettings(BySize: true, Multiplier, ByDistance: true, Distance, ZoneShape.BoundingBox, NpcHandling.Ignore);
+        var both = new TooCloseSettings(BySize: true, Multiplier, ByDistance: true, Distance, ZoneShape.BoundingBox, NpcHandling.Never);
 
         var result = FindWithFacade(CreateScene(), both);
 
@@ -112,7 +112,7 @@ public class TooCloseObjectsTests
     public void WithBothZonesOnEachTargetWithoutMeshTrianglesCountsOnce()
     {
         var scene = CreateScene();
-        var sizeOnly = new TooCloseSettings(BySize: true, Multiplier: 0f, ByDistance: false, Distance, ZoneShape.ObjectShape, NpcHandling.Ignore);
+        var sizeOnly = new TooCloseSettings(BySize: true, Multiplier: 0f, ByDistance: false, Distance, ZoneShape.ObjectShape, NpcHandling.Never);
         var withoutMesh = TestVisibility.TaggedBase(ObjectVisibility.Visible);
 
         var both = FindWithFacade(scene, sizeOnly with { ByDistance = true }).Work.Zone;

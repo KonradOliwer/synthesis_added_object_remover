@@ -8,9 +8,9 @@ Ignored masters of target: Skyrim.esm
 Compatibility patch detection: 2 plugins master the target.
   Compatibility patch TargetPatch.esp: links target with Patched.esp.
 Ignored because of compatibility patches: Patched.esp, TargetPatch.esp.
-NPCs and creatures: OnlyWhenStuckInObject
+NPCs and creatures: OnlyWhenStuckInsideTheObject
 Also remove: everything touching, touch distance 8.
-Leftover invisible objects: removed, search radius 1024, removed area per direction 50%, removed directions required 60%, occupied directions required 50%, protected types Custom (SoundMarkers), kept markers inside other mods' objects moved.
+Leftover invisible objects: removed, search radius 1024, removed area per direction 50%, removed directions required 60%, occupied directions required 50%, never removed (SoundMarkers), kept markers inside other mods' objects moved.
 Detailed log: False
 Write report files: True
 Report folder: <root>/Output/AddedObjectRemover Reports

@@ -34,7 +34,7 @@ internal static class TestTouchCascade
         var input = new RoundsInput(
             [.. targets], protection, ObjectsOfAnyPlugin: null, shapes, triangles, NoTerrain(), execution);
         var result = TestRestingObjects.Run(
-            seeded, input, new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouching, touchDistance, SupportLostFraction: 1f, TouchChainsShown: false));
+            seeded, input, new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouchingIt, touchDistance, SupportLostFraction: 1f, TouchChainsShown: false));
         return Explain(targets, shapes, triangles, result, execution, collectDiagnostics);
     }
 
@@ -61,7 +61,7 @@ internal static class TestTouchCascade
             triangles,
             touchDistance,
             execution);
-        var plan = new RestingObjectsPlan(FollowUpRemovalMode.EverythingTouching, HadSeeds: true, createRule(search, execution), search);
+        var plan = new RestingObjectsPlan(FollowUpRemovalMode.EverythingTouchingIt, HadSeeds: true, createRule(search, execution), search);
         return Explain(targets, shapes, triangles, TestRestingObjects.Run(seeded, plan), execution, collectDiagnostics);
     }
 

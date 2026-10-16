@@ -34,8 +34,7 @@ public class LeftBehindOrderDeterminismTests
         DirectionClearedPercent: 50,
         ClearedDirectionsPercent: 60,
         OccupiedDirectionsPercent: 50,
-        NeverRemove: new HashSet<InvisibleObjectKind>(),
-        Preset: ProtectedInvisibleObjectsPreset.None);
+        NeverRemove: new HashSet<InvisibleObjectKind>());
 
     [Fact]
     public void EvaluateMatchesForReversedAndShuffledWorkOrders()
@@ -72,7 +71,7 @@ public class LeftBehindOrderDeterminismTests
         var immutableTargets = targets.ToImmutableArray();
         var protection = ObjectsToKeep.Build(immutableTargets, [], TestTargets.References(targets.Count));
         var decisions = TestSeededDecisions.Seed(protection, targets.Count, removedTables);
-        var otherModObjects = scene.ObjectsThatCanCauseRemovals(Replacements.None(rooms.Count), NpcHandling.OnlyWhenStuckInObject);
+        var otherModObjects = scene.ObjectsThatCanCauseRemovals(Replacements.None(rooms.Count), NpcHandling.OnlyWhenStuckInsideTheObject);
         return LeftBehindObjects.Find(
             immutableTargets,
             otherModObjects,

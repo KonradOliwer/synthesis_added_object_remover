@@ -5,7 +5,7 @@ using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
 /// <summary>
-/// EverythingTouching: an undecided object whose mesh touches, within the touch gap, a mesh removed
+/// EverythingTouchingIt: an undecided object whose mesh touches, within the touch gap, a mesh removed
 /// in the previous round is proposed for removal, attributed to the first frontier object (in
 /// target order, then neighbour order) that touches it. Kept objects never spread, because the
 /// decisions never list them as removed.

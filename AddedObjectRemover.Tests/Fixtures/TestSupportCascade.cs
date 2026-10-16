@@ -35,7 +35,7 @@ internal static class TestSupportCascade
             new TriangleStore(shapes.ReadTriangles),
             terrain,
             new Execution(threads));
-        var run = TestRestingObjects.Run(seeded, input, new AlsoRemoveSettings(FollowUpRemovalMode.ObjectsSupportedByIt, touchDistance, threshold, TouchChainsShown: false));
+        var run = TestRestingObjects.Run(seeded, input, new AlsoRemoveSettings(FollowUpRemovalMode.OnlyWhatLosesItsSupport, touchDistance, threshold, TouchChainsShown: false));
         return new Run(run.Decisions, run.Result.Rounds) { Result = run.Result };
     }
 }

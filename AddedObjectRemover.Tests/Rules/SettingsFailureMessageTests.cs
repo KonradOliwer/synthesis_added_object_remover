@@ -1,3 +1,5 @@
+using Mutagen.Bethesda.Json;
+using Mutagen.Bethesda.Plugins;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 
@@ -5,10 +7,25 @@ namespace AddedObjectRemover.Tests.Rules;
 
 public class SettingsFailureMessageTests
 {
-    private static readonly JsonSerializerSettings JsonSettings = new()
+    /// <summary>As Synthesis reads settings.json (Mutagen.Bethesda.Synthesis ReflectionSettingsTarget).</summary>
+    private static readonly JsonSerializerSettings JsonSettings = CreateJsonSettings();
+
+    private static JsonSerializerSettings CreateJsonSettings()
     {
-        Converters = { new StringEnumConverter() },
-    };
+        var settings = new JsonSerializerSettings { ObjectCreationHandling = ObjectCreationHandling.Replace };
+        settings.Converters.Add(new StringEnumConverter());
+        settings.AddMutagenConverters();
+        return settings;
+    }
+
+    [Fact]
+    public void ATargetPluginOfTheWrongJsonTypeNamesTheSettingAndAsksForAPluginFileName()
+    {
+        var message = SettingsFailureMessage.Describe(Deserialize("""{"TargetPlugin":[]}"""), Program.SettingsSchema);
+
+        Assert.Contains("'Mod to clean up' (settings.json path 'TargetPlugin')", message);
+        Assert.EndsWith("Expected a plugin file name, for example SomeMod.esp.", message);
+    }
 
     private static JsonException Deserialize(string json)
     {
@@ -30,35 +47,103 @@ public class SettingsFailureMessageTests
 
         var message = SettingsFailureMessage.Describe(ex, Program.SettingsSchema);
 
-        Assert.Contains("Also remove", message);
+        Assert.Contains("When an object is removed, also remove", message);
         Assert.Contains("FollowUpRemoval.Mode", message);
         Assert.Contains("Anchoring", message);
-        Assert.Contains("Allowed values: Nothing, EverythingTouching, ObjectsSupportedByIt", message);
+        Assert.Contains("Allowed values: Nothing, EverythingTouchingIt, OnlyWhatLosesItsSupport", message);
+    }
+
+    [Theory]
+    [InlineData("""{"TooClose":{"NpcHandling":"Ignore"}}""", "TooClose.NpcHandling", "Allowed values: AlwaysLikeAnyObject, OnlyWhenStuckInsideTheObject, Never")]
+    [InlineData(
+        """{"TerrainChange":{"TerrainCheckedObjects":"AllObjects"}}""",
+        "TerrainChange.TerrainCheckedObjects",
+        "Allowed values: VisibleObjectsOnTheGround, VisibleObjectsAtAnyHeight, AllObjectsIncludingInvisibleOnes")]
+    public void UnknownEnumValueInAnotherGroupNamesItsPathAndAllowedOptions(string json, string path, string allowed)
+    {
+        var message = SettingsFailureMessage.Describe(Deserialize(json), Program.SettingsSchema);
+
+        Assert.Contains(path, message);
+        Assert.Contains(allowed, message);
     }
 
     [Fact]
     public void WrongJsonTypeNamesTheSettingAndTheValueFound()
     {
-        var ex = Deserialize("""{"TooClose":{"SizeMultiplier":"abc"}}""");
+        var ex = Deserialize("""{"TooClose":{"BySize":{"SizeMultiplier":"abc"}}}""");
 
         var message = SettingsFailureMessage.Describe(ex, Program.SettingsSchema);
 
-        Assert.Contains("Removal distance", message);
-        Assert.Contains("TooClose.SizeMultiplier", message);
+        Assert.Contains("Margin by object size > Margin on every side", message);
+        Assert.Contains("TooClose.BySize.SizeMultiplier", message);
         Assert.Contains("abc", message);
     }
 
     [Fact]
-    public void TextListGivenASingleTextAsksForTextInPlainWords()
+    public void PluginListGivenASingleTextNamesTheSettingAndTheValueFound()
     {
         var ex = Deserialize("""{"WhatToIgnore":{"ExcludedPlugins":"SomeMod.esp"}}""");
 
         var message = SettingsFailureMessage.Describe(ex, Program.SettingsSchema);
 
         Assert.Contains("WhatToIgnore.ExcludedPlugins", message);
-        Assert.Contains("Expected a text value.", message);
-        Assert.DoesNotContain("String", message);
+        Assert.Contains("Never count these mods", message);
+        Assert.Contains("SomeMod.esp", message);
+        Assert.EndsWith("Expected a plugin file name, for example SomeMod.esp.", message);
     }
+
+    [Theory]
+    [InlineData("""{"TargetPlugin":"Foo"}""")]
+    [InlineData("""{"WhatToIgnore":{"ExcludedPlugins":["Bar.esp","Foo"]}}""")]
+    public void AMisspelledPluginNameStopsTheLoadNamingTheValueAndAskingForAPluginFileName(string json)
+    {
+        var ex = Assert.Throws<SettingsUnreadableException>(
+            () => SettingsLoading.Load(() => JsonConvert.DeserializeObject<Settings>(json, JsonSettings), Program.SettingsSchema));
+
+        Assert.Contains("'Mod to clean up'", ex.Message);
+        Assert.Contains("'Other mods that never cause removals > Never count these mods'", ex.Message);
+        Assert.Contains("Value found: Foo.", ex.Message);
+        Assert.EndsWith("Expected a plugin file name, for example SomeMod.esp.", ex.Message);
+    }
+
+    [Fact]
+    public void AnArgumentFailureThatIsNotAPluginNameIsNotHidden()
+    {
+        Assert.Throws<ArgumentException>(
+            () => SettingsLoading.Load<int>(() => throw new ArgumentException("a bug of ours"), Program.SettingsSchema));
+    }
+
+    [Fact]
+    public void APartlyWrittenTooCloseGroupKeepsTheTooCloseDefaults()
+    {
+        var settings = Read("""{"TooClose":{"ByDistance":{"Use":true},"BySize":{"SizeMultiplier":1}}}""");
+
+        Assert.True(settings.TooClose.ByDistance.Use);
+        Assert.Equal(32f, settings.TooClose.ByDistance.DistanceInUnits);
+        Assert.True(settings.TooClose.BySize.Use);
+        Assert.Equal(1f, settings.TooClose.BySize.SizeMultiplier);
+    }
+
+    [Fact]
+    public void APartlyWrittenTerrainGroupKeepsTheTerrainDefaults()
+    {
+        var settings = Read("""{"TerrainChange":{"ByDistance":{"Use":true},"BySize":{"SizeMultiplier":1}}}""");
+
+        Assert.True(settings.TerrainChange.ByDistance.Use);
+        Assert.Equal(64f, settings.TerrainChange.ByDistance.DistanceInUnits);
+        Assert.False(settings.TerrainChange.BySize.Use);
+    }
+
+    [Fact]
+    public void ANullMarginGroupMeansItsGroupsDefaults()
+    {
+        var settings = Read("""{"TooClose":{"ByDistance":null},"TerrainChange":{"ByDistance":null}}""");
+
+        Assert.Equal(32f, ((ITooCloseSettingsValues)settings.TooClose).DistanceInUnits);
+        Assert.Equal(64f, ((ITerrainChangeSettingsValues)settings.TerrainChange).AreaDistanceInUnits);
+    }
+
+    private static Settings Read(string json) => JsonConvert.DeserializeObject<Settings>(json, JsonSettings)!;
 
     [Fact]
     public void SyntaxErrorOutsideAnySettingNamesItsLineAndPosition()
@@ -73,11 +158,11 @@ public class SettingsFailureMessageTests
     [Fact]
     public void PathIsMappedToItsDisplayNameBreadcrumb()
     {
-        var setting = SettingsFailureMessage.ResolveSetting("LeftoverInvisibleObjects.CustomProtectedTypes[0]", Program.SettingsSchema);
+        var setting = SettingsFailureMessage.ResolveSetting("WhatToIgnore.ExcludedPlugins[0]", Program.SettingsSchema);
 
         Assert.NotNull(setting);
-        Assert.Equal("Invisible objects left behind > Types to never remove (Custom)", setting.Value.Breadcrumb);
-        Assert.Equal(typeof(InvisibleObjectKind), setting.Value.LeafType);
+        Assert.Equal("Other mods that never cause removals > Never count these mods", setting.Value.Breadcrumb);
+        Assert.Equal(typeof(ModKey), setting.Value.LeafType);
     }
 
     [Fact]

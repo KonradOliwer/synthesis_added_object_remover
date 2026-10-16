@@ -6,7 +6,7 @@ using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
-/// <param name="TouchChains">The touch chains; present whenever EverythingTouching ran with seeds, because the details are computed only when the chain search did not fail.</param>
+/// <param name="TouchChains">The touch chains; present whenever EverythingTouchingIt ran with seeds, because the details are computed only when the chain search did not fail.</param>
 internal sealed record ReportFileDetailsInput(
     RestingObjectsRun RestingObjects,
     TouchChainSet? TouchChains,
@@ -26,12 +26,12 @@ internal static class ExplanationFinder
 
         return alsoRemove.Mode switch
         {
-            FollowUpRemovalMode.EverythingTouching => new ReportFileDetails(
+            FollowUpRemovalMode.EverythingTouchingIt => new ReportFileDetails(
                 StepOutcome.Performed,
                 ExplainTouch(input, input.TouchChains ?? throw new InvalidOperationException("Touch rounds with seeds ran for the report files without touch chains.")),
                 MeshOrigins: null,
                 Failure: null),
-            FollowUpRemovalMode.ObjectsSupportedByIt => new ReportFileDetails(
+            FollowUpRemovalMode.OnlyWhatLosesItsSupport => new ReportFileDetails(
                 StepOutcome.Performed,
                 Touch: null,
                 MeshOriginSurvey.Measure(input.Targets, input.Shapes, input.Bases, input.Triangles, input.Exec),

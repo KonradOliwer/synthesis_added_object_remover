@@ -37,10 +37,10 @@ public class TooCloseOrderDeterminismTests
     private sealed record TooCloseScene(List<TargetObject> Targets, List<OtherObject> OtherModObjects);
 
     [Theory]
-    [InlineData(ZoneShape.BoundingBox, NpcHandling.CountLikeObjects)]
-    [InlineData(ZoneShape.BoundingBox, NpcHandling.OnlyWhenStuckInObject)]
-    [InlineData(ZoneShape.ObjectShape, NpcHandling.CountLikeObjects)]
-    [InlineData(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInObject)]
+    [InlineData(ZoneShape.BoundingBox, NpcHandling.AlwaysLikeAnyObject)]
+    [InlineData(ZoneShape.BoundingBox, NpcHandling.OnlyWhenStuckInsideTheObject)]
+    [InlineData(ZoneShape.ObjectShape, NpcHandling.AlwaysLikeAnyObject)]
+    [InlineData(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInsideTheObject)]
     public void FindMatchesForReversedAndShuffledWorkOrders(ZoneShape zone, NpcHandling npcs)
     {
         var scene = CreateScene();

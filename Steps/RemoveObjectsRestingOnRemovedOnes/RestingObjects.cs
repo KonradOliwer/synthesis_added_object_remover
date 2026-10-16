@@ -67,8 +67,8 @@ public static class RestingObjects
 
         return settings.Mode switch
         {
-            FollowUpRemovalMode.EverythingTouching => PrepareTouchRounds(earlierRounds, seeds, input, settings),
-            FollowUpRemovalMode.ObjectsSupportedByIt => PrepareSupportRounds(seeds, input, settings),
+            FollowUpRemovalMode.EverythingTouchingIt => PrepareTouchRounds(earlierRounds, seeds, input, settings),
+            FollowUpRemovalMode.OnlyWhatLosesItsSupport => PrepareSupportRounds(seeds, input, settings),
             _ => throw new UnreachableException($"Unknown follow-up removal mode {settings.Mode}."),
         };
     }
@@ -94,8 +94,8 @@ public static class RestingObjects
         var evidence = rounds.Select(round => round.Details).ToImmutableArray();
         var work = plan.Mode switch
         {
-            FollowUpRemovalMode.EverythingTouching => new RestingObjectsWork(evidence.Length, Candidates: 0, Evaluations: 0, KeptWithoutContacts: 0, SumPairWork(evidence)),
-            FollowUpRemovalMode.ObjectsSupportedByIt => CountSupportWork(evidence, decisions),
+            FollowUpRemovalMode.EverythingTouchingIt => new RestingObjectsWork(evidence.Length, Candidates: 0, Evaluations: 0, KeptWithoutContacts: 0, SumPairWork(evidence)),
+            FollowUpRemovalMode.OnlyWhatLosesItsSupport => CountSupportWork(evidence, decisions),
             _ => throw new UnreachableException($"Unknown follow-up removal mode {plan.Mode}."),
         };
         var result = new RestingObjectsResult(
@@ -118,11 +118,11 @@ public static class RestingObjects
     /// <summary>Whether <see cref="Prepare"/> needs <see cref="RoundsInput.ObjectsOfAnyPlugin"/>: only the support rounds use them, and only when they have seeds.</summary>
     /// <param name="earlierRounds">The decisions with the earlier removal rounds, which seed this step.</param>
     internal static bool NeedsObjectsOfAnyPlugin(IRemovalDecisions earlierRounds, AlsoRemoveSettings settings) =>
-        settings.Mode == FollowUpRemovalMode.ObjectsSupportedByIt && !SeedsOf(earlierRounds).IsEmpty;
+        settings.Mode == FollowUpRemovalMode.OnlyWhatLosesItsSupport && !SeedsOf(earlierRounds).IsEmpty;
 
     /// <summary>Finding the touch chains tests the touching pairs again, so only the detailed log and the report files ask for them.</summary>
     internal static bool NeedsTouchChains(RestingObjectsResult result, AlsoRemoveSettings settings) =>
-        result.Mode == FollowUpRemovalMode.EverythingTouching && result.HadSeeds && settings.TouchChainsShown;
+        result.Mode == FollowUpRemovalMode.EverythingTouchingIt && result.HadSeeds && settings.TouchChainsShown;
 
     /// <remarks>Stopped on its own, so a failure here keeps the rounds.</remarks>
     private static RestingObjectsResult WithTouchChains(RestingObjectsRun run, RestingObjectsInput input)
@@ -179,11 +179,11 @@ public static class RestingObjects
     private static RestingObjectsPlan PrepareTouchRounds(IRemovalDecisions earlierRounds, IReadOnlyList<int> seeds, RoundsInput input, AlsoRemoveSettings settings)
     {
         var search = CreateTouchSearch(earlierRounds, seeds, input, settings);
-        return new RestingObjectsPlan(FollowUpRemovalMode.EverythingTouching, HadSeeds: true, new TouchRule(search), search);
+        return new RestingObjectsPlan(FollowUpRemovalMode.EverythingTouchingIt, HadSeeds: true, new TouchRule(search), search);
     }
 
     private static RestingObjectsPlan PrepareSupportRounds(IReadOnlyList<int> seeds, RoundsInput input, AlsoRemoveSettings settings) =>
-        new(FollowUpRemovalMode.ObjectsSupportedByIt, HadSeeds: true, CreateSupportRule(seeds, input, settings), Search: null);
+        new(FollowUpRemovalMode.OnlyWhatLosesItsSupport, HadSeeds: true, CreateSupportRule(seeds, input, settings), Search: null);
 
     /// <remarks>The objects kept in the seed rounds never take part, so the touch never spreads through them.</remarks>
     private static TouchSearch CreateTouchSearch(IRemovalDecisions earlierRounds, IReadOnlyList<int> seeds, RoundsInput input, AlsoRemoveSettings settings) =>
@@ -199,7 +199,7 @@ public static class RestingObjects
     /// <remarks>Objects kept in the seed rounds are decided, so they are never candidates, and they keep supporting others.</remarks>
     private static SupportRule CreateSupportRule(IReadOnlyList<int> seeds, RoundsInput input, AlsoRemoveSettings settings)
     {
-        var objectsOfAnyPlugin = input.ObjectsOfAnyPlugin ?? throw new ArgumentException("ObjectsSupportedByIt needs the objects of any plugin.", nameof(input));
+        var objectsOfAnyPlugin = input.ObjectsOfAnyPlugin ?? throw new ArgumentException("OnlyWhatLosesItsSupport needs the objects of any plugin.", nameof(input));
         var search = TouchSearch.Create(
             input.Targets,
             ReachableSpaces.CollectReachableSpaces(input.Protection.Groups, input.Targets, seeds),

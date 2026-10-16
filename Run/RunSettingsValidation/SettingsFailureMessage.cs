@@ -11,11 +11,38 @@ internal static class SettingsFailureMessage
 {
     private static readonly Regex PathSegment = new(@"[A-Za-z_][A-Za-z0-9_]*", RegexOptions.Compiled);
     private static readonly Regex ConvertedValue = new(
-        @"Error converting value (.*?) to type|Could not convert string to \w+: (.*?)\.\s*Path",
+        @"Error converting value (.*?) to type|Could not convert string to \w+: (.*?)\.\s*Path|Could not construct ModKey: (.*?)(?: \(Parameter '|[\r\n]|$)",
         RegexOptions.Compiled);
 
     public static string Describe(JsonException exception, SettingsSchema schema) =>
         Describe(PathOf(exception), LocationOf(exception), exception.Message, schema);
+
+    /// <summary>The plugin type's own parse failure, thrown while a plugin name is read; it carries no path, so the settings holding plugin names are listed.</summary>
+    public static bool IsUnreadablePluginName(ArgumentException exception, SettingsSchema schema) =>
+        exception.TargetSite?.DeclaringType == schema.PluginType;
+
+    public static string DescribeUnreadablePluginName(ArgumentException exception, SettingsSchema schema)
+    {
+        var settings = string.Join(" or ", PluginSettingNames(schema.Root, schema).Select(name => $"'{name}'"));
+        return Compose($"a plugin name in {settings}", ExtractFoundValue(exception.Message), DescribeAllowedValues(schema.PluginType, schema));
+    }
+
+    private static IEnumerable<string> PluginSettingNames(Type group, SettingsSchema schema)
+    {
+        foreach (var property in group.GetProperties())
+        {
+            var name = schema.DisplayNameOf(property) ?? property.Name;
+            var type = ElementTypeOrSelf(property.PropertyType);
+            if (type == schema.PluginType)
+            {
+                yield return name;
+            }
+            else if (type.IsClass && type.Assembly == schema.Root.Assembly)
+            {
+                foreach (var inner in PluginSettingNames(type, schema)) yield return $"{name} > {inner}";
+            }
+        }
+    }
 
     /// <summary>Path is on <see cref="JsonSerializationException"/> and <see cref="JsonReaderException"/> individually, not on the shared base type.</summary>
     private static string? PathOf(JsonException exception) => exception switch
@@ -43,10 +70,14 @@ internal static class SettingsFailureMessage
             ? $"'{setting.Value.Breadcrumb}' (settings.json path '{path}')"
             : location != null ? $"the settings file at {location}" : "the settings file";
 
+        var allowed = setting?.LeafType == null ? null : DescribeAllowedValues(setting.Value.LeafType, schema);
+        return Compose(settingDescription, ExtractFoundValue(exceptionMessage), allowed);
+    }
+
+    private static string Compose(string settingDescription, string? foundValue, string? allowed)
+    {
         var message = $"Invalid saved setting: {settingDescription}.";
-        var foundValue = ExtractFoundValue(exceptionMessage);
         if (foundValue != null) message += $" Value found: {foundValue}.";
-        var allowed = setting?.LeafType == null ? null : DescribeAllowedValues(setting.Value.LeafType);
         if (allowed != null) message += $" {allowed}";
         return message;
     }
@@ -91,12 +122,13 @@ internal static class SettingsFailureMessage
     {
         var match = ConvertedValue.Match(message);
         if (!match.Success) return null;
-        return match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
+        return match.Groups.Cast<Group>().Skip(1).First(group => group.Success).Value.Trim();
     }
 
-    internal static string DescribeAllowedValues(Type type)
+    internal static string DescribeAllowedValues(Type type, SettingsSchema schema)
     {
         if (type.IsEnum) return $"Allowed values: {string.Join(", ", Enum.GetNames(type))}.";
+        if (type == schema.PluginType) return "Expected a plugin file name, for example SomeMod.esp.";
         if (type == typeof(bool)) return "Expected value: true or false.";
         if (type == typeof(int) || type == typeof(float) || type == typeof(double)) return "Expected a number.";
         if (type == typeof(string)) return "Expected a text value.";

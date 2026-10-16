@@ -42,7 +42,7 @@ public sealed class TablesTests : IDisposable
     public void TouchTables_MatchTheirExpectedOutputFile()
     {
         var scene = TouchScene();
-        var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouching, TouchDistance, Threshold, TouchChainsShown: true);
+        var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouchingIt, TouchDistance, Threshold, TouchChainsShown: true);
         var tables = Tables.BuildTables(WithDetails(scene.Outcome, TouchDetails(scene)), settings, Context);
 
         Assert.NotEmpty(scene.Run.Explanation!.Edges);
@@ -55,7 +55,7 @@ public sealed class TablesTests : IDisposable
     [Fact]
     public void TouchTables_TakeTheChangedTerrainRoundsRemovalsAsSeedsToo()
     {
-        var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouching, TouchDistance, Threshold, TouchChainsShown: true);
+        var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouchingIt, TouchDistance, Threshold, TouchChainsShown: true);
         var plain = TouchScene();
         var withTerrain = TouchScene(terrainSeeds: [0]);
 
@@ -145,7 +145,7 @@ public sealed class TablesTests : IDisposable
     public void Build_TouchExplanationsGiveEdgesComponentsAndHints()
     {
         var scene = TouchScene();
-        var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouching, TouchDistance, Threshold, TouchChainsShown: true);
+        var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouchingIt, TouchDistance, Threshold, TouchChainsShown: true);
 
         var tables = Tables.BuildTables(WithDetails(scene.Outcome, TouchDetails(scene)), settings, Context);
 
@@ -159,7 +159,7 @@ public sealed class TablesTests : IDisposable
     public void Build_WithoutPerformedDetailsLeftBehindOrSupportRoundsGivesOnlyHints(StepOutcome detailsOutcome)
     {
         var scene = TouchScene();
-        var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouching, TouchDistance, Threshold, TouchChainsShown: true);
+        var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouchingIt, TouchDistance, Threshold, TouchChainsShown: true);
         var details = ReportFileDetails.SwitchedOff with { Outcome = detailsOutcome };
 
         var tables = Tables.BuildTables(WithDetails(scene.Outcome, details), settings, Context);
@@ -171,7 +171,7 @@ public sealed class TablesTests : IDisposable
     public void Build_PerformedTouchDetailsWithoutTheEdgesAreABug()
     {
         var scene = TouchScene();
-        var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouching, TouchDistance, Threshold, TouchChainsShown: true);
+        var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouchingIt, TouchDistance, Threshold, TouchChainsShown: true);
 
         Assert.Throws<InvalidOperationException>(() => Tables.BuildTables(WithDetails(scene.Outcome, ReportFileDetails.None), settings, Context));
     }
@@ -180,16 +180,16 @@ public sealed class TablesTests : IDisposable
     public void Build_PerformedMeshOriginDetailsWithoutTheOriginsAreABug()
     {
         var scene = TouchScene();
-        var settings = new AlsoRemoveSettings(FollowUpRemovalMode.ObjectsSupportedByIt, TouchDistance, Threshold, TouchChainsShown: true);
+        var settings = new AlsoRemoveSettings(FollowUpRemovalMode.OnlyWhatLosesItsSupport, TouchDistance, Threshold, TouchChainsShown: true);
         var outcome = scene.Outcome with { RestingObjects = scene.Outcome.RestingObjects with { Mode = settings.Mode, Rounds = [], Evidence = [] } };
 
         Assert.Throws<InvalidOperationException>(() => Tables.BuildTables(WithDetails(outcome, ReportFileDetails.None), settings, Context));
     }
 
     [Theory]
-    [InlineData(FollowUpRemovalMode.ObjectsSupportedByIt, true, true)]
-    [InlineData(FollowUpRemovalMode.ObjectsSupportedByIt, false, false)]
-    [InlineData(FollowUpRemovalMode.EverythingTouching, true, false)]
+    [InlineData(FollowUpRemovalMode.OnlyWhatLosesItsSupport, true, true)]
+    [InlineData(FollowUpRemovalMode.OnlyWhatLosesItsSupport, false, false)]
+    [InlineData(FollowUpRemovalMode.EverythingTouchingIt, true, false)]
     [InlineData(FollowUpRemovalMode.Nothing, true, false)]
     public void Build_WritesSupportOnlyForSupportRoundsWithSeeds(FollowUpRemovalMode mode, bool hadSeeds, bool expected)
     {
@@ -208,7 +208,7 @@ public sealed class TablesTests : IDisposable
     public void Build_WritesNoSupportTableForAStepThatDidNotRun(StepOutcome outcome)
     {
         var scene = TouchScene();
-        var settings = new AlsoRemoveSettings(FollowUpRemovalMode.ObjectsSupportedByIt, TouchDistance, Threshold, TouchChainsShown: true);
+        var settings = new AlsoRemoveSettings(FollowUpRemovalMode.OnlyWhatLosesItsSupport, TouchDistance, Threshold, TouchChainsShown: true);
         var alsoRemove = scene.Outcome.RestingObjects with { Outcome = outcome, Mode = settings.Mode, HadSeeds = false, Rounds = [], Evidence = [] };
 
         var tables = Tables.BuildTables(WithDetails(scene.Outcome with { RestingObjects = alsoRemove }, ReportFileDetails.SwitchedOff), settings, Context);
@@ -220,7 +220,7 @@ public sealed class TablesTests : IDisposable
     public void Build_AStoppedLeftBehindStepStillGetsItsHeaderOnlyTable()
     {
         var scene = TouchScene();
-        var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouching, TouchDistance, Threshold, TouchChainsShown: true);
+        var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouchingIt, TouchDistance, Threshold, TouchChainsShown: true);
         var stopped = new LeftBehindResult(StepOutcome.StoppedByUnexpectedError, [], [], new PartFailure(LeftBehindParts.LeftBehind, "it broke", Subject: null));
 
         var tables = Tables.BuildTables(WithDetails(scene.Outcome with { LeftBehind = stopped }, ReportFileDetails.SwitchedOff), settings, Context);
@@ -232,7 +232,7 @@ public sealed class TablesTests : IDisposable
     public void Build_ListsTheFilesInTheOrderTheStepsRan()
     {
         var scene = TouchScene();
-        var settings = new AlsoRemoveSettings(FollowUpRemovalMode.ObjectsSupportedByIt, TouchDistance, Threshold, TouchChainsShown: true);
+        var settings = new AlsoRemoveSettings(FollowUpRemovalMode.OnlyWhatLosesItsSupport, TouchDistance, Threshold, TouchChainsShown: true);
         var outcome = scene.Outcome with
         {
             RestingObjects = scene.Outcome.RestingObjects with { Mode = settings.Mode, Rounds = [], Evidence = [] },

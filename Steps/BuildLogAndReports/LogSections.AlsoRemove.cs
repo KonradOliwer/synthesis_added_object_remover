@@ -36,9 +36,9 @@ internal static partial class LogSections
         ReportContext context) =>
         alsoRemove.Mode switch
         {
-            FollowUpRemovalMode.EverythingTouching =>
+            FollowUpRemovalMode.EverythingTouchingIt =>
                 AlsoRemoveSection("touch", world, alsoRemove, decisions, meshes, elapsed, context, () => TouchChainLines(alsoRemove, decisions)),
-            FollowUpRemovalMode.ObjectsSupportedByIt =>
+            FollowUpRemovalMode.OnlyWhatLosesItsSupport =>
                 AlsoRemoveSection("anchoring", world, alsoRemove, decisions, meshes, elapsed, context, () => SupportLines(alsoRemove, decisions)),
             _ => throw new UnreachableException($"Unknown follow-up removal mode {alsoRemove.Mode}."),
         };

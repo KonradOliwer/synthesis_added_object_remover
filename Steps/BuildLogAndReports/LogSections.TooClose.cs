@@ -60,10 +60,10 @@ internal static partial class LogSections
 
     private static IEnumerable<string> NpcLines(TooCloseSection report) => report.Result.Npcs switch
     {
-        NpcHandling.OnlyWhenStuckInObject => StuckNpcLines(
+        NpcHandling.OnlyWhenStuckInsideTheObject => StuckNpcLines(
             report.Result.Npc ?? throw new InvalidOperationException("The too-close step handled NPCs only when stuck but gave no stuck-NPC summary."), report),
-        NpcHandling.Ignore => [$"NPCs and creatures: ignored; {TextFormat.Count(report.Census.PlacedNpcs)} placed NPCs of other mods never cause removals."],
-        NpcHandling.CountLikeObjects => [],
+        NpcHandling.Never => [$"NPCs and creatures: ignored; {TextFormat.Count(report.Census.PlacedNpcs)} placed NPCs of other mods never cause removals."],
+        NpcHandling.AlwaysLikeAnyObject => [],
         _ => throw new UnreachableException($"Unknown NPC handling {report.Result.Npcs}."),
     };
 

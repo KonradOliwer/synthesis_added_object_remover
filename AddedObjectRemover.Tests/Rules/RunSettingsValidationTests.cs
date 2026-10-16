@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Tests.Fixtures;
+using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover.Tests.Rules;
 
@@ -15,21 +16,39 @@ public class RunSettingsValidationTests
             Patch,
             [new PluginListing(Target, targetLoaded, []), new PluginListing(Patch, true, [])]);
 
-    private static Settings SettingsFor(string? target = "Target.esp") =>
-        new() { WhatToCheck = new CheckSettings { TargetPlugin = target! } };
+    private static Settings SettingsFor(string target = "Target.esp") =>
+        new() { TargetPlugin = ModKey.FromNameAndExtension(target) };
 
     private static RunRequest.Ready BuildReady(Settings settings, LoadOrderPlugins? facts = null, int workers = 3) =>
         Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), facts ?? Facts(), OutputPath, workers));
 
-    [Theory]
-    [InlineData(null, (int)StopKind.NoTargetSet, null)]
-    [InlineData("  ", (int)StopKind.NoTargetSet, null)]
-    [InlineData("NoExtension", (int)StopKind.InvalidTargetName, "NoExtension")]
-    [InlineData("Missing.esp", (int)StopKind.TargetNotInLoadOrder, "Missing.esp")]
-    public void ATargetThatCannotBeUsedStopsTheRun(string? target, int kind, string? name)
+    [Fact]
+    public void AnEmptyTargetPluginStopsTheRunAsNoTargetSet()
     {
-        var stop = Assert.IsType<RunRequest.Stop>(SettingsValidator.Build(SettingsFor(target), new PluginNameParsingPlugin(), Facts(), OutputPath, 1));
-        Assert.Equal(new StopReason((StopKind)kind, name), stop.Reason);
+        var stop = Assert.IsType<RunRequest.Stop>(SettingsValidator.Build(new Settings(), new PluginNameParsingPlugin(), Facts(), OutputPath, 1));
+        Assert.Equal(new StopReason(StopKind.NoTargetSet, null), stop.Reason);
+    }
+
+    [Fact]
+    public void ATargetOutsideTheLoadOrderStopsTheRun()
+    {
+        var stop = Assert.IsType<RunRequest.Stop>(SettingsValidator.Build(SettingsFor("Missing.esp"), new PluginNameParsingPlugin(), Facts(), OutputPath, 1));
+        Assert.Equal(new StopReason(StopKind.TargetNotInLoadOrder, "Missing.esp"), stop.Reason);
+    }
+
+    [Fact]
+    public void TooCloseWithNeitherMarginOnGivesAWarning()
+    {
+        var settings = SettingsFor();
+        settings.TooClose.BySize.Use = false;
+        settings.TooClose.ByDistance.Use = false;
+
+        var ready = BuildReady(settings);
+
+        Assert.False(ready.Settings.TooClose.BySize || ready.Settings.TooClose.ByDistance);
+        Assert.Equal(
+            "Warning: neither too-close margin is on; no object is removed for being too close.",
+            Assert.Single(ready.Warnings).Message);
     }
 
     [Fact]
@@ -54,12 +73,10 @@ public class RunSettingsValidationTests
         var settings = SettingsFor();
         settings.WhatToIgnore = new IgnoreSettings
         {
-            ExcludedPlugins = ["bad"],
-            MaxOtherMastersForPatch = 500,
-            NpcHandling = (NpcHandling)99,
+            CompatibilityPatches = new CompatibilityPatchSettings { MaxOtherMastersForPatch = 500 },
         };
-        settings.TooClose.SizeMultiplier = 9f;
-        settings.TooClose.ZoneShape = (ZoneShape)99;
+        settings.TooClose.NpcHandling = (NpcHandling)99;
+        settings.TooClose.BySize.SizeMultiplier = 9f;
         settings.FollowUpRemoval = new FollowUpRemovalSettings
         {
             Mode = (FollowUpRemovalMode)99,
@@ -68,12 +85,13 @@ public class RunSettingsValidationTests
         };
         settings.LeftoverInvisibleObjects = new LeftoverInvisibleObjectSettings
         {
-            ProtectedTypes = (ProtectedInvisibleObjectsPreset)99,
-            SearchRadius = 1f,
-            DirectionThresholdPercent = 45,
-            RemovedDirectionsPercent = 44,
-            OccupiedDirectionsPercent = 5,
-            CustomProtectedTypes = [(InvisibleObjectKind)99],
+            WhenAlone = new AloneSettings
+            {
+                SearchRadius = 1f,
+                DirectionThresholdPercent = 45,
+                RemovedDirectionsPercent = 44,
+                OccupiedDirectionsPercent = 5,
+            },
         };
         settings.Diagnostics = new DiagnosticsSettings { DiagnosticsFolder = "bad\0folder" };
 
@@ -81,21 +99,17 @@ public class RunSettingsValidationTests
 
         string[] expectedStarts =
         [
-            "Warning: excluded plugin 'bad'",
             "Warning: could not read Target.esp",
             "Warning: maximum other masters for a patch",
             "Warning: NPCs and creatures setting",
-            "Warning: size multiplier",
-            "Warning: removal zone",
+            "Warning: Remove objects too close to other mods' objects > Margin by object size > Margin on every side",
             "Warning: follow-up removal mode",
             "Warning: touch distance",
             "Warning: anchoring threshold",
-            "Warning: protected types",
             "Warning: search radius",
             "Warning: removed area per direction 45 is not a multiple",
             "Warning: removed directions required 44 is not a multiple",
             "Warning: occupied directions required 5 is outside",
-            "Warning: custom protected type",
             "Warning: report folder",
         ];
         Assert.Equal(expectedStarts.Length, messages.Count);
@@ -109,14 +123,14 @@ public class RunSettingsValidationTests
     public void ExcludedNamesHoldTheParsedKeys()
     {
         var settings = SettingsFor();
-        settings.WhatToIgnore = new IgnoreSettings { ExcludedPlugins = [" Other.esp ", "bad", ""] };
+        settings.WhatToIgnore = new IgnoreSettings { ExcludedPlugins = [ModKey.FromNameAndExtension("Other.esp"), ModKey.Null] };
         Assert.Equal("Other.esp", Assert.Single(BuildReady(settings).Settings.ExcludedNames));
     }
 
     [Fact]
     public void TheTargetIsComparedAsTheLoadOrderSpellsItAndPrintedAsTheSettingsSpellIt()
     {
-        var ready = BuildReady(SettingsFor(" TARGET.ESP "));
+        var ready = BuildReady(SettingsFor("TARGET.ESP"));
         Assert.Equal("Target.esp", ready.Settings.Target.FileName);
         Assert.Equal("Target.esp", ready.Settings.ModIdentification.Target.FileName);
         Assert.Equal("TARGET.esp", ready.Settings.TargetAsTyped.FileName);
@@ -126,7 +140,7 @@ public class RunSettingsValidationTests
     public void KnownExcludedPluginsAreSpelledAsTheLoadOrderListsThem()
     {
         var settings = SettingsFor();
-        settings.WhatToIgnore = new IgnoreSettings { ExcludedPlugins = ["PATCH.ESP", "Unknown.esp"] };
+        settings.WhatToIgnore = new IgnoreSettings { ExcludedPlugins = [ModKey.FromNameAndExtension("PATCH.ESP"), ModKey.FromNameAndExtension("Unknown.esp")] };
         Assert.Equal("Patch.esp", Assert.Single(BuildReady(settings).Settings.ModIdentification.Excluded).FileName);
     }
 
@@ -156,13 +170,13 @@ public class RunSettingsValidationTests
     }
 
     [Theory]
-    [InlineData(nameof(NpcHandling.Ignore))]
-    [InlineData(nameof(NpcHandling.OnlyWhenStuckInObject))]
-    [InlineData(nameof(NpcHandling.CountLikeObjects))]
+    [InlineData(nameof(NpcHandling.Never))]
+    [InlineData(nameof(NpcHandling.OnlyWhenStuckInsideTheObject))]
+    [InlineData(nameof(NpcHandling.AlwaysLikeAnyObject))]
     public void TheSelectStepHandlesNpcsAsTheTooCloseStepDoes(string handling)
     {
         var settings = SettingsFor();
-        settings.WhatToIgnore = new IgnoreSettings { NpcHandling = Enum.Parse<NpcHandling>(handling) };
+        settings.TooClose.NpcHandling = Enum.Parse<NpcHandling>(handling);
 
         var ready = BuildReady(settings);
 
@@ -174,7 +188,7 @@ public class RunSettingsValidationTests
     public void AnInvalidNpcSettingGivesBothStepsTheDefault()
     {
         var settings = SettingsFor();
-        settings.WhatToIgnore = new IgnoreSettings { NpcHandling = (NpcHandling)99 };
+        settings.TooClose.NpcHandling = (NpcHandling)99;
 
         var ready = BuildReady(settings);
 
@@ -186,11 +200,11 @@ public class RunSettingsValidationTests
     public void SurroundingsAreReadForSupportModeAndNavmeshesOnlyForMarkerMoves()
     {
         var supportOnly = SettingsFor();
-        supportOnly.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.ObjectsSupportedByIt };
+        supportOnly.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.OnlyWhatLosesItsSupport };
         Assert.Equal(new WhatToCollect(true, true, false, false, false, false, false), BuildReady(supportOnly).Settings.Read);
 
         var relocating = SettingsFor();
-        relocating.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.EverythingTouching };
+        relocating.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.EverythingTouchingIt };
         relocating.LeftoverInvisibleObjects = new LeftoverInvisibleObjectSettings
         {
             RemoveLeftoverInvisibleObjects = true,
@@ -201,7 +215,7 @@ public class RunSettingsValidationTests
         Assert.NotNull(runSettings.MarkerMoves);
 
         var neither = SettingsFor();
-        neither.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.EverythingTouching };
+        neither.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.EverythingTouchingIt };
         Assert.Equal(new WhatToCollect(false, false, false, false, false, false, false), BuildReady(neither).Settings.Read);
     }
 
@@ -226,26 +240,95 @@ public class RunSettingsValidationTests
         Assert.Equal(
             new ChangedTerrainSettings(
                 On: false, TerrainCheckedObjects.VisibleObjectsOnTheGround, CountHeightChanges: true, HeightTolerance: 16f, CountTerrainTypeChanges: true,
-                TerrainDistanceMode.GameUnits, DistanceInUnits: 64f, DistanceSizeMultiplier: 0.5f),
+                AreaBySize: false, AreaMultiplier: 0.5f, AreaByDistance: true, AreaDistanceInUnits: 64f),
             defaults);
 
         var settings = SettingsFor();
         settings.TerrainChange = new TerrainChangeSettings
         {
             RemoveOnChangedTerrain = true,
-            TerrainCheckedObjects = TerrainCheckedObjects.AllObjects,
+            TerrainCheckedObjects = TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes,
             CountHeightChanges = false,
             HeightChangeTolerance = 0f,
-            TerrainDistanceMode = TerrainDistanceMode.ObjectSize,
-            TerrainDistanceInUnits = 128f,
-            TerrainDistanceSizeMultiplier = 2f,
+            BySize = new TerrainBySizeSettings { Use = true, SizeMultiplier = 2f },
+            ByDistance = new TerrainByDistanceSettings { Use = true, DistanceInUnits = 128f },
         };
         var ready = BuildReady(settings);
 
         Assert.Empty(ready.Warnings);
         Assert.Equal(
-            new ChangedTerrainSettings(On: true, TerrainCheckedObjects.AllObjects, false, 0f, true, TerrainDistanceMode.ObjectSize, 128f, 2f),
+            new ChangedTerrainSettings(
+                On: true, TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes, false, 0f, true,
+                AreaBySize: true, AreaMultiplier: 2f, AreaByDistance: true, AreaDistanceInUnits: 128f),
             ready.Settings.ChangedTerrain);
+    }
+
+    [Fact]
+    public void ChangedTerrainWithNeitherTerrainMarginOnIsSwitchedOffWithAWarning()
+    {
+        var settings = SettingsFor();
+        settings.TerrainChange = new TerrainChangeSettings
+        {
+            RemoveOnChangedTerrain = true,
+            BySize = new TerrainBySizeSettings { Use = false },
+            ByDistance = new TerrainByDistanceSettings { Use = false },
+        };
+
+        var ready = BuildReady(settings);
+
+        Assert.False(ready.Settings.ChangedTerrain.On);
+        Assert.False(ready.Settings.Read.TerrainVersions);
+        Assert.Equal(
+            "Warning: changed terrain is on, but neither terrain margin is on; no object is removed for changed terrain.",
+            Assert.Single(ready.Warnings).Message);
+    }
+
+    [Fact]
+    public void TerrainMarginsAboveTheirLimitsAreClampedWithAWarningEach()
+    {
+        var settings = SettingsFor();
+        settings.TerrainChange.BySize = new TerrainBySizeSettings { Use = true, SizeMultiplier = 9f };
+        settings.TerrainChange.ByDistance = new TerrainByDistanceSettings { Use = true, DistanceInUnits = 5000f };
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(5f, ready.Settings.ChangedTerrain.AreaMultiplier);
+        Assert.Equal(1024f, ready.Settings.ChangedTerrain.AreaDistanceInUnits);
+        string[] expectedStarts =
+        [
+            "Warning: Remove objects on terrain changed by other mods > Margin by object size > Margin on every side 9",
+            "Warning: Remove objects on terrain changed by other mods > Margin by fixed distance > Margin on every side 5000",
+        ];
+        Assert.Equal(expectedStarts.Length, ready.Warnings.Length);
+        Assert.All(expectedStarts.Zip(ready.Warnings), pair => Assert.StartsWith(pair.First, pair.Second.Message));
+    }
+
+    [Theory]
+    [InlineData(false, ZoneShape.ObjectShape)]
+    [InlineData(true, ZoneShape.BoundingBox)]
+    public void RoughBoxesChooseTheBoundingBoxZoneShape(bool useRoughBoxes, ZoneShape expected)
+    {
+        var settings = SettingsFor();
+        settings.TooClose.UseRoughBoxes = useRoughBoxes;
+
+        Assert.Equal(expected, BuildReady(settings).Settings.TooClose.Zone);
+    }
+
+    [Fact]
+    public void TickedAlwaysKeepKindsAreTheKindsNeverRemoved()
+    {
+        var settings = SettingsFor();
+        settings.LeftoverInvisibleObjects.AlwaysKeep = new KeptInvisibleObjectSettings { Lights = true, SoundMarkers = true };
+
+        var neverRemove = BuildReady(settings).Settings.LeftBehind!.NeverRemove;
+
+        Assert.Equal(new[] { InvisibleObjectKind.Lights, InvisibleObjectKind.SoundMarkers }, neverRemove.Order());
+    }
+
+    [Fact]
+    public void NothingIsKeptUntilAKindIsTicked()
+    {
+        Assert.Empty(BuildReady(SettingsFor()).Settings.LeftBehind!.NeverRemove);
     }
 
     [Fact]
@@ -271,24 +354,23 @@ public class RunSettingsValidationTests
         {
             TerrainCheckedObjects = (TerrainCheckedObjects)99,
             HeightChangeTolerance = 300f,
-            TerrainDistanceMode = (TerrainDistanceMode)99,
-            TerrainDistanceInUnits = -1f,
-            TerrainDistanceSizeMultiplier = float.NaN,
+            BySize = new TerrainBySizeSettings { SizeMultiplier = float.NaN },
+            ByDistance = new TerrainByDistanceSettings { Use = true, DistanceInUnits = -1f },
         };
 
         var ready = BuildReady(settings);
 
         Assert.Equal(
             new ChangedTerrainSettings(
-                On: false, TerrainCheckedObjects.VisibleObjectsOnTheGround, true, 256f, true, TerrainDistanceMode.GameUnits, 0f, 0.5f),
+                On: false, TerrainCheckedObjects.VisibleObjectsOnTheGround, true, 256f, true,
+                AreaBySize: false, AreaMultiplier: 0.5f, AreaByDistance: true, AreaDistanceInUnits: 0f),
             ready.Settings.ChangedTerrain);
         string[] expectedStarts =
         [
             "Warning: objects checked for changed terrain",
             "Warning: height change tolerance 300",
-            "Warning: terrain distance mode",
-            "Warning: terrain distance in game units -1",
-            "Warning: terrain distance size multiplier is not a valid number",
+            "Warning: Remove objects on terrain changed by other mods > Margin by object size > Margin on every side is not a valid number",
+            "Warning: Remove objects on terrain changed by other mods > Margin by fixed distance > Margin on every side -1",
         ];
         Assert.Equal(expectedStarts.Length, ready.Warnings.Length);
         Assert.All(expectedStarts.Zip(ready.Warnings), pair => Assert.StartsWith(pair.First, pair.Second.Message));

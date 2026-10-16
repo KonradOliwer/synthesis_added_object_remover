@@ -7,11 +7,9 @@ namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 /// <param name="ClearedDirectionsPercent">Share of the occupied directions (10-100) that must be cleared for removal.</param>
 /// <param name="OccupiedDirectionsPercent">Share of all directions (10-100) that must be occupied for the direction rule to apply.</param>
 /// <param name="NeverRemove">Invisible object kinds that are never removed when left behind.</param>
-/// <param name="Preset">The protected-types choice the kinds were resolved from, for the settings echo.</param>
 public sealed record LeftBehindSettings(
     float LookAround,
     int DirectionClearedPercent,
     int ClearedDirectionsPercent,
     int OccupiedDirectionsPercent,
-    IReadOnlySet<InvisibleObjectKind> NeverRemove,
-    ProtectedInvisibleObjectsPreset Preset);
+    IReadOnlySet<InvisibleObjectKind> NeverRemove);

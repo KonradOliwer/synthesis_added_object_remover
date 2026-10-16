@@ -55,7 +55,7 @@ internal sealed class ObjectsThatCanCauseRemovals(IOtherModObjectsBySpace otherM
         return CentreOfVisible(index, slot);
     }
 
-    private bool CanCauseRemovals(OtherObject other) => !replaced.IsReplaced(other.Id) && (npcs == NpcHandling.CountLikeObjects || !other.IsPlacedNpc);
+    private bool CanCauseRemovals(OtherObject other) => !replaced.IsReplaced(other.Id) && (npcs == NpcHandling.AlwaysLikeAnyObject || !other.IsPlacedNpc);
 
     private bool IsActive(IOtherObjectIndex index, int slot) => CanCauseRemovals(index[slot]) && index.IsVisible(slot);
 

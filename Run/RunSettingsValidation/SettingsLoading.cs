@@ -18,5 +18,9 @@ public static class SettingsLoading
         {
             throw new SettingsUnreadableException(SettingsFailureMessage.Describe(ex, schema), ex);
         }
+        catch (ArgumentException ex) when (SettingsFailureMessage.IsUnreadablePluginName(ex, schema))
+        {
+            throw new SettingsUnreadableException(SettingsFailureMessage.DescribeUnreadablePluginName(ex, schema), ex);
+        }
     }
 }

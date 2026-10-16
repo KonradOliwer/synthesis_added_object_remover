@@ -10,9 +10,9 @@ Ignored masters of target: Skyrim.esm
 Compatibility patch detection: 2 plugins master the target.
   Compatibility patch TargetPatch.esp: links target with Patched.esp.
 Ignored because of compatibility patches: Patched.esp, TargetPatch.esp.
-NPCs and creatures: OnlyWhenStuckInObject
+NPCs and creatures: OnlyWhenStuckInsideTheObject
 Also remove: objects supported by it, touch distance 8, threshold 50 %.
-Leftover invisible objects: removed, search radius 1024, removed area per direction 50%, removed directions required 60%, occupied directions required 50%, protected types None (none), kept markers inside other mods' objects moved.
+Leftover invisible objects: removed, search radius 1024, removed area per direction 50%, removed directions required 60%, occupied directions required 50%, never removed (none), kept markers inside other mods' objects left in place.
 Detailed log: False
 Write report files: True
 Report folder: <root>/AddedObjectRemover Reports
@@ -44,10 +44,9 @@ Leftover invisible objects: 5 evaluated; removed 4 (2 inside another mod's objec
 ## linked
 ## unexpectedErrors
 ## relocations
-Moved 1 kept markers out of other mods' objects; 0 left in place.
 ## unexpectedErrors
 ## write
-Wrote 23 overrides (22 removed, 1 moved).
+Wrote 22 overrides (22 removed, 0 moved).
   1 removed objects had an Enable Parent; it was replaced by the player with "opposite of parent" so they stay disabled.
 ## explanationProblems
 ## meshProblems

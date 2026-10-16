@@ -10,9 +10,9 @@ Ignored masters of target: Skyrim.esm
 Compatibility patch detection: 2 plugins master the target.
   Compatibility patch TargetPatch.esp: links target with Patched.esp.
 Ignored because of compatibility patches: Patched.esp, TargetPatch.esp.
-NPCs and creatures: OnlyWhenStuckInObject
+NPCs and creatures: OnlyWhenStuckInsideTheObject
 Also remove: everything touching, touch distance 8.
-Leftover invisible objects: removed, search radius 1024, removed area per direction 50%, removed directions required 60%, occupied directions required 50%, protected types None (none), kept markers inside other mods' objects moved.
+Leftover invisible objects: kept.
 Detailed log: False
 Write report files: False
 Report folder: <root>/AddedObjectRemover Reports
@@ -40,15 +40,12 @@ Found 19 of 40 Target.esp objects too close to other mods' objects.
 ## linked
 ## unexpectedErrors
 ## leftovers
-  Kept T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
-Leftover invisible objects: 5 evaluated; removed 4 (2 inside another mod's object, 2 surroundings removed); kept 1 (0 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 1 referenced).
 ## linked
 ## unexpectedErrors
 ## relocations
-Moved 1 kept markers out of other mods' objects; 0 left in place.
 ## unexpectedErrors
 ## write
-Wrote 26 overrides (25 removed, 1 moved).
+Wrote 21 overrides (21 removed, 0 moved).
   1 removed objects had an Enable Parent; it was replaced by the player with "opposite of parent" so they stay disabled.
 ## explanationProblems
 ## meshProblems
@@ -59,18 +56,17 @@ Wrote 26 overrides (25 removed, 1 moved).
 ## spaces
 ## targetVisibility
 ## removal-summary
-Removed 25 objects (16 too close, 4 follow-up removals, 4 leftover invisible objects, 1 linked to removed objects).
+Removed 21 objects (16 too close, 4 follow-up removals, 0 leftover invisible objects, 1 linked to removed objects).
 ## kept-summary
-Kept 5 objects that would have been removed because other records depend on them.
-  FormList record: 2
+Kept 4 objects that would have been removed because other records depend on them.
   placed object: Enable Parent: 2
+  FormList record: 1
   teleport door: 1
 ## markers-by-type
-Removed markers by type: 1 XMarkers, 1 Lights, 2 SoundMarkers.
+Removed markers by type: none.
 ## hints
-Possible manual patch needed: 3 objects to check.
+Possible manual patch needed: 2 objects to check.
   Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
-  Kept, referenced by a non-placed record: T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm], cell AorExterior [000802:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
 ## written
 ## reportFileWarnings

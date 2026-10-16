@@ -20,8 +20,7 @@ public class LeftBehindOutcomeTests
         DirectionClearedPercent: 50,
         ClearedDirectionsPercent: removedPercent,
         OccupiedDirectionsPercent: occupiedPercent,
-        NeverRemove: protectedKinds.ToHashSet(),
-        Preset: ProtectedInvisibleObjectsPreset.Custom);
+        NeverRemove: protectedKinds.ToHashSet());
 
     [Theory]
     [InlineData(3, 3, nameof(LeftBehindOutcome.KeptTooFewSurroundingObjects))]

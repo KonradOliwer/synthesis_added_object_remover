@@ -58,9 +58,9 @@ public class SceneViewTests
     }
 
     [Theory]
-    [InlineData(nameof(NpcHandling.Ignore), false)]
-    [InlineData(nameof(NpcHandling.OnlyWhenStuckInObject), false)]
-    [InlineData(nameof(NpcHandling.CountLikeObjects), true)]
+    [InlineData(nameof(NpcHandling.Never), false)]
+    [InlineData(nameof(NpcHandling.OnlyWhenStuckInsideTheObject), false)]
+    [InlineData(nameof(NpcHandling.AlwaysLikeAnyObject), true)]
     public void ObjectsThatCanCauseRemovalsHoldPlacedNpcsOnlyWhenTheyCountLikeObjects(string handling, bool npcIsActive)
     {
         List<OtherObject> otherModObjects = [TestShapes.Placed(Mod, 0, Crate.Base, Vector3.Zero), PlaceNpc(1, Vector3.Zero)];
@@ -99,7 +99,7 @@ public class SceneViewTests
         List<OtherId> active = [];
 
         scene.VisibleObjectsOfAnyPlugin().Overlapping(TestTargets.Space, area, new ObjectQueryScratch(), objectsOfAnyPlugin);
-        scene.ObjectsThatCanCauseRemovals(replaced, NpcHandling.Ignore).Overlapping(TestTargets.Space, Upright(area), new ObjectQueryScratch(), active);
+        scene.ObjectsThatCanCauseRemovals(replaced, NpcHandling.Never).Overlapping(TestTargets.Space, Upright(area), new ObjectQueryScratch(), active);
 
         Assert.Equal(new[] { new OtherId(0), new OtherId(2) }, objectsOfAnyPlugin);
         Assert.Empty(active);
@@ -147,7 +147,7 @@ public class SceneViewTests
     {
         var execution = new Execution(threads);
         var scene = TestScenes.Create(targets, otherModObjects, Shapes, supportOnlyObjects, threads: threads);
-        var active = scene.ObjectsThatCanCauseRemovals(Replacements.None(otherModObjects.Count), NpcHandling.Ignore);
+        var active = scene.ObjectsThatCanCauseRemovals(Replacements.None(otherModObjects.Count), NpcHandling.Never);
         var objectsOfAnyPlugin = scene.VisibleObjectsOfAnyPlugin();
         var visibleTargets = scene.VisibleTargets;
         return ParallelMap.Run(

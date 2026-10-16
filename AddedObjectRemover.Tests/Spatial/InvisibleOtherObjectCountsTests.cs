@@ -54,7 +54,7 @@ public class InvisibleOtherObjectCountsTests
     private static void QueryEveryOtherModObjectOfTheSpace(ObjectCaches scene, int otherModObjectCount)
     {
         var area = OrientedBox.FromLocal(new Box(new Vector3(-100000), new Vector3(100000)), TestTargets.At(Vector3.Zero));
-        scene.ObjectsThatCanCauseRemovals(Replacements.None(otherModObjectCount), NpcHandling.CountLikeObjects)
+        scene.ObjectsThatCanCauseRemovals(Replacements.None(otherModObjectCount), NpcHandling.AlwaysLikeAnyObject)
             .Overlapping(TestTargets.Space, area, new ObjectQueryScratch(), []);
     }
 }

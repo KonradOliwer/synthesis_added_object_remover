@@ -4,7 +4,7 @@ Removal zone: ObjectShape
 Excluded plugins: (none)
 Masters of target are not ignored.
 Compatibility patches: detection off.
-NPCs and creatures: OnlyWhenStuckInObject
+NPCs and creatures: OnlyWhenStuckInsideTheObject
 Also remove: nothing.
 Leftover invisible objects: kept.
 Detailed log: False

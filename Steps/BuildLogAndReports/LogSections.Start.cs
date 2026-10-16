@@ -53,30 +53,30 @@ internal static partial class LogSections
         [
             "Changed terrain: removed",
             $"objects checked: {CheckedObjectsText(terrain.Objects)}",
-            terrain.DistanceMode switch
-            {
-                TerrainDistanceMode.GameUnits => $"distance {terrain.DistanceInUnits} units",
-                TerrainDistanceMode.ObjectSize => $"distance {terrain.DistanceSizeMultiplier} times the object size",
-                _ => throw new UnreachableException($"Unknown terrain distance mode {terrain.DistanceMode}."),
-            },
+            $"distance {string.Join(" and ", TerrainDistances(terrain))}",
         ];
         if (terrain.CountHeightChanges) parts.Add($"height changes over {terrain.HeightTolerance} units");
         if (terrain.CountTerrainTypeChanges) parts.Add("terrain type changes counted");
         return [$"{string.Join("; ", parts)}."];
     }
 
+    private static IEnumerable<string> TerrainDistances(ChangedTerrainSettings terrain)
+    {
+        if (terrain.AreaBySize) yield return $"{terrain.AreaMultiplier} times the object size";
+        if (terrain.AreaByDistance) yield return $"{terrain.AreaDistanceInUnits} units";
+    }
+
     private static string CheckedObjectsText(TerrainCheckedObjects objects) => objects switch
     {
         TerrainCheckedObjects.VisibleObjectsOnTheGround => "visible objects on the ground",
-        TerrainCheckedObjects.AllVisibleObjects => "all visible objects",
-        TerrainCheckedObjects.AllObjects => "all objects",
+        TerrainCheckedObjects.VisibleObjectsAtAnyHeight => "all visible objects",
+        TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes => "all objects",
         _ => throw new UnreachableException($"Unknown checked objects {objects}."),
     };
 
     private static string StopMessage(StopReason reason) => reason.Kind switch
     {
         StopKind.NoTargetSet => "No target plugin set. No changes made.",
-        StopKind.InvalidTargetName => $"Target plugin '{reason.Name}' is not a valid plugin file name. No changes made.",
         StopKind.TargetNotInLoadOrder => $"Target plugin {reason.Name} is not in the load order. No changes made.",
         StopKind.NoTargetObjects => "Nothing to check. No changes made.",
         _ => throw new UnreachableException($"Unknown stop kind {reason.Kind}."),
@@ -106,8 +106,8 @@ internal static partial class LogSections
     private static string DescribeAlsoRemove(AlsoRemoveSettings settings) => settings.Mode switch
     {
         FollowUpRemovalMode.Nothing => "Also remove: nothing.",
-        FollowUpRemovalMode.EverythingTouching => $"Also remove: everything touching, touch distance {settings.TouchGap}.",
-        FollowUpRemovalMode.ObjectsSupportedByIt =>
+        FollowUpRemovalMode.EverythingTouchingIt => $"Also remove: everything touching, touch distance {settings.TouchGap}.",
+        FollowUpRemovalMode.OnlyWhatLosesItsSupport =>
             $"Also remove: objects supported by it, touch distance {settings.TouchGap}, threshold {TextFormat.Percent(settings.SupportLostFraction)}.",
         _ => throw new UnreachableException($"Unknown follow-up removal mode {settings.Mode}."),
     };
@@ -118,7 +118,7 @@ internal static partial class LogSections
         var protectedKinds = TextLists.JoinOr(leftovers.NeverRemove.Order().Select(kind => kind.ToString()), Describe.ListSeparator, Describe.NoEntries);
         return $"Leftover invisible objects: removed, search radius {leftovers.LookAround}, "
             + $"removed area per direction {leftovers.DirectionClearedPercent}%, removed directions required {leftovers.ClearedDirectionsPercent}%, "
-            + $"occupied directions required {leftovers.OccupiedDirectionsPercent}%, protected types {leftovers.Preset} ({protectedKinds}), "
+            + $"occupied directions required {leftovers.OccupiedDirectionsPercent}%, never removed ({protectedKinds}), "
             + $"kept markers inside other mods' objects {(settings.MarkerMoves != null ? "moved" : "left in place")}.";
     }
 }

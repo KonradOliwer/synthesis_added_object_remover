@@ -14,7 +14,7 @@ namespace AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 /// <param name="Failures">The target objects whose check failed unexpectedly, in target order; none of them is a hit.</param>
 /// <param name="ZonesTested">The removal zones each target was tested with, in that order, as the cause each gives its hits; empty when switched off.</param>
 /// <param name="Zone">The removal zone the step used.</param>
-/// <param name="Npcs">How the step handled other mods' placed NPCs; <paramref name="Npc"/> is present exactly for <see cref="NpcHandling.OnlyWhenStuckInObject"/>.</param>
+/// <param name="Npcs">How the step handled other mods' placed NPCs; <paramref name="Npc"/> is present exactly for <see cref="NpcHandling.OnlyWhenStuckInsideTheObject"/>.</param>
 public sealed record TooCloseResult(
     StepOutcome Outcome,
     ImmutableArray<TooCloseObject> Hits,

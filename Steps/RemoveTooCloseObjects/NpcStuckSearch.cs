@@ -19,7 +19,7 @@ internal sealed class NpcScratch
 }
 
 /// <summary>
-/// The OnlyWhenStuckInObject NPC setting: a visible target object is too close to another mod's
+/// The OnlyWhenStuckInsideTheObject NPC setting: a visible target object is too close to another mod's
 /// placed NPC only when one of the NPC's possible bodies is stuck in the target at the target's
 /// real size, not enlarged (<see cref="NpcStuckTest"/>). A target without mesh triangles uses its
 /// real box, as a closed box mesh. Candidates are tested in index order and each target writes

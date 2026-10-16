@@ -26,7 +26,7 @@ internal static class TestLeftBehind
             targets,
             shapes,
             scene.VisibleTargets,
-            ContainingObjectFinder.Find(targets, shapes, scene.ObjectsThatCanCauseRemovals(Replacements.None(others.Count), NpcHandling.OnlyWhenStuckInObject), order, new Execution(Environment.ProcessorCount)),
+            ContainingObjectFinder.Find(targets, shapes, scene.ObjectsThatCanCauseRemovals(Replacements.None(others.Count), NpcHandling.OnlyWhenStuckInsideTheObject), order, new Execution(Environment.ProcessorCount)),
             new ReachRule(new BaseFactsReader(new SkyrimMod(ReachRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache())),
             config,
             order);
@@ -43,7 +43,7 @@ internal static class TestLeftBehind
         var scene = TestScenes.Create(targets, others, shapes);
         return LeftBehindObjects.Find(
             [.. targets],
-            scene.ObjectsThatCanCauseRemovals(Replacements.None(others.Count), NpcHandling.OnlyWhenStuckInObject),
+            scene.ObjectsThatCanCauseRemovals(Replacements.None(others.Count), NpcHandling.OnlyWhenStuckInsideTheObject),
             RemovalDecisions.Start(protection, targets.Count),
             scene.VisibleTargets,
             new BaseFactsReader(new SkyrimMod(ReachRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),

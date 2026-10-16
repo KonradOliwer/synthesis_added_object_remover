@@ -56,8 +56,8 @@ public class RestingObjectsRunTests
     }
 
     [Theory]
-    [InlineData(FollowUpRemovalMode.EverythingTouching)]
-    [InlineData(FollowUpRemovalMode.ObjectsSupportedByIt)]
+    [InlineData(FollowUpRemovalMode.EverythingTouchingIt)]
+    [InlineData(FollowUpRemovalMode.OnlyWhatLosesItsSupport)]
     public void TheRoundsAreProposedAndTheRunsDecisionsAreLeftUnchanged(FollowUpRemovalMode mode)
     {
         var afterTooClose = AfterTooClose();
@@ -76,8 +76,8 @@ public class RestingObjectsRunTests
 
     /// <summary>The table is removed in the changed-terrain round and the too-close round removes nothing, so only the first holds a seed.</summary>
     [Theory]
-    [InlineData(FollowUpRemovalMode.EverythingTouching)]
-    [InlineData(FollowUpRemovalMode.ObjectsSupportedByIt)]
+    [InlineData(FollowUpRemovalMode.EverythingTouchingIt)]
+    [InlineData(FollowUpRemovalMode.OnlyWhatLosesItsSupport)]
     public void TheChangedTerrainRoundsRemovalsSeedTheRoundsToo(FollowUpRemovalMode mode)
     {
         var afterTooClose = TestSeededDecisions.Seed(
@@ -99,7 +99,7 @@ public class RestingObjectsRunTests
             Targets, [], TestTargets.References(Targets.Count, new Dictionary<int, KeepReason> { [ItemOnTable] = TestKeepReasons.Quest }));
         var afterTooClose = TestSeededDecisions.Seed(protection, Targets.Count, seeds: [], terrainSeeds: [Table, ItemOnTable]);
 
-        var result = Run(new Probe(), FollowUpRemovalMode.EverythingTouching, afterTooClose);
+        var result = Run(new Probe(), FollowUpRemovalMode.EverythingTouchingIt, afterTooClose);
 
         Assert.True(result.HadSeeds);
         Assert.Empty(result.ProposedRounds.SelectMany(round => round));
@@ -111,7 +111,7 @@ public class RestingObjectsRunTests
     {
         var probe = new Probe();
 
-        var result = Run(probe, FollowUpRemovalMode.ObjectsSupportedByIt, reportFiles: StepOutcome.SwitchedOff);
+        var result = Run(probe, FollowUpRemovalMode.OnlyWhatLosesItsSupport, reportFiles: StepOutcome.SwitchedOff);
 
         Assert.Equal([ObjectsOfAnyPluginAsk, ClockReading], probe.Events.Take(2));
         Assert.Equal(ClockReading, probe.Events[^1]);
@@ -123,7 +123,7 @@ public class RestingObjectsRunTests
     {
         var probe = new Probe();
 
-        var result = Run(probe, FollowUpRemovalMode.EverythingTouching, touchChainsShown: true);
+        var result = Run(probe, FollowUpRemovalMode.EverythingTouchingIt, touchChainsShown: true);
 
         var end = probe.Events.LastIndexOf(ClockReading);
         Assert.Equal(ClockReading, probe.Events[0]);
@@ -139,7 +139,7 @@ public class RestingObjectsRunTests
     {
         var probe = new Probe();
 
-        var result = Run(probe, FollowUpRemovalMode.ObjectsSupportedByIt, reportFiles: reportFiles);
+        var result = Run(probe, FollowUpRemovalMode.OnlyWhatLosesItsSupport, reportFiles: reportFiles);
 
         Assert.Equal(StepOutcome.Performed, result.Outcome);
         Assert.Same(ReportFileDetails.SwitchedOff, result.ReportFileDetails);
@@ -151,10 +151,10 @@ public class RestingObjectsRunTests
     public void WithReportFilesTheDetailsAreComputedAfterTheRoundsThroughTheGivenTriangleStore()
     {
         var withoutFiles = new Probe();
-        Run(withoutFiles, FollowUpRemovalMode.ObjectsSupportedByIt, reportFiles: StepOutcome.SwitchedOff);
+        Run(withoutFiles, FollowUpRemovalMode.OnlyWhatLosesItsSupport, reportFiles: StepOutcome.SwitchedOff);
         var probe = new Probe();
 
-        var result = Run(probe, FollowUpRemovalMode.ObjectsSupportedByIt);
+        var result = Run(probe, FollowUpRemovalMode.OnlyWhatLosesItsSupport);
 
         Assert.Equal(withoutFiles.Events, probe.Events.Take(withoutFiles.Events.Count));
         Assert.NotEmpty(probe.Events.Skip(withoutFiles.Events.Count));
@@ -171,7 +171,7 @@ public class RestingObjectsRunTests
         var afterTooClose = AfterTooClose();
         var probe = new Probe { FailingClockReading = 2 };
 
-        var result = Run(probe, FollowUpRemovalMode.EverythingTouching, afterTooClose, touchChainsShown: true);
+        var result = Run(probe, FollowUpRemovalMode.EverythingTouchingIt, afterTooClose, touchChainsShown: true);
 
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
         Assert.Equal(new PartFailure(RestingObjectsParts.AlsoRemove, $"InvalidOperationException: {Failure}", Subject: null), result.Failure);
@@ -187,7 +187,7 @@ public class RestingObjectsRunTests
     {
         var probe = new Probe { MeshesFailAfterClockReading = 2 };
 
-        var result = Run(probe, FollowUpRemovalMode.EverythingTouching, touchChainsShown: true);
+        var result = Run(probe, FollowUpRemovalMode.EverythingTouchingIt, touchChainsShown: true);
 
         Assert.Equal(StepOutcome.Performed, result.Outcome);
         Assert.NotEmpty(result.ProposedRounds);
@@ -202,7 +202,7 @@ public class RestingObjectsRunTests
     {
         var withoutSeeds = TestSeededDecisions.Seed(ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Count)), Targets.Count, []);
 
-        var result = Run(new Probe(), FollowUpRemovalMode.EverythingTouching, withoutSeeds);
+        var result = Run(new Probe(), FollowUpRemovalMode.EverythingTouchingIt, withoutSeeds);
 
         Assert.False(result.HadSeeds);
         Assert.Equal(StepOutcome.Performed, result.ReportFileDetails.Outcome);
@@ -214,7 +214,7 @@ public class RestingObjectsRunTests
     [Fact]
     public void WithReportFilesTheTouchDetailsHoldTheEdges()
     {
-        var result = Run(new Probe(), FollowUpRemovalMode.EverythingTouching);
+        var result = Run(new Probe(), FollowUpRemovalMode.EverythingTouchingIt);
 
         Assert.Equal(StepOutcome.Performed, result.ReportFileDetails.Outcome);
         Assert.NotEmpty(result.ReportFileDetails.Touch!.Edges);
@@ -227,7 +227,7 @@ public class RestingObjectsRunTests
     {
         var probe = new Probe { LampMeshFails = true };
 
-        var result = Run(probe, FollowUpRemovalMode.ObjectsSupportedByIt);
+        var result = Run(probe, FollowUpRemovalMode.OnlyWhatLosesItsSupport);
         var details = result.ReportFileDetails;
 
         Assert.Equal(StepOutcome.Performed, result.Outcome);

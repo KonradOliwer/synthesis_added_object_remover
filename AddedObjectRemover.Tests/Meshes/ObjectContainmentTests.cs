@@ -74,7 +74,7 @@ public class ObjectContainmentTests
         CreateOtherModObjects(Replacements.None(otherModObjects.Length), otherModObjects);
 
     private static IObjectsThatCanCauseRemovals CreateOtherModObjects(Replacements replacements, params OtherObject[] otherModObjects) =>
-        TestScenes.Create([], otherModObjects, Shapes).ObjectsThatCanCauseRemovals(replacements, NpcHandling.CountLikeObjects);
+        TestScenes.Create([], otherModObjects, Shapes).ObjectsThatCanCauseRemovals(replacements, NpcHandling.AlwaysLikeAnyObject);
 
     private static OtherId? FirstCovering(IObjectsThatCanCauseRemovals otherModObjects, Vector3 point) =>
         otherModObjects.FirstCovering(TestTargets.Space, point, new ObjectQueryScratch());

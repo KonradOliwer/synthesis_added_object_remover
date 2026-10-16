@@ -6,8 +6,8 @@ namespace AddedObjectRemover.Steps.RemoveTooCloseObjects;
 
 /// <summary>
 /// The "NPCs and creatures" setting in the too-close step: other mods' placed NPCs are tested
-/// like any object (CountLikeObjects), only by <see cref="NpcStuckSearch"/> (OnlyWhenStuckInObject),
-/// or never (Ignore).
+/// like any object (AlwaysLikeAnyObject), only by <see cref="NpcStuckSearch"/> (OnlyWhenStuckInsideTheObject),
+/// or never (Never).
 /// </summary>
 internal sealed class NpcTooCloseRule
 {
@@ -19,14 +19,14 @@ internal sealed class NpcTooCloseRule
 
     public NpcHandling Handling { get; }
 
-    /// <summary>Set only for OnlyWhenStuckInObject.</summary>
+    /// <summary>Set only for OnlyWhenStuckInsideTheObject.</summary>
     public NpcStuckSearch? StuckSearch { get; }
 
-    /// <param name="createStuckSearch">Called only for OnlyWhenStuckInObject.</param>
+    /// <param name="createStuckSearch">Called only for OnlyWhenStuckInsideTheObject.</param>
     public static NpcTooCloseRule Create(NpcHandling handling, Func<NpcStuckSearch> createStuckSearch) =>
-        new(handling, handling == NpcHandling.OnlyWhenStuckInObject ? createStuckSearch() : null);
+        new(handling, handling == NpcHandling.OnlyWhenStuckInsideTheObject ? createStuckSearch() : null);
 
-    /// <summary>The first NPC stuck in the target, or null; always null unless OnlyWhenStuckInObject.</summary>
+    /// <summary>The first NPC stuck in the target, or null; always null unless OnlyWhenStuckInsideTheObject.</summary>
     public OtherId? FindFirstStuckNpc(int targetIndex, NpcScratch scratch) =>
         StuckSearch?.FindFirstStuckNpc(targetIndex, scratch);
 

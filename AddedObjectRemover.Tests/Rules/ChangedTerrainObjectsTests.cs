@@ -49,11 +49,12 @@ public class ChangedTerrainObjectsTests
     private static ChangedTerrainSettings Settings(
         TerrainCheckedObjects objects = TerrainCheckedObjects.VisibleObjectsOnTheGround,
         float tolerance = 16f,
-        TerrainDistanceMode mode = TerrainDistanceMode.GameUnits,
+        bool bySize = false,
         float multiplier = 0.5f,
+        bool byDistance = true,
         bool heights = true,
         bool types = true) =>
-        new(On: true, objects, heights, tolerance, types, mode, DistanceInUnits: 64f, multiplier);
+        new(On: true, objects, heights, tolerance, types, bySize, multiplier, byDistance, AreaDistanceInUnits: 64f);
 
     private static float[] Heights(float height, params (int Vertex, float Height)[] changes)
     {
@@ -196,8 +197,8 @@ public class ChangedTerrainObjectsTests
 
     [Theory]
     [InlineData(TerrainCheckedObjects.VisibleObjectsOnTheGround, new[] { 0 })]
-    [InlineData(TerrainCheckedObjects.AllVisibleObjects, new[] { 0, 1 })]
-    [InlineData(TerrainCheckedObjects.AllObjects, new[] { 0, 1, 2 })]
+    [InlineData(TerrainCheckedObjects.VisibleObjectsAtAnyHeight, new[] { 0, 1 })]
+    [InlineData(TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes, new[] { 0, 1, 2 })]
     public void TheObjectsCheckedFollowTheSetting(TerrainCheckedObjects objects, int[] removed)
     {
         var terrain = new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(Target), RaisedAt(Other, Near)] };
@@ -216,7 +217,23 @@ public class ChangedTerrainObjectsTests
         var aside = (int)(Spot.Y / TerrainGrid.VertexSpacing) * TerrainHeights.VerticesPerSide + 10;
         var terrain = new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(Target), RaisedAt(Other, aside)] };
 
-        var result = Find(terrain, Settings(mode: TerrainDistanceMode.ObjectSize, multiplier: multiplier));
+        var result = Find(terrain, Settings(bySize: true, multiplier: multiplier, byDistance: false));
+
+        Assert.Equal(removed, result.Proposals.Any());
+    }
+
+    /// <summary>With the object 20 units wide, the 64-unit area reaches vertex column 9 and the 10-times-size area vertex column 10.</summary>
+    [Theory]
+    [InlineData(0.5f, 9, true)]
+    [InlineData(10f, 10, true)]
+    [InlineData(0.5f, 10, false)]
+    [InlineData(10f, 11, false)]
+    public void WithBothAreasOnAChangeInEitherAreaRemovesTheObject(float multiplier, int changedColumn, bool removed)
+    {
+        var changed = 8 * TerrainHeights.VerticesPerSide + changedColumn;
+        var terrain = new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(Target), RaisedAt(Other, changed)] };
+
+        var result = Find(terrain, Settings(bySize: true, multiplier: multiplier, byDistance: true));
 
         Assert.Equal(removed, result.Proposals.Any());
     }

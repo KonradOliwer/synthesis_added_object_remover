@@ -20,6 +20,7 @@
     <ProjectReference Include="..\..\Tools\GroundSurfaceQueries\GroundSurfaceQueries.csproj" />
     <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
     <ProjectReference Include="..\..\Tools\ComputedOnceLookups\ComputedOnceLookups.csproj" />
+    <ProjectReference Include="..\..\Tools\NumericRanges\NumericRanges.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />

@@ -246,12 +246,12 @@ public class TerrainChangeSettings : ITerrainChangeSettingsValues
     public bool CountTerrainTypeChanges { get; set; } = SettingDefaults.CountTerrainTypeChanges;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Share of ground points that must change type (0.2 = one in five)")]
+    [SynthesisSettingName("Remove only when this share of the ground points changed type (%)")]
     [SynthesisTooltip(
         "A ground type change removes an object only when at least this share of the terrain points checked around it changed type.\n"
-        + "Small touch-ups at the edges of painted patches then don't remove objects. 0 removes on any one changed point. 0-1.\n"
+        + "Small touch-ups at the edges of painted patches then don't remove objects. 0 removes on any one changed point. 0-100.\n"
         + "Height changes are not affected. Only used when \"Count ground type changes\" is on.")]
-    public float MinTerrainTypeChangeShare { get; set; } = SettingDefaults.MinTerrainTypeChangeShare;
+    public int MinTerrainTypeChangePercent { get; set; } = SettingDefaults.MinTerrainTypeChangePercent;
 
     bool ITerrainChangeSettingsValues.AreaBySize => (BySize ?? new()).Use;
     float ITerrainChangeSettingsValues.AreaSizeMultiplier => (BySize ?? new()).SizeMultiplier;

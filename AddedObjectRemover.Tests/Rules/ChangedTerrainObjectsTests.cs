@@ -20,10 +20,10 @@ public class ChangedTerrainObjectsTests
     private const int VertexCount = TerrainHeights.VerticesPerSide * TerrainHeights.VerticesPerSide;
 
     /// <summary>The share of an area's vertices whose terrain type must change in <see cref="Settings"/>: 4 of the 16 at <see cref="WideSpot"/>.</summary>
-    private const float TypeShare = 0.25f;
+    private const int TypePercent = 25;
     private const int ChangesAtTypeShare = 4;
-    private const float AnyChange = 0f;
-    private const float WholeArea = 1f;
+    private const int AnyChange = 0;
+    private const int WholeArea = 100;
     private const int MostChanges = 3;
     private const int FewerChanges = 2;
     private const float FullOpacity = 1f;
@@ -81,8 +81,8 @@ public class ChangedTerrainObjectsTests
         bool byDistance = true,
         bool heights = true,
         bool types = true,
-        float typeShare = TypeShare) =>
-        new(On: true, objects, heights, tolerance, types, typeShare, bySize, multiplier, byDistance, AreaDistanceInUnits: 64f);
+        int typePercent = TypePercent) =>
+        new(On: true, objects, heights, tolerance, types, typePercent, bySize, multiplier, byDistance, AreaDistanceInUnits: 64f);
 
     private static float[] Heights(float height, params (int Vertex, float Height)[] changes)
     {
@@ -471,7 +471,7 @@ public class ChangedTerrainObjectsTests
     {
         var plugin = PaintedCell(FlatPainted(Target, Painted(Grass)), FlatPainted(Other, RoadAtWideSpot(changed)));
 
-        Assert.Equal(removed, Find(plugin, Settings(typeShare: AnyChange), threads: 1, Placed(0, Rock, WideSpot)).Proposals.Any());
+        Assert.Equal(removed, Find(plugin, Settings(typePercent: AnyChange), threads: 1, Placed(0, Rock, WideSpot)).Proposals.Any());
     }
 
     /// <summary>The counting mod changed the type of fewer vertices than the share; the later mod adds the rest.</summary>
@@ -507,12 +507,12 @@ public class ChangedTerrainObjectsTests
 
     [Theory]
     [InlineData(AnyChange)]
-    [InlineData(TypeShare)]
+    [InlineData(TypePercent)]
     [InlineData(WholeArea)]
-    public void OneHeightChangeRemovesTheObjectWhateverTheTypeShare(float typeShare) =>
+    public void OneHeightChangeRemovesTheObjectWhateverTheTypePercent(int typePercent) =>
         Assert.Equal(
             [Removal(0, Other)],
-            Find(new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(Target), RaisedAt(Other, Near)] }, Settings(typeShare: typeShare)).Proposals.AsEnumerable());
+            Find(new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(Target), RaisedAt(Other, Near)] }, Settings(typePercent: typePercent)).Proposals.AsEnumerable());
 
     [Fact]
     public void ATypeChangeBelowTheShareIsLeftOutOfTheKindOfAHeightChange()

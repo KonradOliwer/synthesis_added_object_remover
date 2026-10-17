@@ -98,7 +98,7 @@ internal sealed class ObjectTerrainCheck(IPluginRecords records, IBaseObjectShap
     {
         var changes = AreaChanges.Count(cells);
         var heightChanger = changes.HeightChanger;
-        var typeChanger = changes.TypeChanger(settings.MinTerrainTypeChangeShare);
+        var typeChanger = changes.TypeChanger(settings.MinTerrainTypeChangePercent);
         if (new[] { heightChanger, typeChanger }.Max() is not { } changer) return null;
         return new ObjectOnChangedTerrain(target.Id, plugins.PluginAt(changer), new TerrainChange(heightChanger != null, typeChanger != null).Kind);
     }

@@ -41,7 +41,7 @@ public interface ITerrainChangeSettingsValues
     bool CountHeightChanges { get; }
     float HeightChangeTolerance { get; }
     bool CountTerrainTypeChanges { get; }
-    float MinTerrainTypeChangeShare { get; }
+    int MinTerrainTypeChangePercent { get; }
 }
 
 public interface IIgnoreSettingsValues
@@ -93,7 +93,7 @@ public static class SettingDefaults
     public const bool CountHeightChanges = true;
     public const float HeightChangeTolerance = 16f;
     public const bool CountTerrainTypeChanges = true;
-    public const float MinTerrainTypeChangeShare = 0.2f;
+    public const int MinTerrainTypeChangePercent = 20;
     public const int MaxOtherMastersForPatch = 10;
     public const NpcHandling Npcs = NpcHandling.OnlyWhenStuckInsideTheObject;
     public const FollowUpRemovalMode FollowUpMode = FollowUpRemovalMode.EverythingTouchingIt;

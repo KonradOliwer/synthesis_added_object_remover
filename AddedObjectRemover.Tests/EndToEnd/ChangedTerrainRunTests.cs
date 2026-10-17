@@ -45,7 +45,7 @@ public class ChangedTerrainRunTests
         Assert.Contains(
             "Remove objects on terrain changed by other mods: on; Which of the cleaned mod's objects are checked: VisibleObjectsOnTheGround; "
             + "Margin by object size: off; Margin by fixed distance: on, 64 units; Count height changes: on, ignoring changes up to 16 units; "
-            + "Count ground type changes: on, share of ground points that must change type 0.2.",
+            + "Count ground type changes: on, remove only when this share of the ground points changed type: 20%.",
             SectionLines(log, "config"));
         Assert.Equal([$"Found 2 of 4 {FixtureWorld.TargetPlugin} objects on terrain changed by other mods."], SectionLines(log, "changedTerrain"));
         Assert.Equal(

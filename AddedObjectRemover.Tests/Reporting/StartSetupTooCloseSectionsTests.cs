@@ -392,12 +392,12 @@ public sealed class StartSetupTooCloseSectionsTests
     [Fact]
     public void Config_GivesTheChangedTerrainChecksThatAreOn()
     {
-        var lines = ConfigLines(settings => settings.TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = true, MinTerrainTypeChangeShare = 0.5f });
+        var lines = ConfigLines(settings => settings.TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = true, MinTerrainTypeChangePercent = 50 });
 
         Assert.Contains(
             "Remove objects on terrain changed by other mods: on; Which of the cleaned mod's objects are checked: VisibleObjectsOnTheGround; "
             + "Margin by object size: off; Margin by fixed distance: on, 64 units; Count height changes: on, ignoring changes up to 16 units; "
-            + "Count ground type changes: on, share of ground points that must change type 0.5.",
+            + "Count ground type changes: on, remove only when this share of the ground points changed type: 50%.",
             lines);
     }
 
@@ -421,7 +421,7 @@ public sealed class StartSetupTooCloseSectionsTests
 
         Assert.Contains(
             "Remove objects on terrain changed by other mods: on; Which of the cleaned mod's objects are checked: AllObjectsIncludingInvisibleOnes; "
-            + "Margin by object size: on, 0.5 x object size; Margin by fixed distance: off; Count height changes: off; Count ground type changes: on, share of ground points that must change type 0.2.",
+            + "Margin by object size: on, 0.5 x object size; Margin by fixed distance: off; Count height changes: off; Count ground type changes: on, remove only when this share of the ground points changed type: 20%.",
             noHeight);
         Assert.Contains(
             "Remove objects on terrain changed by other mods: on; Which of the cleaned mod's objects are checked: VisibleObjectsAtAnyHeight; "
@@ -442,7 +442,7 @@ public sealed class StartSetupTooCloseSectionsTests
         Assert.Contains(
             "Remove objects on terrain changed by other mods: on; Which of the cleaned mod's objects are checked: VisibleObjectsOnTheGround; "
             + "Margin by object size: on, 0.5 x object size; Margin by fixed distance: on, 64 units; Count height changes: on, ignoring changes up to 16 units; "
-            + "Count ground type changes: on, share of ground points that must change type 0.2.",
+            + "Count ground type changes: on, remove only when this share of the ground points changed type: 20%.",
             lines);
     }
 

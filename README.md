@@ -80,7 +80,7 @@ Off by default. When on, it runs before the too-close check, so an object found 
 | Count height changes | `true` | Whether a change of the ground's height counts. |
 | Ignore height changes up to (game units) | `16` | A height change of up to this many game units is ignored (0-256). 0 counts every change. Small smoothing edits are common and rarely visible under an object. Only used when *Count height changes* is on. |
 | Count ground type changes (for example grass to road) | `true` | Whether a change of the kind of ground counts (see below). |
-| Share of ground points that must change type (0.2 = one in five) | `0.2` | A ground type change removes an object only when at least this share of the terrain points checked around it changed type (0-1). Small touch-ups at the edges of painted patches therefore don't remove objects. 0 removes on any one changed point. Height changes are not affected. Only used when *Count ground type changes* is on. |
+| Remove only when this share of the ground points changed type (%) | `20` | A ground type change removes an object only when at least this share of the terrain points checked around it changed type (0-100). Small touch-ups at the edges of painted patches therefore don't remove objects. 0 removes on any one changed point. Height changes are not affected. Only used when *Count ground type changes* is on. |
 
 The terrain under the object plus the margin around it is checked, for height and ground type changes alike. The terrain points right around the object are always checked. As with the too-close margins, the two margins work on their own and both can be on together: an object is removed when the terrain within either margin holds a change. One point whose height changed beyond the tolerance is enough; a ground type change needs the share of points set above. With both margins off, nothing is removed for changed terrain and the log warns about it.
 
@@ -108,7 +108,7 @@ the most points.
 If *Remove objects on changed terrain* is on but both *Count height changes* and *Count ground
 type changes* are off, nothing is removed for changed terrain and the log warns about it. Switched
 on with the other defaults, only visible objects on the ground are checked, within 64 units, for
-height changes over 16 units and for ground type changes at one in five of the points or more.
+height changes over 16 units and for ground type changes at 20% of the points or more.
 
 ### Also remove what rests on removed objects
 

@@ -24,14 +24,13 @@ internal sealed record AreaChanges(int Vertices, int? HeightChanger, IReadOnlyDi
 
     /// <summary>
     /// The terrain type change counts when at least one vertex changed and the changed vertices make up at least
-    /// <paramref name="minimumShare"/> of the area's vertices.
+    /// <paramref name="minimumPercent"/> percent of the area's vertices.
     /// </summary>
     /// <returns>The plugin that changed the type of the most vertices, the later loading one on a tie; null when the change does not count.</returns>
-    public int? TypeChanger(float minimumShare) =>
-        ReachesShare(TypeChangesByChanger.Values.Sum(), minimumShare)
+    public int? TypeChanger(int minimumPercent) =>
+        ReachesShare(TypeChangesByChanger.Values.Sum(), minimumPercent)
             ? TypeChangesByChanger.MaxBy(changer => (changer.Value, changer.Key)).Key
             : null;
 
-    /// <remarks>The share is compared as the decimal the user typed (a float converts to decimal at its shown digits), so 0.2 of 5 vertices is exactly 1.</remarks>
-    private bool ReachesShare(int changed, float minimumShare) => changed > 0 && changed >= (decimal)minimumShare * Vertices;
+    private bool ReachesShare(int changed, int minimumPercent) => changed > 0 && SharePercent.AtLeast(changed, Vertices, minimumPercent);
 }

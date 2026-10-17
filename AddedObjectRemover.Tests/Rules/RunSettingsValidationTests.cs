@@ -240,7 +240,7 @@ public class RunSettingsValidationTests
         Assert.Equal(
             new ChangedTerrainSettings(
                 On: false, TerrainCheckedObjects.VisibleObjectsOnTheGround, CountHeightChanges: true, HeightTolerance: 16f, CountTerrainTypeChanges: true,
-                MinTerrainTypeChangeShare: 0.2f, AreaBySize: false, AreaMultiplier: 0.5f, AreaByDistance: true, AreaDistanceInUnits: 64f),
+                MinTerrainTypeChangePercent: 20, AreaBySize: false, AreaMultiplier: 0.5f, AreaByDistance: true, AreaDistanceInUnits: 64f),
             defaults);
 
         var settings = SettingsFor();
@@ -250,7 +250,7 @@ public class RunSettingsValidationTests
             TerrainCheckedObjects = TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes,
             CountHeightChanges = false,
             HeightChangeTolerance = 0f,
-            MinTerrainTypeChangeShare = 0.5f,
+            MinTerrainTypeChangePercent = 50,
             BySize = new TerrainBySizeSettings { Use = true, SizeMultiplier = 2f },
             ByDistance = new TerrainByDistanceSettings { Use = true, DistanceInUnits = 128f },
         };
@@ -259,7 +259,7 @@ public class RunSettingsValidationTests
         Assert.Empty(ready.Warnings);
         Assert.Equal(
             new ChangedTerrainSettings(
-                On: true, TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes, false, 0f, true, 0.5f,
+                On: true, TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes, false, 0f, true, 50,
                 AreaBySize: true, AreaMultiplier: 2f, AreaByDistance: true, AreaDistanceInUnits: 128f),
             ready.Settings.ChangedTerrain);
     }
@@ -305,31 +305,31 @@ public class RunSettingsValidationTests
     }
 
     [Theory]
-    [InlineData(0f, 0f)]
-    [InlineData(1f, 1f)]
-    public void AGroundTypeShareFromZeroToOneIsKeptWithoutAWarning(float share, float expected)
+    [InlineData(0)]
+    [InlineData(7)]
+    [InlineData(100)]
+    public void AGroundTypePercentFromZeroTo100IsKeptWithoutAWarning(int percent)
     {
         var settings = SettingsFor();
-        settings.TerrainChange.MinTerrainTypeChangeShare = share;
+        settings.TerrainChange.MinTerrainTypeChangePercent = percent;
 
         var ready = BuildReady(settings);
 
-        Assert.Equal(expected, ready.Settings.ChangedTerrain.MinTerrainTypeChangeShare);
+        Assert.Equal(percent, ready.Settings.ChangedTerrain.MinTerrainTypeChangePercent);
         Assert.Empty(ready.Warnings);
     }
 
     [Theory]
-    [InlineData(-1f, 0f, "Warning: Remove objects on terrain changed by other mods > Share of ground points that must change type -1 is outside 0-1")]
-    [InlineData(2f, 1f, "Warning: Remove objects on terrain changed by other mods > Share of ground points that must change type 2 is outside 0-1")]
-    [InlineData(float.NaN, SettingDefaults.MinTerrainTypeChangeShare, "Warning: Remove objects on terrain changed by other mods > Share of ground points that must change type is not a valid number")]
-    public void AGroundTypeShareOutsideZeroToOneIsCorrectedWithAWarning(float share, float expected, string expectedStart)
+    [InlineData(-1, 0, "Warning: Remove objects on terrain changed by other mods > Remove only when this share of the ground points changed type -1 is outside 0-100")]
+    [InlineData(101, 100, "Warning: Remove objects on terrain changed by other mods > Remove only when this share of the ground points changed type 101 is outside 0-100")]
+    public void AGroundTypePercentOutsideZeroTo100IsCorrectedWithAWarning(int percent, int expected, string expectedStart)
     {
         var settings = SettingsFor();
-        settings.TerrainChange.MinTerrainTypeChangeShare = share;
+        settings.TerrainChange.MinTerrainTypeChangePercent = percent;
 
         var ready = BuildReady(settings);
 
-        Assert.Equal(expected, ready.Settings.ChangedTerrain.MinTerrainTypeChangeShare);
+        Assert.Equal(expected, ready.Settings.ChangedTerrain.MinTerrainTypeChangePercent);
         Assert.StartsWith(expectedStart, Assert.Single(ready.Warnings).Message);
     }
 
@@ -392,7 +392,7 @@ public class RunSettingsValidationTests
 
         Assert.Equal(
             new ChangedTerrainSettings(
-                On: false, TerrainCheckedObjects.VisibleObjectsOnTheGround, true, 256f, true, 0.2f,
+                On: false, TerrainCheckedObjects.VisibleObjectsOnTheGround, true, 256f, true, 20,
                 AreaBySize: false, AreaMultiplier: 0.5f, AreaByDistance: true, AreaDistanceInUnits: 0f),
             ready.Settings.ChangedTerrain);
         string[] expectedStarts =

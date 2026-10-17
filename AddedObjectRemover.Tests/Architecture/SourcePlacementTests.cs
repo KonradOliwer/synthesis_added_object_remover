@@ -27,6 +27,11 @@ public class SourcePlacementTests
         ["Settings.cs"] = "The settings class carries the Synthesis setting-name attributes.",
     };
 
+    private static readonly Dictionary<string, string> NewtonsoftExceptions = new()
+    {
+        ["Settings.cs"] = "The settings class names the converter Synthesis' settings.json reader must use for an unset plugin picker.",
+    };
+
     private static readonly string[] ParallelismApis = ["Parallel.", "AsParallel", "Partitioner", "Task.Run", "new Thread("];
 
     /// <summary>Atomic operations; the lookups tool also needs them for its lock-free memos.</summary>
@@ -46,7 +51,7 @@ public class SourcePlacementTests
 
     [Fact]
     public void NewtonsoftIsUsedOnlyInTheSettingsReading() =>
-        PlacementCheck.AssertUsedOnlyIn(UsesNamespace("Newtonsoft"), ["Run/RunSettingsReading"]);
+        PlacementCheck.AssertUsedOnlyIn(UsesNamespace("Newtonsoft"), ["Run/RunSettingsReading"], NewtonsoftExceptions);
 
     [Fact]
     public void OnlyTheRunnerTheEntryAndTheCsvWritingReadTheClock() =>

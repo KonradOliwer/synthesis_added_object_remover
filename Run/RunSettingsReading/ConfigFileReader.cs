@@ -24,7 +24,7 @@ internal sealed class ConfigFileReader(SettingsSchema schema, JsonSerializerSett
 
         // Parsed twice on purpose: only Newtonsoft's own deserialization reports the setting path in a failure message.
         var settings = SettingsLoading.LoadConfigFile(() => (ISettingsValues)JsonConvert.DeserializeObject(text, schema.Root, json)!, schema, filePath);
-        var notes = ConfigNotes.Of(written, schema, JsonSerializer.Create(json));
+        var notes = ConfigNotes.Of(written, settings, schema);
         var source = new SettingsSource.ConfigFile(Path.GetFileNameWithoutExtension(fileName), fileName, filePath, number, configCount, notes);
         return new ConfiguredSettings(source, settings);
     }

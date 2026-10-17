@@ -1,3 +1,4 @@
+using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda.Json;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Synthesis.Internal;
@@ -450,6 +451,72 @@ public sealed class ConfigFilesTests : IDisposable
 
         Assert.StartsWith($"Group file {GroupPath("group")} could not be read: ", message);
         Assert.EndsWith(NothingWasRun, message);
+    }
+
+    /// <summary>The Synthesis settings screen saves a plugin picker left unset as "".</summary>
+    private const string UnsetPlugins = "\"TargetPlugin\": \"\", \"WhatToIgnore\": { \"ExcludedPlugins\": [\"\"] }";
+
+    private T ReadLikeSynthesis<T>(string fileName, string json) where T : class, new()
+    {
+        Write(Path.Combine(_dataFolder, fileName), json);
+        return new ReflectionSettingsTarget<T>(fileName, throwIfMissing: true) { AnchorPath = _dataFolder }.Value.Value;
+    }
+
+    private static BatchRequest BuildAll(ConfigsRead read)
+    {
+        var target = new PluginName("A.esp");
+        var patch = new PluginName("Patch.esp");
+        var facts = new LoadOrderPlugins(new KnownPluginNames([target, patch]), patch, [new PluginListing(target, true, []), new PluginListing(patch, true, [])]);
+        return SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), facts, "/out", 1);
+    }
+
+    [Fact]
+    public void AnUnsetPluginPickerInSettingsJsonReadsAsNotChosen()
+    {
+        var settings = ReadLikeSynthesis<Settings>(Program.SettingsFileName, $"{{ \"Mode\": \"Standard\", \"Standard\": {{ {UnsetPlugins} }} }}");
+
+        Assert.True(settings.Standard.TargetPlugin.IsNull);
+        Assert.True(Assert.Single(settings.Standard.WhatToIgnore.ExcludedPlugins).IsNull);
+        Assert.Null(((ISettingsValues)settings.Standard).TargetPlugin);
+        Assert.Empty(((ISettingsValues)settings.Standard).WhatToIgnore.ExcludedPlugins);
+    }
+
+    [Fact]
+    public void StandardModeWithAnUnsetPluginPickerInSettingsJsonStopsAsNoTargetSet()
+    {
+        var settings = ReadLikeSynthesis<Settings>(Program.SettingsFileName, $"{{ \"Mode\": \"Standard\", \"Standard\": {{ {UnsetPlugins} }} }}");
+
+        var batch = Assert.IsType<BatchRequest.Ready>(BuildAll(Program.ReadConfigs(settings, _dataFolder)));
+
+        Assert.Equal(new StopReason(StopKind.NoTargetSet, null), Assert.IsType<RunRequest.Stop>(Assert.Single(batch.Requests)).Reason);
+    }
+
+    [Fact]
+    public void BatchModeIgnoresAnUnsetPluginPickerInTheStandardGroupOfSettingsJson()
+    {
+        WriteGroup("group", $"[\"{TownWalls}\"]");
+        WriteConfig(TownWalls, "{\"TargetPlugin\": \"A.esp\"}");
+        var settings = ReadLikeSynthesis<Settings>(
+            Program.SettingsFileName, $"{{ \"Mode\": \"Batch\", \"Batch\": {{ \"GroupFileName\": \"group\" }}, \"Standard\": {{ {UnsetPlugins} }} }}");
+
+        var read = Program.ReadConfigs(settings, _dataFolder);
+
+        Assert.Equal("A.esp", Assert.Single(Assert.IsType<ConfigsRead.Ready>(read).Configs).Settings.TargetPlugin);
+        Assert.IsType<RunRequest.Ready>(Assert.Single(Assert.IsType<BatchRequest.Ready>(BuildAll(read)).Requests));
+    }
+
+    [Fact]
+    public void AConfigFileWithAnEmptyPluginNameReadsLikeSynthesisAndFailsTheBatchAsNoTargetSet()
+    {
+        var config = ReadOnlyConfig($"{{ {UnsetPlugins} }}");
+        var synthesis = new ReflectionSettingsTarget<StandardSettings>(Path.GetFileName(ConfigPath(TownWalls)), throwIfMissing: true) { AnchorPath = ConfigsFolder };
+
+        Assert.Equal(JsonConvert.SerializeObject(synthesis.Value.Value, SynthesisJson), JsonConvert.SerializeObject(config.Settings, SynthesisJson));
+        Assert.Empty(config.Settings.WhatToIgnore.ExcludedPlugins);
+        Assert.DoesNotContain(NotesOf(config).ChangedFromDefault, setting => setting.KeyPath == "TargetPlugin");
+        Assert.Equal(
+            $"Config file {ConfigPath(TownWalls)} sets no mod to clean up (TargetPlugin). Nothing was run and no patch was written.",
+            Assert.IsType<BatchRequest.Failed>(BuildAll(new ConfigsRead.Ready([config]))).Message);
     }
 
     [Fact]

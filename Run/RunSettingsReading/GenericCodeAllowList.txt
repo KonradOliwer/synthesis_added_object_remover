@@ -25,6 +25,7 @@ ConfigFolders.WithoutExtension | Takes the .json extension off a name written wi
 ConfigFolders.HasExtension | Tells whether a name already ends in .json.
 ConfigNotes.IsList | Tells a list setting from a single value.
 ConfigNotes.ItemsOf | The items of a list setting, none for a null list.
+ConfigNotes.DiffersFromDefault | Compares a setting's read value with its default.
 JsonFileParsing.ReadText | Reads a group or config file and explains an unreadable one with the file named.
 JsonFileParsing.Parse | Parses a group or config file and explains a syntax error with the file named.
 JsonFileParsing.DescribeKind | Wording for a failure: what kind of JSON value was found.

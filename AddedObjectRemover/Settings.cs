@@ -4,6 +4,7 @@ using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Synthesis.Settings;
+using Newtonsoft.Json;
 
 namespace AddedObjectRemover;
 
@@ -51,6 +52,7 @@ public class StandardSettings : ISettingsValues
         + "a scene, a location or a navmesh points to; objects whose own script names a quest or scene, or whose base object\n"
         + "is this plugin's own and has a script that does; objects with a location role (except map markers). Linked objects are always removed or kept together.\n"
         + "Pick it from your load order.")]
+    [JsonConverter(typeof(EmptyTextAsNullConverter))]
     public ModKey TargetPlugin { get; set; } = ModKey.Null;
 
     [SynthesisOrder]
@@ -108,6 +110,7 @@ public class IgnoreSettings : IIgnoreSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName("Never count these mods")]
     [SynthesisTooltip("Add plugins whose objects and terrain changes should never cause removals, for example Creation Club plugins.")]
+    [JsonProperty(ItemConverterType = typeof(EmptyTextAsNullConverter))]
     public List<ModKey> ExcludedPlugins { get; set; } = [];
 
     [SynthesisOrder]

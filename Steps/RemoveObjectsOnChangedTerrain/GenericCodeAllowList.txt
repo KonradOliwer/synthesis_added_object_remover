@@ -1,0 +1,3 @@
+# Static methods and local functions of this module that mention no domain type (Ids or a Contracts type), each with its reason.
+# Form: Type.Member | reason  (local function: Type.Method.Local). The test fails when an entry stops being flagged.
+AreaChanges.Count | Counts the changed vertices of a check area over the step's own cell comparisons (internal types).

@@ -33,9 +33,11 @@ internal sealed class CellTerrainComparison(TerrainPlugins plugins, TerrainTypes
         for (var vertex = 0; vertex < CellTerrain.VertexCount; vertex++)
         {
             var shown = _difference.At(versionsFromReference[0].Version, versionsFromReference[^1].Version, vertex);
-            if (!shown.Any || FindChangerAt(versionsFromReference, shown, vertex) is not { } changer) continue;
+            if (!shown.Any) continue;
+            var change = FindChangersAt(versionsFromReference, shown, vertex);
+            if (!change.Any) continue;
             changes ??= new VertexChange[CellTerrain.VertexCount];
-            changes[vertex] = new VertexChange(shown, changer);
+            changes[vertex] = change;
         }
         return changes;
     }
@@ -44,13 +46,10 @@ internal sealed class CellTerrainComparison(TerrainPlugins plugins, TerrainTypes
     /// Height and terrain type are traced apart, so a non-counting plugin changing one of them on top of a counting plugin's
     /// change of the other does not hide that change.
     /// </summary>
-    /// <returns>The later loading of the counting plugins that made the shown height and terrain type changes; null where neither counts.</returns>
-    private int? FindChangerAt(TracedVersion[] versionsFromReference, TerrainChange shown, int vertex)
-    {
-        var heightChanger = shown.Height ? FindOriginOf(versionsFromReference, vertex, static change => change.Height).ChangerPosition : null;
-        var typeChanger = shown.TerrainType ? FindOriginOf(versionsFromReference, vertex, static change => change.TerrainType).ChangerPosition : null;
-        return new[] { heightChanger, typeChanger }.Max();
-    }
+    private VertexChange FindChangersAt(TracedVersion[] versionsFromReference, TerrainChange shown, int vertex) =>
+        new(
+            shown.Height ? FindOriginOf(versionsFromReference, vertex, static change => change.Height).ChangerPosition : null,
+            shown.TerrainType ? FindOriginOf(versionsFromReference, vertex, static change => change.TerrainType).ChangerPosition : null);
 
     /// <summary>
     /// The version whose own edit gave the shown value: the first of the last versions that all carry the shown change. When that

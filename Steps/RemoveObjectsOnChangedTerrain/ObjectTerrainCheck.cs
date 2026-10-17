@@ -90,25 +90,16 @@ internal sealed class ObjectTerrainCheck(IPluginRecords records, IBaseObjectShap
     }
 
     /// <summary>
-    /// How the winner differs at the area's vertices that a counting plugin changed (the change the game shows), and the last
-    /// loading of their changers.
+    /// The counted changes of the area: a height change at any vertex, and a terrain type change at enough of its vertices. The
+    /// kind names the counted changes; the plugin is the later loading of the plugins each counted change names.
     /// </summary>
-    /// <returns>Null when no counting plugin changed a vertex of the area.</returns>
+    /// <returns>Null when no change of the area counts.</returns>
     private ObjectOnChangedTerrain? FindChange(TargetObject target, List<CheckedCell> cells)
     {
-        var shown = default(TerrainChange);
-        int? lastChanger = null;
-        foreach (var (terrain, vertices) in cells)
-        {
-            if (terrain.Changes is not { } changes) continue;
-            foreach (var vertex in vertices)
-            {
-                var change = changes[vertex];
-                if (!change.Shown.Any) continue;
-                shown = shown.With(change.Shown);
-                lastChanger = Math.Max(lastChanger ?? change.Changer, change.Changer);
-            }
-        }
-        return lastChanger is { } position ? new ObjectOnChangedTerrain(target.Id, plugins.PluginAt(position), shown.Kind) : null;
+        var changes = AreaChanges.Count(cells);
+        var heightChanger = changes.HeightChanger;
+        var typeChanger = changes.TypeChanger(settings.MinTerrainTypeChangeShare);
+        if (new[] { heightChanger, typeChanger }.Max() is not { } changer) return null;
+        return new ObjectOnChangedTerrain(target.Id, plugins.PluginAt(changer), new TerrainChange(heightChanger != null, typeChanger != null).Kind);
     }
 }

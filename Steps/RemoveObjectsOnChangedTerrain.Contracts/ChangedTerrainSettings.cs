@@ -8,6 +8,10 @@ namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 /// <param name="CountHeightChanges">Whether a change of terrain height counts as a change.</param>
 /// <param name="HeightTolerance">A height change up to this many game units is ignored; 0 counts every change.</param>
 /// <param name="CountTerrainTypeChanges">Whether a change of terrain type counts as a change; a different texture of the same type does not.</param>
+/// <param name="MinTerrainTypeChangeShare">
+/// The share (0-1) of an area's vertices whose terrain type must have changed for the type change to count; 0 counts any one
+/// changed vertex.
+/// </param>
 /// <param name="AreaBySize">Whether the area grown by <paramref name="AreaMultiplier"/> is on.</param>
 /// <param name="AreaMultiplier">How far the area reaches around the object, as a multiple of its size.</param>
 /// <param name="AreaByDistance">Whether the area grown by <paramref name="AreaDistanceInUnits"/> is on.</param>
@@ -18,6 +22,7 @@ public sealed record ChangedTerrainSettings(
     bool CountHeightChanges,
     float HeightTolerance,
     bool CountTerrainTypeChanges,
+    float MinTerrainTypeChangeShare,
     bool AreaBySize,
     float AreaMultiplier,
     bool AreaByDistance,

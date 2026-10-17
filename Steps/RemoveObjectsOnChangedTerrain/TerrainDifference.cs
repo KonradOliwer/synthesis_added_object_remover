@@ -9,8 +9,6 @@ internal readonly record struct TerrainChange(bool Height, bool TerrainType)
 {
     public bool Any => Height || TerrainType;
 
-    public TerrainChange With(TerrainChange other) => new(Height || other.Height, TerrainType || other.TerrainType);
-
     public TerrainChangeKind Kind => (Height, TerrainType) switch
     {
         (true, true) => TerrainChangeKind.HeightAndTerrainType,

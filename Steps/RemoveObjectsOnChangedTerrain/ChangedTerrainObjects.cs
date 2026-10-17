@@ -10,7 +10,8 @@ namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
 /// <summary>
 /// Finds the target objects on terrain that another mod changed, and proposes their removal. The terrain of each cell is compared
 /// between its reference terrain (the terrain the target was built on) and the version the game shows; a difference counts when
-/// a counting plugin's own edit made it, and that plugin is named as the changer.
+/// a counting plugin's own edit made it, and that plugin is named as the changer. A terrain type change also needs the set share
+/// of the area's vertices.
 /// </summary>
 public static class ChangedTerrainObjects
 {

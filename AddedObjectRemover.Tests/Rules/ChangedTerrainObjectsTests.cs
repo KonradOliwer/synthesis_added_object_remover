@@ -19,11 +19,31 @@ public class ChangedTerrainObjectsTests
     private const float HeightStep = 8f;
     private const int VertexCount = TerrainHeights.VerticesPerSide * TerrainHeights.VerticesPerSide;
 
+    /// <summary>The share of an area's vertices whose terrain type must change in <see cref="Settings"/>: 4 of the 16 at <see cref="WideSpot"/>.</summary>
+    private const float TypeShare = 0.25f;
+    private const int ChangesAtTypeShare = 4;
+    private const float AnyChange = 0f;
+    private const float WholeArea = 1f;
+    private const int MostChanges = 3;
+    private const int FewerChanges = 2;
+    private const float FullOpacity = 1f;
+
     /// <summary>A terrain vertex inside the check area of an object at <see cref="Spot"/>, and one far outside it.</summary>
     private const int Near = 8 * TerrainHeights.VerticesPerSide + 8;
     private const int Far = 20 * TerrainHeights.VerticesPerSide + 20;
 
     private static readonly Vector3 Spot = new(1000, 1000, 0);
+
+    /// <summary>The 64-unit area of an object here covers 4 by 4 vertices from column and row 7 of the cell, all inside its bottom left quadrant.</summary>
+    private static readonly Vector3 WideSpot = new(1088, 1088, 0);
+    private const int WideSpotFirstVertex = 7;
+    private const int WideSpotVerticesPerSide = 4;
+
+    private static readonly (int Column, int Row)[] WideSpotVertices =
+    [
+        .. Enumerable.Range(WideSpotFirstVertex, WideSpotVerticesPerSide)
+            .SelectMany(row => Enumerable.Range(WideSpotFirstVertex, WideSpotVerticesPerSide).Select(column => (column, row))),
+    ];
     private static readonly RecordKey Worldspace = TestTargets.Space;
     private static readonly RecordKey Interior = TestTargets.SpaceKey(0x101);
     private static readonly RecordKey ChildWorldspace = TestTargets.SpaceKey(0x102);
@@ -60,8 +80,9 @@ public class ChangedTerrainObjectsTests
         float multiplier = 0.5f,
         bool byDistance = true,
         bool heights = true,
-        bool types = true) =>
-        new(On: true, objects, heights, tolerance, types, bySize, multiplier, byDistance, AreaDistanceInUnits: 64f);
+        bool types = true,
+        float typeShare = TypeShare) =>
+        new(On: true, objects, heights, tolerance, types, typeShare, bySize, multiplier, byDistance, AreaDistanceInUnits: 64f);
 
     private static float[] Heights(float height, params (int Vertex, float Height)[] changes)
     {
@@ -407,15 +428,108 @@ public class ChangedTerrainObjectsTests
             Find(PaintedCell(FlatPainted(Target, Painted(Grass)), new TerrainVersion(Other, Heights: null, Layers: null)), Settings(heights: heights)).Proposals.AsEnumerable());
 
     [Fact]
-    public void TheKindIsHowTheShownTerrainDiffersEvenWhenTheNamedModChangedLess()
+    public void ATypeChangeByAModThatDoesNotCountIsLeftOutOfTheKind()
     {
         var heightOnly = new TerrainVersion(Other, Heights(Ground, (Near, Raised)), Painted(Grass));
         var shownByIgnoredMod = new TerrainVersion(Ignored, Heights(Ground, (Near, Raised)), Painted(Road));
 
         var result = Find(PaintedCell(FlatPainted(Target, Painted(Grass)), heightOnly, shownByIgnoredMod), Settings());
 
-        Assert.Equal([new ObjectOnChangedTerrain(new TargetId(0), Other, TerrainChangeKind.HeightAndTerrainType)], result.Hits.AsEnumerable());
-        Assert.Equal([Removal(0, Other, TerrainChangeKind.HeightAndTerrainType)], result.Proposals.AsEnumerable());
+        Assert.Equal([new ObjectOnChangedTerrain(new TargetId(0), Other, TerrainChangeKind.Height)], result.Hits.AsEnumerable());
+        Assert.Equal([Removal(0, Other, TerrainChangeKind.Height)], result.Proposals.AsEnumerable());
+    }
+
+    [Fact]
+    public void AHeightChangeByAModThatDoesNotCountIsLeftOutOfTheKind()
+    {
+        var typeOnly = FlatPainted(Other, Painted(Road));
+        var shownByIgnoredMod = new TerrainVersion(Ignored, Heights(Ground, (Near, Raised)), Painted(Road));
+
+        var result = Find(PaintedCell(FlatPainted(Target, Painted(Grass)), typeOnly, shownByIgnoredMod), Settings());
+
+        Assert.Equal([Removal(0, Other, TerrainChangeKind.TerrainType)], result.Proposals.AsEnumerable());
+    }
+
+    [Theory]
+    [InlineData(ChangesAtTypeShare - 1, false)]
+    [InlineData(ChangesAtTypeShare, true)]
+    [InlineData(ChangesAtTypeShare + 1, true)]
+    public void ATypeChangeRemovesTheObjectOnlyFromTheShareOfChangedVerticesOn(int changed, bool removed)
+    {
+        var plugin = PaintedCell(FlatPainted(Target, Painted(Grass)), FlatPainted(Other, RoadAtWideSpot(changed)));
+
+        var result = Find(plugin, Settings(), threads: 1, Placed(0, Rock, WideSpot));
+
+        ProposedRemoval[] expected = removed ? [Removal(0, Other, TerrainChangeKind.TerrainType)] : [];
+        Assert.Equal(expected, result.Proposals.AsEnumerable());
+    }
+
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(1, true)]
+    public void AShareOfZeroRemovesTheObjectOnAnyOneChangedVertex(int changed, bool removed)
+    {
+        var plugin = PaintedCell(FlatPainted(Target, Painted(Grass)), FlatPainted(Other, RoadAtWideSpot(changed)));
+
+        Assert.Equal(removed, Find(plugin, Settings(typeShare: AnyChange), threads: 1, Placed(0, Rock, WideSpot)).Proposals.Any());
+    }
+
+    /// <summary>The counting mod changed the type of fewer vertices than the share; the later mod adds the rest.</summary>
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public void OnlyTheVerticesCountingModsChangedMakeUpTheShare(bool laterCounts, bool removed)
+    {
+        var plugin = PaintedCell(
+            FlatPainted(Target, Painted(Grass)),
+            FlatPainted(Other, RoadAtWideSpot(ChangesAtTypeShare - 1)),
+            FlatPainted(laterCounts ? Later : Ignored, RoadAtWideSpot(ChangesAtTypeShare + 1)));
+
+        Assert.Equal(removed, Find(plugin, Settings(), threads: 1, Placed(0, Rock, WideSpot)).Proposals.Any());
+    }
+
+    /// <summary>The later mod keeps the earlier mod's road and paints more next to it.</summary>
+    [Theory]
+    [InlineData(MostChanges, FewerChanges, false)]
+    [InlineData(FewerChanges, FewerChanges, true)]
+    [InlineData(FewerChanges, MostChanges, true)]
+    public void ATypeChangeNamesTheModThatChangedTheMostVerticesAndTheLaterLoadingOnATie(int otherChanges, int laterChanges, bool laterNamed)
+    {
+        var plugin = PaintedCell(
+            FlatPainted(Target, Painted(Grass)),
+            FlatPainted(Other, RoadAtWideSpot(otherChanges)),
+            FlatPainted(Later, RoadAtWideSpot(otherChanges + laterChanges)));
+
+        var result = Find(plugin, Settings(), threads: 1, Placed(0, Rock, WideSpot));
+
+        Assert.Equal([Removal(0, laterNamed ? Later : Other, TerrainChangeKind.TerrainType)], result.Proposals.AsEnumerable());
+    }
+
+    [Theory]
+    [InlineData(AnyChange)]
+    [InlineData(TypeShare)]
+    [InlineData(WholeArea)]
+    public void OneHeightChangeRemovesTheObjectWhateverTheTypeShare(float typeShare) =>
+        Assert.Equal(
+            [Removal(0, Other)],
+            Find(new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(Target), RaisedAt(Other, Near)] }, Settings(typeShare: typeShare)).Proposals.AsEnumerable());
+
+    [Fact]
+    public void ATypeChangeBelowTheShareIsLeftOutOfTheKindOfAHeightChange()
+    {
+        var plugin = PaintedCell(FlatPainted(Target, Painted(Grass)), new TerrainVersion(Other, Heights(Ground, (Near, Raised)), RoadAtWideSpot(1)));
+
+        Assert.Equal([Removal(0, Other, TerrainChangeKind.Height)], Find(plugin, Settings(), threads: 1, Placed(0, Rock, WideSpot)).Proposals.AsEnumerable());
+    }
+
+    /// <summary>Grass everywhere, with road painted over the first <paramref name="count"/> vertices of the area of an object at <see cref="WideSpot"/>.</summary>
+    private static TerrainLayers RoadAtWideSpot(int count)
+    {
+        var opacities = new float[TerrainQuadrants.VertexCount];
+        foreach (var (column, row) in WideSpotVertices.Take(count)) opacities[row * TerrainQuadrants.VerticesPerSide + column] = FullOpacity;
+        var quadrants = Painted(Grass).Quadrants;
+        quadrants[TerrainQuadrants.IndexOf(0, 0)] = new QuadrantLayers(Grass, [new TerrainAlphaLayer(Road, LayerNumber: 0, opacities)]);
+        return new TerrainLayers(quadrants);
     }
 
     [Theory]

@@ -66,7 +66,7 @@ internal static partial class LogSections
             + $"Margin by object size: {OnWith(terrain.AreaBySize, $"{terrain.AreaMultiplier} x object size")}; "
             + $"Margin by fixed distance: {OnWith(terrain.AreaByDistance, $"{terrain.AreaDistanceInUnits} units")}; "
             + $"Count height changes: {OnWith(terrain.CountHeightChanges, $"ignoring changes up to {terrain.HeightTolerance} units")}; "
-            + $"Count ground type changes: {OnOff(terrain.CountTerrainTypeChanges)}.";
+            + $"Count ground type changes: {OnWith(terrain.CountTerrainTypeChanges, $"share of ground points that must change type {terrain.MinTerrainTypeChangeShare}")}.";
     }
 
     private static string DescribeDiagnostics(RunSettings settings) =>

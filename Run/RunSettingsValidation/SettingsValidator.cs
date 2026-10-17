@@ -24,12 +24,14 @@ public static class SettingsValidator
     private const int MinOtherMastersForPatch = 1;
     private const int MaxOtherMastersForPatch = 100;
     private const float MinPercent = 1f;
+    private const float MaxShare = 1f;
 
     /// <summary>The names the settings screen shows, group first, so a warning leads to the setting.</summary>
     private const string TooCloseSizeMarginName = "Remove objects too close to other mods' objects > Margin by object size > Margin on every side";
     private const string TooCloseDistanceMarginName = "Remove objects too close to other mods' objects > Margin by fixed distance > Margin on every side";
     private const string TerrainSizeMarginName = "Remove objects on terrain changed by other mods > Margin by object size > Margin on every side";
     private const string TerrainDistanceMarginName = "Remove objects on terrain changed by other mods > Margin by fixed distance > Margin on every side";
+    private const string TerrainTypeChangeShareName = "Remove objects on terrain changed by other mods > Share of ground points that must change type";
 
     /// <summary>Validation runs in a fixed order because the warnings are reported in the order found.</summary>
     public static RunRequest Build(ISettingsValues settings, IPluginRecords records, LoadOrderPlugins mods, string outputPath, int workers)
@@ -117,6 +119,8 @@ public static class SettingsValidator
             terrain.HeightChangeTolerance, 0, MaxHeightChangeTolerance, SettingDefaults.HeightChangeTolerance, "height change tolerance", warnings);
         var sizeMultiplier = ClampSizeMultiplier(terrain.AreaSizeMultiplier, TerrainSizeMarginName, warnings);
         var distanceInUnits = ClampMarginInUnits(terrain.AreaDistanceInUnits, SettingDefaults.TerrainAreaDistanceInUnits, TerrainDistanceMarginName, warnings);
+        var typeChangeShare = Clamp(
+            terrain.MinTerrainTypeChangeShare, 0, MaxShare, SettingDefaults.MinTerrainTypeChangeShare, TerrainTypeChangeShareName, warnings);
         var countsAChange = terrain.CountHeightChanges || terrain.CountTerrainTypeChanges;
         var hasAnArea = terrain.AreaBySize || terrain.AreaByDistance;
         if (terrain.RemoveOnChangedTerrain && !countsAChange)
@@ -137,6 +141,7 @@ public static class SettingsValidator
             terrain.CountHeightChanges,
             tolerance,
             terrain.CountTerrainTypeChanges,
+            typeChangeShare,
             terrain.AreaBySize,
             sizeMultiplier,
             terrain.AreaByDistance,

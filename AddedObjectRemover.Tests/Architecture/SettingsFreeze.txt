@@ -46,6 +46,7 @@ TerrainChange.BySize.Use
 TerrainChange.CountHeightChanges
 TerrainChange.CountTerrainTypeChanges
 TerrainChange.HeightChangeTolerance
+TerrainChange.MinTerrainTypeChangeShare
 TerrainChange.RemoveOnChangedTerrain
 TerrainChange.TerrainCheckedObjects
 TerrainCheckedObjects

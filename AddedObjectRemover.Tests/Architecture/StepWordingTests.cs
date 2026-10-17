@@ -63,6 +63,7 @@ public class StepWordingTests
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects too close to other mods' objects > Margin by fixed distance > Margin on every side")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects on terrain changed by other mods > Margin by object size > Margin on every side")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects on terrain changed by other mods > Margin by fixed distance > Margin on every side")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects on terrain changed by other mods > Share of ground points that must change type")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "target plugin")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "too close")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "touch distance")] = SettingsWarning,

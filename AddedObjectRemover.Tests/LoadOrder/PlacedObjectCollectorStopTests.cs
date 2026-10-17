@@ -7,7 +7,7 @@ namespace AddedObjectRemover.Tests.LoadOrder;
 public class PlacedObjectCollectorStopTests
 {
     private static readonly WhatToCollect Plan = new(SupportOnlyObjects: false, Terrain: false, Navmesh: false, OtherEditorIds: false, OverriddenOthersList: false, TerrainVersions: false, TerrainLayers: false);
-    private static readonly IdentifiedMods Mods = new(TestTargets.TargetPlugin, new HashSet<PluginName>(), [], [], DetectedPatches.Off, [], []);
+    private static readonly IdentifiedMods Mods = new(TestTargets.TargetPlugin, new HashSet<PluginName>(), [], [], DetectedPatches.Off, []);
 
     [Fact]
     public void NoTargetObjectsStopsTheRun()

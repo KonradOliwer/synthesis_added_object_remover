@@ -4,7 +4,7 @@ using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
 
-/// <summary>How a terrain version differs from the reference terrain at one or more vertices.</summary>
+/// <summary>How a terrain version differs from another version at one or more vertices.</summary>
 internal readonly record struct TerrainChange(bool Height, bool TerrainType)
 {
     public bool Any => Height || TerrainType;
@@ -25,7 +25,7 @@ internal readonly record struct TerrainChange(bool Height, bool TerrainType)
 /// <param name="Types">The terrain type at each vertex; null exactly when terrain type changes are not counted.</param>
 internal sealed record ComparedVersion(PluginName Plugin, float[]? Heights, TerrainType[]? Types);
 
-/// <summary>How a terrain version differs from the reference terrain at a vertex, by the switched-on checks.</summary>
+/// <summary>How a terrain version differs from another (the reference terrain, or the version the game shows) at a vertex, by the switched-on checks.</summary>
 internal sealed class TerrainDifference(ChangedTerrainSettings settings)
 {
     public TerrainChange At(ComparedVersion reference, ComparedVersion version, int vertex) => new(

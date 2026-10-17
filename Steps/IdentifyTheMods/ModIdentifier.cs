@@ -32,7 +32,7 @@ public static class ModIdentifier
         ignored.UnionWith(settings.Excluded);
         ignored.UnionWith(ignoredMasters);
         ignored.UnionWith(patches.IgnoredMods);
-        return new IdentifiedMods(settings.Target, ignored, targetMasters, ignoredMasters, patches, [.. dependants.Select(listing => listing.Mod)], baseGame);
+        return new IdentifiedMods(settings.Target, ignored, targetMasters, ignoredMasters, patches, [.. dependants.Select(listing => listing.Mod)]);
     }
 
     /// <remarks>

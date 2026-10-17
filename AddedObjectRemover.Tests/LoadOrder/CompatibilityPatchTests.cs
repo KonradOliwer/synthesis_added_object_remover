@@ -89,16 +89,18 @@ public class CompatibilityPatchTests
     }
 
     [Fact]
-    public void BaseGameIsTheKnownBaseGamePluginsWithoutCreationClubContent()
+    public void TheBaseGameIsIgnoredWithoutCreationClubContent()
     {
         var dawnguard = new PluginName("Dawnguard.esm");
         var creationClub = new PluginName("ccBGSSSE001-Fish.esm");
         var standing = ModIdentifier.Identify(
             new LoadOrderPlugins(new KnownPluginNames([Skyrim, dawnguard, creationClub, Target, SynthesisOutput]), SynthesisOutput,
                 [Listing(Skyrim), Listing(dawnguard, Skyrim), Listing(creationClub, Skyrim), Listing(Target, Skyrim)]),
-            new ModIdentificationSettings(Target, Excluded: [], IgnoreTargetMasters: true, IgnorePatched: true, PatchMasterLimit));
+            new ModIdentificationSettings(Target, Excluded: [], IgnoreTargetMasters: false, IgnorePatched: true, PatchMasterLimit));
 
-        Assert.Equal(new[] { Skyrim, dawnguard }, standing.BaseGame);
+        Assert.Contains(Skyrim, standing.IgnoredOrigins);
+        Assert.Contains(dawnguard, standing.IgnoredOrigins);
+        Assert.DoesNotContain(creationClub, standing.IgnoredOrigins);
     }
 
     private static IdentifiedMods Decide(params PluginListing[] listed) =>

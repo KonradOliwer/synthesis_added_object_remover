@@ -2,22 +2,20 @@ using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
 
-/// <summary>What each plugin is to the terrain: the reference terrain's groups, and the plugins that count as changing it.</summary>
+/// <summary>What each plugin is to the terrain: the reference terrain's plugins, and the plugins that count as changing it.</summary>
 internal sealed class TerrainPlugins(IdentifiedMods mods, LoadOrderPlugins loadOrder)
 {
     /// <summary>
-    /// The reference terrain among a cell's versions (in load order): the last dependant's, else the target's, else the last
-    /// base-game plugin's. The last dependant is the one the game shows among them, and a patch or add-on loads after what it builds on.
+    /// The reference terrain among a cell's versions (in load order): the terrain the target was built on, which is the target's
+    /// own version, else the last version among the target's masters.
     /// </summary>
-    /// <returns>Null when none of these groups has a version of the cell.</returns>
+    /// <returns>Null when neither the target nor one of its masters has a version of the cell.</returns>
     public int? ReferenceIn(TerrainVersion[] versions) =>
-        LastIndexIn(versions, mods.Dependants.Contains)
-        ?? LastIndexIn(versions, plugin => plugin == mods.Target)
-        ?? LastIndexIn(versions, mods.BaseGame.Contains);
+        LastIndexIn(versions, plugin => plugin == mods.Target) ?? LastIndexIn(versions, mods.TargetMasters.Contains);
 
     /// <summary>
-    /// Plugins of the reference groups never change the reference, and plugins that never count as clashing (the patch plugin
-    /// among them, which holds earlier patchers' output) never count as changing it either.
+    /// Plugins that never count as clashing (the patch plugin among them, which holds earlier patchers' output) and plugins
+    /// that require the target (its patches and add-ons) never count as changing the terrain.
     /// </summary>
     public bool CountsAsChanging(PluginName plugin) => !mods.IgnoredOrigins.Contains(plugin) && !mods.Dependants.Contains(plugin);
 

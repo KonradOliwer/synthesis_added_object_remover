@@ -9,13 +9,13 @@ internal sealed record CellTerrain(float[]? ReferenceHeights, float[]? WinnerHei
     public const int VertexCount = TerrainHeights.VerticesPerSide * TerrainHeights.VerticesPerSide;
 }
 
-/// <summary>A vertex where the winner differs from the reference and at least one counting plugin's own version differs too.</summary>
+/// <summary>A vertex where the winner differs from the reference and a counting plugin's own edit made the difference.</summary>
 /// <param name="Shown">How the winner differs from the reference: the change the game shows; no change at the other vertices.</param>
-/// <param name="LastChanger">
-/// The load-order position of the last loading counting plugin whose own version differs. An object names the last loading
-/// changer over all its vertices, so the other changers of a vertex are not kept.
+/// <param name="Changer">
+/// The load-order position of the counting plugin whose edit made the shown height or terrain type difference; the later
+/// loading one when both did. An object names the last loading changer over all its vertices.
 /// </param>
-internal readonly record struct VertexChange(TerrainChange Shown, int LastChanger);
+internal readonly record struct VertexChange(TerrainChange Shown, int Changer);
 
 /// <summary>A cell under an object's check area, with the vertices of the area in it.</summary>
 internal sealed record CheckedCell(CellTerrain Terrain, int[] Vertices);

@@ -90,13 +90,17 @@ same ground type (one grass texture replaced by another) is never a change. Wher
 are mixed, the one that covers most of a point counts.
 
 **What is compared.** For each piece of terrain an object stands on, the reference terrain is the
-first of these that has terrain there: the last plugin that requires the cleaned mod (a patch or an
-add-on for it), then the cleaned mod itself, then the base game with its official updates and DLC
-(Creation Club content is not included). A change counts only when the terrain the game shows
-differs from the reference by more than the switched-on checks allow, and a mod that is not part of
-the reference and not one of the *Other mods that never cause removals* made the change. Changes
-made by the cleaned mod, or by a plugin that requires it, are never counted against it. The
-detailed log names the mod that changed the terrain for each removed object.
+terrain the cleaned mod was made for: its own terrain there, or else the terrain of the last of its
+required mods (its masters) that has terrain there. Where neither has terrain, the object is not
+checked. A change counts only when the terrain the game shows differs from the reference by more
+than the switched-on checks allow, and the mod that made the difference is not the cleaned mod, a
+plugin that requires it (a patch or an add-on for it) or one of the *Other mods that never cause
+removals*. That mod's own change must also be larger than the checks allow: several small changes
+that only add up to a larger one through a mod that does not count do not count. A mod that only
+copies another mod's terrain did not make the change: copying a change made by a mod that does not
+count does not count either, and a patch that carries another mod's terrain change does not hide
+it. The detailed log names the mod that made the
+change for each removed object.
 
 If *Remove objects on changed terrain* is on but both *Count height changes* and *Count ground
 type changes* are off, nothing is removed for changed terrain and the log warns about it. Switched

@@ -91,7 +91,7 @@ internal sealed class ObjectTerrainCheck(IPluginRecords records, IBaseObjectShap
 
     /// <summary>
     /// How the winner differs at the area's vertices that a counting plugin changed (the change the game shows), and the last
-    /// loading counting plugin that changed one of them.
+    /// loading of their changers.
     /// </summary>
     /// <returns>Null when no counting plugin changed a vertex of the area.</returns>
     private ObjectOnChangedTerrain? FindChange(TargetObject target, List<CheckedCell> cells)
@@ -106,7 +106,7 @@ internal sealed class ObjectTerrainCheck(IPluginRecords records, IBaseObjectShap
                 var change = changes[vertex];
                 if (!change.Shown.Any) continue;
                 shown = shown.With(change.Shown);
-                lastChanger = Math.Max(lastChanger ?? change.LastChanger, change.LastChanger);
+                lastChanger = Math.Max(lastChanger ?? change.Changer, change.Changer);
             }
         }
         return lastChanger is { } position ? new ObjectOnChangedTerrain(target.Id, plugins.PluginAt(position), shown.Kind) : null;

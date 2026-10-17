@@ -13,6 +13,10 @@ public class ChangedTerrainObjectsTests
 {
     private const float Ground = 0f;
     private const float Raised = 64f;
+
+    /// <summary>The height tolerance of <see cref="Settings"/>, and the smallest height step terrain heights come in.</summary>
+    private const float Tolerance = 16f;
+    private const float HeightStep = 8f;
     private const int VertexCount = TerrainHeights.VerticesPerSide * TerrainHeights.VerticesPerSide;
 
     /// <summary>A terrain vertex inside the check area of an object at <see cref="Spot"/>, and one far outside it.</summary>
@@ -26,10 +30,12 @@ public class ChangedTerrainObjectsTests
     private static readonly ExteriorCell Cell = new(Worldspace, 0, 0);
 
     private static readonly PluginName BaseGame = new("Skyrim.esm");
+    private static readonly PluginName Master = new("Master.esm");
     private static readonly PluginName Early = new("Early.esp");
     private static readonly PluginName Target = TestTargets.TargetPlugin;
     private static readonly PluginName Dependant = new("Dependant.esp");
     private static readonly PluginName Other = new("Other.esp");
+    private static readonly PluginName CompatibilityPatch = new("CompatibilityPatch.esp");
     private static readonly PluginName Ignored = new("Ignored.esp");
     private static readonly PluginName Later = new("Later.esp");
     private static readonly PluginName Patch = new("Synthesis.esp");
@@ -38,17 +44,18 @@ public class ChangedTerrainObjectsTests
     private static readonly BaseKey Marker = new(new RecordKey(Target, 0x901), BaseLinkKind.PlaceableObject);
     private static readonly BaseKey Broken = new(new RecordKey(Target, 0x902), BaseLinkKind.PlaceableObject);
 
+    /// <summary>The target's masters are the base game and a master that is not ignored; two plugins require the target.</summary>
     private static readonly IdentifiedMods Mods = new(
-        Target, new HashSet<PluginName> { BaseGame, Target, Ignored, Patch }, [], [], DetectedPatches.Off, [Dependant], [BaseGame]);
+        Target, new HashSet<PluginName> { BaseGame, Target, Ignored, Patch }, [BaseGame, Master], [], DetectedPatches.Off, [Dependant, CompatibilityPatch]);
+
+    private static readonly PluginName[] Plugins = [BaseGame, Master, Early, Target, Dependant, Other, CompatibilityPatch, Ignored, Later, Patch];
 
     private static readonly LoadOrderPlugins LoadOrder = new(
-        new KnownPluginNames([BaseGame, Early, Target, Dependant, Other, Ignored, Later, Patch]),
-        Patch,
-        [.. new[] { BaseGame, Early, Target, Dependant, Other, Ignored, Later, Patch }.Select(plugin => new PluginListing(plugin, true, []))]);
+        new KnownPluginNames(Plugins), Patch, [.. Plugins.Select(plugin => new PluginListing(plugin, true, []))]);
 
     private static ChangedTerrainSettings Settings(
         TerrainCheckedObjects objects = TerrainCheckedObjects.VisibleObjectsOnTheGround,
-        float tolerance = 16f,
+        float tolerance = Tolerance,
         bool bySize = false,
         float multiplier = 0.5f,
         bool byDistance = true,
@@ -116,9 +123,9 @@ public class ChangedTerrainObjectsTests
         Assert.Empty(FindInCell(Flat(Target), RaisedAt(Other, Far)).Proposals);
 
     [Theory]
-    [InlineData(16f, 16f, false)]
-    [InlineData(16f, 24f, true)]
-    [InlineData(0f, 8f, true)]
+    [InlineData(Tolerance, Tolerance, false)]
+    [InlineData(Tolerance, Tolerance + HeightStep, true)]
+    [InlineData(0f, HeightStep, true)]
     public void AHeightChangeCountsOnlyBeyondTheTolerance(float tolerance, float change, bool removed)
     {
         var terrain = new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(Target), RaisedAt(Other, Near, change)] };
@@ -127,16 +134,62 @@ public class ChangedTerrainObjectsTests
     }
 
     [Fact]
-    public void ADependantsVersionIsTheReferenceSoItsOwnChangeCountsForNothing() =>
+    public void APluginRequiringTheTargetsOwnChangeCountsForNothing() =>
         Assert.Empty(FindInCell(Flat(Target), RaisedAt(Dependant, Near)).Proposals);
 
     [Fact]
-    public void AModUndoingADependantsChangeChangesTheReference() =>
-        Assert.Equal([Removal(0, Other)], FindInCell(Flat(Target), RaisedAt(Dependant, Near), Flat(Other)).Proposals.AsEnumerable());
+    public void APluginRequiringTheTargetsChangeCopiedByACountingModCountsForNothing() =>
+        Assert.Empty(FindInCell(Flat(Target), RaisedAt(Dependant, Near), RaisedAt(Later, Near)).Proposals);
+
+    [Fact]
+    public void AnIgnoredModsChangeCopiedByACountingModCountsForNothing() =>
+        Assert.Empty(FindInCell(Flat(Target), RaisedAt(Ignored, Near), RaisedAt(Later, Near)).Proposals);
+
+    [Fact]
+    public void ACountingModsChangeCarriedByACompatibilityPatchNamesTheCountingMod() =>
+        Assert.Equal([Removal(0, Other)], FindInCell(Flat(Target), RaisedAt(Other, Near), RaisedAt(CompatibilityPatch, Near)).Proposals.AsEnumerable());
+
+    [Fact]
+    public void ACountingModCopyingAnotherCountingModsChangeLeavesItNamedOnTheFirst() =>
+        Assert.Equal([Removal(0, Other)], FindInCell(Flat(Target), RaisedAt(Other, Near), RaisedAt(Later, Near)).Proposals.AsEnumerable());
+
+    [Fact]
+    public void ASmallIgnoredChangeOnTopOfACountingChangeNamesTheCountingMod() =>
+        Assert.Equal([Removal(0, Other)], FindInCell(Flat(Target), RaisedAt(Other, Near), RaisedAt(Ignored, Near, Raised + HeightStep)).Proposals.AsEnumerable());
+
+    [Fact]
+    public void AnIgnoredModsOwnLargerChangeOnTopOfACountingChangeCountsForNothing() =>
+        Assert.Empty(FindInCell(Flat(Target), RaisedAt(Other, Near), RaisedAt(Ignored, Near, 2 * Raised)).Proposals);
+
+    /// <summary>Each step is within the tolerance of the next, and only the ignored mod's own height is beyond it.</summary>
+    [Fact]
+    public void AnIgnoredModsStepPushingSmallChangesBeyondTheToleranceCountsForNothing() =>
+        Assert.Empty(
+            FindInCell(Flat(Target), RaisedAt(Other, Near, HeightStep), RaisedAt(CompatibilityPatch, Near, Tolerance), RaisedAt(Ignored, Near, Tolerance + HeightStep))
+                .Proposals);
+
+    /// <summary>Each step is within the tolerance of the next, and the later counting mod's own height is beyond it.</summary>
+    [Fact]
+    public void CountingModsSmallStepsAddingUpBeyondTheToleranceNameTheModWhoseOwnChangeExceedsIt() =>
+        Assert.Equal(
+            [Removal(0, Later)],
+            FindInCell(Flat(Target), RaisedAt(Other, Near, HeightStep), RaisedAt(Later, Near, Tolerance + HeightStep)).Proposals.AsEnumerable());
+
+    [Fact]
+    public void APatchTakingAnEarlierChangeBackInNamesTheModThatMadeIt() =>
+        Assert.Equal([Removal(0, Other)], FindInCell(Flat(Target), RaisedAt(Other, Near), Flat(Later), RaisedAt(Patch, Near)).Proposals.AsEnumerable());
+
+    [Fact]
+    public void AModRestoringTheTargetsTerrainOverAPluginRequiringTheTargetLeavesNothingChanged() =>
+        Assert.Empty(FindInCell(Flat(Target), RaisedAt(Dependant, Near), Flat(Other)).Proposals);
 
     [Fact]
     public void ALaterModRestoringTheReferenceLeavesNothingChanged() =>
         Assert.Empty(FindInCell(Flat(Target), RaisedAt(Other, Near), Flat(Later)).Proposals);
+
+    [Fact]
+    public void AnIgnoredModRestoringTheReferenceLeavesNothingChanged() =>
+        Assert.Empty(FindInCell(Flat(Target), RaisedAt(Other, Near), Flat(Ignored)).Proposals);
 
     [Fact]
     public void AModLoadingBeforeTheReferenceIsOverriddenByIt() =>
@@ -168,8 +221,20 @@ public class ChangedTerrainObjectsTests
     }
 
     [Fact]
-    public void TheBaseGameIsTheReferenceWhenNeitherTheTargetNorADependantHasTheCell() =>
+    public void TheBaseGameAsATargetMasterIsTheReferenceWhenTheTargetHasNoTerrainThere() =>
         Assert.Equal([Removal(0, Other)], FindInCell(Flat(BaseGame), RaisedAt(Other, Near)).Proposals.AsEnumerable());
+
+    [Fact]
+    public void AModMatchingTheLastTargetMastersTerrainChangesNothingWhenTheTargetHasNoTerrainThere() =>
+        Assert.Empty(FindInCell(Flat(BaseGame), RaisedAt(Master, Near), RaisedAt(Other, Near)).Proposals);
+
+    [Fact]
+    public void AModRestoringAnEarlierMastersTerrainOverTheLastTargetMastersChangesItWhenTheTargetHasNoTerrainThere() =>
+        Assert.Equal([Removal(0, Other)], FindInCell(Flat(BaseGame), RaisedAt(Master, Near), Flat(Other)).Proposals.AsEnumerable());
+
+    [Fact]
+    public void AModThatIsNoTargetMasterLoadingBeforeTheTargetChangesTheMastersTerrain() =>
+        Assert.Equal([Removal(0, Early)], FindInCell(Flat(BaseGame), RaisedAt(Early, Near)).Proposals.AsEnumerable());
 
     [Fact]
     public void ADeletedLandRecordOfAnotherModIsAHeightChange() =>
@@ -259,7 +324,7 @@ public class ChangedTerrainObjectsTests
     {
         var terrain = Enumerable.Range(0, 4).ToDictionary(
             cellX => new ExteriorCell(Worldspace, cellX, 0),
-            cellX => new[] { Flat(Target), RaisedAt(Other, Near), cellX % 2 == 0 ? RaisedAt(Later, Near) : RaisedAt(Ignored, Near) });
+            cellX => new[] { Flat(Target), RaisedAt(Other, Near), cellX % 2 == 0 ? RaisedAt(Later, Near, 2 * Raised) : RaisedAt(Ignored, Near) });
         var targets = Enumerable.Range(0, 40)
             .Select(index => Placed(index, Rock, Spot + new Vector3(index % 4 * ExteriorGrid.CellSize, index / 4 * 4f, 0)))
             .ToArray();

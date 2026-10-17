@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>Finds the target objects on terrain that another mod changed, compared with the reference terrain of the target, its dependants and the base game, and proposes their removal. It references its contracts, the contracts of the steps and caches it reads, Ids, PluginRecordFacts and the package-free tools it uses, and holds no packages.</Description>
+    <Description>Finds the target objects on terrain that another mod changed, compared with the terrain the target was built on (its own, else its masters'), and proposes their removal. It references its contracts, the contracts of the steps and caches it reads, Ids, PluginRecordFacts and the package-free tools it uses, and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\RemoveObjectsOnChangedTerrain.Contracts\RemoveObjectsOnChangedTerrain.Contracts.csproj" />

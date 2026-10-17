@@ -309,7 +309,7 @@ public sealed class TablesTests : IDisposable
             false,
             [],
             new Dictionary<RecordKey, SpaceFact> { [TestTargets.Space] = new(TestTargets.Space, "Tamriel, Test", SpaceKind.Worldspace) },
-            new ReadCounts(0, 0, 0, 0, 0, 0),
+            new ReadCounts(0, 0, 0, 0, 0, 0, 0, 0),
             [],
             TargetWorkOrder.Of(targets),
             null);

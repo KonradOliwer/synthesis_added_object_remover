@@ -21,13 +21,12 @@ public static class PatchWriter
             if (hasEnableParent) enableParentsReplaced++;
         }
 
-        foreach (var move in final.Moves)
-        {
-            orders.Add(new SetPosition(targets[move.Target.Index].Key, move.To));
-        }
+        var moved = final.Moves.Select(move => new RecordMove(targets[move.Target.Index].Key, move.To)).ToImmutableArray();
+        orders.AddRange(moved.Select(move => new SetPosition(move.Record, move.To)));
 
         plugin.Write(orders);
-        return new WriteSummary(removed, final.Moves.Length, enableParentsReplaced);
+        var writes = new RecordWrites([.. removed.Select(id => targets[id.Index].Key)], moved);
+        return new WriteSummary(removed, moved.Length, enableParentsReplaced, writes);
     }
 
     /// <summary>Round by round, each round's direct removals in target order, then the linked ones.</summary>

@@ -4,11 +4,12 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>Gathers from the load order the target's placed objects, the other mods' placed objects in the same spaces and the links to them, leaving out disabled and deleted ones. It references its contracts, IdentifyTheMods.Contracts, Ids and the package-free tools it uses, and holds no packages.</Description>
+    <Description>Gathers from the load order the target's placed objects, the other mods' placed objects in the same spaces and the links to them, leaving out disabled and deleted ones and those an earlier run of the batch removed, and taking the positions earlier runs moved to. It references its contracts, IdentifyTheMods.Contracts, WriteThePatch.Contracts, Ids and the package-free tools it uses, and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
     <ProjectReference Include="..\IdentifyTheMods.Contracts\IdentifyTheMods.Contracts.csproj" />
+    <ProjectReference Include="..\WriteThePatch.Contracts\WriteThePatch.Contracts.csproj" />
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
     <ProjectReference Include="..\..\Tools\PluginRecordFacts\PluginRecordFacts.csproj" />
     <ProjectReference Include="..\..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />

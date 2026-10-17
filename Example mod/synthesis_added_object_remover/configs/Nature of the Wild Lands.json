@@ -1,0 +1,72 @@
+{
+  "TargetPlugin": "Nature of the Wild Lands.esp",
+  "WhatToIgnore": {
+    "ExcludedPlugins": [],
+    "IgnoreTargetMasters": true,
+    "CompatibilityPatches": {
+      "IgnoreModsPatchedWithTarget": true,
+      "MaxOtherMastersForPatch": 10
+    }
+  },
+  "TooClose": {
+    "BySize": {
+      "Use": true,
+      "SizeMultiplier": 0.5
+    },
+    "ByDistance": {
+      "Use": true,
+      "DistanceInUnits": 50.0
+    },
+    "UseRoughBoxes": false,
+    "NpcHandling": "OnlyWhenStuckInsideTheObject"
+  },
+  "TerrainChange": {
+    "RemoveOnChangedTerrain": true,
+    "TerrainCheckedObjects": "AllObjectsIncludingInvisibleOnes",
+    "BySize": {
+      "Use": true,
+      "SizeMultiplier": 0.5
+    },
+    "ByDistance": {
+      "Use": true,
+      "DistanceInUnits": 64.0
+    },
+    "CountHeightChanges": true,
+    "HeightChangeTolerance": 16.0,
+    "CountTerrainTypeChanges": true,
+    "MinTerrainTypeChangePercent": 20
+  },
+  "FollowUpRemoval": {
+    "Mode": "OnlyWhatLosesItsSupport",
+    "TouchDistance": 8.0,
+    "AnchoringThresholdPercent": 50.0
+  },
+  "LeftoverInvisibleObjects": {
+    "RemoveLeftoverInvisibleObjects": true,
+    "SurroundingObjects": {
+      "SearchRadius": 1024.0,
+      "OccupiedDirectionsPercent": 50,
+      "DirectionThresholdPercent": 50,
+      "RemovedDirectionsPercent": 60
+    },
+    "AlwaysKeep": {
+      "MapMarkers": false,
+      "XMarkers": false,
+      "IdleMarkers": false,
+      "FurnitureMarkers": false,
+      "DoorMarkers": false,
+      "Lights": false,
+      "SoundMarkers": false,
+      "AcousticSpaces": false,
+      "CritterSpawners": false,
+      "TriggerBoxes": false,
+      "Decals": false,
+      "OtherMarkers": false
+    },
+    "MoveKeptMarkersOutOfOtherModsObjects": true
+  },
+  "Diagnostics": {
+    "DetailedLog": false,
+    "WriteReportFiles": false
+  }
+}

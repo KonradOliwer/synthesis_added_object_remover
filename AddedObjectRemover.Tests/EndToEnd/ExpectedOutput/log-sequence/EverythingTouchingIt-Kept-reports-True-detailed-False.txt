@@ -11,7 +11,7 @@ Remove objects too close to other mods' objects: Margin by object size: on, 0.5 
 Remove objects on terrain changed by other mods: off.
 Also remove what rests on removed objects: EverythingTouchingIt; Gap that still counts as touching: 8 units.
 Invisible objects left behind: off.
-Logs and reports: Detailed log: off; Write report files (CSV): on; Folder for report files: <root>/AddedObjectRemover Reports.
+Logs and reports: Detailed log: off; Write report files (CSV): on; Folder for report files: <root>/Reports.
 ## scan
 Scanned 75 placed records: 40 Target.esp objects to check, 28 objects from other mods.
   Ignored 1 Target.esp objects whose winning version comes from a later plugin.
@@ -63,8 +63,8 @@ Possible manual patch needed: 2 objects to check.
   Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
 ## written
-Touch diagnostics: wrote 5 edges, 17 components to <root>/AddedObjectRemover Reports/edges.csv / <root>/AddedObjectRemover Reports/components.csv.
-Manual patch hints: wrote 2 rows to <root>/AddedObjectRemover Reports/manual-patch-hints.csv.
+Touch diagnostics: wrote 5 edges, 17 components to <root>/Reports/edges.csv / <root>/Reports/components.csv.
+Manual patch hints: wrote 2 rows to <root>/Reports/manual-patch-hints.csv.
 ## reportFileWarnings
 ## unexpectedErrors
 ## done

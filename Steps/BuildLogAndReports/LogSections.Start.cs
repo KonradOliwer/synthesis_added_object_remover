@@ -11,7 +11,7 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
 internal static partial class LogSections
 {
-    public static LogSection BuildStopSection(StopReason reason) => new("stop", [StopMessage(reason)]);
+    public static LogSection BuildStopSection(StopReason reason, SettingsSource source) => new("stop", [StopMessage(reason, source)]);
 
     /// <summary>The warnings the settings check found, in the order found.</summary>
     public static LogSection BuildWarningsSection(ImmutableArray<SettingWarning> warnings) =>
@@ -73,10 +73,12 @@ internal static partial class LogSections
         $"Logs and reports: Detailed log: {OnOff(settings.DetailedLog)}; Write report files (CSV): {OnOff(settings.Reports.WriteFiles)}; "
         + $"Folder for report files: {settings.Reports.Folder}.";
 
-    private static string StopMessage(StopReason reason) => reason.Kind switch
+    private static string StopMessage(StopReason reason, SettingsSource source) => reason.Kind switch
     {
         StopKind.NoTargetSet => "No target plugin set. No changes made.",
         StopKind.TargetNotInLoadOrder => $"Target plugin {reason.Name} is not in the load order. No changes made.",
+        StopKind.TargetIsThePatch => $"Target plugin {reason.Name} is the patch this patcher writes. No changes made.",
+        StopKind.NoTargetObjects when source is SettingsSource.ConfigFile => "Nothing to check for this config. No changes made for it; the batch goes on.",
         StopKind.NoTargetObjects => "Nothing to check. No changes made.",
         _ => throw new UnreachableException($"Unknown stop kind {reason.Kind}."),
     };

@@ -7,7 +7,40 @@ using Mutagen.Bethesda.Synthesis.Settings;
 
 namespace AddedObjectRemover;
 
-public class Settings : ISettingsValues
+public class Settings : IModeSettingsValues
+{
+    [SynthesisOrder]
+    [SynthesisSettingName("Mode")]
+    [SynthesisTooltip(
+        "Standard: clean up the one mod chosen under \"Standard\".\n"
+        + "Batch: clean up several mods in one run, as listed in the group file named under \"Batch\".")]
+    public PatchMode Mode { get; set; } = PatchMode.Standard;
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Batch")]
+    [SynthesisTooltip("Cleaning up several mods in one run. Not used in Standard mode.")]
+    public BatchSettings Batch { get; set; } = new();
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Standard")]
+    [SynthesisTooltip("The settings for cleaning up one mod. Not used in Batch mode.")]
+    public StandardSettings Standard { get; set; } = new();
+
+    ISettingsValues IModeSettingsValues.Standard => Standard ?? new StandardSettings();
+    string? IModeSettingsValues.GroupFileName => (Batch ?? new BatchSettings()).GroupFileName;
+}
+
+public class BatchSettings
+{
+    [SynthesisOrder]
+    [SynthesisSettingName("Group file name")]
+    [SynthesisTooltip(
+        "The name of the group file in the folder \"synthesis_added_object_remover\\groups\" of the game's Data folder, with or without \".json\".\n"
+        + "It lists, in run order, the config files to run; each is in \"synthesis_added_object_remover\\configs\".")]
+    public string GroupFileName { get; set; } = string.Empty;
+}
+
+public class StandardSettings : ISettingsValues
 {
     [SynthesisOrder]
     [SynthesisSettingName("Mod to clean up")]
@@ -463,7 +496,7 @@ public class DiagnosticsSettings : IDiagnosticsSettingsValues
 
     [SynthesisOrder]
     [SynthesisSettingName("Folder for report files")]
-    [SynthesisTooltip("A full path, or a folder next to the output plugin. Only used when report files are on.")]
+    [SynthesisTooltip("A full path, or a folder inside this patcher's Synthesis settings folder. Only used when report files are on.")]
     public string DiagnosticsFolder { get; set; } = SettingDefaults.ReportFolder;
 
     string? IDiagnosticsSettingsValues.ReportFolder => DiagnosticsFolder;

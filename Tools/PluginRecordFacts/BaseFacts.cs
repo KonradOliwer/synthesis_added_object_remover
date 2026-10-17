@@ -35,6 +35,12 @@ public sealed record BaseFacts(
         new(record, false, BaseRecordKind.Other, null, null, null, null, null, ImmutableArray<string>.Empty, null, null, null);
 }
 
+/// <summary>Opens the base-facts reader of one run, so no run reuses what another run read.</summary>
+public interface IBaseFactsFactory
+{
+    IBaseFacts Open();
+}
+
 /// <summary>The base records of the load order, by base; each value depends only on its key.</summary>
 public interface IBaseFacts
 {

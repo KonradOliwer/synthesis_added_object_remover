@@ -1,0 +1,35 @@
+# Static methods and local functions of this module that mention no domain type (Ids or a Contracts type), each with its reason.
+# Form: Type.Member | reason  (local function: Type.Method.Local). The test fails when an entry stops being flagged.
+SettingsFailureMessage.Describe | Wording for a settings file failure, over the exception and the settings schema.
+SettingsFailureMessage.Compose | Wording for a settings file failure: joins the setting, the value found and what is allowed.
+SettingsFailureMessage.DescribeAllowedValues | Wording for a settings file failure: lists the values a setting allows.
+SettingsFailureMessage.DescribeUnreadablePluginName | Wording for a settings file failure: a misspelled plugin name, which has no settings file path.
+SettingsFailureMessage.IsUnreadablePluginName | Recognises the plugin type's own parse failure among argument errors.
+SettingsFailureMessage.PluginSettingNames | Wording for a settings file failure: the settings that hold plugin names.
+SettingsFailureMessage.DescribeLocation | Wording for a settings file failure: names where the value sits.
+SettingsFailureMessage.ExtractFoundValue | Wording for a settings file failure: the value found in the exception text.
+SettingsFailureMessage.LocationOf | Wording for a settings file failure: the location of the bad value.
+SettingsFailureMessage.PathOf | Wording for a settings file failure: the settings file path of the bad value.
+SettingsFailureMessage.ResolveSetting | Wording for a settings file failure: finds the setting a path leads to.
+SettingsLoading.Load | Reads the settings lazily and turns an unreadable settings file into one explained failure.
+SettingsLoading.LoadConfigFile | The same for a config file, whose failure names the file by its full path.
+SettingsTree.SettingsOf | Walks a settings class: its settings with their screen names and whether each is a group.
+SettingsTree.ScreenNameOf | The name the settings screen shows for a setting.
+SettingsTree.ElementTypeOrSelf | The element type of a list setting.
+ConfigFolders.GroupsFolder | Where the group files are looked for under the data folder.
+ConfigFolders.ConfigsFolder | Where the config files are looked for under the data folder.
+ConfigFolders.IsFileName | Tells a plain file name from a path.
+ConfigFolders.FileNameOf | Adds the .json extension to a name written without it.
+ConfigFolders.IsUsableStem | Tells a name that Windows keeps as written from one it would trim or read as a folder reference.
+ConfigFolders.WithoutExtension | Takes the .json extension off a name written with it.
+ConfigFolders.HasExtension | Tells whether a name already ends in .json.
+ConfigNotes.IsList | Tells a list setting from a single value.
+ConfigNotes.ItemsOf | The items of a list setting, none for a null list.
+JsonFileParsing.ReadText | Reads a group or config file and explains an unreadable one with the file named.
+JsonFileParsing.Parse | Parses a group or config file and explains a syntax error with the file named.
+JsonFileParsing.DescribeKind | Wording for a failure: what kind of JSON value was found.
+JsonFileParsing.LineOf | The line a JSON value starts on.
+GroupFile.Read | Reads and checks the group file by its name.
+GroupFile.ConfigFileNamesOf | Reads the config file names a group file lists and checks each.
+GroupFile.NotAListOfNames | Wording for a failure: the group file does not hold a list of names.
+ConfigFiles.JsonSettingsLikeSynthesis | The JSON rules Synthesis reads settings.json by.

@@ -67,6 +67,42 @@ public sealed class TwoRunsTests : IDisposable
         Assert.Equal(NotesText, File.ReadAllText(second.NotesPath));
     }
 
+    [Fact]
+    public void EachRunOfABatchOpensItsOwnBaseFacts()
+    {
+        var (world, dataFolder) = CreateWorld();
+        var outputPath = Path.Combine(_root.FullName, FixturePatcherState.PatchModKey.FileName);
+        var state = FixturePatcherState.Create(world.LoadOrder, dataFolder, outputPath);
+        var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey);
+        var pluginRecords = new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods);
+        var request = SettingsValidator.Build(
+            StandardConfig.Of(SettingsVariants.Of(SettingsVariants.Support)), pluginRecords.Open(), plugins, Program.ReportBaseFolder(state), Workers);
+        var bases = new CountingBaseFactsFactory(TestBaseFacts.Factory(state.LinkCache));
+        var environment = new RunEnvironment(
+            plugins,
+            pluginRecords,
+            new MeshFilesFactory(state.DataFolderPath.Path, state.GameRelease, [.. state.LoadOrder.ListedOrder.Select(listing => listing.ModKey)]),
+            bases,
+            new ConsoleLogSink(),
+            new CsvReportOutput(),
+            () => TimeSpan.Zero);
+
+        PipelineRun.CaptureConsole(() => StepRunner.PatchLoadOrder([request, request], environment));
+
+        Assert.Equal(2, bases.Opened);
+    }
+
+    private sealed class CountingBaseFactsFactory(IBaseFactsFactory inner) : IBaseFactsFactory
+    {
+        public int Opened { get; private set; }
+
+        public IBaseFacts Open()
+        {
+            Opened++;
+            return inner.Open();
+        }
+    }
+
     /// <summary>One run's folders: its output plugin's folder, and the report folder inside it.</summary>
     private sealed class RunSite
     {
@@ -106,8 +142,8 @@ public sealed class TwoRunsTests : IDisposable
             var state = FixturePatcherState.Create(world.LoadOrder, dataFolder, outputPath);
             var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey);
             var request = SettingsValidator.Build(
-                settings, new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods).Open(), plugins, outputPath, Workers);
-            var log = PipelineRun.CaptureConsole(() => StepRunner.PatchLoadOrder(request, BuildEnvironment(state, plugins)));
+                StandardConfig.Of(settings), new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods).Open(), plugins, Program.ReportBaseFolder(state), Workers);
+            var log = PipelineRun.CaptureConsole(() => StepRunner.PatchLoadOrder([request], BuildEnvironment(state, plugins)));
             return new RunOutput(
                 MaskLog(log),
                 PatchDump.Describe(state.PatchMod),
@@ -121,7 +157,7 @@ public sealed class TwoRunsTests : IDisposable
                 new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods),
                 new MeshFilesFactory(
                     state.DataFolderPath.Path, state.GameRelease, [.. state.LoadOrder.ListedOrder.Select(listing => listing.ModKey)]),
-                TestBaseFacts.Reader(state.LinkCache),
+                TestBaseFacts.Factory(state.LinkCache),
                 new ConsoleLogSink(),
                 new CsvReportOutput(),
                 () => TimeSpan.Zero);

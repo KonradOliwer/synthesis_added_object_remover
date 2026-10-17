@@ -30,7 +30,7 @@ public class SettingsEnumLookupTests
     [Fact]
     public void TheDetailedLogAndTheReportFilesAreOffByDefault()
     {
-        var diagnostics = new Settings().Diagnostics;
+        var diagnostics = new Settings().Standard.Diagnostics;
 
         Assert.False(diagnostics.DetailedLog);
         Assert.False(diagnostics.WriteReportFiles);

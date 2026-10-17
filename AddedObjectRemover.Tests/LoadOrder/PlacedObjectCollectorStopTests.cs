@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Numerics;
 using AddedObjectRemover.Tests.Fixtures;
 
@@ -12,7 +11,7 @@ public class PlacedObjectCollectorStopTests
     [Fact]
     public void NoTargetObjectsStopsTheRun()
     {
-        var world = PlacedObjectCollector.Collect(new FixedFactsPlugin([]), Mods, Plan);
+        var world = Collect(new FixedFactsPlugin([]), Plan);
 
         Assert.Equal(new StopReason(StopKind.NoTargetObjects, null), world.Stop);
     }
@@ -20,7 +19,7 @@ public class PlacedObjectCollectorStopTests
     [Fact]
     public void TargetObjectsLetTheRunGoOn()
     {
-        var world = PlacedObjectCollector.Collect(new FixedFactsPlugin([CreateTargetRecord()]), Mods, Plan);
+        var world = Collect(new FixedFactsPlugin([CreateTargetRecord()]), Plan);
 
         Assert.Single(world.Targets);
         Assert.Null(world.Stop);
@@ -31,8 +30,8 @@ public class PlacedObjectCollectorStopTests
     {
         var records = new FixedFactsPlugin([CreateTargetRecord()]);
 
-        var without = PlacedObjectCollector.Collect(records, Mods, Plan);
-        var with = PlacedObjectCollector.Collect(records, Mods, Plan with { SupportOnlyObjects = true });
+        var without = Collect(records, Plan);
+        var with = Collect(records, Plan with { SupportOnlyObjects = true });
 
         Assert.False(without.SupportOnlyObjectsCollected);
         Assert.True(with.SupportOnlyObjectsCollected);
@@ -42,7 +41,7 @@ public class PlacedObjectCollectorStopTests
     [Fact]
     public void ReadingSupportOnlyObjectsThatWereNotCollectedThrows()
     {
-        var world = PlacedObjectCollector.Collect(new FixedFactsPlugin([CreateTargetRecord()]), Mods, Plan);
+        var world = Collect(new FixedFactsPlugin([CreateTargetRecord()]), Plan);
 
         Assert.Empty(world.SupportOnlyObjects);
         Assert.Throws<InvalidOperationException>(() => world.RequireSupportOnlyObjects());
@@ -54,61 +53,16 @@ public class PlacedObjectCollectorStopTests
         var named = new ScriptNamedRecord(TestTargets.Key(1), "SomeQuest", ScriptNamedKind.Quest);
         var record = CreateTargetRecord() with { IsPersistent = true, NamedByScript = named, HasLocationRefType = true };
 
-        var target = Assert.Single(PlacedObjectCollector.Collect(new FixedFactsPlugin([record]), Mods, Plan).Targets);
+        var target = Assert.Single(Collect(new FixedFactsPlugin([record]), Plan).Targets);
 
         Assert.True(target.IsPersistent);
         Assert.Equal(named, target.NamedByScript);
         Assert.True(target.HasLocationRefType);
     }
 
+    private static CollectedObjects Collect(IPluginRecords plugin, WhatToCollect plan) =>
+        PlacedObjectCollector.Collect(plugin, Mods, plan, WrittenByEarlierRuns.None);
+
     private static PlacedRecordFact CreateTargetRecord() =>
-        new(
-            TestTargets.Key(0),
-            EditorId: null,
-            TestTargets.TargetPlugin,
-            new SpaceFact(TestTargets.Space, null, SpaceKind.Worldspace),
-            new CellFact(TestTargets.Space, null),
-            InTargetSpace: true,
-            new PlacementFacts(InitiallyDisabled: false, HasEnableParent: false, Vector3.Zero, Vector3.Zero),
-            Scale: null,
-            Base: null,
-            IsTeleportDoor: false,
-            IsPrimitive: false,
-            HasMapMarker: false,
-            IsPersistent: false,
-            NamedByScript: null,
-            HasLocationRefType: false,
-            ReferenceRadius: null,
-            PrimitiveBounds: null);
-
-    private sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records) : IPluginRecords
-    {
-        public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope) =>
-            new(records, records.Length, new HashSet<RecordKey>(), [], NavmeshCount: 0);
-
-        public ImmutableArray<LinkFact> ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets) => [];
-
-        public bool HasEnableParent(RecordKey record) => throw new NotSupportedException();
-
-        public void Write(IReadOnlyList<WriteOrder> orders) => throw new NotSupportedException();
-
-        public CellGridPoint? ReadHomeCellGrid(RecordKey record) => throw new NotSupportedException();
-
-        public float[]? ReadTerrain(ExteriorCell cell) => throw new NotSupportedException();
-
-        public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new NotSupportedException();
-        public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => throw new NotSupportedException();
-
-        public RecordKey? FindLandWorldspace(RecordKey space) => throw new NotSupportedException();
-
-        public MeshTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => throw new NotSupportedException();
-
-        public NpcTraits? NpcTraitsOf(BaseKey npc) => throw new NotSupportedException();
-
-        public TraitSupplier? TraitSupplierOf(BaseKey spawn, NpcTemplateFlag templateFlag) => throw new NotSupportedException();
-
-        public IReadOnlyList<RecordKey> LeveledEntriesOf(RecordKey list, NpcTemplateFlag templateFlag) => throw new NotSupportedException();
-
-        public bool TryParsePluginName(string text, out PluginName name) => throw new NotSupportedException();
-    }
+        TestPlacedRecords.Create(TestTargets.Key(0), TestTargets.TargetPlugin, Vector3.Zero);
 }

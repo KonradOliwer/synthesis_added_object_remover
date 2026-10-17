@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AddedObjectRemover</RootNamespace>
+    <Description>Reads the settings the runs use: in Standard mode the Standard group, in Batch mode the group file and its config files from the data folder. It explains a settings.json or config value that cannot be read, and returns each config's settings with the settings it left at their defaults, the keys it does not know and the values it changed, or the one problem that stops the batch. It references RunSettingsValidation.Contracts and holds the Newtonsoft.Json package.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\RunSettingsValidation.Contracts\RunSettingsValidation.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AddedObjectRemover.Tests" />
+  </ItemGroup>
+</Project>

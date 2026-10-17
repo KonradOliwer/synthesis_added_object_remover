@@ -34,6 +34,7 @@ internal static partial class LogSections
         {
             lines.Add($"  Ignored {TextFormat.Count(counts.OthersOverriddenByTarget)} other-mod objects that {target} itself overrides.");
         }
+        lines.AddRange(EarlierConfigLines(counts));
         if (context.Detailed) lines.AddRange(RecordedCounts(world));
         return new LogSection("scan", lines.ToImmutable());
     }
@@ -77,6 +78,18 @@ internal static partial class LogSections
         world.OverriddenOthers.Select(other =>
             $"  Ignored other-mod object overridden by {target}: "
             + $"{Describe.LabelWithOverride(other.Key, other.EditorId, other.WinningMod)}.");
+
+    private static IEnumerable<string> EarlierConfigLines(ReadCounts counts)
+    {
+        if (counts.RemovedByEarlierRuns > 0)
+        {
+            yield return $"  Ignored {TextFormat.Count(counts.RemovedByEarlierRuns)} objects that earlier configs of this batch removed.";
+        }
+        if (counts.MovedByEarlierRuns > 0)
+        {
+            yield return $"  {TextFormat.Count(counts.MovedByEarlierRuns)} objects that earlier configs of this batch moved are checked at their new position.";
+        }
+    }
 
     private static IEnumerable<string> RecordedCounts(CollectedObjects world)
     {

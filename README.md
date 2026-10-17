@@ -16,6 +16,8 @@ References* does. An object that is not persistent is also moved far below the w
 one stays where it is. If it had an enable parent, that is replaced so the object stays disabled.
 The changes are written to your Synthesis group's output plugin.
 
+It can clean up one mod or, in Batch mode, several mods in one run (see *Batch mode*).
+
 Some objects are always kept, whatever the settings, and objects of the target plugin linked
 together are always removed together or all kept (see *What is always kept*).
 A linked partner of an object removed for being too close, for standing on changed terrain, or by
@@ -24,20 +26,36 @@ A linked partner of an object removed for being too close, for standing on chang
 ## How to use
 
 1. Add this repository to a Synthesis group as a Git patcher, with the group placed after the target plugin.
-2. Set *Mod to clean up*.
+2. Leave *Mode* on `Standard` and set *Mod to clean up* under *Standard*. To clean up several mods in one run, see *Batch mode*.
 3. Run the group and keep the group's output plugin enabled after the target plugin.
 
 Near the end of the log, a *Possible manual patch needed* section lists removed markers and kept objects worth checking by hand.
 
 ## Settings
 
-### Mod to clean up
+### Mode
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| Mode | `Standard` | `Standard` cleans up the one mod set under *Standard*. `Batch` cleans up the mods of the config files listed in a group file, one after another (see *Batch mode*). |
+
+### Batch
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| Group file name | *(empty)* | The name of the group file, with or without `.json`; spaces around it are ignored (see *Batch mode*). Only used in `Batch` mode; it must be set there. |
+
+### Standard
+
+Every setting below is in the *Standard* section of the settings screen. Only used in `Standard` mode; a config file of `Batch` mode holds the same settings.
+
+#### Mod to clean up
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | Mod to clean up | *(empty)* | The plugin whose added objects are checked, picked from your load order, e.g. `SomeMod.esp`. If it is empty or not in the load order, nothing is changed. |
 
-### Other mods that never cause removals
+#### Other mods that never cause removals
 
 Objects and terrain changes from these mods are never a reason to remove the cleaned mod's objects.
 
@@ -48,7 +66,7 @@ Objects and terrain changes from these mods are never a reason to remove the cle
 | Compatibility patches: Never count mods that have a compatibility patch with it | `true` | The other mods a detected compatibility patch requires don't clash with the cleaned mod. The log lists every detected patch and the mods it causes to be ignored. |
 | Compatibility patches: A patch requires at most this many other mods | `10` | A compatibility patch is a plugin that requires the cleaned mod and at most this many other mods (1-100; the base game and the cleaned mod's masters do not count). Only used when the switch above is on. Plugins that depend on many mods, such as a merged patch or a Bashed Patch, are therefore not treated as patches; the log lists them as skipped. |
 
-### Remove objects too close to other mods' objects
+#### Remove objects too close to other mods' objects
 
 An object of the cleaned mod is removed when an object from another mod comes within a margin around it. There are two margins; switch on one or both.
 
@@ -63,7 +81,7 @@ An object of the cleaned mod is removed when an object from another mod comes wi
 
 The two margins work on their own and both can be on together; an object found by either is removed once. With both off, nothing is removed for being too close (and NPCs stuck in objects are not checked either), and the log warns about it. The defaults switch on only the margin by object size.
 
-### Remove objects on terrain changed by other mods
+#### Remove objects on terrain changed by other mods
 
 Removes the cleaned mod's objects when another mod changed the terrain under or around them, for
 example raised or flattened the ground or turned grass into a road, so the objects no longer fit.
@@ -110,7 +128,7 @@ type changes* are off, nothing is removed for changed terrain and the log warns 
 on with the other defaults, only visible objects on the ground are checked, within 64 units, for
 height changes over 16 units and for ground type changes at 20% of the points or more.
 
-### Also remove what rests on removed objects
+#### Also remove what rests on removed objects
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
@@ -122,7 +140,7 @@ height changes over 16 units and for ground type changes at 20% of the points or
 - **EverythingTouchingIt**: every object connected to a removed one through touching objects is removed too, spreading outward one touching object at a time until nothing more is added. This can spread through floors and walls to whole rooms. Only the target plugin's visible objects are removed this way; a kept object (see *What is always kept*) is not removed and the spread does not pass through it.
 - **OnlyWhatLosesItsSupport**: a touching object is removed only when at least *remove when this much support is gone (%)* of what it rests on or touches was removed. The ground and objects of any plugin, the base game included, count as support. It works best for objects whose mesh origin is at their base (true for most free-standing props); `mesh-origins.csv` (see *Reports and log*) shows how well that holds for your target plugin.
 
-### Invisible objects left behind
+#### Invisible objects left behind
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
@@ -150,18 +168,77 @@ The tick boxes are: map markers, position markers (XMarker, XMarkerHeading), idl
 invisible marker doors (doors flagged as markers that lead nowhere), lights without a model, sound sources, echo areas (acoustic spaces), critter spawners,
 invisible trigger areas, surface decals (dirt, blood) and, last, other invisible objects.
 
-### Logs and reports
+#### Logs and reports
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | Detailed log (every removed object and why) | `false` | Lists every removed object and why, plus per-space counts, unreadable meshes, timings and processing statistics. |
 | Write report files (CSV) | `false` | Saves CSV files for checking the results (see *Reports and log*). |
-| Folder for report files | `AddedObjectRemover Reports` | A full path, or relative to the folder containing the output plugin. Created if missing; empty means the default. If it can't be used, the log warns and the run continues. Only used when *Write report files (CSV)* is on. |
+| Folder for report files | `Reports` | A full path, or relative to this patcher's Synthesis settings folder (the folder with its `settings.json`, for example `...\Synthesis\Data\<profile>\<patcher name>\Reports`), where the reports last between runs. Created if missing; empty means the default. If it can't be used, the log warns and the run continues. Only used when *Write report files (CSV)* is on. |
 
 Numbers out of range are corrected to the nearest valid value (a value that is not a number becomes
 the default), and percentages are rounded to the nearest step of 10, each with a warning in the log.
 A setting with an invalid value (for example text that is not one of the dropdown choices) stops the
 run; the log names the setting and what is allowed there.
+
+## Batch mode
+
+Batch mode cleans up several mods in one run, one after another, all into the same output plugin. Each mod has its own **config file** with its own settings. The **group file** is the list of config names to run, in order; it has nothing to do with a Synthesis group.
+
+1. Set *Mode* to `Batch` and *Group file name* to the name of your group file.
+2. Put the files in this folder structure inside the game's Data folder (with Mod Organizer 2 this can be a mod of its own, which then appears in the Data folder; start Synthesis from Mod Organizer 2 so it sees that mod):
+
+```
+synthesis_added_object_remover\
+    groups\<group file>.json a list of config names, in run order
+    configs\<config>.json    the settings for one mod
+```
+
+The patcher never creates or changes these files. The `Example mod` folder in the repository is a ready example (a group file and two configs) to copy into Mod Organizer 2.
+
+Names in the group file and the group file name are plain file names, not paths; `.json` is added when missing, and names are matched without regard to case.
+
+**Group file** (`groups\my_town_mods.json`): a JSON list of config names.
+
+```json
+["town_walls", "town_market"]
+```
+
+**Config file** (`configs\town_walls.json`): the same settings as the *Standard* section, written under their key names. **A config does not take any value from *Standard*; a setting it leaves out uses the built-in default.** Only `TargetPlugin` is required; list just the settings you want to change.
+
+To find the key names, copy them from the entries inside `Standard` in the patcher's `settings.json` (in its Synthesis settings folder, see *Folder for report files*) or from the configs in the `Example mod` folder, which list every setting. Dropdown choices are written as text (`"NpcHandling": "Never"`), plugins as `"Name.esp"`, lists as arrays (`["A.esp", "B.esp"]`).
+
+```json
+{
+  "TargetPlugin": "SomeTownMod.esp",
+  "TooClose": { "BySize": { "SizeMultiplier": 1.0 } },
+  "Diagnostics": { "WriteReportFiles": true }
+}
+```
+
+- The *Logs and reports* settings of *Standard* are not used in `Batch` mode; a config that should write reports needs its own `Diagnostics`.
+- Upper and lower case in keys do not matter.
+- With *Detailed log* on in a config, its log section also lists the settings that file changes from the default.
+- Comments and trailing commas are allowed in the files.
+
+**Order is priority.** The configs run in the listed order. A later config treats the objects an earlier one removed as gone, and the markers an earlier one moved as standing at their new position. An object that only clashed with something an earlier config removed is therefore kept.
+
+**What stops the whole run.** Before anything is written, the patcher reads the group file and every config and checks them against the load order. If any of these is wrong, the run stops with a message that names the file and the problem, and no patch is written:
+- no group file name is set, or a name is a path or has characters a file name cannot have;
+- the group file or a listed config file is missing;
+- a file is not valid JSON, the group file is not a list of names or the config is not an object;
+- the group file lists nothing, or lists the same config twice;
+- a setting has a value that cannot be read (for example text that is not one of the dropdown choices);
+- a config sets no *Mod to clean up*, or the mod is not in the load order;
+- two configs clean up the same mod.
+
+The message ends with *Nothing was run and no patch was written.*
+
+**What does not stop the run.**
+- A key the patcher does not know is ignored and listed in the log, so a misspelling is easy to find.
+- A setting a config leaves out uses its default; the log lists those settings.
+- A number out of range is corrected, with a warning in that config's log section.
+- A mod with nothing to check ends its own section with *Nothing to check for this config. No changes made for it; the batch goes on.*
 
 ## What is never removed / never counts
 
@@ -205,6 +282,16 @@ moved, so it is hidden from the world map. Markers a location or quest uses are 
 
 The normal log shows only what you need: the settings in use, warnings and errors, the final summaries of removed, kept and moved objects, one line per kept object, a summary of unreadable meshes, and where report files were written. Turn on *Detailed log* for every removed object and why, per-space counts, unreadable-mesh details, timings and processing statistics. Unreadable meshes are listed together near the end of the log, after the patch is written.
 
+In `Batch` mode the banner prints once, then each config has its own section that starts with a line like `=== Config 1 of 2: town_walls.json, mod to clean up: SomeTownMod.esp ===`. Inside it come that config's notes (keys that were ignored, settings left at their defaults) and then the usual log of that run, ending with its own *Done* line. The notes look like this:
+
+```
+Ignored in town_walls.json, because this patcher has no such setting (check the spelling and the section it is in): Colour.
+Not in town_walls.json, so the default is used:
+  Invisible objects left behind (LeftoverInvisibleObjects), all settings in it
+```
+
+When an earlier config removed or moved objects, the scan summary says how many were ignored or checked at their new position.
+
 Right after the kept summary, each object kept for a reason of its own gets a line saying why: *Kept, script names a quest or scene* (its own script, or its base object's from the target plugin) or *Kept, location role* (a location ref type of its own). They are kept on purpose and need no manual patch.
 
 Near the end of the log, a *Possible manual patch needed* section lists removed door, map, idle and furniture markers (which actors or the map use), and objects that would have been removed but were kept, grouped by why (part of a linked group, kept because something depends on it, or a teleport door). With report files on, the locations of the written files follow.
@@ -217,7 +304,7 @@ If something goes wrong that the patcher did not expect, the log shows a line st
 
 When such an error stops a whole part of the run (*Also remove what rests on removed objects*, *Invisible objects left behind*, moving kept markers, the report files, or the details in them), the log says so with a line like "Also remove: not performed because of an unexpected error.", and the rest of the run still goes on.
 
-With *Write report files (CSV)* on, CSV files (UTF-8, comma-separated, header in the first row) are written to the *Folder for report files*. At the start of each run the plugin's report files from earlier runs are deleted from that folder. Which files appear depends on your settings:
+With *Write report files (CSV)* on, CSV files (UTF-8, comma-separated, header in the first row) are written to the *Folder for report files*. At the start of each run the plugin's report files from earlier runs are deleted from that folder. In `Batch` mode each config writes to a subfolder of it named after the config (`town_walls` for `town_walls.json`), and only that subfolder's earlier files are deleted. Which files appear depends on your settings:
 
 - **`anchoring.csv`**: why each object was removed or kept. Only with *When an object is removed, also remove* `OnlyWhatLosesItsSupport` and something removed for being too close or on changed terrain.
 - **`mesh-origins.csv`**: how each target mesh's origin sits (near the bottom, near the centre, or elsewhere); check it if `OnlyWhatLosesItsSupport` removes or keeps unexpected objects. Same conditions as `anchoring.csv`.

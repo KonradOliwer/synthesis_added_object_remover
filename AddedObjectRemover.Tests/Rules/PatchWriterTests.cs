@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Numerics;
 using AddedObjectRemover.Tests.Fixtures;
 
 namespace AddedObjectRemover.Tests.Rules;
@@ -41,6 +42,22 @@ public sealed class PatchWriterTests
         var move = Assert.Single(plugin.Orders.OfType<SetPosition>());
         Assert.Equal(targets[0].Key, move.Record);
         Assert.Equal(-30000f, move.Position.Z);
+    }
+
+    [Fact]
+    public void WritesListTheDisabledKeysInWriteOrderAndOnlyTheMarkerMoves()
+    {
+        var targets = TestTargets.CreateMany(TargetCount);
+        var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(TargetCount), TestBaseFacts.Unresolved);
+        var markerMove = new MarkerMove(new TargetId(3), Vector3.Zero, new Vector3(1, 2, 3));
+        var final = RemovalDecisions.Start(protection, TargetCount)
+            .Apply(RoundKind.TooClose, [Propose(4), Propose(0)])
+            .AddMoves([markerMove]);
+
+        var written = PatchWriter.Write(final, [.. targets], new RecordingPlugin());
+
+        Assert.Equal([targets[0].Key, targets[4].Key], written.Writes.Disabled.AsEnumerable());
+        Assert.Equal([new RecordMove(targets[3].Key, new Vector3(1, 2, 3))], written.Writes.Moved.AsEnumerable());
     }
 
     private static ProposedRemoval Propose(int index) => new(new TargetId(index), new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()));

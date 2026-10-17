@@ -8,10 +8,10 @@ namespace AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 public sealed record SettingWarning(string Setting, string Message);
 
 /// <summary>Whether a run can go ahead, with the warnings found on the way, in the order found.</summary>
-public abstract record RunRequest(ImmutableArray<SettingWarning> Warnings)
+public abstract record RunRequest(SettingsSource Source, ImmutableArray<SettingWarning> Warnings)
 {
     /// <summary>The run makes no changes.</summary>
-    public sealed record Stop(StopReason Reason, ImmutableArray<SettingWarning> Warnings) : RunRequest(Warnings);
+    public sealed record Stop(StopReason Reason, SettingsSource Source, ImmutableArray<SettingWarning> Warnings) : RunRequest(Source, Warnings);
 
-    public sealed record Ready(RunSettings Settings, ImmutableArray<SettingWarning> Warnings) : RunRequest(Warnings);
+    public sealed record Ready(RunSettings Settings, SettingsSource Source, ImmutableArray<SettingWarning> Warnings) : RunRequest(Source, Warnings);
 }

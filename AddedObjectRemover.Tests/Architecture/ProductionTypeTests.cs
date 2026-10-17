@@ -81,6 +81,7 @@ public class ProductionTypeTests
         ["Supporter.Placed"] = "factory",
         ["Supporter.Target"] = "factory",
         ["TooCloseWork.Zero"] = "factory for the empty value",
+        ["WrittenByEarlierRuns.With"] = "returns the value extended by one run's writes",
     };
 
     /// <summary>The name of the generic Lazy type; every delegate type (Func, Action, custom ones) is found by its base type instead.</summary>

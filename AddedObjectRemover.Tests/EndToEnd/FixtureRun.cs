@@ -9,7 +9,7 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 internal static class FixtureRun
 {
     /// <param name="createLoadOrder">Builds the listed mods, lowest priority first, and writes their meshes under the Data folder; none for the fixture world.</param>
-    public static RunOutcome Execute(Settings settings, int workers, Func<string, IReadOnlyList<ISkyrimMod>>? createLoadOrder = null) =>
+    public static RunOutcome Execute(StandardSettings settings, int workers, Func<string, IReadOnlyList<ISkyrimMod>>? createLoadOrder = null) =>
         ((RunResult.Done)Run(settings, workers, new SilentLogSink(), DefaultMeshFiles, createLoadOrder: createLoadOrder)).Outcome;
 
     /// <param name="openMeshFiles">Creates the mesh reader's factory from the Data folder, the game release and the listed plugins.</param>
@@ -18,7 +18,7 @@ internal static class FixtureRun
     /// <param name="timeSinceStart">The run's clock; none for one that always says zero.</param>
     /// <param name="createLoadOrder">Builds the listed mods, lowest priority first, and writes their meshes under the Data folder; none for the fixture world.</param>
     public static RunResult Run(
-        Settings settings,
+        StandardSettings settings,
         int workers,
         ILogSink log,
         Func<string, GameRelease, IReadOnlyList<ModKey>, IMeshFilesFactory> openMeshFiles,
@@ -36,17 +36,17 @@ internal static class FixtureRun
                 loadOrder, dataFolder, Path.Combine(root.FullName, FixturePatcherState.PatchModKey.FileName));
             var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey);
             var pluginRecords = new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods);
-            var request = SettingsValidator.Build(settings, pluginRecords.Open(), plugins, state.OutputPath.Path, workers);
+            var request = SettingsValidator.Build(StandardConfig.Of(settings), pluginRecords.Open(), plugins, Program.ReportBaseFolder(state), workers);
             var environment = new RunEnvironment(
                 plugins,
                 new WrappedPluginRecordsFactory(pluginRecords, wrapPlugin),
                 openMeshFiles(
                     state.DataFolderPath.Path, state.GameRelease, [.. state.LoadOrder.ListedOrder.Select(listing => listing.ModKey)]),
-                wrapBases is null ? TestBaseFacts.Reader(state.LinkCache) : wrapBases(TestBaseFacts.Reader(state.LinkCache)),
+                TestBaseFacts.Factory(state.LinkCache, wrapBases),
                 log,
                 new CsvReportOutput(),
                 timeSinceStart ?? (() => TimeSpan.Zero));
-            return StepRunner.PatchLoadOrder(request, environment);
+            return Assert.Single(StepRunner.PatchLoadOrder([request], environment));
         }
         finally
         {

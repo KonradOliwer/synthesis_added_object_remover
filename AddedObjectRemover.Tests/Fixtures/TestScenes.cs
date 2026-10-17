@@ -58,7 +58,7 @@ internal static class TestScenes
             supportOnlyObjects is not null,
             [],
             new Dictionary<RecordKey, SpaceFact>(),
-            new ReadCounts(0, 0, 0, 0, 0, 0),
+            new ReadCounts(0, 0, 0, 0, 0, 0, 0, 0),
             [],
             TargetWorkOrder.Of(targets),
             null);

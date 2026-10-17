@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+using System.Diagnostics;
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
@@ -33,12 +35,13 @@ public static class SettingsValidator
     private const string TerrainTypeChangePercentName = "Remove objects on terrain changed by other mods > Remove only when this share of the ground points changed type";
 
     /// <summary>Validation runs in a fixed order because the warnings are reported in the order found.</summary>
-    public static RunRequest Build(ISettingsValues settings, IPluginRecords records, LoadOrderPlugins mods, string outputPath, int workers)
+    public static RunRequest Build(ConfiguredSettings config, IPluginRecords records, LoadOrderPlugins mods, string reportBaseFolder, int workers)
     {
+        var settings = config.Settings;
         var warnings = new List<SettingWarning>();
         if (FindTarget(records, mods, settings.TargetPlugin, out var targetAsTyped, out var targetListing) is { } stop)
         {
-            return new RunRequest.Stop(stop, [.. warnings]);
+            return new RunRequest.Stop(stop, config.Source, [.. warnings]);
         }
 
         var ignore = settings.WhatToIgnore;
@@ -53,7 +56,7 @@ public static class SettingsValidator
         var leftoverSettings = settings.LeftoverInvisibleObjects;
         var leftBehind = CreateLeftBehindSettings(leftoverSettings, warnings);
         var markerMoves = CreateMarkerMoveSettings(leftoverSettings);
-        var reports = new ReportFileSettings(writeReportFiles, ResolveReportFolder(outputPath, settings, warnings));
+        var reports = new ReportFileSettings(writeReportFiles, ResolveReportFolder(reportBaseFolder, config, warnings));
 
         var runSettings = new RunSettings(
             targetListing.Mod,
@@ -70,7 +73,60 @@ public static class SettingsValidator
             reports,
             detailedLog,
             new Execution(workers));
-        return new RunRequest.Ready(runSettings,[.. warnings]);
+        return new RunRequest.Ready(runSettings, config.Source, [.. warnings]);
+    }
+
+    /// <summary>
+    /// Builds every config's request in order. A config file that sets no target, a target outside the load order or the patch plugin as target, or two
+    /// configs with the same target, fail the whole batch; a Standard request that stops stays a stop request.
+    /// </summary>
+    public static BatchRequest BuildAll(ConfigsRead read, IPluginRecords records, LoadOrderPlugins mods, string reportBaseFolder, int workers) =>
+        read switch
+        {
+            ConfigsRead.Failed failed => new BatchRequest.Failed(failed.Message),
+            ConfigsRead.Ready ready => BuildEach(ready.Configs, records, mods, reportBaseFolder, workers),
+            _ => throw new UnreachableException(),
+        };
+
+    private static BatchRequest BuildEach(
+        ImmutableArray<ConfiguredSettings> configs, IPluginRecords records, LoadOrderPlugins mods, string reportBaseFolder, int workers)
+    {
+        var requests = ImmutableArray.CreateBuilder<RunRequest>(configs.Length);
+        foreach (var config in configs)
+        {
+            var request = Build(config, records, mods, reportBaseFolder, workers);
+            if (DescribeConfigFileStop(request) is { } stopped) return new BatchRequest.Failed(stopped);
+            requests.Add(request);
+        }
+
+        return FindSharedTarget(requests) is { } shared ? new BatchRequest.Failed(shared) : new BatchRequest.Ready(requests.MoveToImmutable());
+    }
+
+    private static string? DescribeConfigFileStop(RunRequest request)
+    {
+        if (request is not RunRequest.Stop { Source: SettingsSource.ConfigFile file } stop) return null;
+        return stop.Reason.Kind switch
+        {
+            StopKind.NoTargetSet => $"Config file {file.FilePath} sets no mod to clean up (TargetPlugin).{ConfigsRead.NothingWasRun}",
+            StopKind.TargetNotInLoadOrder => $"Config file {file.FilePath}: the mod to clean up, {stop.Reason.Name}, is not in the load order.{ConfigsRead.NothingWasRun}",
+            StopKind.TargetIsThePatch => $"Config file {file.FilePath}: the mod to clean up, {stop.Reason.Name}, is the patch this patcher writes.{ConfigsRead.NothingWasRun}",
+            _ => throw new UnreachableException(),
+        };
+    }
+
+    private static string? FindSharedTarget(IEnumerable<RunRequest> requests)
+    {
+        var filePathByTarget = new Dictionary<PluginName, string>();
+        foreach (var ready in requests.OfType<RunRequest.Ready>())
+        {
+            if (ready.Source is not SettingsSource.ConfigFile file) continue;
+            if (!filePathByTarget.TryAdd(ready.Settings.Target, file.FilePath))
+            {
+                return $"Config files {filePathByTarget[ready.Settings.Target]} and {file.FilePath} both clean up {ready.Settings.Target}; each mod may be cleaned up by one config only.{ConfigsRead.NothingWasRun}";
+            }
+        }
+
+        return null;
     }
 
     private static ModIdentificationSettings CreateModIdentificationSettings(
@@ -161,11 +217,12 @@ public static class SettingsValidator
     private static MarkerMoveSettings? CreateMarkerMoveSettings(ILeftoverSettingsValues leftovers) =>
         leftovers.RemoveLeftoverInvisibleObjects && leftovers.MoveKeptMarkersOutOfOtherModsObjects ? new MarkerMoveSettings(MarkerMoveLimits.MaxDistance) : null;
 
-    /// <summary>A rooted path is used as is; a relative one is resolved against the output plugin's folder.</summary>
-    internal static string ResolveReportFolder(string outputPath, ISettingsValues settings, ICollection<SettingWarning> warnings)
+    /// <summary>A rooted path is used as is; a relative one is resolved against the base folder. A config file's reports go to a subfolder named after the config.</summary>
+    internal static string ResolveReportFolder(string reportBaseFolder, ConfiguredSettings config, ICollection<SettingWarning> warnings)
     {
-        var folder = ValidateFolder(settings.Diagnostics.ReportFolder?.Trim(), warnings);
-        return FolderPaths.ResolveAgainst(Path.GetDirectoryName(outputPath) ?? string.Empty, folder);
+        var folder = ValidateFolder(config.Settings.Diagnostics.ReportFolder?.Trim(), warnings);
+        var resolved = FolderPaths.ResolveAgainst(reportBaseFolder, folder);
+        return config.Source is SettingsSource.ConfigFile file ? Path.Combine(resolved, file.Name) : resolved;
     }
 
     /// <summary>
@@ -215,6 +272,7 @@ public static class SettingsValidator
         target = ParsePluginName(records, targetPlugin);
         var listing = mods.Find(target);
         if (listing == null) return new StopReason(StopKind.TargetNotInLoadOrder, target.ToString());
+        if (target == mods.PatchMod) return new StopReason(StopKind.TargetIsThePatch, target.ToString());
         targetListing = listing;
         return null;
     }

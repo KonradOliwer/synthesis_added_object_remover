@@ -13,7 +13,7 @@ internal static class SettingsVariants
     public static readonly IReadOnlyList<string> Names =
         [TouchWithLeftBehindAndMarkerMoves, Support, NothingWithBoxZoneAndNpcsAsObjects, TouchWithLeftBehindAndMarkerMovesNormalLog];
 
-    public static Settings Of(string name) => name switch
+    public static StandardSettings Of(string name) => name switch
     {
         TouchWithLeftBehindAndMarkerMoves => Create(
             useRoughBoxes: false, NpcHandling.OnlyWhenStuckInsideTheObject, FollowUpRemovalMode.EverythingTouchingIt,
@@ -33,7 +33,7 @@ internal static class SettingsVariants
         _ => throw new ArgumentOutOfRangeException(nameof(name), name, "Unknown settings variant."),
     };
 
-    private static Settings Create(bool useRoughBoxes, NpcHandling npcs, FollowUpRemovalMode followUp, LeftoverInvisibleObjectSettings leftovers) => new()
+    private static StandardSettings Create(bool useRoughBoxes, NpcHandling npcs, FollowUpRemovalMode followUp, LeftoverInvisibleObjectSettings leftovers) => new()
     {
         TargetPlugin = ModKey.FromNameAndExtension(FixtureWorld.TargetPlugin),
         TooClose = new TooCloseRemovalSettings { UseRoughBoxes = useRoughBoxes, NpcHandling = npcs },
@@ -48,7 +48,7 @@ internal static class SettingsVariants
         Diagnostics = new DiagnosticsSettings { DetailedLog = true, WriteReportFiles = true },
     };
 
-    private static Settings WithNormalLog(Settings settings)
+    private static StandardSettings WithNormalLog(StandardSettings settings)
     {
         settings.Diagnostics!.DetailedLog = false;
         return settings;

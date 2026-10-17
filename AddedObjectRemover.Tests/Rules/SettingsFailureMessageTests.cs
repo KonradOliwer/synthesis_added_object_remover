@@ -21,17 +21,20 @@ public class SettingsFailureMessageTests
     [Fact]
     public void ATargetPluginOfTheWrongJsonTypeNamesTheSettingAndAsksForAPluginFileName()
     {
-        var message = SettingsFailureMessage.Describe(Deserialize("""{"TargetPlugin":[]}"""), Program.SettingsSchema);
+        var message = SettingsFailureMessage.Describe(Deserialize("""{"TargetPlugin":[]}"""), Program.SettingsSchema, Program.SettingsFileName);
 
-        Assert.Contains("'Mod to clean up' (settings.json path 'TargetPlugin')", message);
+        Assert.Contains("'Standard > Mod to clean up' (settings.json path 'Standard.TargetPlugin')", message);
         Assert.EndsWith("Expected a plugin file name, for example SomeMod.esp.", message);
     }
 
-    private static JsonException Deserialize(string json)
+    /// <param name="standardJson">The content of the Standard group; the settings file holds it under "Standard".</param>
+    private static string InStandardGroup(string standardJson) => "{\"Standard\":" + standardJson + "}";
+
+    private static JsonException Deserialize(string standardJson)
     {
         try
         {
-            JsonConvert.DeserializeObject<Settings>(json, JsonSettings);
+            JsonConvert.DeserializeObject<Settings>(InStandardGroup(standardJson), JsonSettings);
         }
         catch (JsonException ex)
         {
@@ -45,23 +48,23 @@ public class SettingsFailureMessageTests
     {
         var ex = Deserialize("""{"FollowUpRemoval":{"Mode":"Anchoring"}}""");
 
-        var message = SettingsFailureMessage.Describe(ex, Program.SettingsSchema);
+        var message = SettingsFailureMessage.Describe(ex, Program.SettingsSchema, Program.SettingsFileName);
 
         Assert.Contains("When an object is removed, also remove", message);
-        Assert.Contains("FollowUpRemoval.Mode", message);
+        Assert.Contains("Standard.FollowUpRemoval.Mode", message);
         Assert.Contains("Anchoring", message);
         Assert.Contains("Allowed values: Nothing, EverythingTouchingIt, OnlyWhatLosesItsSupport", message);
     }
 
     [Theory]
-    [InlineData("""{"TooClose":{"NpcHandling":"Ignore"}}""", "TooClose.NpcHandling", "Allowed values: AlwaysLikeAnyObject, OnlyWhenStuckInsideTheObject, Never")]
+    [InlineData("""{"TooClose":{"NpcHandling":"Ignore"}}""", "Standard.TooClose.NpcHandling", "Allowed values: AlwaysLikeAnyObject, OnlyWhenStuckInsideTheObject, Never")]
     [InlineData(
         """{"TerrainChange":{"TerrainCheckedObjects":"AllObjects"}}""",
-        "TerrainChange.TerrainCheckedObjects",
+        "Standard.TerrainChange.TerrainCheckedObjects",
         "Allowed values: VisibleObjectsOnTheGround, VisibleObjectsAtAnyHeight, AllObjectsIncludingInvisibleOnes")]
     public void UnknownEnumValueInAnotherGroupNamesItsPathAndAllowedOptions(string json, string path, string allowed)
     {
-        var message = SettingsFailureMessage.Describe(Deserialize(json), Program.SettingsSchema);
+        var message = SettingsFailureMessage.Describe(Deserialize(json), Program.SettingsSchema, Program.SettingsFileName);
 
         Assert.Contains(path, message);
         Assert.Contains(allowed, message);
@@ -72,10 +75,10 @@ public class SettingsFailureMessageTests
     {
         var ex = Deserialize("""{"TooClose":{"BySize":{"SizeMultiplier":"abc"}}}""");
 
-        var message = SettingsFailureMessage.Describe(ex, Program.SettingsSchema);
+        var message = SettingsFailureMessage.Describe(ex, Program.SettingsSchema, Program.SettingsFileName);
 
         Assert.Contains("Margin by object size > Margin on every side", message);
-        Assert.Contains("TooClose.BySize.SizeMultiplier", message);
+        Assert.Contains("Standard.TooClose.BySize.SizeMultiplier", message);
         Assert.Contains("abc", message);
     }
 
@@ -84,9 +87,9 @@ public class SettingsFailureMessageTests
     {
         var ex = Deserialize("""{"WhatToIgnore":{"ExcludedPlugins":"SomeMod.esp"}}""");
 
-        var message = SettingsFailureMessage.Describe(ex, Program.SettingsSchema);
+        var message = SettingsFailureMessage.Describe(ex, Program.SettingsSchema, Program.SettingsFileName);
 
-        Assert.Contains("WhatToIgnore.ExcludedPlugins", message);
+        Assert.Contains("Standard.WhatToIgnore.ExcludedPlugins", message);
         Assert.Contains("Never count these mods", message);
         Assert.Contains("SomeMod.esp", message);
         Assert.EndsWith("Expected a plugin file name, for example SomeMod.esp.", message);
@@ -98,10 +101,10 @@ public class SettingsFailureMessageTests
     public void AMisspelledPluginNameStopsTheLoadNamingTheValueAndAskingForAPluginFileName(string json)
     {
         var ex = Assert.Throws<SettingsUnreadableException>(
-            () => SettingsLoading.Load(() => JsonConvert.DeserializeObject<Settings>(json, JsonSettings), Program.SettingsSchema));
+            () => SettingsLoading.Load(() => JsonConvert.DeserializeObject<Settings>(InStandardGroup(json), JsonSettings), Program.SettingsSchema, Program.SettingsFileName));
 
-        Assert.Contains("'Mod to clean up'", ex.Message);
-        Assert.Contains("'Other mods that never cause removals > Never count these mods'", ex.Message);
+        Assert.Contains("'Standard > Mod to clean up'", ex.Message);
+        Assert.Contains("'Standard > Other mods that never cause removals > Never count these mods'", ex.Message);
         Assert.Contains("Value found: Foo.", ex.Message);
         Assert.EndsWith("Expected a plugin file name, for example SomeMod.esp.", ex.Message);
     }
@@ -110,7 +113,7 @@ public class SettingsFailureMessageTests
     public void AnArgumentFailureThatIsNotAPluginNameIsNotHidden()
     {
         Assert.Throws<ArgumentException>(
-            () => SettingsLoading.Load<int>(() => throw new ArgumentException("a bug of ours"), Program.SettingsSchema));
+            () => SettingsLoading.Load<int>(() => throw new ArgumentException("a bug of ours"), Program.SettingsSchema, Program.SettingsFileName));
     }
 
     [Fact]
@@ -143,14 +146,14 @@ public class SettingsFailureMessageTests
         Assert.Equal(64f, ((ITerrainChangeSettingsValues)settings.TerrainChange).AreaDistanceInUnits);
     }
 
-    private static Settings Read(string json) => JsonConvert.DeserializeObject<Settings>(json, JsonSettings)!;
+    private static StandardSettings Read(string json) => JsonConvert.DeserializeObject<StandardSettings>(json, JsonSettings)!;
 
     [Fact]
     public void SyntaxErrorOutsideAnySettingNamesItsLineAndPosition()
     {
-        var ex = Deserialize("{\n,}");
+        var ex = Assert.Throws<JsonReaderException>(() => JsonConvert.DeserializeObject<Settings>("{\n,}", JsonSettings));
 
-        var message = SettingsFailureMessage.Describe(ex, Program.SettingsSchema);
+        var message = SettingsFailureMessage.Describe(ex, Program.SettingsSchema, Program.SettingsFileName);
 
         Assert.Contains("the settings file at line 2, position", message);
     }
@@ -158,10 +161,10 @@ public class SettingsFailureMessageTests
     [Fact]
     public void PathIsMappedToItsDisplayNameBreadcrumb()
     {
-        var setting = SettingsFailureMessage.ResolveSetting("WhatToIgnore.ExcludedPlugins[0]", Program.SettingsSchema);
+        var setting = SettingsFailureMessage.ResolveSetting("Standard.WhatToIgnore.ExcludedPlugins[0]", Program.SettingsSchema);
 
         Assert.NotNull(setting);
-        Assert.Equal("Other mods that never cause removals > Never count these mods", setting.Value.Breadcrumb);
+        Assert.Equal("Standard > Other mods that never cause removals > Never count these mods", setting.Value.Breadcrumb);
         Assert.Equal(typeof(ModKey), setting.Value.LeafType);
     }
 

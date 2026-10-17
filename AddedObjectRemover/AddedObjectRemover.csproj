@@ -27,6 +27,8 @@
     <ProjectReference Include="..\Steps\BuildLogAndReports.Contracts\BuildLogAndReports.Contracts.csproj" />
     <ProjectReference Include="..\Run\RunAllSteps.Contracts\RunAllSteps.Contracts.csproj" />
     <ProjectReference Include="..\Run\RunSettingsValidation\RunSettingsValidation.csproj" />
+    <ProjectReference Include="..\Run\RunSettingsValidation.Contracts\RunSettingsValidation.Contracts.csproj" />
+    <ProjectReference Include="..\Run\RunSettingsReading\RunSettingsReading.csproj" />
     <ProjectReference Include="..\Run\RunAllSteps\RunAllSteps.csproj" />
   </ItemGroup>
   <ItemGroup>

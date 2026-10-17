@@ -11,7 +11,7 @@ Remove objects too close to other mods' objects: Margin by object size: on, 0.5 
 Remove objects on terrain changed by other mods: off.
 Also remove what rests on removed objects: OnlyWhatLosesItsSupport; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %.
 Invisible objects left behind: off.
-Logs and reports: Detailed log: on; Write report files (CSV): on; Folder for report files: <root>/AddedObjectRemover Reports.
+Logs and reports: Detailed log: on; Write report files (CSV): on; Folder for report files: <root>/Reports.
 ## scan
   Ignored other-mod object overridden by Target.esp: R_OverriddenByTarget_Pad [000821:Rival.esp].
 Scanned 75 placed records in <time>: 40 Target.esp objects to check, 28 objects from other mods.
@@ -99,10 +99,10 @@ Possible manual patch needed: 2 objects to check.
   Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
 ## written
-Anchoring diagnostics: wrote 3 evaluations to <root>/AddedObjectRemover Reports/anchoring.csv.
+Anchoring diagnostics: wrote 3 evaluations to <root>/Reports/anchoring.csv.
 Mesh origins: 2 target meshes, 2 origin near bottom, 0 origin near centre, 0 other.
-  Wrote 2 mesh origins to <root>/AddedObjectRemover Reports/mesh-origins.csv.
-Manual patch hints: wrote 2 rows to <root>/AddedObjectRemover Reports/manual-patch-hints.csv.
+  Wrote 2 mesh origins to <root>/Reports/mesh-origins.csv.
+Manual patch hints: wrote 2 rows to <root>/Reports/manual-patch-hints.csv.
 ## reportFileWarnings
 ## unexpectedErrors
 ## done

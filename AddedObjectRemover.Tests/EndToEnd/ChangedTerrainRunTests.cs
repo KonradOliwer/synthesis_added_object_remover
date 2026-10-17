@@ -99,7 +99,7 @@ public class ChangedTerrainRunTests
         Assert.EndsWith(" They were not removed.", error[0]);
     }
 
-    private static RecordingLogSink RunLogged(Settings settings)
+    private static RecordingLogSink RunLogged(StandardSettings settings)
     {
         var log = new RecordingLogSink();
         FixtureRun.Run(settings, Workers, log, DefaultMeshFiles, createLoadOrder: TerrainWorld.Create);
@@ -112,7 +112,7 @@ public class ChangedTerrainRunTests
     private static string[] SectionLines(RecordingLogSink log, string id) =>
         [.. log.Sections.Where(section => section.Id == id).SelectMany(section => section.Lines)];
 
-    private static Settings SettingsWithTerrain(bool on) => new()
+    private static StandardSettings SettingsWithTerrain(bool on) => new()
     {
         TargetPlugin = ModKey.FromNameAndExtension(FixtureWorld.TargetPlugin),
         TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = on },

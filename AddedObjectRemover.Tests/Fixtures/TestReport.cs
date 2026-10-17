@@ -13,12 +13,12 @@ internal sealed class TestReport
 
     public TestReport(IMeshFiles meshFiles, IUnexpectedErrors unexpectedErrors)
     {
-        var settings = new Settings { TargetPlugin = ModKey.FromNameAndExtension(Target.ToString()), Diagnostics = new DiagnosticsSettings { DetailedLog = true } };
+        var settings = new StandardSettings { TargetPlugin = ModKey.FromNameAndExtension(Target.ToString()), Diagnostics = new DiagnosticsSettings { DetailedLog = true } };
         var plugins = new LoadOrderPlugins(
             new KnownPluginNames([Target, Patch]),
             Patch,
             [new PluginListing(Target, true, []), new PluginListing(Patch, true, [])]);
-        var ready = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), plugins, "/out/Patch.esp", 1));
+        var ready = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(StandardConfig.Of(settings),new PluginNameParsingPlugin(), plugins, "/out/Patch.esp", 1));
         _report = new LogAndReports(ready.Settings, new ReportFolderPrepared(StepOutcome.SwitchedOff, null), new MeshFilesOnlyCaches(meshFiles), unexpectedErrors);
     }
 

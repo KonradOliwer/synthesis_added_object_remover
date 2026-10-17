@@ -60,7 +60,7 @@ public class TooCloseBothZonesRunTests
         Assert.Single(removals, line => line.Contains(CrateWorld.CrateFoundByDistance) && line.Contains($"; within 32 units of {CrateWorld.PadWithinDistance} "));
     }
 
-    private static Settings BothZones() => new()
+    private static StandardSettings BothZones() => new()
     {
         TargetPlugin = ModKey.FromNameAndExtension(FixtureWorld.TargetPlugin),
         TooClose = new TooCloseRemovalSettings

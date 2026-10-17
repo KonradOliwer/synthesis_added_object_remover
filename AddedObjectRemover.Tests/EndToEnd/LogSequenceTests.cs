@@ -59,7 +59,7 @@ public class LogSequenceTests
     /// <summary>The temporary folder <see cref="FixtureRun"/> runs in.</summary>
     private static Regex RunFolder() => new(Regex.Escape(Path.GetTempPath()) + @"aor-run-[^\\/\s]+", RegexOptions.IgnoreCase);
 
-    private static Settings Create(FollowUpRemovalMode mode, Leftovers leftovers, bool writeReportFiles, bool detailedLog) => new()
+    private static StandardSettings Create(FollowUpRemovalMode mode, Leftovers leftovers, bool writeReportFiles, bool detailedLog) => new()
     {
         TargetPlugin = ModKey.FromNameAndExtension(FixtureWorld.TargetPlugin),
         TooClose = new TooCloseRemovalSettings { UseRoughBoxes = false, NpcHandling = NpcHandling.OnlyWhenStuckInsideTheObject },

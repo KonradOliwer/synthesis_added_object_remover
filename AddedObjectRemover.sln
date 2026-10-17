@@ -108,6 +108,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RemoveObjectsOnChangedTerra
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RemoveObjectsOnChangedTerrain", "Steps\RemoveObjectsOnChangedTerrain\RemoveObjectsOnChangedTerrain.csproj", "{A1010032-6A11-4B22-8C33-0D4E5F6071C2}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RunSettingsReading", "Run\RunSettingsReading\RunSettingsReading.csproj", "{A1010033-6A11-4B22-8C33-0D4E5F6071C3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -326,6 +328,10 @@ Global
 		{A1010032-6A11-4B22-8C33-0D4E5F6071C2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A1010032-6A11-4B22-8C33-0D4E5F6071C2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A1010032-6A11-4B22-8C33-0D4E5F6071C2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1010033-6A11-4B22-8C33-0D4E5F6071C3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1010033-6A11-4B22-8C33-0D4E5F6071C3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1010033-6A11-4B22-8C33-0D4E5F6071C3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1010033-6A11-4B22-8C33-0D4E5F6071C3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

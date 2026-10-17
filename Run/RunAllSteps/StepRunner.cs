@@ -32,44 +32,60 @@ using AddedObjectRemover.Steps.WriteThePatch.Contracts;
 namespace AddedObjectRemover.Run.RunAllSteps;
 
 /// <summary>
-/// Runs one patch run: creates the run's caches, runs the steps in order and hands each step's result to the log
-/// and reports as the step ends, printing the sections it returns; then writes the report files.
-/// All decisions are made before the patch is written.
+/// Runs the patch runs of a batch one after the other. Each run creates its own caches, runs the steps in order and
+/// hands each step's result to the log and reports as the step ends, printing the sections it returns; then it
+/// writes the report files. All decisions of a run are made before its patch is written. A run decides from what the
+/// earlier runs wrote, passed as a value, and never from the patch.
 /// </summary>
 public static class StepRunner
 {
+    public static ImmutableArray<RunResult> PatchLoadOrder(ImmutableArray<RunRequest> requests, RunEnvironment environment)
+    {
+        var results = ImmutableArray.CreateBuilder<RunResult>(requests.Length);
+        var writtenSoFar = WrittenByEarlierRuns.None;
+        foreach (var request in requests)
+        {
+            var finished = PatchOneRun(request, environment, writtenSoFar);
+            results.Add(finished.Result);
+            writtenSoFar = finished.WrittenSoFar;
+        }
+
+        return results.MoveToImmutable();
+    }
+
     /// <remarks>The start sections of a stop request already hold its stop line.</remarks>
-    public static RunResult PatchLoadOrder(RunRequest request, RunEnvironment environment)
+    private static FinishedRun PatchOneRun(RunRequest request, RunEnvironment environment, WrittenByEarlierRuns writtenSoFar)
     {
         Print(environment.Log, LogAndReports.BuildStartSections(request));
         return request switch
         {
-            RunRequest.Ready ready => PatchWithSettings(ready.Settings, environment),
-            RunRequest.Stop stop => new RunResult.Stopped(stop.Reason),
+            RunRequest.Ready ready => PatchWithSettings(ready, environment, writtenSoFar),
+            RunRequest.Stop stop => new FinishedRun(new RunResult.Stopped(stop.Reason), writtenSoFar),
             _ => throw new UnreachableException(),
         };
     }
 
-    private static RunResult PatchWithSettings(RunSettings settings, RunEnvironment environment)
+    private static FinishedRun PatchWithSettings(RunRequest.Ready ready, RunEnvironment environment, WrittenByEarlierRuns writtenSoFar)
     {
-        var scope = SetUpRun(settings, environment);
+        var scope = SetUpRun(ready.Settings, ready.Source, environment, writtenSoFar);
         return CollectDecideAndWrite(scope);
     }
 
-    private static RunScope SetUpRun(RunSettings settings, RunEnvironment environment)
+    private static RunScope SetUpRun(RunSettings settings, SettingsSource source, RunEnvironment environment, WrittenByEarlierRuns writtenSoFar)
     {
         var unexpectedErrors = new UnexpectedErrors();
         var reportFolder = PrepareReportFolder(settings, environment);
         var plugin = environment.PluginRecords.Open();
+        var bases = environment.Bases.Open();
         var loadOrderCaches = LoadOrderCaches.Create(
             environment.MeshFiles,
             unexpectedErrors,
             plugin,
-            environment.Bases,
+            bases,
             TooCloseObjects.NpcBodyRules,
             TooCloseObjects.PlacedNpcRules);
         var report = new LogAndReports(settings, reportFolder, loadOrderCaches, unexpectedErrors);
-        return new RunScope(settings, environment, plugin, loadOrderCaches, unexpectedErrors, report, reportFolder);
+        return new RunScope(settings, source, environment, plugin, loadOrderCaches, unexpectedErrors, report, reportFolder, writtenSoFar);
     }
 
     private static ReportFolderPrepared PrepareReportFolder(RunSettings settings, RunEnvironment environment)
@@ -79,21 +95,21 @@ public static class StepRunner
         return reportFolder;
     }
 
-    private static RunResult CollectDecideAndWrite(RunScope scope)
+    private static FinishedRun CollectDecideAndWrite(RunScope scope)
     {
         PrepareMeshReading(scope);
         var mods = IdentifyMods(scope);
         var collected = CollectPlacedObjects(scope, mods);
         if (collected.Stop is { } stop)
         {
-            // A stopped run writes no report files.
-            return StopAfterStep(scope.Environment.Log, stop);
+            // A stopped run writes no report files and no records.
+            return new FinishedRun(StopAfterStep(scope.Environment.Log, stop, scope.Source), scope.WrittenByEarlierRuns);
         }
 
         var runCaches = AddObjectCaches(scope, collected);
         var decided = Decide(scope, runCaches, mods, collected);
         var written = WritePatch(scope, decided);
-        return FinishReports(scope, decided, written);
+        return new FinishedRun(FinishReports(scope, decided, written), scope.WrittenByEarlierRuns.With(written.Writes));
     }
 
     private static void Print(ILogSink log, ImmutableArray<LogSection> sections)
@@ -101,9 +117,9 @@ public static class StepRunner
         foreach (var section in sections) log.Print(section);
     }
 
-    private static RunResult.Stopped StopAfterStep(ILogSink log, StopReason reason)
+    private static RunResult.Stopped StopAfterStep(ILogSink log, StopReason reason, SettingsSource source)
     {
-        Print(log, LogAndReports.BuildStopSections(reason));
+        Print(log, LogAndReports.BuildStopSections(reason, source));
         return new RunResult.Stopped(reason);
     }
 
@@ -122,7 +138,7 @@ public static class StepRunner
 
     private static CollectedObjects CollectPlacedObjects(RunScope scope, IdentifiedMods mods) =>
         scope.Environment.Log.Timed(
-            () => PlacedObjectCollector.Collect(scope.Plugin, mods, scope.Settings.Read),
+            () => PlacedObjectCollector.Collect(scope.Plugin, mods, scope.Settings.Read, scope.WrittenByEarlierRuns),
             scope.Report.BuildStepSections);
 
     private static IRunCaches AddObjectCaches(RunScope scope, CollectedObjects collected) =>
@@ -341,14 +357,20 @@ public static class StepRunner
 
     /// <summary>What every phase method reads besides its own inputs.</summary>
     /// <param name="ReportFolder">What the report writer prepared, which says whether the report files are written.</param>
+    /// <param name="WrittenByEarlierRuns">What the earlier runs of the batch wrote; the run decides with it as if it were already in the load order.</param>
     private sealed record RunScope(
         RunSettings Settings,
+        SettingsSource Source,
         RunEnvironment Environment,
         IPluginRecords Plugin,
         LoadOrderCaches LoadOrderCaches,
         IUnexpectedErrors UnexpectedErrors,
         LogAndReports Report,
-        ReportFolderPrepared ReportFolder);
+        ReportFolderPrepared ReportFolder,
+        WrittenByEarlierRuns WrittenByEarlierRuns);
+
+    /// <param name="WrittenSoFar">What the batch has written once this run is over.</param>
+    private sealed record FinishedRun(RunResult Result, WrittenByEarlierRuns WrittenSoFar);
 
     /// <param name="Decisions">The decisions with the changed-terrain round.</param>
     private sealed record ChangedTerrainPhase(ChangedTerrainResult Result, RemovalDecisions Decisions);

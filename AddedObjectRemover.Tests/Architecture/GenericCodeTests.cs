@@ -91,6 +91,7 @@ public partial class GenericCodeTests
 
         Assert.Contains("Steps/WriteThePatch", modules);
         Assert.Contains("Run/RunSettingsValidation", modules);
+        Assert.Contains("Run/RunSettingsReading", modules);
         Assert.Contains("Caches/BaseObjectShapeAndKind", modules);
     }
 

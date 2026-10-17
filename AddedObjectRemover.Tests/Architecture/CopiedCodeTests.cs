@@ -47,9 +47,8 @@ public class CopiedCodeTests
         [CopyFamily.KeyOf([
             Describe + "HintType", Describe + "LeftBehindReason", KeepText + "Relation", LeftBehindText + "Describe",
             MeshText + "FailureCategory", MeshText + "Line", PartText + "LinkedStep", PartText + "Word"])] = EnumTextArms,
-        [CopyFamily.KeyOf([MeshText + "FailureCategory", MeshText + "Line", MeshText + "ReadFailure"])] = EnumTextArms,
         [CopyFamily.KeyOf([KeepText + "Relation", PartText + "LinkedStep"])] = EnumTextArms,
-        [CopyFamily.KeyOf([LogSections + "DescribeAlsoRemove", LogSections + "DescribeLeftBehind", LogSections + "JoinOrNone", LogSections + "StopMessage"])] = EnumTextArms,
+        [CopyFamily.KeyOf([MeshText + "FailureCategory", MeshText + "Line", MeshText + "ReadFailure"])] = EnumTextArms,
         [CopyFamily.KeyOf([PartText + "Wordings"])] = PartKeyLines,
         [CopyFamily.KeyOf([
             Report + "Tables.LeftBehind.cs", Report + "Tables.LeftBehind.cs:Tables", Report + "Tables.LeftBehind.cs:Tables.LeftBehindHeader",

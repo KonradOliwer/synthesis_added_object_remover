@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Numerics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
+using AddedObjectRemover.Steps.WriteThePatch.Contracts;
 
 namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 
@@ -17,6 +18,7 @@ public sealed class PlacedObjectCollector
     private readonly IdentifiedMods _standing;
     private readonly WhatToCollect _plan;
     private readonly PlacedRecordFacts _facts;
+    private readonly WrittenByEarlierRuns _earlier;
 
     private readonly List<TargetObject> _targets = [];
     private readonly List<OtherObject> _otherModObjects = [];
@@ -28,25 +30,56 @@ public sealed class PlacedObjectCollector
     private int _targetsHiddenOrWithoutPlacement;
     private int _othersOverriddenByTarget;
     private int _otherInvalidPlacements;
+    private int _removedByEarlierRuns;
+    private int _movedByEarlierRuns;
 
-    private PlacedObjectCollector(IdentifiedMods standing, WhatToCollect plan, PlacedRecordFacts facts)
+    private PlacedObjectCollector(IdentifiedMods standing, WhatToCollect plan, PlacedRecordFacts facts, WrittenByEarlierRuns earlier)
     {
         _standing = standing;
         _plan = plan;
         _facts = facts;
+        _earlier = earlier;
     }
 
-    public static CollectedObjects Collect(IPluginRecords plugin, IdentifiedMods standing, WhatToCollect plan)
+    /// <param name="earlier">
+    /// Applied here, before any record is judged, so every later step sees the earlier runs' writes. It wins over what
+    /// the load order reads back from the patch: a removed record with an Enable Parent reads back as present.
+    /// </param>
+    public static CollectedObjects Collect(IPluginRecords plugin, IdentifiedMods standing, WhatToCollect plan, WrittenByEarlierRuns earlier)
     {
         var facts = plugin.ReadPlacedRecords(new PlacedReadScope(standing.Target, plan.Terrain, plan.Navmesh, plan.TerrainVersions, plan.TerrainLayers));
-        var collector = new PlacedObjectCollector(standing, plan, facts);
+        var collector = new PlacedObjectCollector(standing, plan, facts, earlier);
         foreach (var record in facts.Records) collector.Collect(record);
 
         var nonPlacedLinks = plugin.ReadLinks(standing.Target, collector._targets.Select(target => target.Key).ToHashSet());
-        return collector.CreateCollectedObjects([.. facts.Links, .. nonPlacedLinks]);
+        return collector.CreateCollectedObjects(collector.WithoutLinksFromRemovedRecords([.. facts.Links, .. nonPlacedLinks]));
     }
 
     private void Collect(PlacedRecordFact record)
+    {
+        if (CountIfRemovedByEarlierRuns(record)) return;
+        CollectByRole(AtPositionOfEarlierRuns(record));
+    }
+
+    /// <returns>True when an earlier run removed the record, so it is no object of any kind in this run.</returns>
+    private bool CountIfRemovedByEarlierRuns(PlacedRecordFact record)
+    {
+        if (!_earlier.Disabled.Contains(record.Key)) return false;
+        if (record.InTargetSpace) _removedByEarlierRuns++;
+        return true;
+    }
+
+    private PlacedRecordFact AtPositionOfEarlierRuns(PlacedRecordFact record)
+    {
+        if (!_earlier.MovedTo.TryGetValue(record.Key, out var position)) return record;
+        if (record.InTargetSpace) _movedByEarlierRuns++;
+        return record with { Placement = record.Placement with { Position = position } };
+    }
+
+    private ImmutableArray<LinkFact> WithoutLinksFromRemovedRecords(ImmutableArray<LinkFact> links) =>
+        [.. links.Where(link => !_earlier.Disabled.Contains(link.Source))];
+
+    private void CollectByRole(PlacedRecordFact record)
     {
         var role = Classify(record);
         // Targets define the target spaces, so no placement outside them can matter.
@@ -164,7 +197,9 @@ public sealed class PlacedObjectCollector
                 _targetsHiddenOrWithoutPlacement,
                 _othersOverriddenByTarget,
                 _otherInvalidPlacements,
-                _facts.NavmeshCount),
+                _facts.NavmeshCount,
+                _removedByEarlierRuns,
+                _movedByEarlierRuns),
             [.. _overriddenOthers],
             TargetWorkOrder.Of(targets),
             targets.IsEmpty ? new StopReason(StopKind.NoTargetObjects, null) : null);

@@ -4,7 +4,7 @@ using Newtonsoft.Json;
 namespace AddedObjectRemover;
 
 /// <summary>
-/// Turns a settings.json deserialization failure (an invalid enum text, a value of the wrong JSON type, ...)
+/// Turns a settings file deserialization failure (an invalid enum text, a value of the wrong JSON type, ...)
 /// into a message naming the setting, the value that was found, and what is allowed there.
 /// </summary>
 internal static class SettingsFailureMessage
@@ -14,32 +14,33 @@ internal static class SettingsFailureMessage
         @"Error converting value (.*?) to type|Could not convert string to \w+: (.*?)\.\s*Path|Could not construct ModKey: (.*?)(?: \(Parameter '|[\r\n]|$)",
         RegexOptions.Compiled);
 
-    public static string Describe(JsonException exception, SettingsSchema schema) =>
-        Describe(PathOf(exception), LocationOf(exception), exception.Message, schema);
+    internal const string SavedSettingLead = "Invalid saved setting";
+
+    /// <param name="lead">How the message opens; it says which file holds the setting when that is not settings.json.</param>
+    public static string Describe(JsonException exception, SettingsSchema schema, string fileName, string lead = SavedSettingLead) =>
+        Describe(PathOf(exception), LocationOf(exception), exception.Message, schema, fileName, lead);
 
     /// <summary>The plugin type's own parse failure, thrown while a plugin name is read; it carries no path, so the settings holding plugin names are listed.</summary>
     public static bool IsUnreadablePluginName(ArgumentException exception, SettingsSchema schema) =>
         exception.TargetSite?.DeclaringType == schema.PluginType;
 
-    public static string DescribeUnreadablePluginName(ArgumentException exception, SettingsSchema schema)
+    public static string DescribeUnreadablePluginName(ArgumentException exception, SettingsSchema schema, string lead = SavedSettingLead)
     {
         var settings = string.Join(" or ", PluginSettingNames(schema.Root, schema).Select(name => $"'{name}'"));
-        return Compose($"a plugin name in {settings}", ExtractFoundValue(exception.Message), DescribeAllowedValues(schema.PluginType, schema));
+        return Compose(lead, $"a plugin name in {settings}", ExtractFoundValue(exception.Message), DescribeAllowedValues(schema.PluginType, schema));
     }
 
     private static IEnumerable<string> PluginSettingNames(Type group, SettingsSchema schema)
     {
-        foreach (var property in group.GetProperties())
+        foreach (var setting in SettingsTree.SettingsOf(group, schema))
         {
-            var name = schema.DisplayNameOf(property) ?? property.Name;
-            var type = ElementTypeOrSelf(property.PropertyType);
-            if (type == schema.PluginType)
+            if (setting.ValueType == schema.PluginType)
             {
-                yield return name;
+                yield return setting.ScreenName;
             }
-            else if (type.IsClass && type.Assembly == schema.Root.Assembly)
+            else if (setting.IsGroup)
             {
-                foreach (var inner in PluginSettingNames(type, schema)) yield return $"{name} > {inner}";
+                foreach (var inner in PluginSettingNames(setting.ValueType, schema)) yield return $"{setting.ScreenName} > {inner}";
             }
         }
     }
@@ -62,27 +63,27 @@ internal static class SettingsFailureMessage
 
     private static string DescribeLocation(int line, int position) => $"line {line}, position {position}";
 
-    /// <param name="location">Where in settings.json the error lies; named only when no setting can be.</param>
-    private static string Describe(string? path, string? location, string exceptionMessage, SettingsSchema schema)
+    /// <param name="location">Where in the settings file the error lies; named only when no setting can be.</param>
+    private static string Describe(string? path, string? location, string exceptionMessage, SettingsSchema schema, string fileName, string lead)
     {
         var setting = string.IsNullOrEmpty(path) ? null : ResolveSetting(path, schema);
         var settingDescription = setting != null
-            ? $"'{setting.Value.Breadcrumb}' (settings.json path '{path}')"
+            ? $"'{setting.Value.Breadcrumb}' ({fileName} path '{path}')"
             : location != null ? $"the settings file at {location}" : "the settings file";
 
         var allowed = setting?.LeafType == null ? null : DescribeAllowedValues(setting.Value.LeafType, schema);
-        return Compose(settingDescription, ExtractFoundValue(exceptionMessage), allowed);
+        return Compose(lead, settingDescription, ExtractFoundValue(exceptionMessage), allowed);
     }
 
-    private static string Compose(string settingDescription, string? foundValue, string? allowed)
+    private static string Compose(string lead, string settingDescription, string? foundValue, string? allowed)
     {
-        var message = $"Invalid saved setting: {settingDescription}.";
+        var message = $"{lead}: {settingDescription}.";
         if (foundValue != null) message += $" Value found: {foundValue}.";
         if (allowed != null) message += $" {allowed}";
         return message;
     }
 
-    /// <summary>Walks the settings.json path through the schema's settings class, naming each setting by its display name.</summary>
+    /// <summary>Walks the settings file path through the schema's settings class, naming each setting by its display name.</summary>
     internal static (string Breadcrumb, Type? LeafType)? ResolveSetting(string jsonPath, SettingsSchema schema)
     {
         var segments = PathSegment.Matches(jsonPath);
@@ -101,21 +102,11 @@ internal static class SettingsFailureMessage
                 current = typeof(object);
                 continue;
             }
-            names.Add(schema.DisplayNameOf(property) ?? property.Name);
+            names.Add(SettingsTree.ScreenNameOf(property, schema));
             current = property.PropertyType;
-            leaf = ElementTypeOrSelf(current);
+            leaf = SettingsTree.ElementTypeOrSelf(current);
         }
         return (string.Join(" > ", names), leaf);
-    }
-
-    /// <summary>The item type of a list setting (its elements are what a saved value replaces), or the type itself.</summary>
-    private static Type ElementTypeOrSelf(Type type)
-    {
-        if (type == typeof(string)) return type;
-        var enumerable = type.GetInterfaces()
-            .Prepend(type)
-            .FirstOrDefault(candidate => candidate.IsGenericType && candidate.GetGenericTypeDefinition() == typeof(IEnumerable<>));
-        return enumerable?.GetGenericArguments()[0] ?? type;
     }
 
     internal static string? ExtractFoundValue(string message)

@@ -45,8 +45,8 @@ public class SourcePlacementTests
         PlacementCheck.AssertUsedOnlyIn(UsesNamespace("NetTopologySuite"), ["Tools/FlatAreaNearestPoint"]);
 
     [Fact]
-    public void NewtonsoftIsUsedOnlyInTheSettingsValidation() =>
-        PlacementCheck.AssertUsedOnlyIn(UsesNamespace("Newtonsoft"), ["Run/RunSettingsValidation"]);
+    public void NewtonsoftIsUsedOnlyInTheSettingsReading() =>
+        PlacementCheck.AssertUsedOnlyIn(UsesNamespace("Newtonsoft"), ["Run/RunSettingsReading"]);
 
     [Fact]
     public void OnlyTheRunnerTheEntryAndTheCsvWritingReadTheClock() =>

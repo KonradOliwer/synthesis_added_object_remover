@@ -300,7 +300,7 @@ public sealed class RestingObjectsEndSectionsTests
     [Fact]
     public void Write_ShowsTheTimeOnlyInTheDetailedLogAndTheEnableParentLineAlways()
     {
-        var written = new WriteSummary(Removed: [.. Enumerable.Range(0, 5).Select(index => new TargetId(index))], Moved: 2, EnableParentsReplaced: 3);
+        var written = new WriteSummary(Removed: [.. Enumerable.Range(0, 5).Select(index => new TargetId(index))], Moved: 2, EnableParentsReplaced: 3, Writes: new RecordWrites([], []));
 
         Assert.Equal(
             [
@@ -314,7 +314,7 @@ public sealed class RestingObjectsEndSectionsTests
     [Fact]
     public void Write_OmitsTheEnableParentLineWhenNoneWasReplaced()
     {
-        Assert.Single(LogSections.BuildWriteSection(new WriteSummary([new TargetId(0)], 0, 0), Elapsed, Normal).Lines.ToList());
+        Assert.Single(LogSections.BuildWriteSection(new WriteSummary([new TargetId(0)], 0, 0, new RecordWrites([], [])), Elapsed, Normal).Lines.ToList());
     }
 
     [Fact]
@@ -588,7 +588,7 @@ public sealed class RestingObjectsEndSectionsTests
             false,
             [],
             new Dictionary<RecordKey, SpaceFact> { [TestTargets.Space] = new(TestTargets.Space, "Tamriel", SpaceKind.Worldspace) },
-            new ReadCounts(0, 0, 0, 0, 0, 0),
+            new ReadCounts(0, 0, 0, 0, 0, 0, 0, 0),
             [],
             TargetWorkOrder.Of(targets),
             null);
@@ -614,7 +614,7 @@ public sealed class RestingObjectsEndSectionsTests
             IsPrimitive: false,
             HasMapMarker: false);
 
-    private static (CollectedObjects World, RestingObjectsResult AlsoRemove, IRemovalDecisions Decisions) RunFixture(Settings settings)
+    private static (CollectedObjects World, RestingObjectsResult AlsoRemove, IRemovalDecisions Decisions) RunFixture(StandardSettings settings)
     {
         var outcome = FixtureRun.Execute(settings, workers: 1);
         return (outcome.Collected, outcome.RestingObjects, outcome.Final);

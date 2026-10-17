@@ -11,7 +11,7 @@ Remove objects too close to other mods' objects: Margin by object size: on, 0.5 
 Remove objects on terrain changed by other mods: off.
 Also remove what rests on removed objects: Nothing.
 Invisible objects left behind: off.
-Logs and reports: Detailed log: off; Write report files (CSV): off; Folder for report files: <root>/AddedObjectRemover Reports.
+Logs and reports: Detailed log: off; Write report files (CSV): off; Folder for report files: <root>/Reports.
 ## scan
 Scanned 75 placed records: 40 Target.esp objects to check, 28 objects from other mods.
   Ignored 1 Target.esp objects whose winning version comes from a later plugin.

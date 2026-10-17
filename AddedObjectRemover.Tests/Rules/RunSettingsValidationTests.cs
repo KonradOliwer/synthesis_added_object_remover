@@ -8,7 +8,7 @@ public class RunSettingsValidationTests
 {
     private static readonly PluginName Target = new("Target.esp");
     private static readonly PluginName Patch = new("Patch.esp");
-    private const string OutputPath = "/out/Patch.esp";
+    private const string ReportBaseFolder = "/out";
 
     private static LoadOrderPlugins Facts(bool targetLoaded = true) =>
         new(
@@ -16,24 +16,31 @@ public class RunSettingsValidationTests
             Patch,
             [new PluginListing(Target, targetLoaded, []), new PluginListing(Patch, true, [])]);
 
-    private static Settings SettingsFor(string target = "Target.esp") =>
+    private static StandardSettings SettingsFor(string target = "Target.esp") =>
         new() { TargetPlugin = ModKey.FromNameAndExtension(target) };
 
-    private static RunRequest.Ready BuildReady(Settings settings, LoadOrderPlugins? facts = null, int workers = 3) =>
-        Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(settings, new PluginNameParsingPlugin(), facts ?? Facts(), OutputPath, workers));
+    private static RunRequest.Ready BuildReady(StandardSettings settings, LoadOrderPlugins? facts = null, int workers = 3) =>
+        Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(StandardConfig.Of(settings), new PluginNameParsingPlugin(), facts ?? Facts(), ReportBaseFolder, workers));
 
     [Fact]
     public void AnEmptyTargetPluginStopsTheRunAsNoTargetSet()
     {
-        var stop = Assert.IsType<RunRequest.Stop>(SettingsValidator.Build(new Settings(), new PluginNameParsingPlugin(), Facts(), OutputPath, 1));
+        var stop = Assert.IsType<RunRequest.Stop>(SettingsValidator.Build(StandardConfig.Of(new StandardSettings()), new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, 1));
         Assert.Equal(new StopReason(StopKind.NoTargetSet, null), stop.Reason);
     }
 
     [Fact]
     public void ATargetOutsideTheLoadOrderStopsTheRun()
     {
-        var stop = Assert.IsType<RunRequest.Stop>(SettingsValidator.Build(SettingsFor("Missing.esp"), new PluginNameParsingPlugin(), Facts(), OutputPath, 1));
+        var stop = Assert.IsType<RunRequest.Stop>(SettingsValidator.Build(StandardConfig.Of(SettingsFor("Missing.esp")), new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, 1));
         Assert.Equal(new StopReason(StopKind.TargetNotInLoadOrder, "Missing.esp"), stop.Reason);
+    }
+
+    [Fact]
+    public void ThePatchPluginAsTargetStopsTheRun()
+    {
+        var stop = Assert.IsType<RunRequest.Stop>(SettingsValidator.Build(StandardConfig.Of(SettingsFor("Patch.esp")), new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, 1));
+        Assert.Equal(new StopReason(StopKind.TargetIsThePatch, "Patch.esp"), stop.Reason);
     }
 
     [Fact]
@@ -429,14 +436,140 @@ public class RunSettingsValidationTests
     }
 
     [Fact]
-    public void ARelativeReportFolderIsResolvedAgainstTheOutputFolder()
+    public void ARelativeReportFolderIsResolvedAgainstTheBaseFolder()
     {
         var warnings = new List<SettingWarning>();
         var settings = SettingsFor();
         settings.Diagnostics = new DiagnosticsSettings { DiagnosticsFolder = "Reports" };
-        Assert.Equal(Path.Combine(Path.GetDirectoryName(OutputPath)!, "Reports"), SettingsValidator.ResolveReportFolder(OutputPath, settings, warnings));
+        Assert.Equal(Path.Combine(ReportBaseFolder, "Reports"), SettingsValidator.ResolveReportFolder(ReportBaseFolder, StandardConfig.Of(settings), warnings));
         Assert.Empty(warnings);
     }
+
+    [Fact]
+    public void TheDefaultReportFolderIsReportsInTheBaseFolder()
+    {
+        var settings = SettingsFor();
+        settings.Diagnostics = new DiagnosticsSettings { DiagnosticsFolder = "" };
+        Assert.Equal(Path.Combine(ReportBaseFolder, "Reports"), SettingsValidator.ResolveReportFolder(ReportBaseFolder, StandardConfig.Of(settings), []));
+    }
+
+    [Fact]
+    public void AConfigFilesReportsGoToASubfolderNamedAfterTheConfig()
+    {
+        var settings = SettingsFor();
+        settings.Diagnostics = new DiagnosticsSettings { DiagnosticsFolder = "Reports" };
+
+        var ready = Assert.IsType<RunRequest.Ready>(Assert.Single(BuildBatch(settings).Requests));
+
+        Assert.Equal(Path.Combine(ReportBaseFolder, "Reports", "town_walls"), ready.Settings.Reports.Folder);
+    }
+
+    [Fact]
+    public void TheSourceReachesTheRequest()
+    {
+        var source = ConfigSource("town_walls", 1, 2);
+
+        var request = Assert.Single(BuildBatch(source, SettingsFor()).Requests);
+
+        Assert.Same(source, request.Source);
+        Assert.IsType<SettingsSource.Standard>(BuildReady(SettingsFor()).Source);
+    }
+
+    [Fact]
+    public void AReadFailurePassesThroughUnchanged()
+    {
+        var failed = SettingsValidator.BuildAll(new ConfigsRead.Failed("Group file x is missing."), new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, 1);
+
+        Assert.Equal("Group file x is missing.", Assert.IsType<BatchRequest.Failed>(failed).Message);
+    }
+
+    [Fact]
+    public void AConfigFileWithoutATargetFailsTheBatchNamingTheFile()
+    {
+        var failed = FailedBatch(ConfigSource("town_walls", 1, 1), new StandardSettings());
+
+        Assert.Equal(
+            $"Config file {FilePathOf("town_walls")} sets no mod to clean up (TargetPlugin). Nothing was run and no patch was written.",
+            failed.Message);
+    }
+
+    [Fact]
+    public void AConfigFileWithATargetOutsideTheLoadOrderFailsTheBatchNamingTheFile()
+    {
+        var failed = FailedBatch(ConfigSource("town_walls", 1, 1), SettingsFor("Missing.esp"));
+
+        Assert.Equal(
+            $"Config file {FilePathOf("town_walls")}: the mod to clean up, Missing.esp, is not in the load order. Nothing was run and no patch was written.",
+            failed.Message);
+    }
+
+    [Fact]
+    public void AConfigFileWithThePatchPluginAsTargetFailsTheBatchNamingTheFile()
+    {
+        var failed = FailedBatch(ConfigSource("town_walls", 1, 1), SettingsFor("Patch.esp"));
+
+        Assert.Equal(
+            $"Config file {FilePathOf("town_walls")}: the mod to clean up, Patch.esp, is the patch this patcher writes. Nothing was run and no patch was written.",
+            failed.Message);
+    }
+
+    [Fact]
+    public void TheFirstConfigFileThatStopsIsTheOneReportedInGroupOrder()
+    {
+        var read = new ConfigsRead.Ready(
+        [
+            new ConfiguredSettings(ConfigSource("first", 1, 3), SettingsFor()),
+            new ConfiguredSettings(ConfigSource("second", 2, 3), new StandardSettings()),
+            new ConfiguredSettings(ConfigSource("third", 3, 3), SettingsFor("Missing.esp")),
+        ]);
+
+        var failed = Assert.IsType<BatchRequest.Failed>(SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, 1));
+
+        Assert.StartsWith($"Config file {FilePathOf("second")} sets no mod", failed.Message);
+    }
+
+    [Fact]
+    public void TwoConfigFilesWithTheSameTargetFailTheBatchNamingBothFiles()
+    {
+        var read = new ConfigsRead.Ready(
+        [
+            new ConfiguredSettings(ConfigSource("first", 1, 2), SettingsFor("Target.esp")),
+            new ConfiguredSettings(ConfigSource("second", 2, 2), SettingsFor("target.ESP")),
+        ]);
+
+        var failed = Assert.IsType<BatchRequest.Failed>(SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, 1));
+
+        Assert.Equal(
+            $"Config files {FilePathOf("first")} and {FilePathOf("second")} both clean up Target.esp; each mod may be cleaned up by one config only. Nothing was run and no patch was written.",
+            failed.Message);
+    }
+
+    [Fact]
+    public void AStandardRequestThatStopsStaysAStopRequest()
+    {
+        var read = new ConfigsRead.Ready([StandardConfig.Of(new StandardSettings())]);
+
+        var batch = Assert.IsType<BatchRequest.Ready>(SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, 1));
+
+        Assert.Equal(new StopReason(StopKind.NoTargetSet, null), Assert.IsType<RunRequest.Stop>(Assert.Single(batch.Requests)).Reason);
+    }
+
+    private static string FilePathOf(string name) => Path.Combine("configs", name + ".json");
+
+    private static SettingsSource.ConfigFile ConfigSource(string name, int number, int count) =>
+        new(name, name + ".json", FilePathOf(name), number, count, new ConfigFileNotes([], [], []));
+
+    private static BatchRequest.Ready BuildBatch(StandardSettings settings) => BuildBatch(ConfigSource("town_walls", 1, 1), settings);
+
+    private static BatchRequest.Ready BuildBatch(SettingsSource source, StandardSettings settings) =>
+        Assert.IsType<BatchRequest.Ready>(
+            SettingsValidator.BuildAll(
+                new ConfigsRead.Ready([new ConfiguredSettings(source, settings)]), new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, 1));
+
+    private static BatchRequest.Failed FailedBatch(SettingsSource source, StandardSettings settings) =>
+        Assert.IsType<BatchRequest.Failed>(
+            SettingsValidator.BuildAll(
+                new ConfigsRead.Ready([new ConfiguredSettings(source, settings)]), new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, 1));
 
     [Theory]
     [InlineData(50, 50)]

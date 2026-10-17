@@ -16,6 +16,7 @@ internal static class FixturePatcherState
     public static readonly ModKey PatchModKey = ModKey.FromNameAndExtension("AddedObjectRemover.esp");
 
     /// <remarks>
+    /// The patcher's settings folder is the output plugin's folder, so tests find the reports next to the patch.
     /// IPatcherState has internal members, so a test cannot implement it; the obsolete SynthesisState
     /// is the only public implementation. As in Synthesis, the link cache is built before the patch
     /// mod joins the load order as its last listing.
@@ -41,7 +42,7 @@ internal static class FixturePatcherState
 #pragma warning disable CS0618 // SynthesisState is obsolete for patchers, but it is the only public IPatcherState.
         return new SynthesisState<ISkyrimMod, ISkyrimModGetter>(
             arguments, rawLoadOrder, loadOrder, linkCache, assets, patchMod,
-            extraDataPath: null, internalDataPath: null, defaultDataPath: null,
+            extraDataPath: Path.GetDirectoryName(outputPath), internalDataPath: null, defaultDataPath: null,
             CancellationToken.None, formKeyAllocator: null);
 #pragma warning restore CS0618
     }

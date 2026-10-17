@@ -45,17 +45,29 @@ public sealed class LogAndReports
         _context = new ReportContext(caches.Bases, caches.Shapes, settings.DetailedLog);
     }
 
-    /// <summary>The warnings the settings check found, then the stop line when the request stops the run.</summary>
+    /// <summary>
+    /// For a config file of a batch, the lines that open its run; then the warnings the settings check found, then the
+    /// stop line when the request stops the run. A Standard run has no opening lines.
+    /// </summary>
     public static ImmutableArray<LogSection> BuildStartSections(RunRequest request)
     {
         var warnings = LogSections.BuildWarningsSection(request.Warnings);
-        return request is RunRequest.Stop stop ? [warnings, LogSections.BuildStopSection(stop.Reason)] : [warnings];
+        var stopped = request is RunRequest.Stop stop ? [LogSections.BuildStopSection(stop.Reason, stop.Source)] : ImmutableArray<LogSection>.Empty;
+        return [.. BuildConfigFileSections(request), warnings, .. stopped];
     }
+
+    private static ImmutableArray<LogSection> BuildConfigFileSections(RunRequest request) => request switch
+    {
+        RunRequest.Ready { Source: SettingsSource.ConfigFile file } ready =>
+            LogSections.BuildConfigFileSections(file, ready.Settings.TargetAsTyped, ready.Settings.DetailedLog),
+        RunRequest.Stop { Source: SettingsSource.ConfigFile } => throw new UnreachableException("A config file that stops fails the batch before any run."),
+        _ => [],
+    };
 
     public static ImmutableArray<LogSection> BuildReportFolderSections(ReportFolderPrepared prepared) =>
         prepared.Warning is { } warning ? [LogSections.BuildReportFolderWarningSection(warning)] : [];
 
-    public static ImmutableArray<LogSection> BuildStopSections(StopReason reason) => [LogSections.BuildStopSection(reason)];
+    public static ImmutableArray<LogSection> BuildStopSections(StopReason reason, SettingsSource source) => [LogSections.BuildStopSection(reason, source)];
 
     /// <summary>The problems met while reading the archive index and starting the mesh loader.</summary>
     public ImmutableArray<LogSection> BuildArchiveSections() =>

@@ -41,7 +41,7 @@ public class LogicPublicTypesTests
             "ObjectVisibility VisibilityOf(BaseKey?, Boolean, Boolean)",
         ],
         ["IdentifyTheMods"] = ["static IdentifiedMods Identify(LoadOrderPlugins, ModIdentificationSettings)"],
-        ["CollectPlacedObjects"] = ["static CollectedObjects Collect(IPluginRecords, IdentifiedMods, WhatToCollect)"],
+        ["CollectPlacedObjects"] = ["static CollectedObjects Collect(IPluginRecords, IdentifiedMods, WhatToCollect, WrittenByEarlierRuns)"],
         ["SelectObjectsThatCanCauseRemovals"] =
         [
             "static ObjectMeasurementRules MeasurementRules(IUnexpectedErrors)",
@@ -95,7 +95,7 @@ public class LogicPublicTypesTests
             "LogAndReports(RunSettings, ReportFolderPrepared, ILoadOrderCaches, IUnexpectedErrors)",
             "static ImmutableArray<LogSection> BuildReportFolderSections(ReportFolderPrepared)",
             "static ImmutableArray<LogSection> BuildStartSections(RunRequest)",
-            "static ImmutableArray<LogSection> BuildStopSections(StopReason)",
+            "static ImmutableArray<LogSection> BuildStopSections(StopReason, SettingsSource)",
             "ImmutableArray<LogSection> BuildArchiveSections()",
             "ImmutableArray<LogSection> BuildIndexSections(CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(IdentifiedMods)",

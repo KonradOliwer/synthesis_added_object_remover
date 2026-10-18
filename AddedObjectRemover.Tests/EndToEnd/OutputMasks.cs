@@ -12,7 +12,7 @@ internal static partial class OutputMasks
 {
     public const string RootPlaceholder = "<root>";
     private static readonly string PathTailPattern =
-        $@"(?<tail>(?:[\\/](?:{Regex.Escape(SettingDefaults.ReportFolder)}|[^\s\\/,]+))*)";
+        $@"(?<tail>(?:[\\/](?:{Regex.Escape(Program.ReportsFolderName)}|[^\s\\/,]+))*)";
     private const string DurationPlaceholder = "in <time>";
 
     /// <summary>Timing, cache, memory and thread-count lines.</summary>

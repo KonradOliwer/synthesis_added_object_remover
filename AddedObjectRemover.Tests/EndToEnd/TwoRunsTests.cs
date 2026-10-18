@@ -18,6 +18,9 @@ public sealed class TwoRunsTests : IDisposable
 
     public static TheoryData<string> Variants => new(SettingsVariants.Names);
 
+    public static TheoryData<string> VariantsWritingReports =>
+        new(SettingsVariants.Names.Where(name => SettingsVariants.Of(name).DetailedLogAndReports));
+
     public void Dispose() => _root.Delete(recursive: true);
 
     private (FixtureWorld World, string DataFolder) CreateWorld()
@@ -43,7 +46,7 @@ public sealed class TwoRunsTests : IDisposable
     }
 
     [Theory]
-    [MemberData(nameof(Variants))]
+    [MemberData(nameof(VariantsWritingReports))]
     public void EachRunWritesAndDeletesFilesOnlyInItsOwnReportFolder(string variant)
     {
         var (world, dataFolder) = CreateWorld();
@@ -75,8 +78,9 @@ public sealed class TwoRunsTests : IDisposable
         var state = FixturePatcherState.Create(world.LoadOrder, dataFolder, outputPath);
         var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey);
         var pluginRecords = new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods);
+        var settings = SettingsVariants.Of(SettingsVariants.Support);
         var request = SettingsValidator.Build(
-            StandardConfig.Of(SettingsVariants.Of(SettingsVariants.Support)), pluginRecords.Open(), plugins, Program.ReportBaseFolder(state), Workers);
+            StandardConfig.Of(settings.Standard), pluginRecords.Open(), plugins, settings.DetailedLogAndReports, Program.ReportsFolder(state), Workers);
         var bases = new CountingBaseFactsFactory(TestBaseFacts.Factory(state.LinkCache));
         var environment = new RunEnvironment(
             plugins,
@@ -137,12 +141,16 @@ public sealed class TwoRunsTests : IDisposable
         public RunOutput Run(FixtureWorld world, string dataFolder, string variant)
         {
             var settings = SettingsVariants.Of(variant);
-            settings.Diagnostics!.DiagnosticsFolder = _reports;
             var outputPath = Path.Combine(_folder, FixturePatcherState.PatchModKey.FileName);
             var state = FixturePatcherState.Create(world.LoadOrder, dataFolder, outputPath);
             var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey);
             var request = SettingsValidator.Build(
-                StandardConfig.Of(settings), new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods).Open(), plugins, Program.ReportBaseFolder(state), Workers);
+                StandardConfig.Of(settings.Standard),
+                new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods).Open(),
+                plugins,
+                settings.DetailedLogAndReports,
+                Program.ReportsFolder(state),
+                Workers);
             var log = PipelineRun.CaptureConsole(() => StepRunner.PatchLoadOrder([request], BuildEnvironment(state, plugins)));
             return new RunOutput(
                 MaskLog(log),
@@ -167,12 +175,14 @@ public sealed class TwoRunsTests : IDisposable
             OutputMasks.MaskLog(log.Select(line => line.Replace(_reports, ReportsPlaceholder, StringComparison.OrdinalIgnoreCase)), _folder);
 
         private List<ReportFile> ReadReports() =>
-            Directory.EnumerateFiles(_reports)
-                .Where(path => Path.GetFileName(path) != NotesFileName)
-                .Order(StringComparer.Ordinal)
-                .Select(path => new ReportFile(
-                    Path.GetFileName(path),
-                    OutputMasks.MaskReport(File.ReadAllLines(path).Select(line => line.Replace(_reports, ReportsPlaceholder, StringComparison.OrdinalIgnoreCase)), _folder)))
-                .ToList();
+            Directory.Exists(_reports)
+                ? Directory.EnumerateFiles(_reports)
+                    .Where(path => Path.GetFileName(path) != NotesFileName)
+                    .Order(StringComparer.Ordinal)
+                    .Select(path => new ReportFile(
+                        Path.GetFileName(path),
+                        OutputMasks.MaskReport(File.ReadAllLines(path).Select(line => line.Replace(_reports, ReportsPlaceholder, StringComparison.OrdinalIgnoreCase)), _folder)))
+                    .ToList()
+                : [];
     }
 }

@@ -39,13 +39,4 @@ public sealed class FileSystemAccessTests : IDisposable
         Assert.False(File.Exists(listed));
         Assert.True(File.Exists(other));
     }
-
-    [Fact]
-    public void ResolveAgainstKeepsARootedPathAndAnchorsARelativeOne()
-    {
-        var rooted = Path.Combine(_folder, "rooted");
-
-        Assert.Equal(rooted, FolderPaths.ResolveAgainst("elsewhere", rooted));
-        Assert.Equal(Path.Combine(_folder, "reports"), FolderPaths.ResolveAgainst(_folder, "reports"));
-    }
 }

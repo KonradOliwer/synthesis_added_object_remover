@@ -20,7 +20,7 @@ public sealed class BatchRunTests : IDisposable
     private const string SecondPlugin = "Second.esp";
     private const string Banner = "=== Added Object Remover ===";
     private const string DoneLinePrefix = "Done";
-    private const string ReportsFolder = SettingDefaults.ReportFolder;
+    private const string ReportsFolder = Program.ReportsFolderName;
     private const float PadCentre = 75f;
 
     private readonly DirectoryInfo _root = Directory.CreateTempSubdirectory("aor-batch-");
@@ -163,7 +163,7 @@ public sealed class BatchRunTests : IDisposable
         FixturePatcherState.Create(_world.LoadOrder, _dataFolder, Path.Combine(_outputFolder, FixturePatcherState.PatchModKey.FileName));
 
     private static IModeSettingsValues BatchSettings() =>
-        new Settings { Mode = PatchMode.Batch, Batch = new BatchSettings { GroupFileName = GroupName } };
+        new Settings { Mode = PatchMode.Batch, DetailedLogAndReports = true, Batch = new BatchSettings { GroupFileName = GroupName } };
 
     private void WriteGroup(params string[] configs) =>
         WriteFile(Path.Combine("groups", GroupName + ".json"), "[" + string.Join(", ", configs.Select(name => $"\"{name}\"")) + "]");
@@ -177,8 +177,7 @@ public sealed class BatchRunTests : IDisposable
               "TooClose": {
                 "BySize": { "Use": true, "SizeMultiplier": 0.1 },
                 "ByDistance": { "Use": true, "DistanceInUnits": 32 }
-              },
-              "Diagnostics": { "WriteReportFiles": true }
+              }
             }
             """);
 

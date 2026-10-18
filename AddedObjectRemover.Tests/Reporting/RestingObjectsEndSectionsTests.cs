@@ -653,7 +653,7 @@ public sealed class RestingObjectsEndSectionsTests
             IsPrimitive: false,
             HasMapMarker: false);
 
-    private static (CollectedObjects World, RestingObjectsResult AlsoRemove, IRemovalDecisions Decisions) RunFixture(StandardSettings settings)
+    private static (CollectedObjects World, RestingObjectsResult AlsoRemove, IRemovalDecisions Decisions) RunFixture(Settings settings)
     {
         var outcome = FixtureRun.Execute(settings, workers: 1);
         return (outcome.Collected, outcome.RestingObjects, outcome.Final);

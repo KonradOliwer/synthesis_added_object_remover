@@ -5,10 +5,14 @@ using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover;
 
-/// <summary>The top level of the user's settings: which mode runs, the one mod's settings of Standard mode, and what Batch mode reads.</summary>
+/// <summary>
+/// The top level of the user's settings: which mode runs, whether every run writes the detailed log and the report files,
+/// the one mod's settings of Standard mode, and what Batch mode reads.
+/// </summary>
 public interface IModeSettingsValues
 {
     PatchMode Mode { get; }
+    bool DetailedLogAndReports { get; }
     ISettingsValues Standard { get; }
     string? GroupFileName { get; }
 }
@@ -25,7 +29,6 @@ public interface ISettingsValues
     ITerrainChangeSettingsValues TerrainChange { get; }
     IFollowUpSettingsValues FollowUpRemoval { get; }
     ILeftoverSettingsValues LeftoverInvisibleObjects { get; }
-    IDiagnosticsSettingsValues Diagnostics { get; }
 }
 
 public interface ITooCloseSettingsValues
@@ -76,11 +79,4 @@ public interface ILeftoverSettingsValues
     int OccupiedDirectionsPercent { get; }
     IReadOnlyList<InvisibleObjectKind> NeverRemove { get; }
     bool MoveKeptMarkersOutOfOtherModsObjects { get; }
-}
-
-public interface IDiagnosticsSettingsValues
-{
-    bool DetailedLog { get; }
-    bool WriteReportFiles { get; }
-    string? ReportFolder { get; }
 }

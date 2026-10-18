@@ -8,7 +8,7 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 internal static partial class LogSections
 {
     /// <param name="target">The mod the config cleans up, as the file spells it.</param>
-    /// <param name="detailed">Whether this config's detailed log is on: only then the values that differ from the default are listed.</param>
+    /// <param name="detailed">Whether the detailed log is on: only then the values that differ from the default are listed.</param>
     public static ImmutableArray<LogSection> BuildConfigFileSections(SettingsSource.ConfigFile file, PluginName target, bool detailed) =>
     [
         BuildConfigDelimiterSection(file, target),

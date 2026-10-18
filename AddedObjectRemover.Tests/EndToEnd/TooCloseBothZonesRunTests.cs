@@ -39,7 +39,7 @@ public class TooCloseBothZonesRunTests
     public void TheLogCountsEachZoneAndWordsEachRemovalByItsZone()
     {
         var settings = BothZones();
-        settings.Diagnostics = new DiagnosticsSettings { DetailedLog = true };
+        settings.DetailedLogAndReports = true;
         var log = new RecordingLogSink();
 
         FixtureRun.Run(settings, Workers, log, DefaultMeshFiles, createLoadOrder: CrateWorld.Create);
@@ -60,13 +60,16 @@ public class TooCloseBothZonesRunTests
         Assert.Single(removals, line => line.Contains(CrateWorld.CrateFoundByDistance) && line.Contains($"; within 32 units of {CrateWorld.PadWithinDistance} "));
     }
 
-    private static StandardSettings BothZones() => new()
+    private static Settings BothZones() => new()
     {
-        TargetPlugin = ModKey.FromNameAndExtension(FixtureWorld.TargetPlugin),
-        TooClose = new TooCloseRemovalSettings
+        Standard = new StandardSettings
         {
-            BySize = new TooCloseBySizeSettings { Use = true, SizeMultiplier = SizeMultiplier },
-            ByDistance = new TooCloseByDistanceSettings { Use = true, DistanceInUnits = DefaultDistance },
+            TargetPlugin = ModKey.FromNameAndExtension(FixtureWorld.TargetPlugin),
+            TooClose = new TooCloseRemovalSettings
+            {
+                BySize = new TooCloseBySizeSettings { Use = true, SizeMultiplier = SizeMultiplier },
+                ByDistance = new TooCloseByDistanceSettings { Use = true, DistanceInUnits = DefaultDistance },
+            },
         },
     };
 

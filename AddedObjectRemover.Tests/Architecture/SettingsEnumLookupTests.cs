@@ -28,13 +28,8 @@ public class SettingsEnumLookupTests
     }
 
     [Fact]
-    public void TheDetailedLogAndTheReportFilesAreOffByDefault()
-    {
-        var diagnostics = new Settings().Standard.Diagnostics;
-
-        Assert.False(diagnostics.DetailedLog);
-        Assert.False(diagnostics.WriteReportFiles);
-    }
+    public void TheDetailedLogAndReportsAreOffByDefault() =>
+        Assert.False(new Settings().DetailedLogAndReports);
 
     private static IEnumerable<(Type Type, object Default)> EnumDefaults(object settings)
     {

@@ -9,7 +9,7 @@ Remove objects too close to other mods' objects: Margin by object size: on, 0.5 
 Remove objects on terrain changed by other mods: off.
 Also remove what rests on removed objects: EverythingTouchingIt; Gap that still counts as touching: 8 units.
 Invisible objects left behind: on; Look this far around it: 1024 units; Decide only if this share of the 8 directions has objects: 50%; A direction is cleared when this much of it was removed: 50%; Remove when this share of those directions is cleared: 60%; Never remove these as left behind: SoundMarkers; Move kept markers out of other mods' objects: on.
-Logs and reports: Detailed log: on; Write report files (CSV): on; Folder for report files: <root>/Output/Reports.
+Detailed log and reports: on, report files go to <root>/Output/Reports.
   Ignored other-mod object overridden by Target.esp: R_OverriddenByTarget_Pad [000821:Rival.esp].
 Scanned 75 placed records in <time>: 40 Target.esp objects to check, 28 objects from other mods.
   Ignored 1 Target.esp objects whose winning version comes from a later plugin.

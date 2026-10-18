@@ -1,5 +1,6 @@
 Batch
 Batch.GroupFileName
+DetailedLogAndReports
 FollowUpRemovalMode
 FollowUpRemovalMode.EverythingTouchingIt
 FollowUpRemovalMode.Nothing
@@ -13,10 +14,6 @@ PatchMode
 PatchMode.Batch
 PatchMode.Standard
 Standard
-Standard.Diagnostics
-Standard.Diagnostics.DetailedLog
-Standard.Diagnostics.DiagnosticsFolder
-Standard.Diagnostics.WriteReportFiles
 Standard.FollowUpRemoval
 Standard.FollowUpRemoval.AnchoringThresholdPercent
 Standard.FollowUpRemoval.Mode

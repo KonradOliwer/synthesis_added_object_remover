@@ -30,5 +30,4 @@ public static class SettingDefaults
     public const int DirectionThresholdPercent = 50;
     public const int RemovedDirectionsPercent = 60;
     public const int OccupiedDirectionsPercent = 50;
-    public const string ReportFolder = "Reports";
 }

@@ -38,6 +38,7 @@ Near the end of the log, a *Possible manual patch needed* section lists removed 
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | Mode | `Standard` | `Standard` cleans up the one mod set under *Standard*. `Batch` cleans up the mods of the config files listed in a group file, one after another (see *Batch mode*). |
+| Detailed log and reports | `false` | Lists every removed object and why in the log, plus per-space counts, unreadable meshes, timings and processing statistics, and saves CSV report files for checking the results (see *Reports and log*). Applies in `Standard` and `Batch` mode. Does not change the patch. |
 
 ### Batch
 
@@ -168,14 +169,6 @@ The tick boxes are: map markers, position markers (XMarker, XMarkerHeading), idl
 invisible marker doors (doors flagged as markers that lead nowhere), lights without a model, sound sources, echo areas (acoustic spaces), critter spawners,
 invisible trigger areas, surface decals (dirt, blood) and, last, other invisible objects.
 
-#### Logs and reports
-
-| Setting | Default | Meaning |
-| --- | --- | --- |
-| Detailed log (every removed object and why) | `false` | Lists every removed object and why, plus per-space counts, unreadable meshes, timings and processing statistics. |
-| Write report files (CSV) | `false` | Saves CSV files for checking the results (see *Reports and log*). |
-| Folder for report files | `Reports` | A full path, or relative to this patcher's Synthesis settings folder (the folder with its `settings.json`, for example `...\Synthesis\Data\<profile>\<patcher name>\Reports`), where the reports last between runs. Created if missing; empty means the default. If it can't be used, the log warns and the run continues. Only used when *Write report files (CSV)* is on. |
-
 Numbers out of range are corrected to the nearest valid value (a value that is not a number becomes
 the default), and percentages are rounded to the nearest step of 10, each with a warning in the log.
 A setting with an invalid value (for example text that is not one of the dropdown choices) stops the
@@ -206,19 +199,18 @@ Names in the group file and the group file name are plain file names, not paths;
 
 **Config file** (`configs\town_walls.json`): the same settings as the *Standard* section, written under their key names. **A config does not take any value from *Standard*; a setting it leaves out uses the built-in default.** Only `TargetPlugin` is required; list just the settings you want to change.
 
-To find the key names, copy them from the entries inside `Standard` in the patcher's `settings.json` (in its Synthesis settings folder, see *Folder for report files*) or from the configs in the `Example mod` folder, which list every setting. Dropdown choices are written as text (`"NpcHandling": "Never"`), plugins as `"Name.esp"`, lists as arrays (`["A.esp", "B.esp"]`).
+To find the key names, copy them from the entries inside `Standard` in the patcher's `settings.json` (in its Synthesis folder `...\Synthesis\Data\<profile>\<patcher name>`) or from the configs in the `Example mod` folder, which list every setting. Dropdown choices are written as text (`"NpcHandling": "Never"`), plugins as `"Name.esp"`, lists as arrays (`["A.esp", "B.esp"]`).
 
 ```json
 {
   "TargetPlugin": "SomeTownMod.esp",
-  "TooClose": { "BySize": { "SizeMultiplier": 1.0 } },
-  "Diagnostics": { "WriteReportFiles": true }
+  "TooClose": { "BySize": { "SizeMultiplier": 1.0 } }
 }
 ```
 
-- The *Logs and reports* settings of *Standard* are not used in `Batch` mode; a config that should write reports needs its own `Diagnostics`.
+- *Detailed log and reports* is set once, next to *Mode*, and applies to every config of the batch.
 - Upper and lower case in keys do not matter.
-- With *Detailed log* on in a config, its log section also lists the settings that file changes from the default.
+- With *Detailed log and reports* on, each config's log section also lists the settings that file changes from the default.
 - Comments and trailing commas are allowed in the files.
 
 **Order is priority.** The configs run in the listed order. A later config treats the objects an earlier one removed as gone, and the markers an earlier one moved as standing at their new position. An object that only clashed with something an earlier config removed is therefore kept.
@@ -280,7 +272,7 @@ moved, so it is hidden from the world map. Markers a location or quest uses are 
 
 ## Reports and log
 
-The normal log shows only what you need: the settings in use, warnings and errors, the final summaries of removed, kept and moved objects, one line per kept object, a summary of unreadable meshes, and where report files were written. Turn on *Detailed log* for every removed object and why, per-space counts, unreadable-mesh details, timings and processing statistics. Unreadable meshes are listed together near the end of the log, after the patch is written.
+The normal log shows only what you need: the settings in use, warnings and errors, the final summaries of removed, kept and moved objects, one line per kept object and a summary of unreadable meshes. Turn on *Detailed log and reports* for every removed object and why, per-space counts, unreadable-mesh details, timings, processing statistics and the report files. Unreadable meshes are listed together near the end of the log, after the patch is written.
 
 In `Batch` mode the banner prints once, then each config has its own section that starts with a line like `=== Config 1 of 2: town_walls.json, mod to clean up: SomeTownMod.esp ===`. Inside it come that config's notes (keys that were ignored, settings left at their defaults) and then the usual log of that run, ending with its own *Done* line. The notes look like this:
 
@@ -294,7 +286,7 @@ When an earlier config removed or moved objects, the scan summary says how many 
 
 Right after the kept summary, each object kept for a reason of its own gets a line saying why: *Kept, script names a quest or scene* (its own script, or its base object's from the target plugin) or *Kept, location role* (a location ref type of its own). They are kept on purpose and need no manual patch.
 
-Near the end of the log, a *Possible manual patch needed* section lists removed door, map, idle and furniture markers (which actors or the map use), and objects that would have been removed but were kept, grouped by why (part of a linked group, kept because something depends on it, or a teleport door). With report files on, the locations of the written files follow.
+Near the end of the log, a *Possible manual patch needed* section lists removed door, map, idle and furniture markers (which actors or the map use), and objects that would have been removed but were kept, grouped by why (part of a linked group, kept because something depends on it, or a teleport door). With *Detailed log and reports* on, the locations of the written files follow.
 
 Before that section, the log warns about removed objects that can still affect the game:
 - each removed unique NPC that a quest fills an alias with (as its *Unique Actor*), when that alias is neither *Optional* nor *Allow Disabled*: that quest role may not fill, or the quest may not start;
@@ -304,7 +296,7 @@ If something goes wrong that the patcher did not expect, the log shows a line st
 
 When such an error stops a whole part of the run (*Also remove what rests on removed objects*, *Invisible objects left behind*, moving kept markers, the report files, or the details in them), the log says so with a line like "Also remove: not performed because of an unexpected error.", and the rest of the run still goes on.
 
-With *Write report files (CSV)* on, CSV files (UTF-8, comma-separated, header in the first row) are written to the *Folder for report files*. At the start of each run the plugin's report files from earlier runs are deleted from that folder. In `Batch` mode each config writes to a subfolder of it named after the config (`town_walls` for `town_walls.json`), and only that subfolder's earlier files are deleted. Which files appear depends on your settings:
+With *Detailed log and reports* on, CSV files (UTF-8, comma-separated, header in the first row) are written to the `Reports` folder inside this patcher's own folder in Synthesis, `...\Synthesis\Data\<profile>\<patcher name>\Reports` (the folder that also holds its `settings.json`), where they last between runs. The log's settings lines show the full path. At the start of each run the plugin's report files from earlier runs are deleted from that folder. In `Batch` mode each config writes to a subfolder of it named after the config (`town_walls` for `town_walls.json`), and only that subfolder's earlier files are deleted. Which files appear depends on your settings:
 
 - **`anchoring.csv`**: why each object was removed or kept. Only with *When an object is removed, also remove* `OnlyWhatLosesItsSupport` and something removed for being too close or on changed terrain.
 - **`mesh-origins.csv`**: how each target mesh's origin sits (near the bottom, near the centre, or elsewhere); check it if `OnlyWhatLosesItsSupport` removes or keeps unexpected objects. Same conditions as `anchoring.csv`.

@@ -1,0 +1,3 @@
+Warning: NPCs and creatures setting 99 is invalid; using OnlyWhenStuckInsideTheObject.
+Warning: Remove objects too close to other mods' objects > Margin by object size > Margin on every side 9 is outside 0-5; using 5.
+Warning: search radius 1 is outside 64-8192; using 64.

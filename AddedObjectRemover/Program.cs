@@ -17,6 +17,8 @@ public static class Program
 {
     internal const string SettingsFileName = "settings.json";
 
+    internal const string ReportsFolderName = "Reports";
+
     internal static readonly SettingsSchema SettingsSchema = SchemaOf(typeof(Settings));
 
     private static readonly SettingsSchema ConfigSchema = SchemaOf(typeof(StandardSettings));
@@ -49,10 +51,12 @@ public static class Program
         var totalTimer = Stopwatch.StartNew();
         Console.WriteLine("=== Added Object Remover ===");
 
-        var configs = ReadConfigs(loadSettings(), state.DataFolderPath.Path);
+        var settings = loadSettings();
+        var configs = ReadConfigs(settings, state.DataFolderPath.Path);
         var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey);
         var pluginRecords = new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods);
-        var batch = SettingsValidator.BuildAll(configs, pluginRecords.Open(), plugins, ReportBaseFolder(state), workers);
+        var batch = SettingsValidator.BuildAll(
+            configs, pluginRecords.Open(), plugins, settings.DetailedLogAndReports, ReportsFolder(state), workers);
         var requests = TakeRequestsOrFail(batch);
         var environment = new RunEnvironment(
             plugins,
@@ -67,11 +71,13 @@ public static class Program
     }
 
     /// <summary>
-    /// The patcher's own settings folder in Synthesis, which lasts between runs (the output folder is wiped at the start of every run);
-    /// the current folder outside Synthesis.
+    /// A folder in the patcher's own data folder in Synthesis ("Data\&lt;profile&gt;\&lt;patcher name&gt;"), which lasts between runs
+    /// (the output folder is wiped at the start of every run). Synthesis passes that folder on every run, and so does a run started without arguments.
     /// </summary>
-    internal static string ReportBaseFolder(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) =>
-        state.ExtraSettingsDataPath?.Path ?? Directory.GetCurrentDirectory();
+    internal static string ReportsFolder(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) =>
+        Path.Combine(
+            state.ExtraSettingsDataPath?.Path ?? throw new InvalidOperationException("Synthesis passed no data folder for this patcher."),
+            ReportsFolderName);
 
     /// <summary>Reads the config files with the converters Synthesis reads settings.json with, so a config file reads like the Standard group.</summary>
     internal static ConfigsRead ReadConfigs(IModeSettingsValues settings, string dataFolder) =>

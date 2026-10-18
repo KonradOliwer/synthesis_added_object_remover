@@ -13,7 +13,7 @@ namespace AddedObjectRemover.Tests.Reporting;
 /// </summary>
 public sealed class StartSetupTooCloseSectionsTests
 {
-    private const string ReportBaseFolder = "/out";
+    private const string ReportsFolder = "/out/Reports";
     private const int Workers = 4;
 
     private static readonly TimeSpan Elapsed = TimeSpan.FromSeconds(1.5);
@@ -37,7 +37,7 @@ public sealed class StartSetupTooCloseSectionsTests
     public void Stop_GivesTheTextOfEveryUnusableTarget(string? target)
     {
         var settings = new StandardSettings { TargetPlugin = target == null ? ModKey.Null : ModKey.FromNameAndExtension(target) };
-        var stop = Assert.IsType<RunRequest.Stop>(SettingsValidator.Build(StandardConfig.Of(settings),new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, Workers));
+        var stop = Assert.IsType<RunRequest.Stop>(Build(settings, Facts()));
 
         AssertExpectedOutput(LogSections.BuildStopSection(stop.Reason, stop.Source).Lines.ToArray(), "Stop_GivesTheTextOfEveryUnusableTarget", $"{target ?? "null"}");
     }
@@ -75,13 +75,12 @@ public sealed class StartSetupTooCloseSectionsTests
         settings.TooClose.NpcHandling = (NpcHandling)99;
         settings.TooClose.BySize.SizeMultiplier = 9f;
         settings.LeftoverInvisibleObjects = new LeftoverInvisibleObjectSettings { SurroundingObjects = new SurroundingObjectsSettings { SearchRadius = 1f } };
-        settings.Diagnostics = new DiagnosticsSettings { DiagnosticsFolder = "bad\0folder" };
-        var ready = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(StandardConfig.Of(settings),new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, Workers));
+        var ready = Assert.IsType<RunRequest.Ready>(Build(settings, Facts()));
 
         var lines = LogSections.BuildWarningsSection(ready.Warnings).Lines.ToArray();
 
         Assert.Equal(ready.Warnings.Select(warning => warning.Message), lines);
-        AssertExpectedOutput(lines, "Warnings_GiveTheTextInTheOrderTheyWereFound");
+        AssertExpectedOutput(lines, "Warnings_GiveTheTextInTheOrderTheOptionsBuilderFoundThem");
     }
 
     [Fact]
@@ -128,9 +127,8 @@ public sealed class StartSetupTooCloseSectionsTests
             RemoveLeftoverInvisibleObjects = everythingOn,
             MoveKeptMarkersOutOfOtherModsObjects = everythingOn,
         };
-        settings.Diagnostics = new DiagnosticsSettings { DetailedLog = everythingOn, WriteReportFiles = everythingOn };
         var mods = Facts();
-        var runSettings = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(StandardConfig.Of(settings),new PluginNameParsingPlugin(), mods, ReportBaseFolder, Workers)).Settings;
+        var runSettings = Assert.IsType<RunRequest.Ready>(Build(settings, mods, detailedLogAndReports: everythingOn)).Settings;
         var standing = ModIdentifier.Identify(mods, runSettings.ModIdentification);
 
         var lines = LogSections.BuildConfigSection(runSettings, standing).Lines.Select(line => line.Replace('\\', '/')).ToArray();
@@ -144,7 +142,7 @@ public sealed class StartSetupTooCloseSectionsTests
         var settings = SettingsFor();
         settings.WhatToIgnore = new IgnoreSettings { CompatibilityPatches = new CompatibilityPatchSettings { MaxOtherMastersForPatch = 1 } };
         var mods = Facts();
-        var runSettings = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(StandardConfig.Of(settings),new PluginNameParsingPlugin(), mods, ReportBaseFolder, Workers)).Settings;
+        var runSettings = Assert.IsType<RunRequest.Ready>(Build(settings, mods)).Settings;
 
         var lines = LogSections.BuildConfigSection(runSettings, ModIdentifier.Identify(mods, runSettings.ModIdentification)).Lines.ToArray();
 
@@ -325,7 +323,7 @@ public sealed class StartSetupTooCloseSectionsTests
         settings.TooClose.BySize.Use = false;
         settings.TooClose.ByDistance.Use = true;
 
-        var ready = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(StandardConfig.Of(settings),new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, Workers));
+        var ready = Assert.IsType<RunRequest.Ready>(Build(settings, Facts()));
 
         Assert.False(ready.Settings.TooClose.BySize);
         Assert.Empty(ready.Warnings);
@@ -392,7 +390,7 @@ public sealed class StartSetupTooCloseSectionsTests
         settings.TooClose.ByDistance.Use = true;
         settings.TooClose.ByDistance.DistanceInUnits = 5000f;
 
-        var ready = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(StandardConfig.Of(settings),new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, Workers));
+        var ready = Assert.IsType<RunRequest.Ready>(Build(settings, Facts()));
 
         Assert.True(ready.Settings.TooClose.ByDistance);
         Assert.Equal(1024f, ready.Settings.TooClose.DistanceInUnits);
@@ -472,9 +470,12 @@ public sealed class StartSetupTooCloseSectionsTests
         var settings = SettingsFor();
         change(settings);
         var mods = Facts();
-        var runSettings = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(StandardConfig.Of(settings),new PluginNameParsingPlugin(), mods, ReportBaseFolder, Workers)).Settings;
+        var runSettings = Assert.IsType<RunRequest.Ready>(Build(settings, mods)).Settings;
         return LogSections.BuildConfigSection(runSettings, ModIdentifier.Identify(mods, runSettings.ModIdentification)).Lines;
     }
+
+    private static RunRequest Build(StandardSettings settings, LoadOrderPlugins mods, bool detailedLogAndReports = false) =>
+        SettingsValidator.Build(StandardConfig.Of(settings), new PluginNameParsingPlugin(), mods, detailedLogAndReports, ReportsFolder, Workers);
 
     [Fact]
     public void TooClose_ForTheNormalLogKeepsTheResultAndTheKeptObjectsOnly()

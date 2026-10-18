@@ -7,7 +7,7 @@ namespace AddedObjectRemover.Tests.Reporting;
 /// <summary>The lines that open one config's run in a batch log: the delimiter, then what the config file left out, got wrong or changed.</summary>
 public sealed class BatchLogSectionsTests
 {
-    private const string ReportBaseFolder = "/out";
+    private const string ReportsFolder = "/out";
     private const string FileName = "town_walls.json";
 
     private static readonly ModKey Skyrim = ModKey.FromNameAndExtension("Skyrim.esm");
@@ -18,7 +18,7 @@ public sealed class BatchLogSectionsTests
     private static readonly SettingInFile SingleSetting =
         new("TooClose.UseRoughBoxes", "Remove objects too close to other mods' objects > Use rough boxes instead of exact shapes (faster)", false, null);
     private static readonly SettingInFile Changed =
-        new("Diagnostics.WriteReportFiles", "Logs and reports > Write report files (CSV)", false, "true");
+        new("TooClose.UseRoughBoxes", "Remove objects too close to other mods' objects > Use rough boxes instead of exact shapes (faster)", false, "true");
 
     [Fact]
     public void TheDelimiterNamesTheConfigItsPlaceInTheGroupAndItsTarget()
@@ -69,7 +69,7 @@ public sealed class BatchLogSectionsTests
 
         Assert.Empty(Lines(StartSections(notes, detailedLog: false), "configNonDefault"));
         Assert.Equal(
-            [$"Set in {FileName} to other than the default:", "  Logs and reports > Write report files (CSV) (Diagnostics.WriteReportFiles): true"],
+            [$"Set in {FileName} to other than the default:", "  Remove objects too close to other mods' objects > Use rough boxes instead of exact shapes (faster) (TooClose.UseRoughBoxes): true"],
             Lines(StartSections(notes, detailedLog: true), "configNonDefault"));
     }
 
@@ -86,7 +86,8 @@ public sealed class BatchLogSectionsTests
     [Fact]
     public void AStandardRunHasNoConfigFileLines()
     {
-        var request = SettingsValidator.Build(StandardConfig.Of(new StandardSettings { TargetPlugin = Target }), new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, 1);
+        var request = SettingsValidator.Build(
+            StandardConfig.Of(new StandardSettings { TargetPlugin = Target }), new PluginNameParsingPlugin(), Facts(), detailedLogAndReports: false, ReportsFolder, 1);
 
         Assert.Equal(["warnings"], LogAndReports.BuildStartSections(request).Select(section => section.Id));
     }
@@ -118,8 +119,8 @@ public sealed class BatchLogSectionsTests
     private static ImmutableArray<LogSection> StartSections(ConfigFileNotes notes, bool detailedLog)
     {
         var source = new SettingsSource.ConfigFile("town_walls", FileName, Path.Combine("configs", FileName), Number: 2, Count: 3, notes);
-        var settings = new StandardSettings { TargetPlugin = Target, Diagnostics = new DiagnosticsSettings { DetailedLog = detailedLog } };
-        var request = SettingsValidator.Build(new ConfiguredSettings(source, settings), new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, 1);
+        var settings = new StandardSettings { TargetPlugin = Target };
+        var request = SettingsValidator.Build(new ConfiguredSettings(source, settings), new PluginNameParsingPlugin(), Facts(), detailedLog, ReportsFolder, 1);
         return LogAndReports.BuildStartSections(request);
     }
 

@@ -30,7 +30,7 @@ internal static partial class LogSections
             DescribeChangedTerrain(settings.ChangedTerrain),
             DescribeAlsoRemove(settings.AlsoRemove),
             DescribeLeftBehind(settings),
-            DescribeDiagnostics(settings),
+            DescribeDetailedLogAndReports(settings.Reports),
         ]);
 
     private static string OnOff(bool on) => on ? "on" : "off";
@@ -69,9 +69,8 @@ internal static partial class LogSections
             + $"Count ground type changes: {OnWith(terrain.CountTerrainTypeChanges, $"remove only when this share of the ground points changed type: {terrain.MinTerrainTypeChangePercent}%")}.";
     }
 
-    private static string DescribeDiagnostics(RunSettings settings) =>
-        $"Logs and reports: Detailed log: {OnOff(settings.DetailedLog)}; Write report files (CSV): {OnOff(settings.Reports.WriteFiles)}; "
-        + $"Folder for report files: {settings.Reports.Folder}.";
+    private static string DescribeDetailedLogAndReports(ReportFileSettings reports) =>
+        $"Detailed log and reports: {OnWith(reports.WriteFiles, $"report files go to {reports.Folder}")}.";
 
     private static string StopMessage(StopReason reason, SettingsSource source) => reason.Kind switch
     {

@@ -6,10 +6,10 @@ public class ReportFilesDecisionTests
     [Theory]
     [InlineData(false, StepOutcome.SwitchedOff)]
     [InlineData(true, StepOutcome.Performed)]
-    public void TheReportFileDetailsAreComputedOnlyWhenTheWriterPreparedReportFiles(bool writeReportFiles, StepOutcome expected)
+    public void TheReportFileDetailsAreComputedOnlyWhenTheWriterPreparedReportFiles(bool detailedLogAndReports, StepOutcome expected)
     {
         var settings = SettingsVariants.Of(SettingsVariants.Support);
-        settings.Diagnostics!.WriteReportFiles = writeReportFiles;
+        settings.DetailedLogAndReports = detailedLogAndReports;
 
         var done = (RunResult.Done)FixtureRun.Run(
             settings,

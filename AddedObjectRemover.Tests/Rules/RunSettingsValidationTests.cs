@@ -8,7 +8,7 @@ public class RunSettingsValidationTests
 {
     private static readonly PluginName Target = new("Target.esp");
     private static readonly PluginName Patch = new("Patch.esp");
-    private const string ReportBaseFolder = "/out";
+    private const string ReportsFolder = "/out";
 
     private static LoadOrderPlugins Facts(bool targetLoaded = true) =>
         new(
@@ -19,27 +19,33 @@ public class RunSettingsValidationTests
     private static StandardSettings SettingsFor(string target = "Target.esp") =>
         new() { TargetPlugin = ModKey.FromNameAndExtension(target) };
 
-    private static RunRequest.Ready BuildReady(StandardSettings settings, LoadOrderPlugins? facts = null, int workers = 3) =>
-        Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(StandardConfig.Of(settings), new PluginNameParsingPlugin(), facts ?? Facts(), ReportBaseFolder, workers));
+    private static RunRequest Build(StandardSettings settings, LoadOrderPlugins? facts = null, bool detailedLogAndReports = false, int workers = 3) =>
+        SettingsValidator.Build(StandardConfig.Of(settings), new PluginNameParsingPlugin(), facts ?? Facts(), detailedLogAndReports, ReportsFolder, workers);
+
+    private static RunRequest.Ready BuildReady(StandardSettings settings, LoadOrderPlugins? facts = null, bool detailedLogAndReports = false, int workers = 3) =>
+        Assert.IsType<RunRequest.Ready>(Build(settings, facts, detailedLogAndReports, workers));
+
+    private static BatchRequest BuildAll(ConfigsRead read) =>
+        SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), Facts(), detailedLogAndReports: false, ReportsFolder, 1);
 
     [Fact]
     public void AnEmptyTargetPluginStopsTheRunAsNoTargetSet()
     {
-        var stop = Assert.IsType<RunRequest.Stop>(SettingsValidator.Build(StandardConfig.Of(new StandardSettings()), new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, 1));
+        var stop = Assert.IsType<RunRequest.Stop>(Build(new StandardSettings()));
         Assert.Equal(new StopReason(StopKind.NoTargetSet, null), stop.Reason);
     }
 
     [Fact]
     public void ATargetOutsideTheLoadOrderStopsTheRun()
     {
-        var stop = Assert.IsType<RunRequest.Stop>(SettingsValidator.Build(StandardConfig.Of(SettingsFor("Missing.esp")), new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, 1));
+        var stop = Assert.IsType<RunRequest.Stop>(Build(SettingsFor("Missing.esp")));
         Assert.Equal(new StopReason(StopKind.TargetNotInLoadOrder, "Missing.esp"), stop.Reason);
     }
 
     [Fact]
     public void ThePatchPluginAsTargetStopsTheRun()
     {
-        var stop = Assert.IsType<RunRequest.Stop>(SettingsValidator.Build(StandardConfig.Of(SettingsFor("Patch.esp")), new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, 1));
+        var stop = Assert.IsType<RunRequest.Stop>(Build(SettingsFor("Patch.esp")));
         Assert.Equal(new StopReason(StopKind.TargetIsThePatch, "Patch.esp"), stop.Reason);
     }
 
@@ -100,7 +106,6 @@ public class RunSettingsValidationTests
                 OccupiedDirectionsPercent = 5,
             },
         };
-        settings.Diagnostics = new DiagnosticsSettings { DiagnosticsFolder = "bad\0folder" };
 
         var messages = BuildReady(settings, Facts(targetLoaded: false)).Warnings.Select(warning => warning.Message).ToList();
 
@@ -117,7 +122,6 @@ public class RunSettingsValidationTests
             "Warning: removed area per direction 45 is not a multiple",
             "Warning: removed directions required 44 is not a multiple",
             "Warning: occupied directions required 5 is outside",
-            "Warning: report folder",
         ];
         Assert.Equal(expectedStarts.Length, messages.Count);
         for (var i = 0; i < expectedStarts.Length; i++)
@@ -152,28 +156,25 @@ public class RunSettingsValidationTests
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(true, true)]
-    public void EditorIdAndOverriddenListsFollowTheDetailedLog(bool detailed, bool expected)
+    [InlineData(false)]
+    [InlineData(true)]
+    public void EditorIdAndOverriddenListsFollowTheDetailedLog(bool detailed)
     {
-        var settings = SettingsFor();
-        settings.Diagnostics = new DiagnosticsSettings { DetailedLog = detailed };
-        var plan = BuildReady(settings).Settings.Read;
-        Assert.Equal(expected, plan.OtherEditorIds);
-        Assert.Equal(expected, plan.OverriddenOthersList);
+        var plan = BuildReady(SettingsFor(), detailedLogAndReports: detailed).Settings.Read;
+        Assert.Equal(detailed, plan.OtherEditorIds);
+        Assert.Equal(detailed, plan.OverriddenOthersList);
     }
 
     [Theory]
-    [InlineData(false, false, false)]
-    [InlineData(true, false, true)]
-    [InlineData(false, true, true)]
-    [InlineData(true, true, true)]
-    public void TouchChainsAreShownForTheDetailedLogOrTheReportFiles(bool detailed, bool reports, bool expected)
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TheDetailedLogAndReportsSettingTurnsOnTheDetailedLogTheReportFilesAndTheTouchChains(bool on)
     {
-        var settings = SettingsFor();
-        settings.Diagnostics = new DiagnosticsSettings { DetailedLog = detailed, WriteReportFiles = reports };
+        var settings = BuildReady(SettingsFor(), detailedLogAndReports: on).Settings;
 
-        Assert.Equal(expected, BuildReady(settings).Settings.AlsoRemove.TouchChainsShown);
+        Assert.Equal(on, settings.DetailedLog);
+        Assert.Equal(on, settings.Reports.WriteFiles);
+        Assert.Equal(on, settings.AlsoRemove.TouchChainsShown);
     }
 
     [Theory]
@@ -436,32 +437,15 @@ public class RunSettingsValidationTests
     }
 
     [Fact]
-    public void ARelativeReportFolderIsResolvedAgainstTheBaseFolder()
-    {
-        var warnings = new List<SettingWarning>();
-        var settings = SettingsFor();
-        settings.Diagnostics = new DiagnosticsSettings { DiagnosticsFolder = "Reports" };
-        Assert.Equal(Path.Combine(ReportBaseFolder, "Reports"), SettingsValidator.ResolveReportFolder(ReportBaseFolder, StandardConfig.Of(settings), warnings));
-        Assert.Empty(warnings);
-    }
-
-    [Fact]
-    public void TheDefaultReportFolderIsReportsInTheBaseFolder()
-    {
-        var settings = SettingsFor();
-        settings.Diagnostics = new DiagnosticsSettings { DiagnosticsFolder = "" };
-        Assert.Equal(Path.Combine(ReportBaseFolder, "Reports"), SettingsValidator.ResolveReportFolder(ReportBaseFolder, StandardConfig.Of(settings), []));
-    }
+    public void StandardReportsGoToTheReportsFolderItself() =>
+        Assert.Equal(ReportsFolder, BuildReady(SettingsFor()).Settings.Reports.Folder);
 
     [Fact]
     public void AConfigFilesReportsGoToASubfolderNamedAfterTheConfig()
     {
-        var settings = SettingsFor();
-        settings.Diagnostics = new DiagnosticsSettings { DiagnosticsFolder = "Reports" };
+        var ready = Assert.IsType<RunRequest.Ready>(Assert.Single(BuildBatch(SettingsFor()).Requests));
 
-        var ready = Assert.IsType<RunRequest.Ready>(Assert.Single(BuildBatch(settings).Requests));
-
-        Assert.Equal(Path.Combine(ReportBaseFolder, "Reports", "town_walls"), ready.Settings.Reports.Folder);
+        Assert.Equal(Path.Combine(ReportsFolder, "town_walls"), ready.Settings.Reports.Folder);
     }
 
     [Fact]
@@ -478,7 +462,7 @@ public class RunSettingsValidationTests
     [Fact]
     public void AReadFailurePassesThroughUnchanged()
     {
-        var failed = SettingsValidator.BuildAll(new ConfigsRead.Failed("Group file x is missing."), new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, 1);
+        var failed = BuildAll(new ConfigsRead.Failed("Group file x is missing."));
 
         Assert.Equal("Group file x is missing.", Assert.IsType<BatchRequest.Failed>(failed).Message);
     }
@@ -523,7 +507,7 @@ public class RunSettingsValidationTests
             new ConfiguredSettings(ConfigSource("third", 3, 3), SettingsFor("Missing.esp")),
         ]);
 
-        var failed = Assert.IsType<BatchRequest.Failed>(SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, 1));
+        var failed = Assert.IsType<BatchRequest.Failed>(BuildAll(read));
 
         Assert.StartsWith($"Config file {FilePathOf("second")} sets no mod", failed.Message);
     }
@@ -537,7 +521,7 @@ public class RunSettingsValidationTests
             new ConfiguredSettings(ConfigSource("second", 2, 2), SettingsFor("target.ESP")),
         ]);
 
-        var failed = Assert.IsType<BatchRequest.Failed>(SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, 1));
+        var failed = Assert.IsType<BatchRequest.Failed>(BuildAll(read));
 
         Assert.Equal(
             $"Config files {FilePathOf("first")} and {FilePathOf("second")} both clean up Target.esp; each mod may be cleaned up by one config only. Nothing was run and no patch was written.",
@@ -549,7 +533,7 @@ public class RunSettingsValidationTests
     {
         var read = new ConfigsRead.Ready([StandardConfig.Of(new StandardSettings())]);
 
-        var batch = Assert.IsType<BatchRequest.Ready>(SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, 1));
+        var batch = Assert.IsType<BatchRequest.Ready>(BuildAll(read));
 
         Assert.Equal(new StopReason(StopKind.NoTargetSet, null), Assert.IsType<RunRequest.Stop>(Assert.Single(batch.Requests)).Reason);
     }
@@ -562,14 +546,10 @@ public class RunSettingsValidationTests
     private static BatchRequest.Ready BuildBatch(StandardSettings settings) => BuildBatch(ConfigSource("town_walls", 1, 1), settings);
 
     private static BatchRequest.Ready BuildBatch(SettingsSource source, StandardSettings settings) =>
-        Assert.IsType<BatchRequest.Ready>(
-            SettingsValidator.BuildAll(
-                new ConfigsRead.Ready([new ConfiguredSettings(source, settings)]), new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, 1));
+        Assert.IsType<BatchRequest.Ready>(BuildAll(new ConfigsRead.Ready([new ConfiguredSettings(source, settings)])));
 
     private static BatchRequest.Failed FailedBatch(SettingsSource source, StandardSettings settings) =>
-        Assert.IsType<BatchRequest.Failed>(
-            SettingsValidator.BuildAll(
-                new ConfigsRead.Ready([new ConfiguredSettings(source, settings)]), new PluginNameParsingPlugin(), Facts(), ReportBaseFolder, 1));
+        Assert.IsType<BatchRequest.Failed>(BuildAll(new ConfigsRead.Ready([new ConfiguredSettings(source, settings)])));
 
     [Theory]
     [InlineData(50, 50)]

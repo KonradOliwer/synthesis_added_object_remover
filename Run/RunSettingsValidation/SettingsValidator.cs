@@ -35,7 +35,9 @@ public static class SettingsValidator
     private const string TerrainTypeChangePercentName = "Remove objects on terrain changed by other mods > Remove only when this share of the ground points changed type";
 
     /// <summary>Validation runs in a fixed order because the warnings are reported in the order found.</summary>
-    public static RunRequest Build(ConfiguredSettings config, IPluginRecords records, LoadOrderPlugins mods, string reportBaseFolder, int workers)
+    /// <param name="detailedLogAndReports">The one setting for every run that turns on both the detailed log and the report files.</param>
+    public static RunRequest Build(
+        ConfiguredSettings config, IPluginRecords records, LoadOrderPlugins mods, bool detailedLogAndReports, string reportsFolder, int workers)
     {
         var settings = config.Settings;
         var warnings = new List<SettingWarning>();
@@ -50,20 +52,18 @@ public static class SettingsValidator
         var modIdentification = CreateModIdentificationSettings(mods, targetListing, excluded, ignore, warnings);
         var tooClose = CreateTooCloseSettings(settings.TooClose, warnings);
         var changedTerrain = CreateChangedTerrainSettings(settings.TerrainChange, warnings);
-        var detailedLog = settings.Diagnostics.DetailedLog;
-        var writeReportFiles = settings.Diagnostics.WriteReportFiles;
-        var alsoRemove = CreateAlsoRemoveSettings(settings.FollowUpRemoval, touchChainsShown: detailedLog || writeReportFiles, warnings);
+        var alsoRemove = CreateAlsoRemoveSettings(settings.FollowUpRemoval, touchChainsShown: detailedLogAndReports, warnings);
         var leftoverSettings = settings.LeftoverInvisibleObjects;
         var leftBehind = CreateLeftBehindSettings(leftoverSettings, warnings);
         var markerMoves = CreateMarkerMoveSettings(leftoverSettings);
-        var reports = new ReportFileSettings(writeReportFiles, ResolveReportFolder(reportBaseFolder, config, warnings));
+        var reports = new ReportFileSettings(detailedLogAndReports, ResolveReportFolder(reportsFolder, config.Source));
 
         var runSettings = new RunSettings(
             targetListing.Mod,
             targetAsTyped,
             [.. excluded.Select(name => name.ToString())],
             modIdentification,
-            CreateWhatToCollect(alsoRemove.Mode, markerMoves, changedTerrain, detailedLog),
+            CreateWhatToCollect(alsoRemove.Mode, markerMoves, changedTerrain, detailedLogAndReports),
             new SelectionSettings(tooClose.Npcs),
             changedTerrain,
             tooClose,
@@ -71,7 +71,7 @@ public static class SettingsValidator
             leftoverSettings.RemoveLeftoverInvisibleObjects ? leftBehind : null,
             markerMoves,
             reports,
-            detailedLog,
+            detailedLogAndReports,
             new Execution(workers));
         return new RunRequest.Ready(runSettings, config.Source, [.. warnings]);
     }
@@ -80,21 +80,22 @@ public static class SettingsValidator
     /// Builds every config's request in order. A config file that sets no target, a target outside the load order or the patch plugin as target, or two
     /// configs with the same target, fail the whole batch; a Standard request that stops stays a stop request.
     /// </summary>
-    public static BatchRequest BuildAll(ConfigsRead read, IPluginRecords records, LoadOrderPlugins mods, string reportBaseFolder, int workers) =>
+    public static BatchRequest BuildAll(
+        ConfigsRead read, IPluginRecords records, LoadOrderPlugins mods, bool detailedLogAndReports, string reportsFolder, int workers) =>
         read switch
         {
             ConfigsRead.Failed failed => new BatchRequest.Failed(failed.Message),
-            ConfigsRead.Ready ready => BuildEach(ready.Configs, records, mods, reportBaseFolder, workers),
+            ConfigsRead.Ready ready => BuildEach(ready.Configs, records, mods, detailedLogAndReports, reportsFolder, workers),
             _ => throw new UnreachableException(),
         };
 
     private static BatchRequest BuildEach(
-        ImmutableArray<ConfiguredSettings> configs, IPluginRecords records, LoadOrderPlugins mods, string reportBaseFolder, int workers)
+        ImmutableArray<ConfiguredSettings> configs, IPluginRecords records, LoadOrderPlugins mods, bool detailedLogAndReports, string reportsFolder, int workers)
     {
         var requests = ImmutableArray.CreateBuilder<RunRequest>(configs.Length);
         foreach (var config in configs)
         {
-            var request = Build(config, records, mods, reportBaseFolder, workers);
+            var request = Build(config, records, mods, detailedLogAndReports, reportsFolder, workers);
             if (DescribeConfigFileStop(request) is { } stopped) return new BatchRequest.Failed(stopped);
             requests.Add(request);
         }
@@ -202,7 +203,7 @@ public static class SettingsValidator
             distanceInUnits);
     }
 
-    /// <param name="touchChainsShown">Whether the Detailed log or the report files show the touch chains.</param>
+    /// <param name="touchChainsShown">Whether the detailed log and the report files, which show the touch chains, are on.</param>
     private static AlsoRemoveSettings CreateAlsoRemoveSettings(
         IFollowUpSettingsValues followUp, bool touchChainsShown, ICollection<SettingWarning> warnings)
     {
@@ -217,13 +218,9 @@ public static class SettingsValidator
     private static MarkerMoveSettings? CreateMarkerMoveSettings(ILeftoverSettingsValues leftovers) =>
         leftovers.RemoveLeftoverInvisibleObjects && leftovers.MoveKeptMarkersOutOfOtherModsObjects ? new MarkerMoveSettings(MarkerMoveLimits.MaxDistance) : null;
 
-    /// <summary>A rooted path is used as is; a relative one is resolved against the base folder. A config file's reports go to a subfolder named after the config.</summary>
-    internal static string ResolveReportFolder(string reportBaseFolder, ConfiguredSettings config, ICollection<SettingWarning> warnings)
-    {
-        var folder = ValidateFolder(config.Settings.Diagnostics.ReportFolder?.Trim(), warnings);
-        var resolved = FolderPaths.ResolveAgainst(reportBaseFolder, folder);
-        return config.Source is SettingsSource.ConfigFile file ? Path.Combine(resolved, file.Name) : resolved;
-    }
+    /// <summary>A config file's reports go to a subfolder named after the config, so the configs of a batch do not overwrite each other's.</summary>
+    internal static string ResolveReportFolder(string reportsFolder, SettingsSource source) =>
+        source is SettingsSource.ConfigFile file ? Path.Combine(reportsFolder, file.Name) : reportsFolder;
 
     /// <summary>
     /// The surroundings are read only when follow-up removal or relocation needs them; the Editor ID lists only when the detailed
@@ -251,17 +248,6 @@ public static class SettingsValidator
             ClearedDirectionsPercent: WholeTens(leftovers.RemovedDirectionsPercent, "removed directions required", warnings),
             OccupiedDirectionsPercent: WholeTens(leftovers.OccupiedDirectionsPercent, "occupied directions required", warnings),
             NeverRemove: leftovers.NeverRemove.ToHashSet());
-    }
-
-    /// <summary>A folder containing characters no path can contain (for example a NUL character) falls back to the default.</summary>
-    private static string ValidateFolder(string? configured, ICollection<SettingWarning> warnings)
-    {
-        if (string.IsNullOrEmpty(configured)) return SettingDefaults.ReportFolder;
-        if (configured.IndexOfAny(Path.GetInvalidPathChars()) < 0) return configured;
-        warnings.Add(new SettingWarning(
-            "report folder",
-            $"Warning: report folder '{configured}' contains characters not allowed in a path; using '{SettingDefaults.ReportFolder}'."));
-        return SettingDefaults.ReportFolder;
     }
 
     private static StopReason? FindTarget(IPluginRecords records, LoadOrderPlugins mods, string? targetPlugin, out PluginName target, out PluginListing targetListing)

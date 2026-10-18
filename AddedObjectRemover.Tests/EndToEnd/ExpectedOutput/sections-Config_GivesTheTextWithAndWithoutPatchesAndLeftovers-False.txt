@@ -4,4 +4,4 @@ Remove objects too close to other mods' objects: Margin by object size: on, 0.5 
 Remove objects on terrain changed by other mods: off.
 Also remove what rests on removed objects: Nothing.
 Invisible objects left behind: off.
-Logs and reports: Detailed log: off; Write report files (CSV): off; Folder for report files: /out/Reports.
+Detailed log and reports: off.

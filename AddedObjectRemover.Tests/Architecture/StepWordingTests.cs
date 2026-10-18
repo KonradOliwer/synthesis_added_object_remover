@@ -67,8 +67,6 @@ public class StepWordingTests
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: could not read {targetListing.Mod} to find its masters.")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "The plugin setting {name} is not a plugin file name.")] = BugMessage,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: neither too-close margin is on; no object is removed for being too close.")] = SettingsWarning,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: report folder '{configured}' contains characters not allowed in a path; using '{SettingDefaults.ReportFolder}'.")] =
-            SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: changed terrain is on, but neither height nor terrain type changes are counted; no object is removed for changed terrain.")] =
             SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: changed terrain is on, but neither terrain margin is on; no object is removed for changed terrain.")] =
@@ -82,7 +80,6 @@ public class StepWordingTests
         [("Run/RunSettingsValidation/SettingsValidator.cs", "occupied directions required")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "removed area per direction")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "removed directions required")] = SettingsWarning,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "report folder")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "search radius")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects too close to other mods' objects > Margin by object size > Margin on every side")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects too close to other mods' objects > Margin by fixed distance > Margin on every side")] = SettingsWarning,

@@ -26,7 +26,7 @@ internal static class PipelineRun
     private const string DataFolderName = "Data";
     private const string OutputFolderName = "Output";
 
-    public static RunOutput Execute(StandardSettings settings, int workers)
+    public static RunOutput Execute(Settings settings, int workers)
     {
         var root = Directory.CreateTempSubdirectory("aor-e2e-");
         try
@@ -39,18 +39,18 @@ internal static class PipelineRun
         }
     }
 
-    private static RunOutput Execute(StandardSettings settings, int workers, string root)
+    private static RunOutput Execute(Settings settings, int workers, string root)
     {
         var dataFolder = Directory.CreateDirectory(Path.Combine(root, DataFolderName)).FullName;
         var outputFolder = Directory.CreateDirectory(Path.Combine(root, OutputFolderName)).FullName;
         var world = FixtureWorld.Create(dataFolder);
         var state = FixturePatcherState.Create(world.LoadOrder, dataFolder, Path.Combine(outputFolder, FixturePatcherState.PatchModKey.FileName));
 
-        var log = CaptureConsole(() => Program.RunPatch(state, () => new Settings { Standard = settings }, workers));
+        var log = CaptureConsole(() => Program.RunPatch(state, () => settings, workers));
         return new RunOutput(
             OutputMasks.MaskLog(log, root),
             PatchDump.Describe(state.PatchMod),
-            ReadReports(SettingsValidator.ResolveReportFolder(Program.ReportBaseFolder(state), StandardConfig.Of(settings), []), root),
+            ReadReports(Program.ReportsFolder(state), root),
             log);
     }
 

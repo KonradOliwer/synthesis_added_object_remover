@@ -5,36 +5,35 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 
 /// <summary>
 /// Pins every printed log section, empty ones included, in order and with its lines, for every combination of the
-/// switches that decide which sections print: also remove, leftover invisible objects, moving kept markers, report
-/// files and the detailed log.
+/// switches that decide which sections print: also remove, leftover invisible objects, moving kept markers, and the
+/// detailed log and reports.
 /// </summary>
 public class LogSequenceTests
 {
     private const int Workers = 2;
     private const string ExpectedOutputSubfolder = "log-sequence";
 
-    public static TheoryData<FollowUpRemovalMode, Leftovers, bool, bool> Switches()
+    public static TheoryData<FollowUpRemovalMode, Leftovers, bool> Switches()
     {
-        var data = new TheoryData<FollowUpRemovalMode, Leftovers, bool, bool>();
+        var data = new TheoryData<FollowUpRemovalMode, Leftovers, bool>();
         foreach (var mode in Enum.GetValues<FollowUpRemovalMode>())
         foreach (var leftovers in Enum.GetValues<Leftovers>())
-        foreach (var writeReportFiles in (bool[])[false, true])
-        foreach (var detailedLog in (bool[])[false, true])
+        foreach (var detailedLogAndReports in (bool[])[false, true])
         {
-            data.Add(mode, leftovers, writeReportFiles, detailedLog);
+            data.Add(mode, leftovers, detailedLogAndReports);
         }
         return data;
     }
 
     [Theory]
     [MemberData(nameof(Switches))]
-    public void PrintedSectionsMatchTheExpectedOutput(FollowUpRemovalMode mode, Leftovers leftovers, bool writeReportFiles, bool detailedLog)
+    public void PrintedSectionsMatchTheExpectedOutput(FollowUpRemovalMode mode, Leftovers leftovers, bool detailedLogAndReports)
     {
         var log = new RecordingLogSink();
 
-        FixtureRun.Run(Create(mode, leftovers, writeReportFiles, detailedLog), Workers, log, DefaultMeshFiles);
+        FixtureRun.Run(Create(mode, leftovers, detailedLogAndReports), Workers, log, DefaultMeshFiles);
 
-        var name = $"{ExpectedOutputSubfolder}/{mode}-{leftovers}-reports-{writeReportFiles}-detailed-{detailedLog}";
+        var name = $"{ExpectedOutputSubfolder}/{mode}-{leftovers}-detailed-log-and-reports-{detailedLogAndReports}";
         ExpectedOutputFiles.AssertMatches(name, Describe(log.Sections));
     }
 
@@ -59,7 +58,13 @@ public class LogSequenceTests
     /// <summary>The temporary folder <see cref="FixtureRun"/> runs in.</summary>
     private static Regex RunFolder() => new(Regex.Escape(Path.GetTempPath()) + @"aor-run-[^\\/\s]+", RegexOptions.IgnoreCase);
 
-    private static StandardSettings Create(FollowUpRemovalMode mode, Leftovers leftovers, bool writeReportFiles, bool detailedLog) => new()
+    private static Settings Create(FollowUpRemovalMode mode, Leftovers leftovers, bool detailedLogAndReports) => new()
+    {
+        DetailedLogAndReports = detailedLogAndReports,
+        Standard = CreateStandard(mode, leftovers),
+    };
+
+    private static StandardSettings CreateStandard(FollowUpRemovalMode mode, Leftovers leftovers) => new()
     {
         TargetPlugin = ModKey.FromNameAndExtension(FixtureWorld.TargetPlugin),
         TooClose = new TooCloseRemovalSettings { UseRoughBoxes = false, NpcHandling = NpcHandling.OnlyWhenStuckInsideTheObject },
@@ -75,6 +80,5 @@ public class LogSequenceTests
             RemoveLeftoverInvisibleObjects = leftovers != Leftovers.Kept,
             MoveKeptMarkersOutOfOtherModsObjects = leftovers == Leftovers.RemovedAndMarkersMoved,
         },
-        Diagnostics = new DiagnosticsSettings { DetailedLog = detailedLog, WriteReportFiles = writeReportFiles },
     };
 }

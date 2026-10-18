@@ -306,8 +306,7 @@ public sealed class ConfigFilesTests : IDisposable
               "TargetPlugin": "A.esp",
               "WhatToIgnore": { "ExcludedPlugins": ["B.esp", "C.esp"], "CompatibilityPatches": null },
               "TooClose": { "NpcHandling": "Never", "ByDistance": { "Use": true, "DistanceInUnits": 40 } },
-              "LeftoverInvisibleObjects": { "AlwaysKeep": { "Lights": true } },
-              "Diagnostics": { "DiagnosticsFolder": "reports" }
+              "LeftoverInvisibleObjects": { "AlwaysKeep": { "Lights": true } }
             }
             """;
         var config = ReadOnlyConfig(Text);
@@ -330,6 +329,14 @@ public sealed class ConfigFilesTests : IDisposable
         var config = ReadOnlyConfig("{\"TargetPlugin\": \"A.esp\", \"Colour\": 1, \"TooClose\": {\"UseRoughBox\": true, \"BySize\": {\"Weight\": 2}}}");
 
         Assert.Equal(["Colour", "TooClose.UseRoughBox", "TooClose.BySize.Weight"], NotesOf(config).UnknownKeys.ToArray());
+    }
+
+    [Fact]
+    public void TheRemovedLogAndReportSettingsAreNotedAsUnknownKeys()
+    {
+        var config = ReadOnlyConfig("{\"TargetPlugin\": \"A.esp\", \"Diagnostics\": {\"DetailedLog\": true, \"WriteReportFiles\": true, \"DiagnosticsFolder\": \"x\"}}");
+
+        Assert.Equal(["Diagnostics"], NotesOf(config).UnknownKeys.ToArray());
     }
 
     [Fact]
@@ -379,16 +386,16 @@ public sealed class ConfigFilesTests : IDisposable
               },
               "WhatToIgnore": { "ExcludedPlugins": ["B.esp"], "IgnoreTargetMasters": true },
               "TerrainChange": { "MinTerrainTypeChangePercent": 20 },
-              "Diagnostics": { "WriteReportFiles": true }
+              "LeftoverInvisibleObjects": { "RemoveLeftoverInvisibleObjects": false }
             }
             """);
 
         var changed = NotesOf(config).ChangedFromDefault;
 
         Assert.Equal(
-            ["TargetPlugin", "WhatToIgnore.ExcludedPlugins", "TooClose.BySize.SizeMultiplier", "TooClose.NpcHandling", "Diagnostics.WriteReportFiles"],
+            ["TargetPlugin", "WhatToIgnore.ExcludedPlugins", "TooClose.BySize.SizeMultiplier", "TooClose.NpcHandling", "LeftoverInvisibleObjects.RemoveLeftoverInvisibleObjects"],
             changed.Select(setting => setting.KeyPath));
-        Assert.Equal(["\"A.esp\"", "[\"B.esp\"]", "1.0", "\"Never\"", "true"], changed.Select(setting => setting.ValueAsWritten));
+        Assert.Equal(["\"A.esp\"", "[\"B.esp\"]", "1.0", "\"Never\"", "false"], changed.Select(setting => setting.ValueAsWritten));
         Assert.Contains(
             new SettingInFile("TooClose.BySize.SizeMultiplier", "Remove objects too close to other mods' objects > Margin by object size > Margin on every side (× object size)", false, "1.0"),
             changed);
@@ -467,7 +474,7 @@ public sealed class ConfigFilesTests : IDisposable
         var target = new PluginName("A.esp");
         var patch = new PluginName("Patch.esp");
         var facts = new LoadOrderPlugins(new KnownPluginNames([target, patch]), patch, [new PluginListing(target, true, []), new PluginListing(patch, true, [])]);
-        return SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), facts, "/out", 1);
+        return SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), facts, detailedLogAndReports: false, "/out", 1);
     }
 
     [Fact]

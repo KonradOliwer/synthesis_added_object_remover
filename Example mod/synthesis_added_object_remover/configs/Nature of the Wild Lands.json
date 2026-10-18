@@ -64,9 +64,5 @@
       "OtherMarkers": false
     },
     "MoveKeptMarkersOutOfOtherModsObjects": true
-  },
-  "Diagnostics": {
-    "DetailedLog": false,
-    "WriteReportFiles": false
   }
 }

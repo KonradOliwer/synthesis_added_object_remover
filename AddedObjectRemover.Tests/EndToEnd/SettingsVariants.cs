@@ -2,7 +2,7 @@ using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover.Tests.EndToEnd;
 
-/// <summary>The settings the end-to-end runs use; every variant writes report files, and all but the normal-log one log in detail.</summary>
+/// <summary>The settings the end-to-end runs use; all but the normal-log variant write the detailed log and the report files.</summary>
 internal static class SettingsVariants
 {
     public const string TouchWithLeftBehindAndMarkerMoves = "touch-leftovers-relocation";
@@ -13,7 +13,13 @@ internal static class SettingsVariants
     public static readonly IReadOnlyList<string> Names =
         [TouchWithLeftBehindAndMarkerMoves, Support, NothingWithBoxZoneAndNpcsAsObjects, TouchWithLeftBehindAndMarkerMovesNormalLog];
 
-    public static StandardSettings Of(string name) => name switch
+    public static Settings Of(string name) => new()
+    {
+        DetailedLogAndReports = name != TouchWithLeftBehindAndMarkerMovesNormalLog,
+        Standard = StandardOf(name),
+    };
+
+    private static StandardSettings StandardOf(string name) => name switch
     {
         TouchWithLeftBehindAndMarkerMoves => Create(
             useRoughBoxes: false, NpcHandling.OnlyWhenStuckInsideTheObject, FollowUpRemovalMode.EverythingTouchingIt,
@@ -29,7 +35,7 @@ internal static class SettingsVariants
         NothingWithBoxZoneAndNpcsAsObjects => Create(
             useRoughBoxes: true, NpcHandling.AlwaysLikeAnyObject, FollowUpRemovalMode.Nothing,
             new LeftoverInvisibleObjectSettings { RemoveLeftoverInvisibleObjects = false }),
-        TouchWithLeftBehindAndMarkerMovesNormalLog => WithNormalLog(Of(TouchWithLeftBehindAndMarkerMoves)),
+        TouchWithLeftBehindAndMarkerMovesNormalLog => StandardOf(TouchWithLeftBehindAndMarkerMoves),
         _ => throw new ArgumentOutOfRangeException(nameof(name), name, "Unknown settings variant."),
     };
 
@@ -45,12 +51,5 @@ internal static class SettingsVariants
         },
         FollowUpRemoval = new FollowUpRemovalSettings { Mode = followUp },
         LeftoverInvisibleObjects = leftovers,
-        Diagnostics = new DiagnosticsSettings { DetailedLog = true, WriteReportFiles = true },
     };
-
-    private static StandardSettings WithNormalLog(StandardSettings settings)
-    {
-        settings.Diagnostics!.DetailedLog = false;
-        return settings;
-    }
 }

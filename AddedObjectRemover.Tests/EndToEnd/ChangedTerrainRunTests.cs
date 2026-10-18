@@ -58,7 +58,7 @@ public class ChangedTerrainRunTests
     public void TheDetailedLogPrintsTheCountsLinkedGroupsAndTheReasonOfEachRemoval()
     {
         var settings = SettingsWithTerrain(on: true);
-        settings.Diagnostics = new DiagnosticsSettings { DetailedLog = true };
+        settings.DetailedLogAndReports = true;
 
         var log = RunLogged(settings);
 
@@ -99,7 +99,7 @@ public class ChangedTerrainRunTests
         Assert.EndsWith(" They were not removed.", error[0]);
     }
 
-    private static RecordingLogSink RunLogged(StandardSettings settings)
+    private static RecordingLogSink RunLogged(Settings settings)
     {
         var log = new RecordingLogSink();
         FixtureRun.Run(settings, Workers, log, DefaultMeshFiles, createLoadOrder: TerrainWorld.Create);
@@ -112,10 +112,13 @@ public class ChangedTerrainRunTests
     private static string[] SectionLines(RecordingLogSink log, string id) =>
         [.. log.Sections.Where(section => section.Id == id).SelectMany(section => section.Lines)];
 
-    private static StandardSettings SettingsWithTerrain(bool on) => new()
+    private static Settings SettingsWithTerrain(bool on) => new()
     {
-        TargetPlugin = ModKey.FromNameAndExtension(FixtureWorld.TargetPlugin),
-        TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = on },
+        Standard = new StandardSettings
+        {
+            TargetPlugin = ModKey.FromNameAndExtension(FixtureWorld.TargetPlugin),
+            TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = on },
+        },
     };
 
     private static Dictionary<string, RemovalReason?> ReasonsByEditorId(RunOutcome outcome) =>

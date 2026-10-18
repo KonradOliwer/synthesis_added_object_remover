@@ -31,7 +31,7 @@ public sealed class BatchOfOneRunTests
         Assert.Equal(standard.Log.Skip(1), batch.Log.Skip(1 + extraLines));
     }
 
-    private static RunOutput Run(StandardSettings settings, bool batch)
+    private static RunOutput Run(Settings settings, bool batch)
     {
         var root = Directory.CreateTempSubdirectory("aor-batch-of-one-");
         try
@@ -40,7 +40,7 @@ public sealed class BatchOfOneRunTests
             var outputFolder = Directory.CreateDirectory(Path.Combine(root.FullName, "Output")).FullName;
             var state = FixturePatcherState.Create(
                 FixtureWorld.Create(dataFolder).LoadOrder, dataFolder, Path.Combine(outputFolder, FixturePatcherState.PatchModKey.FileName));
-            var modeSettings = batch ? BatchSettingsWithConfig(settings, dataFolder) : new Settings { Standard = settings };
+            var modeSettings = batch ? BatchSettingsWithConfig(settings, dataFolder) : settings;
 
             var log = PipelineRun.CaptureConsole(() => Program.RunPatch(state, () => modeSettings, Workers));
 
@@ -54,13 +54,18 @@ public sealed class BatchOfOneRunTests
 
     /// <summary>The config's report subfolder is the one difference in the paths the log shows, so it is taken out of them.</summary>
     private static IReadOnlyList<string> MaskedLog(IReadOnlyList<string> log, string root) =>
-        [.. OutputMasks.MaskLog(log, root).Select(line => line.Replace($"{SettingDefaults.ReportFolder}/{ConfigName}", SettingDefaults.ReportFolder))];
+        [.. OutputMasks.MaskLog(log, root).Select(line => line.Replace($"{Program.ReportsFolderName}/{ConfigName}", Program.ReportsFolderName))];
 
-    private static Settings BatchSettingsWithConfig(StandardSettings settings, string dataFolder)
+    private static Settings BatchSettingsWithConfig(Settings settings, string dataFolder)
     {
         WriteFile(dataFolder, Path.Combine("groups", GroupName + ".json"), $"[\"{ConfigName}\"]");
-        WriteFile(dataFolder, Path.Combine("configs", ConfigName + ".json"), JsonConvert.SerializeObject(settings, ConfigJson()));
-        return new Settings { Mode = PatchMode.Batch, Batch = new BatchSettings { GroupFileName = GroupName } };
+        WriteFile(dataFolder, Path.Combine("configs", ConfigName + ".json"), JsonConvert.SerializeObject(settings.Standard, ConfigJson()));
+        return new Settings
+        {
+            Mode = PatchMode.Batch,
+            DetailedLogAndReports = settings.DetailedLogAndReports,
+            Batch = new BatchSettings { GroupFileName = GroupName },
+        };
     }
 
     private static JsonSerializerSettings ConfigJson()

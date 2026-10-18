@@ -18,6 +18,14 @@ public class Settings : IModeSettingsValues
     public PatchMode Mode { get; set; } = PatchMode.Standard;
 
     [SynthesisOrder]
+    [SynthesisSettingName("Detailed log and reports")]
+    [SynthesisTooltip(
+        "Lists every removed object and why in the log, plus timings and statistics, and saves CSV report files for checking the results.\n"
+        + "The report files go to the \"Reports\" folder in this patcher's own folder in Synthesis; the log shows the full path.\n"
+        + "Applies to Standard and Batch mode. Does not change the patch.")]
+    public bool DetailedLogAndReports { get; set; }
+
+    [SynthesisOrder]
     [SynthesisSettingName("Batch")]
     [SynthesisTooltip("Cleaning up several mods in one run. Not used in Standard mode.")]
     public BatchSettings Batch { get; set; } = new();
@@ -91,18 +99,12 @@ public class StandardSettings : ISettingsValues
         + "another mod's object (a building, a boulder) or when the visible objects around them were removed.")]
     public LeftoverInvisibleObjectSettings LeftoverInvisibleObjects { get; set; } = new();
 
-    [SynthesisOrder]
-    [SynthesisSettingName("Logs and reports")]
-    [SynthesisTooltip("Extra output for checking what was removed and why. Neither setting changes the patch.")]
-    public DiagnosticsSettings Diagnostics { get; set; } = new();
-
     string? ISettingsValues.TargetPlugin => TargetPlugin.IsNull ? null : TargetPlugin.ToString();
     IIgnoreSettingsValues ISettingsValues.WhatToIgnore => WhatToIgnore ?? new IgnoreSettings();
     ITooCloseSettingsValues ISettingsValues.TooClose => TooClose ?? new TooCloseRemovalSettings();
     ITerrainChangeSettingsValues ISettingsValues.TerrainChange => TerrainChange ?? new TerrainChangeSettings();
     IFollowUpSettingsValues ISettingsValues.FollowUpRemoval => FollowUpRemoval ?? new FollowUpRemovalSettings();
     ILeftoverSettingsValues ISettingsValues.LeftoverInvisibleObjects => LeftoverInvisibleObjects ?? new LeftoverInvisibleObjectSettings();
-    IDiagnosticsSettingsValues ISettingsValues.Diagnostics => Diagnostics ?? new DiagnosticsSettings();
 }
 
 public class IgnoreSettings : IIgnoreSettingsValues
@@ -483,24 +485,4 @@ public class KeptInvisibleObjectSettings
         (InvisibleObjectKind.TriggerBoxes, TriggerBoxes),
         (InvisibleObjectKind.Decals, Decals),
     ];
-}
-
-public class DiagnosticsSettings : IDiagnosticsSettingsValues
-{
-    [SynthesisOrder]
-    [SynthesisSettingName("Detailed log (every removed object and why)")]
-    [SynthesisTooltip("Lists every removed object and why, plus timings and statistics.")]
-    public bool DetailedLog { get; set; }
-
-    [SynthesisOrder]
-    [SynthesisSettingName("Write report files (CSV)")]
-    [SynthesisTooltip("Saves CSV files for checking the results.")]
-    public bool WriteReportFiles { get; set; }
-
-    [SynthesisOrder]
-    [SynthesisSettingName("Folder for report files")]
-    [SynthesisTooltip("A full path, or a folder inside this patcher's Synthesis settings folder. Only used when report files are on.")]
-    public string DiagnosticsFolder { get; set; } = SettingDefaults.ReportFolder;
-
-    string? IDiagnosticsSettingsValues.ReportFolder => DiagnosticsFolder;
 }

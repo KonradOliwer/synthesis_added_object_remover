@@ -24,9 +24,12 @@ internal sealed class SupportContactFinder(
     /// <param name="Hits">Per surface sample: whether it is in contact with the supporter.</param>
     internal readonly record struct SupporterHits(Supporter Supporter, bool[] Hits);
 
+    /// <param name="ZeroWeight">Set when the contacts have contact points but no support weight.</param>
+    internal readonly record struct FoundContacts(CandidateContacts Contacts, ZeroWeightDiagnostic? ZeroWeight);
+
     /// <param name="candidate">Index of a target object with a mesh.</param>
     /// <param name="scratch">The calling thread's buffers.</param>
-    public CandidateContacts FindContacts(int candidate, ObjectQueryScratch scratch)
+    public FoundContacts FindContacts(int candidate, ObjectQueryScratch scratch)
     {
         var target = targets[candidate];
         var samples = SampleSurface(candidate);
@@ -37,7 +40,8 @@ internal sealed class SupportContactFinder(
         {
             hits.Add(new SupporterHits(Supporter.Terrain, FindSamplesOnTerrain(samples.Points, target)));
         }
-        return SplitWeightsAmongSupporters(hits, samples.Weights);
+        var contacts = SplitWeightsAmongSupporters(hits, samples.Weights);
+        return new FoundContacts(contacts, ZeroWeightDiagnosis.Of(candidate, meshPaths.Get(candidate), samples, hits, contacts));
     }
 
     private WeightedSurfaceSamples SampleSurface(int candidate)
@@ -70,28 +74,40 @@ internal sealed class SupportContactFinder(
 
     internal static CandidateContacts SplitWeightsAmongSupporters(IReadOnlyList<SupporterHits> hitsBySupporter, float[] weights)
     {
-        var supportersPerPoint = new int[weights.Length];
-        foreach (var (_, hits) in hitsBySupporter)
-        {
-            for (var i = 0; i < weights.Length; i++)
-            {
-                if (hits[i]) supportersPerPoint[i]++;
-            }
-        }
-
+        var supportersPerPoint = CountSupportersPerPoint(hitsBySupporter, weights.Length);
         var bySupporter = new List<SupporterWeight>();
         foreach (var (supporter, hits) in hitsBySupporter)
         {
-            var weight = 0f;
-            for (var i = 0; i < weights.Length; i++)
-            {
-                if (hits[i]) weight += weights[i] / supportersPerPoint[i];
-            }
+            var weight = WeightHeldBy(hits, weights, supportersPerPoint);
             if (weight > 0) bySupporter.Add(new SupporterWeight(supporter, weight));
         }
 
         var contactPoints = supportersPerPoint.Count(count => count > 0);
         var totalWeight = bySupporter.Sum(entry => entry.Weight);
         return new CandidateContacts(contactPoints, totalWeight, bySupporter);
+    }
+
+    internal static int[] CountSupportersPerPoint(IReadOnlyList<SupporterHits> hitsBySupporter, int pointCount)
+    {
+        var supportersPerPoint = new int[pointCount];
+        foreach (var (_, hits) in hitsBySupporter)
+        {
+            for (var i = 0; i < pointCount; i++)
+            {
+                if (hits[i]) supportersPerPoint[i]++;
+            }
+        }
+        return supportersPerPoint;
+    }
+
+    /// <returns>The supporter's weight before supporters without a weight above 0 are left out.</returns>
+    internal static float WeightHeldBy(bool[] hits, float[] weights, int[] supportersPerPoint)
+    {
+        var weight = 0f;
+        for (var i = 0; i < weights.Length; i++)
+        {
+            if (hits[i]) weight += weights[i] / supportersPerPoint[i];
+        }
+        return weight;
     }
 }

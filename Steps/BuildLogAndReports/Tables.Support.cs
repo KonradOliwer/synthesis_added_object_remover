@@ -66,7 +66,7 @@ internal static partial class Tables
             share => $"{DescribeSupporter(share.Supporter, world)} {share.Category} {Number(share.Share)}",
             CellSeparator);
 
-    private static string DescribeSupporter(Supporter supporter, CollectedObjects world) => supporter.Type switch
+    internal static string DescribeSupporter(Supporter supporter, CollectedObjects world) => supporter.Type switch
     {
         SupporterType.Target => world.Targets[supporter.Index].Key.ToString(),
         SupporterType.PlacedObject => world.Other(new OtherId(supporter.Index)).Key.ToString(),

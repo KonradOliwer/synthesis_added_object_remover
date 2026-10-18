@@ -2,6 +2,10 @@
 # Form: Type.Member | reason  (local function: Type.Method.Local). The test fails when an entry stops being flagged.
 MeshOriginSurvey.MeasureTriangleBounds | Measures the bounds of meshes through the triangle cache (a cache's type).
 SupportRule.ReachesThreshold | Threshold rule: does the removed share reach the support threshold.
+SupportContactFinder.CountSupportersPerPoint | Counts per sample how many supporters touch it (the finder's own hit type).
+SupportContactFinder.WeightHeldBy | Sums a supporter's share of the sample weights (the finder's own hit type).
+WeightedSurfaceSamples.MeshSizeOf | Weight formula: the mesh size value from a bounds box (a tool's type).
+ZeroWeightDiagnosis.SumOf | Diagnostic: sums sample weights in double precision.
 TouchChains.CollectCandidatePairs | Pairs candidate targets through this step's own touch search (a logic type).
 WeightedSurfaceSamples.Create | The support rule's sample weighting over a mesh tree (a tool's type).
 WeightedSurfaceSamples.WeightByOriginDistance | Threshold rule: weights a sample by its distance from the object's origin.

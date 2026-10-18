@@ -2,6 +2,8 @@
 # Form: Type.Member | reason  (local function: Type.Method.Local). The test fails when an entry stops being flagged.
 Describe.Cell | Report wording: labels a cell fact (a plugin-facts type outside the domain list).
 Describe.Space | Report wording: labels a space fact (a plugin-facts type outside the domain list).
+LogSections.Corner | Report wording: prints a box corner (a tool's vector type).
+LogSections.Exact | Report wording: prints a number with every digit that matters.
 KeepReasonText.Relation | Report wording: names a link relation.
 LogAndReports.IsAboutMesh | Report filter: tells whether a failure's part key is a mesh reader's per-mesh part (an error-channel record, not a domain type).
 LogAndReports.Present | Report filter: keeps the failures a step result carries and drops the absent ones (an error-channel record, not a domain type).

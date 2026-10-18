@@ -39,7 +39,7 @@ internal static partial class LogSections
             FollowUpRemovalMode.EverythingTouchingIt =>
                 AlsoRemoveSection("touch", world, alsoRemove, decisions, meshes, elapsed, context, () => TouchChainLines(alsoRemove, decisions)),
             FollowUpRemovalMode.OnlyWhatLosesItsSupport =>
-                AlsoRemoveSection("anchoring", world, alsoRemove, decisions, meshes, elapsed, context, () => SupportLines(alsoRemove, decisions)),
+                AlsoRemoveSection("anchoring", world, alsoRemove, decisions, meshes, elapsed, context, () => SupportLines(world, alsoRemove, decisions)),
             _ => throw new UnreachableException($"Unknown follow-up removal mode {alsoRemove.Mode}."),
         };
 
@@ -58,7 +58,7 @@ internal static partial class LogSections
         ];
     }
 
-    private static string[] SupportLines(RestingObjectsResult alsoRemove, IRemovalDecisions decisions)
+    private static string[] SupportLines(CollectedObjects world, RestingObjectsResult alsoRemove, IRemovalDecisions decisions)
     {
         var work = alsoRemove.Work;
         return
@@ -67,6 +67,7 @@ internal static partial class LogSections
             + $"{TextFormat.Count(work.Candidates)} touching objects evaluated ({TextFormat.Count(work.Evaluations)} evaluations), "
             + $"{TextFormat.Count(work.KeptWithoutContacts)} kept without any contact points, {TextFormat.Count(CountKept(alsoRemove, decisions))} kept as referenced.",
             AlsoRemovePairs(work.Pairs, work.Rounds, "iterations"),
+            .. ZeroWeightLines(world, alsoRemove),
         ];
     }
 

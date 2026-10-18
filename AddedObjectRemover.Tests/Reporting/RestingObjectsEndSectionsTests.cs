@@ -191,6 +191,27 @@ public sealed class RestingObjectsEndSectionsTests
     }
 
     [Fact]
+    public void Anchoring_DetailedLogDescribesACandidateWithContactPointsButNoSupportWeight()
+    {
+        var (world, alsoRemove, decisions) = SupportScene();
+        var diagnostic = new ZeroWeightDiagnostic(
+            1, "m.nif", 2, 1.25f, new Box(Vector3.Zero, new Vector3(3, 4, 0)), 3,
+            new SampleWeightCounts(1, 1, 1), double.NaN, 0.5, [new SupporterSamples(Supporter.Terrain, 2, float.NaN)]);
+        var withCase = alsoRemove with { Evidence = [new SupportRoundDetails([], Pairs, [new ZeroWeightCase(5, diagnostic)])] };
+
+        var detailed = LogSections.BuildModeSection(world, withCase, decisions, Elapsed, Meshes, Detailed).Lines.ToList();
+        var normal = LogSections.BuildModeSection(world, withCase, decisions, Elapsed, Meshes, Normal).Lines.ToList();
+
+        var line = Assert.Single(detailed, text => text.StartsWith("  Anchoring found no support weight for ", StringComparison.Ordinal));
+        Assert.Contains("(mesh m.nif, iteration 1, 5 candidates evaluated before it in this run)", line);
+        Assert.EndsWith(
+            "2 contact points; mesh size value 1.25 from bounds (0.0, 0.0, 0.0) to (3.0, 4.0, 0.0); 3 samples: 1 with weight above 0, 1 at 0, 1 not finite; "
+            + "weights add up to NaN (0.5 for the touching samples); supporters: terrain 2 touching samples, raw weight NaN.",
+            line);
+        Assert.DoesNotContain(normal, text => text.Contains("no support weight", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Leftovers_NormalLogShowsKeptAndTheSummaryWithoutTiming()
     {
         var (world, leftBehind) = LeftBehindScene();

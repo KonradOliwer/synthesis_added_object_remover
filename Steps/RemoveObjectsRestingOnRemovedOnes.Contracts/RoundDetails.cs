@@ -11,4 +11,5 @@ public sealed record TouchRoundDetails(ImmutableArray<IndexPair> Reached, PairTe
 
 /// <param name="Evaluations">In target order.</param>
 /// <param name="Work">The pair tests that found the round's candidates.</param>
-public sealed record SupportRoundDetails(ImmutableArray<SupportEvaluation> Evaluations, PairTestStats Work) : RoundDetails;
+/// <param name="ZeroWeights">The candidates whose contacts were found in this round and have contact points but no support weight, in target order.</param>
+public sealed record SupportRoundDetails(ImmutableArray<SupportEvaluation> Evaluations, PairTestStats Work, ImmutableArray<ZeroWeightCase> ZeroWeights) : RoundDetails;

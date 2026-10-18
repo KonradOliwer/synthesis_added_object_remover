@@ -32,17 +32,19 @@ internal sealed class SupportRule(
     /// <summary>Contact points do not depend on what is removed, so each candidate's are found once.</summary>
     private readonly CandidateContacts?[] _contacts = new CandidateContacts?[targetCount];
 
+    private int _contactsFound;
+
     internal static bool ReachesThreshold(float removedShare, float threshold) =>
         Tolerant.AtLeast(removedShare, threshold, ShareRoundingTolerance);
 
     public RoundProposals<RoundDetails> Next(IRemovalDecisions decisions, ImmutableArray<TargetId> removedLastRound)
     {
         var (candidates, work) = FindCandidatesInContactWith(decisions, removedLastRound);
-        FindMissingContacts(candidates);
+        var zeroWeights = FindMissingContacts(candidates);
         var evaluations = candidates.Select(candidate => Evaluate(decisions, candidate)).ToImmutableArray();
         return new RoundProposals<RoundDetails>(
             [.. evaluations.Where(evaluation => evaluation.Proposed).Select(ToProposal)],
-            new SupportRoundDetails(evaluations, work));
+            new SupportRoundDetails(evaluations, work, zeroWeights));
     }
 
     /// <returns>Sorted undecided objects in contact with an object the previous round removed, and the pair tests that found them.</returns>
@@ -52,7 +54,8 @@ internal sealed class SupportRule(
         return (inContact.Select(pair => pair.Second).Distinct().Order().ToList(), work);
     }
 
-    private void FindMissingContacts(List<int> candidates)
+    /// <returns>The candidates found now whose contacts have contact points but no support weight, in target order.</returns>
+    private ImmutableArray<ZeroWeightCase> FindMissingContacts(List<int> candidates)
     {
         var missing = candidates.Where(candidate => _contacts[candidate] == null).ToList();
         var found = ParallelMap.Run(
@@ -61,7 +64,16 @@ internal sealed class SupportRule(
             () => new ObjectQueryScratch(),
             (k, scratch) => contactFinder.FindContacts(missing[k], scratch),
             ParallelMap.AutomaticRangeSize);
-        for (var k = 0; k < missing.Count; k++) _contacts[missing[k]] = found[k];
+        for (var k = 0; k < missing.Count; k++) _contacts[missing[k]] = found[k].Contacts;
+
+        var evaluatedBefore = _contactsFound;
+        _contactsFound += missing.Count;
+        return
+        [
+            .. Enumerable.Range(0, missing.Count)
+                .Where(k => found[k].ZeroWeight is not null)
+                .Select(k => new ZeroWeightCase(evaluatedBefore + k, found[k].ZeroWeight!)),
+        ];
     }
 
     /// <remarks>A candidate without contact points has no shares, so it is never proposed.</remarks>

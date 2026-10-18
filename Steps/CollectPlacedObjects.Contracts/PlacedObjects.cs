@@ -11,6 +11,7 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 /// <param name="HasLocationRefType">The reference itself has at least one location ref type (XLRT).</param>
 /// <param name="ReferenceRadius">The reference's own radius (XRDS) as the record stores it; null when it has none.</param>
 /// <param name="PrimitiveBounds">The reference's primitive box, full sizes as the record exposes them; null when it is not a primitive.</param>
+/// <param name="Area">Where it is below its space, named from the winning cells.</param>
 public sealed record TargetObject(
     TargetId Id,
     RecordKey Key,
@@ -27,7 +28,8 @@ public sealed record TargetObject(
     ScriptNamedRecord? NamedByScript,
     bool HasLocationRefType,
     float? ReferenceRadius,
-    Vector3? PrimitiveBounds);
+    Vector3? PrimitiveBounds,
+    TargetArea Area);
 
 /// <summary>Compact snapshot of another mod's placed object (winning version).</summary>
 /// <param name="HasMapMarker">The placed reference itself carries map marker data (XMRK), e.g. a fast-travel marker.</param>

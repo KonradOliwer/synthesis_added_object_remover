@@ -446,7 +446,8 @@ public sealed class RestingObjectsEndSectionsTests
             Table(ReportFileNames.SupportFileName, 4),
             Table(ReportFileNames.MeshOriginsFileName, 2),
             Table(ReportFileNames.LeftBehindFileName, 6),
-            Table(ReportFileNames.HintsFileName, 3));
+            Table(ReportFileNames.HintsFileName, 3),
+            Table(ReportFileNames.RemovalsFileName, 9));
 
         var detailed = LogSections.BuildWrittenSection(Performed(tables), WithMeshOrigins(), Detailed).Lines.ToList();
         Assert.Equal(
@@ -456,6 +457,7 @@ public sealed class RestingObjectsEndSectionsTests
                 "Mesh origins: 2 target meshes, 1 origin near bottom, 0 origin near centre, 1 other.",
                 $"  Wrote 2 mesh origins to {PathOf(ReportFileNames.MeshOriginsFileName)}.",
                 $"Leftover invisible objects diagnostics: wrote 6 evaluations to {PathOf(ReportFileNames.LeftBehindFileName)}.",
+                $"Removals: wrote 9 rows to {PathOf(ReportFileNames.RemovalsFileName)}.",
                 $"Manual patch hints: wrote 3 rows to {PathOf(ReportFileNames.HintsFileName)}.",
             ],
             detailed);
@@ -626,7 +628,7 @@ public sealed class RestingObjectsEndSectionsTests
             [],
             false,
             [],
-            new Dictionary<RecordKey, SpaceFact> { [TestTargets.Space] = new(TestTargets.Space, "Tamriel", SpaceKind.Worldspace) },
+            new Dictionary<RecordKey, SpaceFact> { [TestTargets.Space] = new(TestTargets.Space, "Tamriel", SpaceKind.Worldspace, "Skyrim") },
             new ReadCounts(0, 0, 0, 0, 0, 0, 0, 0),
             [],
             TargetWorkOrder.Of(targets),

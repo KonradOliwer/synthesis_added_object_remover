@@ -142,6 +142,26 @@ public sealed class TablesTests : IDisposable
     }
 
     [Fact]
+    public void RemovalsTable_IsOrderedByWorldspaceHoldPlaceThenKeyAndMatchesTheExpectedOutput()
+    {
+        var targets = CreateTargets();
+        targets[0] = targets[0] with { Area = new TargetArea("The Pale", "Loreius Farm", PlaceSource.OwnLocation, new CellGridPoint(7, 6)) };
+        targets[1] = targets[1] with { Area = new TargetArea("The Pale", "Dawnstar", PlaceSource.NearbyLocation, new CellGridPoint(8, -6)) };
+        targets[2] = targets[2] with { Area = new TargetArea(null, null, PlaceSource.GridOnly, new CellGridPoint(0, 0)) };
+        targets[4] = targets[4] with { Area = new TargetArea("The Pale", "Loreius Farm", PlaceSource.OwnLocation, new CellGridPoint(7, 6)) };
+        var world = CreateWorld(targets, out var otherModObject);
+        RemovedObject[] removals =
+        [
+            new TooCloseRemoval(4, otherModObject, new TooCloseCause.ObjectSize()),
+            new TouchingRemoval(2, 4),
+            new LinkedRemoval(1, 4),
+            new TooCloseRemoval(0, otherModObject, new TooCloseCause.ObjectSize()),
+        ];
+
+        AssertMatchesExpectedOutput("tables-removals", ReportFileNames.RemovalsFileName, [Tables.BuildRemovalsTable(world, removals, Context)]);
+    }
+
+    [Fact]
     public void Build_TouchExplanationsGiveEdgesComponentsAndHints()
     {
         var scene = TouchScene();
@@ -150,13 +170,14 @@ public sealed class TablesTests : IDisposable
         var tables = Tables.BuildTables(WithDetails(scene.Outcome, TouchDetails(scene)), settings, Context);
 
         Assert.Equal(
-            [ReportFileNames.EdgesFileName, ReportFileNames.ComponentsFileName, ReportFileNames.HintsFileName], tables.Select(table => table.FileName));
+            [ReportFileNames.EdgesFileName, ReportFileNames.ComponentsFileName, ReportFileNames.RemovalsFileName, ReportFileNames.HintsFileName],
+            tables.Select(table => table.FileName));
     }
 
     [Theory]
     [InlineData(StepOutcome.SwitchedOff)]
     [InlineData(StepOutcome.StoppedByUnexpectedError)]
-    public void Build_WithoutPerformedDetailsLeftBehindOrSupportRoundsGivesOnlyHints(StepOutcome detailsOutcome)
+    public void Build_WithoutPerformedDetailsLeftBehindOrSupportRoundsGivesOnlyRemovalsAndHints(StepOutcome detailsOutcome)
     {
         var scene = TouchScene();
         var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouchingIt, TouchDistance, Threshold, TouchChainsShown: true);
@@ -164,7 +185,7 @@ public sealed class TablesTests : IDisposable
 
         var tables = Tables.BuildTables(WithDetails(scene.Outcome, details), settings, Context);
 
-        Assert.Equal([ReportFileNames.HintsFileName], tables.Select(table => table.FileName));
+        Assert.Equal([ReportFileNames.RemovalsFileName, ReportFileNames.HintsFileName], tables.Select(table => table.FileName));
     }
 
     [Fact]
@@ -244,7 +265,7 @@ public sealed class TablesTests : IDisposable
         var tables = Tables.BuildTables(WithDetails(outcome, origins), settings, Context);
 
         Assert.Equal(
-            [ReportFileNames.SupportFileName, ReportFileNames.MeshOriginsFileName, ReportFileNames.LeftBehindFileName, ReportFileNames.HintsFileName],
+            [ReportFileNames.SupportFileName, ReportFileNames.MeshOriginsFileName, ReportFileNames.LeftBehindFileName, ReportFileNames.RemovalsFileName, ReportFileNames.HintsFileName],
             tables.Select(table => table.FileName));
     }
 
@@ -308,7 +329,7 @@ public sealed class TablesTests : IDisposable
             [],
             false,
             [],
-            new Dictionary<RecordKey, SpaceFact> { [TestTargets.Space] = new(TestTargets.Space, "Tamriel, Test", SpaceKind.Worldspace) },
+            new Dictionary<RecordKey, SpaceFact> { [TestTargets.Space] = new(TestTargets.Space, "Tamriel, Test", SpaceKind.Worldspace, "Skyrim, Test") },
             new ReadCounts(0, 0, 0, 0, 0, 0, 0, 0),
             [],
             TargetWorkOrder.Of(targets),

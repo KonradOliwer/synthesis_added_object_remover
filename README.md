@@ -292,6 +292,22 @@ Before that section, the log warns about removed objects that can still affect t
 - each removed unique NPC that a quest fills an alias with (as its *Unique Actor*), when that alias is neither *Optional* nor *Allow Disabled*: that quest role may not fill, or the quest may not start;
 - the number of removed objects in their worldspace's large-reference list: distant LOD may flicker, or full models may not load, in those cells until LOD is generated again (for example with DynDOLOD).
 
+The last section of the log says where these objects are: the removed objects, the kept ones, the ones to check for a manual patch, removed unique NPCs and removed large references, each only when there are any. Each is counted at three levels:
+- **worldspace**: the worldspace (for example *Skyrim*), or for an object in an interior, the interior's name;
+- **hold**: the hold-level location the object's cell belongs to (for example *The Pale*);
+- **place**: the most specific name: the cell's location (*Loreius Farm*), else the cell's own name, else *near* the location of the nearest named cell within 3 cells (*near Loreius Farm*), else the cell grid (*cell 7,6*).
+
+Names are what the game shows (the location or cell name), or their editor ID when they have none. A cell without a location takes the hold of the nearest cell within 3 cells that has one; when there is none, the hold is *unnamed area*. Objects in a worldspace's persistent cell are counted in the grid cell they stand in. The normal log names the 5 areas with the most objects at each level and sums up the rest:
+
+```
+Removed 1284 objects in:
+  worldspaces: 1223 Skyrim, 61 Solstheim.
+  holds: 402 The Pale (Skyrim), 311 Whiterun (Skyrim), 188 Falkreath (Skyrim), 97 The Rift (Skyrim), 61 Solstheim; 225 more in 6 other holds.
+  places: 41 Loreius Farm (Skyrim), 30 Dawnstar (Skyrim), 25 near Halted Stream Camp (Skyrim), 18 Whiterun (Skyrim), 12 cell 7,6 (Skyrim); 1158 more in 210 other places.
+```
+
+The detailed log lists every area, one per line, and for each hold also how many of the mod's objects are there (*removed / target objects there*). Each removed object's line there also names its place, hold and grid cell.
+
 If something goes wrong that the patcher did not expect, the log shows a line starting with "Unexpected error" that names the part that failed, the error, and what is missing from the results because of it. The run carries on and the patch is still written. When it happens for single objects (a target object that is too close or on changed terrain, an other-mod object that can cause removals, or a target object that might have to be kept), only that object is skipped: a target object whose check failed is kept and not removed, and an other-mod object that failed causes no removals. Objects with the same error are grouped into one line with their number and a few examples; turn on the detailed log to list all of them. The run stops only if the load order can't be read, the target plugin is unusable, or the patch can't be written.
 
 When such an error stops a whole part of the run (*Also remove what rests on removed objects*, *Invisible objects left behind*, moving kept markers, the report files, or the details in them), the log says so with a line like "Also remove: not performed because of an unexpected error.", and the rest of the run still goes on.
@@ -302,6 +318,7 @@ With *Detailed log and reports* on, CSV files (UTF-8, comma-separated, header in
 - **`mesh-origins.csv`**: how each target mesh's origin sits (near the bottom, near the centre, or elsewhere); check it if `OnlyWhatLosesItsSupport` removes or keeps unexpected objects. Same conditions as `anchoring.csv`.
 - **`edges.csv`** and **`components.csv`**: which objects were found touching and which chains were removed together. Only with *When an object is removed, also remove* `EverythingTouchingIt` and something removed for being too close or on changed terrain.
 - **`leftover-invisible-objects.csv`**: why each invisible object checked was removed or kept, and where it was moved. Only with *Remove invisible objects left inside other mods' objects or alone* on.
+- **`removals.csv`**: every removed object with where it is, always written. Columns: formKey, editorId, base, reason, worldspace, hold, place, cellFormKey, cellEditorId, gridX, gridY, x, y, z. Sorted by worldspace, hold and place, then by form key.
 - **`manual-patch-hints.csv`**: the rows of the *Possible manual patch needed* section, always written. Columns: hint, formKey, editorId, space, cell, detail.
 
 ## Known limitations

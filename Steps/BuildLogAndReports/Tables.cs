@@ -24,6 +24,7 @@ internal static partial class Tables
             tables.Add(BuildSupportTable(outcome.Collected, SupportEvaluationRows.Join(restingObjects, outcome.Final), alsoRemove.SupportLostFraction, context));
         if (ExplanationEvidence.HasMeshOrigins(restingObjects)) tables.Add(BuildMeshOriginsTable(ExplanationEvidence.MeshOrigins(restingObjects)));
         if (outcome.LeftBehind.Outcome != StepOutcome.SwitchedOff) tables.Add(BuildLeftBehindTable(outcome.Collected, outcome.LeftBehind.Evaluations, outcome.MarkerMoves, context));
+        tables.Add(BuildRemovalsTable(outcome.Collected, outcome.Removals, context));
         tables.Add(BuildHintsTable(outcome.Collected, outcome.Hints));
         return tables.ToImmutable();
     }

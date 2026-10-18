@@ -2,6 +2,9 @@
 # Form: Type.Member | reason  (local function: Type.Method.Local). The test fails when an entry stops being flagged.
 Describe.Cell | Report wording: labels a cell fact (a plugin-facts type outside the domain list).
 Describe.Space | Report wording: labels a space fact (a plugin-facts type outside the domain list).
+AreaText.Worldspace | Report wording: names a space fact by its display name (a plugin-facts type outside the domain list).
+AreaText.WithWorldspace | Report wording: adds a space fact's name to a hold or place (a plugin-facts type outside the domain list).
+AreaText.Grid | Report wording: prints a cell grid point (a plugin-facts type outside the domain list).
 LogSections.Corner | Report wording: prints a box corner (a tool's vector type).
 LogSections.Exact | Report wording: prints a number with every digit that matters.
 KeepReasonText.Relation | Report wording: names a link relation.
@@ -13,6 +16,7 @@ LogSections.AlsoRemovePairs | Report wording: prints mesh-pair statistics (a too
 LogSections.BuildNotPerformedLine | Report wording: the one line of a step or report files that an unexpected error stopped; it takes only the section's name.
 LogSections.BuildNotPerformedBecauseEarlierLine | Report wording: the one line of a step that an earlier section's step not being performed stopped; it takes only the two section names.
 LogSections.DescribeAlreadyRemoved | Report wording: the "of them already removed on changed terrain" part of the too-close line; it takes only the count.
+LogSections.AddRowsLine | Report wording: the "wrote N rows" line of a written report file (a CSV tool's table record, not a domain type).
 LogSections.OnOff | Report wording: prints a setting's switch as on or off.
 LogSections.OnWith | Report wording: prints a setting's switch as off, or as on with the detail that matters when it is on.
 LogSections.JoinOrNone | Report wording: joins names or prints "(none)".

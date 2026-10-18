@@ -67,6 +67,19 @@ Possible manual patch needed: 3 objects to check.
   Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept, referenced by a non-placed record: T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm], cell AorExterior [000802:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
+## areas
+Removed 21 objects in:
+  worldspaces: 20 AorInterior, 1 AorWorld.
+  holds: 20 unnamed area (AorInterior), 1 unnamed area (AorWorld).
+  places: 20 AorInterior, 1 AorExterior (AorWorld).
+Kept 4 objects that would have been removed, in:
+  worldspaces: 3 AorInterior, 1 AorWorld.
+  holds: 3 unnamed area (AorInterior), 1 unnamed area (AorWorld).
+  places: 3 AorInterior, 1 AorExterior (AorWorld).
+Possible manual patch needed for 3 objects, in:
+  worldspaces: 2 AorInterior, 1 AorWorld.
+  holds: 2 unnamed area (AorInterior), 1 unnamed area (AorWorld).
+  places: 2 AorInterior, 1 AorExterior (AorWorld).
 ## written
 ## reportFileWarnings
 ## unexpectedErrors

@@ -42,7 +42,11 @@ internal static class TestTargets
             NamedByScript: null,
             HasLocationRefType: false,
             ReferenceRadius: null,
-            PrimitiveBounds: null);
+            PrimitiveBounds: null,
+            UnnamedArea);
+
+    /// <summary>The area of a target object whose space and cell have no names, such as an interior cell without a name.</summary>
+    public static readonly TargetArea UnnamedArea = new(Hold: null, Place: null, PlaceSource.CellName, Grid: null);
 
     public static List<TargetObject> CreateMany(int count) =>
         Enumerable.Range(0, count).Select(index => Create(index, At(Vector3.Zero))).ToList();

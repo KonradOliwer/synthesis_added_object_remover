@@ -8,7 +8,7 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 internal static partial class LogSections
 {
     /// <summary>
-    /// Where the report files went, in the order touch, support, mesh origins, leftovers, hints. The mesh-origin summary
+    /// Where the report files went, in the order touch, support, mesh origins, leftovers, removals, hints. The mesh-origin summary
     /// comes from the explanations, so it shows even when its file could not be written. Only written files have lines;
     /// when writing the files was stopped, the not-performed line comes first.
     /// </summary>
@@ -36,11 +36,15 @@ internal static partial class LogSections
         {
             lines.Add($"Leftover invisible objects diagnostics: wrote {TextFormat.Count(leftovers.Rows)} evaluations to {leftovers.Path}.");
         }
-        if (WrittenTables.Find(tables, ReportFileNames.HintsFileName) is { } hints)
-        {
-            lines.Add($"Manual patch hints: wrote {TextFormat.Count(hints.Rows)} rows to {hints.Path}.");
-        }
+        AddRowsLine(lines, tables, ReportFileNames.RemovalsFileName, "Removals");
+        AddRowsLine(lines, tables, ReportFileNames.HintsFileName, "Manual patch hints");
         return new LogSection("written", [.. lines]);
+    }
+
+    /// <summary>E.g. "Removals: wrote 3 rows to …", when the file was written.</summary>
+    private static void AddRowsLine(List<string> lines, ImmutableArray<WrittenTable> tables, string fileName, string title)
+    {
+        if (WrittenTables.Find(tables, fileName) is { } table) lines.Add($"{title}: wrote {TextFormat.Count(table.Rows)} rows to {table.Path}.");
     }
 
     /// <remarks>The edges and components files share one line; it needs both, because a failed file has its own warning.</remarks>

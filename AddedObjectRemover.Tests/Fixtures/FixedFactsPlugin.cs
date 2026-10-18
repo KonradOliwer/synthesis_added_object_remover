@@ -11,7 +11,13 @@ internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records,
     }
 
     public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope) =>
-        new(records, records.Length, new HashSet<RecordKey>(), links, NavmeshCount: 0);
+        new(records, records.Length, new HashSet<RecordKey>(), links, NavmeshCount: 0, UnnamedCellsOf(records));
+
+    /// <summary>Each cell of the records once, without grid, name or Location.</summary>
+    private static Dictionary<RecordKey, CellAreaFact> UnnamedCellsOf(ImmutableArray<PlacedRecordFact> records) =>
+        records
+            .DistinctBy(record => record.Cell.Key)
+            .ToDictionary(record => record.Cell.Key, record => new CellAreaFact(record.Space.Key, Grid: null, Name: null, Location: null));
 
     public ImmutableArray<LinkFact> ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets) => [];
 

@@ -10,7 +10,7 @@ internal static class TestPlacedRecords
             key,
             EditorId: null,
             winningMod,
-            new SpaceFact(TestTargets.Space, null, SpaceKind.Worldspace),
+            new SpaceFact(TestTargets.Space, null, SpaceKind.Worldspace, Name: null),
             new CellFact(TestTargets.Space, null),
             InTargetSpace: true,
             new PlacementFacts(InitiallyDisabled: false, HasEnableParent: false, position, Vector3.Zero),

@@ -56,6 +56,9 @@ public class CopiedCodeTests
             Report + "Tables.Support.cs:Tables.MaxListedSupporters", Report + "Tables.Support.cs:Tables.SupportHeader",
             Report + "Tables.Touch.cs:Tables.ComponentHeader", Report + "Tables.Touch.cs:Tables.EdgeHeader", Report + "Tables.Touch.cs:Tables.MaxTopBases"])] = TableDeclarations + " " + CsvColumnNames,
         [CopyFamily.KeyOf([
+            Report + "Tables.Removals.cs:Tables.BuildRemovalsTable", Report + "Tables.Removals.cs:Tables.RemovalsHeader",
+            Report + "Tables.Support.cs:Tables.BuildSupportTable", Report + "Tables.Support.cs:Tables.SupportHeader"])] = CsvColumnNames,
+        [CopyFamily.KeyOf([
             "Steps/FindTargetObjectsToKeep/ObjectsToKeep.cs:ObjectsToKeep.FindOwnReason",
             "Steps/SelectObjectsThatCanCauseRemovals/RemovalCauseSelector.cs:RemovalCauseSelector.MeasureCountingFailuresAsInvisible"])] = ErrorBoundary,
         [CopyFamily.KeyOf([

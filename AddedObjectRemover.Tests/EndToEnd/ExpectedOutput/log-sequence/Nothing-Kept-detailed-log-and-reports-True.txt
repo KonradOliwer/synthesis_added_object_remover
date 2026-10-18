@@ -57,23 +57,23 @@ Wrote 17 overrides (17 removed, 0 moved) in <time>.
 ## archiveWarnings
 ## unexpectedErrors
 ## removals
-  Removed T_TooClose [000807:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_TooClose_Pad [000805:Rival.esp]
-  Removed T_BoundsOnly [000809:Target.esp] (base T_BoundsOnlyBase [000802:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_BoundsOnly_Pad [000807:Rival.esp]
-  Removed T_NpcStuck [00080B:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_NpcStuck [000809:Rival.esp]
-  Removed T_LinkedNear [00080D:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_LinkedNear_Pad [00080B:Rival.esp]
-  Removed T_TouchSeed [000813:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_TouchSeed_Pad [000810:Rival.esp]
-  Removed T_SupportSeed [000817:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_SupportSeed_Pad [000812:Rival.esp]
-  Removed T_SupportSeedPartial [000819:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_SupportSeedPartial_Pad [000813:Rival.esp]
-  Removed T_LightRing0 [00081E:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_LightRing0_Pad [000815:Rival.esp]
-  Removed T_LightRing1 [00081F:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_LightRing1_Pad [000816:Rival.esp]
-  Removed T_LightRing2 [000820:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_LightRing2_Pad [000817:Rival.esp]
-  Removed T_LightRing3 [000821:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_LightRing3_Pad [000818:Rival.esp]
-  Removed T_SoundRing0 [000824:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_SoundRing0_Pad [000819:Rival.esp]
-  Removed T_SoundRing1 [000825:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_SoundRing1_Pad [00081A:Rival.esp]
-  Removed T_SoundRing2 [000826:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_SoundRing2_Pad [00081B:Rival.esp]
-  Removed T_SoundRing3 [000827:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; too close to R_SoundRing3_Pad [00081C:Rival.esp]
-  Removed T_ExteriorCrate [00082A:Target.esp] (base T_CrateBase [000800:Target.esp]) in worldspace AorWorld [000801:Skyrim.esm], cell AorExterior [000802:Skyrim.esm]; too close to R_ExteriorCrate_Pad [00081E:Rival.esp]
-  Removed T_LinkedFar [00080E:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm]; linked to removed T_LinkedNear [00080D:Target.esp]
+  Removed T_TooClose [000807:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_TooClose_Pad [000805:Rival.esp]
+  Removed T_BoundsOnly [000809:Target.esp] (base T_BoundsOnlyBase [000802:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_BoundsOnly_Pad [000807:Rival.esp]
+  Removed T_NpcStuck [00080B:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_NpcStuck [000809:Rival.esp]
+  Removed T_LinkedNear [00080D:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_LinkedNear_Pad [00080B:Rival.esp]
+  Removed T_TouchSeed [000813:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_TouchSeed_Pad [000810:Rival.esp]
+  Removed T_SupportSeed [000817:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_SupportSeed_Pad [000812:Rival.esp]
+  Removed T_SupportSeedPartial [000819:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_SupportSeedPartial_Pad [000813:Rival.esp]
+  Removed T_LightRing0 [00081E:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_LightRing0_Pad [000815:Rival.esp]
+  Removed T_LightRing1 [00081F:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_LightRing1_Pad [000816:Rival.esp]
+  Removed T_LightRing2 [000820:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_LightRing2_Pad [000817:Rival.esp]
+  Removed T_LightRing3 [000821:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_LightRing3_Pad [000818:Rival.esp]
+  Removed T_SoundRing0 [000824:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_SoundRing0_Pad [000819:Rival.esp]
+  Removed T_SoundRing1 [000825:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_SoundRing1_Pad [00081A:Rival.esp]
+  Removed T_SoundRing2 [000826:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_SoundRing2_Pad [00081B:Rival.esp]
+  Removed T_SoundRing3 [000827:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_SoundRing3_Pad [00081C:Rival.esp]
+  Removed T_ExteriorCrate [00082A:Target.esp] (base T_CrateBase [000800:Target.esp]) in worldspace AorWorld [000801:Skyrim.esm], cell AorExterior [000802:Skyrim.esm], place AorExterior, hold unnamed area, grid 0,0; too close to R_ExteriorCrate_Pad [00081E:Rival.esp]
+  Removed T_LinkedFar [00080E:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; linked to removed T_LinkedNear [00080D:Target.esp]
 ## bounds
 Bounds: 6 bases from NIF, 0 NIF misses, 4 from OBND, 0 without bounds. Meshes: 4 read, 0 effect-only, 0 failed (4 loose, 0 from 0 archives), 0 with a footer root other than their first node.
 ## spaces
@@ -93,7 +93,33 @@ Kept 3 objects that would have been removed, because other records depend on the
 Possible manual patch needed: 2 objects to check.
   Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
+## areas
+Removed 17 objects in:
+  worldspaces:
+    16 AorInterior
+    1 AorWorld
+  holds (removed / target objects there):
+    16 / 38 unnamed area (AorInterior)
+    1 / 2 unnamed area (AorWorld)
+  places:
+    16 AorInterior
+    1 AorExterior (AorWorld)
+Kept 3 objects that would have been removed, in:
+  worldspaces:
+    3 AorInterior
+  holds:
+    3 unnamed area (AorInterior)
+  places:
+    3 AorInterior
+Possible manual patch needed for 2 objects, in:
+  worldspaces:
+    2 AorInterior
+  holds:
+    2 unnamed area (AorInterior)
+  places:
+    2 AorInterior
 ## written
+Removals: wrote 17 rows to <root>/Reports/removals.csv.
 Manual patch hints: wrote 2 rows to <root>/Reports/manual-patch-hints.csv.
 ## reportFileWarnings
 ## unexpectedErrors

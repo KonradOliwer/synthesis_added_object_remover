@@ -19,7 +19,7 @@ internal static partial class LogSections
     {
         var target = world.Targets[removal.TargetIndex];
         return $"  Removed {RecordNames.Describe(target)} (base {RecordNames.DescribeBase(context.Bases, target.Base)}) "
-            + $"in {Describe.Location(world, target)}; {Describe.RemovalReason(world, removal)}";
+            + $"in {Describe.Location(world, target)}, {AreaText.Detail(target.Area, world.Spaces[target.SpaceKey])}; {Describe.RemovalReason(world, removal)}";
     }
 
     /// <param name="withoutPlacement">Target-plugin objects not checked because they are initially disabled or have no valid position.</param>

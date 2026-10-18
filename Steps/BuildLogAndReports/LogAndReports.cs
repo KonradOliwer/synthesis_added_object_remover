@@ -291,7 +291,7 @@ public sealed class LogAndReports
         return new RunOutcome(decided, removals, hints, written, _caches.CountBounds());
     }
 
-    /// <summary>What was removed and kept, the removals that can still affect the game, and what may need a manual patch.</summary>
+    /// <summary>What was removed and kept, the removals that can still affect the game, what may need a manual patch, and where all of these are.</summary>
     /// <remarks>Like the report-folder warning, the removal warnings print only when there is one.</remarks>
     private ImmutableArray<LogSection> BuildClosingSections(RunOutcome outcome)
     {
@@ -314,6 +314,7 @@ public sealed class LogAndReports
             .. markersByType.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [markersByType],
             .. warnings.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [warnings],
             LogSections.BuildHintsSection(world, outcome.Hints),
+            LogSections.BuildAreasSection(world, removals, kept, outcome.Hints, outcome.RemovalRisks, _context),
         ];
     }
 }

@@ -50,9 +50,11 @@ public sealed record PlacedRecordFact(
 /// Every link from a placed record into the target plugin, in the order found, read from the same walk as the records;
 /// links from other records come from <see cref="IPluginRecords.ReadLinks"/>.
 /// </param>
+/// <param name="CellAreas">The winning cell records of the target spaces, by cell key.</param>
 public sealed record PlacedRecordFacts(
     ImmutableArray<PlacedRecordFact> Records,
     int RecordsScanned,
     IReadOnlySet<RecordKey> OverriddenRecords,
     ImmutableArray<LinkFact> Links,
-    int NavmeshCount);
+    int NavmeshCount,
+    IReadOnlyDictionary<RecordKey, CellAreaFact> CellAreas);

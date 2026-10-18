@@ -37,6 +37,9 @@ internal sealed class PlacedRecordReader
     private readonly HashSet<RecordKey> _seenRecords = new();
     private readonly HashSet<RecordKey> _seenNavmeshes = new();
     private readonly Dictionary<RecordKey, IModContext<ISkyrimMod, ISkyrimModGetter, ICell, ICellGetter>> _winningCells = new();
+    private readonly Dictionary<RecordKey, SpaceFact> _spaces = new();
+    private readonly LocationNameReader _locationNames;
+    private readonly Dictionary<RecordKey, CellAreaFact> _cellAreas = new();
 
     private readonly List<PlacedRecordFact> _records = [];
     private readonly Dictionary<RecordKey, PlacedRecordHandle> _handles = new();
@@ -60,6 +63,7 @@ internal sealed class PlacedRecordReader
         _patch = patch;
         _names = names;
         _scope = scope;
+        _locationNames = new LocationNameReader(linkCache);
         _footprint = AnalyzeTargetPlugin();
         if (scope.Terrain || scope.TerrainVersions) FindLandWorldspaces();
         _landWorldspaces = _landWorldspaceOf.Values.ToHashSet();
@@ -138,7 +142,7 @@ internal sealed class PlacedRecordReader
                 if (recordKey.Plugin == _scope.Target) hasTargetRecord = true;
                 else footprint.OverriddenRecords.Add(recordKey);
             }
-            if (hasTargetRecord) footprint.SpaceKeys.Add(GetCellSpace(cellContext).Key);
+            if (hasTargetRecord) footprint.SpaceKeys.Add(GetCellSpaceKey(cellContext));
         }
         return footprint;
     }
@@ -152,7 +156,7 @@ internal sealed class PlacedRecordReader
         var space = GetCellSpace(cellContext);
         var cellFact = new CellFact(_names.KeyOf(cell.FormKey), cell.EditorID);
         var inTargetSpace = _footprint.SpaceKeys.Contains(space.Key);
-        if (inTargetSpace) _winningCells.TryAdd(cellFact.Key, cellContext);
+        if (inTargetSpace && _winningCells.TryAdd(cellFact.Key, cellContext)) _cellAreas.Add(cellFact.Key, ReadCellArea(cell, space));
         if (_landWorldspaces.Contains(space.Key)) CollectLandscape(cell, cellFact.Key, space, winningMod);
         if (_scope.Navmeshes && inTargetSpace) CollectNavmeshes(cell, cellFact.Key, space);
 
@@ -160,6 +164,14 @@ internal sealed class PlacedRecordReader
         {
             ScanRecord(record, persistent, new ScannedCell(space, cellFact, inTargetSpace, winningMod, collectReferences));
         }
+    }
+
+    private CellAreaFact ReadCellArea(ICellGetter cell, SpaceFact space)
+    {
+        var interior = space.Kind == SpaceKind.Interior;
+        CellGridPoint? grid = !interior && cell.Grid is { } cellGrid ? new CellGridPoint(cellGrid.Point.X, cellGrid.Point.Y) : null;
+        var location = _locationNames.Read(cell, interior ? null : space.Key.ToFormKey());
+        return new CellAreaFact(space.Key, grid, RecordDisplayNames.Of(cell.Name, cell.EditorID), location);
     }
 
     /// <remarks>
@@ -234,7 +246,8 @@ internal sealed class PlacedRecordReader
             _recordsScanned,
             _footprint.OverriddenRecords,
             [.. _links],
-            _navmeshes.Values.Sum(navmeshes => navmeshes.Count));
+            _navmeshes.Values.Sum(navmeshes => navmeshes.Count),
+            _cellAreas);
         return new ScannedRecords(facts, new RecordHandles(_handles), terrain, new NavmeshRecords(_navmeshes));
     }
 
@@ -245,15 +258,36 @@ internal sealed class PlacedRecordReader
     /// Comparison space of a cell: its worldspace for exterior cells (including the worldspace's
     /// persistent TopCell, whose context parent is the worldspace), otherwise the interior cell itself.
     /// </summary>
+    private RecordKey GetCellSpaceKey(IModContext<ISkyrimMod, ISkyrimModGetter, ICell, ICellGetter> cellContext) =>
+        _names.KeyOf(FindWorldspace(cellContext)?.FormKey ?? cellContext.Record.FormKey);
+
+    /// <remarks>Read at the space's first sighting, which for an interior is its winning cell.</remarks>
     private SpaceFact GetCellSpace(IModContext<ISkyrimMod, ISkyrimModGetter, ICell, ICellGetter> cellContext)
+    {
+        var key = GetCellSpaceKey(cellContext);
+        if (_spaces.TryGetValue(key, out var space)) return space;
+        space = ReadSpace(key, cellContext);
+        _spaces.Add(key, space);
+        return space;
+    }
+
+    private SpaceFact ReadSpace(RecordKey key, IModContext<ISkyrimMod, ISkyrimModGetter, ICell, ICellGetter> cellContext)
+    {
+        if (FindWorldspace(cellContext) is not { } found)
+        {
+            var cell = cellContext.Record;
+            return new SpaceFact(key, cell.EditorID, SpaceKind.Interior, RecordDisplayNames.Of(cell.Name, cell.EditorID));
+        }
+        var worldspace = _linkCache.Resolve<IWorldspaceGetter>(found.FormKey);
+        return new SpaceFact(key, worldspace.EditorID, SpaceKind.Worldspace, RecordDisplayNames.Of(worldspace.Name, worldspace.EditorID));
+    }
+
+    private static IWorldspaceGetter? FindWorldspace(IModContext<ISkyrimMod, ISkyrimModGetter, ICell, ICellGetter> cellContext)
     {
         for (var current = cellContext.Parent; current != null; current = current.Parent)
         {
-            if (current.Record is IWorldspaceGetter worldspace)
-            {
-                return new SpaceFact(_names.KeyOf(worldspace.FormKey), worldspace.EditorID, SpaceKind.Worldspace);
-            }
+            if (current.Record is IWorldspaceGetter worldspace) return worldspace;
         }
-        return new SpaceFact(_names.KeyOf(cellContext.Record.FormKey), cellContext.Record.EditorID, SpaceKind.Interior);
+        return null;
     }
 }

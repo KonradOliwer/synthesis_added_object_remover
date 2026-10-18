@@ -1,0 +1,5 @@
+formKey,editorId,base,reason,worldspace,hold,place,cellFormKey,cellEditorId,gridX,gridY,x,y,z
+000800:Target.esp,,Base711 [000711:Target.esp],"too close to Rival,1 [000010:Other.esp]","Skyrim, Test",The Pale,Loreius Farm,000100:Target.esp,"Tamriel, Test",7,6,0,0,0
+000804:Target.esp,"Item,""4""",000712:Target.esp,"too close to Rival,1 [000010:Other.esp]","Skyrim, Test",The Pale,Loreius Farm,009000:Target.esp,"Cell, one",7,6,105,5,10
+000801:Target.esp,,Base713 [000713:Target.esp],"linked to removed Item,""4"" [000804:Target.esp]","Skyrim, Test",The Pale,near Dawnstar,000100:Target.esp,"Tamriel, Test",8,-6,50,0,3
+000802:Target.esp,,Base711 [000711:Target.esp],"touches removed Item,""4"" [000804:Target.esp]","Skyrim, Test",unnamed area,"cell 0,0",000100:Target.esp,"Tamriel, Test",0,0,100,0,0

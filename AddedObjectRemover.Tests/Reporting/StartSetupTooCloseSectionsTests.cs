@@ -542,7 +542,7 @@ public sealed class StartSetupTooCloseSectionsTests
             ImmutableArray.Create(CreateOtherModObject(2, "Gamma")),
             true,
             [],
-            new Dictionary<RecordKey, SpaceFact> { [space] = new(space, "Tamriel", SpaceKind.Worldspace) },
+            new Dictionary<RecordKey, SpaceFact> { [space] = new(space, "Tamriel", SpaceKind.Worldspace, "Skyrim") },
             new ReadCounts(RecordsScanned: 9, TargetsOverriddenLater: 4, TargetsHiddenOrWithoutPlacement: 5, OthersOverriddenByTarget: 7, OtherInvalidPlacements: 6, NavmeshCount: 8, RemovedByEarlierRuns: 0, MovedByEarlierRuns: 0),
             [new OverriddenOtherRecord(new FormKey(Other, 0x50).ToRecordKey(), "Overridden", Other.ToPluginName())],
             TargetWorkOrder.Of(targets),

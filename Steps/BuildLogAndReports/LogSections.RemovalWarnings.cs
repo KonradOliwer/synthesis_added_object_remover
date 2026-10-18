@@ -13,14 +13,21 @@ internal static partial class LogSections
     public static LogSection BuildRemovalWarningsSection(CollectedObjects world, IEnumerable<RemovedObject> removals, RemovalRisks risks)
     {
         var removed = removals.Select(removal => removal.TargetIndex).ToHashSet();
-        var uniqueActorLines = risks.UniqueActors.Where(role => removed.Contains(role.Target.Index)).Select(role => UniqueActorLine(world, role));
-        var largeReferences = risks.LargeReferences.Count(id => removed.Contains(id.Index));
+        var uniqueActorLines = RemovedUniqueActors(risks, removed).Select(role => UniqueActorLine(world, role));
+        var largeReferences = RemovedLargeReferences(risks, removed).Count();
         string[] largeReferenceLines = largeReferences > 0
             ? [$"Warning: {TextFormat.Count(largeReferences)} removed objects are in their worldspace's large-reference list. Distant LOD may flicker, "
                + "or full models may not load, in their cells until LOD is generated again (for example with DynDOLOD)."]
             : [];
         return new("removalWarnings", [.. uniqueActorLines, .. largeReferenceLines]);
     }
+
+    private static IEnumerable<UniqueActorRole> RemovedUniqueActors(RemovalRisks risks, IReadOnlySet<int> removed) =>
+        risks.UniqueActors.Where(role => removed.Contains(role.Target.Index));
+
+    /// <returns>The target indices.</returns>
+    private static IEnumerable<int> RemovedLargeReferences(RemovalRisks risks, IReadOnlySet<int> removed) =>
+        risks.LargeReferences.Select(id => id.Index).Where(removed.Contains);
 
     private static string UniqueActorLine(CollectedObjects world, UniqueActorRole role)
     {

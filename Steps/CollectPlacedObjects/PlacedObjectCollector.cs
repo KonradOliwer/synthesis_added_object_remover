@@ -19,6 +19,7 @@ public sealed class PlacedObjectCollector
     private readonly WhatToCollect _plan;
     private readonly PlacedRecordFacts _facts;
     private readonly WrittenByEarlierRuns _earlier;
+    private readonly TargetAreaNames _areaNames;
 
     private readonly List<TargetObject> _targets = [];
     private readonly List<OtherObject> _otherModObjects = [];
@@ -39,6 +40,7 @@ public sealed class PlacedObjectCollector
         _plan = plan;
         _facts = facts;
         _earlier = earlier;
+        _areaNames = TargetAreaNames.Of(facts.CellAreas);
     }
 
     /// <param name="earlier">
@@ -154,7 +156,8 @@ public sealed class PlacedObjectCollector
             NamedByScript: record.NamedByScript,
             HasLocationRefType: record.HasLocationRefType,
             ReferenceRadius: record.ReferenceRadius,
-            PrimitiveBounds: record.PrimitiveBounds));
+            PrimitiveBounds: record.PrimitiveBounds,
+            Area: _areaNames.Name(record.Space, record.Cell.Key, position)));
     }
 
     private static OtherObject CreateOtherObject(PlacedRecordFact record, string? editorId)

@@ -9,4 +9,5 @@ public static class ReportFileNames
     public const string MeshOriginsFileName = "mesh-origins.csv";
     public const string LeftBehindFileName = "leftover-invisible-objects.csv";
     public const string HintsFileName = "manual-patch-hints.csv";
+    public const string RemovalsFileName = "removals.csv";
 }

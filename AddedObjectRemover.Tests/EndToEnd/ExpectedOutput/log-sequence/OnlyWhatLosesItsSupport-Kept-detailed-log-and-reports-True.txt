@@ -99,16 +99,16 @@ Possible manual patch needed: 2 objects to check.
   Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
 ## areas
-Removed 18 objects in:
+Removed 18/40 (removed/all mod objects):
   AorInterior › unnamed area 17/38
   AorWorld › unnamed area › AorExterior 1/2
-Kept 1 objects that would have been removed, FormList record, in:
+Kept 1/40 (kept/all mod objects), FormList record:
   AorInterior › unnamed area 1/38
-Kept 1 objects that would have been removed, placed object: Enable Parent, in:
+Kept 1/40 (kept/all mod objects), placed object: Enable Parent:
   AorInterior › unnamed area 1/38
-Kept 1 objects that would have been removed, teleport door, in:
+Kept 1/40 (kept/all mod objects), teleport door:
   AorInterior › unnamed area 1/38
-Possible manual patch needed for 2 objects, in:
+Possible manual patch needed for 2/40 (needing a patch/all mod objects):
   AorInterior › unnamed area 2/38
 ## written
 Anchoring diagnostics: wrote 3 evaluations to <root>/Reports/anchoring.csv.

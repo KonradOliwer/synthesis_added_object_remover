@@ -30,13 +30,17 @@ internal static partial class LogSections
         return new LogSection(
             "areas",
             [
-                .. AreaLines(tree, removedTargets, $"Removed {TextFormat.Count(removedTargets.Count)} objects in:"),
+                .. AreaLines(tree, removedTargets, $"Removed {OfAllModObjects(tree, removedTargets.Count, "removed")}:"),
                 .. KeptAreaLines(tree, keptOnce),
-                .. AreaLines(tree, hintTargets, $"Possible manual patch needed for {TextFormat.Count(hintTargets.Count)} objects, in:"),
-                .. AreaLines(tree, uniqueActors, $"Removed {TextFormat.Count(uniqueActors.Count)} unique NPCs, in:"),
-                .. AreaLines(tree, largeReferences, $"Removed {TextFormat.Count(largeReferences.Count)} objects of the large-reference lists, in:"),
+                .. AreaLines(tree, hintTargets, $"Possible manual patch needed for {OfAllModObjects(tree, hintTargets.Count, "needing a patch")}:"),
+                .. AreaLines(tree, uniqueActors, $"Removed {OfAllModObjects(tree, uniqueActors.Count, "unique NPCs")}:"),
+                .. AreaLines(tree, largeReferences, $"Removed {OfAllModObjects(tree, largeReferences.Count, "large-reference list objects")}:"),
             ]);
     }
+
+    /// <summary>E.g. "3022/4076 (removed/all mod objects)".</summary>
+    private static string OfAllModObjects(AreaTree tree, int count, string what) =>
+        $"{TextFormat.Count(count)}/{TextFormat.Count(tree.Total)} ({what}/all mod objects)";
 
     /// <summary>One tree per kept kind, the kind with the most objects first, as in the kept summary.</summary>
     private static IEnumerable<string> KeptAreaLines(AreaTree tree, IReadOnlyList<KeptObject> keptOnce) =>
@@ -46,7 +50,7 @@ internal static partial class LogSections
             .SelectMany(kind => AreaLines(
                 tree,
                 [.. kind.Indices.Select(index => keptOnce[index].TargetIndex)],
-                $"Kept {TextFormat.Count(kind.Indices.Count)} objects that would have been removed, {kind.Key}, in:"));
+                $"Kept {OfAllModObjects(tree, kind.Indices.Count, "kept")}, {kind.Key}:"));
 
     private static IEnumerable<string> AreaLines(AreaTree tree, IReadOnlyList<int> targets, string header) =>
         targets.Count == 0 ? [] : [header, .. tree.NodesOf(targets).SelectMany(worldspace => AreaNodeLines(worldspace, depth: 0))];

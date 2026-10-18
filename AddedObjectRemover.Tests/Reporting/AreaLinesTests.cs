@@ -49,7 +49,7 @@ public sealed class AreaLinesTests
 
         Assert.Equal(
             [
-                "Removed 8 objects in:",
+                "Removed 8/9 (removed/all mod objects):",
                 "  Skyrim 7/8",
                 "    The Pale hold 3/4",
                 "      Loreius Farm 2/3",
@@ -69,7 +69,7 @@ public sealed class AreaLinesTests
     {
         var lines = LogSections.BuildAreasSection(World(), [new LinkedRemoval(8, 0)], [], [], NoRisks).Lines.ToList();
 
-        Assert.Equal(["Removed 1 objects in:", "  Bannered Mare › Whiterun hold 1/1"], lines);
+        Assert.Equal(["Removed 1/9 (removed/all mod objects):","  Bannered Mare › Whiterun hold 1/1"], lines);
     }
 
     [Fact]
@@ -84,16 +84,60 @@ public sealed class AreaLinesTests
 
         Assert.Equal(
             [
-                "Kept 1 objects that would have been removed, FLST record, in:",
+                "Kept 1/9 (kept/all mod objects), FLST record:",
                 "  Skyrim › Whiterun hold › near Halted Stream Camp 1/1",
-                "Kept 1 objects that would have been removed, QUST record, in:",
+                "Kept 1/9 (kept/all mod objects), QUST record:",
                 "  Skyrim › The Pale hold › Loreius Farm 1/3",
-                "Possible manual patch needed for 1 objects, in:",
+                "Possible manual patch needed for 1/9 (needing a patch/all mod objects):",
                 "  Skyrim › The Pale hold › Loreius Farm 1/3",
-                "Removed 1 objects of the large-reference lists, in:",
+                "Removed 1/9 (large-reference list objects/all mod objects):",
                 "  Skyrim › unnamed area › cell 5,7 1/1",
             ],
             lines.Skip(11).ToList());
+    }
+
+    [Fact]
+    public void SiblingsWithTheSameCountPutTheOneWithFewerTargetObjectsFirst()
+    {
+        var world = WorldOf(
+            Place("Big"), Place("Big"), Place("Big"),
+            Place("Small"),
+            Place("Alpha"), Place("Alpha"));
+
+        var lines = LogSections.BuildAreasSection(world, Removed(0, 3, 4), [], [], NoRisks).Lines.ToList();
+
+        Assert.Equal(
+            [
+                "Removed 3/6 (removed/all mod objects):",
+                "  Skyrim › H hold 3/6",
+                "      Small 1/1",
+                "      Alpha 1/2",
+                "      Big 1/3",
+            ],
+            lines);
+    }
+
+    [Fact]
+    public void APlaceAndItsNearPlaceStayTogetherRankedByTheirCombinedNumbers()
+    {
+        var world = WorldOf(
+            Place("Zed"),
+            NearPlace("Zed"), NearPlace("Zed"),
+            Place("Mid"), Place("Mid"), Place("Mid"), Place("Mid"), Place("Mid"),
+            NearPlace("Solo"), NearPlace("Solo"));
+
+        var lines = LogSections.BuildAreasSection(world, Removed(0, 1, 2, 3, 4, 8, 9), [], [], NoRisks).Lines.ToList();
+
+        Assert.Equal(
+            [
+                "Removed 7/10 (removed/all mod objects):",
+                "  Skyrim › H hold 7/10",
+                "      Zed 1/1",
+                "      near Zed 2/2",
+                "      near Solo 2/2",
+                "      Mid 2/5",
+            ],
+            lines);
     }
 
     [Fact]
@@ -104,14 +148,18 @@ public sealed class AreaLinesTests
 
     private static TargetArea Exterior(string? hold, string? place, PlaceSource source, int x, int y) => new(hold, place, source, new CellGridPoint(x, y));
 
+    private static TargetArea Place(string place) => Exterior("H", place, PlaceSource.OwnLocation, 1, 1);
+
+    private static TargetArea NearPlace(string place) => Exterior("H", place, PlaceSource.NearbyLocation, 1, 1);
+
+    private static List<RemovedObject> Removed(params int[] targetIndices) => [.. targetIndices.Select(index => new LinkedRemoval(index, 0))];
+
     /// <summary>Removes every target object but 2.</summary>
-    private static List<RemovedObject> Removals() => [.. new[] { 0, 1, 3, 4, 5, 6, 7, 8 }.Select(index => new LinkedRemoval(index, 0))];
+    private static List<RemovedObject> Removals() => Removed(0, 1, 3, 4, 5, 6, 7, 8);
 
     /// <summary>Targets 0-2 at Loreius Farm, 3 in Dawnstar, 4 near a camp, 5 unnamed, 6-7 in Falkreath, 8 in an interior.</summary>
-    private static CollectedObjects World()
-    {
-        TargetArea[] areas =
-        [
+    private static CollectedObjects World() =>
+        WorldOf(
             Exterior("The Pale", "Loreius Farm", PlaceSource.OwnLocation, 7, 6),
             Exterior("The Pale", "Loreius Farm", PlaceSource.OwnLocation, 7, 6),
             Exterior("The Pale", "Loreius Farm", PlaceSource.OwnLocation, 7, 6),
@@ -120,8 +168,11 @@ public sealed class AreaLinesTests
             Exterior(null, null, PlaceSource.GridOnly, 5, 7),
             Exterior("Falkreath", "A", PlaceSource.OwnLocation, 2, 2),
             Exterior("Falkreath", "B", PlaceSource.CellName, 3, 3),
-            new TargetArea("Whiterun", "Bannered Mare", PlaceSource.CellName, Grid: null),
-        ];
+            new TargetArea("Whiterun", "Bannered Mare", PlaceSource.CellName, Grid: null));
+
+    /// <summary>One target object per area, in order; an area without a grid is in the interior.</summary>
+    private static CollectedObjects WorldOf(params TargetArea[] areas)
+    {
         List<TargetObject> targets =
         [
             .. areas.Select((area, index) =>

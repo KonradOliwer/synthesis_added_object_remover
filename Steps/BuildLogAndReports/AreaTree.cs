@@ -5,7 +5,7 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
 /// <summary>A worldspace, hold or place of the area tree, with how many listed and how many target objects are there.</summary>
-/// <param name="Children">The holds of a worldspace or the places of a hold, most listed objects first; none for a place.</param>
+/// <param name="Children">The holds of a worldspace or the places of a hold, in the order of <see cref="AreaTree.NodesOf"/>; none for a place.</param>
 internal sealed record AreaNode(string Name, int Count, int TargetsThere, IReadOnlyList<AreaNode> Children);
 
 /// <summary>One area of one level: the space and its name, with the hold and place below it as far as the level goes.</summary>
@@ -48,19 +48,55 @@ internal sealed record AreaTree(ImmutableArray<AreaPath> Paths, IReadOnlyDiction
         return new AreaTree(paths, KeyedGroups.CountBy(areas, area => area, EqualityComparer<AreaKey>.Default).ToDictionary());
     }
 
-    /// <returns>The worldspaces of the listed target objects; siblings by count (most first), then name (ordinal), then space key.</returns>
+    /// <summary>All target objects, which every worldspace of the tree is a part of.</summary>
+    public int Total => Paths.Length;
+
+    /// <returns>
+    /// The worldspaces of the listed target objects; siblings by count (most first), then fewer target objects there (a larger
+    /// share listed), then name (ordinal), then space key. A place and the "near" place of the same name stay together, ranked
+    /// by their combined numbers.
+    /// </returns>
     public IReadOnlyList<AreaNode> NodesOf(IEnumerable<int> targetIndices) => NodesAt(AreaLevel.Worldspace, [.. targetIndices.Select(index => Paths[index])]);
 
-    private List<AreaNode> NodesAt(AreaLevel level, IReadOnlyList<AreaPath> listed) =>
+    private List<AreaNode> NodesAt(AreaLevel level, IReadOnlyList<AreaPath> listed)
+    {
+        List<RankedArea> areas =
         [
-            .. KeyedGroups.Rank(KeyedGroups.CountBy(listed, path => path.KeyAt(level), EqualityComparer<AreaKey>.Default), NameThenSpace)
+            .. KeyedGroups.CountBy(listed, path => path.KeyAt(level), EqualityComparer<AreaKey>.Default)
+                .Select(area => new RankedArea(area.Key, area.Value, TargetsThere[area.Key])),
+        ];
+        var units = level == AreaLevel.Place ? PairNearPlaces(areas) : areas.Select(area => (IReadOnlyList<RankedArea>)[area]);
+        return
+        [
+            .. units
+                .OrderByDescending(unit => unit.Sum(area => area.Count))
+                .ThenBy(unit => unit.Sum(area => area.TargetsThere))
+                .ThenBy(unit => unit[0].Key, NameThenSpace)
+                .SelectMany(unit => unit)
                 .Select(area => CreateNode(level, area, listed)),
         ];
+    }
 
-    private AreaNode CreateNode(AreaLevel level, KeyValuePair<AreaKey, int> area, IReadOnlyList<AreaPath> listed) =>
+    /// <returns>Each place with the "near" place of its name below the same hold, if listed, and every other place alone.</returns>
+    private static IEnumerable<IReadOnlyList<RankedArea>> PairNearPlaces(IReadOnlyList<RankedArea> places)
+    {
+        var byKey = places.ToDictionary(place => place.Key);
+        var paired = places
+            .Select(place => place.Key with { Place = AreaText.NearbyPrefix + place.Key.Place })
+            .Where(byKey.ContainsKey)
+            .ToHashSet();
+        return places
+            .Where(place => !paired.Contains(place.Key))
+            .Select(place => (IReadOnlyList<RankedArea>)
+                (byKey.TryGetValue(place.Key with { Place = AreaText.NearbyPrefix + place.Key.Place }, out var near) ? [place, near] : [place]));
+    }
+
+    private AreaNode CreateNode(AreaLevel level, RankedArea area, IReadOnlyList<AreaPath> listed) =>
         new(
             area.Key.Name,
-            area.Value,
-            TargetsThere[area.Key],
+            area.Count,
+            area.TargetsThere,
             level == AreaLevel.Place ? [] : NodesAt(level + 1, [.. listed.Where(path => path.KeyAt(level) == area.Key)]));
+
+    private readonly record struct RankedArea(AreaKey Key, int Count, int TargetsThere);
 }

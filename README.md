@@ -299,10 +299,10 @@ The last section of the log says where these objects are: the removed objects, t
 
 Names are what the game shows (the location or cell name), or their editor ID when they have none. A cell without a location takes the hold of the nearest cell within 3 cells that has one; when there is none, the hold is *unnamed area*. Objects in a worldspace's persistent cell are counted in the grid cell they stand in.
 
-Every area of the tree is listed. Each line ends with two numbers: the objects of that list in the area, and all of the target mod's objects there (for the removals: *removed / target objects there*). Areas with the most objects come first. A worldspace or hold with only one area below it gets no line of its own: its name is joined to that area's line with *›*, and the joined line sits at the level of its first name. A name that repeats an earlier name of the joined line is left out.
+Every area of the tree is listed. Each line ends with two numbers: the objects of that list in the area, and all of the target mod's objects there (for the removals: *removed / target objects there*). The first line of each tree gives the same two numbers for the whole tree, e.g. *Removed 1284/9850 (removed/all mod objects):*. Areas with the most objects come first; areas with the same number come in order of fewer target objects there (a larger share removed), then by name. A place and the *near* place of the same name (e.g. *Loreius Farm* and *near Loreius Farm*) stay together, the place first, and are ranked as one by their combined numbers. A worldspace or hold with only one area below it gets no line of its own: its name is joined to that area's line with *›*, and the joined line sits at the level of its first name. A name that repeats an earlier name of the joined line is left out.
 
 ```
-Removed 1284 objects in:
+Removed 1284/9850 (removed/all mod objects):
   Skyrim 1223/9850
     The Pale hold 402/1310
       Loreius Farm 41/52

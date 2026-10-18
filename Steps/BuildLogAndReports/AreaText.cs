@@ -14,7 +14,7 @@ internal enum AreaLevel
 internal static class AreaText
 {
     private const string UnnamedHold = "unnamed area";
-    private const string NearbyPrefix = "near ";
+    public const string NearbyPrefix = "near ";
     private const string HoldSuffix = " hold";
 
     /// <summary>The space's display name, else its editor id, else its key.</summary>

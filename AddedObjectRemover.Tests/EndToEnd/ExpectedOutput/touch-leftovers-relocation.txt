@@ -84,35 +84,18 @@ Possible manual patch needed: 3 objects to check.
   Kept, referenced by a non-placed record: T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm], cell AorExterior [000802:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
 Removed 23 objects in:
-  worldspaces:
-    22 AorInterior
-    1 AorWorld
-  holds (removed / target objects there):
-    22 / 38 unnamed area (AorInterior)
-    1 / 2 unnamed area (AorWorld)
-  places:
-    22 AorInterior
-    1 AorExterior (AorWorld)
-Kept 5 objects that would have been removed, in:
-  worldspaces:
-    4 AorInterior
-    1 AorWorld
-  holds:
-    4 unnamed area (AorInterior)
-    1 unnamed area (AorWorld)
-  places:
-    4 AorInterior
-    1 AorExterior (AorWorld)
+  AorInterior › unnamed area 22/38
+  AorWorld › unnamed area › AorExterior 1/2
+Kept 2 objects that would have been removed, FormList record, in:
+  AorInterior › unnamed area 1/38
+  AorWorld › unnamed area › AorExterior 1/2
+Kept 2 objects that would have been removed, placed object: Enable Parent, in:
+  AorInterior › unnamed area 2/38
+Kept 1 objects that would have been removed, teleport door, in:
+  AorInterior › unnamed area 1/38
 Possible manual patch needed for 3 objects, in:
-  worldspaces:
-    2 AorInterior
-    1 AorWorld
-  holds:
-    2 unnamed area (AorInterior)
-    1 unnamed area (AorWorld)
-  places:
-    2 AorInterior
-    1 AorExterior (AorWorld)
+  AorInterior › unnamed area 2/38
+  AorWorld › unnamed area › AorExterior 1/2
 Touch diagnostics: wrote 5 edges, 17 components in <time> to <root>/Output/Reports/edges.csv / <root>/Output/Reports/components.csv.
 Leftover invisible objects diagnostics: wrote 5 evaluations to <root>/Output/Reports/leftover-invisible-objects.csv.
 Removals: wrote 23 rows to <root>/Output/Reports/removals.csv.

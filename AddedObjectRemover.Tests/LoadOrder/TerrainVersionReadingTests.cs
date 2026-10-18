@@ -44,7 +44,7 @@ public class TerrainVersionReadingTests
     public void VersionsHoldEveryPluginsOwnHeightsInLoadOrder()
     {
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false));
+        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, TestRecordKeys.HoldKeyword));
 
         var versions = plugin.ReadTerrainVersions(ExteriorCell);
 
@@ -60,7 +60,7 @@ public class TerrainVersionReadingTests
     public void WinningHeightsAreStillTheLastVersions()
     {
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: true, Navmeshes: false, TerrainVersions: true, TerrainLayers: false));
+        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: true, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, TestRecordKeys.HoldKeyword));
 
         Assert.Equal(LateOffset * UnitsPerHeightStep, plugin.ReadTerrain(ExteriorCell)![0]);
     }
@@ -69,7 +69,7 @@ public class TerrainVersionReadingTests
     public void VersionsAreNotKeptUnlessAskedFor()
     {
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: true, Navmeshes: false, TerrainVersions: false, TerrainLayers: false));
+        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: true, Navmeshes: false, TerrainVersions: false, TerrainLayers: false, TestRecordKeys.HoldKeyword));
 
         Assert.Throws<InvalidOperationException>(() => plugin.ReadTerrainVersions(ExteriorCell));
     }
@@ -85,7 +85,7 @@ public class TerrainVersionReadingTests
         childCell.Temporary.Add(placed);
         AddChildWorldspace(_target, child, childCell);
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false));
+        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, TestRecordKeys.HoldKeyword));
 
         Assert.Equal(_worldspace.ToRecordKey(), plugin.FindLandWorldspace(child.ToRecordKey()));
         Assert.Equal(
@@ -120,6 +120,6 @@ public class TerrainVersionReadingTests
     {
         var state = FixturePatcherState.Create([_base.Mod, _target.Mod, _noLand.Mod, _late.Mod], Path.GetTempPath(), Path.GetTempPath());
         var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey);
-        return new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods).Open();
+        return new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods, Environment.ProcessorCount).Open();
     }
 }

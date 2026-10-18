@@ -15,6 +15,9 @@ public sealed class PlacedObjectCollector
 {
     private enum RecordRole { Target, TargetOverriddenLater, IgnoredOrigin, OverriddenByTarget, Other }
 
+    /// <summary>Vanilla keyword LocTypeHold. Only the Location of the hold itself is sure to have it: the Major and Minor variants are not on every hold.</summary>
+    private static readonly RecordKey HoldLocationKeyword = new(new PluginName("Skyrim.esm"), 0x016771);
+
     private readonly IdentifiedMods _standing;
     private readonly WhatToCollect _plan;
     private readonly PlacedRecordFacts _facts;
@@ -49,7 +52,7 @@ public sealed class PlacedObjectCollector
     /// </param>
     public static CollectedObjects Collect(IPluginRecords plugin, IdentifiedMods standing, WhatToCollect plan, WrittenByEarlierRuns earlier)
     {
-        var facts = plugin.ReadPlacedRecords(new PlacedReadScope(standing.Target, plan.Terrain, plan.Navmesh, plan.TerrainVersions, plan.TerrainLayers));
+        var facts = plugin.ReadPlacedRecords(new PlacedReadScope(standing.Target, plan.Terrain, plan.Navmesh, plan.TerrainVersions, plan.TerrainLayers, HoldLocationKeyword));
         var collector = new PlacedObjectCollector(standing, plan, facts, earlier);
         foreach (var record in facts.Records) collector.Collect(record);
 
@@ -101,7 +104,7 @@ public sealed class PlacedObjectCollector
         }
 
         if (role == RecordRole.Target) AddTarget(record);
-        else _otherModObjects.Add(CreateOtherObject(record, _plan.OtherEditorIds ? record.EditorId : null));
+        else _otherModObjects.Add(CreateOtherObject(record, _plan.OtherModDetails ? record.EditorId : null));
     }
 
     /// <returns>True when the record is neither a target nor another mod's object.</returns>
@@ -116,7 +119,7 @@ public sealed class PlacedObjectCollector
                 return true;
             case RecordRole.OverriddenByTarget:
                 _othersOverriddenByTarget++;
-                if (_plan.OverriddenOthersList) _overriddenOthers.Add(new OverriddenOtherRecord(record.Key, record.EditorId, record.WinningMod));
+                if (_plan.OtherModDetails) _overriddenOthers.Add(new OverriddenOtherRecord(record.Key, record.EditorId, record.WinningMod));
                 return true;
             default:
                 return false;

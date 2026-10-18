@@ -9,6 +9,8 @@ public sealed class LocationNameReaderTests
 {
     private static readonly ModKey Mod = ModKey.FromNameAndExtension("Areas.esp");
 
+    private static readonly FormKey HoldKeyword = TestRecordKeys.HoldKeyword.ToFormKey();
+
     private readonly SkyrimMod _mod = new(Mod, SkyrimRelease.SkyrimSE);
     private uint _nextId = 0x800;
 
@@ -30,6 +32,36 @@ public sealed class LocationNameReaderTests
         var world = AddWorldspace(solstheim);
 
         Assert.Equal(new LocationNames("Solstheim", "Solstheim"), Read(CellAt(solstheim), world));
+    }
+
+    [Fact]
+    public void ATopLocationWithTheHoldKeywordIsTheHoldOfThePlacesUnderIt()
+    {
+        var solstheim = AddLocation("Solstheim", parent: null, isHold: true);
+        var ravenRock = AddLocation("Raven Rock", solstheim);
+        var world = AddWorldspace(solstheim);
+
+        Assert.Equal(new LocationNames("Solstheim", "Raven Rock"), Read(CellAt(ravenRock), world));
+    }
+
+    [Fact]
+    public void TheNearestLocationWithTheHoldKeywordIsTheHoldEvenWhenItIsInTheMiddleOfTheChain()
+    {
+        var tamriel = AddLocation("Tamriel", parent: null);
+        var pale = AddLocation("The Pale", tamriel, isHold: true);
+        var region = AddLocation("Frozen Region", pale);
+        var farm = AddLocation("Loreius Farm", region);
+
+        Assert.Equal(new LocationNames("The Pale", "Loreius Farm"), Read(CellAt(farm), worldspace: null));
+    }
+
+    [Fact]
+    public void ACellWhoseOwnLocationHasTheHoldKeywordIsItsOwnHold()
+    {
+        var tamriel = AddLocation("Tamriel", parent: null);
+        var rift = AddLocation("The Rift", tamriel, isHold: true);
+
+        Assert.Equal(new LocationNames("The Rift", "The Rift"), Read(CellAt(rift), worldspace: null));
     }
 
     [Fact]
@@ -89,13 +121,21 @@ public sealed class LocationNameReaderTests
         Assert.Null(Read(CellAt(unnamed), worldspace: null));
     }
 
-    private LocationNames? Read(ICellGetter cell, FormKey? worldspace) =>
-        new LocationNameReader(_mod.ToImmutableLinkCache()).Read(cell, worldspace);
+    /// <summary>Reads the cell as the only winning cell of its space: the worldspace given, else an interior of its own.</summary>
+    private LocationNames? Read(Cell cell, FormKey? worldspace)
+    {
+        var space = worldspace is { } worldspaceKey
+            ? new SpaceFact(worldspaceKey.ToRecordKey(), EditorId: null, SpaceKind.Worldspace, Name: null)
+            : new SpaceFact(cell.FormKey.ToRecordKey(), EditorId: null, SpaceKind.Interior, Name: null);
+        var areas = CellAreaReader.Read([new SpaceCell(cell.FormKey.ToRecordKey(), space, cell)], new LocationNameReader(_mod.ToImmutableLinkCache(), HoldKeyword), new Execution(1));
+        return Assert.Single(areas).Value.Location;
+    }
 
-    private Location AddLocation(string? name, Location? parent, string? editorId = null)
+    private Location AddLocation(string? name, Location? parent, string? editorId = null, bool isHold = false)
     {
         var location = new Location(NextKey(), SkyrimRelease.SkyrimSE) { Name = name, EditorID = editorId };
         if (parent is not null) location.ParentLocation.SetTo(parent.FormKey);
+        if (isHold) (location.Keywords ??= []).Add(new FormLink<IKeywordGetter>(HoldKeyword));
         _mod.Locations.Add(location);
         return location;
     }

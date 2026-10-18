@@ -3,7 +3,6 @@
 Describe.Cell | Report wording: labels a cell fact (a plugin-facts type outside the domain list).
 Describe.Space | Report wording: labels a space fact (a plugin-facts type outside the domain list).
 AreaText.Worldspace | Report wording: names a space fact by its display name (a plugin-facts type outside the domain list).
-AreaText.WithWorldspace | Report wording: adds a space fact's name to a hold or place (a plugin-facts type outside the domain list).
 AreaText.Grid | Report wording: prints a cell grid point (a plugin-facts type outside the domain list).
 LogSections.Corner | Report wording: prints a box corner (a tool's vector type).
 LogSections.Exact | Report wording: prints a number with every digit that matters.

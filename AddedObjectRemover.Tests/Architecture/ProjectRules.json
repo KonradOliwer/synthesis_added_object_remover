@@ -3,7 +3,7 @@
   "projects": [
     { "name": "AddedObjectRemover.Ids", "kind": "K", "folder": "Ids", "references": [], "packages": [] },
     { "name": "PluginRecordFacts", "kind": "A", "folder": "Tools/PluginRecordFacts", "references": ["AddedObjectRemover.Ids", "BoxAndTransformMath", "TriangleMeshTests", "GroundSurfaceQueries"], "packages": [] },
-    { "name": "PluginRecordReadingAndWriting", "kind": "T", "folder": "Tools/PluginRecordReadingAndWriting", "references": ["PluginRecordFacts", "AddedObjectRemover.Ids", "BoxAndTransformMath", "TriangleMeshTests", "KeyedGroupingInInputOrder", "ComputedOnceLookups", "GroundSurfaceQueries"], "packages": ["Mutagen.Bethesda.Skyrim 0.54.2"] },
+    { "name": "PluginRecordReadingAndWriting", "kind": "T", "folder": "Tools/PluginRecordReadingAndWriting", "references": ["PluginRecordFacts", "AddedObjectRemover.Ids", "BoxAndTransformMath", "TriangleMeshTests", "KeyedGroupingInInputOrder", "ComputedOnceLookups", "GroundSurfaceQueries", "OrderIndependentParallelWork"], "packages": ["Mutagen.Bethesda.Skyrim 0.54.2"] },
     { "name": "MeshFileFacts", "kind": "A", "folder": "Tools/MeshFileFacts", "references": ["UnexpectedFailureHandling", "BoxAndTransformMath", "TriangleMeshTests", "ComputedOnceLookups"], "packages": [] },
     { "name": "MeshFileReading", "kind": "T", "folder": "Tools/MeshFileReading", "references": ["MeshFileFacts", "UnexpectedFailureHandling", "BoxAndTransformMath", "TriangleMeshTests", "ComputedOnceLookups", "FileSystemAccess", "OrderIndependentParallelWork"], "packages": ["Nifly [1.1.0]", "Mutagen.Bethesda.Core 0.54.2", "SharpZipLib 1.4.2", "ini-parser-netstandard 2.5.3"] },
     { "name": "BoxAndTransformMath", "kind": "T", "folder": "Tools/BoxAndTransformMath", "references": [], "packages": [] },

@@ -69,6 +69,7 @@ public class ProductionTypeTests
         ["ObjectVisibility.IsVisible"] = "one-line value derived from its own fields",
         ["OtherObject.Transform"] = "one-line value derived from its own fields",
         ["OtherObject.IsPlacedNpc"] = "one-line value derived from its own fields",
+        ["RunSettings.DetailedLog"] = "one-line value derived from its own fields: the one setting that has the report files, so it is stored once",
         ["DetectedPatches.IgnoredMods"] = "one-line value derived from its own list",
         ["SectorAreas.Removed"] = "index accessor",
         ["SectorAreas.State"] = "index accessor",

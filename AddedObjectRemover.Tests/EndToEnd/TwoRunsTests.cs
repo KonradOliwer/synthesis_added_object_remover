@@ -77,7 +77,7 @@ public sealed class TwoRunsTests : IDisposable
         var outputPath = Path.Combine(_root.FullName, FixturePatcherState.PatchModKey.FileName);
         var state = FixturePatcherState.Create(world.LoadOrder, dataFolder, outputPath);
         var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey);
-        var pluginRecords = new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods);
+        var pluginRecords = new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods, Workers);
         var settings = SettingsVariants.Of(SettingsVariants.Support);
         var request = SettingsValidator.Build(
             StandardConfig.Of(settings.Standard), pluginRecords.Open(), plugins, settings.DetailedLogAndReports, Program.ReportsFolder(state), Workers);
@@ -146,7 +146,7 @@ public sealed class TwoRunsTests : IDisposable
             var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey);
             var request = SettingsValidator.Build(
                 StandardConfig.Of(settings.Standard),
-                new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods).Open(),
+                new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods, Workers).Open(),
                 plugins,
                 settings.DetailedLogAndReports,
                 Program.ReportsFolder(state),
@@ -162,7 +162,7 @@ public sealed class TwoRunsTests : IDisposable
         private static RunEnvironment BuildEnvironment(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, LoadOrderPlugins plugins) =>
             new(
                 plugins,
-                new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods),
+                new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods, Workers),
                 new MeshFilesFactory(
                     state.DataFolderPath.Path, state.GameRelease, [.. state.LoadOrder.ListedOrder.Select(listing => listing.ModKey)]),
                 TestBaseFacts.Factory(state.LinkCache),

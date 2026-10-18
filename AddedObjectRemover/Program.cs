@@ -54,9 +54,9 @@ public static class Program
         var settings = loadSettings();
         var configs = ReadConfigs(settings, state.DataFolderPath.Path);
         var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey);
-        var pluginRecords = new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods);
+        var pluginRecords = new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods, workers);
         var batch = SettingsValidator.BuildAll(
-            configs, pluginRecords.Open(), plugins, settings.DetailedLogAndReports, ReportsFolder(state), workers);
+            configs, pluginRecords.Open(), plugins, settings.DetailedLogAndReports, settings.DetailedLogAndReports ? ReportsFolder(state) : null, workers);
         var requests = TakeRequestsOrFail(batch);
         var environment = new RunEnvironment(
             plugins,
@@ -72,7 +72,7 @@ public static class Program
 
     /// <summary>
     /// A folder in the patcher's own data folder in Synthesis ("Data\&lt;profile&gt;\&lt;patcher name&gt;"), which lasts between runs
-    /// (the output folder is wiped at the start of every run). Synthesis passes that folder on every run, and so does a run started without arguments.
+    /// (the output folder is wiped at the start of every run). Only a run with the detailed log and reports on needs it; a run started with arguments but without that folder fails then.
     /// </summary>
     internal static string ReportsFolder(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) =>
         Path.Combine(

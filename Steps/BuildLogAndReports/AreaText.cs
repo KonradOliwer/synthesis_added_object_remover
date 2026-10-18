@@ -1,9 +1,8 @@
-using System.Diagnostics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
-/// <summary>The three levels at which the log groups where target objects are.</summary>
+/// <summary>The three levels of the area tree, from the top.</summary>
 internal enum AreaLevel
 {
     Worldspace,
@@ -16,6 +15,7 @@ internal static class AreaText
 {
     private const string UnnamedHold = "unnamed area";
     private const string NearbyPrefix = "near ";
+    private const string HoldSuffix = " hold";
 
     /// <summary>The space's display name, else its editor id, else its key.</summary>
     public static string Worldspace(SpaceFact space) => space.Name ?? RecordLabels.Of(space.Key, space.EditorId);
@@ -37,18 +37,11 @@ internal static class AreaText
     public static string Detail(TargetArea area, SpaceFact space) =>
         $"place {Place(area, space)}, hold {Hold(area)}" + (area.Grid is { } grid ? $", grid {Grid(grid)}" : string.Empty);
 
-    public static string Name(AreaLevel level, TargetArea area, SpaceFact space) => level switch
+    /// <summary>E.g. "Whiterun hold"; a name that already ends in the word "hold" (e.g. "Falkreath Hold") and an unnamed area stay as they are.</summary>
+    public static string HoldLabel(TargetArea area) => area.Hold switch
     {
-        AreaLevel.Worldspace => Worldspace(space),
-        AreaLevel.Hold => Hold(area),
-        AreaLevel.Place => Place(area, space),
-        _ => throw new UnreachableException($"Unknown area level {level}."),
+        null => UnnamedHold,
+        { } hold when hold.EndsWith(HoldSuffix, StringComparison.OrdinalIgnoreCase) => hold,
+        { } hold => hold + HoldSuffix,
     };
-
-    /// <summary>A hold or place with its worldspace after it, e.g. "The Pale (Skyrim)"; a name equal to the worldspace's stands alone.</summary>
-    public static string WithWorldspace(string name, SpaceFact space)
-    {
-        var worldspace = Worldspace(space);
-        return name == worldspace ? name : $"{name} ({worldspace})";
-    }
 }

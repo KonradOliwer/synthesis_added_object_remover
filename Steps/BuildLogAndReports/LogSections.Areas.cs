@@ -6,87 +6,66 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
 internal static partial class LogSections
 {
-    /// <summary>How many areas of each level the normal log names before it folds the rest into one count.</summary>
-    private const int TopAreaCount = 5;
-
-    private static readonly AreaLevelName[] AreaLevels =
-        [new(AreaLevel.Worldspace, "worldspaces"), new(AreaLevel.Hold, "holds"), new(AreaLevel.Place, "places")];
+    private const string AreaIndentStep = "  ";
+    private const string JoinedAreaSeparator = " › ";
 
     /// <summary>
-    /// Where the objects of each closing summary are, by worldspace, hold and place: the removals, the kept objects, the
-    /// objects to check for a manual patch and each removal warning; only summaries with objects have lines. The normal log
-    /// names the top areas of each level; the detailed log lists every area, and for the removals per hold also how many
-    /// target objects are there.
+    /// Where the objects of each closing summary are, as one tree by worldspace, hold and place: the removals, the kept
+    /// objects, the objects to check for a manual patch and each removal warning; only summaries with objects have lines.
     /// </summary>
     public static LogSection BuildAreasSection(
         CollectedObjects world,
         IReadOnlyList<RemovedObject> removals,
         IEnumerable<KeptObject> kept,
         IEnumerable<ManualPatchHint> hints,
-        RemovalRisks risks,
-        ReportContext context)
+        RemovalRisks risks)
     {
         List<int> removedTargets = [.. removals.Select(removal => removal.TargetIndex)];
         var removed = removedTargets.ToHashSet();
-        var keptOnce = kept.Select(entry => entry.TargetIndex).Distinct().ToList();
+        var keptOnce = KeyedGroups.DistinctBy(kept, entry => entry.TargetIndex, EqualityComparer<int>.Default);
         var hintTargets = hints.Select(hint => hint.TargetIndex).Distinct().ToList();
         var uniqueActors = RemovedUniqueActors(risks, removed).Select(role => role.Target.Index).Distinct().ToList();
         var largeReferences = RemovedLargeReferences(risks, removed).ToList();
-        var targetsPerHold = context.Detailed ? CountTargetsPerHold(world) : null;
+        var tree = AreaTree.Of(world);
         return new LogSection(
             "areas",
             [
-                .. AreaLines(world, removedTargets, $"Removed {TextFormat.Count(removedTargets.Count)} objects in:", targetsPerHold, context),
-                .. AreaLines(world, keptOnce, $"Kept {TextFormat.Count(keptOnce.Count)} objects that would have been removed, in:", targetsPerHold: null, context),
-                .. AreaLines(world, hintTargets, $"Possible manual patch needed for {TextFormat.Count(hintTargets.Count)} objects, in:", targetsPerHold: null, context),
-                .. AreaLines(world, uniqueActors, $"Removed {TextFormat.Count(uniqueActors.Count)} unique NPCs, in:", targetsPerHold: null, context),
-                .. AreaLines(world, largeReferences, $"Removed {TextFormat.Count(largeReferences.Count)} objects of the large-reference lists, in:", targetsPerHold: null, context),
+                .. AreaLines(tree, removedTargets, $"Removed {TextFormat.Count(removedTargets.Count)} objects in:"),
+                .. KeptAreaLines(tree, keptOnce),
+                .. AreaLines(tree, hintTargets, $"Possible manual patch needed for {TextFormat.Count(hintTargets.Count)} objects, in:"),
+                .. AreaLines(tree, uniqueActors, $"Removed {TextFormat.Count(uniqueActors.Count)} unique NPCs, in:"),
+                .. AreaLines(tree, largeReferences, $"Removed {TextFormat.Count(largeReferences.Count)} objects of the large-reference lists, in:"),
             ]);
     }
 
-    private static Dictionary<AreaGroup, int> CountTargetsPerHold(CollectedObjects world) =>
-        AreaGroups.Rank(world, Enumerable.Range(0, world.Targets.Length), AreaLevel.Hold).ToDictionary(entry => entry.Key, entry => entry.Value);
+    /// <summary>One tree per kept kind, the kind with the most objects first, as in the kept summary.</summary>
+    private static IEnumerable<string> KeptAreaLines(AreaTree tree, IReadOnlyList<KeptObject> keptOnce) =>
+        KeyedGroups.IndicesByKey(keptOnce, entry => KeepReasonText.Category(entry.Reason), StringComparer.Ordinal)
+            .OrderByDescending(kind => kind.Indices.Count)
+            .ThenBy(kind => kind.Key, StringComparer.Ordinal)
+            .SelectMany(kind => AreaLines(
+                tree,
+                [.. kind.Indices.Select(index => keptOnce[index].TargetIndex)],
+                $"Kept {TextFormat.Count(kind.Indices.Count)} objects that would have been removed, {kind.Key}, in:"));
 
-    /// <param name="targetsPerHold">With it, each hold of the detailed log also shows how many target objects are there.</param>
-    private static IEnumerable<string> AreaLines(
-        CollectedObjects world, IReadOnlyList<int> targets, string header, IReadOnlyDictionary<AreaGroup, int>? targetsPerHold, ReportContext context)
+    private static IEnumerable<string> AreaLines(AreaTree tree, IReadOnlyList<int> targets, string header) =>
+        targets.Count == 0 ? [] : [header, .. tree.NodesOf(targets).SelectMany(worldspace => AreaNodeLines(worldspace, depth: 0))];
+
+    /// <summary>
+    /// E.g. "    Whiterun hold 800/3000": the area, indented by its level, then its listed objects / target objects there. An area
+    /// with a single child gets no line of its own; the chain is one line at the level of its first name, e.g.
+    /// "    Riften hold › Riften 2/2", with the counts of its last area and a name that repeats an earlier one in it left out.
+    /// </summary>
+    private static IEnumerable<string> AreaNodeLines(AreaNode node, int depth)
     {
-        if (targets.Count == 0) return [];
-        return [header, .. AreaLevels.SelectMany(level => LevelLines(world, targets, level, level.Level == AreaLevel.Hold ? targetsPerHold : null, context))];
+        List<AreaNode> chain = [node];
+        while (chain[^1].Children.Count == 1) chain.Add(chain[^1].Children[0]);
+        var last = chain[^1];
+        var names = string.Join(JoinedAreaSeparator, chain.Select(area => area.Name).Distinct(StringComparer.Ordinal));
+        return
+        [
+            $"{string.Concat(Enumerable.Repeat(AreaIndentStep, depth + 1))}{names} {TextFormat.Count(last.Count)}/{TextFormat.Count(last.TargetsThere)}",
+            .. last.Children.SelectMany(child => AreaNodeLines(child, depth + chain.Count)),
+        ];
     }
-
-    private static IEnumerable<string> LevelLines(
-        CollectedObjects world, IReadOnlyList<int> targets, AreaLevelName level, IReadOnlyDictionary<AreaGroup, int>? targetsThere, ReportContext context)
-    {
-        var ranked = AreaGroups.Rank(world, targets, level.Level);
-        return context.Detailed ? AllAreasLines(ranked, level.Plural, targetsThere) : [TopAreasLine(ranked, level.Plural)];
-    }
-
-    /// <summary>E.g. "  places: 41 Loreius Farm (Skyrim), 30 Dawnstar (Skyrim); 12 more in 3 other places."</summary>
-    private static string TopAreasLine(IReadOnlyList<KeyValuePair<AreaGroup, int>> ranked, string plural)
-    {
-        var shown = TextLists.TopN(ranked, TopAreaCount, entry => $"{TextFormat.Count(entry.Value)} {entry.Key.Name}", Describe.ListSeparator);
-        var folded = ranked.Skip(TopAreaCount).ToList();
-        var more = folded.Count == 0
-            ? string.Empty
-            : $"; {TextFormat.Count(folded.Sum(entry => entry.Value))} more in {TextFormat.Count(folded.Count)} other {plural}";
-        return $"  {plural}: {shown}{more}.";
-    }
-
-    private static IEnumerable<string> AllAreasLines(
-        IReadOnlyList<KeyValuePair<AreaGroup, int>> ranked, string plural, IReadOnlyDictionary<AreaGroup, int>? targetsThere) =>
-        targetsThere is null
-            ?
-            [
-                $"  {plural}:",
-                .. ranked.Select(entry => $"    {TextFormat.Count(entry.Value)} {entry.Key.Name}"),
-            ]
-            :
-            [
-                $"  {plural} (removed / target objects there):",
-                .. ranked.Select(entry => $"    {TextFormat.Count(entry.Value)} / {TextFormat.Count(targetsThere[entry.Key])} {entry.Key.Name}"),
-            ];
-
-    /// <summary>An area level with the plural noun its area lines list it by.</summary>
-    private readonly record struct AreaLevelName(AreaLevel Level, string Plural);
 }

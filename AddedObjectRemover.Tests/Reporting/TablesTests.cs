@@ -352,7 +352,7 @@ public sealed class TablesTests : IDisposable
         return new SupportEvaluationRow(target, iteration, contacts, supporters, removed, removedAsLinked, held);
     }
 
-    private ReportFileSettings Reports(string name) => new(true, Folder(name));
+    private ReportFileSettings Reports(string name) => new(Folder(name));
 
     private string Folder(string name) => Path.Combine(_root, name);
 

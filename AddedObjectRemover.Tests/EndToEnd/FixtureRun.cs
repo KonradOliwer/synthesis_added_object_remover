@@ -35,7 +35,7 @@ internal static class FixtureRun
             var state = FixturePatcherState.Create(
                 loadOrder, dataFolder, Path.Combine(root.FullName, FixturePatcherState.PatchModKey.FileName));
             var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey);
-            var pluginRecords = new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods);
+            var pluginRecords = new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods, workers);
             var request = SettingsValidator.Build(
                 StandardConfig.Of(settings.Standard), pluginRecords.Open(), plugins, settings.DetailedLogAndReports, Program.ReportsFolder(state), workers);
             var environment = new RunEnvironment(

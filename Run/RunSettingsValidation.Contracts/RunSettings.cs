@@ -17,6 +17,7 @@ namespace AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 /// <param name="ExcludedNames">The excluded plugins as parsed from the settings, loaded or not, for the settings echo.</param>
 /// <param name="LeftBehind">Null when the left-behind invisible objects step is off.</param>
 /// <param name="MarkerMoves">Null unless kept markers are moved, which needs the left-behind step.</param>
+/// <param name="Reports">Null when the detailed log and reports are off.</param>
 public sealed record RunSettings(
     PluginName Target,
     PluginName TargetAsTyped,
@@ -29,6 +30,9 @@ public sealed record RunSettings(
     AlsoRemoveSettings AlsoRemove,
     LeftBehindSettings? LeftBehind,
     MarkerMoveSettings? MarkerMoves,
-    ReportFileSettings Reports,
-    bool DetailedLog,
-    Execution Execution);
+    ReportFileSettings? Reports,
+    Execution Execution)
+{
+    /// <summary>The one "Detailed log and reports" setting: it turns on the detailed log and the report files together.</summary>
+    public bool DetailedLog => Reports is not null;
+}

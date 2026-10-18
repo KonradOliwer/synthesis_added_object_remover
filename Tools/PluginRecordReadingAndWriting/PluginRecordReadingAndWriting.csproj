@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>Reads and writes plugin records through Mutagen. It references PluginRecordFacts, Ids, BoxAndTransformMath, TriangleMeshTests, KeyedGroupingInInputOrder, ComputedOnceLookups and GroundSurfaceQueries and holds Mutagen.Bethesda.Skyrim; only the entry references it.</Description>
+    <Description>Reads and writes plugin records through Mutagen. It references PluginRecordFacts, Ids, BoxAndTransformMath, TriangleMeshTests, KeyedGroupingInInputOrder, ComputedOnceLookups, GroundSurfaceQueries and OrderIndependentParallelWork and holds Mutagen.Bethesda.Skyrim; only the entry references it.</Description>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Mutagen.Bethesda.Skyrim" Version="0.54.2" />
@@ -17,6 +17,7 @@
     <ProjectReference Include="..\KeyedGroupingInInputOrder\KeyedGroupingInInputOrder.csproj" />
     <ProjectReference Include="..\ComputedOnceLookups\ComputedOnceLookups.csproj" />
     <ProjectReference Include="..\GroundSurfaceQueries\GroundSurfaceQueries.csproj" />
+    <ProjectReference Include="..\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />

@@ -69,8 +69,8 @@ internal static partial class LogSections
             + $"Count ground type changes: {OnWith(terrain.CountTerrainTypeChanges, $"remove only when this share of the ground points changed type: {terrain.MinTerrainTypeChangePercent}%")}.";
     }
 
-    private static string DescribeDetailedLogAndReports(ReportFileSettings reports) =>
-        $"Detailed log and reports: {OnWith(reports.WriteFiles, $"report files go to {reports.Folder}")}.";
+    private static string DescribeDetailedLogAndReports(ReportFileSettings? reports) =>
+        $"Detailed log and reports: {(reports is null ? "off" : $"on, report files go to {reports.Folder}")}.";
 
     private static string StopMessage(StopReason reason, SettingsSource source) => reason.Kind switch
     {

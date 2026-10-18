@@ -25,7 +25,7 @@ public sealed class CsvReportOutputTests : IDisposable
         File.WriteAllText(known, "old");
         File.WriteAllText(other, "mine");
 
-        Assert.Equal(new ReportFolderPrepared(StepOutcome.Performed, Warning: null), _output.Prepare(new ReportFileSettings(true, _folder)));
+        Assert.Equal(new ReportFolderPrepared(StepOutcome.Performed, Warning: null), _output.Prepare(new ReportFileSettings(_folder)));
 
         Assert.False(File.Exists(known));
         Assert.True(File.Exists(other));
@@ -38,7 +38,7 @@ public sealed class CsvReportOutputTests : IDisposable
         var known = Path.Combine(_folder, ReportFileNames.EdgesFileName);
         File.WriteAllText(known, "old");
 
-        Assert.Equal(new ReportFolderPrepared(StepOutcome.SwitchedOff, Warning: null), _output.Prepare(new ReportFileSettings(false, _folder)));
+        Assert.Equal(new ReportFolderPrepared(StepOutcome.SwitchedOff, Warning: null), _output.Prepare(settings: null));
 
         Assert.True(File.Exists(known));
     }
@@ -48,7 +48,7 @@ public sealed class CsvReportOutputTests : IDisposable
     [Fact]
     public void WriteCreatesTheFolderAndReportsEachFile()
     {
-        var result = _output.Write(new ReportFileSettings(true, _folder), Performed(Table("x.csv", ["1", "2"], ["3", "4"]), Table("y.csv")));
+        var result = _output.Write(new ReportFileSettings(_folder), Performed(Table("x.csv", ["1", "2"], ["3", "4"]), Table("y.csv")));
 
         Assert.Empty(result.Warnings);
         Assert.Equal(["x.csv", "y.csv"], result.Written.Select(table => table.FileName));
@@ -60,7 +60,7 @@ public sealed class CsvReportOutputTests : IDisposable
     [Fact]
     public void WriteGivenSwitchedOffTablesWritesNothingAndReturnsSwitchedOff()
     {
-        var result = _output.Write(new ReportFileSettings(true, _folder), ReportTables.SwitchedOff);
+        var result = _output.Write(new ReportFileSettings(_folder), ReportTables.SwitchedOff);
 
         Assert.Equal(StepOutcome.SwitchedOff, result.Outcome);
         Assert.Empty(result.Written);
@@ -73,7 +73,7 @@ public sealed class CsvReportOutputTests : IDisposable
         var stopped = new ReportTables(
             StepOutcome.StoppedByUnexpectedError, [], new PartFailure(ReportFileParts.ReportFiles, "InvalidOperationException: it broke", Subject: null));
 
-        var result = _output.Write(new ReportFileSettings(true, _folder), stopped);
+        var result = _output.Write(new ReportFileSettings(_folder), stopped);
 
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
         Assert.Empty(result.Written);
@@ -86,7 +86,7 @@ public sealed class CsvReportOutputTests : IDisposable
     {
         var brokenTable = new CsvTable("x.csv", ["a", "b"], default);
 
-        var result = _output.Write(new ReportFileSettings(true, _folder), Performed(brokenTable));
+        var result = _output.Write(new ReportFileSettings(_folder), Performed(brokenTable));
 
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
         Assert.Empty(result.Written);
@@ -100,7 +100,7 @@ public sealed class CsvReportOutputTests : IDisposable
     {
         Directory.CreateDirectory(Path.Combine(_folder, "x.csv"));
 
-        var result = _output.Write(new ReportFileSettings(true, _folder), Performed(Table("x.csv"), Table("y.csv")));
+        var result = _output.Write(new ReportFileSettings(_folder), Performed(Table("x.csv"), Table("y.csv")));
 
         Assert.Equal("y.csv", Assert.Single(result.Written).FileName);
         var problem = Assert.Single(result.Warnings);
@@ -121,7 +121,7 @@ public sealed class CsvReportOutputTests : IDisposable
         ReportFolderPrepared prepared;
         try
         {
-            prepared = _output.Prepare(new ReportFileSettings(true, _folder));
+            prepared = _output.Prepare(new ReportFileSettings(_folder));
         }
         finally
         {

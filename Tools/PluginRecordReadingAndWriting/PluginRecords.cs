@@ -10,7 +10,8 @@ internal sealed class PluginRecords(
     ILoadOrder<IModListing<ISkyrimModGetter>> loadOrder,
     ILinkCache<ISkyrimMod, ISkyrimModGetter> linkCache,
     ISkyrimMod patchMod,
-    PluginNames names) : IPluginRecords
+    PluginNames names,
+    Execution execution) : IPluginRecords
 {
     private const string NotReadMessage = "The placed records must be read before they are used.";
 
@@ -21,7 +22,7 @@ internal sealed class PluginRecords(
 
     public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope)
     {
-        var scanned = PlacedRecordReader.Read(loadOrder, linkCache, patchMod.ModKey, names, scope);
+        var scanned = PlacedRecordReader.Read(loadOrder, linkCache, patchMod.ModKey, names, scope, execution);
         _scanned = scanned;
         _writer = new PlacedRecordWriter(new PlacedOverrideWriter(patchMod, names), scanned.Handles);
         return scanned.Facts;

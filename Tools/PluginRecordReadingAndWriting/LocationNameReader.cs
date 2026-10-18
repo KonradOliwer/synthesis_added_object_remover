@@ -6,34 +6,21 @@ using Mutagen.Bethesda.Skyrim;
 namespace AddedObjectRemover;
 
 /// <summary>
-/// Names the Location chains of cells through the load-order winners, following each chain once. A link that cannot be
-/// found, or a parent that loops back, ends the chain there.
+/// Names Location chains through the load-order winners. A link that cannot be found, or a parent that loops back, ends the
+/// chain there. Holds no state, so it may be called from several threads at once.
 /// </summary>
-internal sealed class LocationNameReader(ILinkCache<ISkyrimMod, ISkyrimModGetter> linkCache)
+/// <param name="holdKeyword">The keyword that marks a Location as a hold.</param>
+internal sealed class LocationNameReader(ILinkCache linkCache, FormKey holdKeyword)
 {
-    private readonly Dictionary<FormKey, FormKey?> _worldspaceTops = new();
-    private readonly Dictionary<(FormKey Location, FormKey? Top), LocationNames?> _names = new();
-
-    /// <param name="worldspace">The cell's worldspace; null for an interior.</param>
-    public LocationNames? Read(ICellGetter cell, FormKey? worldspace)
-    {
-        if (!cell.Location.TryResolve(linkCache, out var location)) return null;
-        var top = worldspace is { } worldspaceKey ? FindWorldspaceTop(worldspaceKey) : null;
-        if (_names.TryGetValue((location.FormKey, top), out var names)) return names;
-        names = NameChain(FollowParents(location), top);
-        _names.Add((location.FormKey, top), names);
-        return names;
-    }
-
-    private FormKey? FindWorldspaceTop(FormKey worldspace)
-    {
-        if (_worldspaceTops.TryGetValue(worldspace, out var top)) return top;
-        top = linkCache.TryResolve<IWorldspaceGetter>(worldspace, out var record) && record.Location.TryResolve(linkCache, out var location)
+    /// <returns>The last Location of the chain that starts at the worldspace's own Location; null when it has none.</returns>
+    public FormKey? FindWorldspaceTop(FormKey worldspace) =>
+        linkCache.TryResolve<IWorldspaceGetter>(worldspace, out var record) && record.Location.TryResolve(linkCache, out var location)
             ? FollowParents(location)[^1].FormKey
             : null;
-        _worldspaceTops.Add(worldspace, top);
-        return top;
-    }
+
+    /// <param name="top">The top Location of the cell's worldspace; null for an interior or a worldspace without one.</param>
+    public LocationNames? Read(FormKey location, FormKey? top) =>
+        linkCache.TryResolve<ILocationGetter>(location, out var record) ? NameChain(FollowParents(record), top) : null;
 
     private List<ILocationGetter> FollowParents(ILocationGetter location)
     {
@@ -44,11 +31,21 @@ internal sealed class LocationNameReader(ILinkCache<ISkyrimMod, ISkyrimModGetter
     }
 
     /// <remarks>A place Location without any name leaves the cell unnamed by its Location; a hold without one is named like the place.</remarks>
-    private static LocationNames? NameChain(List<ILocationGetter> chain, FormKey? top)
+    private LocationNames? NameChain(List<ILocationGetter> chain, FormKey? top)
     {
         if (RecordDisplayNames.Of(chain[0].Name, chain[0].EditorID) is not { } place) return null;
-        var topIndex = chain.FindIndex(location => location.FormKey == top);
-        var hold = chain[Math.Max((topIndex < 0 ? chain.Count - 1 : topIndex) - 1, 0)];
+        var hold = FindHold(chain, top);
         return new LocationNames(RecordDisplayNames.Of(hold.Name, hold.EditorID) ?? place, place);
+    }
+
+    /// <remarks>
+    /// The nearest Location with the hold keyword. Without it, the hold is the Location just below the top.
+    /// </remarks>
+    private ILocationGetter FindHold(List<ILocationGetter> chain, FormKey? top)
+    {
+        var keyworded = chain.Find(location => location.Keywords?.Any(keyword => keyword.FormKey == holdKeyword) == true);
+        if (keyworded is not null) return keyworded;
+        var topIndex = chain.FindIndex(location => location.FormKey == top);
+        return chain[Math.Max((topIndex < 0 ? chain.Count - 1 : topIndex) - 1, 0)];
     }
 }

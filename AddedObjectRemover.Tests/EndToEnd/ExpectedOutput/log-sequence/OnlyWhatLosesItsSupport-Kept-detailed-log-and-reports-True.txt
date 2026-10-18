@@ -100,29 +100,16 @@ Possible manual patch needed: 2 objects to check.
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
 ## areas
 Removed 18 objects in:
-  worldspaces:
-    17 AorInterior
-    1 AorWorld
-  holds (removed / target objects there):
-    17 / 38 unnamed area (AorInterior)
-    1 / 2 unnamed area (AorWorld)
-  places:
-    17 AorInterior
-    1 AorExterior (AorWorld)
-Kept 3 objects that would have been removed, in:
-  worldspaces:
-    3 AorInterior
-  holds:
-    3 unnamed area (AorInterior)
-  places:
-    3 AorInterior
+  AorInterior › unnamed area 17/38
+  AorWorld › unnamed area › AorExterior 1/2
+Kept 1 objects that would have been removed, FormList record, in:
+  AorInterior › unnamed area 1/38
+Kept 1 objects that would have been removed, placed object: Enable Parent, in:
+  AorInterior › unnamed area 1/38
+Kept 1 objects that would have been removed, teleport door, in:
+  AorInterior › unnamed area 1/38
 Possible manual patch needed for 2 objects, in:
-  worldspaces:
-    2 AorInterior
-  holds:
-    2 unnamed area (AorInterior)
-  places:
-    2 AorInterior
+  AorInterior › unnamed area 2/38
 ## written
 Anchoring diagnostics: wrote 3 evaluations to <root>/Reports/anchoring.csv.
 Mesh origins: 2 target meshes, 2 origin near bottom, 0 origin near centre, 0 other.

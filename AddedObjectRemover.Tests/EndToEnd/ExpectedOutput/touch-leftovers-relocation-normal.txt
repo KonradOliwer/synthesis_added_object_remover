@@ -36,17 +36,18 @@ Possible manual patch needed: 3 objects to check.
   Kept, referenced by a non-placed record: T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm], cell AorExterior [000802:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
 Removed 23 objects in:
-  worldspaces: 22 AorInterior, 1 AorWorld.
-  holds: 22 unnamed area (AorInterior), 1 unnamed area (AorWorld).
-  places: 22 AorInterior, 1 AorExterior (AorWorld).
-Kept 5 objects that would have been removed, in:
-  worldspaces: 4 AorInterior, 1 AorWorld.
-  holds: 4 unnamed area (AorInterior), 1 unnamed area (AorWorld).
-  places: 4 AorInterior, 1 AorExterior (AorWorld).
+  AorInterior › unnamed area 22/38
+  AorWorld › unnamed area › AorExterior 1/2
+Kept 2 objects that would have been removed, FormList record, in:
+  AorInterior › unnamed area 1/38
+  AorWorld › unnamed area › AorExterior 1/2
+Kept 2 objects that would have been removed, placed object: Enable Parent, in:
+  AorInterior › unnamed area 2/38
+Kept 1 objects that would have been removed, teleport door, in:
+  AorInterior › unnamed area 1/38
 Possible manual patch needed for 3 objects, in:
-  worldspaces: 2 AorInterior, 1 AorWorld.
-  holds: 2 unnamed area (AorInterior), 1 unnamed area (AorWorld).
-  places: 2 AorInterior, 1 AorExterior (AorWorld).
+  AorInterior › unnamed area 2/38
+  AorWorld › unnamed area › AorExterior 1/2
 Done.
 ## patch
 000807:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (0.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none

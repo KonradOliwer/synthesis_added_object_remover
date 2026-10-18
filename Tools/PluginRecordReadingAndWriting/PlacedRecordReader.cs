@@ -38,8 +38,7 @@ internal sealed class PlacedRecordReader
     private readonly HashSet<RecordKey> _seenNavmeshes = new();
     private readonly Dictionary<RecordKey, IModContext<ISkyrimMod, ISkyrimModGetter, ICell, ICellGetter>> _winningCells = new();
     private readonly Dictionary<RecordKey, SpaceFact> _spaces = new();
-    private readonly LocationNameReader _locationNames;
-    private readonly Dictionary<RecordKey, CellAreaFact> _cellAreas = new();
+    private readonly List<SpaceCell> _targetSpaceCells = [];
 
     private readonly List<PlacedRecordFact> _records = [];
     private readonly Dictionary<RecordKey, PlacedRecordHandle> _handles = new();
@@ -63,7 +62,6 @@ internal sealed class PlacedRecordReader
         _patch = patch;
         _names = names;
         _scope = scope;
-        _locationNames = new LocationNameReader(linkCache);
         _footprint = AnalyzeTargetPlugin();
         if (scope.Terrain || scope.TerrainVersions) FindLandWorldspaces();
         _landWorldspaces = _landWorldspaceOf.Values.ToHashSet();
@@ -74,11 +72,12 @@ internal sealed class PlacedRecordReader
         ILinkCache<ISkyrimMod, ISkyrimModGetter> linkCache,
         ModKey patch,
         PluginNames names,
-        PlacedReadScope scope)
+        PlacedReadScope scope,
+        Execution execution)
     {
         var reader = new PlacedRecordReader(loadOrder, linkCache, patch, names, scope);
         reader.ScanLoadOrder();
-        return reader.CreateScannedRecords();
+        return reader.CreateScannedRecords(CellAreaReader.Read(reader._targetSpaceCells, new LocationNameReader(linkCache, scope.HoldKeyword.ToFormKey()), execution));
     }
 
     /// <summary>A plugin can only link to a target FormKey if it is the target, has it as a master, or is the patch.</summary>
@@ -156,7 +155,7 @@ internal sealed class PlacedRecordReader
         var space = GetCellSpace(cellContext);
         var cellFact = new CellFact(_names.KeyOf(cell.FormKey), cell.EditorID);
         var inTargetSpace = _footprint.SpaceKeys.Contains(space.Key);
-        if (inTargetSpace && _winningCells.TryAdd(cellFact.Key, cellContext)) _cellAreas.Add(cellFact.Key, ReadCellArea(cell, space));
+        if (inTargetSpace && _winningCells.TryAdd(cellFact.Key, cellContext)) _targetSpaceCells.Add(new SpaceCell(cellFact.Key, space, cell));
         if (_landWorldspaces.Contains(space.Key)) CollectLandscape(cell, cellFact.Key, space, winningMod);
         if (_scope.Navmeshes && inTargetSpace) CollectNavmeshes(cell, cellFact.Key, space);
 
@@ -164,14 +163,6 @@ internal sealed class PlacedRecordReader
         {
             ScanRecord(record, persistent, new ScannedCell(space, cellFact, inTargetSpace, winningMod, collectReferences));
         }
-    }
-
-    private CellAreaFact ReadCellArea(ICellGetter cell, SpaceFact space)
-    {
-        var interior = space.Kind == SpaceKind.Interior;
-        CellGridPoint? grid = !interior && cell.Grid is { } cellGrid ? new CellGridPoint(cellGrid.Point.X, cellGrid.Point.Y) : null;
-        var location = _locationNames.Read(cell, interior ? null : space.Key.ToFormKey());
-        return new CellAreaFact(space.Key, grid, RecordDisplayNames.Of(cell.Name, cell.EditorID), location);
     }
 
     /// <remarks>
@@ -238,7 +229,7 @@ internal sealed class PlacedRecordReader
         record.GetReferenceRadius(),
         record.GetPrimitiveBounds());
 
-    private ScannedRecords CreateScannedRecords()
+    private ScannedRecords CreateScannedRecords(IReadOnlyDictionary<RecordKey, CellAreaFact> cellAreas)
     {
         var terrain = new LandscapeTerrain(_landscapes, _landWorldspaceOf, _scope.TerrainVersions ? _landscapeVersions : null, _scope.TerrainLayers ? _names : null);
         var facts = new PlacedRecordFacts(
@@ -247,7 +238,7 @@ internal sealed class PlacedRecordReader
             _footprint.OverriddenRecords,
             [.. _links],
             _navmeshes.Values.Sum(navmeshes => navmeshes.Count),
-            _cellAreas);
+            cellAreas);
         return new ScannedRecords(facts, new RecordHandles(_handles), terrain, new NavmeshRecords(_navmeshes));
     }
 

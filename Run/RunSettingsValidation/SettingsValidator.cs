@@ -36,8 +36,9 @@ public static class SettingsValidator
 
     /// <summary>Validation runs in a fixed order because the warnings are reported in the order found.</summary>
     /// <param name="detailedLogAndReports">The one setting for every run that turns on both the detailed log and the report files.</param>
+    /// <param name="reportsFolder">Required only when <paramref name="detailedLogAndReports"/> is on.</param>
     public static RunRequest Build(
-        ConfiguredSettings config, IPluginRecords records, LoadOrderPlugins mods, bool detailedLogAndReports, string reportsFolder, int workers)
+        ConfiguredSettings config, IPluginRecords records, LoadOrderPlugins mods, bool detailedLogAndReports, string? reportsFolder, int workers)
     {
         var settings = config.Settings;
         var warnings = new List<SettingWarning>();
@@ -56,7 +57,7 @@ public static class SettingsValidator
         var leftoverSettings = settings.LeftoverInvisibleObjects;
         var leftBehind = CreateLeftBehindSettings(leftoverSettings, warnings);
         var markerMoves = CreateMarkerMoveSettings(leftoverSettings);
-        var reports = new ReportFileSettings(detailedLogAndReports, ResolveReportFolder(reportsFolder, config.Source));
+        var reports = detailedLogAndReports ? CreateReportFileSettings(reportsFolder, config.Source) : null;
 
         var runSettings = new RunSettings(
             targetListing.Mod,
@@ -71,7 +72,6 @@ public static class SettingsValidator
             leftoverSettings.RemoveLeftoverInvisibleObjects ? leftBehind : null,
             markerMoves,
             reports,
-            detailedLogAndReports,
             new Execution(workers));
         return new RunRequest.Ready(runSettings, config.Source, [.. warnings]);
     }
@@ -81,7 +81,7 @@ public static class SettingsValidator
     /// configs with the same target, fail the whole batch; a Standard request that stops stays a stop request.
     /// </summary>
     public static BatchRequest BuildAll(
-        ConfigsRead read, IPluginRecords records, LoadOrderPlugins mods, bool detailedLogAndReports, string reportsFolder, int workers) =>
+        ConfigsRead read, IPluginRecords records, LoadOrderPlugins mods, bool detailedLogAndReports, string? reportsFolder, int workers) =>
         read switch
         {
             ConfigsRead.Failed failed => new BatchRequest.Failed(failed.Message),
@@ -90,7 +90,7 @@ public static class SettingsValidator
         };
 
     private static BatchRequest BuildEach(
-        ImmutableArray<ConfiguredSettings> configs, IPluginRecords records, LoadOrderPlugins mods, bool detailedLogAndReports, string reportsFolder, int workers)
+        ImmutableArray<ConfiguredSettings> configs, IPluginRecords records, LoadOrderPlugins mods, bool detailedLogAndReports, string? reportsFolder, int workers)
     {
         var requests = ImmutableArray.CreateBuilder<RunRequest>(configs.Length);
         foreach (var config in configs)
@@ -219,6 +219,9 @@ public static class SettingsValidator
         leftovers.RemoveLeftoverInvisibleObjects && leftovers.MoveKeptMarkersOutOfOtherModsObjects ? new MarkerMoveSettings(MarkerMoveLimits.MaxDistance) : null;
 
     /// <summary>A config file's reports go to a subfolder named after the config, so the configs of a batch do not overwrite each other's.</summary>
+    private static ReportFileSettings CreateReportFileSettings(string? reportsFolder, SettingsSource source) =>
+        new(ResolveReportFolder(reportsFolder ?? throw new ArgumentNullException(nameof(reportsFolder)), source));
+
     internal static string ResolveReportFolder(string reportsFolder, SettingsSource source) =>
         source is SettingsSource.ConfigFile file ? Path.Combine(reportsFolder, file.Name) : reportsFolder;
 
@@ -233,7 +236,6 @@ public static class SettingsValidator
             needsSurroundings,
             needsSurroundings,
             markerMoves != null,
-            detailedLog,
             detailedLog,
             changedTerrain.On,
             changedTerrain.On && changedTerrain.CountTerrainTypeChanges);

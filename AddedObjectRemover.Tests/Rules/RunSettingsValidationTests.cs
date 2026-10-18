@@ -161,8 +161,7 @@ public class RunSettingsValidationTests
     public void EditorIdAndOverriddenListsFollowTheDetailedLog(bool detailed)
     {
         var plan = BuildReady(SettingsFor(), detailedLogAndReports: detailed).Settings.Read;
-        Assert.Equal(detailed, plan.OtherEditorIds);
-        Assert.Equal(detailed, plan.OverriddenOthersList);
+        Assert.Equal(detailed, plan.OtherModDetails);
     }
 
     [Theory]
@@ -173,9 +172,19 @@ public class RunSettingsValidationTests
         var settings = BuildReady(SettingsFor(), detailedLogAndReports: on).Settings;
 
         Assert.Equal(on, settings.DetailedLog);
-        Assert.Equal(on, settings.Reports.WriteFiles);
+        Assert.Equal(on, settings.Reports is not null);
         Assert.Equal(on, settings.AlsoRemove.TouchChainsShown);
     }
+
+    [Fact]
+    public void NoReportsFolderIsNeededWhenTheDetailedLogAndReportsAreOff() =>
+        Assert.Null(Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(
+            StandardConfig.Of(SettingsFor()), new PluginNameParsingPlugin(), Facts(), detailedLogAndReports: false, reportsFolder: null, 1)).Settings.Reports);
+
+    [Fact]
+    public void AReportsFolderIsRequiredWhenTheDetailedLogAndReportsAreOn() =>
+        Assert.Throws<ArgumentNullException>(() => SettingsValidator.Build(
+            StandardConfig.Of(SettingsFor()), new PluginNameParsingPlugin(), Facts(), detailedLogAndReports: true, reportsFolder: null, 1));
 
     [Theory]
     [InlineData(nameof(NpcHandling.Never))]
@@ -209,7 +218,7 @@ public class RunSettingsValidationTests
     {
         var supportOnly = SettingsFor();
         supportOnly.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.OnlyWhatLosesItsSupport };
-        Assert.Equal(new WhatToCollect(true, true, false, false, false, false, false), BuildReady(supportOnly).Settings.Read);
+        Assert.Equal(new WhatToCollect(true, true, false, false, false, false), BuildReady(supportOnly).Settings.Read);
 
         var relocating = SettingsFor();
         relocating.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.EverythingTouchingIt };
@@ -219,12 +228,12 @@ public class RunSettingsValidationTests
             MoveKeptMarkersOutOfOtherModsObjects = true,
         };
         var runSettings = BuildReady(relocating).Settings;
-        Assert.Equal(new WhatToCollect(true, true, true, false, false, false, false), runSettings.Read);
+        Assert.Equal(new WhatToCollect(true, true, true, false, false, false), runSettings.Read);
         Assert.NotNull(runSettings.MarkerMoves);
 
         var neither = SettingsFor();
         neither.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.EverythingTouchingIt };
-        Assert.Equal(new WhatToCollect(false, false, false, false, false, false, false), BuildReady(neither).Settings.Read);
+        Assert.Equal(new WhatToCollect(false, false, false, false, false, false), BuildReady(neither).Settings.Read);
     }
 
     [Theory]
@@ -438,14 +447,16 @@ public class RunSettingsValidationTests
 
     [Fact]
     public void StandardReportsGoToTheReportsFolderItself() =>
-        Assert.Equal(ReportsFolder, BuildReady(SettingsFor()).Settings.Reports.Folder);
+        Assert.Equal(ReportsFolder, BuildReady(SettingsFor(), detailedLogAndReports: true).Settings.Reports?.Folder);
 
     [Fact]
     public void AConfigFilesReportsGoToASubfolderNamedAfterTheConfig()
     {
-        var ready = Assert.IsType<RunRequest.Ready>(Assert.Single(BuildBatch(SettingsFor()).Requests));
+        var read = new ConfigsRead.Ready([new ConfiguredSettings(ConfigSource("town_walls", 1, 1), SettingsFor())]);
+        var batch = Assert.IsType<BatchRequest.Ready>(SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), Facts(), detailedLogAndReports: true, ReportsFolder, 1));
+        var ready = Assert.IsType<RunRequest.Ready>(Assert.Single(batch.Requests));
 
-        Assert.Equal(Path.Combine(ReportsFolder, "town_walls"), ready.Settings.Reports.Folder);
+        Assert.Equal(Path.Combine(ReportsFolder, "town_walls"), ready.Settings.Reports?.Folder);
     }
 
     [Fact]

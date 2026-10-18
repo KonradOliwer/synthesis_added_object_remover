@@ -4,9 +4,8 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 /// <param name="SupportOnlyObjects">Every other placed object of the target spaces, as possible supporters or objects around a marker.</param>
 /// <param name="Terrain">The terrain of the target worldspaces.</param>
 /// <param name="Navmesh">The winning navmeshes of the target spaces.</param>
-/// <param name="OtherEditorIds">The Editor IDs of other mods' objects.</param>
-/// <param name="OverriddenOthersList">The list of other mods' objects the target overrides.</param>
+/// <param name="OtherModDetails">The Editor IDs of other mods' objects, and the list of other mods' objects the target overrides.</param>
 /// <param name="TerrainVersions">Every plugin's version of the terrain of the target worldspaces' cells.</param>
 /// <param name="TerrainLayers">The texture layers of those versions; needs <paramref name="TerrainVersions"/>.</param>
 public sealed record WhatToCollect(
-    bool SupportOnlyObjects, bool Terrain, bool Navmesh, bool OtherEditorIds, bool OverriddenOthersList, bool TerrainVersions, bool TerrainLayers);
+    bool SupportOnlyObjects, bool Terrain, bool Navmesh, bool OtherModDetails, bool TerrainVersions, bool TerrainLayers);

@@ -112,35 +112,18 @@ Possible manual patch needed: 3 objects to check.
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
 ## areas
 Removed 21 objects in:
-  worldspaces:
-    20 AorInterior
-    1 AorWorld
-  holds (removed / target objects there):
-    20 / 38 unnamed area (AorInterior)
-    1 / 2 unnamed area (AorWorld)
-  places:
-    20 AorInterior
-    1 AorExterior (AorWorld)
-Kept 4 objects that would have been removed, in:
-  worldspaces:
-    3 AorInterior
-    1 AorWorld
-  holds:
-    3 unnamed area (AorInterior)
-    1 unnamed area (AorWorld)
-  places:
-    3 AorInterior
-    1 AorExterior (AorWorld)
+  AorInterior › unnamed area 20/38
+  AorWorld › unnamed area › AorExterior 1/2
+Kept 2 objects that would have been removed, FormList record, in:
+  AorInterior › unnamed area 1/38
+  AorWorld › unnamed area › AorExterior 1/2
+Kept 1 objects that would have been removed, placed object: Enable Parent, in:
+  AorInterior › unnamed area 1/38
+Kept 1 objects that would have been removed, teleport door, in:
+  AorInterior › unnamed area 1/38
 Possible manual patch needed for 3 objects, in:
-  worldspaces:
-    2 AorInterior
-    1 AorWorld
-  holds:
-    2 unnamed area (AorInterior)
-    1 unnamed area (AorWorld)
-  places:
-    2 AorInterior
-    1 AorExterior (AorWorld)
+  AorInterior › unnamed area 2/38
+  AorWorld › unnamed area › AorExterior 1/2
 ## written
 Leftover invisible objects diagnostics: wrote 5 evaluations to <root>/Reports/leftover-invisible-objects.csv.
 Removals: wrote 21 rows to <root>/Reports/removals.csv.

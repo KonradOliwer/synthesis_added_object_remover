@@ -18,9 +18,9 @@ internal sealed class CsvReportOutput : IReportOutput
         ReportFileNames.HintsFileName,
     ];
 
-    public ReportFolderPrepared Prepare(ReportFileSettings settings)
+    public ReportFolderPrepared Prepare(ReportFileSettings? settings)
     {
-        if (!settings.WriteFiles) return new ReportFolderPrepared(StepOutcome.SwitchedOff, Warning: null);
+        if (settings is null) return new ReportFolderPrepared(StepOutcome.SwitchedOff, Warning: null);
 
         var warning = FileFailures.Guard(
             () => Files.DeleteListed(settings.Folder, KnownFileNames),
@@ -28,12 +28,13 @@ internal sealed class CsvReportOutput : IReportOutput
         return new ReportFolderPrepared(StepOutcome.Performed, warning);
     }
 
-    public ReportFilesResult Write(ReportFileSettings settings, ReportTables tables)
+    public ReportFilesResult Write(ReportFileSettings? settings, ReportTables tables)
     {
         if (tables.Outcome != StepOutcome.Performed) return new ReportFilesResult(tables.Outcome, [], [], Failure: null);
 
+        var folderSettings = settings ?? throw new InvalidOperationException("Report tables were performed for a run that writes no report files.");
         return Failures.Attempt(
-            () => WriteAll(settings, tables),
+            () => WriteAll(folderSettings, tables),
             failure => new ReportFilesResult(StepOutcome.StoppedByUnexpectedError, [], [], PartFailure.OfWholePart(ReportFileParts.ReportFiles, failure)));
     }
 

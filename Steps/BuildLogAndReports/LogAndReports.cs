@@ -314,7 +314,7 @@ public sealed class LogAndReports
             .. markersByType.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [markersByType],
             .. warnings.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [warnings],
             LogSections.BuildHintsSection(world, outcome.Hints),
-            LogSections.BuildAreasSection(world, removals, kept, outcome.Hints, outcome.RemovalRisks, _context),
+            LogSections.BuildAreasSection(world, removals, kept, outcome.Hints, outcome.RemovalRisks),
         ];
     }
 }

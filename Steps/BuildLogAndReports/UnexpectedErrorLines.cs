@@ -15,6 +15,9 @@ internal static class UnexpectedErrorLines
 
     private const string ListIndent = "    ";
 
+    private const string StackTraceHeading = ListIndent + "Stack trace:";
+    private const string StackTraceIndent = ListIndent + "  ";
+
     public static ImmutableArray<string> Of(IEnumerable<UnexpectedError> errors, ReportContext context) =>
         [.. InGroupOrder(errors.Distinct()).GroupBy(error => (error.Part, error.Failure, error.Subject?.Kind)).SelectMany(group => LinesOf([.. group], context))];
 
@@ -27,18 +30,24 @@ internal static class UnexpectedErrorLines
             .ThenBy(error => error.Subject?.Position)
             .ThenBy(error => error.Subject?.Label, StringComparer.Ordinal)
             .ThenBy(error => error.Subject?.Kind.Plural, StringComparer.Ordinal)
-            .ThenBy(error => error.Consequence, StringComparer.Ordinal);
+            .ThenBy(error => error.Consequence, StringComparer.Ordinal)
+            .ThenBy(error => error.Details, StringComparer.Ordinal);
 
     private static IEnumerable<string> LinesOf(IReadOnlyList<UnexpectedError> group, ReportContext context)
     {
         var first = group[0];
-        if (first.Subject is null) return [first.Message];
+        if (first.Subject is null) return context.Detailed ? [first.Message, .. StackTraceLines(first)] : [first.Message];
 
         var line = GroupLine(first, group);
         return context.Detailed && group.Count > ExampleCount
             ? [line, .. group.Select(error => ListIndent + error.Subject!.Label)]
             : [line];
     }
+
+    private static IEnumerable<string> StackTraceLines(UnexpectedError error) =>
+        error.Details is { } details
+            ? [StackTraceHeading, .. details.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).Select(line => StackTraceIndent + line)]
+            : [];
 
     private static string GroupLine(UnexpectedError first, IReadOnlyList<UnexpectedError> group)
     {

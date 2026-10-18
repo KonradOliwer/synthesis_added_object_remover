@@ -31,7 +31,7 @@ public static class RestingObjects
 
         var rounds = Failures.Attempt(
             () => DecideRounds(input, shapes, triangles, terrain, objectsOfAnyPlugin),
-            failure => NotPerformed(input, StepOutcome.StoppedByUnexpectedError, new PartFailure(RestingObjectsParts.AlsoRemove, failure, Subject: null)));
+            failure => NotPerformed(input, StepOutcome.StoppedByUnexpectedError, PartFailure.OfWholePart(RestingObjectsParts.AlsoRemove, failure)));
         var run = rounds with { Result = WithTouchChains(rounds, input) };
         return run.Result with { ReportFileDetails = FindReportFileDetails(run, input, bases, shapes, triangles) };
     }
@@ -130,7 +130,7 @@ public static class RestingObjects
         if (!NeedsTouchChains(run.Result, input.Settings)) return run.Result;
         return Failures.Attempt(
             () => run.Result with { TouchChains = TouchChains.Find(run, input.Targets.Length, input.Execution) },
-            failure => run.Result with { TouchChainsFailure = new PartFailure(RestingObjectsParts.TouchChains, failure, Subject: null) });
+            failure => run.Result with { TouchChainsFailure = PartFailure.OfWholePart(RestingObjectsParts.TouchChains, failure) });
     }
 
     /// <remarks>A step whose rounds or touch chains failed computes no details; their status says so.</remarks>
@@ -149,7 +149,7 @@ public static class RestingObjects
         return Failures.Attempt(
             () => ExplanationFinder.Compute(detailsInput),
             failure => new ReportFileDetails(
-                StepOutcome.StoppedByUnexpectedError, Touch: null, MeshOrigins: null, new PartFailure(RestingObjectsParts.ReportFileDetails, failure, Subject: null)));
+                StepOutcome.StoppedByUnexpectedError, Touch: null, MeshOrigins: null, PartFailure.OfWholePart(RestingObjectsParts.ReportFileDetails, failure)));
     }
 
     /// <summary>The step without rounds: switched off, or stopped by <paramref name="failure"/>; it proposes nothing.</summary>

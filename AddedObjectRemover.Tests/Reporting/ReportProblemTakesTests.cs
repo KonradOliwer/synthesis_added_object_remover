@@ -57,6 +57,8 @@ public class ReportProblemTakesTests
 
         public MeshTriangles? ReadTriangles(string meshPath) => throw NotRead();
 
+        public TriangleFailureCounts CountTriangleFailures() => throw NotRead();
+
         private static InvalidOperationException NotRead() => new("The problem takes read only the problem log.");
     }
 }

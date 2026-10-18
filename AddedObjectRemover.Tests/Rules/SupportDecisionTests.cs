@@ -1,4 +1,5 @@
 using System.Numerics;
+using AddedObjectRemover.Tests.Fixtures;
 
 namespace AddedObjectRemover.Tests.Rules;
 
@@ -42,7 +43,7 @@ public class SupportDecisionTests
             new(Supporter.Terrain, [false, true, false]),
         ];
         float[] weights = [float.NaN, 0f, 2f];
-        var samples = new WeightedSurfaceSamples([Vector3.Zero, Vector3.Zero, Vector3.Zero], weights, new Box(Vector3.Zero, new Vector3(3, 4, 0)));
+        var samples = new WeightedSurfaceSamples([Vector3.Zero, Vector3.Zero, Vector3.Zero], weights, new Box(Vector3.Zero, new Vector3(3, 4, 0)), Falloff: 0.75f);
 
         var contacts = SupportContactFinder.SplitWeightsAmongSupporters(hits, weights);
         var diagnostic = ZeroWeightDiagnosis.Of(7, "m.nif", samples, hits, contacts);
@@ -53,6 +54,7 @@ public class SupportDecisionTests
         Assert.NotNull(diagnostic);
         Assert.Equal(7, diagnostic.TargetIndex);
         Assert.Equal("m.nif", diagnostic.MeshPath);
+        Assert.Equal(0.75f, diagnostic.Falloff);
         Assert.Equal(1.25f, diagnostic.MeshSize);
         Assert.Equal(new SampleWeightCounts(Positive: 1, Zero: 1, NotFinite: 1), diagnostic.Weights);
         Assert.True(double.IsNaN(diagnostic.WeightSum));
@@ -63,11 +65,25 @@ public class SupportDecisionTests
     }
 
     [Fact]
+    public void TheSamplesKeepTheMeshSizeValueTheirWeightsWereComputedWith()
+    {
+        var tree = MeshTriangleTree.Build(BoxMesh.CreateTriangles(TestMeshes.UnitCube), MeshLimits.Tree)!;
+
+        var samples = WeightedSurfaceSamples.Create(tree);
+
+        Assert.True(samples.Falloff > 0);
+        Assert.Equal(samples.MeshSize, samples.Falloff);
+        Assert.All(
+            samples.Points.Zip(samples.Weights),
+            sample => Assert.Equal(1f / (1f + MathF.Pow(sample.First.Length() / samples.Falloff, 2)), sample.Second, 1e-6f));
+    }
+
+    [Fact]
     public void ContactsWithWeightAreNotDescribed()
     {
         SupportContactFinder.SupporterHits[] hits = [new(Supporter.Terrain, [true, false])];
         float[] weights = [1f, 1f];
-        var samples = new WeightedSurfaceSamples([Vector3.Zero, Vector3.Zero], weights, Box.Zero);
+        var samples = new WeightedSurfaceSamples([Vector3.Zero, Vector3.Zero], weights, Box.Zero, Falloff: 0f);
 
         var contacts = SupportContactFinder.SplitWeightsAmongSupporters(hits, weights);
 

@@ -5,12 +5,31 @@ public class FailuresTests
     [Fact]
     public void AnAttemptedPartThatThrowsGivesTheStoppedResultBuiltFromItsFailure()
     {
-        var result = Failures.Attempt<string>(() => throw new InvalidOperationException("it broke."), failure => $"stopped: {failure}");
+        var result = Failures.Attempt<string>(() => throw new InvalidOperationException("it broke."), failure => $"stopped: {failure.Description}");
 
         Assert.Equal("stopped: InvalidOperationException: it broke", result);
-        Assert.Equal("worked", Failures.Attempt(() => "worked", failure => failure));
-        Assert.Throws<OutOfMemoryException>(() => Failures.Attempt<string>(() => throw new OutOfMemoryException(), failure => failure));
+        Assert.Equal("worked", Failures.Attempt(() => "worked", failure => failure.Description));
+        Assert.Throws<OutOfMemoryException>(() => Failures.Attempt<string>(() => throw new OutOfMemoryException(), failure => failure.Description));
     }
+
+    [Fact]
+    public void ACaughtFailureKeepsTheExceptionsFullTextWithItsStackTrace()
+    {
+        var details = Failures.Attempt<string>(ThrowFromNamedMethod, failure => failure.Details);
+
+        Assert.StartsWith("System.InvalidOperationException: it broke.", details, StringComparison.Ordinal);
+        Assert.Contains(nameof(ThrowFromNamedMethod), details, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheDetailsOfAWrappedParallelFailureAreThoseOfTheInnerFailureWhoseDescriptionSortsFirst()
+    {
+        var wrapped = new AggregateException(new InvalidOperationException("b"), new ArgumentException("a"));
+
+        Assert.StartsWith("System.ArgumentException: a", Failures.Catch(wrapped).Details, StringComparison.Ordinal);
+    }
+
+    private static string ThrowFromNamedMethod() => throw new InvalidOperationException("it broke.");
 
     [Fact]
     public void AMultiLineMessageIsReportedOnOneLine()

@@ -84,13 +84,26 @@ internal sealed class MeshFileSource
         if (!_archiveIndex.Value.TryGetValue(meshPath, out var archiveFile)) return null;
         try
         {
-            return archiveFile.GetBytes();
+            return ReadToStatedSize(archiveFile);
         }
         catch (Exception ex) when (KnownProblems.IsCorruptArchive(ex))
         {
             _problems.Add(AssetProblem.ArchiveExtractFailed(meshPath, ex.GetType().Name, ex.Message));
             return null;
         }
+    }
+
+    /// <remarks>
+    /// Not <see cref="IArchiveFile.GetBytes"/>: Mutagen's BSA reader reads once and ignores how much it got, so a short read
+    /// would leave zeros. Reading to the archive's stated size turns a short read into an <see cref="EndOfStreamException"/>.
+    /// The size is asked after opening the stream, which caches it.
+    /// </remarks>
+    private static byte[] ReadToStatedSize(IArchiveFile archiveFile)
+    {
+        using var stream = archiveFile.AsStream();
+        var bytes = new byte[archiveFile.Size];
+        stream.ReadExactly(bytes);
+        return bytes;
     }
 
     /// <summary>

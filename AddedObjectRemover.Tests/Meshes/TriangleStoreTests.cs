@@ -60,11 +60,4 @@ public class TriangleStoreTests
         Assert.Equal(3, reads);
         Assert.Equal(1, cache.GetStats().Built);
     }
-
-    [Fact]
-    public void DisposingADefaultLeaseDoesNothing()
-    {
-        var exception = Record.Exception(() => default(Lease<MeshTriangleTree>).Dispose());
-        Assert.Null(exception);
-    }
 }

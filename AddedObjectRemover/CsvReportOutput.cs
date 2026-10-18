@@ -33,7 +33,7 @@ internal sealed class CsvReportOutput : IReportOutput
 
         return Failures.Attempt(
             () => WriteAll(settings, tables),
-            failure => new ReportFilesResult(StepOutcome.StoppedByUnexpectedError, [], [], new PartFailure(ReportFileParts.ReportFiles, failure, Subject: null)));
+            failure => new ReportFilesResult(StepOutcome.StoppedByUnexpectedError, [], [], PartFailure.OfWholePart(ReportFileParts.ReportFiles, failure)));
     }
 
     private static ReportFilesResult WriteAll(ReportFileSettings settings, ReportTables tables)

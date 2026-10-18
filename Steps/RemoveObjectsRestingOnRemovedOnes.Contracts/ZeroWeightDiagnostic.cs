@@ -10,8 +10,9 @@ public readonly record struct SampleWeightCounts(int Positive, int Zero, int Not
 public readonly record struct SupporterSamples(Supporter Supporter, int TouchingSamples, float RawWeightSum);
 
 /// <summary>What a candidate's support evaluation worked with when it found contact points but no support weight.</summary>
-/// <param name="MeshSize">The mesh size value of the sample weights: a quarter of the bounds diagonal.</param>
-/// <param name="Bounds">The mesh bounds the mesh size value comes from.</param>
+/// <param name="Falloff">The mesh size value the sample weights were computed with.</param>
+/// <param name="MeshSize">The mesh size value recomputed from <paramref name="Bounds"/>: a quarter of the bounds diagonal.</param>
+/// <param name="Bounds">The mesh bounds the recomputed mesh size value comes from.</param>
 /// <param name="WeightSum">The sum of all sample weights.</param>
 /// <param name="TouchingWeightSum">The sum of the weights of the samples in contact with any supporter.</param>
 /// <param name="Supporters">Every supporter evaluated, terrain included, in evaluation order.</param>
@@ -19,6 +20,7 @@ public sealed record ZeroWeightDiagnostic(
     int TargetIndex,
     string MeshPath,
     int ContactPoints,
+    float Falloff,
     float MeshSize,
     Box Bounds,
     int Samples,

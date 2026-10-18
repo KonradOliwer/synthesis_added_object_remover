@@ -19,6 +19,14 @@ public class MeshProblemTextTests
             @"  [mesh] triangles unreadable: meshes\a.nif (mesh file not found)"
         },
         {
+            AssetProblem.TrianglesUnreadableAfterGoodRead(Mesh, MeshReadFailure.NotFound()),
+            @"  [mesh] triangles unreadable after reading fine earlier in the run: meshes\a.nif (mesh file not found)"
+        },
+        {
+            AssetProblem.TrianglesUnreadableAfterGoodRead(Mesh, "IOException: broke"),
+            @"  [mesh] triangles unreadable after reading fine earlier in the run: meshes\a.nif (IOException: broke)"
+        },
+        {
             AssetProblem.Unreadable(Mesh, MeshReadFailure.NoRenderGeometry(Shapes([], hiddenIgnored: false))),
             @"  [mesh] no visible geometry (normal for markers and dummy items): meshes\a.nif (20 shapes: counted=1, hidden=2, editorMarker=3, effectShader=4, "
             + "unsupported=0, noVertices=5, unreachable=6, hiddenAncestor=7, markerAncestor=8, mismatchedStrips=9)"

@@ -7,6 +7,9 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 /// <param name="Subject">The one object or mesh it happened for; null when it stopped a whole part.</param>
 internal sealed record UnexpectedError(string Part, string Failure, string Consequence, ErrorSubject? Subject)
 {
+    /// <summary>The exception's full text with its stack trace, which only the detailed log prints; null when the part failed without an exception.</summary>
+    public string? Details { get; init; }
+
     /// <summary>The log line of an error that stopped a whole part, as printed; errors for single objects are printed grouped.</summary>
     public string Message => $"  Unexpected error {(Subject is null ? "in" : "while")} {Part} ({Failure}). {Consequence}";
 }

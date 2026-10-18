@@ -97,5 +97,7 @@ public partial class ObjectFailureRunTests
             string.Equals(meshPath, brokenMesh, StringComparison.OrdinalIgnoreCase)
                 ? throw new InvalidOperationException("crate triangles broke")
                 : inner.ReadTriangles(meshPath);
+
+        public TriangleFailureCounts CountTriangleFailures() => inner.CountTriangleFailures();
     }
 }

@@ -195,7 +195,7 @@ public sealed class RestingObjectsEndSectionsTests
     {
         var (world, alsoRemove, decisions) = SupportScene();
         var diagnostic = new ZeroWeightDiagnostic(
-            1, "m.nif", 2, 1.25f, new Box(Vector3.Zero, new Vector3(3, 4, 0)), 3,
+            1, "m.nif", 2, 0.75f, 1.25f, new Box(Vector3.Zero, new Vector3(3, 4, 0)), 3,
             new SampleWeightCounts(1, 1, 1), double.NaN, 0.5, [new SupporterSamples(Supporter.Terrain, 2, float.NaN)]);
         var withCase = alsoRemove with { Evidence = [new SupportRoundDetails([], Pairs, [new ZeroWeightCase(5, diagnostic)])] };
 
@@ -205,7 +205,7 @@ public sealed class RestingObjectsEndSectionsTests
         var line = Assert.Single(detailed, text => text.StartsWith("  Anchoring found no support weight for ", StringComparison.Ordinal));
         Assert.Contains("(mesh m.nif, iteration 1, 5 candidates evaluated before it in this run)", line);
         Assert.EndsWith(
-            "2 contact points; mesh size value 1.25 from bounds (0.0, 0.0, 0.0) to (3.0, 4.0, 0.0); 3 samples: 1 with weight above 0, 1 at 0, 1 not finite; "
+            "2 contact points; weights computed with mesh size value 0.75; mesh size value 1.25 recomputed from bounds (0.0, 0.0, 0.0) to (3.0, 4.0, 0.0); 3 samples: 1 with weight above 0, 1 at 0, 1 not finite; "
             + "weights add up to NaN (0.5 for the touching samples); supporters: terrain 2 touching samples, raw weight NaN.",
             line);
         Assert.DoesNotContain(normal, text => text.Contains("no support weight", StringComparison.Ordinal));
@@ -356,8 +356,26 @@ public sealed class RestingObjectsEndSectionsTests
     {
         var failures = Statistics([new(Category(MeshReadError.NotFound), 2), new(Category(MeshReadError.NoRootNode), 1)]);
 
-        Assert.Equal(["Mesh failures: 2 not found, 1 no root node."], LogSections.BuildBoundsSection(failures, Normal).Lines.ToList());
-        Assert.Empty(LogSections.BuildBoundsSection(Statistics([]), Normal).Lines.ToList());
+        Assert.Equal(["Mesh failures: 2 not found, 1 no root node."], LogSections.BuildBoundsSection(failures, TriangleFailureCounts.None, Normal).Lines.ToList());
+        Assert.Empty(LogSections.BuildBoundsSection(Statistics([]), TriangleFailureCounts.None, Normal).Lines.ToList());
+    }
+
+    [Fact]
+    public void Bounds_BothLogsShowTheMeshTriangleFailuresAndThoseAfterAGoodReadNextToTheMeshFailures()
+    {
+        var failures = Statistics([new(Category(MeshReadError.NotFound), 2)]);
+        var triangles = new TriangleFailureCounts([new(Category(MeshReadError.UnexpectedException), 1), new(Category(MeshReadError.NotFound), 3)], AfterGoodRead: 1);
+
+        Assert.Equal(
+            [
+                "Mesh failures: 2 not found.",
+                "Mesh triangle failures: 3 not found, 1 unexpected error.",
+                "Meshes whose triangles failed after reading fine earlier in the run: 1.",
+            ],
+            LogSections.BuildBoundsSection(failures, triangles, Normal).Lines.ToList());
+        Assert.Equal(
+            ["  Mesh triangle failures: 3 not found, 1 unexpected error.", "  Meshes whose triangles failed after reading fine earlier in the run: 1."],
+            LogSections.BuildBoundsSection(Statistics([]), triangles, Detailed).Lines.Skip(1).ToList());
     }
 
     [Fact]
@@ -373,7 +391,7 @@ public sealed class RestingObjectsEndSectionsTests
 
         Assert.Equal(
             ["Mesh failures: 3 no root node, 2 EndOfStreamException, 2 not found, 2 unexpected error."],
-            LogSections.BuildBoundsSection(failures, Normal).Lines.ToList());
+            LogSections.BuildBoundsSection(failures, TriangleFailureCounts.None, Normal).Lines.ToList());
     }
 
     [Theory]
@@ -383,7 +401,7 @@ public sealed class RestingObjectsEndSectionsTests
     {
         var stats = Statistics(withFailures ? [new(Category(MeshReadError.NotFound), 2)] : []);
 
-        AssertExpectedOutput(LogSections.BuildBoundsSection(stats, Detailed).Lines.ToList(), "Bounds_DetailedLogMatchesTheExpectedOutput", $"{withFailures}");
+        AssertExpectedOutput(LogSections.BuildBoundsSection(stats, TriangleFailureCounts.None, Detailed).Lines.ToList(), "Bounds_DetailedLogMatchesTheExpectedOutput", $"{withFailures}");
     }
 
     [Fact]

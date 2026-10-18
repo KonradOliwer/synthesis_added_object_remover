@@ -31,7 +31,7 @@ public class UnexpectedErrorRunTests
         Assert.Equal(
             $"  Unexpected error in the marker moves (InvalidOperationException: {FailingHomeCellPlugin.FailureMessage}). "
             + "No kept marker was moved, so markers inside other mods' objects stay where they are.",
-            Assert.Single(errorSection.Lines));
+            Assert.Single(errorSection.Lines, IsErrorLine));
         Assert.Contains("Moved kept markers: not performed because of an unexpected error.", SectionLines(log, "relocations"));
     }
 
@@ -65,6 +65,38 @@ public class UnexpectedErrorRunTests
         Assert.Equal(StepOutcome.StoppedByEarlierFailure, outcome.RestingObjects.ReportFileDetails.Outcome);
         Assert.Equal(
             "Report-file details: not performed because Also remove was not performed.", Assert.Single(SectionLines(log, "explanationProblems")));
+    }
+
+    [Fact]
+    public void AnAlsoRemoveFailureDuringItsRoundsShowsInTheNormalLogAndItsStackTraceInTheDetailedLog()
+    {
+        const string errorLine =
+            "  Unexpected error in the also-remove step (InvalidOperationException: also-remove broke). "
+            + "The also-remove rounds did not complete, so objects resting on removed ones were not removed.";
+
+        var normal = RunWithFailingAlsoRemoveRounds(SettingsVariants.TouchWithLeftBehindAndMarkerMovesNormalLog);
+        var detailed = RunWithFailingAlsoRemoveRounds(SettingsVariants.TouchWithLeftBehindAndMarkerMoves);
+
+        Assert.Equal([errorLine], SectionLines(normal, "unexpectedErrors").ToList());
+        Assert.Equal("Also remove: not performed because of an unexpected error.", Assert.Single(SectionLines(normal, "follow-up")));
+        var detailedLines = SectionLines(detailed, "unexpectedErrors");
+        Assert.Equal([errorLine, "    Stack trace:", "      System.InvalidOperationException: also-remove broke"], detailedLines.Take(3).ToList());
+        Assert.Contains(detailedLines.Skip(3), line => line.StartsWith("         at ", StringComparison.Ordinal));
+    }
+
+    /// <remarks>The clock's second reading is when the rounds end, so the rounds fail after they were decided.</remarks>
+    private static RecordingLogSink RunWithFailingAlsoRemoveRounds(string variant)
+    {
+        var log = new RecordingLogSink();
+        var readings = 0;
+        var outcome = ((RunResult.Done)FixtureRun.Run(
+            SettingsVariants.Of(variant),
+            workers: 1,
+            log,
+            DefaultMeshFiles,
+            timeSinceStart: () => ++readings == 2 ? throw new InvalidOperationException("also-remove broke") : TimeSpan.Zero)).Outcome;
+        Assert.Equal(StepOutcome.StoppedByUnexpectedError, outcome.RestingObjects.Outcome);
+        return log;
     }
 
     [Fact]
@@ -155,7 +187,7 @@ public class UnexpectedErrorRunTests
         Assert.Equal("meshProblems", log.Sections[explanation + 1].Id);
         Assert.Equal("archiveWarnings", log.Sections[explanation + 2].Id);
         Assert.Equal("unexpectedErrors", log.Sections[explanation + 3].Id);
-        Assert.Equal(errorLine, Assert.Single(log.Sections[explanation + 3].Lines));
+        Assert.Equal(errorLine, Assert.Single(log.Sections[explanation + 3].Lines, IsErrorLine));
         Assert.Equal("done", log.Sections.Last().Id);
     }
 
@@ -206,7 +238,10 @@ public class UnexpectedErrorRunTests
         ((RunResult.Done)FixtureRun.Run(
             SettingsVariants.Of(SettingsVariants.TouchWithLeftBehindAndMarkerMoves), workers: 1, log, DefaultMeshFiles, wrapPlugin: null, wrapBases)).Outcome;
 
-    private static ImmutableArray<string> UnexpectedErrorLines(RecordingLogSink log) => SectionLines(log, "unexpectedErrors");
+    /// <summary>The error lines, without the stack traces the detailed log prints under them.</summary>
+    private static ImmutableArray<string> UnexpectedErrorLines(RecordingLogSink log) => [.. SectionLines(log, "unexpectedErrors").Where(IsErrorLine)];
+
+    private static bool IsErrorLine(string line) => line.StartsWith("  Unexpected error ", StringComparison.Ordinal);
 
     [Fact]
     public void ARunWithoutUnexpectedErrorsPrintsNoErrorLines()

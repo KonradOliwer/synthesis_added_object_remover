@@ -202,7 +202,7 @@ public sealed class LogAndReports
 
         return Failures.Attempt(
             () => new ReportTables(StepOutcome.Performed, Tables.BuildTables(outcome, _settings.AlsoRemove, _context), Failure: null),
-            failure => new ReportTables(StepOutcome.StoppedByUnexpectedError, [], new PartFailure(ReportFileParts.ReportFiles, failure, Subject: null)));
+            failure => new ReportTables(StepOutcome.StoppedByUnexpectedError, [], PartFailure.OfWholePart(ReportFileParts.ReportFiles, failure)));
     }
 
     /// <summary>The errors recorded since the last take, worded, except the mesh errors, which print in the mesh problems section.</summary>
@@ -305,7 +305,7 @@ public sealed class LogAndReports
         return
         [
             LogSections.BuildRemovalsSection(world, removals, _context),
-            LogSections.BuildBoundsSection(outcome.Shapes, _context),
+            LogSections.BuildBoundsSection(outcome.Shapes, _caches.MeshFiles.CountTriangleFailures(), _context),
             LogSections.BuildSpacesSection(world, removals, _context),
             LogSections.BuildTargetVisibilitySection(world.Targets, world.Counts.TargetsHiddenOrWithoutPlacement, _context),
             LogSections.BuildRemovalSummarySection(removals, outcome.ChangedTerrain.Outcome),

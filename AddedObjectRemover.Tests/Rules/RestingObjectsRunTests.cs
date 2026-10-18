@@ -174,7 +174,8 @@ public class RestingObjectsRunTests
         var result = Run(probe, FollowUpRemovalMode.EverythingTouchingIt, afterTooClose, touchChainsShown: true);
 
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
-        Assert.Equal(new PartFailure(RestingObjectsParts.AlsoRemove, $"InvalidOperationException: {Failure}", Subject: null), result.Failure);
+        Assert.Equal(new PartFailure(RestingObjectsParts.AlsoRemove, $"InvalidOperationException: {Failure}", Subject: null), result.Failure! with { Details = null });
+        Assert.StartsWith($"System.InvalidOperationException: {Failure}", result.Failure.Details, StringComparison.Ordinal);
         Assert.Empty(result.ProposedRounds);
         Assert.Empty(result.Rounds);
         Assert.Null(result.TouchChains);
@@ -192,7 +193,7 @@ public class RestingObjectsRunTests
         Assert.Equal(StepOutcome.Performed, result.Outcome);
         Assert.NotEmpty(result.ProposedRounds);
         Assert.Null(result.TouchChains);
-        Assert.Equal(new PartFailure(RestingObjectsParts.TouchChains, $"InvalidOperationException: {Failure}", Subject: null), result.TouchChainsFailure);
+        Assert.Equal(new PartFailure(RestingObjectsParts.TouchChains, $"InvalidOperationException: {Failure}", Subject: null), result.TouchChainsFailure! with { Details = null });
         Assert.Same(ReportFileDetails.StoppedByEarlierFailure, result.ReportFileDetails);
         Assert.Equal(StepOutcome.StoppedByEarlierFailure, result.ReportFileDetails.Outcome);
     }
@@ -232,7 +233,7 @@ public class RestingObjectsRunTests
 
         Assert.Equal(StepOutcome.Performed, result.Outcome);
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, details.Outcome);
-        Assert.Equal(new PartFailure(RestingObjectsParts.ReportFileDetails, $"InvalidOperationException: {Failure}", Subject: null), details.Failure);
+        Assert.Equal(new PartFailure(RestingObjectsParts.ReportFileDetails, $"InvalidOperationException: {Failure}", Subject: null), details.Failure! with { Details = null });
         Assert.Null(details.MeshOrigins);
     }
 

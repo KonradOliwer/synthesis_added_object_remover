@@ -50,7 +50,7 @@ internal static class RunPartText
             wording.Part,
             failure.Failure ?? FailuresWithoutException.GetValueOrDefault(failure.Part) ?? throw Unknown(failure.Part),
             wording.Consequence,
-            SubjectOf(failure.Subject, wording));
+            SubjectOf(failure.Subject, wording)) { Details = failure.Details };
     }
 
     /// <summary>How the "Linked groups" line names the step whose removals the linked ones followed.</summary>

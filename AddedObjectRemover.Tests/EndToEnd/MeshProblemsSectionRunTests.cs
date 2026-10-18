@@ -177,6 +177,8 @@ public class MeshProblemsSectionRunTests
         public string NormalizeMeshPath(string givenPath) => inner.NormalizeMeshPath(givenPath);
 
         public MeshTriangles? ReadTriangles(string meshPath) => inner.ReadTriangles(meshPath);
+
+        public TriangleFailureCounts CountTriangleFailures() => inner.CountTriangleFailures();
     }
 
     /// <summary>Opens the run's mesh reader and keeps the reader and the error channel it was given, so a test can record into the run's own channels.</summary>

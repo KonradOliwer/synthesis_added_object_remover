@@ -8,7 +8,8 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 internal static partial class LogSections
 {
     /// <remarks>The mesh failures are the one part the normal log shows, without the indent that nests them under the statistics line.</remarks>
-    public static LogSection BuildBoundsSection(BoundsStats stats, ReportContext context)
+    /// <param name="triangles">The meshes whose triangles could not be read; objects using them have no mesh triangles for the rest of the run.</param>
+    public static LogSection BuildBoundsSection(BoundsStats stats, TriangleFailureCounts triangles, ReportContext context)
     {
         List<string> lines = [];
         if (context.Detailed)
@@ -20,13 +21,20 @@ internal static partial class LogSections
                 + $"({TextFormat.Count(stats.ModelsFromLooseFiles)} loose, {TextFormat.Count(stats.ModelsFromArchives)} from {TextFormat.Count(stats.ArchivesIndexed)} archives), "
                 + $"{TextFormat.Count(stats.ModelsWithFooterRoot)} with a footer root other than their first node.");
         }
-        if (stats.ModelFailuresByKind.Count > 0)
+        var indent = context.Detailed ? "  " : string.Empty;
+        if (stats.ModelFailuresByKind.Count > 0) lines.Add($"{indent}Mesh failures: {MeshFailureCounts(stats.ModelFailuresByKind)}.");
+        if (triangles.ByKind.Count > 0) lines.Add($"{indent}Mesh triangle failures: {MeshFailureCounts(triangles.ByKind)}.");
+        if (triangles.AfterGoodRead > 0)
         {
-            var indent = context.Detailed ? "  " : string.Empty;
-            var worded = stats.ModelFailuresByKind.Select(entry => KeyValuePair.Create(MeshProblemText.FailureCategory(entry.Key), entry.Value));
-            lines.Add($"{indent}Mesh failures: {string.Join(Describe.ListSeparator, TextLists.Counts(KeyedGroups.Rank(worded, StringComparer.Ordinal)))}.");
+            lines.Add($"{indent}Meshes whose triangles failed after reading fine earlier in the run: {TextFormat.Count(triangles.AfterGoodRead)}.");
         }
         return new LogSection("bounds", [.. lines]);
+    }
+
+    private static string MeshFailureCounts(IEnumerable<KeyValuePair<MeshFailureCategory, int>> failures)
+    {
+        var worded = failures.Select(entry => KeyValuePair.Create(MeshProblemText.FailureCategory(entry.Key), entry.Value));
+        return string.Join(Describe.ListSeparator, TextLists.Counts(KeyedGroups.Rank(worded, StringComparer.Ordinal)));
     }
 
     public static LogSection BuildSpacesSection(CollectedObjects world, IReadOnlyList<RemovedObject> removals, ReportContext context)

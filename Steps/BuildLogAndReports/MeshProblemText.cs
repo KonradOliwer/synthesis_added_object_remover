@@ -12,6 +12,8 @@ internal static class MeshProblemText
             $"  [mesh] no visible geometry (normal for markers and dummy items): {problem.Mesh} ({ShapeCountsText(Required(Required(problem.ReadFailure).Shapes))})",
         AssetProblemKind.Unreadable => $"  [mesh] unreadable: {problem.Mesh} ({ReadFailure(Required(problem.ReadFailure))})",
         AssetProblemKind.TrianglesUnreadable => $"  [mesh] triangles unreadable: {problem.Mesh} ({ReadFailure(Required(problem.ReadFailure))})",
+        AssetProblemKind.TrianglesUnreadableAfterGoodRead =>
+            $"  [mesh] triangles unreadable after reading fine earlier in the run: {problem.Mesh} ({(problem.ReadFailure is { } failure ? ReadFailure(failure) : Required(problem.Detail))})",
         AssetProblemKind.ReadWarning =>
             $"  [mesh] {problem.Mesh}: {Required(problem.MismatchedStrips)} NiTriStrips shape(s) whose strip lengths do not match their points are used as points.",
         AssetProblemKind.LooseFileUnreadable => $"  [mesh] could not read loose file {problem.LoosePath}: {problem.Detail}",

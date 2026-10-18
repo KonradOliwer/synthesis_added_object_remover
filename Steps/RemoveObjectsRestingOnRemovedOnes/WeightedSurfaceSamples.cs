@@ -9,16 +9,17 @@ namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 /// triangles' bounds. Most placed objects have their origin where they rest, so contact there
 /// anchors more than contact far away.
 /// </summary>
-internal sealed record WeightedSurfaceSamples(Vector3[] Points, float[] Weights, Box Bounds)
+/// <param name="Falloff">The L the weights were computed with.</param>
+internal sealed record WeightedSurfaceSamples(Vector3[] Points, float[] Weights, Box Bounds, float Falloff)
 {
     /// <summary>Distance from the origin, as a fraction of the bounds diagonal, at which a sample has half weight.</summary>
     private const float OriginFalloffFraction = 0.25f;
 
     private const int SamplesPerMesh = 4096;
 
-    public static WeightedSurfaceSamples Empty { get; } = new([], [], Box.Zero);
+    public static WeightedSurfaceSamples Empty { get; } = new([], [], Box.Zero, Falloff: 0f);
 
-    /// <summary>L of the weight formula.</summary>
+    /// <summary>L of the weight formula, recomputed from <see cref="Bounds"/>.</summary>
     public float MeshSize => MeshSizeOf(Bounds);
 
     private static float MeshSizeOf(Box bounds) => bounds.Size.Length() * OriginFalloffFraction;
@@ -27,7 +28,7 @@ internal sealed record WeightedSurfaceSamples(Vector3[] Points, float[] Weights,
     {
         var points = SurfaceSampler.Sample(tree, SamplesPerMesh);
         var falloff = MeshSizeOf(tree.Bounds);
-        return new WeightedSurfaceSamples(points, points.Select(point => WeightByOriginDistance(point.Length(), falloff)).ToArray(), tree.Bounds);
+        return new WeightedSurfaceSamples(points, points.Select(point => WeightByOriginDistance(point.Length(), falloff)).ToArray(), tree.Bounds, falloff);
     }
 
     /// <remarks>A mesh without size has every point at its origin, so every point gets full weight.</remarks>

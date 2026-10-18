@@ -12,6 +12,7 @@ internal sealed class MeshFiles(
     : IMeshFiles, IMeshBounds
 {
     private readonly ComputedOncePerKey<string, MeshBounds> _byMesh = new(Publication.BuiltOnce, StringComparer.OrdinalIgnoreCase);
+    private readonly TriangleReadFailures _triangleReads = new();
 
     public IMeshBounds Bounds => this;
 
@@ -45,10 +46,17 @@ internal sealed class MeshFiles(
         }
         catch (Exception ex) when (Failures.IsRecoverable(ex))
         {
-            unexpectedErrors.Add(new PartFailure(MeshReadingParts.MeshTriangles, Failures.DescribeFailure(ex), MeshSubject(meshPath)));
+            var failure = Failures.DescribeFailure(ex);
+            unexpectedErrors.Add(new PartFailure(MeshReadingParts.MeshTriangles, failure, MeshSubject(meshPath)));
+            RecordTriangleFailure(
+                meshPath,
+                new MeshFailureCategory(MeshReadError.UnexpectedException, ExceptionType: null),
+                AssetProblem.TrianglesUnreadableAfterGoodRead(meshPath, failure));
             return null;
         }
     }
+
+    public TriangleFailureCounts CountTriangleFailures() => _triangleReads.Count();
 
     private MeshTriangles? ReadTrianglesOfMesh(string meshPath)
     {
@@ -56,9 +64,20 @@ internal sealed class MeshFiles(
         if (result.Failure is { } failure)
         {
             problems.Add(AssetProblem.TrianglesUnreadable(meshPath, failure));
+            if (failure.Kind != MeshReadError.EffectOnly)
+            {
+                RecordTriangleFailure(meshPath, new MeshFailureCategory(failure.Kind, failure.ExceptionType), AssetProblem.TrianglesUnreadableAfterGoodRead(meshPath, failure));
+            }
             return null;
         }
+        _triangleReads.NoteGoodRead(meshPath);
         return result.Geometry is { Triangles.TriangleCount: > 0 } geometry ? geometry.Triangles : null;
+    }
+
+    /// <param name="afterGoodRead">The problem recorded when the mesh's triangles were read fine earlier in the run.</param>
+    private void RecordTriangleFailure(string meshPath, MeshFailureCategory failure, AssetProblem afterGoodRead)
+    {
+        if (_triangleReads.NoteFailure(meshPath, failure)) problems.Add(afterGoodRead);
     }
 
     private MeshBounds ReadBounds(string meshPath)

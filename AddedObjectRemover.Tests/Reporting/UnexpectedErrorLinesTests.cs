@@ -82,6 +82,21 @@ public class UnexpectedErrorLinesTests
     }
 
     [Fact]
+    public void OnlyTheDetailedLogPrintsTheStackTraceOfAnErrorThatStoppedAWholePart()
+    {
+        var error = new UnexpectedError("the also-remove step", "InvalidOperationException: broke", "Nothing was removed by it.", Subject: null)
+        {
+            Details = "System.InvalidOperationException: broke\r\n   at Step.Run()",
+        };
+        const string line = "  Unexpected error in the also-remove step (InvalidOperationException: broke). Nothing was removed by it.";
+
+        Assert.Equal([line], UnexpectedErrorLines.Of([error], Context(detailed: false)).ToList());
+        Assert.Equal(
+            [line, "    Stack trace:", "      System.InvalidOperationException: broke", "         at Step.Run()"],
+            UnexpectedErrorLines.Of([error], Context(detailed: true)).ToList());
+    }
+
+    [Fact]
     public void MeshesAreCountedAsMeshes()
     {
         var errors = new[] { @"meshes\b.nif", @"meshes\a.nif" }.Select(

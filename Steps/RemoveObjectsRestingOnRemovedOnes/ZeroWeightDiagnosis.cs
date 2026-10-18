@@ -24,6 +24,7 @@ internal static class ZeroWeightDiagnosis
             candidate,
             meshPath,
             contacts.ContactPoints,
+            samples.Falloff,
             samples.MeshSize,
             samples.Bounds,
             samples.Weights.Length,

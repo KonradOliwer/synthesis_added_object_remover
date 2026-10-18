@@ -346,9 +346,23 @@ public class MemoTests
         Assert.Equal(1, builds["none"]);
     }
 
+    /// <remarks>Were the second release counted, the slot of "a" would count no use while the later lease holds it, and it would be evicted.</remarks>
     [Fact]
-    public void DisposingADefaultLeaseDoesNothing()
+    public void ALeaseReleasedTwiceEndsItsUseOnceSoALaterLeaseKeepsTheValueResident()
     {
-        Assert.Null(Record.Exception(() => default(Lease<Blob>).Dispose()));
+        var builds = new Dictionary<string, int>();
+        var store = NewStore(builds);
+        var first = store.Acquire("a");
+        var sameLease = first;
+        first.Dispose();
+        sameLease.Dispose();
+        using var held = store.Acquire("a");
+
+        store.Acquire("b").Dispose();
+        store.Acquire("c").Dispose();
+        using var again = store.Acquire("a");
+
+        Assert.Same(held.Value, again.Value);
+        Assert.Equal(1, builds["a"]);
     }
 }

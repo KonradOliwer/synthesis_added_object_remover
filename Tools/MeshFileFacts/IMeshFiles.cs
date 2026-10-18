@@ -25,6 +25,9 @@ public interface IMeshFiles
 
     /// <summary>The mesh's triangles in mesh-local space; null (with a problem recorded) when the mesh cannot be read or has no triangles.</summary>
     MeshTriangles? ReadTriangles(string meshPath);
+
+    /// <summary>The meshes whose <see cref="ReadTriangles"/> failed so far; an effect-only mesh has no triangles by design and is no failure.</summary>
+    TriangleFailureCounts CountTriangleFailures();
 }
 
 /// <summary>The render-geometry bounds of meshes, each read once with failures included. Thread-safe.</summary>

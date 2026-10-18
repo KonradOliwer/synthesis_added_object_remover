@@ -2,17 +2,23 @@ using System.Collections.Immutable;
 
 namespace AddedObjectRemover;
 
-public enum AssetProblemKind { NotFound, LooseFileUnreadable, ArchiveExtractFailed, Unreadable, TrianglesUnreadable, ReadWarning, FooterRoot }
+public enum AssetProblemKind { NotFound, LooseFileUnreadable, ArchiveExtractFailed, Unreadable, TrianglesUnreadable, TrianglesUnreadableAfterGoodRead, ReadWarning, FooterRoot }
 
 /// <summary>The two block indices of a footer root that was used instead of the first-node root.</summary>
 public readonly record struct FooterRootBlocks(int Used, int FirstNodeRoot);
 
 /// <summary>A problem with one mesh file, as facts only; the wording is the reader's.</summary>
-/// <param name="Detail">The exception message; only for <see cref="AssetProblemKind.LooseFileUnreadable"/> and <see cref="AssetProblemKind.ArchiveExtractFailed"/>.</param>
+/// <param name="Detail">
+/// The exception message; only for <see cref="AssetProblemKind.LooseFileUnreadable"/>, <see cref="AssetProblemKind.ArchiveExtractFailed"/>
+/// and an unexpected <see cref="AssetProblemKind.TrianglesUnreadableAfterGoodRead"/>.
+/// </param>
 /// <param name="LoosePath">The loose file that could not be read; only for <see cref="AssetProblemKind.LooseFileUnreadable"/>.</param>
 /// <param name="ExceptionType">The type name of the archive extract's exception; only for <see cref="AssetProblemKind.ArchiveExtractFailed"/>.</param>
 /// <param name="FooterRoot">Only for <see cref="AssetProblemKind.FooterRoot"/>.</param>
-/// <param name="ReadFailure">Only for <see cref="AssetProblemKind.Unreadable"/> and <see cref="AssetProblemKind.TrianglesUnreadable"/>.</param>
+/// <param name="ReadFailure">
+/// Only for <see cref="AssetProblemKind.Unreadable"/>, <see cref="AssetProblemKind.TrianglesUnreadable"/>
+/// and a <see cref="AssetProblemKind.TrianglesUnreadableAfterGoodRead"/> that is not unexpected.
+/// </param>
 /// <param name="MismatchedStrips">The NiTriStrips shapes whose strip lengths do not match their points; only for <see cref="AssetProblemKind.ReadWarning"/>.</param>
 public sealed record AssetProblem(
     string Mesh,
@@ -31,6 +37,12 @@ public sealed record AssetProblem(
 
     public static AssetProblem TrianglesUnreadable(string mesh, MeshReadFailure failure) =>
         new(mesh, AssetProblemKind.TrianglesUnreadable, null, null, null, null, failure, null);
+
+    public static AssetProblem TrianglesUnreadableAfterGoodRead(string mesh, MeshReadFailure failure) =>
+        new(mesh, AssetProblemKind.TrianglesUnreadableAfterGoodRead, null, null, null, null, failure, null);
+
+    public static AssetProblem TrianglesUnreadableAfterGoodRead(string mesh, string unexpectedFailure) =>
+        new(mesh, AssetProblemKind.TrianglesUnreadableAfterGoodRead, unexpectedFailure, null, null, null, null, null);
 
     public static AssetProblem ReadWarning(string mesh, int mismatchedStrips) =>
         new(mesh, AssetProblemKind.ReadWarning, null, null, null, null, null, mismatchedStrips);

@@ -151,7 +151,8 @@ public class LeftBehindObjectsTests
             Settings);
 
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
-        Assert.Equal(new PartFailure(LeftBehindParts.LeftBehind, "InvalidOperationException: it broke", Subject: null), result.Failure);
+        Assert.Equal(new PartFailure(LeftBehindParts.LeftBehind, "InvalidOperationException: it broke", Subject: null), result.Failure! with { Details = null });
+        Assert.StartsWith("System.InvalidOperationException: it broke.", result.Failure.Details, StringComparison.Ordinal);
         Assert.Empty(result.Evaluations);
         Assert.Empty(result.Proposals);
     }
@@ -162,7 +163,7 @@ public class LeftBehindObjectsTests
         var result = Plan(new MarkerMoveSettings(MarkerMoveLimits.MaxDistance), () => throw new InvalidOperationException("it broke."));
 
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
-        Assert.Equal(new PartFailure(MarkerMoveParts.MarkerMoves, "InvalidOperationException: it broke", Subject: null), result.Failure);
+        Assert.Equal(new PartFailure(MarkerMoveParts.MarkerMoves, "InvalidOperationException: it broke", Subject: null), result.Failure! with { Details = null });
         Assert.Empty(result.Moves);
         Assert.Empty(result.Details);
         Assert.Empty(result.LeftInPlace);

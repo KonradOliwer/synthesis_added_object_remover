@@ -46,7 +46,7 @@ public static class LeftBehindObjects
                         order)
                     .SelectRemovals(RemovedIndexes(decisions), execution),
                 decisions),
-            failure => new LeftBehindResult(StepOutcome.StoppedByUnexpectedError, [], [], new PartFailure(LeftBehindParts.LeftBehind, failure, Subject: null)));
+            failure => new LeftBehindResult(StepOutcome.StoppedByUnexpectedError, [], [], PartFailure.OfWholePart(LeftBehindParts.LeftBehind, failure)));
     }
 
     /// <returns>The result with the round decided on a copy of the decisions: an object the round kept is kept as referenced.</returns>

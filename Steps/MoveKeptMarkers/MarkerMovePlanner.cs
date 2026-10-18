@@ -41,7 +41,7 @@ public static class MarkerMovePlanner
                     settings.MaxDistance)
                 .Move(Candidates(leftBehind, final), execution),
             failure => new MarkerMoves(
-                StepOutcome.StoppedByUnexpectedError, [], [], [], settings.MaxDistance, new PartFailure(MarkerMoveParts.MarkerMoves, failure, Subject: null)));
+                StepOutcome.StoppedByUnexpectedError, [], [], [], settings.MaxDistance, PartFailure.OfWholePart(MarkerMoveParts.MarkerMoves, failure)));
     }
 
     private static IFreeSpotSearch[] SpotSearches(

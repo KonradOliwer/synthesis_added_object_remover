@@ -217,10 +217,13 @@ public class RunSettingsValidationTests
     public void SurroundingsAreReadForSupportModeAndNavmeshesOnlyForMarkerMoves()
     {
         var supportOnly = SettingsFor();
+        supportOnly.TerrainChange.RemoveOnChangedTerrain = false;
+        supportOnly.LeftoverInvisibleObjects.MoveKeptMarkersOutOfOtherModsObjects = false;
         supportOnly.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.OnlyWhatLosesItsSupport };
         Assert.Equal(new WhatToCollect(true, true, false, false, false, false, false), BuildReady(supportOnly).Settings.Read);
 
         var relocating = SettingsFor();
+        relocating.TerrainChange.RemoveOnChangedTerrain = false;
         relocating.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.EverythingTouchingIt };
         relocating.LeftoverInvisibleObjects = new LeftoverInvisibleObjectSettings
         {
@@ -232,6 +235,8 @@ public class RunSettingsValidationTests
         Assert.NotNull(runSettings.MarkerMoves);
 
         var neither = SettingsFor();
+        neither.TerrainChange.RemoveOnChangedTerrain = false;
+        neither.LeftoverInvisibleObjects.MoveKeptMarkersOutOfOtherModsObjects = false;
         neither.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.EverythingTouchingIt };
         Assert.Equal(new WhatToCollect(false, false, false, false, false, false, false), BuildReady(neither).Settings.Read);
     }
@@ -269,14 +274,14 @@ public class RunSettingsValidationTests
     }
 
     [Fact]
-    public void TheChangedTerrainSettingsAreOffByDefaultAndPassedThrough()
+    public void TheChangedTerrainSettingsAreOnByDefaultAndPassedThrough()
     {
         var defaults = BuildReady(SettingsFor()).Settings.ChangedTerrain;
         Assert.Equal(
             new ChangedTerrainSettings(
-                On: false, TerrainCheckedObjects.VisibleObjectsOnTheGround, CountHeightChanges: true, HeightTolerance: 16f, CountTerrainTypeChanges: true,
+                On: true, TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes, CountHeightChanges: true, HeightTolerance: 16f, CountTerrainTypeChanges: true,
                 MinTerrainTypeChangePercent: 20, CountWaterHeightChanges: true, WaterHeightTolerance: 16f, CountWaterAddedOrRemoved: true,
-                MinWaterCoverChangePercent: 20, AreaBySize: false, AreaMultiplier: 0.5f, AreaByDistance: true, AreaDistanceInUnits: 64f),
+                MinWaterCoverChangePercent: 20, AreaBySize: true, AreaMultiplier: 0.5f, AreaByDistance: true, AreaDistanceInUnits: 64f),
             defaults);
 
         var settings = SettingsFor();
@@ -470,6 +475,7 @@ public class RunSettingsValidationTests
         var settings = SettingsFor();
         settings.TerrainChange = new TerrainChangeSettings
         {
+            RemoveOnChangedTerrain = false,
             TerrainCheckedObjects = (TerrainCheckedObjects)99,
             HeightChangeTolerance = 300f,
             BySize = new TerrainBySizeSettings { SizeMultiplier = float.NaN },
@@ -480,8 +486,8 @@ public class RunSettingsValidationTests
 
         Assert.Equal(
             new ChangedTerrainSettings(
-                On: false, TerrainCheckedObjects.VisibleObjectsOnTheGround, true, 256f, true, 20, true, 16f, true, 20,
-                AreaBySize: false, AreaMultiplier: 0.5f, AreaByDistance: true, AreaDistanceInUnits: 0f),
+                On: false, TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes, true, 256f, true, 20, true, 16f, true, 20,
+                AreaBySize: true, AreaMultiplier: 0.5f, AreaByDistance: true, AreaDistanceInUnits: 0f),
             ready.Settings.ChangedTerrain);
         string[] expectedStarts =
         [

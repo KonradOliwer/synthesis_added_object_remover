@@ -83,7 +83,7 @@ public class StandardSettings : ISettingsValues
         "Removes an object of the cleaned mod when another mod changed the terrain under or around it: raised, lowered or flattened it,\n"
         + "changed the kind of ground (for example grass to road), or raised, lowered, added or removed the water there,\n"
         + "so the object may float, sink, stand under water or look out of place.\n"
-        + "Off by default. Interiors and worlds without terrain are not checked.")]
+        + "Interiors and worlds without terrain are not checked.")]
     public TerrainChangeSettings TerrainChange { get; set; } = new();
 
     [SynthesisOrder]
@@ -376,7 +376,7 @@ public class LeftoverInvisibleObjectSettings : ILeftoverSettingsValues
     [SynthesisTooltip(
         "A kept map, X, idle or other marker that sits inside another mod's object is moved to the nearest free spot (up to 2048 units).\n"
         + "Only its position changes. Lights, sounds, furniture and door markers are never moved. Needs the switch at the top of this group.")]
-    public bool MoveKeptMarkersOutOfOtherModsObjects { get; set; }
+    public bool MoveKeptMarkersOutOfOtherModsObjects { get; set; } = true;
 
     float ILeftoverSettingsValues.SearchRadius => (SurroundingObjects ?? new()).SearchRadius;
     int ILeftoverSettingsValues.OccupiedDirectionsPercent => (SurroundingObjects ?? new()).OccupiedDirectionsPercent;

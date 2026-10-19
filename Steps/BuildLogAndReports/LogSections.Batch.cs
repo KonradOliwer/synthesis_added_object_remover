@@ -31,7 +31,7 @@ internal static partial class LogSections
         new("configDefaulted",
             file.Notes.NotInFile.IsEmpty
                 ? []
-                : [$"Not in {file.FileName}, so the default is used:", .. file.Notes.NotInFile.Select(DefaultedLine)]);
+                : [$"Not set in {file.FileName}, defaults used: {string.Join(Describe.ListSeparator, file.Notes.NotInFile.Select(DefaultedSetting))}"]);
 
     private static LogSection BuildNonDefaultSettingsSection(SettingsSource.ConfigFile file, bool detailed) =>
         new("configNonDefault",
@@ -39,8 +39,7 @@ internal static partial class LogSections
                 ? [$"Set in {file.FileName} to other than the default:", .. file.Notes.ChangedFromDefault.Select(NonDefaultLine)]
                 : []);
 
-    private static string DefaultedLine(SettingInFile setting) =>
-        $"  {setting.ScreenName} ({setting.KeyPath}){(setting.IsGroup ? ", all settings in it" : string.Empty)}";
+    private static string DefaultedSetting(SettingInFile setting) => $"{setting.KeyPath} = {setting.ValueAsJson}";
 
-    private static string NonDefaultLine(SettingInFile setting) => $"  {setting.ScreenName} ({setting.KeyPath}): {setting.ValueAsWritten}";
+    private static string NonDefaultLine(SettingInFile setting) => $"  {setting.ScreenName} ({setting.KeyPath}): {setting.ValueAsJson}";
 }

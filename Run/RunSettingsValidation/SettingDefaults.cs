@@ -9,12 +9,12 @@ public static class SettingDefaults
 {
     public const bool RemoveTooCloseBySize = true;
     public const float SizeMultiplier = 0.5f;
-    public const bool RemoveTooCloseByDistance = false;
-    public const float RemovalDistanceInUnits = 32f;
+    public const bool RemoveTooCloseByDistance = true;
+    public const float RemovalDistanceInUnits = 50f;
     public const bool UseRoughBoxes = false;
-    public const bool RemoveOnChangedTerrain = false;
-    public const TerrainCheckedObjects TerrainChecked = TerrainCheckedObjects.VisibleObjectsOnTheGround;
-    public const bool TerrainAreaBySize = false;
+    public const bool RemoveOnChangedTerrain = true;
+    public const TerrainCheckedObjects TerrainChecked = TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes;
+    public const bool TerrainAreaBySize = true;
     public const bool TerrainAreaByDistance = true;
     public const float TerrainAreaDistanceInUnits = 64f;
     public const bool CountHeightChanges = true;
@@ -27,7 +27,7 @@ public static class SettingDefaults
     public const int MinWaterCoverChangePercent = 20;
     public const int MaxOtherMastersForPatch = 10;
     public const NpcHandling Npcs = NpcHandling.OnlyWhenStuckInsideTheObject;
-    public const FollowUpRemovalMode FollowUpMode = FollowUpRemovalMode.EverythingTouchingIt;
+    public const FollowUpRemovalMode FollowUpMode = FollowUpRemovalMode.OnlyWhatLosesItsSupport;
     public const float TouchDistance = 8f;
     public const float AnchoringThresholdPercent = 50f;
     public const float SearchRadius = 1024f;

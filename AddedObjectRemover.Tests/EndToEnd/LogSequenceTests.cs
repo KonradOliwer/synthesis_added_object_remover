@@ -67,7 +67,13 @@ public class LogSequenceTests
     private static StandardSettings CreateStandard(FollowUpRemovalMode mode, Leftovers leftovers) => new()
     {
         TargetPlugin = ModKey.FromNameAndExtension(FixtureWorld.TargetPlugin),
-        TooClose = new TooCloseRemovalSettings { UseRoughBoxes = false, NpcHandling = NpcHandling.OnlyWhenStuckInsideTheObject },
+        TooClose = new TooCloseRemovalSettings
+        {
+            ByDistance = new TooCloseByDistanceSettings { Use = false },
+            UseRoughBoxes = false,
+            NpcHandling = NpcHandling.OnlyWhenStuckInsideTheObject,
+        },
+        TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = false },
         WhatToIgnore = new IgnoreSettings
         {
             ExcludedPlugins = [ModKey.FromNameAndExtension(FixtureWorld.ExcludedPlugin)],

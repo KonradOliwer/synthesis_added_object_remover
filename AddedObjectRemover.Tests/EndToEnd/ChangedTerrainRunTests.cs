@@ -45,8 +45,8 @@ public class ChangedTerrainRunTests
         var log = RunLogged(SettingsWithTerrain(on: true));
 
         Assert.Contains(
-            "Remove objects on terrain changed by other mods: on; Which of the cleaned mod's objects are checked: VisibleObjectsOnTheGround; "
-            + "Margin by object size: off; Margin by fixed distance: on, 64 units; Count height changes: on, ignoring changes up to 16 units; "
+            "Remove objects on terrain changed by other mods: on; Which of the cleaned mod's objects are checked: AllObjectsIncludingInvisibleOnes; "
+            + "Margin by object size: on, 0.5 x object size; Margin by fixed distance: on, 64 units; Count height changes: on, ignoring changes up to 16 units; "
             + "Count ground type changes: on, remove only when this share of the ground points changed type: 20%; "
             + "Count water height changes: on, ignoring changes up to 16 units; Count water added/removed changes: on; "
             + "remove only when this share of the ground got covered/uncovered: 20%.",

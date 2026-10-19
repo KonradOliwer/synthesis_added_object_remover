@@ -15,8 +15,7 @@ public class TooCloseBothZonesRunTests
     private const int Workers = 4;
     private const float SizeMultiplier = 0.1f;
 
-    /// <summary>The default of *Removal distance (game units)*.</summary>
-    private const float DefaultDistance = 32f;
+    private const float DistanceMargin = 32f;
 
     [Fact]
     public void EachZoneRemovesTheCrateItFindsWithItsOwnCause()
@@ -27,7 +26,7 @@ public class TooCloseBothZonesRunTests
             new Dictionary<string, TooCloseCause?>
             {
                 [CrateWorld.CrateFoundBySize] = new TooCloseCause.ObjectSize(),
-                [CrateWorld.CrateFoundByDistance] = new TooCloseCause.Distance(DefaultDistance),
+                [CrateWorld.CrateFoundByDistance] = new TooCloseCause.Distance(DistanceMargin),
                 [CrateWorld.CrateOutOfReach] = null,
             },
             outcome.Collected.Targets.ToDictionary(
@@ -65,10 +64,11 @@ public class TooCloseBothZonesRunTests
         Standard = new StandardSettings
         {
             TargetPlugin = ModKey.FromNameAndExtension(FixtureWorld.TargetPlugin),
+            TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = false },
             TooClose = new TooCloseRemovalSettings
             {
                 BySize = new TooCloseBySizeSettings { Use = true, SizeMultiplier = SizeMultiplier },
-                ByDistance = new TooCloseByDistanceSettings { Use = true, DistanceInUnits = DefaultDistance },
+                ByDistance = new TooCloseByDistanceSettings { Use = true, DistanceInUnits = DistanceMargin },
             },
         },
     };

@@ -122,7 +122,7 @@ public class SettingsFailureMessageTests
         var settings = Read("""{"TooClose":{"ByDistance":{"Use":true},"BySize":{"SizeMultiplier":1}}}""");
 
         Assert.True(settings.TooClose.ByDistance.Use);
-        Assert.Equal(32f, settings.TooClose.ByDistance.DistanceInUnits);
+        Assert.Equal(50f, settings.TooClose.ByDistance.DistanceInUnits);
         Assert.True(settings.TooClose.BySize.Use);
         Assert.Equal(1f, settings.TooClose.BySize.SizeMultiplier);
     }
@@ -134,7 +134,7 @@ public class SettingsFailureMessageTests
 
         Assert.True(settings.TerrainChange.ByDistance.Use);
         Assert.Equal(64f, settings.TerrainChange.ByDistance.DistanceInUnits);
-        Assert.False(settings.TerrainChange.BySize.Use);
+        Assert.True(settings.TerrainChange.BySize.Use);
     }
 
     [Fact]
@@ -142,7 +142,7 @@ public class SettingsFailureMessageTests
     {
         var settings = Read("""{"TooClose":{"ByDistance":null},"TerrainChange":{"ByDistance":null}}""");
 
-        Assert.Equal(32f, ((ITooCloseSettingsValues)settings.TooClose).DistanceInUnits);
+        Assert.Equal(50f, ((ITooCloseSettingsValues)settings.TooClose).DistanceInUnits);
         Assert.Equal(64f, ((ITerrainChangeSettingsValues)settings.TerrainChange).AreaDistanceInUnits);
     }
 

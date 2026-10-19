@@ -17,7 +17,7 @@ public abstract record SettingsSource
 
 /// <summary>What reading a config file found besides its values.</summary>
 /// <param name="UnknownKeys">Key paths in the file that this patcher has no setting for.</param>
-/// <param name="NotInFile">Settings (or whole groups) the file leaves out, so their defaults are used.</param>
+/// <param name="NotInFile">Settings the file leaves out (also those of a left-out group), with the default each gets.</param>
 /// <param name="ChangedFromDefault">Settings the file sets to other than their default.</param>
 public sealed record ConfigFileNotes(
     ImmutableArray<string> UnknownKeys,
@@ -26,6 +26,5 @@ public sealed record ConfigFileNotes(
 
 /// <param name="KeyPath">The JSON path of the setting in the file.</param>
 /// <param name="ScreenName">The setting's name on the settings screen, group first.</param>
-/// <param name="IsGroup">The entry stands for a whole group of settings.</param>
-/// <param name="ValueAsWritten">The value as the file wrote it; null for a group or a setting the file leaves out.</param>
-public sealed record SettingInFile(string KeyPath, string ScreenName, bool IsGroup, string? ValueAsWritten);
+/// <param name="ValueAsJson">The value as the config file holds it: the file's own, or the default for a setting the file leaves out.</param>
+public sealed record SettingInFile(string KeyPath, string ScreenName, string ValueAsJson);

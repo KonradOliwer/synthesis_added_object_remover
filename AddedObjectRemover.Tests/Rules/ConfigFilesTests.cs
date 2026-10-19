@@ -340,22 +340,36 @@ public sealed class ConfigFilesTests : IDisposable
     }
 
     [Fact]
-    public void AGroupLeftOutOrNullIsNotedOnceAndAGroupInTheFileNotesOnlyItsMissingSettings()
+    public void ALeftOutOrNullGroupIsNotedAsItsSettingsWithTheirDefaultsAndAGroupInTheFileNotesOnlyItsMissingSettings()
     {
         var config = ReadOnlyConfig("{\"TargetPlugin\": \"A.esp\", \"TerrainChange\": null, \"TooClose\": {\"BySize\": {\"SizeMultiplier\": 1.0}}}");
 
         var notInFile = NotesOf(config).NotInFile;
 
-        Assert.Contains(new SettingInFile("LeftoverInvisibleObjects", "Invisible objects left behind", true, null), notInFile);
-        Assert.Contains(new SettingInFile("TerrainChange", "Remove objects on terrain changed by other mods", true, null), notInFile);
+        Assert.Contains(new SettingInFile("LeftoverInvisibleObjects.RemoveLeftoverInvisibleObjects", "Invisible objects left behind > Remove invisible objects left inside other mods' objects or alone", "true"), notInFile);
+        Assert.Contains(new SettingInFile("LeftoverInvisibleObjects.SurroundingObjects.SearchRadius", "Invisible objects left behind > When the cleaned mod's visible objects around it were removed > Look this far around it (game units)", "1024.0"), notInFile);
+        Assert.Contains(new SettingInFile("TerrainChange.TerrainCheckedObjects", "Remove objects on terrain changed by other mods > Which of the cleaned mod's objects are checked", "\"AllObjectsIncludingInvisibleOnes\""), notInFile);
+        Assert.Contains(new SettingInFile("TerrainChange.ByDistance.DistanceInUnits", "Remove objects on terrain changed by other mods > Margin by fixed distance > Margin on every side (game units)", "64.0"), notInFile);
+        Assert.Contains(new SettingInFile("WhatToIgnore.ExcludedPlugins", "Other mods that never cause removals > Never count these mods", "[]"), notInFile);
         Assert.Contains(
-            new SettingInFile("TooClose.UseRoughBoxes", "Remove objects too close to other mods' objects > Use rough boxes instead of exact shapes (faster)", false, null),
+            new SettingInFile("TooClose.UseRoughBoxes", "Remove objects too close to other mods' objects > Use rough boxes instead of exact shapes (faster)", "false"),
             notInFile);
         Assert.Contains(
-            new SettingInFile("TooClose.BySize.Use", "Remove objects too close to other mods' objects > Margin by object size > Use this margin", false, null),
+            new SettingInFile("TooClose.BySize.Use", "Remove objects too close to other mods' objects > Margin by object size > Use this margin", "true"),
             notInFile);
-        Assert.DoesNotContain(notInFile, setting => setting.KeyPath.StartsWith("LeftoverInvisibleObjects.", StringComparison.Ordinal));
-        Assert.DoesNotContain(notInFile, setting => setting.KeyPath is "TargetPlugin" or "TooClose.BySize.SizeMultiplier" or "TooClose.BySize");
+        Assert.DoesNotContain(notInFile, setting => setting.KeyPath is "TerrainChange" or "LeftoverInvisibleObjects" or "TooClose.BySize");
+        Assert.DoesNotContain(notInFile, setting => setting.KeyPath is "TargetPlugin" or "TooClose.BySize.SizeMultiplier");
+    }
+
+    [Fact]
+    public void AnUnsetPluginIsNotedAsNullAndTheKeysFollowTheOrderOfTheSettings()
+    {
+        var config = ReadOnlyConfig("{}");
+
+        var notInFile = NotesOf(config).NotInFile;
+
+        Assert.Contains(new SettingInFile("TargetPlugin", "Mod to clean up", "null"), notInFile);
+        Assert.Equal(["TargetPlugin", "WhatToIgnore.ExcludedPlugins", "WhatToIgnore.IgnoreTargetMasters"], notInFile.Take(3).Select(setting => setting.KeyPath));
     }
 
     [Fact]
@@ -367,8 +381,8 @@ public sealed class ConfigFilesTests : IDisposable
 
         Assert.Empty(notes.UnknownKeys);
         Assert.DoesNotContain(notes.NotInFile, setting => setting.KeyPath is "TargetPlugin" or "TooClose" or "TooClose.UseRoughBoxes");
-        Assert.Contains(new SettingInFile("TargetPlugin", "Mod to clean up", false, "\"A.esp\""), notes.ChangedFromDefault);
-        Assert.Contains(notes.ChangedFromDefault, setting => setting.KeyPath == "TooClose.UseRoughBoxes" && setting.ValueAsWritten == "true");
+        Assert.Contains(new SettingInFile("TargetPlugin", "Mod to clean up", "\"A.esp\""), notes.ChangedFromDefault);
+        Assert.Contains(notes.ChangedFromDefault, setting => setting.KeyPath == "TooClose.UseRoughBoxes" && setting.ValueAsJson == "true");
     }
 
     [Fact]
@@ -382,7 +396,7 @@ public sealed class ConfigFilesTests : IDisposable
                 "NpcHandling": "Never",
                 "UseRoughBoxes": false,
                 "BySize": { "SizeMultiplier": 1.0 },
-                "ByDistance": { "DistanceInUnits": 32.0 }
+                "ByDistance": { "DistanceInUnits": 50.0 }
               },
               "WhatToIgnore": { "ExcludedPlugins": ["B.esp"], "IgnoreTargetMasters": true },
               "TerrainChange": { "MinTerrainTypeChangePercent": 20 },
@@ -395,9 +409,9 @@ public sealed class ConfigFilesTests : IDisposable
         Assert.Equal(
             ["TargetPlugin", "WhatToIgnore.ExcludedPlugins", "TooClose.BySize.SizeMultiplier", "TooClose.NpcHandling", "LeftoverInvisibleObjects.RemoveLeftoverInvisibleObjects"],
             changed.Select(setting => setting.KeyPath));
-        Assert.Equal(["\"A.esp\"", "[\"B.esp\"]", "1.0", "\"Never\"", "false"], changed.Select(setting => setting.ValueAsWritten));
+        Assert.Equal(["\"A.esp\"", "[\"B.esp\"]", "1.0", "\"Never\"", "false"], changed.Select(setting => setting.ValueAsJson));
         Assert.Contains(
-            new SettingInFile("TooClose.BySize.SizeMultiplier", "Remove objects too close to other mods' objects > Margin by object size > Margin on every side (× object size)", false, "1.0"),
+            new SettingInFile("TooClose.BySize.SizeMultiplier", "Remove objects too close to other mods' objects > Margin by object size > Margin on every side (× object size)", "1.0"),
             changed);
     }
 

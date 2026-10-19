@@ -6,8 +6,8 @@ A [Synthesis](https://github.com/Mutagen-Modding/Synthesis) patcher for Skyrim S
 
 It removes objects added by one plugin (the *target plugin*) when they sit too close to objects
 added by other mods, a common source of clipping and duplicated clutter when several mods edit
-the same area. Optionally it also removes the target's objects that stand on terrain another mod
-changed (see *Remove objects on terrain changed by other mods*). By default it also removes the target's objects that were touching a removed one,
+the same area. By default it also removes the target's objects that stand on terrain another mod
+changed (see *Remove objects on terrain changed by other mods*) and the target's objects that lose their support when one is removed,
 and the target's invisible objects (lights, sounds, critter spawners, ...) that sit inside another
 mod's object or are left behind once the objects around them are gone.
 
@@ -75,12 +75,12 @@ An object of the cleaned mod is removed when an object from another mod comes wi
 | --- | --- | --- |
 | Margin by object size: Use this margin | `true` | Switches this margin on. Bigger objects get a bigger margin. |
 | Margin by object size: Margin on every side (× object size) | `0.5` | The margin is this multiple of the object's own size, added on every side (0-5): 0.5 adds half the object's size on every side, so the checked area is twice as large as the object; 1 adds a whole size on every side (three times as large). Larger removes more; 0.25-1 is typical. |
-| Margin by fixed distance: Use this margin | `false` | Switches this margin on. Every object gets the same margin, however big it is. |
-| Margin by fixed distance: Margin on every side (game units) | `32` | The margin in game units, added on every side (0-1024). 0 means only objects that touch or overlap. |
+| Margin by fixed distance: Use this margin | `true` | Switches this margin on. Every object gets the same margin, however big it is. |
+| Margin by fixed distance: Margin on every side (game units) | `50` | The margin in game units, added on every side (0-1024). 0 means only objects that touch or overlap. |
 | Use rough boxes instead of exact shapes (faster) | `false` | Off: the object's own shape, enlarged by the margin, is compared with the other object's shape. On: the object's box, enlarged by the margin, is compared with the other object's centre point (faster, less exact). Applies to both margins. |
 | Other mods' NPCs and creatures cause removal | `OnlyWhenStuckInsideTheObject` | Whether other mods' NPCs and creatures cause removals: `AlwaysLikeAnyObject` treats them like any other object, `OnlyWhenStuckInsideTheObject` only when they are stuck in the object at its real size, `Never` never. An NPC is stuck when its body sinks more than 8 units into the object, or when it stands inside the object (for example inside a boulder, or in a room of a building); standing on or leaning against the object does not count. An NPC placed through a leveled list counts when any of the NPCs it can be is stuck. |
 
-The two margins work on their own and both can be on together; an object found by either is removed once. With both off, nothing is removed for being too close (and NPCs stuck in objects are not checked either), and the log warns about it. The defaults switch on only the margin by object size.
+The two margins work on their own and both can be on together; an object found by either is removed once. With both off, nothing is removed for being too close (and NPCs stuck in objects are not checked either), and the log warns about it. The defaults switch on both margins.
 
 #### Remove objects on terrain changed by other mods
 
@@ -88,13 +88,13 @@ Removes the cleaned mod's objects when another mod changed the terrain under or 
 example raised or flattened the ground, turned grass into a road, or raised, lowered, added or
 removed the water there, so the objects no longer fit (they float, sink, stand under water or on
 dry land where water was).
-Off by default. When on, it runs before the too-close check, so an object found by both is listed as removed for changed terrain. Objects in interiors, and in worlds without terrain, are not checked.
+When on, it runs before the too-close check, so an object found by both is listed as removed for changed terrain. Objects in interiors, and in worlds without terrain, are not checked.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| Remove objects on changed terrain | `false` | Switches this removal on. |
-| Which of the cleaned mod's objects are checked | `VisibleObjectsOnTheGround` | `VisibleObjectsOnTheGround` only visible objects that reach the ground (objects on roofs, bridges or high shelves are skipped); `VisibleObjectsAtAnyHeight` every visible object; `AllObjectsIncludingInvisibleOnes` also markers, lights and sounds. |
-| Margin by object size: Use this margin | `false` | Switches this margin on. Bigger objects get a bigger margin. |
+| Remove objects on changed terrain | `true` | Switches this removal on. |
+| Which of the cleaned mod's objects are checked | `AllObjectsIncludingInvisibleOnes` | `VisibleObjectsOnTheGround` only visible objects that reach the ground (objects on roofs, bridges or high shelves are skipped); `VisibleObjectsAtAnyHeight` every visible object; `AllObjectsIncludingInvisibleOnes` also markers, lights and sounds. |
+| Margin by object size: Use this margin | `true` | Switches this margin on. Bigger objects get a bigger margin. |
 | Margin by object size: Margin on every side (× object size) | `0.5` | The margin is this multiple of the object's own size, added on every side (0-5): 0.5 adds half the object's size on every side, so the checked area is twice as large as the object. |
 | Margin by fixed distance: Use this margin | `true` | Switches this margin on. Every object gets the same margin. |
 | Margin by fixed distance: Margin on every side (game units) | `64` | The margin in game units, added on every side (0-1024). |
@@ -146,8 +146,8 @@ that is the mod that changed the most points. Where several changes count, the l
 their mods is named.
 
 If *Remove objects on changed terrain* is on but no height, ground type or water change is counted,
-nothing is removed for changed terrain and the log warns about it. Switched on with the other
-defaults, only visible objects on the ground are checked, within 64 units, for height changes over
+nothing is removed for changed terrain and the log warns about it. With the default settings, all
+objects (invisible ones included) are checked, within half their size and 64 units around them, for height changes over
 16 units, for ground type changes at 20% of the points or more, and for water changes (height
 changes over 16 units, water added or removed) that put 20% of the points or more under water or
 out of it.
@@ -156,7 +156,7 @@ out of it.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| When an object is removed, also remove | `EverythingTouchingIt` | What else goes with a removed object (see below). |
+| When an object is removed, also remove | `OnlyWhatLosesItsSupport` | What else goes with a removed object (see below). |
 | Gap that still counts as touching (game units) | `8` | Two objects this close or closer count as touching (0-64). Not used with `Nothing`. |
 | OnlyWhatLosesItsSupport: remove when this much support is gone (%) | `50` | `OnlyWhatLosesItsSupport` only: remove an object once this much of its support is gone (1-100). |
 
@@ -174,7 +174,7 @@ out of it.
 | When the cleaned mod's visible objects around it were removed: A direction is cleared when this much of it was removed (%) | `50` | Share removed for a direction to count as cleared. |
 | When the cleaned mod's visible objects around it were removed: Remove when this share of those directions is cleared (%) | `60` | Share of the directions with objects that must be cleared. |
 | Never remove these as left behind (ticked = kept) | *(none ticked)* | One tick box per kind (see below). A ticked kind is kept by this step, an unticked kind can be removed by it. Does not affect the too-close or changed-terrain removals. |
-| Move kept markers out of other mods' objects | `false` | Move a kept map, X (including heading), idle or other marker that sits inside another mod's object to the nearest free spot on the navmesh or, failing that, the ground. Only its position changes. Needs *Remove invisible objects left inside other mods' objects or alone* on; markers are kept when *Never remove these as left behind* ticks them or something depends on them. Lights, sounds, acoustic spaces, trigger boxes, critter spawners, decals, furniture and door markers are never moved. |
+| Move kept markers out of other mods' objects | `true` | Move a kept map, X (including heading), idle or other marker that sits inside another mod's object to the nearest free spot on the navmesh or, failing that, the ground. Only its position changes. Needs *Remove invisible objects left inside other mods' objects or alone* on; markers are kept when *Never remove these as left behind* ticks them or something depends on them. Lights, sounds, acoustic spaces, trigger boxes, critter spawners, decals, furniture and door markers are never moved. |
 
 The three percentages take values from 10 to 100 in steps of 10.
 
@@ -251,7 +251,7 @@ The message ends with *Nothing was run and no patch was written.*
 
 **What does not stop the run.**
 - A key the patcher does not know is ignored and listed in the log, so a misspelling is easy to find.
-- A setting a config leaves out uses its default; the log lists those settings.
+- A setting a config leaves out uses its default; the log lists those settings with the default used.
 - A number out of range is corrected, with a warning in that config's log section.
 - A mod with nothing to check ends its own section with *Nothing to check for this config. No changes made for it; the batch goes on.*
 
@@ -301,9 +301,10 @@ In `Batch` mode the banner prints once, then each config has its own section tha
 
 ```
 Ignored in town_walls.json, because this patcher has no such setting (check the spelling and the section it is in): Colour.
-Not in town_walls.json, so the default is used:
-  Invisible objects left behind (LeftoverInvisibleObjects), all settings in it
+Not set in town_walls.json, defaults used: TooClose.UseRoughBoxes = false, TooClose.NpcHandling = "OnlyWhenStuckInsideTheObject", FollowUpRemoval.TouchDistance = 8.0
 ```
+
+Every setting the config leaves out is listed with its key and the default used, written as the config file would hold it, in the order of the settings screen.
 
 When an earlier config removed or moved objects, the scan summary says how many were ignored or checked at their new position.
 

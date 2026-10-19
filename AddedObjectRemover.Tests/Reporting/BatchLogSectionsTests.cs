@@ -14,11 +14,11 @@ public sealed class BatchLogSectionsTests
     private static readonly ModKey Target = TestTargets.TargetMod;
     private static readonly ModKey Patch = ModKey.FromNameAndExtension("Patch.esp");
 
-    private static readonly SettingInFile WholeGroup = new("LeftoverInvisibleObjects", "Invisible objects left behind", true, null);
-    private static readonly SettingInFile SingleSetting =
-        new("TooClose.UseRoughBoxes", "Remove objects too close to other mods' objects > Use rough boxes instead of exact shapes (faster)", false, null);
-    private static readonly SettingInFile Changed =
-        new("TooClose.UseRoughBoxes", "Remove objects too close to other mods' objects > Use rough boxes instead of exact shapes (faster)", false, "true");
+    private const string RoughBoxesName = "Remove objects too close to other mods' objects > Use rough boxes instead of exact shapes (faster)";
+
+    private static readonly SettingInFile Defaulted = new("TooClose.UseRoughBoxes", RoughBoxesName, "false");
+    private static readonly SettingInFile DefaultedList = new("WhatToIgnore.ExcludedPlugins", "Never count these mods", "[]");
+    private static readonly SettingInFile Changed = new("TooClose.UseRoughBoxes", RoughBoxesName, "true");
 
     [Fact]
     public void TheDelimiterNamesTheConfigItsPlaceInTheGroupAndItsTarget()
@@ -31,7 +31,7 @@ public sealed class BatchLogSectionsTests
     [Fact]
     public void TheDelimiterComesFirstAndTheWarningsFollowTheConfigFileLines()
     {
-        var sections = StartSections(Notes(["Colour"], [WholeGroup], [Changed]), detailedLog: true);
+        var sections = StartSections(Notes(["Colour"], [Defaulted], [Changed]), detailedLog: true);
 
         Assert.Equal(
             ["configDelimiter", "configIgnoredKeys", "configDefaulted", "configNonDefault", "warnings"],
@@ -49,16 +49,12 @@ public sealed class BatchLogSectionsTests
     }
 
     [Fact]
-    public void SettingsTheFileLeavesOutAreListedWithTheDefaultBeingUsed()
+    public void SettingsTheFileLeavesOutAreListedOnOneLineWithTheDefaultValueUsed()
     {
-        var sections = StartSections(Notes([], [SingleSetting, WholeGroup], []), detailedLog: false);
+        var sections = StartSections(Notes([], [Defaulted, DefaultedList], []), detailedLog: false);
 
         Assert.Equal(
-            [
-                $"Not in {FileName}, so the default is used:",
-                "  Remove objects too close to other mods' objects > Use rough boxes instead of exact shapes (faster) (TooClose.UseRoughBoxes)",
-                "  Invisible objects left behind (LeftoverInvisibleObjects), all settings in it",
-            ],
+            [$"Not set in {FileName}, defaults used: TooClose.UseRoughBoxes = false, WhatToIgnore.ExcludedPlugins = []"],
             Lines(sections, "configDefaulted"));
     }
 
@@ -69,7 +65,7 @@ public sealed class BatchLogSectionsTests
 
         Assert.Empty(Lines(StartSections(notes, detailedLog: false), "configNonDefault"));
         Assert.Equal(
-            [$"Set in {FileName} to other than the default:", "  Remove objects too close to other mods' objects > Use rough boxes instead of exact shapes (faster) (TooClose.UseRoughBoxes): true"],
+            [$"Set in {FileName} to other than the default:", $"  {RoughBoxesName} (TooClose.UseRoughBoxes): true"],
             Lines(StartSections(notes, detailedLog: true), "configNonDefault"));
     }
 

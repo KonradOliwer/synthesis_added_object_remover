@@ -36,6 +36,6 @@ public class SettingsValidationTests
         Assert.Equal(surroundings.OccupiedDirectionsPercent, SettingCorrections.WholeTens(surroundings.OccupiedDirectionsPercent, "occupied", []));
         Assert.False(new TooCloseRemovalSettings().UseRoughBoxes);
         Assert.Equal(NpcHandling.OnlyWhenStuckInsideTheObject, new TooCloseRemovalSettings().NpcHandling);
-        Assert.Equal(FollowUpRemovalMode.EverythingTouchingIt, new FollowUpRemovalSettings().Mode);
+        Assert.Equal(FollowUpRemovalMode.OnlyWhatLosesItsSupport, new FollowUpRemovalSettings().Mode);
     }
 }

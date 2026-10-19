@@ -31,10 +31,10 @@ internal static class SettingsVariants
             }),
         Support => Create(
             useRoughBoxes: false, NpcHandling.OnlyWhenStuckInsideTheObject, FollowUpRemovalMode.OnlyWhatLosesItsSupport,
-            new LeftoverInvisibleObjectSettings { RemoveLeftoverInvisibleObjects = true }),
+            new LeftoverInvisibleObjectSettings { RemoveLeftoverInvisibleObjects = true, MoveKeptMarkersOutOfOtherModsObjects = false }),
         NothingWithBoxZoneAndNpcsAsObjects => Create(
             useRoughBoxes: true, NpcHandling.AlwaysLikeAnyObject, FollowUpRemovalMode.Nothing,
-            new LeftoverInvisibleObjectSettings { RemoveLeftoverInvisibleObjects = false }),
+            new LeftoverInvisibleObjectSettings { RemoveLeftoverInvisibleObjects = false, MoveKeptMarkersOutOfOtherModsObjects = false }),
         TouchWithLeftBehindAndMarkerMovesNormalLog => StandardOf(TouchWithLeftBehindAndMarkerMoves),
         _ => throw new ArgumentOutOfRangeException(nameof(name), name, "Unknown settings variant."),
     };
@@ -42,7 +42,13 @@ internal static class SettingsVariants
     private static StandardSettings Create(bool useRoughBoxes, NpcHandling npcs, FollowUpRemovalMode followUp, LeftoverInvisibleObjectSettings leftovers) => new()
     {
         TargetPlugin = ModKey.FromNameAndExtension(FixtureWorld.TargetPlugin),
-        TooClose = new TooCloseRemovalSettings { UseRoughBoxes = useRoughBoxes, NpcHandling = npcs },
+        TooClose = new TooCloseRemovalSettings
+        {
+            ByDistance = new TooCloseByDistanceSettings { Use = false },
+            UseRoughBoxes = useRoughBoxes,
+            NpcHandling = npcs,
+        },
+        TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = false },
         WhatToIgnore = new IgnoreSettings
         {
             ExcludedPlugins = [ModKey.FromNameAndExtension(FixtureWorld.ExcludedPlugin)],

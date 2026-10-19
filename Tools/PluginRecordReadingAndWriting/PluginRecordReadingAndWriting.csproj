@@ -7,7 +7,7 @@
     <Description>Reads and writes plugin records through Mutagen. It references PluginRecordFacts, Ids, BoxAndTransformMath, TriangleMeshTests, KeyedGroupingInInputOrder, ComputedOnceLookups, GroundSurfaceQueries and OrderIndependentParallelWork and holds Mutagen.Bethesda.Skyrim; only the entry references it.</Description>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Mutagen.Bethesda.Skyrim" Version="0.54.2" />
+    <PackageReference Include="Mutagen.Bethesda.Skyrim" Version="0.54.4" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\PluginRecordFacts\PluginRecordFacts.csproj" />

@@ -10,7 +10,7 @@
     <!-- Pinned exactly: NifShapes.cs reads Nifly's private _points/_stripLengths fields via reflection,
          which breaks silently on a library update. -->
     <PackageReference Include="Nifly" Version="[1.1.0]" />
-    <PackageReference Include="Mutagen.Bethesda.Core" Version="0.54.2" />
+    <PackageReference Include="Mutagen.Bethesda.Core" Version="0.54.4" />
     <!-- Used directly (KnownProblems.cs); otherwise they only arrive transitively through Mutagen. -->
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
     <PackageReference Include="ini-parser-netstandard" Version="2.5.3" />

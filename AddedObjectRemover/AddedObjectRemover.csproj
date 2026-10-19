@@ -8,9 +8,9 @@
     <Description>The Synthesis entry. It reads the settings, builds the plugin and mesh readers and the report output, calls the runner, and prints the log. The only project that uses the console and the Synthesis packages.</Description>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Mutagen.Bethesda.Synthesis" Version="0.36.5" />
+    <PackageReference Include="Mutagen.Bethesda.Synthesis" Version="0.36.6" />
     <!-- Synthesis reads the Mutagen version only from this project's own references, so it must match the version the tools use. -->
-    <PackageReference Include="Mutagen.Bethesda.Skyrim" Version="0.54.2" />
+    <PackageReference Include="Mutagen.Bethesda.Skyrim" Version="0.54.4" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Tools\FileSystemAccess\FileSystemAccess.csproj" />

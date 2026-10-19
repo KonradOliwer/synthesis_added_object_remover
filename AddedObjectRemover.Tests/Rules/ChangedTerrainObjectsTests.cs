@@ -81,8 +81,14 @@ public class ChangedTerrainObjectsTests
         bool byDistance = true,
         bool heights = true,
         bool types = true,
-        int typePercent = TypePercent) =>
-        new(On: true, objects, heights, tolerance, types, typePercent, bySize, multiplier, byDistance, AreaDistanceInUnits: 64f);
+        int typePercent = TypePercent,
+        bool waterHeights = true,
+        float waterTolerance = Tolerance,
+        bool waterAddedOrRemoved = true,
+        int waterPercent = TypePercent) =>
+        new(
+            On: true, objects, heights, tolerance, types, typePercent, waterHeights, waterTolerance, waterAddedOrRemoved, waterPercent,
+            bySize, multiplier, byDistance, AreaDistanceInUnits: 64f);
 
     private static float[] Heights(float height, params (int Vertex, float Height)[] changes)
     {
@@ -415,12 +421,12 @@ public class ChangedTerrainObjectsTests
         var changed = new TerrainVersion(Other, Heights(Ground, (Near, Raised)), Painted(Road));
 
         Assert.Equal(
-            [Removal(0, Other, TerrainChangeKind.HeightAndTerrainType)],
+            [Removal(0, Other, TerrainChangeKind.Height | TerrainChangeKind.TerrainType)],
             Find(PaintedCell(FlatPainted(Target, Painted(Grass)), changed), Settings()).Proposals.AsEnumerable());
     }
 
     [Theory]
-    [InlineData(true, TerrainChangeKind.HeightAndTerrainType)]
+    [InlineData(true, TerrainChangeKind.Height | TerrainChangeKind.TerrainType)]
     [InlineData(false, TerrainChangeKind.TerrainType)]
     public void ADeletedLandRecordShowsTheDefaultTerrain(bool heights, TerrainChangeKind kind) =>
         Assert.Equal(
@@ -640,6 +646,288 @@ public class ChangedTerrainObjectsTests
         Assert.Equal(2, plugin.MaterialReads);
     }
 
+    private const float BelowTheGround = -100f;
+    private const float AboveTheGround = 50f;
+    private const float High = 64f;
+
+    /// <summary>The share of an area's vertices that must get covered or uncovered in <see cref="Settings"/>: 4 of the 16 at <see cref="WideSpot"/>.</summary>
+    private const int CoverChangesAtShare = 4;
+
+    /// <summary>A plugin's copy of the cell with water at its own height; null for no water.</summary>
+    private static CellWaterCopy Water(PluginName plugin, float? level) => new(plugin, HasWater: level != null, level);
+
+    private static CellWaterCopy WaterAtTheDefault(PluginName plugin) => new(plugin, HasWater: true, OwnLevel: null);
+
+    private static WorldspaceWaterCopy Default(PluginName plugin, float? level) => new(plugin, level);
+
+    /// <summary>The worldspace copies of a test that gives none: only the base game's.</summary>
+    private static readonly WorldspaceWaterCopy[] BaseGameWorldspace = [Default(BaseGame, BelowTheGround)];
+
+    private static ChangedTerrainResult FindWithWater(
+        TerrainVersion[] terrain,
+        CellWaterCopy[] water,
+        ChangedTerrainSettings? settings = null,
+        Vector3? position = null,
+        WorldspaceWaterCopy[]? worldspace = null,
+        RecordKey? space = null) =>
+        Find(
+            new TerrainPlugin(
+                new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = terrain },
+                water: new Dictionary<ExteriorCell, WaterCopies> { [Cell with { WorldspaceKey = space ?? Worldspace }] = new(water, worldspace ?? BaseGameWorldspace) }),
+            settings ?? Settings(),
+            threads: 1,
+            Placed(0, Rock, position ?? Spot, space));
+
+    [Fact]
+    public void AnotherModRaisingTheWaterOverTheGroundRemovesTheObject() =>
+        Assert.Equal(
+            [Removal(0, Other, TerrainChangeKind.WaterHeight)],
+            FindWithWater([Flat(Target)], [Water(Target, BelowTheGround), Water(Other, AboveTheGround)]).Proposals.AsEnumerable());
+
+    [Fact]
+    public void AnotherModLoweringTheWaterBelowTheGroundRemovesTheObject() =>
+        Assert.Equal(
+            [Removal(0, Other, TerrainChangeKind.WaterHeight)],
+            FindWithWater([Flat(Target)], [Water(Target, AboveTheGround), Water(Other, BelowTheGround)]).Proposals.AsEnumerable());
+
+    [Theory]
+    [InlineData(null, AboveTheGround, TerrainChangeKind.WaterAdded)]
+    [InlineData(AboveTheGround, null, TerrainChangeKind.WaterRemoved)]
+    public void AnotherModAddingOrRemovingWaterOverTheGroundRemovesTheObject(float? expected, float? shown, TerrainChangeKind kind) =>
+        Assert.Equal([Removal(0, Other, kind)], FindWithWater([Flat(Target)], [Water(Target, expected), Water(Other, shown)]).Proposals.AsEnumerable());
+
+    [Fact]
+    public void UnchangedWaterRemovesNothing() =>
+        Assert.Empty(FindWithWater([Flat(Target)], [Water(BaseGame, AboveTheGround), Water(Target, AboveTheGround), Water(Other, AboveTheGround)]).Proposals);
+
+    [Fact]
+    public void AWaterChangeThatLeavesTheGroundUnderWaterRemovesNothing() =>
+        Assert.Empty(FindWithWater([Flat(Target)], [Water(Target, AboveTheGround), Water(Other, 2 * AboveTheGround)]).Proposals);
+
+    [Fact]
+    public void WaterAddedBelowTheGroundRemovesNothing() =>
+        Assert.Empty(FindWithWater([Flat(Target)], [Water(Target, null), Water(Other, BelowTheGround)]).Proposals);
+
+    /// <summary>The ground is at 0; the water moves from just below it to just above it by the given change.</summary>
+    [Theory]
+    [InlineData(Tolerance, Tolerance, false)]
+    [InlineData(Tolerance, Tolerance + HeightStep, true)]
+    [InlineData(0f, HeightStep, true)]
+    public void AWaterHeightChangeCountsOnlyBeyondItsTolerance(float tolerance, float change, bool removed)
+    {
+        var result = FindWithWater([Flat(Target)], [Water(Target, -1f), Water(Other, change - 1f)], Settings(waterTolerance: tolerance));
+
+        Assert.Equal(removed, result.Proposals.Any());
+    }
+
+    [Fact]
+    public void WaterHeightChangesCountOnlyWhenSwitchedOn() =>
+        Assert.Empty(FindWithWater([Flat(Target)], [Water(Target, BelowTheGround), Water(Other, AboveTheGround)], Settings(waterHeights: false)).Proposals);
+
+    [Fact]
+    public void WaterAddedOrRemovedCountsOnlyWhenSwitchedOn() =>
+        Assert.Empty(FindWithWater([Flat(Target)], [Water(Target, null), Water(Other, AboveTheGround)], Settings(waterAddedOrRemoved: false)).Proposals);
+
+    [Fact]
+    public void WithNoWaterChangeCountedTheWaterIsNotRead()
+    {
+        var plugin = new TerrainPlugin(
+            new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(Target)] },
+            water: new Dictionary<ExteriorCell, WaterCopies> { [Cell] = new([Water(Target, BelowTheGround), Water(Other, AboveTheGround)], BaseGameWorldspace) });
+
+        Assert.Empty(Find(plugin, Settings(waterHeights: false, waterAddedOrRemoved: false)).Proposals);
+        Assert.Equal(0, plugin.WaterReads);
+    }
+
+    /// <summary>The ground of the area at <see cref="WideSpot"/> is high except at the given number of vertices, which the raised water covers.</summary>
+    [Theory]
+    [InlineData(CoverChangesAtShare - 1, false)]
+    [InlineData(CoverChangesAtShare, true)]
+    public void AWaterChangeRemovesTheObjectOnlyFromTheShareOfCoveredOrUncoveredVerticesOn(int covered, bool removed)
+    {
+        var land = new TerrainVersion(Target, Heights(High, [.. WideSpotVertices.Take(covered).Select(vertex => (vertex.Row * TerrainHeights.VerticesPerSide + vertex.Column, Ground))]), Layers: null);
+
+        var result = FindWithWater([land], [Water(Target, BelowTheGround), Water(Other, AboveTheGround)], position: WideSpot);
+
+        Assert.Equal(removed, result.Proposals.Any());
+    }
+
+    [Fact]
+    public void LandLoweredUnderUnchangedWaterIsAHeightChangeOnly() =>
+        Assert.Equal(
+            [Removal(0, Other, TerrainChangeKind.Height)],
+            FindWithWater([new TerrainVersion(Target, Heights(High), Layers: null), Flat(Other)], [Water(Target, AboveTheGround)]).Proposals.AsEnumerable());
+
+    /// <summary>
+    /// The water rises, but stays below the expected ground; only the lowered ground puts the point under water, so the water
+    /// change is not counted and the height check alone decides.
+    /// </summary>
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void APointCoveredOnlyThroughTheLandChangeIsLeftToTheHeightCheck(bool heights, bool removed)
+    {
+        var result = FindWithWater(
+            [new TerrainVersion(Target, Heights(High), Layers: null), Flat(Other)],
+            [Water(Target, AboveTheGround - Tolerance - HeightStep), Water(Other, AboveTheGround)],
+            Settings(heights: heights));
+
+        ProposedRemoval[] expected = removed ? [Removal(0, Other, TerrainChangeKind.Height)] : [];
+        Assert.Equal(expected, result.Proposals.AsEnumerable());
+    }
+
+    [Fact]
+    public void AHeightAndWaterChangeHasBothKindsAndNamesTheLaterMod() =>
+        Assert.Equal(
+            [Removal(0, Later, TerrainChangeKind.Height | TerrainChangeKind.WaterHeight)],
+            FindWithWater([Flat(Target), RaisedAt(Other, Near, -Raised)], [Water(Target, BelowTheGround), Water(Later, AboveTheGround)]).Proposals.AsEnumerable());
+
+    [Fact]
+    public void AWaterChangeOnlyByAPluginRequiringTheTargetCountsForNothing() =>
+        Assert.Empty(FindWithWater([Flat(Target)], [Water(Target, BelowTheGround), Water(Dependant, AboveTheGround)]).Proposals);
+
+    [Fact]
+    public void AnIgnoredModCarryingAnotherModsWaterChangeNamesTheOtherMod() =>
+        Assert.Equal(
+            [Removal(0, Other, TerrainChangeKind.WaterHeight)],
+            FindWithWater([Flat(Target)], [Water(Target, BelowTheGround), Water(Other, AboveTheGround), Water(Ignored, AboveTheGround)]).Proposals.AsEnumerable());
+
+    [Fact]
+    public void TheLastMastersWaterIsTheReferenceWhenTheTargetHasNoCopyOfTheCell() =>
+        Assert.Empty(FindWithWater([Flat(BaseGame)], [Water(BaseGame, BelowTheGround), Water(Master, AboveTheGround), Water(Early, AboveTheGround)]).Proposals);
+
+    [Fact]
+    public void AModLoadingBeforeTheTargetDoesNotChangeTheTargetsWater() =>
+        Assert.Empty(FindWithWater([Flat(Target)], [Water(Early, AboveTheGround), Water(Target, BelowTheGround)]).Proposals);
+
+    /// <summary>The target's copy of the worldspace and none of the cell, as for a neighbour cell reached by the margin.</summary>
+    private static readonly WorldspaceWaterCopy[] TargetWorldspace = [Default(BaseGame, BelowTheGround), Default(Target, BelowTheGround)];
+
+    [Fact]
+    public void TheMastersCellCopyIsTheReferenceWhenTheTargetHasOnlyAWorldspaceCopy() =>
+        Assert.Equal(
+            [Removal(0, Other, TerrainChangeKind.WaterHeight)],
+            FindWithWater([Flat(Target)], [Water(Master, BelowTheGround), Water(Other, AboveTheGround)], worldspace: TargetWorldspace).Proposals.AsEnumerable());
+
+    [Fact]
+    public void AnEarlierModsCellCopyIsNotTheReferenceThroughTheTargetsWorldspaceCopy() =>
+        Assert.Equal(
+            [Removal(0, Early, TerrainChangeKind.WaterHeight)],
+            FindWithWater([Flat(Target)], [Water(Master, BelowTheGround), Water(Early, AboveTheGround)], worldspace: TargetWorldspace).Proposals.AsEnumerable());
+
+    [Fact]
+    public void ALaterModCarryingTheMastersWaterChangesNothing() =>
+        Assert.Empty(
+            FindWithWater(
+                [Flat(Target)], [Water(Master, BelowTheGround), Water(Early, AboveTheGround), Water(Later, BelowTheGround)], worldspace: TargetWorldspace).Proposals);
+
+    [Fact]
+    public void AChangedWorldspaceDefaultNamesThePluginOfTheWorldspaceCopy() =>
+        Assert.Equal(
+            [Removal(0, Other, TerrainChangeKind.WaterHeight)],
+            FindWithWater(
+                [Flat(Target)], [WaterAtTheDefault(Target)], worldspace: [.. TargetWorldspace, Default(Other, AboveTheGround)]).Proposals.AsEnumerable());
+
+    /// <summary>The water is read in the object's own worldspace, whose land comes from its parent; the copies then hold the parent's defaults.</summary>
+    [Fact]
+    public void AChangedDefaultOfAWorldspaceSuppliedToAChildNamesThePluginOfTheSupplyingWorldspace() =>
+        Assert.Equal(
+            [Removal(0, Other, TerrainChangeKind.WaterHeight)],
+            FindWithWater(
+                [Flat(Target)], [WaterAtTheDefault(Target)], worldspace: [.. TargetWorldspace, Default(Other, AboveTheGround)], space: ChildWorldspace)
+                .Proposals.AsEnumerable());
+
+    [Fact]
+    public void ACellUsingTheDefaultOfAWorldspaceWithoutOneIsSkippedAsUnknown() =>
+        Assert.Empty(
+            FindWithWater(
+                [Flat(Target)], [WaterAtTheDefault(Target), Water(Other, AboveTheGround)], worldspace: [Default(BaseGame, level: null)]).Proposals);
+
+    [Fact]
+    public void AWorldspaceCopyLosingTheDefaultDoesNotRemoveTheWaterOfCellsUsingIt() =>
+        Assert.Empty(
+            FindWithWater(
+                [Flat(Target)], [WaterAtTheDefault(Target)], worldspace: [.. TargetWorldspace, Default(Other, level: null)]).Proposals);
+
+    [Fact]
+    public void AnUnknownDefaultDoesNotHideAChangeOfACellWithItsOwnHeight() =>
+        Assert.Equal(
+            [Removal(0, Other, TerrainChangeKind.WaterHeight)],
+            FindWithWater(
+                [Flat(Target)], [Water(Target, BelowTheGround), Water(Other, AboveTheGround)], worldspace: [Default(BaseGame, level: null)])
+                .Proposals.AsEnumerable());
+
+    /// <summary>A plugin with two cells at the grid has two copies in load order; the last is the one the game shows.</summary>
+    [Theory]
+    [InlineData(AboveTheGround, BelowTheGround, false)]
+    [InlineData(BelowTheGround, AboveTheGround, true)]
+    public void OfTwoCellCopiesInOnePluginTheLastIsShown(float first, float last, bool removed)
+    {
+        var result = FindWithWater([Flat(Target)], [Water(Target, BelowTheGround), Water(Other, first), Water(Other, last)]);
+
+        Assert.Equal(removed, result.Proposals.Any());
+    }
+
+    [Fact]
+    public void ACellWithoutTheHasWaterFlagHasNoWaterWhateverHeightItStores() =>
+        Assert.Equal(
+            [Removal(0, Other, TerrainChangeKind.WaterAdded)],
+            FindWithWater([Flat(Target)], [new CellWaterCopy(Target, HasWater: false, AboveTheGround), Water(Other, AboveTheGround)]).Proposals.AsEnumerable());
+
+    /// <summary>
+    /// The other mod's cell copy loads before the later mod's worldspace copy, so the other mod made the change and the later mod
+    /// only carries it; joined out of load order, the later mod's copy would seem to make it first.
+    /// </summary>
+    [Fact]
+    public void LaterCellAndWorldspaceCopiesOfDifferentPluginsAreJoinedInLoadOrder() =>
+        Assert.Equal(
+            [Removal(0, Other, TerrainChangeKind.WaterHeight)],
+            FindWithWater(
+                [Flat(Target)], [WaterAtTheDefault(Target), Water(Other, AboveTheGround)], worldspace: [.. TargetWorldspace, Default(Later, AboveTheGround)])
+                .Proposals.AsEnumerable());
+
+    [Fact]
+    public void APluginWithACellAndAWorldspaceCopyGivesOneVersionJoiningBoth() =>
+        Assert.Equal(
+            [Removal(0, Other, TerrainChangeKind.WaterHeight)],
+            FindWithWater(
+                [Flat(Target)],
+                [WaterAtTheDefault(Target), WaterAtTheDefault(Other), WaterAtTheDefault(Ignored)],
+                worldspace: [.. TargetWorldspace, Default(Other, AboveTheGround)])
+                .Proposals.AsEnumerable());
+
+    /// <summary>
+    /// The compatibility patch's worldspace copy stores no default, so its version is unknown and carries nothing; the ignored mod
+    /// carrying the other mod's default is traced through it back to the other mod.
+    /// </summary>
+    [Fact]
+    public void AChangeIsTracedThroughAnUnknownVersionInBetween() =>
+        Assert.Equal(
+            [Removal(0, Other, TerrainChangeKind.WaterHeight)],
+            FindWithWater(
+                [Flat(Target)],
+                [WaterAtTheDefault(Target)],
+                worldspace: [.. TargetWorldspace, Default(Other, AboveTheGround), Default(CompatibilityPatch, level: null), Default(Ignored, AboveTheGround)])
+                .Proposals.AsEnumerable());
+
+    /// <summary>Both worldspaces use the same land cell, which is compared once; each has its own cell water.</summary>
+    [Fact]
+    public void ObjectsInAChildAndItsParentAtOneGridShareTheLandAndKeepTheirOwnWater()
+    {
+        var plugin = new TerrainPlugin(
+            new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(Target)] },
+            water: new Dictionary<ExteriorCell, WaterCopies>
+            {
+                [Cell] = new([Water(Target, BelowTheGround), Water(Other, BelowTheGround)], BaseGameWorldspace),
+                [Cell with { WorldspaceKey = ChildWorldspace }] = new([Water(Target, BelowTheGround), Water(Other, AboveTheGround)], BaseGameWorldspace),
+            });
+
+        var result = Find(plugin, Settings(), threads: 1, Placed(0, Rock), Placed(1, Rock, space: ChildWorldspace));
+
+        Assert.Equal([Removal(1, Other, TerrainChangeKind.WaterHeight)], result.Proposals.AsEnumerable());
+        Assert.Equal(1, result.CellsCompared);
+    }
+
     /// <summary>A rock 20 units wide and high, a marker without size, and a base whose visibility cannot be read.</summary>
     private sealed class BoxShapes : IBaseObjectShapes
     {
@@ -654,15 +942,29 @@ public class ChangedTerrainObjectsTests
         public IReadOnlyList<MeasuredBase> Computed() => [];
     }
 
-    /// <summary>Terrain versions by cell, and material chains by texture; only the test worldspace has land data, which its child worldspace uses.</summary>
+    /// <summary>
+    /// Terrain and water versions by cell, and material chains by texture; only the test worldspace has land data, which its child
+    /// worldspace uses.
+    /// </summary>
     private sealed class TerrainPlugin(
-        IReadOnlyDictionary<ExteriorCell, TerrainVersion[]> terrain, IReadOnlyDictionary<RecordKey, RecordKey[]>? materials = null) : IPluginRecords
+        IReadOnlyDictionary<ExteriorCell, TerrainVersion[]> terrain,
+        IReadOnlyDictionary<RecordKey, RecordKey[]>? materials = null,
+        IReadOnlyDictionary<ExteriorCell, WaterCopies>? water = null) : IPluginRecords
     {
         private int _materialReads;
+        private int _waterReads;
 
         public int MaterialReads => _materialReads;
 
+        public int WaterReads => _waterReads;
+
         public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => terrain.GetValueOrDefault(cell) ?? [];
+
+        public WaterCopies ReadWaterCopies(ExteriorCell cell)
+        {
+            Interlocked.Increment(ref _waterReads);
+            return water?.GetValueOrDefault(cell) ?? new WaterCopies([], []);
+        }
 
         public RecordKey? FindLandWorldspace(RecordKey space) => space == Worldspace || space == ChildWorldspace ? Worldspace : null;
 

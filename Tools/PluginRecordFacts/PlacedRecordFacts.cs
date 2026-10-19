@@ -8,8 +8,12 @@ namespace AddedObjectRemover;
 /// <param name="Navmeshes">Also find the navmeshes of the target spaces, for <see cref="IPluginRecords.ReadNavmeshes"/>.</param>
 /// <param name="TerrainVersions">Also keep every plugin's own land record of the target worldspaces' cells, for <see cref="IPluginRecords.ReadTerrainVersions"/>.</param>
 /// <param name="TerrainLayers">Also decode the texture layers of those land records, for <see cref="TerrainVersion.Layers"/>; needs <paramref name="TerrainVersions"/>.</param>
+/// <param name="Water">
+/// Also keep every plugin's own water fields of the target worldspaces' own exterior cells and of the worldspaces that supply their
+/// default water, for <see cref="IPluginRecords.ReadWaterCopies"/>.
+/// </param>
 /// <param name="HoldKeyword">The keyword a Location carries when it is a hold; the nearest such Location in a cell's Location chain names the cell's hold.</param>
-public sealed record PlacedReadScope(PluginName Target, bool Terrain, bool Navmeshes, bool TerrainVersions, bool TerrainLayers, RecordKey HoldKeyword);
+public sealed record PlacedReadScope(PluginName Target, bool Terrain, bool Navmeshes, bool TerrainVersions, bool TerrainLayers, bool Water, RecordKey HoldKeyword);
 
 /// <summary>One winning placed record as its plugin stores it; it is not judged here.</summary>
 /// <param name="WinningMod">The plugin whose version of the record wins.</param>

@@ -52,7 +52,7 @@ public sealed class PlacedObjectCollector
     /// </param>
     public static CollectedObjects Collect(IPluginRecords plugin, IdentifiedMods standing, WhatToCollect plan, WrittenByEarlierRuns earlier)
     {
-        var facts = plugin.ReadPlacedRecords(new PlacedReadScope(standing.Target, plan.Terrain, plan.Navmesh, plan.TerrainVersions, plan.TerrainLayers, HoldLocationKeyword));
+        var facts = plugin.ReadPlacedRecords(new PlacedReadScope(standing.Target, plan.Terrain, plan.Navmesh, plan.TerrainVersions, plan.TerrainLayers, plan.Water, HoldLocationKeyword));
         var collector = new PlacedObjectCollector(standing, plan, facts, earlier);
         foreach (var record in facts.Records) collector.Collect(record);
 

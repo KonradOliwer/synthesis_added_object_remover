@@ -33,6 +33,7 @@ public static class SettingsValidator
     private const string TerrainSizeMarginName = "Remove objects on terrain changed by other mods > Margin by object size > Margin on every side";
     private const string TerrainDistanceMarginName = "Remove objects on terrain changed by other mods > Margin by fixed distance > Margin on every side";
     private const string TerrainTypeChangePercentName = "Remove objects on terrain changed by other mods > Remove only when this share of the ground points changed type";
+    private const string WaterCoverChangePercentName = "Remove objects on terrain changed by other mods > Remove only when this share of the ground got covered/uncovered";
 
     /// <summary>Validation runs in a fixed order because the warnings are reported in the order found.</summary>
     /// <param name="detailedLogAndReports">The one setting for every run that turns on both the detailed log and the report files.</param>
@@ -165,7 +166,7 @@ public static class SettingsValidator
 
     /// <summary>
     /// Built (and its settings validated) even when the step is off, so invalid values are always reported. Switched on with
-    /// neither height nor terrain type changes counted, or with neither terrain area on, it is passed as off, with a warning,
+    /// no height, terrain type or water changes counted, or with neither terrain area on, it is passed as off, with a warning,
     /// because it could remove nothing.
     /// </summary>
     private static ChangedTerrainSettings CreateChangedTerrainSettings(ITerrainChangeSettingsValues terrain, ICollection<SettingWarning> warnings)
@@ -176,31 +177,39 @@ public static class SettingsValidator
         var sizeMultiplier = ClampSizeMultiplier(terrain.AreaSizeMultiplier, TerrainSizeMarginName, warnings);
         var distanceInUnits = ClampMarginInUnits(terrain.AreaDistanceInUnits, SettingDefaults.TerrainAreaDistanceInUnits, TerrainDistanceMarginName, warnings);
         var typeChangePercent = Clamp(terrain.MinTerrainTypeChangePercent, 0, Percent.PerWhole, TerrainTypeChangePercentName, warnings);
-        var countsAChange = terrain.CountHeightChanges || terrain.CountTerrainTypeChanges;
-        var hasAnArea = terrain.AreaBySize || terrain.AreaByDistance;
-        if (terrain.RemoveOnChangedTerrain && !countsAChange)
-        {
-            warnings.Add(new SettingWarning(
-                "changed terrain",
-                "Warning: changed terrain is on, but neither height nor terrain type changes are counted; no object is removed for changed terrain."));
-        }
-        if (terrain.RemoveOnChangedTerrain && !hasAnArea)
-        {
-            warnings.Add(new SettingWarning(
-                "changed terrain",
-                "Warning: changed terrain is on, but neither terrain margin is on; no object is removed for changed terrain."));
-        }
-        return new ChangedTerrainSettings(
-            terrain.RemoveOnChangedTerrain && countsAChange && hasAnArea,
+        var waterTolerance = Clamp(
+            terrain.WaterHeightChangeTolerance, 0, MaxHeightChangeTolerance, SettingDefaults.WaterHeightChangeTolerance, "water height change tolerance", warnings);
+        var waterCoverPercent = Clamp(terrain.MinWaterCoverChangePercent, 0, Percent.PerWhole, WaterCoverChangePercentName, warnings);
+        var settings = new ChangedTerrainSettings(
+            terrain.RemoveOnChangedTerrain,
             objects,
             terrain.CountHeightChanges,
             tolerance,
             terrain.CountTerrainTypeChanges,
             typeChangePercent,
+            terrain.CountWaterHeightChanges,
+            waterTolerance,
+            terrain.CountWaterAddedOrRemoved,
+            waterCoverPercent,
             terrain.AreaBySize,
             sizeMultiplier,
             terrain.AreaByDistance,
             distanceInUnits);
+        var countsAChange = settings.CountHeightChanges || settings.CountTerrainTypeChanges || settings.CountsWaterChanges;
+        var hasAnArea = settings.AreaBySize || settings.AreaByDistance;
+        if (settings.On && !countsAChange)
+        {
+            warnings.Add(new SettingWarning(
+                "changed terrain",
+                "Warning: changed terrain is on, but no height, terrain type or water changes are counted; no object is removed for changed terrain."));
+        }
+        if (settings.On && !hasAnArea)
+        {
+            warnings.Add(new SettingWarning(
+                "changed terrain",
+                "Warning: changed terrain is on, but neither terrain margin is on; no object is removed for changed terrain."));
+        }
+        return settings with { On = settings.On && countsAChange && hasAnArea };
     }
 
     /// <param name="touchChainsShown">Whether the detailed log and the report files, which show the touch chains, are on.</param>
@@ -227,7 +236,8 @@ public static class SettingsValidator
 
     /// <summary>
     /// The surroundings are read only when follow-up removal or relocation needs them; the Editor ID lists only when the detailed
-    /// log prints them; every plugin's terrain only when the changed-terrain step runs, and its texture layers only when it counts terrain types.
+    /// log prints them; every plugin's terrain only when the changed-terrain step runs, its texture layers only when it counts terrain
+    /// types, and its water only when it counts a water change.
     /// </summary>
     private static WhatToCollect CreateWhatToCollect(FollowUpRemovalMode mode, MarkerMoveSettings? markerMoves, ChangedTerrainSettings changedTerrain, bool detailedLog)
     {
@@ -238,7 +248,8 @@ public static class SettingsValidator
             markerMoves != null,
             detailedLog,
             changedTerrain.On,
-            changedTerrain.On && changedTerrain.CountTerrainTypeChanges);
+            changedTerrain.On && changedTerrain.CountTerrainTypeChanges,
+            changedTerrain.On && changedTerrain.CountsWaterChanges);
     }
 
     /// <summary>Built (and its settings validated) even when the step is off, so invalid values are always reported.</summary>

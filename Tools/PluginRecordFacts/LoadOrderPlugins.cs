@@ -30,3 +30,18 @@ public sealed record LoadOrderPlugins(KnownPluginNames Mods, PluginName PatchMod
 {
     public PluginListing? Find(PluginName mod) => Listed.FirstOrDefault(listing => listing.Mod == mod);
 }
+
+/// <summary>The load-order position of each listed plugin, found without walking the load order.</summary>
+public sealed class LoadOrderPositions
+{
+    private readonly Dictionary<PluginName, int> _positions = [];
+
+    /// <param name="listed">The listed plugins, lowest priority first.</param>
+    public LoadOrderPositions(ImmutableArray<PluginListing> listed)
+    {
+        for (var position = 0; position < listed.Length; position++) _positions[listed[position].Mod] = position;
+    }
+
+    /// <returns>A higher position for a plugin loading later; the last position of a plugin listed twice.</returns>
+    public int Of(PluginName plugin) => _positions[plugin];
+}

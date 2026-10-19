@@ -10,14 +10,13 @@ internal sealed class CellTerrainComparison(TerrainPlugins plugins, TerrainTypes
 {
     private readonly TerrainDifference _difference = new(settings);
 
-    /// <param name="versions">The cell's versions in load order.</param>
+    /// <param name="versions">The cell's terrain versions in load order.</param>
     /// <returns>Null when the cell has no reference terrain.</returns>
     public CellTerrain? Compare(TerrainVersion[] versions)
     {
-        if (plugins.ReferenceIn(versions) is not { } referenceIndex) return null;
+        if (plugins.FromReference(versions, static version => version.Plugin) is not { } fromReference) return null;
 
-        // Only the versions loading after the reference can change it: the reference overrides the earlier ones.
-        var versionsFromReference = versions[referenceIndex..].Select(ToTraced).ToArray();
+        var versionsFromReference = fromReference.Select(ToTraced).ToArray();
         return new CellTerrain(versionsFromReference[0].Version.Heights, versionsFromReference[^1].Version.Heights, ChangesOf(versionsFromReference));
     }
 
@@ -48,55 +47,21 @@ internal sealed class CellTerrainComparison(TerrainPlugins plugins, TerrainTypes
     /// </summary>
     private VertexChange FindChangersAt(TracedVersion[] versionsFromReference, TerrainChange shown, int vertex) =>
         new(
-            shown.Height ? FindOriginOf(versionsFromReference, vertex, static change => change.Height).ChangerPosition : null,
-            shown.TerrainType ? FindOriginOf(versionsFromReference, vertex, static change => change.TerrainType).ChangerPosition : null);
+            shown.Height ? FindChangerOf(versionsFromReference, vertex, static change => change.Height) : null,
+            shown.TerrainType ? FindChangerOf(versionsFromReference, vertex, static change => change.TerrainType) : null);
 
-    /// <summary>
-    /// The version whose own edit gave the shown value: the first of the last versions that all carry the shown change. When that
-    /// version does not count and an earlier version already carried the change, it took that version's edit back in (as a patch
-    /// combining several mods' changes does), and the earlier version is traced instead.
-    /// </summary>
     /// <remarks>
     /// A version carries the change only when its own value differs from the reference beyond the check's tolerance, so small
-    /// steps within the height tolerance cannot add up to a change that no version made. The reference never differs from
-    /// itself, so the origin is always a version after it.
+    /// steps within the height tolerance cannot add up to a change that no version made.
     /// </remarks>
     /// <param name="check">Selects the check traced: height or terrain type.</param>
-    private TracedVersion FindOriginOf(TracedVersion[] versionsFromReference, int vertex, Func<TerrainChange, bool> check)
+    /// <returns>The position of the counting plugin whose own edit gave the shown change; null when that plugin does not count.</returns>
+    private int? FindChangerOf(TracedVersion[] versionsFromReference, int vertex, Func<TerrainChange, bool> check)
     {
-        var origin = FindStartOfCarryingRun(versionsFromReference, versionsFromReference.Length - 1, vertex, check);
-        while (TakesAnEarlierEditBackIn(versionsFromReference, origin, vertex, check, out var earlier))
-        {
-            origin = FindStartOfCarryingRun(versionsFromReference, earlier, vertex, check);
-        }
-        return versionsFromReference[origin];
-    }
-
-    /// <returns>The first of the versions up to <paramref name="end"/> that all carry the shown change.</returns>
-    private int FindStartOfCarryingRun(TracedVersion[] versionsFromReference, int end, int vertex, Func<TerrainChange, bool> check)
-    {
-        var start = end;
-        while (CarriesShownChange(versionsFromReference, start - 1, vertex, check)) start--;
-        return start;
-    }
-
-    /// <summary>A non-counting version takes an earlier edit back in when an earlier version already carried the shown change.</summary>
-    private bool TakesAnEarlierEditBackIn(TracedVersion[] versionsFromReference, int origin, int vertex, Func<TerrainChange, bool> check, out int earlier)
-    {
-        earlier = 0;
-        if (versionsFromReference[origin].ChangerPosition != null || FindLastCarrierBefore(versionsFromReference, origin, vertex, check) is not { } carrier) return false;
-        earlier = carrier;
-        return true;
-    }
-
-    /// <returns>The last version after the reference and before <paramref name="end"/> that carries the shown change; null when none does.</returns>
-    private int? FindLastCarrierBefore(TracedVersion[] versionsFromReference, int end, int vertex, Func<TerrainChange, bool> check)
-    {
-        for (var index = end - 1; index > 0; index--)
-        {
-            if (CarriesShownChange(versionsFromReference, index, vertex, check)) return index;
-        }
-        return null;
+        var origin = new ChangeOrigin(
+            index => CarriesShownChange(versionsFromReference, index, vertex, check),
+            index => versionsFromReference[index].ChangerPosition != null);
+        return versionsFromReference[origin.Find(versionsFromReference.Length - 1)].ChangerPosition;
     }
 
     /// <summary>The version differs from the reference beyond the check's tolerance and matches the shown version within it.</summary>

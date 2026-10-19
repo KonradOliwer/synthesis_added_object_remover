@@ -218,7 +218,7 @@ public class RunSettingsValidationTests
     {
         var supportOnly = SettingsFor();
         supportOnly.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.OnlyWhatLosesItsSupport };
-        Assert.Equal(new WhatToCollect(true, true, false, false, false, false), BuildReady(supportOnly).Settings.Read);
+        Assert.Equal(new WhatToCollect(true, true, false, false, false, false, false), BuildReady(supportOnly).Settings.Read);
 
         var relocating = SettingsFor();
         relocating.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.EverythingTouchingIt };
@@ -228,12 +228,30 @@ public class RunSettingsValidationTests
             MoveKeptMarkersOutOfOtherModsObjects = true,
         };
         var runSettings = BuildReady(relocating).Settings;
-        Assert.Equal(new WhatToCollect(true, true, true, false, false, false), runSettings.Read);
+        Assert.Equal(new WhatToCollect(true, true, true, false, false, false, false), runSettings.Read);
         Assert.NotNull(runSettings.MarkerMoves);
 
         var neither = SettingsFor();
         neither.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.EverythingTouchingIt };
-        Assert.Equal(new WhatToCollect(false, false, false, false, false, false), BuildReady(neither).Settings.Read);
+        Assert.Equal(new WhatToCollect(false, false, false, false, false, false, false), BuildReady(neither).Settings.Read);
+    }
+
+    [Theory]
+    [InlineData(false, true, true, false)]
+    [InlineData(true, false, false, false)]
+    [InlineData(true, true, false, true)]
+    [InlineData(true, false, true, true)]
+    public void WaterIsReadOnlyForTheChangedTerrainStepCountingAWaterChange(bool on, bool waterHeights, bool waterAddedOrRemoved, bool water)
+    {
+        var settings = SettingsFor();
+        settings.TerrainChange = new TerrainChangeSettings
+        {
+            RemoveOnChangedTerrain = on,
+            CountWaterHeightChanges = waterHeights,
+            CountWaterAddedOrRemoved = waterAddedOrRemoved,
+        };
+
+        Assert.Equal(water, BuildReady(settings).Settings.Read.Water);
     }
 
     [Theory]
@@ -257,7 +275,8 @@ public class RunSettingsValidationTests
         Assert.Equal(
             new ChangedTerrainSettings(
                 On: false, TerrainCheckedObjects.VisibleObjectsOnTheGround, CountHeightChanges: true, HeightTolerance: 16f, CountTerrainTypeChanges: true,
-                MinTerrainTypeChangePercent: 20, AreaBySize: false, AreaMultiplier: 0.5f, AreaByDistance: true, AreaDistanceInUnits: 64f),
+                MinTerrainTypeChangePercent: 20, CountWaterHeightChanges: true, WaterHeightTolerance: 16f, CountWaterAddedOrRemoved: true,
+                MinWaterCoverChangePercent: 20, AreaBySize: false, AreaMultiplier: 0.5f, AreaByDistance: true, AreaDistanceInUnits: 64f),
             defaults);
 
         var settings = SettingsFor();
@@ -268,6 +287,10 @@ public class RunSettingsValidationTests
             CountHeightChanges = false,
             HeightChangeTolerance = 0f,
             MinTerrainTypeChangePercent = 50,
+            CountWaterHeightChanges = false,
+            WaterHeightChangeTolerance = 32f,
+            CountWaterAddedOrRemoved = false,
+            MinWaterCoverChangePercent = 40,
             BySize = new TerrainBySizeSettings { Use = true, SizeMultiplier = 2f },
             ByDistance = new TerrainByDistanceSettings { Use = true, DistanceInUnits = 128f },
         };
@@ -276,7 +299,7 @@ public class RunSettingsValidationTests
         Assert.Empty(ready.Warnings);
         Assert.Equal(
             new ChangedTerrainSettings(
-                On: true, TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes, false, 0f, true, 50,
+                On: true, TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes, false, 0f, true, 50, false, 32f, false, 40,
                 AreaBySize: true, AreaMultiplier: 2f, AreaByDistance: true, AreaDistanceInUnits: 128f),
             ready.Settings.ChangedTerrain);
     }
@@ -382,15 +405,63 @@ public class RunSettingsValidationTests
     public void ChangedTerrainCountingNoChangeIsSwitchedOffWithAWarning()
     {
         var settings = SettingsFor();
-        settings.TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = true, CountHeightChanges = false, CountTerrainTypeChanges = false };
+        settings.TerrainChange = new TerrainChangeSettings
+        {
+            RemoveOnChangedTerrain = true,
+            CountHeightChanges = false,
+            CountTerrainTypeChanges = false,
+            CountWaterHeightChanges = false,
+            CountWaterAddedOrRemoved = false,
+        };
 
         var ready = BuildReady(settings);
 
         Assert.False(ready.Settings.ChangedTerrain.On);
         Assert.False(ready.Settings.Read.TerrainVersions);
         Assert.Equal(
-            "Warning: changed terrain is on, but neither height nor terrain type changes are counted; no object is removed for changed terrain.",
+            "Warning: changed terrain is on, but no height, terrain type or water changes are counted; no object is removed for changed terrain.",
             Assert.Single(ready.Warnings).Message);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void ChangedTerrainCountingOnlyAWaterChangeStaysOn(bool waterHeights, bool waterAddedOrRemoved)
+    {
+        var settings = SettingsFor();
+        settings.TerrainChange = new TerrainChangeSettings
+        {
+            RemoveOnChangedTerrain = true,
+            CountHeightChanges = false,
+            CountTerrainTypeChanges = false,
+            CountWaterHeightChanges = waterHeights,
+            CountWaterAddedOrRemoved = waterAddedOrRemoved,
+        };
+
+        var ready = BuildReady(settings);
+
+        Assert.True(ready.Settings.ChangedTerrain.On);
+        Assert.True(ready.Settings.Read.TerrainVersions);
+        Assert.Empty(ready.Warnings);
+    }
+
+    [Fact]
+    public void InvalidWaterValuesAreCorrectedWithAWarningEach()
+    {
+        var settings = SettingsFor();
+        settings.TerrainChange.WaterHeightChangeTolerance = -5f;
+        settings.TerrainChange.MinWaterCoverChangePercent = 101;
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal((0f, 100), (ready.Settings.ChangedTerrain.WaterHeightTolerance, ready.Settings.ChangedTerrain.MinWaterCoverChangePercent));
+        string[] expectedStarts =
+        [
+            "Warning: water height change tolerance -5",
+            "Warning: Remove objects on terrain changed by other mods > Remove only when this share of the ground got covered/uncovered 101 is outside 0-100",
+        ];
+        Assert.Equal(expectedStarts.Length, ready.Warnings.Length);
+        Assert.All(expectedStarts.Zip(ready.Warnings), pair => Assert.StartsWith(pair.First, pair.Second.Message));
     }
 
     [Fact]
@@ -409,7 +480,7 @@ public class RunSettingsValidationTests
 
         Assert.Equal(
             new ChangedTerrainSettings(
-                On: false, TerrainCheckedObjects.VisibleObjectsOnTheGround, true, 256f, true, 20,
+                On: false, TerrainCheckedObjects.VisibleObjectsOnTheGround, true, 256f, true, 20, true, 16f, true, 20,
                 AreaBySize: false, AreaMultiplier: 0.5f, AreaByDistance: true, AreaDistanceInUnits: 0f),
             ready.Settings.ChangedTerrain);
         string[] expectedStarts =

@@ -42,14 +42,14 @@ public sealed class SharedReportingTests
         var world = CreateWorld();
         var changedBy = new PluginName("Other.esp");
         var decisions = RemovalDecisions.Start(ObjectsToKeep.Build(world.Targets, [], TestTargets.References(TargetCount), TestBaseFacts.Unresolved), TargetCount)
-            .Apply(RoundKind.ChangedTerrain, [Propose(0, new RemovalReason.TerrainChanged(changedBy, TerrainChangeKind.HeightAndTerrainType))])
+            .Apply(RoundKind.ChangedTerrain, [Propose(0, new RemovalReason.TerrainChanged(changedBy, TerrainChangeKind.Height | TerrainChangeKind.TerrainType))])
             .Apply(RoundKind.TooClose, [Propose(1, new RemovalReason.TooClose(new OtherId(0), BySize)), Propose(2, new RemovalReason.TooClose(new OtherId(0), WithinDistance))]);
 
         var removals = RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(decisions), decisions, world, TestLeftBehind.PerformedWithoutFindings);
 
         var other = world.OtherModObjects[0];
         Assert.Equal(
-            [new TerrainChangedRemoval(0, changedBy, TerrainChangeKind.HeightAndTerrainType), new TooCloseRemoval(1, other, BySize), new TooCloseRemoval(2, other, WithinDistance)],
+            [new TerrainChangedRemoval(0, changedBy, TerrainChangeKind.Height | TerrainChangeKind.TerrainType), new TooCloseRemoval(1, other, BySize), new TooCloseRemoval(2, other, WithinDistance)],
             removals);
     }
 
@@ -81,7 +81,11 @@ public sealed class SharedReportingTests
     [Theory]
     [InlineData(TerrainChangeKind.Height, "terrain changed by Other.esp (height)")]
     [InlineData(TerrainChangeKind.TerrainType, "terrain changed by Other.esp (terrain type)")]
-    [InlineData(TerrainChangeKind.HeightAndTerrainType, "terrain changed by Other.esp (height and terrain type)")]
+    [InlineData(TerrainChangeKind.Height | TerrainChangeKind.TerrainType, "terrain changed by Other.esp (height and terrain type)")]
+    [InlineData(TerrainChangeKind.WaterHeight, "terrain changed by Other.esp (water height)")]
+    [InlineData(TerrainChangeKind.WaterAdded, "terrain changed by Other.esp (water added)")]
+    [InlineData(TerrainChangeKind.WaterRemoved, "terrain changed by Other.esp (water removed)")]
+    [InlineData(TerrainChangeKind.Height | TerrainChangeKind.TerrainType | TerrainChangeKind.WaterHeight, "terrain changed by Other.esp (height, terrain type and water height)")]
     public void ATerrainChangeNamesTheModAndWhatChanged(TerrainChangeKind kind, string expected)
     {
         Assert.Equal(expected, Describe.RemovalReason(null!, new TerrainChangedRemoval(0, new PluginName("Other.esp"), kind)));

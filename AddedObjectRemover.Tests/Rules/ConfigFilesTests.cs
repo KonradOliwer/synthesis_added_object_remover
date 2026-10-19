@@ -402,6 +402,23 @@ public sealed class ConfigFilesTests : IDisposable
     }
 
     [Fact]
+    public void TheWaterSettingsOfTheTerrainGroupAreReadByTheirSettingsKeys()
+    {
+        var config = ReadOnlyConfig(
+            """
+            {
+              "TargetPlugin": "A.esp",
+              "TerrainChange": { "CountWaterHeightChanges": false, "WaterHeightChangeTolerance": 40, "CountWaterAddedOrRemoved": false, "MinWaterCoverChangePercent": 60 }
+            }
+            """);
+
+        var terrain = config.Settings.TerrainChange;
+
+        Assert.Equal((false, 40f, false, 60), (terrain.CountWaterHeightChanges, terrain.WaterHeightChangeTolerance, terrain.CountWaterAddedOrRemoved, terrain.MinWaterCoverChangePercent));
+        Assert.Empty(NotesOf(config).UnknownKeys);
+    }
+
+    [Fact]
     public void ANullListIsTheDefaultOfAListSetting()
     {
         var config = ReadOnlyConfig("{\"TargetPlugin\": \"A.esp\", \"WhatToIgnore\": {\"ExcludedPlugins\": null}}");

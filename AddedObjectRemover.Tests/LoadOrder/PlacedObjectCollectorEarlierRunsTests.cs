@@ -27,7 +27,7 @@ public class PlacedObjectCollectorEarlierRunsTests
 
     private static readonly IBaseObjectShapes Shapes = TestShapes.Create(Mod, "EarlierRunsData", Table);
 
-    private static readonly WhatToCollect Plan = new(SupportOnlyObjects: true, Terrain: false, Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false);
+    private static readonly WhatToCollect Plan = new(SupportOnlyObjects: true, Terrain: false, Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false);
     private static readonly IdentifiedMods Mods = new(TestTargets.TargetPlugin, new HashSet<PluginName> { IgnoredPlugin }, [], [], DetectedPatches.Off, []);
 
     private static readonly PlacedRecordFact Target = TestPlacedRecords.Create(TestTargets.Key(0), TestTargets.TargetPlugin, Vector3.Zero, Table.Base);

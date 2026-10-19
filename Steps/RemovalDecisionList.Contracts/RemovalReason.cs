@@ -1,7 +1,16 @@
 namespace AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
-/// <summary>What changed in the terrain under or near a target object.</summary>
-public enum TerrainChangeKind { Height, TerrainType, HeightAndTerrainType }
+/// <summary>What changed in the terrain under or near a target object; a removal can name several.</summary>
+[Flags]
+public enum TerrainChangeKind
+{
+    None = 0,
+    Height = 1,
+    TerrainType = 2,
+    WaterHeight = 4,
+    WaterAdded = 8,
+    WaterRemoved = 16,
+}
 
 /// <summary>How another mod's object was found too close to a target object.</summary>
 public abstract record TooCloseCause
@@ -16,7 +25,7 @@ public abstract record TooCloseCause
 /// <summary>Why a step proposes to remove a target object.</summary>
 public abstract record RemovalReason
 {
-    /// <param name="ChangedBy">The plugin whose terrain change the game shows.</param>
+    /// <param name="ChangedBy">The plugin whose terrain or water change the game shows.</param>
     public sealed record TerrainChanged(PluginName ChangedBy, TerrainChangeKind Kind) : RemovalReason;
 
     public sealed record TooClose(OtherId Other, TooCloseCause Cause) : RemovalReason;

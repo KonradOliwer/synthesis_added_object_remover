@@ -67,7 +67,7 @@ public class StepWordingTests
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: could not read {targetListing.Mod} to find its masters.")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "The plugin setting {name} is not a plugin file name.")] = BugMessage,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: neither too-close margin is on; no object is removed for being too close.")] = SettingsWarning,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: changed terrain is on, but neither height nor terrain type changes are counted; no object is removed for changed terrain.")] =
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: changed terrain is on, but no height, terrain type or water changes are counted; no object is removed for changed terrain.")] =
             SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: changed terrain is on, but neither terrain margin is on; no object is removed for changed terrain.")] =
             SettingsWarning,
@@ -86,6 +86,8 @@ public class StepWordingTests
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects on terrain changed by other mods > Margin by object size > Margin on every side")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects on terrain changed by other mods > Margin by fixed distance > Margin on every side")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects on terrain changed by other mods > Remove only when this share of the ground points changed type")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects on terrain changed by other mods > Remove only when this share of the ground got covered/uncovered")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "water height change tolerance")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "target plugin")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "too close")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "touch distance")] = SettingsWarning,
@@ -102,7 +104,6 @@ public class StepWordingTests
         [("Steps/RemoveObjectsRestingOnRemovedOnes/TargetMeshPaths.cs", "Target {target} has no mesh but was used as a mesh.")] = BugMessage,
         [("Steps/RemoveObjectsRestingOnRemovedOnes/TouchChains.cs", "A touch round has no cause {reason}.")] = BugMessage,
         [("Steps/RemoveObjectsRestingOnRemovedOnes/TouchChains.cs", "Touch chains need the touch rounds' search.")] = BugMessage,
-        [("Steps/RemoveObjectsOnChangedTerrain/TerrainDifference.cs", "A terrain change without a kind.")] = BugMessage,
         [("Steps/RemoveTooCloseObjects/TooCloseObjects.cs", "Unknown removal zone {settings.Zone}.")] = BugMessage,
         [("Steps/SelectObjectsThatCanCauseRemovals/OtherObjectViews.cs", "Other-mod object {index[slot].Key} is invisible, so it is not active.")] = BugMessage,
     };

@@ -34,7 +34,11 @@
     "CountHeightChanges": true,
     "HeightChangeTolerance": 16.0,
     "CountTerrainTypeChanges": true,
-    "MinTerrainTypeChangePercent": 20
+    "MinTerrainTypeChangePercent": 20,
+    "CountWaterHeightChanges": true,
+    "WaterHeightChangeTolerance": 16.0,
+    "CountWaterAddedOrRemoved": true,
+    "MinWaterCoverChangePercent": 20
   },
   "FollowUpRemoval": {
     "Mode": "OnlyWhatLosesItsSupport",

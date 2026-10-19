@@ -21,6 +21,10 @@ public static class SettingDefaults
     public const float HeightChangeTolerance = 16f;
     public const bool CountTerrainTypeChanges = true;
     public const int MinTerrainTypeChangePercent = 20;
+    public const bool CountWaterHeightChanges = true;
+    public const float WaterHeightChangeTolerance = 16f;
+    public const bool CountWaterAddedOrRemoved = true;
+    public const int MinWaterCoverChangePercent = 20;
     public const int MaxOtherMastersForPatch = 10;
     public const NpcHandling Npcs = NpcHandling.OnlyWhenStuckInsideTheObject;
     public const FollowUpRemovalMode FollowUpMode = FollowUpRemovalMode.EverythingTouchingIt;

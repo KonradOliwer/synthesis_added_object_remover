@@ -7,7 +7,7 @@ using Mutagen.Bethesda.Skyrim;
 namespace AddedObjectRemover;
 
 /// <summary>What reading the placed records produced: the facts, and the load-order records behind them that later reads and writes need.</summary>
-internal sealed record ScannedRecords(PlacedRecordFacts Facts, RecordHandles Handles, LandscapeTerrain Terrain, NavmeshRecords Navmeshes);
+internal sealed record ScannedRecords(PlacedRecordFacts Facts, RecordHandles Handles, LandscapeTerrain Terrain, CellWater Water, NavmeshRecords Navmeshes);
 
 /// <summary>
 /// The spaces (worldspace or interior cell keys) that contain a record created by the target
@@ -18,7 +18,7 @@ internal sealed record TargetPluginFootprint(HashSet<RecordKey> SpaceKeys, HashS
 /// <summary>
 /// Reads every winning placed record (REFR, ACHR and all placed trap/hazard/projectile types) of a
 /// load order as <see cref="PlacedRecordFact"/>s, with the links from them into the target plugin, the terrain
-/// of the target worldspaces and the navmeshes of the target spaces.
+/// and water of the target worldspaces and the navmeshes of the target spaces.
 ///
 /// Walks each mod's cell tree once via <c>EnumerateMajorRecordContexts&lt;ICell&gt;</c> (enumerating
 /// IPlaced walks each tree three times) and reads each cell's Persistent and Temporary lists itself.
@@ -44,8 +44,10 @@ internal sealed class PlacedRecordReader
     private readonly Dictionary<RecordKey, PlacedRecordHandle> _handles = new();
     private readonly List<LinkFact> _links = [];
     private readonly Dictionary<RecordKey, RecordKey> _landWorldspaceOf = new();
+    private readonly Dictionary<RecordKey, RecordKey> _waterWorldspaceOf = new();
     private readonly Dictionary<ExteriorCell, ILandscapeGetter> _landscapes = new();
     private readonly Dictionary<ExteriorCell, List<LandscapeVersion>> _landscapeVersions = new();
+    private readonly Dictionary<ExteriorCell, List<CellWaterCopy>> _cellWaterCopies = new();
     private readonly Dictionary<RecordKey, List<CellNavmesh>> _navmeshes = new();
 
     private int _recordsScanned;
@@ -63,7 +65,7 @@ internal sealed class PlacedRecordReader
         _names = names;
         _scope = scope;
         _footprint = AnalyzeTargetPlugin();
-        if (scope.Terrain || scope.TerrainVersions) FindLandWorldspaces();
+        if (scope.Terrain || scope.TerrainVersions || scope.Water) FindLandAndWaterWorldspaces();
         _landWorldspaces = _landWorldspaceOf.Values.ToHashSet();
     }
 
@@ -86,21 +88,26 @@ internal sealed class PlacedRecordReader
         || mod.ModKey == patch
         || mod.MasterReferences.Any(master => names.Of(master.Master) == target);
 
-    private void FindLandWorldspaces()
+    private void FindLandAndWaterWorldspaces()
     {
         foreach (var spaceKey in _footprint.SpaceKeys)
         {
             if (!_linkCache.TryResolve<IWorldspaceGetter>(spaceKey.ToFormKey(), out var worldspace)) continue;
-            _landWorldspaceOf[spaceKey] = FollowLandDataParents(worldspace);
+            _landWorldspaceOf[spaceKey] = FollowParents(worldspace, WorldspaceParent.Flag.UseLandData);
+            _waterWorldspaceOf[spaceKey] = FollowParents(worldspace, WorldspaceParent.Flag.UseWaterData);
         }
     }
 
-    /// <remarks>A parent chain that loops back (broken data) stops at the last worldspace not yet seen.</remarks>
-    private RecordKey FollowLandDataParents(IWorldspaceGetter worldspace)
+    /// <remarks>
+    /// A parent chain that loops back (broken data) stops at the last worldspace not yet seen. The parent and its flags come from
+    /// the winning worldspace records only, so a mod switching "use water data" on a child is not seen as a water change; that
+    /// misses the change but never causes a wrong removal.
+    /// </remarks>
+    private RecordKey FollowParents(IWorldspaceGetter worldspace, WorldspaceParent.Flag usesParent)
     {
         var seen = new HashSet<FormKey> { worldspace.FormKey };
         while (worldspace.Parent is { } parent
-               && parent.Flags.HasFlag(WorldspaceParent.Flag.UseLandData)
+               && parent.Flags.HasFlag(usesParent)
                && _linkCache.TryResolve<IWorldspaceGetter>(parent.Worldspace.FormKey, out var parentWorldspace)
                && seen.Add(parentWorldspace.FormKey))
         {
@@ -111,7 +118,7 @@ internal sealed class PlacedRecordReader
 
     private void ScanLoadOrder()
     {
-        foreach (var listing in _loadOrder.PriorityOrder)
+        foreach (var listing in _loadOrder.ListedOrder.Reverse())
         {
             if (listing.Mod is not { } mod) continue;
             var collectReferences = MayReferenceTarget(mod, _scope.Target, _patch, _names);
@@ -121,6 +128,25 @@ internal sealed class PlacedRecordReader
                 ScanCell(cellContext, winningMod, collectReferences);
             }
         }
+    }
+
+    /// <summary>Every plugin's own default water height of each worldspace that supplies water, in load order, when the water is asked for.</summary>
+    private Dictionary<RecordKey, List<WorldspaceWaterCopy>> CollectWorldspaceWater()
+    {
+        var copies = new Dictionary<RecordKey, List<WorldspaceWaterCopy>>();
+        if (!_scope.Water) return copies;
+        var supplierKeys = _waterWorldspaceOf.Values.ToHashSet();
+        foreach (var listing in _loadOrder.ListedOrder)
+        {
+            if (listing.Mod is not { } mod) continue;
+            foreach (var worldspaceKey in supplierKeys)
+            {
+                if (mod.Worldspaces.RecordCache.TryGetValue(worldspaceKey.ToFormKey()) is not { } worldspace) continue;
+                var copy = new WorldspaceWaterCopy(_names.Of(listing.ModKey), worldspace.LandDefaults?.DefaultWaterHeight);
+                KeyedGroups.GetOrAddList(copies, worldspaceKey).Add(copy);
+            }
+        }
+        return copies;
     }
 
     /// <summary>
@@ -156,7 +182,11 @@ internal sealed class PlacedRecordReader
         var cellFact = new CellFact(_names.KeyOf(cell.FormKey), cell.EditorID);
         var inTargetSpace = _footprint.SpaceKeys.Contains(space.Key);
         if (inTargetSpace && _winningCells.TryAdd(cellFact.Key, cellContext)) _targetSpaceCells.Add(new SpaceCell(cellFact.Key, space, cell));
-        if (_landWorldspaces.Contains(space.Key)) CollectLandscape(cell, cellFact.Key, space, winningMod);
+        if (ExteriorCellOf(cell, cellFact.Key, space) is { } exteriorCell)
+        {
+            if (_landWorldspaces.Contains(space.Key)) CollectLandscape(cell, exteriorCell, winningMod);
+            if (_scope.Water && _waterWorldspaceOf.ContainsKey(space.Key)) CollectCellWater(cell, exteriorCell, winningMod);
+        }
         if (_scope.Navmeshes && inTargetSpace) CollectNavmeshes(cell, cellFact.Key, space);
 
         foreach (var (record, persistent) in cell.EnumeratePlaced())
@@ -170,13 +200,24 @@ internal sealed class PlacedRecordReader
     /// terrain to a lower-priority plugin; the first cell copy found that carries one is the winner.
     /// With the terrain versions asked for, each plugin's copy is also kept, undecoded, in the order found.
     /// </remarks>
-    private void CollectLandscape(ICellGetter cell, RecordKey cellKey, SpaceFact space, PluginName plugin)
+    private void CollectLandscape(ICellGetter cell, ExteriorCell exteriorCell, PluginName plugin)
     {
-        if (space.Key == cellKey || cell.Grid is not { } grid || cell.Landscape is not { } landscape) return;
-        var exteriorCell = new ExteriorCell(space.Key, grid.Point.X, grid.Point.Y);
+        if (cell.Landscape is not { } landscape) return;
         _landscapes.TryAdd(exteriorCell, landscape);
         if (_scope.TerrainVersions) KeyedGroups.GetOrAddList(_landscapeVersions, exteriorCell).Add(new LandscapeVersion(plugin, landscape));
     }
+
+    /// <remarks>
+    /// The water fields are part of the cell record itself, so they are read from the cells of the target's own worldspaces, not
+    /// of the worldspace whose land they use. Every plugin's copy of the cell is kept, with or without land, in the order found;
+    /// like the land, two cells at one grid in one plugin are both kept.
+    /// </remarks>
+    private void CollectCellWater(ICellGetter cell, ExteriorCell exteriorCell, PluginName plugin) =>
+        KeyedGroups.GetOrAddList(_cellWaterCopies, exteriorCell).Add(WaterLevel.ReadCopy(plugin, cell));
+
+    /// <returns>Null for a worldspace's persistent cell and any other cell without a grid.</returns>
+    private static ExteriorCell? ExteriorCellOf(ICellGetter cell, RecordKey cellKey, SpaceFact space) =>
+        space.Key != cellKey && cell.Grid is { } grid ? new ExteriorCell(space.Key, grid.Point.X, grid.Point.Y) : null;
 
     /// <remarks>Like placed records, the first copy of a navmesh found is its winner.</remarks>
     private void CollectNavmeshes(ICellGetter cell, RecordKey cellKey, SpaceFact space)
@@ -239,7 +280,8 @@ internal sealed class PlacedRecordReader
             [.. _links],
             _navmeshes.Values.Sum(navmeshes => navmeshes.Count),
             cellAreas);
-        return new ScannedRecords(facts, new RecordHandles(_handles), terrain, new NavmeshRecords(_navmeshes));
+        var water = new CellWater(_scope.Water ? _cellWaterCopies : null, CollectWorldspaceWater(), _waterWorldspaceOf);
+        return new ScannedRecords(facts, new RecordHandles(_handles), terrain, water, new NavmeshRecords(_navmeshes));
     }
 
     /// <summary>What every record of one cell shares.</summary>

@@ -24,6 +24,8 @@ internal sealed class FailingTerrainVersionsPlugin(IPluginRecords inner) : IPlug
 
     public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new InvalidOperationException(FailureMessage);
 
+    public WaterCopies ReadWaterCopies(ExteriorCell cell) => inner.ReadWaterCopies(cell);
+
     public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => inner.ReadTextureMaterialChain(texture);
 
     public RecordKey? FindLandWorldspace(RecordKey space) => inner.FindLandWorldspace(space);

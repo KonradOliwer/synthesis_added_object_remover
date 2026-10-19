@@ -49,10 +49,14 @@ Standard.TerrainChange.BySize.SizeMultiplier
 Standard.TerrainChange.BySize.Use
 Standard.TerrainChange.CountHeightChanges
 Standard.TerrainChange.CountTerrainTypeChanges
+Standard.TerrainChange.CountWaterAddedOrRemoved
+Standard.TerrainChange.CountWaterHeightChanges
 Standard.TerrainChange.HeightChangeTolerance
 Standard.TerrainChange.MinTerrainTypeChangePercent
+Standard.TerrainChange.MinWaterCoverChangePercent
 Standard.TerrainChange.RemoveOnChangedTerrain
 Standard.TerrainChange.TerrainCheckedObjects
+Standard.TerrainChange.WaterHeightChangeTolerance
 Standard.TooClose
 Standard.TooClose.ByDistance
 Standard.TooClose.ByDistance.DistanceInUnits

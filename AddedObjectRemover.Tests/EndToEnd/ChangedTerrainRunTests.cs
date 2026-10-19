@@ -29,6 +29,8 @@ public class ChangedTerrainRunTests
                 [TerrainWorld.CrateOnRoad] = new RemovalReason.TerrainChanged(Other, TerrainChangeKind.TerrainType),
                 [TerrainWorld.CrateOnOtherGrass] = null,
                 [TerrainWorld.CrateOnTerrainRaisedByADependant] = null,
+                [TerrainWorld.CrateUnderRaisedWater] = new RemovalReason.TerrainChanged(Other, TerrainChangeKind.WaterHeight),
+                [TerrainWorld.CrateInAddedWater] = new RemovalReason.TerrainChanged(Other, TerrainChangeKind.WaterAdded),
             },
             ReasonsByEditorId(outcome));
     }
@@ -45,11 +47,13 @@ public class ChangedTerrainRunTests
         Assert.Contains(
             "Remove objects on terrain changed by other mods: on; Which of the cleaned mod's objects are checked: VisibleObjectsOnTheGround; "
             + "Margin by object size: off; Margin by fixed distance: on, 64 units; Count height changes: on, ignoring changes up to 16 units; "
-            + "Count ground type changes: on, remove only when this share of the ground points changed type: 20%.",
+            + "Count ground type changes: on, remove only when this share of the ground points changed type: 20%; "
+            + "Count water height changes: on, ignoring changes up to 16 units; Count water added/removed changes: on; "
+            + "remove only when this share of the ground got covered/uncovered: 20%.",
             SectionLines(log, "config"));
-        Assert.Equal([$"Found 2 of 4 {FixtureWorld.TargetPlugin} objects on terrain changed by other mods."], SectionLines(log, "changedTerrain"));
+        Assert.Equal([$"Found 4 of 6 {FixtureWorld.TargetPlugin} objects on terrain changed by other mods."], SectionLines(log, "changedTerrain"));
         Assert.Equal(
-            ["Removed 2 objects (2 on changed terrain, 0 too close, 0 follow-up removals, 0 leftover invisible objects, 0 linked to removed objects)."],
+            ["Removed 4 objects (4 on changed terrain, 0 too close, 0 follow-up removals, 0 leftover invisible objects, 0 linked to removed objects)."],
             SectionLines(log, "removal-summary"));
         Assert.All(log.Sections.Where(section => section.Id == "linked"), section => Assert.Empty(section.Lines));
     }
@@ -63,14 +67,28 @@ public class ChangedTerrainRunTests
         var log = RunLogged(settings);
 
         var changedTerrain = SectionLines(log, "changedTerrain");
-        Assert.Equal($"Found 2 of 4 {FixtureWorld.TargetPlugin} objects on terrain changed by other mods in 0.0s.", changedTerrain[0]);
-        Assert.Equal("  Terrain: 4 cells compared; 2 objects on changed terrain (by plugin: 2 Other.esp); 0 objects not checked (interior or no terrain).", changedTerrain[1]);
+        Assert.Equal($"Found 4 of 6 {FixtureWorld.TargetPlugin} objects on terrain changed by other mods in 0.0s.", changedTerrain[0]);
+        Assert.Equal("  Terrain: 6 cells compared; 4 objects on changed terrain (by plugin: 4 Other.esp); 0 objects not checked (interior or no terrain).", changedTerrain[1]);
         Assert.Contains(
             "Linked groups: 0 more objects removed with the changed-terrain removals they are linked to.",
             log.Sections.Where(section => section.Id == "linked").SelectMany(section => section.Lines));
         var removals = SectionLines(log, "removals");
         Assert.Single(removals, line => line.Contains(TerrainWorld.CrateOnRaisedTerrain) && line.EndsWith("terrain changed by Other.esp (height)"));
         Assert.Single(removals, line => line.Contains(TerrainWorld.CrateOnRoad) && line.EndsWith("terrain changed by Other.esp (terrain type)"));
+        Assert.Single(removals, line => line.Contains(TerrainWorld.CrateUnderRaisedWater) && line.EndsWith("terrain changed by Other.esp (water height)"));
+        Assert.Single(removals, line => line.Contains(TerrainWorld.CrateInAddedWater) && line.EndsWith("terrain changed by Other.esp (water added)"));
+    }
+
+    [Fact]
+    public void WithWaterChangesNotCountedTheWaterCratesStay()
+    {
+        var settings = SettingsWithTerrain(on: true);
+        settings.Standard.TerrainChange.CountWaterHeightChanges = false;
+        settings.Standard.TerrainChange.CountWaterAddedOrRemoved = false;
+
+        var reasons = ReasonsByEditorId(FixtureRun.Execute(settings, Workers, TerrainWorld.Create));
+
+        Assert.Equal((null, null), (reasons[TerrainWorld.CrateUnderRaisedWater], reasons[TerrainWorld.CrateInAddedWater]));
     }
 
     [Fact]
@@ -94,7 +112,7 @@ public class ChangedTerrainRunTests
         Assert.Empty(outcome.Final.RemovedTargets());
         var error = Assert.Single(log.Sections, section => section.Id == "unexpectedErrors" && section.Lines.Length > 0).Lines;
         Assert.StartsWith(
-            $"  Unexpected error while checking objects for changed terrain (InvalidOperationException: {FailingTerrainVersionsPlugin.FailureMessage}): 4 objects, e.g. ",
+            $"  Unexpected error while checking objects for changed terrain (InvalidOperationException: {FailingTerrainVersionsPlugin.FailureMessage}): 6 objects, e.g. ",
             Assert.Single(error));
         Assert.EndsWith(" They were not removed.", error[0]);
     }
@@ -127,9 +145,10 @@ public class ChangedTerrainRunTests
             target => outcome.Final.Of(target.Id) is Decision.Removed removed ? removed.Reason : null);
 
     /// <summary>
-    /// Four exterior cells in a row, each with one target crate. The base game paints them all flat grass; another mod raises the
+    /// Six exterior cells in a row, each with one target crate. The base game paints them all flat grass; another mod raises the
     /// first, paves the second with a road (a stone material) and repaints the third with another grass texture; a mod that
-    /// requires the target raises the fourth.
+    /// requires the target raises the fourth. The fifth has water below the ground, which the other mod raises above it; the
+    /// sixth has no water, and the other mod gives it water at the worldspace's default height, which is above the ground.
     /// </summary>
     private sealed class TerrainWorld
     {
@@ -138,6 +157,8 @@ public class ChangedTerrainRunTests
         public const string CrateOnRoad = "T_CrateOnRoad";
         public const string CrateOnOtherGrass = "T_CrateOnOtherGrass";
         public const string CrateOnTerrainRaisedByADependant = "T_CrateOnTerrainRaisedByADependant";
+        public const string CrateUnderRaisedWater = "T_CrateUnderRaisedWater";
+        public const string CrateInAddedWater = "T_CrateInAddedWater";
 
         private const string BaseGamePlugin = "Skyrim.esm";
         private const string DependantPlugin = "Dependant.esp";
@@ -147,6 +168,13 @@ public class ChangedTerrainRunTests
 
         private const float FlatSteps = 0f;
         private const float CrateOffsetInCell = 1000f;
+
+        private const float WaterBelowTheGround = -100f;
+        private const float WaterAboveTheGround = 100f;
+        private const float DefaultWaterHeight = 50f;
+        private const float DefaultLandHeight = -2048f;
+        private const int RaisedWaterCell = 4;
+        private const int AddedWaterCell = 5;
 
         private readonly FixtureMod _baseGame = new(BaseGamePlugin);
         private readonly FormKey _worldspace;
@@ -172,7 +200,7 @@ public class ChangedTerrainRunTests
             var otherGrass = world.AddTexture(world.Material(grass));
             var road = world.AddTexture(world.AddMaterial());
 
-            var crates = new[] { CrateOnRaisedTerrain, CrateOnRoad, CrateOnOtherGrass, CrateOnTerrainRaisedByADependant };
+            var crates = new[] { CrateOnRaisedTerrain, CrateOnRoad, CrateOnOtherGrass, CrateOnTerrainRaisedByADependant, CrateUnderRaisedWater, CrateInAddedWater };
             var crateBase = target.AddModeledStatic("T_CrateBase", FixtureMeshes.CrateModel);
             for (var cellX = 0; cellX < crates.Length; cellX++)
             {
@@ -184,7 +212,19 @@ public class ChangedTerrainRunTests
             world.Paint(other, 1, FlatSteps, road);
             world.Paint(other, 2, FlatSteps, otherGrass);
             world.Paint(dependant, 3, RaisedSteps, grass);
+            world.Flood(baseGame, RaisedWaterCell, WaterBelowTheGround);
+            world.Flood(target, RaisedWaterCell, WaterBelowTheGround);
+            world.Flood(other, RaisedWaterCell, WaterAboveTheGround);
+            world.Flood(other, AddedWaterCell, height: null);
             return [baseGame.Mod, target.Mod, dependant.Mod, other.Mod];
+        }
+
+        /// <summary>The mod's copy of the cell has water at the given height; null uses the worldspace's default height.</summary>
+        private void Flood(FixtureMod mod, int cellX, float? height)
+        {
+            var cell = CopyOf(mod, cellX);
+            cell.Flags |= Cell.Flag.HasWater;
+            cell.WaterHeight = height;
         }
 
         private FormKey AddMaterial()
@@ -232,7 +272,10 @@ public class ChangedTerrainRunTests
         private Worldspace WorldspaceOf(FixtureMod mod)
         {
             if (_worldspaces.TryGetValue(mod.Key, out var existing)) return existing;
-            var worldspace = new Worldspace(_worldspace, FixtureMod.Release);
+            var worldspace = new Worldspace(_worldspace, FixtureMod.Release)
+            {
+                LandDefaults = new WorldspaceLandDefaults { DefaultLandHeight = DefaultLandHeight, DefaultWaterHeight = DefaultWaterHeight },
+            };
             mod.Mod.Worldspaces.Add(worldspace);
             _worldspaces[mod.Key] = worldspace;
             return worldspace;

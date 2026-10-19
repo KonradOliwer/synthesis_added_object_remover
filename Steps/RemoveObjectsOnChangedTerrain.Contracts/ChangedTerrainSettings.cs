@@ -12,6 +12,13 @@ namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 /// The share (0-100) of an area's vertices whose terrain type must have changed for the type change to count; 0 counts any one
 /// changed vertex.
 /// </param>
+/// <param name="CountWaterHeightChanges">Whether a change of a cell's water height counts as a change.</param>
+/// <param name="WaterHeightTolerance">A water height change up to this many game units is ignored; 0 counts every change.</param>
+/// <param name="CountWaterAddedOrRemoved">Whether water added to or removed from a cell counts as a change.</param>
+/// <param name="MinWaterCoverChangePercent">
+/// The share (0-100) of an area's vertices that the counted water changes must have covered or uncovered for the water change to
+/// count; 0 counts any one such vertex.
+/// </param>
 /// <param name="AreaBySize">Whether the area grown by <paramref name="AreaMultiplier"/> is on.</param>
 /// <param name="AreaMultiplier">How far the area reaches around the object, as a multiple of its size.</param>
 /// <param name="AreaByDistance">Whether the area grown by <paramref name="AreaDistanceInUnits"/> is on.</param>
@@ -23,7 +30,14 @@ public sealed record ChangedTerrainSettings(
     float HeightTolerance,
     bool CountTerrainTypeChanges,
     int MinTerrainTypeChangePercent,
+    bool CountWaterHeightChanges,
+    float WaterHeightTolerance,
+    bool CountWaterAddedOrRemoved,
+    int MinWaterCoverChangePercent,
     bool AreaBySize,
     float AreaMultiplier,
     bool AreaByDistance,
-    float AreaDistanceInUnits);
+    float AreaDistanceInUnits)
+{
+    public bool CountsWaterChanges => CountWaterHeightChanges || CountWaterAddedOrRemoved;
+}

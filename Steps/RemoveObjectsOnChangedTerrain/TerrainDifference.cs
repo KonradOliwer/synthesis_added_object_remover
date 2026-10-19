@@ -1,21 +1,11 @@
-using System.Diagnostics;
-using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
 
-/// <summary>How a terrain version differs from another version at one or more vertices.</summary>
+/// <summary>How a terrain version differs from another version at a vertex.</summary>
 internal readonly record struct TerrainChange(bool Height, bool TerrainType)
 {
     public bool Any => Height || TerrainType;
-
-    public TerrainChangeKind Kind => (Height, TerrainType) switch
-    {
-        (true, true) => TerrainChangeKind.HeightAndTerrainType,
-        (true, false) => TerrainChangeKind.Height,
-        (false, true) => TerrainChangeKind.TerrainType,
-        _ => throw new UnreachableException("A terrain change without a kind."),
-    };
 }
 
 /// <summary>A plugin's terrain version of a cell, decoded per vertex for the comparison.</summary>

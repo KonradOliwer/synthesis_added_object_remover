@@ -85,7 +85,9 @@ The two margins work on their own and both can be on together; an object found b
 #### Remove objects on terrain changed by other mods
 
 Removes the cleaned mod's objects when another mod changed the terrain under or around them, for
-example raised or flattened the ground or turned grass into a road, so the objects no longer fit.
+example raised or flattened the ground, turned grass into a road, or raised, lowered, added or
+removed the water there, so the objects no longer fit (they float, sink, stand under water or on
+dry land where water was).
 Off by default. When on, it runs before the too-close check, so an object found by both is listed as removed for changed terrain. Objects in interiors, and in worlds without terrain, are not checked.
 
 | Setting | Default | Meaning |
@@ -100,8 +102,23 @@ Off by default. When on, it runs before the too-close check, so an object found 
 | Ignore height changes up to (game units) | `16` | A height change of up to this many game units is ignored (0-256). 0 counts every change. Small smoothing edits are common and rarely visible under an object. Only used when *Count height changes* is on. |
 | Count ground type changes (for example grass to road) | `true` | Whether a change of the kind of ground counts (see below). |
 | Remove only when this share of the ground points changed type (%) | `20` | A ground type change removes an object only when at least this share of the terrain points checked around it changed type (0-100). Small touch-ups at the edges of painted patches therefore don't remove objects. 0 removes on any one changed point. Height changes are not affected. Only used when *Count ground type changes* is on. |
+| Count water height changes | `true` | Whether another mod raising or lowering a cell's water counts, when that puts ground around the object under water or out of it (see below). Water over ground that stays covered is not seen (see *Known limitations*). |
+| Ignore water height changes up to (game units) | `16` | A water height change of up to this many game units is ignored (0-256). 0 counts every change. Only used when *Count water height changes* is on. |
+| Count water added/removed changes | `true` | Whether another mod adding water to a cell or taking its water away counts, when that puts ground around the object under water or out of it (see below). Water over ground that stays covered is not seen (see *Known limitations*). |
+| Remove only when this share of the ground got covered/uncovered (%) | `20` | A water change removes an object only when at least this share of the terrain points checked around it went under water or came out of it (0-100). 0 removes on any one such point. Only used when one of the two water switches is on. |
 
-The terrain under the object plus the margin around it is checked, for height and ground type changes alike. The terrain points right around the object are always checked. As with the too-close margins, the two margins work on their own and both can be on together: an object is removed when the terrain within either margin holds a change. One point whose height changed beyond the tolerance is enough; a ground type change needs the share of points set above. With both margins off, nothing is removed for changed terrain and the log warns about it.
+The terrain under the object plus the margin around it is checked, for height, ground type and water changes alike. The terrain points right around the object are always checked. As with the too-close margins, the two margins work on their own and both can be on together: an object is removed when the terrain within either margin holds a change. One point whose height changed beyond the tolerance is enough; a ground type change and a water change each need the share of points set above. With both margins off, nothing is removed for changed terrain and the log warns about it.
+
+**What counts as a water change.** A terrain point is under water when the cell's water surface is
+above the ground there. A water change counts at a point when the point went under water or came out
+of it, and the new water level alone does that over the ground the cleaned mod was made for. A
+point that only went under water or dried up because another mod raised or lowered the ground is
+judged by the height check, not counted again as a water change. Water that moves but stays above
+(or below) the ground everywhere around the object changes nothing. A cell's water level is its own
+water height, or its world's default water height where the cell uses the default; a cell without
+water has none. A world that uses its parent world's water data takes the default from the parent
+world. A cell that uses a default water height no copy of its world stores is not checked for water,
+since its water level is unknown. Water types, colours and other looks of the water are not compared.
 
 **What counts as a terrain type.** The terrain type is the kind of ground: grass, dirt, stone,
 snow and so on. A road counts by its ground type: grass changed to a road counts as a change, but a
@@ -119,15 +136,21 @@ removals*. That mod's own change must also be larger than the checks allow: seve
 that only add up to a larger one through a mod that does not count do not count. A mod that only
 copies another mod's terrain did not make the change: copying a change made by a mod that does not
 count does not count either, and a patch that carries another mod's terrain change does not hide
-it. Only the points changed by mods that count make up the share of changed ground points. The
-detailed log names the mod that made the change for each removed object, and whether the height,
-the ground type or both changed; for a ground type change, that is the mod that changed the type of
-the most points.
+it. Only the points changed by mods that count make up the share of changed ground points. Water
+is compared the same way: the water the cleaned mod was made for is the water of the cell, and the
+world's default water height, as the cleaned mod or else the last of its masters has them; the mod
+that changed the water must count. The detailed log names the mod that made the change for each
+removed object, and what changed: height, terrain type, water height, water added or water removed
+(for example `terrain changed by SomeMod.esp (water height)`); for a ground type or water change,
+that is the mod that changed the most points. Where several changes count, the later loading of
+their mods is named.
 
-If *Remove objects on changed terrain* is on but both *Count height changes* and *Count ground
-type changes* are off, nothing is removed for changed terrain and the log warns about it. Switched
-on with the other defaults, only visible objects on the ground are checked, within 64 units, for
-height changes over 16 units and for ground type changes at 20% of the points or more.
+If *Remove objects on changed terrain* is on but no height, ground type or water change is counted,
+nothing is removed for changed terrain and the log warns about it. Switched on with the other
+defaults, only visible objects on the ground are checked, within 64 units, for height changes over
+16 units, for ground type changes at 20% of the points or more, and for water changes (height
+changes over 16 units, water added or removed) that put 20% of the points or more under water or
+out of it.
 
 #### Also remove what rests on removed objects
 
@@ -299,7 +322,7 @@ The last section of the log says where these objects are: the removed objects, t
 
 Names are what the game shows (the location or cell name), or their editor ID when they have none. A cell without a location takes the hold of the nearest cell within 3 cells that has one; when there is none, the hold is *unnamed area*. Objects in a worldspace's persistent cell are counted in the grid cell they stand in.
 
-Every area of the tree is listed. Each line ends with two numbers: the objects of that list in the area, and all of the target mod's objects there (for the removals: *removed / target objects there*). The first line of each tree gives the same two numbers for the whole tree, e.g. *Removed 1284/9850 (removed/all mod objects):*. Areas with the most objects come first; areas with the same number come in order of fewer target objects there (a larger share removed), then by name. A place and the *near* place of the same name (e.g. *Loreius Farm* and *near Loreius Farm*) stay together, the place first, and are ranked as one by their combined numbers. A worldspace or hold with only one area below it gets no line of its own: its name is joined to that area's line with *›*, and the joined line sits at the level of its first name. A name that repeats an earlier name of the joined line is left out.
+Every area of the tree is listed. Each line ends with two numbers: the objects of that list in the area, and all of the target mod's objects there (for the removals: *removed / target objects there*). The first line of each tree gives the same two numbers for the whole tree, e.g. *Removed 1284/9850 (removed/all mod objects):*; the other trees have matching headers (*Kept 12/9850 (kept/all mod objects), teleport door:*, *Possible manual patch needed for 7/9850 (needing a patch/all mod objects):*). Areas with the most objects come first; areas with the same number come in order of fewer target objects there (a larger share removed), then by name. A place and the *near* place of the same name (e.g. *Loreius Farm* and *near Loreius Farm*) stay together, the place first, and are ranked as one by their combined numbers. A worldspace or hold with only one area below it gets no line of its own: its name is joined to that area's line with *›*, and the joined line sits at the level of its first name. A name that repeats an earlier name of the joined line is left out.
 
 ```
 Removed 1284/9850 (removed/all mod objects):
@@ -335,6 +358,11 @@ With *Detailed log and reports* on, CSV files (UTF-8, comma-separated, header in
   large objects that only overlap at their edges may not be detected as too close.
 - Changed terrain is judged from the terrain data and the ground types of the texture records; the
   check does not know which textures look like a road, only what ground type each texture is set to.
+- Water changes are judged only at the terrain points around an object: a point counts only when it
+  went under water or came out of it. An object over water that stays deep enough to keep the ground
+  under it covered (a boat or a jetty over a lake bed) is therefore not found by the water check when
+  another mod raises or lowers that water, whatever *Which of the cleaned mod's objects are checked*
+  is set to. Water placed as an object (a water plane) is not seen as water.
 - Object size comes from the mesh, or its Object Bounds when the mesh can't be read, which can
   differ slightly from what you see in game.
 - The target plugin's objects that a later-loading plugin, or an earlier patcher in the same group,

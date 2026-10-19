@@ -16,6 +16,15 @@ internal static class Describe
     /// <summary>The text for a list with no entries.</summary>
     public const string NoEntries = "none";
 
+    private static readonly (TerrainChangeKind Kind, string Text)[] TerrainChangeTexts =
+    [
+        (TerrainChangeKind.Height, "height"),
+        (TerrainChangeKind.TerrainType, "terrain type"),
+        (TerrainChangeKind.WaterHeight, "water height"),
+        (TerrainChangeKind.WaterAdded, "water added"),
+        (TerrainChangeKind.WaterRemoved, "water removed"),
+    ];
+
     public static string OtherObject(OtherObject other) =>
         LabelWithOverride(other.Key, other.EditorId, other.WinningMod);
 
@@ -72,13 +81,17 @@ internal static class Describe
         _ => throw new UnreachableException($"Unknown removal type {removal.GetType().Name}."),
     };
 
-    private static string TerrainChange(TerrainChangeKind kind) => kind switch
+    /// <summary>E.g. "height", "height and terrain type" or "height, terrain type and water height".</summary>
+    private static string TerrainChange(TerrainChangeKind kind)
     {
-        TerrainChangeKind.Height => "height",
-        TerrainChangeKind.TerrainType => "terrain type",
-        TerrainChangeKind.HeightAndTerrainType => "height and terrain type",
-        _ => throw new UnreachableException($"Unknown terrain change kind {kind}."),
-    };
+        List<string> parts = [.. TerrainChangeTexts.Where(text => kind.HasFlag(text.Kind)).Select(text => text.Text)];
+        return parts switch
+        {
+            [] => throw new UnreachableException($"A terrain change without a known kind: {kind}."),
+            [var single] => single,
+            [.. var first, var last] => $"{string.Join(ListSeparator, first)} and {last}",
+        };
+    }
 
     /// <summary>The reason, naming the other mod's object the invisible object sits inside, if any.</summary>
     public static string LeftBehindReason(LeftBehindCheck evaluation) =>

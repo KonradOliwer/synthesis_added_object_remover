@@ -54,6 +54,7 @@ ParallelMap.OneItemPerRange | budget | Range size for heavy items.
 ParallelMap.AutomaticRangeSize | budget | Range size 0 means: choose from the item and worker counts.
 LandHeightReader.VerticesPerSide | game format | A cell's terrain height grid is 33 by 33 vertices (the same value as TerrainHeights.VerticesPerSide).
 LandHeightReader.UnitsPerHeightStep | game format | One step of a stored terrain height is 8 game units.
+WaterLevel.UseWorldspaceDefault | game format | A cell's stored water height of the largest float means it uses its worldspace's default water height.
 LandLayerReader.QuadrantPlaces | game format | The column and row of each texture quadrant of a LAND record in its cell.
 ScriptPropertyReader.NamedKinds | game format | The library record type behind each ScriptNamedKind, the record kinds a script property is reported for.
 PluginRecords.NotReadMessage | internal | Error text for using the records before they were read.

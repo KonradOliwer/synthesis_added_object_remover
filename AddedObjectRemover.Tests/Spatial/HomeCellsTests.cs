@@ -53,6 +53,8 @@ public class HomeCellsTests
         public float[]? ReadTerrain(ExteriorCell cell) => throw new NotSupportedException();
 
         public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new NotSupportedException();
+
+        public WaterCopies ReadWaterCopies(ExteriorCell cell) => throw new NotSupportedException();
         public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => throw new NotSupportedException();
 
         public RecordKey? FindLandWorldspace(RecordKey space) => throw new NotSupportedException();

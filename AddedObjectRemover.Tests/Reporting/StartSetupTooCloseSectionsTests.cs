@@ -413,7 +413,30 @@ public sealed class StartSetupTooCloseSectionsTests
         Assert.Contains(
             "Remove objects on terrain changed by other mods: on; Which of the cleaned mod's objects are checked: VisibleObjectsOnTheGround; "
             + "Margin by object size: off; Margin by fixed distance: on, 64 units; Count height changes: on, ignoring changes up to 16 units; "
-            + "Count ground type changes: on, remove only when this share of the ground points changed type: 50%.",
+            + "Count ground type changes: on, remove only when this share of the ground points changed type: 50%; "
+            + WaterChecksOn,
+            lines);
+    }
+
+    private const string WaterChecksOn =
+        "Count water height changes: on, ignoring changes up to 16 units; Count water added/removed changes: on; "
+        + "remove only when this share of the ground got covered/uncovered: 20%.";
+
+    [Fact]
+    public void Config_LeavesOutTheWaterShareWhenNoWaterChangeIsCounted()
+    {
+        var lines = ConfigLines(settings => settings.TerrainChange = new TerrainChangeSettings
+        {
+            RemoveOnChangedTerrain = true,
+            CountWaterHeightChanges = false,
+            CountWaterAddedOrRemoved = false,
+        });
+
+        Assert.Contains(
+            "Remove objects on terrain changed by other mods: on; Which of the cleaned mod's objects are checked: VisibleObjectsOnTheGround; "
+            + "Margin by object size: off; Margin by fixed distance: on, 64 units; Count height changes: on, ignoring changes up to 16 units; "
+            + "Count ground type changes: on, remove only when this share of the ground points changed type: 20%; "
+            + "Count water height changes: off; Count water added/removed changes: off.",
             lines);
     }
 
@@ -437,11 +460,13 @@ public sealed class StartSetupTooCloseSectionsTests
 
         Assert.Contains(
             "Remove objects on terrain changed by other mods: on; Which of the cleaned mod's objects are checked: AllObjectsIncludingInvisibleOnes; "
-            + "Margin by object size: on, 0.5 x object size; Margin by fixed distance: off; Count height changes: off; Count ground type changes: on, remove only when this share of the ground points changed type: 20%.",
+            + "Margin by object size: on, 0.5 x object size; Margin by fixed distance: off; Count height changes: off; Count ground type changes: on, remove only when this share of the ground points changed type: 20%; "
+            + WaterChecksOn,
             noHeight);
         Assert.Contains(
             "Remove objects on terrain changed by other mods: on; Which of the cleaned mod's objects are checked: VisibleObjectsAtAnyHeight; "
-            + "Margin by object size: off; Margin by fixed distance: on, 64 units; Count height changes: on, ignoring changes up to 16 units; Count ground type changes: off.",
+            + "Margin by object size: off; Margin by fixed distance: on, 64 units; Count height changes: on, ignoring changes up to 16 units; Count ground type changes: off; "
+            + WaterChecksOn,
             noType);
     }
 
@@ -458,7 +483,8 @@ public sealed class StartSetupTooCloseSectionsTests
         Assert.Contains(
             "Remove objects on terrain changed by other mods: on; Which of the cleaned mod's objects are checked: VisibleObjectsOnTheGround; "
             + "Margin by object size: on, 0.5 x object size; Margin by fixed distance: on, 64 units; Count height changes: on, ignoring changes up to 16 units; "
-            + "Count ground type changes: on, remove only when this share of the ground points changed type: 20%.",
+            + "Count ground type changes: on, remove only when this share of the ground points changed type: 20%; "
+            + WaterChecksOn,
             lines);
     }
 

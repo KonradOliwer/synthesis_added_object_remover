@@ -53,6 +53,10 @@ public interface ITerrainChangeSettingsValues
     float HeightChangeTolerance { get; }
     bool CountTerrainTypeChanges { get; }
     int MinTerrainTypeChangePercent { get; }
+    bool CountWaterHeightChanges { get; }
+    float WaterHeightChangeTolerance { get; }
+    bool CountWaterAddedOrRemoved { get; }
+    int MinWaterCoverChangePercent { get; }
 }
 
 public interface IIgnoreSettingsValues

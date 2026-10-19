@@ -66,7 +66,18 @@ internal static partial class LogSections
             + $"Margin by object size: {OnWith(terrain.AreaBySize, $"{terrain.AreaMultiplier} x object size")}; "
             + $"Margin by fixed distance: {OnWith(terrain.AreaByDistance, $"{terrain.AreaDistanceInUnits} units")}; "
             + $"Count height changes: {OnWith(terrain.CountHeightChanges, $"ignoring changes up to {terrain.HeightTolerance} units")}; "
-            + $"Count ground type changes: {OnWith(terrain.CountTerrainTypeChanges, $"remove only when this share of the ground points changed type: {terrain.MinTerrainTypeChangePercent}%")}.";
+            + $"Count ground type changes: {OnWith(terrain.CountTerrainTypeChanges, $"remove only when this share of the ground points changed type: {terrain.MinTerrainTypeChangePercent}%")}; "
+            + $"{DescribeWaterChecks(terrain)}.";
+    }
+
+    /// <summary>The share is left out when neither water change is counted, since it is then not used.</summary>
+    private static string DescribeWaterChecks(ChangedTerrainSettings terrain)
+    {
+        var checks = $"Count water height changes: {OnWith(terrain.CountWaterHeightChanges, $"ignoring changes up to {terrain.WaterHeightTolerance} units")}; "
+            + $"Count water added/removed changes: {OnOff(terrain.CountWaterAddedOrRemoved)}";
+        return terrain.CountsWaterChanges
+            ? $"{checks}; remove only when this share of the ground got covered/uncovered: {terrain.MinWaterCoverChangePercent}%"
+            : checks;
     }
 
     private static string DescribeDetailedLogAndReports(ReportFileSettings? reports) =>

@@ -18,7 +18,8 @@ public class CopiedCodeTests
     private const string ViewForwarders ="One-line members of a read-only view, each forwarding one question of the index to its caller; no logic to share.";
     private const string SettingChecks = "Setting-by-setting check lines; each reads another setting with its own default, limit and wording.";
     private const string TableDeclarations = "Declaration of a report class with a constant or header list; the tables share only the shape of the declaration.";
-    private const string ErrorBoundary = "Per-object error boundary of two steps: each catches the failure of its own kind of object under its own part key and recovers in its own way; they share only the shape.";
+    private const string TextConstants = "Lists of text constants; each names its own setting or wording, so there is no logic to share.";
+    private const string ErrorBoundary ="Per-object error boundary of two steps: each catches the failure of its own kind of object under its own part key and recovers in its own way; they share only the shape.";
 
     private const string Shapes = "Caches/BaseObjectShapeAndKind/BaseObjectShapes.cs:BaseObjectShapes.";
     private const string TooClose = "Steps/RemoveTooCloseObjects/";
@@ -39,10 +40,15 @@ public class CopiedCodeTests
         [CopyFamily.KeyOf([Settings + "ClampMarginInUnits", Settings + "CreateChangedTerrainSettings", Settings + "CreateModIdentificationSettings", Settings + "CreateTooCloseSettings"])] = SettingChecks,
         [CopyFamily.KeyOf([Settings + "CreateChangedTerrainSettings", Settings + "CreateTooCloseSettings"])] = SettingChecks,
         [CopyFamily.KeyOf([Settings + "CreateAlsoRemoveSettings", Settings + "CreateChangedTerrainSettings"])] = SettingChecks,
-        [CopyFamily.KeyOf([Describe + "HintType", Describe + "PointReason", Describe + "RemovalReason", Describe + "TimedSuffix"])] = EnumTextArms,
-        [CopyFamily.KeyOf([Describe + "OriginPlace", Describe + "TerrainChange"])] = EnumTextArms,
         [CopyFamily.KeyOf([
-            Describe + "HintType", Describe + "LeftBehindReason", Describe + "TerrainChange", Describe + "TimedSuffix",
+            Settings + "Build", Settings + "MinPercent", Settings + "TerrainDistanceMarginName", Settings + "TerrainSizeMarginName",
+            Settings + "TerrainTypeChangePercentName", Settings + "TooCloseDistanceMarginName", Settings + "TooCloseSizeMarginName",
+            Settings + "WaterCoverChangePercentName", KeepText + "Category", KeepText + "CheckFailed", KeepText + "LinkedGroupCategory",
+            KeepText + "LocationRoleCategory", KeepText + "OwnLocationRefType", KeepText + "PlacedCategoryPrefix", KeepText + "ScriptCategory",
+            KeepText + "TeleportDoor"])] = TextConstants,
+        [CopyFamily.KeyOf([Describe + "HintType", Describe + "PointReason", Describe + "RemovalReason", Describe + "TimedSuffix"])] = EnumTextArms,
+        [CopyFamily.KeyOf([
+            Describe + "HintType", Describe + "TimedSuffix",
             LeftBehindText + "Describe", LeftBehindText + "DescribeReason", MeshText + "FailureCategory", MeshText + "ReadFailure"])] = EnumTextArms,
         [CopyFamily.KeyOf([
             Describe + "HintType", Describe + "LeftBehindReason", KeepText + "Relation", LeftBehindText + "Describe",

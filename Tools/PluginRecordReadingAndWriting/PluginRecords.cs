@@ -50,6 +50,8 @@ internal sealed class PluginRecords(
 
     public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => Scanned.Terrain.ReadVersions(cell);
 
+    public WaterCopies ReadWaterCopies(ExteriorCell cell) => Scanned.Water.ReadCopies(cell);
+
     public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => _materials.ChainOf(texture);
 
     public RecordKey? FindLandWorldspace(RecordKey space) => Scanned.Terrain.FindLandWorldspace(space);

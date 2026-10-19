@@ -71,6 +71,7 @@ public class ProductionTypeTests
         ["OtherObject.IsPlacedNpc"] = "one-line value derived from its own fields",
         ["RunSettings.DetailedLog"] = "one-line value derived from its own fields: the one setting that has the report files, so it is stored once",
         ["DetectedPatches.IgnoredMods"] = "one-line value derived from its own list",
+        ["ChangedTerrainSettings.CountsWaterChanges"] = "one-line value derived from its own fields: either water switch, asked by the validator, the step and the log",
         ["SectorAreas.Removed"] = "index accessor",
         ["SectorAreas.State"] = "index accessor",
         ["SectorAreas.Total"] = "index accessor",

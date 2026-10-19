@@ -30,6 +30,7 @@ public partial class ToolWordingTests
         [("Tools/PluginRecordReadingAndWriting/PlacedRecordWriter.cs", "Unknown write order.")] = BugMessage,
         [("Tools/PluginRecordReadingAndWriting/PluginRecords.cs", "The placed records must be read before they are used.")] = BugMessage,
         [("Tools/PluginRecordReadingAndWriting/LandscapeTerrain.cs", "The terrain versions were not read; ask for them in the read scope.")] = BugMessage,
+        [("Tools/PluginRecordReadingAndWriting/CellWater.cs", "The water copies were not read; ask for the water in the read scope.")] = BugMessage,
         [("Tools/GroundSurfaceQueries/TerrainLayerShares.cs", "The vertex ({vertexX}, {vertexY}) is outside the cell's terrain.")] = BugMessage,
         [("Tools/PluginRecordReadingAndWriting/RecordKeyConversion.cs", "Plugin {plugin} is not in the load order's known plugin names.")] = BugMessage,
     };

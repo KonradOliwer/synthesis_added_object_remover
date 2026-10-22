@@ -36,7 +36,7 @@ public sealed class StartSetupTooCloseSectionsTests
     [InlineData("Missing.esp")]
     public void Stop_GivesTheTextOfEveryUnusableTarget(string? target)
     {
-        var settings = new StandardSettings { TargetPlugin = target == null ? ModKey.Null : ModKey.FromNameAndExtension(target) };
+        var settings = new StandardSettings { CleanedMod = target == null ? ModKey.Null : ModKey.FromNameAndExtension(target) };
         var stop = Assert.IsType<RunRequest.Stop>(Build(settings, Facts()));
 
         AssertExpectedOutput(LogSections.BuildStopSection(stop.Reason, stop.Source).Lines.ToArray(), "Stop_GivesTheTextOfEveryUnusableTarget", $"{target ?? "null"}");
@@ -61,10 +61,36 @@ public sealed class StartSetupTooCloseSectionsTests
     }
 
     [Fact]
+    public void Stop_SaysTheCleanedModIsDisabled()
+    {
+        Assert.Equal(
+            ["Target.esp is disabled. No changes made."],
+            LogSections.BuildStopSection(new StopReason(StopKind.CleanedModDisabled, "Target.esp"), new SettingsSource.Standard()).Lines.ToArray());
+    }
+
+    [Fact]
+    public void Stop_SaysSynthesisDidNotLoadTheEnabledCleanedMod()
+    {
+        Assert.Equal(
+            ["Target.esp is enabled in your plugin list but Synthesis did not load it for this group. No changes made."],
+            LogSections.BuildStopSection(new StopReason(StopKind.CleanedModNotLoadedBySynthesis, "Target.esp"), new SettingsSource.Standard()).Lines.ToArray());
+    }
+
+    [Fact]
+    public void Stop_SaysTheCleanedModLoadsAfterThePatchWithBothPositions()
+    {
+        var reason = new StopReason(StopKind.CleanedModLoadsAfterPatch, "Target.esp", new PatchPlacement("Patch.esp", 300, 250));
+
+        Assert.Equal(
+            ["Target.esp loads after the patch Patch.esp (position 300 > 250): move Patch.esp below it. No changes made."],
+            LogSections.BuildStopSection(reason, new SettingsSource.Standard()).Lines.ToArray());
+    }
+
+    [Fact]
     public void Stop_SaysTheTargetIsThePatch()
     {
         Assert.Equal(
-            ["Target plugin Patch.esp is the patch this patcher writes. No changes made."],
+            ["Patch.esp is the patch this patcher writes. No changes made."],
             LogSections.BuildStopSection(new StopReason(StopKind.TargetIsThePatch, "Patch.esp"), new SettingsSource.Standard()).Lines.ToArray());
     }
 
@@ -133,7 +159,7 @@ public sealed class StartSetupTooCloseSectionsTests
         var runSettings = Assert.IsType<RunRequest.Ready>(Build(settings, mods, detailedLogAndReports: everythingOn)).Settings;
         var standing = ModIdentifier.Identify(mods, runSettings.ModIdentification);
 
-        var lines = LogSections.BuildConfigSection(runSettings, standing).Lines.Select(line => line.Replace('\\', '/')).ToArray();
+        var lines = LogSections.BuildConfigSection(runSettings, standing, mods).Lines.Select(line => line.Replace('\\', '/')).ToArray();
 
         AssertExpectedOutput(lines, "Config_GivesTheTextWithAndWithoutPatchesAndLeftovers", $"{everythingOn}");
     }
@@ -146,7 +172,7 @@ public sealed class StartSetupTooCloseSectionsTests
         var mods = Facts();
         var runSettings = Assert.IsType<RunRequest.Ready>(Build(settings, mods)).Settings;
 
-        var lines = LogSections.BuildConfigSection(runSettings, ModIdentifier.Identify(mods, runSettings.ModIdentification)).Lines.ToArray();
+        var lines = LogSections.BuildConfigSection(runSettings, ModIdentifier.Identify(mods, runSettings.ModIdentification), mods).Lines.ToArray();
 
         Assert.Contains("Compatibility patch detection: 2 plugins master the target, 1 of them compatibility patches.", lines);
         Assert.Contains(lines, line => line.StartsWith("  Plugin Merged.esp skipped: too many masters"));
@@ -499,7 +525,7 @@ public sealed class StartSetupTooCloseSectionsTests
         change(settings);
         var mods = Facts();
         var runSettings = Assert.IsType<RunRequest.Ready>(Build(settings, mods)).Settings;
-        return LogSections.BuildConfigSection(runSettings, ModIdentifier.Identify(mods, runSettings.ModIdentification)).Lines;
+        return LogSections.BuildConfigSection(runSettings, ModIdentifier.Identify(mods, runSettings.ModIdentification), mods).Lines;
     }
 
     private static RunRequest Build(StandardSettings settings, LoadOrderPlugins mods, bool detailedLogAndReports = false) =>
@@ -591,14 +617,14 @@ public sealed class StartSetupTooCloseSectionsTests
             IsPrimitive: false,
             HasMapMarker: false);
 
-    private static StandardSettings SettingsFor() => new() { TargetPlugin = Target };
+    private static StandardSettings SettingsFor() => new() { CleanedMod = Target };
 
     private static LoadOrderPlugins Facts()
     {
         var table = new KnownPluginNames(new[] { Skyrim, Target, Other, Compat, Merged, ExtraA, ExtraB, Patch }.Select(key => key.ToPluginName()));
         PluginListing Listing(ModKey key, params ModKey[] masters) =>
             new(key.ToPluginName(), Loaded: true, [.. masters.Select(master => master.ToPluginName())]);
-        return new LoadOrderPlugins(
+        return TestLoadOrderPlugins.Of(
             table,
             Patch.ToPluginName(),
             [

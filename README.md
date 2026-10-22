@@ -14,7 +14,7 @@ mod's object or are left behind once the objects around them are gone.
 Removal never deletes anything: the object is disabled, the same way xEdit's *Undelete and Disable
 References* does. An object that is not persistent is also moved far below the world; a persistent
 one stays where it is. If it had an enable parent, that is replaced so the object stays disabled.
-The changes are written to your Synthesis group's output plugin.
+The changes are written to the patch: your Synthesis group's output plugin.
 
 It can clean up one mod or, in Batch mode, several mods in one run (see *Batch mode*).
 
@@ -29,7 +29,15 @@ A linked partner of an object removed for being too close, for standing on chang
 2. Leave *Mode* on `Standard` and set *Mod to clean up* under *Standard*. To clean up several mods in one run, see *Batch mode*.
 3. Run the group and keep the group's output plugin enabled after the target plugin.
 
-Near the end of the log, a *Possible manual patch needed* section lists removed markers and kept objects worth checking by hand.
+Near the end of the log, a *Removed markers and kept objects* section lists the removed markers and the kept objects it names (only when there are any).
+
+The mod to clean up must be enabled in your plugin list and load above the patch. Before anything is changed, the patcher checks this and stops with one of these messages (positions count from 0 in your plugin list):
+- *SomeMod.esp is not in your plugin list*
+- *SomeMod.esp is disabled*
+- *SomeMod.esp loads after the patch AddedObjectRemover.esp (position 300 > 250): move AddedObjectRemover.esp below it*
+- *SomeMod.esp is enabled in your plugin list but Synthesis did not load it for this group* (for example when the plugin is excluded from the group)
+
+It also stops, with a message that names the plugin list file (and the line, for a malformed entry), when it cannot find the plugin list, the file does not exist, an entry in it is malformed, or a plugin Synthesis loads is missing from it. Every stop ends with *No changes made.* (*Nothing was run and no patch was written.* in Batch mode).
 
 ## Settings
 
@@ -54,7 +62,7 @@ Every setting below is in the *Standard* section of the settings screen. Only us
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| Mod to clean up | *(empty)* | The plugin whose added objects are checked, picked from your load order, e.g. `SomeMod.esp`. If it is empty or not in the load order, nothing is changed. |
+| Mod to clean up | *(empty)* | The plugin whose added objects are checked, picked from your load order, e.g. `SomeMod.esp`. It must be enabled and load above the patch. If it is empty, not in your plugin list, disabled, loads after the patch or was not loaded by Synthesis, the run stops and nothing is changed (see *How to use*). |
 
 #### Other mods that never cause removals
 
@@ -65,7 +73,7 @@ Objects and terrain changes from these mods are never a reason to remove the cle
 | Never count these mods | *(empty)* | Plugins, picked from your load order, whose objects and terrain changes never cause removals. |
 | Never count the mods the cleaned mod requires | `true` | The plugins the cleaned mod lists as its masters never cause removals. |
 | Compatibility patches: Never count mods that have a compatibility patch with it | `true` | The other mods a detected compatibility patch requires don't clash with the cleaned mod. The log lists every detected patch and the mods it causes to be ignored. |
-| Compatibility patches: A patch requires at most this many other mods | `10` | A compatibility patch is a plugin that requires the cleaned mod and at most this many other mods (1-100; the base game and the cleaned mod's masters do not count). Only used when the switch above is on. Plugins that depend on many mods, such as a merged patch or a Bashed Patch, are therefore not treated as patches; the log lists them as skipped. |
+| Compatibility patches: A patch requires at most this many other mods | `10` | A compatibility patch is a plugin that requires the cleaned mod and at most this many other mods (1-100; the base game and the cleaned mod's masters do not count). Only used when the switch above is on. Plugins that depend on many mods, such as a merged plugin or a Bashed Patch, are therefore not treated as patches; the log lists them as skipped. |
 
 #### Remove objects too close to other mods' objects
 
@@ -99,11 +107,11 @@ When on, it runs before the too-close check, so an object found by both is liste
 | Margin by fixed distance: Use this margin | `true` | Switches this margin on. Every object gets the same margin. |
 | Margin by fixed distance: Margin on every side (game units) | `64` | The margin in game units, added on every side (0-1024). |
 | Count height changes | `true` | Whether a change of the ground's height counts. |
-| Ignore height changes up to (game units) | `16` | A height change of up to this many game units is ignored (0-256). 0 counts every change. Small smoothing edits are common and rarely visible under an object. Only used when *Count height changes* is on. |
+| Count only height changes larger than (game units) | `16` | A height change of up to this many game units is not counted (0-256). 0 counts every change. Small smoothing edits are common and rarely visible under an object. Only used when *Count height changes* is on. |
 | Count ground type changes (for example grass to road) | `true` | Whether a change of the kind of ground counts (see below). |
 | Remove only when this share of the ground points changed type (%) | `20` | A ground type change removes an object only when at least this share of the terrain points checked around it changed type (0-100). Small touch-ups at the edges of painted patches therefore don't remove objects. 0 removes on any one changed point. Height changes are not affected. Only used when *Count ground type changes* is on. |
 | Count water height changes | `true` | Whether another mod raising or lowering a cell's water counts, when that puts ground around the object under water or out of it (see below). Water over ground that stays covered is not seen (see *Known limitations*). |
-| Ignore water height changes up to (game units) | `16` | A water height change of up to this many game units is ignored (0-256). 0 counts every change. Only used when *Count water height changes* is on. |
+| Count only water height changes larger than (game units) | `16` | A water height change of up to this many game units is not counted (0-256). 0 counts every change. Only used when *Count water height changes* is on. |
 | Count water added/removed changes | `true` | Whether another mod adding water to a cell or taking its water away counts, when that puts ground around the object under water or out of it (see below). Water over ground that stays covered is not seen (see *Known limitations*). |
 | Remove only when this share of the ground got covered/uncovered (%) | `20` | A water change removes an object only when at least this share of the terrain points checked around it went under water or came out of it (0-100). 0 removes on any one such point. Only used when one of the two water switches is on. |
 
@@ -131,7 +139,7 @@ terrain the cleaned mod was made for: its own terrain there, or else the terrain
 required mods (its masters) that has terrain there. Where neither has terrain, the object is not
 checked. A change counts only when the terrain the game shows differs from the reference by more
 than the switched-on checks allow, and the mod that made the difference is not the cleaned mod, a
-plugin that requires it (a patch or an add-on for it) or one of the *Other mods that never cause
+mod that requires it (a patch or any other mod made for it) or one of the *Other mods that never cause
 removals*. That mod's own change must also be larger than the checks allow: several small changes
 that only add up to a larger one through a mod that does not count do not count. A mod that only
 copies another mod's terrain did not make the change: copying a change made by a mod that does not
@@ -220,13 +228,13 @@ Names in the group file and the group file name are plain file names, not paths;
 ["town_walls", "town_market"]
 ```
 
-**Config file** (`configs\town_walls.json`): the same settings as the *Standard* section, written under their key names. **A config does not take any value from *Standard*; a setting it leaves out uses the built-in default.** Only `TargetPlugin` is required; list just the settings you want to change.
+**Config file** (`configs\town_walls.json`): the same settings as the *Standard* section, written under their key names. **A config does not take any value from *Standard*; a setting it leaves out uses the built-in default.** Only `CleanedMod` is required; list just the settings you want to change.
 
 To find the key names, copy them from the entries inside `Standard` in the patcher's `settings.json` (in its Synthesis folder `...\Synthesis\Data\<profile>\<patcher name>`) or from the configs in the `Example mod` folder, which list every setting. Dropdown choices are written as text (`"NpcHandling": "Never"`), plugins as `"Name.esp"`, lists as arrays (`["A.esp", "B.esp"]`).
 
 ```json
 {
-  "TargetPlugin": "SomeTownMod.esp",
+  "CleanedMod": "SomeTownMod.esp",
   "TooClose": { "BySize": { "SizeMultiplier": 1.0 } }
 }
 ```
@@ -238,13 +246,14 @@ To find the key names, copy them from the entries inside `Standard` in the patch
 
 **Order is priority.** The configs run in the listed order. A later config treats the objects an earlier one removed as gone, and the markers an earlier one moved as standing at their new position. An object that only clashed with something an earlier config removed is therefore kept.
 
-**What stops the whole run.** Before anything is written, the patcher reads the group file and every config and checks them against the load order. If any of these is wrong, the run stops with a message that names the file and the problem, and no patch is written:
+**What stops the whole run.** Before anything is written, the patcher reads the group file and every config and checks them against your plugin list. If any of these is wrong, the run stops with a message that names the file and the problem, and no patch is written:
 - no group file name is set, or a name is a path or has characters a file name cannot have;
 - the group file or a listed config file is missing;
 - a file is not valid JSON, the group file is not a list of names or the config is not an object;
 - the group file lists nothing, or lists the same config twice;
 - a setting has a value that cannot be read (for example text that is not one of the dropdown choices);
-- a config sets no *Mod to clean up*, or the mod is not in the load order;
+- a config sets no *Mod to clean up*, or the mod is not in your plugin list, is disabled, loads after the patch or was not loaded by Synthesis;
+- the plugin list cannot be read (see *How to use*);
 - two configs clean up the same mod.
 
 The message ends with *Nothing was run and no patch was written.*
@@ -273,7 +282,7 @@ The message ends with *Nothing was run and no patch was written.*
 - Objects added by patchers that run earlier in the same Synthesis group.
 - With *Never count mods that have a compatibility patch with it* on: every compatibility patch (a plugin that requires the target
   plugin and at most *A patch requires at most this many other mods* other mods) and the other mods it requires. A plugin that
-  requires only the target plugin, such as an add-on for it, is not a patch; its objects can cause removals.
+  requires only the target plugin (a mod that requires the cleaned mod and nothing else) is not a patch; its objects can cause removals.
 - The target plugin's objects listed under *What is always kept*.
 
 ## What is always kept
@@ -308,22 +317,22 @@ Every setting the config leaves out is listed with its key and the default used,
 
 When an earlier config removed or moved objects, the scan summary says how many were ignored or checked at their new position.
 
-Right after the kept summary, each object kept for a reason of its own gets a line saying why: *Kept, script names a quest or scene* (its own script, or its base object's from the target plugin) or *Kept, location role* (a location ref type of its own). They are kept on purpose and need no manual patch.
+Right after the kept summary, each object kept for a reason of its own gets a line saying why: *Kept, script names a quest or scene* (its own script, or its base object's from the target plugin) or *Kept, location role* (a location ref type of its own). They are kept on purpose and are not in the *Removed markers and kept objects* section.
 
-Near the end of the log, a *Possible manual patch needed* section lists removed door, map, idle and furniture markers (which actors or the map use), and objects that would have been removed but were kept, grouped by why (part of a linked group, kept because something depends on it, or a teleport door). With *Detailed log and reports* on, the locations of the written files follow.
+Near the end of the log, a *Removed markers and kept objects* section (printed only when it has rows) lists removed door, map, idle and furniture markers (which actors or the map use), and objects that would have been removed but were kept, grouped by why (part of a linked group, kept because something depends on it, or a teleport door). With *Detailed log and reports* on, the locations of the written files follow.
 
 Before that section, the log warns about removed objects that can still affect the game:
 - each removed unique NPC that a quest fills an alias with (as its *Unique Actor*), when that alias is neither *Optional* nor *Allow Disabled*: that quest role may not fill, or the quest may not start;
 - the number of removed objects in their worldspace's large-reference list: distant LOD may flicker, or full models may not load, in those cells until LOD is generated again (for example with DynDOLOD).
 
-The last section of the log says where these objects are: the removed objects, the kept ones (one tree for each reason they were kept), the ones to check for a manual patch, removed unique NPCs and removed large references, each only when there are any. Each is shown as a tree of three levels, each level indented further:
+The last section of the log says where these objects are: the removed objects, the kept ones (one tree for each reason they were kept), the removed markers and kept objects, removed unique NPCs and removed large references, each only when there are any. Each is shown as a tree of three levels, each level indented further:
 - **worldspace**: the worldspace (for example *Skyrim*), or for an object in an interior, the interior's name;
 - **hold**: the hold-level location the object's cell belongs to (for example *The Pale hold*): the nearest location of the cell's location chain that the game marks as a hold; without one, the location just below the top of the chain;
 - **place**: the most specific name: the cell's location (*Loreius Farm*), else the cell's own name, else *near* the location of the nearest named cell within 3 cells (*near Loreius Farm*), else the cell grid (*cell 7,6*).
 
 Names are what the game shows (the location or cell name), or their editor ID when they have none. A cell without a location takes the hold of the nearest cell within 3 cells that has one; when there is none, the hold is *unnamed area*. Objects in a worldspace's persistent cell are counted in the grid cell they stand in.
 
-Every area of the tree is listed. Each line ends with two numbers: the objects of that list in the area, and all of the target mod's objects there (for the removals: *removed / target objects there*). The first line of each tree gives the same two numbers for the whole tree, e.g. *Removed 1284/9850 (removed/all mod objects):*; the other trees have matching headers (*Kept 12/9850 (kept/all mod objects), teleport door:*, *Possible manual patch needed for 7/9850 (needing a patch/all mod objects):*). Areas with the most objects come first; areas with the same number come in order of fewer target objects there (a larger share removed), then by name. A place and the *near* place of the same name (e.g. *Loreius Farm* and *near Loreius Farm*) stay together, the place first, and are ranked as one by their combined numbers. A worldspace or hold with only one area below it gets no line of its own: its name is joined to that area's line with *›*, and the joined line sits at the level of its first name. A name that repeats an earlier name of the joined line is left out.
+Every area of the tree is listed. Each line ends with two numbers: the objects of that list in the area, and all of the target mod's objects there (for the removals: *removed / target objects there*). The first line of each tree gives the same two numbers for the whole tree, e.g. *Removed 1284/9850 (removed/all mod objects):*; the other trees have matching headers (*Kept 12/9850 (kept/all mod objects), teleport door:*, *Removed markers and kept objects: 7 of 9850:*). Areas with the most objects come first; areas with the same number come in order of fewer target objects there (a larger share removed), then by name. A place and the *near* place of the same name (e.g. *Loreius Farm* and *near Loreius Farm*) stay together, the place first, and are ranked as one by their combined numbers. A worldspace or hold with only one area below it gets no line of its own: its name is joined to that area's line with *›*, and the joined line sits at the level of its first name. A name that repeats an earlier name of the joined line is left out.
 
 ```
 Removed 1284/9850 (removed/all mod objects):
@@ -351,7 +360,7 @@ With *Detailed log and reports* on, CSV files (UTF-8, comma-separated, header in
 - **`edges.csv`** and **`components.csv`**: which objects were found touching and which chains were removed together. Only with *When an object is removed, also remove* `EverythingTouchingIt` and something removed for being too close or on changed terrain.
 - **`leftover-invisible-objects.csv`**: why each invisible object checked was removed or kept, and where it was moved. Only with *Remove invisible objects left inside other mods' objects or alone* on.
 - **`removals.csv`**: every removed object with where it is, always written. Columns: formKey, editorId, base, reason, worldspace, hold, place, cellFormKey, cellEditorId, gridX, gridY, x, y, z. Sorted by worldspace, hold and place, then by form key.
-- **`manual-patch-hints.csv`**: the rows of the *Possible manual patch needed* section, always written. Columns: hint, formKey, editorId, space, cell, detail.
+- **`removed-markers-and-kept-objects.csv`**: the rows of the *Removed markers and kept objects* section, always written. Columns: hint, formKey, editorId, space, cell, detail.
 
 ## Known limitations
 

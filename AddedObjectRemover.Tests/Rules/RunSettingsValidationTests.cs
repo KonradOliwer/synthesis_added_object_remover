@@ -11,13 +11,28 @@ public class RunSettingsValidationTests
     private const string ReportsFolder = "/out";
 
     private static LoadOrderPlugins Facts(bool targetLoaded = true) =>
-        new(
+        TestLoadOrderPlugins.Of(
             new KnownPluginNames([Target, Patch]),
             Patch,
             [new PluginListing(Target, targetLoaded, []), new PluginListing(Patch, true, [])]);
 
+    /// <summary>The target only has to be in the plugin list; the plugins above the patch are the ones Synthesis loads.</summary>
+    private static LoadOrderPlugins FactsWithPluginList(PluginName[] pluginList, params PluginName[] disabled) =>
+        TestLoadOrderPlugins.Of(
+            new KnownPluginNames([Target, Patch]),
+            Patch,
+            [new PluginListing(Patch, true, [])],
+            pluginList,
+            disabled);
+
+    private static readonly PluginName Base = new("Skyrim.esm");
+    private static readonly PluginName Middle = new("Middle.esp");
+    private static readonly LoadOrderPlugins DisabledTargetFacts = FactsWithPluginList([Base, Target, Patch], Target);
+    private static readonly LoadOrderPlugins NotLoadedTargetFacts = FactsWithPluginList([Base, Target, Patch]);
+    private static readonly LoadOrderPlugins TargetAfterPatchFacts = FactsWithPluginList([Base, Patch, Middle, Target]);
+
     private static StandardSettings SettingsFor(string target = "Target.esp") =>
-        new() { TargetPlugin = ModKey.FromNameAndExtension(target) };
+        new() { CleanedMod = ModKey.FromNameAndExtension(target) };
 
     private static RunRequest Build(StandardSettings settings, LoadOrderPlugins? facts = null, bool detailedLogAndReports = false, int workers = 3) =>
         SettingsValidator.Build(StandardConfig.Of(settings), new PluginNameParsingPlugin(), facts ?? Facts(), detailedLogAndReports, ReportsFolder, workers);
@@ -25,21 +40,42 @@ public class RunSettingsValidationTests
     private static RunRequest.Ready BuildReady(StandardSettings settings, LoadOrderPlugins? facts = null, bool detailedLogAndReports = false, int workers = 3) =>
         Assert.IsType<RunRequest.Ready>(Build(settings, facts, detailedLogAndReports, workers));
 
-    private static BatchRequest BuildAll(ConfigsRead read) =>
-        SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), Facts(), detailedLogAndReports: false, ReportsFolder, 1);
+    private static BatchRequest BuildAll(ConfigsRead read, LoadOrderPlugins? facts = null) =>
+        SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), facts ?? Facts(), detailedLogAndReports: false, ReportsFolder, 1);
 
     [Fact]
-    public void AnEmptyTargetPluginStopsTheRunAsNoTargetSet()
+    public void AnEmptyCleanedModStopsTheRunAsNoTargetSet()
     {
         var stop = Assert.IsType<RunRequest.Stop>(Build(new StandardSettings()));
         Assert.Equal(new StopReason(StopKind.NoTargetSet, null), stop.Reason);
     }
 
     [Fact]
-    public void ATargetOutsideTheLoadOrderStopsTheRun()
+    public void ATargetNotInThePluginListStopsTheRun()
     {
         var stop = Assert.IsType<RunRequest.Stop>(Build(SettingsFor("Missing.esp")));
-        Assert.Equal(new StopReason(StopKind.TargetNotInLoadOrder, "Missing.esp"), stop.Reason);
+        Assert.Equal(new StopReason(StopKind.CleanedModNotInLoadOrder, "Missing.esp"), stop.Reason);
+    }
+
+    [Fact]
+    public void ADisabledTargetStopsTheRun()
+    {
+        var stop = Assert.IsType<RunRequest.Stop>(Build(SettingsFor(), DisabledTargetFacts));
+        Assert.Equal(new StopReason(StopKind.CleanedModDisabled, "Target.esp"), stop.Reason);
+    }
+
+    [Fact]
+    public void ATargetEnabledAboveThePatchButNotLoadedBySynthesisStopsTheRun()
+    {
+        var stop = Assert.IsType<RunRequest.Stop>(Build(SettingsFor(), NotLoadedTargetFacts));
+        Assert.Equal(new StopReason(StopKind.CleanedModNotLoadedBySynthesis, "Target.esp"), stop.Reason);
+    }
+
+    [Fact]
+    public void ATargetLoadingAfterThePatchStopsTheRunWithBothPositions()
+    {
+        var stop = Assert.IsType<RunRequest.Stop>(Build(SettingsFor(), TargetAfterPatchFacts));
+        Assert.Equal(new StopReason(StopKind.CleanedModLoadsAfterPatch, "Target.esp", new PatchPlacement("Patch.esp", 3, 1)), stop.Reason);
     }
 
     [Fact]
@@ -561,17 +597,47 @@ public class RunSettingsValidationTests
         var failed = FailedBatch(ConfigSource("town_walls", 1, 1), new StandardSettings());
 
         Assert.Equal(
-            $"Config file {FilePathOf("town_walls")} sets no mod to clean up (TargetPlugin). Nothing was run and no patch was written.",
+            $"Config file {FilePathOf("town_walls")} sets no mod to clean up (CleanedMod). Nothing was run and no patch was written.",
             failed.Message);
     }
 
     [Fact]
-    public void AConfigFileWithATargetOutsideTheLoadOrderFailsTheBatchNamingTheFile()
+    public void AConfigFileWithATargetNotInThePluginListFailsTheBatchNamingTheFile()
     {
         var failed = FailedBatch(ConfigSource("town_walls", 1, 1), SettingsFor("Missing.esp"));
 
         Assert.Equal(
-            $"Config file {FilePathOf("town_walls")}: the mod to clean up, Missing.esp, is not in the load order. Nothing was run and no patch was written.",
+            $"Config file {FilePathOf("town_walls")}: the mod to clean up, Missing.esp, is not in your plugin list. Nothing was run and no patch was written.",
+            failed.Message);
+    }
+
+    [Fact]
+    public void AConfigFileWithADisabledTargetFailsTheBatchNamingTheFile()
+    {
+        var failed = FailedBatch(ConfigSource("town_walls", 1, 1), SettingsFor(), DisabledTargetFacts);
+
+        Assert.Equal(
+            $"Config file {FilePathOf("town_walls")}: the mod to clean up, Target.esp, is disabled. Nothing was run and no patch was written.",
+            failed.Message);
+    }
+
+    [Fact]
+    public void AConfigFileWithATargetNotLoadedBySynthesisFailsTheBatchNamingTheFile()
+    {
+        var failed = FailedBatch(ConfigSource("town_walls", 1, 1), SettingsFor(), NotLoadedTargetFacts);
+
+        Assert.Equal(
+            $"Config file {FilePathOf("town_walls")}: the mod to clean up, Target.esp, is enabled in your plugin list but Synthesis did not load it for this group. Nothing was run and no patch was written.",
+            failed.Message);
+    }
+
+    [Fact]
+    public void AConfigFileWithATargetLoadingAfterThePatchFailsTheBatchNamingTheFileAndBothPositions()
+    {
+        var failed = FailedBatch(ConfigSource("town_walls", 1, 1), SettingsFor(), TargetAfterPatchFacts);
+
+        Assert.Equal(
+            $"Config file {FilePathOf("town_walls")}: the mod to clean up, Target.esp, loads after the patch Patch.esp (position 3 > 1): move Patch.esp below it. Nothing was run and no patch was written.",
             failed.Message);
     }
 
@@ -636,8 +702,8 @@ public class RunSettingsValidationTests
     private static BatchRequest.Ready BuildBatch(SettingsSource source, StandardSettings settings) =>
         Assert.IsType<BatchRequest.Ready>(BuildAll(new ConfigsRead.Ready([new ConfiguredSettings(source, settings)])));
 
-    private static BatchRequest.Failed FailedBatch(SettingsSource source, StandardSettings settings) =>
-        Assert.IsType<BatchRequest.Failed>(BuildAll(new ConfigsRead.Ready([new ConfiguredSettings(source, settings)])));
+    private static BatchRequest.Failed FailedBatch(SettingsSource source, StandardSettings settings, LoadOrderPlugins? facts = null) =>
+        Assert.IsType<BatchRequest.Failed>(BuildAll(new ConfigsRead.Ready([new ConfiguredSettings(source, settings)]), facts));
 
     [Theory]
     [InlineData(50, 50)]

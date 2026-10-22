@@ -33,6 +33,7 @@ public partial class ToolWordingTests
         [("Tools/PluginRecordReadingAndWriting/CellWater.cs", "The water copies were not read; ask for the water in the read scope.")] = BugMessage,
         [("Tools/GroundSurfaceQueries/TerrainLayerShares.cs", "The vertex ({vertexX}, {vertexY}) is outside the cell's terrain.")] = BugMessage,
         [("Tools/PluginRecordReadingAndWriting/RecordKeyConversion.cs", "Plugin {plugin} is not in the load order's known plugin names.")] = BugMessage,
+        [("Tools/PluginRecordReadingAndWriting/EnabledPluginListReader.cs", "The library's malformed-line error names no line: {ex.Message}")] = BugMessage,
     };
 
     [Fact]

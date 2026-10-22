@@ -19,7 +19,7 @@ internal sealed class ConfigFileReader(SettingsSchema schema, JsonSerializerSett
         var text = JsonFileParsing.ReadText("Config file", filePath);
         if (JsonFileParsing.Parse("Config file", filePath, text) is not JObject written)
         {
-            throw new ConfigFilesProblem($"Config file {filePath} must hold an object of settings, like {{\"TargetPlugin\": \"SomeMod.esp\"}}.");
+            throw new ConfigFilesProblem($"Config file {filePath} must hold an object of settings, like {{\"CleanedMod\": \"SomeMod.esp\"}}.");
         }
 
         // Parsed twice on purpose: only Newtonsoft's own deserialization reports the setting path in a failure message.

@@ -52,8 +52,8 @@ public class ChangedTerrainObjectsTests
     private static readonly PluginName BaseGame = new("Skyrim.esm");
     private static readonly PluginName Master = new("Master.esm");
     private static readonly PluginName Early = new("Early.esp");
-    private static readonly PluginName Target = TestTargets.TargetPlugin;
-    private static readonly PluginName Dependant = new("Dependant.esp");
+    private static readonly PluginName Target = TestTargets.TargetName;
+    private static readonly PluginName RequiringMod = new("RequiringMod.esp");
     private static readonly PluginName Other = new("Other.esp");
     private static readonly PluginName CompatibilityPatch = new("CompatibilityPatch.esp");
     private static readonly PluginName Ignored = new("Ignored.esp");
@@ -66,11 +66,11 @@ public class ChangedTerrainObjectsTests
 
     /// <summary>The target's masters are the base game and a master that is not ignored; two plugins require the target.</summary>
     private static readonly IdentifiedMods Mods = new(
-        Target, new HashSet<PluginName> { BaseGame, Target, Ignored, Patch }, [BaseGame, Master], [], DetectedPatches.Off, [Dependant, CompatibilityPatch]);
+        Target, new HashSet<PluginName> { BaseGame, Target, Ignored, Patch }, [BaseGame, Master], [], DetectedPatches.Off, [RequiringMod, CompatibilityPatch]);
 
-    private static readonly PluginName[] Plugins = [BaseGame, Master, Early, Target, Dependant, Other, CompatibilityPatch, Ignored, Later, Patch];
+    private static readonly PluginName[] Plugins = [BaseGame, Master, Early, Target, RequiringMod, Other, CompatibilityPatch, Ignored, Later, Patch];
 
-    private static readonly LoadOrderPlugins LoadOrder = new(
+    private static readonly LoadOrderPlugins LoadOrder = TestLoadOrderPlugins.Of(
         new KnownPluginNames(Plugins), Patch, [.. Plugins.Select(plugin => new PluginListing(plugin, true, []))]);
 
     private static ChangedTerrainSettings Settings(
@@ -162,11 +162,11 @@ public class ChangedTerrainObjectsTests
 
     [Fact]
     public void APluginRequiringTheTargetsOwnChangeCountsForNothing() =>
-        Assert.Empty(FindInCell(Flat(Target), RaisedAt(Dependant, Near)).Proposals);
+        Assert.Empty(FindInCell(Flat(Target), RaisedAt(RequiringMod, Near)).Proposals);
 
     [Fact]
     public void APluginRequiringTheTargetsChangeCopiedByACountingModCountsForNothing() =>
-        Assert.Empty(FindInCell(Flat(Target), RaisedAt(Dependant, Near), RaisedAt(Later, Near)).Proposals);
+        Assert.Empty(FindInCell(Flat(Target), RaisedAt(RequiringMod, Near), RaisedAt(Later, Near)).Proposals);
 
     [Fact]
     public void AnIgnoredModsChangeCopiedByACountingModCountsForNothing() =>
@@ -208,7 +208,7 @@ public class ChangedTerrainObjectsTests
 
     [Fact]
     public void AModRestoringTheTargetsTerrainOverAPluginRequiringTheTargetLeavesNothingChanged() =>
-        Assert.Empty(FindInCell(Flat(Target), RaisedAt(Dependant, Near), Flat(Other)).Proposals);
+        Assert.Empty(FindInCell(Flat(Target), RaisedAt(RequiringMod, Near), Flat(Other)).Proposals);
 
     [Fact]
     public void ALaterModRestoringTheReferenceLeavesNothingChanged() =>
@@ -784,7 +784,7 @@ public class ChangedTerrainObjectsTests
 
     [Fact]
     public void AWaterChangeOnlyByAPluginRequiringTheTargetCountsForNothing() =>
-        Assert.Empty(FindWithWater([Flat(Target)], [Water(Target, BelowTheGround), Water(Dependant, AboveTheGround)]).Proposals);
+        Assert.Empty(FindWithWater([Flat(Target)], [Water(Target, BelowTheGround), Water(RequiringMod, AboveTheGround)]).Proposals);
 
     [Fact]
     public void AnIgnoredModCarryingAnotherModsWaterChangeNamesTheOtherMod() =>

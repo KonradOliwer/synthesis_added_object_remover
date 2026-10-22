@@ -9,7 +9,7 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 internal sealed class FixtureWorld
 {
     /// <summary>The mod being cleaned.</summary>
-    public const string TargetPlugin = "Target.esp";
+    public const string TargetName = "Target.esp";
 
     /// <summary>Listed in the settings' excluded plugins.</summary>
     public const string ExcludedPlugin = "Excluded.esp";

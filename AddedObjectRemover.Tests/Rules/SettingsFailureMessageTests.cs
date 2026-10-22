@@ -19,11 +19,11 @@ public class SettingsFailureMessageTests
     }
 
     [Fact]
-    public void ATargetPluginOfTheWrongJsonTypeNamesTheSettingAndAsksForAPluginFileName()
+    public void ACleanedModOfTheWrongJsonTypeNamesTheSettingAndAsksForAPluginFileName()
     {
-        var message = SettingsFailureMessage.Describe(Deserialize("""{"TargetPlugin":[]}"""), Program.SettingsSchema, Program.SettingsFileName);
+        var message = SettingsFailureMessage.Describe(Deserialize("""{"CleanedMod":[]}"""), Program.SettingsSchema, Program.SettingsFileName);
 
-        Assert.Contains("'Standard > Mod to clean up' (settings.json path 'Standard.TargetPlugin')", message);
+        Assert.Contains("'Standard > Mod to clean up' (settings.json path 'Standard.CleanedMod')", message);
         Assert.EndsWith("Expected a plugin file name, for example SomeMod.esp.", message);
     }
 
@@ -96,7 +96,7 @@ public class SettingsFailureMessageTests
     }
 
     [Theory]
-    [InlineData("""{"TargetPlugin":"Foo"}""")]
+    [InlineData("""{"CleanedMod":"Foo"}""")]
     [InlineData("""{"WhatToIgnore":{"ExcludedPlugins":["Bar.esp","Foo"]}}""")]
     public void AMisspelledPluginNameStopsTheLoadNamingTheValueAndAskingForAPluginFileName(string json)
     {

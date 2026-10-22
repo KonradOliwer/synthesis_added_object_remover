@@ -28,7 +28,7 @@ public class ChangedTerrainRunTests
                 [TerrainWorld.CrateOnRaisedTerrain] = new RemovalReason.TerrainChanged(Other, TerrainChangeKind.Height),
                 [TerrainWorld.CrateOnRoad] = new RemovalReason.TerrainChanged(Other, TerrainChangeKind.TerrainType),
                 [TerrainWorld.CrateOnOtherGrass] = null,
-                [TerrainWorld.CrateOnTerrainRaisedByADependant] = null,
+                [TerrainWorld.CrateOnTerrainRaisedByARequiringMod] = null,
                 [TerrainWorld.CrateUnderRaisedWater] = new RemovalReason.TerrainChanged(Other, TerrainChangeKind.WaterHeight),
                 [TerrainWorld.CrateInAddedWater] = new RemovalReason.TerrainChanged(Other, TerrainChangeKind.WaterAdded),
             },
@@ -51,7 +51,7 @@ public class ChangedTerrainRunTests
             + "Count water height changes: on, ignoring changes up to 16 units; Count water added/removed changes: on; "
             + "remove only when this share of the ground got covered/uncovered: 20%.",
             SectionLines(log, "config"));
-        Assert.Equal([$"Found 4 of 6 {FixtureWorld.TargetPlugin} objects on terrain changed by other mods."], SectionLines(log, "changedTerrain"));
+        Assert.Equal([$"Found 4 of 6 {FixtureWorld.TargetName} objects on terrain changed by other mods."], SectionLines(log, "changedTerrain"));
         Assert.Equal(
             ["Removed 4 objects (4 on changed terrain, 0 too close, 0 follow-up removals, 0 leftover invisible objects, 0 linked to removed objects)."],
             SectionLines(log, "removal-summary"));
@@ -67,7 +67,7 @@ public class ChangedTerrainRunTests
         var log = RunLogged(settings);
 
         var changedTerrain = SectionLines(log, "changedTerrain");
-        Assert.Equal($"Found 4 of 6 {FixtureWorld.TargetPlugin} objects on terrain changed by other mods in 0.0s.", changedTerrain[0]);
+        Assert.Equal($"Found 4 of 6 {FixtureWorld.TargetName} objects on terrain changed by other mods in 0.0s.", changedTerrain[0]);
         Assert.Equal("  Terrain: 6 cells compared; 4 objects on changed terrain (by plugin: 4 Other.esp); 0 objects not checked (interior or no terrain).", changedTerrain[1]);
         Assert.Contains(
             "Linked groups: 0 more objects removed with the changed-terrain removals they are linked to.",
@@ -134,7 +134,7 @@ public class ChangedTerrainRunTests
     {
         Standard = new StandardSettings
         {
-            TargetPlugin = ModKey.FromNameAndExtension(FixtureWorld.TargetPlugin),
+            CleanedMod = ModKey.FromNameAndExtension(FixtureWorld.TargetName),
             TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = on },
         },
     };
@@ -156,12 +156,12 @@ public class ChangedTerrainRunTests
         public const string CrateOnRaisedTerrain = "T_CrateOnRaisedTerrain";
         public const string CrateOnRoad = "T_CrateOnRoad";
         public const string CrateOnOtherGrass = "T_CrateOnOtherGrass";
-        public const string CrateOnTerrainRaisedByADependant = "T_CrateOnTerrainRaisedByADependant";
+        public const string CrateOnTerrainRaisedByARequiringMod = "T_CrateOnTerrainRaisedByARequiringMod";
         public const string CrateUnderRaisedWater = "T_CrateUnderRaisedWater";
         public const string CrateInAddedWater = "T_CrateInAddedWater";
 
         private const string BaseGamePlugin = "Skyrim.esm";
-        private const string DependantPlugin = "Dependant.esp";
+        private const string RequiringModPlugin = "RequiringMod.esp";
 
         /// <summary>Height steps of 8 units: 64 units, above the default tolerance.</summary>
         private const float RaisedSteps = 8f;
@@ -192,15 +192,15 @@ public class ChangedTerrainRunTests
             FixtureMeshes.WriteAll(dataFolder);
             var world = new TerrainWorld();
             var baseGame = world._baseGame;
-            var target = new FixtureMod(FixtureWorld.TargetPlugin, baseGame);
-            var dependant = new FixtureMod(DependantPlugin, baseGame, target);
+            var target = new FixtureMod(FixtureWorld.TargetName, baseGame);
+            var requiringMod = new FixtureMod(RequiringModPlugin, baseGame, target);
             var other = new FixtureMod(OtherPlugin, baseGame);
 
             var grass = world.AddTexture(world.AddMaterial());
             var otherGrass = world.AddTexture(world.Material(grass));
             var road = world.AddTexture(world.AddMaterial());
 
-            var crates = new[] { CrateOnRaisedTerrain, CrateOnRoad, CrateOnOtherGrass, CrateOnTerrainRaisedByADependant, CrateUnderRaisedWater, CrateInAddedWater };
+            var crates = new[] { CrateOnRaisedTerrain, CrateOnRoad, CrateOnOtherGrass, CrateOnTerrainRaisedByARequiringMod, CrateUnderRaisedWater, CrateInAddedWater };
             var crateBase = target.AddModeledStatic("T_CrateBase", FixtureMeshes.CrateModel);
             for (var cellX = 0; cellX < crates.Length; cellX++)
             {
@@ -211,12 +211,12 @@ public class ChangedTerrainRunTests
             world.Paint(other, 0, RaisedSteps, grass);
             world.Paint(other, 1, FlatSteps, road);
             world.Paint(other, 2, FlatSteps, otherGrass);
-            world.Paint(dependant, 3, RaisedSteps, grass);
+            world.Paint(requiringMod, 3, RaisedSteps, grass);
             world.Flood(baseGame, RaisedWaterCell, WaterBelowTheGround);
             world.Flood(target, RaisedWaterCell, WaterBelowTheGround);
             world.Flood(other, RaisedWaterCell, WaterAboveTheGround);
             world.Flood(other, AddedWaterCell, height: null);
-            return [baseGame.Mod, target.Mod, dependant.Mod, other.Mod];
+            return [baseGame.Mod, target.Mod, requiringMod.Mod, other.Mod];
         }
 
         /// <summary>The mod's copy of the cell has water at the given height; null uses the worldspace's default height.</summary>

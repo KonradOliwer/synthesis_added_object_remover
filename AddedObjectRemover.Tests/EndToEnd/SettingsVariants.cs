@@ -41,7 +41,7 @@ internal static class SettingsVariants
 
     private static StandardSettings Create(bool useRoughBoxes, NpcHandling npcs, FollowUpRemovalMode followUp, LeftoverInvisibleObjectSettings leftovers) => new()
     {
-        TargetPlugin = ModKey.FromNameAndExtension(FixtureWorld.TargetPlugin),
+        CleanedMod = ModKey.FromNameAndExtension(FixtureWorld.TargetName),
         TooClose = new TooCloseRemovalSettings
         {
             ByDistance = new TooCloseByDistanceSettings { Use = false },

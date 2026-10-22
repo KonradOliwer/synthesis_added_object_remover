@@ -98,7 +98,7 @@ public class LogicPublicTypesTests
             "static ImmutableArray<LogSection> BuildStopSections(StopReason, SettingsSource)",
             "ImmutableArray<LogSection> BuildArchiveSections()",
             "ImmutableArray<LogSection> BuildIndexSections(CollectedObjects, TimeSpan)",
-            "ImmutableArray<LogSection> BuildStepSections(IdentifiedMods)",
+            "ImmutableArray<LogSection> BuildStepSections(IdentifiedMods, LoadOrderPlugins)",
             "ImmutableArray<LogSection> BuildStepSections(CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(Replacements, CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(ObjectsToKeepResult)",

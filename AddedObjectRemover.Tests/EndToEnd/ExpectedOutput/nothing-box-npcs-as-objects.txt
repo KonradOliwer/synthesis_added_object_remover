@@ -1,6 +1,7 @@
 ## log
 === Added Object Remover ===
 Mod to clean up: Target.esp
+Plugin list read from <root>/Output/Plugins.txt: 7 listings.
 Other mods that never cause removals: Never count these mods: Excluded.esp; Never count the mods the cleaned mod requires: Skyrim.esm; Never count mods that have a compatibility patch with it: on, a patch requires at most 10 other mods.
 Compatibility patch detection: 2 plugins master the target, 1 of them compatibility patches.
   Compatibility patch TargetPatch.esp: links target with Patched.esp.
@@ -57,7 +58,7 @@ Kept 3 objects that would have been removed, because other records depend on the
   FormList record: 1
   placed object: Enable Parent: 1
   teleport door: 1
-Possible manual patch needed: 2 objects to check.
+Removed markers and kept objects: 2 objects.
   Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
 Removed 19/40 (removed/all mod objects):
@@ -69,10 +70,10 @@ Kept 1/40 (kept/all mod objects), placed object: Enable Parent:
   AorInterior › unnamed area 1/38
 Kept 1/40 (kept/all mod objects), teleport door:
   AorInterior › unnamed area 1/38
-Possible manual patch needed for 2/40 (needing a patch/all mod objects):
+Removed markers and kept objects: 2 of 40:
   AorInterior › unnamed area 2/38
 Removals: wrote 19 rows to <root>/Output/Reports/removals.csv.
-Manual patch hints: wrote 2 rows to <root>/Output/Reports/manual-patch-hints.csv.
+Removed markers and kept objects: wrote 2 rows to <root>/Output/Reports/removed-markers-and-kept-objects.csv.
 ## patch
 000807:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (0.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
 000808:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (4000.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
@@ -93,10 +94,6 @@ Manual patch hints: wrote 2 rows to <root>/Output/Reports/manual-patch-hints.csv
 000826:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (55600.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
 000827:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (56000.00, -400.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
 00082A:Target.esp in 000802:Skyrim.esm (temporary): disabled True, position (600.00, 600.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
-## report manual-patch-hints.csv
-hint,formKey,editorId,space,cell,detail
-KeptForNonPlacedReference,000810:Target.esp,T_ReferencedByFormList,interior AorInterior [000800:Skyrim.esm],,linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp]
-KeptTeleportDoor,000811:Target.esp,T_TeleportDoorA,interior AorInterior [000800:Skyrim.esm],,teleport door
 ## report removals.csv
 formKey,editorId,base,reason,worldspace,hold,place,cellFormKey,cellEditorId,gridX,gridY,x,y,z
 000807:Target.esp,T_TooClose,T_CrateBase [000800:Target.esp],too close to R_TooClose_Pad [000805:Rival.esp],AorInterior,unnamed area,AorInterior,000800:Skyrim.esm,AorInterior,,,0,0,0
@@ -118,3 +115,7 @@ formKey,editorId,base,reason,worldspace,hold,place,cellFormKey,cellEditorId,grid
 000826:Target.esp,T_SoundRing2,T_CrateBase [000800:Target.esp],too close to R_SoundRing2_Pad [00081B:Rival.esp],AorInterior,unnamed area,AorInterior,000800:Skyrim.esm,AorInterior,,,55600,0,0
 000827:Target.esp,T_SoundRing3,T_CrateBase [000800:Target.esp],too close to R_SoundRing3_Pad [00081C:Rival.esp],AorInterior,unnamed area,AorInterior,000800:Skyrim.esm,AorInterior,,,56000,-400,0
 00082A:Target.esp,T_ExteriorCrate,T_CrateBase [000800:Target.esp],too close to R_ExteriorCrate_Pad [00081E:Rival.esp],AorWorld,unnamed area,AorExterior,000802:Skyrim.esm,AorExterior,0,0,600,600,128
+## report removed-markers-and-kept-objects.csv
+hint,formKey,editorId,space,cell,detail
+KeptForNonPlacedReference,000810:Target.esp,T_ReferencedByFormList,interior AorInterior [000800:Skyrim.esm],,linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp]
+KeptTeleportDoor,000811:Target.esp,T_TeleportDoorA,interior AorInterior [000800:Skyrim.esm],,teleport door

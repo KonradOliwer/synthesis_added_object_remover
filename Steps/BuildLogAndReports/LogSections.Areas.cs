@@ -11,7 +11,7 @@ internal static partial class LogSections
 
     /// <summary>
     /// Where the objects of each closing summary are, as one tree by worldspace, hold and place: the removals, the kept
-    /// objects, the objects to check for a manual patch and each removal warning; only summaries with objects have lines.
+    /// objects, the removed markers and kept objects and each removal warning; only summaries with objects have lines.
     /// </summary>
     public static LogSection BuildAreasSection(
         CollectedObjects world,
@@ -32,7 +32,7 @@ internal static partial class LogSections
             [
                 .. AreaLines(tree, removedTargets, $"Removed {OfAllModObjects(tree, removedTargets.Count, "removed")}:"),
                 .. KeptAreaLines(tree, keptOnce),
-                .. AreaLines(tree, hintTargets, $"Possible manual patch needed for {OfAllModObjects(tree, hintTargets.Count, "needing a patch")}:"),
+                .. AreaLines(tree, hintTargets, $"Removed markers and kept objects: {TextFormat.Count(hintTargets.Count)} of {TextFormat.Count(tree.Total)}:"),
                 .. AreaLines(tree, uniqueActors, $"Removed {OfAllModObjects(tree, uniqueActors.Count, "unique NPCs")}:"),
                 .. AreaLines(tree, largeReferences, $"Removed {OfAllModObjects(tree, largeReferences.Count, "large-reference list objects")}:"),
             ]);

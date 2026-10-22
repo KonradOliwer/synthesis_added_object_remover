@@ -50,7 +50,7 @@ public class TooCloseBothZonesRunTests
             + "0 targets without mesh triangles used their box;",
             tooClose[0]);
         Assert.Contains(
-            $"Found 2 of 3 {FixtureWorld.TargetPlugin} objects too close to other mods' objects (1 by object size, 1 by distance) in 0.0s.", tooClose);
+            $"Found 2 of 3 {FixtureWorld.TargetName} objects too close to other mods' objects (1 by object size, 1 by distance) in 0.0s.", tooClose);
         Assert.Equal(
             ["Removed 2 objects (2 too close, 0 follow-up removals, 0 leftover invisible objects, 0 linked to removed objects)."],
             SectionLines(log, "removal-summary"));
@@ -63,7 +63,7 @@ public class TooCloseBothZonesRunTests
     {
         Standard = new StandardSettings
         {
-            TargetPlugin = ModKey.FromNameAndExtension(FixtureWorld.TargetPlugin),
+            CleanedMod = ModKey.FromNameAndExtension(FixtureWorld.TargetName),
             TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = false },
             TooClose = new TooCloseRemovalSettings
             {
@@ -105,7 +105,7 @@ public class TooCloseBothZonesRunTests
         {
             FixtureMeshes.WriteAll(dataFolder);
             var baseGame = new FixtureMod(BaseGamePlugin);
-            var target = new FixtureMod(FixtureWorld.TargetPlugin, baseGame);
+            var target = new FixtureMod(FixtureWorld.TargetName, baseGame);
             var other = new FixtureMod(OtherPlugin, baseGame);
             var spaces = FixtureSpaces.CreateIn(baseGame);
             spaces.AddOverridesTo(target);

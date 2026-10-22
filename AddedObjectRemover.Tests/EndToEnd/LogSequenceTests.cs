@@ -66,7 +66,7 @@ public class LogSequenceTests
 
     private static StandardSettings CreateStandard(FollowUpRemovalMode mode, Leftovers leftovers) => new()
     {
-        TargetPlugin = ModKey.FromNameAndExtension(FixtureWorld.TargetPlugin),
+        CleanedMod = ModKey.FromNameAndExtension(FixtureWorld.TargetName),
         TooClose = new TooCloseRemovalSettings
         {
             ByDistance = new TooCloseByDistanceSettings { Use = false },

@@ -42,6 +42,12 @@ public class SourcePlacementTests
         PlacementCheck.AssertUsedOnlyIn(UsesNamespace("Mutagen", "Noggog"), [.. RecordReadingAndWriting, "Program.cs"], MutagenExceptions);
 
     [Fact]
+    public void ThePluginListIsReadOnlyByTheEnabledPluginListReader() =>
+        PlacementCheck.AssertUsedOnlyIn(
+            file => file.Code.Contains("GetLoadOrderListings", StringComparison.Ordinal),
+            ["Tools/PluginRecordReadingAndWriting/EnabledPluginListReader.cs"]);
+
+    [Fact]
     public void NiflyIsUsedOnlyInTheMeshReading() =>
         PlacementCheck.AssertUsedOnlyIn(UsesNamespace("Nifly"), [MeshReading]);
 

@@ -13,8 +13,8 @@ internal sealed class TestReport
 
     public TestReport(IMeshFiles meshFiles, IUnexpectedErrors unexpectedErrors)
     {
-        var settings = new StandardSettings { TargetPlugin = ModKey.FromNameAndExtension(Target.ToString()) };
-        var plugins = new LoadOrderPlugins(
+        var settings = new StandardSettings { CleanedMod = ModKey.FromNameAndExtension(Target.ToString()) };
+        var plugins = TestLoadOrderPlugins.Of(
             new KnownPluginNames([Target, Patch]),
             Patch,
             [new PluginListing(Target, true, []), new PluginListing(Patch, true, [])]);

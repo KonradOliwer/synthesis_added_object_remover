@@ -46,7 +46,7 @@ internal static class PipelineRun
         var world = FixtureWorld.Create(dataFolder);
         var state = FixturePatcherState.Create(world.LoadOrder, dataFolder, Path.Combine(outputFolder, FixturePatcherState.PatchModKey.FileName));
 
-        var log = CaptureConsole(() => Program.RunPatch(state, () => settings, workers));
+        var log = CaptureConsole(() => Program.RunPatch(state, () => settings, workers, FixturePatcherState.WritePluginsFile(state)));
         return new RunOutput(
             OutputMasks.MaskLog(log, root),
             PatchDump.Describe(state.PatchMod),

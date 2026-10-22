@@ -1,4 +1,5 @@
 Mod to clean up: Target.esp
+Plugin list read from Plugins.txt: 6 listings.
 Other mods that never cause removals: Never count these mods: Extra.esp, Second.esp; Never count the mods the cleaned mod requires: Skyrim.esm; Never count mods that have a compatibility patch with it: on, a patch requires at most 1 other mods.
 Compatibility patch detection: 2 plugins master the target, 1 of them compatibility patches.
   Plugin Merged.esp skipped: too many masters (likely generated or merged); it masters the target and 3 other mods.

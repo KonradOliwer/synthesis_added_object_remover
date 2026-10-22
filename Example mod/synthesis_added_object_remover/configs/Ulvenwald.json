@@ -1,5 +1,5 @@
 {
-  "TargetPlugin": "Ulvenwald.esp",
+  "CleanedMod": "Ulvenwald.esp",
   "WhatToIgnore": {
     "ExcludedPlugins": [],
     "IgnoreTargetMasters": true,

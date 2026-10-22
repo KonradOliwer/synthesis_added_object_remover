@@ -132,7 +132,7 @@ public static class StepRunner
     private static IdentifiedMods IdentifyMods(RunScope scope)
     {
         var mods = ModIdentifier.Identify(scope.Environment.Plugins, scope.Settings.ModIdentification);
-        Print(scope.Environment.Log, scope.Report.BuildStepSections(mods));
+        Print(scope.Environment.Log, scope.Report.BuildStepSections(mods, scope.Environment.Plugins));
         return mods;
     }
 

@@ -7,7 +7,7 @@ namespace AddedObjectRemover.Tests.Fixtures;
 internal static class TestTargets
 {
     public static readonly ModKey TargetMod = ModKey.FromNameAndExtension("Target.esp");
-    public static readonly PluginName TargetPlugin = TargetMod.ToPluginName();
+    public static readonly PluginName TargetName = TargetMod.ToPluginName();
     public static readonly RecordKey Space = SpaceKey(0x100);
 
     public static RecordKey SpaceKey(uint id) => new FormKey(TargetMod, id).ToRecordKey();

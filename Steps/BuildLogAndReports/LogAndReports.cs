@@ -73,7 +73,7 @@ public sealed class LogAndReports
     public ImmutableArray<LogSection> BuildArchiveSections() =>
         [LogSections.BuildArchiveWarningsSection(TakeArchiveProblems()), TakeUnexpectedErrors()];
 
-    public ImmutableArray<LogSection> BuildStepSections(IdentifiedMods mods) => [LogSections.BuildConfigSection(_settings, mods)];
+    public ImmutableArray<LogSection> BuildStepSections(IdentifiedMods mods, LoadOrderPlugins plugins) => [LogSections.BuildConfigSection(_settings, mods, plugins)];
 
     /// <remarks>The run stops when there is nothing to check, before the threads line.</remarks>
     public ImmutableArray<LogSection> BuildStepSections(CollectedObjects world, TimeSpan elapsed)
@@ -302,6 +302,7 @@ public sealed class LogAndReports
         var keptOnPurpose = LogSections.BuildKeptOnPurposeSection(world, kept);
         var keptSummary = LogSections.BuildKeptSummarySection(kept);
         var markersByType = LogSections.BuildMarkersByTypeSection(world.Targets, removals, _context);
+        var hints = LogSections.BuildHintsSection(world, outcome.Hints);
         return
         [
             LogSections.BuildRemovalsSection(world, removals, _context),
@@ -313,7 +314,7 @@ public sealed class LogAndReports
             .. keptOnPurpose.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [keptOnPurpose],
             .. markersByType.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [markersByType],
             .. warnings.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [warnings],
-            LogSections.BuildHintsSection(world, outcome.Hints),
+            .. hints.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [hints],
             LogSections.BuildAreasSection(world, removals, kept, outcome.Hints, outcome.RemovalRisks),
         ];
     }

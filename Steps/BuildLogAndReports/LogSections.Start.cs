@@ -20,10 +20,11 @@ internal static partial class LogSections
     public static LogSection BuildReportFolderWarningSection(ReportFileProblem problem) =>
         new("reportFolderWarning", [BuildReportFileProblemLine(problem)]);
 
-    public static LogSection BuildConfigSection(RunSettings settings, IdentifiedMods standing) =>
+    public static LogSection BuildConfigSection(RunSettings settings, IdentifiedMods standing, LoadOrderPlugins plugins) =>
         new("config",
         [
             $"Mod to clean up: {settings.TargetAsTyped}",
+            .. settings.DetailedLog ? [DescribePluginList(plugins)] : ImmutableArray<string>.Empty,
             DescribeOtherModsThatNeverCauseRemovals(settings, standing),
             .. CompatibilityPatches(standing.Patches),
             DescribeTooClose(settings.TooClose),
@@ -32,6 +33,9 @@ internal static partial class LogSections
             DescribeLeftBehind(settings),
             DescribeDetailedLogAndReports(settings.Reports),
         ]);
+
+    private static string DescribePluginList(LoadOrderPlugins plugins) =>
+        $"Plugin list read from {plugins.PluginsFilePath}: {TextFormat.Count(plugins.Positions.Count)} listings.";
 
     private static string OnOff(bool on) => on ? "on" : "off";
 
@@ -85,9 +89,13 @@ internal static partial class LogSections
 
     private static string StopMessage(StopReason reason, SettingsSource source) => reason.Kind switch
     {
-        StopKind.NoTargetSet => "No target plugin set. No changes made.",
-        StopKind.TargetNotInLoadOrder => $"Target plugin {reason.Name} is not in the load order. No changes made.",
-        StopKind.TargetIsThePatch => $"Target plugin {reason.Name} is the patch this patcher writes. No changes made.",
+        StopKind.NoTargetSet => "No mod to clean up is set (CleanedMod). No changes made.",
+        StopKind.CleanedModNotInLoadOrder => $"{reason.Name} is not in your plugin list. No changes made.",
+        StopKind.CleanedModDisabled => $"{reason.Name} is disabled. No changes made.",
+        StopKind.CleanedModLoadsAfterPatch when reason.Placement is { } placement =>
+            $"{reason.Name} loads after the patch {placement.Patch} (position {placement.CleanedModPosition} > {placement.PatchPosition}): move {placement.Patch} below it. No changes made.",
+        StopKind.CleanedModNotLoadedBySynthesis => $"{reason.Name} is enabled in your plugin list but Synthesis did not load it for this group. No changes made.",
+        StopKind.TargetIsThePatch => $"{reason.Name} is the patch this patcher writes. No changes made.",
         StopKind.NoTargetObjects when source is SettingsSource.ConfigFile => "Nothing to check for this config. No changes made for it; the batch goes on.",
         StopKind.NoTargetObjects => "Nothing to check. No changes made.",
         _ => throw new UnreachableException($"Unknown stop kind {reason.Kind}."),

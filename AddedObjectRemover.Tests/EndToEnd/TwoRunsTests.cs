@@ -76,7 +76,7 @@ public sealed class TwoRunsTests : IDisposable
         var (world, dataFolder) = CreateWorld();
         var outputPath = Path.Combine(_root.FullName, FixturePatcherState.PatchModKey.FileName);
         var state = FixturePatcherState.Create(world.LoadOrder, dataFolder, outputPath);
-        var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey);
+        var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey, FixturePatcherState.PluginListOf(state));
         var pluginRecords = new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods, Workers);
         var settings = SettingsVariants.Of(SettingsVariants.Support);
         var request = SettingsValidator.Build(
@@ -143,7 +143,7 @@ public sealed class TwoRunsTests : IDisposable
             var settings = SettingsVariants.Of(variant);
             var outputPath = Path.Combine(_folder, FixturePatcherState.PatchModKey.FileName);
             var state = FixturePatcherState.Create(world.LoadOrder, dataFolder, outputPath);
-            var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey);
+            var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey, FixturePatcherState.PluginListOf(state));
             var request = SettingsValidator.Build(
                 StandardConfig.Of(settings.Standard),
                 new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods, Workers).Open(),

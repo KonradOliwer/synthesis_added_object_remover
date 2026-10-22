@@ -9,10 +9,12 @@ internal static partial class LogSections
     public static LogSection BuildHintsSection(CollectedObjects world, IReadOnlyList<ManualPatchHint> hints) =>
         new(
             "hints",
-            [
-                $"Possible manual patch needed: {TextFormat.Count(hints.Count)} objects to check.",
-                .. hints.Select(hint => HintLine(world, hint)),
-            ]);
+            hints.Count == 0
+                ? []
+                : [
+                    $"Removed markers and kept objects: {TextFormat.Count(hints.Count)} objects.",
+                    .. hints.Select(hint => HintLine(world, hint)),
+                ]);
 
     private static string HintLine(CollectedObjects world, ManualPatchHint hint)
     {

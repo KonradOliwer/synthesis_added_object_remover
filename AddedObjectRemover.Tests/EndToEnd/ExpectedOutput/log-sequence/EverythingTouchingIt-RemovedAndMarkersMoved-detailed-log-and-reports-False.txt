@@ -64,7 +64,7 @@ Kept 5 objects that would have been removed, because other records depend on the
 ## markers-by-type
 Removed markers by type: 1 XMarkers, 1 Lights, 2 SoundMarkers.
 ## hints
-Possible manual patch needed: 3 objects to check.
+Removed markers and kept objects: 3 objects.
   Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept, referenced by a non-placed record: T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm], cell AorExterior [000802:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
@@ -79,7 +79,7 @@ Kept 2/40 (kept/all mod objects), placed object: Enable Parent:
   AorInterior › unnamed area 2/38
 Kept 1/40 (kept/all mod objects), teleport door:
   AorInterior › unnamed area 1/38
-Possible manual patch needed for 3/40 (needing a patch/all mod objects):
+Removed markers and kept objects: 3 of 40:
   AorInterior › unnamed area 2/38
   AorWorld › unnamed area › AorExterior 1/2
 ## written

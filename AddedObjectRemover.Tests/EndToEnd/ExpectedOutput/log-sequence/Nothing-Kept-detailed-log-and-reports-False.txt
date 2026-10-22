@@ -58,7 +58,7 @@ Kept 3 objects that would have been removed, because other records depend on the
   placed object: Enable Parent: 1
   teleport door: 1
 ## hints
-Possible manual patch needed: 2 objects to check.
+Removed markers and kept objects: 2 objects.
   Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
 ## areas
@@ -71,7 +71,7 @@ Kept 1/40 (kept/all mod objects), placed object: Enable Parent:
   AorInterior › unnamed area 1/38
 Kept 1/40 (kept/all mod objects), teleport door:
   AorInterior › unnamed area 1/38
-Possible manual patch needed for 2/40 (needing a patch/all mod objects):
+Removed markers and kept objects: 2 of 40:
   AorInterior › unnamed area 2/38
 ## written
 ## reportFileWarnings

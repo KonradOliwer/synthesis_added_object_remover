@@ -13,7 +13,7 @@ internal sealed record ScannedRecords(PlacedRecordFacts Facts, RecordHandles Han
 /// The spaces (worldspace or interior cell keys) that contain a record created by the target
 /// plugin, and every placed record from another plugin that the target plugin overrides.
 /// </summary>
-internal sealed record TargetPluginFootprint(HashSet<RecordKey> SpaceKeys, HashSet<RecordKey> OverriddenRecords);
+internal sealed record TargetFootprint(HashSet<RecordKey> SpaceKeys, HashSet<RecordKey> OverriddenRecords);
 
 /// <summary>
 /// Reads every winning placed record (REFR, ACHR and all placed trap/hazard/projectile types) of a
@@ -32,7 +32,7 @@ internal sealed class PlacedRecordReader
     private readonly ModKey _patch;
     private readonly PluginNames _names;
     private readonly PlacedReadScope _scope;
-    private readonly TargetPluginFootprint _footprint;
+    private readonly TargetFootprint _footprint;
     private readonly HashSet<RecordKey> _landWorldspaces;
     private readonly HashSet<RecordKey> _seenRecords = new();
     private readonly HashSet<RecordKey> _seenNavmeshes = new();
@@ -64,7 +64,7 @@ internal sealed class PlacedRecordReader
         _patch = patch;
         _names = names;
         _scope = scope;
-        _footprint = AnalyzeTargetPlugin();
+        _footprint = AnalyzeTarget();
         if (scope.Terrain || scope.TerrainVersions || scope.Water) FindLandAndWaterWorldspaces();
         _landWorldspaces = _landWorldspaceOf.Values.ToHashSet();
     }
@@ -153,9 +153,9 @@ internal sealed class PlacedRecordReader
     /// Walks only the target plugin's own cell tree. A FormKey the target overrides is a
     /// replacement, never an "other mod" object, whichever plugin wins it.
     /// </summary>
-    private TargetPluginFootprint AnalyzeTargetPlugin()
+    private TargetFootprint AnalyzeTarget()
     {
-        var footprint = new TargetPluginFootprint([], []);
+        var footprint = new TargetFootprint([], []);
         if (_loadOrder.ListedOrder.FirstOrDefault(listing => _names.Of(listing.ModKey) == _scope.Target)?.Mod is not { } mod) return footprint;
 
         foreach (var cellContext in mod.EnumerateMajorRecordContexts<ICell, ICellGetter>(_linkCache))

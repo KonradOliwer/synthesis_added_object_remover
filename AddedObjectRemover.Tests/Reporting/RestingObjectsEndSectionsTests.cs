@@ -425,7 +425,7 @@ public sealed class RestingObjectsEndSectionsTests
     }
 
     [Fact]
-    public void Hints_AlwaysShowAndMatchTheExpectedOutput()
+    public void Hints_MatchTheExpectedOutput()
     {
         var (world, _) = RunRounds();
         ImmutableArray<ManualPatchHint> hints =
@@ -434,7 +434,15 @@ public sealed class RestingObjectsEndSectionsTests
             new(ManualPatchHintType.KeptForNonPlacedReference, Protected, TestKeepReasons.QuestDetail),
         ];
 
-        AssertExpectedOutput(LogSections.BuildHintsSection(world, hints).Lines.ToList(), "Hints_AlwaysShowAndMatchTheExpectedOutput");
+        AssertExpectedOutput(LogSections.BuildHintsSection(world, hints).Lines.ToList(), "Hints_MatchTheExpectedOutput");
+    }
+
+    [Fact]
+    public void Hints_HaveNoLinesWithoutRows()
+    {
+        var (world, _) = RunRounds();
+
+        Assert.True(LogSections.BuildHintsSection(world, []).Lines.IsEmpty);
     }
 
     [Fact]
@@ -458,7 +466,7 @@ public sealed class RestingObjectsEndSectionsTests
                 $"  Wrote 2 mesh origins to {PathOf(ReportFileNames.MeshOriginsFileName)}.",
                 $"Leftover invisible objects diagnostics: wrote 6 evaluations to {PathOf(ReportFileNames.LeftBehindFileName)}.",
                 $"Removals: wrote 9 rows to {PathOf(ReportFileNames.RemovalsFileName)}.",
-                $"Manual patch hints: wrote 3 rows to {PathOf(ReportFileNames.HintsFileName)}.",
+                $"Removed markers and kept objects: wrote 3 rows to {PathOf(ReportFileNames.HintsFileName)}.",
             ],
             detailed);
         Assert.Equal(

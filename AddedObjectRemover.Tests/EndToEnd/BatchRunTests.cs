@@ -120,12 +120,41 @@ public sealed class BatchRunTests : IDisposable
     {
         WriteGroup(FirstConfig, SecondConfig);
         WriteConfig(FirstConfig, FirstPlugin);
-        WriteFile(Path.Combine("configs", SecondConfig + ".json"), "{\"TargetPlugin\": \"Second.esp\", \"TooClose\": {\"NpcHandling\": \"Sometimes\"}}");
+        WriteFile(Path.Combine("configs", SecondConfig + ".json"), "{\"CleanedMod\": \"Second.esp\", \"TooClose\": {\"NpcHandling\": \"Sometimes\"}}");
 
         var run = RunFailing();
 
         Assert.Contains("Invalid setting in config file", run.Message);
         Assert.Contains(SecondConfig + ".json", run.Message);
+        AssertNothingRanOrWritten(run);
+    }
+
+    [Fact]
+    public void AMissingPluginsFileFailsTheRunBeforeAnythingRunsOrIsWritten()
+    {
+        WriteGroup(FirstConfig);
+        WriteConfig(FirstConfig, FirstPlugin);
+        var missing = Path.Combine(_outputFolder, "Missing.txt");
+
+        var run = RunFailing(_ => missing);
+
+        Assert.Contains(missing, run.Message);
+        AssertNothingRanOrWritten(run);
+    }
+
+    [Fact]
+    public void AMalformedPluginsFileLineFailsTheRunNamingTheFileAndTheLineBeforeAnythingRunsOrIsWritten()
+    {
+        WriteGroup(FirstConfig);
+        WriteConfig(FirstConfig, FirstPlugin);
+        var malformed = Path.Combine(_outputFolder, "Malformed.txt");
+        File.WriteAllLines(malformed, ["*Skyrim.esm", "NoExtension"]);
+
+        var run = RunFailing(_ => malformed);
+
+        Assert.Equal(
+            $"The plugin list file {malformed} has a malformed entry at line 2. Correct or remove that line. Nothing was run and no patch was written.",
+            run.Message);
         AssertNothingRanOrWritten(run);
     }
 
@@ -147,15 +176,17 @@ public sealed class BatchRunTests : IDisposable
     private FinishedRun Run()
     {
         var state = CreateState();
-        var log = PipelineRun.CaptureConsole(() => Program.RunPatch(state, BatchSettings, Workers));
+        var log = PipelineRun.CaptureConsole(() => Program.RunPatch(state, BatchSettings, Workers, FixturePatcherState.WritePluginsFile(state)));
         return new FinishedRun(log, PatchDump.Describe(state.PatchMod));
     }
 
-    private FailedRun RunFailing()
+    private FailedRun RunFailing() => RunFailing(FixturePatcherState.WritePluginsFile);
+
+    private FailedRun RunFailing(Func<IPatcherState<ISkyrimMod, ISkyrimModGetter>, string> pluginsFileOf)
     {
         var state = CreateState();
         BatchStoppedException? stopped = null;
-        var log = PipelineRun.CaptureConsole(() => stopped = Assert.Throws<BatchStoppedException>(() => Program.RunPatch(state, BatchSettings, Workers)));
+        var log = PipelineRun.CaptureConsole(() => stopped = Assert.Throws<BatchStoppedException>(() => Program.RunPatch(state, BatchSettings, Workers, pluginsFileOf(state))));
         return new FailedRun(log, PatchDump.Describe(state.PatchMod), stopped!.Message);
     }
 
@@ -173,7 +204,7 @@ public sealed class BatchRunTests : IDisposable
             Path.Combine("configs", name + ".json"),
             $$"""
             {
-              "TargetPlugin": "{{target}}",
+              "CleanedMod": "{{target}}",
               "TooClose": {
                 "BySize": { "Use": true, "SizeMultiplier": 0.1 },
                 "ByDistance": { "Use": true, "DistanceInUnits": 32 }

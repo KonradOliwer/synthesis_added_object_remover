@@ -48,7 +48,7 @@ public class ObjectsToKeepFinderTests
     }
 
     [Fact]
-    public void AnObjectWhoseTargetPluginBaseScriptNamesAQuestIsKept()
+    public void AnObjectWhoseCleanedModBaseScriptNamesAQuestIsKept()
     {
         var targets = TestTargets.CreateMany(2);
         targets[0] = TestTargets.Create(0, TestTargets.At(default), TargetScriptedBase, TestTargets.Space);

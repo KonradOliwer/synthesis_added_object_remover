@@ -28,6 +28,30 @@ public class SettingsValidationTests
         Assert.Equal(expected, SettingCorrections.Clamp(value, 0f, 5f, SettingDefaults.SizeMultiplier, "test number", []));
 
     [Fact]
+    public void AnUnknownPluginListPlaceStopsTheBatch() =>
+        Assert.Equal(
+            "Could not find the game's plugin list file (Plugins.txt in the game's folder under your local application data). Nothing was run and no patch was written.",
+            SettingsValidator.StopOnUnusablePluginList(new PluginListProblem.PathUnknown()).Message);
+
+    [Fact]
+    public void AMissingPluginListFileStopsTheBatchNamingTheFile() =>
+        Assert.Equal(
+            "The plugin list file C:/game/Plugins.txt does not exist. Nothing was run and no patch was written.",
+            SettingsValidator.StopOnUnusablePluginList(new PluginListProblem.FileMissing("C:/game/Plugins.txt")).Message);
+
+    [Fact]
+    public void AMalformedPluginListLineStopsTheBatchNamingTheFileAndTheLine() =>
+        Assert.Equal(
+            "The plugin list file C:/game/Plugins.txt has a malformed entry at line 4. Correct or remove that line. Nothing was run and no patch was written.",
+            SettingsValidator.StopOnUnusablePluginList(new PluginListProblem.MalformedLine("C:/game/Plugins.txt", 4)).Message);
+
+    [Fact]
+    public void ALoadedPluginMissingFromThePluginListStopsTheBatchNamingThePluginAndTheFile() =>
+        Assert.Equal(
+            "Second.esp is loaded by Synthesis but is not in the plugin list file C:/game/Plugins.txt. Nothing was run and no patch was written.",
+            SettingsValidator.StopOnUnusablePluginList(new PluginListProblem.PluginNotListed("C:/game/Plugins.txt", new PluginName("Second.esp"))).Message);
+
+    [Fact]
     public void DefaultsAreWithinTheirValidRanges()
     {
         var surroundings = new LeftoverInvisibleObjectSettings().SurroundingObjects;

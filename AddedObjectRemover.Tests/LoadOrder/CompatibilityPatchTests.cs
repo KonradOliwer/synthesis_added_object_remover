@@ -1,3 +1,5 @@
+using AddedObjectRemover.Tests.Fixtures;
+
 namespace AddedObjectRemover.Tests.LoadOrder;
 
 public class CompatibilityPatchTests
@@ -62,7 +64,7 @@ public class CompatibilityPatchTests
     }
 
     [Fact]
-    public void DependantsAreTheLoadedPluginsMasteringTheTargetInLoadOrderWithoutThePatchPlugin()
+    public void RequiringModsAreTheLoadedPluginsMasteringTheTargetInLoadOrderWithoutThePatchPlugin()
     {
         var standing = Decide(
             Listing(Skyrim),
@@ -74,17 +76,17 @@ public class CompatibilityPatchTests
             new PluginListing(Missing, Loaded: false, [Target]),
             Listing(SynthesisOutput, Skyrim, Target));
 
-        Assert.Equal(new[] { Patch, Addon }, standing.Dependants);
+        Assert.Equal(new[] { Patch, Addon }, standing.RequiringMods);
     }
 
     [Fact]
-    public void DependantsAreListedWhenPatchDetectionIsOff()
+    public void RequiringModsAreListedWhenPatchDetectionIsOff()
     {
         var standing = ModIdentifier.Identify(
-            new LoadOrderPlugins(Mods, SynthesisOutput, [Listing(Skyrim), Listing(Target, Skyrim), Listing(Addon, Skyrim, Target)]),
+            TestLoadOrderPlugins.Of(Mods, SynthesisOutput, [Listing(Skyrim), Listing(Target, Skyrim), Listing(Addon, Skyrim, Target)]),
             new ModIdentificationSettings(Target, Excluded: [], IgnoreTargetMasters: true, IgnorePatched: false, PatchMasterLimit));
 
-        Assert.Equal(new[] { Addon }, standing.Dependants);
+        Assert.Equal(new[] { Addon }, standing.RequiringMods);
         Assert.False(standing.Patches.DetectionOn);
     }
 
@@ -94,7 +96,7 @@ public class CompatibilityPatchTests
         var dawnguard = new PluginName("Dawnguard.esm");
         var creationClub = new PluginName("ccBGSSSE001-Fish.esm");
         var standing = ModIdentifier.Identify(
-            new LoadOrderPlugins(new KnownPluginNames([Skyrim, dawnguard, creationClub, Target, SynthesisOutput]), SynthesisOutput,
+            TestLoadOrderPlugins.Of(new KnownPluginNames([Skyrim, dawnguard, creationClub, Target, SynthesisOutput]), SynthesisOutput,
                 [Listing(Skyrim), Listing(dawnguard, Skyrim), Listing(creationClub, Skyrim), Listing(Target, Skyrim)]),
             new ModIdentificationSettings(Target, Excluded: [], IgnoreTargetMasters: false, IgnorePatched: true, PatchMasterLimit));
 
@@ -105,7 +107,7 @@ public class CompatibilityPatchTests
 
     private static IdentifiedMods Decide(params PluginListing[] listed) =>
         ModIdentifier.Identify(
-            new LoadOrderPlugins(Mods, SynthesisOutput, [.. listed]),
+            TestLoadOrderPlugins.Of(Mods, SynthesisOutput, [.. listed]),
             new ModIdentificationSettings(Target, Excluded: [], IgnoreTargetMasters: true, IgnorePatched: true, PatchMasterLimit));
 
     private static PluginListing Listing(PluginName plugin, params PluginName[] masters) =>

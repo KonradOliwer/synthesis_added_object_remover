@@ -19,6 +19,7 @@ public class CopiedCodeTests
     private const string SettingChecks = "Setting-by-setting check lines; each reads another setting with its own default, limit and wording.";
     private const string TableDeclarations = "Declaration of a report class with a constant or header list; the tables share only the shape of the declaration.";
     private const string TextConstants = "Lists of text constants; each names its own setting or wording, so there is no logic to share.";
+    private const string SectionForwarders = "One-line members of the log and reports object, each handing one step's result to that step's section builder; no logic to share.";
     private const string ErrorBoundary ="Per-object error boundary of two steps: each catches the failure of its own kind of object under its own part key and recovers in its own way; they share only the shape.";
 
     private const string Shapes = "Caches/BaseObjectShapeAndKind/BaseObjectShapes.cs:BaseObjectShapes.";
@@ -32,6 +33,7 @@ public class CopiedCodeTests
     private const string MeshText = Report + "MeshProblemText.cs:MeshProblemText.";
     private const string KeepText = Report + "KeepReasonText.cs:KeepReasonText.";
     private const string PartText = Report + "RunPartText.cs:RunPartText.";
+    private const string LogAndReports = Report + "LogAndReports.cs:LogAndReports.";
 
     /// <summary>Each copy by the places it occurs in (see <see cref="CopyFamily.Key"/>), with the reason it is not shared.</summary>
     private static readonly Dictionary<string, string> Allowed = new()
@@ -56,6 +58,7 @@ public class CopiedCodeTests
         [CopyFamily.KeyOf([KeepText + "Relation", PartText + "LinkedStep"])] = EnumTextArms,
         [CopyFamily.KeyOf([MeshText + "FailureCategory", MeshText + "Line", MeshText + "ReadFailure"])] = EnumTextArms,
         [CopyFamily.KeyOf([PartText + "Wordings"])] = PartKeyLines,
+        [CopyFamily.KeyOf([LogAndReports + "BuildArchiveSections", LogAndReports + "BuildIndexSections", LogAndReports + "BuildStepSections"])] = SectionForwarders,
         [CopyFamily.KeyOf([
             Report + "Tables.LeftBehind.cs", Report + "Tables.LeftBehind.cs:Tables", Report + "Tables.LeftBehind.cs:Tables.LeftBehindHeader",
             Report + "Tables.LeftBehind.cs:Tables.MoveColumnCount", Report + "Tables.Support.cs", Report + "Tables.Support.cs:Tables",

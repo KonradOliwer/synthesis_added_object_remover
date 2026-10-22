@@ -42,7 +42,7 @@ public sealed class BatchOfOneRunTests
                 FixtureWorld.Create(dataFolder).LoadOrder, dataFolder, Path.Combine(outputFolder, FixturePatcherState.PatchModKey.FileName));
             var modeSettings = batch ? BatchSettingsWithConfig(settings, dataFolder) : settings;
 
-            var log = PipelineRun.CaptureConsole(() => Program.RunPatch(state, () => modeSettings, Workers));
+            var log = PipelineRun.CaptureConsole(() => Program.RunPatch(state, () => modeSettings, Workers, FixturePatcherState.WritePluginsFile(state)));
 
             return new RunOutput(MaskedLog(log, root.FullName), PatchDump.Describe(state.PatchMod), [], log);
         }

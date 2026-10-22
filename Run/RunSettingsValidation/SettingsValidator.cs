@@ -43,7 +43,7 @@ public static class SettingsValidator
     {
         var settings = config.Settings;
         var warnings = new List<SettingWarning>();
-        if (FindTarget(records, mods, settings.TargetPlugin, out var targetAsTyped, out var targetListing) is { } stop)
+        if (FindTarget(records, mods, settings.CleanedMod, out var targetAsTyped, out var targetListing) is { } stop)
         {
             return new RunRequest.Stop(stop, config.Source, [.. warnings]);
         }
@@ -78,8 +78,8 @@ public static class SettingsValidator
     }
 
     /// <summary>
-    /// Builds every config's request in order. A config file that sets no target, a target outside the load order or the patch plugin as target, or two
-    /// configs with the same target, fail the whole batch; a Standard request that stops stays a stop request.
+    /// Builds every config's request in order. A config file that sets no target, a target that is not in the plugin list, is disabled or loads after the patch, or is the patch
+    /// plugin, or two configs with the same target, fail the whole batch; a Standard request that stops stays a stop request.
     /// </summary>
     public static BatchRequest BuildAll(
         ConfigsRead read, IPluginRecords records, LoadOrderPlugins mods, bool detailedLogAndReports, string? reportsFolder, int workers) =>
@@ -89,6 +89,19 @@ public static class SettingsValidator
             ConfigsRead.Ready ready => BuildEach(ready.Configs, records, mods, detailedLogAndReports, reportsFolder, workers),
             _ => throw new UnreachableException(),
         };
+
+    /// <summary>The plugin list is read before any settings are checked, so its problem stops every run of the batch.</summary>
+    public static BatchRequest.Failed StopOnUnusablePluginList(PluginListProblem problem) =>
+        new(
+            (problem switch
+            {
+                PluginListProblem.PathUnknown => "Could not find the game's plugin list file (Plugins.txt in the game's folder under your local application data).",
+                PluginListProblem.FileMissing missing => $"The plugin list file {missing.Path} does not exist.",
+                PluginListProblem.MalformedLine malformed => $"The plugin list file {malformed.Path} has a malformed entry at line {malformed.Number}. Correct or remove that line.",
+                PluginListProblem.PluginNotListed unlisted => $"{unlisted.Plugin} is loaded by Synthesis but is not in the plugin list file {unlisted.Path}.",
+                _ => throw new UnreachableException(),
+            })
+            + ConfigsRead.NothingWasRun);
 
     private static BatchRequest BuildEach(
         ImmutableArray<ConfiguredSettings> configs, IPluginRecords records, LoadOrderPlugins mods, bool detailedLogAndReports, string? reportsFolder, int workers)
@@ -109,8 +122,12 @@ public static class SettingsValidator
         if (request is not RunRequest.Stop { Source: SettingsSource.ConfigFile file } stop) return null;
         return stop.Reason.Kind switch
         {
-            StopKind.NoTargetSet => $"Config file {file.FilePath} sets no mod to clean up (TargetPlugin).{ConfigsRead.NothingWasRun}",
-            StopKind.TargetNotInLoadOrder => $"Config file {file.FilePath}: the mod to clean up, {stop.Reason.Name}, is not in the load order.{ConfigsRead.NothingWasRun}",
+            StopKind.NoTargetSet => $"Config file {file.FilePath} sets no mod to clean up (CleanedMod).{ConfigsRead.NothingWasRun}",
+            StopKind.CleanedModNotInLoadOrder => $"Config file {file.FilePath}: the mod to clean up, {stop.Reason.Name}, is not in your plugin list.{ConfigsRead.NothingWasRun}",
+            StopKind.CleanedModDisabled => $"Config file {file.FilePath}: the mod to clean up, {stop.Reason.Name}, is disabled.{ConfigsRead.NothingWasRun}",
+            StopKind.CleanedModNotLoadedBySynthesis => $"Config file {file.FilePath}: the mod to clean up, {stop.Reason.Name}, is enabled in your plugin list but Synthesis did not load it for this group.{ConfigsRead.NothingWasRun}",
+            StopKind.CleanedModLoadsAfterPatch when stop.Reason.Placement is { } placement =>
+                $"Config file {file.FilePath}: the mod to clean up, {stop.Reason.Name}, loads after the patch {placement.Patch} (position {placement.CleanedModPosition} > {placement.PatchPosition}): move {placement.Patch} below it.{ConfigsRead.NothingWasRun}",
             StopKind.TargetIsThePatch => $"Config file {file.FilePath}: the mod to clean up, {stop.Reason.Name}, is the patch this patcher writes.{ConfigsRead.NothingWasRun}",
             _ => throw new UnreachableException(),
         };
@@ -269,11 +286,27 @@ public static class SettingsValidator
         targetListing = null!;
         if (targetPlugin == null) return new StopReason(StopKind.NoTargetSet, null);
         target = ParsePluginName(records, targetPlugin);
-        var listing = mods.Find(target);
-        if (listing == null) return new StopReason(StopKind.TargetNotInLoadOrder, target.ToString());
         if (target == mods.PatchMod) return new StopReason(StopKind.TargetIsThePatch, target.ToString());
+        if (FindUnusablePlacement(mods, target) is { } unusable) return unusable;
+        var listing = mods.Find(target);
+        if (listing == null) return new StopReason(StopKind.CleanedModNotLoadedBySynthesis, target.ToString());
         targetListing = listing;
         return null;
+    }
+
+    /// <summary>
+    /// Synthesis loads only the enabled plugins above the patch, so the plugin list alone tells why the cleaned mod is missing:
+    /// not listed, disabled, or below the patch. The positions are the plugin list's, counted from 0.
+    /// </summary>
+    private static StopReason? FindUnusablePlacement(LoadOrderPlugins mods, PluginName target)
+    {
+        var name = target.ToString();
+        if (!mods.Positions.Contains(target)) return new StopReason(StopKind.CleanedModNotInLoadOrder, name);
+        if (mods.DisabledPlugins.Contains(target)) return new StopReason(StopKind.CleanedModDisabled, name);
+        var position = mods.Positions.Of(target);
+        return position > mods.PatchPosition
+            ? new StopReason(StopKind.CleanedModLoadsAfterPatch, name, new PatchPlacement(mods.PatchMod.ToString(), position, mods.PatchPosition))
+            : null;
     }
 
     /// <summary>Plugin settings are load-order picker values, which the settings reader only creates from valid plugin file names.</summary>

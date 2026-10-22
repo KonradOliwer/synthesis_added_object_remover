@@ -83,7 +83,7 @@ public sealed class BatchLogSectionsTests
     public void AStandardRunHasNoConfigFileLines()
     {
         var request = SettingsValidator.Build(
-            StandardConfig.Of(new StandardSettings { TargetPlugin = Target }), new PluginNameParsingPlugin(), Facts(), detailedLogAndReports: false, ReportsFolder, 1);
+            StandardConfig.Of(new StandardSettings { CleanedMod = Target }), new PluginNameParsingPlugin(), Facts(), detailedLogAndReports: false, ReportsFolder, 1);
 
         Assert.Equal(["warnings"], LogAndReports.BuildStartSections(request).Select(section => section.Id));
     }
@@ -115,7 +115,7 @@ public sealed class BatchLogSectionsTests
     private static ImmutableArray<LogSection> StartSections(ConfigFileNotes notes, bool detailedLog)
     {
         var source = new SettingsSource.ConfigFile("town_walls", FileName, Path.Combine("configs", FileName), Number: 2, Count: 3, notes);
-        var settings = new StandardSettings { TargetPlugin = Target };
+        var settings = new StandardSettings { CleanedMod = Target };
         var request = SettingsValidator.Build(new ConfiguredSettings(source, settings), new PluginNameParsingPlugin(), Facts(), detailedLog, ReportsFolder, 1);
         return LogAndReports.BuildStartSections(request);
     }
@@ -127,6 +127,6 @@ public sealed class BatchLogSectionsTests
         var table = new KnownPluginNames(new[] { Skyrim, Target, Patch }.Select(key => key.ToPluginName()));
         PluginListing Listing(ModKey key, params ModKey[] masters) =>
             new(key.ToPluginName(), Loaded: true, [.. masters.Select(master => master.ToPluginName())]);
-        return new LoadOrderPlugins(table, Patch.ToPluginName(), [Listing(Skyrim), Listing(Target, Skyrim), Listing(Patch, Skyrim)]);
+        return TestLoadOrderPlugins.Of(table, Patch.ToPluginName(), [Listing(Skyrim), Listing(Target, Skyrim), Listing(Patch, Skyrim)]);
     }
 }

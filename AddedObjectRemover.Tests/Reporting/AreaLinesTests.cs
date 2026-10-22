@@ -88,7 +88,7 @@ public sealed class AreaLinesTests
                 "  Skyrim › Whiterun hold › near Halted Stream Camp 1/1",
                 "Kept 1/9 (kept/all mod objects), QUST record:",
                 "  Skyrim › The Pale hold › Loreius Farm 1/3",
-                "Possible manual patch needed for 1/9 (needing a patch/all mod objects):",
+                "Removed markers and kept objects: 1 of 9:",
                 "  Skyrim › The Pale hold › Loreius Farm 1/3",
                 "Removed 1/9 (large-reference list objects/all mod objects):",
                 "  Skyrim › unnamed area › cell 5,7 1/1",

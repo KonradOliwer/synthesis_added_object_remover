@@ -23,7 +23,7 @@ public interface IModeSettingsValues
 /// </summary>
 public interface ISettingsValues
 {
-    string? TargetPlugin { get; }
+    string? CleanedMod { get; }
     IIgnoreSettingsValues WhatToIgnore { get; }
     ITooCloseSettingsValues TooClose { get; }
     ITerrainChangeSettingsValues TerrainChange { get; }

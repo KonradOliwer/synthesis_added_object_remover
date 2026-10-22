@@ -37,7 +37,7 @@ internal static partial class LogSections
             lines.Add($"Leftover invisible objects diagnostics: wrote {TextFormat.Count(leftovers.Rows)} evaluations to {leftovers.Path}.");
         }
         AddRowsLine(lines, tables, ReportFileNames.RemovalsFileName, "Removals");
-        AddRowsLine(lines, tables, ReportFileNames.HintsFileName, "Manual patch hints");
+        AddRowsLine(lines, tables, ReportFileNames.HintsFileName, "Removed markers and kept objects");
         return new LogSection("written", [.. lines]);
     }
 

@@ -24,23 +24,51 @@ public sealed class KnownPluginNames
 /// <param name="Masters">Empty when the plugin could not be read.</param>
 public sealed record PluginListing(PluginName Mod, bool Loaded, ImmutableArray<PluginName> Masters);
 
+/// <summary>An entry of the game's plugin list, enabled or not.</summary>
+public sealed record PluginListEntry(PluginName Plugin, bool Enabled);
+
 /// <summary>The load order as read once, before the settings are checked.</summary>
 /// <param name="Listed">The listed plugins, lowest priority first, the patch plugin included.</param>
-public sealed record LoadOrderPlugins(KnownPluginNames Mods, PluginName PatchMod, ImmutableArray<PluginListing> Listed)
+/// <param name="PluginsFilePath">The file the game's plugin list was read from.</param>
+/// <param name="Positions">
+/// The position of every entry of the game's plugin list, enabled or not. These are plain list positions: the game's
+/// master-first reordering is not modelled.
+/// </param>
+/// <param name="DisabledPlugins">The entries of the game's plugin list that are not enabled.</param>
+public sealed record LoadOrderPlugins(
+    KnownPluginNames Mods,
+    PluginName PatchMod,
+    ImmutableArray<PluginListing> Listed,
+    string PluginsFilePath,
+    LoadOrderPositions Positions,
+    ImmutableHashSet<PluginName> DisabledPlugins)
 {
+    /// <summary>The position of the patch's entry in the game's plugin list; the end of the list when the patch has no entry.</summary>
+    public int PatchPosition => Positions.Contains(PatchMod) ? Positions.Of(PatchMod) : Positions.Count;
+
     public PluginListing? Find(PluginName mod) => Listed.FirstOrDefault(listing => listing.Mod == mod);
 }
 
-/// <summary>The load-order position of each listed plugin, found without walking the load order.</summary>
+/// <summary>The position of each plugin in a list, found without walking the load order.</summary>
 public sealed class LoadOrderPositions
 {
     private readonly Dictionary<PluginName, int> _positions = [];
 
     /// <param name="listed">The listed plugins, lowest priority first.</param>
-    public LoadOrderPositions(ImmutableArray<PluginListing> listed)
+    public LoadOrderPositions(ImmutableArray<PluginListing> listed) : this(listed.Select(listing => listing.Mod))
     {
-        for (var position = 0; position < listed.Length; position++) _positions[listed[position].Mod] = position;
     }
+
+    /// <param name="inOrder">The plugins, lowest priority first.</param>
+    public LoadOrderPositions(IEnumerable<PluginName> inOrder)
+    {
+        foreach (var plugin in inOrder) _positions[plugin] = Count++;
+    }
+
+    /// <summary>The number of entries, which is the position after the last one.</summary>
+    public int Count { get; }
+
+    public bool Contains(PluginName plugin) => _positions.ContainsKey(plugin);
 
     /// <returns>A higher position for a plugin loading later; the last position of a plugin listed twice.</returns>
     public int Of(PluginName plugin) => _positions[plugin];

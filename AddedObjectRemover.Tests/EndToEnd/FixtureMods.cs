@@ -22,7 +22,7 @@ internal sealed class FixtureMods
     private FixtureMods()
     {
         BaseGame = new FixtureMod(BaseGamePlugin);
-        Target = new FixtureMod(FixtureWorld.TargetPlugin, BaseGame);
+        Target = new FixtureMod(FixtureWorld.TargetName, BaseGame);
         OtherMod = new FixtureMod(OtherModPlugin, BaseGame, Target);
         Patched = new FixtureMod(PatchedPlugin, BaseGame);
         TargetPatch = new FixtureMod(TargetPatchPlugin, BaseGame, Target, Patched);

@@ -10,6 +10,7 @@ using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Skyrim;
 using Mutagen.Bethesda.Synthesis;
 using Mutagen.Bethesda.Synthesis.Settings;
+using Noggog;
 
 namespace AddedObjectRemover;
 
@@ -34,7 +35,7 @@ public static class Program
                     SettingsFileName,
                     out Lazy<Settings> lazySettings)
                 .AddPatch<ISkyrimMod, ISkyrimModGetter>(
-                    state => RunPatch(state, () => LoadSettings(lazySettings), Environment.ProcessorCount))
+                    state => RunPatch(state, () => LoadSettings(lazySettings), Environment.ProcessorCount, pluginsFile: null))
                 .SetTypicalOpen(GameRelease.SkyrimSE, "AddedObjectRemover.esp")
                 .Run(args);
         }
@@ -46,14 +47,22 @@ public static class Program
     }
 
     /// <param name="loadSettings">Called after the banner, so a settings failure message follows it.</param>
-    internal static void RunPatch(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, Func<IModeSettingsValues> loadSettings, int workers)
+    /// <param name="pluginsFile">The game's plugins file; null reads the library's default location for the game.</param>
+    internal static void RunPatch(
+        IPatcherState<ISkyrimMod, ISkyrimModGetter> state, Func<IModeSettingsValues> loadSettings, int workers, FilePath? pluginsFile)
     {
         var totalTimer = Stopwatch.StartNew();
         Console.WriteLine("=== Added Object Remover ===");
 
         var settings = loadSettings();
         var configs = ReadConfigs(settings, state.DataFolderPath.Path);
-        var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey);
+        var pluginList = EnabledPluginListReader.Read(
+            state.GameRelease,
+            state.DataFolderPath,
+            pluginsFile,
+            state.LoadOrder.ListedOrder.Select(listing => listing.ModKey),
+            state.PatchMod.ModKey);
+        var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey, TakeListOrFail(pluginList));
         var pluginRecords = new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods, workers);
         var batch = SettingsValidator.BuildAll(
             configs, pluginRecords.Open(), plugins, settings.DetailedLogAndReports, settings.DetailedLogAndReports ? ReportsFolder(state) : null, workers);
@@ -83,18 +92,24 @@ public static class Program
     internal static ConfigsRead ReadConfigs(IModeSettingsValues settings, string dataFolder) =>
         ConfigFiles.Read(settings, dataFolder, ConfigSchema, json => json.AddMutagenConverters());
 
-    private static ImmutableArray<RunRequest> TakeRequestsOrFail(BatchRequest batch)
+    private static ImmutableArray<RunRequest> TakeRequestsOrFail(BatchRequest batch) => batch switch
     {
-        switch (batch)
-        {
-            case BatchRequest.Ready ready:
-                return ready.Requests;
-            case BatchRequest.Failed failed:
-                Console.Error.WriteLine(failed.Message);
-                throw new BatchStoppedException(failed.Message);
-            default:
-                throw new UnreachableException();
-        }
+        BatchRequest.Ready ready => ready.Requests,
+        BatchRequest.Failed failed => throw StopRun(failed),
+        _ => throw new UnreachableException(),
+    };
+
+    private static PluginListRead.Found TakeListOrFail(PluginListRead pluginList) => pluginList switch
+    {
+        PluginListRead.Found found => found,
+        PluginListRead.Failed unusable => throw StopRun(SettingsValidator.StopOnUnusablePluginList(unusable.Problem)),
+        _ => throw new UnreachableException(),
+    };
+
+    private static BatchStoppedException StopRun(BatchRequest.Failed failed)
+    {
+        Console.Error.WriteLine(failed.Message);
+        return new BatchStoppedException(failed.Message);
     }
 
     private static SettingsSchema SchemaOf(Type root) =>

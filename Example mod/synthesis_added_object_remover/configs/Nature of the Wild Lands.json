@@ -1,5 +1,5 @@
 {
-  "TargetPlugin": "Nature of the Wild Lands.esp",
+  "CleanedMod": "Nature of the Wild Lands.esp",
   "WhatToIgnore": {
     "ExcludedPlugins": [],
     "IgnoreTargetMasters": true,

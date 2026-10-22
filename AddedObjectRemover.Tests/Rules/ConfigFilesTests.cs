@@ -79,7 +79,7 @@ public sealed class ConfigFilesTests : IDisposable
     [Fact]
     public void StandardModeGivesTheStandardGroupAsTheOnlyConfigAndReadsNoFile()
     {
-        var standard = new StandardSettings { TargetPlugin = ModKey.FromNameAndExtension("Target.esp") };
+        var standard = new StandardSettings { CleanedMod = ModKey.FromNameAndExtension("Target.esp") };
 
         var read = Program.ReadConfigs(new Settings { Standard = standard, Batch = new BatchSettings { GroupFileName = "ignored" } }, _dataFolder);
 
@@ -198,7 +198,7 @@ public sealed class ConfigFilesTests : IDisposable
     public void AConfigFileThatIsNotJsonFailsNamingTheFileAndTheProblem()
     {
         WriteGroup("group", $"[\"{TownWalls}\"]");
-        WriteConfig(TownWalls, "{\"TargetPlugin\": ");
+        WriteConfig(TownWalls, "{\"CleanedMod\": ");
 
         var message = ReadFailure("group");
 
@@ -213,7 +213,7 @@ public sealed class ConfigFilesTests : IDisposable
         WriteConfig(TownWalls, "[1]");
 
         Assert.Equal(
-            $"Config file {ConfigPath(TownWalls)} must hold an object of settings, like {{\"TargetPlugin\": \"SomeMod.esp\"}}." + NothingWasRun,
+            $"Config file {ConfigPath(TownWalls)} must hold an object of settings, like {{\"CleanedMod\": \"SomeMod.esp\"}}." + NothingWasRun,
             ReadFailure("group"));
     }
 
@@ -250,7 +250,7 @@ public sealed class ConfigFilesTests : IDisposable
     public void AMisspelledPluginNameFailsNamingTheConfigFile()
     {
         WriteGroup("group", $"[\"{TownWalls}\"]");
-        WriteConfig(TownWalls, "{\"TargetPlugin\": \"Foo\"}");
+        WriteConfig(TownWalls, "{\"CleanedMod\": \"Foo\"}");
 
         var message = ReadFailure("group");
 
@@ -263,7 +263,7 @@ public sealed class ConfigFilesTests : IDisposable
     public void TheFirstProblemInGroupOrderIsTheOneReported()
     {
         WriteGroup("group", "[\"first\", \"second\", \"third\"]");
-        WriteConfig("first", "{\"TargetPlugin\": \"A.esp\"}");
+        WriteConfig("first", "{\"CleanedMod\": \"A.esp\"}");
 
         Assert.Equal($"Config file not found: {ConfigPath("second")} (listed in {GroupPath("group")})." + MissingConfigAdvice + NothingWasRun, ReadFailure("group"));
     }
@@ -275,12 +275,12 @@ public sealed class ConfigFilesTests : IDisposable
     public void TheGroupFileNameWorksWithOrWithoutTheExtension(string groupName)
     {
         WriteGroup("group", "[\"first\", \"second.json\"]");
-        WriteConfig("first", "{\"TargetPlugin\": \"A.esp\"}");
-        WriteConfig("second", "{\"TargetPlugin\": \"B.esp\"}");
+        WriteConfig("first", "{\"CleanedMod\": \"A.esp\"}");
+        WriteConfig("second", "{\"CleanedMod\": \"B.esp\"}");
 
         var configs = Assert.IsType<ConfigsRead.Ready>(ReadBatch(groupName)).Configs;
 
-        Assert.Equal(["A.esp", "B.esp"], configs.Select(config => config.Settings.TargetPlugin));
+        Assert.Equal(["A.esp", "B.esp"], configs.Select(config => config.Settings.CleanedMod));
         var second = Assert.IsType<SettingsSource.ConfigFile>(configs[1].Source);
         Assert.Equal(("second", "second.json", ConfigPath("second"), 2, 2), (second.Name, second.FileName, second.FilePath, second.Number, second.Count));
     }
@@ -292,7 +292,7 @@ public sealed class ConfigFilesTests : IDisposable
         standard.TooClose.BySize.SizeMultiplier = 3f;
 
         WriteGroup("group", $"[\"{TownWalls}\"]");
-        WriteConfig(TownWalls, "{\"TargetPlugin\": \"A.esp\"}");
+        WriteConfig(TownWalls, "{\"CleanedMod\": \"A.esp\"}");
         var config = Assert.Single(Assert.IsType<ConfigsRead.Ready>(ReadBatch("group", standard)).Configs);
 
         Assert.Equal(SettingDefaults.SizeMultiplier, config.Settings.TooClose.SizeMultiplier);
@@ -303,7 +303,7 @@ public sealed class ConfigFilesTests : IDisposable
     {
         const string Text = """
             {
-              "TargetPlugin": "A.esp",
+              "CleanedMod": "A.esp",
               "WhatToIgnore": { "ExcludedPlugins": ["B.esp", "C.esp"], "CompatibilityPatches": null },
               "TooClose": { "NpcHandling": "Never", "ByDistance": { "Use": true, "DistanceInUnits": 40 } },
               "LeftoverInvisibleObjects": { "AlwaysKeep": { "Lights": true } }
@@ -318,15 +318,15 @@ public sealed class ConfigFilesTests : IDisposable
     [Fact]
     public void CommentsAndTrailingCommasAreAccepted()
     {
-        var config = ReadOnlyConfig("// the town\n{\n  \"TargetPlugin\": \"A.esp\", /* the mod */\n}");
+        var config = ReadOnlyConfig("// the town\n{\n  \"CleanedMod\": \"A.esp\", /* the mod */\n}");
 
-        Assert.Equal("A.esp", config.Settings.TargetPlugin);
+        Assert.Equal("A.esp", config.Settings.CleanedMod);
     }
 
     [Fact]
     public void UnknownKeysAtTheTopAndInsideAGroupAreNotedAndNotAFailure()
     {
-        var config = ReadOnlyConfig("{\"TargetPlugin\": \"A.esp\", \"Colour\": 1, \"TooClose\": {\"UseRoughBox\": true, \"BySize\": {\"Weight\": 2}}}");
+        var config = ReadOnlyConfig("{\"CleanedMod\": \"A.esp\", \"Colour\": 1, \"TooClose\": {\"UseRoughBox\": true, \"BySize\": {\"Weight\": 2}}}");
 
         Assert.Equal(["Colour", "TooClose.UseRoughBox", "TooClose.BySize.Weight"], NotesOf(config).UnknownKeys.ToArray());
     }
@@ -334,7 +334,7 @@ public sealed class ConfigFilesTests : IDisposable
     [Fact]
     public void TheRemovedLogAndReportSettingsAreNotedAsUnknownKeys()
     {
-        var config = ReadOnlyConfig("{\"TargetPlugin\": \"A.esp\", \"Diagnostics\": {\"DetailedLog\": true, \"WriteReportFiles\": true, \"DiagnosticsFolder\": \"x\"}}");
+        var config = ReadOnlyConfig("{\"CleanedMod\": \"A.esp\", \"Diagnostics\": {\"DetailedLog\": true, \"WriteReportFiles\": true, \"DiagnosticsFolder\": \"x\"}}");
 
         Assert.Equal(["Diagnostics"], NotesOf(config).UnknownKeys.ToArray());
     }
@@ -342,7 +342,7 @@ public sealed class ConfigFilesTests : IDisposable
     [Fact]
     public void ALeftOutOrNullGroupIsNotedAsItsSettingsWithTheirDefaultsAndAGroupInTheFileNotesOnlyItsMissingSettings()
     {
-        var config = ReadOnlyConfig("{\"TargetPlugin\": \"A.esp\", \"TerrainChange\": null, \"TooClose\": {\"BySize\": {\"SizeMultiplier\": 1.0}}}");
+        var config = ReadOnlyConfig("{\"CleanedMod\": \"A.esp\", \"TerrainChange\": null, \"TooClose\": {\"BySize\": {\"SizeMultiplier\": 1.0}}}");
 
         var notInFile = NotesOf(config).NotInFile;
 
@@ -358,7 +358,7 @@ public sealed class ConfigFilesTests : IDisposable
             new SettingInFile("TooClose.BySize.Use", "Remove objects too close to other mods' objects > Margin by object size > Use this margin", "true"),
             notInFile);
         Assert.DoesNotContain(notInFile, setting => setting.KeyPath is "TerrainChange" or "LeftoverInvisibleObjects" or "TooClose.BySize");
-        Assert.DoesNotContain(notInFile, setting => setting.KeyPath is "TargetPlugin" or "TooClose.BySize.SizeMultiplier");
+        Assert.DoesNotContain(notInFile, setting => setting.KeyPath is "CleanedMod" or "TooClose.BySize.SizeMultiplier");
     }
 
     [Fact]
@@ -368,20 +368,20 @@ public sealed class ConfigFilesTests : IDisposable
 
         var notInFile = NotesOf(config).NotInFile;
 
-        Assert.Contains(new SettingInFile("TargetPlugin", "Mod to clean up", "null"), notInFile);
-        Assert.Equal(["TargetPlugin", "WhatToIgnore.ExcludedPlugins", "WhatToIgnore.IgnoreTargetMasters"], notInFile.Take(3).Select(setting => setting.KeyPath));
+        Assert.Contains(new SettingInFile("CleanedMod", "Mod to clean up", "null"), notInFile);
+        Assert.Equal(["CleanedMod", "WhatToIgnore.ExcludedPlugins", "WhatToIgnore.IgnoreTargetMasters"], notInFile.Take(3).Select(setting => setting.KeyPath));
     }
 
     [Fact]
     public void KeysMatchIgnoringCaseSoTheyAreNeitherUnknownNorMissing()
     {
-        var config = ReadOnlyConfig("{\"targetplugin\": \"A.esp\", \"tooclose\": {\"useroughboxes\": true}}");
+        var config = ReadOnlyConfig("{\"cleanedmod\": \"A.esp\", \"tooclose\": {\"useroughboxes\": true}}");
 
         var notes = NotesOf(config);
 
         Assert.Empty(notes.UnknownKeys);
-        Assert.DoesNotContain(notes.NotInFile, setting => setting.KeyPath is "TargetPlugin" or "TooClose" or "TooClose.UseRoughBoxes");
-        Assert.Contains(new SettingInFile("TargetPlugin", "Mod to clean up", "\"A.esp\""), notes.ChangedFromDefault);
+        Assert.DoesNotContain(notes.NotInFile, setting => setting.KeyPath is "CleanedMod" or "TooClose" or "TooClose.UseRoughBoxes");
+        Assert.Contains(new SettingInFile("CleanedMod", "Mod to clean up", "\"A.esp\""), notes.ChangedFromDefault);
         Assert.Contains(notes.ChangedFromDefault, setting => setting.KeyPath == "TooClose.UseRoughBoxes" && setting.ValueAsJson == "true");
     }
 
@@ -391,7 +391,7 @@ public sealed class ConfigFilesTests : IDisposable
         var config = ReadOnlyConfig(
             """
             {
-              "TargetPlugin": "A.esp",
+              "CleanedMod": "A.esp",
               "TooClose": {
                 "NpcHandling": "Never",
                 "UseRoughBoxes": false,
@@ -407,7 +407,7 @@ public sealed class ConfigFilesTests : IDisposable
         var changed = NotesOf(config).ChangedFromDefault;
 
         Assert.Equal(
-            ["TargetPlugin", "WhatToIgnore.ExcludedPlugins", "TooClose.BySize.SizeMultiplier", "TooClose.NpcHandling", "LeftoverInvisibleObjects.RemoveLeftoverInvisibleObjects"],
+            ["CleanedMod", "WhatToIgnore.ExcludedPlugins", "TooClose.BySize.SizeMultiplier", "TooClose.NpcHandling", "LeftoverInvisibleObjects.RemoveLeftoverInvisibleObjects"],
             changed.Select(setting => setting.KeyPath));
         Assert.Equal(["\"A.esp\"", "[\"B.esp\"]", "1.0", "\"Never\"", "false"], changed.Select(setting => setting.ValueAsJson));
         Assert.Contains(
@@ -421,7 +421,7 @@ public sealed class ConfigFilesTests : IDisposable
         var config = ReadOnlyConfig(
             """
             {
-              "TargetPlugin": "A.esp",
+              "CleanedMod": "A.esp",
               "TerrainChange": { "CountWaterHeightChanges": false, "WaterHeightChangeTolerance": 40, "CountWaterAddedOrRemoved": false, "MinWaterCoverChangePercent": 60 }
             }
             """);
@@ -435,7 +435,7 @@ public sealed class ConfigFilesTests : IDisposable
     [Fact]
     public void ANullListIsTheDefaultOfAListSetting()
     {
-        var config = ReadOnlyConfig("{\"TargetPlugin\": \"A.esp\", \"WhatToIgnore\": {\"ExcludedPlugins\": null}}");
+        var config = ReadOnlyConfig("{\"CleanedMod\": \"A.esp\", \"WhatToIgnore\": {\"ExcludedPlugins\": null}}");
 
         Assert.DoesNotContain(NotesOf(config).ChangedFromDefault, setting => setting.KeyPath == "WhatToIgnore.ExcludedPlugins");
     }
@@ -492,7 +492,7 @@ public sealed class ConfigFilesTests : IDisposable
     }
 
     /// <summary>The Synthesis settings screen saves a plugin picker left unset as "".</summary>
-    private const string UnsetPlugins = "\"TargetPlugin\": \"\", \"WhatToIgnore\": { \"ExcludedPlugins\": [\"\"] }";
+    private const string UnsetPlugins = "\"CleanedMod\": \"\", \"WhatToIgnore\": { \"ExcludedPlugins\": [\"\"] }";
 
     private T ReadLikeSynthesis<T>(string fileName, string json) where T : class, new()
     {
@@ -504,7 +504,7 @@ public sealed class ConfigFilesTests : IDisposable
     {
         var target = new PluginName("A.esp");
         var patch = new PluginName("Patch.esp");
-        var facts = new LoadOrderPlugins(new KnownPluginNames([target, patch]), patch, [new PluginListing(target, true, []), new PluginListing(patch, true, [])]);
+        var facts = TestLoadOrderPlugins.Of(new KnownPluginNames([target, patch]), patch, [new PluginListing(target, true, []), new PluginListing(patch, true, [])]);
         return SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), facts, detailedLogAndReports: false, "/out", 1);
     }
 
@@ -513,9 +513,9 @@ public sealed class ConfigFilesTests : IDisposable
     {
         var settings = ReadLikeSynthesis<Settings>(Program.SettingsFileName, $"{{ \"Mode\": \"Standard\", \"Standard\": {{ {UnsetPlugins} }} }}");
 
-        Assert.True(settings.Standard.TargetPlugin.IsNull);
+        Assert.True(settings.Standard.CleanedMod.IsNull);
         Assert.True(Assert.Single(settings.Standard.WhatToIgnore.ExcludedPlugins).IsNull);
-        Assert.Null(((ISettingsValues)settings.Standard).TargetPlugin);
+        Assert.Null(((ISettingsValues)settings.Standard).CleanedMod);
         Assert.Empty(((ISettingsValues)settings.Standard).WhatToIgnore.ExcludedPlugins);
     }
 
@@ -533,13 +533,13 @@ public sealed class ConfigFilesTests : IDisposable
     public void BatchModeIgnoresAnUnsetPluginPickerInTheStandardGroupOfSettingsJson()
     {
         WriteGroup("group", $"[\"{TownWalls}\"]");
-        WriteConfig(TownWalls, "{\"TargetPlugin\": \"A.esp\"}");
+        WriteConfig(TownWalls, "{\"CleanedMod\": \"A.esp\"}");
         var settings = ReadLikeSynthesis<Settings>(
             Program.SettingsFileName, $"{{ \"Mode\": \"Batch\", \"Batch\": {{ \"GroupFileName\": \"group\" }}, \"Standard\": {{ {UnsetPlugins} }} }}");
 
         var read = Program.ReadConfigs(settings, _dataFolder);
 
-        Assert.Equal("A.esp", Assert.Single(Assert.IsType<ConfigsRead.Ready>(read).Configs).Settings.TargetPlugin);
+        Assert.Equal("A.esp", Assert.Single(Assert.IsType<ConfigsRead.Ready>(read).Configs).Settings.CleanedMod);
         Assert.IsType<RunRequest.Ready>(Assert.Single(Assert.IsType<BatchRequest.Ready>(BuildAll(read)).Requests));
     }
 
@@ -551,16 +551,16 @@ public sealed class ConfigFilesTests : IDisposable
 
         Assert.Equal(JsonConvert.SerializeObject(synthesis.Value.Value, SynthesisJson), JsonConvert.SerializeObject(config.Settings, SynthesisJson));
         Assert.Empty(config.Settings.WhatToIgnore.ExcludedPlugins);
-        Assert.DoesNotContain(NotesOf(config).ChangedFromDefault, setting => setting.KeyPath == "TargetPlugin");
+        Assert.DoesNotContain(NotesOf(config).ChangedFromDefault, setting => setting.KeyPath == "CleanedMod");
         Assert.Equal(
-            $"Config file {ConfigPath(TownWalls)} sets no mod to clean up (TargetPlugin). Nothing was run and no patch was written.",
+            $"Config file {ConfigPath(TownWalls)} sets no mod to clean up (CleanedMod). Nothing was run and no patch was written.",
             Assert.IsType<BatchRequest.Failed>(BuildAll(new ConfigsRead.Ready([config]))).Message);
     }
 
     [Fact]
     public void AnEmptyListIsTheDefaultOfAListSetting()
     {
-        var config = ReadOnlyConfig("{\"TargetPlugin\": \"A.esp\", \"WhatToIgnore\": {\"ExcludedPlugins\": []}}");
+        var config = ReadOnlyConfig("{\"CleanedMod\": \"A.esp\", \"WhatToIgnore\": {\"ExcludedPlugins\": []}}");
 
         Assert.DoesNotContain(NotesOf(config).ChangedFromDefault, setting => setting.KeyPath == "WhatToIgnore.ExcludedPlugins");
     }

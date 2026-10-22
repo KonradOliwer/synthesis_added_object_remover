@@ -22,9 +22,9 @@ internal sealed class TerrainPlugins(IdentifiedMods mods, LoadOrderPlugins loadO
 
     /// <summary>
     /// Plugins that never count as clashing (the patch plugin among them, which holds earlier patchers' output) and plugins
-    /// that require the target (its patches and add-ons) never count as changing the terrain.
+    /// that require the target (its patches and other mods made for it) never count as changing the terrain.
     /// </summary>
-    public bool CountsAsChanging(PluginName plugin) => !mods.IgnoredOrigins.Contains(plugin) && !mods.Dependants.Contains(plugin);
+    public bool CountsAsChanging(PluginName plugin) => !mods.IgnoredOrigins.Contains(plugin) && !mods.RequiringMods.Contains(plugin);
 
     /// <summary>The plugin's position in the load order: a plugin loading later has a higher position.</summary>
     public int PositionOf(PluginName plugin) => _positions.Of(plugin);

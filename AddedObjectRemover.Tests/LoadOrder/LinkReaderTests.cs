@@ -10,7 +10,7 @@ public class LinkReaderTests
     private static readonly ModKey OtherMod = ModKey.FromNameAndExtension("Other.esp");
 
     [Fact]
-    public void PlacedLinkIntoTheTargetPluginIsReadWithItsRelation()
+    public void PlacedLinkIntoTheTargetIsReadWithItsRelation()
     {
         var source = WithEnableParent(TestTargets.FormKeyOf(0), TestTargets.FormKeyOf(1));
 
@@ -54,7 +54,7 @@ public class LinkReaderTests
         var facts = new List<LinkFact>();
 
         LinkReader.ReadFromNonPlaced(
-            [mod], new HashSet<RecordKey> { TestTargets.Key(2), TestTargets.Key(3) }, TestTargets.TargetPlugin, CreateNames(), facts);
+            [mod], new HashSet<RecordKey> { TestTargets.Key(2), TestTargets.Key(3) }, TestTargets.TargetName, CreateNames(), facts);
 
         var fact = Assert.Single(facts);
         Assert.Equal(TestTargets.Key(2), fact.Target);
@@ -74,7 +74,7 @@ public class LinkReaderTests
         mod.Locations.Add(location);
         var facts = new List<LinkFact>();
 
-        LinkReader.ReadFromNonPlaced([mod], new HashSet<RecordKey> { TestTargets.Key(1) }, TestTargets.TargetPlugin, CreateNames(), facts);
+        LinkReader.ReadFromNonPlaced([mod], new HashSet<RecordKey> { TestTargets.Key(1) }, TestTargets.TargetName, CreateNames(), facts);
 
         Assert.Equal(RelationKind.LocationRefType, Assert.Single(facts).Relation);
     }
@@ -90,7 +90,7 @@ public class LinkReaderTests
         var facts = new List<LinkFact>();
 
         LinkReader.ReadFromNonPlaced(
-            [mod], new HashSet<RecordKey> { TestTargets.Key(1), TestTargets.Key(2) }, TestTargets.TargetPlugin, CreateNames(), facts);
+            [mod], new HashSet<RecordKey> { TestTargets.Key(1), TestTargets.Key(2) }, TestTargets.TargetName, CreateNames(), facts);
 
         Assert.Equal([TestTargets.Key(1), TestTargets.Key(2)], facts.Select(fact => fact.Target).ToArray());
         Assert.All(facts, fact => Assert.Equal(RelationKind.Other, fact.Relation));
@@ -117,7 +117,7 @@ public class LinkReaderTests
         mod.Locations.Add(location);
         var facts = new List<LinkFact>();
 
-        LinkReader.ReadFromNonPlaced([mod], new HashSet<RecordKey> { TestTargets.Key(1) }, TestTargets.TargetPlugin, CreateNames(), facts);
+        LinkReader.ReadFromNonPlaced([mod], new HashSet<RecordKey> { TestTargets.Key(1) }, TestTargets.TargetName, CreateNames(), facts);
 
         Assert.Empty(facts);
     }
@@ -133,7 +133,7 @@ public class LinkReaderTests
         mod.Locations.Add(location);
         var facts = new List<LinkFact>();
 
-        LinkReader.ReadFromNonPlaced([mod], new HashSet<RecordKey> { TestTargets.Key(1) }, TestTargets.TargetPlugin, CreateNames(), facts);
+        LinkReader.ReadFromNonPlaced([mod], new HashSet<RecordKey> { TestTargets.Key(1) }, TestTargets.TargetName, CreateNames(), facts);
 
         Assert.Equal(RelationKind.LocationRefType, Assert.Single(facts).Relation);
     }
@@ -149,7 +149,7 @@ public class LinkReaderTests
         mod.Quests.Add(quest);
         var facts = new List<LinkFact>();
 
-        LinkReader.ReadFromNonPlaced([mod], new HashSet<RecordKey>(), TestTargets.TargetPlugin, CreateNames(), facts);
+        LinkReader.ReadFromNonPlaced([mod], new HashSet<RecordKey>(), TestTargets.TargetName, CreateNames(), facts);
 
         var fact = Assert.Single(facts);
         Assert.Equal(RelationKind.UniqueActor, fact.Relation);
@@ -170,7 +170,7 @@ public class LinkReaderTests
         mod.Quests.Add(quest);
         var facts = new List<LinkFact>();
 
-        LinkReader.ReadFromNonPlaced([mod], new HashSet<RecordKey>(), TestTargets.TargetPlugin, CreateNames(), facts);
+        LinkReader.ReadFromNonPlaced([mod], new HashSet<RecordKey>(), TestTargets.TargetName, CreateNames(), facts);
 
         Assert.Equal(expected, Assert.Single(facts).AliasFlags);
     }
@@ -185,19 +185,19 @@ public class LinkReaderTests
         var facts = new List<LinkFact>();
 
         LinkReader.ReadFromNonPlaced(
-            [mod], new HashSet<RecordKey> { TestTargets.Key(1) }, TestTargets.TargetPlugin, CreateNames(), facts);
+            [mod], new HashSet<RecordKey> { TestTargets.Key(1) }, TestTargets.TargetName, CreateNames(), facts);
 
         Assert.True(Assert.Single(facts).SourceIsWorldspace);
         var outcome = LinkRule.DecideLinkOutcome(TestTargets.CreateMany(4), facts);
         Assert.All(outcome.References, Assert.Null);
     }
 
-    private static PluginNames CreateNames() => new(new KnownPluginNames([TestTargets.TargetPlugin, OtherMod.ToPluginName()]));
+    private static PluginNames CreateNames() => new(new KnownPluginNames([TestTargets.TargetName, OtherMod.ToPluginName()]));
 
     private static List<LinkFact> ReadFromPlaced(IPlacedGetter record)
     {
         var facts = new List<LinkFact>();
-        LinkReader.ReadFromPlaced(record, record.FormKey.ToRecordKey(), TestTargets.TargetPlugin, CreateNames(), facts);
+        LinkReader.ReadFromPlaced(record, record.FormKey.ToRecordKey(), TestTargets.TargetName, CreateNames(), facts);
         return facts;
     }
 

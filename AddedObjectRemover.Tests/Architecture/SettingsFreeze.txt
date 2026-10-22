@@ -14,6 +14,7 @@ PatchMode
 PatchMode.Batch
 PatchMode.Standard
 Standard
+Standard.CleanedMod
 Standard.FollowUpRemoval
 Standard.FollowUpRemoval.AnchoringThresholdPercent
 Standard.FollowUpRemoval.Mode
@@ -39,7 +40,6 @@ Standard.LeftoverInvisibleObjects.SurroundingObjects.DirectionThresholdPercent
 Standard.LeftoverInvisibleObjects.SurroundingObjects.OccupiedDirectionsPercent
 Standard.LeftoverInvisibleObjects.SurroundingObjects.RemovedDirectionsPercent
 Standard.LeftoverInvisibleObjects.SurroundingObjects.SearchRadius
-Standard.TargetPlugin
 Standard.TerrainChange
 Standard.TerrainChange.ByDistance
 Standard.TerrainChange.ByDistance.DistanceInUnits

@@ -54,14 +54,15 @@ public class StandardSettings : ISettingsValues
     [SynthesisOrder]
     [SynthesisSettingName("Mod to clean up")]
     [SynthesisTooltip(
-        "The plugin whose added objects are checked. Its objects that clash with other mods are removed in this patch.\n"
+        "The cleaned mod: the plugin whose added objects are checked; those that clash with other mods are removed in the patch, this Synthesis group's output plugin.\n"
         + "Nothing is deleted: a removed object is disabled; one that is not persistent is also moved below the world.\n"
         + "Always kept, whatever the settings: teleport doors and their destinations; anything another mod's object, a quest, a package,\n"
         + "a scene, a location or a navmesh points to; objects whose own script names a quest or scene, or whose base object\n"
         + "is this plugin's own and has a script that does; objects with a location role (except map markers). Linked objects are always removed or kept together.\n"
         + "Pick it from your load order.")]
     [JsonConverter(typeof(EmptyTextAsNullConverter))]
-    public ModKey TargetPlugin { get; set; } = ModKey.Null;
+    // The settings key is CleanedMod (the user's word); the code keeps its target names.
+    public ModKey CleanedMod { get; set; } = ModKey.Null;
 
     [SynthesisOrder]
     [SynthesisSettingName("Other mods that never cause removals")]
@@ -100,7 +101,7 @@ public class StandardSettings : ISettingsValues
         + "another mod's object (a building, a boulder) or when the visible objects around them were removed.")]
     public LeftoverInvisibleObjectSettings LeftoverInvisibleObjects { get; set; } = new();
 
-    string? ISettingsValues.TargetPlugin => TargetPlugin.IsNull ? null : TargetPlugin.ToString();
+    string? ISettingsValues.CleanedMod => CleanedMod.IsNull ? null : CleanedMod.ToString();
     IIgnoreSettingsValues ISettingsValues.WhatToIgnore => WhatToIgnore ?? new IgnoreSettings();
     ITooCloseSettingsValues ISettingsValues.TooClose => TooClose ?? new TooCloseRemovalSettings();
     ITerrainChangeSettingsValues ISettingsValues.TerrainChange => TerrainChange ?? new TerrainChangeSettings();
@@ -273,7 +274,7 @@ public class TerrainChangeSettings : ITerrainChangeSettingsValues
     public bool CountHeightChanges { get; set; } = SettingDefaults.CountHeightChanges;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Ignore height changes up to (game units)")]
+    [SynthesisSettingName("Count only height changes larger than (game units)")]
     [SynthesisTooltip(
         "Small smoothing edits are common and rarely visible under an object. 0 counts every change. 0-256.\n"
         + "Only used when \"Count height changes\" is on.")]
@@ -300,7 +301,7 @@ public class TerrainChangeSettings : ITerrainChangeSettingsValues
     public bool CountWaterHeightChanges { get; set; } = SettingDefaults.CountWaterHeightChanges;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Ignore water height changes up to (game units)")]
+    [SynthesisSettingName("Count only water height changes larger than (game units)")]
     [SynthesisTooltip(
         "Small water level edits rarely matter. 0 counts every change. 0-256.\n"
         + "Only used when \"Count water height changes\" is on.")]

@@ -15,6 +15,19 @@ internal static class FixturePatcherState
 {
     public static readonly ModKey PatchModKey = ModKey.FromNameAndExtension("AddedObjectRemover.esp");
 
+    /// <summary>The game's plugin list as the fixture state has it: every listed mod enabled, the patch last, read from a file of a fixed name.</summary>
+    public static PluginListRead.Found PluginListOf(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) =>
+        new("Plugins.txt", [.. state.LoadOrder.ListedOrder.Select(listing => (ILoadOrderListingGetter)new LoadOrderListing(listing.ModKey, enabled: true))]);
+
+    /// <summary>Writes the plugins file of <see cref="PluginListOf"/> into the state's settings folder, for the runs that read it from disk.</summary>
+    /// <returns>The path of the plugins file.</returns>
+    public static string WritePluginsFile(IPatcherState<ISkyrimMod, ISkyrimModGetter> state)
+    {
+        var path = Path.Combine(state.ExtraSettingsDataPath!.Value.Path, "Plugins.txt");
+        File.WriteAllLines(path, PluginListOf(state).Listings.Select(listing => "*" + listing.ModKey.FileName));
+        return path;
+    }
+
     /// <remarks>
     /// The patcher's settings folder is the output plugin's folder, so tests find the reports next to the patch.
     /// IPatcherState has internal members, so a test cannot implement it; the obsolete SynthesisState

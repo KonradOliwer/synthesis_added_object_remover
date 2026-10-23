@@ -23,7 +23,7 @@ public class RunnerWordingTests
         var stale = AllowedLiterals.Keys.Except(found).Order(StringComparer.Ordinal).ToList();
 
         Assert.True(notAllowed.Count == 0, $"Text in the runner project; move the wording to the report step:{Environment.NewLine}{string.Join(Environment.NewLine, notAllowed)}");
-        Assert.True(stale.Count == 0, $"Allowed in {nameof(RunnerWordingTests)} but no longer in the runner project (remove):{Environment.NewLine}{string.Join(Environment.NewLine, stale)}");
+        AllowListAssert.NoneStale(stale, $"Allowed in {nameof(RunnerWordingTests)} but no longer in the runner project (remove)");
     }
 
     [Fact]

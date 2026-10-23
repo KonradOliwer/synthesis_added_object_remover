@@ -15,26 +15,24 @@ namespace AddedObjectRemover;
 /// <param name="HoldKeyword">The keyword a Location carries when it is a hold; the nearest such Location in a cell's Location chain names the cell's hold.</param>
 public sealed record PlacedReadScope(PluginName Target, bool Terrain, bool Navmeshes, bool TerrainVersions, bool TerrainLayers, bool Water, RecordKey HoldKeyword);
 
-/// <summary>One winning placed record as its plugin stores it; it is not judged here.</summary>
-/// <param name="WinningMod">The plugin whose version of the record wins.</param>
+/// <summary>One placed record: its winning version as its plugin stores it, and the versions below it that were kept. It is not judged here.</summary>
 /// <param name="Cell">The cell whose child list holds the winning version; for an interior it is the space itself.</param>
 /// <param name="InTargetSpace">The record's space holds a record created by the target plugin.</param>
-/// <param name="Scale">As the record stores it; null when it has none.</param>
 /// <param name="IsPersistent">The record's own Persistent flag is set.</param>
 /// <param name="NamedByScript">The first quest or scene that a script on the record itself names; null when none does.</param>
 /// <param name="HasLocationRefType">The record itself has at least one location ref type (XLRT).</param>
 /// <param name="ReferenceRadius">The reference's own radius (XRDS) as the record stores it; null when it has none.</param>
 /// <param name="PrimitiveBounds">The reference's primitive box, full sizes as the record exposes them; null when it is not a primitive.</param>
+/// <param name="Versions">
+/// Lowest first, the winner last: the record's versions from the winner down to and including the first one whose plugin stops the
+/// walk (<see cref="IPluginRecords.ReadPlacedRecords"/>), or all of them when none does. Each plugin gives one version.
+/// </param>
 public sealed record PlacedRecordFact(
     RecordKey Key,
     string? EditorId,
-    PluginName WinningMod,
     SpaceFact Space,
     CellFact Cell,
     bool InTargetSpace,
-    PlacementFacts Placement,
-    float? Scale,
-    BaseKey? Base,
     bool IsTeleportDoor,
     bool IsPrimitive,
     bool HasMapMarker,
@@ -42,12 +40,28 @@ public sealed record PlacedRecordFact(
     ScriptNamedRecord? NamedByScript,
     bool HasLocationRefType,
     float? ReferenceRadius,
-    Vector3? PrimitiveBounds);
+    Vector3? PrimitiveBounds,
+    ImmutableArray<PlacedVersionFact> Versions)
+{
+    /// <summary>The winning version, the last of <see cref="Versions"/>.</summary>
+    public PlacedVersionFact Winner => Versions[^1];
+
+    /// <summary>The plugin whose version of the record wins.</summary>
+    public PluginName WinningMod => Winner.Plugin;
+
+    public PlacementFacts Placement => Winner.Placement;
+
+    /// <summary>As the winning version stores it; null when it has none.</summary>
+    public float? Scale => Winner.Scale;
+
+    public BaseKey? Base => Winner.Base;
+}
 
 /// <summary>What reading the placed records of the load order found.</summary>
 /// <param name="Records">
 /// Each record once, by its first sighting (plugins from the highest priority down, in each cell the persistent children before
-/// the temporary ones), without deleted ones. Only records in a target space, created by the target plugin, or overridden by it.
+/// the temporary ones); a deleted winning version is a fact too, so no lower version stands in for it. Only records in a target
+/// space, created by the target plugin, overridden by it, or linking into it.
 /// </param>
 /// <param name="RecordsScanned">Every record seen once, deleted ones and those in other spaces included.</param>
 /// <param name="OverriddenRecords">Placed records of other plugins that the target plugin overrides.</param>

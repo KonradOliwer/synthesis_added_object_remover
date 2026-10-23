@@ -4,10 +4,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The settings and the result of the step that identifies the mods whose objects are ignored: the target, its masters and the detected compatibility patches. It references only Ids and holds no packages.</Description>
+    <Description>The settings and the result of the step that decides how far each plugin is trusted: the trust lists and rules, per plugin its trust and the reason for it, and the trust of its record versions. It references Ids and PluginRecordFacts and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
+    <ProjectReference Include="..\..\Tools\PluginRecordFacts\PluginRecordFacts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />

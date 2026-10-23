@@ -5,6 +5,7 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
+using AddedObjectRemover.Steps.WriteThePatch.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
@@ -22,11 +23,11 @@ internal static partial class LogSections
             + $"in {Describe.Location(world, target)}, {AreaText.Detail(target.Area, world.Spaces[target.SpaceKey])}; {Describe.RemovalReason(world, removal)}";
     }
 
-    /// <param name="withoutPlacement">Target-plugin objects not checked because they are initially disabled or have no valid position.</param>
-    public static LogSection BuildTargetVisibilitySection(IReadOnlyList<TargetObject> targets, int withoutPlacement, ReportContext context)
+    /// <param name="withoutPlacement">Target-plugin objects not checked because they are deleted, start disabled or have no valid position.</param>
+    public static LogSection BuildTargetVisibilitySection(IReadOnlyList<TargetObject> targets, int withoutPlacement, PluginName target, ReportContext context)
     {
         if (!context.Detailed) return new LogSection("targetVisibility", []);
-        var looks = targets.Select(target => context.Shapes.VisibilityOf(target)).ToList();
+        var looks = targets.Select(targetObject => context.Shapes.VisibilityOf(targetObject)).ToList();
         var invisibleByKind = KeyedGroups
             .Rank(
                 KeyedGroups.CountBy(looks.Where(entry => !entry.IsVisible), ObjectVisibilityText.Describe, StringComparer.Ordinal),
@@ -37,8 +38,21 @@ internal static partial class LogSections
         return new LogSection(
             "targetVisibility",
             [
-                $"Target objects: {TextFormat.Count(visible)} visible, {TextFormat.Count(looks.Count - visible)} invisible (by kind: {kinds}), "
-                + $"{TextFormat.Count(withoutPlacement)} without placement/disabled.",
+                $"{target} objects: {TextFormat.Count(visible)} visible, {TextFormat.Count(looks.Count - visible)} invisible (by kind: {kinds}), "
+                + $"{TextFormat.Count(withoutPlacement)} deleted, start disabled, or without a valid position or rotation.",
+            ]);
+    }
+
+    /// <summary>What the run started from and what it did with the target's objects: all of them, those earlier patchers in this group removed, those it judged and those it removed.</summary>
+    public static LogSection BuildRunSummarySection(CollectedObjects world, PluginName target, int removedInThisRun)
+    {
+        var counts = world.Counts;
+        return new LogSection(
+            "run-summary",
+            [
+                $"Objects of {target}: {TextFormat.Count(counts.CleanedModObjects)}; "
+                + $"already removed by earlier patchers in this group: {TextFormat.Count(counts.RemovedByEarlierPatchers)}; "
+                + $"judged in this run: {TextFormat.Count(world.Targets.Length)}; removed in this run: {TextFormat.Count(removedInThisRun)}.",
             ]);
     }
 
@@ -56,7 +70,7 @@ internal static partial class LogSections
             "removal-summary",
             [
                 $"Removed {TextFormat.Count(removals.Count)} objects ({onChangedTerrain}{TextFormat.Count(tooClose)} too close, {TextFormat.Count(alsoRemoved)} follow-up removals, "
-                + $"{TextFormat.Count(leftBehind)} leftover invisible objects, {TextFormat.Count(linked)} linked to removed objects).",
+                + $"{TextFormat.Count(leftBehind)} invisible objects left behind, {TextFormat.Count(linked)} linked to removed objects).",
             ]);
     }
 

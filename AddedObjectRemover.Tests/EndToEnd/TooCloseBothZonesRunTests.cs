@@ -47,12 +47,12 @@ public class TooCloseBothZonesRunTests
         var tooClose = SectionLines(log, "tooClose");
         Assert.StartsWith(
             "Object-shape zones: 2 candidate pairs, 2 passed the box filter, 2 mesh tests, 2 hits, 0 centre-point fallbacks (other object without mesh triangles), "
-            + "0 targets without mesh triangles used their box;",
+            + $"0 {FixtureWorld.TargetName} objects without mesh triangles used their box;",
             tooClose[0]);
         Assert.Contains(
             $"Found 2 of 3 {FixtureWorld.TargetName} objects too close to other mods' objects (1 by object size, 1 by distance) in 0.0s.", tooClose);
         Assert.Equal(
-            ["Removed 2 objects (2 too close, 0 follow-up removals, 0 leftover invisible objects, 0 linked to removed objects)."],
+            ["Removed 2 objects (2 too close, 0 follow-up removals, 0 invisible objects left behind, 0 linked to removed objects)."],
             SectionLines(log, "removal-summary"));
         var removals = SectionLines(log, "removals");
         Assert.Single(removals, line => line.Contains(CrateWorld.CrateFoundBySize) && line.Contains($"; too close to {CrateWorld.PadNearBySize} "));

@@ -10,14 +10,17 @@ public readonly record struct TargetLink(TargetId From, TargetId To);
 /// decision and never changed afterwards.
 /// </summary>
 /// <param name="Targets">In <see cref="RecordKeyOrder"/>; the position is the <see cref="TargetId"/>.</param>
-/// <param name="OtherModObjects">Other mods' objects that may make a target too close, in <see cref="RecordKeyOrder"/>.</param>
-/// <param name="SupportOnlyObjects">
-/// Every other present placed object of the target spaces (base game, masters, excluded plugins,
-/// records the target overrides, target records a later plugin overrides), in <see cref="RecordKeyOrder"/>;
-/// empty unless <paramref name="SupportOnlyObjectsCollected"/>.
+/// <param name="OtherModObjects">
+/// Other mods' objects the game shows differently from their accepted values, or that have none, which may make a target too close,
+/// in <see cref="RecordKeyOrder"/>.
 /// </param>
-/// <param name="SupportOnlyObjectsCollected">Whether step 2 collected the support-only objects, which it does when objects of any plugin are needed as supporters or objects around a marker.</param>
-/// <param name="Links">Every link into the target plugin as read, placed records before non-placed ones, in the order found; none from a record an earlier run of the batch removed.</param>
+/// <param name="SupportOnlyObjects">
+/// Every other present placed object of the target spaces (other mods' objects the game shows with their accepted values, records
+/// the target overrides, target records a later plugin overrides), in <see cref="RecordKeyOrder"/>; empty unless
+/// <paramref name="SupportOnlyObjectsCollected"/>.
+/// </param>
+/// <param name="SupportOnlyObjectsCollected">Whether the collection holds the support-only objects, which it does when objects of any plugin are needed as supporters or objects around a marker.</param>
+/// <param name="Links">Every link into the target plugin as read, placed records before non-placed ones, in the order found; none from a removed record.</param>
 /// <param name="OverriddenOthers">Only with the detailed log.</param>
 /// <param name="Order">The order the steps visit <paramref name="Targets"/> in, by space and exterior cell, so neighbouring targets run close together in time.</param>
 /// <param name="Stop">Why the run ends after this step; null when it goes on.</param>

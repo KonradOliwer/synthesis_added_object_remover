@@ -16,10 +16,13 @@ internal static class Describe
     /// <summary>The text for a list with no entries.</summary>
     public const string NoEntries = "none";
 
+    /// <summary>Named for a change only the patch holds, which this run did not make.</summary>
+    private const string EarlierPatcher = "an earlier patcher in this group";
+
     private static readonly (TerrainChangeKind Kind, string Text)[] TerrainChangeTexts =
     [
         (TerrainChangeKind.Height, "height"),
-        (TerrainChangeKind.TerrainType, "terrain type"),
+        (TerrainChangeKind.TerrainType, "ground type"),
         (TerrainChangeKind.WaterHeight, "water height"),
         (TerrainChangeKind.WaterAdded, "water added"),
         (TerrainChangeKind.WaterRemoved, "water removed"),
@@ -70,9 +73,9 @@ internal static class Describe
 
     public static string RemovalReason(CollectedObjects world, RemovedObject removal) => removal switch
     {
-        TerrainChangedRemoval changed => $"terrain changed by {changed.ChangedBy} ({TerrainChange(changed.Kind)})",
-        TooCloseRemoval { TooCloseTo: var other, Cause: TooCloseCause.ObjectSize } => $"too close to {OtherObject(other)}",
-        TooCloseRemoval { TooCloseTo: var other, Cause: TooCloseCause.Distance distance } => $"within {distance.Units} units of {OtherObject(other)}",
+        TerrainChangedRemoval changed => $"terrain changed by {ChangingMod(changed.ChangedBy)} ({TerrainChange(changed.Kind)})",
+        TooCloseRemoval { TooCloseTo: var other, Cause: TooCloseCause.ObjectSize } => $"too close to {OtherObject(other)}, {Change(other)}",
+        TooCloseRemoval { TooCloseTo: var other, Cause: TooCloseCause.Distance distance } => $"within {distance.Units} units of {OtherObject(other)}, {Change(other)}",
         TouchingRemoval touching => $"touches removed {RecordNames.Describe(world.Targets[touching.TouchedTargetIndex])}",
         SupportRemoval support =>
             $"{TextFormat.Percent(support.RemovedShare)} of its support was removed (mostly {RecordNames.Describe(world.Targets[support.MainRemovedSupporter])})",
@@ -80,6 +83,17 @@ internal static class Describe
         LinkedRemoval linked => $"linked to removed {RecordNames.Describe(world.Targets[linked.LinkedToTargetIndex])}",
         _ => throw new UnreachableException($"Unknown removal type {removal.GetType().Name}."),
     };
+
+    /// <param name="changedBy">Null when only the patch holds the change.</param>
+    public static string ChangingMod(PluginName? changedBy) => changedBy?.ToString() ?? EarlierPatcher;
+
+    /// <summary>E.g. "changed by CityMod.esp (accepted value from SomeMod.esp)" or "changed by CityMod.esp (new object)".</summary>
+    private static string Change(OtherObject other)
+    {
+        var change = other.Change ?? throw new UnreachableException($"The other-mod object {other.Key} causes a removal but has no change.");
+        var accepted = change.AcceptedFrom is { } from ? $"accepted value from {from}" : "new object";
+        return $"changed by {ChangingMod(change.ChangingMod)} ({accepted})";
+    }
 
     /// <summary>E.g. "height", "height and terrain type" or "height, terrain type and water height".</summary>
     private static string TerrainChange(TerrainChangeKind kind)

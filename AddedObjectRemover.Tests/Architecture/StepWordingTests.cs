@@ -19,6 +19,7 @@ public class StepWordingTests
     private static readonly Dictionary<(string File, string Literal), string> AllowedPhrases = new()
     {
         [("Run/RunAllSteps/RunCaches/NpcBodyCache.cs", "The NPC {npc} that supplies its own traits was not found.")] = BugMessage,
+        [("Steps/IdentifyTheMods.Contracts/ModTrustTable.cs", "Unknown trust {unknown}.")] = BugMessage,
         [("Run/RunSettingsValidation/SettingCorrections.cs", "Warning: {label} {value} is invalid; using {fallback}.")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingCorrections.cs", "Warning: {name} is not a valid number; using {defaultValue}.")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingCorrections.cs", "Warning: {name} {percent} is outside {PercentStep}-{Percent.PerWhole}; using {withinRange}.")] = SettingsWarning,
@@ -55,51 +56,68 @@ public class StepWordingTests
         [("Run/RunSettingsReading/JsonFileParsing.cs", "{kind} {filePath} is not valid JSON: {ex.Message}")] = SettingsFailure,
         [("Run/RunSettingsReading/JsonFileParsing.cs", "{kind} {filePath} could not be read: {ex.Message}")] = SettingsFailure,
         [("Run/RunSettingsReading/ConfigFiles.cs", "Mode {settings.Mode} is invalid; use Standard or Batch.{ConfigsRead.NothingWasRun}")] = SettingsFailure,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "Config file {file.FilePath}: the mod to clean up, {stop.Reason.Name}, is the patch this patcher writes.{ConfigsRead.NothingWasRun}")] = SettingsFailure,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Config file {file.FilePath}: {stop.Reason.Name} is the patch this patcher writes.{ConfigsRead.NothingWasRun}")] = SettingsFailure,
         [("Run/RunSettingsReading/SettingsFailureMessage.cs", "the settings file")] = SettingsFailure,
         [("Run/RunSettingsReading/SettingsFailureMessage.cs", "the settings file at {location}")] = SettingsFailure,
         [("Run/RunSettingsValidation.Contracts/ConfigsRead.cs", " Nothing was run and no patch was written.")] = SettingsFailure,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Config file {file.FilePath} sets no mod to clean up (CleanedMod).{ConfigsRead.NothingWasRun}")] = SettingsFailure,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "Config file {file.FilePath}: the mod to clean up, {stop.Reason.Name}, is not in your plugin list.{ConfigsRead.NothingWasRun}")] = SettingsFailure,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "Config file {file.FilePath}: the mod to clean up, {stop.Reason.Name}, is disabled.{ConfigsRead.NothingWasRun}")] = SettingsFailure,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "Config file {file.FilePath}: the mod to clean up, {stop.Reason.Name}, is enabled in your plugin list but Synthesis did not load it for this group.{ConfigsRead.NothingWasRun}")] =
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Config file {file.FilePath}: {stop.Reason.Name} is not in your plugin list.{ConfigsRead.NothingWasRun}")] = SettingsFailure,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Config file {file.FilePath}: {stop.Reason.Name} is disabled.{ConfigsRead.NothingWasRun}")] = SettingsFailure,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Config file {file.FilePath}: {stop.Reason.Name} is enabled in your plugin list but Synthesis did not load it for this group.{ConfigsRead.NothingWasRun}")] =
             SettingsFailure,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "Config file {file.FilePath}: the mod to clean up, {stop.Reason.Name}, loads after the patch {placement.Patch} (position {placement.CleanedModPosition} > {placement.PatchPosition}): move {placement.Patch} below it.{ConfigsRead.NothingWasRun}")] =
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Config file {file.FilePath}: {stop.Reason.Name} loads after the patch {placement.Patch} (position {placement.ModPosition} > {placement.PatchPosition}): move {placement.Patch} below it.{ConfigsRead.NothingWasRun}")] =
             SettingsFailure,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", @"Config file {file.FilePath}: {placement.Mod} requires {stop.Reason.Name} and loads after the patch {placement.Patch} (position {placement.ModPosition} > {placement.PatchPosition}): move {placement.Patch} below it in your plugin list, or turn on \""{RunSettings.OnlyWarnSettingName}\"".{ConfigsRead.NothingWasRun}")] =
+            SettingsFailure,
+        [("Run/RunSettingsValidation.Contracts/RunSettings.cs", "Only warn (don't stop) when a mod that requires the cleaned mod loads after the patch")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: {placement.Mod} requires {cleanedMod} and loads after the patch {placement.Patch} (position {placement.ModPosition} > {placement.PatchPosition}); the objects of {cleanedMod} that it overrides are left unchanged.")] =
+            SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Config files {filePathByTarget[ready.Settings.Target]} and {file.FilePath} both clean up {ready.Settings.Target}; each mod may be cleaned up by one config only.{ConfigsRead.NothingWasRun}")] =
             SettingsFailure,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Could not find the game's plugin list file (Plugins.txt in the game's folder under your local application data).")] = SettingsFailure,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "The plugin list file {missing.Path} does not exist.")] = SettingsFailure,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "The plugin list file {malformed.Path} has a malformed entry at line {malformed.Number}. Correct or remove that line.")] = SettingsFailure,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "{unlisted.Plugin} is loaded by Synthesis but is not in the plugin list file {unlisted.Path}.")] = SettingsFailure,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "NPCs and creatures setting")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "{after.Plugin} is loaded by Synthesis above the patch {after.Patch} but is listed after it in the plugin list file {after.Path}.")] = SettingsFailure,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Mod to clean up")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects too close to other mods' objects > Other mods' NPCs and creatures cause removal")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects on terrain changed by other mods > Which of the cleaned mod's objects are checked")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects on terrain changed by other mods > Count only height changes larger than")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects on terrain changed by other mods > Count only water height changes larger than")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Also remove what rests on removed objects > When an object is removed, also remove")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Also remove what rests on removed objects > Gap that still counts as touching")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Also remove what rests on removed objects > OnlyWhatLosesItsSupport: remove when this much support is gone")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Invisible objects left behind > When the cleaned mod's visible objects around it were removed > ")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Look this far around it")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "A direction is cleared when this much of it was removed")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove when this share of those directions is cleared")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Decide only if this share of the 8 directions has objects")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: could not read {targetListing.Mod} to find its masters.")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: {missing} is enabled in your plugin list but its file was not found; it was skipped.")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "plugin list")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "The plugin setting {name} is not a plugin file name.")] = BugMessage,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: neither too-close margin is on; no object is removed for being too close.")] = SettingsWarning,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: changed terrain is on, but no height, terrain type or water changes are counted; no object is removed for changed terrain.")] =
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: changed terrain is on, but no height, ground type or water changes are counted; no object is removed for changed terrain.")] =
             SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: changed terrain is on, but neither terrain margin is on; no object is removed for changed terrain.")] =
             SettingsWarning,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "anchoring threshold")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "changed terrain")] = SettingsWarning,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "follow-up removal mode")] = SettingsWarning,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "height change tolerance")] = SettingsWarning,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "maximum other masters for a patch")] = SettingsWarning,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "objects checked for changed terrain")] = SettingsWarning,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "occupied directions required")] = SettingsWarning,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "removed area per direction")] = SettingsWarning,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "removed directions required")] = SettingsWarning,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "search radius")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Which other mods can cause removals > Trusted mods, and their masters")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Which other mods can cause removals > Mods trusted for their own changes only")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Which other mods can cause removals > Never trusted mods")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Which other mods can cause removals > ...only if it has at most this many other masters")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: {listName}: {plugin} is not in your plugin list.")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: {NeverTrustedModsName}: {plugin} is the mod to clean up, which cannot be listed here; the entry has no effect.")] =
+            SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Warning: {NeverTrustedModsName}: {plugin} is the patch this patcher writes, which cannot be listed here; the entry has no effect.")] =
+            SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects too close to other mods' objects > Margin by object size > Margin on every side")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects too close to other mods' objects > Margin by fixed distance > Margin on every side")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects on terrain changed by other mods > Margin by object size > Margin on every side")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects on terrain changed by other mods > Margin by fixed distance > Margin on every side")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects on terrain changed by other mods > Remove only when this share of the ground points changed type")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects on terrain changed by other mods > Remove only when this share of the ground got covered/uncovered")] = SettingsWarning,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "water height change tolerance")] = SettingsWarning,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "target plugin")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "too close")] = SettingsWarning,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "touch distance")] = SettingsWarning,
         [("Steps/CollectPlacedObjects.Contracts/CollectedObjects.cs", "The support-only objects were not collected in this run.")] = BugMessage,
         [("Steps/RemovalDecisionList/RemovalDecisions.cs", "Only the newest view of the removal decisions can be added to.")] = BugMessage,
         [("Steps/RemovalDecisionList/RemovalDecisions.cs", "The round is not part of this view.")] = BugMessage,
@@ -129,7 +147,7 @@ public class StepWordingTests
         var stale = AllowedPhrases.Keys.Except(found).Select(Describe).Order(StringComparer.Ordinal).ToList();
 
         Assert.True(notAllowed.Count == 0, $"Text outside the report step; move the wording there:{Environment.NewLine}{string.Join(Environment.NewLine, notAllowed)}");
-        Assert.True(stale.Count == 0, $"Allowed in {nameof(StepWordingTests)} but no longer found (remove):{Environment.NewLine}{string.Join(Environment.NewLine, stale)}");
+        AllowListAssert.NoneStale(stale, $"Allowed in {nameof(StepWordingTests)} but no longer found (remove)");
     }
 
     private static string Describe((string File, string Literal) phrase) => $"{phrase.File}: {phrase.Literal}";

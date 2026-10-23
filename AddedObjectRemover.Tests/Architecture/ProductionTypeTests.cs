@@ -26,6 +26,7 @@ public class ProductionTypeTests
     {
         ["MeshLimits"] = "named constants: the mesh size limits",
         ["MarkerMoveLimits"] = "named constants: the marker move limit",
+        ["RemovalConvention"] = "named constants: the game's convention for a placed object switched off for good",
         ["ReportFileNames"] = "named constants: the report file names",
         ["SelectionParts"] = "named constants: the part key the select step records its unexpected errors under",
         ["KeepParts"] = "named constants: the part key the keep step records its unexpected errors under",
@@ -70,7 +71,8 @@ public class ProductionTypeTests
         ["OtherObject.Transform"] = "one-line value derived from its own fields",
         ["OtherObject.IsPlacedNpc"] = "one-line value derived from its own fields",
         ["RunSettings.DetailedLog"] = "one-line value derived from its own fields: the one setting that has the report files, so it is stored once",
-        ["DetectedPatches.IgnoredMods"] = "one-line value derived from its own list",
+        ["ModTrustTable.IsPatch"] = "one-line rule over its own field",
+        ["ModTrustTable.VersionTrustOf"] = "the one mapping of a plugin's trust to the version trust of the accepted-value rule, over its own fields",
         ["ChangedTerrainSettings.CountsWaterChanges"] = "one-line value derived from its own fields: either water switch, asked by the validator, the step and the log",
         ["SectorAreas.Removed"] = "index accessor",
         ["SectorAreas.State"] = "index accessor",
@@ -83,7 +85,6 @@ public class ProductionTypeTests
         ["Supporter.Placed"] = "factory",
         ["Supporter.Target"] = "factory",
         ["TooCloseWork.Zero"] = "factory for the empty value",
-        ["WrittenByEarlierRuns.With"] = "returns the value extended by one run's writes",
     };
 
     /// <summary>The name of the generic Lazy type; every delegate type (Func, Action, custom ones) is found by its base type instead.</summary>

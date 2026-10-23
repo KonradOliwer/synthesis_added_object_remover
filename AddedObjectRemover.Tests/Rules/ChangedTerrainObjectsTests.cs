@@ -6,8 +6,9 @@ using AddedObjectRemover.Tests.Fixtures;
 namespace AddedObjectRemover.Tests.Rules;
 
 /// <summary>
-/// The changed-terrain step: the reference terrain per cell, which plugins count as changing it and which one is named, the check
-/// area, the height rule, which objects are checked, the per-object error boundary and the independence from the thread count.
+/// The changed-terrain step: the accepted height and terrain type per vertex, the accepted water per cell, which plugin is named for a
+/// change, the check area, the height rule, which objects are checked, the per-object error boundary and the independence from the
+/// thread count.
 /// </summary>
 public class ChangedTerrainObjectsTests
 {
@@ -31,6 +32,9 @@ public class ChangedTerrainObjectsTests
     /// <summary>A terrain vertex inside the check area of an object at <see cref="Spot"/>, and one far outside it.</summary>
     private const int Near = 8 * TerrainHeights.VerticesPerSide + 8;
     private const int Far = 20 * TerrainHeights.VerticesPerSide + 20;
+
+    /// <summary>The vertex next to <see cref="Near"/>, also inside the check area (column 9 of row 8).</summary>
+    private const int Beside = Near + 1;
 
     private static readonly Vector3 Spot = new(1000, 1000, 0);
 
@@ -56,7 +60,8 @@ public class ChangedTerrainObjectsTests
     private static readonly PluginName RequiringMod = new("RequiringMod.esp");
     private static readonly PluginName Other = new("Other.esp");
     private static readonly PluginName CompatibilityPatch = new("CompatibilityPatch.esp");
-    private static readonly PluginName Ignored = new("Ignored.esp");
+    private static readonly PluginName TrustedMod = new("TrustedMod.esp");
+    private static readonly PluginName OwnChanges = new("OwnChanges.esp");
     private static readonly PluginName Later = new("Later.esp");
     private static readonly PluginName Patch = new("Synthesis.esp");
 
@@ -64,14 +69,24 @@ public class ChangedTerrainObjectsTests
     private static readonly BaseKey Marker = new(new RecordKey(Target, 0x901), BaseLinkKind.PlaceableObject);
     private static readonly BaseKey Broken = new(new RecordKey(Target, 0x902), BaseLinkKind.PlaceableObject);
 
-    /// <summary>The target's masters are the base game and a master that is not ignored; two plugins require the target.</summary>
-    private static readonly IdentifiedMods Mods = new(
-        Target, new HashSet<PluginName> { BaseGame, Target, Ignored, Patch }, [BaseGame, Master], [], DetectedPatches.Off, [RequiringMod, CompatibilityPatch]);
+    /// <summary>
+    /// The target's masters are the base game and Master.esm. TrustedMod.esp is trusted, and so are the two plugins that require the
+    /// target, as the rule for such mods trusts them; OwnChanges.esp is trusted for its own changes; Early.esp loads before the
+    /// target and is untrusted.
+    /// </summary>
+    private static readonly ModTrustTable Mods = TestModTrust.Of(
+        Target,
+        Patch,
+        trusted: [BaseGame, Master, TrustedMod, RequiringMod, CompatibilityPatch],
+        untrusted: [Early, Other, Later],
+        trustedForOwnChanges: [OwnChanges]);
 
-    private static readonly PluginName[] Plugins = [BaseGame, Master, Early, Target, RequiringMod, Other, CompatibilityPatch, Ignored, Later, Patch];
+    private static readonly ImmutableArray<PluginName> TargetMasters = [BaseGame, Master];
+
+    private static readonly PluginName[] Plugins = [BaseGame, Master, Early, Target, RequiringMod, Other, CompatibilityPatch, TrustedMod, OwnChanges, Later, Patch];
 
     private static readonly LoadOrderPlugins LoadOrder = TestLoadOrderPlugins.Of(
-        new KnownPluginNames(Plugins), Patch, [.. Plugins.Select(plugin => new PluginListing(plugin, true, []))]);
+        new KnownPluginNames(Plugins), Patch, [.. Plugins.Select(plugin => new PluginListing(plugin, true, plugin == Target ? TargetMasters : []))]);
 
     private static ChangedTerrainSettings Settings(
         TerrainCheckedObjects objects = TerrainCheckedObjects.VisibleObjectsOnTheGround,
@@ -121,7 +136,8 @@ public class ChangedTerrainObjectsTests
     private static ChangedTerrainResult FindInCell(params TerrainVersion[] versions) =>
         Find(new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = versions }, Settings());
 
-    private static ProposedRemoval Removal(int index, PluginName changedBy, TerrainChangeKind kind = TerrainChangeKind.Height) =>
+    /// <param name="changedBy">Null for a change only the patch holds.</param>
+    private static ProposedRemoval Removal(int index, PluginName? changedBy, TerrainChangeKind kind = TerrainChangeKind.Height) =>
         new(new TargetId(index), new RemovalReason.TerrainChanged(changedBy, kind));
 
     [Fact]
@@ -165,39 +181,71 @@ public class ChangedTerrainObjectsTests
         Assert.Empty(FindInCell(Flat(Target), RaisedAt(RequiringMod, Near)).Proposals);
 
     [Fact]
-    public void APluginRequiringTheTargetsChangeCopiedByACountingModCountsForNothing() =>
+    public void APluginRequiringTheTargetsChangeCarriedByAnUntrustedModCountsForNothing() =>
         Assert.Empty(FindInCell(Flat(Target), RaisedAt(RequiringMod, Near), RaisedAt(Later, Near)).Proposals);
 
     [Fact]
-    public void AnIgnoredModsChangeCopiedByACountingModCountsForNothing() =>
-        Assert.Empty(FindInCell(Flat(Target), RaisedAt(Ignored, Near), RaisedAt(Later, Near)).Proposals);
+    public void ATrustedModsChangeCarriedByAnUntrustedModCountsForNothing() =>
+        Assert.Empty(FindInCell(Flat(Target), RaisedAt(TrustedMod, Near), RaisedAt(Later, Near)).Proposals);
 
     [Fact]
-    public void ACountingModsChangeCarriedByACompatibilityPatchNamesTheCountingMod() =>
-        Assert.Equal([Removal(0, Other)], FindInCell(Flat(Target), RaisedAt(Other, Near), RaisedAt(CompatibilityPatch, Near)).Proposals.AsEnumerable());
+    public void AnUntrustedModsHeightCarriedByATrustedCompatibilityPatchIsAccepted() =>
+        Assert.Empty(FindInCell(Flat(Target), RaisedAt(Other, Near), RaisedAt(CompatibilityPatch, Near)).Proposals);
+
+    /// <summary>The carried height is the accepted one, so the later mod is named, not the mod whose height was carried.</summary>
+    [Fact]
+    public void AChangeOnTopOfACarriedHeightIsComparedWithTheCarriedHeight() =>
+        Assert.Equal(
+            [Removal(0, Later)],
+            FindInCell(Flat(Target), RaisedAt(Other, Near), RaisedAt(CompatibilityPatch, Near), RaisedAt(Later, Near, 2 * Raised)).Proposals.AsEnumerable());
 
     [Fact]
-    public void ACountingModCopyingAnotherCountingModsChangeLeavesItNamedOnTheFirst() =>
+    public void AnUntrustedModCarryingAnotherUntrustedModsChangeLeavesTheFirstNamed() =>
         Assert.Equal([Removal(0, Other)], FindInCell(Flat(Target), RaisedAt(Other, Near), RaisedAt(Later, Near)).Proposals.AsEnumerable());
 
     [Fact]
-    public void ASmallIgnoredChangeOnTopOfACountingChangeNamesTheCountingMod() =>
-        Assert.Equal([Removal(0, Other)], FindInCell(Flat(Target), RaisedAt(Other, Near), RaisedAt(Ignored, Near, Raised + HeightStep)).Proposals.AsEnumerable());
+    public void ATrustedModsSmallChangeOnTopOfAnUntrustedChangeMakesItAccepted() =>
+        Assert.Empty(FindInCell(Flat(Target), RaisedAt(Other, Near), RaisedAt(TrustedMod, Near, Raised + HeightStep)).Proposals);
+
+    /// <summary>
+    /// OwnChanges.esp re-saves the other mod's land: one height step above the other mod's is within the tolerance, so it owns no
+    /// height there and the other mod is named; twice the raise is its own height, which is accepted.
+    /// </summary>
+    [Theory]
+    [InlineData(Raised + HeightStep, true)]
+    [InlineData(2 * Raised, false)]
+    public void AModTrustedForItsOwnChangesOwnsAHeightOnlyBeyondTheTolerance(float resaved, bool removed)
+    {
+        var result = FindInCell(Flat(Target), RaisedAt(Other, Near), RaisedAt(OwnChanges, Near, resaved));
+
+        ProposedRemoval[] expected = removed ? [Removal(0, Other)] : [];
+        Assert.Equal(expected, result.Proposals.AsEnumerable());
+    }
+
+    /// <summary>
+    /// Each step is within the tolerance of the version below, so OwnChanges.esp owns no height; together they are beyond it, and
+    /// OwnChanges.esp holds the first height that differs from the accepted one beyond the tolerance.
+    /// </summary>
+    [Fact]
+    public void SmallStepsAddingUpThroughAModTrustedForItsOwnChangesNameThatMod() =>
+        Assert.Equal(
+            [Removal(0, OwnChanges)],
+            FindInCell(Flat(Target), RaisedAt(Other, Near, Tolerance), RaisedAt(OwnChanges, Near, Tolerance + HeightStep)).Proposals.AsEnumerable());
 
     [Fact]
-    public void AnIgnoredModsOwnLargerChangeOnTopOfACountingChangeCountsForNothing() =>
-        Assert.Empty(FindInCell(Flat(Target), RaisedAt(Other, Near), RaisedAt(Ignored, Near, 2 * Raised)).Proposals);
+    public void ATrustedModsOwnLargerChangeOnTopOfAnUntrustedChangeCountsForNothing() =>
+        Assert.Empty(FindInCell(Flat(Target), RaisedAt(Other, Near), RaisedAt(TrustedMod, Near, 2 * Raised)).Proposals);
 
-    /// <summary>Each step is within the tolerance of the next, and only the ignored mod's own height is beyond it.</summary>
+    /// <summary>Each step is within the tolerance of the next, and only the trusted mod's own height is beyond it.</summary>
     [Fact]
-    public void AnIgnoredModsStepPushingSmallChangesBeyondTheToleranceCountsForNothing() =>
+    public void ATrustedModsStepPushingSmallChangesBeyondTheToleranceCountsForNothing() =>
         Assert.Empty(
-            FindInCell(Flat(Target), RaisedAt(Other, Near, HeightStep), RaisedAt(CompatibilityPatch, Near, Tolerance), RaisedAt(Ignored, Near, Tolerance + HeightStep))
+            FindInCell(Flat(Target), RaisedAt(Other, Near, HeightStep), RaisedAt(CompatibilityPatch, Near, Tolerance), RaisedAt(TrustedMod, Near, Tolerance + HeightStep))
                 .Proposals);
 
-    /// <summary>Each step is within the tolerance of the next, and the later counting mod's own height is beyond it.</summary>
+    /// <summary>Each step is within the tolerance of the next, and the later untrusted mod's own height is beyond it.</summary>
     [Fact]
-    public void CountingModsSmallStepsAddingUpBeyondTheToleranceNameTheModWhoseOwnChangeExceedsIt() =>
+    public void UntrustedModsSmallStepsAddingUpBeyondTheToleranceNameTheModWhoseOwnChangeExceedsIt() =>
         Assert.Equal(
             [Removal(0, Later)],
             FindInCell(Flat(Target), RaisedAt(Other, Near, HeightStep), RaisedAt(Later, Near, Tolerance + HeightStep)).Proposals.AsEnumerable());
@@ -207,28 +255,33 @@ public class ChangedTerrainObjectsTests
         Assert.Equal([Removal(0, Other)], FindInCell(Flat(Target), RaisedAt(Other, Near), Flat(Later), RaisedAt(Patch, Near)).Proposals.AsEnumerable());
 
     [Fact]
-    public void AModRestoringTheTargetsTerrainOverAPluginRequiringTheTargetLeavesNothingChanged() =>
-        Assert.Empty(FindInCell(Flat(Target), RaisedAt(RequiringMod, Near), Flat(Other)).Proposals);
+    public void AModUndoingTheChangeOfAPluginRequiringTheTargetChangesTheAcceptedTerrain() =>
+        Assert.Equal([Removal(0, Other)], FindInCell(Flat(Target), RaisedAt(RequiringMod, Near), Flat(Other)).Proposals.AsEnumerable());
 
     [Fact]
-    public void ALaterModRestoringTheReferenceLeavesNothingChanged() =>
+    public void ALaterModRestoringTheAcceptedTerrainLeavesNothingChanged() =>
         Assert.Empty(FindInCell(Flat(Target), RaisedAt(Other, Near), Flat(Later)).Proposals);
 
     [Fact]
-    public void AnIgnoredModRestoringTheReferenceLeavesNothingChanged() =>
-        Assert.Empty(FindInCell(Flat(Target), RaisedAt(Other, Near), Flat(Ignored)).Proposals);
+    public void ATrustedModRestoringTheAcceptedTerrainLeavesNothingChanged() =>
+        Assert.Empty(FindInCell(Flat(Target), RaisedAt(Other, Near), Flat(TrustedMod)).Proposals);
 
     [Fact]
-    public void AModLoadingBeforeTheReferenceIsOverriddenByIt() =>
+    public void AModLoadingBeforeTheCleanedModIsOverriddenByIt() =>
         Assert.Empty(FindInCell(RaisedAt(Early, Near), Flat(Target)).Proposals);
 
     [Fact]
-    public void AnIgnoredModCarryingAnotherModsChangeNamesTheOtherMod() =>
-        Assert.Equal([Removal(0, Other)], FindInCell(Flat(Target), RaisedAt(Other, Near), RaisedAt(Ignored, Near)).Proposals.AsEnumerable());
+    public void ThePatchCarryingAnUntrustedModsChangeNamesThatMod() =>
+        Assert.Equal([Removal(0, Other)], FindInCell(Flat(Target), RaisedAt(Other, Near), RaisedAt(Patch, Near)).Proposals.AsEnumerable());
 
     [Fact]
-    public void AChangeOnlyByModsThatNeverCountRemovesNothing() =>
-        Assert.Empty(FindInCell(Flat(Target), RaisedAt(Ignored, Near), RaisedAt(Patch, Near)).Proposals);
+    public void AChangeOnlyByTrustedModsAndThePatchRemovesNothing() =>
+        Assert.Empty(FindInCell(Flat(Target), RaisedAt(TrustedMod, Near), RaisedAt(Patch, Near)).Proposals);
+
+    /// <summary>Only the patch holds the change: an earlier patcher of the group made it, and no plugin is named.</summary>
+    [Fact]
+    public void AChangeOnlyThePatchHoldsNamesAnEarlierPatcher() =>
+        Assert.Equal([Removal(0, changedBy: null)], FindInCell(Flat(Target), RaisedAt(Patch, Near)).Proposals.AsEnumerable());
 
     [Fact]
     public void TheLastLoadingChangingModIsNamedOverEveryCellTheAreaCrosses()
@@ -248,7 +301,7 @@ public class ChangedTerrainObjectsTests
     }
 
     [Fact]
-    public void TheBaseGameAsATargetMasterIsTheReferenceWhenTheTargetHasNoTerrainThere() =>
+    public void TheBaseGameAsAMasterOfTheCleanedModIsAcceptedWhenTheCleanedModHasNoTerrainThere() =>
         Assert.Equal([Removal(0, Other)], FindInCell(Flat(BaseGame), RaisedAt(Other, Near)).Proposals.AsEnumerable());
 
     [Fact]
@@ -268,12 +321,65 @@ public class ChangedTerrainObjectsTests
         Assert.Equal([Removal(0, Other)], FindInCell(Flat(Target), new TerrainVersion(Other, Heights: null, Layers: null)).Proposals.AsEnumerable());
 
     [Fact]
-    public void ACellWithoutReferenceTerrainIsNotChecked()
+    public void ACellNoTrustedPluginHasALandRecordOfIsNotChecked()
     {
         var result = FindInCell(RaisedAt(Other, Near));
 
         Assert.Empty(result.Proposals);
         Assert.Equal((0, 1), (result.CellsCompared, result.ObjectsWithoutTerrain));
+    }
+
+    /// <summary>
+    /// The other mod's land is the cell's first, as in a world it adds; OwnChanges.esp raises the vertex beside the object's, so only
+    /// that vertex has an accepted height. The later mod changes the object's vertex or the one beside it.
+    /// </summary>
+    [Theory]
+    [InlineData(2 * Raised, Raised, false)]
+    [InlineData(Raised, Ground, true)]
+    public void AVertexWithoutATrustedVersionIsNotChecked(float nearHeight, float besideHeight, bool removed)
+    {
+        var result = FindInCell(
+            RaisedAt(Other, Near),
+            OwnChangesRaisingBeside,
+            new TerrainVersion(Later, Heights(Ground, (Near, nearHeight), (Beside, besideHeight)), Layers: null));
+
+        ProposedRemoval[] expected = removed ? [Removal(0, Later)] : [];
+        Assert.Equal(expected, result.Proposals.AsEnumerable());
+        Assert.Equal((1, 0), (result.CellsCompared, result.ObjectsWithoutTerrain));
+    }
+
+    /// <summary>
+    /// OwnChanges.esp keeps the other mod's raise at the object's vertex and raises the vertex beside it. Over the target's flat land
+    /// the object's vertex is accepted from the target and the one beside it from OwnChanges.esp, a terrain no single version holds.
+    /// </summary>
+    private static readonly TerrainVersion OwnChangesRaisingBeside = new(OwnChanges, Heights(Ground, (Near, Raised), (Beside, Raised)), Layers: null);
+
+    [Fact]
+    public void TheAcceptedHeightsTakeEachVertexFromItsOwnAcceptedVersion()
+    {
+        var comparison = new CellTerrainComparison(
+            new TerrainPlugins(Mods, LoadOrder), new TerrainTypes(new TerrainPlugin(new Dictionary<ExteriorCell, TerrainVersion[]>())), Settings());
+
+        var terrain = comparison.Compare([Flat(Target), RaisedAt(Other, Near), OwnChangesRaisingBeside]);
+
+        Assert.Equal((Ground, Raised), (terrain!.AcceptedHeights![Near], terrain.AcceptedHeights[Beside]));
+    }
+
+    /// <summary>The later mod keeps the accepted terrain, lowers the vertex beside the object's, or keeps the other mod's raise.</summary>
+    [Theory]
+    [InlineData(Ground, Raised, null)]
+    [InlineData(Ground, Ground, "Later.esp")]
+    [InlineData(Raised, Raised, "Other.esp")]
+    public void EachVertexIsComparedWithItsOwnAcceptedVersion(float nearHeight, float besideHeight, string? changedBy)
+    {
+        var result = FindInCell(
+            Flat(Target),
+            RaisedAt(Other, Near),
+            OwnChangesRaisingBeside,
+            new TerrainVersion(Later, Heights(Ground, (Near, nearHeight), (Beside, besideHeight)), Layers: null));
+
+        ProposedRemoval[] expected = changedBy is { } plugin ? [Removal(0, new PluginName(plugin))] : [];
+        Assert.Equal(expected, result.Proposals.AsEnumerable());
     }
 
     [Fact]
@@ -351,7 +457,7 @@ public class ChangedTerrainObjectsTests
     {
         var terrain = Enumerable.Range(0, 4).ToDictionary(
             cellX => new ExteriorCell(Worldspace, cellX, 0),
-            cellX => new[] { Flat(Target), RaisedAt(Other, Near), cellX % 2 == 0 ? RaisedAt(Later, Near, 2 * Raised) : RaisedAt(Ignored, Near) });
+            cellX => new[] { Flat(Target), RaisedAt(Other, Near), cellX % 2 == 0 ? RaisedAt(Later, Near, 2 * Raised) : RaisedAt(Patch, Near) });
         var targets = Enumerable.Range(0, 40)
             .Select(index => Placed(index, Rock, Spot + new Vector3(index % 4 * ExteriorGrid.CellSize, index / 4 * 4f, 0)))
             .ToArray();
@@ -425,6 +531,18 @@ public class ChangedTerrainObjectsTests
             Find(PaintedCell(FlatPainted(Target, Painted(Grass)), changed), Settings()).Proposals.AsEnumerable());
     }
 
+    /// <summary>The other mod raises the object's vertex; the later mod carries the height and paves the ground.</summary>
+    [Fact]
+    public void AHeightAndATypeChangeOfDifferentModsNameTheLaterLoadingOne()
+    {
+        var raised = new TerrainVersion(Other, Heights(Ground, (Near, Raised)), Painted(Grass));
+        var paved = new TerrainVersion(Later, Heights(Ground, (Near, Raised)), Painted(Road));
+
+        Assert.Equal(
+            [Removal(0, Later, TerrainChangeKind.Height | TerrainChangeKind.TerrainType)],
+            Find(PaintedCell(FlatPainted(Target, Painted(Grass)), raised, paved), Settings()).Proposals.AsEnumerable());
+    }
+
     [Theory]
     [InlineData(true, TerrainChangeKind.Height | TerrainChangeKind.TerrainType)]
     [InlineData(false, TerrainChangeKind.TerrainType)]
@@ -433,25 +551,27 @@ public class ChangedTerrainObjectsTests
             [Removal(0, Other, kind)],
             Find(PaintedCell(FlatPainted(Target, Painted(Grass)), new TerrainVersion(Other, Heights: null, Layers: null)), Settings(heights: heights)).Proposals.AsEnumerable());
 
+    /// <summary>OwnChanges.esp carries the other mod's height and paves the ground: the road is its own change, the height is not.</summary>
     [Fact]
-    public void ATypeChangeByAModThatDoesNotCountIsLeftOutOfTheKind()
+    public void ATypeChangeOfAModTrustedForItsOwnChangesIsLeftOutOfTheKind()
     {
         var heightOnly = new TerrainVersion(Other, Heights(Ground, (Near, Raised)), Painted(Grass));
-        var shownByIgnoredMod = new TerrainVersion(Ignored, Heights(Ground, (Near, Raised)), Painted(Road));
+        var shownByOwnChanges = new TerrainVersion(OwnChanges, Heights(Ground, (Near, Raised)), Painted(Road));
 
-        var result = Find(PaintedCell(FlatPainted(Target, Painted(Grass)), heightOnly, shownByIgnoredMod), Settings());
+        var result = Find(PaintedCell(FlatPainted(Target, Painted(Grass)), heightOnly, shownByOwnChanges), Settings());
 
         Assert.Equal([new ObjectOnChangedTerrain(new TargetId(0), Other, TerrainChangeKind.Height)], result.Hits.AsEnumerable());
         Assert.Equal([Removal(0, Other, TerrainChangeKind.Height)], result.Proposals.AsEnumerable());
     }
 
+    /// <summary>OwnChanges.esp carries the other mod's road and raises the ground: the height is its own change, the road is not.</summary>
     [Fact]
-    public void AHeightChangeByAModThatDoesNotCountIsLeftOutOfTheKind()
+    public void AHeightChangeOfAModTrustedForItsOwnChangesIsLeftOutOfTheKind()
     {
         var typeOnly = FlatPainted(Other, Painted(Road));
-        var shownByIgnoredMod = new TerrainVersion(Ignored, Heights(Ground, (Near, Raised)), Painted(Road));
+        var shownByOwnChanges = new TerrainVersion(OwnChanges, Heights(Ground, (Near, Raised)), Painted(Road));
 
-        var result = Find(PaintedCell(FlatPainted(Target, Painted(Grass)), typeOnly, shownByIgnoredMod), Settings());
+        var result = Find(PaintedCell(FlatPainted(Target, Painted(Grass)), typeOnly, shownByOwnChanges), Settings());
 
         Assert.Equal([Removal(0, Other, TerrainChangeKind.TerrainType)], result.Proposals.AsEnumerable());
     }
@@ -480,18 +600,33 @@ public class ChangedTerrainObjectsTests
         Assert.Equal(removed, Find(plugin, Settings(typePercent: AnyChange), threads: 1, Placed(0, Rock, WideSpot)).Proposals.Any());
     }
 
-    /// <summary>The counting mod changed the type of fewer vertices than the share; the later mod adds the rest.</summary>
+    /// <summary>The untrusted mod changed the type of fewer vertices than the share; the later mod adds the rest.</summary>
     [Theory]
     [InlineData(false, false)]
     [InlineData(true, true)]
-    public void OnlyTheVerticesCountingModsChangedMakeUpTheShare(bool laterCounts, bool removed)
+    public void OnlyTheVerticesUntrustedModsChangedMakeUpTheShare(bool laterUntrusted, bool removed)
     {
         var plugin = PaintedCell(
             FlatPainted(Target, Painted(Grass)),
             FlatPainted(Other, RoadAtWideSpot(ChangesAtTypeShare - 1)),
-            FlatPainted(laterCounts ? Later : Ignored, RoadAtWideSpot(ChangesAtTypeShare + 1)));
+            FlatPainted(laterUntrusted ? Later : TrustedMod, RoadAtWideSpot(ChangesAtTypeShare + 1)));
 
         Assert.Equal(removed, Find(plugin, Settings(), threads: 1, Placed(0, Rock, WideSpot)).Proposals.Any());
+    }
+
+    /// <summary>
+    /// The other mod adds the land; OwnChanges.esp paves two of the sixteen vertices of the area, the only ones with an accepted
+    /// terrain type, and the later mod paints them back: all checked vertices changed type, though only two of sixteen did.
+    /// </summary>
+    [Fact]
+    public void VerticesWithoutAnAcceptedValueAreLeftOutOfTheShare()
+    {
+        var plugin = PaintedCell(
+            FlatPainted(Other, Painted(Grass)), FlatPainted(OwnChanges, RoadAtWideSpot(FewerChanges)), FlatPainted(Later, Painted(Grass)));
+
+        Assert.Equal(
+            [Removal(0, Later, TerrainChangeKind.TerrainType)],
+            Find(plugin, Settings(), threads: 1, Placed(0, Rock, WideSpot)).Proposals.AsEnumerable());
     }
 
     /// <summary>The later mod keeps the earlier mod's road and paints more next to it.</summary>
@@ -787,13 +922,79 @@ public class ChangedTerrainObjectsTests
         Assert.Empty(FindWithWater([Flat(Target)], [Water(Target, BelowTheGround), Water(RequiringMod, AboveTheGround)]).Proposals);
 
     [Fact]
-    public void AnIgnoredModCarryingAnotherModsWaterChangeNamesTheOtherMod() =>
-        Assert.Equal(
-            [Removal(0, Other, TerrainChangeKind.WaterHeight)],
-            FindWithWater([Flat(Target)], [Water(Target, BelowTheGround), Water(Other, AboveTheGround), Water(Ignored, AboveTheGround)]).Proposals.AsEnumerable());
+    public void AnUntrustedModsWaterCarriedByATrustedModIsAccepted() =>
+        Assert.Empty(FindWithWater([Flat(Target)], [Water(Target, BelowTheGround), Water(Other, AboveTheGround), Water(TrustedMod, AboveTheGround)]).Proposals);
 
     [Fact]
-    public void TheLastMastersWaterIsTheReferenceWhenTheTargetHasNoCopyOfTheCell() =>
+    public void AnUntrustedModsDefaultCarriedByATrustedModIsAccepted() =>
+        Assert.Empty(
+            FindWithWater(
+                [Flat(Target)],
+                [WaterAtTheDefault(Target)],
+                worldspace: [Default(BaseGame, BelowTheGround), Default(Other, AboveTheGround), Default(TrustedMod, AboveTheGround)]).Proposals);
+
+    [Fact]
+    public void ThePatchCarryingAnUntrustedModsWaterNamesThatMod() =>
+        Assert.Equal(
+            [Removal(0, Other, TerrainChangeKind.WaterHeight)],
+            FindWithWater([Flat(Target)], [Water(Target, BelowTheGround), Water(Other, AboveTheGround), Water(Patch, AboveTheGround)]).Proposals.AsEnumerable());
+
+    /// <summary>Only the patch holds the change: an earlier patcher of the group made it, and no plugin is named.</summary>
+    [Fact]
+    public void AWaterChangeOnlyThePatchHoldsNamesAnEarlierPatcher() =>
+        Assert.Equal(
+            [Removal(0, changedBy: null, TerrainChangeKind.WaterHeight)],
+            FindWithWater([Flat(Target)], [Water(Target, BelowTheGround), Water(Patch, AboveTheGround)]).Proposals.AsEnumerable());
+
+    /// <summary>
+    /// OwnChanges.esp re-saves the other mod's water: one height step above it is within the tolerance, so it owns no water height
+    /// there and the other mod is named; twice the other mod's height is its own, which is accepted.
+    /// </summary>
+    [Theory]
+    [InlineData(AboveTheGround + HeightStep, true)]
+    [InlineData(2 * AboveTheGround, false)]
+    public void AModTrustedForItsOwnChangesOwnsAWaterHeightOnlyBeyondTheTolerance(float resaved, bool removed)
+    {
+        var result = FindWithWater([Flat(Target)], [Water(Target, BelowTheGround), Water(Other, AboveTheGround), Water(OwnChanges, resaved)]);
+
+        ProposedRemoval[] expected = removed ? [Removal(0, Other, TerrainChangeKind.WaterHeight)] : [];
+        Assert.Equal(expected, result.Proposals.AsEnumerable());
+    }
+
+    /// <summary>
+    /// Only untrusted mods have the cell, as in a world one of them adds, so its water has no accepted value: it is not checked, and
+    /// nothing about it is reported. The land is still compared, and the object is not one without terrain.
+    /// </summary>
+    [Fact]
+    public void ACellNoTrustedPluginHasIsNotCheckedForWater()
+    {
+        var result = FindWithWater([Flat(Target)], [Water(Other, BelowTheGround), Water(Later, AboveTheGround)]);
+
+        Assert.Empty(result.Proposals);
+        Assert.Empty(result.Failures);
+        Assert.Equal((1, 0), (result.CellsCompared, result.ObjectsWithoutTerrain));
+    }
+
+    /// <summary>The cell uses the default water height, and only an untrusted mod has the worldspace: the default has no accepted value.</summary>
+    [Fact]
+    public void ACellUsingADefaultNoTrustedPluginHasIsNotCheckedForWater()
+    {
+        var result = FindWithWater([Flat(Target)], [WaterAtTheDefault(Target)], worldspace: [Default(Other, AboveTheGround)]);
+
+        Assert.Empty(result.Proposals);
+        Assert.Empty(result.Failures);
+        Assert.Equal((1, 0), (result.CellsCompared, result.ObjectsWithoutTerrain));
+    }
+
+    /// <summary>The accepted cell has no water, so its worldspace's default is not needed, though no trusted plugin has the worldspace.</summary>
+    [Fact]
+    public void ACellWithoutWaterIsCheckedWhateverItsWorldspaceHas() =>
+        Assert.Equal(
+            [Removal(0, Later, TerrainChangeKind.WaterAdded)],
+            FindWithWater([Flat(Target)], [Water(Target, null), Water(Later, AboveTheGround)], worldspace: [Default(Other, AboveTheGround)]).Proposals.AsEnumerable());
+
+    [Fact]
+    public void AnUntrustedModCarryingTheLastTrustedCellCopysWaterChangesNothing() =>
         Assert.Empty(FindWithWater([Flat(BaseGame)], [Water(BaseGame, BelowTheGround), Water(Master, AboveTheGround), Water(Early, AboveTheGround)]).Proposals);
 
     [Fact]
@@ -804,13 +1005,13 @@ public class ChangedTerrainObjectsTests
     private static readonly WorldspaceWaterCopy[] TargetWorldspace = [Default(BaseGame, BelowTheGround), Default(Target, BelowTheGround)];
 
     [Fact]
-    public void TheMastersCellCopyIsTheReferenceWhenTheTargetHasOnlyAWorldspaceCopy() =>
+    public void TheMastersCellCopyIsAcceptedWhenTheTargetHasOnlyAWorldspaceCopy() =>
         Assert.Equal(
             [Removal(0, Other, TerrainChangeKind.WaterHeight)],
             FindWithWater([Flat(Target)], [Water(Master, BelowTheGround), Water(Other, AboveTheGround)], worldspace: TargetWorldspace).Proposals.AsEnumerable());
 
     [Fact]
-    public void AnEarlierModsCellCopyIsNotTheReferenceThroughTheTargetsWorldspaceCopy() =>
+    public void AnUntrustedCellCopyIsNotAcceptedThroughTheTargetsWorldspaceCopy() =>
         Assert.Equal(
             [Removal(0, Early, TerrainChangeKind.WaterHeight)],
             FindWithWater([Flat(Target)], [Water(Master, BelowTheGround), Water(Early, AboveTheGround)], worldspace: TargetWorldspace).Proposals.AsEnumerable());
@@ -837,20 +1038,43 @@ public class ChangedTerrainObjectsTests
                 [Flat(Target)], [WaterAtTheDefault(Target)], worldspace: [.. TargetWorldspace, Default(Other, AboveTheGround)], space: ChildWorldspace)
                 .Proposals.AsEnumerable());
 
+    /// <summary>The worldspace stores no default water height, so the target's cell using the default has no water.</summary>
     [Fact]
-    public void ACellUsingTheDefaultOfAWorldspaceWithoutOneIsSkippedAsUnknown() =>
-        Assert.Empty(
+    public void ACellUsingTheDefaultOfAWorldspaceWithoutOneHasNoWater() =>
+        Assert.Equal(
+            [Removal(0, Other, TerrainChangeKind.WaterAdded)],
             FindWithWater(
-                [Flat(Target)], [WaterAtTheDefault(Target), Water(Other, AboveTheGround)], worldspace: [Default(BaseGame, level: null)]).Proposals);
+                [Flat(Target)], [WaterAtTheDefault(Target), Water(Other, AboveTheGround)], worldspace: [Default(BaseGame, level: null)])
+                .Proposals.AsEnumerable());
 
     [Fact]
-    public void AWorldspaceCopyLosingTheDefaultDoesNotRemoveTheWaterOfCellsUsingIt() =>
-        Assert.Empty(
+    public void AWorldspaceVersionAddingTheDefaultAddsWaterToCellsUsingIt() =>
+        Assert.Equal(
+            [Removal(0, Other, TerrainChangeKind.WaterAdded)],
             FindWithWater(
-                [Flat(Target)], [WaterAtTheDefault(Target)], worldspace: [.. TargetWorldspace, Default(Other, level: null)]).Proposals);
+                [Flat(Target)], [WaterAtTheDefault(Target)], worldspace: [Default(BaseGame, level: null), Default(Other, AboveTheGround)])
+                .Proposals.AsEnumerable());
 
     [Fact]
-    public void AnUnknownDefaultDoesNotHideAChangeOfACellWithItsOwnHeight() =>
+    public void AWorldspaceVersionDroppingTheDefaultRemovesTheWaterOfCellsUsingIt() =>
+        Assert.Equal(
+            [Removal(0, Other, TerrainChangeKind.WaterRemoved)],
+            FindWithWater(
+                [Flat(Target)], [WaterAtTheDefault(Target)], worldspace: [Default(BaseGame, AboveTheGround), Default(Other, level: null)])
+                .Proposals.AsEnumerable());
+
+    /// <summary>The other mod switches the cell from the worldspace's default to its own height, or back.</summary>
+    [Theory]
+    [InlineData(null, AboveTheGround)]
+    [InlineData(AboveTheGround, null)]
+    public void SwitchingBetweenTheOwnHeightAndTheDefaultIsAWaterHeightChange(float? targetOwnLevel, float? otherOwnLevel) =>
+        Assert.Equal(
+            [Removal(0, Other, TerrainChangeKind.WaterHeight)],
+            FindWithWater([Flat(Target)], [new CellWaterCopy(Target, HasWater: true, targetOwnLevel), new CellWaterCopy(Other, HasWater: true, otherOwnLevel)])
+                .Proposals.AsEnumerable());
+
+    [Fact]
+    public void AMissingDefaultDoesNotMatterToACellWithItsOwnHeight() =>
         Assert.Equal(
             [Removal(0, Other, TerrainChangeKind.WaterHeight)],
             FindWithWater(
@@ -875,39 +1099,35 @@ public class ChangedTerrainObjectsTests
             FindWithWater([Flat(Target)], [new CellWaterCopy(Target, HasWater: false, AboveTheGround), Water(Other, AboveTheGround)]).Proposals.AsEnumerable());
 
     /// <summary>
-    /// The other mod's cell copy loads before the later mod's worldspace copy, so the other mod made the change and the later mod
-    /// only carries it; joined out of load order, the later mod's copy would seem to make it first.
+    /// The other mod gives the cell its own height; the later mod's changed default is not what the shown water is made of, so the
+    /// later mod is not named though it loads later.
     /// </summary>
     [Fact]
-    public void LaterCellAndWorldspaceCopiesOfDifferentPluginsAreJoinedInLoadOrder() =>
+    public void ADefaultTheShownCellDoesNotUseIsNotNamed() =>
         Assert.Equal(
             [Removal(0, Other, TerrainChangeKind.WaterHeight)],
             FindWithWater(
                 [Flat(Target)], [WaterAtTheDefault(Target), Water(Other, AboveTheGround)], worldspace: [.. TargetWorldspace, Default(Later, AboveTheGround)])
                 .Proposals.AsEnumerable());
 
+    /// <summary>The other mod switches the cell to the default, which the later mod changed: both made the shown water, the later is named.</summary>
     [Fact]
-    public void APluginWithACellAndAWorldspaceCopyGivesOneVersionJoiningBoth() =>
+    public void WhenTheCellAndTheDefaultItUsesBothChangedTheLaterLoadingModIsNamed() =>
         Assert.Equal(
-            [Removal(0, Other, TerrainChangeKind.WaterHeight)],
+            [Removal(0, Later, TerrainChangeKind.WaterHeight)],
             FindWithWater(
-                [Flat(Target)],
-                [WaterAtTheDefault(Target), WaterAtTheDefault(Other), WaterAtTheDefault(Ignored)],
-                worldspace: [.. TargetWorldspace, Default(Other, AboveTheGround)])
+                [Flat(Target)], [Water(Target, BelowTheGround), WaterAtTheDefault(Other)], worldspace: [.. TargetWorldspace, Default(Later, AboveTheGround)])
                 .Proposals.AsEnumerable());
 
-    /// <summary>
-    /// The compatibility patch's worldspace copy stores no default, so its version is unknown and carries nothing; the ignored mod
-    /// carrying the other mod's default is traced through it back to the other mod.
-    /// </summary>
+    /// <summary>The trusted mod's cell uses the default, which only the untrusted mod's worldspace version changed.</summary>
     [Fact]
-    public void AChangeIsTracedThroughAnUnknownVersionInBetween() =>
+    public void ATrustedCellUsingTheDefaultDoesNotMakeAnUntrustedDefaultAccepted() =>
         Assert.Equal(
             [Removal(0, Other, TerrainChangeKind.WaterHeight)],
             FindWithWater(
                 [Flat(Target)],
-                [WaterAtTheDefault(Target)],
-                worldspace: [.. TargetWorldspace, Default(Other, AboveTheGround), Default(CompatibilityPatch, level: null), Default(Ignored, AboveTheGround)])
+                [WaterAtTheDefault(Target), WaterAtTheDefault(Other), WaterAtTheDefault(TrustedMod)],
+                worldspace: [.. TargetWorldspace, Default(Other, AboveTheGround)])
                 .Proposals.AsEnumerable());
 
     /// <summary>Both worldspaces use the same land cell, which is compared once; each has its own cell water.</summary>
@@ -974,13 +1194,13 @@ public class ChangedTerrainObjectsTests
             return materials?.GetValueOrDefault(texture) ?? [];
         }
 
-        public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope) => throw new NotSupportedException();
+        public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk) => throw new NotSupportedException();
 
         public ImmutableArray<LinkFact> ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets) => throw new NotSupportedException();
 
-        public bool HasEnableParent(RecordKey record) => throw new NotSupportedException();
+        public IWritableRecords ReadWritableRecords() => throw new NotSupportedException();
 
-        public void Write(IReadOnlyList<WriteOrder> orders) => throw new NotSupportedException();
+        public IRecordIndex ReadRecordIndex() => throw new NotSupportedException();
 
         public CellGridPoint? ReadHomeCellGrid(RecordKey record) => throw new NotSupportedException();
 

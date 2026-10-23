@@ -36,7 +36,7 @@ public sealed class ChangedTerrainSectionTests
         Assert.Equal(
             [
                 "Found 3 of 5 Target.esp objects on terrain changed by other mods in 1.5s.",
-                "  Terrain: 12 cells compared; 3 objects on changed terrain (by plugin: 2 B.esp, 1 A.esp); 7 objects not checked (interior or no terrain).",
+                "  Terrain: 12 cells compared; 3 objects on changed terrain (by changing mod: 2 B.esp, 1 A.esp); 7 objects not checked (interior, no terrain, or no trusted land record).",
             ],
             lines);
     }
@@ -48,7 +48,7 @@ public sealed class ChangedTerrainSectionTests
 
         var lines = LogSections.BuildChangedTerrainSection(CreateWorld(), Target, found, [], Elapsed, Detailed).Lines;
 
-        Assert.Equal("  Terrain: 2 cells compared; 0 objects on changed terrain (by plugin: none); 0 objects not checked (interior or no terrain).", lines[1]);
+        Assert.Equal("  Terrain: 2 cells compared; 0 objects on changed terrain (by changing mod: none); 0 objects not checked (interior, no terrain, or no trusted land record).", lines[1]);
     }
 
     private static ChangedTerrainResult Found()
@@ -72,7 +72,7 @@ public sealed class ChangedTerrainSectionTests
             false,
             [],
             new Dictionary<RecordKey, SpaceFact> { [TestTargets.Space] = new(TestTargets.Space, "Tamriel", SpaceKind.Worldspace, "Skyrim") },
-            new ReadCounts(0, 0, 0, 0, 0, 0, 0, 0),
+            new ReadCounts(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             [],
             TargetWorkOrder.Of(targets),
             null);

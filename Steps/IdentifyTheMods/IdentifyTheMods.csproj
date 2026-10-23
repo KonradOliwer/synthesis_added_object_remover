@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>Decides which plugin is cleaned and which mods' objects never cause removals: the base game, the mods to ignore, the target's masters and the mods sharing a patch with it. It references its contracts, Ids and PluginRecordFacts and holds no packages.</Description>
+    <Description>Decides how far each plugin is trusted: always (the base game, the cleaned mod and its masters), by the user's three lists, or by the automatic rules for mods that require the cleaned mod and for mods loading before it. It references its contracts, Ids and PluginRecordFacts and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\IdentifyTheMods.Contracts\IdentifyTheMods.Contracts.csproj" />

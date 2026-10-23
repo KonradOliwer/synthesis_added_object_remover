@@ -37,15 +37,15 @@ internal static partial class LogSections
         return string.Join(Describe.ListSeparator, TextLists.Counts(KeyedGroups.Rank(worded, StringComparer.Ordinal)));
     }
 
-    public static LogSection BuildSpacesSection(CollectedObjects world, IReadOnlyList<RemovedObject> removals, ReportContext context)
+    public static LogSection BuildSpacesSection(CollectedObjects world, IReadOnlyList<RemovedObject> removals, PluginName target, ReportContext context)
     {
         if (!context.Detailed) return new LogSection("spaces", []);
 
         var removedBySpace = removals.CountBy(removal => world.Targets[removal.TargetIndex].SpaceKey).ToDictionary();
         var otherModObjectsBySpace = world.OtherModObjects.CountBy(other => other.SpaceKey).ToDictionary();
-        List<string> lines = ["Per cell/worldspace (target objects / other objects / removed):"];
+        List<string> lines = [$"Per cell/worldspace (objects of {target} / other objects / removed):"];
         foreach (var group in world.Targets
-                     .GroupBy(target => target.SpaceKey)
+                     .GroupBy(targetObject => targetObject.SpaceKey)
                      .OrderBy(group => Describe.Space(world, group.Key), StringComparer.OrdinalIgnoreCase))
         {
             removedBySpace.TryGetValue(group.Key, out var removedCount);

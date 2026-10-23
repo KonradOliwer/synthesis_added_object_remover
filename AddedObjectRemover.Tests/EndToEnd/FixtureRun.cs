@@ -17,6 +17,8 @@ internal static class FixtureRun
     /// <param name="wrapBases">Wraps the base facts the run reads; none when the run reads them as they are.</param>
     /// <param name="timeSinceStart">The run's clock; none for one that always says zero.</param>
     /// <param name="createLoadOrder">Builds the listed mods, lowest priority first, and writes their meshes under the Data folder; none for the fixture world.</param>
+    /// <param name="patchPosition">How many of the listed mods load above the patch; the others load below it. None puts the patch last.</param>
+    /// <param name="inspectPatch">Reads the patch once the run is over.</param>
     public static RunResult Run(
         Settings settings,
         int workers,
@@ -25,29 +27,40 @@ internal static class FixtureRun
         Func<IPluginRecords, IPluginRecords>? wrapPlugin = null,
         Func<IBaseFacts, IBaseFacts>? wrapBases = null,
         Func<TimeSpan>? timeSinceStart = null,
-        Func<string, IReadOnlyList<ISkyrimMod>>? createLoadOrder = null)
+        Func<string, IReadOnlyList<ISkyrimMod>>? createLoadOrder = null,
+        int? patchPosition = null,
+        Action<ISkyrimModGetter>? inspectPatch = null)
     {
         var root = Directory.CreateTempSubdirectory("aor-run-");
         try
         {
             var dataFolder = Directory.CreateDirectory(Path.Combine(root.FullName, "Data")).FullName;
-            var loadOrder = createLoadOrder is null ? FixtureWorld.Create(dataFolder).LoadOrder : createLoadOrder(dataFolder);
+            var listedMods = createLoadOrder is null ? FixtureWorld.Create(dataFolder).LoadOrder : createLoadOrder(dataFolder);
+            var abovePatch = patchPosition ?? listedMods.Count;
             var state = FixturePatcherState.Create(
-                loadOrder, dataFolder, Path.Combine(root.FullName, FixturePatcherState.PatchModKey.FileName));
-            var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey, FixturePatcherState.PluginListOf(state));
-            var pluginRecords = new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods, workers);
+                [.. listedMods.Take(abovePatch)], dataFolder, Path.Combine(root.FullName, FixturePatcherState.PatchModKey.FileName));
+            using var world = FixturePatcherState.CreateFinalWorld(state, [.. listedMods.Skip(abovePatch)]);
+            var pluginRecords = new PluginRecordsFactory(world, workers);
             var request = SettingsValidator.Build(
-                StandardConfig.Of(settings.Standard), pluginRecords.Open(), plugins, settings.DetailedLogAndReports, Program.ReportsFolder(state), workers);
+                StandardConfig.Of(settings.Standard),
+                pluginRecords.Open(),
+                world.Plugins,
+                settings.DetailedLogAndReports,
+                settings.OnlyWarnWhenModRequiringCleanedModLoadsAfterPatch,
+                Program.ReportsFolder(state),
+                workers);
             var environment = new RunEnvironment(
-                plugins,
+                world.Plugins,
                 new WrappedPluginRecordsFactory(pluginRecords, wrapPlugin),
-                openMeshFiles(
-                    state.DataFolderPath.Path, state.GameRelease, [.. state.LoadOrder.ListedOrder.Select(listing => listing.ModKey)]),
-                TestBaseFacts.Factory(state.LinkCache, wrapBases),
+                new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod),
+                openMeshFiles(state.DataFolderPath.Path, state.GameRelease, [.. world.Order.ListedOrder.Select(listing => listing.ModKey)]),
+                new WrappedBaseFactsFactory(new BaseFactsFactory(world.Plugins.Mods), wrapBases),
                 log,
                 new CsvReportOutput(),
                 timeSinceStart ?? (() => TimeSpan.Zero));
-            return Assert.Single(StepRunner.PatchLoadOrder([request], environment));
+            var result = Assert.Single(StepRunner.PatchLoadOrder([request], environment));
+            inspectPatch?.Invoke(state.PatchMod);
+            return result;
         }
         finally
         {
@@ -64,6 +77,15 @@ internal static class FixtureRun
         public IPluginRecords Open()
         {
             var opened = inner.Open();
+            return wrap is null ? opened : wrap(opened);
+        }
+    }
+
+    private sealed class WrappedBaseFactsFactory(IBaseFactsFactory inner, Func<IBaseFacts, IBaseFacts>? wrap) : IBaseFactsFactory
+    {
+        public IBaseFacts Open(IRecordIndex records)
+        {
+            var opened = inner.Open(records);
             return wrap is null ? opened : wrap(opened);
         }
     }

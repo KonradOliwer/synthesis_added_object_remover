@@ -1,3 +1,3 @@
-  Removed 000800:Target.esp (base (none)) in worldspace Tamriel [000100:Target.esp], place Skyrim, hold unnamed area; too close to 000010:Other.esp
+  Removed 000800:Target.esp (base (none)) in worldspace Tamriel [000100:Target.esp], place Skyrim, hold unnamed area; too close to 000010:Other.esp, changed by Other.esp (new object)
   Removed 000801:Target.esp (base (none)) in worldspace Tamriel [000100:Target.esp], place Skyrim, hold unnamed area; touches removed 000800:Target.esp
   Removed 000802:Target.esp (base (none)) in worldspace Tamriel [000100:Target.esp], place Skyrim, hold unnamed area; linked to removed 000801:Target.esp

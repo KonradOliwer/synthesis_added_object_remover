@@ -15,7 +15,7 @@ internal static partial class Tables
     [
         "iteration", "formKey", "editorId", "base", "modelPath", "space",
         "contactPoints", "totalWeight",
-        "removedTargetShare", "keptTargetShare", "otherPluginShare", "terrainShare",
+        "removedCleanedModShare", "keptCleanedModShare", "otherPluginShare", "terrainShare",
         "threshold", "decision", "topSupporters",
     ];
 
@@ -63,8 +63,17 @@ internal static partial class Tables
         TextLists.TopN(
             evaluation.Shares,
             MaxListedSupporters,
-            share => $"{DescribeSupporter(share.Supporter, world)} {share.Category} {Number(share.Share)}",
+            share => $"{DescribeSupporter(share.Supporter, world)} {DescribeCategory(share.Category)} {Number(share.Share)}",
             CellSeparator);
+
+    private static string DescribeCategory(SupportCategory category) => category switch
+    {
+        SupportCategory.RemovedTarget => "RemovedCleanedMod",
+        SupportCategory.KeptTarget => "KeptCleanedMod",
+        SupportCategory.OtherPlugin => nameof(SupportCategory.OtherPlugin),
+        SupportCategory.Terrain => nameof(SupportCategory.Terrain),
+        _ => throw new UnreachableException($"Unknown support category {category}."),
+    };
 
     internal static string DescribeSupporter(Supporter supporter, CollectedObjects world) => supporter.Type switch
     {

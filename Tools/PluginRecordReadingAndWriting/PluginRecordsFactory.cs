@@ -1,17 +1,17 @@
-using Mutagen.Bethesda.Plugins.Cache;
-using Mutagen.Bethesda.Plugins.Order;
+using Mutagen.Bethesda;
 using Mutagen.Bethesda.Skyrim;
 
 namespace AddedObjectRemover;
 
-/// <summary>Created in the entry from the Synthesis state's load order, link cache and patch plugin, and the run's known plugin names.</summary>
+/// <summary>Created in the entry from the final world; each run's reader gets a link cache of its own over the world's order.</summary>
 /// <param name="workers">How many threads may read records at once.</param>
-public sealed class PluginRecordsFactory(
-    ILoadOrder<IModListing<ISkyrimModGetter>> loadOrder,
-    ILinkCache<ISkyrimMod, ISkyrimModGetter> linkCache,
-    ISkyrimMod patchMod,
-    KnownPluginNames knownPlugins,
-    int workers) : IPluginRecordsFactory
+public sealed class PluginRecordsFactory(FinalWorld world, int workers) : IPluginRecordsFactory
 {
-    public IPluginRecords Open() => new PluginRecords(loadOrder, linkCache, patchMod, new PluginNames(knownPlugins), new Execution(workers));
+    public IPluginRecords Open() =>
+        new PluginRecords(
+            world.Order,
+            new RunLinkCache(world.Order.ToImmutableLinkCache<ISkyrimMod, ISkyrimModGetter>()),
+            world.Patch,
+            new PluginNames(world.Plugins.Mods),
+            new Execution(workers));
 }

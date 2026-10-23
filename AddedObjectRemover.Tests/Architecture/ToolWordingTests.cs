@@ -29,11 +29,14 @@ public partial class ToolWordingTests
         [("Tools/TriangleMeshTests/BoxMesh.cs", "A box mesh always has 12 triangles.")] = BugMessage,
         [("Tools/PluginRecordReadingAndWriting/PlacedRecordWriter.cs", "Unknown write order.")] = BugMessage,
         [("Tools/PluginRecordReadingAndWriting/PluginRecords.cs", "The placed records must be read before they are used.")] = BugMessage,
+        [("Tools/PluginRecordReadingAndWriting/PatchWriting.cs", "The records to write were not read by this plugin tool.")] = BugMessage,
+        [("Tools/PluginRecordReadingAndWriting/PatchMarker.cs", "Added Object Remover patch")] = "Header description text that marks a plugin as this patcher's output; plugin file content, never log wording.",
+        [("Tools/PluginRecordReadingAndWriting/BaseFactsFactory.cs", "The record index was not opened by this plugin tool.")] = BugMessage,
         [("Tools/PluginRecordReadingAndWriting/LandscapeTerrain.cs", "The terrain versions were not read; ask for them in the read scope.")] = BugMessage,
         [("Tools/PluginRecordReadingAndWriting/CellWater.cs", "The water copies were not read; ask for the water in the read scope.")] = BugMessage,
         [("Tools/GroundSurfaceQueries/TerrainLayerShares.cs", "The vertex ({vertexX}, {vertexY}) is outside the cell's terrain.")] = BugMessage,
         [("Tools/PluginRecordReadingAndWriting/RecordKeyConversion.cs", "Plugin {plugin} is not in the load order's known plugin names.")] = BugMessage,
-        [("Tools/PluginRecordReadingAndWriting/EnabledPluginListReader.cs", "The library's malformed-line error names no line: {ex.Message}")] = BugMessage,
+        [("Tools/PluginRecordReadingAndWriting/PluginListReader.cs", "The library's malformed-line error names no line: {ex.Message}")] = BugMessage,
     };
 
     [Fact]
@@ -48,7 +51,7 @@ public partial class ToolWordingTests
         var stale = AllowedPhrases.Keys.Except(found).Select(Describe).Order(StringComparer.Ordinal).ToList();
 
         Assert.True(notAllowed.Count == 0, $"Text in a tool; move the wording to the report step:{Environment.NewLine}{string.Join(Environment.NewLine, notAllowed)}");
-        Assert.True(stale.Count == 0, $"Allowed in {nameof(ToolWordingTests)} but no longer in a tool (remove):{Environment.NewLine}{string.Join(Environment.NewLine, stale)}");
+        AllowListAssert.NoneStale(stale, $"Allowed in {nameof(ToolWordingTests)} but no longer in a tool (remove)");
     }
 
     [Theory]

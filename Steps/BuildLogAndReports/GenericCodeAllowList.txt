@@ -20,6 +20,8 @@ LogSections.DescribePluginList | Report wording: prints where the game's plugin 
 LogSections.OnOff | Report wording: prints a setting's switch as on or off.
 LogSections.OnWith | Report wording: prints a setting's switch as off, or as on with the detail that matters when it is on.
 LogSections.JoinOrNone | Report wording: joins names or prints "(none)".
+LogSections.TrustReasonLine | Report wording: one trust reason's line of described plugins, or no line when no plugin has that reason.
+LogSections.OtherMasters | Report wording: a number of other masters, singular for 1.
 LogSections.MeshFailureCounts | Report wording: the counts of the "Mesh failures" and "Mesh triangle failures" lines (a mesh tool's category, not a domain type).
 LogSections.MeshProblemLinesInOrder | Report ordering: sorts the mesh problems by mesh, then by their worded line (a mesh tool's problem record, not a domain type).
 MeshProblemText.Line | Report wording: the line of one mesh or archive problem (a mesh tool's problem record, not a domain type).

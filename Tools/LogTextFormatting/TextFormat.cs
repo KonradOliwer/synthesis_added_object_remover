@@ -11,6 +11,10 @@ public static class TextFormat
     /// <summary>A whole number as plain digits, like "12345", without digit grouping.</summary>
     public static string Count<T>(T value) where T : IBinaryInteger<T> => value.ToString(null, CultureInfo.InvariantCulture);
 
+    /// <summary>A whole number with its noun, singular only for 1, like "1 mod" or "143 mods".</summary>
+    public static string Count<T>(T value, string singular, string plural) where T : IBinaryInteger<T> =>
+        $"{Count(value)} {(value == T.One ? singular : plural)}";
+
     /// <summary>A number with exactly <paramref name="decimals"/> decimals.</summary>
     public static string Fixed<T>(T value, int decimals) where T : IFormattable => value.ToString($"F{decimals}", null);
 

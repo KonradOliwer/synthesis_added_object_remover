@@ -16,15 +16,29 @@ public sealed class PatchWriterTests
         var final = RemovalDecisions.Start(protection, TargetCount)
             .Apply(RoundKind.TooClose, [Propose(4), Propose(0)])
             .Apply(RoundKind.AlsoRemove, [Propose(1)]);
-        var plugin = new RecordingPlugin();
+        var writing = new RecordingWriting();
 
-        var written = PatchWriter.Write(final, [.. targets], plugin);
+        var written = PatchWriter.Write(final, [.. targets], new ReadPlugin(), writing);
 
         Assert.Equal([0, 4, 1, 2], written.Removed.Select(id => id.Index));
         Assert.Equal(
             written.Removed.Select(id => targets[id.Index].Key),
-            plugin.Orders.OfType<SetInitiallyDisabled>().Select(order => order.Record));
+            writing.Orders.OfType<SetInitiallyDisabled>().Select(order => order.Record));
         Assert.Equal(0, written.Moved);
+    }
+
+    [Fact]
+    public void TheWritingCopiesFromTheRecordsThePluginRead()
+    {
+        var targets = TestTargets.CreateMany(1);
+        var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(1), TestBaseFacts.Unresolved);
+        var final = RemovalDecisions.Start(protection, 1).Apply(RoundKind.TooClose, [Propose(0)]);
+        var plugin = new ReadPlugin();
+        var writing = new RecordingWriting();
+
+        PatchWriter.Write(final, [.. targets], plugin, writing);
+
+        Assert.Same(plugin.Records, writing.Records);
     }
 
     [Fact]
@@ -34,45 +48,60 @@ public sealed class PatchWriterTests
         targets[1] = targets[1] with { IsPersistent = true };
         var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(2), TestBaseFacts.Unresolved);
         var final = RemovalDecisions.Start(protection, 2).Apply(RoundKind.TooClose, [Propose(0), Propose(1)]);
-        var plugin = new RecordingPlugin();
+        var writing = new RecordingWriting();
 
-        PatchWriter.Write(final, [.. targets], plugin);
+        PatchWriter.Write(final, [.. targets], new ReadPlugin(), writing);
 
-        Assert.Equal([targets[0].Key, targets[1].Key], plugin.Orders.OfType<SetInitiallyDisabled>().Select(order => order.Record));
-        var move = Assert.Single(plugin.Orders.OfType<SetPosition>());
+        Assert.Equal([targets[0].Key, targets[1].Key], writing.Orders.OfType<SetInitiallyDisabled>().Select(order => order.Record));
+        var move = Assert.Single(writing.Orders.OfType<SetPosition>());
         Assert.Equal(targets[0].Key, move.Record);
         Assert.Equal(-30000f, move.Position.Z);
     }
 
     [Fact]
-    public void WritesListTheDisabledKeysInWriteOrderAndOnlyTheMarkerMoves()
+    public void AKeptMarkersMoveIsWrittenToItsNewPositionAndCountedAsMoved()
     {
         var targets = TestTargets.CreateMany(TargetCount);
         var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(TargetCount), TestBaseFacts.Unresolved);
         var markerMove = new MarkerMove(new TargetId(3), Vector3.Zero, new Vector3(1, 2, 3));
-        var final = RemovalDecisions.Start(protection, TargetCount)
-            .Apply(RoundKind.TooClose, [Propose(4), Propose(0)])
-            .AddMoves([markerMove]);
+        var final = RemovalDecisions.Start(protection, TargetCount).AddMoves([markerMove]);
+        var writing = new RecordingWriting();
 
-        var written = PatchWriter.Write(final, [.. targets], new RecordingPlugin());
+        var written = PatchWriter.Write(final, [.. targets], new ReadPlugin(), writing);
 
-        Assert.Equal([targets[0].Key, targets[4].Key], written.Writes.Disabled.AsEnumerable());
-        Assert.Equal([new RecordMove(targets[3].Key, new Vector3(1, 2, 3))], written.Writes.Moved.AsEnumerable());
+        Assert.Equal<WriteOrder>([new SetPosition(targets[3].Key, new Vector3(1, 2, 3))], writing.Orders);
+        Assert.Equal(1, written.Moved);
     }
 
     private static ProposedRemoval Propose(int index) => new(new TargetId(index), new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()));
 
-    private sealed class RecordingPlugin : IPluginRecords
+    private sealed class RecordingWriting : IPatchWriting
     {
         public List<WriteOrder> Orders { get; } = [];
 
-        public bool HasEnableParent(RecordKey record) => false;
+        public IWritableRecords? Records { get; private set; }
 
-        public void Write(IReadOnlyList<WriteOrder> orders) => Orders.AddRange(orders);
+        public void Write(IWritableRecords records, IReadOnlyList<WriteOrder> orders)
+        {
+            Records = records;
+            Orders.AddRange(orders);
+        }
+    }
+
+    private sealed class NoRecords : IWritableRecords;
+
+    /// <summary>A reader whose placed records were read: none has an enable parent.</summary>
+    private sealed class ReadPlugin : IPluginRecords
+    {
+        public IWritableRecords Records { get; } = new NoRecords();
+
+        public IWritableRecords ReadWritableRecords() => Records;
+
+        public IRecordIndex ReadRecordIndex() => throw new NotSupportedException();
 
         public bool TryParsePluginName(string text, out PluginName name) => throw new NotSupportedException();
 
-        public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope) => throw new NotSupportedException();
+        public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk) => throw new NotSupportedException();
 
         public ImmutableArray<LinkFact> ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets) => throw new NotSupportedException();
 

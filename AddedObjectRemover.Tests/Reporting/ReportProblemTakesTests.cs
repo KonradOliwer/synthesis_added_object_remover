@@ -36,29 +36,10 @@ public class ReportProblemTakesTests
 
     private sealed class FakeRun
     {
-        public FakeRun() => Report = new TestReport(new MeshFilesWithProblems(Problems), new UnexpectedErrors());
+        public FakeRun() => Report = TestReport.Over(Problems);
 
         public AssetProblemLog Problems { get; } = new();
 
         public TestReport Report { get; }
-    }
-
-    private sealed class MeshFilesWithProblems(AssetProblemLog problems) : IMeshFiles
-    {
-        public IMeshBounds Bounds => throw NotRead();
-
-        public IMeshProblems Problems => problems;
-
-        public int ArchivesIndexed => throw NotRead();
-
-        public void PrepareReading() => throw NotRead();
-
-        public string NormalizeMeshPath(string givenPath) => throw NotRead();
-
-        public MeshTriangles? ReadTriangles(string meshPath) => throw NotRead();
-
-        public TriangleFailureCounts CountTriangleFailures() => throw NotRead();
-
-        private static InvalidOperationException NotRead() => new("The problem takes read only the problem log.");
     }
 }

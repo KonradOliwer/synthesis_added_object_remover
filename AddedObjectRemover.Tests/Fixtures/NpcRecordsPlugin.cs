@@ -14,13 +14,13 @@ internal sealed class NpcRecordsPlugin(ILinkCache linkCache) : IPluginRecords
 
     public IReadOnlyList<RecordKey> LeveledEntriesOf(RecordKey list, NpcTemplateFlag templateFlag) => _npcReads.LeveledEntriesOf(list, templateFlag);
 
-    public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope) => throw new NotSupportedException();
+    public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk) => throw new NotSupportedException();
 
     public ImmutableArray<LinkFact> ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets) => throw new NotSupportedException();
 
-    public bool HasEnableParent(RecordKey record) => throw new NotSupportedException();
+    public IWritableRecords ReadWritableRecords() => throw new NotSupportedException();
 
-    public void Write(IReadOnlyList<WriteOrder> orders) => throw new NotSupportedException();
+    public IRecordIndex ReadRecordIndex() => throw new NotSupportedException();
 
     public CellGridPoint? ReadHomeCellGrid(RecordKey record) => throw new NotSupportedException();
 

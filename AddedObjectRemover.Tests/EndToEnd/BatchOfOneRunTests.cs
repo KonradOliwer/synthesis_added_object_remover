@@ -1,7 +1,3 @@
-using Mutagen.Bethesda.Json;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-
 namespace AddedObjectRemover.Tests.EndToEnd;
 
 /// <summary>Standard mode is a batch of one: a config equal to the Standard settings changes nothing but the lines that open its run.</summary>
@@ -58,28 +54,14 @@ public sealed class BatchOfOneRunTests
 
     private static Settings BatchSettingsWithConfig(Settings settings, string dataFolder)
     {
-        WriteFile(dataFolder, Path.Combine("groups", GroupName + ".json"), $"[\"{ConfigName}\"]");
-        WriteFile(dataFolder, Path.Combine("configs", ConfigName + ".json"), JsonConvert.SerializeObject(settings.Standard, ConfigJson()));
+        BatchFiles.WriteGroup(dataFolder, GroupName, [ConfigName]);
+        BatchFiles.WriteConfig(dataFolder, ConfigName, settings.Standard);
         return new Settings
         {
             Mode = PatchMode.Batch,
             DetailedLogAndReports = settings.DetailedLogAndReports,
+            OnlyWarnWhenModRequiringCleanedModLoadsAfterPatch = settings.OnlyWarnWhenModRequiringCleanedModLoadsAfterPatch,
             Batch = new BatchSettings { GroupFileName = GroupName },
         };
-    }
-
-    private static JsonSerializerSettings ConfigJson()
-    {
-        var json = new JsonSerializerSettings();
-        json.Converters.Add(new StringEnumConverter());
-        json.AddMutagenConverters();
-        return json;
-    }
-
-    private static void WriteFile(string dataFolder, string relativePath, string content)
-    {
-        var path = Path.Combine(dataFolder, "synthesis_added_object_remover", relativePath);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, content);
     }
 }

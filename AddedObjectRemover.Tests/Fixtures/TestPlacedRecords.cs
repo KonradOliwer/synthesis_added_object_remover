@@ -2,20 +2,18 @@ using System.Numerics;
 
 namespace AddedObjectRemover.Tests.Fixtures;
 
-/// <summary>Placed record facts in the test target space, shown in game, unrotated.</summary>
+/// <summary>Placed record facts in the test target space, shown in game, unrotated, with the winning version as their only version.</summary>
 internal static class TestPlacedRecords
 {
-    public static PlacedRecordFact Create(RecordKey key, PluginName winningMod, Vector3 position, BaseKey? baseKey = null) =>
-        new(
+    public static PlacedRecordFact Create(RecordKey key, PluginName winningMod, Vector3 position, BaseKey? baseKey = null)
+    {
+        var placement = new PlacementFacts(new PresenceFacts(Deleted: false, InitiallyDisabled: false, EnableParent: null), position, Vector3.Zero);
+        return new(
             key,
             EditorId: null,
-            winningMod,
             new SpaceFact(TestTargets.Space, null, SpaceKind.Worldspace, Name: null),
             new CellFact(TestTargets.Space, null),
             InTargetSpace: true,
-            new PlacementFacts(InitiallyDisabled: false, HasEnableParent: false, position, Vector3.Zero),
-            Scale: null,
-            Base: baseKey,
             IsTeleportDoor: false,
             IsPrimitive: false,
             HasMapMarker: false,
@@ -23,5 +21,11 @@ internal static class TestPlacedRecords
             NamedByScript: null,
             HasLocationRefType: false,
             ReferenceRadius: null,
-            PrimitiveBounds: null);
+            PrimitiveBounds: null,
+            Versions: [new PlacedVersionFact(winningMod, placement, Scale: null, baseKey)]);
+    }
+
+    /// <summary>The record with its winning version's presence flags replaced.</summary>
+    public static PlacedRecordFact WithWinningPresence(PlacedRecordFact record, PresenceFacts presence) =>
+        record with { Versions = record.Versions.SetItem(record.Versions.Length - 1, record.Winner with { Placement = record.Placement with { Presence = presence } }) };
 }

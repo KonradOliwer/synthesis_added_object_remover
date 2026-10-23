@@ -14,7 +14,7 @@ public class LogicPublicTypesTests
     private static readonly Dictionary<string, string> EntryTypes = new()
     {
         ["BaseObjectShapeAndKind"] = "BaseObjectShapes",
-        ["IdentifyTheMods"] = "ModIdentifier",
+        ["IdentifyTheMods"] = "ModTrustClassifier",
         ["CollectPlacedObjects"] = "PlacedObjectCollector",
         ["SelectObjectsThatCanCauseRemovals"] = "RemovalCauseSelector",
         ["FindTargetObjectsToKeep"] = "ObjectsToKeepFinder",
@@ -40,8 +40,8 @@ public class LogicPublicTypesTests
             "BaseShape Of(BaseKey?)",
             "ObjectVisibility VisibilityOf(BaseKey?, Boolean, Boolean)",
         ],
-        ["IdentifyTheMods"] = ["static IdentifiedMods Identify(LoadOrderPlugins, ModIdentificationSettings)"],
-        ["CollectPlacedObjects"] = ["static CollectedObjects Collect(IPluginRecords, IdentifiedMods, WhatToCollect, WrittenByEarlierRuns)"],
+        ["IdentifyTheMods"] = ["static ModTrustTable Classify(LoadOrderPlugins, ModTrustSettings)"],
+        ["CollectPlacedObjects"] = ["static CollectedObjects Collect(IPluginRecords, ModTrustTable, WhatToCollect)"],
         ["SelectObjectsThatCanCauseRemovals"] =
         [
             "static ObjectMeasurementRules MeasurementRules(IUnexpectedErrors)",
@@ -69,7 +69,7 @@ public class LogicPublicTypesTests
         ],
         ["RemoveObjectsOnChangedTerrain"] =
         [
-            "static ChangedTerrainResult Find(CollectedObjects, IdentifiedMods, LoadOrderPlugins, IPluginRecords, IBaseObjectShapes, Execution, ChangedTerrainSettings)",
+            "static ChangedTerrainResult Find(CollectedObjects, ModTrustTable, LoadOrderPlugins, IPluginRecords, IBaseObjectShapes, Execution, ChangedTerrainSettings)",
         ],
         ["RemoveTooCloseObjects"] =
         [
@@ -89,7 +89,7 @@ public class LogicPublicTypesTests
         [
             "static MarkerMoves Plan(ImmutableArray<TargetObject>, LeftBehindResult, IRemovalDecisions, Func<IVisibleObjectsOfAnyPlugin>, IVisibleTargetObjects, IPluginRecords, INavmeshes, ITerrainHeights, IBaseObjectShapes, Execution, MarkerMoveSettings)",
         ],
-        ["WriteThePatch"] = ["static WriteSummary Write(IRemovalDecisions, ImmutableArray<TargetObject>, IPluginRecords)"],
+        ["WriteThePatch"] = ["static WriteSummary Write(IRemovalDecisions, ImmutableArray<TargetObject>, IPluginRecords, IPatchWriting)"],
         ["BuildLogAndReports"] =
         [
             "LogAndReports(RunSettings, ReportFolderPrepared, ILoadOrderCaches, IUnexpectedErrors)",
@@ -98,7 +98,7 @@ public class LogicPublicTypesTests
             "static ImmutableArray<LogSection> BuildStopSections(StopReason, SettingsSource)",
             "ImmutableArray<LogSection> BuildArchiveSections()",
             "ImmutableArray<LogSection> BuildIndexSections(CollectedObjects, TimeSpan)",
-            "ImmutableArray<LogSection> BuildStepSections(IdentifiedMods, LoadOrderPlugins)",
+            "ImmutableArray<LogSection> BuildStepSections(ModTrustTable, LoadOrderPlugins)",
             "ImmutableArray<LogSection> BuildStepSections(CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(Replacements, CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(ObjectsToKeepResult)",

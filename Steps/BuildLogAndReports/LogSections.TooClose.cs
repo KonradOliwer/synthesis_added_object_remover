@@ -45,9 +45,9 @@ internal static partial class LogSections
         [
             $"Object-shape zones: {TextFormat.Count(stats.CandidatePairs)} candidate pairs, {TextFormat.Count(stats.BoxFilterPasses)} passed the box filter, "
                 + $"{TextFormat.Count(stats.NarrowTests)} mesh tests, {TextFormat.Count(stats.Hits)} hits, {TextFormat.Count(stats.CentrePointFallbacks)} centre-point fallbacks "
-                + $"(other object without mesh triangles), {TextFormat.Count(stats.BoxZoneTargets)} targets without mesh triangles used their box; "
+                + $"(other object without mesh triangles), {TextFormat.Count(stats.BoxZoneTargets)} {report.Target} objects without mesh triangles used their box; "
                 + $"{TextFormat.Count(stats.TrianglePairsTested)} triangle pairs tested exactly.",
-            $"  {TextFormat.Count(report.Result.LargeOtherObjects)} large other objects tested against every target of their space; "
+            $"  {TextFormat.Count(report.Result.LargeOtherObjects)} large other objects tested against every {report.Target} object of their space; "
                 + $"{TextFormat.Count(report.EffectOnlyMeshes)} effect-only meshes (fog, light rays, water spray) ignored.",
             $"  Meshes indexed: {TextFormat.Count(report.MeshesIndexed)} ({TextFormat.Count(report.MeshTriangles)} triangles).",
         ];

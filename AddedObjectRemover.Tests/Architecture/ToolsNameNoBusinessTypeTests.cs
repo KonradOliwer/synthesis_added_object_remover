@@ -40,7 +40,7 @@ public partial class ToolsNameNoBusinessTypeTests
     {
         var stale = RecordIdentityTypes.Keys.Except(IdsTypeNames()).Order(StringComparer.Ordinal).ToList();
 
-        Assert.True(stale.Count == 0, $"Listed in {nameof(RecordIdentityTypes)} but not declared in Ids (remove):{Environment.NewLine}{string.Join(Environment.NewLine, stale)}");
+        AllowListAssert.NoneStale(stale, $"Listed in {nameof(RecordIdentityTypes)} but not declared in Ids (remove)");
     }
 
     [Fact]

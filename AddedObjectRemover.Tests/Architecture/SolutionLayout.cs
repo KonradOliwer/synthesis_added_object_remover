@@ -7,7 +7,8 @@ namespace AddedObjectRemover.Tests.Architecture;
 /// <summary>Where the solution's projects are on disk, read from the repository files rather than from the build.</summary>
 internal static partial class SolutionLayout
 {
-    private static readonly string[] GeneratedFolders = ["obj", "bin", "TestRun"];
+    /// <summary>Build and test output, and .claude, whose worktrees hold whole copies of the repository.</summary>
+    private static readonly string[] GeneratedFolders = ["obj", "bin", "TestRun", ".claude"];
 
     public static string Root() => RootFrom();
 

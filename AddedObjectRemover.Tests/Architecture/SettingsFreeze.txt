@@ -10,6 +10,7 @@ NpcHandling
 NpcHandling.AlwaysLikeAnyObject
 NpcHandling.Never
 NpcHandling.OnlyWhenStuckInsideTheObject
+OnlyWarnWhenModRequiringCleanedModLoadsAfterPatch
 PatchMode
 PatchMode.Batch
 PatchMode.Standard
@@ -66,12 +67,13 @@ Standard.TooClose.BySize.SizeMultiplier
 Standard.TooClose.BySize.Use
 Standard.TooClose.NpcHandling
 Standard.TooClose.UseRoughBoxes
-Standard.WhatToIgnore
-Standard.WhatToIgnore.CompatibilityPatches
-Standard.WhatToIgnore.CompatibilityPatches.IgnoreModsPatchedWithTarget
-Standard.WhatToIgnore.CompatibilityPatches.MaxOtherMastersForPatch
-Standard.WhatToIgnore.ExcludedPlugins
-Standard.WhatToIgnore.IgnoreTargetMasters
+Standard.Trust
+Standard.Trust.MaxOtherMastersOfRequiringModToTrust
+Standard.Trust.ModsTrustedForOwnChangesOnly
+Standard.Trust.NeverTrustedMods
+Standard.Trust.TrustModsLoadingBeforeCleanedMod
+Standard.Trust.TrustModsRequiringCleanedModAndTheirMasters
+Standard.Trust.TrustedModsAndTheirMasters
 TerrainCheckedObjects
 TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes
 TerrainCheckedObjects.VisibleObjectsAtAnyHeight

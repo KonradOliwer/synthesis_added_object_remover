@@ -123,7 +123,7 @@ internal static partial class Tables
 
     private static string DescribeSeedReason(RemovedObject seed, IReadOnlyList<TargetObject> targets) => seed switch
     {
-        TerrainChangedRemoval changed => $"terrain changed by {changed.ChangedBy}",
+        TerrainChangedRemoval changed => $"terrain changed by {Describe.ChangingMod(changed.ChangedBy)}",
         TooCloseRemoval { TooCloseTo: var other } => $"{other.Key} ({other.WinningMod})",
         LinkedRemoval linked => $"linked to {targets[linked.LinkedToTargetIndex].Key}",
         _ => throw new UnreachableException($"Unexpected seed removal type {seed.GetType().Name}."),

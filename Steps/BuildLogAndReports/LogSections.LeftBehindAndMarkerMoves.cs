@@ -8,6 +8,9 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
 internal static partial class LogSections
 {
+    /// <summary>The step's name, as the settings screen names its group.</summary>
+    private const string LeftBehindStepName = "Invisible objects left behind";
+
     /// <param name="kept">The objects the left-behind round held.</param>
     /// <remarks>The kept lines come first, then the per-object decisions and the summary.</remarks>
     public static LogSection BuildLeftBehindSection(
@@ -45,7 +48,7 @@ internal static partial class LogSections
             if (reported.Detail.LeftHomeCell)
             {
                 lines.Add(
-                    $"  Warning: {RecordNames.Describe(target)} was moved into the neighboring cell "
+                    $"  Warning: {RecordNames.Describe(target)} was moved into the neighbouring cell "
                     + $"({ExteriorGrid.CellIndex(reported.Move.To.X)}, {ExteriorGrid.CellIndex(reported.Move.To.Y)}) because its own cell has no free spot.");
             }
         }
@@ -64,14 +67,14 @@ internal static partial class LogSections
     {
         StepOutcome.Performed => MarkerMovesSummaryLine(markerMoves),
         StepOutcome.StoppedByUnexpectedError => BuildNotPerformedLine("Moved kept markers"),
-        StepOutcome.StoppedByEarlierFailure => BuildNotPerformedBecauseEarlierLine("Moved kept markers", "Leftover invisible objects"),
+        StepOutcome.StoppedByEarlierFailure => BuildNotPerformedBecauseEarlierLine("Moved kept markers", LeftBehindStepName),
         _ => throw new UnreachableException($"Unexpected marker move outcome {markerMoves.Outcome}."),
     };
 
     private static string LeftBehindClosingLine(LeftBehindResult leftBehind, TimeSpan elapsed, ReportContext context) => leftBehind.Outcome switch
     {
         StepOutcome.Performed => LeftBehindSummaryLine(leftBehind, elapsed, context),
-        StepOutcome.StoppedByUnexpectedError => BuildNotPerformedLine("Leftover invisible objects"),
+        StepOutcome.StoppedByUnexpectedError => BuildNotPerformedLine(LeftBehindStepName),
         _ => throw new UnreachableException($"Unexpected left-behind outcome {leftBehind.Outcome}."),
     };
 
@@ -81,7 +84,7 @@ internal static partial class LogSections
     private static string LeftBehindOutcomeLine(CollectedObjects world, LeftBehindCheck evaluation)
     {
         var target = world.Targets[evaluation.TargetIndex];
-        return $"  Leftover {RecordNames.Describe(target)} ({evaluation.Kind}) in {Describe.Space(world, target.SpaceKey)}: "
+        return $"  Left behind: {RecordNames.Describe(target)} ({evaluation.Kind}) in {Describe.Space(world, target.SpaceKey)}: "
             + $"{(evaluation.IsRemoved ? "removed" : "kept")}, {Describe.LeftBehindReason(evaluation)}; radius {TextFormat.Fixed(evaluation.Radius, 0)}, "
             + $"removed/total ground area {SectorAreasText.Describe(evaluation.Surroundings)}.";
     }
@@ -90,7 +93,7 @@ internal static partial class LogSections
     {
         var outcomes = Enum.GetValues<LeftBehindOutcome>();
         var removedCount = leftBehind.Evaluations.Count(evaluation => evaluation.IsRemoved);
-        return $"Leftover invisible objects: {TextFormat.Count(leftBehind.Evaluations.Count)} evaluated{Describe.TimedSuffix(elapsed, context)}; "
+        return $"{LeftBehindStepName}: {TextFormat.Count(leftBehind.Evaluations.Count)} evaluated{Describe.TimedSuffix(elapsed, context)}; "
             + $"removed {TextFormat.Count(removedCount)} ({CountOutcomes(leftBehind, outcomes.Where(LeftBehindOutcomes.IsRemoval))}); "
             + $"kept {TextFormat.Count(leftBehind.Evaluations.Count - removedCount)} "
             + $"({CountOutcomes(leftBehind, outcomes.Where(outcome => !LeftBehindOutcomes.IsRemoval(outcome)))}).";

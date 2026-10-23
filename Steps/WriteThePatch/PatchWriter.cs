@@ -5,10 +5,10 @@ using AddedObjectRemover.Steps.WriteThePatch.Contracts;
 
 namespace AddedObjectRemover.Steps.WriteThePatch;
 
-/// <summary>Turns the final removal decisions into write orders and has the plugin writer run them.</summary>
+/// <summary>Turns the final removal decisions into write orders and has the patch writing run them.</summary>
 public static class PatchWriter
 {
-    public static WriteSummary Write(IRemovalDecisions final, ImmutableArray<TargetObject> targets, IPluginRecords plugin)
+    public static WriteSummary Write(IRemovalDecisions final, ImmutableArray<TargetObject> targets, IPluginRecords plugin, IPatchWriting writing)
     {
         var removed = ListRemovalsInWriteOrder(final);
         var orders = new List<WriteOrder>();
@@ -16,17 +16,15 @@ public static class PatchWriter
         foreach (var id in removed)
         {
             var target = targets[id.Index];
-            var hasEnableParent = plugin.HasEnableParent(target.Key);
-            orders.AddRange(RemovalWrite.OrdersFor(target, hasEnableParent));
-            if (hasEnableParent) enableParentsReplaced++;
+            orders.AddRange(RemovalWrite.OrdersFor(target));
+            if (target.HasEnableParent) enableParentsReplaced++;
         }
 
-        var moved = final.Moves.Select(move => new RecordMove(targets[move.Target.Index].Key, move.To)).ToImmutableArray();
-        orders.AddRange(moved.Select(move => new SetPosition(move.Record, move.To)));
+        var moves = final.Moves.Select(move => new SetPosition(targets[move.Target.Index].Key, move.To)).ToList();
+        orders.AddRange(moves);
 
-        plugin.Write(orders);
-        var writes = new RecordWrites([.. removed.Select(id => targets[id.Index].Key)], moved);
-        return new WriteSummary(removed, moved.Length, enableParentsReplaced, writes);
+        writing.Write(plugin.ReadWritableRecords(), orders);
+        return new WriteSummary(removed, moves.Count, enableParentsReplaced);
     }
 
     /// <summary>Round by round, each round's direct removals in target order, then the linked ones.</summary>

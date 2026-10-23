@@ -120,11 +120,11 @@ public class UnexpectedErrorRunTests
         Assert.DoesNotContain(outcome.LeftBehind.Evaluations, evaluation => evaluation.IsRemoved);
         Assert.Equal(outcome.Removals.Select(removal => removal.TargetIndex), outcome.Written.Removed.Select(id => id.Index));
         Assert.Equal(
-            $"  Unexpected error in the left-behind step (InvalidOperationException: {FailingBaseFacts.FailureMessage}). "
-            + "The left-behind step did not run, so invisible objects whose surroundings were removed were not removed.",
+            $"  Unexpected error in the step for invisible objects left behind (InvalidOperationException: {FailingBaseFacts.FailureMessage}). "
+            + "That step did not run, so invisible objects whose surroundings were removed were not removed.",
             Assert.Single(UnexpectedErrorLines(log)));
-        Assert.Contains("Leftover invisible objects: not performed because of an unexpected error.", SectionLines(log, "leftovers"));
-        Assert.Contains("Moved kept markers: not performed because Leftover invisible objects was not performed.", SectionLines(log, "relocations"));
+        Assert.Contains("Invisible objects left behind: not performed because of an unexpected error.", SectionLines(log, "leftovers"));
+        Assert.Contains("Moved kept markers: not performed because Invisible objects left behind was not performed.", SectionLines(log, "relocations"));
         Assert.Equal(StepOutcome.StoppedByEarlierFailure, outcome.MarkerMoves.Outcome);
     }
 

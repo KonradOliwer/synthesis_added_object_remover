@@ -304,7 +304,7 @@ public sealed class ConfigFilesTests : IDisposable
         const string Text = """
             {
               "CleanedMod": "A.esp",
-              "WhatToIgnore": { "ExcludedPlugins": ["B.esp", "C.esp"], "CompatibilityPatches": null },
+              "Trust": { "TrustedModsAndTheirMasters": ["B.esp", "C.esp"], "TrustModsLoadingBeforeCleanedMod": false },
               "TooClose": { "NpcHandling": "Never", "ByDistance": { "Use": true, "DistanceInUnits": 40 } },
               "LeftoverInvisibleObjects": { "AlwaysKeep": { "Lights": true } }
             }
@@ -350,7 +350,7 @@ public sealed class ConfigFilesTests : IDisposable
         Assert.Contains(new SettingInFile("LeftoverInvisibleObjects.SurroundingObjects.SearchRadius", "Invisible objects left behind > When the cleaned mod's visible objects around it were removed > Look this far around it (game units)", "1024.0"), notInFile);
         Assert.Contains(new SettingInFile("TerrainChange.TerrainCheckedObjects", "Remove objects on terrain changed by other mods > Which of the cleaned mod's objects are checked", "\"AllObjectsIncludingInvisibleOnes\""), notInFile);
         Assert.Contains(new SettingInFile("TerrainChange.ByDistance.DistanceInUnits", "Remove objects on terrain changed by other mods > Margin by fixed distance > Margin on every side (game units)", "64.0"), notInFile);
-        Assert.Contains(new SettingInFile("WhatToIgnore.ExcludedPlugins", "Other mods that never cause removals > Never count these mods", "[]"), notInFile);
+        Assert.Contains(new SettingInFile("Trust.TrustedModsAndTheirMasters", "Which other mods can cause removals > Trusted mods, and their masters", "[]"), notInFile);
         Assert.Contains(
             new SettingInFile("TooClose.UseRoughBoxes", "Remove objects too close to other mods' objects > Use rough boxes instead of exact shapes (faster)", "false"),
             notInFile);
@@ -369,7 +369,7 @@ public sealed class ConfigFilesTests : IDisposable
         var notInFile = NotesOf(config).NotInFile;
 
         Assert.Contains(new SettingInFile("CleanedMod", "Mod to clean up", "null"), notInFile);
-        Assert.Equal(["CleanedMod", "WhatToIgnore.ExcludedPlugins", "WhatToIgnore.IgnoreTargetMasters"], notInFile.Take(3).Select(setting => setting.KeyPath));
+        Assert.Equal(["CleanedMod", "Trust.TrustedModsAndTheirMasters", "Trust.ModsTrustedForOwnChangesOnly"], notInFile.Take(3).Select(setting => setting.KeyPath));
     }
 
     [Fact]
@@ -398,7 +398,7 @@ public sealed class ConfigFilesTests : IDisposable
                 "BySize": { "SizeMultiplier": 1.0 },
                 "ByDistance": { "DistanceInUnits": 50.0 }
               },
-              "WhatToIgnore": { "ExcludedPlugins": ["B.esp"], "IgnoreTargetMasters": true },
+              "Trust": { "TrustedModsAndTheirMasters": ["B.esp"], "TrustModsLoadingBeforeCleanedMod": true },
               "TerrainChange": { "MinTerrainTypeChangePercent": 20 },
               "LeftoverInvisibleObjects": { "RemoveLeftoverInvisibleObjects": false }
             }
@@ -407,7 +407,7 @@ public sealed class ConfigFilesTests : IDisposable
         var changed = NotesOf(config).ChangedFromDefault;
 
         Assert.Equal(
-            ["CleanedMod", "WhatToIgnore.ExcludedPlugins", "TooClose.BySize.SizeMultiplier", "TooClose.NpcHandling", "LeftoverInvisibleObjects.RemoveLeftoverInvisibleObjects"],
+            ["CleanedMod", "Trust.TrustedModsAndTheirMasters", "TooClose.BySize.SizeMultiplier", "TooClose.NpcHandling", "LeftoverInvisibleObjects.RemoveLeftoverInvisibleObjects"],
             changed.Select(setting => setting.KeyPath));
         Assert.Equal(["\"A.esp\"", "[\"B.esp\"]", "1.0", "\"Never\"", "false"], changed.Select(setting => setting.ValueAsJson));
         Assert.Contains(
@@ -435,9 +435,9 @@ public sealed class ConfigFilesTests : IDisposable
     [Fact]
     public void ANullListIsTheDefaultOfAListSetting()
     {
-        var config = ReadOnlyConfig("{\"CleanedMod\": \"A.esp\", \"WhatToIgnore\": {\"ExcludedPlugins\": null}}");
+        var config = ReadOnlyConfig("{\"CleanedMod\": \"A.esp\", \"Trust\": {\"TrustedModsAndTheirMasters\": null}}");
 
-        Assert.DoesNotContain(NotesOf(config).ChangedFromDefault, setting => setting.KeyPath == "WhatToIgnore.ExcludedPlugins");
+        Assert.DoesNotContain(NotesOf(config).ChangedFromDefault, setting => setting.KeyPath == "Trust.TrustedModsAndTheirMasters");
     }
 
     [Theory]
@@ -492,7 +492,7 @@ public sealed class ConfigFilesTests : IDisposable
     }
 
     /// <summary>The Synthesis settings screen saves a plugin picker left unset as "".</summary>
-    private const string UnsetPlugins = "\"CleanedMod\": \"\", \"WhatToIgnore\": { \"ExcludedPlugins\": [\"\"] }";
+    private const string UnsetPlugins = "\"CleanedMod\": \"\", \"Trust\": { \"TrustedModsAndTheirMasters\": [\"\"] }";
 
     private T ReadLikeSynthesis<T>(string fileName, string json) where T : class, new()
     {
@@ -505,7 +505,7 @@ public sealed class ConfigFilesTests : IDisposable
         var target = new PluginName("A.esp");
         var patch = new PluginName("Patch.esp");
         var facts = TestLoadOrderPlugins.Of(new KnownPluginNames([target, patch]), patch, [new PluginListing(target, true, []), new PluginListing(patch, true, [])]);
-        return SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), facts, detailedLogAndReports: false, "/out", 1);
+        return SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), facts, detailedLogAndReports: false, onlyWarnWhenRequiringModLoadsAfterPatch: false, "/out", 1);
     }
 
     [Fact]
@@ -514,9 +514,9 @@ public sealed class ConfigFilesTests : IDisposable
         var settings = ReadLikeSynthesis<Settings>(Program.SettingsFileName, $"{{ \"Mode\": \"Standard\", \"Standard\": {{ {UnsetPlugins} }} }}");
 
         Assert.True(settings.Standard.CleanedMod.IsNull);
-        Assert.True(Assert.Single(settings.Standard.WhatToIgnore.ExcludedPlugins).IsNull);
+        Assert.True(Assert.Single(settings.Standard.Trust.TrustedModsAndTheirMasters).IsNull);
         Assert.Null(((ISettingsValues)settings.Standard).CleanedMod);
-        Assert.Empty(((ISettingsValues)settings.Standard).WhatToIgnore.ExcludedPlugins);
+        Assert.Empty(((ISettingsValues)settings.Standard).Trust.TrustedModsAndTheirMasters);
     }
 
     [Fact]
@@ -550,7 +550,7 @@ public sealed class ConfigFilesTests : IDisposable
         var synthesis = new ReflectionSettingsTarget<StandardSettings>(Path.GetFileName(ConfigPath(TownWalls)), throwIfMissing: true) { AnchorPath = ConfigsFolder };
 
         Assert.Equal(JsonConvert.SerializeObject(synthesis.Value.Value, SynthesisJson), JsonConvert.SerializeObject(config.Settings, SynthesisJson));
-        Assert.Empty(config.Settings.WhatToIgnore.ExcludedPlugins);
+        Assert.Empty(config.Settings.Trust.TrustedModsAndTheirMasters);
         Assert.DoesNotContain(NotesOf(config).ChangedFromDefault, setting => setting.KeyPath == "CleanedMod");
         Assert.Equal(
             $"Config file {ConfigPath(TownWalls)} sets no mod to clean up (CleanedMod). Nothing was run and no patch was written.",
@@ -560,8 +560,8 @@ public sealed class ConfigFilesTests : IDisposable
     [Fact]
     public void AnEmptyListIsTheDefaultOfAListSetting()
     {
-        var config = ReadOnlyConfig("{\"CleanedMod\": \"A.esp\", \"WhatToIgnore\": {\"ExcludedPlugins\": []}}");
+        var config = ReadOnlyConfig("{\"CleanedMod\": \"A.esp\", \"Trust\": {\"TrustedModsAndTheirMasters\": []}}");
 
-        Assert.DoesNotContain(NotesOf(config).ChangedFromDefault, setting => setting.KeyPath == "WhatToIgnore.ExcludedPlugins");
+        Assert.DoesNotContain(NotesOf(config).ChangedFromDefault, setting => setting.KeyPath == "Trust.TrustedModsAndTheirMasters");
     }
 }

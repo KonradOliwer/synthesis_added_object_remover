@@ -9,10 +9,10 @@ namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 /// <param name="Proposals">A removal proposal for each hit, in target order.</param>
 /// <param name="Failures">The target objects whose check failed unexpectedly, in target order; none of them is a hit.</param>
 /// <param name="CellsCompared">
-/// The exterior cells whose terrain versions were compared with their reference, each land cell once, even when a child
+/// The exterior cells whose terrain versions were compared with their accepted terrain, each land cell once, even when a child
 /// worldspace uses it too.
 /// </param>
-/// <param name="ObjectsWithoutTerrain">The objects the step would check that have no terrain to compare: in an interior, in a worldspace without terrain, or over cells without reference terrain.</param>
+/// <param name="ObjectsWithoutTerrain">The objects the step would check that have no terrain to compare: in an interior, in a worldspace without terrain, or over cells no trusted plugin has a land record of.</param>
 public sealed record ChangedTerrainResult(
     StepOutcome Outcome,
     ImmutableArray<ObjectOnChangedTerrain> Hits,
@@ -25,6 +25,9 @@ public sealed record ChangedTerrainResult(
 }
 
 /// <summary>A target object on terrain that another mod changed.</summary>
-/// <param name="ChangedBy">The last loading counting plugin whose own terrain or water differs from the reference around the object.</param>
-/// <param name="Kind">How the terrain and water the game shows differ from the reference, at the vertices the counting plugins changed.</param>
-public readonly record struct ObjectOnChangedTerrain(TargetId Target, PluginName ChangedBy, TerrainChangeKind Kind);
+/// <param name="ChangedBy">
+/// The later loading of the plugins named for the counted changes around the object; null when that is the patch, whose change an
+/// earlier patcher of the group made.
+/// </param>
+/// <param name="Kind">How the terrain and water the game shows differ from the accepted ones, at the vertices of the counted changes.</param>
+public readonly record struct ObjectOnChangedTerrain(TargetId Target, PluginName? ChangedBy, TerrainChangeKind Kind);

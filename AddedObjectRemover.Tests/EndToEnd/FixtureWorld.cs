@@ -11,8 +11,11 @@ internal sealed class FixtureWorld
     /// <summary>The mod being cleaned.</summary>
     public const string TargetName = "Target.esp";
 
-    /// <summary>Listed in the settings' excluded plugins.</summary>
-    public const string ExcludedPlugin = "Excluded.esp";
+    /// <summary>Listed in the settings' trusted mods and their masters.</summary>
+    public const string TrustedPlugin = "Trusted.esp";
+
+    /// <summary>The other mod; it requires the target and is listed in the settings' never trusted mods.</summary>
+    public const string OtherModPlugin = "Rival.esp";
 
     private FixtureWorld(IReadOnlyList<ISkyrimMod> loadOrder)
     {

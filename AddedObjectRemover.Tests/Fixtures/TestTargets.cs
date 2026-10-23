@@ -10,6 +10,9 @@ internal static class TestTargets
     public static readonly PluginName TargetName = TargetMod.ToPluginName();
     public static readonly RecordKey Space = SpaceKey(0x100);
 
+    /// <summary>The group's output plugin the target's objects are collected with.</summary>
+    public static readonly PluginName PatchName = new("Synthesis.esp");
+
     public static RecordKey SpaceKey(uint id) => new FormKey(TargetMod, id).ToRecordKey();
 
     public static RecordKey Key(int index) => FormKeyOf(index).ToRecordKey();
@@ -39,6 +42,7 @@ internal static class TestTargets
             IsPrimitive: false,
             HasMapMarker: false,
             IsPersistent: false,
+            HasEnableParent: false,
             NamedByScript: null,
             HasLocationRefType: false,
             ReferenceRadius: null,

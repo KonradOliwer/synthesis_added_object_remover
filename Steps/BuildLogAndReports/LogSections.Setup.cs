@@ -22,9 +22,13 @@ internal static partial class LogSections
         {
             lines.Add($"  Ignored {TextFormat.Count(counts.TargetsOverriddenLater)} {target} objects whose winning version comes from a later plugin.");
         }
+        if (counts.RemovedByOtherPlugins > 0)
+        {
+            lines.Add($"  Ignored {TextFormat.Count(counts.RemovedByOtherPlugins)} {target} objects that a later plugin removes.");
+        }
         if (counts.TargetsHiddenOrWithoutPlacement > 0)
         {
-            lines.Add($"  Ignored {TextFormat.Count(counts.TargetsHiddenOrWithoutPlacement)} {target} objects that are initially disabled or have no valid position or rotation.");
+            lines.Add($"  Ignored {TextFormat.Count(counts.TargetsHiddenOrWithoutPlacement)} {target} objects that are deleted, start disabled, or have no valid position or rotation.");
         }
         if (context.Detailed && counts.OtherInvalidPlacements > 0)
         {
@@ -34,7 +38,10 @@ internal static partial class LogSections
         {
             lines.Add($"  Ignored {TextFormat.Count(counts.OthersOverriddenByTarget)} other-mod objects that {target} itself overrides.");
         }
-        lines.AddRange(EarlierConfigLines(counts));
+        if (context.Detailed && counts.OthersUnchanged > 0)
+        {
+            lines.Add($"  Ignored {TextFormat.Count(counts.OthersUnchanged)} objects of other mods that the game shows with their accepted values.");
+        }
         if (context.Detailed) lines.AddRange(RecordedCounts(world));
         return new LogSection("scan", lines.ToImmutable());
     }
@@ -54,15 +61,15 @@ internal static partial class LogSections
     }
 
     /// <param name="linkCount">Links from target objects to any target-plugin record, before those not between two target objects are dropped.</param>
-    public static LogSection BuildGroupsSection(ILinkedGroups groups, int linkCount, ReportContext context)
+    public static LogSection BuildGroupsSection(ILinkedGroups groups, int linkCount, PluginName target, ReportContext context)
     {
         if (!context.Detailed) return new LogSection("groups", []);
         var multiMember = groups.MultiMemberGroups.ToList();
         return new LogSection(
             "groups",
             [
-                $"Linked groups: {TextFormat.Count(multiMember.Count)} groups of linked target objects ({TextFormat.Count(multiMember.Sum(members => members.Count))} objects) "
-                + $"from {TextFormat.Count(linkCount)} links to target-plugin records.",
+                $"Linked groups: {TextFormat.Count(multiMember.Count)} groups of linked {target} objects ({TextFormat.Count(multiMember.Sum(members => members.Count))} objects) "
+                + $"from {TextFormat.Count(linkCount)} links to {target} records.",
             ]);
     }
 
@@ -78,18 +85,6 @@ internal static partial class LogSections
         world.OverriddenOthers.Select(other =>
             $"  Ignored other-mod object overridden by {target}: "
             + $"{Describe.LabelWithOverride(other.Key, other.EditorId, other.WinningMod)}.");
-
-    private static IEnumerable<string> EarlierConfigLines(ReadCounts counts)
-    {
-        if (counts.RemovedByEarlierRuns > 0)
-        {
-            yield return $"  Ignored {TextFormat.Count(counts.RemovedByEarlierRuns)} objects that earlier configs of this batch removed.";
-        }
-        if (counts.MovedByEarlierRuns > 0)
-        {
-            yield return $"  {TextFormat.Count(counts.MovedByEarlierRuns)} objects that earlier configs of this batch moved are checked at their new position.";
-        }
-    }
 
     private static IEnumerable<string> RecordedCounts(CollectedObjects world)
     {

@@ -7,6 +7,7 @@ public partial class BusinessTypeNamesTests
 {
     private static readonly Dictionary<string, string> Allowed = new()
     {
+        ["ModTrustTable"] = "vocabulary.md fixes the name: the per-plugin trust the classifier decides once, read by the collector, the terrain step and the log.",
         ["NpcBodySet"] = "The set of meshes that make up one NPC body; the log reports 'body mesh sets'.",
         ["ObjectQueryScratch"] = "The per-worker scratch buffers for questions about the placed objects (the spatial tool's own buffers plus the caller's); reused buffers, not a cache.",
         ["NpcScratch"] = "The design's per-worker scratch buffers for the NPC search (see the tool catalog); reused buffers, not a cache.",
@@ -28,7 +29,7 @@ public partial class BusinessTypeNamesTests
         var stale = Allowed.Keys.Except(found).Order(StringComparer.Ordinal).ToList();
 
         Assert.True(unlisted.Count == 0, $"Banned type names:{Environment.NewLine}{string.Join(Environment.NewLine, unlisted)}");
-        Assert.True(stale.Count == 0, $"Listed but no longer found:{Environment.NewLine}{string.Join(Environment.NewLine, stale)}");
+        AllowListAssert.NoneStale(stale, "Listed but no longer found");
     }
 
     [Theory]

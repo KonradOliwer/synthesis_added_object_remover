@@ -7,7 +7,7 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
 internal static partial class Tables
 {
-    private static readonly ImmutableArray<string> HintsHeader = ["hint", "formKey", "editorId", "space", "cell", "detail"];
+    private static readonly ImmutableArray<string> HintsHeader = ["kind", "formKey", "editorId", "space", "cell", "detail"];
 
     public static CsvTable BuildHintsTable(CollectedObjects world, IEnumerable<ManualPatchHint> hints) =>
         new(ReportFileNames.HintsFileName, HintsHeader, [.. hints.Select(hint => HintRow(hint, world))]);

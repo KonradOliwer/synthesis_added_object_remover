@@ -49,11 +49,10 @@ internal static class SettingsVariants
             NpcHandling = npcs,
         },
         TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = false },
-        WhatToIgnore = new IgnoreSettings
+        Trust = new TrustSettings
         {
-            ExcludedPlugins = [ModKey.FromNameAndExtension(FixtureWorld.ExcludedPlugin)],
-            IgnoreTargetMasters = true,
-            CompatibilityPatches = new CompatibilityPatchSettings { IgnoreModsPatchedWithTarget = true },
+            TrustedModsAndTheirMasters = [ModKey.FromNameAndExtension(FixtureWorld.TrustedPlugin)],
+            NeverTrustedMods = [ModKey.FromNameAndExtension(FixtureWorld.OtherModPlugin)],
         },
         FollowUpRemoval = new FollowUpRemovalSettings { Mode = followUp },
         LeftoverInvisibleObjects = leftovers,

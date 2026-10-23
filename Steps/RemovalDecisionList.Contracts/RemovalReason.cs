@@ -25,8 +25,11 @@ public abstract record TooCloseCause
 /// <summary>Why a step proposes to remove a target object.</summary>
 public abstract record RemovalReason
 {
-    /// <param name="ChangedBy">The plugin whose terrain or water change the game shows.</param>
-    public sealed record TerrainChanged(PluginName ChangedBy, TerrainChangeKind Kind) : RemovalReason;
+    /// <param name="ChangedBy">
+    /// The plugin whose terrain or water change the game shows; null when only the patch holds it: an earlier patcher of the group
+    /// made it.
+    /// </param>
+    public sealed record TerrainChanged(PluginName? ChangedBy, TerrainChangeKind Kind) : RemovalReason;
 
     public sealed record TooClose(OtherId Other, TooCloseCause Cause) : RemovalReason;
 

@@ -23,7 +23,7 @@ internal static class FixtureStandingScene
         AddOverriddenByTarget(scenery, NextRow());
         AddNearForeignPad(scenery, "BaseGame", scenery.Mods.BaseGame, scenery.Bases.BaseGamePad, NextRow());
         AddNearForeignPad(scenery, "Patched", scenery.Mods.Patched, scenery.Bases.PatchedPad, NextRow());
-        AddNearForeignPad(scenery, "Excluded", scenery.Mods.Excluded, scenery.Bases.ExcludedPad, NextRow());
+        AddNearForeignPad(scenery, "Trusted", scenery.Mods.Trusted, scenery.Bases.TrustedPad, NextRow());
     }
 
     /// <summary>A later plugin overrides the target's record: the target's own version is not checked.</summary>
@@ -49,7 +49,7 @@ internal static class FixtureStandingScene
         scenery.Mods.Target.Interior.PlaceCopyOf(pad);
     }
 
-    /// <summary>Pads of the base game, of a mod a compatibility patch links to the target, and of an excluded plugin never count.</summary>
+    /// <summary>Pads of the base game, of a mod the compatibility patch masters, and of a plugin listed as trusted never cause removals.</summary>
     private static void AddNearForeignPad(FixtureScenery scenery, string name, FixtureMod padOwner, FormKey padBase, Vector3 position)
     {
         padOwner.Interior.Place($"{name}_Pad", padBase, position + FixtureLayout.PinningPadOffset);

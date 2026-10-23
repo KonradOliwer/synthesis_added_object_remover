@@ -1,7 +1,9 @@
 Mod to clean up: Target.esp
-Other mods that never cause removals: Never count these mods: (none); Never count the mods the cleaned mod requires: off; Never count mods that have a compatibility patch with it: off.
+Which other mods can cause removals: Trusted mods, and their masters: (none); Mods trusted for their own changes only: (none); Never trusted mods: (none); Also trust mods that require the cleaned mod, and their masters: off; Trust mods loading before the cleaned mod: off.
+Trusted, base game: Skyrim.esm
 Remove objects too close to other mods' objects: Margin by object size: on, 0.5 x object size; Margin by fixed distance: off; Use rough boxes instead of exact shapes (faster): off; Other mods' NPCs and creatures cause removal: OnlyWhenStuckInsideTheObject.
 Remove objects on terrain changed by other mods: off.
 Also remove what rests on removed objects: Nothing.
 Invisible objects left behind: off.
 Detailed log and reports: off.
+Only warn (don't stop) when a mod that requires the cleaned mod loads after the patch: off.

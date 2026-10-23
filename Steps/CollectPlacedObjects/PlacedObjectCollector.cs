@@ -2,26 +2,26 @@ using System.Collections.Immutable;
 using System.Numerics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
-using AddedObjectRemover.Steps.WriteThePatch.Contracts;
 
 namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 
 /// <summary>
-/// Turns the placed record facts into target objects and other mods' objects, with their roles,
-/// and joins the links into the target plugin. The facts come in the order the plugins were read; the
+/// Turns the placed record facts into target objects, other mods' objects the game shows changed from their accepted values
+/// (<see cref="OtherRecordChange"/>), and support-only objects, with their roles, and joins the links into the target plugin. A
+/// removed record (<see cref="RemovedForm"/>) is none of them and its links are dropped. The facts are the final world, which
+/// includes what earlier patchers in this group wrote into the patch. The facts come in the order the plugins were read; the
 /// objects are then put in <see cref="RecordKeyOrder"/>, which gives them their ids.
 /// </summary>
 public sealed class PlacedObjectCollector
 {
-    private enum RecordRole { Target, TargetOverriddenLater, IgnoredOrigin, OverriddenByTarget, Other }
+    private enum RecordRole { Target, TargetOverriddenLater, OverriddenByTarget, OtherUnchanged, OtherChanged }
 
     /// <summary>Vanilla keyword LocTypeHold. Only the Location of the hold itself is sure to have it: the Major and Minor variants are not on every hold.</summary>
     private static readonly RecordKey HoldLocationKeyword = new(new PluginName("Skyrim.esm"), 0x016771);
 
-    private readonly IdentifiedMods _standing;
+    private readonly ModTrustTable _trust;
     private readonly WhatToCollect _plan;
     private readonly PlacedRecordFacts _facts;
-    private readonly WrittenByEarlierRuns _earlier;
     private readonly TargetAreaNames _areaNames;
 
     private readonly List<TargetObject> _targets = [];
@@ -29,72 +29,82 @@ public sealed class PlacedObjectCollector
     private readonly List<OtherObject> _supportOnlyObjects = [];
     private readonly List<SpaceFact> _targetSpaces = [];
     private readonly List<OverriddenOtherRecord> _overriddenOthers = [];
+    private readonly List<RecordKey> _removedRecords = [];
 
+    private int _cleanedModObjects;
     private int _targetsOverriddenLater;
     private int _targetsHiddenOrWithoutPlacement;
+    private int _removedByEarlierPatchers;
+    private int _removedByOtherPlugins;
     private int _othersOverriddenByTarget;
+    private int _othersUnchanged;
     private int _otherInvalidPlacements;
-    private int _removedByEarlierRuns;
-    private int _movedByEarlierRuns;
 
-    private PlacedObjectCollector(IdentifiedMods standing, WhatToCollect plan, PlacedRecordFacts facts, WrittenByEarlierRuns earlier)
+    private PlacedObjectCollector(ModTrustTable trust, WhatToCollect plan, PlacedRecordFacts facts)
     {
-        _standing = standing;
+        _trust = trust;
         _plan = plan;
         _facts = facts;
-        _earlier = earlier;
         _areaNames = TargetAreaNames.Of(facts.CellAreas);
     }
 
-    /// <param name="earlier">
-    /// Applied here, before any record is judged, so every later step sees the earlier runs' writes. It wins over what
-    /// the load order reads back from the patch: a removed record with an Enable Parent reads back as present.
-    /// </param>
-    public static CollectedObjects Collect(IPluginRecords plugin, IdentifiedMods standing, WhatToCollect plan, WrittenByEarlierRuns earlier)
+    public static CollectedObjects Collect(IPluginRecords plugin, ModTrustTable trust, WhatToCollect plan)
     {
-        var facts = plugin.ReadPlacedRecords(new PlacedReadScope(standing.Target, plan.Terrain, plan.Navmesh, plan.TerrainVersions, plan.TerrainLayers, plan.Water, HoldLocationKeyword));
-        var collector = new PlacedObjectCollector(standing, plan, facts, earlier);
+        var facts = plugin.ReadPlacedRecords(
+            new PlacedReadScope(trust.CleanedMod, plan.Terrain, plan.Navmesh, plan.TerrainVersions, plan.TerrainLayers, plan.Water, HoldLocationKeyword),
+            candidate => IsFullyTrusted(trust, candidate));
+        var collector = new PlacedObjectCollector(trust, plan, facts);
         foreach (var record in facts.Records) collector.Collect(record);
 
-        var nonPlacedLinks = plugin.ReadLinks(standing.Target, collector._targets.Select(target => target.Key).ToHashSet());
+        var nonPlacedLinks = plugin.ReadLinks(trust.CleanedMod, collector._targets.Select(target => target.Key).ToHashSet());
         return collector.CreateCollectedObjects(collector.WithoutLinksFromRemovedRecords([.. facts.Links, .. nonPlacedLinks]));
     }
 
+    /// <remarks>A fully trusted version's values are accepted whatever lies below it, so no lower version can change a decision.</remarks>
+    private static bool IsFullyTrusted(ModTrustTable trust, PluginName plugin) => trust.VersionTrustOf(plugin) == VersionTrust.Full;
+
     private void Collect(PlacedRecordFact record)
     {
-        if (CountIfRemovedByEarlierRuns(record)) return;
-        CollectByRole(AtPositionOfEarlierRuns(record));
+        if (IsCreatedByTarget(record)) _cleanedModObjects++;
+        if (RemovedForm.IsRemoved(record.Placement.Presence)) CountRemovedRecord(record);
+        else CollectByRole(record);
     }
 
-    /// <returns>True when an earlier run removed the record, so it is no object of any kind in this run.</returns>
-    private bool CountIfRemovedByEarlierRuns(PlacedRecordFact record)
+    /// <summary>The record's final version is removed in the game, so it is no object of any kind and its links keep nothing.</summary>
+    private void CountRemovedRecord(PlacedRecordFact record)
     {
-        if (!_earlier.Disabled.Contains(record.Key)) return false;
-        if (record.InTargetSpace) _removedByEarlierRuns++;
-        return true;
+        _removedRecords.Add(record.Key);
+        if (IsCreatedByTarget(record)) CountRemovedTargetRecord(record.WinningMod);
     }
 
-    private PlacedRecordFact AtPositionOfEarlierRuns(PlacedRecordFact record)
+    /// <param name="winner">The plugin whose version removes the record; the target's own removal counts with its hidden records.</param>
+    private void CountRemovedTargetRecord(PluginName winner)
     {
-        if (!_earlier.MovedTo.TryGetValue(record.Key, out var position)) return record;
-        if (record.InTargetSpace) _movedByEarlierRuns++;
-        return record with { Placement = record.Placement with { Position = position } };
+        if (winner == _trust.Patch) _removedByEarlierPatchers++;
+        else if (winner == _trust.CleanedMod) _targetsHiddenOrWithoutPlacement++;
+        else _removedByOtherPlugins++;
     }
 
-    private ImmutableArray<LinkFact> WithoutLinksFromRemovedRecords(ImmutableArray<LinkFact> links) =>
-        [.. links.Where(link => !_earlier.Disabled.Contains(link.Source))];
+    private ImmutableArray<LinkFact> WithoutLinksFromRemovedRecords(ImmutableArray<LinkFact> links)
+    {
+        var removed = _removedRecords.ToHashSet();
+        return [.. links.Where(link => !removed.Contains(link.Source))];
+    }
 
+    /// <remarks>
+    /// Targets define the target spaces, so no placement outside them can matter: a record there is hidden. A target record there
+    /// (one an earlier patcher moved into another space) counts with the hidden ones.
+    /// </remarks>
     private void CollectByRole(PlacedRecordFact record)
     {
-        var role = Classify(record);
-        // Targets define the target spaces, so no placement outside them can matter.
+        var (role, change) = Classify(record);
         var presence = record.InTargetSpace ? StartsDisabledRule.Of(record.Placement, isWinningTarget: role == RecordRole.Target) : ShownInGame.Hidden;
 
-        if (_plan.SupportOnlyObjects && role is not (RecordRole.Target or RecordRole.Other) && presence == ShownInGame.Present)
+        if (_plan.SupportOnlyObjects && role is not (RecordRole.Target or RecordRole.OtherChanged) && presence == ShownInGame.Present)
         {
-            _supportOnlyObjects.Add(CreateOtherObject(record, editorId: null));
+            _supportOnlyObjects.Add(CreateOtherObject(record, editorId: null, change: null));
         }
-        if (CountIfSkipped(role, record) || !record.InTargetSpace) return;
+        if (CountIfSkipped(role, record, presence)) return;
 
         if (presence != ShownInGame.Present)
         {
@@ -104,39 +114,44 @@ public sealed class PlacedObjectCollector
         }
 
         if (role == RecordRole.Target) AddTarget(record);
-        else _otherModObjects.Add(CreateOtherObject(record, _plan.OtherModDetails ? record.EditorId : null));
+        else _otherModObjects.Add(CreateOtherObject(record, _plan.OtherModDetails ? record.EditorId : null, change));
     }
 
     /// <returns>True when the record is neither a target nor another mod's object.</returns>
-    private bool CountIfSkipped(RecordRole role, PlacedRecordFact record)
+    private bool CountIfSkipped(RecordRole role, PlacedRecordFact record, ShownInGame presence)
     {
         switch (role)
         {
             case RecordRole.TargetOverriddenLater:
                 _targetsOverriddenLater++;
                 return true;
-            case RecordRole.IgnoredOrigin:
-                return true;
             case RecordRole.OverriddenByTarget:
                 _othersOverriddenByTarget++;
                 if (_plan.OtherModDetails) _overriddenOthers.Add(new OverriddenOtherRecord(record.Key, record.EditorId, record.WinningMod));
+                return true;
+            case RecordRole.OtherUnchanged:
+                if (presence == ShownInGame.Present) _othersUnchanged++;
+                else if (presence == ShownInGame.InvalidPlacement) _otherInvalidPlacements++;
                 return true;
             default:
                 return false;
         }
     }
 
-    private RecordRole Classify(PlacedRecordFact record)
+    /// <summary>Creator first: the target's own records, then the records the target overrides, then the rule decides once.</summary>
+    /// <returns>The change only for <see cref="RecordRole.OtherChanged"/>.</returns>
+    private (RecordRole Role, ObjectChange? Change) Classify(PlacedRecordFact record)
     {
-        var origin = record.Key.Plugin;
-        if (origin == _standing.Target)
-        {
-            // Also true when an earlier patcher in this run (the patch mod) overrode it.
-            return record.WinningMod == _standing.Target ? RecordRole.Target : RecordRole.TargetOverriddenLater;
-        }
-        if (_standing.IgnoredOrigins.Contains(origin)) return RecordRole.IgnoredOrigin;
-        return _facts.OverriddenRecords.Contains(record.Key) ? RecordRole.OverriddenByTarget : RecordRole.Other;
+        if (IsCreatedByTarget(record)) return (WinsInTargetOrPatch(record) ? RecordRole.Target : RecordRole.TargetOverriddenLater, null);
+        if (_facts.OverriddenRecords.Contains(record.Key)) return (RecordRole.OverriddenByTarget, null);
+        var change = OtherRecordChange.Decide(record, _trust);
+        return (change is null ? RecordRole.OtherUnchanged : RecordRole.OtherChanged, change);
     }
+
+    private bool IsCreatedByTarget(PlacedRecordFact record) => record.Key.Plugin == _trust.CleanedMod;
+
+    /// <remarks>The patch's version holds what earlier patchers in this group wrote, so a target record it wins is judged as the patch left it.</remarks>
+    private bool WinsInTargetOrPatch(PlacedRecordFact record) => record.WinningMod == _trust.CleanedMod || record.WinningMod == _trust.Patch;
 
     private void AddTarget(PlacedRecordFact record)
     {
@@ -156,6 +171,7 @@ public sealed class PlacedObjectCollector
             IsPrimitive: record.IsPrimitive,
             HasMapMarker: record.HasMapMarker,
             IsPersistent: record.IsPersistent,
+            HasEnableParent: record.Placement.Presence.EnableParent is not null,
             NamedByScript: record.NamedByScript,
             HasLocationRefType: record.HasLocationRefType,
             ReferenceRadius: record.ReferenceRadius,
@@ -163,7 +179,7 @@ public sealed class PlacedObjectCollector
             Area: _areaNames.Name(record.Space, record.Cell.Key, position)));
     }
 
-    private static OtherObject CreateOtherObject(PlacedRecordFact record, string? editorId)
+    private static OtherObject CreateOtherObject(PlacedRecordFact record, string? editorId, ObjectChange? change)
     {
         var (position, rotation) = PlacementOf(record);
         return new OtherObject(
@@ -177,7 +193,8 @@ public sealed class PlacedObjectCollector
             rotation,
             ReferenceScale.Normalize(record.Scale),
             record.IsPrimitive,
-            record.HasMapMarker);
+            record.HasMapMarker,
+            change);
     }
 
     /// <remarks>Only for a record whose presence is <see cref="ShownInGame.Present"/>, which has a position and a rotation.</remarks>
@@ -199,13 +216,15 @@ public sealed class PlacedObjectCollector
             _targetSpaces.DistinctBy(space => space.Key).ToDictionary(space => space.Key),
             new ReadCounts(
                 _facts.RecordsScanned,
+                _cleanedModObjects,
                 _targetsOverriddenLater,
                 _targetsHiddenOrWithoutPlacement,
+                _removedByEarlierPatchers,
+                _removedByOtherPlugins,
                 _othersOverriddenByTarget,
+                _othersUnchanged,
                 _otherInvalidPlacements,
-                _facts.NavmeshCount,
-                _removedByEarlierRuns,
-                _movedByEarlierRuns),
+                _facts.NavmeshCount),
             [.. _overriddenOthers],
             TargetWorkOrder.Of(targets),
             targets.IsEmpty ? new StopReason(StopKind.NoTargetObjects, null) : null);

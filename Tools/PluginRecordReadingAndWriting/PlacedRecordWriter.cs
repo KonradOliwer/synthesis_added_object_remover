@@ -4,11 +4,9 @@ using Noggog;
 
 namespace AddedObjectRemover;
 
-/// <summary>Runs write orders as overrides in the patch and answers the one read the orders depend on; records are addressed by key. Not thread-safe.</summary>
+/// <summary>Runs write orders as overrides in the patch; records are addressed by key. Not thread-safe.</summary>
 internal sealed class PlacedRecordWriter(PlacedOverrideWriter overrides, RecordHandles handles)
 {
-    public bool HasEnableParent(RecordKey record) => handles.RecordOf(record).EnableParent != null;
-
     public void Write(IReadOnlyList<WriteOrder> orders)
     {
         foreach (var order in orders)

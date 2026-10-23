@@ -27,7 +27,7 @@ public class FieldTypeTests
         var stale = Allowed.Keys.Except(found).Order(StringComparer.Ordinal).ToList();
 
         Assert.True(unlisted.Count == 0, $"Fields of banned types:{Environment.NewLine}{string.Join(Environment.NewLine, unlisted)}");
-        Assert.True(stale.Count == 0, $"Listed but no longer found:{Environment.NewLine}{string.Join(Environment.NewLine, stale)}");
+        AllowListAssert.NoneStale(stale, "Listed but no longer found");
     }
 
     [Fact]

@@ -1,6 +1,8 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
+using Mutagen.Bethesda.Plugins.Cache;
 
 namespace AddedObjectRemover.Tests.Architecture;
 
@@ -8,6 +10,11 @@ namespace AddedObjectRemover.Tests.Architecture;
 /// The runner only wires: it hands each step its own settings record and decides nothing about the domain. Three rules,
 /// checked on the source text (comments and literals removed): it reads no member of a settings record, it has no
 /// conditions of its own, and it holds no error boundary. A new settings read, condition or error boundary fails here.
+/// It also carries nothing from one run to the next, so chained Standard runs equal one Batch run: the only state that
+/// crosses runs is what the patch writing writes into the patch. The runner holds no field, its loop over the requests hands
+/// each run only its request and the environment, every member of the environment is listed with why no run changes it,
+/// nothing the environment shares holds what a run opens, and each run's link cache is built when that run opens its plugin
+/// records, so it is dropped with them.
 /// </summary>
 public class RunnerRulesTests
 {
@@ -25,6 +32,41 @@ public class RunnerRulesTests
         ["StepRunner.cs: if (collected.Stop is { } stop)"] =
             "Step 2 returns the stop for a run without target objects; the runner ends the run on any stop a step returns.",
     };
+
+    private const string StepRunnerFile = "Run/RunAllSteps/StepRunner.cs";
+
+    private const string LinkCacheFactoryFile = "Tools/PluginRecordReadingAndWriting/PluginRecordsFactory.cs";
+
+    private const BindingFlags DeclaredFields =
+        BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+
+    /// <summary>
+    /// "RunEnvironment member": why no run changes what it holds for the runs after it. Every run of a batch gets the same
+    /// environment; a new member fails here until it is listed with its reason.
+    /// </summary>
+    private static readonly Dictionary<string, string> SharedBetweenRuns = new()
+    {
+        ["Plugins"] = "The plugin list facts, read once before the first run; no step changes them.",
+        ["PluginRecords"] = "Opens a new reader for each run, with a link cache of its own.",
+        ["PatchWriting"] = "The one writer: what it writes into the patch is what later runs read, as they read any plugin.",
+        ["MeshFiles"] = "Opens a new mesh reader for each run.",
+        ["Bases"] = "Opens a new base reader for each run, over that run's link cache.",
+        ["Log"] = "Only prints; no run reads it back.",
+        ["ReportOutput"] = "Writes each run's report files into that run's folder; no run reads them back.",
+        ["TimeSinceStart"] = "Reads the clock; the times go into log lines only.",
+    };
+
+    /// <summary>What a run opens for itself and drops when it ends; nothing the environment shares may hold one.</summary>
+    private static readonly Type[] OpenedPerRun = [typeof(IPluginRecords), typeof(IRecordIndex), typeof(IBaseFacts), typeof(IMeshFiles), typeof(ILinkCache)];
+
+    /// <summary>The names the loop over the requests may use besides its own request: the environment and the results it collects.</summary>
+    private static readonly string[] RequestLoopNames = ["Add", "PatchOneRun", "environment", "results"];
+
+    private static readonly Regex LinkCacheBuild = new(@"\bTo(?:Immutable|Mutable)LinkCache\b");
+
+    /// <summary>The build call inside the body of <c>Open()</c>, before any other member starts.</summary>
+    private static readonly Regex LinkCacheBuildInOpen =
+        new(@"\bOpen\(\)\s*(?:=>|\{)(?:(?!\b(?:public|internal|protected|private)\b).)*?\bToImmutableLinkCache\b", RegexOptions.Singleline);
 
     [Fact]
     public void TheRunnerReadsNoMemberOfAnySettingsRecord()
@@ -81,13 +123,13 @@ public class RunnerRulesTests
         var settings = SettingsOfRunSettings();
 
         Assert.Equal(
-            ["AlsoRemoveSettings", "ChangedTerrainSettings", "Execution", "LeftBehindSettings", "MarkerMoveSettings", "ModIdentificationSettings", "ReportFileSettings", "SelectionSettings", "TooCloseSettings", "WhatToCollect"],
+            ["AlsoRemoveSettings", "ChangedTerrainSettings", "Execution", "LeftBehindSettings", "MarkerMoveSettings", "ModTrustSettings", "ReportFileSettings", "SelectionSettings", "TooCloseSettings", "WhatToCollect"],
             settings.RecordTypes.Order(StringComparer.Ordinal));
         Assert.Equal(
-            ["AlsoRemove", "ChangedTerrain", "Execution", "LeftBehind", "MarkerMoves", "ModIdentification", "Read", "Reports", "Selection", "TooClose"],
+            ["AlsoRemove", "ChangedTerrain", "Execution", "LeftBehind", "MarkerMoves", "ModTrust", "Read", "Reports", "Selection", "TooClose"],
             settings.RecordProperties.Order(StringComparer.Ordinal));
         Assert.Equal(
-            ["DetailedLog", "ExcludedNames", "Target", "TargetAsTyped"],
+            ["DetailedLog", "OnlyWarnWhenRequiringModLoadsAfterPatch", "Target", "TargetAsTyped"],
             settings.PlainProperties.Order(StringComparer.Ordinal));
     }
 
@@ -155,6 +197,128 @@ public class RunnerRulesTests
                 "var vv = ww?.Length;", "var y = z.Any();",
             },
             lines.Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void TheRunnerHoldsNoFieldThatOutlivesARun()
+    {
+        var found = FindFieldsOutlivingARun(typeof(StepRunner));
+
+        Assert.True(
+            found.Count == 0,
+            $"The runner keeps something from one run to the next; a run decides from the world alone:{Environment.NewLine}{string.Join(Environment.NewLine, found)}");
+    }
+
+    [Fact]
+    public void TheFieldReaderSeesTheRunnersFieldsAndTheStaticFieldsOfItsNestedTypes()
+    {
+        Assert.Equal(
+            ["RunnerWithMemory.<RunsSoFar>k__BackingField", "Scope.<SeenRuns>k__BackingField"],
+            FindFieldsOutlivingARun(typeof(RunnerWithMemory)).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void TheRequestLoopHandsEachRunOnlyItsRequestAndTheEnvironment()
+    {
+        var loop = Assert.Single(FindRequestLoops(SourceFile.All().Single(file => file.Path == StepRunnerFile).Code));
+
+        var notAllowed = loop.Names.Except([loop.Request, .. RequestLoopNames]).ToList();
+
+        Assert.True(
+            notAllowed.Count == 0,
+            $"The loop over the requests hands a run more than its request and the environment:{Environment.NewLine}{string.Join(Environment.NewLine, notAllowed)}");
+    }
+
+    [Fact]
+    public void TheRequestLoopReaderSeesTheLoopVariableAndTheNamesOfTheLoopBody()
+    {
+        const string code = """
+            foreach (var request in requests) results.Add(PatchOneRun(request, environment, earlier));
+            foreach (var section in sections) log.Print(section);
+            foreach (var next in requests)
+            {
+                earlier = PatchOneRun(next, environment);
+            }
+            """;
+
+        var loops = FindRequestLoops(code);
+
+        Assert.Equal(
+            ["request: Add, PatchOneRun, earlier, environment, request, results", "next: PatchOneRun, earlier, environment, next"],
+            loops.Select(loop => $"{loop.Request}: {string.Join(", ", loop.Names)}"));
+    }
+
+    [Fact]
+    public void EveryMemberTheEnvironmentSharesBetweenRunsIsListedWithWhyNoRunChangesIt()
+    {
+        var members = typeof(RunEnvironment).GetProperties().Select(property => property.Name).ToHashSet();
+
+        AssertOnlyAllowed(
+            members, SharedBetweenRuns.Keys, "Member of RunEnvironment, which every run of a batch shares, without why no run changes it", nameof(SharedBetweenRuns));
+    }
+
+    [Fact]
+    public void NothingTheEnvironmentSharesHoldsWhatARunOpens()
+    {
+        var sharedTypes = typeof(RunEnvironment).GetProperties().Select(property => property.PropertyType).ToList();
+
+        var found = ProductionSources.Assemblies()
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => type.IsClass && sharedTypes.Any(shared => shared.IsAssignableFrom(type)))
+            .SelectMany(type => type.GetFields(DeclaredFields)
+                .Where(field => OpenedPerRun.Any(opened => opened.IsAssignableFrom(field.FieldType)))
+                .Select(field => $"{type.Name}.{field.Name}: {field.FieldType.Name}"))
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(
+            found.Count == 0,
+            $"Shared by every run, but holds what one run opened, which then outlives that run:{Environment.NewLine}{string.Join(Environment.NewLine, found)}");
+    }
+
+    [Fact]
+    public void EachRunsLinkCacheIsBuiltOnlyWhenThatRunOpensItsPluginRecords()
+    {
+        var building = SourceFile.All().Where(file => LinkCacheBuild.IsMatch(file.Code)).Select(file => file.Path).ToList();
+
+        Assert.Equal([LinkCacheFactoryFile], building);
+        Assert.Matches(LinkCacheBuildInOpen, SourceFile.All().Single(file => file.Path == LinkCacheFactoryFile).Code);
+    }
+
+    /// <summary>
+    /// The fields of the runner, and the static fields of the types nested in it, an auto-property's backing field included.
+    /// An instance field of a nested type belongs to one run's object; compiler-generated nested types hold lambdas only.
+    /// </summary>
+    private static IReadOnlyList<string> FindFieldsOutlivingARun(Type runner) =>
+    [
+        .. runner.GetFields(DeclaredFields).Select(field => $"{runner.Name}.{field.Name}"),
+        .. runner.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic)
+            .Where(type => !type.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false))
+            .SelectMany(type => type.GetFields(DeclaredFields).Where(field => field.IsStatic).Select(field => $"{type.Name}.{field.Name}")),
+    ];
+
+    /// <param name="Request">The loop variable.</param>
+    /// <param name="Names">Every name the loop body uses, in ordinal order.</param>
+    private sealed record RequestLoop(string Request, IReadOnlyList<string> Names);
+
+    /// <summary>The loops over <c>requests</c> whose body is one statement or one block without nested braces.</summary>
+    private static IReadOnlyList<RequestLoop> FindRequestLoops(string code) =>
+    [
+        .. Regex.Matches(code, @"\bforeach\s*\(\s*var\s+(?<request>\w+)\s+in\s+requests\s*\)\s*(?<body>\{[^{}]*\}|[^;{]*;)")
+            .Select(match => new RequestLoop(
+                match.Groups["request"].Value,
+                [.. Regex.Matches(match.Groups["body"].Value, @"\b[A-Za-z_]\w*\b").Select(name => name.Value).Distinct().Order(StringComparer.Ordinal)])),
+    ];
+
+    /// <summary>A runner that counts its runs, with a nested scope that keeps a static list: the field reader finds both.</summary>
+    private static class RunnerWithMemory
+    {
+        public static int RunsSoFar { get; set; }
+
+        public sealed record Scope(int Run)
+        {
+            public static List<int> SeenRuns { get; } = [];
+        }
     }
 
     private static IReadOnlyList<string> FindErrorBoundaryUses(string code) =>
@@ -245,6 +409,6 @@ public class RunnerRulesTests
         var stale = allowedSet.Except(found).Order(StringComparer.Ordinal).ToList();
 
         Assert.True(notAllowed.Count == 0, $"{problem}:{Environment.NewLine}{string.Join(Environment.NewLine, notAllowed)}");
-        Assert.True(stale.Count == 0, $"Allowed in {listName} but no longer in the runner (remove):{Environment.NewLine}{string.Join(Environment.NewLine, stale)}");
+        AllowListAssert.NoneStale(stale, $"Allowed in {listName} but no longer found (remove)");
     }
 }

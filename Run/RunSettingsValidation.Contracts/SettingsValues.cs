@@ -7,12 +7,14 @@ namespace AddedObjectRemover;
 
 /// <summary>
 /// The top level of the user's settings: which mode runs, whether every run writes the detailed log and the report files,
+/// whether a mod that requires the cleaned mod and loads after the patch only warns instead of stopping the run,
 /// the one mod's settings of Standard mode, and what Batch mode reads.
 /// </summary>
 public interface IModeSettingsValues
 {
     PatchMode Mode { get; }
     bool DetailedLogAndReports { get; }
+    bool OnlyWarnWhenModRequiringCleanedModLoadsAfterPatch { get; }
     ISettingsValues Standard { get; }
     string? GroupFileName { get; }
 }
@@ -24,7 +26,7 @@ public interface IModeSettingsValues
 public interface ISettingsValues
 {
     string? CleanedMod { get; }
-    IIgnoreSettingsValues WhatToIgnore { get; }
+    ITrustSettingsValues Trust { get; }
     ITooCloseSettingsValues TooClose { get; }
     ITerrainChangeSettingsValues TerrainChange { get; }
     IFollowUpSettingsValues FollowUpRemoval { get; }
@@ -59,12 +61,15 @@ public interface ITerrainChangeSettingsValues
     int MinWaterCoverChangePercent { get; }
 }
 
-public interface IIgnoreSettingsValues
+/// <summary>The three lists hold the plugin names as the settings spell them; an unset entry is left out.</summary>
+public interface ITrustSettingsValues
 {
-    IReadOnlyList<string> ExcludedPlugins { get; }
-    bool IgnoreTargetMasters { get; }
-    bool IgnoreModsPatchedWithTarget { get; }
-    int MaxOtherMastersForPatch { get; }
+    IReadOnlyList<string> TrustedModsAndTheirMasters { get; }
+    IReadOnlyList<string> ModsTrustedForOwnChangesOnly { get; }
+    IReadOnlyList<string> NeverTrustedMods { get; }
+    bool TrustModsRequiringCleanedModAndTheirMasters { get; }
+    int MaxOtherMastersOfRequiringModToTrust { get; }
+    bool TrustModsLoadingBeforeCleanedMod { get; }
 }
 
 public interface IFollowUpSettingsValues

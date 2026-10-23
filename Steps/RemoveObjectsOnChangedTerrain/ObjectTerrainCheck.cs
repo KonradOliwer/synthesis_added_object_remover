@@ -38,7 +38,7 @@ internal sealed class ObjectTerrainCheck(IPluginRecords records, IBaseObjectShap
     /// <summary>Null when no water change is counted; the water is then not read.</summary>
     private readonly CellWaterComparison? _water = settings.CountsWaterChanges ? new CellWaterComparison(plugins, settings) : null;
 
-    /// <summary>The land cells read so far that have a reference terrain.</summary>
+    /// <summary>The land cells read so far that have an accepted terrain.</summary>
     public int CellsCompared() => _landCells.Contents().Count(cell => cell != null);
 
     /// <remarks>An object whose check fails is not removed; the failure is returned with the object.</remarks>
@@ -73,7 +73,7 @@ internal sealed class ObjectTerrainCheck(IPluginRecords records, IBaseObjectShap
         return anyAreaHasTerrain ? ObjectCheck.NothingFound : ObjectCheck.NoTerrain;
     }
 
-    /// <summary>The cells under the area that have a reference terrain; a cell without one is not checked.</summary>
+    /// <summary>The cells under the area that have an accepted terrain; a cell no trusted plugin has a land record of is not checked.</summary>
     private List<CheckedCell> CellsUnder(RecordKey space, RecordKey landWorldspace, Box area)
     {
         var cells = new List<CheckedCell>();
@@ -91,9 +91,9 @@ internal sealed class ObjectTerrainCheck(IPluginRecords records, IBaseObjectShap
     private CellWaterChange? CompareWater(ExteriorCell cell) =>
         _water is { } water ? _waterCells.Get(cell, () => water.Compare(records.ReadWaterCopies(cell))) : null;
 
-    /// <summary>Whether the area's height range overlaps the heights at its vertices, as the terrain was (the reference) or as it is now (the winner).</summary>
+    /// <summary>Whether the area's height range overlaps the heights at its vertices, as accepted or as the game shows them (the winner).</summary>
     private bool ReachesTheGround(Box area, List<CheckedCell> cells) =>
-        OverlapsHeights(area, cells, static terrain => terrain.ReferenceHeights) || OverlapsHeights(area, cells, static terrain => terrain.WinnerHeights);
+        OverlapsHeights(area, cells, static terrain => terrain.AcceptedHeights) || OverlapsHeights(area, cells, static terrain => terrain.WinnerHeights);
 
     /// <remarks>A version without heights adds no heights.</remarks>
     private bool OverlapsHeights(Box area, List<CheckedCell> cells, Func<CellTerrain, float[]?> heightsOf)
@@ -110,7 +110,7 @@ internal sealed class ObjectTerrainCheck(IPluginRecords records, IBaseObjectShap
     /// <summary>
     /// The counted changes of the area: a height change at any vertex, a terrain type change at enough of its vertices, and a
     /// water change that covered or uncovered enough of them. The kind names the counted changes; the plugin is the later loading
-    /// of the plugins each counted change names.
+    /// of the plugins each counted change names, and none when that is the patch (an earlier patcher of the group made the change).
     /// </summary>
     /// <returns>Null when no change of the area counts.</returns>
     private ObjectOnChangedTerrain? FindChange(TargetObject target, List<CheckedCell> cells)
@@ -123,6 +123,6 @@ internal sealed class ObjectTerrainCheck(IPluginRecords records, IBaseObjectShap
         var kind = (heightChanger != null ? TerrainChangeKind.Height : TerrainChangeKind.None)
             | (typeChanger != null ? TerrainChangeKind.TerrainType : TerrainChangeKind.None)
             | (waterChanger != null ? changes.WaterKinds : TerrainChangeKind.None);
-        return new ObjectOnChangedTerrain(target.Id, plugins.PluginAt(changer), kind);
+        return new ObjectOnChangedTerrain(target.Id, plugins.ChangerAt(changer), kind);
     }
 }

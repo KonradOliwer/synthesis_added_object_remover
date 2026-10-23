@@ -322,7 +322,8 @@ public sealed class TablesTests : IDisposable
             default(Vector3),
             Scale: 1f,
             IsPrimitive: false,
-            HasMapMarker: false);
+            HasMapMarker: false,
+            Change: new ObjectChange(new PluginName("Other.esp"), AcceptedFrom: null));
         return new CollectedObjects(
             [.. targets],
             [otherModObject],
@@ -330,7 +331,7 @@ public sealed class TablesTests : IDisposable
             false,
             [],
             new Dictionary<RecordKey, SpaceFact> { [TestTargets.Space] = new(TestTargets.Space, "Tamriel, Test", SpaceKind.Worldspace, "Skyrim, Test") },
-            new ReadCounts(0, 0, 0, 0, 0, 0, 0, 0),
+            new ReadCounts(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             [],
             TargetWorkOrder.Of(targets),
             null);

@@ -26,6 +26,10 @@ internal static class PlacedRecordExtensions
             ? new Vector3(primitive.Bounds.X, primitive.Bounds.Y, primitive.Bounds.Z)
             : null;
 
+    /// <returns>Null also when the enable parent's reference is null: the game then has no parent to follow.</returns>
+    public static IEnableParentGetter? GetEnableParent(this IPlacedGetter record) =>
+        record.EnableParent is { Reference.IsNull: false } parent ? parent : null;
+
     public static bool IsInitiallyDisabled(this IPlacedGetter record) =>
         (record.MajorRecordFlagsRaw & (int)SkyrimMajorRecord.SkyrimMajorRecordFlag.InitiallyDisabled) != 0;
 

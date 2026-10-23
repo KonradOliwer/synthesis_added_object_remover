@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Numerics;
 using Mutagen.Bethesda.Plugins;
 using AddedObjectRemover.Tests.Fixtures;
@@ -61,15 +62,15 @@ public sealed class SharedReportingTests
         var summary = LogSections.BuildRemovalSummarySection(removals, StepOutcome.SwitchedOff);
 
         Assert.Equal(
-            "Removed 2 objects (2 too close, 0 follow-up removals, 0 leftover invisible objects, 0 linked to removed objects).",
+            "Removed 2 objects (2 too close, 0 follow-up removals, 0 invisible objects left behind, 0 linked to removed objects).",
             Assert.Single(summary.Lines));
     }
 
     [Theory]
-    [InlineData(StepOutcome.Performed, 1, "Removed 2 objects (1 on changed terrain, 1 too close, 0 follow-up removals, 0 leftover invisible objects, 0 linked to removed objects).")]
-    [InlineData(StepOutcome.Performed, 0, "Removed 1 objects (0 on changed terrain, 1 too close, 0 follow-up removals, 0 leftover invisible objects, 0 linked to removed objects).")]
-    [InlineData(StepOutcome.SwitchedOff, 0, "Removed 1 objects (1 too close, 0 follow-up removals, 0 leftover invisible objects, 0 linked to removed objects).")]
-    [InlineData(StepOutcome.StoppedByUnexpectedError, 0, "Removed 1 objects (1 too close, 0 follow-up removals, 0 leftover invisible objects, 0 linked to removed objects).")]
+    [InlineData(StepOutcome.Performed, 1, "Removed 2 objects (1 on changed terrain, 1 too close, 0 follow-up removals, 0 invisible objects left behind, 0 linked to removed objects).")]
+    [InlineData(StepOutcome.Performed, 0, "Removed 1 objects (0 on changed terrain, 1 too close, 0 follow-up removals, 0 invisible objects left behind, 0 linked to removed objects).")]
+    [InlineData(StepOutcome.SwitchedOff, 0, "Removed 1 objects (1 too close, 0 follow-up removals, 0 invisible objects left behind, 0 linked to removed objects).")]
+    [InlineData(StepOutcome.StoppedByUnexpectedError, 0, "Removed 1 objects (1 too close, 0 follow-up removals, 0 invisible objects left behind, 0 linked to removed objects).")]
     public void TheSummaryShowsTheChangedTerrainItemOnlyWhenTheStepWasPerformed(StepOutcome outcome, int onChangedTerrain, string expected)
     {
         List<RemovedObject> removals = [new TooCloseRemoval(0, CreateOtherModObject(), BySize)];
@@ -80,16 +81,22 @@ public sealed class SharedReportingTests
 
     [Theory]
     [InlineData(TerrainChangeKind.Height, "terrain changed by Other.esp (height)")]
-    [InlineData(TerrainChangeKind.TerrainType, "terrain changed by Other.esp (terrain type)")]
-    [InlineData(TerrainChangeKind.Height | TerrainChangeKind.TerrainType, "terrain changed by Other.esp (height and terrain type)")]
+    [InlineData(TerrainChangeKind.TerrainType, "terrain changed by Other.esp (ground type)")]
+    [InlineData(TerrainChangeKind.Height | TerrainChangeKind.TerrainType, "terrain changed by Other.esp (height and ground type)")]
     [InlineData(TerrainChangeKind.WaterHeight, "terrain changed by Other.esp (water height)")]
     [InlineData(TerrainChangeKind.WaterAdded, "terrain changed by Other.esp (water added)")]
     [InlineData(TerrainChangeKind.WaterRemoved, "terrain changed by Other.esp (water removed)")]
-    [InlineData(TerrainChangeKind.Height | TerrainChangeKind.TerrainType | TerrainChangeKind.WaterHeight, "terrain changed by Other.esp (height, terrain type and water height)")]
+    [InlineData(TerrainChangeKind.Height | TerrainChangeKind.TerrainType | TerrainChangeKind.WaterHeight, "terrain changed by Other.esp (height, ground type and water height)")]
     public void ATerrainChangeNamesTheModAndWhatChanged(TerrainChangeKind kind, string expected)
     {
         Assert.Equal(expected, Describe.RemovalReason(null!, new TerrainChangedRemoval(0, new PluginName("Other.esp"), kind)));
     }
+
+    [Fact]
+    public void ATerrainChangeOnlyThePatchHoldsNamesAnEarlierPatcher() =>
+        Assert.Equal(
+            "terrain changed by an earlier patcher in this group (height)",
+            Describe.RemovalReason(null!, new TerrainChangedRemoval(0, ChangedBy: null, TerrainChangeKind.Height)));
 
     [Fact]
     public void ADistanceRemovalNamesTheDistanceAndTheOtherObject()
@@ -98,7 +105,7 @@ public sealed class SharedReportingTests
 
         var text = Describe.RemovalReason(null!, new TooCloseRemoval(0, other, WithinDistance));
 
-        Assert.Equal($"within 32 units of {Describe.OtherObject(other)}", text);
+        Assert.Equal($"within 32 units of {Describe.OtherObject(other)}, changed by Other.esp (new object)", text);
     }
 
     [Fact]
@@ -106,8 +113,28 @@ public sealed class SharedReportingTests
     {
         var other = CreateOtherModObject();
 
-        Assert.Equal($"too close to {Describe.OtherObject(other)}", Describe.RemovalReason(null!, new TooCloseRemoval(0, other, BySize)));
+        Assert.Equal(
+            $"too close to {Describe.OtherObject(other)}, changed by Other.esp (new object)",
+            Describe.RemovalReason(null!, new TooCloseRemoval(0, other, BySize)));
     }
+
+    [Theory]
+    [InlineData("CityMod.esp", "Skyrim.esm", "changed by CityMod.esp (accepted value from Skyrim.esm)")]
+    [InlineData("CityMod.esp", null, "changed by CityMod.esp (new object)")]
+    [InlineData(null, "Skyrim.esm", "changed by an earlier patcher in this group (accepted value from Skyrim.esm)")]
+    [InlineData(null, null, "changed by an earlier patcher in this group (new object)")]
+    public void ATooCloseRemovalNamesHowTheOtherObjectChanged(string? changingMod, string? acceptedFrom, string expected)
+    {
+        var other = CreateOtherModObject() with { Change = new ObjectChange(PluginOrNull(changingMod), PluginOrNull(acceptedFrom)) };
+
+        Assert.Equal($"too close to {Describe.OtherObject(other)}, {expected}", Describe.RemovalReason(null!, new TooCloseRemoval(0, other, BySize)));
+    }
+
+    [Fact]
+    public void ATooCloseRemovalByAnObjectWithoutAChangeIsABug() =>
+        Assert.Throws<UnreachableException>(() => Describe.RemovalReason(null!, new TooCloseRemoval(0, CreateOtherModObject() with { Change = null }, BySize)));
+
+    private static PluginName? PluginOrNull(string? name) => name is null ? null : new PluginName(name);
 
     [Fact]
     public void Removals_ComeInTheOrderTheStepNineResultGives()
@@ -299,7 +326,7 @@ public sealed class SharedReportingTests
             false,
             [],
             new Dictionary<RecordKey, SpaceFact> { [TestTargets.Space] = new(TestTargets.Space, "Tamriel", SpaceKind.Worldspace, "Skyrim") },
-            new ReadCounts(0, 0, 0, 0, 0, 0, 0, 0),
+            new ReadCounts(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             [],
             TargetWorkOrder.Of(targets),
             null);
@@ -327,5 +354,6 @@ public sealed class SharedReportingTests
             default(Vector3),
             Scale: 1f,
             IsPrimitive: false,
-            HasMapMarker: false);
+            HasMapMarker: false,
+            Change: new ObjectChange(new PluginName("Other.esp"), AcceptedFrom: null));
 }

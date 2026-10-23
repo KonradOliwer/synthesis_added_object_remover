@@ -1,50 +1,48 @@
 using System.Collections.Immutable;
-using Mutagen.Bethesda.Plugins.Cache;
+using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Plugins.Order;
 using Mutagen.Bethesda.Skyrim;
 
 namespace AddedObjectRemover;
 
-/// <summary>Reads the load order's plugin records through Mutagen and writes the patch.</summary>
+/// <summary>Reads the final world's plugin records through Mutagen, resolving through the run's own link cache.</summary>
 internal sealed class PluginRecords(
-    ILoadOrder<IModListing<ISkyrimModGetter>> loadOrder,
-    ILinkCache<ISkyrimMod, ISkyrimModGetter> linkCache,
-    ISkyrimMod patchMod,
+    ILoadOrderGetter<IModListingGetter<ISkyrimModGetter>> order,
+    RunLinkCache runCache,
+    ModKey patch,
     PluginNames names,
     Execution execution) : IPluginRecords
 {
     private const string NotReadMessage = "The placed records must be read before they are used.";
 
-    private readonly NpcRecordReads _npcReads = new(linkCache, names);
-    private readonly LandscapeMaterials _materials = new(linkCache, names);
-    private PlacedRecordWriter? _writer;
-    private ScannedRecords? _scanned;
+    private readonly NpcRecordReads _npcReads = new(runCache.Cache, names);
+    private readonly LandscapeMaterials _materials = new(runCache.Cache, names);
+    private ScanLookups? _scanned;
 
-    public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope)
+    public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk)
     {
-        var scanned = PlacedRecordReader.Read(loadOrder, linkCache, patchMod.ModKey, names, scope, execution);
-        _scanned = scanned;
-        _writer = new PlacedRecordWriter(new PlacedOverrideWriter(patchMod, names), scanned.Handles);
+        var scanned = PlacedRecordReader.Read(order, runCache.Cache, patch, names, scope, stopsTheWalk, execution);
+        _scanned = scanned.Lookups;
         return scanned.Facts;
     }
 
     public ImmutableArray<LinkFact> ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets)
     {
-        var referencingMods = loadOrder.PriorityOrder
+        var referencingMods = order.PriorityOrder
             .Select(listing => listing.Mod)
             .OfType<ISkyrimModGetter>()
-            .Where(mod => PlacedRecordReader.MayReferenceTarget(mod, target, patchMod.ModKey, names));
+            .Where(mod => PlacedRecordReader.MayReferenceTarget(mod, target, patch, names));
         var facts = new List<LinkFact>();
         LinkReader.ReadFromNonPlaced(referencingMods, targets, target, names, facts);
         return [.. facts];
     }
 
-    public bool HasEnableParent(RecordKey record) => Writer.HasEnableParent(record);
+    public IWritableRecords ReadWritableRecords() => Scanned.Handles;
 
-    public void Write(IReadOnlyList<WriteOrder> orders) => Writer.Write(orders);
+    public IRecordIndex ReadRecordIndex() => runCache;
 
     public CellGridPoint? ReadHomeCellGrid(RecordKey record) =>
-        Scanned.Handles.LocationOf(record).WinningCell.Record.Grid is { } grid ? new CellGridPoint(grid.Point.X, grid.Point.Y) : null;
+        Scanned.Handles.LocationOf(record).WinningCell.Grid is { } grid ? new CellGridPoint(grid.Point.X, grid.Point.Y) : null;
 
     public float[]? ReadTerrain(ExteriorCell cell) => Scanned.Terrain.ReadHeights(cell);
 
@@ -66,7 +64,5 @@ internal sealed class PluginRecords(
 
     public bool TryParsePluginName(string text, out PluginName name) => PluginNameParser.TryParsePluginName(text, out name);
 
-    private PlacedRecordWriter Writer => _writer ?? throw new InvalidOperationException(NotReadMessage);
-
-    private ScannedRecords Scanned => _scanned ?? throw new InvalidOperationException(NotReadMessage);
+    private ScanLookups Scanned => _scanned ?? throw new InvalidOperationException(NotReadMessage);
 }

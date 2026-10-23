@@ -18,11 +18,12 @@ public class ModTableTests
     {
         var facts = LoadOrderPluginsReader.Create(
             [
-                (new PluginName("Skyrim.esm"), []),
-                (new PluginName("Target.esp"), [new PluginName("skyrim.ESM"), new PluginName("Unlisted.esm")]),
+                (new PluginName("Skyrim.esm"), [], false),
+                (new PluginName("Target.esp"), [new PluginName("skyrim.ESM"), new PluginName("Unlisted.esm")], false),
             ],
             new PluginName("Patch.esp"),
             "Plugins.txt",
+            [],
             []);
 
         var masters = facts.Find(new PluginName("TARGET.esp"))!.Masters;

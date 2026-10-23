@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>Gathers from the load order the target's placed objects, the other mods' placed objects in the same spaces and the links to them, leaving out disabled and deleted ones and those an earlier run of the batch removed, and taking the positions earlier runs moved to. It references its contracts, IdentifyTheMods.Contracts, WriteThePatch.Contracts, Ids and the package-free tools it uses, and holds no packages.</Description>
+    <Description>Gathers from the load order the target's placed objects, the other mods' placed objects in the same spaces and the links to them, leaving out removed ones (deleted, or disabled for good), and judging the target's objects the patch holds where the patch put them. Another mod's object can cause removals when the accepted-value rule finds it changed. It references its contracts, IdentifyTheMods.Contracts, WriteThePatch.Contracts, Ids and the package-free tools it uses, and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />

@@ -2,17 +2,24 @@ using System.Collections.Immutable;
 
 namespace AddedObjectRemover;
 
-/// <summary>Opens the reader and writer of the load order's plugin records; one per run.</summary>
+/// <summary>Opens the reader of the load order's plugin records; one per run.</summary>
 public interface IPluginRecordsFactory
 {
     IPluginRecords Open();
 }
 
-/// <summary>Reads the load order's plugin records and writes override records into the patch plugin. Not thread-safe, except <see cref="ReadHomeCellGrid"/>, <see cref="ReadTerrain"/>, <see cref="ReadTerrainVersions"/>, <see cref="ReadWaterCopies"/>, <see cref="ReadTextureMaterialChain"/>, <see cref="FindLandWorldspace"/>, <see cref="ReadNavmeshes"/>, <see cref="NpcTraitsOf"/>, <see cref="TraitSupplierOf"/>, <see cref="LeveledEntriesOf"/> and <see cref="TryParsePluginName"/>.</summary>
+/// <summary>The winning records of the load order by key, as one run's plugin records resolve them.</summary>
+public interface IRecordIndex;
+
+/// <summary>Reads the load order's plugin records. Not thread-safe, except <see cref="ReadHomeCellGrid"/>, <see cref="ReadTerrain"/>, <see cref="ReadTerrainVersions"/>, <see cref="ReadWaterCopies"/>, <see cref="ReadTextureMaterialChain"/>, <see cref="FindLandWorldspace"/>, <see cref="ReadNavmeshes"/>, <see cref="NpcTraitsOf"/>, <see cref="TraitSupplierOf"/>, <see cref="LeveledEntriesOf"/> and <see cref="TryParsePluginName"/>.</summary>
 public interface IPluginRecords
 {
-    /// <summary>Walks every plugin's cells once; the records the later reads and writes need are remembered until the reader is dropped.</summary>
-    PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope);
+    /// <summary>Walks every plugin's cells once; the records the later reads and the patch writing need are remembered until the reader is dropped.</summary>
+    /// <param name="stopsTheWalk">
+    /// Whether a plugin's version is the lowest one kept of a record: each record's versions are kept from the winner down to and
+    /// including the first version whose plugin stops the walk, or all of them when none does.
+    /// </param>
+    PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk);
 
     /// <summary>
     /// The links into the given target-plugin records from every version of every record that is not a placed record, in the plugins
@@ -21,10 +28,11 @@ public interface IPluginRecords
     /// </summary>
     ImmutableArray<LinkFact> ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets);
 
-    bool HasEnableParent(RecordKey record);
+    /// <summary>The records <see cref="IPatchWriting"/> copies from; the placed records must have been read before.</summary>
+    IWritableRecords ReadWritableRecords();
 
-    /// <summary>Writes each order as an override of the record in its winning cell; the records must have been read before.</summary>
-    void Write(IReadOnlyList<WriteOrder> orders);
+    /// <summary>The index this reader resolves records through; it lives as long as the reader.</summary>
+    IRecordIndex ReadRecordIndex();
 
     /// <summary>The grid point of the winning cell whose child list holds the record; the placed records must have been read before. Thread-safe.</summary>
     /// <returns>Null where that cell has no grid: an interior cell, or the persistent cell of a worldspace.</returns>

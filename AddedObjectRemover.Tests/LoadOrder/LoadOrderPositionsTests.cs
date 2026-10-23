@@ -64,7 +64,8 @@ public class LoadOrderPositionsTests
             [],
             Patch,
             "Plugins.txt",
-            [new PluginListEntry(First, Enabled: true), new PluginListEntry(Second, Enabled: false), new PluginListEntry(Third, Enabled: false)]);
+            [new PluginListEntry(First, Enabled: true), new PluginListEntry(Second, Enabled: false), new PluginListEntry(Third, Enabled: false)],
+            []);
 
         Assert.Equal([Second, Third], plugins.DisabledPlugins.Order(PluginNameOrder));
         Assert.Contains(new PluginName("SECOND.esp"), plugins.DisabledPlugins);
@@ -72,18 +73,19 @@ public class LoadOrderPositionsTests
     }
 
     [Fact]
-    public void TheFixtureRunReadsItsPositionsFromAListingSequenceWithTheModsEnabledAndThePatchLast()
+    public void TheFixtureWorldReadsItsPositionsFromAListingSequenceWithTheModsEnabledAndThePatchWhereChosen()
     {
         var state = FixturePatcherState.Create(
             [new SkyrimMod(ModKey.FromNameAndExtension("Skyrim.esm"), SkyrimRelease.SkyrimSE), new SkyrimMod(ModKey.FromNameAndExtension("First.esp"), SkyrimRelease.SkyrimSE)],
             Path.GetTempPath(),
             Path.GetTempPath());
 
-        var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey, FixturePatcherState.PluginListOf(state));
+        using var world = FixturePatcherState.CreateFinalWorld(state, [new SkyrimMod(ModKey.FromNameAndExtension("Below.esp"), SkyrimRelease.SkyrimSE)]);
 
-        Assert.Equal(2, plugins.PatchPosition);
-        Assert.Equal(1, plugins.Positions.Of(new PluginName("First.esp")));
-        Assert.Empty(plugins.DisabledPlugins);
+        Assert.Equal(2, world.Plugins.PatchPosition);
+        Assert.Equal(1, world.Plugins.Positions.Of(new PluginName("First.esp")));
+        Assert.Equal(3, world.Plugins.Positions.Of(new PluginName("Below.esp")));
+        Assert.Empty(world.Plugins.DisabledPlugins);
     }
 
     private static readonly PluginName Third = new("Third.esp");
@@ -94,5 +96,5 @@ public class LoadOrderPositionsTests
 
     /// <param name="inListOrder">The entries of the plugin list, all enabled.</param>
     private static LoadOrderPlugins Create(PluginName patch, params PluginName[] inListOrder) =>
-        LoadOrderPluginsReader.Create([], patch, "Plugins.txt", [.. inListOrder.Select(plugin => new PluginListEntry(plugin, Enabled: true))]);
+        LoadOrderPluginsReader.Create([], patch, "Plugins.txt", [.. inListOrder.Select(plugin => new PluginListEntry(plugin, Enabled: true))], []);
 }

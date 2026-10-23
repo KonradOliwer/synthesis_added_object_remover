@@ -48,7 +48,7 @@ public class TerrainVersionReadingTests
     public void VersionsHoldEveryPluginsOwnHeightsInLoadOrder()
     {
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword));
+        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword), TestVersionWalks.NoStop);
 
         var versions = plugin.ReadTerrainVersions(ExteriorCell);
 
@@ -64,7 +64,7 @@ public class TerrainVersionReadingTests
     public void WinningHeightsAreStillTheLastVersions()
     {
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: true, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword));
+        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: true, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword), TestVersionWalks.NoStop);
 
         Assert.Equal(LateOffset * UnitsPerHeightStep, plugin.ReadTerrain(ExteriorCell)![0]);
     }
@@ -73,7 +73,7 @@ public class TerrainVersionReadingTests
     public void VersionsAreNotKeptUnlessAskedFor()
     {
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: true, Navmeshes: false, TerrainVersions: false, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword));
+        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: true, Navmeshes: false, TerrainVersions: false, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword), TestVersionWalks.NoStop);
 
         Assert.Throws<InvalidOperationException>(() => plugin.ReadTerrainVersions(ExteriorCell));
     }
@@ -89,7 +89,7 @@ public class TerrainVersionReadingTests
         childCell.Temporary.Add(placed);
         AddChildWorldspace(_target, child, childCell);
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword));
+        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword), TestVersionWalks.NoStop);
 
         Assert.Equal(_worldspace.ToRecordKey(), plugin.FindLandWorldspace(child.ToRecordKey()));
         Assert.Equal(
@@ -107,7 +107,7 @@ public class TerrainVersionReadingTests
         };
         _late.Mod.Worldspaces.RecordCache[_worldspace].AddCell(secondCell);
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: true, TestRecordKeys.HoldKeyword));
+        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: true, TestRecordKeys.HoldKeyword), TestVersionWalks.NoStop);
 
         var late = _late.Key.ToPluginName();
         Assert.Equal(
@@ -123,7 +123,7 @@ public class TerrainVersionReadingTests
     public void WaterIsNotKeptUnlessAskedFor()
     {
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword));
+        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword), TestVersionWalks.NoStop);
 
         Assert.Throws<InvalidOperationException>(() => plugin.ReadWaterCopies(ExteriorCell));
     }
@@ -139,7 +139,7 @@ public class TerrainVersionReadingTests
         SetDefaultWater(_late, _worldspace, ParentLateWater);
         var child = AddChildWithTargetCell(WorldspaceParent.Flag.UseLandData | WorldspaceParent.Flag.UseWaterData, childDefaultWater: ChildBaseWater);
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(WaterScope());
+        plugin.ReadPlacedRecords(WaterScope(), TestVersionWalks.NoStop);
 
         var copies = plugin.ReadWaterCopies(new ExteriorCell(child.ToRecordKey(), 0, 0));
 
@@ -158,7 +158,7 @@ public class TerrainVersionReadingTests
         SetDefaultWater(_base, _worldspace, ParentBaseWater);
         var child = AddChildWithTargetCell(WorldspaceParent.Flag.UseLandData, childDefaultWater: ChildBaseWater);
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(WaterScope());
+        plugin.ReadPlacedRecords(WaterScope(), TestVersionWalks.NoStop);
 
         Assert.Equal(
             [new WorldspaceWaterCopy(_base.Key.ToPluginName(), ChildBaseWater), new WorldspaceWaterCopy(_target.Key.ToPluginName(), null)],
@@ -169,7 +169,7 @@ public class TerrainVersionReadingTests
     public void AWorldspaceCopyWithoutLandDefaultsHasNoDefaultLevel()
     {
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(WaterScope());
+        plugin.ReadPlacedRecords(WaterScope(), TestVersionWalks.NoStop);
 
         Assert.All(plugin.ReadWaterCopies(ExteriorCell).Worldspace, copy => Assert.Null(copy.DefaultLevel));
     }
@@ -181,7 +181,7 @@ public class TerrainVersionReadingTests
         var first = AddChildWithTargetCell(WorldspaceParent.Flag.UseWaterData, childDefaultWater: ChildBaseWater, parent: second);
         AddChildWorldspace(_base, second, cell: null, WorldspaceParent.Flag.UseWaterData, ParentBaseWater, parent: first);
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(WaterScope());
+        plugin.ReadPlacedRecords(WaterScope(), TestVersionWalks.NoStop);
 
         Assert.Equal(
             [new WorldspaceWaterCopy(_base.Key.ToPluginName(), ParentBaseWater)],
@@ -193,7 +193,7 @@ public class TerrainVersionReadingTests
     {
         var child = AddChildWithTargetCell(WorldspaceParent.Flag.UseWaterData, childDefaultWater: ChildBaseWater, parent: _base.NextKey());
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(WaterScope());
+        plugin.ReadPlacedRecords(WaterScope(), TestVersionWalks.NoStop);
 
         Assert.Equal(
             [new WorldspaceWaterCopy(_base.Key.ToPluginName(), ChildBaseWater), new WorldspaceWaterCopy(_target.Key.ToPluginName(), null)],
@@ -252,7 +252,6 @@ public class TerrainVersionReadingTests
     private IPluginRecords OpenPlugin()
     {
         var state = FixturePatcherState.Create([_base.Mod, _target.Mod, _noLand.Mod, _late.Mod], Path.GetTempPath(), Path.GetTempPath());
-        var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey, FixturePatcherState.PluginListOf(state));
-        return new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods, Environment.ProcessorCount).Open();
+        return new PluginRecordsFactory(FixturePatcherState.CreateFinalWorld(state), Environment.ProcessorCount).Open();
     }
 }

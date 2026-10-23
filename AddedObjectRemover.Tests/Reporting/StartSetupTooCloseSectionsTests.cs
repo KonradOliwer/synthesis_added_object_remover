@@ -25,6 +25,12 @@ public sealed class StartSetupTooCloseSectionsTests
     private static readonly ModKey ExtraB = ModKey.FromNameAndExtension("ExtraB.esp");
     private static readonly ModKey Skyrim = ModKey.FromNameAndExtension("Skyrim.esm");
     private static readonly ModKey Patch = ModKey.FromNameAndExtension("Patch.esp");
+    private static readonly ModKey CreationClub = ModKey.FromNameAndExtension("ccBGSSSE001-Fish.esm");
+    private static readonly ModKey TargetMaster = ModKey.FromNameAndExtension("TargetMaster.esm");
+    private static readonly ModKey CityMaster = ModKey.FromNameAndExtension("CityMaster.esm");
+    private static readonly ModKey City = ModKey.FromNameAndExtension("City.esp");
+    private static readonly ModKey Birds = ModKey.FromNameAndExtension("Birds.esp");
+    private static readonly ModKey Never = ModKey.FromNameAndExtension("Never.esp");
 
     private static readonly ReportContext Normal = new(null!, null!, Detailed: false);
     private static readonly ReportContext Detailed = new(null!, null!, Detailed: true);
@@ -79,7 +85,7 @@ public sealed class StartSetupTooCloseSectionsTests
     [Fact]
     public void Stop_SaysTheCleanedModLoadsAfterThePatchWithBothPositions()
     {
-        var reason = new StopReason(StopKind.CleanedModLoadsAfterPatch, "Target.esp", new PatchPlacement("Patch.esp", 300, 250));
+        var reason = new StopReason(StopKind.CleanedModLoadsAfterPatch, "Target.esp", new PatchPlacement("Patch.esp", "Target.esp", 300, 250));
 
         Assert.Equal(
             ["Target.esp loads after the patch Patch.esp (position 300 > 250): move Patch.esp below it. No changes made."],
@@ -140,11 +146,12 @@ public sealed class StartSetupTooCloseSectionsTests
         var settings = SettingsFor();
         settings.TooClose.ByDistance.Use = false;
         settings.TerrainChange.RemoveOnChangedTerrain = false;
-        settings.WhatToIgnore = new IgnoreSettings
+        settings.Trust = new TrustSettings
         {
-            IgnoreTargetMasters = everythingOn,
-            CompatibilityPatches = new CompatibilityPatchSettings { IgnoreModsPatchedWithTarget = everythingOn, MaxOtherMastersForPatch = 1 },
-            ExcludedPlugins = everythingOn ? [ModKey.FromNameAndExtension("Extra.esp"), ModKey.FromNameAndExtension("Second.esp")] : [],
+            TrustedModsAndTheirMasters = everythingOn ? [ModKey.FromNameAndExtension("Extra.esp"), ModKey.FromNameAndExtension("Second.esp")] : [],
+            TrustModsRequiringCleanedModAndTheirMasters = everythingOn,
+            MaxOtherMastersOfRequiringModToTrust = 1,
+            TrustModsLoadingBeforeCleanedMod = everythingOn,
         };
         settings.FollowUpRemoval = new FollowUpRemovalSettings
         {
@@ -157,27 +164,114 @@ public sealed class StartSetupTooCloseSectionsTests
         };
         var mods = Facts();
         var runSettings = Assert.IsType<RunRequest.Ready>(Build(settings, mods, detailedLogAndReports: everythingOn)).Settings;
-        var standing = ModIdentifier.Identify(mods, runSettings.ModIdentification);
+        var trust = ModTrustClassifier.Classify(mods, runSettings.ModTrust);
 
-        var lines = LogSections.BuildConfigSection(runSettings, standing, mods).Lines.Select(line => line.Replace('\\', '/')).ToArray();
+        var lines = LogSections.BuildConfigSection(runSettings, trust, mods).Lines.Select(line => line.Replace('\\', '/')).ToArray();
 
         AssertExpectedOutput(lines, "Config_GivesTheTextWithAndWithoutPatchesAndLeftovers", $"{everythingOn}");
     }
 
     [Fact]
-    public void Config_ListsSkippedPluginsAndDetectedPatchesWhenDetectionIsOn()
+    public void Config_PrintsTheTrustSettingsAndOneLinePerTrustReasonInLoadOrder()
     {
         var settings = SettingsFor();
-        settings.WhatToIgnore = new IgnoreSettings { CompatibilityPatches = new CompatibilityPatchSettings { MaxOtherMastersForPatch = 1 } };
-        var mods = Facts();
+        settings.Trust = new TrustSettings { TrustedModsAndTheirMasters = [City], ModsTrustedForOwnChangesOnly = [Birds], NeverTrustedMods = [Never] };
+        var mods = TrustFacts();
         var runSettings = Assert.IsType<RunRequest.Ready>(Build(settings, mods)).Settings;
 
-        var lines = LogSections.BuildConfigSection(runSettings, ModIdentifier.Identify(mods, runSettings.ModIdentification), mods).Lines.ToArray();
+        var lines = LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(mods, runSettings.ModTrust), mods).Lines;
 
-        Assert.Contains("Compatibility patch detection: 2 plugins master the target, 1 of them compatibility patches.", lines);
-        Assert.Contains(lines, line => line.StartsWith("  Plugin Merged.esp skipped: too many masters"));
-        Assert.Contains("  Compatibility patch Compat.esp: links target with Other.esp.", lines);
-        Assert.Contains("Ignored because of compatibility patches (the patches and the other mods they link to the target): Compat.esp, Other.esp.", lines);
+        Assert.Equal(
+            [
+                "Which other mods can cause removals: Trusted mods, and their masters: City.esp; Mods trusted for their own changes only: Birds.esp; "
+                    + "Never trusted mods: Never.esp; Also trust mods that require the cleaned mod, and their masters: on, only if it has at most 5 other masters; "
+                    + "Trust mods loading before the cleaned mod: on.",
+                "Trusted, base game: Skyrim.esm",
+                "Trusted, masters of Target.esp: TargetMaster.esm",
+                "Trusted, listed with masters: City.esp (masters: CityMaster.esm)",
+                "Trusted, requires Target.esp: Compat.esp (masters: Other.esp)",
+                "Trusted for own changes only, listed: Birds.esp",
+                "Never trusted, listed: Never.esp",
+                "Requires Target.esp but not trusted, 6 other masters (limit 5): Merged.esp",
+                "Trusted, loading before Target.esp: 1 mod",
+            ],
+            lines.Skip(1).Take(9));
+    }
+
+    [Fact]
+    public void Config_NamesTheMarkedPluginsRequiringTheCleanedModAndThoseOnlyLoadingBeforeItEachInLoadOrder()
+    {
+        var firstBefore = ModKey.FromNameAndExtension("First Before Patch.esp");
+        var secondBefore = ModKey.FromNameAndExtension("Second Before Patch.esp");
+        var second = ModKey.FromNameAndExtension("Second Group Patch.esp");
+        var first = ModKey.FromNameAndExtension("First Group Patch.esp");
+        PluginListing Listing(ModKey key, bool marked, params ModKey[] masters) =>
+            new(key.ToPluginName(), Loaded: true, [.. masters.Select(master => master.ToPluginName())]) { CarriesPatchMarker = marked };
+        PluginListing[] listed =
+        [
+            Listing(Skyrim, marked: false),
+            Listing(secondBefore, marked: true, Skyrim),
+            Listing(firstBefore, marked: true, Skyrim),
+            Listing(Target, marked: false, Skyrim),
+            Listing(second, marked: true, Skyrim, Target),
+            Listing(first, marked: true, Skyrim, Target),
+            Listing(Patch, marked: false, Skyrim),
+        ];
+        var mods = TestLoadOrderPlugins.Of(
+            new KnownPluginNames(listed.SelectMany(listing => listing.Masters.Prepend(listing.Mod))), Patch.ToPluginName(), [.. listed]);
+        var runSettings = Assert.IsType<RunRequest.Ready>(Build(SettingsFor(), mods)).Settings;
+
+        var lines = LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(mods, runSettings.ModTrust), mods).Lines;
+
+        Assert.Equal(
+            [
+                "Trusted, base game: Skyrim.esm",
+                "Requires Target.esp but not trusted, Added Object Remover patch of another group: Second Group Patch.esp, First Group Patch.esp",
+                "Loads before Target.esp but not trusted, Added Object Remover patch of another group: Second Before Patch.esp, First Before Patch.esp",
+            ],
+            lines.Skip(2).Take(3));
+    }
+
+    /// <summary>Such a patch is caught only as a master of a trusted mod that requires the cleaned mod, so it neither requires nor loads before it.</summary>
+    [Fact]
+    public void Config_NamesAMarkedPluginLoadingAfterTheCleanedModAsAMasterOfAModThatRequiresIt()
+    {
+        var otherGroup = ModKey.FromNameAndExtension("Other Group Patch.esp");
+        var compat = ModKey.FromNameAndExtension("Compat.esp");
+        PluginListing Listing(ModKey key, bool marked, params ModKey[] masters) =>
+            new(key.ToPluginName(), Loaded: true, [.. masters.Select(master => master.ToPluginName())]) { CarriesPatchMarker = marked };
+        PluginListing[] listed =
+        [
+            Listing(Skyrim, marked: false),
+            Listing(Target, marked: false, Skyrim),
+            Listing(otherGroup, marked: true, Skyrim),
+            Listing(compat, marked: false, Skyrim, Target, otherGroup),
+            Listing(Patch, marked: false, Skyrim),
+        ];
+        var mods = TestLoadOrderPlugins.Of(
+            new KnownPluginNames(listed.SelectMany(listing => listing.Masters.Prepend(listing.Mod))), Patch.ToPluginName(), [.. listed]);
+        var runSettings = Assert.IsType<RunRequest.Ready>(Build(SettingsFor(), mods)).Settings;
+
+        var lines = LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(mods, runSettings.ModTrust), mods).Lines;
+
+        Assert.Equal(
+            [
+                "Trusted, base game: Skyrim.esm",
+                "Trusted, requires Target.esp: Compat.esp",
+                "Master of a mod that requires Target.esp but not trusted, Added Object Remover patch of another group: Other Group Patch.esp",
+            ],
+            lines.Skip(2).Take(3));
+    }
+
+    [Fact]
+    public void Config_PrintsNoLineForPatchesOfOtherGroupsWhenThereAreNone()
+    {
+        var mods = TrustFacts();
+        var runSettings = Assert.IsType<RunRequest.Ready>(Build(SettingsFor(), mods)).Settings;
+
+        var lines = LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(mods, runSettings.ModTrust), mods).Lines;
+
+        Assert.DoesNotContain(lines, line => line.Contains("another group", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -200,7 +294,8 @@ public sealed class StartSetupTooCloseSectionsTests
             [
                 "Scanned 9 placed records: 3 Target.esp objects to check, 2 objects from other mods.",
                 "  Ignored 4 Target.esp objects whose winning version comes from a later plugin.",
-                "  Ignored 5 Target.esp objects that are initially disabled or have no valid position or rotation.",
+                "  Ignored 3 Target.esp objects that a later plugin removes.",
+                "  Ignored 5 Target.esp objects that are deleted, start disabled, or have no valid position or rotation.",
                 "  Ignored 7 other-mod objects that Target.esp itself overrides.",
             ],
             lines);
@@ -248,10 +343,10 @@ public sealed class StartSetupTooCloseSectionsTests
         var groups = LinkedGroups.Build(3, [TestTargets.Link(0, 1)]);
 
         AssertExpectedOutput(
-            [.. LogSections.BuildTargetVisibilitySection(targets, 5, Detailed with { Shapes = shapes }).Lines, .. LogSections.BuildGroupsSection(groups, 2, Detailed).Lines],
+            [.. LogSections.BuildTargetVisibilitySection(targets, 5, Target.ToPluginName(), Detailed with { Shapes = shapes }).Lines, .. LogSections.BuildGroupsSection(groups, 2, Target.ToPluginName(), Detailed).Lines],
             "TargetVisibilityAndGroups_GiveTheTextWithTheDetailedLogAndNothingWithout");
-        Assert.Empty(LogSections.BuildTargetVisibilitySection(targets, 5, Normal).Lines);
-        Assert.Empty(LogSections.BuildGroupsSection(groups, 2, Normal).Lines);
+        Assert.Empty(LogSections.BuildTargetVisibilitySection(targets, 5, Target.ToPluginName(), Normal).Lines);
+        Assert.Empty(LogSections.BuildGroupsSection(groups, 2, Target.ToPluginName(), Normal).Lines);
     }
 
     [Fact]
@@ -525,11 +620,11 @@ public sealed class StartSetupTooCloseSectionsTests
         change(settings);
         var mods = Facts();
         var runSettings = Assert.IsType<RunRequest.Ready>(Build(settings, mods)).Settings;
-        return LogSections.BuildConfigSection(runSettings, ModIdentifier.Identify(mods, runSettings.ModIdentification), mods).Lines;
+        return LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(mods, runSettings.ModTrust), mods).Lines;
     }
 
     private static RunRequest Build(StandardSettings settings, LoadOrderPlugins mods, bool detailedLogAndReports = false) =>
-        SettingsValidator.Build(StandardConfig.Of(settings), new PluginNameParsingPlugin(), mods, detailedLogAndReports, ReportsFolder, Workers);
+        SettingsValidator.Build(StandardConfig.Of(settings), new PluginNameParsingPlugin(), mods, detailedLogAndReports, onlyWarnWhenRequiringModLoadsAfterPatch: false, ReportsFolder, Workers);
 
     [Fact]
     public void TooClose_ForTheNormalLogKeepsTheResultAndTheKeptObjectsOnly()
@@ -597,7 +692,17 @@ public sealed class StartSetupTooCloseSectionsTests
             true,
             [],
             new Dictionary<RecordKey, SpaceFact> { [space] = new(space, "Tamriel", SpaceKind.Worldspace, "Skyrim") },
-            new ReadCounts(RecordsScanned: 9, TargetsOverriddenLater: 4, TargetsHiddenOrWithoutPlacement: 5, OthersOverriddenByTarget: 7, OtherInvalidPlacements: 6, NavmeshCount: 8, RemovedByEarlierRuns: 0, MovedByEarlierRuns: 0),
+            new ReadCounts(
+                RecordsScanned: 9,
+                CleanedModObjects: 16,
+                TargetsOverriddenLater: 4,
+                TargetsHiddenOrWithoutPlacement: 5,
+                RemovedByEarlierPatchers: 1,
+                RemovedByOtherPlugins: 3,
+                OthersOverriddenByTarget: 7,
+                OthersUnchanged: 10,
+                OtherInvalidPlacements: 6,
+                NavmeshCount: 8),
             [new OverriddenOtherRecord(new FormKey(Other, 0x50).ToRecordKey(), "Overridden", Other.ToPluginName())],
             TargetWorkOrder.Of(targets),
             null);
@@ -615,7 +720,8 @@ public sealed class StartSetupTooCloseSectionsTests
             default(Vector3),
             Scale: 1f,
             IsPrimitive: false,
-            HasMapMarker: false);
+            HasMapMarker: false,
+            new ObjectChange(Other.ToPluginName(), AcceptedFrom: null));
 
     private static StandardSettings SettingsFor() => new() { CleanedMod = Target };
 
@@ -635,6 +741,35 @@ public sealed class StartSetupTooCloseSectionsTests
                 Listing(Merged, Skyrim, Target, Other, ExtraA, ExtraB),
                 Listing(Patch, Skyrim),
             ]);
+    }
+
+    /// <summary>
+    /// Before the cleaned mod: the base game, a Creation Club plugin and the cleaned mod's master. After it: a city mod with its
+    /// master, a bird mod, a mod to be never trusted, a compatibility patch with one other master, and a merged plugin that
+    /// requires the cleaned mod and six plugins that are not in the plugin list.
+    /// </summary>
+    private static LoadOrderPlugins TrustFacts()
+    {
+        PluginListing Listing(ModKey key, params ModKey[] masters) =>
+            new(key.ToPluginName(), Loaded: true, [.. masters.Select(master => master.ToPluginName())]);
+        ModKey[] mergedMasters = [Skyrim, Target, .. Enumerable.Range(1, 6).Select(number => ModKey.FromNameAndExtension($"Part{number}.esp"))];
+        PluginListing[] listed =
+        [
+            Listing(Skyrim),
+            Listing(CreationClub, Skyrim),
+            Listing(TargetMaster, Skyrim),
+            Listing(Target, Skyrim, TargetMaster),
+            Listing(CityMaster, Skyrim),
+            Listing(City, Skyrim, CityMaster),
+            Listing(Birds, Skyrim),
+            Listing(Never, Skyrim),
+            Listing(Other, Skyrim),
+            Listing(Compat, Skyrim, Target, Other),
+            Listing(Merged, mergedMasters),
+            Listing(Patch, Skyrim),
+        ];
+        return TestLoadOrderPlugins.Of(
+            new KnownPluginNames(listed.SelectMany(listing => listing.Masters.Prepend(listing.Mod))), Patch.ToPluginName(), [.. listed]);
     }
 
     private static void AssertExpectedOutput(IReadOnlyList<string> actual, string name, string part = "") =>

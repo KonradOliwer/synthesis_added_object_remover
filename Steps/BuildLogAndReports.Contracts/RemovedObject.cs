@@ -7,8 +7,8 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 /// <summary>A target object to remove (index into the scanned targets).</summary>
 public abstract record RemovedObject(int TargetIndex);
 
-/// <param name="ChangedBy">The plugin whose terrain change the game shows.</param>
-public sealed record TerrainChangedRemoval(int TargetIndex, PluginName ChangedBy, TerrainChangeKind Kind) : RemovedObject(TargetIndex);
+/// <param name="ChangedBy">The plugin whose terrain change the game shows; null when an earlier patcher of the group made it.</param>
+public sealed record TerrainChangedRemoval(int TargetIndex, PluginName? ChangedBy, TerrainChangeKind Kind) : RemovedObject(TargetIndex);
 
 public sealed record TooCloseRemoval(int TargetIndex, OtherObject TooCloseTo, TooCloseCause Cause) : RemovedObject(TargetIndex);
 

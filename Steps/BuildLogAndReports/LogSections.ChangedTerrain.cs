@@ -28,13 +28,13 @@ internal static partial class LogSections
     {
         if (!context.Detailed) return [];
 
-        var changers = found.Hits.Select(hit => hit.ChangedBy.ToString());
-        var byPlugin = KeyedGroups.Rank(KeyedGroups.CountBy(changers, name => name, StringComparer.Ordinal), StringComparer.Ordinal);
+        var changers = found.Hits.Select(hit => Describe.ChangingMod(hit.ChangedBy));
+        var byChanger = KeyedGroups.Rank(KeyedGroups.CountBy(changers, name => name, StringComparer.Ordinal), StringComparer.Ordinal);
         return
         [
             $"  Terrain: {TextFormat.Count(found.CellsCompared)} cells compared; {TextFormat.Count(found.Hits.Length)} objects on changed terrain "
-                + $"(by plugin: {TextLists.JoinOr(TextLists.Counts(byPlugin), Describe.ListSeparator, Describe.NoEntries)}); "
-                + $"{TextFormat.Count(found.ObjectsWithoutTerrain)} objects not checked (interior or no terrain).",
+                + $"(by changing mod: {TextLists.JoinOr(TextLists.Counts(byChanger), Describe.ListSeparator, Describe.NoEntries)}); "
+                + $"{TextFormat.Count(found.ObjectsWithoutTerrain)} objects not checked (interior, no terrain, or no trusted land record).",
         ];
     }
 }

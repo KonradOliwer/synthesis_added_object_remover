@@ -1,12 +1,12 @@
 {
   "CleanedMod": "Nature of the Wild Lands.esp",
-  "WhatToIgnore": {
-    "ExcludedPlugins": [],
-    "IgnoreTargetMasters": true,
-    "CompatibilityPatches": {
-      "IgnoreModsPatchedWithTarget": true,
-      "MaxOtherMastersForPatch": 10
-    }
+  "Trust": {
+    "TrustedModsAndTheirMasters": [],
+    "ModsTrustedForOwnChangesOnly": [],
+    "NeverTrustedMods": [],
+    "TrustModsRequiringCleanedModAndTheirMasters": true,
+    "MaxOtherMastersOfRequiringModToTrust": 5,
+    "TrustModsLoadingBeforeCleanedMod": true
   },
   "TooClose": {
     "BySize": {

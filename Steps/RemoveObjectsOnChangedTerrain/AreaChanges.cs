@@ -3,7 +3,10 @@ using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
 
 /// <summary>The counted changes at the vertices of one check area, and which plugin each removal by height, terrain type or water names.</summary>
-/// <param name="Vertices">The vertices of the area in the cells that have a reference terrain, counted once per cell.</param>
+/// <param name="Vertices">
+/// The checked vertices of the area in the cells that have an accepted terrain, counted once per cell: the total the terrain type
+/// and water shares are measured against.
+/// </param>
 /// <param name="HeightChanger">The last loading plugin that changed the height of a vertex; null when none did.</param>
 /// <param name="TypeChangesByChanger">Per plugin that changed the terrain type of vertices, how many it changed.</param>
 /// <param name="WaterFlipsByChanger">Per plugin whose water change covered or uncovered vertices, how many.</param>
@@ -15,13 +18,14 @@ internal sealed record AreaChanges(
     IReadOnlyDictionary<int, int> WaterFlipsByChanger,
     TerrainChangeKind WaterKinds)
 {
+    /// <remarks>A vertex without an accepted height or terrain type is not checked: it counts for no change and not in the total.</remarks>
     public static AreaChanges Count(List<CheckedCell> cells)
     {
         var (vertexCount, heightChanger, typeChanges) = (0, (int?)null, new Dictionary<int, int>());
         var (waterFlips, waterKinds) = (new Dictionary<int, int>(), TerrainChangeKind.None);
         foreach (var cell in cells)
         {
-            foreach (var vertex in cell.Vertices)
+            foreach (var vertex in cell.Vertices.Where(cell.Terrain.IsCheckedAt))
             {
                 vertexCount++;
                 if (cell.WaterFlipAt(vertex) is { } water)

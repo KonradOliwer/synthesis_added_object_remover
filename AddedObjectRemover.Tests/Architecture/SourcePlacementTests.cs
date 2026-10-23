@@ -32,6 +32,13 @@ public class SourcePlacementTests
         ["Settings.cs"] = "The settings class names the converter Synthesis' settings.json reader must use for an unset plugin picker.",
     };
 
+    /// <summary>Tools that touch a placed record's enable parent for another purpose than deciding whether the game has the record.</summary>
+    private static readonly Dictionary<string, string> PresenceExceptions = new()
+    {
+        ["Tools/PluginRecordReadingAndWriting/LinkReader.cs"] = "An enable parent is a link; the link reader names its relation.",
+        ["Tools/PluginRecordReadingAndWriting/PlacedRecordWriter.cs"] = "Writes the enable parent a removal sets.",
+    };
+
     private static readonly string[] ParallelismApis = ["Parallel.", "AsParallel", "Partitioner", "Task.Run", "new Thread("];
 
     /// <summary>Atomic operations; the lookups tool also needs them for its lock-free memos.</summary>
@@ -41,11 +48,52 @@ public class SourcePlacementTests
     public void MutagenAndNoggogAreUsedOnlyWhereRecordsAreReadOrWritten() =>
         PlacementCheck.AssertUsedOnlyIn(UsesNamespace("Mutagen", "Noggog"), [.. RecordReadingAndWriting, "Program.cs"], MutagenExceptions);
 
+    /// <summary>Everything past the entry reads the final world; only the entry takes what it needs from the Synthesis state.</summary>
     [Fact]
-    public void ThePluginListIsReadOnlyByTheEnabledPluginListReader() =>
+    public void OnlyTheEntryMentionsTheSynthesisState() =>
+        PlacementCheck.AssertUsedOnlyIn(file => Regex.IsMatch(file.Code, @"\bIPatcherState\b"), ["Program.cs"]);
+
+    [Fact]
+    public void ThePluginListIsReadOnlyByThePluginListReader() =>
         PlacementCheck.AssertUsedOnlyIn(
             file => file.Code.Contains("GetLoadOrderListings", StringComparison.Ordinal),
-            ["Tools/PluginRecordReadingAndWriting/EnabledPluginListReader.cs"]);
+            ["Tools/PluginRecordReadingAndWriting/PluginListReader.cs"]);
+
+    [Fact]
+    public void OnlyTheFinalWorldFactoryOpensPluginsFromTheDataFolder() =>
+        PlacementCheck.AssertUsedOnlyIn(
+            file => Regex.IsMatch(file.Code, @"\bLoadOrderImporter\b|\bLoadOrder\.Import\b"),
+            ["Tools/PluginRecordReadingAndWriting/FinalWorldFactory.cs"]);
+
+    /// <summary>A writable mod is the patch: only the patch writing holds it as a value or overrides records into it.</summary>
+    [Fact]
+    public void OnlyThePatchWritingOverridesRecordsIntoThePatch() =>
+        PlacementCheck.AssertUsedOnlyIn(
+            file => Regex.IsMatch(file.Code, @"\bGetOrAddAsOverride\b|\bI?SkyrimMod\??\s+[A-Za-z_]"),
+            ["Tools/PluginRecordReadingAndWriting/PatchWriting.cs", "Tools/PluginRecordReadingAndWriting/PlacedOverrideWriter.cs"]);
+
+    /// <summary>
+    /// Whether the game has a placed record is decided once, by the collector's presence rule, from the presence facts the
+    /// reader takes from the record's final version; the patch writing writes the same convention.
+    /// </summary>
+    [Fact]
+    public void OnlyTheCollectorAndThePatchWritingReadThePresenceOfPlacedRecords() =>
+        PlacementCheck.AssertUsedOnlyIn(
+            file => Regex.IsMatch(file.Code, @"\.Presence\b|\bPresenceFacts\b|\bEnableParentFact\b|(?<!RelationKind)\.EnableParent\b|\bGetEnableParent\(|\bIsInitiallyDisabled\("),
+            [
+                "Steps/CollectPlacedObjects", "Steps/WriteThePatch", "Steps/WriteThePatch.Contracts",
+                "Tools/PluginRecordFacts/PlacementFacts.cs",
+                "Tools/PluginRecordReadingAndWriting/PlacedRecordReader.cs",
+                "Tools/PluginRecordReadingAndWriting/PlacedRecordExtensions.cs",
+            ],
+            PresenceExceptions);
+
+    /// <summary>The accepted-value rule is applied only where the properties it decides are compared: placed objects and terrain.</summary>
+    [Fact]
+    public void OnlyTheCollectorAndTheTerrainStepApplyTheAcceptedValueRule() =>
+        PlacementCheck.AssertUsedOnlyIn(
+            file => Regex.IsMatch(file.Code, @"\bAcceptedVersions\.Decide\b"),
+            ["Steps/CollectPlacedObjects", "Steps/RemoveObjectsOnChangedTerrain"]);
 
     [Fact]
     public void NiflyIsUsedOnlyInTheMeshReading() =>

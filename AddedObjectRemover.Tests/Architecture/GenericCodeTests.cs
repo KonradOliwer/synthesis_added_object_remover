@@ -54,7 +54,7 @@ public partial class GenericCodeTests
         var stale = listed.Keys.Except(flagged).Select(Describe).Order(StringComparer.Ordinal).ToList();
 
         Assert.True(unlisted.Count == 0, $"Mention no domain type (fix, or list in {AllowListFile} with a reason):{Environment.NewLine}{string.Join(Environment.NewLine, unlisted)}");
-        Assert.True(stale.Count == 0, $"Listed but no longer flagged (remove from {AllowListFile}):{Environment.NewLine}{string.Join(Environment.NewLine, stale)}");
+        AllowListAssert.NoneStale(stale, $"Listed but no longer flagged (remove from {AllowListFile})");
     }
 
     [Fact]

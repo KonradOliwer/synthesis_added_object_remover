@@ -12,4 +12,7 @@ public abstract record PluginListProblem
 
     /// <summary>A plugin of the Synthesis state has no entry in the plugin list.</summary>
     public sealed record PluginNotListed(string Path, PluginName Plugin) : PluginListProblem;
+
+    /// <summary>A plugin of the Synthesis state, which Synthesis loads above the patch, is listed after the patch's entry.</summary>
+    public sealed record PluginListedAfterPatch(string Path, PluginName Plugin, PluginName Patch) : PluginListProblem;
 }

@@ -38,7 +38,8 @@ public sealed record BaseFacts(
 /// <summary>Opens the base-facts reader of one run, so no run reuses what another run read.</summary>
 public interface IBaseFactsFactory
 {
-    IBaseFacts Open();
+    /// <param name="records">The index of the run's plugin records.</param>
+    IBaseFacts Open(IRecordIndex records);
 }
 
 /// <summary>The base records of the load order, by base; each value depends only on its key.</summary>

@@ -35,13 +35,13 @@ public class RunSettingsValidationTests
         new() { CleanedMod = ModKey.FromNameAndExtension(target) };
 
     private static RunRequest Build(StandardSettings settings, LoadOrderPlugins? facts = null, bool detailedLogAndReports = false, int workers = 3) =>
-        SettingsValidator.Build(StandardConfig.Of(settings), new PluginNameParsingPlugin(), facts ?? Facts(), detailedLogAndReports, ReportsFolder, workers);
+        SettingsValidator.Build(StandardConfig.Of(settings), new PluginNameParsingPlugin(), facts ?? Facts(), detailedLogAndReports, onlyWarnWhenRequiringModLoadsAfterPatch: false, ReportsFolder, workers);
 
     private static RunRequest.Ready BuildReady(StandardSettings settings, LoadOrderPlugins? facts = null, bool detailedLogAndReports = false, int workers = 3) =>
         Assert.IsType<RunRequest.Ready>(Build(settings, facts, detailedLogAndReports, workers));
 
     private static BatchRequest BuildAll(ConfigsRead read, LoadOrderPlugins? facts = null) =>
-        SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), facts ?? Facts(), detailedLogAndReports: false, ReportsFolder, 1);
+        SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), facts ?? Facts(), detailedLogAndReports: false, onlyWarnWhenRequiringModLoadsAfterPatch: false, ReportsFolder, 1);
 
     [Fact]
     public void AnEmptyCleanedModStopsTheRunAsNoTargetSet()
@@ -75,7 +75,7 @@ public class RunSettingsValidationTests
     public void ATargetLoadingAfterThePatchStopsTheRunWithBothPositions()
     {
         var stop = Assert.IsType<RunRequest.Stop>(Build(SettingsFor(), TargetAfterPatchFacts));
-        Assert.Equal(new StopReason(StopKind.CleanedModLoadsAfterPatch, "Target.esp", new PatchPlacement("Patch.esp", 3, 1)), stop.Reason);
+        Assert.Equal(new StopReason(StopKind.CleanedModLoadsAfterPatch, "Target.esp", new PatchPlacement("Patch.esp", "Target.esp", 3, 1)), stop.Reason);
     }
 
     [Fact]
@@ -117,13 +117,25 @@ public class RunSettingsValidationTests
     }
 
     [Fact]
+    public void EachEnabledPluginWithoutItsFileGivesAWarningLine()
+    {
+        var facts = Facts() with { MissingPlugins = [new PluginName("Gone.esp"), new PluginName("Lost.esm")] };
+
+        var ready = BuildReady(SettingsFor(), facts);
+
+        Assert.Equal(
+            [
+                "Warning: Gone.esp is enabled in your plugin list but its file was not found; it was skipped.",
+                "Warning: Lost.esm is enabled in your plugin list but its file was not found; it was skipped.",
+            ],
+            ready.Warnings.Select(warning => warning.Message));
+    }
+
+    [Fact]
     public void WarningsComeInTheOrderSettingsAreCheckedWithEachInvalidValueReportedOnce()
     {
         var settings = SettingsFor();
-        settings.WhatToIgnore = new IgnoreSettings
-        {
-            CompatibilityPatches = new CompatibilityPatchSettings { MaxOtherMastersForPatch = 500 },
-        };
+        settings.Trust = new TrustSettings { MaxOtherMastersOfRequiringModToTrust = 500 };
         settings.TooClose.NpcHandling = (NpcHandling)99;
         settings.TooClose.BySize.SizeMultiplier = 9f;
         settings.FollowUpRemoval = new FollowUpRemovalSettings
@@ -148,16 +160,16 @@ public class RunSettingsValidationTests
         string[] expectedStarts =
         [
             "Warning: could not read Target.esp",
-            "Warning: maximum other masters for a patch",
-            "Warning: NPCs and creatures setting",
+            "Warning: Which other mods can cause removals > ...only if it has at most this many other masters 500 is outside 0-100",
+            "Warning: Remove objects too close to other mods' objects > Other mods' NPCs and creatures cause removal",
             "Warning: Remove objects too close to other mods' objects > Margin by object size > Margin on every side",
-            "Warning: follow-up removal mode",
-            "Warning: touch distance",
-            "Warning: anchoring threshold",
-            "Warning: search radius",
-            "Warning: removed area per direction 45 is not a multiple",
-            "Warning: removed directions required 44 is not a multiple",
-            "Warning: occupied directions required 5 is outside",
+            "Warning: Also remove what rests on removed objects > When an object is removed, also remove",
+            "Warning: Also remove what rests on removed objects > Gap that still counts as touching",
+            "Warning: Also remove what rests on removed objects > OnlyWhatLosesItsSupport: remove when this much support is gone",
+            "Warning: Invisible objects left behind > When the cleaned mod's visible objects around it were removed > Look this far around it",
+            "Warning: Invisible objects left behind > When the cleaned mod's visible objects around it were removed > A direction is cleared when this much of it was removed 45 is not a multiple",
+            "Warning: Invisible objects left behind > When the cleaned mod's visible objects around it were removed > Remove when this share of those directions is cleared 44 is not a multiple",
+            "Warning: Invisible objects left behind > When the cleaned mod's visible objects around it were removed > Decide only if this share of the 8 directions has objects 5 is outside",
         ];
         Assert.Equal(expectedStarts.Length, messages.Count);
         for (var i = 0; i < expectedStarts.Length; i++)
@@ -167,11 +179,54 @@ public class RunSettingsValidationTests
     }
 
     [Fact]
-    public void ExcludedNamesHoldTheParsedKeys()
+    public void TheTrustListsHoldTheNamesAsTheSettingsSpellThemWithoutUnsetEntries()
     {
         var settings = SettingsFor();
-        settings.WhatToIgnore = new IgnoreSettings { ExcludedPlugins = [ModKey.FromNameAndExtension("Other.esp"), ModKey.Null] };
-        Assert.Equal("Other.esp", Assert.Single(BuildReady(settings).Settings.ExcludedNames));
+        settings.Trust = new TrustSettings { TrustedModsAndTheirMasters = [ModKey.FromNameAndExtension("PATCH.ESP"), ModKey.Null] };
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal("PATCH.esp", Assert.Single(ready.Settings.ModTrust.TrustedModsAndTheirMasters).FileName);
+        Assert.Empty(ready.Warnings);
+    }
+
+    [Fact]
+    public void EachListedPluginThatIsNotInThePluginListGivesAWarningNamingItsList()
+    {
+        var settings = SettingsFor();
+        settings.Trust = new TrustSettings
+        {
+            TrustedModsAndTheirMasters = [ModKey.FromNameAndExtension("City.esp")],
+            ModsTrustedForOwnChangesOnly = [ModKey.FromNameAndExtension("Birds.esp")],
+            NeverTrustedMods = [ModKey.FromNameAndExtension("Merged.esp")],
+        };
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(
+            [
+                "Warning: Which other mods can cause removals > Trusted mods, and their masters: City.esp is not in your plugin list.",
+                "Warning: Which other mods can cause removals > Mods trusted for their own changes only: Birds.esp is not in your plugin list.",
+                "Warning: Which other mods can cause removals > Never trusted mods: Merged.esp is not in your plugin list.",
+            ],
+            ready.Warnings.Select(warning => warning.Message));
+        Assert.Equal("City.esp", Assert.Single(ready.Settings.ModTrust.TrustedModsAndTheirMasters).FileName);
+    }
+
+    [Fact]
+    public void TheCleanedModOrThePatchListedAsNeverTrustedGivesAWarningEach()
+    {
+        var settings = SettingsFor();
+        settings.Trust = new TrustSettings { NeverTrustedMods = [ModKey.FromNameAndExtension("Target.esp"), ModKey.FromNameAndExtension("Patch.esp")] };
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(
+            [
+                "Warning: Which other mods can cause removals > Never trusted mods: Target.esp is the mod to clean up, which cannot be listed here; the entry has no effect.",
+                "Warning: Which other mods can cause removals > Never trusted mods: Patch.esp is the patch this patcher writes, which cannot be listed here; the entry has no effect.",
+            ],
+            ready.Warnings.Select(warning => warning.Message));
     }
 
     [Fact]
@@ -179,16 +234,8 @@ public class RunSettingsValidationTests
     {
         var ready = BuildReady(SettingsFor("TARGET.ESP"));
         Assert.Equal("Target.esp", ready.Settings.Target.FileName);
-        Assert.Equal("Target.esp", ready.Settings.ModIdentification.Target.FileName);
+        Assert.Equal("Target.esp", ready.Settings.ModTrust.Target.FileName);
         Assert.Equal("TARGET.esp", ready.Settings.TargetAsTyped.FileName);
-    }
-
-    [Fact]
-    public void KnownExcludedPluginsAreSpelledAsTheLoadOrderListsThem()
-    {
-        var settings = SettingsFor();
-        settings.WhatToIgnore = new IgnoreSettings { ExcludedPlugins = [ModKey.FromNameAndExtension("PATCH.ESP"), ModKey.FromNameAndExtension("Unknown.esp")] };
-        Assert.Equal("Patch.esp", Assert.Single(BuildReady(settings).Settings.ModIdentification.Excluded).FileName);
     }
 
     [Theory]
@@ -215,12 +262,12 @@ public class RunSettingsValidationTests
     [Fact]
     public void NoReportsFolderIsNeededWhenTheDetailedLogAndReportsAreOff() =>
         Assert.Null(Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(
-            StandardConfig.Of(SettingsFor()), new PluginNameParsingPlugin(), Facts(), detailedLogAndReports: false, reportsFolder: null, 1)).Settings.Reports);
+            StandardConfig.Of(SettingsFor()), new PluginNameParsingPlugin(), Facts(), detailedLogAndReports: false, onlyWarnWhenRequiringModLoadsAfterPatch: false, reportsFolder: null, 1)).Settings.Reports);
 
     [Fact]
     public void AReportsFolderIsRequiredWhenTheDetailedLogAndReportsAreOn() =>
         Assert.Throws<ArgumentNullException>(() => SettingsValidator.Build(
-            StandardConfig.Of(SettingsFor()), new PluginNameParsingPlugin(), Facts(), detailedLogAndReports: true, reportsFolder: null, 1));
+            StandardConfig.Of(SettingsFor()), new PluginNameParsingPlugin(), Facts(), detailedLogAndReports: true, onlyWarnWhenRequiringModLoadsAfterPatch: false, reportsFolder: null, 1));
 
     [Theory]
     [InlineData(nameof(NpcHandling.Never))]
@@ -460,7 +507,7 @@ public class RunSettingsValidationTests
         Assert.False(ready.Settings.ChangedTerrain.On);
         Assert.False(ready.Settings.Read.TerrainVersions);
         Assert.Equal(
-            "Warning: changed terrain is on, but no height, terrain type or water changes are counted; no object is removed for changed terrain.",
+            "Warning: changed terrain is on, but no height, ground type or water changes are counted; no object is removed for changed terrain.",
             Assert.Single(ready.Warnings).Message);
     }
 
@@ -498,7 +545,7 @@ public class RunSettingsValidationTests
         Assert.Equal((0f, 100), (ready.Settings.ChangedTerrain.WaterHeightTolerance, ready.Settings.ChangedTerrain.MinWaterCoverChangePercent));
         string[] expectedStarts =
         [
-            "Warning: water height change tolerance -5",
+            "Warning: Remove objects on terrain changed by other mods > Count only water height changes larger than -5",
             "Warning: Remove objects on terrain changed by other mods > Remove only when this share of the ground got covered/uncovered 101 is outside 0-100",
         ];
         Assert.Equal(expectedStarts.Length, ready.Warnings.Length);
@@ -527,8 +574,8 @@ public class RunSettingsValidationTests
             ready.Settings.ChangedTerrain);
         string[] expectedStarts =
         [
-            "Warning: objects checked for changed terrain",
-            "Warning: height change tolerance 300",
+            "Warning: Remove objects on terrain changed by other mods > Which of the cleaned mod's objects are checked",
+            "Warning: Remove objects on terrain changed by other mods > Count only height changes larger than 300",
             "Warning: Remove objects on terrain changed by other mods > Margin by object size > Margin on every side is not a valid number",
             "Warning: Remove objects on terrain changed by other mods > Margin by fixed distance > Margin on every side -1",
         ];
@@ -566,7 +613,7 @@ public class RunSettingsValidationTests
     public void AConfigFilesReportsGoToASubfolderNamedAfterTheConfig()
     {
         var read = new ConfigsRead.Ready([new ConfiguredSettings(ConfigSource("town_walls", 1, 1), SettingsFor())]);
-        var batch = Assert.IsType<BatchRequest.Ready>(SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), Facts(), detailedLogAndReports: true, ReportsFolder, 1));
+        var batch = Assert.IsType<BatchRequest.Ready>(SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), Facts(), detailedLogAndReports: true, onlyWarnWhenRequiringModLoadsAfterPatch: false, ReportsFolder, 1));
         var ready = Assert.IsType<RunRequest.Ready>(Assert.Single(batch.Requests));
 
         Assert.Equal(Path.Combine(ReportsFolder, "town_walls"), ready.Settings.Reports?.Folder);
@@ -607,7 +654,7 @@ public class RunSettingsValidationTests
         var failed = FailedBatch(ConfigSource("town_walls", 1, 1), SettingsFor("Missing.esp"));
 
         Assert.Equal(
-            $"Config file {FilePathOf("town_walls")}: the mod to clean up, Missing.esp, is not in your plugin list. Nothing was run and no patch was written.",
+            $"Config file {FilePathOf("town_walls")}: Missing.esp is not in your plugin list. Nothing was run and no patch was written.",
             failed.Message);
     }
 
@@ -617,7 +664,7 @@ public class RunSettingsValidationTests
         var failed = FailedBatch(ConfigSource("town_walls", 1, 1), SettingsFor(), DisabledTargetFacts);
 
         Assert.Equal(
-            $"Config file {FilePathOf("town_walls")}: the mod to clean up, Target.esp, is disabled. Nothing was run and no patch was written.",
+            $"Config file {FilePathOf("town_walls")}: Target.esp is disabled. Nothing was run and no patch was written.",
             failed.Message);
     }
 
@@ -627,7 +674,7 @@ public class RunSettingsValidationTests
         var failed = FailedBatch(ConfigSource("town_walls", 1, 1), SettingsFor(), NotLoadedTargetFacts);
 
         Assert.Equal(
-            $"Config file {FilePathOf("town_walls")}: the mod to clean up, Target.esp, is enabled in your plugin list but Synthesis did not load it for this group. Nothing was run and no patch was written.",
+            $"Config file {FilePathOf("town_walls")}: Target.esp is enabled in your plugin list but Synthesis did not load it for this group. Nothing was run and no patch was written.",
             failed.Message);
     }
 
@@ -637,7 +684,7 @@ public class RunSettingsValidationTests
         var failed = FailedBatch(ConfigSource("town_walls", 1, 1), SettingsFor(), TargetAfterPatchFacts);
 
         Assert.Equal(
-            $"Config file {FilePathOf("town_walls")}: the mod to clean up, Target.esp, loads after the patch Patch.esp (position 3 > 1): move Patch.esp below it. Nothing was run and no patch was written.",
+            $"Config file {FilePathOf("town_walls")}: Target.esp loads after the patch Patch.esp (position 3 > 1): move Patch.esp below it. Nothing was run and no patch was written.",
             failed.Message);
     }
 
@@ -647,7 +694,7 @@ public class RunSettingsValidationTests
         var failed = FailedBatch(ConfigSource("town_walls", 1, 1), SettingsFor("Patch.esp"));
 
         Assert.Equal(
-            $"Config file {FilePathOf("town_walls")}: the mod to clean up, Patch.esp, is the patch this patcher writes. Nothing was run and no patch was written.",
+            $"Config file {FilePathOf("town_walls")}: Patch.esp is the patch this patcher writes. Nothing was run and no patch was written.",
             failed.Message);
     }
 

@@ -22,7 +22,11 @@ public sealed class KnownPluginNames
 
 /// <param name="Loaded">False when the plugin is listed but could not be read.</param>
 /// <param name="Masters">Empty when the plugin could not be read.</param>
-public sealed record PluginListing(PluginName Mod, bool Loaded, ImmutableArray<PluginName> Masters);
+public sealed record PluginListing(PluginName Mod, bool Loaded, ImmutableArray<PluginName> Masters)
+{
+    /// <summary>Whether the plugin's header description holds the patch marker text.</summary>
+    public bool CarriesPatchMarker { get; init; }
+}
 
 /// <summary>An entry of the game's plugin list, enabled or not.</summary>
 public sealed record PluginListEntry(PluginName Plugin, bool Enabled);
@@ -35,18 +39,24 @@ public sealed record PluginListEntry(PluginName Plugin, bool Enabled);
 /// master-first reordering is not modelled.
 /// </param>
 /// <param name="DisabledPlugins">The entries of the game's plugin list that are not enabled.</param>
+/// <param name="MissingPlugins">The enabled entries below the patch whose file was not found; they are not in <paramref name="Listed"/>.</param>
 public sealed record LoadOrderPlugins(
     KnownPluginNames Mods,
     PluginName PatchMod,
     ImmutableArray<PluginListing> Listed,
     string PluginsFilePath,
     LoadOrderPositions Positions,
-    ImmutableHashSet<PluginName> DisabledPlugins)
+    ImmutableHashSet<PluginName> DisabledPlugins,
+    ImmutableArray<PluginName> MissingPlugins)
 {
     /// <summary>The position of the patch's entry in the game's plugin list; the end of the list when the patch has no entry.</summary>
     public int PatchPosition => Positions.Contains(PatchMod) ? Positions.Of(PatchMod) : Positions.Count;
 
     public PluginListing? Find(PluginName mod) => Listed.FirstOrDefault(listing => listing.Mod == mod);
+
+    /// <summary>The listed plugins that have the mod as a master, in the order of <see cref="Listed"/>; the patch is left out.</summary>
+    public ImmutableArray<PluginListing> ListingsRequiring(PluginName mod) =>
+        [.. Listed.Where(listing => listing.Mod != PatchMod && listing.Masters.Contains(mod))];
 }
 
 /// <summary>The position of each plugin in a list, found without walking the load order.</summary>

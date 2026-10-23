@@ -12,14 +12,14 @@ internal static class StartsDisabledRule
     private const float PlacementLimit = 1e6f;
 
     /// <summary>
-    /// Initially Disabled hides a record, except a record that is not a winning target record and has
-    /// an Enable Parent: the parent's state decides whether the game shows it, so it counts as present.
-    /// A record without a placement is never shown. A non-finite rotation would make every oriented
-    /// box test report a hit, so it makes the placement invalid, as does a position out of range.
+    /// A removed record (<see cref="RemovedForm"/>) never reaches this rule, so an initially disabled record here has an Enable
+    /// Parent. Initially Disabled hides a winning target record; on any other record the parent's state decides whether the game
+    /// shows it, so it counts as present. A record without a placement is never shown. A non-finite rotation would make
+    /// every oriented box test report a hit, so it makes the placement invalid, as does a position out of range.
     /// </summary>
     public static ShownInGame Of(PlacementFacts facts, bool isWinningTarget)
     {
-        if (facts.InitiallyDisabled && (isWinningTarget || !facts.HasEnableParent)) return ShownInGame.Hidden;
+        if (facts.Presence.InitiallyDisabled && isWinningTarget) return ShownInGame.Hidden;
         if (facts is not { Position: { } position, EulerRotation: { } rotation }) return ShownInGame.Hidden;
         return Vectors.IsWithinLimit(position, PlacementLimit) && Vectors.IsFinite(rotation) ? ShownInGame.Present : ShownInGame.InvalidPlacement;
     }

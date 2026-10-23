@@ -1,2 +1,2 @@
-Per cell/worldspace (target objects / other objects / removed):
+Per cell/worldspace (objects of Target.esp / other objects / removed):
   worldspace Tamriel [000100:Target.esp]: 5 / 1 / 3

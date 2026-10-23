@@ -85,26 +85,26 @@ public class SettingsFailureMessageTests
     [Fact]
     public void PluginListGivenASingleTextNamesTheSettingAndTheValueFound()
     {
-        var ex = Deserialize("""{"WhatToIgnore":{"ExcludedPlugins":"SomeMod.esp"}}""");
+        var ex = Deserialize("""{"Trust":{"TrustedModsAndTheirMasters":"SomeMod.esp"}}""");
 
         var message = SettingsFailureMessage.Describe(ex, Program.SettingsSchema, Program.SettingsFileName);
 
-        Assert.Contains("Standard.WhatToIgnore.ExcludedPlugins", message);
-        Assert.Contains("Never count these mods", message);
+        Assert.Contains("Standard.Trust.TrustedModsAndTheirMasters", message);
+        Assert.Contains("Trusted mods, and their masters", message);
         Assert.Contains("SomeMod.esp", message);
         Assert.EndsWith("Expected a plugin file name, for example SomeMod.esp.", message);
     }
 
     [Theory]
     [InlineData("""{"CleanedMod":"Foo"}""")]
-    [InlineData("""{"WhatToIgnore":{"ExcludedPlugins":["Bar.esp","Foo"]}}""")]
+    [InlineData("""{"Trust":{"TrustedModsAndTheirMasters":["Bar.esp","Foo"]}}""")]
     public void AMisspelledPluginNameStopsTheLoadNamingTheValueAndAskingForAPluginFileName(string json)
     {
         var ex = Assert.Throws<SettingsUnreadableException>(
             () => SettingsLoading.Load(() => JsonConvert.DeserializeObject<Settings>(InStandardGroup(json), JsonSettings), Program.SettingsSchema, Program.SettingsFileName));
 
         Assert.Contains("'Standard > Mod to clean up'", ex.Message);
-        Assert.Contains("'Standard > Other mods that never cause removals > Never count these mods'", ex.Message);
+        Assert.Contains("'Standard > Which other mods can cause removals > Trusted mods, and their masters'", ex.Message);
         Assert.Contains("Value found: Foo.", ex.Message);
         Assert.EndsWith("Expected a plugin file name, for example SomeMod.esp.", ex.Message);
     }
@@ -161,10 +161,10 @@ public class SettingsFailureMessageTests
     [Fact]
     public void PathIsMappedToItsDisplayNameBreadcrumb()
     {
-        var setting = SettingsFailureMessage.ResolveSetting("Standard.WhatToIgnore.ExcludedPlugins[0]", Program.SettingsSchema);
+        var setting = SettingsFailureMessage.ResolveSetting("Standard.Trust.TrustedModsAndTheirMasters[0]", Program.SettingsSchema);
 
         Assert.NotNull(setting);
-        Assert.Equal("Standard > Other mods that never cause removals > Never count these mods", setting.Value.Breadcrumb);
+        Assert.Equal("Standard > Which other mods can cause removals > Trusted mods, and their masters", setting.Value.Breadcrumb);
         Assert.Equal(typeof(ModKey), setting.Value.LeafType);
     }
 

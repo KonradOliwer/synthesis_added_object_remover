@@ -44,5 +44,5 @@ internal static class TestNpcs
 
     public static OtherObject Place(ModKey mod, int index, FormKey npc, Vector3 position, Vector3 rotation) =>
         new(new OtherId(index), new FormKey(mod, 0x900 + (uint)index).ToRecordKey(), TestTargets.Space, mod.ToPluginName(), EditorId: null, new BaseKey(npc.ToRecordKey(), BaseLinkKind.Npc), position, rotation, 1f,
-            IsPrimitive: false, HasMapMarker: false);
+            IsPrimitive: false, HasMapMarker: false, new ObjectChange(mod.ToPluginName(), AcceptedFrom: null));
 }

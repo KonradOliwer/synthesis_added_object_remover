@@ -10,8 +10,14 @@ internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records,
     {
     }
 
-    public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope) =>
-        new(records, records.Length, new HashSet<RecordKey>(), links, NavmeshCount: 0, UnnamedCellsOf(records));
+    /// <summary>The stop predicate of the last read; null before any.</summary>
+    public Func<PluginName, bool>? StopsTheWalk { get; private set; }
+
+    public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk)
+    {
+        StopsTheWalk = stopsTheWalk;
+        return new(records, records.Length, new HashSet<RecordKey>(), links, NavmeshCount: 0, UnnamedCellsOf(records));
+    }
 
     /// <summary>Each cell of the records once, without grid, name or Location.</summary>
     private static Dictionary<RecordKey, CellAreaFact> UnnamedCellsOf(ImmutableArray<PlacedRecordFact> records) =>
@@ -21,9 +27,9 @@ internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records,
 
     public ImmutableArray<LinkFact> ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets) => [];
 
-    public bool HasEnableParent(RecordKey record) => throw new NotSupportedException();
+    public IWritableRecords ReadWritableRecords() => throw new NotSupportedException();
 
-    public void Write(IReadOnlyList<WriteOrder> orders) => throw new NotSupportedException();
+    public IRecordIndex ReadRecordIndex() => throw new NotSupportedException();
 
     public CellGridPoint? ReadHomeCellGrid(RecordKey record) => throw new NotSupportedException();
 

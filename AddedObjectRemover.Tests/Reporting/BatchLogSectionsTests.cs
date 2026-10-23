@@ -17,7 +17,7 @@ public sealed class BatchLogSectionsTests
     private const string RoughBoxesName = "Remove objects too close to other mods' objects > Use rough boxes instead of exact shapes (faster)";
 
     private static readonly SettingInFile Defaulted = new("TooClose.UseRoughBoxes", RoughBoxesName, "false");
-    private static readonly SettingInFile DefaultedList = new("WhatToIgnore.ExcludedPlugins", "Never count these mods", "[]");
+    private static readonly SettingInFile DefaultedList = new("Trust.TrustedModsAndTheirMasters", "Trusted mods, and their masters", "[]");
     private static readonly SettingInFile Changed = new("TooClose.UseRoughBoxes", RoughBoxesName, "true");
 
     [Fact]
@@ -54,7 +54,7 @@ public sealed class BatchLogSectionsTests
         var sections = StartSections(Notes([], [Defaulted, DefaultedList], []), detailedLog: false);
 
         Assert.Equal(
-            [$"Not set in {FileName}, defaults used: TooClose.UseRoughBoxes = false, WhatToIgnore.ExcludedPlugins = []"],
+            [$"Not set in {FileName}, defaults used: TooClose.UseRoughBoxes = false, Trust.TrustedModsAndTheirMasters = []"],
             Lines(sections, "configDefaulted"));
     }
 
@@ -83,29 +83,28 @@ public sealed class BatchLogSectionsTests
     public void AStandardRunHasNoConfigFileLines()
     {
         var request = SettingsValidator.Build(
-            StandardConfig.Of(new StandardSettings { CleanedMod = Target }), new PluginNameParsingPlugin(), Facts(), detailedLogAndReports: false, ReportsFolder, 1);
+            StandardConfig.Of(new StandardSettings { CleanedMod = Target }), new PluginNameParsingPlugin(), Facts(), detailedLogAndReports: false, onlyWarnWhenRequiringModLoadsAfterPatch: false, ReportsFolder, 1);
 
         Assert.Equal(["warnings"], LogAndReports.BuildStartSections(request).Select(section => section.Id));
     }
 
+    /// <summary>Two runs of a batch: the first starts from a patch earlier patchers already wrote into, the second from its own mod's objects only.</summary>
     [Fact]
-    public void TheScanSaysWhatEarlierConfigsRemovedAndMovedOnlyWhenThereWasSomething()
+    public void EachRunsSummaryGivesItsStartingStateAndWhatItRemoved()
     {
-        Assert.Equal(["Scanned 0 placed records: 0 Target.esp objects to check, 0 objects from other mods."], ScanLines(removed: 0, moved: 0));
         Assert.Equal(
-            [
-                "Scanned 0 placed records: 0 Target.esp objects to check, 0 objects from other mods.",
-                "  Ignored 37 objects that earlier configs of this batch removed.",
-                "  2 objects that earlier configs of this batch moved are checked at their new position.",
-            ],
-            ScanLines(removed: 37, moved: 2));
+            ["Objects of Target.esp: 9; already removed by earlier patchers in this group: 2; judged in this run: 6; removed in this run: 4."],
+            RunSummaryLines(Target, objects: 9, removedByEarlierPatchers: 2, judged: 6, removed: 4));
+        Assert.Equal(
+            ["Objects of Second.esp: 3; already removed by earlier patchers in this group: 0; judged in this run: 3; removed in this run: 0."],
+            RunSummaryLines(ModKey.FromNameAndExtension("Second.esp"), objects: 3, removedByEarlierPatchers: 0, judged: 3, removed: 0));
     }
 
-    private static string[] ScanLines(int removed, int moved)
+    private static string[] RunSummaryLines(ModKey cleanedMod, int objects, int removedByEarlierPatchers, int judged, int removed)
     {
-        var world = TestScenes.CreateWorld([], []);
-        var counts = world.Counts with { RemovedByEarlierRuns = removed, MovedByEarlierRuns = moved };
-        return [.. LogSections.BuildScanSection(world with { Counts = counts }, Target.ToPluginName(), TimeSpan.Zero, new ReportContext(null!, null!, Detailed: false)).Lines];
+        var world = TestScenes.CreateWorld(TestTargets.CreateMany(judged), []);
+        var counts = world.Counts with { CleanedModObjects = objects, RemovedByEarlierPatchers = removedByEarlierPatchers };
+        return [.. LogSections.BuildRunSummarySection(world with { Counts = counts }, cleanedMod.ToPluginName(), removed).Lines];
     }
 
     private static ConfigFileNotes Notes(
@@ -116,7 +115,7 @@ public sealed class BatchLogSectionsTests
     {
         var source = new SettingsSource.ConfigFile("town_walls", FileName, Path.Combine("configs", FileName), Number: 2, Count: 3, notes);
         var settings = new StandardSettings { CleanedMod = Target };
-        var request = SettingsValidator.Build(new ConfiguredSettings(source, settings), new PluginNameParsingPlugin(), Facts(), detailedLog, ReportsFolder, 1);
+        var request = SettingsValidator.Build(new ConfiguredSettings(source, settings), new PluginNameParsingPlugin(), Facts(), detailedLog, onlyWarnWhenRequiringModLoadsAfterPatch: false, ReportsFolder, 1);
         return LogAndReports.BuildStartSections(request);
     }
 

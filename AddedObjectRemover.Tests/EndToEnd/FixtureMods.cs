@@ -5,14 +5,14 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 
 /// <summary>
 /// The plugins of the fixture load order. The target masters only the base game: a master of the
-/// target counts as ignored, so the other mod cannot be one. The target's override of the other
+/// target is always trusted, so the other mod cannot be one. The target's override of the other
 /// mod's record (see <see cref="FixtureStandingScene"/>) therefore lacks that master, which
-/// in-memory plugins allow.
+/// in-memory plugins allow. The other mod masters the target, because links into the target are only
+/// read from plugins that master it; the settings list it as never trusted.
 /// </summary>
 internal sealed class FixtureMods
 {
     private const string BaseGamePlugin = "Skyrim.esm";
-    private const string OtherModPlugin = "Rival.esp";
     private const string PatchedPlugin = "Patched.esp";
     private const string TargetPatchPlugin = "TargetPatch.esp";
     private const string KeepListEditorId = "TargetPatch_KeepList";
@@ -23,10 +23,10 @@ internal sealed class FixtureMods
     {
         BaseGame = new FixtureMod(BaseGamePlugin);
         Target = new FixtureMod(FixtureWorld.TargetName, BaseGame);
-        OtherMod = new FixtureMod(OtherModPlugin, BaseGame, Target);
+        OtherMod = new FixtureMod(FixtureWorld.OtherModPlugin, BaseGame, Target);
         Patched = new FixtureMod(PatchedPlugin, BaseGame);
         TargetPatch = new FixtureMod(TargetPatchPlugin, BaseGame, Target, Patched);
-        Excluded = new FixtureMod(FixtureWorld.ExcludedPlugin, BaseGame);
+        Trusted = new FixtureMod(FixtureWorld.TrustedPlugin, BaseGame);
         _keepList = TargetPatch.AddFormList(KeepListEditorId);
     }
 
@@ -34,23 +34,24 @@ internal sealed class FixtureMods
     public FixtureMod Target { get; }
     public FixtureMod OtherMod { get; }
 
-    /// <summary>Another mod that a compatibility patch links to the target, so it is ignored.</summary>
+    /// <summary>Another mod that the compatibility patch masters, so it is trusted with the patch.</summary>
     public FixtureMod Patched { get; }
 
-    /// <summary>The compatibility patch; also holds a non-placed record that references target objects.</summary>
+    /// <summary>The compatibility patch, a mod that requires the target, so it is trusted; also holds a non-placed record that references target objects.</summary>
     public FixtureMod TargetPatch { get; }
 
-    public FixtureMod Excluded { get; }
+    /// <summary>Listed as trusted in the settings.</summary>
+    public FixtureMod Trusted { get; }
 
     /// <summary>Lowest priority first.</summary>
-    public IReadOnlyList<ISkyrimMod> LoadOrder => [BaseGame.Mod, Target.Mod, OtherMod.Mod, Patched.Mod, TargetPatch.Mod, Excluded.Mod];
+    public IReadOnlyList<ISkyrimMod> LoadOrder => [BaseGame.Mod, Target.Mod, OtherMod.Mod, Patched.Mod, TargetPatch.Mod, Trusted.Mod];
 
     /// <summary>Every plugin that places records, with its copy of the shared spaces.</summary>
     public static FixtureMods Create()
     {
         var mods = new FixtureMods();
         var spaces = FixtureSpaces.CreateIn(mods.BaseGame);
-        foreach (var mod in new[] { mods.Target, mods.OtherMod, mods.Patched, mods.Excluded }) spaces.AddOverridesTo(mod);
+        foreach (var mod in new[] { mods.Target, mods.OtherMod, mods.Patched, mods.Trusted }) spaces.AddOverridesTo(mod);
         return mods;
     }
 

@@ -11,14 +11,6 @@ internal static class TestBaseFacts
     public static BaseFactsReader Reader(ILinkCache linkCache) =>
         new(linkCache, new KnownPluginNames(linkCache.ListedOrder.Select(mod => mod.ModKey.ToPluginName())));
 
-    public static IBaseFactsFactory Factory(ILinkCache linkCache, Func<IBaseFacts, IBaseFacts>? wrap = null) =>
-        new OpeningFactory(() => wrap is null ? Reader(linkCache) : wrap(Reader(linkCache)));
-
-    private sealed class OpeningFactory(Func<IBaseFacts> open) : IBaseFactsFactory
-    {
-        public IBaseFacts Open() => open();
-    }
-
     private sealed class UnresolvedBases : IBaseFacts
     {
         public BaseFacts Of(BaseKey baseKey) => BaseFacts.Unresolved(baseKey.Record);

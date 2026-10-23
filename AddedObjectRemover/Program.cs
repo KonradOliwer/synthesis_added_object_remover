@@ -56,28 +56,53 @@ public static class Program
 
         var settings = loadSettings();
         var configs = ReadConfigs(settings, state.DataFolderPath.Path);
-        var pluginList = EnabledPluginListReader.Read(
+        using var world = OpenFinalWorld(state, pluginsFile);
+        var pluginRecords = new PluginRecordsFactory(world, workers);
+        var requests = ValidateRequests(state, settings, configs, world, pluginRecords, workers);
+        var patchWriting = new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod);
+        if (requests.Any(request => request is RunRequest.Ready)) patchWriting.WritePatchMarker();
+        StepRunner.PatchLoadOrder(requests, CreateEnvironment(state, world, pluginRecords, patchWriting, totalTimer));
+    }
+
+    private static FinalWorld OpenFinalWorld(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, FilePath? pluginsFile)
+    {
+        var pluginList = PluginListReader.Read(
             state.GameRelease,
             state.DataFolderPath,
             pluginsFile,
             state.LoadOrder.ListedOrder.Select(listing => listing.ModKey),
             state.PatchMod.ModKey);
-        var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey, TakeListOrFail(pluginList));
-        var pluginRecords = new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods, workers);
-        var batch = SettingsValidator.BuildAll(
-            configs, pluginRecords.Open(), plugins, settings.DetailedLogAndReports, settings.DetailedLogAndReports ? ReportsFolder(state) : null, workers);
-        var requests = TakeRequestsOrFail(batch);
-        var environment = new RunEnvironment(
-            plugins,
+        var worlds = new FinalWorldFactory(FinalWorldFactory.ImportFromDataFolder(state.GameRelease));
+        return worlds.Create(state.LoadOrder.ListedOrder, state.PatchMod, TakeListOrFail(pluginList), state.DataFolderPath);
+    }
+
+    private static ImmutableArray<RunRequest> ValidateRequests(
+        IPatcherState<ISkyrimMod, ISkyrimModGetter> state,
+        IModeSettingsValues settings,
+        ConfigsRead configs,
+        FinalWorld world,
+        PluginRecordsFactory pluginRecords,
+        int workers) =>
+        TakeRequestsOrFail(SettingsValidator.BuildAll(
+            configs,
+            pluginRecords.Open(),
+            world.Plugins,
+            settings.DetailedLogAndReports,
+            settings.OnlyWarnWhenModRequiringCleanedModLoadsAfterPatch,
+            settings.DetailedLogAndReports ? ReportsFolder(state) : null,
+            workers));
+
+    private static RunEnvironment CreateEnvironment(
+        IPatcherState<ISkyrimMod, ISkyrimModGetter> state, FinalWorld world, PluginRecordsFactory pluginRecords, PatchWriting patchWriting, Stopwatch totalTimer) =>
+        new(
+            world.Plugins,
             pluginRecords,
-            new MeshFilesFactory(
-                state.DataFolderPath.Path, state.GameRelease, [.. state.LoadOrder.ListedOrder.Select(listing => listing.ModKey)]),
-            new BaseFactsFactory(state.LinkCache, plugins.Mods),
+            patchWriting,
+            new MeshFilesFactory(state.DataFolderPath.Path, state.GameRelease, [.. world.Order.ListedOrder.Select(listing => listing.ModKey)]),
+            new BaseFactsFactory(world.Plugins.Mods),
             new ConsoleLogSink(),
             new CsvReportOutput(),
             () => totalTimer.Elapsed);
-        StepRunner.PatchLoadOrder(requests, environment);
-    }
 
     /// <summary>
     /// A folder in the patcher's own data folder in Synthesis ("Data\&lt;profile&gt;\&lt;patcher name&gt;"), which lasts between runs

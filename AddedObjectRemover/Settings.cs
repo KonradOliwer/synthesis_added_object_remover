@@ -1,4 +1,5 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
+using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
@@ -24,6 +25,13 @@ public class Settings : IModeSettingsValues
         + "The report files go to the \"Reports\" folder in this patcher's own folder in Synthesis; the log shows the full path.\n"
         + "Applies to Standard and Batch mode. Does not change the patch.")]
     public bool DetailedLogAndReports { get; set; }
+
+    [SynthesisOrder]
+    [SynthesisSettingName(RunSettings.OnlyWarnSettingName)]
+    [SynthesisTooltip(
+        "Such a mod below the patch in your plugin list overrides what the patch writes, so the run normally stops; moving the patch below it fixes that.\n"
+        + "On: one warning per mod, and the cleaned mod's objects it overrides are left unchanged.")]
+    public bool OnlyWarnWhenModRequiringCleanedModLoadsAfterPatch { get; set; }
 
     [SynthesisOrder]
     [SynthesisSettingName("Batch")]
@@ -54,7 +62,7 @@ public class StandardSettings : ISettingsValues
     [SynthesisOrder]
     [SynthesisSettingName("Mod to clean up")]
     [SynthesisTooltip(
-        "The cleaned mod: the plugin whose added objects are checked; those that clash with other mods are removed in the patch, this Synthesis group's output plugin.\n"
+        "The cleaned mod: the plugin whose added objects are checked. Those that clash with other mods are removed in the patch, this Synthesis group's output plugin.\n"
         + "Nothing is deleted: a removed object is disabled; one that is not persistent is also moved below the world.\n"
         + "Always kept, whatever the settings: teleport doors and their destinations; anything another mod's object, a quest, a package,\n"
         + "a scene, a location or a navmesh points to; objects whose own script names a quest or scene, or whose base object\n"
@@ -65,11 +73,11 @@ public class StandardSettings : ISettingsValues
     public ModKey CleanedMod { get; set; } = ModKey.Null;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Other mods that never cause removals")]
+    [SynthesisSettingName("Which other mods can cause removals")]
     [SynthesisTooltip(
-        "Objects and terrain changes from these mods are never a reason to remove the cleaned mod's objects.\n"
-        + "The base game and its official DLC never count either.")]
-    public IgnoreSettings WhatToIgnore { get; set; } = new();
+        "Only untrusted mods' objects and terrain changes can remove the cleaned mod's objects.\n"
+        + "Always trusted: the base game (Skyrim.esm, Update.esm and the three DLCs), the cleaned mod, and its masters (the plugins it requires).")]
+    public TrustSettings Trust { get; set; } = new();
 
     [SynthesisOrder]
     [SynthesisSettingName("Remove objects too close to other mods' objects")]
@@ -102,55 +110,70 @@ public class StandardSettings : ISettingsValues
     public LeftoverInvisibleObjectSettings LeftoverInvisibleObjects { get; set; } = new();
 
     string? ISettingsValues.CleanedMod => CleanedMod.IsNull ? null : CleanedMod.ToString();
-    IIgnoreSettingsValues ISettingsValues.WhatToIgnore => WhatToIgnore ?? new IgnoreSettings();
+    ITrustSettingsValues ISettingsValues.Trust => Trust ?? new TrustSettings();
     ITooCloseSettingsValues ISettingsValues.TooClose => TooClose ?? new TooCloseRemovalSettings();
     ITerrainChangeSettingsValues ISettingsValues.TerrainChange => TerrainChange ?? new TerrainChangeSettings();
     IFollowUpSettingsValues ISettingsValues.FollowUpRemoval => FollowUpRemoval ?? new FollowUpRemovalSettings();
     ILeftoverSettingsValues ISettingsValues.LeftoverInvisibleObjects => LeftoverInvisibleObjects ?? new LeftoverInvisibleObjectSettings();
 }
 
-public class IgnoreSettings : IIgnoreSettingsValues
+public class TrustSettings : ITrustSettingsValues
 {
     [SynthesisOrder]
-    [SynthesisSettingName("Never count these mods")]
-    [SynthesisTooltip("Add plugins whose objects and terrain changes should never cause removals, for example Creation Club plugins.")]
+    [SynthesisSettingName("Trusted mods, and their masters")]
+    [SynthesisTooltip(
+        "Everything these plugins and their masters contain is accepted, even values they only carry over, everywhere.\n"
+        + "For example, list a compatibility patch made for the cleaned mod and a city mod: the city mod's wall standing where the cleaned mod puts a cart\n"
+        + "no longer removes the cart.")]
     [JsonProperty(ItemConverterType = typeof(EmptyTextAsNullConverter))]
-    public List<ModKey> ExcludedPlugins { get; set; } = [];
+    public List<ModKey> TrustedModsAndTheirMasters { get; set; } = [];
 
     [SynthesisOrder]
-    [SynthesisSettingName("Never count the mods the cleaned mod requires")]
-    [SynthesisTooltip("The plugins the cleaned mod lists as its masters were made to fit with it.")]
-    public bool IgnoreTargetMasters { get; set; } = true;
-
-    [SynthesisOrder]
-    [SynthesisSettingName("Compatibility patches")]
+    [SynthesisSettingName("Mods trusted for their own changes only")]
     [SynthesisTooltip(
-        "A compatibility patch is a plugin that requires both the cleaned mod and another mod. The other mod was already made to fit,\n"
-        + "so it never counts. The log lists each patch found.")]
-    public CompatibilityPatchSettings CompatibilityPatches { get; set; } = new();
-
-    IReadOnlyList<string> IIgnoreSettingsValues.ExcludedPlugins =>
-        ExcludedPlugins?.Where(plugin => !plugin.IsNull).Select(plugin => plugin.ToString()).ToArray() ?? [];
-
-    bool IIgnoreSettingsValues.IgnoreModsPatchedWithTarget => (CompatibilityPatches ?? new()).IgnoreModsPatchedWithTarget;
-    int IIgnoreSettingsValues.MaxOtherMastersForPatch => (CompatibilityPatches ?? new()).MaxOtherMastersForPatch;
-}
-
-public class CompatibilityPatchSettings
-{
-    [SynthesisOrder]
-    [SynthesisSettingName("Never count mods that have a compatibility patch with it")]
-    [SynthesisTooltip(
-        "If a plugin requires both the cleaned mod and another mod, it is treated as a compatibility patch:\n"
-        + "that other mod was already made to fit, so it never counts.")]
-    public bool IgnoreModsPatchedWithTarget { get; set; } = true;
+        "A record these plugins add is accepted in full. In other records, only the values that differ from the plugin loading just before them are accepted.\n"
+        + "Their masters are not affected. For example, a bird-sound mod's new sound markers are accepted, but a wall it only carries over from a city mod is not.")]
+    [JsonProperty(ItemConverterType = typeof(EmptyTextAsNullConverter))]
+    public List<ModKey> ModsTrustedForOwnChangesOnly { get; set; } = [];
 
     [SynthesisOrder]
-    [SynthesisSettingName("A patch requires at most this many other mods")]
+    [SynthesisSettingName("Never trusted mods")]
     [SynthesisTooltip(
-        "Plugins that require more other mods than this (for example a merged or Bashed Patch) are not treated as compatibility patches.\n"
-        + "The base game and the cleaned mod's masters are not counted. 1-100. Only used when the switch above is on.")]
-    public int MaxOtherMastersForPatch { get; set; } = SettingDefaults.MaxOtherMastersForPatch;
+        "These plugins can always cause removals, even when they are listed above, require the cleaned mod, load before it, or are its masters.\n"
+        + "For example, another Synthesis patcher's output. The cleaned mod and the patch cannot be listed.")]
+    [JsonProperty(ItemConverterType = typeof(EmptyTextAsNullConverter))]
+    public List<ModKey> NeverTrustedMods { get; set; } = [];
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Also trust mods that require the cleaned mod, and their masters")]
+    [SynthesisTooltip(
+        "A plugin that has the cleaned mod as a master (such as a compatibility patch) was made to fit it, so it is trusted like a listed mod,\n"
+        + "masters included: CityMod - CleanedMod Patch.esp makes CityMod.esp trusted. An Added Object Remover patch from another Synthesis group\n"
+        + "is never trusted this way.")]
+    public bool TrustModsRequiringCleanedModAndTheirMasters { get; set; } = true;
+
+    [SynthesisOrder]
+    [SynthesisSettingName("...only if it has at most this many other masters")]
+    [SynthesisTooltip(
+        "Other masters are those besides the cleaned mod, the base game and the cleaned mod's masters: a patch requiring Skyrim.esm, the cleaned mod\n"
+        + "and CityMod.esp has 1. Mods with more (a merged plugin, a Bashed Patch) are not trusted, and the log lists them.\n"
+        + "0 trusts only mods with no other masters. 0-100.")]
+    public int MaxOtherMastersOfRequiringModToTrust { get; set; } = SettingDefaults.MaxOtherMastersOfRequiringModToTrust;
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Trust mods loading before the cleaned mod")]
+    [SynthesisTooltip(
+        "The plugins above it in your plugin list, Creation Club content included; the cleaned mod was usually made to fit them.\n"
+        + "Off: they can cause removals, except the always-trusted ones.")]
+    public bool TrustModsLoadingBeforeCleanedMod { get; set; } = true;
+
+    IReadOnlyList<string> ITrustSettingsValues.TrustedModsAndTheirMasters => NamesOf(TrustedModsAndTheirMasters);
+    IReadOnlyList<string> ITrustSettingsValues.ModsTrustedForOwnChangesOnly => NamesOf(ModsTrustedForOwnChangesOnly);
+    IReadOnlyList<string> ITrustSettingsValues.NeverTrustedMods => NamesOf(NeverTrustedMods);
+
+    /// <summary>The settings screen saves a plugin picker left unset as an empty entry, which is no plugin.</summary>
+    private static IReadOnlyList<string> NamesOf(List<ModKey>? plugins) =>
+        plugins?.Where(plugin => !plugin.IsNull).Select(plugin => plugin.ToString()).ToArray() ?? [];
 }
 
 internal static class MarginTexts
@@ -277,7 +300,8 @@ public class TerrainChangeSettings : ITerrainChangeSettingsValues
     [SynthesisSettingName("Count only height changes larger than (game units)")]
     [SynthesisTooltip(
         "Small smoothing edits are common and rarely visible under an object. 0 counts every change. 0-256.\n"
-        + "Only used when \"Count height changes\" is on.")]
+        + "Counting uses it only when \"Count height changes\" is on.\n"
+        + "With that switch on or off, it also decides which height changes a mod trusted for its own changes owns: only those larger than this.")]
     public float HeightChangeTolerance { get; set; } = SettingDefaults.HeightChangeTolerance;
 
     [SynthesisOrder]
@@ -297,21 +321,24 @@ public class TerrainChangeSettings : ITerrainChangeSettingsValues
     [SynthesisSettingName("Count water height changes")]
     [SynthesisTooltip(
         "Whether another mod raising or lowering a cell's water counts, when that puts ground around the object under water\n"
-        + "or out of it. Water over ground that stays covered is not seen. A cell whose default water height is unknown is not checked.")]
+        + "or out of it. Water over ground that stays covered is not seen.")]
     public bool CountWaterHeightChanges { get; set; } = SettingDefaults.CountWaterHeightChanges;
 
     [SynthesisOrder]
     [SynthesisSettingName("Count only water height changes larger than (game units)")]
     [SynthesisTooltip(
         "Small water level edits rarely matter. 0 counts every change. 0-256.\n"
-        + "Only used when \"Count water height changes\" is on.")]
+        + "Counting uses it only when \"Count water height changes\" is on.\n"
+        + "With that switch on or off, it also decides which water height changes a mod trusted for its own changes owns: only those larger than this.")]
     public float WaterHeightChangeTolerance { get; set; } = SettingDefaults.WaterHeightChangeTolerance;
 
     [SynthesisOrder]
     [SynthesisSettingName("Count water added/removed changes")]
     [SynthesisTooltip(
         "Whether another mod adding water to a cell or taking its water away counts, when that puts ground around the object\n"
-        + "under water or out of it. Water over ground that stays covered is not seen. A cell whose default water height is unknown is not checked.")]
+        + "under water or out of it. Water over ground that stays covered is not seen.\n"
+        + "A world that stores no default water height has no default water: adding or dropping that default adds or takes away\n"
+        + "the water of the cells that use it.")]
     public bool CountWaterAddedOrRemoved { get; set; } = SettingDefaults.CountWaterAddedOrRemoved;
 
     [SynthesisOrder]
@@ -480,7 +507,7 @@ public class KeptInvisibleObjectSettings
     [SynthesisTooltip(
         "Invisible boxes without a model that start something when entered or left, such as a script, a quest stage or a trap.\n"
         + "Disabling one can stop whatever it starts. Always kept: those with a script that names a quest or scene, on the trigger itself\n"
-        + "or on a base object the mod to clean up defines.")]
+        + "or on a base object the cleaned mod defines.")]
     public bool TriggerBoxes { get; set; }
 
     [SynthesisOrder]

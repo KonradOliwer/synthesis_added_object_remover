@@ -20,18 +20,19 @@ internal static partial class LogSections
     public static LogSection BuildReportFolderWarningSection(ReportFileProblem problem) =>
         new("reportFolderWarning", [BuildReportFileProblemLine(problem)]);
 
-    public static LogSection BuildConfigSection(RunSettings settings, IdentifiedMods standing, LoadOrderPlugins plugins) =>
+    public static LogSection BuildConfigSection(RunSettings settings, ModTrustTable trust, LoadOrderPlugins plugins) =>
         new("config",
         [
             $"Mod to clean up: {settings.TargetAsTyped}",
             .. settings.DetailedLog ? [DescribePluginList(plugins)] : ImmutableArray<string>.Empty,
-            DescribeOtherModsThatNeverCauseRemovals(settings, standing),
-            .. CompatibilityPatches(standing.Patches),
+            DescribeTrustSettings(settings.ModTrust),
+            .. DescribeTrustReasons(settings.TargetAsTyped, settings.ModTrust.MaxOtherMastersOfRequiringMod, trust, plugins),
             DescribeTooClose(settings.TooClose),
             DescribeChangedTerrain(settings.ChangedTerrain),
             DescribeAlsoRemove(settings.AlsoRemove),
             DescribeLeftBehind(settings),
             DescribeDetailedLogAndReports(settings.Reports),
+            DescribeOnlyWarnWhenRequiringModLoadsAfterPatch(settings),
         ]);
 
     private static string DescribePluginList(LoadOrderPlugins plugins) =>
@@ -41,18 +42,6 @@ internal static partial class LogSections
 
     /// <summary>"off", or "on" with the detail that only matters when it is on.</summary>
     private static string OnWith(bool on, string detail) => on ? $"on, {detail}" : "off";
-
-    private static string DescribeOtherModsThatNeverCauseRemovals(RunSettings settings, IdentifiedMods standing)
-    {
-        var identification = settings.ModIdentification;
-        var requiredMods = identification.IgnoreTargetMasters
-            ? JoinOrNone(standing.IgnoredMasters.Select(mod => mod.ToString()))
-            : "off";
-        var patchedMods = identification.IgnorePatched ? $"on, a patch requires at most {identification.PatchMasterLimit} other mods" : "off";
-        return $"Other mods that never cause removals: Never count these mods: {JoinOrNone(settings.ExcludedNames)}; "
-            + $"Never count the mods the cleaned mod requires: {requiredMods}; "
-            + $"Never count mods that have a compatibility patch with it: {patchedMods}.";
-    }
 
     private static string DescribeTooClose(TooCloseSettings tooClose) =>
         "Remove objects too close to other mods' objects: "
@@ -87,13 +76,18 @@ internal static partial class LogSections
     private static string DescribeDetailedLogAndReports(ReportFileSettings? reports) =>
         $"Detailed log and reports: {(reports is null ? "off" : $"on, report files go to {reports.Folder}")}.";
 
+    private static string DescribeOnlyWarnWhenRequiringModLoadsAfterPatch(RunSettings settings) =>
+        $"{RunSettings.OnlyWarnSettingName}: {OnOff(settings.OnlyWarnWhenRequiringModLoadsAfterPatch)}.";
+
     private static string StopMessage(StopReason reason, SettingsSource source) => reason.Kind switch
     {
         StopKind.NoTargetSet => "No mod to clean up is set (CleanedMod). No changes made.",
         StopKind.CleanedModNotInLoadOrder => $"{reason.Name} is not in your plugin list. No changes made.",
         StopKind.CleanedModDisabled => $"{reason.Name} is disabled. No changes made.",
         StopKind.CleanedModLoadsAfterPatch when reason.Placement is { } placement =>
-            $"{reason.Name} loads after the patch {placement.Patch} (position {placement.CleanedModPosition} > {placement.PatchPosition}): move {placement.Patch} below it. No changes made.",
+            $"{reason.Name} loads after the patch {placement.Patch} (position {placement.ModPosition} > {placement.PatchPosition}): move {placement.Patch} below it. No changes made.",
+        StopKind.RequiringModLoadsAfterPatch when reason.Placement is { } placement =>
+            $"{placement.Mod} requires {reason.Name} and loads after the patch {placement.Patch} (position {placement.ModPosition} > {placement.PatchPosition}): move {placement.Patch} below it in your plugin list, or turn on \"{RunSettings.OnlyWarnSettingName}\". No changes made.",
         StopKind.CleanedModNotLoadedBySynthesis => $"{reason.Name} is enabled in your plugin list but Synthesis did not load it for this group. No changes made.",
         StopKind.TargetIsThePatch => $"{reason.Name} is the patch this patcher writes. No changes made.",
         StopKind.NoTargetObjects when source is SettingsSource.ConfigFile => "Nothing to check for this config. No changes made for it; the batch goes on.",
@@ -102,25 +96,6 @@ internal static partial class LogSections
     };
 
     private static string JoinOrNone(IEnumerable<string> names) => TextLists.JoinOr(names, Describe.ListSeparator, "(none)");
-
-    private static ImmutableArray<string> CompatibilityPatches(DetectedPatches patches)
-    {
-        if (!patches.DetectionOn) return [];
-        var lines = ImmutableArray.CreateBuilder<string>();
-        lines.Add($"Compatibility patch detection: {TextFormat.Count(patches.PluginsMasteringTarget)} plugins master the target, {TextFormat.Count(patches.Detected.Length)} of them compatibility patches.");
-        lines.AddRange(patches.SkippedTooManyMasters.Select(skipped =>
-            $"  Plugin {skipped.Patch} skipped: too many masters (likely generated or merged); it masters the target and {TextFormat.Count(skipped.OtherMasters.Length)} other mods."));
-        if (patches.Detected.Length == 0)
-        {
-            lines.Add("Compatibility patches: none detected.");
-            return lines.ToImmutable();
-        }
-        lines.AddRange(patches.Detected.Select(patch =>
-            $"  Compatibility patch {patch.Patch}: links target with {string.Join(", ", patch.OtherMasters)}."));
-        var ignoredMods = patches.IgnoredMods.OrderBy(mod => mod.ToString(), StringComparer.Ordinal);
-        lines.Add($"Ignored because of compatibility patches (the patches and the other mods they link to the target): {string.Join(", ", ignoredMods)}.");
-        return lines.ToImmutable();
-    }
 
     private static string DescribeAlsoRemove(AlsoRemoveSettings settings)
     {

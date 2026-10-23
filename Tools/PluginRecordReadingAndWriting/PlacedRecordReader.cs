@@ -7,7 +7,10 @@ using Mutagen.Bethesda.Skyrim;
 namespace AddedObjectRemover;
 
 /// <summary>What reading the placed records produced: the facts, and the load-order records behind them that later reads and writes need.</summary>
-internal sealed record ScannedRecords(PlacedRecordFacts Facts, RecordHandles Handles, LandscapeTerrain Terrain, CellWater Water, NavmeshRecords Navmeshes);
+internal sealed record ScannedRecords(PlacedRecordFacts Facts, ScanLookups Lookups);
+
+/// <summary>The load-order records behind the facts that later reads and writes need; kept without the facts, which only the caller holds.</summary>
+internal sealed record ScanLookups(RecordHandles Handles, LandscapeTerrain Terrain, CellWater Water, NavmeshRecords Navmeshes);
 
 /// <summary>
 /// The spaces (worldspace or interior cell keys) that contain a record created by the target
@@ -23,24 +26,36 @@ internal sealed record TargetFootprint(HashSet<RecordKey> SpaceKeys, HashSet<Rec
 /// Walks each mod's cell tree once via <c>EnumerateMajorRecordContexts&lt;ICell&gt;</c> (enumerating
 /// IPlaced walks each tree three times) and reads each cell's Persistent and Temporary lists itself.
 /// Mods are visited highest priority first, so the first sighting of a FormKey (record or cell)
-/// is its winner.
+/// is its winner. The later sightings of a record that became a fact are its lower versions; they are kept down to and
+/// including the first one whose plugin stops the walk.
 /// </summary>
 internal sealed class PlacedRecordReader
 {
-    private readonly ILoadOrder<IModListing<ISkyrimModGetter>> _loadOrder;
+    private readonly ILoadOrderGetter<IModListingGetter<ISkyrimModGetter>> _loadOrder;
     private readonly ILinkCache<ISkyrimMod, ISkyrimModGetter> _linkCache;
     private readonly ModKey _patch;
     private readonly PluginNames _names;
     private readonly PlacedReadScope _scope;
+    private readonly Func<PluginName, bool> _stopsTheWalk;
     private readonly TargetFootprint _footprint;
     private readonly HashSet<RecordKey> _landWorldspaces;
     private readonly HashSet<RecordKey> _seenRecords = new();
     private readonly HashSet<RecordKey> _seenNavmeshes = new();
-    private readonly Dictionary<RecordKey, IModContext<ISkyrimMod, ISkyrimModGetter, ICell, ICellGetter>> _winningCells = new();
+    private readonly Dictionary<RecordKey, ICellGetter> _winningCells = new();
     private readonly Dictionary<RecordKey, SpaceFact> _spaces = new();
     private readonly List<SpaceCell> _targetSpaceCells = [];
 
+    /// <summary>The facts in the order found; their versions are added when the walk is over.</summary>
     private readonly List<PlacedRecordFact> _records = [];
+
+    /// <summary>Each fact's versions, highest first.</summary>
+    private readonly Dictionary<RecordKey, List<PlacedVersionFact>> _versions = new();
+
+    /// <summary>
+    /// The version lists no plugin has stopped yet. Memory stays bounded: only records that became facts keep versions, and each
+    /// keeps them only down to the first version whose plugin stops the walk.
+    /// </summary>
+    private readonly Dictionary<RecordKey, List<PlacedVersionFact>> _openVersions = new();
     private readonly Dictionary<RecordKey, PlacedRecordHandle> _handles = new();
     private readonly List<LinkFact> _links = [];
     private readonly Dictionary<RecordKey, RecordKey> _landWorldspaceOf = new();
@@ -53,31 +68,34 @@ internal sealed class PlacedRecordReader
     private int _recordsScanned;
 
     private PlacedRecordReader(
-        ILoadOrder<IModListing<ISkyrimModGetter>> loadOrder,
+        ILoadOrderGetter<IModListingGetter<ISkyrimModGetter>> loadOrder,
         ILinkCache<ISkyrimMod, ISkyrimModGetter> linkCache,
         ModKey patch,
         PluginNames names,
-        PlacedReadScope scope)
+        PlacedReadScope scope,
+        Func<PluginName, bool> stopsTheWalk)
     {
         _loadOrder = loadOrder;
         _linkCache = linkCache;
         _patch = patch;
         _names = names;
         _scope = scope;
+        _stopsTheWalk = stopsTheWalk;
         _footprint = AnalyzeTarget();
         if (scope.Terrain || scope.TerrainVersions || scope.Water) FindLandAndWaterWorldspaces();
         _landWorldspaces = _landWorldspaceOf.Values.ToHashSet();
     }
 
     public static ScannedRecords Read(
-        ILoadOrder<IModListing<ISkyrimModGetter>> loadOrder,
+        ILoadOrderGetter<IModListingGetter<ISkyrimModGetter>> loadOrder,
         ILinkCache<ISkyrimMod, ISkyrimModGetter> linkCache,
         ModKey patch,
         PluginNames names,
         PlacedReadScope scope,
+        Func<PluginName, bool> stopsTheWalk,
         Execution execution)
     {
-        var reader = new PlacedRecordReader(loadOrder, linkCache, patch, names, scope);
+        var reader = new PlacedRecordReader(loadOrder, linkCache, patch, names, scope, stopsTheWalk);
         reader.ScanLoadOrder();
         return reader.CreateScannedRecords(CellAreaReader.Read(reader._targetSpaceCells, new LocationNameReader(linkCache, scope.HoldKeyword.ToFormKey()), execution));
     }
@@ -118,14 +136,14 @@ internal sealed class PlacedRecordReader
 
     private void ScanLoadOrder()
     {
-        foreach (var listing in _loadOrder.ListedOrder.Reverse())
+        foreach (var listing in _loadOrder.PriorityOrder)
         {
             if (listing.Mod is not { } mod) continue;
             var collectReferences = MayReferenceTarget(mod, _scope.Target, _patch, _names);
-            var winningMod = _names.Of(listing.ModKey);
+            var plugin = _names.Of(listing.ModKey);
             foreach (var cellContext in mod.EnumerateMajorRecordContexts<ICell, ICellGetter>(_linkCache))
             {
-                ScanCell(cellContext, winningMod, collectReferences);
+                ScanCell(cellContext, plugin, collectReferences);
             }
         }
     }
@@ -174,24 +192,24 @@ internal sealed class PlacedRecordReader
 
     private void ScanCell(
         IModContext<ISkyrimMod, ISkyrimModGetter, ICell, ICellGetter> cellContext,
-        PluginName winningMod,
+        PluginName plugin,
         bool collectReferences)
     {
         var cell = cellContext.Record;
         var space = GetCellSpace(cellContext);
         var cellFact = new CellFact(_names.KeyOf(cell.FormKey), cell.EditorID);
         var inTargetSpace = _footprint.SpaceKeys.Contains(space.Key);
-        if (inTargetSpace && _winningCells.TryAdd(cellFact.Key, cellContext)) _targetSpaceCells.Add(new SpaceCell(cellFact.Key, space, cell));
+        if (inTargetSpace && _winningCells.TryAdd(cellFact.Key, cell)) _targetSpaceCells.Add(new SpaceCell(cellFact.Key, space, cell));
         if (ExteriorCellOf(cell, cellFact.Key, space) is { } exteriorCell)
         {
-            if (_landWorldspaces.Contains(space.Key)) CollectLandscape(cell, exteriorCell, winningMod);
-            if (_scope.Water && _waterWorldspaceOf.ContainsKey(space.Key)) CollectCellWater(cell, exteriorCell, winningMod);
+            if (_landWorldspaces.Contains(space.Key)) CollectLandscape(cell, exteriorCell, plugin);
+            if (_scope.Water && _waterWorldspaceOf.ContainsKey(space.Key)) CollectCellWater(cell, exteriorCell, plugin);
         }
         if (_scope.Navmeshes && inTargetSpace) CollectNavmeshes(cell, cellFact.Key, space);
 
         foreach (var (record, persistent) in cell.EnumeratePlaced())
         {
-            ScanRecord(record, persistent, new ScannedCell(space, cellFact, inTargetSpace, winningMod, collectReferences));
+            ScanRecord(record, persistent, new ScannedCell(space, cellFact, inTargetSpace, plugin, collectReferences));
         }
     }
 
@@ -233,34 +251,55 @@ internal sealed class PlacedRecordReader
     private void ScanRecord(IPlacedGetter record, bool persistent, ScannedCell cell)
     {
         var key = _names.KeyOf(record.FormKey);
-        if (!_seenRecords.Add(key)) return;
+        if (!_seenRecords.Add(key))
+        {
+            KeepLowerVersion(record, key, cell.Plugin);
+            return;
+        }
         _recordsScanned++;
-        if (record.IsDeleted) return;
 
-        if (cell.CollectReferences) LinkReader.ReadFromPlaced(record, key, _scope.Target, _names, _links);
-        if (!cell.InTargetSpace && key.Plugin != _scope.Target && !_footprint.OverriddenRecords.Contains(key)) return;
+        var linksIntoTarget = cell.CollectReferences && ReadLinksIntoTarget(record, key);
+        if (!linksIntoTarget && !cell.InTargetSpace && key.Plugin != _scope.Target && !_footprint.OverriddenRecords.Contains(key)) return;
 
-        _records.Add(CreateFact(record, key, cell));
+        var winner = ReadVersion(record, cell.Plugin);
+        _records.Add(CreateFact(record, key, cell, winner));
+        StartVersions(key, winner);
         if (cell.InTargetSpace && key.Plugin == _scope.Target)
         {
             _handles.Add(key, new PlacedRecordHandle(record, new PlacedRecordLocation(_winningCells[cell.Cell.Key], persistent)));
         }
     }
 
-    private PlacedRecordFact CreateFact(IPlacedGetter record, RecordKey key, ScannedCell cell) => new(
+    private void StartVersions(RecordKey key, PlacedVersionFact winner)
+    {
+        var versions = new List<PlacedVersionFact> { winner };
+        _versions.Add(key, versions);
+        if (!_stopsTheWalk(winner.Plugin)) _openVersions.Add(key, versions);
+    }
+
+    /// <remarks>A plugin that holds the record twice (broken data) gives one version, the first found, as it does for the winner.</remarks>
+    private void KeepLowerVersion(IPlacedGetter record, RecordKey key, PluginName plugin)
+    {
+        if (!_openVersions.TryGetValue(key, out var versions) || versions[^1].Plugin == plugin) return;
+        versions.Add(ReadVersion(record, plugin));
+        if (_stopsTheWalk(plugin)) _openVersions.Remove(key);
+    }
+
+    /// <returns>True when the record links into the target plugin.</returns>
+    private bool ReadLinksIntoTarget(IPlacedGetter record, RecordKey key)
+    {
+        var linksBefore = _links.Count;
+        LinkReader.ReadFromPlaced(record, key, _scope.Target, _names, _links);
+        return _links.Count > linksBefore;
+    }
+
+    /// <param name="winner">The record's winning version, read from <paramref name="record"/>; the lower versions are added when the walk ends.</param>
+    private PlacedRecordFact CreateFact(IPlacedGetter record, RecordKey key, ScannedCell cell, PlacedVersionFact winner) => new(
         key,
         record.EditorID,
-        cell.WinningMod,
         cell.Space,
         cell.Cell,
         cell.InTargetSpace,
-        new PlacementFacts(
-            record.IsInitiallyDisabled(),
-            record.EnableParent != null,
-            record.Placement?.GetPosition(),
-            record.Placement?.GetRotation()),
-        record.Scale,
-        record.GetBaseKey(_names),
         record is IPlacedObjectGetter { TeleportDestination: not null },
         record is IPlacedObjectGetter { Primitive: not null },
         record is IPlacedObjectGetter { MapMarker: not null },
@@ -268,24 +307,41 @@ internal sealed class PlacedRecordReader
         ScriptPropertyReader.FindQuestOrScene(record.VirtualMachineAdapter, _linkCache, _names),
         record.LocationRefTypes is { Count: > 0 },
         record.GetReferenceRadius(),
-        record.GetPrimitiveBounds());
+        record.GetPrimitiveBounds(),
+        Versions: [winner]);
+
+    private PlacedVersionFact ReadVersion(IPlacedGetter record, PluginName plugin) => new(
+        plugin,
+        new PlacementFacts(ReadPresence(record), record.Placement?.GetPosition(), record.Placement?.GetRotation()),
+        record.Scale,
+        record.GetBaseKey(_names));
+
+    private PresenceFacts ReadPresence(IPlacedGetter record) => new(
+        record.IsDeleted,
+        record.IsInitiallyDisabled(),
+        record.GetEnableParent() is { } parent
+            ? new EnableParentFact(_names.KeyOf(parent.Reference.FormKey), parent.Flags.HasFlag(EnableParent.Flag.SetEnableStateToOppositeOfParent))
+            : null);
 
     private ScannedRecords CreateScannedRecords(IReadOnlyDictionary<RecordKey, CellAreaFact> cellAreas)
     {
         var terrain = new LandscapeTerrain(_landscapes, _landWorldspaceOf, _scope.TerrainVersions ? _landscapeVersions : null, _scope.TerrainLayers ? _names : null);
         var facts = new PlacedRecordFacts(
-            [.. _records],
+            [.. _records.Select(WithVersions)],
             _recordsScanned,
             _footprint.OverriddenRecords,
             [.. _links],
             _navmeshes.Values.Sum(navmeshes => navmeshes.Count),
             cellAreas);
         var water = new CellWater(_scope.Water ? _cellWaterCopies : null, CollectWorldspaceWater(), _waterWorldspaceOf);
-        return new ScannedRecords(facts, new RecordHandles(_handles), terrain, water, new NavmeshRecords(_navmeshes));
+        return new ScannedRecords(facts, new ScanLookups(new RecordHandles(_handles), terrain, water, new NavmeshRecords(_navmeshes)));
     }
 
+    private PlacedRecordFact WithVersions(PlacedRecordFact fact) => fact with { Versions = [.. Enumerable.Reverse(_versions[fact.Key])] };
+
     /// <summary>What every record of one cell shares.</summary>
-    private sealed record ScannedCell(SpaceFact Space, CellFact Cell, bool InTargetSpace, PluginName WinningMod, bool CollectReferences);
+    /// <param name="Plugin">The plugin whose copy of the cell is walked.</param>
+    private sealed record ScannedCell(SpaceFact Space, CellFact Cell, bool InTargetSpace, PluginName Plugin, bool CollectReferences);
 
     /// <summary>
     /// Comparison space of a cell: its worldspace for exterior cells (including the worldspace's

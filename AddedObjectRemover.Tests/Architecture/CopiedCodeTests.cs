@@ -28,7 +28,6 @@ public class CopiedCodeTests
     private const string Settings = "Run/RunSettingsValidation/SettingsValidator.cs:SettingsValidator.";
     private const string Report = "Steps/BuildLogAndReports/";
     private const string Describe = Report + "Describe.cs:Describe.";
-    private const string LogSections = Report + "LogSections.Start.cs:LogSections.";
     private const string LeftBehindText = Report + "LeftBehindOutcomeText.cs:LeftBehindOutcomeText.";
     private const string MeshText = Report + "MeshProblemText.cs:MeshProblemText.";
     private const string KeepText = Report + "KeepReasonText.cs:KeepReasonText.";
@@ -39,13 +38,17 @@ public class CopiedCodeTests
     private static readonly Dictionary<string, string> Allowed = new()
     {
         [CopyFamily.KeyOf([Shapes + "CountBounds", TooClose + "TooCloseObjects.cs:TooCloseObjects.CountSizes"])] = CountLines + " " + CounterRecord,
-        [CopyFamily.KeyOf([Settings + "ClampMarginInUnits", Settings + "CreateChangedTerrainSettings", Settings + "CreateModIdentificationSettings", Settings + "CreateTooCloseSettings"])] = SettingChecks,
+        [CopyFamily.KeyOf([Settings + "ClampMarginInUnits", Settings + "CreateChangedTerrainSettings", Settings + "CreateTooCloseSettings", Settings + "WarnOfUnlistableNeverTrusted"])] = SettingChecks,
         [CopyFamily.KeyOf([Settings + "CreateChangedTerrainSettings", Settings + "CreateTooCloseSettings"])] = SettingChecks,
         [CopyFamily.KeyOf([Settings + "CreateAlsoRemoveSettings", Settings + "CreateChangedTerrainSettings"])] = SettingChecks,
         [CopyFamily.KeyOf([
-            Settings + "Build", Settings + "MinPercent", Settings + "TerrainDistanceMarginName", Settings + "TerrainSizeMarginName",
-            Settings + "TerrainTypeChangePercentName", Settings + "TooCloseDistanceMarginName", Settings + "TooCloseSizeMarginName",
-            Settings + "WaterCoverChangePercentName", KeepText + "Category", KeepText + "CheckFailed", KeepText + "LinkedGroupCategory",
+            Settings + "AnchoringThresholdName", Settings + "Build", Settings + "CleanedModName", Settings + "FollowUpModeName",
+            Settings + "HeightChangeToleranceName", Settings + "MaxOtherMastersName", Settings + "MinPercent", Settings + "NeverTrustedModsName",
+            Settings + "NpcsName", Settings + "OccupiedDirectionsName", Settings + "OwnChangesModsName", Settings + "SearchRadiusName",
+            Settings + "SurroundingObjectsGroup", Settings + "TerrainCheckedObjectsName",
+            Settings + "TerrainDistanceMarginName", Settings + "TerrainSizeMarginName", Settings + "TerrainTypeChangePercentName",
+            Settings + "TooCloseDistanceMarginName", Settings + "TooCloseSizeMarginName", Settings + "TouchDistanceName", Settings + "TrustedModsName",
+            Settings + "WaterCoverChangePercentName", Settings + "WaterHeightChangeToleranceName", KeepText + "Category", KeepText + "CheckFailed", KeepText + "LinkedGroupCategory",
             KeepText + "LocationRoleCategory", KeepText + "OwnLocationRefType", KeepText + "PlacedCategoryPrefix", KeepText + "ScriptCategory",
             KeepText + "TeleportDoor"])] = TextConstants,
         [CopyFamily.KeyOf([Describe + "HintType", Describe + "PointReason", Describe + "RemovalReason", Describe + "TimedSuffix"])] = EnumTextArms,
@@ -91,7 +94,7 @@ public class CopiedCodeTests
         var stale = Allowed.Keys.Except(families.Select(family => family.Key)).Order(StringComparer.Ordinal).ToList();
 
         Assert.True(unlisted.Count == 0, $"Copied code (reuse a tool or share one method, or list its places with a reason):{Environment.NewLine}{string.Join(Environment.NewLine, unlisted)}");
-        Assert.True(stale.Count == 0, $"Listed but no longer copied:{Environment.NewLine}{string.Join(Environment.NewLine, stale)}");
+        AllowListAssert.NoneStale(stale, "Listed but no longer copied");
     }
 
     [Fact]

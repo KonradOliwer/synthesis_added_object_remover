@@ -4,94 +4,96 @@ using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
 
 /// <summary>
-/// Compares the water of a cell the game shows with the water the target expected, and finds the plugin whose own edit made the
-/// difference. Thread-safe.
+/// Compares the water of a cell the game shows with the accepted water, and names the plugin that changed it. Thread-safe.
 /// </summary>
+/// <remarks>
+/// A cell's water is made of three parts: the cell's "has water" flag and its own height, held by the cell's versions, and the
+/// default height, held by its worldspace's versions. Each part is accepted on its own, since a plugin's version of the worldspace
+/// says nothing about the cell and the other way round. The accepted water is made of the accepted parts by the same rule as the
+/// water the game shows is made of the parts it shows.
+/// </remarks>
 internal sealed class CellWaterComparison(TerrainPlugins plugins, ChangedTerrainSettings settings)
 {
-    /// <remarks>
-    /// A worldspace copy without a default water height says nothing about water. A cell using that default has an unknown water
-    /// height, and a cell whose expected or shown height is unknown is skipped; a plugin in between with an unknown height carries
-    /// no change.
-    /// </remarks>
+    /// <summary>The parts in the order the game's rule reads them, as <see cref="DecideParts"/> returns them.</summary>
+    private const int FlagPart = 0;
+    private const int OwnLevelPart = 1;
+    private const int DefaultLevelPart = 2;
+
+    /// <summary>The positions of the cell's properties in the results of <see cref="AcceptedVersions.Decide"/>.</summary>
+    private const int FlagProperty = 0;
+    private const int OwnLevelProperty = 1;
+
     /// <returns>
-    /// Null when the cell or its worldspace has no reference copy, when the expected or shown height is unknown, when the water the
-    /// game shows differs from the expected water by no counted change, or when the plugin whose own edit gave the change does not count.
+    /// Null when the cell's water is not checked, because a part it is made of has no accepted version or no version at all, or
+    /// when the water the game shows differs from the accepted water by no counted change.
     /// </returns>
     public CellWaterChange? Compare(WaterCopies copies)
     {
-        if (plugins.FromReference(copies.Cell, static copy => copy.Plugin) is not { } cellFromReference
-            || plugins.FromReference(copies.Worldspace, static copy => copy.Plugin) is not { } worldspaceFromReference)
+        var parts = DecideParts(copies);
+        if (Combine(copies, parts, static part => part.Acceptance.Accepted) is not { } accepted
+            || Combine(copies, parts, static part => part.Shown) is not { } shown)
         {
             return null;
         }
 
-        var versionsFromReference = JoinFromReference(cellFromReference, worldspaceFromReference);
-        if (!versionsFromReference[0].IsKnown || !versionsFromReference[^1].IsKnown) return null;
+        var kind = FindChangeBetween(accepted.Level, shown.Level);
+        return IsCounted(kind) ? new CellWaterChange(accepted.Level, shown.Level, FindChanger(parts, shown), kind) : null;
+    }
 
-        var (expected, shown) = (versionsFromReference[0].Level, versionsFromReference[^1].Level);
-        var kind = FindChangeBetween(expected, shown);
-        if (!IsCounted(kind)) return null;
+    /// <returns>The flag, the own level and the default level, in that order.</returns>
+    private WaterPart[] DecideParts(WaterCopies copies)
+    {
+        PluginName[] cellPlugins = [.. copies.Cell.Select(static copy => copy.Plugin)];
+        PluginName[] worldspacePlugins = [.. copies.Worldspace.Select(static copy => copy.Plugin)];
+        var cell = AcceptedVersions.Decide(
+            TrustsOf(cellPlugins),
+            [
+                (one, other) => copies.Cell[one].HasWater != copies.Cell[other].HasWater,
+                (one, other) => LevelsDiffer(copies.Cell[one].OwnLevel, copies.Cell[other].OwnLevel),
+            ]);
+        var worldspace = AcceptedVersions.Decide(
+            TrustsOf(worldspacePlugins),
+            [(one, other) => LevelsDiffer(copies.Worldspace[one].DefaultLevel, copies.Worldspace[other].DefaultLevel)]);
+        return [new(cellPlugins, cell[FlagProperty]), new(cellPlugins, cell[OwnLevelProperty]), new(worldspacePlugins, worldspace.Single())];
+    }
 
-        var origin = new ChangeOrigin(
-            index => CarriesShownChange(versionsFromReference, index),
-            index => plugins.CountsAsChanging(versionsFromReference[index].Plugin));
-        var changer = versionsFromReference[origin.Find(versionsFromReference.Length - 1)].Plugin;
-        return plugins.CountsAsChanging(changer) ? new CellWaterChange(expected, shown, plugins.PositionOf(changer), kind) : null;
+    private VersionTrust[] TrustsOf(PluginName[] versionPlugins) => [.. versionPlugins.Select(plugins.TrustOf)];
+
+    /// <summary>
+    /// The game's rule, reading the parts in order: a cell without the "has water" flag has no water, whatever height it stores;
+    /// with it, the cell's own height, else its worldspace's default height. A worldspace version that stores no default height has
+    /// no default water, so a cell using it has no water.
+    /// </summary>
+    /// <param name="versionOf">The index of the version a part is read from; null where there is none.</param>
+    /// <returns>Null when a part the rule reads has no version.</returns>
+    private Water? Combine(WaterCopies copies, WaterPart[] parts, Func<WaterPart, int?> versionOf)
+    {
+        if (versionOf(parts[FlagPart]) is not { } flag) return null;
+        if (!copies.Cell[flag].HasWater) return new Water(Level: null, FlagPart);
+        if (versionOf(parts[OwnLevelPart]) is not { } own) return null;
+        if (copies.Cell[own].OwnLevel is { } ownLevel) return new Water(ownLevel, OwnLevelPart);
+        return versionOf(parts[DefaultLevelPart]) is { } defaultLevel ? new Water(copies.Worldspace[defaultLevel].DefaultLevel, DefaultLevelPart) : null;
     }
 
     /// <summary>
-    /// The water the target expected first: the reference cell copy with the reference worldspace default, each chosen on its
-    /// own, since a plugin's copy of the worldspace says nothing about the cell. Then the water after each later plugin with a
-    /// copy of either, in load order, joining the last copies of both up to that plugin; the last version is the water the game
-    /// shows. Both copy lists are already in load order, so they are merged rather than sorted.
+    /// The changed parts the shown water is made of each name a plugin, and the later loading one is named; a part whose shown value
+    /// only the patch holds names the patch.
     /// </summary>
-    private WaterVersion[] JoinFromReference(CellWaterCopy[] cellFromReference, WorldspaceWaterCopy[] worldspaceFromReference)
-    {
-        var (cell, worldspace) = (cellFromReference[0], worldspaceFromReference[0]);
-        var versions = new List<WaterVersion> { CreateVersion(cell.Plugin, cell, worldspace) };
-        var (nextCell, nextWorldspace) = (1, 1);
-        while (NextPlugin(cellFromReference, nextCell, worldspaceFromReference, nextWorldspace) is { } plugin)
-        {
-            for (; nextCell < cellFromReference.Length && cellFromReference[nextCell].Plugin == plugin; nextCell++) cell = cellFromReference[nextCell];
-            for (; nextWorldspace < worldspaceFromReference.Length && worldspaceFromReference[nextWorldspace].Plugin == plugin; nextWorldspace++)
-            {
-                worldspace = worldspaceFromReference[nextWorldspace];
-            }
-            versions.Add(CreateVersion(plugin, cell, worldspace));
-        }
-        return [.. versions];
-    }
+    /// <returns>The load-order position of the plugin named for the change.</returns>
+    private int FindChanger(WaterPart[] parts, Water shown) =>
+        parts.Take(shown.FixingPart + 1).Where(static part => part.Acceptance.Changed).Max(part => plugins.PositionOf(part.ChangingPlugin));
 
-    /// <returns>The earlier loading plugin of the next cell copy and the next worldspace copy; null when both lists are used up.</returns>
-    private PluginName? NextPlugin(CellWaterCopy[] cells, int nextCell, WorldspaceWaterCopy[] worldspaces, int nextWorldspace)
-    {
-        PluginName? cellPlugin = nextCell < cells.Length ? cells[nextCell].Plugin : null;
-        PluginName? worldspacePlugin = nextWorldspace < worldspaces.Length ? worldspaces[nextWorldspace].Plugin : null;
-        if (cellPlugin is not { } fromCell) return worldspacePlugin;
-        if (worldspacePlugin is not { } fromWorldspace) return fromCell;
-        return plugins.PositionOf(fromCell) <= plugins.PositionOf(fromWorldspace) ? fromCell : fromWorldspace;
-    }
-
-    /// <summary>
-    /// The game's rule: a cell without the "has water" flag has no water; with it, the cell's own height, else its worldspace's
-    /// default. A cell using a default that the worldspace copy does not store has an unknown height.
-    /// </summary>
-    private static WaterVersion CreateVersion(PluginName plugin, CellWaterCopy cell, WorldspaceWaterCopy worldspace) =>
-        new(
-            plugin,
-            cell.HasWater ? cell.OwnLevel ?? worldspace.DefaultLevel : null,
-            !cell.HasWater || cell.OwnLevel != null || worldspace.DefaultLevel != null);
+    private bool LevelsDiffer(float? one, float? other) => FindChangeBetween(one, other) != TerrainChangeKind.None;
 
     /// <summary>A water height change counts only beyond the tolerance; water added or removed always differs.</summary>
-    /// <returns><see cref="TerrainChangeKind.None"/> when the versions do not differ.</returns>
-    private TerrainChangeKind FindChangeBetween(float? reference, float? version) => (reference, version) switch
+    /// <returns><see cref="TerrainChangeKind.None"/> when the levels do not differ.</returns>
+    private TerrainChangeKind FindChangeBetween(float? before, float? after) => (before, after) switch
     {
         (null, null) => TerrainChangeKind.None,
         (null, _) => TerrainChangeKind.WaterAdded,
         (_, null) => TerrainChangeKind.WaterRemoved,
-        ({ } referenceLevel, { } versionLevel) =>
-            MathF.Abs(versionLevel - referenceLevel) > settings.WaterHeightTolerance ? TerrainChangeKind.WaterHeight : TerrainChangeKind.None,
+        ({ } beforeLevel, { } afterLevel) =>
+            MathF.Abs(afterLevel - beforeLevel) > settings.WaterHeightTolerance ? TerrainChangeKind.WaterHeight : TerrainChangeKind.None,
     };
 
     private bool IsCounted(TerrainChangeKind kind) => kind switch
@@ -101,14 +103,22 @@ internal sealed class CellWaterComparison(TerrainPlugins plugins, ChangedTerrain
         _ => false,
     };
 
-    /// <summary>The version differs from the reference and matches the shown version, both beyond the tolerance.</summary>
-    private bool CarriesShownChange(WaterVersion[] versionsFromReference, int index) =>
-        versionsFromReference[index].IsKnown
-        && FindChangeBetween(versionsFromReference[0].Level, versionsFromReference[index].Level) != TerrainChangeKind.None
-        && FindChangeBetween(versionsFromReference[^1].Level, versionsFromReference[index].Level) == TerrainChangeKind.None;
+    /// <summary>One part of a cell's water, decided over the versions that hold it.</summary>
+    /// <param name="Plugins">The plugins of the versions, in load order; the last one's value is the one the game shows.</param>
+    private sealed record WaterPart(PluginName[] Plugins, PropertyAcceptance Acceptance)
+    {
+        /// <summary>The index of the version the game shows; null where no plugin has a version.</summary>
+        public int? Shown => Plugins.Length == 0 ? null : Plugins.Length - 1;
 
-    /// <summary>The cell's water as the load order stands after one plugin.</summary>
+        /// <summary>
+        /// The plugin of the changing version; where only the patch holds the shown value (an earlier patcher of the group made the
+        /// change), the patch, the plugin of the version the game shows.
+        /// </summary>
+        public PluginName ChangingPlugin => Acceptance.Changing is { } changing ? Plugins[changing] : Plugins[^1];
+    }
+
+    /// <summary>A cell's water as made of its parts.</summary>
     /// <param name="Level">The height of the water surface; null where the cell has no water.</param>
-    /// <param name="IsKnown">False where the cell uses a default water height that no copy stores.</param>
-    private readonly record struct WaterVersion(PluginName Plugin, float? Level, bool IsKnown);
+    /// <param name="FixingPart">The last part the rule read, which fixes the level; the water is made of it and the parts before it.</param>
+    private readonly record struct Water(float? Level, int FixingPart);
 }

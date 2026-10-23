@@ -73,13 +73,15 @@ public sealed class LogAndReports
     public ImmutableArray<LogSection> BuildArchiveSections() =>
         [LogSections.BuildArchiveWarningsSection(TakeArchiveProblems()), TakeUnexpectedErrors()];
 
-    public ImmutableArray<LogSection> BuildStepSections(IdentifiedMods mods, LoadOrderPlugins plugins) => [LogSections.BuildConfigSection(_settings, mods, plugins)];
+    public ImmutableArray<LogSection> BuildStepSections(ModTrustTable trust, LoadOrderPlugins plugins) => [LogSections.BuildConfigSection(_settings, trust, plugins)];
 
-    /// <remarks>The run stops when there is nothing to check, before the threads line.</remarks>
+    /// <remarks>The run stops when there is nothing to check, before the threads line; it still logs its starting state, having removed nothing.</remarks>
     public ImmutableArray<LogSection> BuildStepSections(CollectedObjects world, TimeSpan elapsed)
     {
         var scan = LogSections.BuildScanSection(world, _settings.TargetAsTyped, elapsed, _context);
-        return world.Stop is not null ? [scan] : [scan, LogSections.BuildThreadsSection(_settings.Execution, _context)];
+        return world.Stop is not null
+            ? [scan, LogSections.BuildRunSummarySection(world, _settings.TargetAsTyped, removedInThisRun: 0)]
+            : [scan, LogSections.BuildThreadsSection(_settings.Execution, _context)];
     }
 
     public ImmutableArray<LogSection> BuildIndexSections(CollectedObjects world, TimeSpan elapsed) =>
@@ -92,7 +94,7 @@ public sealed class LogAndReports
 
     public ImmutableArray<LogSection> BuildStepSections(ObjectsToKeepResult found)
     {
-        var groups = LogSections.BuildGroupsSection(found.ObjectsToKeep.Groups, found.LinkCount, _context);
+        var groups = LogSections.BuildGroupsSection(found.ObjectsToKeep.Groups, found.LinkCount, _settings.TargetAsTyped, _context);
         return [groups, TakeUnexpectedErrors(found.CheckFailures)];
     }
 
@@ -185,7 +187,7 @@ public sealed class LogAndReports
         RequireNoProblemRecordedSinceEndOfRunTakes();
         return
         [
-            LogSections.BuildWrittenSection(files, ended.Outcome.RestingObjects, _context),
+            LogSections.BuildWrittenSection(files, ended.Outcome.RestingObjects, _settings.TargetAsTyped, _context),
             LogSections.BuildReportFileWarningsSection(files.Warnings),
             TakeUnexpectedErrors(Present(ended.Tables.Failure, files.Failure)),
             LogSections.BuildDoneSection(timeSinceStart, _context),
@@ -291,7 +293,10 @@ public sealed class LogAndReports
         return new RunOutcome(decided, removals, hints, written, _caches.CountBounds());
     }
 
-    /// <summary>What was removed and kept, the removals that can still affect the game, what may need a manual patch, and where all of these are.</summary>
+    /// <summary>
+    /// What was removed and kept, the run's starting state and result, the removals that can still affect the game, what may
+    /// need a manual patch, and where all of these are.
+    /// </summary>
     /// <remarks>Like the report-folder warning, the removal warnings print only when there is one.</remarks>
     private ImmutableArray<LogSection> BuildClosingSections(RunOutcome outcome)
     {
@@ -307,8 +312,9 @@ public sealed class LogAndReports
         [
             LogSections.BuildRemovalsSection(world, removals, _context),
             LogSections.BuildBoundsSection(outcome.Shapes, _caches.MeshFiles.CountTriangleFailures(), _context),
-            LogSections.BuildSpacesSection(world, removals, _context),
-            LogSections.BuildTargetVisibilitySection(world.Targets, world.Counts.TargetsHiddenOrWithoutPlacement, _context),
+            LogSections.BuildSpacesSection(world, removals, _settings.TargetAsTyped, _context),
+            LogSections.BuildTargetVisibilitySection(world.Targets, world.Counts.TargetsHiddenOrWithoutPlacement, _settings.TargetAsTyped, _context),
+            LogSections.BuildRunSummarySection(world, _settings.TargetAsTyped, outcome.Written.Removed.Length),
             LogSections.BuildRemovalSummarySection(removals, outcome.ChangedTerrain.Outcome),
             .. keptSummary.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [keptSummary],
             .. keptOnPurpose.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [keptOnPurpose],

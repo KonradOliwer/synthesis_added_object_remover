@@ -7,7 +7,9 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 
 /// <summary>
 /// Batch mode through the entry, on a small world of its own: the first mod's crate and the second mod's pad stand
-/// 5 units apart in one interior, so each mod's object is too close to the other's when its mod is cleaned up.
+/// 5 units apart in one interior, so each mod's object is too close to the other's when its mod is cleaned up. In the
+/// exterior cell, the third and the fourth mod each have a crate too close to a pad of a neighbouring mod, far apart.
+/// The configs do not trust the mods loading before their cleaned mod, so the earlier mods' objects can cause removals.
 /// </summary>
 [Collection(ConsoleOutputCollection.Name)]
 public sealed class BatchRunTests : IDisposable
@@ -18,8 +20,16 @@ public sealed class BatchRunTests : IDisposable
     private const string GroupName = "my_group";
     private const string FirstPlugin = "First.esp";
     private const string SecondPlugin = "Second.esp";
+    private const string ThirdConfig = "third_mod";
+    private const string FourthConfig = "fourth_mod";
+    private const string ThirdPlugin = "Third.esp";
+    private const string FourthPlugin = "Fourth.esp";
+    private const string NeighbourPlugin = "Neighbours.esp";
+    private const float ThirdCrateCorner = 1000f;
+    private const float FourthCrateCorner = 3000f;
     private const string Banner = "=== Added Object Remover ===";
     private const string DoneLinePrefix = "Done";
+    private const string RunSummaryPrefix = "Objects of ";
     private const string ReportsFolder = Program.ReportsFolderName;
     private const float PadCentre = 75f;
 
@@ -42,7 +52,22 @@ public sealed class BatchRunTests : IDisposable
     public void Dispose() => _root.Delete(recursive: true);
 
     [Fact]
-    public void TheSecondConfigSeesTheObjectTheFirstOneRemovedAsGone()
+    public void TheSecondConfigWritesIntoTheCellCopyTheFirstOneMade()
+    {
+        WriteGroup(ThirdConfig, FourthConfig);
+        WriteConfig(ThirdConfig, ThirdPlugin);
+        WriteConfig(FourthConfig, FourthPlugin);
+
+        var run = Run();
+
+        Assert.Single(run.PatchMod.Worldspaces);
+        var cell = Assert.Single(run.PatchMod.EnumerateMajorRecords<ICellGetter>());
+        Assert.Equal([_world.ThirdCrate, _world.FourthCrate], cell.EnumeratePlaced().Select(entry => entry.Record.FormKey));
+    }
+
+    /// <summary>Nothing passes between the runs: the second one reads the first one's removal from the patch.</summary>
+    [Fact]
+    public void TheSecondConfigSeesTheObjectTheFirstOneRemovedThroughThePatchAsGone()
     {
         WriteGroup(FirstConfig, SecondConfig);
         WriteConfig(FirstConfig, FirstPlugin);
@@ -51,6 +76,12 @@ public sealed class BatchRunTests : IDisposable
         var run = Run();
 
         Assert.Equal([Crate], run.RemovedRecords());
+        Assert.Equal(
+            [
+                "Objects of First.esp: 1; already removed by earlier patchers in this group: 0; judged in this run: 1; removed in this run: 1.",
+                "Objects of Second.esp: 1; already removed by earlier patchers in this group: 0; judged in this run: 1; removed in this run: 0.",
+            ],
+            run.Log.Where(line => line.StartsWith(RunSummaryPrefix, StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -165,7 +196,7 @@ public sealed class BatchRunTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(_outputFolder, ReportsFolder)));
     }
 
-    private sealed record FinishedRun(IReadOnlyList<string> Log, IReadOnlyList<string> Patch)
+    private sealed record FinishedRun(IReadOnlyList<string> Log, IReadOnlyList<string> Patch, ISkyrimModGetter PatchMod)
     {
         public IReadOnlyList<FormKey> RemovedRecords() =>
             [.. Patch.Where(line => line.Contains("disabled True")).Select(line => FormKey.Factory(line.Split(' ')[0]))];
@@ -177,7 +208,7 @@ public sealed class BatchRunTests : IDisposable
     {
         var state = CreateState();
         var log = PipelineRun.CaptureConsole(() => Program.RunPatch(state, BatchSettings, Workers, FixturePatcherState.WritePluginsFile(state)));
-        return new FinishedRun(log, PatchDump.Describe(state.PatchMod));
+        return new FinishedRun(log, PatchDump.Describe(state.PatchMod), state.PatchMod);
     }
 
     private FailedRun RunFailing() => RunFailing(FixturePatcherState.WritePluginsFile);
@@ -205,6 +236,7 @@ public sealed class BatchRunTests : IDisposable
             $$"""
             {
               "CleanedMod": "{{target}}",
+              "Trust": { "TrustModsLoadingBeforeCleanedMod": false },
               "TooClose": {
                 "BySize": { "Use": true, "SizeMultiplier": 0.1 },
                 "ByDistance": { "Use": true, "DistanceInUnits": 32 }
@@ -219,7 +251,7 @@ public sealed class BatchRunTests : IDisposable
         File.WriteAllText(path, content);
     }
 
-    private sealed record World(IReadOnlyList<ISkyrimMod> LoadOrder, FormKey Crate, FormKey Pad);
+    private sealed record World(IReadOnlyList<ISkyrimMod> LoadOrder, FormKey Crate, FormKey Pad, FormKey ThirdCrate, FormKey FourthCrate);
 
     private static World CreateWorld(string dataFolder)
     {
@@ -227,12 +259,27 @@ public sealed class BatchRunTests : IDisposable
         var baseGame = new FixtureMod("Skyrim.esm");
         var first = new FixtureMod(FirstPlugin, baseGame);
         var second = new FixtureMod(SecondPlugin, baseGame);
+        var third = new FixtureMod(ThirdPlugin, baseGame);
+        var fourth = new FixtureMod(FourthPlugin, baseGame);
+        var neighbours = new FixtureMod(NeighbourPlugin, baseGame);
         var spaces = FixtureSpaces.CreateIn(baseGame);
-        spaces.AddOverridesTo(first);
-        spaces.AddOverridesTo(second);
+        foreach (var mod in new[] { first, second, third, fourth, neighbours }) spaces.AddOverridesTo(mod);
 
         var crate = first.Interior.Place("F_Crate", first.AddModeledStatic("F_CrateBase", FixtureMeshes.CrateModel), Vector3.Zero);
         var pad = second.Interior.Place("S_Pad", second.AddModeledStatic("S_PadBase", FixtureMeshes.PadModel), new Vector3(PadCentre, 0, 0));
-        return new World([baseGame.Mod, first.Mod, second.Mod], crate.FormKey, pad.FormKey);
+        var thirdCrate = PlaceExteriorCrateNextToAPad(third, neighbours, ThirdCrateCorner);
+        var fourthCrate = PlaceExteriorCrateNextToAPad(fourth, neighbours, FourthCrateCorner);
+        return new World(
+            [baseGame.Mod, first.Mod, second.Mod, third.Mod, fourth.Mod, neighbours.Mod], crate.FormKey, pad.FormKey, thirdCrate.FormKey, fourthCrate.FormKey);
+    }
+
+    /// <summary>The crate stands on the terrain at (corner, corner); the neighbouring mod's pad stands as close to it as the interior's pad to its crate.</summary>
+    private static PlacedObject PlaceExteriorCrateNextToAPad(FixtureMod owner, FixtureMod neighbour, float corner)
+    {
+        var at = new Vector3(corner, corner, FixtureSpaces.TerrainHeight);
+        var crate = owner.Exterior.Place(owner.Key.Name + "_Crate", owner.AddModeledStatic(owner.Key.Name + "_CrateBase", FixtureMeshes.CrateModel), at);
+        neighbour.Exterior.Place(
+            owner.Key.Name + "_Pad", neighbour.AddModeledStatic(owner.Key.Name + "_PadBase", FixtureMeshes.PadModel), at + new Vector3(PadCentre, 0, 0));
+        return crate;
     }
 }

@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda.Skyrim;
 using Mutagen.Bethesda.Synthesis;
@@ -13,6 +15,9 @@ public sealed class TwoRunsTests : IDisposable
     private const string NotesText = "mine";
     private const string NotesFileName = "notes.txt";
     private const string ReportsPlaceholder = "<reports>";
+
+    /// <summary>The first run follows up on its own removals in the same pass, so what it kept is still kept when the second run judges it again.</summary>
+    private const int RemovedByTheSecondRun = 0;
 
     private readonly DirectoryInfo _root = Directory.CreateTempSubdirectory("aor-two-runs-");
 
@@ -70,40 +75,119 @@ public sealed class TwoRunsTests : IDisposable
         Assert.Equal(NotesText, File.ReadAllText(second.NotesPath));
     }
 
+    /// <summary>
+    /// The second run's link cache is its own, not the first run's, which indexed its record types before the first run wrote;
+    /// so the second run reads the first run's removals from the patch.
+    /// </summary>
     [Fact]
-    public void EachRunOfABatchOpensItsOwnBaseFacts()
+    public void EachRunOfABatchOpensItsOwnRecordIndexAndItsBaseFactsOverItAndReadsWhatTheRunsBeforeItWrote()
     {
         var (world, dataFolder) = CreateWorld();
         var outputPath = Path.Combine(_root.FullName, FixturePatcherState.PatchModKey.FileName);
         var state = FixturePatcherState.Create(world.LoadOrder, dataFolder, outputPath);
-        var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey, FixturePatcherState.PluginListOf(state));
-        var pluginRecords = new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods, Workers);
+        using var finalWorld = FixturePatcherState.CreateFinalWorld(state);
         var settings = SettingsVariants.Of(SettingsVariants.Support);
         var request = SettingsValidator.Build(
-            StandardConfig.Of(settings.Standard), pluginRecords.Open(), plugins, settings.DetailedLogAndReports, Program.ReportsFolder(state), Workers);
-        var bases = new CountingBaseFactsFactory(TestBaseFacts.Factory(state.LinkCache));
-        var environment = new RunEnvironment(
-            plugins,
+            StandardConfig.Of(settings.Standard),
+            new PluginRecordsFactory(finalWorld, Workers).Open(),
+            finalWorld.Plugins,
+            settings.DetailedLogAndReports,
+            settings.OnlyWarnWhenModRequiringCleanedModLoadsAfterPatch,
+            Program.ReportsFolder(state),
+            Workers);
+        var pluginRecords = new RecordingPluginRecordsFactory(new PluginRecordsFactory(finalWorld, Workers));
+        var bases = new RecordingBaseFactsFactory(new BaseFactsFactory(finalWorld.Plugins.Mods));
+        var environment = BuildEnvironment(state, finalWorld, pluginRecords, bases);
+
+        var log = PipelineRun.CaptureConsole(() => StepRunner.PatchLoadOrder([request, request], environment));
+
+        Assert.Equal(2, bases.Indexes.Count);
+        Assert.NotSame(bases.Indexes[0], bases.Indexes[1]);
+        Assert.Equal(pluginRecords.Opened.Select(opened => opened.ReadRecordIndex()), bases.Indexes);
+        var runs = RunSummariesOf(log);
+        Assert.True(runs[0].Removed > 0);
+        Assert.Equal(runs[0].Removed, runs[1].AlreadyRemoved);
+    }
+
+    /// <summary>A second run of the same cleaned mod reads the first run's removals from the patch: they count as already removed and are not judged again.</summary>
+    [Fact]
+    public void ASecondRunOfTheSameCleanedModStartsFromTheRemovalsTheFirstRunWroteIntoThePatch()
+    {
+        var (world, dataFolder) = CreateWorld();
+        var state = FixturePatcherState.Create(world.LoadOrder, dataFolder, Path.Combine(_root.FullName, FixturePatcherState.PatchModKey.FileName));
+        using var finalWorld = FixturePatcherState.CreateFinalWorld(state);
+        var settings = SettingsVariants.Of(SettingsVariants.Support);
+        var pluginRecords = new PluginRecordsFactory(finalWorld, Workers);
+        var request = SettingsValidator.Build(
+            StandardConfig.Of(settings.Standard),
+            pluginRecords.Open(),
+            finalWorld.Plugins,
+            settings.DetailedLogAndReports,
+            settings.OnlyWarnWhenModRequiringCleanedModLoadsAfterPatch,
+            Program.ReportsFolder(state),
+            Workers);
+        var environment = BuildEnvironment(state, finalWorld, pluginRecords, new BaseFactsFactory(finalWorld.Plugins.Mods));
+
+        var log = PipelineRun.CaptureConsole(() => StepRunner.PatchLoadOrder([request, request], environment));
+
+        var runs = RunSummariesOf(log);
+        Assert.True(runs[0].Removed > 0);
+        Assert.Equal(
+            new RunSummary(runs[0].Objects, AlreadyRemoved: runs[0].Removed, Judged: runs[0].Judged - runs[0].Removed, Removed: RemovedByTheSecondRun),
+            runs[1]);
+    }
+
+    /// <returns>The summary of each run of the log, in run order; both runs of a two-run log have one.</returns>
+    private static List<RunSummary> RunSummariesOf(IEnumerable<string> log)
+    {
+        var runs = log.Select(line => RunSummaryLine().Match(line)).Where(match => match.Success).Select(RunSummary.Of).ToList();
+        Assert.Equal(2, runs.Count);
+        return runs;
+    }
+
+    private static Regex RunSummaryLine() =>
+        new(@"^Objects of \S+: (\d+); already removed by earlier patchers in this group: (\d+); judged in this run: (\d+); removed in this run: (\d+)\.$");
+
+    private sealed record RunSummary(int Objects, int AlreadyRemoved, int Judged, int Removed)
+    {
+        public static RunSummary Of(Match match) =>
+            new(Number(match, 1), Number(match, 2), Number(match, 3), Number(match, 4));
+
+        private static int Number(Match match, int group) => int.Parse(match.Groups[group].Value, CultureInfo.InvariantCulture);
+    }
+
+    private static RunEnvironment BuildEnvironment(
+        IPatcherState<ISkyrimMod, ISkyrimModGetter> state, FinalWorld world, IPluginRecordsFactory pluginRecords, IBaseFactsFactory bases) =>
+        new(
+            world.Plugins,
             pluginRecords,
-            new MeshFilesFactory(state.DataFolderPath.Path, state.GameRelease, [.. state.LoadOrder.ListedOrder.Select(listing => listing.ModKey)]),
+            new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod),
+            new MeshFilesFactory(state.DataFolderPath.Path, state.GameRelease, [.. world.Order.ListedOrder.Select(listing => listing.ModKey)]),
             bases,
             new ConsoleLogSink(),
             new CsvReportOutput(),
             () => TimeSpan.Zero);
 
-        PipelineRun.CaptureConsole(() => StepRunner.PatchLoadOrder([request, request], environment));
+    private sealed class RecordingPluginRecordsFactory(IPluginRecordsFactory inner) : IPluginRecordsFactory
+    {
+        public List<IPluginRecords> Opened { get; } = [];
 
-        Assert.Equal(2, bases.Opened);
+        public IPluginRecords Open()
+        {
+            var opened = inner.Open();
+            Opened.Add(opened);
+            return opened;
+        }
     }
 
-    private sealed class CountingBaseFactsFactory(IBaseFactsFactory inner) : IBaseFactsFactory
+    private sealed class RecordingBaseFactsFactory(IBaseFactsFactory inner) : IBaseFactsFactory
     {
-        public int Opened { get; private set; }
+        public List<IRecordIndex> Indexes { get; } = [];
 
-        public IBaseFacts Open()
+        public IBaseFacts Open(IRecordIndex records)
         {
-            Opened++;
-            return inner.Open();
+            Indexes.Add(records);
+            return inner.Open(records);
         }
     }
 
@@ -143,32 +227,24 @@ public sealed class TwoRunsTests : IDisposable
             var settings = SettingsVariants.Of(variant);
             var outputPath = Path.Combine(_folder, FixturePatcherState.PatchModKey.FileName);
             var state = FixturePatcherState.Create(world.LoadOrder, dataFolder, outputPath);
-            var plugins = LoadOrderPluginsReader.Read(state.LoadOrder, state.PatchMod.ModKey, FixturePatcherState.PluginListOf(state));
+            using var finalWorld = FixturePatcherState.CreateFinalWorld(state);
+            var pluginRecords = new PluginRecordsFactory(finalWorld, Workers);
             var request = SettingsValidator.Build(
                 StandardConfig.Of(settings.Standard),
-                new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods, Workers).Open(),
-                plugins,
+                pluginRecords.Open(),
+                finalWorld.Plugins,
                 settings.DetailedLogAndReports,
+                settings.OnlyWarnWhenModRequiringCleanedModLoadsAfterPatch,
                 Program.ReportsFolder(state),
                 Workers);
-            var log = PipelineRun.CaptureConsole(() => StepRunner.PatchLoadOrder([request], BuildEnvironment(state, plugins)));
+            var environment = BuildEnvironment(state, finalWorld, pluginRecords, new BaseFactsFactory(finalWorld.Plugins.Mods));
+            var log = PipelineRun.CaptureConsole(() => StepRunner.PatchLoadOrder([request], environment));
             return new RunOutput(
                 MaskLog(log),
                 PatchDump.Describe(state.PatchMod),
                 ReadReports(),
                 log);
         }
-
-        private static RunEnvironment BuildEnvironment(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, LoadOrderPlugins plugins) =>
-            new(
-                plugins,
-                new PluginRecordsFactory(state.LoadOrder, state.LinkCache, state.PatchMod, plugins.Mods, Workers),
-                new MeshFilesFactory(
-                    state.DataFolderPath.Path, state.GameRelease, [.. state.LoadOrder.ListedOrder.Select(listing => listing.ModKey)]),
-                TestBaseFacts.Factory(state.LinkCache),
-                new ConsoleLogSink(),
-                new CsvReportOutput(),
-                () => TimeSpan.Zero);
 
         /// <summary>The run's own folder name is replaced, so a log that differs only by it is still the same log.</summary>
         private IReadOnlyList<string> MaskLog(IEnumerable<string> log) =>

@@ -52,6 +52,13 @@ public class SettingsValidationTests
             SettingsValidator.StopOnUnusablePluginList(new PluginListProblem.PluginNotListed("C:/game/Plugins.txt", new PluginName("Second.esp"))).Message);
 
     [Fact]
+    public void ALoadedPluginListedAfterThePatchStopsTheBatchNamingThePluginThePatchAndTheFile() =>
+        Assert.Equal(
+            "Second.esp is loaded by Synthesis above the patch Patch.esp but is listed after it in the plugin list file C:/game/Plugins.txt. Nothing was run and no patch was written.",
+            SettingsValidator.StopOnUnusablePluginList(
+                new PluginListProblem.PluginListedAfterPatch("C:/game/Plugins.txt", new PluginName("Second.esp"), new PluginName("Patch.esp"))).Message);
+
+    [Fact]
     public void DefaultsAreWithinTheirValidRanges()
     {
         var surroundings = new LeftoverInvisibleObjectSettings().SurroundingObjects;

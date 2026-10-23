@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>What the patch will contain and what writing it did. It references AddedObjectRemover.Ids and holds no packages.</Description>
+    <Description>What the patch will contain, what writing it did, and the game's convention a removal is written in. It references AddedObjectRemover.Ids and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />

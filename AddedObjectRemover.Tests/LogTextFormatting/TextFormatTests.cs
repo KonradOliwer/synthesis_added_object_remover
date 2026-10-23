@@ -16,6 +16,12 @@ public class TextFormatTests
     public void CountAcceptsLongNumbers() => Assert.Equal("5000000000", TextFormat.Count(5_000_000_000L));
 
     [Theory]
+    [InlineData(0, "0 mods")]
+    [InlineData(1, "1 mod")]
+    [InlineData(143, "143 mods")]
+    public void CountWithItsNounIsSingularOnlyForOne(int value, string expected) => Assert.Equal(expected, TextFormat.Count(value, "mod", "mods"));
+
+    [Theory]
     [InlineData(1.25, 0, "1")]
     [InlineData(1.26, 1, "1.3")]
     [InlineData(2.0, 2, "2.00")]

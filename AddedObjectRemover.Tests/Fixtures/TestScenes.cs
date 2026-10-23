@@ -58,7 +58,17 @@ internal static class TestScenes
             supportOnlyObjects is not null,
             [],
             new Dictionary<RecordKey, SpaceFact>(),
-            new ReadCounts(0, 0, 0, 0, 0, 0, 0, 0),
+            new ReadCounts(
+                RecordsScanned: 0,
+                CleanedModObjects: 0,
+                TargetsOverriddenLater: 0,
+                TargetsHiddenOrWithoutPlacement: 0,
+                RemovedByEarlierPatchers: 0,
+                RemovedByOtherPlugins: 0,
+                OthersOverriddenByTarget: 0,
+                OthersUnchanged: 0,
+                OtherInvalidPlacements: 0,
+                NavmeshCount: 0),
             [],
             TargetWorkOrder.Of(targets),
             null);

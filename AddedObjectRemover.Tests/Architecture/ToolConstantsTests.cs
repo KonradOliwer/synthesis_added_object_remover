@@ -33,7 +33,7 @@ public class ToolConstantsTests
         var stale = listed.Keys.Except(found).Order(StringComparer.Ordinal).ToList();
 
         Assert.True(unlisted.Count == 0, $"Not in {ListFile} (a game convention moves to the business caller; anything else gets a kind and a reason):{Environment.NewLine}{string.Join(Environment.NewLine, unlisted)}");
-        Assert.True(stale.Count == 0, $"Listed in {ListFile} but no longer there (remove):{Environment.NewLine}{string.Join(Environment.NewLine, stale)}");
+        AllowListAssert.NoneStale(stale, $"Listed in {ListFile} but no longer there (remove)");
     }
 
     [Fact]

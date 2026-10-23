@@ -3,19 +3,21 @@
 ## unexpectedErrors
 ## config
 Mod to clean up: Target.esp
-Other mods that never cause removals: Never count these mods: Excluded.esp; Never count the mods the cleaned mod requires: Skyrim.esm; Never count mods that have a compatibility patch with it: on, a patch requires at most 10 other mods.
-Compatibility patch detection: 2 plugins master the target, 1 of them compatibility patches.
-  Compatibility patch TargetPatch.esp: links target with Patched.esp.
-Ignored because of compatibility patches (the patches and the other mods they link to the target): Patched.esp, TargetPatch.esp.
+Which other mods can cause removals: Trusted mods, and their masters: Trusted.esp; Mods trusted for their own changes only: (none); Never trusted mods: Rival.esp; Also trust mods that require the cleaned mod, and their masters: on, only if it has at most 5 other masters; Trust mods loading before the cleaned mod: on.
+Trusted, base game: Skyrim.esm
+Trusted, listed with masters: Trusted.esp
+Trusted, requires Target.esp: TargetPatch.esp (masters: Patched.esp)
+Never trusted, listed: Rival.esp
 Remove objects too close to other mods' objects: Margin by object size: on, 0.5 x object size; Margin by fixed distance: off; Use rough boxes instead of exact shapes (faster): off; Other mods' NPCs and creatures cause removal: OnlyWhenStuckInsideTheObject.
 Remove objects on terrain changed by other mods: off.
 Also remove what rests on removed objects: Nothing.
 Invisible objects left behind: on; Look this far around it: 1024 units; Decide only if this share of the 8 directions has objects: 50%; A direction is cleared when this much of it was removed: 50%; Remove when this share of those directions is cleared: 60%; Never remove these as left behind: none; Move kept markers out of other mods' objects: on.
 Detailed log and reports: off.
+Only warn (don't stop) when a mod that requires the cleaned mod loads after the patch: off.
 ## scan
 Scanned 75 placed records: 40 Target.esp objects to check, 28 objects from other mods.
   Ignored 1 Target.esp objects whose winning version comes from a later plugin.
-  Ignored 1 Target.esp objects that are initially disabled or have no valid position or rotation.
+  Ignored 1 Target.esp objects that are deleted, start disabled, or have no valid position or rotation.
   Ignored 1 other-mod objects that Target.esp itself overrides.
 ## threads
 ## index
@@ -36,7 +38,7 @@ Found 19 of 40 Target.esp objects too close to other mods' objects.
 ## unexpectedErrors
 ## leftovers
   Kept T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
-Leftover invisible objects: 5 evaluated; removed 4 (2 inside another mod's object, 2 surroundings removed); kept 1 (0 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 1 referenced).
+Invisible objects left behind: 5 evaluated; removed 4 (2 inside another mod's object, 2 surroundings removed); kept 1 (0 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 1 referenced).
 ## linked
 ## unexpectedErrors
 ## relocations
@@ -53,8 +55,10 @@ Wrote 22 overrides (21 removed, 1 moved).
 ## bounds
 ## spaces
 ## targetVisibility
+## run-summary
+Objects of Target.esp: 42; already removed by earlier patchers in this group: 0; judged in this run: 40; removed in this run: 21.
 ## removal-summary
-Removed 21 objects (16 too close, 0 follow-up removals, 4 leftover invisible objects, 1 linked to removed objects).
+Removed 21 objects (16 too close, 0 follow-up removals, 4 invisible objects left behind, 1 linked to removed objects).
 ## kept-summary
 Kept 4 objects that would have been removed, because other records depend on them or because of their own script or location ref type.
   FormList record: 2

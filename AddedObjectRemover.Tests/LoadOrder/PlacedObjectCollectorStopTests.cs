@@ -6,7 +6,7 @@ namespace AddedObjectRemover.Tests.LoadOrder;
 public class PlacedObjectCollectorStopTests
 {
     private static readonly WhatToCollect Plan = new(SupportOnlyObjects: false, Terrain: false, Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false);
-    private static readonly IdentifiedMods Mods = new(TestTargets.TargetName, new HashSet<PluginName>(), [], [], DetectedPatches.Off, []);
+    private static readonly ModTrustTable Mods = TestModTrust.Of(TestTargets.TargetName, TestTargets.PatchName, trusted: [], untrusted: []);
 
     [Fact]
     public void NoTargetObjectsStopsTheRun()
@@ -61,7 +61,7 @@ public class PlacedObjectCollectorStopTests
     }
 
     private static CollectedObjects Collect(IPluginRecords plugin, WhatToCollect plan) =>
-        PlacedObjectCollector.Collect(plugin, Mods, plan, WrittenByEarlierRuns.None);
+        PlacedObjectCollector.Collect(plugin, Mods, plan);
 
     private static PlacedRecordFact CreateTargetRecord() =>
         TestPlacedRecords.Create(TestTargets.Key(0), TestTargets.TargetName, Vector3.Zero);

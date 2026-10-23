@@ -22,6 +22,7 @@ public sealed class RestingObjectsEndSectionsTests
 
     private static readonly KeepReason QuestReason = TestKeepReasons.Quest;
     private static readonly ModKey OtherMod = ModKey.FromNameAndExtension("Other.esp");
+    private static readonly PluginName Target = new("Target.esp");
     private static readonly ReportContext Normal = new(null!, null!, Detailed: false);
     private static readonly ReportContext Detailed = new(null!, null!, Detailed: true);
     private static readonly TriangleStoreStats Meshes = new(Built: 3, TooLarge: 2, Triangles: 900);
@@ -220,7 +221,7 @@ public sealed class RestingObjectsEndSectionsTests
 
         Assert.Equal(2, lines.Count);
         Assert.StartsWith("  Kept ", lines[0]);
-        Assert.StartsWith("Leftover invisible objects: 2 evaluated; removed 1 (", lines[1]);
+        Assert.StartsWith("Invisible objects left behind: 2 evaluated; removed 1 (", lines[1]);
         Assert.DoesNotContain(" in 1.5s", lines[1]);
     }
 
@@ -252,7 +253,7 @@ public sealed class RestingObjectsEndSectionsTests
         var lines = LogSections.BuildLeftBehindSection(
             world, new LeftBehindResult(StepOutcome.StoppedByUnexpectedError, [], [], Broke(LeftBehindParts.LeftBehind)), [], Elapsed, Normal).Lines.ToList();
 
-        Assert.Equal("Leftover invisible objects: not performed because of an unexpected error.", Assert.Single(lines));
+        Assert.Equal("Invisible objects left behind: not performed because of an unexpected error.", Assert.Single(lines));
     }
 
     [Fact]
@@ -297,7 +298,7 @@ public sealed class RestingObjectsEndSectionsTests
         var lines = LogSections.BuildKeptMarkerMovesSection(
             world, MarkerMoves.NotPerformedAfterLeftBehindStopped, Normal).Lines.ToList();
 
-        Assert.Equal("Moved kept markers: not performed because Leftover invisible objects was not performed.", Assert.Single(lines));
+        Assert.Equal("Moved kept markers: not performed because Invisible objects left behind was not performed.", Assert.Single(lines));
     }
 
     [Fact]
@@ -321,7 +322,7 @@ public sealed class RestingObjectsEndSectionsTests
     [Fact]
     public void Write_ShowsTheTimeOnlyInTheDetailedLogAndTheEnableParentLineAlways()
     {
-        var written = new WriteSummary(Removed: [.. Enumerable.Range(0, 5).Select(index => new TargetId(index))], Moved: 2, EnableParentsReplaced: 3, Writes: new RecordWrites([], []));
+        var written = new WriteSummary(Removed: [.. Enumerable.Range(0, 5).Select(index => new TargetId(index))], Moved: 2, EnableParentsReplaced: 3);
 
         Assert.Equal(
             [
@@ -335,7 +336,7 @@ public sealed class RestingObjectsEndSectionsTests
     [Fact]
     public void Write_OmitsTheEnableParentLineWhenNoneWasReplaced()
     {
-        Assert.Single(LogSections.BuildWriteSection(new WriteSummary([new TargetId(0)], 0, 0, new RecordWrites([], [])), Elapsed, Normal).Lines.ToList());
+        Assert.Single(LogSections.BuildWriteSection(new WriteSummary([new TargetId(0)], 0, 0), Elapsed, Normal).Lines.ToList());
     }
 
     [Fact]
@@ -346,9 +347,9 @@ public sealed class RestingObjectsEndSectionsTests
         var detailed = Detailed with { Bases = null! };
 
         Assert.Empty(LogSections.BuildRemovalsSection(world, removals, Normal).Lines.ToList());
-        Assert.Empty(LogSections.BuildSpacesSection(world, removals, Normal).Lines.ToList());
+        Assert.Empty(LogSections.BuildSpacesSection(world, removals, Target, Normal).Lines.ToList());
         AssertExpectedOutput(LogSections.BuildRemovalsSection(world, removals, detailed).Lines.ToList(), "Removals_AndSpaces_AreDetailedOnlyAndMatchTheExpectedOutput", "removals");
-        AssertExpectedOutput(LogSections.BuildSpacesSection(world, removals, detailed).Lines.ToList(), "Removals_AndSpaces_AreDetailedOnlyAndMatchTheExpectedOutput", "spaces");
+        AssertExpectedOutput(LogSections.BuildSpacesSection(world, removals, Target, detailed).Lines.ToList(), "Removals_AndSpaces_AreDetailedOnlyAndMatchTheExpectedOutput", "spaces");
     }
 
     [Fact]
@@ -457,35 +458,35 @@ public sealed class RestingObjectsEndSectionsTests
             Table(ReportFileNames.HintsFileName, 3),
             Table(ReportFileNames.RemovalsFileName, 9));
 
-        var detailed = LogSections.BuildWrittenSection(Performed(tables), WithMeshOrigins(), Detailed).Lines.ToList();
+        var detailed = LogSections.BuildWrittenSection(Performed(tables), WithMeshOrigins(), Target, Detailed).Lines.ToList();
         Assert.Equal(
             [
                 $"Touch diagnostics: wrote 7 edges, 2 components in 1.5s to {PathOf(ReportFileNames.EdgesFileName)} / {PathOf(ReportFileNames.ComponentsFileName)}.",
                 $"Anchoring diagnostics: wrote 4 evaluations to {PathOf(ReportFileNames.SupportFileName)}.",
-                "Mesh origins: 2 target meshes, 1 origin near bottom, 0 origin near centre, 1 other.",
+                "Mesh origins: 2 meshes of Target.esp objects, 1 origin near bottom, 0 origin near centre, 1 other.",
                 $"  Wrote 2 mesh origins to {PathOf(ReportFileNames.MeshOriginsFileName)}.",
-                $"Leftover invisible objects diagnostics: wrote 6 evaluations to {PathOf(ReportFileNames.LeftBehindFileName)}.",
+                $"Invisible objects left behind diagnostics: wrote 6 evaluations to {PathOf(ReportFileNames.LeftBehindFileName)}.",
                 $"Removals: wrote 9 rows to {PathOf(ReportFileNames.RemovalsFileName)}.",
                 $"Removed markers and kept objects: wrote 3 rows to {PathOf(ReportFileNames.HintsFileName)}.",
             ],
             detailed);
         Assert.Equal(
             $"Touch diagnostics: wrote 7 edges, 2 components to {PathOf(ReportFileNames.EdgesFileName)} / {PathOf(ReportFileNames.ComponentsFileName)}.",
-            LogSections.BuildWrittenSection(Performed(tables), WithMeshOrigins(), Normal).Lines.ToList()[0]);
+            LogSections.BuildWrittenSection(Performed(tables), WithMeshOrigins(), Target, Normal).Lines.ToList()[0]);
     }
 
     [Fact]
     public void Written_ShowsTheMeshOriginSummaryEvenWhenItsFileWasNotWritten()
     {
-        var lines = LogSections.BuildWrittenSection(Performed([]), WithMeshOrigins(), Detailed).Lines.ToList();
+        var lines = LogSections.BuildWrittenSection(Performed([]), WithMeshOrigins(), Target, Detailed).Lines.ToList();
 
-        Assert.Equal(["Mesh origins: 2 target meshes, 1 origin near bottom, 0 origin near centre, 1 other."], lines);
+        Assert.Equal(["Mesh origins: 2 meshes of Target.esp objects, 1 origin near bottom, 0 origin near centre, 1 other."], lines);
     }
 
     [Fact]
     public void Written_HidesTheMeshOriginSummaryInTheNormalLog()
     {
-        Assert.Empty(LogSections.BuildWrittenSection(Performed([]), WithMeshOrigins(), Normal).Lines.ToList());
+        Assert.Empty(LogSections.BuildWrittenSection(Performed([]), WithMeshOrigins(), Target, Normal).Lines.ToList());
     }
 
     [Fact]
@@ -493,14 +494,14 @@ public sealed class RestingObjectsEndSectionsTests
     {
         var switchedOff = new ReportFilesResult(StepOutcome.SwitchedOff, [], [], Failure: null);
 
-        Assert.Empty(LogSections.BuildWrittenSection(switchedOff, SupportScene().AlsoRemove, Detailed).Lines.ToList());
+        Assert.Empty(LogSections.BuildWrittenSection(switchedOff, SupportScene().AlsoRemove, Target, Detailed).Lines.ToList());
     }
 
     [Fact]
     public void Written_AStoppedWriterPrintsTheNotPerformedLine()
     {
         var lines = LogSections.BuildWrittenSection(
-            new ReportFilesResult(StepOutcome.StoppedByUnexpectedError, [], [], Failure: null), SupportScene().AlsoRemove, Normal).Lines.ToList();
+            new ReportFilesResult(StepOutcome.StoppedByUnexpectedError, [], [], Failure: null), SupportScene().AlsoRemove, Target, Normal).Lines.ToList();
 
         Assert.Equal(["Report files: not performed because of an unexpected error."], lines);
     }
@@ -637,7 +638,7 @@ public sealed class RestingObjectsEndSectionsTests
             false,
             [],
             new Dictionary<RecordKey, SpaceFact> { [TestTargets.Space] = new(TestTargets.Space, "Tamriel", SpaceKind.Worldspace, "Skyrim") },
-            new ReadCounts(0, 0, 0, 0, 0, 0, 0, 0),
+            new ReadCounts(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             [],
             TargetWorkOrder.Of(targets),
             null);
@@ -661,7 +662,8 @@ public sealed class RestingObjectsEndSectionsTests
             default(Vector3),
             Scale: 1f,
             IsPrimitive: false,
-            HasMapMarker: false);
+            HasMapMarker: false,
+            Change: new ObjectChange(OtherMod.ToPluginName(), AcceptedFrom: null));
 
     private static (CollectedObjects World, RestingObjectsResult AlsoRemove, IRemovalDecisions Decisions) RunFixture(Settings settings)
     {

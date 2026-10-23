@@ -10,13 +10,13 @@ internal sealed class FailingHomeCellPlugin(IPluginRecords inner) : IPluginRecor
 {
     public const string FailureMessage = "home cells broke";
 
-    public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope) => inner.ReadPlacedRecords(scope);
+    public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk) => inner.ReadPlacedRecords(scope, stopsTheWalk);
 
     public ImmutableArray<LinkFact> ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets) => inner.ReadLinks(target, targets);
 
-    public bool HasEnableParent(RecordKey record) => inner.HasEnableParent(record);
+    public IWritableRecords ReadWritableRecords() => inner.ReadWritableRecords();
 
-    public void Write(IReadOnlyList<WriteOrder> orders) => inner.Write(orders);
+    public IRecordIndex ReadRecordIndex() => inner.ReadRecordIndex();
 
     public CellGridPoint? ReadHomeCellGrid(RecordKey record) => throw new InvalidOperationException(FailureMessage);
 

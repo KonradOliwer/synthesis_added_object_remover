@@ -25,7 +25,7 @@ public class RunPartTextTests
         { "ReportFiles", "  Unexpected error in the report files (InvalidOperationException: broke). Some or all of the report files are missing; the patch is not affected." },
         { "AlsoRemove", "  Unexpected error in the also-remove step (InvalidOperationException: broke). The also-remove rounds did not complete, so objects resting on removed ones were not removed." },
         { "TouchChains", "  Unexpected error in the touch-chain search (InvalidOperationException: broke). The chains of touching objects that the detailed log and the report files list are missing." },
-        { "LeftBehind", "  Unexpected error in the left-behind step (InvalidOperationException: broke). The left-behind step did not run, so invisible objects whose surroundings were removed were not removed." },
+        { "LeftBehind", "  Unexpected error in the step for invisible objects left behind (InvalidOperationException: broke). That step did not run, so invisible objects whose surroundings were removed were not removed." },
         { "MarkerMoves", "  Unexpected error in the marker moves (InvalidOperationException: broke). No kept marker was moved, so markers inside other mods' objects stay where they are." },
         { "ReportFileDetails", "  Unexpected error in the report-file details (InvalidOperationException: broke). The touching pairs or mesh origins that the report files list are missing from them." },
         { "LoaderStartUp", "  Unexpected error in the NIF loader start-up (InvalidOperationException: broke). Meshes are read one at a time, which is slower; the results are not affected." },
@@ -35,8 +35,8 @@ public class RunPartTextTests
     {
         { "TooCloseCheck", "  Unexpected error while checking objects for being too close (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were not removed." },
         { "TerrainCheck", "  Unexpected error while checking objects for changed terrain (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were not removed." },
-        { "KeepCheck", "  Unexpected error while finding the target objects to keep (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were kept." },
-        { "RemovalCauseSelection", "  Unexpected error while selecting the objects that can cause removals (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were not used to remove target objects." },
+        { "KeepCheck", "  Unexpected error while finding the cleaned mod's objects to keep (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were kept." },
+        { "RemovalCauseSelection", "  Unexpected error while selecting the objects that can cause removals (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were not used to remove the cleaned mod's objects." },
         { "MeshShapes", @"  Unexpected error while reading mesh shapes (InvalidOperationException: broke): 1 mesh, e.g. meshes\crate.nif. Objects using the mesh are treated as having no mesh shape." },
         { "MeshTriangles", @"  Unexpected error while reading mesh triangles (InvalidOperationException: broke): 1 mesh, e.g. meshes\crate.nif. Objects using the mesh are treated as having no mesh triangles." },
     };
@@ -69,7 +69,7 @@ public class RunPartTextTests
     [InlineData(RoundKind.ChangedTerrain, "changed-terrain")]
     [InlineData(RoundKind.TooClose, "too-close")]
     [InlineData(RoundKind.AlsoRemove, "follow-up")]
-    [InlineData(RoundKind.LeftBehind, "leftover invisible object")]
+    [InlineData(RoundKind.LeftBehind, "left-behind")]
     public void TheLinkedGroupsLabelNamesTheStepOfTheRoundKind(RoundKind kind, string step)
     {
         Assert.Equal(step, RunPartText.LinkedStep(kind));

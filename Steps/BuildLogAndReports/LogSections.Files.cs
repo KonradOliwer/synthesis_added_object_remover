@@ -12,7 +12,7 @@ internal static partial class LogSections
     /// comes from the explanations, so it shows even when its file could not be written. Only written files have lines;
     /// when writing the files was stopped, the not-performed line comes first.
     /// </summary>
-    public static LogSection BuildWrittenSection(ReportFilesResult files, RestingObjectsResult alsoRemove, ReportContext context)
+    public static LogSection BuildWrittenSection(ReportFilesResult files, RestingObjectsResult alsoRemove, PluginName target, ReportContext context)
     {
         var tables = files.Outcome == StepOutcome.Performed ? files.Written : [];
         List<string> lines = files.Outcome == StepOutcome.StoppedByUnexpectedError ? [BuildNotPerformedLine("Report files")] : [];
@@ -25,7 +25,7 @@ internal static partial class LogSections
         {
             var origins = ExplanationEvidence.MeshOrigins(alsoRemove);
             lines.Add(
-                $"Mesh origins: {TextFormat.Count(origins.Length)} target meshes, {CountedPlace(origins, MeshOriginPlace.NearBottom)}, "
+                $"Mesh origins: {TextFormat.Count(origins.Length)} meshes of {target} objects, {CountedPlace(origins, MeshOriginPlace.NearBottom)}, "
                 + $"{CountedPlace(origins, MeshOriginPlace.NearCentre)}, {CountedPlace(origins, MeshOriginPlace.Other)}.");
         }
         if (WrittenTables.Find(tables, ReportFileNames.MeshOriginsFileName) is { } meshOrigins)
@@ -34,7 +34,7 @@ internal static partial class LogSections
         }
         if (WrittenTables.Find(tables, ReportFileNames.LeftBehindFileName) is { } leftovers)
         {
-            lines.Add($"Leftover invisible objects diagnostics: wrote {TextFormat.Count(leftovers.Rows)} evaluations to {leftovers.Path}.");
+            lines.Add($"{LeftBehindStepName} diagnostics: wrote {TextFormat.Count(leftovers.Rows)} evaluations to {leftovers.Path}.");
         }
         AddRowsLine(lines, tables, ReportFileNames.RemovalsFileName, "Removals");
         AddRowsLine(lines, tables, ReportFileNames.HintsFileName, "Removed markers and kept objects");

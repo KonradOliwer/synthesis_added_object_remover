@@ -3,37 +3,79 @@ using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
 
 /// <summary>
-/// Compares the version of a cell's terrain the game shows with the cell's reference terrain, vertex by vertex, and finds the
-/// plugin whose own edit made each difference. Thread-safe.
+/// Builds a cell's accepted terrain, each vertex's height and terrain type from its own accepted version, and compares the version
+/// the game shows with it vertex by vertex. Thread-safe.
 /// </summary>
+/// <remarks>
+/// Height and terrain type are decided apart, so a plugin trusted for its own changes that only repaints a vertex does not make an
+/// untrusted mod's height there accepted. Such a plugin owns a height only beyond the height tolerance, so a land record it re-saved
+/// with rounding noise owns nothing.
+/// </remarks>
 internal sealed class CellTerrainComparison(TerrainPlugins plugins, TerrainTypes types, ChangedTerrainSettings settings)
 {
+    /// <summary>The positions of the vertex properties in the results of <see cref="AcceptedVersions.Decide"/>.</summary>
+    private const int HeightProperty = 0;
+    private const int TypeProperty = 1;
+
     private readonly TerrainDifference _difference = new(settings);
 
     /// <param name="versions">The cell's terrain versions in load order.</param>
-    /// <returns>Null when the cell has no reference terrain.</returns>
+    /// <returns>Null when no vertex has an accepted height or terrain type: no trusted plugin has a version of the cell.</returns>
     public CellTerrain? Compare(TerrainVersion[] versions)
     {
-        if (plugins.FromReference(versions, static version => version.Plugin) is not { } fromReference) return null;
+        if (versions.Length == 0) return null;
+        var compared = versions.Select(ToCompared).ToArray();
+        var trusts = versions.Select(version => plugins.TrustOf(version.Plugin)).ToArray();
+        var vertices = Enumerable.Range(0, CellTerrain.VertexCount).Select(vertex => DecideAt(compared, trusts, vertex)).ToArray();
+        if (!vertices.Any(vertex => vertex.IsChecked)) return null;
 
-        var versionsFromReference = fromReference.Select(ToTraced).ToArray();
-        return new CellTerrain(versionsFromReference[0].Version.Heights, versionsFromReference[^1].Version.Heights, ChangesOf(versionsFromReference));
+        var shown = compared[^1].Heights;
+        return new CellTerrain(ComposeAcceptedHeights(compared, vertices, shown), shown, ChangesOf(compared, vertices), FindUnchecked(vertices));
     }
 
-    private TracedVersion ToTraced(TerrainVersion version) =>
-        new(
-            new ComparedVersion(version.Plugin, version.Heights, settings.CountTerrainTypeChanges ? types.AtEveryVertex(version) : null),
-            plugins.CountsAsChanging(version.Plugin) ? plugins.PositionOf(version.Plugin) : null);
+    private ComparedVersion ToCompared(TerrainVersion version) =>
+        new(version.Plugin, version.Heights, settings.CountTerrainTypeChanges ? types.AtEveryVertex(version) : null);
 
-    /// <param name="versionsFromReference">The reference first, then every later version in load order; the last one is the version the game shows.</param>
-    private VertexChange[]? ChangesOf(TracedVersion[] versionsFromReference)
+    /// <remarks>The height is decided also when height changes are not counted: the accepted heights still say where the ground was.</remarks>
+    private VertexAcceptance DecideAt(ComparedVersion[] compared, VersionTrust[] trusts, int vertex)
+    {
+        var properties = AcceptedVersions.Decide(
+            trusts,
+            [
+                (one, other) => _difference.HeightDiffersAt(compared[one], compared[other], vertex),
+                (one, other) => _difference.TypeDiffersAt(compared[one], compared[other], vertex),
+            ]);
+        return new VertexAcceptance(properties[HeightProperty], properties[TypeProperty]);
+    }
+
+    /// <summary>
+    /// Each vertex's height from its accepted version. Where that version holds no heights, or the vertex has no accepted height, the
+    /// shown height stands in: the ground there is taken as the game shows it.
+    /// </summary>
+    /// <returns>Null when a vertex needs the shown height and the shown version holds none.</returns>
+    private float[]? ComposeAcceptedHeights(ComparedVersion[] compared, VertexAcceptance[] vertices, float[]? shown)
+    {
+        var heights = new float[CellTerrain.VertexCount];
+        for (var vertex = 0; vertex < heights.Length; vertex++)
+        {
+            if ((AcceptedHeightAt(compared, vertices[vertex], vertex) ?? shown?[vertex]) is not { } height) return null;
+            heights[vertex] = height;
+        }
+        return heights;
+    }
+
+    private float? AcceptedHeightAt(ComparedVersion[] compared, VertexAcceptance acceptance, int vertex) =>
+        acceptance.Height.Accepted is { } accepted ? compared[accepted].Heights?[vertex] : null;
+
+    /// <returns>Null when no vertex changed.</returns>
+    private VertexChange[]? ChangesOf(ComparedVersion[] compared, VertexAcceptance[] vertices)
     {
         VertexChange[]? changes = null;
-        for (var vertex = 0; vertex < CellTerrain.VertexCount; vertex++)
+        for (var vertex = 0; vertex < vertices.Length; vertex++)
         {
-            var shown = _difference.At(versionsFromReference[0].Version, versionsFromReference[^1].Version, vertex);
-            if (!shown.Any) continue;
-            var change = FindChangersAt(versionsFromReference, shown, vertex);
+            var change = new VertexChange(
+                settings.CountHeightChanges ? FindChangerOf(compared, vertices[vertex].Height) : null,
+                FindChangerOf(compared, vertices[vertex].Type));
             if (!change.Any) continue;
             changes ??= new VertexChange[CellTerrain.VertexCount];
             changes[vertex] = change;
@@ -42,33 +84,23 @@ internal sealed class CellTerrainComparison(TerrainPlugins plugins, TerrainTypes
     }
 
     /// <summary>
-    /// Height and terrain type are traced apart, so a non-counting plugin changing one of them on top of a counting plugin's
-    /// change of the other does not hide that change.
+    /// A property without accepted version is not checked. When the shown value differs from the accepted one and no version but a
+    /// transparent one holds it, that version is the patch the game shows: an earlier patcher of the group made the change.
     /// </summary>
-    private VertexChange FindChangersAt(TracedVersion[] versionsFromReference, TerrainChange shown, int vertex) =>
-        new(
-            shown.Height ? FindChangerOf(versionsFromReference, vertex, static change => change.Height) : null,
-            shown.TerrainType ? FindChangerOf(versionsFromReference, vertex, static change => change.TerrainType) : null);
+    /// <returns>The load-order position of the plugin named for the change; null when the property is not checked or unchanged.</returns>
+    private int? FindChangerOf(ComparedVersion[] compared, PropertyAcceptance property) =>
+        property is { Accepted: not null, Changed: true }
+            ? plugins.PositionOf(compared[property.Changing ?? compared.Length - 1].Plugin)
+            : null;
 
-    /// <remarks>
-    /// A version carries the change only when its own value differs from the reference beyond the check's tolerance, so small
-    /// steps within the height tolerance cannot add up to a change that no version made.
-    /// </remarks>
-    /// <param name="check">Selects the check traced: height or terrain type.</param>
-    /// <returns>The position of the counting plugin whose own edit gave the shown change; null when that plugin does not count.</returns>
-    private int? FindChangerOf(TracedVersion[] versionsFromReference, int vertex, Func<TerrainChange, bool> check)
+    /// <returns>Null when every vertex is checked.</returns>
+    private bool[]? FindUnchecked(VertexAcceptance[] vertices) =>
+        vertices.All(vertex => vertex.IsChecked) ? null : [.. vertices.Select(vertex => !vertex.IsChecked)];
+
+    /// <param name="Type">Never changed when terrain type changes are not counted: the versions then hold no types.</param>
+    private readonly record struct VertexAcceptance(PropertyAcceptance Height, PropertyAcceptance Type)
     {
-        var origin = new ChangeOrigin(
-            index => CarriesShownChange(versionsFromReference, index, vertex, check),
-            index => versionsFromReference[index].ChangerPosition != null);
-        return versionsFromReference[origin.Find(versionsFromReference.Length - 1)].ChangerPosition;
+        /// <summary>The vertex has an accepted height or terrain type.</summary>
+        public bool IsChecked => Height.Accepted != null || Type.Accepted != null;
     }
-
-    /// <summary>The version differs from the reference beyond the check's tolerance and matches the shown version within it.</summary>
-    private bool CarriesShownChange(TracedVersion[] versionsFromReference, int index, int vertex, Func<TerrainChange, bool> check) =>
-        check(_difference.At(versionsFromReference[0].Version, versionsFromReference[index].Version, vertex))
-        && !check(_difference.At(versionsFromReference[^1].Version, versionsFromReference[index].Version, vertex));
-
-    /// <param name="ChangerPosition">The plugin's load-order position when it counts as changing the terrain; null when it does not.</param>
-    private readonly record struct TracedVersion(ComparedVersion Version, int? ChangerPosition);
 }

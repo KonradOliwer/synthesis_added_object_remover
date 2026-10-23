@@ -19,7 +19,7 @@ internal sealed record FixtureBases(
     FormKey BaseGamePad,
     FormKey BaseGameCrate,
     FormKey PatchedPad,
-    FormKey ExcludedPad)
+    FormKey TrustedPad)
 {
     private const float NpcHalfWidth = 16f;
     private const float NpcHeight = 128f;
@@ -44,7 +44,7 @@ internal sealed record FixtureBases(
             BaseGamePad: mods.BaseGame.AddModeledStatic("Sky_PadBase", FixtureMeshes.PadModel),
             BaseGameCrate: mods.BaseGame.AddModeledStatic("Sky_CrateBase", FixtureMeshes.CrateModel),
             PatchedPad: mods.Patched.AddModeledStatic("Patched_PadBase", FixtureMeshes.PadModel),
-            ExcludedPad: mods.Excluded.AddModeledStatic("Excluded_PadBase", FixtureMeshes.PadModel));
+            TrustedPad: mods.Trusted.AddModeledStatic("Trusted_PadBase", FixtureMeshes.PadModel));
     }
 
     private static Box NpcBounds => new(new Vector3(-NpcHalfWidth, -NpcHalfWidth, 0f), new Vector3(NpcHalfWidth, NpcHalfWidth, NpcHeight));

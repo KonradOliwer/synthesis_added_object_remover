@@ -2,10 +2,12 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
+using System.Reflection;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Tests.EndToEnd;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda.Plugins;
+using Mutagen.Bethesda.Synthesis.Settings;
 
 namespace AddedObjectRemover.Tests.Reporting;
 
@@ -422,7 +424,19 @@ public sealed class RestingObjectsEndSectionsTests
         AssertExpectedOutput(LogSections.BuildRemovalSummarySection(removals, StepOutcome.SwitchedOff).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "removal-summary");
         AssertExpectedOutput(LogSections.BuildKeptSummarySection(kept).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "kept-summary");
         AssertExpectedOutput(LogSections.BuildMarkersByTypeSection(targets, removals, context).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "markers");
-        Assert.Equal(["Removed markers by type: 1 DoorMarkers."], LogSections.BuildMarkersByTypeSection(targets, removals, context).Lines.ToList());
+        Assert.Equal(["Removed markers by type: 1 Invisible marker doors."], LogSections.BuildMarkersByTypeSection(targets, removals, context).Lines.ToList());
+    }
+
+    /// <summary>Each kind's log name is the name its tick box has under "Never remove these as left behind".</summary>
+    [Fact]
+    public void TheLogNamesEachInvisibleObjectKindAsTheSettingsScreenDoes()
+    {
+        foreach (var kind in Enum.GetValues<InvisibleObjectKind>())
+        {
+            var property = typeof(KeptInvisibleObjectSettings).GetProperty(kind.ToString())!;
+
+            Assert.Equal(property.GetCustomAttribute<SynthesisSettingName>()!.Name, ObjectVisibilityText.KindName(kind));
+        }
     }
 
     [Fact]

@@ -57,7 +57,7 @@ public class SettingsFailureMessageTests
     }
 
     [Theory]
-    [InlineData("""{"TooClose":{"NpcHandling":"Ignore"}}""", "Standard.TooClose.NpcHandling", "Allowed values: AlwaysLikeAnyObject, OnlyWhenStuckInsideTheObject, Never")]
+    [InlineData("""{"TooClose":{"NpcHandling":"Ignore"}}""", "Standard.TooClose.NpcHandling", "Allowed values: AlwaysLikeAnyObject, OnlyWhenStuckInsideTheObject, OnlyWhenStuckInsideTheObjectWithCollision, Never")]
     [InlineData(
         """{"TerrainChange":{"TerrainCheckedObjects":"AllObjects"}}""",
         "Standard.TerrainChange.TerrainCheckedObjects",

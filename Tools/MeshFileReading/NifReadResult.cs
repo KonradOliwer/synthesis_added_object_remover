@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace AddedObjectRemover;
 
 /// <param name="Geometry">Set only on success.</param>
@@ -14,6 +16,9 @@ internal sealed record NifReadResult(
 
     /// <summary>Set when a NiTriStrips shape needed strip fields this NiflySharp version lacks.</summary>
     public bool StripFieldsMissing { get; init; }
+
+    /// <summary>The distinct layers of the collision rigid bodies, in ascending order; null when the file did not load or has no root node.</summary>
+    public ImmutableArray<CollisionLayer>? CollisionLayers { get; init; }
 
     public static NifReadResult Succeeded(NifGeometry geometry, int mismatchedStrips) =>
         new(MeshReadStatus.Success, geometry, null, mismatchedStrips);

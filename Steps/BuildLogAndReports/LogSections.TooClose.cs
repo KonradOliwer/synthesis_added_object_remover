@@ -63,22 +63,30 @@ internal static partial class LogSections
 
     private static IEnumerable<string> NpcLines(TooCloseSection report) => report.Result.Npcs switch
     {
-        NpcHandling.OnlyWhenStuckInsideTheObject => StuckNpcLines(
-            report.Result.Npc ?? throw new InvalidOperationException("The too-close step handled NPCs only when stuck but gave no stuck-NPC summary."), report),
+        NpcHandling.OnlyWhenStuckInsideTheObject => StuckNpcLines(GetStuckNpcSummary(report), report, withCollision: false),
+        NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision => StuckNpcLines(GetStuckNpcSummary(report), report, withCollision: true),
         NpcHandling.Never => [$"NPCs and creatures: ignored; {TextFormat.Count(report.Census.PlacedNpcs)} placed NPCs of other mods never cause removals."],
         NpcHandling.AlwaysLikeAnyObject => [],
         _ => throw new UnreachableException($"Unknown NPC handling {report.Result.Npcs}."),
     };
 
-    private static IEnumerable<string> StuckNpcLines(NpcStuckSummary summary, TooCloseSection report)
+    private static NpcStuckSummary GetStuckNpcSummary(TooCloseSection report) =>
+        report.Result.Npc ?? throw new InvalidOperationException("The too-close step handled NPCs only when stuck but gave no stuck-NPC summary.");
+
+    /// <param name="withCollision">Only objects whose mesh collision stops characters count.</param>
+    private static IEnumerable<string> StuckNpcLines(NpcStuckSummary summary, TooCloseSection report, bool withCollision)
     {
         var sizes = summary.Sizes;
-        yield return $"NPCs and creatures (only when stuck in the object): {TextFormat.Count(sizes.Evaluated)} placed NPCs evaluated: "
+        var mode = withCollision ? "only when stuck in the object and the object's collision stops characters" : "only when stuck in the object";
+        var notCounted = withCollision
+            ? $", {TextFormat.Count(summary.ConflictsWithoutBlockingCollision)} of them not counted because their collision does not stop characters"
+            : string.Empty;
+        yield return $"NPCs and creatures ({mode}): {TextFormat.Count(sizes.Evaluated)} placed NPCs evaluated: "
             + $"{TextFormat.Count(sizes.ByBodyMesh)} sized by body mesh, {TextFormat.Count(sizes.ByObjectBounds)} by Object Bounds, "
             + $"{TextFormat.Count(sizes.ByHumanoidApproximation)} by humanoid approximation, {TextFormat.Count(sizes.ByPoint)} sized as a point; "
             + $"{TextFormat.Count(sizes.WithoutNpc)} skipped because their base is no NPC; "
             + $"{TextFormat.Count(summary.PairsTested)} NPC-object pairs tested ({TextFormat.Count(summary.CoreTests)} body boxes), "
-            + $"{TextFormat.Count(summary.Conflicts)} objects with an NPC stuck in them.";
+            + $"{TextFormat.Count(summary.Conflicts)} objects with an NPC stuck in them{notCounted}.";
         yield return $"  NPC body cache: {TextFormat.Count(report.BodiesBuilt)} bodies built; "
             + $"{TextFormat.Count(report.NpcBasesResolved)} NPC bases resolved; "
             + $"{TextFormat.Count(report.LeveledListsResolved)} leveled lists resolved; "

@@ -5,5 +5,8 @@ public enum NpcHandling
 {
     AlwaysLikeAnyObject,
     OnlyWhenStuckInsideTheObject,
+
+    /// <summary>As <see cref="OnlyWhenStuckInsideTheObject"/>, but only objects whose mesh collision stops characters count.</summary>
+    OnlyWhenStuckInsideTheObjectWithCollision,
     Never,
 }

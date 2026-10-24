@@ -6,8 +6,8 @@ namespace AddedObjectRemover.Steps.RemoveTooCloseObjects;
 
 /// <summary>
 /// The "NPCs and creatures" setting in the too-close step: other mods' placed NPCs are tested
-/// like any object (AlwaysLikeAnyObject), only by <see cref="NpcStuckSearch"/> (OnlyWhenStuckInsideTheObject),
-/// or never (Never).
+/// like any object (AlwaysLikeAnyObject), only by <see cref="NpcStuckSearch"/> (OnlyWhenStuckInsideTheObject,
+/// and OnlyWhenStuckInsideTheObjectWithCollision for objects whose collision stops characters), or never (Never).
 /// </summary>
 internal sealed class NpcTooCloseRule
 {
@@ -19,14 +19,19 @@ internal sealed class NpcTooCloseRule
 
     public NpcHandling Handling { get; }
 
-    /// <summary>Set only for OnlyWhenStuckInsideTheObject.</summary>
+    /// <summary>Set only when NPCs count when stuck in an object.</summary>
     public NpcStuckSearch? StuckSearch { get; }
 
-    /// <param name="createStuckSearch">Called only for OnlyWhenStuckInsideTheObject.</param>
-    public static NpcTooCloseRule Create(NpcHandling handling, Func<NpcStuckSearch> createStuckSearch) =>
-        new(handling, handling == NpcHandling.OnlyWhenStuckInsideTheObject ? createStuckSearch() : null);
+    /// <param name="createStuckSearch">
+    /// Called only when NPCs count when stuck in an object, with whether only objects whose collision stops characters count.
+    /// </param>
+    public static NpcTooCloseRule Create(NpcHandling handling, Func<bool, NpcStuckSearch> createStuckSearch) =>
+        new(handling, CountsStuckNpcs(handling) ? createStuckSearch(handling == NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision) : null);
 
-    /// <summary>The first NPC stuck in the target, or null; always null unless OnlyWhenStuckInsideTheObject.</summary>
+    private static bool CountsStuckNpcs(NpcHandling handling) =>
+        handling is NpcHandling.OnlyWhenStuckInsideTheObject or NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision;
+
+    /// <summary>The first NPC stuck in the target, or null; always null unless NPCs count when stuck in an object.</summary>
     public OtherId? FindFirstStuckNpc(int targetIndex, NpcScratch scratch) =>
         StuckSearch?.FindFirstStuckNpc(targetIndex, scratch);
 

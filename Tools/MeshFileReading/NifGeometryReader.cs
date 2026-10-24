@@ -3,7 +3,7 @@ using NiflySharp.Blocks;
 
 namespace AddedObjectRemover;
 
-/// <summary>Reads a NIF's render geometry (bounds and optionally triangles) in root-node space with NiflySharp.</summary>
+/// <summary>Reads a NIF's render geometry (bounds and optionally triangles) in root-node space, and its collision layers, with NiflySharp.</summary>
 internal sealed class NifGeometryReader
 {
     /// <summary>
@@ -47,7 +47,8 @@ internal sealed class NifGeometryReader
     /// the root node's own transform: the engine overwrites the root's local transform with the
     /// placed reference's position/rotation/scale, so it has no effect in game. Only shapes
     /// reachable from the root node are counted (orphan blocks are never rendered). Collision and
-    /// particle systems are always skipped; which other shapes count is up to <paramref name="inclusion"/>.
+    /// particle systems are always left out of the geometry; which other shapes count is up to <paramref name="inclusion"/>,
+    /// which also decides the marker nodes whose collision is left out (<see cref="NifCollisionLayers"/>).
     /// With <paramref name="includeTriangles"/>, also returns the root-space vertices and triangles
     /// of every counted shape (shapes that only have a bounding sphere add to the bounds only).
     /// A vertex that is non-finite or beyond <see cref="BoundsAccumulator.MaxCoordinate"/> makes the whole
@@ -112,11 +113,15 @@ internal sealed class NifGeometryReader
             return NifReadResult.Failed(MeshReadFailure.NoRootNode());
         }
 
-        var shapes = CollectWithRetry(nif, root.Index, includeTriangles, inclusion);
+        var blocks = nif.Blocks;
+        var parentOf = BuildParentMap(blocks);
+        var flags = AvObjectFlags.For(nif);
+        var shapes = CollectWithRetry(blocks, parentOf, flags, root.Index, includeTriangles, inclusion);
         return ToResult(shapes) with
         {
             FooterRoot = root.DiffersFromLibraryRoot ? root : null,
             StripFieldsMissing = shapes.Stats.StripFieldsMissing > 0,
+            CollisionLayers = NifCollisionLayers.Collect(blocks, parentOf, root.Index, flags, inclusion),
         };
     }
 
@@ -149,12 +154,9 @@ internal sealed class NifGeometryReader
     /// First collects as <paramref name="inclusion"/> says. If that leaves nothing but some shapes were hidden and the
     /// inclusion allows it, a second pass includes the hidden shapes: the mesh is certainly rendered somehow, and OBND would be worse.
     /// </summary>
-    private ShapeCollection CollectWithRetry(NifFile nif, int rootIndex, bool includeTriangles, ShapeInclusion inclusion)
+    private ShapeCollection CollectWithRetry(
+        List<INiObject> blocks, Dictionary<int, int> parentOf, AvObjectFlags flags, int rootIndex, bool includeTriangles, ShapeInclusion inclusion)
     {
-        var blocks = nif.Blocks;
-        var parentOf = BuildParentMap(blocks);
-        var flags = AvObjectFlags.For(nif);
-
         var shapes = NifShapeCollector.Collect(_renderTypes, blocks, parentOf, rootIndex, flags, inclusion, includeTriangles);
         if (inclusion.RetryIncludingHiddenWhenEmpty
             && shapes.Bounds.Invalid == null && !shapes.Bounds.Any && shapes.Stats.Hidden + shapes.Stats.HiddenAncestor > 0)

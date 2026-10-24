@@ -663,6 +663,32 @@ public class ChangedTerrainObjectsTests
         Assert.Equal([Removal(0, Other, TerrainChangeKind.Height)], Find(plugin, Settings(), threads: 1, Placed(0, Rock, WideSpot)).Proposals.AsEnumerable());
     }
 
+    /// <summary>The other mod raises the object's vertex; an earlier patcher repaints the ground in the patch, which loads last.</summary>
+    [Fact]
+    public void ARealModsHeightChangeIsNamedBeforeATypeChangeOnlyThePatchHolds()
+    {
+        var raised = new TerrainVersion(Other, Heights(Ground, (Near, Raised)), Painted(Grass));
+        var repainted = new TerrainVersion(Patch, Heights(Ground, (Near, Raised)), Painted(Road));
+
+        Assert.Equal(
+            [Removal(0, Other, TerrainChangeKind.Height | TerrainChangeKind.TerrainType)],
+            Find(PaintedCell(FlatPainted(Target, Painted(Grass)), raised, repainted), Settings()).Proposals.AsEnumerable());
+    }
+
+    /// <summary>The patch carries the other mod's road and an earlier patcher paints more vertices: the real mod is named.</summary>
+    [Fact]
+    public void ATypeChangeNamesARealModEvenWhenThePatchAloneChangedMoreVertices()
+    {
+        var plugin = PaintedCell(
+            FlatPainted(Target, Painted(Grass)),
+            FlatPainted(Other, RoadAtWideSpot(FewerChanges)),
+            FlatPainted(Patch, RoadAtWideSpot(FewerChanges + MostChanges)));
+
+        Assert.Equal(
+            [Removal(0, Other, TerrainChangeKind.TerrainType)],
+            Find(plugin, Settings(), threads: 1, Placed(0, Rock, WideSpot)).Proposals.AsEnumerable());
+    }
+
     /// <summary>Grass everywhere, with road painted over the first <paramref name="count"/> vertices of the area of an object at <see cref="WideSpot"/>.</summary>
     private static TerrainLayers RoadAtWideSpot(int count)
     {

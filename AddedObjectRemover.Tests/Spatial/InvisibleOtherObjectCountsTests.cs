@@ -43,7 +43,7 @@ public class InvisibleOtherObjectCountsTests
         var census = InvisibleOtherObjectCounter.Take(world, Shapes, scene.VisibleTargets);
 
         Assert.Equal(
-            new[] { KeyValuePair.Create("MapMarkers", 1), KeyValuePair.Create("base not found", 1) },
+            new[] { KeyValuePair.Create("Map markers", 1), KeyValuePair.Create("base not found", 1) },
             census.InvisibleByReason);
         Assert.Equal(1, census.PlacedNpcs);
         QueryEveryOtherModObjectOfTheSpace(scene, otherModObjects.Count);

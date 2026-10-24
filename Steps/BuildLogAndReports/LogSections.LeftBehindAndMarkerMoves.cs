@@ -84,7 +84,7 @@ internal static partial class LogSections
     private static string LeftBehindOutcomeLine(CollectedObjects world, LeftBehindCheck evaluation)
     {
         var target = world.Targets[evaluation.TargetIndex];
-        return $"  Left behind: {RecordNames.Describe(target)} ({evaluation.Kind}) in {Describe.Space(world, target.SpaceKey)}: "
+        return $"  Left behind: {RecordNames.Describe(target)} ({ObjectVisibilityText.KindName(evaluation.Kind)}) in {Describe.Space(world, target.SpaceKey)}: "
             + $"{(evaluation.IsRemoved ? "removed" : "kept")}, {Describe.LeftBehindReason(evaluation)}; radius {TextFormat.Fixed(evaluation.Radius, 0)}, "
             + $"removed/total ground area {SectorAreasText.Describe(evaluation.Surroundings)}.";
     }

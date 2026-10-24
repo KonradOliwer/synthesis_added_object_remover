@@ -23,7 +23,10 @@ internal sealed record CellTerrain(float[]? AcceptedHeights, float[]? WinnerHeig
     public bool IsCheckedAt(int vertex) => UncheckedVertices?[vertex] != true;
 }
 
-/// <summary>The plugins named for the changes of a vertex's accepted values, per check.</summary>
+/// <summary>
+/// The plugins named for the changes of a vertex's accepted values, per check; <see cref="TerrainPlugins.PatchOnlyChange"/> where
+/// only the patch holds the change.
+/// </summary>
 /// <param name="HeightChanger">The load-order position of the plugin named for the changed height; null where the height is unchanged or not checked.</param>
 /// <param name="TypeChanger">The load-order position of the plugin named for the changed terrain type; null where the type is unchanged or not checked.</param>
 internal readonly record struct VertexChange(int? HeightChanger, int? TypeChanger)
@@ -35,7 +38,8 @@ internal readonly record struct VertexChange(int? HeightChanger, int? TypeChange
 /// <param name="Accepted">The accepted water level; null where the accepted water is none.</param>
 /// <param name="Shown">The water level the game shows; null where it has no water.</param>
 /// <param name="Changer">
-/// The load-order position of the plugin named for the change; the patch's where only the patch holds it.
+/// The load-order position of the plugin named for the change; <see cref="TerrainPlugins.PatchOnlyChange"/> where only the patch
+/// holds it.
 /// </param>
 /// <param name="Kind">A water height change, or water added or removed.</param>
 internal sealed record CellWaterChange(float? Accepted, float? Shown, int Changer, TerrainChangeKind Kind)

@@ -30,6 +30,9 @@ public enum TrustReason
     /// <summary>Untrusted: an Added Object Remover patch of another group, which the automatic rules skip.</summary>
     OtherGroupPatch,
 
-    /// <summary>Untrusted: has the cleaned mod as a master but more other masters than allowed.</summary>
+    /// <summary>
+    /// Untrusted: has the cleaned mod as a master but more other masters than allowed, and is not an Added Object Remover patch of
+    /// another group.
+    /// </summary>
     RequiringModTooManyMasters,
 }

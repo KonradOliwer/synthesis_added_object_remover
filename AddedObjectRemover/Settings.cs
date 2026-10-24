@@ -252,6 +252,8 @@ public class TooCloseRemovalSettings : ITooCloseSettingsValues
         "AlwaysLikeAnyObject: they count like any other object.\n"
         + "OnlyWhenStuckInsideTheObject: only when their body sinks into the object or they stand inside it (a boulder, a room of a building);\n"
         + "standing on or leaning against it does not count.\n"
+        + "OnlyWhenStuckInsideTheObjectWithCollision: the same, but only for objects you cannot walk through (a rock, a tree, a wall);\n"
+        + "objects without collision (ferns, shrubs, thickets, kelp) are never removed because an NPC stands in them.\n"
         + "Never: they never cause removal.")]
     public NpcHandling NpcHandling { get; set; } = SettingDefaults.Npcs;
 

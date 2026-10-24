@@ -1,0 +1,4 @@
+# Static methods and local functions of this module that mention no domain type (Ids or a Contracts type), each with its reason.
+# Form: Type.Member | reason  (local function: Type.Method.Local). The test fails when an entry stops being flagged.
+BaseObjectRules.BlocksMovement | Game convention: which mesh collision layers stop characters; the mesh tool only reports the layers, so the rule stays in this module.
+BaseObjectRules.IsMovementBlocking | Game convention: the layers the character controller collides with; the mesh tool only reports the layers, so the rule stays in this module.

@@ -10,6 +10,7 @@ NpcHandling
 NpcHandling.AlwaysLikeAnyObject
 NpcHandling.Never
 NpcHandling.OnlyWhenStuckInsideTheObject
+NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision
 OnlyWarnWhenModRequiringCleanedModLoadsAfterPatch
 PatchMode
 PatchMode.Batch

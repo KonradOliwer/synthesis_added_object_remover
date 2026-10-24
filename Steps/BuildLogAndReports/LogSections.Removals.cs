@@ -123,6 +123,7 @@ internal static partial class LogSections
             .OrderBy(group => group.Key)
             .ToList();
         if (counts.Count == 0) return new LogSection("markers-by-type", []);
-        return new LogSection("markers-by-type", [$"Removed markers by type: {string.Join(Describe.ListSeparator, TextLists.Counts(counts))}."]);
+        var named = counts.Select(group => KeyValuePair.Create(ObjectVisibilityText.KindName(group.Key), group.Value));
+        return new LogSection("markers-by-type", [$"Removed markers by type: {string.Join(Describe.ListSeparator, TextLists.Counts(named))}."]);
     }
 }

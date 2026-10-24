@@ -26,7 +26,7 @@ public static class SettingDefaults
     public const bool CountWaterAddedOrRemoved = true;
     public const int MinWaterCoverChangePercent = 20;
     public const int MaxOtherMastersOfRequiringModToTrust = 5;
-    public const NpcHandling Npcs = NpcHandling.OnlyWhenStuckInsideTheObject;
+    public const NpcHandling Npcs = NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision;
     public const FollowUpRemovalMode FollowUpMode = FollowUpRemovalMode.OnlyWhatLosesItsSupport;
     public const float TouchDistance = 8f;
     public const float AnchoringThresholdPercent = 50f;

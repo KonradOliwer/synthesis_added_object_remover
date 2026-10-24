@@ -229,7 +229,7 @@ public sealed class ConfigFilesTests : IDisposable
             $"Invalid setting in config file {ConfigPath(TownWalls)}: 'Remove objects too close to other mods' objects > Other mods' NPCs and creatures cause removal' ({TownWalls}.json path 'TooClose.NpcHandling').",
             message);
         Assert.Contains("Sometimes", message);
-        Assert.EndsWith("Allowed values: AlwaysLikeAnyObject, OnlyWhenStuckInsideTheObject, Never." + NothingWasRun, message);
+        Assert.EndsWith("Allowed values: AlwaysLikeAnyObject, OnlyWhenStuckInsideTheObject, OnlyWhenStuckInsideTheObjectWithCollision, Never." + NothingWasRun, message);
     }
 
     [Fact]

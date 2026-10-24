@@ -216,7 +216,8 @@ public class StepDeterminismTests
         IReadOnlyList<TargetObject> targets, ObjectCaches scene, Replacements replacements) =>
         NpcTooCloseRule.Create(
             NpcHandling.OnlyWhenStuckInsideTheObject,
-            () => NpcStuckSearch.Create(targets, scene.VisibleTargets, scene.NpcsThatCanSpawn(replacements), Shapes, NewCache()));
+            onlyWithBlockingCollision => NpcStuckSearch.Create(
+                targets, scene.VisibleTargets, scene.NpcsThatCanSpawn(replacements), Shapes, NewCache(), onlyWithBlockingCollision));
 
     /// <summary>
     /// Targets with and without meshes, every few of them invisible, among other mods' objects with

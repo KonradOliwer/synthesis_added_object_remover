@@ -232,6 +232,32 @@ public sealed class StartSetupTooCloseSectionsTests
             lines.Skip(2).Take(3));
     }
 
+    /// <summary>The patch marker decides before the other-master limit, so raising the limit would not change the line.</summary>
+    [Fact]
+    public void Config_NamesAMarkedPluginOverTheOtherMasterLimitAsAPatchOfAnotherGroup()
+    {
+        var otherGroup = ModKey.FromNameAndExtension("Other Group Patch.esp");
+        ModKey[] extraMasters = [.. Enumerable.Range(1, 6).Select(number => ModKey.FromNameAndExtension($"Extra{number}.esp"))];
+        PluginListing Listing(ModKey key, bool marked, params ModKey[] masters) =>
+            new(key.ToPluginName(), Loaded: true, [.. masters.Select(master => master.ToPluginName())]) { CarriesPatchMarker = marked };
+        PluginListing[] listed =
+        [
+            Listing(Skyrim, marked: false),
+            Listing(Target, marked: false, Skyrim),
+            .. extraMasters.Select(master => Listing(master, marked: false, Skyrim)),
+            Listing(otherGroup, marked: true, [Skyrim, Target, .. extraMasters]),
+            Listing(Patch, marked: false, Skyrim),
+        ];
+        var mods = TestLoadOrderPlugins.Of(
+            new KnownPluginNames(listed.SelectMany(listing => listing.Masters.Prepend(listing.Mod))), Patch.ToPluginName(), [.. listed]);
+        var runSettings = Assert.IsType<RunRequest.Ready>(Build(SettingsFor(), mods)).Settings;
+
+        var lines = LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(mods, runSettings.ModTrust), mods).Lines;
+
+        Assert.Contains("Requires Target.esp but not trusted, Added Object Remover patch of another group: Other Group Patch.esp", lines);
+        Assert.DoesNotContain(lines, line => line.Contains("other masters (limit", StringComparison.Ordinal));
+    }
+
     /// <summary>Such a patch is caught only as a master of a trusted mod that requires the cleaned mod, so it neither requires nor loads before it.</summary>
     [Fact]
     public void Config_NamesAMarkedPluginLoadingAfterTheCleanedModAsAMasterOfAModThatRequiresIt()
@@ -400,9 +426,11 @@ public sealed class StartSetupTooCloseSectionsTests
     [Theory]
     [InlineData(ZoneShape.BoundingBox, NpcHandling.AlwaysLikeAnyObject, false, false, false)]
     [InlineData(ZoneShape.BoundingBox, NpcHandling.OnlyWhenStuckInsideTheObject, false, true, false)]
+    [InlineData(ZoneShape.BoundingBox, NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision, false, true, false)]
     [InlineData(ZoneShape.BoundingBox, NpcHandling.Never, false, false, true)]
     [InlineData(ZoneShape.ObjectShape, NpcHandling.AlwaysLikeAnyObject, true, false, false)]
     [InlineData(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInsideTheObject, true, true, false)]
+    [InlineData(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision, true, true, false)]
     [InlineData(ZoneShape.ObjectShape, NpcHandling.Never, true, false, true)]
     public void TooClose_PrintsTheZoneAndNpcLinesTheResultSays(ZoneShape zone, NpcHandling npcs, bool zoneLines, bool stuckLines, bool ignoredLine)
     {
@@ -411,6 +439,20 @@ public sealed class StartSetupTooCloseSectionsTests
         Assert.Equal(zoneLines, lines.Any(line => line.StartsWith("Object-shape zones:")));
         Assert.Equal(stuckLines, lines.Any(line => line.StartsWith("NPCs and creatures (only when stuck")));
         Assert.Equal(ignoredLine, lines.Any(line => line.StartsWith("NPCs and creatures: ignored;")));
+    }
+
+    [Fact]
+    public void TooClose_CountsTheStuckNpcObjectsWithoutBlockingCollisionOnlyWhenCollisionIsRequired()
+    {
+        const string NotCounted = "4 objects with an NPC stuck in them, 1 of them not counted because their collision does not stop characters.";
+        var withCollision = LogSections.BuildTooCloseSection(
+            CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision), Detailed).Lines;
+        var withoutCollision = LogSections.BuildTooCloseSection(
+            CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.OnlyWhenStuckInsideTheObject), Detailed).Lines;
+
+        var line = Assert.Single(withCollision, line => line.StartsWith("NPCs and creatures (only when stuck in the object and the object's collision stops characters):"));
+        Assert.EndsWith(NotCounted, line);
+        Assert.DoesNotContain(withoutCollision, line => line.Contains("not counted"));
     }
 
     [Fact]
@@ -649,8 +691,8 @@ public sealed class StartSetupTooCloseSectionsTests
     {
         var world = CreateWorld();
         var zoneWork = zone == ZoneShape.ObjectShape ? new ShapeZoneWork(10, 8, 6, 3, 2, 1, 40) : default;
-        var stuck = npcs == NpcHandling.OnlyWhenStuckInsideTheObject
-            ? new NpcStuckSummary(new NpcSizeCounts(5, 2, 1, 1, 1, 3), 12, 30, 4, [new PointNpc(world.OtherModObjects[1], new PointReason(PointReasonKind.NoBodyMeshNoBoundsNotPlayable, TestTargets.SpaceKey(0x7000), "TestRace"))])
+        var stuck = npcs is NpcHandling.OnlyWhenStuckInsideTheObject or NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision
+            ? new NpcStuckSummary(new NpcSizeCounts(5, 2, 1, 1, 1, 3), 12, 30, 4, 1, [new PointNpc(world.OtherModObjects[1], new PointReason(PointReasonKind.NoBodyMeshNoBoundsNotPlayable, TestTargets.SpaceKey(0x7000), "TestRace"))])
             : null;
         var result = new TooCloseResult(
             StepOutcome.Performed,

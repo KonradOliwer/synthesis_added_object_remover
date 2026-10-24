@@ -16,8 +16,8 @@ internal static partial class LogSections
         var uniqueActorLines = RemovedUniqueActors(risks, removed).Select(role => UniqueActorLine(world, role));
         var largeReferences = RemovedLargeReferences(risks, removed).Count();
         string[] largeReferenceLines = largeReferences > 0
-            ? [$"Warning: {TextFormat.Count(largeReferences)} removed objects are in their worldspace's large-reference list. Distant LOD may flicker, "
-               + "or full models may not load, in their cells until LOD is generated again (for example with DynDOLOD)."]
+            ? [$"Warning: {TextFormat.Count(largeReferences)} removed objects are in their worldspace's large-reference list; "
+               + "distant LOD made before this run still shows them."]
             : [];
         return new("removalWarnings", [.. uniqueActorLines, .. largeReferenceLines]);
     }
@@ -34,7 +34,7 @@ internal static partial class LogSections
         var target = world.Targets[role.Target.Index];
         var quest = role.Alias;
         return $"Warning: removed unique NPC {RecordNames.Describe(target)} in {Describe.Location(world, target)}: "
-            + $"{quest.SourceRecordType} {RecordLabels.Of(quest.Source, quest.SourceEditorId)} fills an alias with it as a Unique Actor. "
-            + "That quest role may not fill, or the quest may not start.";
+            + $"{quest.SourceRecordType} {RecordLabels.Of(quest.Source, quest.SourceEditorId)} fills an alias with it as a Unique Actor; "
+            + "a disabled actor cannot fill that alias.";
     }
 }

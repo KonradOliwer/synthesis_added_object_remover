@@ -5,6 +5,7 @@ using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Skyrim;
+using NiflySharp.Enums;
 using Noggog;
 
 namespace AddedObjectRemover.Tests.Rules;
@@ -26,6 +27,7 @@ public class TooCloseObjectsTests
     private static readonly ModKey Mod = ModKey.FromNameAndExtension("Clashes.esp");
     private static readonly FormKey Race = new(Mod, 0x601);
     private static readonly FormKey Npc = new(Mod, 0x602);
+    private static readonly FormKey MeshNotFound = new(Mod, 0x706);
 
     private static readonly TestStatic Table = new(
         new FormKey(Mod, 0x701), @"test\table.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20, -20, 0), new Vector3(20, 20, 10))));
@@ -33,17 +35,25 @@ public class TooCloseObjectsTests
     private static readonly TestStatic Boulder = new(
         new FormKey(Mod, 0x703), @"test\boulder.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-50, -50, -20), new Vector3(50, 50, 40))));
 
+    private static readonly TestStatic CollidingBoulder = new(
+        new FormKey(Mod, 0x704), @"test\collidingboulder.nif", Boulder.Triangles, SkyrimLayer.SKYL_STATIC);
+
+    private static readonly TestStatic Fern = new(
+        new FormKey(Mod, 0x705), @"test\fern.nif", Boulder.Triangles, SkyrimLayer.SKYL_NONCOLLIDABLE);
+
     private static readonly SkyrimMod Records = CreateRecords();
-    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(Records, "ClashesData", Table, Boulder));
+    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(Records, "ClashesData", Table, Boulder, CollidingBoulder, Fern));
 
     private sealed record TooCloseScene(List<TargetObject> Targets, List<OtherObject> OtherModObjects);
 
     [Theory]
     [InlineData(ZoneShape.BoundingBox, NpcHandling.AlwaysLikeAnyObject)]
     [InlineData(ZoneShape.BoundingBox, NpcHandling.OnlyWhenStuckInsideTheObject)]
+    [InlineData(ZoneShape.BoundingBox, NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision)]
     [InlineData(ZoneShape.BoundingBox, NpcHandling.Never)]
     [InlineData(ZoneShape.ObjectShape, NpcHandling.AlwaysLikeAnyObject)]
     [InlineData(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInsideTheObject)]
+    [InlineData(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision)]
     [InlineData(ZoneShape.ObjectShape, NpcHandling.Never)]
     public void FindGivesTheSameResultAsTheSearches(ZoneShape zone, NpcHandling npcs)
     {
@@ -95,6 +105,27 @@ public class TooCloseObjectsTests
         Assert.All(result.Hits.Where(hit => !hit.TooCloseTo.IsPlacedNpc), hit => Assert.Equal(new TooCloseCause.Distance(0f), hit.Cause));
     }
 
+    /// <summary>
+    /// An NPC stands in each of a boulder with blocking collision, a fern-like object of the same shape with only non-colliding
+    /// collision, a boulder whose mesh has no collision at all, and a boulder whose mesh is not found, so its collision is unknown.
+    /// </summary>
+    [Theory]
+    [InlineData(ZoneShape.BoundingBox)]
+    [InlineData(ZoneShape.ObjectShape)]
+    public void WithCollisionRequiredAStuckNpcRemovesOnlyObjectsWhoseCollisionStopsCharacters(ZoneShape zone)
+    {
+        var scene = CreateStuckNpcScene();
+        var settings = new TooCloseSettings(BySize: true, Multiplier: 0f, ByDistance: false, DistanceInUnits: 0f, zone, NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision);
+
+        var withCollision = FindWithFacade(scene, settings);
+        var anyObject = FindWithFacade(scene, settings with { Npcs = NpcHandling.OnlyWhenStuckInsideTheObject });
+
+        Assert.Equal([0, 3], withCollision.Hits.Select(hit => hit.TargetIndex));
+        Assert.Equal([0, 1, 2, 3], anyObject.Hits.Select(hit => hit.TargetIndex));
+        Assert.Equal((4, 2), (withCollision.Npc!.Conflicts, withCollision.Npc.ConflictsWithoutBlockingCollision));
+        Assert.Equal((4, 0), (anyObject.Npc!.Conflicts, anyObject.Npc.ConflictsWithoutBlockingCollision));
+    }
+
     [Fact]
     public void TheResultNamesTheZonesItTestedInOrder()
     {
@@ -128,7 +159,8 @@ public class TooCloseObjectsTests
         var otherModObjects = world.ObjectsThatCanCauseRemovals(replacements, settings.Npcs);
         var npcRule = NpcTooCloseRule.Create(
             settings.Npcs,
-            () => NpcStuckSearch.Create(scene.Targets, world.VisibleTargets, world.NpcsThatCanSpawn(replacements), Shapes, NewTriangles()));
+            onlyWithBlockingCollision => NpcStuckSearch.Create(
+                scene.Targets, world.VisibleTargets, world.NpcsThatCanSpawn(replacements), Shapes, NewTriangles(), onlyWithBlockingCollision));
         var order = TargetWorkOrder.Of(scene.Targets);
         var execution = new Execution(Threads);
         var largeOtherObjects = 0;
@@ -186,6 +218,16 @@ public class TooCloseObjectsTests
         return new TooCloseScene(targets, otherModObjects);
     }
 
+    /// <summary>Targets far apart, each with another mod's NPC standing at its origin, sunk into it.</summary>
+    private static TooCloseScene CreateStuckNpcScene()
+    {
+        BaseKey[] bases = [CollidingBoulder.Base, Fern.Base, Boulder.Base, new(MeshNotFound.ToRecordKey(), BaseLinkKind.PlaceableObject)];
+        var positions = bases.Select((_, i) => new Vector3(i * SceneExtent, 0, 0)).ToList();
+        var targets = bases.Select((baseKey, i) => TestTargets.Create(i, TestTargets.At(positions[i], 0f), baseKey, TestTargets.Space)).ToList();
+        var npcs = positions.Select((position, i) => TestNpcs.Place(Mod, i, Npc, position, Vector3.Zero)).ToList();
+        return new TooCloseScene(targets, npcs);
+    }
+
     private static ObjectCaches CreateWorld(TooCloseScene scene) =>
         TestScenes.Create(scene.Targets, scene.OtherModObjects, Shapes, bodies: NewBodies(), threads: Threads);
 
@@ -212,6 +254,11 @@ public class TooCloseObjectsTests
             Second = new P3Int16(NpcHalfWidth, NpcHalfWidth, NpcHeight),
         };
         mod.Npcs.Add(npc);
+        mod.Statics.Add(new Static(MeshNotFound, SkyrimRelease.SkyrimSE)
+        {
+            Model = new Model { File = @"test\notfound.nif" },
+            ObjectBounds = new ObjectBounds { First = new P3Int16(-50, -50, -20), Second = new P3Int16(50, 50, 40) },
+        });
         return mod;
     }
 }

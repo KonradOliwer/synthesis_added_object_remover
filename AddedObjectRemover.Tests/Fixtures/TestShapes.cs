@@ -4,11 +4,13 @@ using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Skyrim;
+using NiflySharp.Enums;
 
 namespace AddedObjectRemover.Tests.Fixtures;
 
 /// <summary>A static base object whose model is a loose mesh of the given triangles.</summary>
-internal sealed record TestStatic(FormKey FormKey, string Model, IReadOnlyList<MeshTriangle> Triangles)
+/// <param name="Collision">The layer of the mesh's collision rigid body; null for a mesh without collision.</param>
+internal sealed record TestStatic(FormKey FormKey, string Model, IReadOnlyList<MeshTriangle> Triangles, SkyrimLayer? Collision = null)
 {
     public BaseKey Base => new(FormKey.ToRecordKey(), BaseLinkKind.PlaceableObject);
 }
@@ -33,7 +35,7 @@ internal static class TestShapes
         }
 
         var dataPath = Path.Combine(AppContext.BaseDirectory, dataFolderName);
-        foreach (var model in statics) WriteMesh(dataPath, model.Model, model.Triangles);
+        foreach (var model in statics) WriteMesh(dataPath, model.Model, model.Triangles, model.Collision);
 
         return Catalog(TestBaseFacts.Reader(skyrimMod.ToImmutableLinkCache()), dataPath, mod);
     }
@@ -60,10 +62,12 @@ internal static class TestShapes
             IsPrimitive: false, HasMapMarker: false, new ObjectChange(mod.ToPluginName(), AcceptedFrom: null));
 
     /// <summary>Writes a loose NIF of the triangles at the model path under the Data folder.</summary>
-    public static void WriteMesh(string dataPath, string model, IReadOnlyList<MeshTriangle> triangles)
+    /// <param name="collision">The layer of a collision rigid body on the root node; null for none.</param>
+    public static void WriteMesh(string dataPath, string model, IReadOnlyList<MeshTriangle> triangles, SkyrimLayer? collision = null)
     {
         var nif = TestNifs.CreateWithRoot();
         TestNifs.AddShape(nif, TestNifs.Root(nif), triangles);
+        if (collision is { } layer) TestNifs.AddRigidBodyCollision(nif, TestNifs.Root(nif), layer);
         var meshPath = Path.Combine(dataPath, MeshFileSource.NormalizeMeshPath(model).Replace('\\', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(Path.GetDirectoryName(meshPath)!);
         File.WriteAllBytes(meshPath, TestNifs.Save(nif));

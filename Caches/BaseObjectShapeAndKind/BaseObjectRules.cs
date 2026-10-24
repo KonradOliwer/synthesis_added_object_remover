@@ -1,9 +1,10 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 
 namespace AddedObjectRemover.Caches.BaseObjectShapeAndKind;
 
-/// <summary>The rules that decide which mesh shapes count and what kind of invisible object a base is.</summary>
+/// <summary>The rules that decide which mesh shapes count, what kind of invisible object a base is and whether its mesh's collision stops characters.</summary>
 internal static class BaseObjectRules
 {
     /// <summary>Vanilla critter spawner activators run a script whose name starts with this.</summary>
@@ -40,6 +41,19 @@ internal static class BaseObjectRules
         var kind = facts.Kind == BaseRecordKind.Light ? InvisibleObjectKind.Lights : (InvisibleObjectKind?)null;
         return new BaseShape(facts.ObjectBounds ?? Box.Zero, null, kind, EffectOnlyMesh: true);
     }
+
+    /// <summary>Whether any of the mesh's collision layers stops characters; null when the mesh's collision was not read.</summary>
+    internal static bool? BlocksMovement(ImmutableArray<CollisionLayer>? meshCollisionLayers) =>
+        meshCollisionLayers?.Any(IsMovementBlocking);
+
+    /// <summary>
+    /// The layers the game's character controller collides with in its collision layer matrix. Pick, zone, trigger, camera,
+    /// line-of-sight, small debris and non-collidable layers do not stop a character, so a mesh with only those can be walked through.
+    /// </summary>
+    private static bool IsMovementBlocking(CollisionLayer layer) => layer is
+        CollisionLayer.Static or CollisionLayer.AnimStatic or CollisionLayer.Transparent or CollisionLayer.Clutter
+        or CollisionLayer.Trees or CollisionLayer.Props or CollisionLayer.Terrain or CollisionLayer.Trap or CollisionLayer.Ground
+        or CollisionLayer.DebrisLarge or CollisionLayer.InvisibleWall or CollisionLayer.StairHelper;
 
     private static InvisibleObjectKind? GetRecordTypeInvisibleKind(BaseRecordKind recordKind, bool hasModel, bool meshWithoutGeometry) => recordKind switch
     {

@@ -87,10 +87,13 @@ internal sealed class CellTerrainComparison(TerrainPlugins plugins, TerrainTypes
     /// A property without accepted version is not checked. When the shown value differs from the accepted one and no version but a
     /// transparent one holds it, that version is the patch the game shows: an earlier patcher of the group made the change.
     /// </summary>
-    /// <returns>The load-order position of the plugin named for the change; null when the property is not checked or unchanged.</returns>
+    /// <returns>
+    /// The load-order position of the plugin named for the change, <see cref="TerrainPlugins.PatchOnlyChange"/> when only the patch
+    /// holds it; null when the property is not checked or unchanged.
+    /// </returns>
     private int? FindChangerOf(ComparedVersion[] compared, PropertyAcceptance property) =>
         property is { Accepted: not null, Changed: true }
-            ? plugins.PositionOf(compared[property.Changing ?? compared.Length - 1].Plugin)
+            ? property.Changing is { } changing ? plugins.PositionOf(compared[changing].Plugin) : TerrainPlugins.PatchOnlyChange
             : null;
 
     /// <returns>Null when every vertex is checked.</returns>

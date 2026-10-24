@@ -64,7 +64,7 @@ Kept 4 objects that would have been removed, because other records depend on the
   placed object: Enable Parent: 1
   teleport door: 1
 ## markers-by-type
-Removed markers by type: 1 XMarkers, 1 Lights, 2 SoundMarkers.
+Removed markers by type: 1 Position markers (XMarker, XMarkerHeading), 1 Lights without a model, 2 Sound sources.
 ## hints
 Removed markers and kept objects: 3 objects.
   Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].

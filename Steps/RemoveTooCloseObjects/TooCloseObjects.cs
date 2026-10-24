@@ -70,12 +70,13 @@ public static class TooCloseObjects
 
         var npcRule = NpcTooCloseRule.Create(
             settings.Npcs,
-            () => NpcStuckSearch.Create(
+            onlyWithBlockingCollision => NpcStuckSearch.Create(
                 input.Targets,
                 input.VisibleTargets,
                 input.Npcs,
                 input.Shapes,
-                input.Triangles));
+                input.Triangles,
+                onlyWithBlockingCollision));
         var (search, largeOtherObjects) = settings.Zone switch
         {
             ZoneShape.BoundingBox => (FindInBoxZone(input, zones, npcRule), 0),

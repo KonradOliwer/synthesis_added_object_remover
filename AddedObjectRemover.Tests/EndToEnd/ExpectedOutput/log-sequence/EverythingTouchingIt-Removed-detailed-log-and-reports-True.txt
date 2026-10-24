@@ -53,11 +53,11 @@ Linked groups: 0 more objects removed with the follow-up removals they are linke
 ## unexpectedErrors
 ## leftovers
   Kept T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
-  Left behind: T_MarkerInsideBuilding [00081B:Target.esp] (XMarkers) in interior AorInterior [000800:Skyrim.esm]: removed, inside another mod's object (inside R_InsideBuilding [000814:Rival.esp]); radius 1024, removed/total ground area East -, NorthEast -, North -, NorthWest -, West -, SouthWest -, South -, SouthEast -.
-  Left behind: T_SoundInsideBuilding [00081C:Target.esp] (SoundMarkers) in interior AorInterior [000800:Skyrim.esm]: removed, inside another mod's object (inside R_InsideBuilding [000814:Rival.esp]); radius 1024, removed/total ground area East -, NorthEast -, North -, NorthWest -, West -, SouthWest -, South -, SouthEast -.
-  Left behind: T_Light [00081D:Target.esp] (Lights) in interior AorInterior [000800:Skyrim.esm]: removed, surroundings removed; radius 1024, removed/total ground area East 10000/10000, NorthEast 0/10000, North 10000/10000, NorthWest -, West 10000/10000, SouthWest -, South 10000/10000, SouthEast -.
-  Left behind: T_Sound [000823:Target.esp] (SoundMarkers) in interior AorInterior [000800:Skyrim.esm]: removed, surroundings removed; radius 1024, removed/total ground area East 10000/10000, NorthEast 0/10000, North 10000/10000, NorthWest -, West 10000/10000, SouthWest -, South 10000/10000, SouthEast -.
-  Left behind: T_ExteriorMarkerInBuilding [000829:Target.esp] (XMarkers) in worldspace AorWorld [000801:Skyrim.esm]: kept, referenced: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp] (inside R_ExteriorBuilding [00081D:Rival.esp]); radius 1024, removed/total ground area East -, NorthEast -, North -, NorthWest -, West -, SouthWest -, South -, SouthEast -.
+  Left behind: T_MarkerInsideBuilding [00081B:Target.esp] (Position markers (XMarker, XMarkerHeading)) in interior AorInterior [000800:Skyrim.esm]: removed, inside another mod's object (inside R_InsideBuilding [000814:Rival.esp]); radius 1024, removed/total ground area East -, NorthEast -, North -, NorthWest -, West -, SouthWest -, South -, SouthEast -.
+  Left behind: T_SoundInsideBuilding [00081C:Target.esp] (Sound sources) in interior AorInterior [000800:Skyrim.esm]: removed, inside another mod's object (inside R_InsideBuilding [000814:Rival.esp]); radius 1024, removed/total ground area East -, NorthEast -, North -, NorthWest -, West -, SouthWest -, South -, SouthEast -.
+  Left behind: T_Light [00081D:Target.esp] (Lights without a model) in interior AorInterior [000800:Skyrim.esm]: removed, surroundings removed; radius 1024, removed/total ground area East 10000/10000, NorthEast 0/10000, North 10000/10000, NorthWest -, West 10000/10000, SouthWest -, South 10000/10000, SouthEast -.
+  Left behind: T_Sound [000823:Target.esp] (Sound sources) in interior AorInterior [000800:Skyrim.esm]: removed, surroundings removed; radius 1024, removed/total ground area East 10000/10000, NorthEast 0/10000, North 10000/10000, NorthWest -, West 10000/10000, SouthWest -, South 10000/10000, SouthEast -.
+  Left behind: T_ExteriorMarkerInBuilding [000829:Target.esp] (Position markers (XMarker, XMarkerHeading)) in worldspace AorWorld [000801:Skyrim.esm]: kept, referenced: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp] (inside R_ExteriorBuilding [00081D:Rival.esp]); radius 1024, removed/total ground area East -, NorthEast -, North -, NorthWest -, West -, SouthWest -, South -, SouthEast -.
 Invisible objects left behind: 5 evaluated in <time>; removed 4 (2 inside another mod's object, 2 surroundings removed); kept 1 (0 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 1 referenced).
 ## linked
 Linked groups: 0 more objects removed with the left-behind removals they are linked to.
@@ -104,7 +104,7 @@ Per cell/worldspace (objects of Target.esp / other objects / removed):
   interior AorInterior [000800:Skyrim.esm]: 38 / 26 / 24
   worldspace AorWorld [000801:Skyrim.esm]: 2 / 2 / 1
 ## targetVisibility
-Target.esp objects: 35 visible, 5 invisible (by kind: 2 SoundMarkers, 2 XMarkers, 1 Lights), 1 deleted, start disabled, or without a valid position or rotation.
+Target.esp objects: 35 visible, 5 invisible (by kind: 2 Position markers (XMarker, XMarkerHeading), 2 Sound sources, 1 Lights without a model), 1 deleted, start disabled, or without a valid position or rotation.
 ## run-summary
 Objects of Target.esp: 42; already removed by earlier patchers in this group: 0; judged in this run: 40; removed in this run: 25.
 ## removal-summary
@@ -115,7 +115,7 @@ Kept 5 objects that would have been removed, because other records depend on the
   placed object: Enable Parent: 2
   teleport door: 1
 ## markers-by-type
-Removed markers by type: 1 XMarkers, 1 Lights, 2 SoundMarkers.
+Removed markers by type: 1 Position markers (XMarker, XMarkerHeading), 1 Lights without a model, 2 Sound sources.
 ## hints
 Removed markers and kept objects: 3 objects.
   Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].

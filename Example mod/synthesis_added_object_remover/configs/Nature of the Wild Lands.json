@@ -18,7 +18,7 @@
       "DistanceInUnits": 50.0
     },
     "UseRoughBoxes": false,
-    "NpcHandling": "OnlyWhenStuckInsideTheObject"
+    "NpcHandling": "OnlyWhenStuckInsideTheObjectWithCollision"
   },
   "TerrainChange": {
     "RemoveOnChangedTerrain": true,

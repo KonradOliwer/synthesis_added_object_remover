@@ -77,11 +77,14 @@ internal sealed class CellWaterComparison(TerrainPlugins plugins, ChangedTerrain
 
     /// <summary>
     /// The changed parts the shown water is made of each name a plugin, and the later loading one is named; a part whose shown value
-    /// only the patch holds names the patch.
+    /// only the patch holds names <see cref="TerrainPlugins.PatchOnlyChange"/>.
     /// </summary>
     /// <returns>The load-order position of the plugin named for the change.</returns>
     private int FindChanger(WaterPart[] parts, Water shown) =>
-        parts.Take(shown.FixingPart + 1).Where(static part => part.Acceptance.Changed).Max(part => plugins.PositionOf(part.ChangingPlugin));
+        parts.Take(shown.FixingPart + 1).Where(static part => part.Acceptance.Changed).Max(ChangerOf);
+
+    private int ChangerOf(WaterPart part) =>
+        part.Acceptance.Changing is { } changing ? plugins.PositionOf(part.Plugins[changing]) : TerrainPlugins.PatchOnlyChange;
 
     private bool LevelsDiffer(float? one, float? other) => FindChangeBetween(one, other) != TerrainChangeKind.None;
 
@@ -109,12 +112,6 @@ internal sealed class CellWaterComparison(TerrainPlugins plugins, ChangedTerrain
     {
         /// <summary>The index of the version the game shows; null where no plugin has a version.</summary>
         public int? Shown => Plugins.Length == 0 ? null : Plugins.Length - 1;
-
-        /// <summary>
-        /// The plugin of the changing version; where only the patch holds the shown value (an earlier patcher of the group made the
-        /// change), the patch, the plugin of the version the game shows.
-        /// </summary>
-        public PluginName ChangingPlugin => Acceptance.Changing is { } changing ? Plugins[changing] : Plugins[^1];
     }
 
     /// <summary>A cell's water as made of its parts.</summary>

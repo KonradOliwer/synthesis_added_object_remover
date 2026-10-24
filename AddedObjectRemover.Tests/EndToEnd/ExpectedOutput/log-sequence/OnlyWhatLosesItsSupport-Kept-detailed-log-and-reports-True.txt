@@ -90,7 +90,7 @@ Per cell/worldspace (objects of Target.esp / other objects / removed):
   interior AorInterior [000800:Skyrim.esm]: 38 / 26 / 17
   worldspace AorWorld [000801:Skyrim.esm]: 2 / 2 / 1
 ## targetVisibility
-Target.esp objects: 35 visible, 5 invisible (by kind: 2 SoundMarkers, 2 XMarkers, 1 Lights), 1 deleted, start disabled, or without a valid position or rotation.
+Target.esp objects: 35 visible, 5 invisible (by kind: 2 Position markers (XMarker, XMarkerHeading), 2 Sound sources, 1 Lights without a model), 1 deleted, start disabled, or without a valid position or rotation.
 ## run-summary
 Objects of Target.esp: 42; already removed by earlier patchers in this group: 0; judged in this run: 40; removed in this run: 18.
 ## removal-summary

@@ -60,6 +60,7 @@ public class SceneViewTests
     [Theory]
     [InlineData(nameof(NpcHandling.Never), false)]
     [InlineData(nameof(NpcHandling.OnlyWhenStuckInsideTheObject), false)]
+    [InlineData(nameof(NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision), false)]
     [InlineData(nameof(NpcHandling.AlwaysLikeAnyObject), true)]
     public void ObjectsThatCanCauseRemovalsHoldPlacedNpcsOnlyWhenTheyCountLikeObjects(string handling, bool npcIsActive)
     {

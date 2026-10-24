@@ -1,6 +1,7 @@
 using System.Numerics;
 using NiflySharp;
 using NiflySharp.Blocks;
+using NiflySharp.Enums;
 using NiflySharp.Structs;
 
 namespace AddedObjectRemover.Tests.Fixtures;
@@ -42,6 +43,32 @@ internal static class TestNifs
         };
         AddChild(nif, parent, node);
         return node;
+    }
+
+    /// <summary>A collision object with a rigid body on <paramref name="layer"/>, attached to <paramref name="owner"/>.</summary>
+    public static void AddRigidBodyCollision(NifFile nif, NiAVObject owner, SkyrimLayer layer)
+    {
+        var body = new bhkRigidBody();
+        var filter = body.HavokFilter;
+        filter.Layer_SL = layer;
+        body.HavokFilter = filter;
+        AttachCollision(nif, owner, new bhkCollisionObject(), body);
+    }
+
+    /// <summary>A phantom (trigger volume) collision object on <paramref name="layer"/>, attached to <paramref name="owner"/>.</summary>
+    public static void AddPhantomCollision(NifFile nif, NiAVObject owner, SkyrimLayer layer)
+    {
+        var phantom = new bhkSimpleShapePhantom();
+        var filter = phantom.HavokFilter;
+        filter.Layer_SL = layer;
+        phantom.HavokFilter = filter;
+        AttachCollision(nif, owner, new bhkSPCollisionObject(), phantom);
+    }
+
+    private static void AttachCollision(NifFile nif, NiAVObject owner, bhkNiCollisionObject collision, bhkWorldObject body)
+    {
+        collision.Body = new NiBlockRef<bhkWorldObject>(nif.AddBlock(body));
+        owner.CollisionObject = new NiBlockRef<NiCollisionObject>(nif.AddBlock(collision));
     }
 
     public static byte[] Save(NifFile nif)

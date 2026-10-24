@@ -90,8 +90,9 @@ public sealed class BaseObjectShapes : IBaseObjectShapes
             var mesh = _meshFiles.Bounds.Of(meshPath);
             if (mesh.Box is { } nifBox)
             {
-                return new MeasuredBase(
-                    BaseObjectRules.ClassifyShape(facts, nifBox, meshPath, hasModel, meshWithoutGeometry: false), BoundsSource.MeshFile, MeshGaveNoBounds: false);
+                var shape = BaseObjectRules.ClassifyShape(facts, nifBox, meshPath, hasModel, meshWithoutGeometry: false)
+                    with { CollisionBlocksMovement = BaseObjectRules.BlocksMovement(mesh.CollisionLayers) };
+                return new MeasuredBase(shape, BoundsSource.MeshFile, MeshGaveNoBounds: false);
             }
             if (mesh.Status == MeshReadStatus.EffectOnly)
             {

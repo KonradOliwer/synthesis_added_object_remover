@@ -164,9 +164,8 @@ public sealed class SharedReportingTests
         Assert.Equal(
             [
                 $"Warning: removed unique NPC {RecordNames.Describe(npc)} in {Describe.Location(world, npc)}: Quest SomeQuest [{questKey}] fills an alias "
-                + "with it as a Unique Actor. That quest role may not fill, or the quest may not start.",
-                "Warning: 2 removed objects are in their worldspace's large-reference list. Distant LOD may flicker, or full models may not load, "
-                + "in their cells until LOD is generated again (for example with DynDOLOD).",
+                + "with it as a Unique Actor; a disabled actor cannot fill that alias.",
+                "Warning: 2 removed objects are in their worldspace's large-reference list; distant LOD made before this run still shows them.",
             ],
             section.Lines.ToArray());
         Assert.Empty(LogSections.BuildRemovalWarningsSection(world, [], risks).Lines);

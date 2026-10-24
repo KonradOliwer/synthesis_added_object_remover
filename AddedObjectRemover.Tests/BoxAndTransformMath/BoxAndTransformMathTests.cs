@@ -180,4 +180,18 @@ public class BoxAndTransformMathTests
     [InlineData(1f, 2f, float.PositiveInfinity, false)]
     public void FiniteNeedsEveryComponentFinite(float x, float y, float z, bool expected) =>
         Assert.Equal(expected, Vectors.IsFinite(new Vector3(x, y, z)));
+
+    [Theory]
+    [InlineData(0.5f, 0.2f, 0.3f)]
+    [InlineData(0.1f, MathF.Tau - 0.1f, 0.2f)]
+    [InlineData(-0.00005f, 6.28313f, 0f)]
+    [InlineData(3f, -3f, MathF.Tau - 6f)]
+    public void ShortestAnglesTakeEachAxisModuloAFullTurn(float one, float other, float expected)
+    {
+        var gaps = Vectors.ShortestAngles(new Vector3(one, 0, -one), new Vector3(other, 0, -other));
+
+        Assert.Equal(expected, gaps.X, 0.0001f);
+        Assert.Equal(0f, gaps.Y);
+        Assert.Equal(expected, gaps.Z, 0.0001f);
+    }
 }

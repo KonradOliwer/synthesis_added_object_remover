@@ -1,6 +1,6 @@
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 
-public enum SupportCategory { RemovedTarget, KeptTarget, OtherPlugin, Terrain }
+public enum SupportCategory { RemovedTarget, KeptTarget, OtherMod, Terrain }
 
 public readonly record struct SupporterShare(Supporter Supporter, SupportCategory Category, float Share);
 

@@ -93,7 +93,7 @@ internal sealed class SupportRule(
     private static SupportCategory Categorize(IRemovalDecisions decisions, Supporter supporter) => supporter.Type switch
     {
         SupporterType.Target => decisions.IsRemoved(new TargetId(supporter.Index)) ? SupportCategory.RemovedTarget : SupportCategory.KeptTarget,
-        SupporterType.PlacedObject => SupportCategory.OtherPlugin,
+        SupporterType.PlacedObject => SupportCategory.OtherMod,
         SupporterType.Terrain => SupportCategory.Terrain,
         _ => throw new UnreachableException($"Unknown supporter type {supporter.Type}."),
     };

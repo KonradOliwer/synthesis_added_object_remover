@@ -83,6 +83,37 @@ public class BaseClassificationTests
         Assert.Null(shape.InvisibleKind);
     }
 
+    [Theory]
+    [InlineData(CollisionLayer.Static, true)]
+    [InlineData(CollisionLayer.AnimStatic, true)]
+    [InlineData(CollisionLayer.Clutter, true)]
+    [InlineData(CollisionLayer.Trees, true)]
+    [InlineData(CollisionLayer.Props, true)]
+    [InlineData(CollisionLayer.InvisibleWall, true)]
+    [InlineData(CollisionLayer.NonCollidable, false)]
+    [InlineData(CollisionLayer.Trigger, false)]
+    [InlineData(CollisionLayer.ItemPick, false)]
+    [InlineData(CollisionLayer.CameraPick, false)]
+    [InlineData(CollisionLayer.DebrisSmall, false)]
+    [InlineData(CollisionLayer.Unidentified, false)]
+    public void OnlyLayersTheCharacterControllerCollidesWithBlockMovement(CollisionLayer layer, bool blocks)
+    {
+        Assert.Equal(blocks, BaseObjectRules.BlocksMovement([layer]));
+    }
+
+    [Fact]
+    public void AMeshBlocksMovementWhenAnyOfItsLayersDoes()
+    {
+        Assert.True(BaseObjectRules.BlocksMovement([CollisionLayer.NonCollidable, CollisionLayer.Static]));
+        Assert.False(BaseObjectRules.BlocksMovement([]));
+    }
+
+    [Fact]
+    public void AMeshWhoseCollisionWasNotReadHasNoAnswer()
+    {
+        Assert.Null(BaseObjectRules.BlocksMovement(null));
+    }
+
     private static BaseFacts Facts(uint id, BaseRecordKind kind) =>
         new(new FormKey(Mod, id).ToRecordKey(), Resolved: true, kind, kind.ToString(), null, null, null, null, ImmutableArray<string>.Empty, null, null, null);
 

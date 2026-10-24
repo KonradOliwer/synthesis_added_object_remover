@@ -268,7 +268,7 @@ public class ModTrustClassifierTests
     }
 
     [Fact]
-    public void AMarkedPluginRequiringTheCleanedModAboveTheLimitHasTheTooManyMastersReason()
+    public void AMarkedPluginRequiringTheCleanedModAboveTheLimitHasTheOtherGroupPatchReason()
     {
         var table = Classify(
             Settings(),
@@ -277,7 +277,7 @@ public class ModTrustClassifierTests
             Listing(OtherC, Skyrim),
             MarkedListing(OtherGroupPatch, Skyrim, CleanedMod, OtherA, OtherB, OtherC));
 
-        AssertTrust(table, OtherGroupPatch, ModTrust.Untrusted, TrustReason.RequiringModTooManyMasters);
+        AssertTrust(table, OtherGroupPatch, ModTrust.Untrusted, TrustReason.OtherGroupPatch);
     }
 
     [Fact]

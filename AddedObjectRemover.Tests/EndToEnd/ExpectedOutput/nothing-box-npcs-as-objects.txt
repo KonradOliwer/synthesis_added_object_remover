@@ -55,7 +55,7 @@ Bounds: 6 bases from NIF, 0 NIF misses, 4 from OBND, 0 without bounds. Meshes: 4
 Per cell/worldspace (objects of Target.esp / other objects / removed):
   interior AorInterior [000800:Skyrim.esm]: 38 / 26 / 18
   worldspace AorWorld [000801:Skyrim.esm]: 2 / 2 / 1
-Target.esp objects: 35 visible, 5 invisible (by kind: 2 SoundMarkers, 2 XMarkers, 1 Lights), 1 deleted, start disabled, or without a valid position or rotation.
+Target.esp objects: 35 visible, 5 invisible (by kind: 2 Position markers (XMarker, XMarkerHeading), 2 Sound sources, 1 Lights without a model), 1 deleted, start disabled, or without a valid position or rotation.
 Objects of Target.esp: 42; already removed by earlier patchers in this group: 0; judged in this run: 40; removed in this run: 19.
 Removed 19 objects (18 too close, 0 follow-up removals, 0 invisible objects left behind, 1 linked to removed objects).
 Kept 3 objects that would have been removed, because other records depend on them or because of their own script or location ref type.

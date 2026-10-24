@@ -32,6 +32,7 @@ public class CopiedCodeTests
     private const string MeshText = Report + "MeshProblemText.cs:MeshProblemText.";
     private const string KeepText = Report + "KeepReasonText.cs:KeepReasonText.";
     private const string PartText = Report + "RunPartText.cs:RunPartText.";
+    private const string VisibilityText = Report + "ObjectVisibilityText.cs:ObjectVisibilityText.";
     private const string LogAndReports = Report + "LogAndReports.cs:LogAndReports.";
 
     /// <summary>Each copy by the places it occurs in (see <see cref="CopyFamily.Key"/>), with the reason it is not shared.</summary>
@@ -57,7 +58,7 @@ public class CopiedCodeTests
             LeftBehindText + "Describe", LeftBehindText + "DescribeReason", MeshText + "FailureCategory", MeshText + "ReadFailure"])] = EnumTextArms,
         [CopyFamily.KeyOf([
             Describe + "HintType", Describe + "LeftBehindReason", KeepText + "Relation", LeftBehindText + "Describe",
-            MeshText + "FailureCategory", MeshText + "Line", PartText + "LinkedStep", PartText + "Word"])] = EnumTextArms,
+            MeshText + "FailureCategory", MeshText + "Line", VisibilityText + "Describe", VisibilityText + "KindName", PartText + "LinkedStep", PartText + "Word"])] = EnumTextArms,
         [CopyFamily.KeyOf([KeepText + "Relation", PartText + "LinkedStep"])] = EnumTextArms,
         [CopyFamily.KeyOf([MeshText + "FailureCategory", MeshText + "Line", MeshText + "ReadFailure"])] = EnumTextArms,
         [CopyFamily.KeyOf([PartText + "Wordings"])] = PartKeyLines,

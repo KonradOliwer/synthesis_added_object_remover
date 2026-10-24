@@ -115,7 +115,7 @@ internal static partial class LogSections
     {
         const string group = "Invisible objects left behind";
         if (settings.LeftBehind is not { } leftovers) return $"{group}: off.";
-        var protectedKinds = TextLists.JoinOr(leftovers.NeverRemove.Order().Select(kind => kind.ToString()), Describe.ListSeparator, Describe.NoEntries);
+        var protectedKinds = TextLists.JoinOr(leftovers.NeverRemove.Order().Select(ObjectVisibilityText.KindName), Describe.ListSeparator, Describe.NoEntries);
         return $"{group}: on; Look this far around it: {leftovers.LookAround} units; "
             + $"Decide only if this share of the 8 directions has objects: {leftovers.OccupiedDirectionsPercent}%; "
             + $"A direction is cleared when this much of it was removed: {leftovers.DirectionClearedPercent}%; "

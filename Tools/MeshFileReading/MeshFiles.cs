@@ -89,7 +89,8 @@ internal sealed class MeshFiles(
         catch (Exception ex) when (Failures.IsRecoverable(ex))
         {
             unexpectedErrors.Add(new PartFailure(MeshReadingParts.MeshShapes, Failures.DescribeFailure(ex), MeshSubject(meshPath)));
-            return new MeshBounds(null, MeshReadStatus.Failed, MeshSource.NotFound, HasFooterRoot: false, MeshReadError.UnexpectedException, FailureExceptionType: null);
+            return new MeshBounds(
+                null, MeshReadStatus.Failed, MeshSource.NotFound, HasFooterRoot: false, MeshReadError.UnexpectedException, FailureExceptionType: null, CollisionLayers: null);
         }
     }
 
@@ -100,18 +101,19 @@ internal sealed class MeshFiles(
 
         if (result is { Status: MeshReadStatus.Success, Geometry: { } geometry })
         {
-            return new MeshBounds(Box.FromCorners(geometry.Min, geometry.Max), result.Status, meshSource, hasFooterRoot, FailureKind: null, FailureExceptionType: null);
+            return new MeshBounds(
+                Box.FromCorners(geometry.Min, geometry.Max), result.Status, meshSource, hasFooterRoot, FailureKind: null, FailureExceptionType: null, result.CollisionLayers);
         }
         var failure = result.Failure ?? throw new UnreachableException("A read that did not succeed carries its failure.");
         if (failure.Kind == MeshReadError.EffectOnly)
         {
-            return new MeshBounds(null, result.Status, meshSource, hasFooterRoot, FailureKind: null, FailureExceptionType: null);
+            return new MeshBounds(null, result.Status, meshSource, hasFooterRoot, FailureKind: null, FailureExceptionType: null, result.CollisionLayers);
         }
 
         problems.Add(failure.Kind == MeshReadError.NotFound
             ? AssetProblem.NotFound(meshPath)
             : AssetProblem.Unreadable(meshPath, failure));
-        return new MeshBounds(null, result.Status, meshSource, hasFooterRoot, failure.Kind, failure.ExceptionType);
+        return new MeshBounds(null, result.Status, meshSource, hasFooterRoot, failure.Kind, failure.ExceptionType, result.CollisionLayers);
     }
 
     private (NifReadResult Result, MeshSource Source) LoadAndParse(string meshPath, bool includeTriangles)

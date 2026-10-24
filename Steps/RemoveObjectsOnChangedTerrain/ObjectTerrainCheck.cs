@@ -110,7 +110,7 @@ internal sealed class ObjectTerrainCheck(IPluginRecords records, IBaseObjectShap
     /// <summary>
     /// The counted changes of the area: a height change at any vertex, a terrain type change at enough of its vertices, and a
     /// water change that covered or uncovered enough of them. The kind names the counted changes; the plugin is the later loading
-    /// of the plugins each counted change names, and none when that is the patch (an earlier patcher of the group made the change).
+    /// of the real mods the counted changes name, and none when only the patch holds them (an earlier patcher of the group made them).
     /// </summary>
     /// <returns>Null when no change of the area counts.</returns>
     private ObjectOnChangedTerrain? FindChange(TargetObject target, List<CheckedCell> cells)

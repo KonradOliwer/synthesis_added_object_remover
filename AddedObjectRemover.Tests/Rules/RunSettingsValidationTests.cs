@@ -272,6 +272,7 @@ public class RunSettingsValidationTests
     [Theory]
     [InlineData(nameof(NpcHandling.Never))]
     [InlineData(nameof(NpcHandling.OnlyWhenStuckInsideTheObject))]
+    [InlineData(nameof(NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision))]
     [InlineData(nameof(NpcHandling.AlwaysLikeAnyObject))]
     public void TheSelectStepHandlesNpcsAsTheTooCloseStepDoes(string handling)
     {

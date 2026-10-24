@@ -15,7 +15,7 @@ internal static partial class Tables
     [
         "iteration", "formKey", "editorId", "base", "modelPath", "space",
         "contactPoints", "totalWeight",
-        "removedCleanedModShare", "keptCleanedModShare", "otherPluginShare", "terrainShare",
+        "removedCleanedModShare", "keptCleanedModShare", "otherModShare", "terrainShare",
         "threshold", "decision", "topSupporters",
     ];
 
@@ -43,7 +43,7 @@ internal static partial class Tables
             Number(evaluation.Contacts.TotalWeight),
             Number(ShareOf(SupportCategory.RemovedTarget)),
             Number(ShareOf(SupportCategory.KeptTarget)),
-            Number(ShareOf(SupportCategory.OtherPlugin)),
+            Number(ShareOf(SupportCategory.OtherMod)),
             Number(ShareOf(SupportCategory.Terrain)),
             Number(threshold),
             Quote(DescribeDecision(evaluation)),
@@ -70,7 +70,7 @@ internal static partial class Tables
     {
         SupportCategory.RemovedTarget => "RemovedCleanedMod",
         SupportCategory.KeptTarget => "KeptCleanedMod",
-        SupportCategory.OtherPlugin => nameof(SupportCategory.OtherPlugin),
+        SupportCategory.OtherMod => nameof(SupportCategory.OtherMod),
         SupportCategory.Terrain => nameof(SupportCategory.Terrain),
         _ => throw new UnreachableException($"Unknown support category {category}."),
     };

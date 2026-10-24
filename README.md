@@ -111,7 +111,8 @@ masters* does the same.
 **Other mods' objects.** Each object of another mod is compared, as the game shows it, with its accepted values: its position,
 rotation, size, base object and enable state (deleted, Initially Disabled, enable parent), each taken from the last plugin in the
 load order that is trusted for it. The object can cause removals only when one of these differs, or when no plugin trusted for it
-has the object (an object an untrusted mod adds). A trusted mod that only carries over an untrusted mod's change, such as a
+has the object (an object an untrusted mod adds). Tiny differences in position, rotation or size, as a plugin that re-saves the
+record rounds them, are no change, and neither is the same rotation stored a full turn apart. A trusted mod that only carries over an untrusted mod's change, such as a
 compatibility patch that keeps a moved wall, makes that change accepted. A plugin that changes only other data of an object, such
 as its ownership, changes nothing here: when it carries another mod's move, that other mod is the one named. The patch is neither
 trusted nor untrusted: its values are the final ones, so objects that earlier patchers of your group added or moved can cause removals like any other change.
@@ -124,8 +125,9 @@ mods loading before it); you can still list it under *Trusted mods, and their ma
 recognised, so the automatic rules can trust it: list it under *Never trusted mods*.
 
 The settings lines at the start of the log name the trusted plugins, one line per reason (for the plugins trusted for loading
-before the cleaned mod, only their number), and each mod that requires the cleaned mod but is not trusted: one with too many
-other masters, or an Added Object Remover patch of another group. A patch of another group that really loads before the
+before the cleaned mod, only their number), the plugins listed under *Never trusted mods*, and each mod that requires the
+cleaned mod but is not trusted: one with too many other masters, or an Added Object Remover patch of another group, which is
+named as such whatever its number of other masters. A patch of another group that really loads before the
 cleaned mod, and is therefore skipped by the rule for mods loading before it, has its own line (*Loads before SomeMod.esp but
 not trusted, Added Object Remover patch of another group: X.esp*). So has such a patch that is a master of a trusted mod that
 requires the cleaned mod (*Master of a mod that requires SomeMod.esp but not trusted, Added Object Remover patch of another
@@ -145,7 +147,7 @@ An object of the cleaned mod is removed when an object from another mod comes wi
 | Margin by fixed distance: Use this margin | `true` | Switches this margin on. Every object gets the same margin, however big it is. |
 | Margin by fixed distance: Margin on every side (game units) | `50` | The margin in game units, added on every side (0-1024). 0 means only objects that touch or overlap. |
 | Use rough boxes instead of exact shapes (faster) | `false` | Off: the object's own shape, enlarged by the margin, is compared with the other object's shape. On: the object's box, enlarged by the margin, is compared with the other object's centre point (faster, less exact). Applies to both margins. |
-| Other mods' NPCs and creatures cause removal | `OnlyWhenStuckInsideTheObject` | Whether other mods' NPCs and creatures cause removals: `AlwaysLikeAnyObject` treats them like any other object, `OnlyWhenStuckInsideTheObject` only when they are stuck in the object at its real size, `Never` never. An NPC is stuck when its body sinks more than 8 units into the object, or when it stands inside the object (for example inside a boulder, or in a room of a building); standing on or leaning against the object does not count. An NPC placed through a leveled list counts when any of the NPCs it can be is stuck. |
+| Other mods' NPCs and creatures cause removal | `OnlyWhenStuckInsideTheObjectWithCollision` | Whether other mods' NPCs and creatures cause removals: `AlwaysLikeAnyObject` treats them like any other object; `OnlyWhenStuckInsideTheObject` only when they are stuck in the object at its real size; `OnlyWhenStuckInsideTheObjectWithCollision` the same, but only when the object is one you cannot walk through (a rock, a tree, a wall), so plants you walk through (ferns, shrubs, thickets, kelp) are never removed because an NPC stands in them; `Never` never. An NPC is stuck when its body sinks more than 8 units into the object, or when it stands inside the object (for example inside a boulder, or in a room of a building); standing on or leaning against the object does not count. An NPC placed through a leveled list counts when any of the NPCs it can be is stuck. Whether an object can be walked through is read from the collision in its mesh file; when the mesh cannot be read, the object counts as one you cannot walk through. |
 
 The two margins work on their own and both can be on together; an object found by either is removed once. With both off, nothing is removed for being too close (and NPCs stuck in objects are not checked either), and the log warns about it. The defaults switch on both margins.
 
@@ -195,7 +197,7 @@ dirt patch repainted as a dirt road of the same ground type does not. A differen
 same ground type (one grass texture replaced by another) is never a change. Where several types
 are mixed, the one that covers most of a point counts.
 
-**What is compared.** At each terrain point an object stands on, the height and the ground type the
+**What is compared.** At each terrain point checked around an object, the height and the ground type the
 game shows are compared with the accepted ones: those of the last plugin in the load order that is
 trusted for them (see *Which other mods can cause removals*). A trusted mod is trusted for all of its
 terrain, also for a height or ground type it only carries over from another mod: an untrusted mod's
@@ -206,9 +208,9 @@ where it changes it; a mod that re-saves the terrain with small rounding differe
 no height its own. A mod that requires the cleaned mod is trusted for terrain exactly as for objects.
 The patch is neither trusted nor untrusted, so an earlier patcher's copy of another mod's change does not make that change accepted.
 Height and ground type are accepted point by point and apart: one point can take its height from
-one plugin and its ground type from another. A point that no trusted plugin has terrain for (in a
-world or cell that only untrusted mods add) is not checked, and does not count in the share of
-changed ground points or of ground covered or uncovered by water.
+one plugin and its ground type from another. A point with neither an accepted height nor an accepted
+ground type (for example in a world or cell that only untrusted mods add) is not checked, and does not
+count in the share of changed ground points or of ground covered or uncovered by water.
 
 A change counts when the terrain the game shows differs from the accepted one by more than the
 switched-on checks allow; only those points make up the share of changed ground points. Water is
@@ -220,7 +222,8 @@ by more than *Count only water height changes larger than*. The accepted water i
 accepted parts the way the game makes the water it shows, and the two are compared. A trusted mod
 that carries another mod's water change makes it accepted, as for terrain. A cell is not checked for
 water when a part its accepted water is made of has no trusted plugin: when no trusted plugin has
-the cell, or when the cell uses the default water height and no trusted plugin has the world.
+the cell, or when the cell uses the default water height and no trusted plugin has the world. Nor is
+it checked in a cell none of whose land points is checked (for example when no trusted plugin has the cell's land).
 
 The detailed log names the mod that made the change for each removed object, and what changed:
 height, ground type, water height, water added or water removed (for example `terrain changed by
@@ -229,9 +232,11 @@ accepted one whose terrain differs from the accepted one by more than the checks
 holds the value the game ends up with, so a mod that only copies another mod's change is not named. For a water
 change, a plugin is found for each changed part of the water, and the one that loads later is
 named: a mod that changed the world's default water height is not named for a
-cell that uses its own water height. Where only the patch holds the change, `an earlier patcher in
-this group` is named. For a ground type or water change, it is the mod that changed the most points.
-Where several changes count, the one of those mods that loads last is named.
+cell that uses its own water height. For a ground type or water change, it is the mod that changed
+the most points. Where several changes count, the one of those mods that loads last is named. A
+change that only the patch holds is named only when there is no other: a mod's change is always named
+before it, and `an earlier patcher in this group` stands only when the patch alone holds every
+counted change.
 
 If *Remove objects on changed terrain* is on but no height, ground type or water change is counted,
 nothing is removed for changed terrain and the log warns about it. With the default settings, all
@@ -397,9 +402,11 @@ The normal log shows: the settings in use, warnings and errors, the final summar
 In the detailed log, each object removed for being too close names the other mod's object and how that object changed, for
 example `too close to Wall [012345:Skyrim.esm] (winning override in CityMod.esp), changed by CityMod.esp (accepted value from
 Skyrim.esm)`: `CityMod.esp` is the first plugin after the accepted value that already holds the value the game ends up with, and
-`Skyrim.esm` holds the accepted value. `(new object)` stands instead when no trusted plugin has the object, and `an earlier
-patcher in this group` stands instead of a plugin when only the patch holds the change. The scan lines of the detailed log also
-count the objects of other mods that no untrusted mod changed.
+`Skyrim.esm` holds the accepted value. When several of the object's values changed, the plugin that loads last of those that
+changed them is named, with the accepted value of the value it changed. `(new object)` stands instead when no trusted plugin has
+the object. A change that only the patch holds is named only when there is no other: `an earlier patcher in this group` stands
+instead of a plugin only when the patch alone holds every change of the object. The scan lines of the detailed log also count
+the objects of other mods that the game shows with their accepted values.
 
 Every run's summary, in both logs, has one line with where the run started and what it did, like `Objects of SomeTownMod.esp: 1240; already removed by earlier patchers in this group: 12; judged in this run: 1228; removed in this run: 37.` The first number counts all objects of the cleaned mod. The second counts those a patcher that ran earlier in the same Synthesis group (an earlier config of the same Batch run, or an earlier copy of this patcher, included) already removed in the patch; they are not checked again. The third counts those this run checked, the fourth those this run removed. Objects that a later-loading plugin changes or removes, and objects that are deleted, start disabled or have no valid position, count only in the first number. The line is printed in every run, also in one that stops with *Nothing to check*; the third and fourth numbers are then 0.
 
@@ -407,7 +414,7 @@ In `Batch` mode the banner prints once, then each config has its own section tha
 
 ```
 Ignored in town_walls.json, because this patcher has no such setting (check the spelling and the section it is in): Colour.
-Not set in town_walls.json, defaults used: TooClose.UseRoughBoxes = false, TooClose.NpcHandling = "OnlyWhenStuckInsideTheObject", FollowUpRemoval.TouchDistance = 8.0
+Not set in town_walls.json, defaults used: TooClose.UseRoughBoxes = false, TooClose.NpcHandling = "OnlyWhenStuckInsideTheObjectWithCollision", FollowUpRemoval.TouchDistance = 8.0
 ```
 
 Every setting the config leaves out is listed with its key and the default used, written as the config file would hold it, in the order of the settings screen.
@@ -417,8 +424,8 @@ Right after the kept summary, each object kept for a reason of its own gets a li
 Near the end of the log, a *Removed markers and kept objects* section (printed only when it has rows) lists removed door, map, idle and furniture markers (which actors or the map use), and objects that would have been removed but were kept, grouped by why (part of a linked group, kept because something depends on it, or a teleport door). With *Detailed log and reports* on, the locations of the written files follow.
 
 Before that section, the log warns about removed objects that can still affect the game:
-- each removed unique NPC that a quest fills an alias with (as its *Unique Actor*), when that alias is neither *Optional* nor *Allow Disabled*: that quest role may not fill, or the quest may not start;
-- the number of removed objects in their worldspace's large-reference list: distant LOD may flicker, or full models may not load, in those cells until LOD is generated again (for example with DynDOLOD).
+- each removed unique NPC that a quest fills an alias with (as its *Unique Actor*), when that alias is neither *Optional* nor *Allow Disabled*, for example *Warning: removed unique NPC BanditChief [...] in ...: Quest SomeQuest [...] fills an alias with it as a Unique Actor; a disabled actor cannot fill that alias.*;
+- the number of removed objects in their worldspace's large-reference list: *Warning: 3 removed objects are in their worldspace's large-reference list; distant LOD made before this run still shows them.*
 
 The last section of the log says where these objects are: the removed objects, the kept ones (one tree for each reason they were kept), the removed markers and kept objects, removed unique NPCs and removed large references, each only when there are any. Each is shown as a tree of three levels, each level indented further:
 - **worldspace**: the worldspace (for example *Skyrim*), or for an object in an interior, the interior's name;
@@ -482,6 +489,10 @@ With *Detailed log and reports* on, CSV files (UTF-8, comma-separated, header in
 - The cleaned mod must load above the patch in your plugin list, and so must every enabled mod that requires it;
   otherwise the run stops (see *How to use*). For a mod that requires the cleaned mod, *Only warn (don't stop) when a mod
   that requires the cleaned mod loads after the patch* turns the stop into a warning.
+- Keep master-flagged plugins (`.esm`, `.esl`, and plugins flagged as masters) above the patch; Mod Organizer 2 and LOOT keep
+  them at the top. The game loads them before all other plugins wherever they stand in your plugin list, but the patcher, like
+  Synthesis, uses the plain order of the list: a master-flagged plugin listed after the patch is treated as loading after it, so
+  it can stop the run as a mod that requires the cleaned mod, and its records count as beating the patch.
 - What the previous Synthesis run wrote into the patch is not seen: the patch file it left is not read, and every run
   starts from an empty patch. Only what earlier patchers wrote in the same run (earlier patchers of the group, or earlier
   configs of a `Batch` run) is seen.

@@ -345,7 +345,7 @@ public sealed class TablesTests : IDisposable
             : new List<SupporterShare>
             {
                 new(Supporter.Target(2), SupportCategory.RemovedTarget, 0.5f),
-                new(Supporter.Placed(new OtherId(0)), SupportCategory.OtherPlugin, 0.25f),
+                new(Supporter.Placed(new OtherId(0)), SupportCategory.OtherMod, 0.25f),
                 new(Supporter.Terrain, SupportCategory.Terrain, 0.125f),
                 new(Supporter.Target(0), SupportCategory.KeptTarget, 0.0625f),
             };

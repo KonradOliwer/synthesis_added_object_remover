@@ -1,2 +1,2 @@
-Target.esp objects: 1 visible, 2 invisible (by kind: 1 DoorMarkers, 1 base not found), 5 deleted, start disabled, or without a valid position or rotation.
+Target.esp objects: 1 visible, 2 invisible (by kind: 1 Invisible marker doors, 1 base not found), 5 deleted, start disabled, or without a valid position or rotation.
 Linked groups: 1 groups of linked Target.esp objects (2 objects) from 2 links to Target.esp records.

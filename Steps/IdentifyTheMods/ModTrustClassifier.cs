@@ -170,14 +170,17 @@ public static class ModTrustClassifier
                 carryingPatchMarker);
         }
 
+        /// <remarks>
+        /// The patch marker decides before the other-master limit: a marked plugin a rule considers is named as another group's patch,
+        /// the reason no setting can change.
+        /// </remarks>
         public TrustDecision Decide(PluginName plugin)
         {
-            if (CaughtBy(plugin) is { } reason)
-            {
-                return CarryingPatchMarker.Contains(plugin) ? TrustDecision.Untrusted(TrustReason.OtherGroupPatch) : TrustDecision.Trusted(reason);
-            }
-            if (RequiringModsOverLimit.Contains(plugin)) return TrustDecision.Untrusted(TrustReason.RequiringModTooManyMasters);
-            return TrustDecision.Untrusted(null);
+            var caughtBy = CaughtBy(plugin);
+            var overLimit = RequiringModsOverLimit.Contains(plugin);
+            if ((caughtBy != null || overLimit) && CarryingPatchMarker.Contains(plugin)) return TrustDecision.Untrusted(TrustReason.OtherGroupPatch);
+            if (caughtBy is { } reason) return TrustDecision.Trusted(reason);
+            return TrustDecision.Untrusted(overLimit ? TrustReason.RequiringModTooManyMasters : null);
         }
 
         private TrustReason? CaughtBy(PluginName plugin)

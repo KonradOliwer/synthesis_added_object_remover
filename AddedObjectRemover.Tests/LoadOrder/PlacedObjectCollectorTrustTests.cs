@@ -74,6 +74,25 @@ public class PlacedObjectCollectorTrustTests
         Assert.Null(ChangeOf(Record(BaseGame, At(BaseGame, Placed), resaved)));
     }
 
+    /// <summary>The same facing stored a full turn apart on each axis is no rotation change.</summary>
+    [Fact]
+    public void AnUntrustedReSaveOfTheSameFacingAFullTurnApartChangesNothing()
+    {
+        var original = At(BaseGame, Placed) with { Placement = new PlacementFacts(Shown, Placed, new Vector3(0.5f, -3f, -0.00005f)) };
+        var resaved = At(City, Placed) with { Placement = new PlacementFacts(Shown, Placed, new Vector3(0.5f - MathF.Tau, MathF.Tau - 3f, 6.28313f)) };
+
+        Assert.Null(ChangeOf(Record(BaseGame, original, resaved)));
+    }
+
+    [Fact]
+    public void ARotationPastTheToleranceAcrossAFullTurnStillChangesTheObject()
+    {
+        var original = At(BaseGame, Placed) with { Placement = new PlacementFacts(Shown, Placed, new Vector3(0, 0, 0.1f)) };
+        var turned = At(City, Placed) with { Placement = new PlacementFacts(Shown, Placed, new Vector3(0, 0, MathF.Tau - 0.1f)) };
+
+        Assert.Equal(new ObjectChange(City, BaseGame), ChangeOf(Record(BaseGame, original, turned)));
+    }
+
     [Fact]
     public void TheChangedObjectStandsWhereTheGameShowsIt()
     {
@@ -134,6 +153,16 @@ public class PlacedObjectCollectorTrustTests
     [Fact]
     public void AMoveOnlyThePatchHoldsNamesNoPlugin() =>
         Assert.Equal(new ObjectChange(ChangingMod: null, BaseGame), ChangeOf(Record(BaseGame, At(BaseGame, Placed), At(Patch, Moved))));
+
+    /// <summary>
+    /// City swaps the base and an earlier patcher moves the object in the patch: the patch's change loads last, but the real mod's
+    /// change is named, with the accepted value of its own property.
+    /// </summary>
+    [Fact]
+    public void ARealModsChangeIsNamedBeforeAChangeOnlyThePatchHolds() =>
+        Assert.Equal(
+            new ObjectChange(City, BaseGame),
+            ChangeOf(Record(BaseGame, At(BaseGame, Placed), At(City, Placed) with { Base = OtherWall }, At(Patch, Moved) with { Base = OtherWall })));
 
     [Fact]
     public void AnObjectAnEarlierPatcherAddedToThePatchIsANewObject() =>

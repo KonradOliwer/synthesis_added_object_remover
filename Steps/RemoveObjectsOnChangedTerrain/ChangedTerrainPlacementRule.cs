@@ -4,7 +4,7 @@ using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
 
-/// <summary>The changed-terrain check of one target object at another placement.</summary>
+/// <summary>The changed-terrain check of one target object at a given placement.</summary>
 /// <param name="check">Null when the step is off: it finds nothing.</param>
 internal sealed class ChangedTerrainPlacementRule(ImmutableArray<TargetObject> targets, ObjectTerrainCheck? check) : IPlacementRule
 {

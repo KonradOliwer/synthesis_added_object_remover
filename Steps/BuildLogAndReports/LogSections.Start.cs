@@ -79,8 +79,7 @@ internal static partial class LogSections
         "Shrink or turn objects to make them fit: "
         + $"Distance that counts as moved: {movedDistance} units; "
         + $"Shrink down to: {fit.ShrinkLimitPercent}% of its size; "
-        + $"Turn by at most: {fit.TurnLimitDegrees} degrees either way; "
-        + $"Which objects may be shrunk or turned: {fit.Objects}.";
+        + $"Turn by at most: {fit.TurnLimitDegrees} degrees either way.";
 
     private static string DescribeDetailedLogAndReports(ReportFileSettings? reports) =>
         $"Detailed log and reports: {(reports is null ? "off" : $"on, report files go to {reports.Folder}")}.";

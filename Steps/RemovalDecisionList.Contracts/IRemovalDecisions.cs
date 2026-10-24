@@ -27,21 +27,14 @@ public interface IRemovalDecisions
     /// <summary>The objects the round kept, in target order.</summary>
     ImmutableArray<TargetId> KeptIn(Round round);
 
-    /// <summary>The objects the round kept at another placement, in target order.</summary>
+    /// <summary>The objects the round kept shrunk or turned where they stand, in target order.</summary>
     ImmutableArray<TargetId> FittedIn(Round round);
 
-    /// <summary>Whether the object no longer stands at its own placement: it is removed, or moved back to the placement it replaces.</summary>
-    bool HasLeftItsSpot(TargetId id);
-
-    /// <summary>The objects the round took off their own placement: its removals as <see cref="RemovedIn"/> lists them, then the objects it moved back, in target order.</summary>
-    ImmutableArray<TargetId> LeftTheirSpotIn(Round round);
-
-    /// <summary>Every object that no longer stands at its own placement, in target order.</summary>
-    ImmutableArray<TargetId> TargetsThatLeftTheirSpot();
+    /// <summary>Every removed object, in target order.</summary>
+    ImmutableArray<TargetId> RemovedTargets();
 
     /// <summary>Every decided object, in target order.</summary>
     IEnumerable<(TargetId Target, Decision Decision)> All();
-
 
     /// <summary>The rounds this view has beyond <paramref name="older"/>, an earlier state of the same decisions: the run's earlier view, or the view a working copy started from.</summary>
     ImmutableArray<Round> RoundsAfter(IRemovalDecisions older);

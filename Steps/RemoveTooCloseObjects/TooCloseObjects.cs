@@ -62,7 +62,7 @@ public static class TooCloseObjects
                 world.Targets, visibleTargets, world.Order, otherModObjects, new NpcsThatCanSpawn(placedNpcs, replacements), shapes, triangles, execution),
             settings);
 
-    /// <summary>The step's check of one target object at another placement; it finds nothing when no removal zone is on.</summary>
+    /// <summary>The step's check of one target object at a given placement; it finds nothing when no removal zone is on.</summary>
     /// <param name="placedNpcs">C10; the rule leaves out the NPCs <paramref name="replacements"/> replaces.</param>
     public static IPlacementRule CreatePlacementRule(
         CollectedObjects world,

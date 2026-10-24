@@ -323,7 +323,7 @@ public sealed class LogAndReports
         var hints = LogSections.BuildHintsSection(world, outcome.Hints);
         var movedReplacements = LogSections.BuildMovedReplacementsSection(world, outcome.Final, _settings.TargetAsTyped, _context);
         var ownShrunkOrTurned = LogSections.BuildOwnObjectsShrunkOrTurnedSection(world, outcome.Final, _settings.TargetAsTyped, _context);
-        var ownRemoved = outcome.Written.Removed.Count(id => world[id].Replaced is null);
+        var ownRemoved = outcome.Written.Removed.Count(id => !world[id].IsMovedReplacement);
         return
         [
             LogSections.BuildRemovalsSection(world, removals, _context),

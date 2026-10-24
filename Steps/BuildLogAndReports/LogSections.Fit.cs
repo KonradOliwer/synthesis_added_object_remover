@@ -8,16 +8,17 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
 internal static partial class LogSections
 {
-    /// <summary>The detailed log's count of the objects tried at other placements; nothing when none was tried.</summary>
+    /// <summary>The detailed log's count of the objects that may be shrunk or turned and are too close where they stand; nothing when there is none.</summary>
     public static LogSection BuildFitSection(FitResult found, TimeSpan elapsed, ReportContext context)
     {
-        if (!context.Detailed || found.Tried == 0) return new LogSection("fit", []);
-        var movedBack = found.Fits.Count(fit => fit.Kind != FitKind.ShrunkOrTurned);
+        if (!context.Detailed || found.Clashing == 0) return new LogSection("fit", []);
         return new LogSection(
             "fit",
             [
-                $"Tried {TextFormat.Count(found.Tried)} objects that clash where they stand at other placements: {TextFormat.Count(found.Fits.Length)} fit "
-                + $"({TextFormat.Count(movedBack)} of them moved back){Describe.TimedSuffix(elapsed, context)}.",
+                $"Objects too close where they stand: {TextFormat.Count(found.Clashing)}; "
+                + $"not shrunk or turned because other objects rest on them: {TextFormat.Count(found.RestedOn)}; "
+                + $"tried shrunk or turned: {TextFormat.Count(found.Tried)}; "
+                + $"fit: {TextFormat.Count(found.Fits.Length)}{Describe.TimedSuffix(elapsed, context)}.",
             ]);
     }
 
@@ -34,8 +35,6 @@ internal static partial class LogSections
                 $"Objects of other mods that {target} moved: {TextFormat.Count(total)}; "
                 + $"kept where {target} put them: {TextFormat.Count(CountOf(ReplacementOutcome.KeptWhereMoved))}; "
                 + $"kept there shrunk or turned: {TextFormat.Count(CountOf(ReplacementOutcome.KeptShrunkOrTurned))}; "
-                + $"moved back: {TextFormat.Count(CountOf(ReplacementOutcome.MovedBack))}; "
-                + $"moved back and shrunk or turned: {TextFormat.Count(CountOf(ReplacementOutcome.MovedBackShrunkOrTurned))}; "
                 + $"removed: {TextFormat.Count(CountOf(ReplacementOutcome.Removed))}.",
                 .. context.Detailed
                     ? Enum.GetValues<ReplacementOutcome>().SelectMany(outcome => byOutcome[outcome].Select(replacement =>
@@ -61,8 +60,6 @@ internal static partial class LogSections
     {
         ReplacementOutcome.KeptWhereMoved => $"Kept where {target} put it",
         ReplacementOutcome.KeptShrunkOrTurned => "Kept there, shrunk or turned",
-        ReplacementOutcome.MovedBack => "Moved back",
-        ReplacementOutcome.MovedBackShrunkOrTurned => "Moved back, shrunk or turned",
         ReplacementOutcome.Removed => "Removed",
         _ => throw new UnreachableException($"Unknown replacement outcome {outcome}."),
     };

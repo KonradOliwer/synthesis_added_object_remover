@@ -13,6 +13,9 @@ internal static class SettingsVariants
     public static readonly IReadOnlyList<string> Names =
         [TouchWithLeftBehindAndMarkerMoves, Support, NothingWithBoxZoneAndNpcsAsObjects, TouchWithLeftBehindAndMarkerMovesNormalLog];
 
+    /// <summary>The scenes of the saved outputs are about removals; only <see cref="Support"/> keeps the default shrinking and turning.</summary>
+    public static readonly ShrinkOrTurnSettings NothingShrunkOrTurned = new() { ShrinkLimitPercent = 100, TurnLimitDegrees = 0 };
+
     public static Settings Of(string name) => new()
     {
         DetailedLogAndReports = name != TouchWithLeftBehindAndMarkerMovesNormalLog,
@@ -31,7 +34,8 @@ internal static class SettingsVariants
             }),
         Support => Create(
             useRoughBoxes: false, NpcHandling.OnlyWhenStuckInsideTheObject, FollowUpRemovalMode.OnlyWhatLosesItsSupport,
-            new LeftoverInvisibleObjectSettings { RemoveLeftoverInvisibleObjects = true, MoveKeptMarkersOutOfOtherModsObjects = false }),
+            new LeftoverInvisibleObjectSettings { RemoveLeftoverInvisibleObjects = true, MoveKeptMarkersOutOfOtherModsObjects = false },
+            new ShrinkOrTurnSettings()),
         NothingWithBoxZoneAndNpcsAsObjects => Create(
             useRoughBoxes: true, NpcHandling.AlwaysLikeAnyObject, FollowUpRemovalMode.Nothing,
             new LeftoverInvisibleObjectSettings { RemoveLeftoverInvisibleObjects = false, MoveKeptMarkersOutOfOtherModsObjects = false }),
@@ -39,7 +43,8 @@ internal static class SettingsVariants
         _ => throw new ArgumentOutOfRangeException(nameof(name), name, "Unknown settings variant."),
     };
 
-    private static StandardSettings Create(bool useRoughBoxes, NpcHandling npcs, FollowUpRemovalMode followUp, LeftoverInvisibleObjectSettings leftovers) => new()
+    private static StandardSettings Create(
+        bool useRoughBoxes, NpcHandling npcs, FollowUpRemovalMode followUp, LeftoverInvisibleObjectSettings leftovers, ShrinkOrTurnSettings? shrinkOrTurn = null) => new()
     {
         CleanedMod = ModKey.FromNameAndExtension(FixtureWorld.TargetName),
         TooClose = new TooCloseRemovalSettings
@@ -54,6 +59,7 @@ internal static class SettingsVariants
             TrustedModsAndTheirMasters = [ModKey.FromNameAndExtension(FixtureWorld.TrustedPlugin)],
             NeverTrustedMods = [ModKey.FromNameAndExtension(FixtureWorld.OtherModPlugin)],
         },
+        ShrinkOrTurn = shrinkOrTurn ?? NothingShrunkOrTurned,
         FollowUpRemoval = new FollowUpRemovalSettings { Mode = followUp },
         LeftoverInvisibleObjects = leftovers,
     };

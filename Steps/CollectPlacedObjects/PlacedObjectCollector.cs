@@ -18,8 +18,7 @@ public sealed class PlacedObjectCollector
     private enum RecordRole { Target, TargetOverriddenLater, MovedReplacement, OverriddenByTarget, OtherUnchanged, OtherChanged }
 
     /// <param name="Change">Only for <see cref="RecordRole.OtherChanged"/>.</param>
-    /// <param name="Replaced">Only for <see cref="RecordRole.MovedReplacement"/>.</param>
-    private readonly record struct Classification(RecordRole Role, ObjectChange? Change, ReplacedVersion? Replaced)
+    private readonly record struct Classification(RecordRole Role, ObjectChange? Change)
     {
         public bool IsJudged => Role is RecordRole.Target or RecordRole.MovedReplacement;
     }
@@ -133,7 +132,7 @@ public sealed class PlacedObjectCollector
             return;
         }
 
-        if (classification.IsJudged) AddTarget(record, classification.Replaced);
+        if (classification.IsJudged) AddTarget(record, isMovedReplacement: role == RecordRole.MovedReplacement);
         else _otherModObjects.Add(CreateOtherObject(record, _plan.OtherModDetails ? record.EditorId : null, classification.Change));
     }
 
@@ -161,14 +160,14 @@ public sealed class PlacedObjectCollector
     /// <summary>Creator first: the target's own records, then the records the target overrides, then the rule decides once.</summary>
     private Classification Classify(PlacedRecordFact record)
     {
-        if (IsCreatedByTarget(record)) return new(WinsInTargetOrPatch(record) ? RecordRole.Target : RecordRole.TargetOverriddenLater, null, null);
+        if (IsCreatedByTarget(record)) return new(WinsInTargetOrPatch(record) ? RecordRole.Target : RecordRole.TargetOverriddenLater, null);
         if (_facts.OverriddenRecords.Contains(record.Key))
         {
-            var replaced = MovedReplacement.ReplacedVersionOf(record, _trust.CleanedMod, _trust.Patch, _plan.MovedDistance);
-            return new(replaced is null ? RecordRole.OverriddenByTarget : RecordRole.MovedReplacement, null, replaced);
+            var isMoved = MovedReplacement.Is(record, _trust.CleanedMod, _trust.Patch, _plan.MovedDistance);
+            return new(isMoved ? RecordRole.MovedReplacement : RecordRole.OverriddenByTarget, null);
         }
         var change = OtherRecordChange.Decide(record, _trust);
-        return new(change is null ? RecordRole.OtherUnchanged : RecordRole.OtherChanged, change, null);
+        return new(change is null ? RecordRole.OtherUnchanged : RecordRole.OtherChanged, change);
     }
 
     private bool IsCreatedByTarget(PlacedRecordFact record) => record.Key.Plugin == _trust.CleanedMod;
@@ -176,8 +175,7 @@ public sealed class PlacedObjectCollector
     /// <remarks>The patch's version holds what earlier patchers in this group wrote, so a target record it wins is judged as the patch left it.</remarks>
     private bool WinsInTargetOrPatch(PlacedRecordFact record) => record.WinningMod == _trust.CleanedMod || record.WinningMod == _trust.Patch;
 
-    /// <param name="replaced">The version a moved replacement replaces; null for the target's own records.</param>
-    private void AddTarget(PlacedRecordFact record, ReplacedVersion? replaced)
+    private void AddTarget(PlacedRecordFact record, bool isMovedReplacement)
     {
         _targetSpaces.Add(record.Space);
 
@@ -201,7 +199,7 @@ public sealed class PlacedObjectCollector
             ReferenceRadius: record.ReferenceRadius,
             PrimitiveBounds: record.PrimitiveBounds,
             Area: _areaNames.Name(record.Space, record.Cell.Key, position),
-            Replaced: replaced));
+            IsMovedReplacement: isMovedReplacement));
     }
 
     private static OtherObject CreateOtherObject(PlacedRecordFact record, string? editorId, ObjectChange? change)

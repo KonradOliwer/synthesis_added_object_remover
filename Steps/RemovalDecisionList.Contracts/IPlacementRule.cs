@@ -1,6 +1,6 @@
 namespace AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
-/// <summary>A removal step's rule asked about one target object standing at a placement other than its own.</summary>
+/// <summary>A removal step's rule asked about one target object standing at a given placement, its own or a shrunk or turned one.</summary>
 public interface IPlacementRule
 {
     /// <summary>Exactly the step's own check of the object, with the object standing at <paramref name="placement"/>. Thread-safe.</summary>

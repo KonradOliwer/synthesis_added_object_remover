@@ -35,6 +35,8 @@ internal sealed class TestRunCaches(
 
     public IVisibleTargetObjects VisibleTargets => throw NotRead();
 
+    public IVisibleTargetObjects IndexVisibleTargets(IReadOnlyList<TargetObject> targets) => throw NotRead();
+
     public IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPlugin() => objectsOfAnyPlugin();
 
     public BoundsStats CountBounds() => throw NotRead();

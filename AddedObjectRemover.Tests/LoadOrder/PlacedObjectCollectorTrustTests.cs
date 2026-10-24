@@ -69,7 +69,7 @@ public class PlacedObjectCollectorTrustTests
     public void AnUntrustedReSaveWithinTheTolerancesChangesNothing()
     {
         var resaved = new PlacedVersionFact(
-            City, new PlacementFacts(Shown, Placed + new Vector3(0.005f, 0, 0), new Vector3(0, 0, 0.00005f)), Scale: 1.00005f, Wall, TestPlacedRecords.InTheSpace);
+            City, new PlacementFacts(Shown, Placed + new Vector3(0.005f, 0, 0), new Vector3(0, 0, 0.00005f)), Scale: 1.00005f, Wall);
 
         Assert.Null(ChangeOf(Record(BaseGame, At(BaseGame, Placed), resaved)));
     }
@@ -210,7 +210,7 @@ public class PlacedObjectCollectorTrustTests
     }
 
     private static PlacedVersionFact At(PluginName plugin, Vector3 position) =>
-        new(plugin, new PlacementFacts(Shown, position, Vector3.Zero), Scale: null, Wall, TestPlacedRecords.InTheSpace);
+        new(plugin, new PlacementFacts(Shown, position, Vector3.Zero), Scale: null, Wall);
 
     private static PlacedVersionFact Changed(PlacedVersionFact version, Property property) => property switch
     {

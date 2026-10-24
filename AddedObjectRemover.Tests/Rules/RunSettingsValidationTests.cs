@@ -48,7 +48,7 @@ public class RunSettingsValidationTests
     {
         var ready = BuildReady(SettingsFor());
 
-        Assert.Equal(new FitSettings(80, 360, ShrinkOrTurnObjects.ReplacementsAfterMovingBack), ready.Settings.Fit);
+        Assert.Equal(new FitSettings(80, 360), ready.Settings.Fit);
         Assert.Empty(ready.Warnings);
     }
 
@@ -109,18 +109,6 @@ public class RunSettingsValidationTests
 
         Assert.Equal(10f, ready.Settings.Read.MovedDistance);
         Assert.Equal(warning, Assert.Single(ready.Warnings).Message);
-    }
-
-    [Fact]
-    public void AnUnknownChoiceOfObjectsToShrinkOrTurnFallsBackToTheDefaultWithAWarning()
-    {
-        var settings = SettingsFor();
-        settings.ShrinkOrTurn = new ShrinkOrTurnSettings { WhichObjects = (ShrinkOrTurnObjects)99 };
-
-        var ready = BuildReady(settings);
-
-        Assert.Equal(ShrinkOrTurnObjects.ReplacementsAfterMovingBack, ready.Settings.Fit.Objects);
-        Assert.Single(ready.Warnings);
     }
 
     [Fact]

@@ -66,6 +66,9 @@ public interface IObjectCaches
     /// <summary>C12.</summary>
     IVisibleTargetObjects VisibleTargets { get; }
 
+    /// <summary>A new index like C12 over <paramref name="targets"/>: the collected targets, some shrunk or turned. C12 stays as it is.</summary>
+    IVisibleTargetObjects IndexVisibleTargets(IReadOnlyList<TargetObject> targets);
+
     /// <summary>The visible objects of C11; asking builds C11.</summary>
     IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPlugin();
 }

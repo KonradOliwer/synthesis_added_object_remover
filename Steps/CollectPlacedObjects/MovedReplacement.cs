@@ -13,18 +13,13 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 internal static class MovedReplacement
 {
     /// <param name="movedDistance">A replacement at most this far from the version it replaces stands where it stood.</param>
-    /// <returns>The replaced version; null when the record is no moved replacement.</returns>
-    public static ReplacedVersion? ReplacedVersionOf(PlacedRecordFact record, PluginName cleanedMod, PluginName patch, float movedDistance)
+    public static bool Is(PlacedRecordFact record, PluginName cleanedMod, PluginName patch, float movedDistance)
     {
-        if (record.WinningMod != cleanedMod && record.WinningMod != patch) return null;
-        if (!record.InTargetSpace || StartsDisabledRule.Of(record.Placement, isWinningTarget: true) != ShownInGame.Present) return null;
-        if (ReplacedVersionBelow(record, cleanedMod) is not { } replaced) return null;
-        if (RemovedForm.IsRemoved(replaced.Placement.Presence) || replaced.Placement is not { Position: { } position, EulerRotation: { } rotation }) return null;
-        if (Vector3.Distance(position, record.Placement.Position!.Value) <= movedDistance) return null;
-        return new ReplacedVersion(
-            new EulerPlacement(position, rotation, ReferenceScale.Normalize(replaced.Scale)),
-            replaced.Location.Cell,
-            CanMoveBack(record.Winner, replaced.Location, patch));
+        if (record.WinningMod != cleanedMod && record.WinningMod != patch) return false;
+        if (!record.InTargetSpace || StartsDisabledRule.Of(record.Placement, isWinningTarget: true) != ShownInGame.Present) return false;
+        if (ReplacedVersionBelow(record, cleanedMod) is not { } replaced) return false;
+        if (RemovedForm.IsRemoved(replaced.Placement.Presence) || replaced.Placement.Position is not { } position) return false;
+        return Vector3.Distance(position, record.Placement.Position!.Value) > movedDistance;
     }
 
     /// <returns>Null when the versions kept do not reach below the cleaned mod's.</returns>
@@ -36,14 +31,4 @@ internal static class MovedReplacement
         }
         return null;
     }
-
-    /// <remarks>
-    /// The patch writes the move back into the replaced version's cell. A record moved to another space, or between a persistent
-    /// and a temporary child list (a worldspace's persistent cell and a grid cell), would change what loads it with it; and a
-    /// record the patch already holds in another cell would end up twice in the patch. Such a record is not moved back.
-    /// </remarks>
-    private static bool CanMoveBack(PlacedVersionFact winner, VersionLocation replaced, PluginName patch) =>
-        winner.Location.Space == replaced.Space
-        && winner.Location.InPersistentList == replaced.InPersistentList
-        && (winner.Location.Cell == replaced.Cell || winner.Plugin != patch);
 }

@@ -250,7 +250,7 @@ internal sealed class PlacedRecordReader
         var key = _names.KeyOf(record.FormKey);
         if (!_seenRecords.Add(key))
         {
-            KeepLowerVersion(record, key, cell, persistent);
+            KeepLowerVersion(record, key, cell);
             return;
         }
         _recordsScanned++;
@@ -258,7 +258,7 @@ internal sealed class PlacedRecordReader
         var linksIntoTarget = ReadLinks(record, key, cell);
         if (!linksIntoTarget && !cell.InTargetSpace && key.Plugin != _scope.Target && !_footprint.OverriddenRecords.Contains(key)) return;
 
-        var winner = ReadVersion(record, cell, persistent);
+        var winner = ReadVersion(record, cell);
         _records.Add(CreateFact(record, key, cell, winner));
         StartVersions(key, winner);
         if (cell.InTargetSpace && (key.Plugin == _scope.Target || _footprint.OverriddenRecords.Contains(key)))
@@ -275,10 +275,10 @@ internal sealed class PlacedRecordReader
     }
 
     /// <remarks>A plugin that holds the record twice (broken data) gives one version, the first found, as it does for the winner.</remarks>
-    private void KeepLowerVersion(IPlacedGetter record, RecordKey key, ScannedCell cell, bool persistent)
+    private void KeepLowerVersion(IPlacedGetter record, RecordKey key, ScannedCell cell)
     {
         if (!_openVersions.TryGetValue(key, out var versions) || versions[^1].Plugin == cell.Plugin) return;
-        versions.Add(ReadVersion(record, cell, persistent));
+        versions.Add(ReadVersion(record, cell));
         if (_stopsTheWalk(cell.Plugin)) _openVersions.Remove(key);
     }
 
@@ -315,13 +315,11 @@ internal sealed class PlacedRecordReader
         record.GetPrimitiveBounds(),
         Versions: [winner]);
 
-    /// <param name="cell">The plugin's copy of the cell whose child list holds this version.</param>
-    private PlacedVersionFact ReadVersion(IPlacedGetter record, ScannedCell cell, bool persistent) => new(
+    private PlacedVersionFact ReadVersion(IPlacedGetter record, ScannedCell cell) => new(
         cell.Plugin,
         new PlacementFacts(ReadPresence(record), record.Placement?.GetPosition(), record.Placement?.GetRotation()),
         record.Scale,
-        record.GetBaseKey(_names),
-        new VersionLocation(cell.Space.Key, cell.Cell.Key, persistent));
+        record.GetBaseKey(_names));
 
     private PresenceFacts ReadPresence(IPlacedGetter record) => new(
         record.IsDeleted,

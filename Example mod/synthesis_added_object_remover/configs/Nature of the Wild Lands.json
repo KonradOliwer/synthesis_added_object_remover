@@ -43,8 +43,7 @@
   "ShrinkOrTurn": {
     "MovedDistanceInUnits": 10.0,
     "ShrinkLimitPercent": 80,
-    "TurnLimitDegrees": 360,
-    "WhichObjects": "ReplacementsAfterMovingBack"
+    "TurnLimitDegrees": 360
   },
   "FollowUpRemoval": {
     "Mode": "OnlyWhatLosesItsSupport",

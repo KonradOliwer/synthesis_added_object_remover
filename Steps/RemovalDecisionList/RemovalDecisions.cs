@@ -79,7 +79,7 @@ public sealed class RemovalDecisions : IRemovalDecisions
 
     public bool IsDecided(TargetId id) => Of(id) != null;
 
-    public bool MayStillBeRemoved(TargetId id) => Of(id) is null or Decision.Fitted { Kind: FitKind.ShrunkOrTurned };
+    public bool MayStillBeRemoved(TargetId id) => Of(id) is null or Decision.Fitted;
 
     public bool IsRemoved(TargetId id) => Of(id) is Decision.Removed;
 
@@ -91,16 +91,7 @@ public sealed class RemovalDecisions : IRemovalDecisions
 
     public ImmutableArray<TargetId> FittedIn(Round round) => [.. _store.FittedIn[VisibleIndexOf(round)].Where(target => Of(target) is Decision.Fitted)];
 
-    public bool HasLeftItsSpot(TargetId id) => Of(id) is { } decision && LeavesItsSpot(decision);
-
-    public ImmutableArray<TargetId> LeftTheirSpotIn(Round round) =>
-        [.. RemovedIn(round), .. FittedIn(round).Where(target => LeavesItsSpot(Of(target)!))];
-
-    public ImmutableArray<TargetId> TargetsThatLeftTheirSpot() => [.. All().Where(entry => LeavesItsSpot(entry.Decision)).Select(entry => entry.Target)];
-
-    /// <summary>A removed object is gone from its placement, and so is one moved back; one shrunk or turned still stands there.</summary>
-    private static bool LeavesItsSpot(Decision decision) =>
-        decision is Decision.Removed or Decision.Fitted { Kind: FitKind.MovedBack or FitKind.MovedBackShrunkOrTurned };
+    public ImmutableArray<TargetId> RemovedTargets() => [.. All().Where(entry => entry.Decision is Decision.Removed).Select(entry => entry.Target)];
 
     public IEnumerable<(TargetId Target, Decision Decision)> All()
     {
@@ -138,7 +129,7 @@ public sealed class RemovalDecisions : IRemovalDecisions
 
     /// <summary>
     /// Opens a fit round, when there is a fit: each fitted object is decided as kept at its new placement, so no later round
-    /// judges it, except an also-remove round one shrunk or turned where it stands (see <see cref="Apply"/>). A fit may only be proposed once for an undecided object that is not protected and has no linked partner, so
+    /// judges it, except an also-remove round (see <see cref="Apply"/>). A fit may only be proposed once for an undecided object that is not protected and has no linked partner, so
     /// fitting never splits a linked group; anything else is a bug.
     /// </summary>
     /// <returns>The view that includes the new round; this view when there is no fit.</returns>
@@ -153,7 +144,7 @@ public sealed class RemovalDecisions : IRemovalDecisions
         foreach (var fit in fits.OrderBy(fit => fit.Target))
         {
             RequireFittable(fit.Target);
-            _store.Decisions[fit.Target.Index] = new Decision.Fitted(round, fit.Clash, fit.Kind, fit.To);
+            _store.Decisions[fit.Target.Index] = new Decision.Fitted(round, fit.Clash, fit.To);
             fitted.Add(fit.Target);
         }
         _store.RemovedIn.Add([]);

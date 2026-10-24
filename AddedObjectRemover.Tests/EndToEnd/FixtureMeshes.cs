@@ -17,10 +17,11 @@ internal static class FixtureMeshes
     /// <summary>Two pillars with a gap between them, so the mesh does not fill its own bounding box.</summary>
     public const string TwinPillarsModel = "aor\\twinpillars.nif";
 
+    public const float BuildingHeight = 300f;
+
     private const float PadWidth = 40f;
     private const float PadHeight = 20f;
     private const float BuildingWidth = 400f;
-    private const float BuildingHeight = 300f;
     private const float PillarWidth = 40f;
     private const float PillarHeight = 200f;
     private const float PillarCentreX = 130f;

@@ -70,6 +70,7 @@ public class TooCloseBothZonesRunTests
                 BySize = new TooCloseBySizeSettings { Use = true, SizeMultiplier = SizeMultiplier },
                 ByDistance = new TooCloseByDistanceSettings { Use = true, DistanceInUnits = DistanceMargin },
             },
+            ShrinkOrTurn = SettingsVariants.NothingShrunkOrTurned,
         },
     };
 

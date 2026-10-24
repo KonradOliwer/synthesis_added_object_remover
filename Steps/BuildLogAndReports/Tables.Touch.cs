@@ -40,7 +40,6 @@ internal static partial class Tables
         var (alsoRemove, final) = (outcome.RestingObjects, outcome.Final);
         var seeds = SeedReasons(
             alsoRemove.SeedRounds.SelectMany(round => RemovalList.RemovalsIn(final, outcome.Collected, round)),
-            alsoRemove.SeedRounds.SelectMany(round => final.LeftTheirSpotIn(round).Where(target => !final.IsRemoved(target))),
             outcome.Collected.Targets);
         var removals = alsoRemove.Rounds.SelectMany(round => RemovalList.RemovalsIn(final, outcome.Collected, round)).ToList();
         var kept = alsoRemove.Rounds.SelectMany(round => RemovalList.KeptIn(final, round)).ToList();
@@ -120,16 +119,11 @@ internal static partial class Tables
         string SeedReasons);
 
     /// <param name="removedSeeds">The removals of the seed rounds (changed terrain, too close).</param>
-    /// <param name="movedBackSeeds">The objects the seed rounds moved back to the placement they replace.</param>
-    private static PerIndexTable<string> SeedReasons(IEnumerable<RemovedObject> removedSeeds, IEnumerable<TargetId> movedBackSeeds, IReadOnlyList<TargetObject> targets)
-    {
-        const string MovedBackSeedReason = "moved back";
-        return PerIndexTable<string>.From(
-            removedSeeds.Select(seed => (seed.TargetIndex, Reason: DescribeSeedReason(seed, targets)))
-                .Concat(movedBackSeeds.Select(seed => (TargetIndex: seed.Index, Reason: MovedBackSeedReason))),
+    private static PerIndexTable<string> SeedReasons(IEnumerable<RemovedObject> removedSeeds, IReadOnlyList<TargetObject> targets) =>
+        PerIndexTable<string>.From(
+            removedSeeds.Select(seed => (seed.TargetIndex, Reason: DescribeSeedReason(seed, targets))),
             seed => seed.TargetIndex,
             seed => seed.Reason);
-    }
 
     private static string DescribeSeedReason(RemovedObject seed, IReadOnlyList<TargetObject> targets) => seed switch
     {

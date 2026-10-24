@@ -13,6 +13,8 @@ internal sealed class ObjectCaches : IObjectCaches
 {
     private readonly ComputedOnce<PlacedSpaces> _objectsOfAnyPlugin;
     private readonly ObjectContainment _containment;
+    private readonly IBaseObjectShapes _shapes;
+    private readonly Execution _execution;
 
     private ObjectCaches(
         CollectedObjects world,
@@ -23,6 +25,8 @@ internal sealed class ObjectCaches : IObjectCaches
         PlacedNpcRules placedNpcRules,
         Execution execution)
     {
+        _shapes = shapes;
+        _execution = execution;
         _containment = new ObjectContainment(shapes, triangles);
         var otherModObjects = new PlacedSpaces(world.OtherModObjects, shapes, measurementRules.OtherModObjects, _containment, execution);
         OtherModObjects = otherModObjects;
@@ -51,6 +55,8 @@ internal sealed class ObjectCaches : IObjectCaches
     public IObjectsOfAnyPluginBySpace ObjectsOfAnyPlugin => _objectsOfAnyPlugin.Value;
 
     public IVisibleTargetObjects VisibleTargets { get; }
+
+    public IVisibleTargetObjects IndexVisibleTargets(IReadOnlyList<TargetObject> targets) => new VisibleTargetObjects(targets, _shapes, _containment, _execution);
 
     /// <summary>Only when the run collected the support-only objects.</summary>
     public IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPlugin() => new VisibleObjectsOfAnyPlugin(ObjectsOfAnyPlugin);

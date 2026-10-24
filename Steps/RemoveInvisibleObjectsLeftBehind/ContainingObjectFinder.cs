@@ -30,7 +30,7 @@ internal static class ContainingObjectFinder
             ParallelMap.AutomaticRangeSize)]);
     }
 
-    /// <summary>The other-mod object that can cause removals which the target object, wherever it is placed, sits inside; null when none covers it.</summary>
-    public static OtherObject? FindContainingObject(TargetObject target, IObjectsThatCanCauseRemovals otherModObjects, ObjectQueryScratch scratch) =>
+    /// <summary>The other-mod object that can cause removals which the target object sits inside; null when none covers it.</summary>
+    private static OtherObject? FindContainingObject(TargetObject target, IObjectsThatCanCauseRemovals otherModObjects, ObjectQueryScratch scratch) =>
         otherModObjects.FirstCovering(target.SpaceKey, target.Transform.Position, scratch) is { } container ? otherModObjects.Get(container) : null;
 }

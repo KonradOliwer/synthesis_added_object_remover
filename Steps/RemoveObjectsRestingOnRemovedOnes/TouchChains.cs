@@ -6,8 +6,7 @@ namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
 /// <summary>
 /// The connected chains of the touch cascade, read from the removal decisions. Nodes are the seeds (every
-/// object the earlier rounds took off its spot: removed, or moved back) and every object the also-remove rounds removed or kept;
-/// below, "removed" covers a seed moved back. Edges
+/// object the earlier rounds removed) and every object the also-remove rounds removed or kept. Edges
 /// join every touching pair of removed objects, whether or not the touch was an object's cause,
 /// and each also-remove removal to its cause: the object it touched or the member of its group it
 /// was linked to. The seed rounds' linked removals are seeds of their own. Kept objects are
@@ -43,7 +42,7 @@ internal sealed class TouchChains
         var search = run.Search ?? throw new ArgumentException("Touch chains need the touch rounds' search.", nameof(run));
         var alsoRemove = run.Result;
         var decisions = run.Decisions;
-        ImmutableArray<TargetId> seeds = [.. alsoRemove.SeedRounds.SelectMany(round => decisions.LeftTheirSpotIn(round))];
+        ImmutableArray<TargetId> seeds = [.. alsoRemove.SeedRounds.SelectMany(round => decisions.RemovedIn(round))];
         var chains = new TouchChains(decisions, targetCount, search, execution);
         chains.RecordDiscovery(seeds, alsoRemove.Rounds);
         chains.AssignComponents(seeds, alsoRemove.Rounds);
@@ -84,7 +83,7 @@ internal sealed class TouchChains
 
     private void AssignComponents(ImmutableArray<TargetId> seeds, ImmutableArray<Round> alsoRemoveRounds)
     {
-        var removed = _nodes.Where(node => _decisions.HasLeftItsSpot(new TargetId(node))).ToList();
+        var removed = _nodes.Where(node => _decisions.IsRemoved(new TargetId(node))).ToList();
         var roots = new UnionFind(_componentId.Length);
         foreach (var pair in FindTouchingPairs(removed)) roots.Join(pair.First, pair.Second);
         // A pair near the touch distance can test apart here although its round found it touching, so the causes are edges too.
@@ -100,7 +99,7 @@ internal sealed class TouchChains
         }
         foreach (var node in _nodes)
         {
-            var component = _decisions.HasLeftItsSpot(new TargetId(node)) ? componentOfRoot[roots.Find(node)] : _componentId[_parentOf[node]];
+            var component = _decisions.IsRemoved(new TargetId(node)) ? componentOfRoot[roots.Find(node)] : _componentId[_parentOf[node]];
             _componentId[node] = component;
             _componentMembers[component].Add(node);
         }
@@ -125,7 +124,7 @@ internal sealed class TouchChains
     private TouchChainStatistics CreateStats(IReadOnlyList<TouchRoundDetails> rounds)
     {
         var removedPerComponent = _componentMembers
-            .Select(members => members.Count(node => _decisions.HasLeftItsSpot(new TargetId(node))))
+            .Select(members => members.Count(node => _decisions.IsRemoved(new TargetId(node))))
             .ToList();
         return new TouchChainStatistics(
             _componentMembers.Count,

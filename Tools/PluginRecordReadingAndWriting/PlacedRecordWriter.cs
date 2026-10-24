@@ -13,8 +13,7 @@ internal sealed class PlacedRecordWriter(PlacedOverrideWriter overrides, RecordH
         foreach (var order in orders)
         {
             var location = handles.LocationOf(order.Record);
-            var cell = order is SetPlacement { IntoCell: { } intoCell } ? intoCell.ToFormKey() : location.WinningCell.FormKey;
-            Apply(overrides.GetOrAddOverride(handles.RecordOf(order.Record), cell, location.InPersistentList), order);
+            Apply(overrides.GetOrAddOverride(handles.RecordOf(order.Record), location.WinningCell.FormKey, location.InPersistentList), order);
         }
     }
 

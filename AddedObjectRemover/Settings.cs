@@ -1,6 +1,5 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
-using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
@@ -99,9 +98,11 @@ public class StandardSettings : ISettingsValues
     [SynthesisOrder]
     [SynthesisSettingName("Shrink or turn objects to make them fit")]
     [SynthesisTooltip(
-        "An object that would be removed for being too close or on changed terrain may first be shrunk or turned until it fits.\n"
-        + "An object of another mod that the cleaned mod moved is always tried back where that mod placed it before it is removed;\n"
-        + "one the cleaned mod left in place is never checked.")]
+        "An object of the cleaned mod, or of another mod that the cleaned mod moved, that would be removed for being too close to another mod's object\n"
+        + "is first tried shrunk or turned where it stands. If it fits, it is kept that way; otherwise it is removed.\n"
+        + "Never shrunk or turned, but removed as before: an object on terrain another mod changed, and an object other objects rest on\n"
+        + "(as \"Also remove what rests on removed objects\" decides; with \"Nothing\" there, no object counts as having others resting on it).\n"
+        + "Invisible objects, objects that are always kept and linked objects are never shrunk or turned. Objects of other mods that the cleaned mod left in place are never checked.")]
     public ShrinkOrTurnSettings ShrinkOrTurn { get; set; } = new();
 
     [SynthesisOrder]
@@ -372,15 +373,16 @@ public class ShrinkOrTurnSettings : IShrinkOrTurnSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName("Distance that counts as moved (game units)")]
     [SynthesisTooltip(
-        "A replacement of another mod's object counts as moved when it stands more than this many game units from the object it replaces;\n"
-        + "a moved one is judged like the mod's own objects, an unmoved one is always kept.")]
+        "An object of another mod that the cleaned mod changed counts as moved when it now stands more than this many game units from where that mod placed it.\n"
+        + "A moved one is judged like the cleaned mod's own objects; one that stayed is always kept. 0 or more.")]
     public float MovedDistanceInUnits { get; set; } = SettingDefaults.MovedDistanceInUnits;
 
     [SynthesisOrder]
     [SynthesisSettingName("Shrink down to (% of its size)")]
     [SynthesisTooltip(
-        "An object may be shrunk down to this share of its size to make it fit, in steps of 5%; the largest size that fits is used.\n"
-        + "100 or more: objects are never shrunk. At least 1.")]
+        "An object that would be removed for being too close to another mod's object may be shrunk where it stands, down to this share of its size, to make it fit,\n"
+        + "in steps of 5%; the largest size that fits is used. This applies to the cleaned mod's own objects and to the objects of other mods it moved.\n"
+        + "100 or more: objects are never shrunk. With 100 here and 0 in the turn setting, nothing is shrunk or turned. At least 1 (a lower value becomes 1).")]
     public int ShrinkLimitPercent { get; set; } = SettingDefaults.ShrinkLimitPercent;
 
     [SynthesisOrder]
@@ -388,17 +390,9 @@ public class ShrinkOrTurnSettings : IShrinkOrTurnSettingsValues
     [SynthesisTooltip(
         "An object may be turned about its upright axis by up to this many degrees to the left or to the right to make it fit,\n"
         + "in steps of 15 degrees; the smallest turn that fits is used. It is never tilted.\n"
-        + "0: objects are never turned. 180 or more: objects may face any way.")]
+        + "0: objects are never turned. 180 or more: objects may face any way. With 0 here and 100 in the shrink setting, nothing is shrunk or turned.\n"
+        + "Not below 0 (a lower value becomes 0).")]
     public int TurnLimitDegrees { get; set; } = SettingDefaults.TurnLimitDegrees;
-
-    [SynthesisOrder]
-    [SynthesisSettingName("Which objects may be shrunk or turned")]
-    [SynthesisTooltip(
-        "ReplacementsAfterMovingBack: only objects of other mods that the cleaned mod moved, and only after moving them back where that mod placed them.\n"
-        + "ReplacementsAtBothSpots: the same objects, first where the cleaned mod put them, then after moving them back.\n"
-        + "AllObjects: as ReplacementsAtBothSpots, and also the cleaned mod's own objects where they stand.\n"
-        + "With neither shrinking nor turning allowed, this changes nothing.")]
-    public ShrinkOrTurnObjects WhichObjects { get; set; } = SettingDefaults.ShrinkOrTurn;
 }
 
 public class FollowUpRemovalSettings : IFollowUpSettingsValues

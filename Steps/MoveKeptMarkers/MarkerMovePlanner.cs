@@ -55,7 +55,7 @@ public static class MarkerMovePlanner
         var objectsAroundMarker = new OtherObjectsAroundMarker(
             objectsOfAnyPlugin,
             visibleTargets,
-            final.TargetsThatLeftTheirSpot().Select(target => target.Index).ToHashSet(),
+            final.RemovedTargets().Select(target => target.Index).ToHashSet(),
             shapes);
         return
         [

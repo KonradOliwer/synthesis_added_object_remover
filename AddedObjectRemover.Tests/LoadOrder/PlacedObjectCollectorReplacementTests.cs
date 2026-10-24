@@ -6,7 +6,7 @@ namespace AddedObjectRemover.Tests.LoadOrder;
 
 /// <summary>
 /// A record of another plugin that the target plugin overrides is skipped while the target plugin leaves it where the version
-/// below it stood, and judged as a target object, with that version's placement, once the target plugin moved it.
+/// below it stood, and judged as a target object once the target plugin moved it.
 /// </summary>
 public class PlacedObjectCollectorReplacementTests
 {
@@ -54,59 +54,37 @@ public class PlacedObjectCollectorReplacementTests
     }
 
     [Fact]
-    public void AMovedReplacementIsATargetObjectWithThePlacementItReplaces()
+    public void AMovedReplacementIsATargetObjectAtThePlacementTheTargetPluginGaveIt()
     {
         var original = At(BaseGame, Placed) with { Scale = 1.5f, Placement = new PlacementFacts(Shown, Placed, new Vector3(0, 0, 0.5f)) };
 
         var replacement = Assert.Single(Collect(Tree, original, At(Target, Moved)).Targets, target => target.Key == Tree);
 
         Assert.Equal(Moved, replacement.Transform.Position);
-        Assert.Equal(new ReplacedVersion(new EulerPlacement(Placed, new Vector3(0, 0, 0.5f), 1.5f), TestTargets.Space, CanMoveBack: true), replacement.Replaced);
+        Assert.True(replacement.IsMovedReplacement);
+        Assert.Equal(2, Collect(Tree, original, At(Target, Moved)).Targets.Length);
+    }
+
+    /// <summary>Only the distance decides whether it moved, so a replaced version without a rotation is measured like any other.</summary>
+    [Fact]
+    public void AReplacementOfAVersionWithoutARotationIsMovedByItsDistance()
+    {
+        var withoutRotation = At(BaseGame, Placed) with { Placement = new PlacementFacts(Shown, Placed, EulerRotation: null) };
+
+        Assert.True(Assert.Single(Collect(Tree, withoutRotation, At(Target, Moved)).Targets, target => target.Key == Tree).IsMovedReplacement);
+        Assert.Single(Collect(Tree, withoutRotation, At(Target, Placed)).Targets);
     }
 
     [Fact]
-    public void AReplacementMovedOutOfTheReplacedVersionsCellIsMovedBackIntoThatCell()
-    {
-        var gridCell = new RecordKey(BaseGame, 0x20);
-        var original = At(BaseGame, Placed) with { Location = TestPlacedRecords.InTheSpace with { Cell = gridCell } };
-
-        var replaced = ReplacementOf(Collect(Tree, original, At(Target, Moved))).Replaced!.Value;
-
-        Assert.Equal((gridCell, true), (replaced.Cell, replaced.CanMoveBack));
-    }
+    public void TheTargetPluginsOwnObjectIsNoMovedReplacement() =>
+        Assert.False(Assert.Single(Collect(Tree, At(BaseGame, Placed), At(Target, Moved)).Targets, target => target.Key == OwnObject.Key).IsMovedReplacement);
 
     [Fact]
-    public void AReplacementMovedBetweenThePersistentAndTheTemporaryListIsNotMovedBack()
+    public void TheReplacedVersionIsTheHighestVersionBelowTheTargetPlugin()
     {
-        var persistent = At(BaseGame, Placed) with { Location = TestPlacedRecords.InTheSpace with { Cell = new RecordKey(BaseGame, 0x20), InPersistentList = true } };
+        var nearTheCityVersion = At(Target, Placed + new Vector3(3, 0, 0));
 
-        Assert.False(ReplacementOf(Collect(Tree, persistent, At(Target, Moved))).Replaced!.Value.CanMoveBack);
-    }
-
-    [Fact]
-    public void AReplacementMovedIntoAnotherSpaceIsNotMovedBack()
-    {
-        var elsewhere = At(BaseGame, Placed) with { Location = new VersionLocation(new RecordKey(BaseGame, 0x30), new RecordKey(BaseGame, 0x30), InPersistentList: false) };
-
-        Assert.False(ReplacementOf(Collect(Tree, elsewhere, At(Target, Moved))).Replaced!.Value.CanMoveBack);
-    }
-
-    [Fact]
-    public void AReplacementThePatchHoldsInAnotherCellThanTheReplacedVersionIsNotMovedBack()
-    {
-        var original = At(BaseGame, Placed) with { Location = TestPlacedRecords.InTheSpace with { Cell = new RecordKey(BaseGame, 0x20) } };
-
-        Assert.False(ReplacementOf(Collect(Tree, original, At(Target, Moved), At(Patch, Moved))).Replaced!.Value.CanMoveBack);
-    }
-
-    private static TargetObject ReplacementOf(CollectedObjects collected) => Assert.Single(collected.Targets, target => target.Key == Tree);
-
-    [Fact]
-    public void TheReplacedPlacementIsTheHighestVersionBelowTheTargetPlugin()
-    {
-        var replacement = Assert.Single(Collect(Tree, At(BaseGame, Vector3.Zero), At(City, Placed), At(Target, Moved)).Targets, target => target.Key == Tree);
-
-        Assert.Equal(Placed, replacement.Replaced!.Value.Placement.Position);
+        Assert.Single(Collect(Tree, At(BaseGame, Vector3.Zero), At(City, Placed), nearTheCityVersion).Targets);
     }
 
     [Fact]
@@ -127,7 +105,7 @@ public class PlacedObjectCollectorReplacementTests
     }
 
     [Fact]
-    public void AReplacementThePatchMovedBackIsSkipped() =>
+    public void AReplacementThePatchPutBackWhereItStoodIsSkipped() =>
         Assert.Single(Collect(Tree, At(BaseGame, Placed), At(Target, Moved), At(Patch, Placed)).Targets);
 
     [Fact]
@@ -149,7 +127,7 @@ public class PlacedObjectCollectorReplacementTests
     }
 
     private static PlacedVersionFact At(PluginName plugin, Vector3 position) =>
-        new(plugin, new PlacementFacts(Shown, position, Vector3.Zero), Scale: null, TreeBase, TestPlacedRecords.InTheSpace);
+        new(plugin, new PlacementFacts(Shown, position, Vector3.Zero), Scale: null, TreeBase);
 
     /// <param name="versions">Lowest first, the winner last.</param>
     private static CollectedObjects Collect(RecordKey key, params PlacedVersionFact[] versions) => Collect(Plan, key, versions);

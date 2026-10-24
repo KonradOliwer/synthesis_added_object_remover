@@ -48,7 +48,7 @@ public static class ChangedTerrainObjects
             checks.Count(objectCheck => objectCheck.WithoutTerrain));
     }
 
-    /// <summary>The step's check of one target object at another placement; it finds nothing when the step is off.</summary>
+    /// <summary>The step's check of one target object at a given placement; it finds nothing when the step is off.</summary>
     /// <param name="loadOrder">Decides which of several changing plugins loads last.</param>
     /// <param name="records">Its terrain and water versions must have been read.</param>
     public static IPlacementRule CreatePlacementRule(

@@ -301,11 +301,10 @@ public class PlacedRecordFactReadingTests
         laterVersion.Scale = LaterScale;
         laterVersion.Base.SetTo(otherBase);
         laterVersion.MajorRecordFlagsRaw |= (int)SkyrimMajorRecord.SkyrimMajorRecordFlag.InitiallyDisabled;
-        var inTheCell = new VersionLocation(_worldspace.FormKey.ToRecordKey(), _cell.FormKey.ToRecordKey(), InPersistentList: false);
         List<PlacedVersionFact> expected =
         [
-            new(new PluginName(TargetPlugin), new PlacementFacts(Shown, Vector3.Zero, Vector3.Zero), Scale: null, PlaceableBase(_marker), inTheCell),
-            new(new PluginName(LaterPlugin), new PlacementFacts(Shown with { InitiallyDisabled = true }, Moved, Turned), LaterScale, PlaceableBase(otherBase), inTheCell),
+            new(new PluginName(TargetPlugin), new PlacementFacts(Shown, Vector3.Zero, Vector3.Zero), Scale: null, PlaceableBase(_marker)),
+            new(new PluginName(LaterPlugin), new PlacementFacts(Shown with { InitiallyDisabled = true }, Moved, Turned), LaterScale, PlaceableBase(otherBase)),
         ];
 
         var versions = ReadVersions(placed, TestVersionWalks.NoStop, later);

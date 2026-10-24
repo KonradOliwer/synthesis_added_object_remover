@@ -18,7 +18,7 @@ internal sealed class PlacedOverrideWriter(SynthesisWriteCache synthesis, ISkyri
     /// Mirrors Mutagen's placed-record context: override the cell (without its children), then add a copy of the
     /// winning record to the child list of the given kind.
     /// </summary>
-    /// <param name="cellKey">The cell the record was found in, or the cell it is moved into.</param>
+    /// <param name="cellKey">The cell the record was found in.</param>
     public IPlaced GetOrAddOverride(IPlacedGetter record, FormKey cellKey, bool inPersistentList)
     {
         var cell = GetOrAddCellOverride(cellKey);

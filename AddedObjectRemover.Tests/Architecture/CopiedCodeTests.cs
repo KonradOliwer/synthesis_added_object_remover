@@ -22,6 +22,8 @@ public class CopiedCodeTests
     private const string SectionForwarders = "One-line members of the log and reports object, each handing one step's result to that step's section builder; no logic to share.";
     private const string ErrorBoundary ="Per-object error boundary of two steps: each catches the failure of its own kind of object under its own part key and recovers in its own way; they share only the shape.";
 
+    private const string PartKeyHolders = "Part key holders of two steps with an owner and two keys each; each key names its own part, so there is no logic to share.";
+
     private const string PlacementRules = "The placement rule of two steps: each places the object and runs its own step's check, which returns its own result type; they share only the shape.";
 
     private const string Shapes = "Caches/BaseObjectShapeAndKind/BaseObjectShapes.cs:BaseObjectShapes.";
@@ -57,18 +59,24 @@ public class CopiedCodeTests
             Settings + "AnchoringThresholdName", Settings + "DirectionThresholdName", Settings + "FollowUpModeName", Settings + "HeightChangeToleranceName",
             Settings + "MovedDistanceName", Settings + "NpcsName", Settings + "OccupiedDirectionsName", Settings + "RemovedDirectionsName",
             Settings + "SearchRadiusName", Settings + "ShrinkLimitName", Settings + "ShrinkOrTurnGroup", Settings + "SurroundingObjectsGroup",
-            Settings + "TerrainCheckedObjectsName", Settings + "TerrainDistanceMarginName", Settings + "TerrainSizeMarginName",
+            Settings + "TerrainCheckedObjectsName", Settings + "TouchDistanceName", Settings + "TurnLimitName", Settings + "WaterHeightChangeToleranceName"])] = TextConstants,
+        [CopyFamily.KeyOf([
+            Settings + "AnchoringThresholdName", Settings + "DirectionThresholdName", Settings + "FollowUpModeName", Settings + "MovedDistanceName",
+            Settings + "OccupiedDirectionsName", Settings + "RemovedDirectionsName", Settings + "SearchRadiusName", Settings + "ShrinkLimitName",
+            Settings + "ShrinkOrTurnGroup", Settings + "SurroundingObjectsGroup", Settings + "TerrainDistanceMarginName", Settings + "TerrainSizeMarginName",
             Settings + "TerrainTypeChangePercentName", Settings + "TooCloseDistanceMarginName", Settings + "TooCloseSizeMarginName",
-            Settings + "TouchDistanceName", Settings + "TurnLimitName", Settings + "WaterHeightChangeToleranceName", Settings + "WhichObjectsName"])] = TextConstants,
+            Settings + "TouchDistanceName", Settings + "TurnLimitName"])] = TextConstants,
         [CopyFamily.KeyOf([Describe + "HintType", Describe + "PointReason", Describe + "RemovalReason", Describe + "TimedSuffix"])] = EnumTextArms,
         [CopyFamily.KeyOf([
             Describe + "HintType", Describe + "TimedSuffix",
             LeftBehindText + "Describe", LeftBehindText + "DescribeReason", MeshText + "FailureCategory", MeshText + "ReadFailure"])] = EnumTextArms,
         [CopyFamily.KeyOf([
-            Describe + "HintType", Describe + "LeftBehindReason", KeepText + "Link", KeepText + "Relation", LeftBehindText + "Describe",
+            Describe + "HintType", Describe + "LeftBehindReason", KeepText + "Relation", LeftBehindText + "Describe", MeshText + "FailureCategory", MeshText + "Line",
+            VisibilityText + "Describe", VisibilityText + "KindName", PartText + "LinkedStep", PartText + "Word"])] = EnumTextArms,
+        [CopyFamily.KeyOf([Describe + "OriginPlace", Report + "Tables.Fits.cs:Tables.OutcomeName"])] = EnumTextArms,
+        [CopyFamily.KeyOf([
             Report + "LogSections.Fit.cs:LogSections.FittedObjectLine", Report + "LogSections.Fit.cs:LogSections.OutcomeText",
-            MeshText + "FailureCategory", MeshText + "Line", VisibilityText + "Describe", VisibilityText + "KindName", PartText + "LinkedStep", PartText + "Word",
-            Report + "Tables.Fits.cs:Tables.FitRow", Report + "Tables.Fits.cs:Tables.OutcomeName", Report + "Tables.Fits.cs:Tables.OwnShrunkOrTurned"])] = EnumTextArms,
+            Report + "Tables.Fits.cs:Tables.FitRow", Report + "Tables.Fits.cs:Tables.OutcomeName"])] = EnumTextArms,
         [CopyFamily.KeyOf([KeepText + "Relation", PartText + "LinkedStep"])] = EnumTextArms,
         [CopyFamily.KeyOf([MeshText + "FailureCategory", MeshText + "Line", MeshText + "ReadFailure"])] = EnumTextArms,
         [CopyFamily.KeyOf([PartText + "Wordings"])] = PartKeyLines,
@@ -86,8 +94,13 @@ public class CopiedCodeTests
             "Steps/RemoveObjectsOnChangedTerrain/ChangedTerrainPlacementRule.cs:ChangedTerrainPlacementRule.Check",
             TooClose + "TooClosePlacementRule.cs:TooClosePlacementRule.Check"])] = PlacementRules,
         [CopyFamily.KeyOf([
-            "Steps/RemoveInvisibleObjectsLeftBehind/LeftBehindPlacementRule.cs:LeftBehindPlacementRule.Check",
-            TooClose + "TooCloseSearch.cs:TooCloseSearch.CheckTarget"])] = ErrorBoundary,
+            "Steps/FitClashingObjects.Contracts/FitParts.cs", "Steps/FitClashingObjects.Contracts/FitParts.cs:FitParts",
+            "Steps/FitClashingObjects.Contracts/FitParts.cs:FitParts.FitCheck", "Steps/FitClashingObjects.Contracts/FitParts.cs:FitParts.Owner",
+            "Steps/FitClashingObjects.Contracts/FitParts.cs:FitParts.RestingCheck",
+            "Steps/RemoveObjectsRestingOnRemovedOnes.Contracts/RestingObjectsParts.cs", "Steps/RemoveObjectsRestingOnRemovedOnes.Contracts/RestingObjectsParts.cs:RestingObjectsParts",
+            "Steps/RemoveObjectsRestingOnRemovedOnes.Contracts/RestingObjectsParts.cs:RestingObjectsParts.AlsoRemove",
+            "Steps/RemoveObjectsRestingOnRemovedOnes.Contracts/RestingObjectsParts.cs:RestingObjectsParts.Owner",
+            "Steps/RemoveObjectsRestingOnRemovedOnes.Contracts/RestingObjectsParts.cs:RestingObjectsParts.TouchChains"])] = PartKeyHolders,
         [CopyFamily.KeyOf([
             Report + "Tables.Removals.cs:Tables.BuildRemovalsTable", Report + "Tables.Removals.cs:Tables.RemovalsHeader",
             Report + "Tables.Support.cs:Tables.BuildSupportTable", Report + "Tables.Support.cs:Tables.SupportHeader"])] = CsvColumnNames,

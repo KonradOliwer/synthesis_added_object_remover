@@ -179,8 +179,9 @@ public static class StepRunner
         var changedTerrain = RunChangedTerrain(scope, runCaches, trust, collected, fitted.Decisions);
         var tooClose = RunTooClose(scope, runCaches, collected, selected, changedTerrain.Decisions);
         var alsoRemove = RunAlsoRemove(scope, runCaches, collected, kept.ObjectsToKeep, tooClose.Decisions);
-        var leftBehind = RunLeftBehind(scope, runCaches, collected, selected.ObjectsThatCanCauseRemovals, alsoRemove.Decisions);
-        var markerMoves = RunMarkerMoves(scope, runCaches, collected, leftBehind);
+        var visibleTargets = ClashingObjectFitter.IndexAsTheyStand(collected.Targets, alsoRemove.Decisions, runCaches);
+        var leftBehind = RunLeftBehind(scope, runCaches, visibleTargets, collected, selected.ObjectsThatCanCauseRemovals, alsoRemove.Decisions);
+        var markerMoves = RunMarkerMoves(scope, runCaches, visibleTargets, collected, leftBehind);
         var final = leftBehind.Decisions.AddMoves(markerMoves.Moves);
         return new StepResults(
             Collected: collected,
@@ -222,7 +223,10 @@ public static class StepRunner
             () => FindAndApplyFits(scope, runCaches, trust, collected, selected, objectsToKeep, started),
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, elapsed));
 
-    /// <remarks>The rules come in the order of their removal rounds.</remarks>
+    /// <remarks>
+    /// Only a too-close clash is fitted. An object on changed terrain is removed as it stands, since shrinking or turning it does not
+    /// change the ground under it; a shrunk or turned placement must not stand on changed terrain either.
+    /// </remarks>
     private static FitPhase FindAndApplyFits(
         RunScope scope,
         IRunCaches runCaches,
@@ -232,11 +236,8 @@ public static class StepRunner
         IObjectsToKeep objectsToKeep,
         RemovalDecisions started)
     {
-        IPlacementRule[] rules =
-        [
-            ChangedTerrainObjects.CreatePlacementRule(
-                collected, trust, scope.Environment.Plugins, scope.Plugin, runCaches.Shapes, scope.Settings.ChangedTerrain),
-            TooCloseObjects.CreatePlacementRule(
+        var rules = new FitRules(
+            Fittable: TooCloseObjects.CreatePlacementRule(
                 collected,
                 runCaches.VisibleTargets,
                 selected.ObjectsThatCanCauseRemovals,
@@ -245,8 +246,16 @@ public static class StepRunner
                 runCaches.Shapes,
                 runCaches.Triangles,
                 scope.Settings.TooClose),
-            LeftBehindObjects.CreatePlacementRule(collected.Targets, selected.ObjectsThatCanCauseRemovals, runCaches.Shapes, scope.Settings.LeftBehind),
-        ];
+            Unfittable: ChangedTerrainObjects.CreatePlacementRule(
+                collected, trust, scope.Environment.Plugins, scope.Plugin, runCaches.Shapes, scope.Settings.ChangedTerrain),
+            Resting: RestingObjects.CreateRestingRule(
+                collected.Targets,
+                scope.Settings.AlsoRemove,
+                runCaches.Shapes,
+                runCaches.Triangles,
+                runCaches.Terrain,
+                runCaches.VisibleObjectsOfAnyPlugin,
+                scope.Settings.Execution));
         var result = ClashingObjectFitter.Fit(
             collected.Targets, objectsToKeep, rules, runCaches.Shapes, collected.Order, scope.Settings.Execution, scope.Settings.Fit);
         return new FitPhase(result, started.ApplyFits(result.Fits));
@@ -332,7 +341,7 @@ public static class StepRunner
     {
         var result = RestingObjects.Find(
             new RestingObjectsInput(
-                collected.Targets,
+                ClashingObjectFitter.PlaceAsTheyStand(collected.Targets, afterTooClose),
                 objectsToKeep,
                 afterTooClose,
                 scope.Settings.AlsoRemove,
@@ -350,16 +359,19 @@ public static class StepRunner
     private static LeftBehindPhase RunLeftBehind(
         RunScope scope,
         IRunCaches runCaches,
+        IVisibleTargetObjects visibleTargets,
         CollectedObjects collected,
         IObjectsThatCanCauseRemovals objectsThatCanCauseRemovals,
         RemovalDecisions afterAlsoRemove) =>
         scope.Environment.Log.Timed(
-            () => FindAndApplyLeftBehindRound(scope, runCaches, collected, objectsThatCanCauseRemovals, afterAlsoRemove),
+            () => FindAndApplyLeftBehindRound(scope, runCaches, visibleTargets, collected, objectsThatCanCauseRemovals, afterAlsoRemove),
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
 
+    /// <param name="visibleTargets">The visible targets as they stand.</param>
     private static LeftBehindPhase FindAndApplyLeftBehindRound(
         RunScope scope,
         IRunCaches runCaches,
+        IVisibleTargetObjects visibleTargets,
         CollectedObjects collected,
         IObjectsThatCanCauseRemovals objectsThatCanCauseRemovals,
         RemovalDecisions afterAlsoRemove)
@@ -368,7 +380,7 @@ public static class StepRunner
             collected.Targets,
             objectsThatCanCauseRemovals,
             afterAlsoRemove,
-            runCaches.VisibleTargets,
+            visibleTargets,
             runCaches.Bases,
             runCaches.Shapes,
             collected.Order,
@@ -377,14 +389,16 @@ public static class StepRunner
         return new LeftBehindPhase(result, afterAlsoRemove.Apply(RoundKind.LeftBehind, result.Proposals));
     }
 
-    private static MarkerMoves RunMarkerMoves(RunScope scope, IRunCaches runCaches, CollectedObjects collected, LeftBehindPhase leftBehind)
+    /// <param name="visibleTargets">The visible targets as they stand.</param>
+    private static MarkerMoves RunMarkerMoves(
+        RunScope scope, IRunCaches runCaches, IVisibleTargetObjects visibleTargets, CollectedObjects collected, LeftBehindPhase leftBehind)
     {
         var markerMoves = MarkerMovePlanner.Plan(
             collected.Targets,
             leftBehind.Result,
             leftBehind.Decisions,
             runCaches.VisibleObjectsOfAnyPlugin,
-            runCaches.VisibleTargets,
+            visibleTargets,
             scope.Plugin,
             runCaches.Navmeshes,
             runCaches.Terrain,

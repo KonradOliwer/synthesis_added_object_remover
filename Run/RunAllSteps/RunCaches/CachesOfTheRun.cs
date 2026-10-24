@@ -1,5 +1,6 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
+using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
 namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
 
@@ -35,6 +36,8 @@ internal sealed class CachesOfTheRun(ILoadOrderCaches loadOrder, ObjectCaches ob
     public IObjectsOfAnyPluginBySpace ObjectsOfAnyPlugin => objects.ObjectsOfAnyPlugin;
 
     public IVisibleTargetObjects VisibleTargets => objects.VisibleTargets;
+
+    public IVisibleTargetObjects IndexVisibleTargets(IReadOnlyList<TargetObject> targets) => objects.IndexVisibleTargets(targets);
 
     public IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPlugin() => objects.VisibleObjectsOfAnyPlugin();
 }

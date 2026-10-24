@@ -30,11 +30,9 @@ internal static partial class Tables
 
     private static string OutcomeName(ReplacementOutcome outcome) => outcome switch
     {
-        ReplacementOutcome.KeptWhereMoved => "replacement kept where moved",
-        ReplacementOutcome.KeptShrunkOrTurned => "replacement kept shrunk or turned",
-        ReplacementOutcome.MovedBack => "replacement moved back",
-        ReplacementOutcome.MovedBackShrunkOrTurned => "replacement moved back and shrunk or turned",
-        ReplacementOutcome.Removed => "replacement removed",
+        ReplacementOutcome.KeptWhereMoved => "moved object kept where moved",
+        ReplacementOutcome.KeptShrunkOrTurned => "moved object kept shrunk or turned",
+        ReplacementOutcome.Removed => "moved object removed",
         _ => throw new UnreachableException($"Unknown replacement outcome {outcome}."),
     };
 

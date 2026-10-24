@@ -79,6 +79,7 @@ public class LogSequenceTests
             TrustedModsAndTheirMasters = [ModKey.FromNameAndExtension(FixtureWorld.TrustedPlugin)],
             NeverTrustedMods = [ModKey.FromNameAndExtension(FixtureWorld.OtherModPlugin)],
         },
+        ShrinkOrTurn = SettingsVariants.NothingShrunkOrTurned,
         FollowUpRemoval = new FollowUpRemovalSettings { Mode = mode },
         LeftoverInvisibleObjects = new LeftoverInvisibleObjectSettings
         {

@@ -38,7 +38,6 @@ public static class SettingsValidator
     private const string MovedDistanceName = ShrinkOrTurnGroup + "Distance that counts as moved";
     private const string ShrinkLimitName = ShrinkOrTurnGroup + "Shrink down to";
     private const string TurnLimitName = ShrinkOrTurnGroup + "Turn by at most";
-    private const string WhichObjectsName = ShrinkOrTurnGroup + "Which objects may be shrunk or turned";
     private const string FollowUpModeName = "Also remove what rests on removed objects > When an object is removed, also remove";
     private const string TouchDistanceName = "Also remove what rests on removed objects > Gap that still counts as touching";
     private const string AnchoringThresholdName = "Also remove what rests on removed objects > OnlyWhatLosesItsSupport: remove when this much support is gone";
@@ -339,8 +338,7 @@ public static class SettingsValidator
     private static FitSettings CreateFitSettings(IShrinkOrTurnSettingsValues values, ICollection<SettingWarning> warnings) =>
         new(
             AtLeast(values.ShrinkLimitPercent, MinShrinkLimitPercent, ShrinkLimitName, warnings),
-            AtLeast(values.TurnLimitDegrees, 0, TurnLimitName, warnings),
-            ValidateDefined(values.WhichObjects, SettingDefaults.ShrinkOrTurn, WhichObjectsName, warnings));
+            AtLeast(values.TurnLimitDegrees, 0, TurnLimitName, warnings));
 
     /// <param name="touchChainsShown">Whether the detailed log and the report files, which show the touch chains, are on.</param>
     private static AlsoRemoveSettings CreateAlsoRemoveSettings(

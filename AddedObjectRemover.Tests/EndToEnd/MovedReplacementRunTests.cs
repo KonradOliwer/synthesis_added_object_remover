@@ -46,26 +46,36 @@ public class MovedReplacementRunTests
         Assert.Null(outcome.Final.Of(ReplacementOf(outcome).Id));
     }
 
+    /// <summary>Only the size margin, so the crate shrunk to 90% keeps clear of the wall that the full crate's margin reaches.</summary>
     [Fact]
-    public void AMovedReplacementNextToAWallIsMovedBackAndThePatchPutsItWhereTheBaseGameHadIt()
+    public void AMovedReplacementNextToAWallIsShrunkWhereTheCleanedModPutIt()
     {
         IPlacedObjectGetter? written = null;
-        var outcome = Run(movedTo: MovedTo, walls: [NearMovedTo], inspectPatch: patch => written = FindBaseGameObject(patch));
+        var outcome = Run(ShrinkSettings(), movedTo: MovedTo, walls: [NearMovedTo], inspectPatch: patch => written = FindBaseGameObject(patch));
 
-        Assert.Equal(FitKind.MovedBack, Assert.IsType<Decision.Fitted>(outcome.Final.Of(ReplacementOf(outcome).Id)).Kind);
+        Assert.IsType<Decision.Fitted>(outcome.Final.Of(ReplacementOf(outcome).Id));
         Assert.Empty(outcome.Final.RemovedTargets());
-        Assert.Equal(Original, PositionOf(written!));
+        Assert.Equal(MovedTo, PositionOf(written!));
+        Assert.Equal(0.9f, written!.Scale ?? 1f, 5);
         Assert.False(IsInitiallyDisabled(written!));
     }
 
     [Fact]
-    public void AMovedReplacementThatFitsNeitherWhereItWasPutNorBackIsRemovedLikeTheCleanedModsObjects()
+    public void AMovedReplacementThatFitsNowhereIsRemovedLikeTheCleanedModsObjects()
     {
         IPlacedObjectGetter? written = null;
-        var outcome = Run(movedTo: MovedTo, walls: [NearMovedTo, Original], inspectPatch: patch => written = FindBaseGameObject(patch));
+        var outcome = Run(ShrinkSettings(), movedTo: MovedTo, walls: [NearMovedTo, MovedTo], inspectPatch: patch => written = FindBaseGameObject(patch));
 
         Assert.Equal(ReplacementOf(outcome).Id, Assert.Single(outcome.Final.RemovedTargets()));
         Assert.True(IsInitiallyDisabled(written!));
+    }
+
+    [Fact]
+    public void AMovedReplacementNextToAWallIsRemovedWhenShrinkingAndTurningAreSwitchedOff()
+    {
+        var outcome = Run(ShrinkSettings(shrinkLimitPercent: 100, turnLimitDegrees: 0), movedTo: MovedTo, walls: [NearMovedTo]);
+
+        Assert.Equal(ReplacementOf(outcome).Id, Assert.Single(outcome.Final.RemovedTargets()));
     }
 
     [Fact]
@@ -73,48 +83,39 @@ public class MovedReplacementRunTests
     {
         var log = new RecordingLogSink();
         FixtureRun.Run(
-            CrateSettings(),
+            ShrinkSettings(),
             Workers,
             log,
             OpenMeshFiles,
             createLoadOrder: dataFolder => CreateCrateWorld(dataFolder, MovedTo, [NearMovedTo]));
 
         Assert.Equal(
-            "Objects of other mods that Target.esp moved: 1; kept where Target.esp put them: 0; kept there shrunk or turned: 0; moved back: 1; moved back and shrunk or turned: 0; removed: 0.",
+            "Objects of other mods that Target.esp moved: 1; kept where Target.esp put them: 0; kept there shrunk or turned: 1; removed: 0.",
             Assert.Single(log.Sections.Single(section => section.Id == "moved-replacements").Lines));
         Assert.Contains("1 Target.esp objects to check, 1 objects of other mods that Target.esp moved,", log.Sections.Single(section => section.Id == "scan").Lines[0]);
-        Assert.Contains("1 moved back, shrunk or turned to fit", log.Sections.Single(section => section.Id == "write").Lines[0]);
+        Assert.Contains("1 shrunk or turned to fit", log.Sections.Single(section => section.Id == "write").Lines[0]);
     }
 
-    /// <summary>The cleaned mod moved the crate into the next exterior cell; moved back, the patch keeps it in the base game's cell.</summary>
+    /// <summary>The cleaned mod moved the crate into the next exterior cell; shrunk there, the patch keeps it in the cell the cleaned mod put it in.</summary>
     [Fact]
-    public void AReplacementMovedIntoAnotherCellIsMovedBackIntoTheReplacedVersionsCell()
+    public void AReplacementMovedIntoAnotherCellIsShrunkInThatCell()
     {
         string? cellOfTheWrittenCrate = null;
-        var outcome = FixtureRun.Execute(CrateSettings(), Workers, dataFolder => CreateTwoCellWorld(dataFolder, persistentOriginal: false));
+        var outcome = FixtureRun.Execute(ShrinkSettings(), Workers, CreateTwoCellWorld);
         RunTwoCellWorld(patch => cellOfTheWrittenCrate = CellHoldingBaseGameObject(patch));
 
-        Assert.Equal(FitKind.MovedBack, Assert.IsType<Decision.Fitted>(outcome.Final.Of(ReplacementOf(outcome).Id)).Kind);
-        Assert.Equal(HomeCellEditorId, cellOfTheWrittenCrate);
+        Assert.IsType<Decision.Fitted>(outcome.Final.Of(ReplacementOf(outcome).Id));
+        Assert.Equal(EastCellEditorId, cellOfTheWrittenCrate);
     }
 
     [Fact]
     public void AMovedReplacementIsJudgedInASpaceWhereTheCleanedModHasNoObjectOfItsOwn()
     {
-        var outcome = FixtureRun.Execute(CrateSettings(), Workers, dataFolder => CreateTwoCellWorld(dataFolder, persistentOriginal: false));
+        var outcome = FixtureRun.Execute(CrateSettings(), Workers, CreateTwoCellWorld);
 
         var replacement = ReplacementOf(outcome);
-        Assert.DoesNotContain(outcome.Collected.Targets, target => target.Replaced is null && target.SpaceKey == replacement.SpaceKey);
+        Assert.DoesNotContain(outcome.Collected.Targets, target => !target.IsMovedReplacement && target.SpaceKey == replacement.SpaceKey);
         Assert.NotNull(outcome.Final.Of(replacement.Id));
-    }
-
-    /// <summary>The base game's crate is a persistent reference, the cleaned mod's a temporary one in another cell: it cannot be moved back, so it is removed.</summary>
-    [Fact]
-    public void AReplacementThatWouldMoveBetweenThePersistentAndTheTemporaryListIsRemovedInstead()
-    {
-        var outcome = FixtureRun.Execute(CrateSettings(), Workers, dataFolder => CreateTwoCellWorld(dataFolder, persistentOriginal: true));
-
-        Assert.Equal(ReplacementOf(outcome).Id, Assert.Single(outcome.Final.RemovedTargets()));
     }
 
     /// <summary>
@@ -125,39 +126,85 @@ public class MovedReplacementRunTests
     public void AnObjectKeptShrunkIsRemovedByAlsoRemoveWhenWhatItRestsOnIsRemoved()
     {
         IPlacedObjectGetter? writtenTop = null;
-        var outcome = FixtureRun.Execute(StackSettings(), Workers, CreateStackWorld);
-        RunStackWorld(patch => writtenTop = patch.EnumerateMajorRecords<IPlacedObjectGetter>().Single(placed => placed.EditorID == "T_Top"));
+        var outcome = RunStackWorld(SupportSettings(), [BesideTheTop, Original], patch => writtenTop = FindTarget(patch, "T_Top"));
 
-        var top = Assert.Single(outcome.Collected.Targets, target => target.EditorId == "T_Top");
-        var bottom = Assert.Single(outcome.Collected.Targets, target => target.EditorId == "T_Bottom");
-        Assert.Equal(new RemovalReason.Touching(bottom.Id), Assert.IsType<Decision.Removed>(outcome.Final.Of(top.Id)).Reason);
+        var (top, bottom) = StackOf(outcome);
+        Assert.Equal(bottom.Id, Assert.IsType<RemovalReason.LostSupport>(Assert.IsType<Decision.Removed>(outcome.Final.Of(top.Id)).Reason).MainSupporter);
         Assert.True(IsInitiallyDisabled(writtenTop!));
         Assert.Equal(1f, writtenTop!.Scale ?? 1f);
     }
 
+    /// <summary>The bottom crate only touches the top crate with its top face, far from its base, so it does not rest on the top crate.</summary>
     [Fact]
     public void AnObjectKeptShrunkStaysWhenWhatItRestsOnStays()
     {
-        var outcome = FixtureRun.Execute(StackSettings(), Workers, dataFolder => CreateStackWorld(dataFolder, wallInTheBottomCrate: false));
+        var outcome = RunStackWorld(SupportSettings(), [BesideTheTop]);
 
-        var top = Assert.Single(outcome.Collected.Targets, target => target.EditorId == "T_Top");
-        Assert.Equal(FitKind.ShrunkOrTurned, Assert.IsType<Decision.Fitted>(outcome.Final.Of(top.Id)).Kind);
+        var (top, bottom) = StackOf(outcome);
+        Assert.IsType<Decision.Fitted>(outcome.Final.Of(top.Id));
+        Assert.Null(outcome.Final.Of(bottom.Id));
     }
 
-    /// <summary>The cleaned mod moved a base-game sound marker into a city mod's building: it is moved back, where nothing contains it.</summary>
+    /// <summary>The bottom crate would fit shrunk beside a city wall, but the top crate rests on it.</summary>
     [Fact]
-    public void AnInvisibleReplacementMovedIntoAnotherModsObjectIsMovedBack()
+    public void AnObjectOthersRestOnIsRemovedInsteadOfShrunkAndWhatRestsOnItGoesWithIt()
     {
-        var outcome = FixtureRun.Execute(CrateSettings(), Workers, dataFolder => CreateSoundWorld(dataFolder, buildingAtTheOriginalSpot: false));
+        var outcome = RunStackWorld(SupportSettings(), [BesideTheBottom]);
 
-        Assert.Equal(FitKind.MovedBack, Assert.IsType<Decision.Fitted>(outcome.Final.Of(ReplacementOf(outcome).Id)).Kind);
-        Assert.Empty(outcome.Final.RemovedTargets());
+        var (top, bottom) = StackOf(outcome);
+        Assert.IsType<RemovalReason.TooClose>(Assert.IsType<Decision.Removed>(outcome.Final.Of(bottom.Id)).Reason);
+        Assert.Equal(bottom.Id, Assert.IsType<RemovalReason.LostSupport>(Assert.IsType<Decision.Removed>(outcome.Final.Of(top.Id)).Reason).MainSupporter);
+    }
+
+    /// <summary>With EverythingTouchingIt, the bottom crate touching the top crate counts as resting on it.</summary>
+    [Fact]
+    public void WithEverythingTouchingItAnObjectAnotherTouchesIsRemovedInsteadOfShrunk()
+    {
+        var outcome = RunStackWorld(ShrinkSettings(), [BesideTheTop]);
+
+        var (top, bottom) = StackOf(outcome);
+        Assert.IsType<RemovalReason.TooClose>(Assert.IsType<Decision.Removed>(outcome.Final.Of(top.Id)).Reason);
+        Assert.Equal(new RemovalReason.Touching(top.Id), Assert.IsType<Decision.Removed>(outcome.Final.Of(bottom.Id)).Reason);
     }
 
     [Fact]
-    public void AnInvisibleReplacementInsideAnotherModsObjectAtBothSpotsIsRemovedAsLeftInsideIt()
+    public void TheCleanedModsOwnObjectIsRemovedWhenShrinkingAndTurningAreSwitchedOff()
     {
-        var outcome = FixtureRun.Execute(CrateSettings(), Workers, dataFolder => CreateSoundWorld(dataFolder, buildingAtTheOriginalSpot: true));
+        var outcome = RunStackWorld(SupportSettings(shrinkLimitPercent: 100, turnLimitDegrees: 0), [BesideTheTop]);
+
+        Assert.IsType<Decision.Removed>(outcome.Final.Of(StackOf(outcome).Top.Id));
+    }
+
+    /// <summary>
+    /// The cleaned mod's twin pillars with a city pad 5 units east of the east pillar: turned 15 degrees either way the pillar is
+    /// still within the 32-unit margin, turned 30 degrees it is clear.
+    /// </summary>
+    [Fact]
+    public void AnObjectThatCannotBeShrunkIsTurnedByTheSmallestTurnThatFitsAndThePatchHoldsTheTurn()
+    {
+        IPlacedObjectGetter? written = null;
+        var settings = ShrinkSettings(shrinkLimitPercent: 100, turnLimitDegrees: 90);
+        settings.Standard.TooClose = new TooCloseRemovalSettings
+        {
+            BySize = new TooCloseBySizeSettings { Use = false },
+            ByDistance = new TooCloseByDistanceSettings { Use = true, DistanceInUnits = 32f },
+        };
+        var outcome = Assert.IsType<RunResult.Done>(FixtureRun.Run(
+            settings, Workers, new RecordingLogSink(), OpenMeshFiles, createLoadOrder: CreatePillarWorld, inspectPatch: patch => written = FindTarget(patch, "T_Pillars"))).Outcome;
+
+        var pillars = Assert.Single(outcome.Collected.Targets, target => target.EditorId == "T_Pillars");
+        var fitted = Assert.IsType<Decision.Fitted>(outcome.Final.Of(pillars.Id));
+        Assert.Equal(float.DegreesToRadians(30), fitted.To.Rotation.Z, 4);
+        Assert.Equal(1f, fitted.To.Scale);
+        Assert.Equal(float.DegreesToRadians(30), written!.Placement!.Rotation.Z, 4);
+        Assert.False(IsInitiallyDisabled(written));
+    }
+
+    /// <summary>The cleaned mod moved a base-game sound marker into a city mod's building: an invisible object has no shape to fit, so it is removed.</summary>
+    [Fact]
+    public void AnInvisibleReplacementMovedIntoAnotherModsObjectIsRemovedAsLeftInsideIt()
+    {
+        var outcome = FixtureRun.Execute(CrateSettings(), Workers, CreateSoundWorld);
 
         var removal = Assert.IsType<Decision.Removed>(outcome.Final.Of(ReplacementOf(outcome).Id));
         Assert.IsType<RemovalReason.InsideAnotherModsObject>(removal.Reason);
@@ -166,7 +213,7 @@ public class MovedReplacementRunTests
     private const string HomeCellEditorId = "AorHomeCell";
     private const string EastCellEditorId = "AorEastCell";
 
-    private static TargetObject ReplacementOf(RunOutcome outcome) => Assert.Single(outcome.Collected.Targets, target => target.Replaced is not null);
+    private static TargetObject ReplacementOf(RunOutcome outcome) => Assert.Single(outcome.Collected.Targets, target => target.IsMovedReplacement);
 
     /// <summary>The base game's object that the cleaned mod overrides, as the patch holds it; null when the patch does not hold it.</summary>
     private static IPlacedObjectGetter? FindBaseGameObject(ISkyrimModGetter patch) =>
@@ -186,18 +233,32 @@ public class MovedReplacementRunTests
     private static IMeshFilesFactory OpenMeshFiles(string dataFolder, Mutagen.Bethesda.GameRelease release, IReadOnlyList<ModKey> plugins) =>
         new MeshFilesFactory(dataFolder, release, plugins);
 
-    private static RunOutcome Run(Vector3 movedTo, IReadOnlyList<Vector3> walls, Action<ISkyrimModGetter>? inspectPatch = null)
+    private static RunOutcome Run(Vector3 movedTo, IReadOnlyList<Vector3> walls) => Run(CrateSettings(), movedTo, walls);
+
+    private static RunOutcome Run(Settings settings, Vector3 movedTo, IReadOnlyList<Vector3> walls, Action<ISkyrimModGetter>? inspectPatch = null)
     {
         var result = FixtureRun.Run(
-            CrateSettings(), Workers, new RecordingLogSink(), OpenMeshFiles, createLoadOrder: dataFolder => CreateCrateWorld(dataFolder, movedTo, walls), inspectPatch: inspectPatch);
+            settings, Workers, new RecordingLogSink(), OpenMeshFiles, createLoadOrder: dataFolder => CreateCrateWorld(dataFolder, movedTo, walls), inspectPatch: inspectPatch);
         return Assert.IsType<RunResult.Done>(result).Outcome;
     }
 
     private static void RunTwoCellWorld(Action<ISkyrimModGetter> inspectPatch) =>
-        FixtureRun.Run(CrateSettings(), Workers, new RecordingLogSink(), OpenMeshFiles, createLoadOrder: dataFolder => CreateTwoCellWorld(dataFolder, persistentOriginal: false), inspectPatch: inspectPatch);
+        FixtureRun.Run(ShrinkSettings(), Workers, new RecordingLogSink(), OpenMeshFiles, createLoadOrder: CreateTwoCellWorld, inspectPatch: inspectPatch);
 
-    private static void RunStackWorld(Action<ISkyrimModGetter> inspectPatch) =>
-        FixtureRun.Run(StackSettings(), Workers, new RecordingLogSink(), OpenMeshFiles, createLoadOrder: CreateStackWorld, inspectPatch: inspectPatch);
+    /// <param name="walls">Where the city mod's walls stand.</param>
+    private static RunOutcome RunStackWorld(Settings settings, IReadOnlyList<Vector3> walls, Action<ISkyrimModGetter>? inspectPatch = null)
+    {
+        var result = FixtureRun.Run(
+            settings, Workers, new RecordingLogSink(), OpenMeshFiles, createLoadOrder: dataFolder => CreateStackWorld(dataFolder, walls), inspectPatch: inspectPatch);
+        return Assert.IsType<RunResult.Done>(result).Outcome;
+    }
+
+    private static (TargetObject Top, TargetObject Bottom) StackOf(RunOutcome outcome) =>
+        (Assert.Single(outcome.Collected.Targets, target => target.EditorId == "T_Top"),
+            Assert.Single(outcome.Collected.Targets, target => target.EditorId == "T_Bottom"));
+
+    private static IPlacedObjectGetter FindTarget(ISkyrimModGetter patch, string editorId) =>
+        patch.EnumerateMajorRecords<IPlacedObjectGetter>().Single(placed => placed.EditorID == editorId);
 
     private static Settings CrateSettings() => new()
     {
@@ -213,8 +274,9 @@ public class MovedReplacementRunTests
         },
     };
 
-    /// <summary>Only the size margin, so the 90% crate keeps clear of a wall the full crate's margin reaches; every object is tried shrunk.</summary>
-    private static Settings StackSettings() => new()
+    /// <summary>Only the size margin, so the 90% crate keeps clear of a wall the full crate's margin reaches.</summary>
+    private static Settings ShrinkSettings(
+        int shrinkLimitPercent = 80, int turnLimitDegrees = 0, FollowUpRemovalMode followUp = FollowUpRemovalMode.EverythingTouchingIt) => new()
     {
         Standard = new StandardSettings
         {
@@ -225,10 +287,13 @@ public class MovedReplacementRunTests
                 BySize = new TooCloseBySizeSettings { Use = true, SizeMultiplier = 0.1f },
                 ByDistance = new TooCloseByDistanceSettings { Use = false },
             },
-            ShrinkOrTurn = new ShrinkOrTurnSettings { ShrinkLimitPercent = 80, TurnLimitDegrees = 0, WhichObjects = ShrinkOrTurnObjects.AllObjects },
-            FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.EverythingTouchingIt },
+            ShrinkOrTurn = new ShrinkOrTurnSettings { ShrinkLimitPercent = shrinkLimitPercent, TurnLimitDegrees = turnLimitDegrees },
+            FollowUpRemoval = new FollowUpRemovalSettings { Mode = followUp },
         },
     };
+
+    private static Settings SupportSettings(int shrinkLimitPercent = 80, int turnLimitDegrees = 0) =>
+        ShrinkSettings(shrinkLimitPercent, turnLimitDegrees, FollowUpRemovalMode.OnlyWhatLosesItsSupport);
 
     private sealed record World(FixtureMod BaseGame, FixtureMod Target, FixtureMod City)
     {
@@ -263,47 +328,54 @@ public class MovedReplacementRunTests
     /// The base game's crate in its own exterior cell; the cleaned mod moves it into the cell east of it, next to a city wall. The
     /// cleaned mod's own crate is in the interior, so the worldspace holds no object of its own. Each plugin holds both cells.
     /// </summary>
-    private static IReadOnlyList<ISkyrimMod> CreateTwoCellWorld(string dataFolder, bool persistentOriginal)
+    private static IReadOnlyList<ISkyrimMod> CreateTwoCellWorld(string dataFolder)
     {
         var world = CreateWorld(dataFolder);
         var (homeKey, eastKey) = (world.BaseGame.NextKey(), world.BaseGame.NextKey());
         var cells = new[] { world.BaseGame, world.Target, world.City }
             .ToDictionary(mod => mod, mod => (Home: AddExteriorCell(mod, homeKey, HomeCellEditorId, HomeGridX), East: AddExteriorCell(mod, eastKey, EastCellEditorId, EastGridX)));
-        var crate = cells[world.BaseGame].Home.Place("B_Crate", world.BaseGame.AddModeledStatic("B_CrateBase", FixtureMeshes.CrateModel), InTheHomeCell, persistentOriginal);
+        var crate = cells[world.BaseGame].Home.Place("B_Crate", world.BaseGame.AddModeledStatic("B_CrateBase", FixtureMeshes.CrateModel), InTheHomeCell);
         MoveCopy(cells[world.Target].East.PlaceCopyOf(crate), InTheEastCell);
         PlaceWalls(world.City, cells[world.City].East, [InTheEastCell + new Vector3(75, 0, 0)]);
         return world.LoadOrder;
     }
 
     /// <summary>
-    /// The cleaned mod's crate standing on its other crate in the interior, a city wall beside the top crate, and, when asked
-    /// for, a city wall standing in the bottom crate.
+    /// The cleaned mod's crate standing on its other crate in the interior, on a base-game floor, and the city mod's walls. A wall
+    /// beside the top crate stands 20 units above the bottom crate, so only the top crate is too close to it.
     /// </summary>
-    private static IReadOnlyList<ISkyrimMod> CreateStackWorld(string dataFolder) => CreateStackWorld(dataFolder, wallInTheBottomCrate: true);
-
-    private static IReadOnlyList<ISkyrimMod> CreateStackWorld(string dataFolder, bool wallInTheBottomCrate)
+    private static IReadOnlyList<ISkyrimMod> CreateStackWorld(string dataFolder, IReadOnlyList<Vector3> walls)
     {
         var world = CreateWorld(dataFolder);
+        var floor = world.BaseGame.AddModeledStatic("B_FloorBase", FixtureMeshes.BuildingModel);
+        world.BaseGame.Interior.Place("B_Floor", floor, Original - new Vector3(0, 0, FixtureMeshes.BuildingHeight));
         var crateBase = world.Target.AddModeledStatic("T_StackCrateBase", FixtureMeshes.CrateModel);
         world.Target.Interior.Place("T_Bottom", crateBase, Original);
         world.Target.Interior.Place("T_Top", crateBase, Original + new Vector3(0, 0, FixtureMeshes.CrateSize));
-        Vector3 besideTheTop = Original + new Vector3(75, 0, FixtureMeshes.CrateSize);
-        PlaceWalls(world.City, world.City.Interior, wallInTheBottomCrate ? [besideTheTop, Original] : [besideTheTop]);
+        PlaceWalls(world.City, world.City.Interior, walls);
         return world.LoadOrder;
     }
 
-    /// <summary>
-    /// A base-game sound marker in the interior that the cleaned mod moves into a city building, and, when asked for, a city
-    /// building over the marker's original spot too.
-    /// </summary>
-    private static IReadOnlyList<ISkyrimMod> CreateSoundWorld(string dataFolder, bool buildingAtTheOriginalSpot)
+    private static readonly Vector3 BesideTheBottom = Original + new Vector3(75, 0, 0);
+    private static readonly Vector3 BesideTheTop = Original + new Vector3(75, 0, FixtureMeshes.CrateSize + 20);
+
+    /// <summary>The cleaned mod's twin pillars in the interior and a city pad 5 units east of the east pillar.</summary>
+    private static IReadOnlyList<ISkyrimMod> CreatePillarWorld(string dataFolder)
+    {
+        var world = CreateWorld(dataFolder);
+        world.Target.Interior.Place("T_Pillars", world.Target.AddModeledStatic("T_PillarsBase", FixtureMeshes.TwinPillarsModel), Original);
+        PlaceWalls(world.City, world.City.Interior, [Original + new Vector3(175, 0, 0)]);
+        return world.LoadOrder;
+    }
+
+    /// <summary>A base-game sound marker in the interior that the cleaned mod moves into a city building.</summary>
+    private static IReadOnlyList<ISkyrimMod> CreateSoundWorld(string dataFolder)
     {
         var world = CreateWorld(dataFolder);
         var sound = world.BaseGame.Interior.Place("B_Sound", world.BaseGame.AddSoundMarker("B_SoundBase"), Original + new Vector3(0, 0, 50));
         MoveCopy(world.Target.Interior.PlaceCopyOf(sound), MovedTo + new Vector3(0, 0, 50));
         var building = world.City.AddModeledStatic("C_Building", FixtureMeshes.BuildingModel);
         world.City.Interior.Place("C_BuildingAtTheNewSpot", building, MovedTo);
-        if (buildingAtTheOriginalSpot) world.City.Interior.Place("C_BuildingAtTheOriginalSpot", building, Original);
         return world.LoadOrder;
     }
 

@@ -34,14 +34,11 @@ public static class PatchWriter
     internal static ImmutableArray<TargetId> ListRemovalsInWriteOrder(IRemovalDecisions final) =>
         [.. final.Rounds.SelectMany(round => final.RemovedIn(round))];
 
-    /// <summary>Each fitted object's new placement, round by round, in target order; one moved back goes into the cell of the version it replaces.</summary>
+    /// <summary>Each fitted object's new placement, round by round, in target order.</summary>
     private static List<SetPlacement> ListFitsInWriteOrder(IRemovalDecisions final, ImmutableArray<TargetObject> targets) =>
     [
         .. final.Rounds
             .SelectMany(round => final.FittedIn(round))
-            .Select(id => FitOrderOf(targets[id.Index], (Decision.Fitted)final.Of(id)!)),
+            .Select(id => new SetPlacement(targets[id.Index].Key, ((Decision.Fitted)final.Of(id)!).To)),
     ];
-
-    private static SetPlacement FitOrderOf(TargetObject target, Decision.Fitted fitted) =>
-        new(target.Key, fitted.To, fitted.Kind == FitKind.ShrunkOrTurned ? null : target.Replaced!.Value.Cell);
 }

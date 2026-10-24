@@ -72,7 +72,7 @@ public class ProductionTypeTests
         ["OtherObject.Transform"] = "one-line value derived from its own fields",
         ["OtherObject.IsPlacedNpc"] = "one-line value derived from its own fields",
         ["TargetObject.Placement"] = "one-line value derived from its own fields",
-        ["TargetObject.PlacedAt"] = "one-line copy of itself at another placement, for the rules asked about other placements",
+        ["TargetObject.PlacedAt"] = "one-line copy of itself at a given placement, for the rules asked about a shrunk or turned object",
         ["RunSettings.DetailedLog"] = "one-line value derived from its own fields: the one setting that has the report files, so it is stored once",
         ["ModTrustTable.IsPatch"] = "one-line rule over its own field",
         ["ModTrustTable.VersionTrustOf"] = "the one mapping of a plugin's trust to the version trust of the accepted-value rule, over its own fields",

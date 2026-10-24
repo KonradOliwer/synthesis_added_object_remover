@@ -5,7 +5,7 @@ using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 namespace AddedObjectRemover.Steps.RemoveTooCloseObjects;
 
 /// <summary>
-/// The too-close check of one target object at another placement, with the step's zones and NPC rule. The search is built on the
+/// The too-close check of one target object at a given placement, with the step's zones and NPC rule. The search is built on the
 /// first check, so a run that asks nothing builds nothing.
 /// </summary>
 /// <param name="search">Null when no removal zone is on: the step is switched off and finds nothing.</param>

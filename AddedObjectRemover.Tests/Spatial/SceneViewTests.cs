@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Tests.Fixtures;
@@ -55,6 +56,32 @@ public class SceneViewTests
         Assert.Equal(
             targets.Select(target => OrientedBox.FromLocal(Shapes.Of(target.Base).Box, target.Transform).Center),
             visibleTargets.BoxesNear(TestTargets.Space, point, radius: 450f, include: _ => true).Select(box => box.Center));
+    }
+
+    /// <summary>
+    /// The slab is 1000 units long east to west and 1200 north to south; kept turned a quarter, it reaches 600 units east. The
+    /// left-behind step and the marker moves read this index.
+    /// </summary>
+    [Fact]
+    public void TheVisibleTargetsAsTheyStandSeeAnObjectKeptTurnedWhereItIsNowAndLeaveTheCollectedIndexAsItIs()
+    {
+        ImmutableArray<TargetObject> targets = [TestTargets.Create(0, TestTargets.At(Vector3.Zero), Slab.Base, TestTargets.Space)];
+        var caches = TestScenes.Create(targets, [], Shapes);
+        var started = RemovalDecisions.Start(ObjectsToKeep.Build(targets, [], TestTargets.References(1), TestBaseFacts.Unresolved), targets.Length);
+        var turnedAQuarter = targets[0].Placement with { Rotation = new Vector3(0, 0, MathF.PI / 2) };
+        var kept = started.ApplyFits([new ProposedFit(targets[0].Id, new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()), turnedAQuarter)]);
+        var eastOfTheSlab = new Vector3(550, 0, 5);
+
+        Assert.Equal([new TargetId(0)], Near(ClashingObjectFitter.IndexAsTheyStand(targets, kept, caches)));
+        Assert.Empty(Near(caches.VisibleTargets));
+        Assert.Same(caches.VisibleTargets, ClashingObjectFitter.IndexAsTheyStand(targets, started, caches));
+
+        List<TargetId> Near(IVisibleTargetObjects index)
+        {
+            List<VisibleTargetNear> neighbours = [];
+            index.Around(TestTargets.Space, eastOfTheSlab, radius: 10f, neighbours);
+            return [.. neighbours.Select(neighbour => neighbour.Target)];
+        }
     }
 
     [Theory]

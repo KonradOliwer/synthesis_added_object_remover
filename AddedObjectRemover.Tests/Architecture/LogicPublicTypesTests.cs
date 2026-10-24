@@ -57,10 +57,8 @@ public class LogicPublicTypesTests
             "ImmutableArray<Round> RoundsAfter(IRemovalDecisions)",
             "ImmutableArray<TargetId> KeptIn(Round)",
             "ImmutableArray<TargetId> FittedIn(Round)",
-            "ImmutableArray<TargetId> LeftTheirSpotIn(Round)",
             "ImmutableArray<TargetId> RemovedIn(Round)",
-            "ImmutableArray<TargetId> TargetsThatLeftTheirSpot()",
-            "Boolean HasLeftItsSpot(TargetId)",
+            "ImmutableArray<TargetId> RemovedTargets()",
             "Boolean IsDecided(TargetId)",
             "Boolean MayStillBeRemoved(TargetId)",
             "Boolean IsProtected(TargetId)",
@@ -75,7 +73,9 @@ public class LogicPublicTypesTests
         ],
         ["FitClashingObjects"] =
         [
-            "static FitResult Fit(ImmutableArray<TargetObject>, IObjectsToKeep, IReadOnlyList<IPlacementRule>, IBaseObjectShapes, WorkOrder, Execution, FitSettings)",
+            "static FitResult Fit(ImmutableArray<TargetObject>, IObjectsToKeep, FitRules, IBaseObjectShapes, WorkOrder, Execution, FitSettings)",
+            "static IVisibleTargetObjects IndexAsTheyStand(ImmutableArray<TargetObject>, IRemovalDecisions, IObjectCaches)",
+            "static ImmutableArray<TargetObject> PlaceAsTheyStand(ImmutableArray<TargetObject>, IRemovalDecisions)",
         ],
         ["RemoveObjectsOnChangedTerrain"] =
         [
@@ -91,11 +91,11 @@ public class LogicPublicTypesTests
         ],
         ["RemoveObjectsRestingOnRemovedOnes"] =
         [
+            "static IRestingRule CreateRestingRule(ImmutableArray<TargetObject>, AlsoRemoveSettings, IBaseObjectShapes, ITriangleMeshes, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
             "static RestingObjectsResult Find(RestingObjectsInput, IBaseFacts, IBaseObjectShapes, ITriangleMeshes, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>)",
         ],
         ["RemoveInvisibleObjectsLeftBehind"] =
         [
-            "static IPlacementRule CreatePlacementRule(ImmutableArray<TargetObject>, IObjectsThatCanCauseRemovals, IBaseObjectShapes, LeftBehindSettings)",
             "static LeftBehindResult Find(ImmutableArray<TargetObject>, IObjectsThatCanCauseRemovals, IRemovalDecisions, IVisibleTargetObjects, IBaseFacts, IBaseObjectShapes, WorkOrder, Execution, LeftBehindSettings)",
         ],
         ["MoveKeptMarkers"] =

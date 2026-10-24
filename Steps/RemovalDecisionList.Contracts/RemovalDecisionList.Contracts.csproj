@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The decisions about which target objects are removed, kept or kept at another placement, round by round, the proposals steps make, and the rules steps share to judge an object at another placement. It references Ids, BoxAndTransformMath (for the placement) and FindTargetObjectsToKeep.Contracts and holds no packages.</Description>
+    <Description>The decisions about which target objects are removed, kept or kept shrunk or turned where they stand, round by round, the proposals steps make, and the rules steps share to judge an object shrunk or turned and to find the objects others rest on. It references Ids, BoxAndTransformMath (for the placement) and FindTargetObjectsToKeep.Contracts and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />

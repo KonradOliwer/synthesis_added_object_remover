@@ -5,16 +5,10 @@ using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
 namespace AddedObjectRemover.Steps.FitClashingObjects;
 
-/// <summary>A placement an object is tried at, and where it goes when it fits there.</summary>
-internal readonly record struct PlacementTry(FitKind Kind, EulerPlacement Placement);
-
 /// <summary>
-/// The placements a clashing object is tried at, in order; the first that fits wins. A moved replacement is tried at the placement
-/// it replaces, when the patch can put it back there, shrunk or turned there after it as is, and with <see cref="ShrinkOrTurnObjects.ReplacementsAtBothSpots"/> or
-/// <see cref="ShrinkOrTurnObjects.AllObjects"/> also shrunk or turned where the target plugin put it, before moving back. With
-/// <see cref="ShrinkOrTurnObjects.AllObjects"/> the target plugin's own objects are tried shrunk or turned where they stand.
+/// The placements a clashing object is tried at, in order; the first that fits wins: the object shrunk or turned where it stands.
 /// The adjustments go from the largest size down, each size from the smallest turn up, a turn the other way after the turn the
-/// one way: an object stays as big as it can, then as near its own heading as it can.
+/// one way: an object stays as big as it can, then as near its own heading as it can. Shrink limit 100 and turn limit 0 give none.
 /// </summary>
 internal sealed class PlacementTries(FitSettings settings)
 {
@@ -31,28 +25,15 @@ internal sealed class PlacementTries(FitSettings settings)
 
     /// <param name="adjustable">Whether the object may be shrunk or turned.</param>
     /// <returns>Empty when the object is not tried.</returns>
-    public ImmutableArray<PlacementTry> For(TargetObject target, bool adjustable)
-    {
-        var adjustments = adjustable ? _adjustments : [];
-        if (target.Replaced is { } replaced)
-        {
-            var whereItStands = settings.Objects == ShrinkOrTurnObjects.ReplacementsAfterMovingBack ? [] : Adjusted(target.Placement, FitKind.ShrunkOrTurned, adjustments);
-            return replaced.CanMoveBack
-                ? [.. whereItStands, new PlacementTry(FitKind.MovedBack, replaced.Placement), .. Adjusted(replaced.Placement, FitKind.MovedBackShrunkOrTurned, adjustments)]
-                : whereItStands;
-        }
-        return settings.Objects == ShrinkOrTurnObjects.AllObjects ? Adjusted(target.Placement, FitKind.ShrunkOrTurned, adjustments) : [];
-    }
+    public ImmutableArray<EulerPlacement> For(TargetObject target, bool adjustable) => adjustable ? Adjusted(target.Placement) : [];
 
-    private static ImmutableArray<PlacementTry> Adjusted(EulerPlacement placement, FitKind kind, ImmutableArray<(int Percent, int Degrees)> adjustments) =>
+    private ImmutableArray<EulerPlacement> Adjusted(EulerPlacement placement) =>
     [
-        .. adjustments.Select(adjustment => new PlacementTry(
-            kind,
-            placement with
-            {
-                Rotation = placement.Rotation with { Z = placement.Rotation.Z + float.DegreesToRadians(adjustment.Degrees) },
-                Scale = placement.Scale * adjustment.Percent / Percent.PerWhole,
-            })),
+        .. _adjustments.Select(adjustment => placement with
+        {
+            Rotation = placement.Rotation with { Z = placement.Rotation.Z + float.DegreesToRadians(adjustment.Degrees) },
+            Scale = placement.Scale * adjustment.Percent / Percent.PerWhole,
+        }),
     ];
 
     /// <summary>Every size with every turn, in the order they are tried, without the object as it is.</summary>

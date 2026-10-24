@@ -22,11 +22,8 @@ internal static class TestPlacedRecords
             HasLocationRefType: false,
             ReferenceRadius: null,
             PrimitiveBounds: null,
-            Versions: [new PlacedVersionFact(winningMod, placement, Scale: null, baseKey, InTheSpace)]);
+            Versions: [new PlacedVersionFact(winningMod, placement, Scale: null, baseKey)]);
     }
-
-    /// <summary>Where every version of these records sits: the temporary list of the test space's own cell.</summary>
-    public static readonly VersionLocation InTheSpace = new(TestTargets.Space, TestTargets.Space, InPersistentList: false);
 
     /// <summary>The record with its winning version's presence flags replaced.</summary>
     public static PlacedRecordFact WithWinningPresence(PlacedRecordFact record, PresenceFacts presence) =>

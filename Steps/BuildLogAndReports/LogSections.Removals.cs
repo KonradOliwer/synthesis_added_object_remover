@@ -61,7 +61,7 @@ internal static partial class LogSections
     }
 
     /// <summary>The target objects that are the target plugin's own, not moved replacements.</summary>
-    private static int CountOwnObjects(CollectedObjects world) => world.Targets.Count(target => target.Replaced is null);
+    private static int CountOwnObjects(CollectedObjects world) => world.Targets.Count(target => !target.IsMovedReplacement);
 
     /// <param name="changedTerrain">The changed-terrain step's outcome; the "on changed terrain" item only shows when the step was performed.</param>
     public static LogSection BuildRemovalSummarySection(IReadOnlyList<RemovedObject> removals, StepOutcome changedTerrain)

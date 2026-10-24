@@ -28,6 +28,7 @@ public sealed record RunSettings(
     TooCloseSettings TooClose,
     FitSettings Fit,
     AlsoRemoveSettings AlsoRemove,
+    OtherModsObjectsSettings OtherModsObjects,
     LeftBehindSettings? LeftBehind,
     MarkerMoveSettings? MarkerMoves,
     ReportFileSettings? Reports,

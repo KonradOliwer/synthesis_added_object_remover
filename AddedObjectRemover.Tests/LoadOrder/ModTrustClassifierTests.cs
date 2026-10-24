@@ -53,6 +53,37 @@ public class ModTrustClassifierTests
     }
 
     [Fact]
+    public void OnlyPluginsTheRulesNameThemselvesAreTrustedItselfAndTheBaseGameAndTheCleanedModsMastersAreToldApart()
+    {
+        var table = Classify(
+            Settings(trusted: [CityMod]),
+            Listing(CityModMaster, Skyrim),
+            Listing(CityMod, Skyrim, CityModMaster),
+            Listing(Birds, Skyrim));
+
+        Assert.True(table.IsTrustedItself(CityMod));
+        Assert.False(table.IsTrustedItself(CityModMaster));
+        Assert.False(table.IsTrustedItself(Skyrim));
+        Assert.False(table.IsTrustedItself(Birds));
+        Assert.True(table.IsBaseGame(Skyrim));
+        Assert.False(table.IsBaseGame(CityMod));
+        Assert.True(table.IsMasterOfCleanedMod(CleanedModMaster));
+        Assert.True(table.IsMasterOfCleanedMod(Skyrim));
+        Assert.False(table.IsMasterOfCleanedMod(CityModMaster));
+    }
+
+    [Fact]
+    public void AMasterOfTheCleanedModListedAsNeverTrustedIsToldApart()
+    {
+        var table = Classify(Settings(never: [CleanedModMaster]));
+
+        AssertTrust(table, CleanedModMaster, ModTrust.Untrusted, TrustReason.NeverTrusted);
+        Assert.True(table.IsNeverTrusted(CleanedModMaster));
+        Assert.True(table.IsMasterOfCleanedMod(CleanedModMaster));
+        Assert.False(table.IsNeverTrusted(Skyrim));
+    }
+
+    [Fact]
     public void ListedPluginsAndTheirMastersAreTrustedAlsoMastersThatAreNotListed()
     {
         var table = Classify(

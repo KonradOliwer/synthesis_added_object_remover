@@ -16,6 +16,24 @@ public sealed record ModTrustTable(
     public bool IsPatch(PluginName plugin) => plugin == Patch;
 
     /// <summary>
+    /// Whether a rule names the plugin itself as trusted: listed, requiring the cleaned mod, or loading before it. Not the base game,
+    /// the cleaned mod, a plugin trusted only as a master, one trusted for its own changes only, an untrusted one, the patch or an
+    /// unknown one.
+    /// </summary>
+    public bool IsTrustedItself(PluginName plugin) =>
+        Plugins.TryGetValue(plugin, out var trust)
+        && trust is { Trust: ModTrust.Trusted, Reason: TrustReason.Listed or TrustReason.RequiringMod or TrustReason.LoadsBeforeCleanedMod };
+
+    /// <summary>Whether the plugin is one of the game's own (Skyrim.esm, Update.esm and the three DLCs), a master of the cleaned mod or not.</summary>
+    public bool IsBaseGame(PluginName plugin) => Plugins.TryGetValue(plugin, out var trust) && trust.Reason == TrustReason.BaseGame;
+
+    /// <summary>Whether the cleaned mod lists the plugin as a master; false for the patch and an unknown plugin.</summary>
+    public bool IsMasterOfCleanedMod(PluginName plugin) => Plugins.TryGetValue(plugin, out var trust) && trust.IsMasterOfCleanedMod;
+
+    /// <summary>Whether the user listed the plugin under the never trusted mods, which wins over every other rule.</summary>
+    public bool IsNeverTrusted(PluginName plugin) => Plugins.TryGetValue(plugin, out var trust) && trust.Reason == TrustReason.NeverTrusted;
+
+    /// <summary>
     /// The trust of the plugin's version of a record in the accepted-value rule (<see cref="AcceptedVersions"/>): the one mapping of
     /// plugin trust to version trust. The patch is transparent: it holds what earlier patchers of the group wrote, which is never
     /// accepted, and a value it only carries is traced to the plugin it came from.
@@ -35,4 +53,5 @@ public sealed record ModTrustTable(
 /// <param name="Reason">Null for an untrusted plugin that no rule names.</param>
 /// <param name="RequiresCleanedMod">Whether the plugin has the cleaned mod as a master, trusted or not.</param>
 /// <param name="OtherMasterCount">The plugin's masters other than the base game, the cleaned mod and the cleaned mod's masters.</param>
-public sealed record PluginTrust(ModTrust Trust, TrustReason? Reason, bool RequiresCleanedMod, int OtherMasterCount);
+/// <param name="IsMasterOfCleanedMod">Whether the cleaned mod lists the plugin as a master, whatever rule trusts it.</param>
+public sealed record PluginTrust(ModTrust Trust, TrustReason? Reason, bool RequiresCleanedMod, int OtherMasterCount, bool IsMasterOfCleanedMod = false);

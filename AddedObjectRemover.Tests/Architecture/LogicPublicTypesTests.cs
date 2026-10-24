@@ -48,7 +48,7 @@ public class LogicPublicTypesTests
             "static ObjectMeasurementRules MeasurementRules(IUnexpectedErrors)",
             "static SelectedObjects Select(CollectedObjects, IOtherModObjectsBySpace, IBaseObjectShapes, SelectionSettings, Execution)",
         ],
-        ["FindTargetObjectsToKeep"] = ["static ObjectsToKeepResult Find(IReadOnlyList<TargetObject>, IReadOnlyList<LinkFact>, IBaseFacts)"],
+        ["FindTargetObjectsToKeep"] = ["static ObjectsToKeepResult Find(IReadOnlyList<TargetObject>, IReadOnlyList<LinkFact>, IBaseFacts, IReadOnlyDictionary<TargetId, RestingObject>)"],
         ["RemovalDecisionList"] =
         [
             "IEnumerable<ValueTuple<TargetId, Decision>> All()",
@@ -93,6 +93,8 @@ public class LogicPublicTypesTests
         [
             "static IRestingRule CreateRestingRule(ImmutableArray<TargetObject>, AlsoRemoveSettings, IBaseObjectShapes, ITriangleMeshes, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
             "static RestingObjectsResult Find(RestingObjectsInput, IBaseFacts, IBaseObjectShapes, ITriangleMeshes, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>)",
+            "static HeldUpTargets FindHeldUpTargets(ImmutableArray<TargetObject>, IVisibleTargetObjects, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, IBaseObjectShapes, ITriangleMeshes, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
+            "static OtherModsObjectsResult SettleOtherModsObjects(ImmutableArray<TargetObject>, ImmutableArray<TargetObject>, IRemovalDecisions, IObjectsToKeep, IVisibleTargetObjects, IVisibleTargetObjects, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, AlsoRemoveSettings, IBaseObjectShapes, ITriangleMeshes, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
         ],
         ["RemoveInvisibleObjectsLeftBehind"] =
         [
@@ -102,7 +104,7 @@ public class LogicPublicTypesTests
         [
             "static MarkerMoves Plan(ImmutableArray<TargetObject>, LeftBehindResult, IRemovalDecisions, Func<IVisibleObjectsOfAnyPlugin>, IVisibleTargetObjects, IPluginRecords, INavmeshes, ITerrainHeights, IBaseObjectShapes, Execution, MarkerMoveSettings)",
         ],
-        ["WriteThePatch"] = ["static WriteSummary Write(IRemovalDecisions, ImmutableArray<TargetObject>, IPluginRecords, IPatchWriting)"],
+        ["WriteThePatch"] = ["static WriteSummary Write(IRemovalDecisions, ImmutableArray<TargetObject>, OtherModsObjectsResult, IPluginRecords, IPatchWriting)"],
         ["BuildLogAndReports"] =
         [
             "LogAndReports(RunSettings, ReportFolderPrepared, ILoadOrderCaches, IUnexpectedErrors, UnreadableRecordsReported)",
@@ -115,6 +117,8 @@ public class LogicPublicTypesTests
             "ImmutableArray<LogSection> BuildStepSections(CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(Replacements, CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(ObjectsToKeepResult)",
+            "ImmutableArray<LogSection> BuildStepSections(HeldUpTargets, TimeSpan)",
+            "ImmutableArray<LogSection> BuildStepSections(OtherModsObjectsResult, IRemovalDecisions, CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(FitResult, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(ChangedTerrainResult, IRemovalDecisions, CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(TooCloseResult, IRemovalDecisions, CollectedObjects, IVisibleTargetObjects, TimeSpan)",

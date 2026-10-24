@@ -12,7 +12,7 @@ Never trusted, listed: Rival.esp
 Remove objects too close to other mods' objects: Margin by object size: on, 0.5 x object size; Margin by fixed distance: off; Use rough boxes instead of exact shapes (faster): off; Other mods' NPCs and creatures cause removal: OnlyWhenStuckInsideTheObject.
 Remove objects on terrain changed by other mods: off.
 Shrink or turn objects to make them fit: Distance that counts as moved: 10 units; Shrink down to: 100% of its size; Turn by at most: 0 degrees either way.
-Also remove what rests on removed objects: OnlyWhatLosesItsSupport; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %.
+Also remove what rests on removed objects: OnlyWhatLosesItsSupport; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
 Invisible objects left behind: off.
 Detailed log and reports: on, report files go to <root>/Reports.
 Only warn (don't stop) when a mod that requires the cleaned mod loads after the patch: off.
@@ -53,6 +53,8 @@ Anchoring: 1 removed over 2 iterations; 3 touching objects evaluated (3 evaluati
 Also remove: 2 rounds in <time>.
 ## linked
 Linked groups: 0 more objects removed with the follow-up removals they are linked to.
+## unexpectedErrors
+## left-without-support-step
 ## unexpectedErrors
 ## leftovers
 ## linked

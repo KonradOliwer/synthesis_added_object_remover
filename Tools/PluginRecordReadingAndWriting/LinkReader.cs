@@ -13,22 +13,25 @@ namespace AddedObjectRemover;
 internal static class LinkReader
 {
     /// <param name="isAskedFor">Whether a link into this record is read.</param>
+    /// <param name="linkedRecords">When given, every record the placed record links to, other than its base object and itself, is added to it.</param>
     /// <remarks>
     /// Every link into a record asked for is read, the base object link and links to the record itself
-    /// included. Which of them are target objects is decided later.
+    /// included. Which of them are target objects is decided later. The links are walked once for both.
     /// </remarks>
     public static void ReadFromPlaced(
         IPlacedGetter record,
         RecordKey recordKey,
         Func<RecordKey, bool> isAskedFor,
         PluginNames names,
-        List<LinkFact> facts)
+        List<LinkFact> facts,
+        ISet<RecordKey>? linkedRecords)
     {
         var baseKey = record.GetBaseKey(names)?.Record;
         foreach (var link in record.EnumerateFormLinks())
         {
             if (link.IsNull) continue;
             var linkedKey = names.KeyOf(link.FormKey);
+            if (linkedKey != baseKey && linkedKey != recordKey) linkedRecords?.Add(linkedKey);
             if (!isAskedFor(linkedKey)) continue;
             var relation = linkedKey == baseKey ? RelationKind.BaseObject : DescribeRelation(record, link.FormKey);
             facts.Add(new LinkFact(

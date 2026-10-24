@@ -102,6 +102,27 @@ public sealed class LogAndReports
         return [LogSections.BuildReplacementsSection(world, found, elapsed, _context), TakeUnexpectedErrors()];
     }
 
+    /// <remarks>A switched-off part prints nothing, not even an empty section.</remarks>
+    public ImmutableArray<LogSection> BuildStepSections(HeldUpTargets found, TimeSpan elapsed) =>
+        found.Outcome == StepOutcome.SwitchedOff
+            ? []
+            : [LogSections.BuildHeldUpSection(found, _settings.TargetAsTyped, elapsed, _context), TakeUnexpectedErrors(Present(found.Failure))];
+
+    /// <param name="decisions">The run's decisions with the step's rounds applied.</param>
+    /// <remarks>A switched-off part prints nothing, not even an empty section; without rounds there is no linked line.</remarks>
+    public ImmutableArray<LogSection> BuildStepSections(OtherModsObjectsResult settled, IRemovalDecisions decisions, CollectedObjects world, TimeSpan elapsed) =>
+        settled.Outcome == StepOutcome.SwitchedOff
+            ? []
+            :
+            [
+                LogSections.BuildLeftWithoutSupportStepSection(world, settled, decisions, _settings.TargetAsTyped, elapsed, _context),
+                .. LinkedSectionWhenAnyRound(settled.Rounds, decisions),
+                TakeUnexpectedErrors(Present(settled.Failure)),
+            ];
+
+    private ImmutableArray<LogSection> LinkedSectionWhenAnyRound(ImmutableArray<Round> rounds, IRemovalDecisions decisions) =>
+        rounds.IsEmpty ? [] : [LogSections.BuildLinkedSection(decisions, rounds, RoundKind.AlsoRemove, _context)];
+
     public ImmutableArray<LogSection> BuildStepSections(ObjectsToKeepResult found)
     {
         var groups = LogSections.BuildGroupsSection(found.ObjectsToKeep.Groups, found.LinkCount, _settings.TargetAsTyped, _context);
@@ -119,7 +140,7 @@ public sealed class LogAndReports
 
         var kept = RemovalList.KeptIn(decisions, decisions.Rounds[^1]);
         var section = LogSections.BuildChangedTerrainSection(world, _settings.TargetAsTyped, found, kept, elapsed, _context);
-        return BuildRoundSections(section, decisions, RoundKind.ChangedTerrain, found.Failures);
+        return BuildRoundSections(section, decisions, [decisions.Rounds[^1]], RoundKind.ChangedTerrain, found.Failures);
     }
 
     /// <param name="decisions">The decisions whose last round is the too-close round.</param>
@@ -131,33 +152,33 @@ public sealed class LogAndReports
 
         var census = InvisibleOtherObjectCounter.Take(world, _caches.Shapes, visibleTargets);
         var tooClose = LogSections.BuildTooCloseSection(BuildTooCloseSection(found, decisions, world, census, elapsed), _context);
-        return BuildRoundSections(tooClose, decisions, RoundKind.TooClose, found.Failures);
+        return BuildRoundSections(tooClose, decisions, [decisions.Rounds[^1]], RoundKind.TooClose, found.Failures);
     }
 
     /// <summary>The step's section, the line for the removals linked to its own, then the step's unexpected errors.</summary>
-    /// <param name="decisions">The decisions whose last round is the step's round.</param>
+    /// <param name="rounds">The step's rounds in <paramref name="decisions"/>.</param>
     private ImmutableArray<LogSection> BuildRoundSections(
-        LogSection section, IRemovalDecisions decisions, RoundKind kind, IEnumerable<PartFailure> failures)
+        LogSection section, IRemovalDecisions decisions, IEnumerable<Round> rounds, RoundKind kind, IEnumerable<PartFailure> failures)
     {
-        var linked = LogSections.BuildLinkedSection(decisions, [decisions.Rounds[^1]], kind, _context);
+        var linked = LogSections.BuildLinkedSection(decisions, rounds, kind, _context);
         return [section, linked, TakeUnexpectedErrors(failures)];
     }
 
     /// <param name="decisions">The run's decisions with the also-remove rounds applied.</param>
-    public ImmutableArray<LogSection> BuildStepSections(RestingObjectsResult alsoRemove, IRemovalDecisions decisions, CollectedObjects world)
-    {
-        var section = LogSections.BuildAlsoRemoveSection(world, alsoRemove, decisions, _caches.Triangles.GetStats(), _context);
-        var linked = LogSections.BuildLinkedSection(decisions, alsoRemove.Rounds, RoundKind.AlsoRemove, _context);
-        return [section, linked, TakeUnexpectedErrors(Present(alsoRemove.Failure, alsoRemove.TouchChainsFailure))];
-    }
+    public ImmutableArray<LogSection> BuildStepSections(RestingObjectsResult alsoRemove, IRemovalDecisions decisions, CollectedObjects world) =>
+        BuildRoundSections(
+            LogSections.BuildAlsoRemoveSection(world, alsoRemove, decisions, _caches.Triangles.GetStats(), _context),
+            decisions,
+            alsoRemove.Rounds,
+            RoundKind.AlsoRemove,
+            Present(alsoRemove.Failure, alsoRemove.TouchChainsFailure));
 
     /// <param name="final">The decisions whose last round is the left-behind round.</param>
     public ImmutableArray<LogSection> BuildStepSections(LeftBehindResult found, IRemovalDecisions final, CollectedObjects world, TimeSpan elapsed)
     {
         var lastRound = final.Rounds[^1];
         var leftBehind = LogSections.BuildLeftBehindSection(world, found, RemovalList.KeptIn(final, lastRound), elapsed, _context);
-        var linked = LogSections.BuildLinkedSection(final, [lastRound], RoundKind.LeftBehind, _context);
-        return [leftBehind, linked, TakeUnexpectedErrors(Present(found.Failure))];
+        return BuildRoundSections(leftBehind, final, [lastRound], RoundKind.LeftBehind, Present(found.Failure));
     }
 
     public ImmutableArray<LogSection> BuildStepSections(MarkerMoves moves, CollectedObjects world)
@@ -323,6 +344,7 @@ public sealed class LogAndReports
         var hints = LogSections.BuildHintsSection(world, outcome.Hints);
         var movedReplacements = LogSections.BuildMovedReplacementsSection(world, outcome.Final, _settings.TargetAsTyped, _context);
         var ownShrunkOrTurned = LogSections.BuildOwnObjectsShrunkOrTurnedSection(world, outcome.Final, _settings.TargetAsTyped, _context);
+        var leftWithoutSupport = LogSections.BuildLeftWithoutSupportSection(world, outcome.OtherModsObjects, _context);
         var ownRemoved = outcome.Written.Removed.Count(id => !world[id].IsMovedReplacement);
         return
         [
@@ -334,6 +356,7 @@ public sealed class LogAndReports
             LogSections.BuildRemovalSummarySection(removals, outcome.ChangedTerrain.Outcome),
             .. WhenItHasLines(movedReplacements),
             .. WhenItHasLines(ownShrunkOrTurned),
+            .. WhenItHasLines(leftWithoutSupport),
             .. WhenItHasLines(keptSummary),
             .. WhenItHasLines(keptOnPurpose),
             .. WhenItHasLines(markersByType),

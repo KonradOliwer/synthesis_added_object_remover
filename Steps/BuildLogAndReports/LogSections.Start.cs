@@ -31,7 +31,7 @@ internal static partial class LogSections
             DescribeTooClose(settings.TooClose),
             DescribeChangedTerrain(settings.ChangedTerrain),
             DescribeShrinkOrTurn(settings.Read.MovedDistance, settings.Fit),
-            DescribeAlsoRemove(settings.AlsoRemove),
+            DescribeAlsoRemove(settings.AlsoRemove, settings.OtherModsObjects),
             DescribeLeftBehind(settings),
             DescribeDetailedLogAndReports(settings.Reports),
             DescribeOnlyWarnWhenRequiringModLoadsAfterPatch(settings),
@@ -105,19 +105,11 @@ internal static partial class LogSections
 
     private static string JoinOrNone(IEnumerable<string> names) => TextLists.JoinOr(names, Describe.ListSeparator, "(none)");
 
-    private static string DescribeAlsoRemove(AlsoRemoveSettings settings)
-    {
-        const string group = "Also remove what rests on removed objects";
-        var touchGap = $"Gap that still counts as touching: {settings.TouchGap} units";
-        return settings.Mode switch
-        {
-            FollowUpRemovalMode.Nothing => $"{group}: {settings.Mode}.",
-            FollowUpRemovalMode.EverythingTouchingIt => $"{group}: {settings.Mode}; {touchGap}.",
-            FollowUpRemovalMode.OnlyWhatLosesItsSupport =>
-                $"{group}: {settings.Mode}; {touchGap}; Remove when this much support is gone: {TextFormat.Percent(settings.SupportLostFraction)}.",
-            _ => throw new UnreachableException($"Unknown follow-up removal mode {settings.Mode}."),
-        };
-    }
+    /// <remarks>The gap and the share are printed in every mode, since other mods' objects are judged by them whatever the mode.</remarks>
+    private static string DescribeAlsoRemove(AlsoRemoveSettings settings, OtherModsObjectsSettings otherModsObjects) =>
+        $"Also remove what rests on removed objects: {settings.Mode}; Gap that still counts as touching: {settings.TouchGap} units; "
+        + $"Remove when this much support is gone: {TextFormat.Percent(settings.SupportLostFraction)}; "
+        + $"Other mods' objects left without support: {otherModsObjects.Handling}.";
 
     private static string DescribeLeftBehind(RunSettings settings)
     {

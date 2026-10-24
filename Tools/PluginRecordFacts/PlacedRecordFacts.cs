@@ -3,7 +3,7 @@ using System.Numerics;
 
 namespace AddedObjectRemover;
 
-/// <param name="Target">The plugin whose cells define the spaces to read; its own placed records can be written later.</param>
+/// <param name="Target">The plugin whose cells define the spaces to read; the placed records of those spaces can be written later.</param>
 /// <param name="Terrain">Also find the land of the target worldspaces, for <see cref="IPluginRecords.ReadTerrain"/>.</param>
 /// <param name="Navmeshes">Also find the navmeshes of the target spaces, for <see cref="IPluginRecords.ReadNavmeshes"/>.</param>
 /// <param name="TerrainVersions">Also keep every plugin's own land record of the target worldspaces' cells, for <see cref="IPluginRecords.ReadTerrainVersions"/>.</param>
@@ -71,10 +71,12 @@ public sealed record PlacedRecordFact(
 /// <see cref="IPluginRecords.ReadLinks"/>.
 /// </param>
 /// <param name="CellAreas">The winning cell records of the target spaces, by cell key.</param>
+/// <param name="LinkedFromPlacedRecords">Every record that the winning version of a placed record of a target space links to, other than its base.</param>
 public sealed record PlacedRecordFacts(
     ImmutableArray<PlacedRecordFact> Records,
     int RecordsScanned,
     IReadOnlySet<RecordKey> OverriddenRecords,
     ImmutableArray<LinkFact> Links,
     int NavmeshCount,
-    IReadOnlyDictionary<RecordKey, CellAreaFact> CellAreas);
+    IReadOnlyDictionary<RecordKey, CellAreaFact> CellAreas,
+    IReadOnlySet<RecordKey> LinkedFromPlacedRecords);

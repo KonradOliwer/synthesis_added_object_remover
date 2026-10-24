@@ -10,3 +10,4 @@ using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 [assembly: TypeForwardedTo(typeof(TerrainCheckedObjects))]
 [assembly: TypeForwardedTo(typeof(NpcHandling))]
 [assembly: TypeForwardedTo(typeof(FollowUpRemovalMode))]
+[assembly: TypeForwardedTo(typeof(OtherModsObjectsHandling))]

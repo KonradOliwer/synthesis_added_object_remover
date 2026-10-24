@@ -85,6 +85,7 @@ public interface IFollowUpSettingsValues
     FollowUpRemovalMode Mode { get; }
     float TouchDistance { get; }
     float AnchoringThresholdPercent { get; }
+    OtherModsObjectsHandling OtherModsObjectsLeftWithoutSupport { get; }
 }
 
 public interface ILeftoverSettingsValues

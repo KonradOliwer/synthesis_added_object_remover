@@ -10,7 +10,7 @@ Never trusted, listed: Rival.esp
 Remove objects too close to other mods' objects: Margin by object size: on, 0.5 x object size; Margin by fixed distance: off; Use rough boxes instead of exact shapes (faster): on; Other mods' NPCs and creatures cause removal: AlwaysLikeAnyObject.
 Remove objects on terrain changed by other mods: off.
 Shrink or turn objects to make them fit: Distance that counts as moved: 10 units; Shrink down to: 100% of its size; Turn by at most: 0 degrees either way.
-Also remove what rests on removed objects: Nothing.
+Also remove what rests on removed objects: Nothing; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
 Invisible objects left behind: off.
 Detailed log and reports: on, report files go to <root>/Output/Reports.
 Only warn (don't stop) when a mod that requires the cleaned mod loads after the patch: off.
@@ -20,6 +20,7 @@ Scanned 75 placed records in <time>: 40 Target.esp objects to check, 28 objects 
   Ignored 1 Target.esp objects that are deleted, start disabled, or have no valid position or rotation.
   Ignored 1 other-mod objects that Target.esp itself overrides.
   Ignored 4 objects of other mods that the game shows with their accepted values.
+  Recorded 34 placed objects of any plugin as possible supporters or obstacles.
 Indexed 28 other objects in 2 cells/worldspaces in <time>.
   Ignored replaced object R_Replacement_Crate [000808:Rival.esp] from Rival.esp: replaced by T_Replaced [00080A:Target.esp], distance 10.0, size ratio 1.00.
 Replacement matching: 1 other-mod objects excluded in <time>.
@@ -52,7 +53,7 @@ Wrote 19 overrides (19 removed, 0 moved) in <time>.
   Removed T_SoundRing3 [000827:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_SoundRing3_Pad [00081C:Rival.esp], changed by Rival.esp (new object)
   Removed T_ExteriorCrate [00082A:Target.esp] (base T_CrateBase [000800:Target.esp]) in worldspace AorWorld [000801:Skyrim.esm], cell AorExterior [000802:Skyrim.esm], place AorExterior, hold unnamed area, grid 0,0; too close to R_ExteriorCrate_Pad [00081E:Rival.esp], changed by Rival.esp (new object)
   Removed T_LinkedFar [00080E:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; linked to removed T_LinkedNear [00080D:Target.esp]
-Bounds: 6 bases from NIF, 0 NIF misses, 4 from OBND, 0 without bounds. Meshes: 4 read, 0 effect-only, 0 failed (4 loose, 0 from 0 archives), 0 with a footer root other than their first node.
+Bounds: 10 bases from NIF, 0 NIF misses, 4 from OBND, 0 without bounds. Meshes: 4 read, 0 effect-only, 0 failed (4 loose, 0 from 0 archives), 0 with a footer root other than their first node.
 Per cell/worldspace (objects of Target.esp / other objects / removed):
   interior AorInterior [000800:Skyrim.esm]: 38 / 26 / 18
   worldspace AorWorld [000801:Skyrim.esm]: 2 / 2 / 1

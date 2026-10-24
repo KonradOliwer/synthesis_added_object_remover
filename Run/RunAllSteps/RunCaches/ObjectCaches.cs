@@ -58,6 +58,5 @@ internal sealed class ObjectCaches : IObjectCaches
 
     public IVisibleTargetObjects IndexVisibleTargets(IReadOnlyList<TargetObject> targets) => new VisibleTargetObjects(targets, _shapes, _containment, _execution);
 
-    /// <summary>Only when the run collected the support-only objects.</summary>
     public IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPlugin() => new VisibleObjectsOfAnyPlugin(ObjectsOfAnyPlugin);
 }

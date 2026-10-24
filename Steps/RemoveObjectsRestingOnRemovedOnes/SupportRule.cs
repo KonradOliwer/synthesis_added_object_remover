@@ -37,6 +37,11 @@ internal sealed class SupportRule(
     internal static bool ReachesThreshold(float removedShare, float threshold) =>
         Tolerant.AtLeast(removedShare, threshold, ShareRoundingTolerance);
 
+    /// <summary>The supporters each holding at least the threshold share of the support.</summary>
+    /// <remarks>Only supporters with weight are listed, so a listed supporter means the total weight is above 0.</remarks>
+    internal static IEnumerable<Supporter> FindSupportersHoldingEnough(CandidateContacts contacts, float threshold) =>
+        contacts.Supporters.Where(entry => ReachesThreshold(entry.Weight / contacts.TotalWeight, threshold)).Select(entry => entry.Supporter);
+
     public RoundProposals<RoundDetails> Next(IRemovalDecisions decisions, ImmutableArray<TargetId> removedLastRound)
     {
         var (candidates, work) = FindCandidatesInContactWith(decisions, removedLastRound);

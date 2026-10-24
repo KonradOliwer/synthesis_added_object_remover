@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Numerics;
 using AddedObjectRemover.Tests.Fixtures;
+using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover.Tests.Rules;
 
@@ -18,7 +19,7 @@ public sealed class PatchWriterTests
             .Apply(RoundKind.AlsoRemove, [Propose(1)]);
         var writing = new RecordingWriting();
 
-        var written = PatchWriter.Write(final, [.. targets], new ReadPlugin(), writing);
+        var written = PatchWriter.Write(final, [.. targets], OtherModsObjectsResult.SwitchedOff, new ReadPlugin(), writing);
 
         Assert.Equal([0, 4, 1, 2], written.Removed.Select(id => id.Index));
         Assert.Equal(
@@ -36,7 +37,7 @@ public sealed class PatchWriterTests
         var plugin = new ReadPlugin();
         var writing = new RecordingWriting();
 
-        PatchWriter.Write(final, [.. targets], plugin, writing);
+        PatchWriter.Write(final, [.. targets], OtherModsObjectsResult.SwitchedOff, plugin, writing);
 
         Assert.Same(plugin.Records, writing.Records);
     }
@@ -50,7 +51,7 @@ public sealed class PatchWriterTests
         var final = RemovalDecisions.Start(protection, 2).Apply(RoundKind.TooClose, [Propose(0), Propose(1)]);
         var writing = new RecordingWriting();
 
-        PatchWriter.Write(final, [.. targets], new ReadPlugin(), writing);
+        PatchWriter.Write(final, [.. targets], OtherModsObjectsResult.SwitchedOff, new ReadPlugin(), writing);
 
         Assert.Equal([targets[0].Key, targets[1].Key], writing.Orders.OfType<SetInitiallyDisabled>().Select(order => order.Record));
         var move = Assert.Single(writing.Orders.OfType<SetPosition>());
@@ -67,7 +68,7 @@ public sealed class PatchWriterTests
         var final = RemovalDecisions.Start(protection, TargetCount).AddMoves([markerMove]);
         var writing = new RecordingWriting();
 
-        var written = PatchWriter.Write(final, [.. targets], new ReadPlugin(), writing);
+        var written = PatchWriter.Write(final, [.. targets], OtherModsObjectsResult.SwitchedOff, new ReadPlugin(), writing);
 
         Assert.Equal<WriteOrder>([new SetPosition(targets[3].Key, new Vector3(1, 2, 3))], writing.Orders);
         Assert.Equal(1, written.Moved);
@@ -84,10 +85,46 @@ public sealed class PatchWriterTests
             .Apply(RoundKind.TooClose, [Propose(0)]);
         var writing = new RecordingWriting();
 
-        var written = PatchWriter.Write(final, [.. targets], new ReadPlugin(), writing);
+        var written = PatchWriter.Write(final, [.. targets], OtherModsObjectsResult.SwitchedOff, new ReadPlugin(), writing);
 
         Assert.Equal<WriteOrder>([new SetPlacement(targets[0].Key, to)], writing.Orders);
         Assert.Equal((0, 1), (written.Removed.Length, written.Fitted));
+    }
+
+    [Fact]
+    public void OtherModsObjectsAreRemovedOrPulledDownAfterTheTargetObjectsAndTheOthersLeftAlone()
+    {
+        var targets = TestTargets.CreateMany(1);
+        var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(1), TestBaseFacts.Unresolved);
+        var final = RemovalDecisions.Start(protection, 1).Apply(RoundKind.TooClose, [Propose(0)]);
+        var other = ModKey.FromNameAndExtension("Other.esp");
+        var removed = TestShapes.Placed(other, 0, default, new Vector3(1, 2, 3));
+        var pulled = TestShapes.Placed(other, 1, default, new Vector3(4, 5, 60));
+        var left = TestShapes.Placed(other, 2, default, new Vector3(7, 8, 9));
+        var settled = new OtherModsObjectsResult(
+            StepOutcome.Performed,
+            [
+                new OtherModsObjectOutcome(removed, OtherModsObjectFate.RemovedNothingBelow, LostShare: 1f, Drop: 0f, ReferenceRoles.None),
+                new OtherModsObjectOutcome(pulled, OtherModsObjectFate.PulledDown, LostShare: 1f, Drop: 50f, ReferenceRoles.None),
+                new OtherModsObjectOutcome(left, OtherModsObjectFate.LeftNotRemovable, LostShare: 1f, Drop: 0f, ReferenceRoles.Persistent),
+            ],
+            Rounds: [],
+            ProposedRounds: [],
+            Failure: null);
+        var writing = new RecordingWriting();
+
+        var written = PatchWriter.Write(final, [.. targets], settled, new ReadPlugin(), writing);
+
+        Assert.Equal<WriteOrder>(
+            [
+                new SetInitiallyDisabled(targets[0].Key),
+                new SetPosition(targets[0].Key, targets[0].Transform.Position with { Z = -30000f }),
+                new SetInitiallyDisabled(removed.Key),
+                new SetPosition(removed.Key, new Vector3(1, 2, -30000f)),
+                new SetPosition(pulled.Key, new Vector3(4, 5, 10)),
+            ],
+            writing.Orders);
+        Assert.Equal((1, 1), (written.OtherModsObjectsRemoved, written.OtherModsObjectsPulledDown));
     }
 
     private static ProposedRemoval Propose(int index) => new(new TargetId(index), new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()));

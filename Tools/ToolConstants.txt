@@ -24,7 +24,7 @@ SurfaceSampler.SequenceStepU | math | Step of the low-discrepancy (R2) sequence,
 SurfaceSampler.SequenceStepV | math | Step of the low-discrepancy (R2) sequence, second axis.
 SurfaceSampler.SequenceStart | math | Start of the low-discrepancy sequence.
 TriangleDistance.MinFaceSineSquared | math | Smallest face-angle sine (squared) treated as non-degenerate; float robustness.
-SurroundingRayTest.MinHitSine | math | Smallest angle a ray may graze a triangle; float robustness.
+RayHit.MinHitSine | math | Smallest angle a ray may graze a triangle; float robustness.
 SurroundingRayTest.WorldDirections | game format | The up, east-west and north-south ray directions of the game's Z-up world axes.
 Percent.PerWhole | math | 100 percent make a whole.
 CsvFormat.CharactersNeedingQuotes | file format | Characters that make a CSV field need quoting.

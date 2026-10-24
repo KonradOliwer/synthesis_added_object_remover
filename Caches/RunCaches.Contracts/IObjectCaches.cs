@@ -60,7 +60,7 @@ public interface IObjectCaches
     /// <summary>C10.</summary>
     IPlacedNpcsBySpace PlacedNpcs { get; }
 
-    /// <summary>C11: built on the first ask, and only when the run collected the support-only objects.</summary>
+    /// <summary>C11: built on the first ask.</summary>
     IObjectsOfAnyPluginBySpace ObjectsOfAnyPlugin { get; }
 
     /// <summary>C12.</summary>

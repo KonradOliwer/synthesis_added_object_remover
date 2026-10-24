@@ -13,6 +13,7 @@ internal static class KeepReasonText
     private const string ScriptCategory ="script names a quest or scene";
     private const string LocationRoleCategory = "location role";
     private const string OwnLocationRefType = "it has a location ref type, by which a quest can pick it";
+    private const string OtherModsObjectRestsOnIt = "another mod's object rests on it";
 
     /// <summary>Groups reasons in the summary, e.g. "placed object: Enable Parent" or "Quest record".</summary>
     public static string Category(KeepReason reason) => reason.Kind switch
@@ -23,6 +24,7 @@ internal static class KeepReasonText
         KeepKind.ScriptNamesQuestOrScene => ScriptCategory,
         KeepKind.LocationRole => LocationRoleCategory,
         KeepKind.LinkedGroup => LinkedGroupCategory,
+        KeepKind.OtherModsObjectRestsOnIt => OtherModsObjectRestsOnIt,
         KeepKind.CheckFailed => CheckFailed,
         _ => throw new UnreachableException($"Unknown keep kind {reason.Kind}."),
     };
@@ -38,9 +40,28 @@ internal static class KeepReasonText
         KeepKind.ScriptNamesQuestOrScene => ScriptDetail(reason.Script!),
         KeepKind.LocationRole => OwnLocationRefType,
         KeepKind.LinkedGroup => LinkedGroupDetail(reason.Keeper!),
+        KeepKind.OtherModsObjectRestsOnIt => RestingDetail(reason.Resting!),
         KeepKind.CheckFailed => CheckFailed,
         _ => throw new UnreachableException($"Unknown keep kind {reason.Kind}."),
     };
+
+    /// <summary>
+    /// What rests on an object kept because another mod's object rests on it, for a line that already says so: "Lantern [...]",
+    /// or "Book [...] rests on it; Lantern [...] rests on that" for a chain.
+    /// </summary>
+    public static string RestingObjects(KeepReason reason) => reason.Resting! switch
+    {
+        { KeptFor: null } direct => Label(direct),
+        var chain => RestingDetail(chain),
+    };
+
+    /// <summary>E.g. "Lantern [...] rests on it", or "Book [...] rests on it; Lantern [...] rests on that" for a chain.</summary>
+    private static string RestingDetail(RestingObject resting) => $"{Label(resting)} rests on it{RestingOnThat(resting.KeptFor)}";
+
+    private static string RestingOnThat(RestingObject? resting) =>
+        resting is { } next ? $"; {Label(next)} rests on that{RestingOnThat(next.KeptFor)}" : string.Empty;
+
+    private static string Label(RestingObject resting) => RecordLabels.Of(resting.Key, resting.EditorId);
 
     /// <summary>E.g. "its base object's script names Quest MyQuest [000D62:Some.esp]".</summary>
     private static string ScriptDetail(ScriptFinding script) =>

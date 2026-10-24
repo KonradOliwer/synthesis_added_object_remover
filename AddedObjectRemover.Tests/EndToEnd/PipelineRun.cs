@@ -26,12 +26,13 @@ internal static class PipelineRun
     private const string DataFolderName = "Data";
     private const string OutputFolderName = "Output";
 
-    public static RunOutput Execute(Settings settings, int workers)
+    /// <param name="createLoadOrder">Builds the listed mods, lowest priority first, and writes their meshes under the Data folder; none for the fixture world.</param>
+    public static RunOutput Execute(Settings settings, int workers, Func<string, IReadOnlyList<ISkyrimMod>>? createLoadOrder = null)
     {
         var root = Directory.CreateTempSubdirectory("aor-e2e-");
         try
         {
-            return Execute(settings, workers, root.FullName);
+            return Execute(settings, workers, root.FullName, createLoadOrder);
         }
         finally
         {
@@ -39,12 +40,12 @@ internal static class PipelineRun
         }
     }
 
-    private static RunOutput Execute(Settings settings, int workers, string root)
+    private static RunOutput Execute(Settings settings, int workers, string root, Func<string, IReadOnlyList<ISkyrimMod>>? createLoadOrder)
     {
         var dataFolder = Directory.CreateDirectory(Path.Combine(root, DataFolderName)).FullName;
         var outputFolder = Directory.CreateDirectory(Path.Combine(root, OutputFolderName)).FullName;
-        var world = FixtureWorld.Create(dataFolder);
-        var state = FixturePatcherState.Create(world.LoadOrder, dataFolder, Path.Combine(outputFolder, FixturePatcherState.PatchModKey.FileName));
+        var loadOrder = createLoadOrder is null ? FixtureWorld.Create(dataFolder).LoadOrder : createLoadOrder(dataFolder);
+        var state = FixturePatcherState.Create(loadOrder, dataFolder, Path.Combine(outputFolder, FixturePatcherState.PatchModKey.FileName));
 
         var log = CaptureConsole(() => Program.RunPatch(state, () => settings, workers, FixturePatcherState.WritePluginsFile(state)));
         return new RunOutput(

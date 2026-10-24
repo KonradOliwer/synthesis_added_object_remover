@@ -12,7 +12,7 @@ Never trusted, listed: Rival.esp
 Remove objects too close to other mods' objects: Margin by object size: on, 0.5 x object size; Margin by fixed distance: off; Use rough boxes instead of exact shapes (faster): off; Other mods' NPCs and creatures cause removal: OnlyWhenStuckInsideTheObject.
 Remove objects on terrain changed by other mods: off.
 Shrink or turn objects to make them fit: Distance that counts as moved: 10 units; Shrink down to: 100% of its size; Turn by at most: 0 degrees either way.
-Also remove what rests on removed objects: EverythingTouchingIt; Gap that still counts as touching: 8 units.
+Also remove what rests on removed objects: EverythingTouchingIt; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
 Invisible objects left behind: on; Look this far around it: 1024 units; Decide only if this share of the 8 directions has objects: 50%; A direction is cleared when this much of it was removed: 50%; Remove when this share of those directions is cleared: 60%; Never remove these as left behind: none; Move kept markers out of other mods' objects: on.
 Detailed log and reports: on, report files go to <root>/Reports.
 Only warn (don't stop) when a mod that requires the cleaned mod loads after the patch: off.
@@ -54,6 +54,8 @@ Touching objects: 4 removed in 17 components (3 with follow-up removals, largest
 Also remove: 3 rounds in <time>.
 ## linked
 Linked groups: 0 more objects removed with the follow-up removals they are linked to.
+## unexpectedErrors
+## left-without-support-step
 ## unexpectedErrors
 ## leftovers
   Kept T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
@@ -104,7 +106,7 @@ Wrote 26 overrides (25 removed, 1 moved) in <time>.
   Removed T_Light [00081D:Target.esp] (base T_LightBase [000805:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; invisible, surroundings removed
   Removed T_Sound [000823:Target.esp] (base T_SoundMarkerBase [000806:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; invisible, surroundings removed
 ## bounds
-Bounds: 6 bases from NIF, 0 NIF misses, 4 from OBND, 0 without bounds. Meshes: 4 read, 0 effect-only, 0 failed (4 loose, 0 from 0 archives), 0 with a footer root other than their first node.
+Bounds: 10 bases from NIF, 0 NIF misses, 4 from OBND, 0 without bounds. Meshes: 4 read, 0 effect-only, 0 failed (4 loose, 0 from 0 archives), 0 with a footer root other than their first node.
 ## spaces
 Per cell/worldspace (objects of Target.esp / other objects / removed):
   interior AorInterior [000800:Skyrim.esm]: 38 / 26 / 24

@@ -43,6 +43,8 @@ internal static class RemovalList
         RemovalReason.TooClose tooClose => new TooCloseRemoval(target.Index, world.OtherModObjects[tooClose.Other.Index], tooClose.Cause),
         RemovalReason.Touching touching => new TouchingRemoval(target.Index, touching.Touched.Index),
         RemovalReason.LostSupport lost => new SupportRemoval(target.Index, lost.RemovedShare, lost.MainSupporter.Index),
+        RemovalReason.TouchingAnotherModsObject touching => new TouchingAnotherModsObjectRemoval(target.Index, world.Other(touching.Touched)),
+        RemovalReason.LostSupportWithAnotherModsObject lost => new SupportWithAnotherModsObjectRemoval(target.Index, lost.RemovedShare, world.Other(lost.MainSupporter)),
         RemovalReason.InsideAnotherModsObject or RemovalReason.SurroundingsRemoved => new LeftBehindRemoval(target.Index, leftBehindByTarget.Get(target.Index)),
         RemovalReason.LinkedTo linked => new LinkedRemoval(target.Index, linked.To.Index),
         _ => throw new InvalidOperationException($"Unknown removal reason {reason}."),

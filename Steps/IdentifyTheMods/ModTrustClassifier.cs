@@ -25,7 +25,7 @@ public static class ModTrustClassifier
         var undecidedRequiringMods = requiringMods.Where(plugin => fixedDecisions[plugin] is null).ToImmutableHashSet();
         var automaticRules = AutomaticRules.Of(plugins, settings, listings, undecidedRequiringMods, otherMasterCounts);
         var decisions = known.ToImmutableDictionary(plugin => plugin, plugin => fixedDecisions[plugin] ?? automaticRules.Decide(plugin));
-        return BuildTable(settings.Target, plugins.PatchMod, decisions, requiringMods, otherMasterCounts);
+        return BuildTable(settings.Target, plugins.PatchMod, decisions, requiringMods, otherMasterCounts, alwaysTrusted.CleanedModMasters);
     }
 
     private static ModTrustTable BuildTable(
@@ -33,11 +33,13 @@ public static class ModTrustClassifier
         PluginName patch,
         IReadOnlyDictionary<PluginName, TrustDecision> decisions,
         ImmutableHashSet<PluginName> requiringMods,
-        IReadOnlyDictionary<PluginName, int> otherMasterCounts)
+        IReadOnlyDictionary<PluginName, int> otherMasterCounts,
+        ImmutableHashSet<PluginName> cleanedModMasters)
     {
         var trust = decisions.ToImmutableDictionary(
             entry => entry.Key,
-            entry => new PluginTrust(entry.Value.Trust, entry.Value.Reason, requiringMods.Contains(entry.Key), otherMasterCounts[entry.Key]));
+            entry => new PluginTrust(
+                entry.Value.Trust, entry.Value.Reason, requiringMods.Contains(entry.Key), otherMasterCounts[entry.Key], cleanedModMasters.Contains(entry.Key)));
         return new ModTrustTable(cleanedMod, patch, trust, trust.Values.Count(entry => entry.Reason == TrustReason.LoadsBeforeCleanedMod));
     }
 

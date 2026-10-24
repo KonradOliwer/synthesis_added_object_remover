@@ -10,6 +10,35 @@ public class ObjectsToKeepFinderTests
     private static readonly RecordKey BaseGameQuest = new FormKey(ModKey.FromNameAndExtension("Skyrim.esm"), 0x123).ToRecordKey();
     private static readonly BaseKey TargetScriptedBase = new(new FormKey(TestTargets.TargetMod, 0x901).ToRecordKey(), BaseLinkKind.PlaceableObject);
     private static readonly BaseKey OtherScriptedBase = new(new FormKey(ModKey.FromNameAndExtension("Other.esp"), 0x901).ToRecordKey(), BaseLinkKind.PlaceableObject);
+    private static readonly Dictionary<TargetId, RestingObject> NothingResting = [];
+
+    [Fact]
+    public void AnObjectAnotherModsObjectRestsOnIsKeptWithItsLinkedGroupAndALinkComesFirst()
+    {
+        var targets = TestTargets.CreateMany(4);
+        var lantern = new RestingObject(OtherPlaced, "Lantern", KeptFor: null);
+        var restingOn = new Dictionary<TargetId, RestingObject>
+        {
+            [new TargetId(0)] = lantern,
+            [new TargetId(2)] = new RestingObject(TestTargets.Key(0), "Book", KeptFor: lantern),
+            [new TargetId(3)] = lantern,
+        };
+
+        var found = ObjectsToKeepFinder.Find(
+            targets, [Placed(TestTargets.Key(1), TestTargets.Key(0)), Placed(OtherPlaced, TestTargets.Key(3))], TestBaseFacts.Unresolved, restingOn);
+
+        var reason = found.ObjectsToKeep.GetOwnReason(0)!;
+        Assert.Equal(KeepKind.OtherModsObjectRestsOnIt, reason.Kind);
+        Assert.Equal("another mod's object rests on it", KeepReasonText.Category(reason));
+        Assert.Equal($"Lantern [{OtherPlaced}] rests on it", KeepReasonText.Detail(reason));
+        Assert.Equal($"Lantern [{OtherPlaced}]", KeepReasonText.RestingObjects(reason));
+        var chain = $"Book [{TestTargets.Key(0)}] rests on it; Lantern [{OtherPlaced}] rests on that";
+        Assert.Equal(chain, KeepReasonText.Detail(found.ObjectsToKeep.GetOwnReason(2)!));
+        Assert.Equal(chain, KeepReasonText.RestingObjects(found.ObjectsToKeep.GetOwnReason(2)!));
+        Assert.True(found.ObjectsToKeep.TryGetKeepReason(1, out var linked));
+        Assert.Equal(KeepKind.LinkedGroup, linked.Kind);
+        Assert.Equal(KeepKind.PlacedReference, found.ObjectsToKeep.GetOwnReason(3)!.Kind);
+    }
 
     [Fact]
     public void TheLinksDecideTheGroupsTheKeptTargetsAndTheLinkCount()
@@ -21,7 +50,7 @@ public class ObjectsToKeepFinderTests
             Placed(OtherPlaced, TestTargets.Key(3)),
         ];
 
-        var found = ObjectsToKeepFinder.Find(targets, links, TestBaseFacts.Unresolved);
+        var found = ObjectsToKeepFinder.Find(targets, links, TestBaseFacts.Unresolved, NothingResting);
 
         Assert.Equal(1, found.LinkCount);
         Assert.Equal([0, 1], found.ObjectsToKeep.Groups.MembersOf(0));
@@ -36,7 +65,7 @@ public class ObjectsToKeepFinderTests
         var targets = TestTargets.CreateMany(3);
         targets[0] = targets[0] with { NamedByScript = new ScriptNamedRecord(BaseGameQuest, "SomeQuest", ScriptNamedKind.Quest) };
 
-        var found = ObjectsToKeepFinder.Find(targets, [Placed(TestTargets.Key(1), TestTargets.Key(0))], TestBaseFacts.Unresolved);
+        var found = ObjectsToKeepFinder.Find(targets, [Placed(TestTargets.Key(1), TestTargets.Key(0))], TestBaseFacts.Unresolved, NothingResting);
 
         var reason = found.ObjectsToKeep.GetOwnReason(0)!;
         Assert.Equal(KeepKind.ScriptNamesQuestOrScene, reason.Kind);
@@ -53,7 +82,7 @@ public class ObjectsToKeepFinderTests
         var targets = TestTargets.CreateMany(2);
         targets[0] = TestTargets.Create(0, TestTargets.At(default), TargetScriptedBase, TestTargets.Space);
 
-        var found = ObjectsToKeepFinder.Find(targets, [], new ScriptedBases());
+        var found = ObjectsToKeepFinder.Find(targets, [], new ScriptedBases(), NothingResting);
 
         var reason = found.ObjectsToKeep.GetOwnReason(0)!;
         Assert.Equal(KeepKind.ScriptNamesQuestOrScene, reason.Kind);
@@ -66,7 +95,7 @@ public class ObjectsToKeepFinderTests
     {
         List<TargetObject> targets = [TestTargets.Create(0, TestTargets.At(default), OtherScriptedBase, TestTargets.Space)];
 
-        var found = ObjectsToKeepFinder.Find(targets, [], new ScriptedBases());
+        var found = ObjectsToKeepFinder.Find(targets, [], new ScriptedBases(), NothingResting);
 
         Assert.False(found.ObjectsToKeep.IsProtected(0));
     }
@@ -77,7 +106,7 @@ public class ObjectsToKeepFinderTests
         var targets = TestTargets.CreateMany(1);
         targets[0] = targets[0] with { NamedByScript = new ScriptNamedRecord(BaseGameQuest, null, ScriptNamedKind.Scene) };
 
-        var found = ObjectsToKeepFinder.Find(targets, [Placed(OtherPlaced, TestTargets.Key(0))], TestBaseFacts.Unresolved);
+        var found = ObjectsToKeepFinder.Find(targets, [Placed(OtherPlaced, TestTargets.Key(0))], TestBaseFacts.Unresolved, NothingResting);
 
         Assert.Equal(KeepKind.PlacedReference, found.ObjectsToKeep.GetOwnReason(0)!.Kind);
     }
@@ -89,7 +118,7 @@ public class ObjectsToKeepFinderTests
         targets[0] = targets[0] with { HasLocationRefType = true };
         targets[1] = targets[1] with { HasLocationRefType = true, HasMapMarker = true };
 
-        var found = ObjectsToKeepFinder.Find(targets, [], TestBaseFacts.Unresolved);
+        var found = ObjectsToKeepFinder.Find(targets, [], TestBaseFacts.Unresolved, NothingResting);
 
         var reason = found.ObjectsToKeep.GetOwnReason(0)!;
         Assert.Equal(KeepKind.LocationRole, reason.Kind);
@@ -112,7 +141,7 @@ public class ObjectsToKeepFinderTests
         var secondQuest = firstQuest with { SourceEditorId = "SecondQuest" };
         var largeReference = new LinkFact(OtherPlaced, "World", "Worldspace", TestTargets.Key(2), RelationKind.Other, SourceIsPlaced: false, SourceIsWorldspace: true, AliasFillFlags.None);
 
-        var found = ObjectsToKeepFinder.Find(targets, [firstQuest, secondQuest, largeReference], TestBaseFacts.Unresolved);
+        var found = ObjectsToKeepFinder.Find(targets, [firstQuest, secondQuest, largeReference], TestBaseFacts.Unresolved, NothingResting);
 
         Assert.Equal([new UniqueActorRole(new TargetId(1), firstQuest)], found.Risks.UniqueActors.ToArray());
         Assert.Equal([new TargetId(2)], found.Risks.LargeReferences.ToArray());
@@ -130,10 +159,10 @@ public class ObjectsToKeepFinderTests
             BaseGameQuest, "LenientQuest", "Quest", npcBase.Record, RelationKind.UniqueActor, SourceIsPlaced: false, SourceIsWorldspace: false, flags);
         var requiredQuest = lenientQuest with { SourceEditorId = "RequiredQuest", AliasFlags = AliasFillFlags.None };
 
-        Assert.Empty(ObjectsToKeepFinder.Find(targets, [lenientQuest], TestBaseFacts.Unresolved).Risks.UniqueActors);
+        Assert.Empty(ObjectsToKeepFinder.Find(targets, [lenientQuest], TestBaseFacts.Unresolved, NothingResting).Risks.UniqueActors);
         Assert.Equal(
             [new UniqueActorRole(new TargetId(0), requiredQuest)],
-            ObjectsToKeepFinder.Find(targets, [lenientQuest, requiredQuest], TestBaseFacts.Unresolved).Risks.UniqueActors.ToArray());
+            ObjectsToKeepFinder.Find(targets, [lenientQuest, requiredQuest], TestBaseFacts.Unresolved, NothingResting).Risks.UniqueActors.ToArray());
     }
 
     private static LinkFact Placed(RecordKey source, RecordKey target) =>

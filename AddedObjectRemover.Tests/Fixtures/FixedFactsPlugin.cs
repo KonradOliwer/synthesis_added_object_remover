@@ -22,7 +22,7 @@ internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records,
     public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk)
     {
         StopsTheWalk = stopsTheWalk;
-        return new(records, records.Length, overridden, links, NavmeshCount: 0, UnnamedCellsOf(records));
+        return new(records, records.Length, overridden, links, NavmeshCount: 0, UnnamedCellsOf(records), LinkedFrom);
     }
 
     /// <summary>Each cell of the records once, without grid, name or Location.</summary>
@@ -30,6 +30,9 @@ internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records,
         records
             .DistinctBy(record => record.Cell.Key)
             .ToDictionary(record => record.Cell.Key, record => new CellAreaFact(record.Space.Key, Grid: null, Name: null, Location: null));
+
+    /// <summary>The records the placed records of the target spaces link to.</summary>
+    public IReadOnlySet<RecordKey> LinkedFrom { get; init; } = new HashSet<RecordKey>();
 
     /// <summary>The records the non-placed read reports as unreadable.</summary>
     public ImmutableArray<UnreadableRecord> Unreadable { get; init; } = [];

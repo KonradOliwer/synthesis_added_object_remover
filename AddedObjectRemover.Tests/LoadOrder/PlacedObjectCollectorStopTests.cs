@@ -5,7 +5,7 @@ namespace AddedObjectRemover.Tests.LoadOrder;
 
 public class PlacedObjectCollectorStopTests
 {
-    private static readonly WhatToCollect Plan = new(SupportOnlyObjects: false, Terrain: false, Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits);
+    private static readonly WhatToCollect Plan = new(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits);
     private static readonly ModTrustTable Mods = TestModTrust.Of(TestTargets.TargetName, TestTargets.PatchName, trusted: [], untrusted: []);
 
     [Fact]
@@ -23,28 +23,6 @@ public class PlacedObjectCollectorStopTests
 
         Assert.Single(world.Targets);
         Assert.Null(world.Stop);
-    }
-
-    [Fact]
-    public void TheSupportOnlyFlagFollowsThePlan()
-    {
-        var records = new FixedFactsPlugin([CreateTargetRecord()]);
-
-        var without = Collect(records, Plan);
-        var with = Collect(records, Plan with { SupportOnlyObjects = true });
-
-        Assert.False(without.SupportOnlyObjectsCollected);
-        Assert.True(with.SupportOnlyObjectsCollected);
-        Assert.Empty(with.RequireSupportOnlyObjects());
-    }
-
-    [Fact]
-    public void ReadingSupportOnlyObjectsThatWereNotCollectedThrows()
-    {
-        var world = Collect(new FixedFactsPlugin([CreateTargetRecord()]), Plan);
-
-        Assert.Empty(world.SupportOnlyObjects);
-        Assert.Throws<InvalidOperationException>(() => world.RequireSupportOnlyObjects());
     }
 
     [Fact]

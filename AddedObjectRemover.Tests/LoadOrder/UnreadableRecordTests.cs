@@ -16,7 +16,7 @@ public class UnreadableRecordTests : IDisposable
     private const byte NotAFloatParameterType = 5;
 
     private static readonly PluginName OtherPlugin = new("Other.esp");
-    private static readonly WhatToCollect Plan = new(SupportOnlyObjects: false, Terrain: false, Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits);
+    private static readonly WhatToCollect Plan = new(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits);
     private static readonly ModTrustTable Mods = TestModTrust.Of(TestTargets.TargetName, TestTargets.PatchName, trusted: [], untrusted: [OtherPlugin]);
 
     private readonly string _folder = Directory.CreateTempSubdirectory().FullName;

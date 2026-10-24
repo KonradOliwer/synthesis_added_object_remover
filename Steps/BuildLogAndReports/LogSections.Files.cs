@@ -8,7 +8,8 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 internal static partial class LogSections
 {
     /// <summary>
-    /// Where the report files went, in the order touch, support, mesh origins, leftovers, removals, moved and fitted objects, hints. The mesh-origin summary
+    /// Where the report files went, in the order touch, support, mesh origins, leftovers, removals, moved and fitted objects, other mods'
+    /// objects left without support, hints. The mesh-origin summary
     /// comes from the explanations, so it shows even when its file could not be written. Only written files have lines;
     /// when writing the files was stopped, the not-performed line comes first.
     /// </summary>
@@ -38,6 +39,7 @@ internal static partial class LogSections
         }
         AddRowsLine(lines, tables, ReportFileNames.RemovalsFileName, "Removals");
         AddRowsLine(lines, tables, ReportFileNames.FitsFileName, "Moved and fitted objects");
+        AddRowsLine(lines, tables, ReportFileNames.LeftWithoutSupportFileName, LeftWithoutSupportName);
         AddRowsLine(lines, tables, ReportFileNames.HintsFileName, "Removed markers and kept objects");
         return new LogSection("written", [.. lines]);
     }

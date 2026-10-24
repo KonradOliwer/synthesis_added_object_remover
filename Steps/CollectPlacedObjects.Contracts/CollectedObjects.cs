@@ -16,10 +16,8 @@ public readonly record struct TargetLink(TargetId From, TargetId To);
 /// </param>
 /// <param name="SupportOnlyObjects">
 /// Every other present placed object of the target spaces (other mods' objects the game shows with their accepted values, records
-/// the target overrides, target records a later plugin overrides), in <see cref="RecordKeyOrder"/>; empty unless
-/// <paramref name="SupportOnlyObjectsCollected"/>.
+/// the target overrides, target records a later plugin overrides), in <see cref="RecordKeyOrder"/>.
 /// </param>
-/// <param name="SupportOnlyObjectsCollected">Whether the collection holds the support-only objects, which it does when objects of any plugin are needed as supporters or objects around a marker.</param>
 /// <param name="Links">Every link into the target plugin as read, placed records before non-placed ones, in the order found; none from a removed record.</param>
 /// <param name="UnreadableRecords">The non-placed records that could not be read, in the order found; the links read from them before the problem are in <paramref name="Links"/>.</param>
 /// <param name="OverriddenOthers">Only with the detailed log.</param>
@@ -29,7 +27,6 @@ public sealed record CollectedObjects(
     ImmutableArray<TargetObject> Targets,
     ImmutableArray<OtherObject> OtherModObjects,
     ImmutableArray<OtherObject> SupportOnlyObjects,
-    bool SupportOnlyObjectsCollected,
     ImmutableArray<LinkFact> Links,
     ImmutableArray<UnreadableRecord> UnreadableRecords,
     IReadOnlyDictionary<RecordKey, SpaceFact> Spaces,
@@ -43,14 +40,10 @@ public sealed record CollectedObjects(
     /// <summary>The spaces holding a target object.</summary>
     public IReadOnlySet<RecordKey> TargetSpaces() => Targets.Select(target => target.SpaceKey).ToHashSet();
 
-    /// <summary>An other-mod object, or a support-only object when those were collected.</summary>
+    /// <summary>An other-mod object or a support-only object.</summary>
     public OtherObject Other(OtherId id) =>
-        id.Index < OtherModObjects.Length ? OtherModObjects[id.Index] : RequireSupportOnlyObjects()[id.Index - OtherModObjects.Length];
+        id.Index < OtherModObjects.Length ? OtherModObjects[id.Index] : SupportOnlyObjects[id.Index - OtherModObjects.Length];
 
-    /// <summary>The other-mod objects and the support-only objects together, by <see cref="OtherId"/>; only when those were collected.</summary>
-    public IEnumerable<OtherObject> OtherModAndSupportOnlyObjects => OtherModObjects.Concat(RequireSupportOnlyObjects());
-
-    /// <summary>Reading the support-only objects when they were not collected in this run is a bug.</summary>
-    public ImmutableArray<OtherObject> RequireSupportOnlyObjects() =>
-        SupportOnlyObjectsCollected ? SupportOnlyObjects : throw new InvalidOperationException("The support-only objects were not collected in this run.");
+    /// <summary>The other-mod objects and the support-only objects together, by <see cref="OtherId"/>.</summary>
+    public IEnumerable<OtherObject> OtherModAndSupportOnlyObjects => OtherModObjects.Concat(SupportOnlyObjects);
 }

@@ -58,7 +58,7 @@ public sealed class PlacedObjectCollector
     public static CollectedObjects Collect(IPluginRecords plugin, ModTrustTable trust, WhatToCollect plan)
     {
         var facts = plugin.ReadPlacedRecords(
-            new PlacedReadScope(trust.CleanedMod, plan.Terrain, plan.Navmesh, plan.TerrainVersions, plan.TerrainLayers, plan.Water, HoldLocationKeyword),
+            new PlacedReadScope(trust.CleanedMod, Terrain: true, plan.Navmesh, plan.TerrainVersions, plan.TerrainLayers, plan.Water, HoldLocationKeyword),
             candidate => StopsTheWalk(trust, candidate));
         var collector = new PlacedObjectCollector(trust, plan, facts);
         foreach (var record in facts.Records) collector.Collect(record);
@@ -119,7 +119,7 @@ public sealed class PlacedObjectCollector
         var role = classification.Role;
         var presence = record.InTargetSpace ? StartsDisabledRule.Of(record.Placement, isWinningTarget: classification.IsJudged) : ShownInGame.Hidden;
 
-        if (_plan.SupportOnlyObjects && !classification.IsJudged && role != RecordRole.OtherChanged && presence == ShownInGame.Present)
+        if (!classification.IsJudged && role != RecordRole.OtherChanged && presence == ShownInGame.Present)
         {
             _supportOnlyObjects.Add(CreateOtherObject(record, editorId: null, change: null));
         }
@@ -202,7 +202,7 @@ public sealed class PlacedObjectCollector
             IsMovedReplacement: isMovedReplacement));
     }
 
-    private static OtherObject CreateOtherObject(PlacedRecordFact record, string? editorId, ObjectChange? change)
+    private OtherObject CreateOtherObject(PlacedRecordFact record, string? editorId, ObjectChange? change)
     {
         var (position, rotation) = PlacementOf(record);
         return new OtherObject(
@@ -217,8 +217,18 @@ public sealed class PlacedObjectCollector
             ReferenceScale.Normalize(record.Scale),
             record.IsPrimitive,
             record.HasMapMarker,
-            change);
+            change,
+            RolesOf(record));
     }
+
+    private ReferenceRoles RolesOf(PlacedRecordFact record) =>
+        (record.IsPersistent ? ReferenceRoles.Persistent : ReferenceRoles.None)
+        | (record.IsTeleportDoor ? ReferenceRoles.TeleportDoor : ReferenceRoles.None)
+        | (record.Placement.Presence.EnableParent is not null ? ReferenceRoles.HasEnableParent : ReferenceRoles.None)
+        | (record.NamedByScript is not null ? ReferenceRoles.ScriptNamesQuestOrScene : ReferenceRoles.None)
+        | (record.HasLocationRefType ? ReferenceRoles.LocationRefType : ReferenceRoles.None)
+        | (_facts.LinkedFromPlacedRecords.Contains(record.Key) ? ReferenceRoles.LinkedFromPlacedRecord : ReferenceRoles.None)
+        | (record.HasMapMarker ? ReferenceRoles.MapMarker : ReferenceRoles.None);
 
     /// <remarks>Only for a record whose presence is <see cref="ShownInGame.Present"/>, which has a position and a rotation.</remarks>
     private static (Vector3 Position, Vector3 Rotation) PlacementOf(PlacedRecordFact record) =>
@@ -233,8 +243,7 @@ public sealed class PlacedObjectCollector
         return new CollectedObjects(
             targets,
             NumberInKeyOrder(_otherModObjects, firstId: 0),
-            _plan.SupportOnlyObjects ? NumberInKeyOrder(_supportOnlyObjects, firstId: _otherModObjects.Count) : ImmutableArray<OtherObject>.Empty,
-            _plan.SupportOnlyObjects,
+            NumberInKeyOrder(_supportOnlyObjects, firstId: _otherModObjects.Count),
             links,
             unreadable,
             _targetSpaces.DistinctBy(space => space.Key).ToDictionary(space => space.Key),

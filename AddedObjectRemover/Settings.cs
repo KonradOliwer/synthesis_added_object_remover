@@ -102,14 +102,15 @@ public class StandardSettings : ISettingsValues
         + "is first tried shrunk or turned where it stands. If it fits, it is kept that way; otherwise it is removed.\n"
         + "Never shrunk or turned, but removed as before: an object on terrain another mod changed, and an object other objects rest on\n"
         + "(as \"Also remove what rests on removed objects\" decides; with \"Nothing\" there, no object counts as having others resting on it).\n"
-        + "Invisible objects, objects that are always kept and linked objects are never shrunk or turned. Objects of other mods that the cleaned mod left in place are never checked.")]
+        + "Invisible objects, objects that are always kept and linked objects are never shrunk or turned, nor, with KeepSupportingObject, an object another mod's object rests on.\n"
+        + "Objects of other mods that the cleaned mod left in place are never checked.")]
     public ShrinkOrTurnSettings ShrinkOrTurn { get; set; } = new();
 
     [SynthesisOrder]
     [SynthesisSettingName("Also remove what rests on removed objects")]
     [SynthesisTooltip(
         "When an object is removed, the cleaned mod's objects resting on it or touching it would be left floating. This removes them too.\n"
-        + "Only the cleaned mod's own visible objects are removed this way.")]
+        + "Only the cleaned mod's own visible objects are removed this way; the last setting of this group decides about other mods' objects.")]
     public FollowUpRemovalSettings FollowUpRemoval { get; set; } = new();
 
     [SynthesisOrder]
@@ -407,13 +408,31 @@ public class FollowUpRemovalSettings : IFollowUpSettingsValues
 
     [SynthesisOrder]
     [SynthesisSettingName("Gap that still counts as touching (game units)")]
-    [SynthesisTooltip("Two objects this close or closer count as touching. 0-64. Not used with \"Nothing\".")]
+    [SynthesisTooltip(
+        "Two objects this close or closer count as touching. 0-64.\n"
+        + "Used by EverythingTouchingIt and OnlyWhatLosesItsSupport, and for other mods' objects (the last setting of this group).")]
     public float TouchDistance { get; set; } = SettingDefaults.TouchDistance;
 
     [SynthesisOrder]
     [SynthesisSettingName("OnlyWhatLosesItsSupport: remove when this much support is gone (%)")]
-    [SynthesisTooltip("The ground and every plugin's objects count as support. 1-100.")]
+    [SynthesisTooltip(
+        "The ground and every plugin's objects count as support. 1-100.\n"
+        + "Also decides when another mod's object rests on an object or is left without support (the last setting of this group).")]
     public float AnchoringThresholdPercent { get; set; } = SettingDefaults.AnchoringThresholdPercent;
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Other mods' objects left without support")]
+    [SynthesisTooltip(
+        "What happens to another mod's object resting on an object of the cleaned mod that is removed, shrunk or turned.\n"
+        + "Only objects of the base game, of the cleaned mod's masters and of mods trusted in the settings above (listed, requiring the cleaned mod, or loading before it) count; "
+        + "objects of untrusted mods, of never trusted mods and of mods trusted only as masters of other mods are ignored.\n"
+        + "KeepSupportingObject: the cleaned mod's object it rests on is kept as it is: never removed, shrunk or turned.\n"
+        + "RemoveFloatingObject: the other mod's object is removed too.\n"
+        + "PullObjectToTheGround: the other mod's object is moved straight down onto what is below it, keeping its rotation;\n"
+        + "with nothing below it within 2048 units, it is removed.\n"
+        + "Other mods' objects that something depends on (persistent ones, ones another object links to, ...) are never removed.\n"
+        + "With the last two, an object of the cleaned mod resting on such an object goes as \"When an object is removed, also remove\" says.")]
+    public OtherModsObjectsHandling OtherModsObjectsLeftWithoutSupport { get; set; } = SettingDefaults.OtherModsObjects;
 }
 
 public class LeftoverInvisibleObjectSettings : ILeftoverSettingsValues

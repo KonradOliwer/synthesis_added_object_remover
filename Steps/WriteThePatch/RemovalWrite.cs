@@ -1,3 +1,4 @@
+using System.Numerics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.WriteThePatch.Contracts;
 
@@ -17,10 +18,17 @@ namespace AddedObjectRemover.Steps.WriteThePatch;
 /// </remarks>
 internal static class RemovalWrite
 {
-    public static IEnumerable<WriteOrder> OrdersFor(TargetObject target)
+    public static IEnumerable<WriteOrder> OrdersFor(TargetObject target) =>
+        OrdersFor(target.Key, target.Transform.Position, target.IsPersistent, target.HasEnableParent);
+
+    /// <remarks>Another mod's object is removed only when it is not persistent and has no enable parent.</remarks>
+    public static IEnumerable<WriteOrder> OrdersFor(OtherObject other) =>
+        OrdersFor(other.Key, other.Position, other.Roles.HasFlag(ReferenceRoles.Persistent), other.Roles.HasFlag(ReferenceRoles.HasEnableParent));
+
+    private static IEnumerable<WriteOrder> OrdersFor(RecordKey key, Vector3 position, bool isPersistent, bool hasEnableParent)
     {
-        yield return new SetInitiallyDisabled(target.Key);
-        if (!target.IsPersistent) yield return new SetPosition(target.Key, target.Transform.Position with { Z = RemovalConvention.RemovedZ });
-        if (target.HasEnableParent) yield return new SetEnableParent(target.Key, RemovalConvention.PlayerRef, RemovalConvention.OppositeOfParent);
+        yield return new SetInitiallyDisabled(key);
+        if (!isPersistent) yield return new SetPosition(key, position with { Z = RemovalConvention.RemovedZ });
+        if (hasEnableParent) yield return new SetEnableParent(key, RemovalConvention.PlayerRef, RemovalConvention.OppositeOfParent);
     }
 }

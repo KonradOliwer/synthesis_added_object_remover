@@ -109,7 +109,7 @@ public class UnexpectedErrorRunTests
             OnPrint = section =>
             {
                 if (bases is null) return;
-                if (section.Id is "touch" or "follow-up") bases.Armed = true;
+                if (section.Id == "left-without-support-step") bases.Armed = true;
                 if (section.Id == "leftovers") bases.Armed = false;
             },
         };

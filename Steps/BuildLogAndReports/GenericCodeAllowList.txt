@@ -18,6 +18,7 @@ LogSections.DescribeAlreadyRemoved | Report wording: the "of them already remove
 LogSections.AddRowsLine | Report wording: the "wrote N rows" line of a written report file (a CSV tool's table record, not a domain type).
 LogSections.DescribePluginList | Report wording: prints where the game's plugin list was read from and how many listings it has (a plugin-facts type outside the domain list).
 LogSections.OnOff | Report wording: prints a setting's switch as on or off.
+LogSections.WhenAny | Report wording: one counted item of the write line, left out when its count is 0; it takes only the count and the words.
 LogSections.OnWith | Report wording: prints a setting's switch as off, or as on with the detail that matters when it is on.
 LogSections.JoinOrNone | Report wording: joins names or prints "(none)".
 LogSections.TrustReasonLine | Report wording: one trust reason's line of described plugins, or no line when no plugin has that reason.

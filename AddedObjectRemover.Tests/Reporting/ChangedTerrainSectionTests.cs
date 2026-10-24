@@ -69,7 +69,6 @@ public sealed class ChangedTerrainSectionTests
             [.. targets],
             [],
             [],
-            false,
             [],
             [],
             new Dictionary<RecordKey, SpaceFact> { [TestTargets.Space] = new(TestTargets.Space, "Tamriel", SpaceKind.Worldspace, "Skyrim") },

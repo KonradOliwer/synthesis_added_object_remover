@@ -53,9 +53,28 @@ public sealed record TargetObject(
 /// </param>
 public readonly record struct ObjectChange(PluginName? ChangingMod, PluginName? AcceptedFrom);
 
+/// <summary>What else depends on a placed reference or controls it, as its record and the records linking to it show.</summary>
+[Flags]
+public enum ReferenceRoles
+{
+    None = 0,
+    Persistent = 1,
+    TeleportDoor = 2,
+    HasEnableParent = 4,
+    ScriptNamesQuestOrScene = 8,
+    LocationRefType = 16,
+
+    /// <summary>Another placed record of the target spaces links to it (as enable parent, linked reference, script property, ...).</summary>
+    LinkedFromPlacedRecord = 32,
+
+    /// <summary>The reference itself carries map marker data (XMRK).</summary>
+    MapMarker = 64,
+}
+
 /// <summary>Compact snapshot of another mod's placed object (winning version).</summary>
 /// <param name="HasMapMarker">The placed reference itself carries map marker data (XMRK), e.g. a fast-travel marker.</param>
 /// <param name="Change">Why it can cause removals; null for a support-only object.</param>
+/// <param name="Roles">What else depends on it or controls it.</param>
 public readonly record struct OtherObject(
     OtherId Id,
     RecordKey Key,
@@ -68,7 +87,8 @@ public readonly record struct OtherObject(
     float Scale,
     bool IsPrimitive,
     bool HasMapMarker,
-    ObjectChange? Change)
+    ObjectChange? Change,
+    ReferenceRoles Roles = ReferenceRoles.None)
 {
     public PlacedTransform Transform => new(Position, Mat3.FromEuler(Rotation), Scale);
 

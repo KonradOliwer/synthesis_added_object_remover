@@ -3,6 +3,8 @@ using System.Diagnostics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
+using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 
@@ -11,7 +13,8 @@ namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 /// <summary>
 /// The also-remove step: seeded with the removals of every earlier removal round, its rounds remove what
 /// goes with them, as the also-remove mode says, until a round removes nothing. It decides the rounds on its own copy
-/// of the decisions and proposes them as one proposal, which the runner applies to the run's decisions.
+/// of the decisions and proposes them as one proposal, which the runner applies to the run's decisions. It also judges the
+/// other mods' objects resting on target objects, and the target objects resting on those (<see cref="OtherModsObjects"/>).
 /// </summary>
 public static class RestingObjects
 {
@@ -50,6 +53,61 @@ public static class RestingObjects
         Execution execution) =>
         new RestingRule(targets, settings, shapes, triangles, terrain, objectsOfAnyPlugin, execution);
 
+    /// <summary>
+    /// KeepSupportingObject: the target objects other mods' objects rest on, directly or through other target objects, each where
+    /// it stands before any decision; switched off otherwise (see <see cref="OtherModsObjects"/>).
+    /// </summary>
+    /// <param name="visibleTargets">The index of <paramref name="targets"/>.</param>
+    /// <param name="trust">Decides whose objects are judged.</param>
+    /// <param name="objectsOfAnyPlugin">Asked only with KeepSupportingObject.</param>
+    public static HeldUpTargets FindHeldUpTargets(
+        ImmutableArray<TargetObject> targets,
+        IVisibleTargetObjects visibleTargets,
+        ModTrustTable trust,
+        LoadOrderPlugins plugins,
+        OtherModsObjectsSettings settings,
+        IBaseObjectShapes shapes,
+        ITriangleMeshes triangles,
+        ITerrainHeights terrain,
+        Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin,
+        Execution execution) =>
+        OtherModsObjects.FindHeldUpTargets(
+            targets, visibleTargets, new OtherModsObjectsContext(trust, plugins, settings, shapes, triangles, terrain, objectsOfAnyPlugin, execution));
+
+    /// <summary>
+    /// RemoveFloatingObject and PullObjectToTheGround: what becomes of the other mods' objects left without support once the
+    /// also-remove rounds are decided, and the also-remove rounds for the target objects resting on or touching those taken away;
+    /// switched off with KeepSupportingObject (see <see cref="OtherModsObjects"/>). The rounds are decided on a working copy of
+    /// <paramref name="decided"/>, which never changes, and proposed for the runner to apply.
+    /// </summary>
+    /// <param name="targets">Where they stood before any decision.</param>
+    /// <param name="targetsAsTheyStand">Each target object kept shrunk or turned at its new placement.</param>
+    /// <param name="decided">The decisions of every removal round so far, the also-remove rounds included.</param>
+    /// <param name="visibleTargets">The index of <paramref name="targets"/>.</param>
+    /// <param name="visibleTargetsAsTheyStand">The index of <paramref name="targetsAsTheyStand"/>.</param>
+    /// <param name="trust">Decides whose objects are judged.</param>
+    /// <param name="objectsOfAnyPlugin">Asked only when a target object was removed, shrunk or turned.</param>
+    public static OtherModsObjectsResult SettleOtherModsObjects(
+        ImmutableArray<TargetObject> targets,
+        ImmutableArray<TargetObject> targetsAsTheyStand,
+        IRemovalDecisions decided,
+        IObjectsToKeep objectsToKeep,
+        IVisibleTargetObjects visibleTargets,
+        IVisibleTargetObjects visibleTargetsAsTheyStand,
+        ModTrustTable trust,
+        LoadOrderPlugins plugins,
+        OtherModsObjectsSettings settings,
+        AlsoRemoveSettings alsoRemove,
+        IBaseObjectShapes shapes,
+        ITriangleMeshes triangles,
+        ITerrainHeights terrain,
+        Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin,
+        Execution execution) =>
+        OtherModsObjects.SettleLeftWithoutSupport(
+            new DecidedTargets(targets, targetsAsTheyStand, decided, objectsToKeep, visibleTargets, visibleTargetsAsTheyStand),
+            alsoRemove,
+            new OtherModsObjectsContext(trust, plugins, settings, shapes, triangles, terrain, objectsOfAnyPlugin, execution));
+
     /// <remarks>
     /// The objects of any plugin are asked for before the rounds' time starts, because the first ask builds the
     /// supporters' bounds index, which the "Also remove" time leaves out.
@@ -79,13 +137,18 @@ public static class RestingObjects
         var hadSeeds = seeds.Count > 0;
         if (!hadSeeds) return new RestingObjectsPlan(settings.Mode, hadSeeds, Rounds: null, Search: null);
 
-        return settings.Mode switch
+        return PrepareFrom(earlierRounds, seeds, input, settings);
+    }
+
+    /// <summary>The rounds that spread from <paramref name="seeds"/> as the mode says; Nothing has none.</summary>
+    /// <param name="decided">The decisions the seeds were removed in; the objects they kept never take part in the touch rounds.</param>
+    internal static RestingObjectsPlan PrepareFrom(IRemovalDecisions decided, IReadOnlyList<int> seeds, RoundsInput input, AlsoRemoveSettings settings) =>
+        settings.Mode switch
         {
-            FollowUpRemovalMode.EverythingTouchingIt => PrepareTouchRounds(earlierRounds, seeds, input, settings),
+            FollowUpRemovalMode.EverythingTouchingIt => PrepareTouchRounds(decided, seeds, input, settings),
             FollowUpRemovalMode.OnlyWhatLosesItsSupport => PrepareSupportRounds(seeds, input, settings),
             _ => throw new UnreachableException($"Unknown follow-up removal mode {settings.Mode}."),
         };
-    }
 
     /// <summary>The plan's rounds, decided on a working copy of <paramref name="earlierRounds"/>, which never changes.</summary>
     internal static RestingObjectsRun DecideOnWorkingCopy(RestingObjectsPlan plan, IRemovalDecisions earlierRounds)
@@ -235,7 +298,7 @@ public static class RestingObjects
         float touchGap)
     {
         var supporterFinder = new SupporterFinder(targets, search, objectsOfAnyPlugin, shapes, touchGap);
-        return new SupportContactFinder(targets, search.MeshPaths, supporterFinder, terrain, search.Cache, touchGap);
+        return new SupportContactFinder(targets, search.MeshPaths, supporterFinder, new SurfaceContacts(terrain, search.Cache, touchGap));
     }
 
     private static RestingObjectsWork CountSupportWork(ImmutableArray<RoundDetails> evidence, IRemovalDecisions decisions)

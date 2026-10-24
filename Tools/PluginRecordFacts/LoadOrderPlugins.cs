@@ -54,6 +54,9 @@ public sealed record LoadOrderPlugins(
 
     public PluginListing? Find(PluginName mod) => Listed.FirstOrDefault(listing => listing.Mod == mod);
 
+    /// <summary>Whether the plugin is listed after the patch in the game's plugin list, so its records beat what the patch writes.</summary>
+    public bool LoadsAfterPatch(PluginName plugin) => plugin != PatchMod && Positions.Contains(plugin) && Positions.Of(plugin) > PatchPosition;
+
     /// <summary>The listed plugins that have the mod as a master, in the order of <see cref="Listed"/>; the patch is left out.</summary>
     public ImmutableArray<PluginListing> ListingsRequiring(PluginName mod) =>
         [.. Listed.Where(listing => listing.Mod != PatchMod && listing.Masters.Contains(mod))];

@@ -10,7 +10,7 @@ Never trusted, listed: Rival.esp
 Remove objects too close to other mods' objects: Margin by object size: on, 0.5 x object size; Margin by fixed distance: off; Use rough boxes instead of exact shapes (faster): off; Other mods' NPCs and creatures cause removal: OnlyWhenStuckInsideTheObject.
 Remove objects on terrain changed by other mods: off.
 Shrink or turn objects to make them fit: Distance that counts as moved: 10 units; Shrink down to: 100% of its size; Turn by at most: 0 degrees either way.
-Also remove what rests on removed objects: EverythingTouchingIt; Gap that still counts as touching: 8 units.
+Also remove what rests on removed objects: EverythingTouchingIt; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
 Invisible objects left behind: on; Look this far around it: 1024 units; Decide only if this share of the 8 directions has objects: 50%; A direction is cleared when this much of it was removed: 50%; Remove when this share of those directions is cleared: 60%; Never remove these as left behind: Sound sources; Move kept markers out of other mods' objects: on.
 Detailed log and reports: on, report files go to <root>/Output/Reports.
 Only warn (don't stop) when a mod that requires the cleaned mod loads after the patch: off.
@@ -73,7 +73,7 @@ Wrote 24 overrides (23 removed, 1 moved) in <time>.
   Removed T_TouchLink2 [000815:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; touches removed T_TouchLink1 [000814:Target.esp]
   Removed T_MarkerInsideBuilding [00081B:Target.esp] (base T_XMarkerBase [000804:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; invisible, inside another mod's object (inside R_InsideBuilding [000814:Rival.esp])
   Removed T_Light [00081D:Target.esp] (base T_LightBase [000805:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; invisible, surroundings removed
-Bounds: 6 bases from NIF, 0 NIF misses, 4 from OBND, 0 without bounds. Meshes: 4 read, 0 effect-only, 0 failed (4 loose, 0 from 0 archives), 0 with a footer root other than their first node.
+Bounds: 10 bases from NIF, 0 NIF misses, 4 from OBND, 0 without bounds. Meshes: 4 read, 0 effect-only, 0 failed (4 loose, 0 from 0 archives), 0 with a footer root other than their first node.
 Per cell/worldspace (objects of Target.esp / other objects / removed):
   interior AorInterior [000800:Skyrim.esm]: 38 / 26 / 22
   worldspace AorWorld [000801:Skyrim.esm]: 2 / 2 / 1

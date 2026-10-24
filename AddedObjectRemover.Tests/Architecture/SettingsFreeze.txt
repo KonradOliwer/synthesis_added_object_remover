@@ -12,6 +12,10 @@ NpcHandling.Never
 NpcHandling.OnlyWhenStuckInsideTheObject
 NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision
 OnlyWarnWhenModRequiringCleanedModLoadsAfterPatch
+OtherModsObjectsHandling
+OtherModsObjectsHandling.KeepSupportingObject
+OtherModsObjectsHandling.PullObjectToTheGround
+OtherModsObjectsHandling.RemoveFloatingObject
 PatchMode
 PatchMode.Batch
 PatchMode.Standard
@@ -20,6 +24,7 @@ Standard.CleanedMod
 Standard.FollowUpRemoval
 Standard.FollowUpRemoval.AnchoringThresholdPercent
 Standard.FollowUpRemoval.Mode
+Standard.FollowUpRemoval.OtherModsObjectsLeftWithoutSupport
 Standard.FollowUpRemoval.TouchDistance
 Standard.LeftoverInvisibleObjects
 Standard.LeftoverInvisibleObjects.AlwaysKeep

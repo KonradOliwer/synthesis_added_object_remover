@@ -23,7 +23,7 @@ public class PlacedObjectCollectorReplacementTests
     private static readonly BaseKey OtherTreeBase = new(new RecordKey(BaseGame, 0x101), BaseLinkKind.PlaceableObject);
     private static readonly PresenceFacts Shown = new(Deleted: false, InitiallyDisabled: false, EnableParent: null);
 
-    private static readonly WhatToCollect Plan = new(SupportOnlyObjects: true, Terrain: false, Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits);
+    private static readonly WhatToCollect Plan = new(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits);
     private static readonly ModTrustTable Mods = TestModTrust.Of(Target, Patch, trusted: [BaseGame], untrusted: [City, Later], trustedForOwnChanges: []);
 
     private static readonly PlacedRecordFact OwnObject = TestPlacedRecords.Create(TestTargets.Key(0), Target, Vector3.Zero);

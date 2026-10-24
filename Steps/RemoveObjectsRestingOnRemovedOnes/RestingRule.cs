@@ -67,9 +67,6 @@ internal sealed class RestingRule(
         return resting.Zip(found).ToDictionary(entry => entry.First, entry => entry.Second.Contacts);
     }
 
-    /// <remarks>Only supporters with weight are listed, so a listed supporter means the total weight is above 0.</remarks>
     private bool HoldsEnoughOf(CandidateContacts contacts, int supporter) =>
-        contacts.Supporters
-            .Where(entry => entry.Supporter == Supporter.Target(supporter))
-            .Any(entry => SupportRule.ReachesThreshold(entry.Weight / contacts.TotalWeight, settings.SupportLostFraction));
+        SupportRule.FindSupportersHoldingEnough(contacts, settings.SupportLostFraction).Contains(Supporter.Target(supporter));
 }

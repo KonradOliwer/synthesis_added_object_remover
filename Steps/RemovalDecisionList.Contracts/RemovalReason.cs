@@ -39,6 +39,13 @@ public abstract record RemovalReason
     /// <param name="MainSupporter">The removed target holding the largest share of its support.</param>
     public sealed record LostSupport(float RemovedShare, TargetId MainSupporter) : RemovalReason;
 
+    /// <param name="Touched">Another mod's object left without support, removed or pulled down, that the object touched where it stood.</param>
+    public sealed record TouchingAnotherModsObject(OtherId Touched) : RemovalReason;
+
+    /// <param name="RemovedShare">Fraction of the object's support held by removed objects and other mods' objects taken away.</param>
+    /// <param name="MainSupporter">The other mod's object left without support, removed or pulled down, holding the largest share of its support.</param>
+    public sealed record LostSupportWithAnotherModsObject(float RemovedShare, OtherId MainSupporter) : RemovalReason;
+
     public sealed record InsideAnotherModsObject(OtherId Container) : RemovalReason;
 
     public sealed record SurroundingsRemoved : RemovalReason;

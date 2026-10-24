@@ -70,7 +70,7 @@ internal static partial class LogSections
             ? $"{TextFormat.Count(removals.Count(removal => removal is TerrainChangedRemoval))} on changed terrain, "
             : string.Empty;
         var tooClose = removals.Count(removal => removal is TooCloseRemoval);
-        var alsoRemoved = removals.Count(removal => removal is TouchingRemoval or SupportRemoval);
+        var alsoRemoved = removals.Count(removal => removal is TouchingRemoval or SupportRemoval or TouchingAnotherModsObjectRemoval or SupportWithAnotherModsObjectRemoval);
         var leftBehind = removals.Count(removal => removal is LeftBehindRemoval);
         var linked = removals.Count(removal => removal is LinkedRemoval);
         return new LogSection(
@@ -84,26 +84,30 @@ internal static partial class LogSections
     /// <summary>Each kept target once, counted under the first reason found for it.</summary>
     public static LogSection BuildKeptSummarySection(IEnumerable<KeptObject> kept)
     {
+        var keptOnce = KeyedGroups.DistinctBy(kept, entry => entry.TargetIndex, EqualityComparer<int>.Default).ToList();
         var byCategory = KeyedGroups.Rank(
-            KeyedGroups.CountBy(
-                KeyedGroups.DistinctBy(kept, entry => entry.TargetIndex, EqualityComparer<int>.Default),
-                entry => KeepReasonText.Category(entry.Reason),
-                StringComparer.Ordinal),
+            KeyedGroups.CountBy(keptOnce, entry => KeepReasonText.Category(entry.Reason), StringComparer.Ordinal),
             StringComparer.Ordinal);
         if (byCategory.Count == 0) return new LogSection("kept-summary", []);
+        var because = keptOnce.Any(entry => IsKeptForAnotherModsObject(entry.Reason))
+            ? "because other records depend on them, because of their own script or location ref type, or because other mods' objects rest on them."
+            : "because other records depend on them or because of their own script or location ref type.";
         return new LogSection(
             "kept-summary",
             [
-                $"Kept {TextFormat.Count(byCategory.Sum(group => group.Value))} objects that would have been removed, "
-                + "because other records depend on them or because of their own script or location ref type.",
+                $"Kept {TextFormat.Count(byCategory.Sum(group => group.Value))} objects that would have been removed, {because}",
                 .. byCategory.Select(group => $"  {group.Key}: {TextFormat.Count(group.Value)}"),
             ]);
     }
 
+    private static bool IsKeptForAnotherModsObject(KeepReason reason) =>
+        reason.Kind == KeepKind.OtherModsObjectRestsOnIt || reason.Keeper?.Reason.Kind == KeepKind.OtherModsObjectRestsOnIt;
+
     /// <summary>
-    /// The objects kept for a property of their own: a script on them, or on their base the target plugin defines, names
-    /// a quest or scene, or they have a location ref type themselves. They are kept on purpose and need no manual patch;
-    /// objects that another record links to are in the hints instead. Each kept object once; no lines when there are none.
+    /// The objects kept for a reason of their own: a script on them, or on their base the target plugin defines, names
+    /// a quest or scene, they have a location ref type themselves, or another mod's object rests on them. They are kept on
+    /// purpose and need no manual patch; objects that another record links to are in the hints instead. Each kept object
+    /// once; no lines when there are none.
     /// </summary>
     public static LogSection BuildKeptOnPurposeSection(CollectedObjects world, IEnumerable<KeptObject> kept)
     {
@@ -111,16 +115,19 @@ internal static partial class LogSections
         return new LogSection(
             "kept-on-purpose",
             [
-                .. KeptOnPurposeLines(world, keptOnce, KeepKind.ScriptNamesQuestOrScene, "Kept, script names a quest or scene:"),
-                .. KeptOnPurposeLines(world, keptOnce, KeepKind.LocationRole, "Kept, location role:"),
+                .. KeptOnPurposeLines(world, keptOnce, KeepKind.ScriptNamesQuestOrScene, "Kept, script names a quest or scene:", KeepReasonText.Detail),
+                .. KeptOnPurposeLines(world, keptOnce, KeepKind.LocationRole, "Kept, location role:", KeepReasonText.Detail),
+                .. KeptOnPurposeLines(world, keptOnce, KeepKind.OtherModsObjectRestsOnIt, "Kept, another mod's object rests on it:", KeepReasonText.RestingObjects),
             ]);
     }
 
-    private static IEnumerable<string> KeptOnPurposeLines(CollectedObjects world, IEnumerable<KeptObject> kept, KeepKind kind, string header) =>
+    /// <param name="detail">The reason's detail, which does not repeat the header.</param>
+    private static IEnumerable<string> KeptOnPurposeLines(
+        CollectedObjects world, IEnumerable<KeptObject> kept, KeepKind kind, string header, Func<KeepReason, string> detail) =>
         kept.Where(entry => entry.Reason.Kind == kind).Select(entry =>
         {
             var target = world.Targets[entry.TargetIndex];
-            return $"  {header} {RecordNames.Describe(target)} in {Describe.Location(world, target)}: {KeepReasonText.Detail(entry.Reason)}.";
+            return $"  {header} {RecordNames.Describe(target)} in {Describe.Location(world, target)}: {detail(entry.Reason)}.";
         });
 
     public static LogSection BuildMarkersByTypeSection(IReadOnlyList<TargetObject> targets, IEnumerable<RemovedObject> removals, ReportContext context)

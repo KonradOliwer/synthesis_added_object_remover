@@ -194,10 +194,27 @@ public class LinkReaderTests
 
     private static PluginNames CreateNames() => new(new KnownPluginNames([TestTargets.TargetName, OtherMod.ToPluginName()]));
 
-    private static List<LinkFact> ReadFromPlaced(IPlacedGetter record)
+    [Fact]
+    public void EveryRecordAPlacedRecordLinksToButItsBaseAndItselfIsCollectedInTheSameWalk()
+    {
+        var parent = new FormKey(OtherMod, 0x901);
+        var linkedReference = new FormKey(OtherMod, 0x902);
+        var source = WithEnableParent(new FormKey(OtherMod, 0x903), parent);
+        source.Base.SetTo(new FormKey(OtherMod, 0x904));
+        source.LinkedReferences.Add(new LinkedReferences { Reference = new FormLink<IPlacedGetter>(linkedReference) });
+        source.LinkedReferences.Add(new LinkedReferences { Reference = new FormLink<IPlacedGetter>(source.FormKey) });
+        var linked = new HashSet<RecordKey>();
+
+        var facts = ReadFromPlaced(source, linked);
+
+        Assert.Empty(facts);
+        Assert.Equal(new HashSet<RecordKey> { parent.ToRecordKey(), linkedReference.ToRecordKey() }, linked);
+    }
+
+    private static List<LinkFact> ReadFromPlaced(IPlacedGetter record, ISet<RecordKey>? linkedRecords = null)
     {
         var facts = new List<LinkFact>();
-        LinkReader.ReadFromPlaced(record, record.FormKey.ToRecordKey(), linked => linked.Plugin == TestTargets.TargetName, CreateNames(), facts);
+        LinkReader.ReadFromPlaced(record, record.FormKey.ToRecordKey(), linked => linked.Plugin == TestTargets.TargetName, CreateNames(), facts, linkedRecords);
         return facts;
     }
 

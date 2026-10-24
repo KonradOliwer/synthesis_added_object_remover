@@ -48,7 +48,8 @@
   "FollowUpRemoval": {
     "Mode": "OnlyWhatLosesItsSupport",
     "TouchDistance": 8.0,
-    "AnchoringThresholdPercent": 50.0
+    "AnchoringThresholdPercent": 50.0,
+    "OtherModsObjectsLeftWithoutSupport": "PullObjectToTheGround"
   },
   "LeftoverInvisibleObjects": {
     "RemoveLeftoverInvisibleObjects": true,

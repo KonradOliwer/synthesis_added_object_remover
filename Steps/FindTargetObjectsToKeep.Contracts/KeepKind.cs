@@ -24,6 +24,9 @@ public enum KeepKind
     /// <summary>Another member of its linked group must stay.</summary>
     LinkedGroup,
 
+    /// <summary>Another mod's object rests on it, or on a target object kept for this reason that rests on it.</summary>
+    OtherModsObjectRestsOnIt,
+
     /// <summary>An unexpected error stopped the check of what depends on it, and keeping an object is safe when that is unknown.</summary>
     CheckFailed,
 }

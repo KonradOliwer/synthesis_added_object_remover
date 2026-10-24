@@ -12,7 +12,7 @@ internal static class TestScenes
     private static readonly ModKey NoRecords = ModKey.FromNameAndExtension("NoRecords.esp");
 
     /// <param name="otherModObjects">Ids 0..n-1 in order.</param>
-    /// <param name="supportOnlyObjects">Ids following the other-mod objects' in order; null when the support-only objects are not collected.</param>
+    /// <param name="supportOnlyObjects">Ids following the other-mod objects' in order; none when null.</param>
     /// <param name="bodies">Null when no placed NPC needs a body.</param>
     public static ObjectCaches Create(
         IReadOnlyList<TargetObject> targets,
@@ -55,7 +55,6 @@ internal static class TestScenes
             [.. targets],
             [.. otherModObjects],
             supportOnlyObjects is null ? [] : [.. supportOnlyObjects],
-            supportOnlyObjects is not null,
             [],
             [],
             new Dictionary<RecordKey, SpaceFact>(),

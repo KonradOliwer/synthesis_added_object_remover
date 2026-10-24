@@ -6,8 +6,7 @@ namespace AddedObjectRemover;
 internal sealed record PlacedRecordHandle(IPlacedGetter Record, PlacedRecordLocation Location);
 
 /// <summary>
-/// The plugin tool's record map: the load-order records of the target spaces that can be written, those of the target plugin and
-/// those it overrides, by <see cref="RecordKey"/>.
+/// The plugin tool's record map: the winning load-order records of the target spaces, which can be written, by <see cref="RecordKey"/>.
 /// Only the plugin tool reads it.
 /// </summary>
 internal sealed class RecordHandles(IReadOnlyDictionary<RecordKey, PlacedRecordHandle> handles) : IWritableRecords

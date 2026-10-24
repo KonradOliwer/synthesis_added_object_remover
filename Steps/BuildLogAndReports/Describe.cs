@@ -79,6 +79,10 @@ internal static class Describe
         TouchingRemoval touching => $"touches removed {RecordNames.Describe(world.Targets[touching.TouchedTargetIndex])}",
         SupportRemoval support =>
             $"{TextFormat.Percent(support.RemovedShare)} of its support was removed (mostly {RecordNames.Describe(world.Targets[support.MainRemovedSupporter])})",
+        TouchingAnotherModsObjectRemoval touching => $"touches {OtherObject(touching.Touched)}, another mod's object left without support",
+        SupportWithAnotherModsObjectRemoval support =>
+            $"{TextFormat.Percent(support.RemovedShare)} of its support was removed or pulled down (mostly {OtherObject(support.MainSupporter)}, "
+            + "another mod's object left without support)",
         LeftBehindRemoval { Evaluation: var evaluation } => $"invisible, {LeftBehindReason(evaluation)}",
         LinkedRemoval linked => $"linked to removed {RecordNames.Describe(world.Targets[linked.LinkedToTargetIndex])}",
         _ => throw new UnreachableException($"Unknown removal type {removal.GetType().Name}."),

@@ -366,14 +366,8 @@ public class RunSettingsValidationTests
     }
 
     [Fact]
-    public void SurroundingsAreReadForSupportModeAndNavmeshesOnlyForMarkerMoves()
+    public void SurroundingsAreAlwaysReadAndNavmeshesOnlyForMarkerMoves()
     {
-        var supportOnly = SettingsFor();
-        supportOnly.TerrainChange.RemoveOnChangedTerrain = false;
-        supportOnly.LeftoverInvisibleObjects.MoveKeptMarkersOutOfOtherModsObjects = false;
-        supportOnly.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.OnlyWhatLosesItsSupport };
-        Assert.Equal(new WhatToCollect(true, true, false, false, false, false, false, 10f), BuildReady(supportOnly).Settings.Read);
-
         var relocating = SettingsFor();
         relocating.TerrainChange.RemoveOnChangedTerrain = false;
         relocating.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.EverythingTouchingIt };
@@ -383,14 +377,47 @@ public class RunSettingsValidationTests
             MoveKeptMarkersOutOfOtherModsObjects = true,
         };
         var runSettings = BuildReady(relocating).Settings;
-        Assert.Equal(new WhatToCollect(true, true, true, false, false, false, false, 10f), runSettings.Read);
+        Assert.Equal(new WhatToCollect(true, false, false, false, false, 10f), runSettings.Read);
         Assert.NotNull(runSettings.MarkerMoves);
 
         var neither = SettingsFor();
         neither.TerrainChange.RemoveOnChangedTerrain = false;
         neither.LeftoverInvisibleObjects.MoveKeptMarkersOutOfOtherModsObjects = false;
-        neither.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.EverythingTouchingIt };
-        Assert.Equal(new WhatToCollect(false, false, false, false, false, false, false, 10f), BuildReady(neither).Settings.Read);
+        neither.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.Nothing };
+        Assert.Equal(new WhatToCollect(false, false, false, false, false, 10f), BuildReady(neither).Settings.Read);
+    }
+
+    [Fact]
+    public void OtherModsObjectsAreJudgedByTheGapAndShareOfTheAlsoRemoveGroup()
+    {
+        var settings = SettingsFor();
+        settings.FollowUpRemoval = new FollowUpRemovalSettings
+        {
+            Mode = FollowUpRemovalMode.Nothing,
+            TouchDistance = 12f,
+            AnchoringThresholdPercent = 40f,
+            OtherModsObjectsLeftWithoutSupport = OtherModsObjectsHandling.RemoveFloatingObject,
+        };
+
+        var otherModsObjects = BuildReady(settings).Settings.OtherModsObjects;
+
+        Assert.Equal(new OtherModsObjectsSettings(OtherModsObjectsHandling.RemoveFloatingObject, 12f, 0.4f), otherModsObjects);
+    }
+
+    [Fact]
+    public void OtherModsObjectsArePulledToTheGroundByDefault() =>
+        Assert.Equal(OtherModsObjectsHandling.PullObjectToTheGround, BuildReady(SettingsFor()).Settings.OtherModsObjects.Handling);
+
+    [Fact]
+    public void AnUndefinedOtherModsObjectsValueIsReplacedByTheDefaultWithAWarning()
+    {
+        var settings = SettingsFor();
+        settings.FollowUpRemoval.OtherModsObjectsLeftWithoutSupport = (OtherModsObjectsHandling)99;
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(SettingDefaults.OtherModsObjects, ready.Settings.OtherModsObjects.Handling);
+        Assert.Contains(ready.Warnings, warning => warning.Message.Contains("Other mods' objects left without support", StringComparison.Ordinal));
     }
 
     [Theory]

@@ -59,6 +59,7 @@ internal sealed class PlacedRecordReader
     private readonly Dictionary<RecordKey, List<PlacedVersionFact>> _openVersions = new();
     private readonly Dictionary<RecordKey, PlacedRecordHandle> _handles = new();
     private readonly List<LinkFact> _links = [];
+    private readonly HashSet<RecordKey> _linkedFromPlacedRecords = [];
     private readonly Dictionary<RecordKey, RecordKey> _landWorldspaceOf = new();
     private readonly Dictionary<RecordKey, RecordKey> _waterWorldspaceOf = new();
     private readonly Dictionary<ExteriorCell, ILandscapeGetter> _landscapes = new();
@@ -261,10 +262,9 @@ internal sealed class PlacedRecordReader
         var winner = ReadVersion(record, cell);
         _records.Add(CreateFact(record, key, cell, winner));
         StartVersions(key, winner);
-        if (cell.InTargetSpace && (key.Plugin == _scope.Target || _footprint.OverriddenRecords.Contains(key)))
-        {
-            _handles.Add(key, new PlacedRecordHandle(record, new PlacedRecordLocation(_winningCells[cell.Cell.Key], persistent)));
-        }
+        if (!cell.InTargetSpace) return;
+
+        _handles.Add(key, new PlacedRecordHandle(record, new PlacedRecordLocation(_winningCells[cell.Cell.Key], persistent)));
     }
 
     private void StartVersions(RecordKey key, PlacedVersionFact winner)
@@ -287,7 +287,7 @@ internal sealed class PlacedRecordReader
     {
         if (!cell.CollectReferences && !cell.InTargetSpace) return false;
         var linksBefore = _links.Count;
-        LinkReader.ReadFromPlaced(record, key, linked => IsLinkRead(linked, cell), _names, _links);
+        LinkReader.ReadFromPlaced(record, key, linked => IsLinkRead(linked, cell), _names, _links, cell.InTargetSpace ? _linkedFromPlacedRecords : null);
         return _links.Count > linksBefore;
     }
 
@@ -337,7 +337,8 @@ internal sealed class PlacedRecordReader
             _footprint.OverriddenRecords,
             [.. _links],
             _navmeshes.Values.Sum(navmeshes => navmeshes.Count),
-            cellAreas);
+            cellAreas,
+            _linkedFromPlacedRecords);
         var water = new CellWater(_scope.Water ? _cellWaterCopies : null, CollectWorldspaceWater(), _waterWorldspaceOf);
         return new ScannedRecords(facts, new ScanLookups(new RecordHandles(_handles), terrain, water, new NavmeshRecords(_navmeshes)));
     }

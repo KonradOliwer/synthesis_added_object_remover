@@ -33,6 +33,7 @@ public static class SettingDefaults
     public const FollowUpRemovalMode FollowUpMode = FollowUpRemovalMode.OnlyWhatLosesItsSupport;
     public const float TouchDistance = 8f;
     public const float AnchoringThresholdPercent = 50f;
+    public const OtherModsObjectsHandling OtherModsObjects = OtherModsObjectsHandling.PullObjectToTheGround;
     public const float SearchRadius = 1024f;
     public const int DirectionThresholdPercent = 50;
     public const int RemovedDirectionsPercent = 60;

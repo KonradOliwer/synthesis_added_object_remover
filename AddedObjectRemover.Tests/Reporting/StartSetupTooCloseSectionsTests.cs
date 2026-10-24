@@ -731,7 +731,6 @@ public sealed class StartSetupTooCloseSectionsTests
             [.. targets],
             [CreateOtherModObject(0, "Alpha"), CreateOtherModObject(1, "Beta")],
             ImmutableArray.Create(CreateOtherModObject(2, "Gamma")),
-            true,
             [],
             [],
             new Dictionary<RecordKey, SpaceFact> { [space] = new(space, "Tamriel", SpaceKind.Worldspace, "Skyrim") },

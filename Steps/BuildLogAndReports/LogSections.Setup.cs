@@ -105,7 +105,7 @@ internal static partial class LogSections
     private static IEnumerable<string> RecordedCounts(CollectedObjects world)
     {
         var counts = world.Counts;
-        var supporterCount = world.SupportOnlyObjectsCollected ? world.OtherModObjects.Length + world.RequireSupportOnlyObjects().Length : 0;
+        var supporterCount = world.OtherModObjects.Length + world.SupportOnlyObjects.Length;
         if (supporterCount > 0)
         {
             yield return $"  Recorded {TextFormat.Count(supporterCount)} placed objects of any plugin as possible supporters or obstacles.";

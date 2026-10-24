@@ -182,7 +182,6 @@ public sealed class AreaLinesTests
             [.. targets],
             [],
             [],
-            false,
             [],
             [],
             new Dictionary<RecordKey, SpaceFact> { [Skyrim.Key] = Skyrim, [Interior] = BanneredMare },

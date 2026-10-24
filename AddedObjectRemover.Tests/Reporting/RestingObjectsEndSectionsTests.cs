@@ -324,7 +324,8 @@ public sealed class RestingObjectsEndSectionsTests
     [Fact]
     public void Write_ShowsTheTimeOnlyInTheDetailedLogAndTheEnableParentLineAlways()
     {
-        var written = new WriteSummary(Removed: [.. Enumerable.Range(0, 5).Select(index => new TargetId(index))], Moved: 2, EnableParentsReplaced: 3, Fitted: 0);
+        var written = new WriteSummary(
+            Removed: [.. Enumerable.Range(0, 5).Select(index => new TargetId(index))], Moved: 2, EnableParentsReplaced: 3, Fitted: 0, OtherModsObjectsRemoved: 0, OtherModsObjectsPulledDown: 0);
 
         Assert.Equal(
             [
@@ -338,7 +339,17 @@ public sealed class RestingObjectsEndSectionsTests
     [Fact]
     public void Write_OmitsTheEnableParentLineWhenNoneWasReplaced()
     {
-        Assert.Single(LogSections.BuildWriteSection(new WriteSummary([new TargetId(0)], 0, 0, 0), Elapsed, Normal).Lines.ToList());
+        Assert.Single(LogSections.BuildWriteSection(new WriteSummary([new TargetId(0)], 0, 0, 0, 0, 0), Elapsed, Normal).Lines.ToList());
+    }
+
+    [Fact]
+    public void Write_NamesTheOtherModsObjectsPulledDownAndRemovedOnlyWhenThereAreAny()
+    {
+        var written = new WriteSummary([new TargetId(0)], Moved: 0, EnableParentsReplaced: 0, Fitted: 1, OtherModsObjectsRemoved: 2, OtherModsObjectsPulledDown: 3);
+
+        Assert.Equal(
+            "Wrote 7 overrides (1 removed, 0 moved, 1 shrunk or turned to fit; other mods' objects: 3 pulled down, 2 removed).",
+            LogSections.BuildWriteSection(written, Elapsed, Normal).Lines[0]);
     }
 
     [Fact]
@@ -649,7 +660,6 @@ public sealed class RestingObjectsEndSectionsTests
             [.. targets],
             [CreateOtherModObject()],
             [],
-            false,
             [],
             [],
             new Dictionary<RecordKey, SpaceFact> { [TestTargets.Space] = new(TestTargets.Space, "Tamriel", SpaceKind.Worldspace, "Skyrim") },

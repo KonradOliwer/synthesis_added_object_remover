@@ -18,6 +18,13 @@ public sealed record TouchingRemoval(int TargetIndex, int TouchedTargetIndex) : 
 /// <param name="MainRemovedSupporter">The removed target holding the largest share of its support.</param>
 public sealed record SupportRemoval(int TargetIndex, float RemovedShare, int MainRemovedSupporter) : RemovedObject(TargetIndex);
 
+/// <param name="Touched">Another mod's object left without support, removed or pulled down, that the object touched where it stood.</param>
+public sealed record TouchingAnotherModsObjectRemoval(int TargetIndex, OtherObject Touched) : RemovedObject(TargetIndex);
+
+/// <param name="RemovedShare">Fraction of the object's support held by removed objects and other mods' objects taken away.</param>
+/// <param name="MainSupporter">The other mod's object left without support, removed or pulled down, holding the largest share of its support.</param>
+public sealed record SupportWithAnotherModsObjectRemoval(int TargetIndex, float RemovedShare, OtherObject MainSupporter) : RemovedObject(TargetIndex);
+
 /// <summary>An invisible target object inside another mod's object or whose surrounding visible target objects were removed.</summary>
 public sealed record LeftBehindRemoval(int TargetIndex, LeftBehindCheck Evaluation) : RemovedObject(TargetIndex);
 

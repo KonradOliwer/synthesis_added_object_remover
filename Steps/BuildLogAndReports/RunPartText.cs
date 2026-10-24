@@ -27,6 +27,10 @@ internal static class RunPartText
         [RestingObjectsParts.TouchChains] = new("the touch-chain search", "The chains of touching objects that the detailed log and the report files list are missing.", Subjects: null),
         [LeftBehindParts.LeftBehind] = new("the step for invisible objects left behind", "That step did not run, so invisible objects whose surroundings were removed were not removed.", Subjects: null),
         [MarkerMoveParts.MarkerMoves] = new("the marker moves", "No kept marker was moved, so markers inside other mods' objects stay where they are.", Subjects: null),
+        [OtherModsObjectsParts.HeldUpTargets] = new(
+            "finding the cleaned mod's objects other mods' objects rest on", "No object was kept because another mod's object rests on it.", Subjects: null),
+        [OtherModsObjectsParts.LeftWithoutSupport] = new(
+            "the step for other mods' objects left without support", "No other mod's object was removed or pulled down.", Subjects: null),
         [RestingObjectsParts.ReportFileDetails] = new("the report-file details", "The touching pairs or mesh origins that the report files list are missing from them.", Subjects: null),
         [FitParts.FitCheck] = new("checking objects shrunk or turned", "Those sizes and turns were not used.", SubjectKind.Object),
         [FitParts.RestingCheck] = new("finding the objects other objects rest on", "No object was shrunk or turned; the objects that were too close were removed.", Subjects: null),

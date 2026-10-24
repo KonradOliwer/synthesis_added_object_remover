@@ -205,7 +205,7 @@ public sealed class SharedReportingTests
         };
         var protection = CreateProtection(tagged.Targets);
         var decided = new StepResults(
-            tagged, protection, new RemovalRisks([], []), ChangedTerrainResult.SwitchedOff, null!, TestLeftBehind.PerformedWithoutFindings, null!, decisions);
+            tagged, protection, new RemovalRisks([], []), ChangedTerrainResult.SwitchedOff, null!, TestLeftBehind.PerformedWithoutFindings, null!, null!, decisions);
 
         var hints = ManualPatchHints.FindManualPatchHints(decided, TestVisibility.OfTaggedBasesOnly(), RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(decided.Final), decided.Final, decided.Collected, decided.LeftBehind));
 
@@ -233,7 +233,7 @@ public sealed class SharedReportingTests
             TestTargets.References(TargetCount, new Dictionary<int, KeepReason> { [Protected] = QuestReason, [ProtectedTouching] = listed }),
             TestBaseFacts.Unresolved);
         var decided = new StepResults(
-            visible, protection, new RemovalRisks([], []), ChangedTerrainResult.SwitchedOff, null!, TestLeftBehind.PerformedWithoutFindings, null!, decisions);
+            visible, protection, new RemovalRisks([], []), ChangedTerrainResult.SwitchedOff, null!, TestLeftBehind.PerformedWithoutFindings, null!, null!, decisions);
 
         var hints = ManualPatchHints.FindManualPatchHints(decided, TestVisibility.OfTaggedBasesOnly(), RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(decided.Final), decided.Final, decided.Collected, decided.LeftBehind));
 
@@ -322,7 +322,6 @@ public sealed class SharedReportingTests
             [.. targets],
             [CreateOtherModObject()],
             [],
-            false,
             [],
             [],
             new Dictionary<RecordKey, SpaceFact> { [TestTargets.Space] = new(TestTargets.Space, "Tamriel", SpaceKind.Worldspace, "Skyrim") },

@@ -291,7 +291,8 @@ public sealed class TablesTests : IDisposable
             targets, Shapes, protection, terrainSeeds is null ? [0, 2] : [2], TouchDistance, threads: 2, collectDiagnostics: true, terrainSeeds);
         var world = CreateWorld(targets, out _);
         var decided = new StepResults(
-            world, protection, new RemovalRisks([], []), ChangedTerrainResult.SwitchedOff, run.Result, LeftBehindResult.SwitchedOff, MarkerMoves.SwitchedOff, run.RemovalDecisions);
+            world, protection, new RemovalRisks([], []), ChangedTerrainResult.SwitchedOff, run.Result, LeftBehindResult.SwitchedOff, MarkerMoves.SwitchedOff,
+            OtherModsObjectsResult.SwitchedOff, run.RemovalDecisions);
         var removals = RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(run.RemovalDecisions), run.RemovalDecisions, world, TestLeftBehind.PerformedWithoutFindings).ToImmutableArray();
         var outcome = new RunOutcome(decided, removals, ManualPatchHints.FindManualPatchHints(decided, Shapes, removals), null!, default);
         return new Scene(outcome, run);
@@ -328,7 +329,6 @@ public sealed class TablesTests : IDisposable
             [.. targets],
             [otherModObject],
             [],
-            false,
             [],
             [],
             new Dictionary<RecordKey, SpaceFact> { [TestTargets.Space] = new(TestTargets.Space, "Tamriel, Test", SpaceKind.Worldspace, "Skyrim, Test") },

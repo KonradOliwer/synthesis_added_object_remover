@@ -26,6 +26,7 @@ internal static partial class Tables
         if (outcome.LeftBehind.Outcome != StepOutcome.SwitchedOff) tables.Add(BuildLeftBehindTable(outcome.Collected, outcome.LeftBehind.Evaluations, outcome.MarkerMoves, context));
         tables.Add(BuildRemovalsTable(outcome.Collected, outcome.Removals, context));
         if (BuildFitsTable(outcome.Collected, outcome.Final, context) is { } fits) tables.Add(fits);
+        if (BuildLeftWithoutSupportTable(outcome.Collected, outcome.OtherModsObjects, context) is { } leftWithoutSupport) tables.Add(leftWithoutSupport);
         tables.Add(BuildHintsTable(outcome.Collected, outcome.Hints));
         return tables.ToImmutable();
     }

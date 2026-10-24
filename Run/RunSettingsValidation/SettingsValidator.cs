@@ -41,6 +41,7 @@ public static class SettingsValidator
     private const string FollowUpModeName = "Also remove what rests on removed objects > When an object is removed, also remove";
     private const string TouchDistanceName = "Also remove what rests on removed objects > Gap that still counts as touching";
     private const string AnchoringThresholdName = "Also remove what rests on removed objects > OnlyWhatLosesItsSupport: remove when this much support is gone";
+    private const string OtherModsObjectsName = "Also remove what rests on removed objects > Other mods' objects left without support";
     private const string SurroundingObjectsGroup = "Invisible objects left behind > When the cleaned mod's visible objects around it were removed > ";
     private const string SearchRadiusName = SurroundingObjectsGroup + "Look this far around it";
     private const string DirectionThresholdName = SurroundingObjectsGroup + "A direction is cleared when this much of it was removed";
@@ -95,6 +96,7 @@ public static class SettingsValidator
         var movedDistance = NotNegative(settings.ShrinkOrTurn.MovedDistanceInUnits, SettingDefaults.MovedDistanceInUnits, MovedDistanceName, warnings);
         var fit = CreateFitSettings(settings.ShrinkOrTurn, warnings);
         var alsoRemove = CreateAlsoRemoveSettings(settings.FollowUpRemoval, touchChainsShown: detailedLogAndReports, warnings);
+        var otherModsObjects = CreateOtherModsObjectsSettings(settings.FollowUpRemoval, alsoRemove, warnings);
         var leftoverSettings = settings.LeftoverInvisibleObjects;
         var leftBehind = CreateLeftBehindSettings(leftoverSettings, warnings);
         var markerMoves = CreateMarkerMoveSettings(leftoverSettings);
@@ -104,12 +106,13 @@ public static class SettingsValidator
             targetListing.Mod,
             targetAsTyped,
             modTrust,
-            CreateWhatToCollect(alsoRemove.Mode, markerMoves, changedTerrain, detailedLogAndReports, movedDistance),
+            CreateWhatToCollect(markerMoves, changedTerrain, detailedLogAndReports, movedDistance),
             new SelectionSettings(tooClose.Npcs),
             changedTerrain,
             tooClose,
             fit,
             alsoRemove,
+            otherModsObjects,
             leftoverSettings.RemoveLeftoverInvisibleObjects ? leftBehind : null,
             markerMoves,
             reports,
@@ -352,6 +355,14 @@ public static class SettingsValidator
         return new AlsoRemoveSettings(mode, touchDistance, supportPercent /Percent.PerWhole, touchChainsShown);
     }
 
+    /// <param name="alsoRemove">The validated group, whose gap and threshold other mods' objects are judged by too.</param>
+    private static OtherModsObjectsSettings CreateOtherModsObjectsSettings(
+        IFollowUpSettingsValues followUp, AlsoRemoveSettings alsoRemove, ICollection<SettingWarning> warnings) =>
+        new(
+            ValidateDefined(followUp.OtherModsObjectsLeftWithoutSupport, SettingDefaults.OtherModsObjects, OtherModsObjectsName, warnings),
+            alsoRemove.TouchGap,
+            alsoRemove.SupportLostFraction);
+
     private static MarkerMoveSettings? CreateMarkerMoveSettings(ILeftoverSettingsValues leftovers) =>
         leftovers.RemoveLeftoverInvisibleObjects && leftovers.MoveKeptMarkersOutOfOtherModsObjects ? new MarkerMoveSettings(MarkerMoveLimits.MaxDistance) : null;
 
@@ -363,18 +374,15 @@ public static class SettingsValidator
         source is SettingsSource.ConfigFile file ? Path.Combine(reportsFolder, file.Name) : reportsFolder;
 
     /// <summary>
-    /// The surroundings are read only when follow-up removal or relocation needs them; the Editor ID lists only when the detailed
-    /// log prints them; every plugin's terrain only when the changed-terrain step runs, its texture layers only when it counts terrain
-    /// types, and its water only when it counts a water change.
+    /// The navmeshes are read only when relocation needs them; the Editor ID lists only when the detailed log prints them; every
+    /// plugin's terrain only when the changed-terrain step runs, its texture layers only when it counts terrain types, and its water
+    /// only when it counts a water change.
     /// </summary>
     /// <param name="movedDistance">The validated distance that counts as moved.</param>
     private static WhatToCollect CreateWhatToCollect(
-        FollowUpRemovalMode mode, MarkerMoveSettings? markerMoves, ChangedTerrainSettings changedTerrain, bool detailedLog, float movedDistance)
+        MarkerMoveSettings? markerMoves, ChangedTerrainSettings changedTerrain, bool detailedLog, float movedDistance)
     {
-        var needsSurroundings = mode == FollowUpRemovalMode.OnlyWhatLosesItsSupport || markerMoves != null;
         return new WhatToCollect(
-            needsSurroundings,
-            needsSurroundings,
             markerMoves != null,
             detailedLog,
             changedTerrain.On,

@@ -130,6 +130,22 @@ public class PlacedRecordFactReadingTests
     }
 
     [Fact]
+    public void TheRecordsPlacedRecordsOfTheTargetSpacesLinkToAreCollectedButNotTheirBasesNorLinksFromElsewhere()
+    {
+        var parent = AddPlaced(_ => { }, persistentList: true);
+        AddPlaced(record => record.EnableParent = EnableParentOf(parent, flags: 0), persistentList: false);
+        var linkedFromElsewhere = AddPlaced(_ => { }, persistentList: true);
+        var linker = new FixtureMod(LinkerPlugin, _base, _target);
+        var elsewhere = new Cell(linker.NextKey(), FixtureMod.Release) { Flags = Cell.Flag.IsInteriorCell };
+        linker.Mod.Cells.AddInteriorCell(elsewhere);
+        AddPlaced(record => record.EnableParent = EnableParentOf(linkedFromElsewhere, flags: 0), persistentList: false, elsewhere, linker);
+
+        var linked = Read(workers: 1, linker).LinkedFromPlacedRecords;
+
+        Assert.Equal(new HashSet<RecordKey> { parent.ToRecordKey() }, linked.ToHashSet());
+    }
+
+    [Fact]
     public void AScriptOnTheRecordNamingABaseGameQuestIsRead()
     {
         var quest = new Quest(_base.NextKey(), FixtureMod.Release) { EditorID = "BaseQuest" };
@@ -339,7 +355,7 @@ public class PlacedRecordFactReadingTests
         var collected = PlacedObjectCollector.Collect(
             new PluginRecordsFactory(world, Environment.ProcessorCount).Open(),
             table,
-            new WhatToCollect(SupportOnlyObjects: false, Terrain: false, Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits));
+            new WhatToCollect(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits));
 
         Assert.All(plugins, plugin => Assert.True(table.Plugins.ContainsKey(plugin)));
         Assert.Contains(new PluginName(BelowPlugin), table.Plugins.Keys);

@@ -26,6 +26,8 @@ public class ProductionTypeTests
     {
         ["MeshLimits"] = "named constants: the mesh size limits",
         ["MarkerMoveLimits"] = "named constants: the marker move limit",
+        ["OtherModsObjectsLimits"] = "named constants: how far another mod's object is pulled down",
+        ["OtherModsObjectsParts"] = "named constants: the part keys the step for other mods' objects records its unexpected errors under",
         ["RemovalConvention"] = "named constants: the game's convention for a placed object switched off for good",
         ["ReportFileNames"] = "named constants: the report file names",
         ["SelectionParts"] = "named constants: the part key the select step records its unexpected errors under",
@@ -53,7 +55,6 @@ public class ProductionTypeTests
     private static readonly Dictionary<string, string> AllowedMembers = new()
     {
         ["CollectedObjects.Other"] = "index accessor",
-        ["CollectedObjects.RequireSupportOnlyObjects"] = "accessor that fails when the objects were not collected",
         ["CollectedObjects.TargetSpaces"] = "accessor over the collected objects",
         ["CollectedObjects.OtherModAndSupportOnlyObjects"] = "accessor joining two collected lists",
         ["CollectedObjects.Item"] = "indexer",
@@ -71,10 +72,15 @@ public class ProductionTypeTests
         ["ObjectVisibility.IsVisible"] = "one-line value derived from its own fields",
         ["OtherObject.Transform"] = "one-line value derived from its own fields",
         ["OtherObject.IsPlacedNpc"] = "one-line value derived from its own fields",
+        ["OtherModsObjectOutcome.NewPosition"] = "one-line value derived from its own fields",
         ["TargetObject.Placement"] = "one-line value derived from its own fields",
         ["TargetObject.PlacedAt"] = "one-line copy of itself at a given placement, for the rules asked about a shrunk or turned object",
         ["RunSettings.DetailedLog"] = "one-line value derived from its own fields: the one setting that has the report files, so it is stored once",
         ["ModTrustTable.IsPatch"] = "one-line rule over its own field",
+        ["ModTrustTable.IsTrustedItself"] = "one-line fact over its own entries: a rule names the plugin itself as trusted",
+        ["ModTrustTable.IsBaseGame"] = "one-line fact over its own entries: the plugin is one of the game's own",
+        ["ModTrustTable.IsMasterOfCleanedMod"] = "one-line fact over its own entries: the cleaned mod lists the plugin as a master",
+        ["ModTrustTable.IsNeverTrusted"] = "one-line fact over its own entries: the user listed the plugin as never trusted",
         ["ModTrustTable.VersionTrustOf"] = "the one mapping of a plugin's trust to the version trust of the accepted-value rule, over its own fields",
         ["ChangedTerrainSettings.CountsWaterChanges"] = "one-line value derived from its own fields: either water switch, asked by the validator, the step and the log",
         ["SectorAreas.Removed"] = "index accessor",

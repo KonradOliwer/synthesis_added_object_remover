@@ -9,6 +9,7 @@ namespace AddedObjectRemover.Run.RunAllSteps.Contracts;
 /// <param name="Log">Where the log sections go.</param>
 /// <param name="ReportOutput">Where the report files go.</param>
 /// <param name="TimeSinceStart">The time since the program started; only the entry reads the clock.</param>
+/// <param name="UnreadableRecordsReported">The unreadable records the log named so far; the runs of a batch name each record once, in the batch's order.</param>
 public sealed record RunEnvironment(
     LoadOrderPlugins Plugins,
     IPluginRecordsFactory PluginRecords,
@@ -17,4 +18,5 @@ public sealed record RunEnvironment(
     IBaseFactsFactory Bases,
     ILogSink Log,
     IReportOutput ReportOutput,
-    Func<TimeSpan> TimeSinceStart);
+    Func<TimeSpan> TimeSinceStart,
+    UnreadableRecordsReported UnreadableRecordsReported);

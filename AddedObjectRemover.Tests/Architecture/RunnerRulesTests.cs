@@ -11,7 +11,7 @@ namespace AddedObjectRemover.Tests.Architecture;
 /// checked on the source text (comments and literals removed): it reads no member of a settings record, it has no
 /// conditions of its own, and it holds no error boundary. A new settings read, condition or error boundary fails here.
 /// It also carries nothing from one run to the next, so chained Standard runs equal one Batch run: the only state that
-/// crosses runs is what the patch writing writes into the patch. The runner holds no field, its loop over the requests hands
+/// crosses runs is what the patch writing writes into the patch, and which unreadable records the log has named. The runner holds no field, its loop over the requests hands
 /// each run only its request and the environment, every member of the environment is listed with why no run changes it,
 /// nothing the environment shares holds what a run opens, and each run's link cache is built when that run opens its plugin
 /// records, so it is dropped with them.
@@ -54,6 +54,8 @@ public class RunnerRulesTests
         ["Log"] = "Only prints; no run reads it back.",
         ["ReportOutput"] = "Writes each run's report files into that run's folder; no run reads them back.",
         ["TimeSinceStart"] = "Reads the clock; the times go into log lines only.",
+        ["UnreadableRecordsReported"] =
+            "Only the log lines read it: a run names an unreadable record once per Synthesis run, so a later run leaves out the lines an earlier run printed. No decision, patch record or report file depends on it.",
     };
 
     /// <summary>What a run opens for itself and drops when it ends; nothing the environment shares may hold one.</summary>

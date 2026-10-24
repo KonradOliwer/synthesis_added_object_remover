@@ -55,6 +55,6 @@ internal static class LinkRule
     private static KeepReason CreateReason(LinkFact fact)
     {
         if (fact.SourceIsPlaced) return new KeepReason(fact.Relation == RelationKind.TeleportDestination ? KeepKind.TeleportDoor : KeepKind.PlacedReference, fact);
-        return new KeepReason(fact.Relation == RelationKind.UnreadableRecord ? KeepKind.UnreadableRecord : KeepKind.NonPlacedReference, fact);
+        return new KeepReason(KeepKind.NonPlacedReference, fact);
     }
 }

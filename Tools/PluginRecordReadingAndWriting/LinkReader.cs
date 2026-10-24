@@ -68,7 +68,7 @@ internal static class LinkReader
                 catch (MalformedDataException ex)
                 {
                     unreadable.Add(new UnreadableRecord(
-                        names.KeyOf(record.FormKey), record.EditorID, record.Registration.Name, ex.Message, LinkablePlugins.Of(mod, names)));
+                        names.KeyOf(record.FormKey), record.EditorID, record.Registration.Name, ex.Message));
                 }
             }
         }

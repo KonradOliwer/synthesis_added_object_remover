@@ -66,24 +66,9 @@ public sealed class PlacedObjectCollector
 
         var targetKeys = collector._targets.Select(target => target.Key).ToHashSet();
         var nonPlaced = plugin.ReadLinks(trust.CleanedMod, targetKeys);
-        var links = collector.KeepLinksIntoTargets(
-            [.. facts.Links, .. nonPlaced.Links, .. collector.CreateLinksFromUnreadable(nonPlaced.Unreadable)], targetKeys);
+        var links = collector.KeepLinksIntoTargets([.. facts.Links, .. nonPlaced.Links], targetKeys);
         return collector.CreateCollectedObjects(links, nonPlaced.Unreadable);
     }
-
-    /// <summary>An unreadable record may link to every checked object of its own plugin and of its masters.</summary>
-    private IEnumerable<LinkFact> CreateLinksFromUnreadable(IEnumerable<UnreadableRecord> unreadable) =>
-        unreadable.SelectMany(record => _targets
-            .Where(target => record.LinkablePlugins.Contains(target.Key.Plugin))
-            .Select(target => new LinkFact(
-                record.Key,
-                record.EditorId,
-                record.RecordType,
-                target.Key,
-                RelationKind.UnreadableRecord,
-                SourceIsPlaced: false,
-                SourceIsWorldspace: false,
-                AliasFillFlags.None)));
 
     /// <remarks>
     /// A fully trusted version's values are accepted whatever lies below it, so no lower version can change a decision. The cleaned

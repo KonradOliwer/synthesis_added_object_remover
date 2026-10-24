@@ -105,7 +105,7 @@ public class LogicPublicTypesTests
         ["WriteThePatch"] = ["static WriteSummary Write(IRemovalDecisions, ImmutableArray<TargetObject>, IPluginRecords, IPatchWriting)"],
         ["BuildLogAndReports"] =
         [
-            "LogAndReports(RunSettings, ReportFolderPrepared, ILoadOrderCaches, IUnexpectedErrors)",
+            "LogAndReports(RunSettings, ReportFolderPrepared, ILoadOrderCaches, IUnexpectedErrors, UnreadableRecordsReported)",
             "static ImmutableArray<LogSection> BuildReportFolderSections(ReportFolderPrepared)",
             "static ImmutableArray<LogSection> BuildStartSections(RunRequest)",
             "static ImmutableArray<LogSection> BuildStopSections(StopReason, SettingsSource)",

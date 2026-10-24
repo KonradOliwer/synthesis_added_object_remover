@@ -57,7 +57,8 @@ internal static class FixtureRun
                 new WrappedBaseFactsFactory(new BaseFactsFactory(world.Plugins.Mods), wrapBases),
                 log,
                 new CsvReportOutput(),
-                timeSinceStart ?? (() => TimeSpan.Zero));
+                timeSinceStart ?? (() => TimeSpan.Zero),
+                new UnreadableRecordsReported());
             var result = Assert.Single(StepRunner.PatchLoadOrder([request], environment));
             inspectPatch?.Invoke(state.PatchMod);
             return result;

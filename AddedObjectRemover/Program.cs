@@ -102,7 +102,8 @@ public static class Program
             new BaseFactsFactory(world.Plugins.Mods),
             new ConsoleLogSink(),
             new CsvReportOutput(),
-            () => totalTimer.Elapsed);
+            () => totalTimer.Elapsed,
+            new UnreadableRecordsReported());
 
     /// <summary>
     /// A folder in the patcher's own data folder in Synthesis ("Data\&lt;profile&gt;\&lt;patcher name&gt;"), which lasts between runs

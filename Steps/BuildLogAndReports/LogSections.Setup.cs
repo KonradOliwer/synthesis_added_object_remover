@@ -12,7 +12,9 @@ internal static partial class LogSections
     /// What the load-order read found, then a warning line per record that could not be read; the list of overridden other-mod
     /// objects and the index sizes only the detailed log shows.
     /// </summary>
-    public static LogSection BuildScanSection(CollectedObjects world, PluginName target, TimeSpan elapsed, ReportContext context)
+    /// <param name="unreadableToName">The unreadable records of the world that no earlier run of the batch named.</param>
+    public static LogSection BuildScanSection(
+        CollectedObjects world, ImmutableArray<UnreadableRecord> unreadableToName, PluginName target, TimeSpan elapsed, ReportContext context)
     {
         var counts = world.Counts;
         var lines = ImmutableArray.CreateBuilder<string>();
@@ -47,9 +49,9 @@ internal static partial class LogSections
             lines.Add($"  Ignored {TextFormat.Count(counts.OthersUnchanged)} objects of other mods that the game shows with their accepted values.");
         }
         if (context.Detailed) lines.AddRange(RecordedCounts(world));
-        lines.AddRange(world.UnreadableRecords.Select(record =>
+        lines.AddRange(unreadableToName.Select(record =>
             $"Warning: could not read {record.RecordType} {RecordLabels.Of(record.Key, record.EditorId)}: {record.Problem}. "
-            + "The objects to check that it may link to are kept."));
+            + "Its links were not all checked."));
         return new LogSection("scan", lines.ToImmutable());
     }
 

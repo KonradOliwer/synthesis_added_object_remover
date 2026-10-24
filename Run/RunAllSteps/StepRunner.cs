@@ -37,7 +37,8 @@ namespace AddedObjectRemover.Run.RunAllSteps;
 /// Runs the patch runs of a batch one after the other. Each run creates its own caches, runs the steps in order and
 /// hands each step's result to the log and reports as the step ends, printing the sections it returns; then it
 /// writes the report files. All decisions of a run are made before its patch is written. Nothing passes between runs: a
-/// run decides from the world, which includes what earlier runs wrote into the patch.
+/// run decides from the world, which includes what earlier runs wrote into the patch. Only the environment's record of
+/// the unreadable records the log has named passes between the logs of the runs.
 /// </summary>
 public static class StepRunner
 {
@@ -79,7 +80,7 @@ public static class StepRunner
             bases,
             TooCloseObjects.NpcBodyRules,
             TooCloseObjects.PlacedNpcRules);
-        var report = new LogAndReports(settings, reportFolder, loadOrderCaches, unexpectedErrors);
+        var report = new LogAndReports(settings, reportFolder, loadOrderCaches, unexpectedErrors, environment.UnreadableRecordsReported);
         return new RunScope(settings, source, environment, plugin, loadOrderCaches, unexpectedErrors, report, reportFolder);
     }
 

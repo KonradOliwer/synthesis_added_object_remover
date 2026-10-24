@@ -8,7 +8,7 @@ using Mutagen.Bethesda.Skyrim;
 
 namespace AddedObjectRemover.Tests.LoadOrder;
 
-/// <summary>A record the game library cannot parse is reported, the rest is still read, and the objects it may link to are kept.</summary>
+/// <summary>A record the game library cannot parse is reported once per run of the patcher and the rest is still read; no object is kept because of it.</summary>
 public class UnreadableRecordTests : IDisposable
 {
     private static readonly byte[] ParameterTypeTag = "EPFT"u8.ToArray();
@@ -18,8 +18,6 @@ public class UnreadableRecordTests : IDisposable
     private static readonly PluginName OtherPlugin = new("Other.esp");
     private static readonly WhatToCollect Plan = new(SupportOnlyObjects: false, Terrain: false, Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits);
     private static readonly ModTrustTable Mods = TestModTrust.Of(TestTargets.TargetName, TestTargets.PatchName, trusted: [], untrusted: [OtherPlugin]);
-
-    private static readonly ReportContext Context = new(null!, null!, Detailed: false);
 
     private readonly string _folder = Directory.CreateTempSubdirectory().FullName;
     private readonly FixtureMod _base = new("Base.esm");
@@ -64,58 +62,53 @@ public class UnreadableRecordTests : IDisposable
         Assert.Equal("Perk", record.RecordType);
         Assert.Equal("BrokenPerk", record.EditorId);
         Assert.Contains("expected parameter type flag", record.Problem);
-        Assert.Equal(new HashSet<PluginName> { _target.Key.ToPluginName(), broken.Key.ToPluginName() }, record.LinkablePlugins);
         Assert.Equal("Location", Assert.Single(facts).SourceRecordType);
     }
 
     [Fact]
-    public void AnUnreadableRecordMayLinkToEveryCheckedObjectOfItsOwnPluginAndMasters()
+    public void NoObjectIsKeptOrLinkedBecauseARecordIsUnreadable()
     {
         var target = TestPlacedRecords.Create(TestTargets.Key(0), TestTargets.TargetName, Vector3.Zero);
-        var mayLink = Unreadable(TestTargets.TargetName);
-        var cannotLink = Unreadable(OtherPlugin);
+        var broken = Unreadable();
 
-        var linked = PlacedObjectCollector.Collect(new FixedFactsPlugin([target]) { Unreadable = [mayLink] }, Mods, Plan);
-        var notLinked = PlacedObjectCollector.Collect(new FixedFactsPlugin([target]) { Unreadable = [cannotLink] }, Mods, Plan);
+        var collected = PlacedObjectCollector.Collect(new FixedFactsPlugin([target]) { Unreadable = [broken] }, Mods, Plan);
 
-        var link = Assert.Single(linked.Links);
-        Assert.Equal((mayLink.Key, target.Key, RelationKind.UnreadableRecord), (link.Source, link.Target, link.Relation));
-        Assert.Empty(notLinked.Links);
-        Assert.Equal(mayLink, Assert.Single(linked.UnreadableRecords));
+        Assert.Empty(collected.Links);
+        Assert.Equal(broken, Assert.Single(collected.UnreadableRecords));
     }
 
     [Fact]
-    public void AnUnreadableRecordKeepsTheObjectItMayLinkToWithAReasonThatSaysSo()
+    public void TheLogNamesTheUnreadableRecordWithItsPluginAndWhatTheLibraryReportedWhetherOrNotAnyCheckedObjectIsLinkable()
     {
-        var link = new LinkFact(
-            new RecordKey(OtherPlugin, 0x10), "BrokenPerk", "Perk", TestTargets.Key(0), RelationKind.UnreadableRecord,
-            SourceIsPlaced: false, SourceIsWorldspace: false, AliasFillFlags.None);
+        var world = TestScenes.CreateWorld([], []) with { UnreadableRecords = [Unreadable()] };
 
-        var outcome = LinkRule.DecideLinkOutcome(TestTargets.CreateMany(1), [link]);
-
-        var reason = Assert.IsType<KeepReason>(Assert.Single(outcome.References));
-        Assert.Equal(KeepKind.UnreadableRecord, reason.Kind);
-        Assert.Equal("record that could not be read", KeepReasonText.Category(reason));
-        Assert.Contains("could not be read and may link to it", KeepReasonText.Detail(reason));
-    }
-
-    [Fact]
-    public void TheLogNamesEachUnreadableRecordWithItsPluginAndWhatTheLibraryReported()
-    {
-        var world = TestScenes.CreateWorld([], []) with { UnreadableRecords = [Unreadable(OtherPlugin)] };
-
-        var lines = LogSections.BuildScanSection(world, TestTargets.TargetName, TimeSpan.Zero, Context).Lines;
+        var lines = TestReport.InBatch(new UnreadableRecordsReported()).CollectedSectionLines(world);
 
         Assert.Equal(
-            "Warning: could not read Perk BrokenPerk [000010:Other.esp]: it is malformed. The objects to check that it may link to are kept.",
-            lines[^1]);
+            "Warning: could not read Perk BrokenPerk [000010:Other.esp]: it is malformed. Its links were not all checked.",
+            Assert.Single(lines, line => line.StartsWith("Warning")));
         Assert.DoesNotContain(
-            LogSections.BuildScanSection(TestScenes.CreateWorld([], []), TestTargets.TargetName, TimeSpan.Zero, Context).Lines,
+            TestReport.InBatch(new UnreadableRecordsReported()).CollectedSectionLines(TestScenes.CreateWorld([], [])),
             line => line.StartsWith("Warning"));
     }
 
-    private static UnreadableRecord Unreadable(PluginName linkable) =>
-        new(new RecordKey(OtherPlugin, 0x10), "BrokenPerk", "Perk", "it is malformed", new HashSet<PluginName> { linkable });
+    [Fact]
+    public void TheLogNamesARecordOnceWhicheverRunsOfTheBatchReadIt()
+    {
+        var world = TestScenes.CreateWorld([], []) with { UnreadableRecords = [Unreadable()] };
+        var reported = new UnreadableRecordsReported();
+
+        var first = TestReport.InBatch(reported).CollectedSectionLines(world);
+        var second = TestReport.InBatch(reported).CollectedSectionLines(world);
+        var other = Unreadable() with { Key = new RecordKey(OtherPlugin, 0x11) };
+        var third = TestReport.InBatch(reported).CollectedSectionLines(world with { UnreadableRecords = [Unreadable(), other] });
+
+        Assert.Single(first, line => line.StartsWith("Warning"));
+        Assert.DoesNotContain(second, line => line.StartsWith("Warning"));
+        Assert.Contains("000011", Assert.Single(third, line => line.StartsWith("Warning")));
+    }
+
+    private static UnreadableRecord Unreadable() => new(new RecordKey(OtherPlugin, 0x10), "BrokenPerk", "Perk", "it is malformed");
 
     private static Perk CreatePerk(FixtureMod mod, string editorId) => new(mod.NextKey(), FixtureMod.Release)
     {

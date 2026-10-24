@@ -18,9 +18,6 @@ public enum RelationKind
     /// <summary>A quest alias fills with the NPC as its Unique Actor (ALUA); the linked record is the NPC base, not a placed one.</summary>
     UniqueActor,
     Other,
-
-    /// <summary>The linking record could not be read, so it is not known whether it links to the record; it may.</summary>
-    UnreadableRecord,
 }
 
 /// <summary>The quest alias flags (FNAM) that say whether the alias can stay empty or fill with a disabled reference.</summary>
@@ -32,11 +29,10 @@ public enum AliasFillFlags
     AllowDisabled = 2,
 }
 
-/// <summary>A record whose data the game library could not parse, so the links it holds are unknown.</summary>
+/// <summary>A record whose data the game library could not parse; the links read from it before the problem are real, the rest are unknown.</summary>
 /// <param name="RecordType">The record type name, e.g. "Perk".</param>
 /// <param name="Problem">What the game library reported.</param>
-/// <param name="LinkablePlugins">The plugins whose records it can link to: its own plugin and that plugin's masters.</param>
-public sealed record UnreadableRecord(RecordKey Key, string? EditorId, string RecordType, string Problem, IReadOnlySet<PluginName> LinkablePlugins);
+public sealed record UnreadableRecord(RecordKey Key, string? EditorId, string RecordType, string Problem);
 
 /// <summary>What reading the links of the non-placed records produced.</summary>
 /// <param name="Links">The links read.</param>

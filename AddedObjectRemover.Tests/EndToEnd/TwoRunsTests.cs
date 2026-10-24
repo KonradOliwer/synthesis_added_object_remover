@@ -166,7 +166,8 @@ public sealed class TwoRunsTests : IDisposable
             bases,
             new ConsoleLogSink(),
             new CsvReportOutput(),
-            () => TimeSpan.Zero);
+            () => TimeSpan.Zero,
+            new UnreadableRecordsReported());
 
     private sealed class RecordingPluginRecordsFactory(IPluginRecordsFactory inner) : IPluginRecordsFactory
     {

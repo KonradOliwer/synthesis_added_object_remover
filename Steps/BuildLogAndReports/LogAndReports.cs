@@ -30,6 +30,7 @@ public sealed class LogAndReports
     private readonly IUnexpectedErrors _unexpectedErrors;
     private readonly ReportContext _context;
     private readonly bool _reportFilesWritten;
+    private readonly UnreadableRecordsReported _unreadableRecordsReported;
     private ErrorMark _errorsTakenUpTo;
     private ProblemMark _archiveProblemsTakenUpTo;
     private ProblemMark _meshProblemsAtMeshSection;
@@ -37,8 +38,15 @@ public sealed class LogAndReports
 
     /// <param name="reportFolder">What the report writer decided; the tables are built only when it is performed.</param>
     /// <param name="unexpectedErrors">The run's unexpected errors: the steps record into it, and the log only reads what is new where it shows errors; it never adds to it.</param>
-    public LogAndReports(RunSettings settings, ReportFolderPrepared reportFolder, ILoadOrderCaches caches, IUnexpectedErrors unexpectedErrors)
+    /// <param name="unreadableRecordsReported">Shared by all runs of the batch.</param>
+    public LogAndReports(
+        RunSettings settings,
+        ReportFolderPrepared reportFolder,
+        ILoadOrderCaches caches,
+        IUnexpectedErrors unexpectedErrors,
+        UnreadableRecordsReported unreadableRecordsReported)
     {
+        _unreadableRecordsReported = unreadableRecordsReported;
         _settings = settings;
         _reportFilesWritten = reportFolder.Outcome == StepOutcome.Performed;
         _caches = caches;
@@ -79,7 +87,8 @@ public sealed class LogAndReports
     /// <remarks>The run stops when there is nothing to check, before the threads line; it still logs its starting state, having removed nothing.</remarks>
     public ImmutableArray<LogSection> BuildStepSections(CollectedObjects world, TimeSpan elapsed)
     {
-        var scan = LogSections.BuildScanSection(world, _settings.TargetAsTyped, elapsed, _context);
+        var scan = LogSections.BuildScanSection(
+            world, _unreadableRecordsReported.TakeNew(world.UnreadableRecords), _settings.TargetAsTyped, elapsed, _context);
         return world.Stop is not null
             ? [scan, LogSections.BuildRunSummarySection(world, _settings.TargetAsTyped, removedInThisRun: 0)]
             : [scan, LogSections.BuildThreadsSection(_settings.Execution, _context)];

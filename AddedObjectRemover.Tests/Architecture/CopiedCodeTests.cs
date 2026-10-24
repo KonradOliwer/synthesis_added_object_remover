@@ -52,7 +52,7 @@ public class CopiedCodeTests
             Settings + "TooCloseDistanceMarginName", Settings + "TooCloseSizeMarginName", Settings + "TrustedModsName",
             Settings + "WaterCoverChangePercentName", Settings + "WaterHeightChangeToleranceName", KeepText + "Category", KeepText + "CheckFailed", KeepText + "LinkedGroupCategory",
             KeepText + "LocationRoleCategory", KeepText + "OwnLocationRefType", KeepText + "PlacedCategoryPrefix", KeepText + "ScriptCategory",
-            KeepText + "TeleportDoor", KeepText + "UnreadableRecordCategory"])] = TextConstants,
+            KeepText + "TeleportDoor"])] = TextConstants,
         [CopyFamily.KeyOf([
             Settings + "AnchoringThresholdName", Settings + "DirectionThresholdName", Settings + "FollowUpModeName", Settings + "HeightChangeToleranceName",
             Settings + "MovedDistanceName", Settings + "NpcsName", Settings + "OccupiedDirectionsName", Settings + "RemovedDirectionsName",

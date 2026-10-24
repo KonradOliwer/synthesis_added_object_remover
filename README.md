@@ -428,9 +428,7 @@ Whatever the settings, the cleaned mod's objects of these kinds are never remove
 - objects whose own script names a quest or a scene, or whose base object comes from the cleaned mod and
   has a script that names one. A base object from another plugin also serves that plugin's own copies, so
   its script does not keep the cleaned mod's copies;
-- objects with a location role: a location ref type of their own. Map markers are not kept for this reason alone;
-- objects that a record the patcher could not read may link to (see *Reports and log*): a record in a plugin that is the
-  object's plugin or has it as a master, whose data is malformed.
+- objects with a location role: a location ref type of their own. Map markers are not kept for this reason alone.
 
 Objects of the cleaned mod that are linked to each other (enable parent, linked references, script
 properties, ...) are always removed together or kept together. The log names the reason each object was kept.
@@ -468,7 +466,7 @@ Right after the kept summary, each object kept for a reason of its own gets a li
 
 Near the end of the log, a *Removed markers and kept objects* section (printed only when it has rows) lists removed door, map, idle and furniture markers (which actors or the map use), and objects that would have been removed but were kept, grouped by why (part of a linked group, kept because something depends on it, or a teleport door). With *Detailed log and reports* on, the locations of the written files follow.
 
-A record whose data is malformed in its plugin does not stop the run. The scan section of the log has a line for it, for example *Warning: could not read Perk SomePerk [...]: PerkEntryPointModifyActorValue did not have expected parameter type flag: Float. The objects to check that it may link to are kept.* The rest of that plugin is still read.
+A record whose data is malformed in its plugin does not stop the run. The log has one warning line for it, right after the scan section, for example *Warning: could not read Perk SomePerk [...]: PerkEntryPointModifyActorValue did not have expected parameter type flag: Float. Its links were not all checked.* A record is reported once per Synthesis run, in the first config that reads it, even when several configs read the same plugin. The links of the record that were read before the problem count as usual, and nothing is kept or removed because of the record. The rest of that plugin is still read.
 
 Before that section, the log warns about removed objects that can still affect the game:
 - each removed unique NPC that a quest fills an alias with (as its *Unique Actor*), when that alias is neither *Optional* nor *Allow Disabled*, for example *Warning: removed unique NPC BanditChief [...] in ...: Quest SomeQuest [...] fills an alias with it as a Unique Actor; a disabled actor cannot fill that alias.*;

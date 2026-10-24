@@ -23,11 +23,12 @@ public interface IPluginRecords
 
     /// <summary>
     /// The links into the given records from every version of every record that is not a placed record, in the plugins that can
-    /// link to them (only those that can link to the target plugin when every record is the target plugin's, otherwise every
-    /// plugin), and the quest aliases that fill with a target-plugin NPC as their Unique Actor (<see cref="RelationKind.UniqueActor"/>,
-    /// linking the NPC base). The links of placed records are in <see cref="PlacedRecordFacts.Links"/>.
+    /// link to them (the patch, and the plugins that are one of the records' plugins or have one as a master), and the quest aliases
+    /// that fill with a target-plugin NPC as their Unique Actor (<see cref="RelationKind.UniqueActor"/>, linking the NPC base).
+    /// A record that cannot be parsed is not read further and is listed in <see cref="NonPlacedLinks.Unreadable"/>.
+    /// The links of placed records are in <see cref="PlacedRecordFacts.Links"/>.
     /// </summary>
-    ImmutableArray<LinkFact> ReadLinks(PluginName target, IReadOnlySet<RecordKey> records);
+    NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> records);
 
     /// <summary>The records <see cref="IPatchWriting"/> copies from; the placed records must have been read before.</summary>
     IWritableRecords ReadWritableRecords();

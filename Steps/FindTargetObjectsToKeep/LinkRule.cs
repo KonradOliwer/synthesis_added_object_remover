@@ -16,7 +16,8 @@ internal sealed record LinkOutcome(ImmutableArray<TargetLink> GroupLinks, Immuta
 /// base object links count for nothing. A worldspace links placed objects only through its
 /// large-reference list, which the engine builds its distant LOD handling from; no script or quest uses it,
 /// so its links keep nothing (a removed large reference gets a log warning instead). Unique Actor links
-/// name an NPC base, never a placed object, so they keep nothing either.
+/// name an NPC base, never a placed object, so they keep nothing either. A record that could not be read may
+/// link to the object, so it keeps it.
 /// </summary>
 internal static class LinkRule
 {
@@ -54,6 +55,6 @@ internal static class LinkRule
     private static KeepReason CreateReason(LinkFact fact)
     {
         if (fact.SourceIsPlaced) return new KeepReason(fact.Relation == RelationKind.TeleportDestination ? KeepKind.TeleportDoor : KeepKind.PlacedReference, fact);
-        return new KeepReason(KeepKind.NonPlacedReference, fact);
+        return new KeepReason(fact.Relation == RelationKind.UnreadableRecord ? KeepKind.UnreadableRecord : KeepKind.NonPlacedReference, fact);
     }
 }

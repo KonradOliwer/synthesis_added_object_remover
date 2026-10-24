@@ -21,6 +21,7 @@ public readonly record struct TargetLink(TargetId From, TargetId To);
 /// </param>
 /// <param name="SupportOnlyObjectsCollected">Whether the collection holds the support-only objects, which it does when objects of any plugin are needed as supporters or objects around a marker.</param>
 /// <param name="Links">Every link into the target plugin as read, placed records before non-placed ones, in the order found; none from a removed record.</param>
+/// <param name="UnreadableRecords">The non-placed records that could not be read; each has a link, relation <see cref="RelationKind.UnreadableRecord"/>, to every target object it may link to.</param>
 /// <param name="OverriddenOthers">Only with the detailed log.</param>
 /// <param name="Order">The order the steps visit <paramref name="Targets"/> in, by space and exterior cell, so neighbouring targets run close together in time.</param>
 /// <param name="Stop">Why the run ends after this step; null when it goes on.</param>
@@ -30,6 +31,7 @@ public sealed record CollectedObjects(
     ImmutableArray<OtherObject> SupportOnlyObjects,
     bool SupportOnlyObjectsCollected,
     ImmutableArray<LinkFact> Links,
+    ImmutableArray<UnreadableRecord> UnreadableRecords,
     IReadOnlyDictionary<RecordKey, SpaceFact> Spaces,
     ReadCounts Counts,
     ImmutableArray<OverriddenOtherRecord> OverriddenOthers,

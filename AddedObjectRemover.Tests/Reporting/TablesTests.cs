@@ -330,6 +330,7 @@ public sealed class TablesTests : IDisposable
             [],
             false,
             [],
+            [],
             new Dictionary<RecordKey, SpaceFact> { [TestTargets.Space] = new(TestTargets.Space, "Tamriel, Test", SpaceKind.Worldspace, "Skyrim, Test") },
             new ReadCounts(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             [],

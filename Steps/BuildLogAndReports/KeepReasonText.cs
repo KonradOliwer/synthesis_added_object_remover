@@ -10,7 +10,8 @@ internal static class KeepReasonText
     private const string LinkedGroupCategory = "linked to a kept object";
     private const string PlacedCategoryPrefix = "placed object: ";
     private const string CheckFailed = "unexpected error while checking what depends on it";
-    private const string ScriptCategory = "script names a quest or scene";
+    private const string UnreadableRecordCategory = "record that could not be read";
+    private const string ScriptCategory ="script names a quest or scene";
     private const string LocationRoleCategory = "location role";
     private const string OwnLocationRefType = "it has a location ref type, by which a quest can pick it";
 
@@ -20,6 +21,7 @@ internal static class KeepReasonText
         KeepKind.TeleportDoor when reason.Link is null => TeleportDoor,
         KeepKind.TeleportDoor or KeepKind.PlacedReference => PlacedCategoryPrefix + Relation(Link(reason).Relation),
         KeepKind.NonPlacedReference => $"{Link(reason).SourceRecordType} record",
+        KeepKind.UnreadableRecord => UnreadableRecordCategory,
         KeepKind.ScriptNamesQuestOrScene => ScriptCategory,
         KeepKind.LocationRole => LocationRoleCategory,
         KeepKind.LinkedGroup => LinkedGroupCategory,
@@ -35,6 +37,7 @@ internal static class KeepReasonText
         KeepKind.NonPlacedReference when Link(reason).Relation == RelationKind.LocationRefType =>
             $"listed with a location ref type by {DescribeLinkingRecord(reason)}",
         KeepKind.NonPlacedReference => $"linked from {DescribeLinkingRecord(reason)}",
+        KeepKind.UnreadableRecord => $"{DescribeLinkingRecord(reason)} could not be read and may link to it",
         KeepKind.ScriptNamesQuestOrScene => ScriptDetail(reason.Script!),
         KeepKind.LocationRole => OwnLocationRefType,
         KeepKind.LinkedGroup => LinkedGroupDetail(reason.Keeper!),

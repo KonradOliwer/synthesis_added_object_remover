@@ -1,4 +1,6 @@
+using System.Collections.Immutable;
 using Mutagen.Bethesda.Plugins;
+using Mutagen.Bethesda.Plugins.Exceptions;
 using Mutagen.Bethesda.Plugins.Records;
 using Mutagen.Bethesda.Skyrim;
 
@@ -40,22 +42,37 @@ internal static class LinkReader
     /// left out because <see cref="ReadFromPlaced"/> covers their winning versions. Besides the links to
     /// the given records, each quest alias that fills with a target-plugin NPC as its Unique Actor is read.
     /// </summary>
-    public static void ReadFromNonPlaced(
+    /// <returns>The records that could not be parsed.</returns>
+    /// <remarks>
+    /// Mutagen reads a record's subrecords lazily, so a malformed one throws while its links are enumerated, not while the mod's
+    /// records are enumerated. Only that exception is caught, per record: the links read before it stay, and the rest of the mod is read.
+    /// </remarks>
+    public static ImmutableArray<UnreadableRecord> ReadFromNonPlaced(
         IEnumerable<ISkyrimModGetter> mods,
         IReadOnlySet<RecordKey> records,
         PluginName target,
         PluginNames names,
         List<LinkFact> facts)
     {
+        var unreadable = ImmutableArray.CreateBuilder<UnreadableRecord>();
         foreach (var mod in mods)
         {
             foreach (var record in mod.EnumerateMajorRecords())
             {
                 if (record is IPlacedGetter) continue;
-                ReadLinksToRecords(record, records, names, facts);
-                if (record is IQuestGetter quest) ReadUniqueActors(quest, target, names, facts);
+                try
+                {
+                    ReadLinksToRecords(record, records, names, facts);
+                    if (record is IQuestGetter quest) ReadUniqueActors(quest, target, names, facts);
+                }
+                catch (MalformedDataException ex)
+                {
+                    unreadable.Add(new UnreadableRecord(
+                        names.KeyOf(record.FormKey), record.EditorID, record.Registration.Name, ex.Message, LinkablePlugins.Of(mod, names)));
+                }
             }
         }
+        return unreadable.ToImmutable();
     }
 
     private static void ReadLinksToRecords(IMajorRecordGetter record, IReadOnlySet<RecordKey> records, PluginNames names, List<LinkFact> facts)

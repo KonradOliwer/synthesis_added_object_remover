@@ -65,9 +65,25 @@ public sealed class PlacedObjectCollector
         foreach (var record in facts.Records) collector.Collect(record);
 
         var targetKeys = collector._targets.Select(target => target.Key).ToHashSet();
-        var nonPlacedLinks = plugin.ReadLinks(trust.CleanedMod, targetKeys);
-        return collector.CreateCollectedObjects(collector.KeepLinksIntoTargets([.. facts.Links, .. nonPlacedLinks], targetKeys));
+        var nonPlaced = plugin.ReadLinks(trust.CleanedMod, targetKeys);
+        var links = collector.KeepLinksIntoTargets(
+            [.. facts.Links, .. nonPlaced.Links, .. collector.CreateLinksFromUnreadable(nonPlaced.Unreadable)], targetKeys);
+        return collector.CreateCollectedObjects(links, nonPlaced.Unreadable);
     }
+
+    /// <summary>An unreadable record may link to every checked object of its own plugin and of its masters.</summary>
+    private IEnumerable<LinkFact> CreateLinksFromUnreadable(IEnumerable<UnreadableRecord> unreadable) =>
+        unreadable.SelectMany(record => _targets
+            .Where(target => record.LinkablePlugins.Contains(target.Key.Plugin))
+            .Select(target => new LinkFact(
+                record.Key,
+                record.EditorId,
+                record.RecordType,
+                target.Key,
+                RelationKind.UnreadableRecord,
+                SourceIsPlaced: false,
+                SourceIsWorldspace: false,
+                AliasFillFlags.None)));
 
     /// <remarks>
     /// A fully trusted version's values are accepted whatever lies below it, so no lower version can change a decision. The cleaned
@@ -225,7 +241,7 @@ public sealed class PlacedObjectCollector
     private static (Vector3 Position, Vector3 Rotation) PlacementOf(PlacedRecordFact record) =>
         (record.Placement.Position!.Value, record.Placement.EulerRotation!.Value);
 
-    private CollectedObjects CreateCollectedObjects(ImmutableArray<LinkFact> links)
+    private CollectedObjects CreateCollectedObjects(ImmutableArray<LinkFact> links, ImmutableArray<UnreadableRecord> unreadable)
     {
         var targets = _targets
             .OrderBy(target => target.Key, RecordKeyOrder.Comparer)
@@ -237,6 +253,7 @@ public sealed class PlacedObjectCollector
             _plan.SupportOnlyObjects ? NumberInKeyOrder(_supportOnlyObjects, firstId: _otherModObjects.Count) : ImmutableArray<OtherObject>.Empty,
             _plan.SupportOnlyObjects,
             links,
+            unreadable,
             _targetSpaces.DistinctBy(space => space.Key).ToDictionary(space => space.Key),
             new ReadCounts(
                 _facts.RecordsScanned,

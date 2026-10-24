@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace AddedObjectRemover;
 
 /// <summary>How a record links to another one, as the linking record itself says.</summary>
@@ -16,6 +18,9 @@ public enum RelationKind
     /// <summary>A quest alias fills with the NPC as its Unique Actor (ALUA); the linked record is the NPC base, not a placed one.</summary>
     UniqueActor,
     Other,
+
+    /// <summary>The linking record could not be read, so it is not known whether it links to the record; it may.</summary>
+    UnreadableRecord,
 }
 
 /// <summary>The quest alias flags (FNAM) that say whether the alias can stay empty or fill with a disabled reference.</summary>
@@ -26,6 +31,17 @@ public enum AliasFillFlags
     Optional = 1,
     AllowDisabled = 2,
 }
+
+/// <summary>A record whose data the game library could not parse, so the links it holds are unknown.</summary>
+/// <param name="RecordType">The record type name, e.g. "Perk".</param>
+/// <param name="Problem">What the game library reported.</param>
+/// <param name="LinkablePlugins">The plugins whose records it can link to: its own plugin and that plugin's masters.</param>
+public sealed record UnreadableRecord(RecordKey Key, string? EditorId, string RecordType, string Problem, IReadOnlySet<PluginName> LinkablePlugins);
+
+/// <summary>What reading the links of the non-placed records produced.</summary>
+/// <param name="Links">The links read.</param>
+/// <param name="Unreadable">The records that could not be read, in the order found.</param>
+public sealed record NonPlacedLinks(ImmutableArray<LinkFact> Links, ImmutableArray<UnreadableRecord> Unreadable);
 
 /// <summary>One form link from a record into a target-plugin record, as read; it is not judged here.</summary>
 /// <param name="SourceRecordType">The record type name of the linking record, e.g. "Quest".</param>

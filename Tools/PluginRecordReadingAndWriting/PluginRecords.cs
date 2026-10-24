@@ -26,16 +26,16 @@ internal sealed class PluginRecords(
         return scanned.Facts;
     }
 
-    public ImmutableArray<LinkFact> ReadLinks(PluginName target, IReadOnlySet<RecordKey> records)
+    public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> records)
     {
-        var onlyTargetRecords = records.All(record => record.Plugin == target);
+        var linkedPlugins = records.Select(record => record.Plugin).Append(target).ToHashSet();
         var referencingMods = order.PriorityOrder
             .Select(listing => listing.Mod)
             .OfType<ISkyrimModGetter>()
-            .Where(mod => !onlyTargetRecords || PlacedRecordReader.MayReferenceTarget(mod, target, patch, names));
+            .Where(mod => LinkablePlugins.MayLinkToAny(mod, linkedPlugins, patch, names));
         var facts = new List<LinkFact>();
-        LinkReader.ReadFromNonPlaced(referencingMods, records, target, names, facts);
-        return [.. facts];
+        var unreadable = LinkReader.ReadFromNonPlaced(referencingMods, records, target, names, facts);
+        return new NonPlacedLinks([.. facts], unreadable);
     }
 
     public IWritableRecords ReadWritableRecords() => Scanned.Handles;

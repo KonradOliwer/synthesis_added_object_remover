@@ -61,7 +61,7 @@ internal sealed class ManualPatchHints(
         return $"members {string.Join(", ", names)}; kept because {string.Join("; ", reasons)}";
     }
 
-    private static bool IsReferencedByNonPlacedRecord(KeepReason reason) => reason.Link is { SourceIsPlaced: false };
+    private static bool IsReferencedByNonPlacedRecord(KeepReason reason) => reason.Kind == KeepKind.NonPlacedReference;
 
     private IEnumerable<ManualPatchHint> CollectKeptByOwnReason(IEnumerable<int> keptIndices, Func<KeepReason, bool> belongs, ManualPatchHintType type) =>
         WithOwnReasons(keptIndices)

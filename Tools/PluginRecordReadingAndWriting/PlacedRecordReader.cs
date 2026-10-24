@@ -38,6 +38,7 @@ internal sealed class PlacedRecordReader
     private readonly PlacedReadScope _scope;
     private readonly Func<PluginName, bool> _stopsTheWalk;
     private readonly TargetFootprint _footprint;
+    private readonly HashSet<PluginName> _targetPlugin;
     private readonly HashSet<RecordKey> _landWorldspaces;
     private readonly HashSet<RecordKey> _seenRecords = new();
     private readonly HashSet<RecordKey> _seenNavmeshes = new();
@@ -81,6 +82,7 @@ internal sealed class PlacedRecordReader
         _names = names;
         _scope = scope;
         _stopsTheWalk = stopsTheWalk;
+        _targetPlugin = [scope.Target];
         _footprint = AnalyzeTarget();
         if (scope.Terrain || scope.TerrainVersions || scope.Water) FindLandAndWaterWorldspaces();
         _landWorldspaces = _landWorldspaceOf.Values.ToHashSet();
@@ -99,12 +101,6 @@ internal sealed class PlacedRecordReader
         reader.ScanLoadOrder();
         return reader.CreateScannedRecords(CellAreaReader.Read(reader._targetSpaceCells, new LocationNameReader(linkCache, scope.HoldKeyword.ToFormKey()), execution));
     }
-
-    /// <summary>A plugin can only link to a target FormKey if it is the target, has it as a master, or is the patch.</summary>
-    public static bool MayReferenceTarget(ISkyrimModGetter mod, PluginName target, ModKey patch, PluginNames names) =>
-        names.Of(mod.ModKey) == target
-        || mod.ModKey == patch
-        || mod.MasterReferences.Any(master => names.Of(master.Master) == target);
 
     private void FindLandAndWaterWorldspaces()
     {
@@ -139,7 +135,7 @@ internal sealed class PlacedRecordReader
         foreach (var listing in _loadOrder.PriorityOrder)
         {
             if (listing.Mod is not { } mod) continue;
-            var collectReferences = MayReferenceTarget(mod, _scope.Target, _patch, _names);
+            var collectReferences = LinkablePlugins.MayLinkToAny(mod, _targetPlugin, _patch, _names);
             var plugin = _names.Of(listing.ModKey);
             foreach (var cellContext in mod.EnumerateMajorRecordContexts<ICell, ICellGetter>(_linkCache))
             {

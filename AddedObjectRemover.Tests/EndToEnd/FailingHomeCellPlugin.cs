@@ -12,7 +12,7 @@ internal sealed class FailingHomeCellPlugin(IPluginRecords inner) : IPluginRecor
 
     public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk) => inner.ReadPlacedRecords(scope, stopsTheWalk);
 
-    public ImmutableArray<LinkFact> ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets) => inner.ReadLinks(target, targets);
+    public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets) => inner.ReadLinks(target, targets);
 
     public IWritableRecords ReadWritableRecords() => inner.ReadWritableRecords();
 

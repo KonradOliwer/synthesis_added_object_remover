@@ -324,6 +324,7 @@ public sealed class SharedReportingTests
             [],
             false,
             [],
+            [],
             new Dictionary<RecordKey, SpaceFact> { [TestTargets.Space] = new(TestTargets.Space, "Tamriel", SpaceKind.Worldspace, "Skyrim") },
             new ReadCounts(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             [],

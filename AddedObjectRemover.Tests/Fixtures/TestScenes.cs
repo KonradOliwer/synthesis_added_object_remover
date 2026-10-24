@@ -57,6 +57,7 @@ internal static class TestScenes
             supportOnlyObjects is null ? [] : [.. supportOnlyObjects],
             supportOnlyObjects is not null,
             [],
+            [],
             new Dictionary<RecordKey, SpaceFact>(),
             new ReadCounts(
                 RecordsScanned: 0,

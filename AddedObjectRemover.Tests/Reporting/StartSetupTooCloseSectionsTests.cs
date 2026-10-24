@@ -733,6 +733,7 @@ public sealed class StartSetupTooCloseSectionsTests
             ImmutableArray.Create(CreateOtherModObject(2, "Gamma")),
             true,
             [],
+            [],
             new Dictionary<RecordKey, SpaceFact> { [space] = new(space, "Tamriel", SpaceKind.Worldspace, "Skyrim") },
             new ReadCounts(
                 RecordsScanned: 9,

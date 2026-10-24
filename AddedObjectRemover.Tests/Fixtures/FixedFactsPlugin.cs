@@ -31,7 +31,10 @@ internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records,
             .DistinctBy(record => record.Cell.Key)
             .ToDictionary(record => record.Cell.Key, record => new CellAreaFact(record.Space.Key, Grid: null, Name: null, Location: null));
 
-    public ImmutableArray<LinkFact> ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets) => [];
+    /// <summary>The records the non-placed read reports as unreadable.</summary>
+    public ImmutableArray<UnreadableRecord> Unreadable { get; init; } = [];
+
+    public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets) => new([], Unreadable);
 
     public IWritableRecords ReadWritableRecords() => throw new NotSupportedException();
 

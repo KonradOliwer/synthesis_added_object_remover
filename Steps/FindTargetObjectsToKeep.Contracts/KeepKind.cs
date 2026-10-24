@@ -12,6 +12,9 @@ public enum KeepKind
     /// <summary>A quest, package, location, script, ... links to it.</summary>
     NonPlacedReference,
 
+    /// <summary>A record that could not be read may link to it, and keeping an object is safe when that is unknown.</summary>
+    UnreadableRecord,
+
     /// <summary>A script on it, or on its base object that the target plugin defines, names a quest or scene.</summary>
     ScriptNamesQuestOrScene,
 

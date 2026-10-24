@@ -10,6 +10,7 @@ Trusted, requires Target.esp: TargetPatch.esp (masters: Patched.esp)
 Never trusted, listed: Rival.esp
 Remove objects too close to other mods' objects: Margin by object size: on, 0.5 x object size; Margin by fixed distance: off; Use rough boxes instead of exact shapes (faster): off; Other mods' NPCs and creatures cause removal: OnlyWhenStuckInsideTheObject.
 Remove objects on terrain changed by other mods: off.
+Shrink or turn objects to make them fit: Distance that counts as moved: 10 units; Shrink down to: 80% of its size; Turn by at most: 360 degrees either way; Which objects may be shrunk or turned: ReplacementsAfterMovingBack.
 Also remove what rests on removed objects: Nothing.
 Invisible objects left behind: off.
 Detailed log and reports: off.
@@ -25,6 +26,8 @@ Scanned 75 placed records: 40 Target.esp objects to check, 28 objects from other
 Replacement matching: 1 other-mod objects excluded.
 ## unexpectedErrors
 ## groups
+## unexpectedErrors
+## fit
 ## unexpectedErrors
 ## tooClose
 Found 19 of 40 Target.esp objects too close to other mods' objects.

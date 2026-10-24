@@ -27,7 +27,7 @@ public class PlacedObjectCollectorTrustTests
     private static readonly BaseKey OtherWall = new(new RecordKey(BaseGame, 0x101), BaseLinkKind.PlaceableObject);
     private static readonly PresenceFacts Shown = new(Deleted: false, InitiallyDisabled: false, EnableParent: null);
 
-    private static readonly WhatToCollect Plan = new(SupportOnlyObjects: true, Terrain: false, Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false);
+    private static readonly WhatToCollect Plan = new(SupportOnlyObjects: true, Terrain: false, Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits);
     private static readonly ModTrustTable Mods = TestModTrust.Of(
         TestTargets.TargetName, Patch, trusted: [BaseGame, Carrier], untrusted: [City, Later], trustedForOwnChanges: [Birds]);
 
@@ -69,7 +69,7 @@ public class PlacedObjectCollectorTrustTests
     public void AnUntrustedReSaveWithinTheTolerancesChangesNothing()
     {
         var resaved = new PlacedVersionFact(
-            City, new PlacementFacts(Shown, Placed + new Vector3(0.005f, 0, 0), new Vector3(0, 0, 0.00005f)), Scale: 1.00005f, Wall);
+            City, new PlacementFacts(Shown, Placed + new Vector3(0.005f, 0, 0), new Vector3(0, 0, 0.00005f)), Scale: 1.00005f, Wall, TestPlacedRecords.InTheSpace);
 
         Assert.Null(ChangeOf(Record(BaseGame, At(BaseGame, Placed), resaved)));
     }
@@ -210,7 +210,7 @@ public class PlacedObjectCollectorTrustTests
     }
 
     private static PlacedVersionFact At(PluginName plugin, Vector3 position) =>
-        new(plugin, new PlacementFacts(Shown, position, Vector3.Zero), Scale: null, Wall);
+        new(plugin, new PlacementFacts(Shown, position, Vector3.Zero), Scale: null, Wall, TestPlacedRecords.InTheSpace);
 
     private static PlacedVersionFact Changed(PlacedVersionFact version, Property property) => property switch
     {

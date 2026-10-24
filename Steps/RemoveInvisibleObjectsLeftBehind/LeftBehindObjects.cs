@@ -49,6 +49,13 @@ public static class LeftBehindObjects
             failure => new LeftBehindResult(StepOutcome.StoppedByUnexpectedError, [], [], PartFailure.OfWholePart(LeftBehindParts.LeftBehind, failure)));
     }
 
+    /// <summary>The step's check of one invisible target object at another placement (<see cref="LeftBehindPlacementRule"/>).</summary>
+    /// <param name="otherModObjects">The other-mod objects that can cause removals (the selection step's view).</param>
+    /// <param name="settings">Null when the step is switched off: the rule finds nothing.</param>
+    public static IPlacementRule CreatePlacementRule(
+        ImmutableArray<TargetObject> targets, IObjectsThatCanCauseRemovals otherModObjects, IBaseObjectShapes shapes, LeftBehindSettings? settings) =>
+        new LeftBehindPlacementRule(targets, otherModObjects, shapes, settings);
+
     /// <returns>The result with the round decided on a copy of the decisions: an object the round kept is kept as referenced.</returns>
     private static LeftBehindResult JoinVerdicts(LeftBehindResult evaluated, IRemovalDecisions decisions)
     {
@@ -65,6 +72,7 @@ public static class LeftBehindObjects
         };
     }
 
+    /// <summary>An object moved back to the placement it replaces clears its spot as a removed one does.</summary>
     private static HashSet<int> RemovedIndexes(IRemovalDecisions decisions) =>
-        decisions.RemovedTargets().Select(target => target.Index).ToHashSet();
+        decisions.TargetsThatLeftTheirSpot().Select(target => target.Index).ToHashSet();
 }

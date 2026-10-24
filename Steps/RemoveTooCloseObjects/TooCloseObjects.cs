@@ -62,35 +62,50 @@ public static class TooCloseObjects
                 world.Targets, visibleTargets, world.Order, otherModObjects, new NpcsThatCanSpawn(placedNpcs, replacements), shapes, triangles, execution),
             settings);
 
+    /// <summary>The step's check of one target object at another placement; it finds nothing when no removal zone is on.</summary>
+    /// <param name="placedNpcs">C10; the rule leaves out the NPCs <paramref name="replacements"/> replaces.</param>
+    public static IPlacementRule CreatePlacementRule(
+        CollectedObjects world,
+        IVisibleTargetObjects visibleTargets,
+        IObjectsThatCanCauseRemovals otherModObjects,
+        IPlacedNpcsBySpace placedNpcs,
+        Replacements replacements,
+        IBaseObjectShapes shapes,
+        ITriangleMeshes triangles,
+        TooCloseSettings settings)
+    {
+        var zones = ZoneGrowth.Active(settings);
+        return new TooClosePlacementRule(
+            world.Targets,
+            zones.IsEmpty
+                ? null
+                : new ComputedOnce<ITooCloseSearch>(() =>
+                {
+                    var npcRule = CreateNpcRule(visibleTargets, new NpcsThatCanSpawn(placedNpcs, replacements), shapes, triangles, settings.Npcs);
+                    return CreateSearch(world.Targets, visibleTargets, otherModObjects, shapes, triangles, zones, npcRule, settings.Zone);
+                }));
+    }
+
+    /// <summary>How the step words a too-close finding as the reason of a removal.</summary>
+    internal static RemovalReason ReasonOf(ZoneHit hit) => new RemovalReason.TooClose(hit.Other, hit.Cause);
+
     /// <remarks>When no removal zone is on, the step looks at nothing, not even for stuck NPCs, and the result is <see cref="StepOutcome.SwitchedOff"/>.</remarks>
     internal static TooCloseResult Find(TooCloseInput input, TooCloseSettings settings)
     {
         var zones = ZoneGrowth.Active(settings);
         if (zones.IsEmpty) return SwitchedOff(settings);
 
-        var npcRule = NpcTooCloseRule.Create(
-            settings.Npcs,
-            onlyWithBlockingCollision => NpcStuckSearch.Create(
-                input.Targets,
-                input.VisibleTargets,
-                input.Npcs,
-                input.Shapes,
-                input.Triangles,
-                onlyWithBlockingCollision));
-        var (search, largeOtherObjects) = settings.Zone switch
-        {
-            ZoneShape.BoundingBox => (FindInBoxZone(input, zones, npcRule), 0),
-            ZoneShape.ObjectShape => FindInShapeZone(input, zones, npcRule),
-            _ => throw new UnreachableException($"Unknown removal zone {settings.Zone}."),
-        };
+        var npcRule = CreateNpcRule(input.VisibleTargets, input.Npcs, input.Shapes, input.Triangles, settings.Npcs);
+        var search = CreateSearch(input.Targets, input.VisibleTargets, input.OtherModObjects, input.Shapes, input.Triangles, zones, npcRule, settings.Zone);
+        var found = search.FindTooCloseTargets(input.Order, input.Exec);
         return new TooCloseResult(
             StepOutcome.Performed,
-            [.. search.Hits],
-            [.. search.Hits.Select(hit => new ProposedRemoval(new TargetId(hit.TargetIndex), new RemovalReason.TooClose(hit.TooCloseTo.Id, hit.Cause)))],
-            search.Work,
-            npcRule.StuckSearch?.GetSummary(search.Work.Npcs),
-            largeOtherObjects,
-            [.. search.Failures],
+            [.. found.Hits],
+            [.. found.Hits.Select(hit => new ProposedRemoval(new TargetId(hit.TargetIndex), ReasonOf(new ZoneHit(hit.TooCloseTo.Id, hit.Cause))))],
+            found.Work,
+            npcRule.StuckSearch?.GetSummary(found.Work.Npcs),
+            search.LargeOtherObjects,
+            [.. found.Failures],
             [.. zones.Select(zone => zone.Cause)],
             settings.Zone,
             settings.Npcs);
@@ -99,15 +114,25 @@ public static class TooCloseObjects
     private static TooCloseResult SwitchedOff(TooCloseSettings settings) =>
         new(StepOutcome.SwitchedOff, [], [], TooCloseWork.Zero, Npc: null, LargeOtherObjects: 0, [], ZonesTested: [], settings.Zone, settings.Npcs);
 
-    private static TooCloseSearchResult FindInBoxZone(TooCloseInput input, ImmutableArray<ZoneGrowth> zones, NpcTooCloseRule npcRule) =>
-        TooCloseSearch.FindTooCloseTargets(
-            input.Targets, input.OtherModObjects, input.Shapes, zones, npcRule, input.Order, input.Exec);
+    private static NpcTooCloseRule CreateNpcRule(
+        IVisibleTargetObjects visibleTargets, INpcsThatCanSpawn npcs, IBaseObjectShapes shapes, ITriangleMeshes triangles, NpcHandling handling) =>
+        NpcTooCloseRule.Create(
+            handling,
+            onlyWithBlockingCollision => NpcStuckSearch.Create(visibleTargets, npcs, shapes, triangles, onlyWithBlockingCollision));
 
-    private static (TooCloseSearchResult Result, int LargeOtherObjects) FindInShapeZone(TooCloseInput input, ImmutableArray<ZoneGrowth> zones, NpcTooCloseRule npcRule)
-    {
-        var search = ShapeZoneSearch.Create(
-            input.Targets, input.VisibleTargets, input.OtherModObjects, input.Shapes, input.Triangles, zones, npcRule);
-        var result = search.FindTooCloseTargets(input.Order, input.Exec);
-        return (result, search.LargeOtherObjects);
-    }
+    private static ITooCloseSearch CreateSearch(
+        IReadOnlyList<TargetObject> targets,
+        IVisibleTargetObjects visibleTargets,
+        IObjectsThatCanCauseRemovals otherModObjects,
+        IBaseObjectShapes shapes,
+        ITriangleMeshes triangles,
+        ImmutableArray<ZoneGrowth> zones,
+        NpcTooCloseRule npcRule,
+        ZoneShape zone) =>
+        zone switch
+        {
+            ZoneShape.BoundingBox => new BoxZoneSearch(targets, otherModObjects, shapes, zones, npcRule),
+            ZoneShape.ObjectShape => ShapeZoneSearch.Create(targets, visibleTargets, otherModObjects, shapes, triangles, zones, npcRule),
+            _ => throw new UnreachableException($"Unknown removal zone {zone}."),
+        };
 }

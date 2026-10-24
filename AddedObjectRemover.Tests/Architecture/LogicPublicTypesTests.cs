@@ -19,6 +19,7 @@ public class LogicPublicTypesTests
         ["SelectObjectsThatCanCauseRemovals"] = "RemovalCauseSelector",
         ["FindTargetObjectsToKeep"] = "ObjectsToKeepFinder",
         ["RemovalDecisionList"] = "RemovalDecisions",
+        ["FitClashingObjects"] = "ClashingObjectFitter",
         ["RemoveObjectsOnChangedTerrain"] = "ChangedTerrainObjects",
         ["RemoveTooCloseObjects"] = "TooCloseObjects",
         ["RemoveObjectsRestingOnRemovedOnes"] = "RestingObjects",
@@ -55,26 +56,37 @@ public class LogicPublicTypesTests
             "ImmutableArray<Round> Rounds { get; }",
             "ImmutableArray<Round> RoundsAfter(IRemovalDecisions)",
             "ImmutableArray<TargetId> KeptIn(Round)",
+            "ImmutableArray<TargetId> FittedIn(Round)",
+            "ImmutableArray<TargetId> LeftTheirSpotIn(Round)",
             "ImmutableArray<TargetId> RemovedIn(Round)",
-            "ImmutableArray<TargetId> RemovedTargets()",
+            "ImmutableArray<TargetId> TargetsThatLeftTheirSpot()",
+            "Boolean HasLeftItsSpot(TargetId)",
             "Boolean IsDecided(TargetId)",
+            "Boolean MayStillBeRemoved(TargetId)",
             "Boolean IsProtected(TargetId)",
             "Boolean IsRemoved(TargetId)",
             "Decision Of(TargetId)",
             "IRemovalDecisionsCopy WorkingCopy()",
             "RemovalDecisions AddMoves(IReadOnlyList<MarkerMove>)",
+            "RemovalDecisions ApplyFits(IReadOnlyList<ProposedFit>)",
             "RemovalDecisions Apply(RoundKind, IReadOnlyList<ProposedRemoval>)",
             "RemovalDecisions ApplyRounds(RoundKind, IReadOnlyList<IReadOnlyList<ProposedRemoval>>)",
             "static RemovalDecisions Start(IObjectsToKeep, Int32)",
         ],
+        ["FitClashingObjects"] =
+        [
+            "static FitResult Fit(ImmutableArray<TargetObject>, IObjectsToKeep, IReadOnlyList<IPlacementRule>, IBaseObjectShapes, WorkOrder, Execution, FitSettings)",
+        ],
         ["RemoveObjectsOnChangedTerrain"] =
         [
+            "static IPlacementRule CreatePlacementRule(CollectedObjects, ModTrustTable, LoadOrderPlugins, IPluginRecords, IBaseObjectShapes, ChangedTerrainSettings)",
             "static ChangedTerrainResult Find(CollectedObjects, ModTrustTable, LoadOrderPlugins, IPluginRecords, IBaseObjectShapes, Execution, ChangedTerrainSettings)",
         ],
         ["RemoveTooCloseObjects"] =
         [
             "static NpcBodyRules NpcBodyRules { get; }",
             "static PlacedNpcRules PlacedNpcRules { get; }",
+            "static IPlacementRule CreatePlacementRule(CollectedObjects, IVisibleTargetObjects, IObjectsThatCanCauseRemovals, IPlacedNpcsBySpace, Replacements, IBaseObjectShapes, ITriangleMeshes, TooCloseSettings)",
             "static TooCloseResult Find(CollectedObjects, IVisibleTargetObjects, IObjectsThatCanCauseRemovals, IPlacedNpcsBySpace, Replacements, IBaseObjectShapes, ITriangleMeshes, Execution, TooCloseSettings)",
         ],
         ["RemoveObjectsRestingOnRemovedOnes"] =
@@ -83,6 +95,7 @@ public class LogicPublicTypesTests
         ],
         ["RemoveInvisibleObjectsLeftBehind"] =
         [
+            "static IPlacementRule CreatePlacementRule(ImmutableArray<TargetObject>, IObjectsThatCanCauseRemovals, IBaseObjectShapes, LeftBehindSettings)",
             "static LeftBehindResult Find(ImmutableArray<TargetObject>, IObjectsThatCanCauseRemovals, IRemovalDecisions, IVisibleTargetObjects, IBaseFacts, IBaseObjectShapes, WorkOrder, Execution, LeftBehindSettings)",
         ],
         ["MoveKeptMarkers"] =
@@ -102,6 +115,7 @@ public class LogicPublicTypesTests
             "ImmutableArray<LogSection> BuildStepSections(CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(Replacements, CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(ObjectsToKeepResult)",
+            "ImmutableArray<LogSection> BuildStepSections(FitResult, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(ChangedTerrainResult, IRemovalDecisions, CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(TooCloseResult, IRemovalDecisions, CollectedObjects, IVisibleTargetObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(RestingObjectsResult, IRemovalDecisions, CollectedObjects)",

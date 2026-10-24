@@ -13,8 +13,8 @@ internal sealed record ScannedRecords(PlacedRecordFacts Facts, ScanLookups Looku
 internal sealed record ScanLookups(RecordHandles Handles, LandscapeTerrain Terrain, CellWater Water, NavmeshRecords Navmeshes);
 
 /// <summary>
-/// The spaces (worldspace or interior cell keys) that contain a record created by the target
-/// plugin, and every placed record from another plugin that the target plugin overrides.
+/// The spaces (worldspace or interior cell keys) where the target plugin places a record, one it created or one it overrides,
+/// and every placed record from another plugin that the target plugin overrides.
 /// </summary>
 internal sealed record TargetFootprint(HashSet<RecordKey> SpaceKeys, HashSet<RecordKey> OverriddenRecords);
 
@@ -168,8 +168,9 @@ internal sealed class PlacedRecordReader
     }
 
     /// <summary>
-    /// Walks only the target plugin's own cell tree. A FormKey the target overrides is a
-    /// replacement, never an "other mod" object, whichever plugin wins it.
+    /// Walks only the target plugin's own cell tree, for the records of other plugins it overrides and the target spaces: every
+    /// space where it places a record, its own or its override of another plugin's, which the caller can judge as a target object.
+    /// A cell copy the target holds only to carry other data places nothing, so it adds no space.
     /// </summary>
     private TargetFootprint AnalyzeTarget()
     {
@@ -178,14 +179,14 @@ internal sealed class PlacedRecordReader
 
         foreach (var cellContext in mod.EnumerateMajorRecordContexts<ICell, ICellGetter>(_linkCache))
         {
-            var hasTargetRecord = false;
+            var placesARecord = false;
             foreach (var (record, _) in cellContext.Record.EnumeratePlaced())
             {
                 var recordKey = _names.KeyOf(record.FormKey);
-                if (recordKey.Plugin == _scope.Target) hasTargetRecord = true;
-                else footprint.OverriddenRecords.Add(recordKey);
+                if (recordKey.Plugin != _scope.Target) footprint.OverriddenRecords.Add(recordKey);
+                placesARecord = true;
             }
-            if (hasTargetRecord) footprint.SpaceKeys.Add(GetCellSpaceKey(cellContext));
+            if (placesARecord) footprint.SpaceKeys.Add(GetCellSpaceKey(cellContext));
         }
         return footprint;
     }
@@ -253,18 +254,18 @@ internal sealed class PlacedRecordReader
         var key = _names.KeyOf(record.FormKey);
         if (!_seenRecords.Add(key))
         {
-            KeepLowerVersion(record, key, cell.Plugin);
+            KeepLowerVersion(record, key, cell, persistent);
             return;
         }
         _recordsScanned++;
 
-        var linksIntoTarget = cell.CollectReferences && ReadLinksIntoTarget(record, key);
+        var linksIntoTarget = ReadLinks(record, key, cell);
         if (!linksIntoTarget && !cell.InTargetSpace && key.Plugin != _scope.Target && !_footprint.OverriddenRecords.Contains(key)) return;
 
-        var winner = ReadVersion(record, cell.Plugin);
+        var winner = ReadVersion(record, cell, persistent);
         _records.Add(CreateFact(record, key, cell, winner));
         StartVersions(key, winner);
-        if (cell.InTargetSpace && key.Plugin == _scope.Target)
+        if (cell.InTargetSpace && (key.Plugin == _scope.Target || _footprint.OverriddenRecords.Contains(key)))
         {
             _handles.Add(key, new PlacedRecordHandle(record, new PlacedRecordLocation(_winningCells[cell.Cell.Key], persistent)));
         }
@@ -278,20 +279,28 @@ internal sealed class PlacedRecordReader
     }
 
     /// <remarks>A plugin that holds the record twice (broken data) gives one version, the first found, as it does for the winner.</remarks>
-    private void KeepLowerVersion(IPlacedGetter record, RecordKey key, PluginName plugin)
+    private void KeepLowerVersion(IPlacedGetter record, RecordKey key, ScannedCell cell, bool persistent)
     {
-        if (!_openVersions.TryGetValue(key, out var versions) || versions[^1].Plugin == plugin) return;
-        versions.Add(ReadVersion(record, plugin));
-        if (_stopsTheWalk(plugin)) _openVersions.Remove(key);
+        if (!_openVersions.TryGetValue(key, out var versions) || versions[^1].Plugin == cell.Plugin) return;
+        versions.Add(ReadVersion(record, cell, persistent));
+        if (_stopsTheWalk(cell.Plugin)) _openVersions.Remove(key);
     }
 
-    /// <returns>True when the record links into the target plugin.</returns>
-    private bool ReadLinksIntoTarget(IPlacedGetter record, RecordKey key)
+    /// <returns>True when a link was read; outside the target spaces only links into the target plugin are read.</returns>
+    private bool ReadLinks(IPlacedGetter record, RecordKey key, ScannedCell cell)
     {
+        if (!cell.CollectReferences && !cell.InTargetSpace) return false;
         var linksBefore = _links.Count;
-        LinkReader.ReadFromPlaced(record, key, _scope.Target, _names, _links);
+        LinkReader.ReadFromPlaced(record, key, linked => IsLinkRead(linked, cell), _names, _links);
         return _links.Count > linksBefore;
     }
+
+    /// <summary>
+    /// A plugin that can link to the target plugin is read for its links into it. In the target spaces every plugin is also read
+    /// for its links into the records the target plugin overrides: the caller can judge such a record as a target object.
+    /// </summary>
+    private bool IsLinkRead(RecordKey linked, ScannedCell cell) =>
+        (cell.CollectReferences && linked.Plugin == _scope.Target) || (cell.InTargetSpace && _footprint.OverriddenRecords.Contains(linked));
 
     /// <param name="winner">The record's winning version, read from <paramref name="record"/>; the lower versions are added when the walk ends.</param>
     private PlacedRecordFact CreateFact(IPlacedGetter record, RecordKey key, ScannedCell cell, PlacedVersionFact winner) => new(
@@ -310,11 +319,13 @@ internal sealed class PlacedRecordReader
         record.GetPrimitiveBounds(),
         Versions: [winner]);
 
-    private PlacedVersionFact ReadVersion(IPlacedGetter record, PluginName plugin) => new(
-        plugin,
+    /// <param name="cell">The plugin's copy of the cell whose child list holds this version.</param>
+    private PlacedVersionFact ReadVersion(IPlacedGetter record, ScannedCell cell, bool persistent) => new(
+        cell.Plugin,
         new PlacementFacts(ReadPresence(record), record.Placement?.GetPosition(), record.Placement?.GetRotation()),
         record.Scale,
-        record.GetBaseKey(_names));
+        record.GetBaseKey(_names),
+        new VersionLocation(cell.Space.Key, cell.Cell.Key, persistent));
 
     private PresenceFacts ReadPresence(IPlacedGetter record) => new(
         record.IsDeleted,

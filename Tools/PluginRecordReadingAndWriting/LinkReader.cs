@@ -5,27 +5,29 @@ using Mutagen.Bethesda.Skyrim;
 namespace AddedObjectRemover;
 
 /// <summary>
-/// Enumerates the form links from records into target-plugin records as neutral <see cref="LinkFact"/>s;
+/// Enumerates the form links from records into the records asked for as neutral <see cref="LinkFact"/>s;
 /// which of them matter is decided by the caller.
 /// </summary>
 internal static class LinkReader
 {
+    /// <param name="isAskedFor">Whether a link into this record is read.</param>
     /// <remarks>
-    /// Every link into the target plugin is read, the base object link and links to the record itself
+    /// Every link into a record asked for is read, the base object link and links to the record itself
     /// included. Which of them are target objects is decided later.
     /// </remarks>
     public static void ReadFromPlaced(
         IPlacedGetter record,
         RecordKey recordKey,
-        PluginName target,
+        Func<RecordKey, bool> isAskedFor,
         PluginNames names,
         List<LinkFact> facts)
     {
         var baseKey = record.GetBaseKey(names)?.Record;
         foreach (var link in record.EnumerateFormLinks())
         {
-            if (link.IsNull || names.Of(link.FormKey.ModKey) != target) continue;
+            if (link.IsNull) continue;
             var linkedKey = names.KeyOf(link.FormKey);
+            if (!isAskedFor(linkedKey)) continue;
             var relation = linkedKey == baseKey ? RelationKind.BaseObject : DescribeRelation(record, link.FormKey);
             facts.Add(new LinkFact(
                 recordKey, record.EditorID, record.Registration.Name, linkedKey, relation, SourceIsPlaced: true, SourceIsWorldspace: false, AliasFillFlags.None));
@@ -40,7 +42,7 @@ internal static class LinkReader
     /// </summary>
     public static void ReadFromNonPlaced(
         IEnumerable<ISkyrimModGetter> mods,
-        IReadOnlySet<RecordKey> targets,
+        IReadOnlySet<RecordKey> records,
         PluginName target,
         PluginNames names,
         List<LinkFact> facts)
@@ -50,19 +52,19 @@ internal static class LinkReader
             foreach (var record in mod.EnumerateMajorRecords())
             {
                 if (record is IPlacedGetter) continue;
-                ReadLinksToTargets(record, targets, target, names, facts);
+                ReadLinksToRecords(record, records, names, facts);
                 if (record is IQuestGetter quest) ReadUniqueActors(quest, target, names, facts);
             }
         }
     }
 
-    private static void ReadLinksToTargets(IMajorRecordGetter record, IReadOnlySet<RecordKey> targets, PluginName target, PluginNames names, List<LinkFact> facts)
+    private static void ReadLinksToRecords(IMajorRecordGetter record, IReadOnlySet<RecordKey> records, PluginNames names, List<LinkFact> facts)
     {
         foreach (var link in EnumerateDependencyLinks(record))
         {
-            if (link.IsNull || names.Of(link.FormKey.ModKey) != target) continue;
+            if (link.IsNull) continue;
             var linkedKey = names.KeyOf(link.FormKey);
-            if (!targets.Contains(linkedKey)) continue;
+            if (!records.Contains(linkedKey)) continue;
             facts.Add(CreateNonPlacedFact(record, linkedKey, DescribeNonPlacedRelation(record, link.FormKey), AliasFillFlags.None, names));
         }
     }

@@ -90,9 +90,10 @@ internal sealed class SupportRule(
         return evaluation with { Proposed = ReachesThreshold(evaluation.RemovedShare, threshold) };
     }
 
+    /// <remarks>A target moved back to the placement it replaces no longer holds anything up where it stood, as a removed one.</remarks>
     private static SupportCategory Categorize(IRemovalDecisions decisions, Supporter supporter) => supporter.Type switch
     {
-        SupporterType.Target => decisions.IsRemoved(new TargetId(supporter.Index)) ? SupportCategory.RemovedTarget : SupportCategory.KeptTarget,
+        SupporterType.Target => decisions.HasLeftItsSpot(new TargetId(supporter.Index)) ? SupportCategory.RemovedTarget : SupportCategory.KeptTarget,
         SupporterType.PlacedObject => SupportCategory.OtherMod,
         SupporterType.Terrain => SupportCategory.Terrain,
         _ => throw new UnreachableException($"Unknown supporter type {supporter.Type}."),

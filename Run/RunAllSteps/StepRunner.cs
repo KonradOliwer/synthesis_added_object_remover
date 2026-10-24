@@ -10,6 +10,8 @@ using AddedObjectRemover.Steps.CollectPlacedObjects;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
+using AddedObjectRemover.Steps.FitClashingObjects;
+using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers;
@@ -158,8 +160,9 @@ public static class StepRunner
     }
 
     /// <summary>
-    /// Selects the objects that can cause removals and finds the objects to keep, then decides the removal rounds in
-    /// order (changed terrain, too close, also remove, leftover invisible objects) and the moves of the kept markers.
+    /// Selects the objects that can cause removals and finds the objects to keep, then decides the fits of clashing objects
+    /// and the removal rounds in order (changed terrain, too close, also remove, leftover invisible objects) and the moves of
+    /// the kept markers.
     /// </summary>
     /// <remarks>
     /// The runner holds no error boundary: each step catches its own errors inside the step. Applying a step's
@@ -171,7 +174,8 @@ public static class StepRunner
         var selected = RunSelection(scope, runCaches, collected);
         var kept = RunKeepCheck(scope, runCaches, collected);
         var started = RemovalDecisions.Start(kept.ObjectsToKeep, collected.Targets.Length);
-        var changedTerrain = RunChangedTerrain(scope, runCaches, trust, collected, started);
+        var fitted = RunFit(scope, runCaches, trust, collected, selected, kept.ObjectsToKeep, started);
+        var changedTerrain = RunChangedTerrain(scope, runCaches, trust, collected, fitted.Decisions);
         var tooClose = RunTooClose(scope, runCaches, collected, selected, changedTerrain.Decisions);
         var alsoRemove = RunAlsoRemove(scope, runCaches, collected, kept.ObjectsToKeep, tooClose.Decisions);
         var leftBehind = RunLeftBehind(scope, runCaches, collected, selected.ObjectsThatCanCauseRemovals, alsoRemove.Decisions);
@@ -203,6 +207,48 @@ public static class StepRunner
         var kept = ObjectsToKeepFinder.Find(collected.Targets, collected.Links, runCaches.Bases);
         Print(scope.Environment.Log, scope.Report.BuildStepSections(kept));
         return kept;
+    }
+
+    private static FitPhase RunFit(
+        RunScope scope,
+        IRunCaches runCaches,
+        ModTrustTable trust,
+        CollectedObjects collected,
+        SelectedObjects selected,
+        IObjectsToKeep objectsToKeep,
+        RemovalDecisions started) =>
+        scope.Environment.Log.Timed(
+            () => FindAndApplyFits(scope, runCaches, trust, collected, selected, objectsToKeep, started),
+            (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, elapsed));
+
+    /// <remarks>The rules come in the order of their removal rounds.</remarks>
+    private static FitPhase FindAndApplyFits(
+        RunScope scope,
+        IRunCaches runCaches,
+        ModTrustTable trust,
+        CollectedObjects collected,
+        SelectedObjects selected,
+        IObjectsToKeep objectsToKeep,
+        RemovalDecisions started)
+    {
+        IPlacementRule[] rules =
+        [
+            ChangedTerrainObjects.CreatePlacementRule(
+                collected, trust, scope.Environment.Plugins, scope.Plugin, runCaches.Shapes, scope.Settings.ChangedTerrain),
+            TooCloseObjects.CreatePlacementRule(
+                collected,
+                runCaches.VisibleTargets,
+                selected.ObjectsThatCanCauseRemovals,
+                runCaches.PlacedNpcs,
+                selected.Replacements,
+                runCaches.Shapes,
+                runCaches.Triangles,
+                scope.Settings.TooClose),
+            LeftBehindObjects.CreatePlacementRule(collected.Targets, selected.ObjectsThatCanCauseRemovals, runCaches.Shapes, scope.Settings.LeftBehind),
+        ];
+        var result = ClashingObjectFitter.Fit(
+            collected.Targets, objectsToKeep, rules, runCaches.Shapes, collected.Order, scope.Settings.Execution, scope.Settings.Fit);
+        return new FitPhase(result, started.ApplyFits(result.Fits));
     }
 
     private static ChangedTerrainPhase RunChangedTerrain(
@@ -359,6 +405,9 @@ public static class StepRunner
         IUnexpectedErrors UnexpectedErrors,
         LogAndReports Report,
         ReportFolderPrepared ReportFolder);
+
+    /// <param name="Decisions">The decisions with the fit round, when there was a fit.</param>
+    private sealed record FitPhase(FitResult Result, RemovalDecisions Decisions);
 
     /// <param name="Decisions">The decisions with the changed-terrain round.</param>
     private sealed record ChangedTerrainPhase(ChangedTerrainResult Result, RemovalDecisions Decisions);

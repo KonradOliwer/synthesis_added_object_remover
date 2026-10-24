@@ -47,7 +47,8 @@ internal static class TestTargets
             HasLocationRefType: false,
             ReferenceRadius: null,
             PrimitiveBounds: null,
-            UnnamedArea);
+            UnnamedArea,
+            Replaced: null);
 
     /// <summary>The area of a target object whose space and cell have no names, such as an interior cell without a name.</summary>
     public static readonly TargetArea UnnamedArea = new(Hold: null, Place: null, PlaceSource.CellName, Grid: null);

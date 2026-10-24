@@ -393,6 +393,60 @@ public class RemovalDecisionsTests
         Assert.Equal(new[] { "details 1", "details 2", "details 3" }, rounds.Select(round => round.Details).ToArray());
     }
 
+    [Fact]
+    public void AFitRoundComesFirstAndALaterRemovalRoundSkipsTheFittedObjects()
+    {
+        var fitted = Start().ApplyFits([Fit(9, FitKind.MovedBack), Fit(8, FitKind.ShrunkOrTurned)]);
+
+        var final = fitted.Apply(RoundKind.TooClose, [Propose(8, TooClose), Propose(9, TooClose), Propose(10, TooClose)]);
+
+        Assert.Equal(new Round(1, RoundKind.Fit), final.Rounds[0]);
+        Assert.Equal(Ids(8, 9), final.FittedIn(final.Rounds[0]).ToArray());
+        Assert.Equal(Ids(10), final.RemovedIn(final.Rounds[1]).ToArray());
+        Assert.Equal(FitKind.MovedBack, Assert.IsType<Decision.Fitted>(final.Of(Id(9))).Kind);
+    }
+
+    [Fact]
+    public void AnObjectMovedBackHasLeftItsSpotLikeARemovedOneButOneShrunkOrTurnedHasNot()
+    {
+        var final = Start()
+            .ApplyFits([Fit(8, FitKind.ShrunkOrTurned), Fit(9, FitKind.MovedBack), Fit(11, FitKind.MovedBackShrunkOrTurned)])
+            .Apply(RoundKind.TooClose, [Propose(10, TooClose)]);
+
+        Assert.Equal((false, true, true, true), (final.HasLeftItsSpot(Id(8)), final.HasLeftItsSpot(Id(9)), final.HasLeftItsSpot(Id(10)), final.HasLeftItsSpot(Id(11))));
+        Assert.Equal(Ids(9, 11), final.LeftTheirSpotIn(final.Rounds[0]).ToArray());
+        Assert.Equal(Ids(9, 10, 11), final.TargetsThatLeftTheirSpot().ToArray());
+        Assert.Equal(Ids(10), final.RemovedTargets().ToArray());
+    }
+
+    [Fact]
+    public void NoFitOpensNoRound()
+    {
+        var start = Start();
+
+        Assert.Same(start, start.ApplyFits([]));
+    }
+
+    [Fact]
+    public void FittingAProtectedOrLinkedObjectIsABug()
+    {
+        Assert.Throws<InvalidOperationException>(() => Start(new Dictionary<int, KeepReason> { [8] = QuestReason }).ApplyFits([Fit(8, FitKind.MovedBack)]));
+        Assert.Throws<InvalidOperationException>(() => Start().ApplyFits([Fit(0, FitKind.MovedBack)]));
+    }
+
+    [Fact]
+    public void AWorkingCopyKeepsTheFitRound()
+    {
+        var fitted = Start().ApplyFits([Fit(9, FitKind.MovedBack)]);
+
+        var copy = fitted.WorkingCopy().DecideRound(RoundKind.TooClose, [Propose(10, TooClose)]);
+
+        Assert.Equal(Ids(9), copy.FittedIn(copy.Rounds[0]).ToArray());
+        Assert.True(copy.HasLeftItsSpot(Id(9)));
+    }
+
+    private static ProposedFit Fit(int index, FitKind kind) => new(Id(index), TooClose, kind, new EulerPlacement(Vector3.One, Vector3.Zero, 1f));
+
     private static RemovalDecisions Start(IReadOnlyDictionary<int, KeepReason>? references = null) =>
         RemovalDecisions.Start(ObjectsToKeep.Build(TestTargets.CreateMany(TargetCount), Links, TestTargets.References(TargetCount, references), TestBaseFacts.Unresolved), TargetCount);
 

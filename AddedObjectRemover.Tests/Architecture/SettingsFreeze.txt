@@ -15,6 +15,10 @@ OnlyWarnWhenModRequiringCleanedModLoadsAfterPatch
 PatchMode
 PatchMode.Batch
 PatchMode.Standard
+ShrinkOrTurnObjects
+ShrinkOrTurnObjects.AllObjects
+ShrinkOrTurnObjects.ReplacementsAfterMovingBack
+ShrinkOrTurnObjects.ReplacementsAtBothSpots
 Standard
 Standard.CleanedMod
 Standard.FollowUpRemoval
@@ -42,6 +46,11 @@ Standard.LeftoverInvisibleObjects.SurroundingObjects.DirectionThresholdPercent
 Standard.LeftoverInvisibleObjects.SurroundingObjects.OccupiedDirectionsPercent
 Standard.LeftoverInvisibleObjects.SurroundingObjects.RemovedDirectionsPercent
 Standard.LeftoverInvisibleObjects.SurroundingObjects.SearchRadius
+Standard.ShrinkOrTurn
+Standard.ShrinkOrTurn.MovedDistanceInUnits
+Standard.ShrinkOrTurn.ShrinkLimitPercent
+Standard.ShrinkOrTurn.TurnLimitDegrees
+Standard.ShrinkOrTurn.WhichObjects
 Standard.TerrainChange
 Standard.TerrainChange.ByDistance
 Standard.TerrainChange.ByDistance.DistanceInUnits

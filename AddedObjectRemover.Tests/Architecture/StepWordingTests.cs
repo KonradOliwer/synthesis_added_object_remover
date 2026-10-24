@@ -25,6 +25,8 @@ public class StepWordingTests
         [("Run/RunSettingsValidation/SettingCorrections.cs", "Warning: {name} {percent} is outside {PercentStep}-{Percent.PerWhole}; using {withinRange}.")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingCorrections.cs", "Warning: {name} {value} is outside {minimum}-{maximum}; using {clamped}.")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingCorrections.cs", "Warning: {name} {withinRange} is not a multiple of {PercentStep}; using {rounded}.")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingCorrections.cs", "Warning: {name} {value} is below {minimum}; using {minimum}.")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingCorrections.cs", "Warning: {name} {value} is below 0; using {defaultValue}.")] = SettingsWarning,
         [("Run/RunSettingsReading/SettingsFailureMessage.cs", " Value found: {foundValue}.")] = SettingsFailure,
         [("Run/RunSettingsReading/SettingsFailureMessage.cs", "Allowed values: {string.Join(")] = SettingsFailure,
         [("Run/RunSettingsReading/SettingsFailureMessage.cs", @"Error converting value (.*?) to type|Could not convert string to \w+: (.*?)\.\s*Path|Could not construct ModKey: (.*?)(?: \(Parameter '|[\r\n]|$)")] =
@@ -118,6 +120,11 @@ public class StepWordingTests
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects on terrain changed by other mods > Remove only when this share of the ground points changed type")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Remove objects on terrain changed by other mods > Remove only when this share of the ground got covered/uncovered")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "too close")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Shrink or turn objects to make them fit > ")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Shrink down to")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Distance that counts as moved")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Turn by at most")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Which objects may be shrunk or turned")] = SettingsWarning,
         [("Steps/CollectPlacedObjects.Contracts/CollectedObjects.cs", "The support-only objects were not collected in this run.")] = BugMessage,
         [("Steps/RemovalDecisionList/RemovalDecisions.cs", "Only the newest view of the removal decisions can be added to.")] = BugMessage,
         [("Steps/RemovalDecisionList/RemovalDecisions.cs", "The round is not part of this view.")] = BugMessage,
@@ -131,7 +138,8 @@ public class StepWordingTests
         [("Steps/RemoveObjectsRestingOnRemovedOnes/TargetMeshPaths.cs", "Target {target} has no mesh but was used as a mesh.")] = BugMessage,
         [("Steps/RemoveObjectsRestingOnRemovedOnes/TouchChains.cs", "A touch round has no cause {reason}.")] = BugMessage,
         [("Steps/RemoveObjectsRestingOnRemovedOnes/TouchChains.cs", "Touch chains need the touch rounds' search.")] = BugMessage,
-        [("Steps/RemoveTooCloseObjects/TooCloseObjects.cs", "Unknown removal zone {settings.Zone}.")] = BugMessage,
+        [("Steps/RemoveTooCloseObjects/TooCloseObjects.cs", "Unknown removal zone {zone}.")] = BugMessage,
+        [("Steps/RemovalDecisionList/RemovalDecisions.cs", "Target {target.Index} cannot be fitted: it is decided, protected or linked.")] = BugMessage,
         [("Steps/SelectObjectsThatCanCauseRemovals/OtherObjectViews.cs", "Other-mod object {index[slot].Key} is invisible, so it is not active.")] = BugMessage,
     };
 

@@ -35,9 +35,7 @@ internal static partial class Tables
         var grid = target.Area.Grid;
         return CsvRow.Of(
         [
-            Quote(target.Key.ToString()),
-            OptionalText(target.EditorId),
-            Quote(RecordNames.DescribeBase(context.Bases, target.Base)),
+            .. RecordColumns(target, context),
             Quote(Describe.RemovalReason(world, removal)),
             Quote(AreaText.Worldspace(space)),
             Quote(AreaText.Hold(target.Area)),

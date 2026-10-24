@@ -245,6 +245,46 @@ objects (invisible ones included) are checked, within half their size and 64 uni
 changes over 16 units, water added or removed) that put 20% of the points or more under water or
 out of it.
 
+#### Objects of other mods that the cleaned mod moved
+
+The cleaned mod can change an object another mod (or the base game) placed. When it leaves the object where that mod
+placed it (within *Distance that counts as moved*, see below), other mods were made to fit it there, so the object is never checked, even if the cleaned
+mod gave it another model, rotation or size. When it moves the object, the moved object is checked like the cleaned mod's
+own objects (too close to other mods' objects, NPCs stuck in it, terrain changed by other mods, and, for an invisible object
+such as a sound or a marker, sitting inside another mod's object), in this order:
+
+1. where the cleaned mod put it: if it fits, it stays there;
+2. moved back where the other mod placed it (its position, rotation and size are set back in the patch, in the cell the other
+   mod placed it in): if it fits there, it stays there;
+3. otherwise it is removed, the same way as the cleaned mod's objects.
+
+It is not moved back when that would take it into another worldspace or interior, or between a worldspace's persistent cell
+and an ordinary cell, or when an earlier patcher of your group already holds it in another cell; then step 2 is skipped.
+Shrinking and turning can be tried in between (see below). Objects resting on a moved object that was moved back or removed
+are handled like objects resting on a removed object. A moved object that a plugin after the cleaned mod changes again is left
+to that plugin and not checked. Objects the cleaned mod's objects or other records are linked to are kept, as for the cleaned
+mod's own objects (see *What is always kept*); a moved object linked to another object of the cleaned mod is never moved back,
+shrunk or turned.
+
+#### Shrink or turn objects to make them fit
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| Distance that counts as moved (game units) | `10` | A replacement of another mod's object counts as moved when it stands more than this many game units from the object it replaces; a moved one is judged like the mod's own objects, an unmoved one is always kept. A negative value is replaced by the default. |
+| Shrink down to (% of its size) | `80` | An object may be shrunk down to this share of its size to make it fit, in steps of 5%; the largest size that fits is used. 100 or more: objects are never shrunk. At least 1. |
+| Turn by at most (degrees either way) | `360` | An object may be turned about its upright axis by up to this many degrees to the left or to the right to make it fit, in steps of 15 degrees; the smallest turn that fits is used. It is never tilted. 0: objects are never turned. 180 or more: objects may face any way. |
+| Which objects may be shrunk or turned | `ReplacementsAfterMovingBack` | Which objects are tried shrunk or turned, and when (see below). With neither shrinking nor turning allowed, this changes nothing. |
+
+The larger size always comes first: each size is tried with no turn, then with the smallest turns, one way before the other. An object that fits nowhere is removed.
+
+- **ReplacementsAfterMovingBack**: a moved object of another mod is tried where the cleaned mod put it, then moved back as it was, then moved back and shrunk or turned. The cleaned mod's own objects are never shrunk or turned.
+- **ReplacementsAtBothSpots**: a moved object of another mod is tried where the cleaned mod put it, there shrunk or turned, then moved back as it was, then moved back and shrunk or turned. The cleaned mod's own objects are never shrunk or turned.
+- **AllObjects**: moved objects of other mods as with `ReplacementsAtBothSpots`, and the cleaned mod's own objects where they stand, then shrunk or turned there.
+
+Only visible objects are shrunk or turned. Objects that are always kept (see *What is always kept*) and objects linked to
+other objects of the cleaned mod are never moved back, shrunk or turned. An object kept shrunk or turned still stands where
+it was: *Also remove what rests on removed objects* removes it like any other object when what it rests on is removed.
+
 #### Also remove what rests on removed objects
 
 | Setting | Default | Meaning |
@@ -367,7 +407,8 @@ A config that stops fails the whole batch. Its message names the config file, th
 - Other mods' NPCs and creatures, except as set in *Other mods' NPCs and creatures cause removal*.
 - Effect meshes, such as fog, light rays and water spray: they never cause removals.
 - Objects the cleaned mod overrides or replaces (e.g. a piece of clutter the cleaned mod swaps
-  for its own version of about the same size at the same spot).
+  for its own version of about the same size at the same spot). An object of another mod that the cleaned mod moved is
+  checked instead (see *Objects of other mods that the cleaned mod moved*).
 - Removed objects: an object whose final version is deleted, is initially disabled without an enable parent, or has
   the player as enable parent with the opposite state (the way xEdit, other mods and this patcher switch an object off
   for good). Every rule skips it: it is never checked, never causes a removal, and nothing is kept because of it.
@@ -419,6 +460,8 @@ Not set in town_walls.json, defaults used: TooClose.UseRoughBoxes = false, TooCl
 
 Every setting the config leaves out is listed with its key and the default used, written as the config file would hold it, in the order of the settings screen.
 
+After the removal summary, when the cleaned mod moved objects of other mods, a line counts them and what became of them, like `Objects of other mods that SomeTownMod.esp moved: 12; kept where SomeTownMod.esp put them: 7; kept there shrunk or turned: 1; moved back: 2; moved back and shrunk or turned: 1; removed: 1.`, and a line like `SomeTownMod.esp objects kept shrunk or turned: 4.` counts the cleaned mod's own objects kept shrunk or turned. The detailed log lists each of these objects, with its new size and turn. These moved objects are not counted in the run summary line; the removed ones are listed with the other removals.
+
 Right after the kept summary, each object kept for a reason of its own gets a line saying why: *Kept, script names a quest or scene* (its own script, or its base object's from the cleaned mod) or *Kept, location role* (a location ref type of its own). They are kept on purpose and are not in the *Removed markers and kept objects* section.
 
 Near the end of the log, a *Removed markers and kept objects* section (printed only when it has rows) lists removed door, map, idle and furniture markers (which actors or the map use), and objects that would have been removed but were kept, grouped by why (part of a linked group, kept because something depends on it, or a teleport door). With *Detailed log and reports* on, the locations of the written files follow.
@@ -464,6 +507,7 @@ With *Detailed log and reports* on, CSV files (UTF-8, comma-separated, header in
 - **`edges.csv`** and **`components.csv`**: which objects were found touching and which chains were removed together. Only with *When an object is removed, also remove* `EverythingTouchingIt` and something removed for being too close or on changed terrain.
 - **`leftover-invisible-objects.csv`** (the *Invisible objects left behind* step): why each invisible object checked was removed or kept, and where it was moved. Only with *Remove invisible objects left inside other mods' objects or alone* on.
 - **`removals.csv`**: every removed object with where it is, always written. Columns: formKey, editorId, base, reason, worldspace, hold, place, cellFormKey, cellEditorId, gridX, gridY, x, y, z. Sorted by worldspace, hold and place, then by form key.
+- **`moved-and-fitted-objects.csv`**: every object of another mod that the cleaned mod moved, with what became of it (kept where the cleaned mod put it, kept there shrunk or turned, moved back, moved back and shrunk or turned, removed), and every object of the cleaned mod kept shrunk or turned. Only when there is such an object. Columns: outcome, formKey, editorId, base, worldspace, x, y, z, rotZDeg, scale, and the new placement newX, newY, newZ, newRotZDeg, newScale (empty when the placement did not change).
 - **`removed-markers-and-kept-objects.csv`**: the rows of the *Removed markers and kept objects* section, always written. Columns: kind, formKey, editorId, space, cell, detail.
 
 ## Known limitations

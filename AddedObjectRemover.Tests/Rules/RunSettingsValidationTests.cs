@@ -44,6 +44,86 @@ public class RunSettingsValidationTests
         SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), facts ?? Facts(), detailedLogAndReports: false, onlyWarnWhenRequiringModLoadsAfterPatch: false, ReportsFolder, 1);
 
     [Fact]
+    public void TheShrinkAndTurnDefaultsReachTheRunUnchanged()
+    {
+        var ready = BuildReady(SettingsFor());
+
+        Assert.Equal(new FitSettings(80, 360, ShrinkOrTurnObjects.ReplacementsAfterMovingBack), ready.Settings.Fit);
+        Assert.Empty(ready.Warnings);
+    }
+
+    [Theory]
+    [InlineData(100, 180)]
+    [InlineData(250, 720)]
+    [InlineData(1, 0)]
+    public void ShrinkAndTurnLimitsAtOrBeyondTheirMeaningfulRangeAreKeptWithoutWarning(int shrink, int turn)
+    {
+        var settings = SettingsFor();
+        settings.ShrinkOrTurn = new ShrinkOrTurnSettings { ShrinkLimitPercent = shrink, TurnLimitDegrees = turn };
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal((shrink, turn), (ready.Settings.Fit.ShrinkLimitPercent, ready.Settings.Fit.TurnLimitDegrees));
+        Assert.Empty(ready.Warnings);
+    }
+
+    [Fact]
+    public void AShrinkLimitBelow1AndANegativeTurnLimitAreRaisedWithAWarningEach()
+    {
+        var settings = SettingsFor();
+        settings.ShrinkOrTurn = new ShrinkOrTurnSettings { ShrinkLimitPercent = 0, TurnLimitDegrees = -10 };
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal((1, 0), (ready.Settings.Fit.ShrinkLimitPercent, ready.Settings.Fit.TurnLimitDegrees));
+        Assert.Equal(
+            [
+                "Warning: Shrink or turn objects to make them fit > Shrink down to 0 is below 1; using 1.",
+                "Warning: Shrink or turn objects to make them fit > Turn by at most -10 is below 0; using 0.",
+            ],
+            ready.Warnings.Select(warning => warning.Message));
+    }
+
+    [Fact]
+    public void TheDistanceThatCountsAsMovedIs10UnitsByDefaultAndReachesTheRead()
+    {
+        Assert.Equal(10f, BuildReady(SettingsFor()).Settings.Read.MovedDistance);
+
+        var settings = SettingsFor();
+        settings.ShrinkOrTurn = new ShrinkOrTurnSettings { MovedDistanceInUnits = 0f };
+        var ready = BuildReady(settings);
+
+        Assert.Equal(0f, ready.Settings.Read.MovedDistance);
+        Assert.Empty(ready.Warnings);
+    }
+
+    [Theory]
+    [InlineData(-3f, "Warning: Shrink or turn objects to make them fit > Distance that counts as moved -3 is below 0; using 10.")]
+    [InlineData(float.NaN, "Warning: Shrink or turn objects to make them fit > Distance that counts as moved is not a valid number; using 10.")]
+    public void ANegativeDistanceThatCountsAsMovedIsReplacedByTheDefaultWithAWarning(float distance, string warning)
+    {
+        var settings = SettingsFor();
+        settings.ShrinkOrTurn = new ShrinkOrTurnSettings { MovedDistanceInUnits = distance };
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(10f, ready.Settings.Read.MovedDistance);
+        Assert.Equal(warning, Assert.Single(ready.Warnings).Message);
+    }
+
+    [Fact]
+    public void AnUnknownChoiceOfObjectsToShrinkOrTurnFallsBackToTheDefaultWithAWarning()
+    {
+        var settings = SettingsFor();
+        settings.ShrinkOrTurn = new ShrinkOrTurnSettings { WhichObjects = (ShrinkOrTurnObjects)99 };
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(ShrinkOrTurnObjects.ReplacementsAfterMovingBack, ready.Settings.Fit.Objects);
+        Assert.Single(ready.Warnings);
+    }
+
+    [Fact]
     public void AnEmptyCleanedModStopsTheRunAsNoTargetSet()
     {
         var stop = Assert.IsType<RunRequest.Stop>(Build(new StandardSettings()));
@@ -304,7 +384,7 @@ public class RunSettingsValidationTests
         supportOnly.TerrainChange.RemoveOnChangedTerrain = false;
         supportOnly.LeftoverInvisibleObjects.MoveKeptMarkersOutOfOtherModsObjects = false;
         supportOnly.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.OnlyWhatLosesItsSupport };
-        Assert.Equal(new WhatToCollect(true, true, false, false, false, false, false), BuildReady(supportOnly).Settings.Read);
+        Assert.Equal(new WhatToCollect(true, true, false, false, false, false, false, 10f), BuildReady(supportOnly).Settings.Read);
 
         var relocating = SettingsFor();
         relocating.TerrainChange.RemoveOnChangedTerrain = false;
@@ -315,14 +395,14 @@ public class RunSettingsValidationTests
             MoveKeptMarkersOutOfOtherModsObjects = true,
         };
         var runSettings = BuildReady(relocating).Settings;
-        Assert.Equal(new WhatToCollect(true, true, true, false, false, false, false), runSettings.Read);
+        Assert.Equal(new WhatToCollect(true, true, true, false, false, false, false, 10f), runSettings.Read);
         Assert.NotNull(runSettings.MarkerMoves);
 
         var neither = SettingsFor();
         neither.TerrainChange.RemoveOnChangedTerrain = false;
         neither.LeftoverInvisibleObjects.MoveKeptMarkersOutOfOtherModsObjects = false;
         neither.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.EverythingTouchingIt };
-        Assert.Equal(new WhatToCollect(false, false, false, false, false, false, false), BuildReady(neither).Settings.Read);
+        Assert.Equal(new WhatToCollect(false, false, false, false, false, false, false, 10f), BuildReady(neither).Settings.Read);
     }
 
     [Theory]

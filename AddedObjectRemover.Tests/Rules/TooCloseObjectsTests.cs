@@ -73,6 +73,42 @@ public class TooCloseObjectsTests
     }
 
     [Theory]
+    [InlineData(ZoneShape.BoundingBox, NpcHandling.AlwaysLikeAnyObject)]
+    [InlineData(ZoneShape.ObjectShape, NpcHandling.OnlyWhenStuckInsideTheObject)]
+    public void ThePlacementRuleAtAnObjectsOwnPlacementGivesTheSameReasonAsFind(ZoneShape zone, NpcHandling npcs)
+    {
+        var scene = WithStoredHeadings(CreateScene());
+        var settings = new TooCloseSettings(BySize: true, Multiplier, ByDistance: true, DistanceInUnits: Distance, zone, npcs);
+        var rule = CreatePlacementRule(scene, settings);
+
+        var found = FindWithFacade(scene, settings).Proposals.ToDictionary(proposal => proposal.Target, proposal => proposal.Reason);
+
+        Assert.NotEmpty(found);
+        Assert.All(scene.Targets, target => Assert.Equal(found.GetValueOrDefault(target.Id), rule.Check(target.Id, target.Placement).Clash));
+    }
+
+    [Fact]
+    public void ThePlacementRuleJudgesTheObjectWhereItIsPlaced()
+    {
+        var scene = CreateScene();
+        var settings = new TooCloseSettings(BySize: true, Multiplier, ByDistance: false, DistanceInUnits: 0f, ZoneShape.ObjectShape, NpcHandling.Never);
+        var rule = CreatePlacementRule(scene, settings);
+        var hit = FindWithFacade(scene, settings).Proposals[0].Target;
+        var farAway = new EulerPlacement(new Vector3(-10 * SceneExtent, 0, 0), Vector3.Zero, 1f);
+
+        Assert.Equal(new PlacementCheck(null, null), rule.Check(hit, farAway));
+    }
+
+    [Fact]
+    public void ThePlacementRuleFindsNothingWhenNoZoneIsOn()
+    {
+        var scene = CreateScene();
+        var rule = CreatePlacementRule(scene, new TooCloseSettings(BySize: false, Multiplier, ByDistance: false, DistanceInUnits: 0f, ZoneShape.ObjectShape, NpcHandling.AlwaysLikeAnyObject));
+
+        Assert.All(scene.Targets, target => Assert.Null(rule.Check(target.Id, target.Placement).Clash));
+    }
+
+    [Theory]
     [InlineData(ZoneShape.BoundingBox)]
     [InlineData(ZoneShape.ObjectShape)]
     public void FindIsSwitchedOffAndLooksAtNothingWhenNoZoneIsOn(ZoneShape zone)
@@ -160,7 +196,7 @@ public class TooCloseObjectsTests
         var npcRule = NpcTooCloseRule.Create(
             settings.Npcs,
             onlyWithBlockingCollision => NpcStuckSearch.Create(
-                scene.Targets, world.VisibleTargets, world.NpcsThatCanSpawn(replacements), Shapes, NewTriangles(), onlyWithBlockingCollision));
+                world.VisibleTargets, world.NpcsThatCanSpawn(replacements), Shapes, NewTriangles(), onlyWithBlockingCollision));
         var order = TargetWorkOrder.Of(scene.Targets);
         var execution = new Execution(Threads);
         var largeOtherObjects = 0;
@@ -194,6 +230,37 @@ public class TooCloseObjectsTests
             Shapes,
             NewTriangles(),
             new Execution(Threads),
+            settings);
+    }
+
+    /// <summary>
+    /// The scene's targets turn only about Z, but store no Euler rotation; each gets the stored rotation of its turn, and the
+    /// transform made from it, so the target at its own placement is the target itself.
+    /// </summary>
+    private static TooCloseScene WithStoredHeadings(TooCloseScene scene) =>
+        scene with
+        {
+            Targets =
+            [
+                .. scene.Targets.Select(target => target.PlacedAt(new EulerPlacement(
+                    target.Transform.Position,
+                    new Vector3(0, 0, MathF.Atan2(-target.Transform.Rotation.M21, target.Transform.Rotation.M11)),
+                    target.Transform.Scale))),
+            ],
+        };
+
+    private static IPlacementRule CreatePlacementRule(TooCloseScene scene, TooCloseSettings settings)
+    {
+        var replacements = Replacements.None(scene.OtherModObjects.Count);
+        var caches = CreateWorld(scene);
+        return TooCloseObjects.CreatePlacementRule(
+            TestScenes.CreateWorld(scene.Targets, scene.OtherModObjects),
+            caches.VisibleTargets,
+            caches.ObjectsThatCanCauseRemovals(replacements, settings.Npcs),
+            caches.PlacedNpcs,
+            replacements,
+            Shapes,
+            NewTriangles(),
             settings);
     }
 

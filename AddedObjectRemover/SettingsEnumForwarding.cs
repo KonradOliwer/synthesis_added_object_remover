@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using AddedObjectRemover;
+using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
@@ -9,4 +10,5 @@ using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 [assembly: TypeForwardedTo(typeof(PatchMode))]
 [assembly: TypeForwardedTo(typeof(TerrainCheckedObjects))]
 [assembly: TypeForwardedTo(typeof(NpcHandling))]
+[assembly: TypeForwardedTo(typeof(ShrinkOrTurnObjects))]
 [assembly: TypeForwardedTo(typeof(FollowUpRemovalMode))]

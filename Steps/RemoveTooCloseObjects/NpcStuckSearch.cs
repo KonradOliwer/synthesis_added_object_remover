@@ -29,7 +29,6 @@ internal sealed class NpcScratch
 /// </summary>
 internal sealed class NpcStuckSearch
 {
-    private readonly IReadOnlyList<TargetObject> _targets;
     private readonly INpcsThatCanSpawn _npcs;
     private readonly IReadOnlyList<RecordKey> _spaces;
     private readonly IBaseObjectShapes _shapes;
@@ -38,14 +37,12 @@ internal sealed class NpcStuckSearch
     private readonly ComputedOncePerKey<RecordKey, MeshTriangleTree> _targetBoxTrees = new(Publication.BuiltOnce, EqualityComparer<RecordKey>.Default);
 
     private NpcStuckSearch(
-        IReadOnlyList<TargetObject> targets,
         INpcsThatCanSpawn npcs,
         IReadOnlyList<RecordKey> spaces,
         IBaseObjectShapes shapes,
         ITriangleMeshes meshCache,
         bool onlyWithBlockingCollision)
     {
-        _targets = targets;
         _npcs = npcs;
         _spaces = spaces;
         _shapes = shapes;
@@ -56,7 +53,6 @@ internal sealed class NpcStuckSearch
     /// <summary>Sizes the placed NPCs of every space holding a visible target up front.</summary>
     /// <param name="onlyWithBlockingCollision">Only targets whose mesh collision stops characters can have an NPC stuck in them.</param>
     public static NpcStuckSearch Create(
-        IReadOnlyList<TargetObject> targets,
         IVisibleTargetObjects visibleTargets,
         INpcsThatCanSpawn npcs,
         IBaseObjectShapes shapes,
@@ -64,7 +60,7 @@ internal sealed class NpcStuckSearch
         bool onlyWithBlockingCollision)
     {
         foreach (var space in visibleTargets.Spaces) npcs.MeasureBodiesIn(space);
-        return new NpcStuckSearch(targets, npcs, visibleTargets.Spaces, shapes, meshCache, onlyWithBlockingCollision);
+        return new NpcStuckSearch(npcs, visibleTargets.Spaces, shapes, meshCache, onlyWithBlockingCollision);
     }
 
     /// <param name="work">The search's work counts, harvested from its scratches.</param>
@@ -81,9 +77,8 @@ internal sealed class NpcStuckSearch
                 .ToList());
 
     /// <summary>The first other-mod NPC stuck in the visible target, or null.</summary>
-    public OtherId? FindFirstStuckNpc(int targetIndex, NpcScratch scratch)
+    public OtherId? FindFirstStuckNpc(TargetObject target, NpcScratch scratch)
     {
-        var target = _targets[targetIndex];
         if (target.Base is not { } baseKey) return null;
 
         var shape = _shapes.Of(baseKey);

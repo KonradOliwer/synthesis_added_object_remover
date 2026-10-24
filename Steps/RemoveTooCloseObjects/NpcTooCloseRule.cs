@@ -1,3 +1,4 @@
+using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
@@ -32,11 +33,11 @@ internal sealed class NpcTooCloseRule
         handling is NpcHandling.OnlyWhenStuckInsideTheObject or NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision;
 
     /// <summary>The first NPC stuck in the target, or null; always null unless NPCs count when stuck in an object.</summary>
-    public OtherId? FindFirstStuckNpc(int targetIndex, NpcScratch scratch) =>
-        StuckSearch?.FindFirstStuckNpc(targetIndex, scratch);
+    public OtherId? FindFirstStuckNpc(TargetObject target, NpcScratch scratch) =>
+        StuckSearch?.FindFirstStuckNpc(target, scratch);
 
     /// <summary>The first object match wins; NPCs are only looked at when no object matched.</summary>
     /// <remarks>An NPC stuck in the target is within the target's own size, whichever zones are on.</remarks>
-    public ZoneHit? ThenFirstStuckNpc(ZoneHit? objectMatch, int targetIndex, NpcScratch scratch) =>
-        objectMatch ?? (FindFirstStuckNpc(targetIndex, scratch) is { } npc ? new ZoneHit(npc, new TooCloseCause.ObjectSize()) : null);
+    public ZoneHit? ThenFirstStuckNpc(ZoneHit? objectMatch, TargetObject target, NpcScratch scratch) =>
+        objectMatch ?? (FindFirstStuckNpc(target, scratch) is { } npc ? new ZoneHit(npc, new TooCloseCause.ObjectSize()) : null);
 }

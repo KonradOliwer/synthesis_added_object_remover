@@ -40,6 +40,12 @@
     "CountWaterAddedOrRemoved": true,
     "MinWaterCoverChangePercent": 20
   },
+  "ShrinkOrTurn": {
+    "MovedDistanceInUnits": 10.0,
+    "ShrinkLimitPercent": 80,
+    "TurnLimitDegrees": 360,
+    "WhichObjects": "ReplacementsAfterMovingBack"
+  },
   "FollowUpRemoval": {
     "Mode": "OnlyWhatLosesItsSupport",
     "TouchDistance": 8.0,

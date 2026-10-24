@@ -22,11 +22,12 @@ public interface IPluginRecords
     PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk);
 
     /// <summary>
-    /// The links into the given target-plugin records from every version of every record that is not a placed record, in the plugins
-    /// that can link to the target plugin, and the quest aliases that fill with a target-plugin NPC as their Unique Actor
-    /// (<see cref="RelationKind.UniqueActor"/>, linking the NPC base). The links of placed records are in <see cref="PlacedRecordFacts.Links"/>.
+    /// The links into the given records from every version of every record that is not a placed record, in the plugins that can
+    /// link to them (only those that can link to the target plugin when every record is the target plugin's, otherwise every
+    /// plugin), and the quest aliases that fill with a target-plugin NPC as their Unique Actor (<see cref="RelationKind.UniqueActor"/>,
+    /// linking the NPC base). The links of placed records are in <see cref="PlacedRecordFacts.Links"/>.
     /// </summary>
-    ImmutableArray<LinkFact> ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets);
+    ImmutableArray<LinkFact> ReadLinks(PluginName target, IReadOnlySet<RecordKey> records);
 
     /// <summary>The records <see cref="IPatchWriting"/> copies from; the placed records must have been read before.</summary>
     IWritableRecords ReadWritableRecords();

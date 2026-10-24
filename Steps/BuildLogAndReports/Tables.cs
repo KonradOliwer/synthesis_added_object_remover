@@ -25,9 +25,18 @@ internal static partial class Tables
         if (ExplanationEvidence.HasMeshOrigins(restingObjects)) tables.Add(BuildMeshOriginsTable(ExplanationEvidence.MeshOrigins(restingObjects)));
         if (outcome.LeftBehind.Outcome != StepOutcome.SwitchedOff) tables.Add(BuildLeftBehindTable(outcome.Collected, outcome.LeftBehind.Evaluations, outcome.MarkerMoves, context));
         tables.Add(BuildRemovalsTable(outcome.Collected, outcome.Removals, context));
+        if (BuildFitsTable(outcome.Collected, outcome.Final, context) is { } fits) tables.Add(fits);
         tables.Add(BuildHintsTable(outcome.Collected, outcome.Hints));
         return tables.ToImmutable();
     }
+
+    /// <summary>The columns that name a target object's record: its form key, its Editor ID and its base.</summary>
+    private static IEnumerable<string> RecordColumns(TargetObject target, ReportContext context) =>
+    [
+        Quote(target.Key.ToString()),
+        OptionalText(target.EditorId),
+        Quote(RecordNames.DescribeBase(context.Bases, target.Base)),
+    ];
 
     /// <summary>The columns that name a target object's base: its Editor ID, the base and the model path.</summary>
     private static IEnumerable<string> BaseColumns(TargetObject target, ReportContext context) =>

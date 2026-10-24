@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
+using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
@@ -27,6 +28,7 @@ internal static class RunPartText
         [LeftBehindParts.LeftBehind] = new("the step for invisible objects left behind", "That step did not run, so invisible objects whose surroundings were removed were not removed.", Subjects: null),
         [MarkerMoveParts.MarkerMoves] = new("the marker moves", "No kept marker was moved, so markers inside other mods' objects stay where they are.", Subjects: null),
         [RestingObjectsParts.ReportFileDetails] = new("the report-file details", "The touching pairs or mesh origins that the report files list are missing from them.", Subjects: null),
+        [FitParts.FitCheck] = new("checking objects at other placements", "Those placements were not used.", SubjectKind.Object),
         [ChangedTerrainParts.TerrainCheck] = new("checking objects for changed terrain", "They were not removed.", SubjectKind.Object),
         [TooCloseParts.TooCloseCheck] = new("checking objects for being too close", "They were not removed.", SubjectKind.Object),
         [KeepParts.KeepCheck] = new("finding the cleaned mod's objects to keep", "They were kept.", SubjectKind.Object),

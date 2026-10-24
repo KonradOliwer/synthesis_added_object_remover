@@ -3,10 +3,16 @@ using System.Collections.Immutable;
 namespace AddedObjectRemover.Tests.Fixtures;
 
 /// <summary>A load order that holds only the given placed record facts and links; every other read throws.</summary>
-internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records, ImmutableArray<LinkFact> links) : IPluginRecords
+/// <param name="overridden">The records of other plugins the target plugin overrides.</param>
+internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records, ImmutableArray<LinkFact> links, IReadOnlySet<RecordKey> overridden) : IPluginRecords
 {
     public FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records)
-        : this(records, [])
+        : this(records, [], new HashSet<RecordKey>())
+    {
+    }
+
+    public FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records, ImmutableArray<LinkFact> links)
+        : this(records, links, new HashSet<RecordKey>())
     {
     }
 
@@ -16,7 +22,7 @@ internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records,
     public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk)
     {
         StopsTheWalk = stopsTheWalk;
-        return new(records, records.Length, new HashSet<RecordKey>(), links, NavmeshCount: 0, UnnamedCellsOf(records));
+        return new(records, records.Length, overridden, links, NavmeshCount: 0, UnnamedCellsOf(records));
     }
 
     /// <summary>Each cell of the records once, without grid, name or Location.</summary>

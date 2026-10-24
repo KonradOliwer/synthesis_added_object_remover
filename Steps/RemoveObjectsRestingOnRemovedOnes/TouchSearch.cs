@@ -75,14 +75,14 @@ internal sealed class TouchSearch
     }
 
     /// <summary>
-    /// The undecided objects whose mesh touches an object removed in the previous round, each paired with the first
+    /// The objects an also-remove round may still decide whose mesh touches an object removed in the previous round, each paired with the first
     /// removed object (in target order, then neighbour order) that touches it.
     /// </summary>
     public (List<IndexPair> Found, PairTestStats Work) FindUndecidedTouchingRemoved(
         IRemovalDecisions decisions, ImmutableArray<TargetId> removedLastRound, bool alsoWhenCentreEnclosed)
     {
         var frontier = removedLastRound.Order().Select(target => target.Index).ToList();
-        var pairs = CollectFrontierPairs(frontier, skip: node => decisions.IsDecided(new TargetId(node)));
+        var pairs = CollectFrontierPairs(frontier, skip: node => !decisions.MayStillBeRemoved(new TargetId(node)));
         return Tester.FindFirstInContact(pairs, alsoWhenCentreEnclosed, _execution);
     }
 

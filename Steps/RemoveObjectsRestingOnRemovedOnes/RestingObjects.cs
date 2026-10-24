@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
+using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 
@@ -20,13 +21,14 @@ public static class RestingObjects
     /// </summary>
     /// <param name="objectsOfAnyPlugin">Asked only when the support rounds have seeds: the first ask builds the supporters' bounds index.</param>
     public static RestingObjectsResult Find(
-        RestingObjectsInput input,
+        RestingObjectsInput unplaced,
         IBaseFacts bases,
         IBaseObjectShapes shapes,
         ITriangleMeshes triangles,
         ITerrainHeights terrain,
         Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin)
     {
+        var input = unplaced with { Targets = AsTheyStand(unplaced.Targets, unplaced.EarlierRounds) };
         if (input.Settings.Mode == FollowUpRemovalMode.Nothing) return NotPerformed(input, StepOutcome.SwitchedOff, failure: null).Result;
 
         var rounds = Failures.Attempt(
@@ -35,6 +37,13 @@ public static class RestingObjects
         var run = rounds with { Result = WithTouchChains(rounds, input) };
         return run.Result with { ReportFileDetails = FindReportFileDetails(run, input, bases, shapes, triangles) };
     }
+
+    /// <summary>
+    /// The targets where they stand: one kept shrunk or turned at its fitted placement. One moved back is a seed where it stood,
+    /// so it keeps that placement.
+    /// </summary>
+    private static ImmutableArray<TargetObject> AsTheyStand(ImmutableArray<TargetObject> targets, IRemovalDecisions earlierRounds) =>
+        [.. targets.Select(target => earlierRounds.Of(target.Id) is Decision.Fitted { Kind: FitKind.ShrunkOrTurned } fitted ? target.PlacedAt(fitted.To) : target)];
 
     /// <remarks>
     /// The objects of any plugin are asked for before the rounds' time starts, because the first ask builds the
@@ -172,9 +181,12 @@ public static class RestingObjects
             TouchChainsFailure: null,
             ReportFileDetails.SwitchedOff);
 
-    /// <summary>The removals the also-remove rounds start from: those of every earlier round.</summary>
+    /// <summary>
+    /// The objects the also-remove rounds start from: those every earlier round took off their spot. An object moved back to the
+    /// placement it replaces left its spot as a removed one did, so what rests on it there goes the same way.
+    /// </summary>
     private static ImmutableArray<TargetId> SeedsOf(IRemovalDecisions earlierRounds) =>
-        [.. earlierRounds.Rounds.SelectMany(round => earlierRounds.RemovedIn(round))];
+        [.. earlierRounds.Rounds.SelectMany(round => earlierRounds.LeftTheirSpotIn(round))];
 
     private static RestingObjectsPlan PrepareTouchRounds(IRemovalDecisions earlierRounds, IReadOnlyList<int> seeds, RoundsInput input, AlsoRemoveSettings settings)
     {

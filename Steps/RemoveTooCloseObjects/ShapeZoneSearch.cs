@@ -17,7 +17,7 @@ namespace AddedObjectRemover.Steps.RemoveTooCloseObjects;
 /// <see cref="NpcTooCloseRule"/>. Candidates are tested in index order, so the result
 /// does not depend on thread scheduling.
 /// </summary>
-internal sealed class ShapeZoneSearch
+internal sealed class ShapeZoneSearch : ITooCloseSearch
 {
     /// <summary>
     /// One pair count of one worker thread. A pair the current target's earlier zone already counted is not counted again;
@@ -156,24 +156,25 @@ internal sealed class ShapeZoneSearch
             _targets, _otherModObjects, _shapes, order, execution, () => new Scratch(), FindFirstTooCloseOther, scratch => scratch.Harvest());
     }
 
+    public TargetCheck CheckAlone(TargetObject target) => TooCloseSearch.CheckTarget(target, _shapes, new Scratch(), FindFirstTooCloseOther);
+
     /// <remarks>
     /// A target the size zone missed runs the whole search again with the distance zone. One broad phase over a box holding
     /// both zones would save only the second grid query, while the zones' own box filters and mesh tests still differ.
     /// </remarks>
-    private ZoneHit? FindFirstTooCloseOther(int targetIndex, Scratch scratch)
+    private ZoneHit? FindFirstTooCloseOther(TargetObject target, Scratch scratch)
     {
         scratch.StartTarget();
         return _npcRule.ThenFirstStuckNpc(
-            ZoneGrowth.FirstHit(_zones, growth => FindFirstOtherModObjectInZone(targetIndex, growth, scratch)),
-            targetIndex,
+            ZoneGrowth.FirstHit(_zones, growth => FindFirstOtherModObjectInZone(target, growth, scratch)),
+            target,
             scratch.Npcs);
     }
 
     /// <summary>The first other-mod object reaching the target's zone, or null.</summary>
-    private OtherId? FindFirstOtherModObjectInZone(int targetIndex, ZoneGrowth growth, Scratch scratch)
+    private OtherId? FindFirstOtherModObjectInZone(TargetObject target, ZoneGrowth growth, Scratch scratch)
     {
         scratch.StartZone();
-        var target = _targets[targetIndex];
         if (_shapes.Of(target.Base).MeshPath is not { } meshPath) return FindFirstInBoxZone(target, growth, scratch);
 
         var zone = growth.CreateShapeZone(_shapes.Of(target.Base).Box, target.Transform);

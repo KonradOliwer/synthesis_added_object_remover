@@ -43,7 +43,11 @@ internal static partial class LogSections
             ]);
     }
 
-    /// <summary>What the run started from and what it did with the target's objects: all of them, those earlier patchers in this group removed, those it judged and those it removed.</summary>
+    /// <summary>
+    /// What the run started from and what it did with the target's own objects: all of them, those earlier patchers in this group
+    /// removed, those it judged and those it removed. The moved replacements have a section of their own.
+    /// </summary>
+    /// <param name="removedInThisRun">The target's own objects removed in this run.</param>
     public static LogSection BuildRunSummarySection(CollectedObjects world, PluginName target, int removedInThisRun)
     {
         var counts = world.Counts;
@@ -52,9 +56,12 @@ internal static partial class LogSections
             [
                 $"Objects of {target}: {TextFormat.Count(counts.CleanedModObjects)}; "
                 + $"already removed by earlier patchers in this group: {TextFormat.Count(counts.RemovedByEarlierPatchers)}; "
-                + $"judged in this run: {TextFormat.Count(world.Targets.Length)}; removed in this run: {TextFormat.Count(removedInThisRun)}.",
+                + $"judged in this run: {TextFormat.Count(CountOwnObjects(world))}; removed in this run: {TextFormat.Count(removedInThisRun)}.",
             ]);
     }
+
+    /// <summary>The target objects that are the target plugin's own, not moved replacements.</summary>
+    private static int CountOwnObjects(CollectedObjects world) => world.Targets.Count(target => target.Replaced is null);
 
     /// <param name="changedTerrain">The changed-terrain step's outcome; the "on changed terrain" item only shows when the step was performed.</param>
     public static LogSection BuildRemovalSummarySection(IReadOnlyList<RemovedObject> removals, StepOutcome changedTerrain)

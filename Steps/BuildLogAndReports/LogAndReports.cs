@@ -5,6 +5,7 @@ using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
+using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
@@ -97,6 +98,9 @@ public sealed class LogAndReports
         var groups = LogSections.BuildGroupsSection(found.ObjectsToKeep.Groups, found.LinkCount, _settings.TargetAsTyped, _context);
         return [groups, TakeUnexpectedErrors(found.CheckFailures)];
     }
+
+    public ImmutableArray<LogSection> BuildStepSections(FitResult found, TimeSpan elapsed) =>
+        [LogSections.BuildFitSection(found, elapsed, _context), TakeUnexpectedErrors(found.Failures)];
 
     /// <param name="decisions">The decisions whose last round is the changed-terrain round.</param>
     /// <remarks>A switched-off step prints nothing, not even an empty section.</remarks>
@@ -308,20 +312,28 @@ public sealed class LogAndReports
         var keptSummary = LogSections.BuildKeptSummarySection(kept);
         var markersByType = LogSections.BuildMarkersByTypeSection(world.Targets, removals, _context);
         var hints = LogSections.BuildHintsSection(world, outcome.Hints);
+        var movedReplacements = LogSections.BuildMovedReplacementsSection(world, outcome.Final, _settings.TargetAsTyped, _context);
+        var ownShrunkOrTurned = LogSections.BuildOwnObjectsShrunkOrTurnedSection(world, outcome.Final, _settings.TargetAsTyped, _context);
+        var ownRemoved = outcome.Written.Removed.Count(id => world[id].Replaced is null);
         return
         [
             LogSections.BuildRemovalsSection(world, removals, _context),
             LogSections.BuildBoundsSection(outcome.Shapes, _caches.MeshFiles.CountTriangleFailures(), _context),
             LogSections.BuildSpacesSection(world, removals, _settings.TargetAsTyped, _context),
             LogSections.BuildTargetVisibilitySection(world.Targets, world.Counts.TargetsHiddenOrWithoutPlacement, _settings.TargetAsTyped, _context),
-            LogSections.BuildRunSummarySection(world, _settings.TargetAsTyped, outcome.Written.Removed.Length),
+            LogSections.BuildRunSummarySection(world, _settings.TargetAsTyped, ownRemoved),
             LogSections.BuildRemovalSummarySection(removals, outcome.ChangedTerrain.Outcome),
-            .. keptSummary.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [keptSummary],
-            .. keptOnPurpose.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [keptOnPurpose],
-            .. markersByType.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [markersByType],
-            .. warnings.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [warnings],
-            .. hints.Lines.IsEmpty ? ImmutableArray<LogSection>.Empty : [hints],
+            .. WhenItHasLines(movedReplacements),
+            .. WhenItHasLines(ownShrunkOrTurned),
+            .. WhenItHasLines(keptSummary),
+            .. WhenItHasLines(keptOnPurpose),
+            .. WhenItHasLines(markersByType),
+            .. WhenItHasLines(warnings),
+            .. WhenItHasLines(hints),
             LogSections.BuildAreasSection(world, removals, kept, outcome.Hints, outcome.RemovalRisks),
         ];
     }
+
+    /// <summary>The section alone, or nothing when it has no line: such a section is left out, not printed empty.</summary>
+    private static ImmutableArray<LogSection> WhenItHasLines(LogSection section) => section.Lines.IsEmpty ? [] : [section];
 }

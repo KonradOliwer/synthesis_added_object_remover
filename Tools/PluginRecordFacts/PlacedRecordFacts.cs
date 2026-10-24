@@ -17,7 +17,7 @@ public sealed record PlacedReadScope(PluginName Target, bool Terrain, bool Navme
 
 /// <summary>One placed record: its winning version as its plugin stores it, and the versions below it that were kept. It is not judged here.</summary>
 /// <param name="Cell">The cell whose child list holds the winning version; for an interior it is the space itself.</param>
-/// <param name="InTargetSpace">The record's space holds a record created by the target plugin.</param>
+/// <param name="InTargetSpace">The target plugin places a record in the record's space: one it created or one it overrides.</param>
 /// <param name="IsPersistent">The record's own Persistent flag is set.</param>
 /// <param name="NamedByScript">The first quest or scene that a script on the record itself names; null when none does.</param>
 /// <param name="HasLocationRefType">The record itself has at least one location ref type (XLRT).</param>
@@ -66,8 +66,9 @@ public sealed record PlacedRecordFact(
 /// <param name="RecordsScanned">Every record seen once, deleted ones and those in other spaces included.</param>
 /// <param name="OverriddenRecords">Placed records of other plugins that the target plugin overrides.</param>
 /// <param name="Links">
-/// Every link from a placed record into the target plugin, in the order found, read from the same walk as the records;
-/// links from other records come from <see cref="IPluginRecords.ReadLinks"/>.
+/// Every link from a placed record into the target plugin, and from a placed record of a target space into a record the target
+/// plugin overrides, in the order found, read from the same walk as the records; links from other records come from
+/// <see cref="IPluginRecords.ReadLinks"/>.
 /// </param>
 /// <param name="CellAreas">The winning cell records of the target spaces, by cell key.</param>
 public sealed record PlacedRecordFacts(

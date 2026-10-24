@@ -19,7 +19,7 @@ public sealed class RemovalRoundTripTests
 
     private static readonly Vector3 MovedTo = new(Spacing, Spacing, 0);
 
-    private static readonly WhatToCollect Plan = new(SupportOnlyObjects: true, Terrain: false, Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false);
+    private static readonly WhatToCollect Plan = new(SupportOnlyObjects: true, Terrain: false, Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits);
 
     private readonly FixtureMod _baseGame = new("Skyrim.esm");
     private readonly FixtureMod _second;

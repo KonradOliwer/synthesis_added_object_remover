@@ -1,3 +1,4 @@
+using System.Numerics;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Skyrim;
 using Noggog;
@@ -11,8 +12,9 @@ internal sealed class PlacedRecordWriter(PlacedOverrideWriter overrides, RecordH
     {
         foreach (var order in orders)
         {
-            var placed = overrides.GetOrAddOverride(handles.RecordOf(order.Record), handles.LocationOf(order.Record));
-            Apply(placed, order);
+            var location = handles.LocationOf(order.Record);
+            var cell = order is SetPlacement { IntoCell: { } intoCell } ? intoCell.ToFormKey() : location.WinningCell.FormKey;
+            Apply(overrides.GetOrAddOverride(handles.RecordOf(order.Record), cell, location.InPersistentList), order);
         }
     }
 
@@ -24,7 +26,12 @@ internal sealed class PlacedRecordWriter(PlacedOverrideWriter overrides, RecordH
                 placed.MajorRecordFlagsRaw |= (int)SkyrimMajorRecord.SkyrimMajorRecordFlag.InitiallyDisabled;
                 break;
             case SetPosition set:
-                placed.Placement!.Position = new P3Float(set.Position.X, set.Position.Y, set.Position.Z);
+                placed.Placement!.Position = ToP3Float(set.Position);
+                break;
+            case SetPlacement set:
+                placed.Placement!.Position = ToP3Float(set.Placement.Position);
+                placed.Placement.Rotation = ToP3Float(set.Placement.Rotation);
+                placed.Scale = set.Placement.Scale;
                 break;
             case SetEnableParent set:
                 placed.EnableParent = new EnableParent
@@ -37,4 +44,6 @@ internal sealed class PlacedRecordWriter(PlacedOverrideWriter overrides, RecordH
                 throw new ArgumentOutOfRangeException(nameof(order), order, "Unknown write order.");
         }
     }
+
+    private static P3Float ToP3Float(Vector3 vector) => new(vector.X, vector.Y, vector.Z);
 }

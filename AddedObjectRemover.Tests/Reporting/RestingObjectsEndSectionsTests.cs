@@ -324,7 +324,7 @@ public sealed class RestingObjectsEndSectionsTests
     [Fact]
     public void Write_ShowsTheTimeOnlyInTheDetailedLogAndTheEnableParentLineAlways()
     {
-        var written = new WriteSummary(Removed: [.. Enumerable.Range(0, 5).Select(index => new TargetId(index))], Moved: 2, EnableParentsReplaced: 3);
+        var written = new WriteSummary(Removed: [.. Enumerable.Range(0, 5).Select(index => new TargetId(index))], Moved: 2, EnableParentsReplaced: 3, Fitted: 0);
 
         Assert.Equal(
             [
@@ -338,7 +338,7 @@ public sealed class RestingObjectsEndSectionsTests
     [Fact]
     public void Write_OmitsTheEnableParentLineWhenNoneWasReplaced()
     {
-        Assert.Single(LogSections.BuildWriteSection(new WriteSummary([new TargetId(0)], 0, 0), Elapsed, Normal).Lines.ToList());
+        Assert.Single(LogSections.BuildWriteSection(new WriteSummary([new TargetId(0)], 0, 0, 0), Elapsed, Normal).Lines.ToList());
     }
 
     [Fact]

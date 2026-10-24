@@ -31,7 +31,7 @@ public static class ChangedTerrainObjects
     {
         if (!settings.On) return ChangedTerrainResult.SwitchedOff;
 
-        var check = new ObjectTerrainCheck(records, shapes, new TerrainPlugins(trust, loadOrder), settings);
+        var check = CreateCheck(trust, loadOrder, records, shapes, settings);
         var checks = ParallelMap.Run(
             execution,
             world.Order,
@@ -48,8 +48,26 @@ public static class ChangedTerrainObjects
             checks.Count(objectCheck => objectCheck.WithoutTerrain));
     }
 
-    private static ProposedRemoval ProposalOf(ObjectOnChangedTerrain hit) =>
-        new(hit.Target, new RemovalReason.TerrainChanged(hit.ChangedBy, hit.Kind));
+    /// <summary>The step's check of one target object at another placement; it finds nothing when the step is off.</summary>
+    /// <param name="loadOrder">Decides which of several changing plugins loads last.</param>
+    /// <param name="records">Its terrain and water versions must have been read.</param>
+    public static IPlacementRule CreatePlacementRule(
+        CollectedObjects world,
+        ModTrustTable trust,
+        LoadOrderPlugins loadOrder,
+        IPluginRecords records,
+        IBaseObjectShapes shapes,
+        ChangedTerrainSettings settings) =>
+        new ChangedTerrainPlacementRule(world.Targets, settings.On ? CreateCheck(trust, loadOrder, records, shapes, settings) : null);
+
+    /// <summary>How the step words a finding as the reason of a removal.</summary>
+    internal static RemovalReason ReasonOf(ObjectOnChangedTerrain hit) => new RemovalReason.TerrainChanged(hit.ChangedBy, hit.Kind);
+
+    private static ObjectTerrainCheck CreateCheck(
+        ModTrustTable trust, LoadOrderPlugins loadOrder, IPluginRecords records, IBaseObjectShapes shapes, ChangedTerrainSettings settings) =>
+        new(records, shapes, new TerrainPlugins(trust, loadOrder), settings);
+
+    private static ProposedRemoval ProposalOf(ObjectOnChangedTerrain hit) => new(hit.Target, ReasonOf(hit));
 
     private static ImmutableArray<PartFailure> FailuresOf(ImmutableArray<TargetObject> targets, ObjectCheck[] checks) =>
     [

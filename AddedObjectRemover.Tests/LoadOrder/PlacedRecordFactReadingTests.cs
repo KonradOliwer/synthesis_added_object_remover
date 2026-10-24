@@ -301,10 +301,11 @@ public class PlacedRecordFactReadingTests
         laterVersion.Scale = LaterScale;
         laterVersion.Base.SetTo(otherBase);
         laterVersion.MajorRecordFlagsRaw |= (int)SkyrimMajorRecord.SkyrimMajorRecordFlag.InitiallyDisabled;
+        var inTheCell = new VersionLocation(_worldspace.FormKey.ToRecordKey(), _cell.FormKey.ToRecordKey(), InPersistentList: false);
         List<PlacedVersionFact> expected =
         [
-            new(new PluginName(TargetPlugin), new PlacementFacts(Shown, Vector3.Zero, Vector3.Zero), Scale: null, PlaceableBase(_marker)),
-            new(new PluginName(LaterPlugin), new PlacementFacts(Shown with { InitiallyDisabled = true }, Moved, Turned), LaterScale, PlaceableBase(otherBase)),
+            new(new PluginName(TargetPlugin), new PlacementFacts(Shown, Vector3.Zero, Vector3.Zero), Scale: null, PlaceableBase(_marker), inTheCell),
+            new(new PluginName(LaterPlugin), new PlacementFacts(Shown with { InitiallyDisabled = true }, Moved, Turned), LaterScale, PlaceableBase(otherBase), inTheCell),
         ];
 
         var versions = ReadVersions(placed, TestVersionWalks.NoStop, later);
@@ -339,7 +340,7 @@ public class PlacedRecordFactReadingTests
         var collected = PlacedObjectCollector.Collect(
             new PluginRecordsFactory(world, Environment.ProcessorCount).Open(),
             table,
-            new WhatToCollect(SupportOnlyObjects: false, Terrain: false, Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false));
+            new WhatToCollect(SupportOnlyObjects: false, Terrain: false, Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits));
 
         Assert.All(plugins, plugin => Assert.True(table.Plugins.ContainsKey(plugin)));
         Assert.Contains(new PluginName(BelowPlugin), table.Plugins.Keys);

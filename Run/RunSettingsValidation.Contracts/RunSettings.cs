@@ -1,5 +1,6 @@
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
@@ -25,6 +26,7 @@ public sealed record RunSettings(
     SelectionSettings Selection,
     ChangedTerrainSettings ChangedTerrain,
     TooCloseSettings TooClose,
+    FitSettings Fit,
     AlsoRemoveSettings AlsoRemove,
     LeftBehindSettings? LeftBehind,
     MarkerMoveSettings? MarkerMoves,

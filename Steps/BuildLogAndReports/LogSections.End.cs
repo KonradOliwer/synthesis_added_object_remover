@@ -10,7 +10,8 @@ internal static partial class LogSections
     {
         List<string> lines =
         [
-            $"Wrote {TextFormat.Count(written.Removed.Length + written.Moved)} overrides ({TextFormat.Count(written.Removed.Length)} removed, {TextFormat.Count(written.Moved)} moved){Describe.TimedSuffix(elapsed, context)}.",
+            $"Wrote {TextFormat.Count(written.Removed.Length + written.Moved + written.Fitted)} overrides ({TextFormat.Count(written.Removed.Length)} removed, {TextFormat.Count(written.Moved)} moved"
+                + $"{(written.Fitted > 0 ? $", {TextFormat.Count(written.Fitted)} moved back, shrunk or turned to fit" : string.Empty)}){Describe.TimedSuffix(elapsed, context)}.",
         ];
         if (written.EnableParentsReplaced > 0)
         {

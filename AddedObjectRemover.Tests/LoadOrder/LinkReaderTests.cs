@@ -197,7 +197,7 @@ public class LinkReaderTests
     private static List<LinkFact> ReadFromPlaced(IPlacedGetter record)
     {
         var facts = new List<LinkFact>();
-        LinkReader.ReadFromPlaced(record, record.FormKey.ToRecordKey(), TestTargets.TargetName, CreateNames(), facts);
+        LinkReader.ReadFromPlaced(record, record.FormKey.ToRecordKey(), linked => linked.Plugin == TestTargets.TargetName, CreateNames(), facts);
         return facts;
     }
 

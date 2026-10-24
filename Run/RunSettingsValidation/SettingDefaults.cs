@@ -1,3 +1,4 @@
+using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
@@ -25,6 +26,10 @@ public static class SettingDefaults
     public const float WaterHeightChangeTolerance = 16f;
     public const bool CountWaterAddedOrRemoved = true;
     public const int MinWaterCoverChangePercent = 20;
+    public const float MovedDistanceInUnits = 10f;
+    public const int ShrinkLimitPercent = 80;
+    public const int TurnLimitDegrees = 360;
+    public const ShrinkOrTurnObjects ShrinkOrTurn = ShrinkOrTurnObjects.ReplacementsAfterMovingBack;
     public const int MaxOtherMastersOfRequiringModToTrust = 5;
     public const NpcHandling Npcs = NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision;
     public const FollowUpRemovalMode FollowUpMode = FollowUpRemovalMode.OnlyWhatLosesItsSupport;

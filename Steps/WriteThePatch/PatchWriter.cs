@@ -20,14 +20,28 @@ public static class PatchWriter
             if (target.HasEnableParent) enableParentsReplaced++;
         }
 
+        var fitted = ListFitsInWriteOrder(final, targets);
+        orders.AddRange(fitted);
+
         var moves = final.Moves.Select(move => new SetPosition(targets[move.Target.Index].Key, move.To)).ToList();
         orders.AddRange(moves);
 
         writing.Write(plugin.ReadWritableRecords(), orders);
-        return new WriteSummary(removed, moves.Count, enableParentsReplaced);
+        return new WriteSummary(removed, moves.Count, enableParentsReplaced, fitted.Count);
     }
 
     /// <summary>Round by round, each round's direct removals in target order, then the linked ones.</summary>
     internal static ImmutableArray<TargetId> ListRemovalsInWriteOrder(IRemovalDecisions final) =>
         [.. final.Rounds.SelectMany(round => final.RemovedIn(round))];
+
+    /// <summary>Each fitted object's new placement, round by round, in target order; one moved back goes into the cell of the version it replaces.</summary>
+    private static List<SetPlacement> ListFitsInWriteOrder(IRemovalDecisions final, ImmutableArray<TargetObject> targets) =>
+    [
+        .. final.Rounds
+            .SelectMany(round => final.FittedIn(round))
+            .Select(id => FitOrderOf(targets[id.Index], (Decision.Fitted)final.Of(id)!)),
+    ];
+
+    private static SetPlacement FitOrderOf(TargetObject target, Decision.Fitted fitted) =>
+        new(target.Key, fitted.To, fitted.Kind == FitKind.ShrunkOrTurned ? null : target.Replaced!.Value.Cell);
 }

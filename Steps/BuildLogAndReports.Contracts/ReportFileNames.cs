@@ -10,4 +10,5 @@ public static class ReportFileNames
     public const string LeftBehindFileName = "leftover-invisible-objects.csv";
     public const string HintsFileName = "removed-markers-and-kept-objects.csv";
     public const string RemovalsFileName = "removals.csv";
+    public const string FitsFileName = "moved-and-fitted-objects.csv";
 }

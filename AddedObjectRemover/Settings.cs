@@ -1,5 +1,6 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
+using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
@@ -96,6 +97,14 @@ public class StandardSettings : ISettingsValues
     public TerrainChangeSettings TerrainChange { get; set; } = new();
 
     [SynthesisOrder]
+    [SynthesisSettingName("Shrink or turn objects to make them fit")]
+    [SynthesisTooltip(
+        "An object that would be removed for being too close or on changed terrain may first be shrunk or turned until it fits.\n"
+        + "An object of another mod that the cleaned mod moved is always tried back where that mod placed it before it is removed;\n"
+        + "one the cleaned mod left in place is never checked.")]
+    public ShrinkOrTurnSettings ShrinkOrTurn { get; set; } = new();
+
+    [SynthesisOrder]
     [SynthesisSettingName("Also remove what rests on removed objects")]
     [SynthesisTooltip(
         "When an object is removed, the cleaned mod's objects resting on it or touching it would be left floating. This removes them too.\n"
@@ -113,6 +122,7 @@ public class StandardSettings : ISettingsValues
     ITrustSettingsValues ISettingsValues.Trust => Trust ?? new TrustSettings();
     ITooCloseSettingsValues ISettingsValues.TooClose => TooClose ?? new TooCloseRemovalSettings();
     ITerrainChangeSettingsValues ISettingsValues.TerrainChange => TerrainChange ?? new TerrainChangeSettings();
+    IShrinkOrTurnSettingsValues ISettingsValues.ShrinkOrTurn => ShrinkOrTurn ?? new ShrinkOrTurnSettings();
     IFollowUpSettingsValues ISettingsValues.FollowUpRemoval => FollowUpRemoval ?? new FollowUpRemovalSettings();
     ILeftoverSettingsValues ISettingsValues.LeftoverInvisibleObjects => LeftoverInvisibleObjects ?? new LeftoverInvisibleObjectSettings();
 }
@@ -355,6 +365,40 @@ public class TerrainChangeSettings : ITerrainChangeSettingsValues
     float ITerrainChangeSettingsValues.AreaSizeMultiplier => (BySize ?? new()).SizeMultiplier;
     bool ITerrainChangeSettingsValues.AreaByDistance => (ByDistance ?? new()).Use;
     float ITerrainChangeSettingsValues.AreaDistanceInUnits => (ByDistance ?? new()).DistanceInUnits;
+}
+
+public class ShrinkOrTurnSettings : IShrinkOrTurnSettingsValues
+{
+    [SynthesisOrder]
+    [SynthesisSettingName("Distance that counts as moved (game units)")]
+    [SynthesisTooltip(
+        "A replacement of another mod's object counts as moved when it stands more than this many game units from the object it replaces;\n"
+        + "a moved one is judged like the mod's own objects, an unmoved one is always kept.")]
+    public float MovedDistanceInUnits { get; set; } = SettingDefaults.MovedDistanceInUnits;
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Shrink down to (% of its size)")]
+    [SynthesisTooltip(
+        "An object may be shrunk down to this share of its size to make it fit, in steps of 5%; the largest size that fits is used.\n"
+        + "100 or more: objects are never shrunk. At least 1.")]
+    public int ShrinkLimitPercent { get; set; } = SettingDefaults.ShrinkLimitPercent;
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Turn by at most (degrees either way)")]
+    [SynthesisTooltip(
+        "An object may be turned about its upright axis by up to this many degrees to the left or to the right to make it fit,\n"
+        + "in steps of 15 degrees; the smallest turn that fits is used. It is never tilted.\n"
+        + "0: objects are never turned. 180 or more: objects may face any way.")]
+    public int TurnLimitDegrees { get; set; } = SettingDefaults.TurnLimitDegrees;
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Which objects may be shrunk or turned")]
+    [SynthesisTooltip(
+        "ReplacementsAfterMovingBack: only objects of other mods that the cleaned mod moved, and only after moving them back where that mod placed them.\n"
+        + "ReplacementsAtBothSpots: the same objects, first where the cleaned mod put them, then after moving them back.\n"
+        + "AllObjects: as ReplacementsAtBothSpots, and also the cleaned mod's own objects where they stand.\n"
+        + "With neither shrinking nor turning allowed, this changes nothing.")]
+    public ShrinkOrTurnObjects WhichObjects { get; set; } = SettingDefaults.ShrinkOrTurn;
 }
 
 public class FollowUpRemovalSettings : IFollowUpSettingsValues

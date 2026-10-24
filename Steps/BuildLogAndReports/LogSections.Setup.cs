@@ -16,7 +16,8 @@ internal static partial class LogSections
         if (context.Detailed) lines.AddRange(OverriddenOthers(world, target));
         lines.Add(
             $"Scanned {TextFormat.Count(counts.RecordsScanned)} placed records{Describe.TimedSuffix(elapsed, context)}: "
-            + $"{TextFormat.Count(world.Targets.Length)} {target} objects to check, "
+            + $"{TextFormat.Count(CountOwnObjects(world))} {target} objects to check, "
+            + DescribeMovedReplacements(world, target)
             + $"{TextFormat.Count(world.OtherModObjects.Length)} objects from other mods.");
         if (counts.TargetsOverriddenLater > 0)
         {
@@ -44,6 +45,13 @@ internal static partial class LogSections
         }
         if (context.Detailed) lines.AddRange(RecordedCounts(world));
         return new LogSection("scan", lines.ToImmutable());
+    }
+
+    /// <summary>The moved replacements to check, when there are any.</summary>
+    private static string DescribeMovedReplacements(CollectedObjects world, PluginName target)
+    {
+        var moved = world.Targets.Length - CountOwnObjects(world);
+        return moved > 0 ? $"{TextFormat.Count(moved)} objects of other mods that {target} moved, " : string.Empty;
     }
 
     public static LogSection BuildThreadsSection(Execution execution, ReportContext context) =>

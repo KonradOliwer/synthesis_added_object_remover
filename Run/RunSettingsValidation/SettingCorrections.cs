@@ -40,6 +40,24 @@ internal static class SettingCorrections
         return clamped;
     }
 
+    /// <summary>For a setting with a lower limit only.</summary>
+    public static int AtLeast(int value, int minimum, string name, ICollection<SettingWarning> warnings)
+    {
+        if (value >= minimum) return value;
+        warnings.Add(new SettingWarning(name, $"Warning: {name} {value} is below {minimum}; using {minimum}."));
+        return minimum;
+    }
+
+    /// <summary>For a distance with no upper limit: a negative value, or one that is not a number, becomes the default.</summary>
+    public static float NotNegative(float value, float defaultValue, string name, ICollection<SettingWarning> warnings)
+    {
+        if (value >= 0) return value;
+        warnings.Add(new SettingWarning(name, float.IsNaN(value)
+            ? $"Warning: {name} is not a valid number; using {defaultValue}."
+            : $"Warning: {name} {value} is below 0; using {defaultValue}."));
+        return defaultValue;
+    }
+
     /// <summary>Out of range values become the nearest valid value; a value that is not a number becomes the default.</summary>
     public static float Clamp(float value, float minimum, float maximum, float defaultValue, string name, ICollection<SettingWarning> warnings)
     {

@@ -73,6 +73,39 @@ public sealed class PatchWriterTests
         Assert.Equal(1, written.Moved);
     }
 
+    [Fact]
+    public void AMovedBackObjectIsWrittenAtItsNewPlacementIntoTheReplacedVersionsCellAndNotDisabled()
+    {
+        var targets = TestTargets.CreateMany(2);
+        var baseCell = TestTargets.Key(9);
+        var to = new EulerPlacement(new Vector3(5, 6, 7), new Vector3(0, 0, 0.25f), 0.8f);
+        targets[1] = targets[1] with { Replaced = new ReplacedVersion(to with { Scale = 1f }, baseCell, CanMoveBack: true) };
+        var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(2), TestBaseFacts.Unresolved);
+        var final = RemovalDecisions.Start(protection, 2)
+            .ApplyFits([new ProposedFit(new TargetId(1), Propose(1).Reason, FitKind.MovedBackShrunkOrTurned, to)])
+            .Apply(RoundKind.TooClose, [Propose(1)]);
+        var writing = new RecordingWriting();
+
+        var written = PatchWriter.Write(final, [.. targets], new ReadPlugin(), writing);
+
+        Assert.Equal<WriteOrder>([new SetPlacement(targets[1].Key, to, baseCell)], writing.Orders);
+        Assert.Equal((0, 1), (written.Removed.Length, written.Fitted));
+    }
+
+    [Fact]
+    public void AnObjectShrunkOrTurnedWhereItStandsIsWrittenInTheCellItIsIn()
+    {
+        var targets = TestTargets.CreateMany(1);
+        var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(1), TestBaseFacts.Unresolved);
+        var to = new EulerPlacement(Vector3.Zero, new Vector3(0, 0, 0.25f), 0.8f);
+        var final = RemovalDecisions.Start(protection, 1).ApplyFits([new ProposedFit(new TargetId(0), Propose(0).Reason, FitKind.ShrunkOrTurned, to)]);
+        var writing = new RecordingWriting();
+
+        PatchWriter.Write(final, [.. targets], new ReadPlugin(), writing);
+
+        Assert.Equal<WriteOrder>([new SetPlacement(targets[0].Key, to, IntoCell: null)], writing.Orders);
+    }
+
     private static ProposedRemoval Propose(int index) => new(new TargetId(index), new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()));
 
     private sealed class RecordingWriting : IPatchWriting

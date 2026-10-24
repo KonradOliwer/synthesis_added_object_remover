@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>Runs one patch run: creates the run's caches and runs the ten steps in order, handing each its inputs and applying the removal decisions. It holds no domain rules and knows nothing about Synthesis, JSON or the command line. It references every step's logic and contracts, the base object shapes, the run caches' contracts and the tools for ids, plugin and mesh facts, math, spatial indexes, parallel work, lookups, ground queries and CSV tables, and holds no packages.</Description>
+    <Description>Runs one patch run: creates the run's caches and runs the steps in order, handing each its inputs and applying the removal decisions. It holds no domain rules and knows nothing about Synthesis, JSON or the command line. It references every step's logic and contracts, the base object shapes, the run caches' contracts and the tools for ids, plugin and mesh facts, math, spatial indexes, parallel work, lookups, ground queries and CSV tables, and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\RunAllSteps.Contracts\RunAllSteps.Contracts.csproj" />
@@ -22,6 +22,8 @@
     <ProjectReference Include="..\..\Steps\FindTargetObjectsToKeep\FindTargetObjectsToKeep.csproj" />
     <ProjectReference Include="..\..\Steps\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\RemovalDecisionList\RemovalDecisionList.csproj" />
+    <ProjectReference Include="..\..\Steps\FitClashingObjects.Contracts\FitClashingObjects.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\FitClashingObjects\FitClashingObjects.csproj" />
     <ProjectReference Include="..\..\Steps\RemoveObjectsOnChangedTerrain.Contracts\RemoveObjectsOnChangedTerrain.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\RemoveObjectsOnChangedTerrain\RemoveObjectsOnChangedTerrain.csproj" />
     <ProjectReference Include="..\..\Steps\RemoveTooCloseObjects.Contracts\RemoveTooCloseObjects.Contracts.csproj" />

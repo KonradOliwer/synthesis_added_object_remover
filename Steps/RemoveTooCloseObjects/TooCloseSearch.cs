@@ -11,6 +11,9 @@ namespace AddedObjectRemover.Steps.RemoveTooCloseObjects;
 /// <param name="Failures">The targets whose check failed, in target order.</param>
 internal sealed record TooCloseSearchResult(List<TooCloseObject> Hits, TooCloseWork Work, ImmutableArray<PartFailure> Failures);
 
+/// <summary>The outcome of checking one target: the other-mod object it is too close to, or the failure that stopped the check.</summary>
+internal readonly record struct TargetCheck(ZoneHit? TooCloseTo, string? Failure);
+
 /// <summary>
 /// BoundingBox removal zone: finds visible target objects whose grown local box (grown by a multiple of
 /// its size or by a distance in game units, see <see cref="ZoneGrowth.GrownScaledBox"/>) contains the bounds center of
@@ -45,12 +48,14 @@ internal static class TooCloseSearch
             order,
             execution,
             () => new Scratch(),
-            (targetIndex, scratch) => FindFirstTooCloseOther(targets[targetIndex], targetIndex, otherModObjects, shapes, zones, npcRule, scratch),
+            (target, scratch) => FindFirstTooCloseOther(target, otherModObjects, shapes, zones, npcRule, scratch),
             scratch => scratch.Harvest());
     }
 
-    /// <summary>The outcome of checking one target: the other-mod object it is too close to, or the failure that stopped the check.</summary>
-    private readonly record struct TargetCheck(ZoneHit? TooCloseTo, string? Failure);
+    /// <summary>One target alone, with a scratch of its own, so its work is not counted.</summary>
+    public static TargetCheck CheckAlone(
+        TargetObject target, IObjectsThatCanCauseRemovals otherModObjects, IBaseObjectShapes shapes, ImmutableArray<ZoneGrowth> zones, NpcTooCloseRule npcRule) =>
+        CheckTarget(target, shapes, new Scratch(), (placed, scratch) => FindFirstTooCloseOther(placed, otherModObjects, shapes, zones, npcRule, scratch));
 
     /// <summary>Runs the search for every visible target on worker threads; each worker has its own scratch.</summary>
     public static TooCloseSearchResult FindForVisibleTargets<TScratch>(
@@ -60,7 +65,7 @@ internal static class TooCloseSearch
         WorkOrder order,
         Execution execution,
         Func<TScratch> createScratch,
-        Func<int, TScratch, ZoneHit?> findFirstTooCloseOther,
+        Func<TargetObject, TScratch, ZoneHit?> findFirstTooCloseOther,
         Func<TScratch, TooCloseWork> harvest)
     {
         var (checks, work) = ParallelMap.Run(
@@ -68,19 +73,19 @@ internal static class TooCloseSearch
             order,
             targets.Count,
             createScratch,
-            (targetIndex, scratch) => CheckTarget(targets[targetIndex], targetIndex, shapes, scratch, findFirstTooCloseOther),
+            (targetIndex, scratch) => CheckTarget(targets[targetIndex], shapes, scratch, findFirstTooCloseOther),
             harvest,
             ParallelMap.AutomaticRangeSize);
         return new TooCloseSearchResult(ToHits(otherModObjects, checks), work, ToFailures(targets, checks));
     }
 
     /// <remarks>A target whose check fails is not too close to anything, so it is not removed.</remarks>
-    private static TargetCheck CheckTarget<TScratch>(
-        TargetObject target, int targetIndex, IBaseObjectShapes shapes, TScratch scratch, Func<int, TScratch, ZoneHit?> findFirstTooCloseOther)
+    public static TargetCheck CheckTarget<TScratch>(
+        TargetObject target, IBaseObjectShapes shapes, TScratch scratch, Func<TargetObject, TScratch, ZoneHit?> findFirstTooCloseOther)
     {
         try
         {
-            return new TargetCheck(shapes.VisibilityOf(target).IsVisible ? findFirstTooCloseOther(targetIndex, scratch) : null, Failure: null);
+            return new TargetCheck(shapes.VisibilityOf(target).IsVisible ? findFirstTooCloseOther(target, scratch) : null, Failure: null);
         }
         catch (Exception ex) when (Failures.IsRecoverable(ex))
         {
@@ -108,10 +113,10 @@ internal static class TooCloseSearch
     ];
 
     private static ZoneHit? FindFirstTooCloseOther(
-        TargetObject target, int targetIndex, IObjectsThatCanCauseRemovals otherModObjects, IBaseObjectShapes shapes, ImmutableArray<ZoneGrowth> zones, NpcTooCloseRule npcRule, Scratch scratch) =>
+        TargetObject target, IObjectsThatCanCauseRemovals otherModObjects, IBaseObjectShapes shapes, ImmutableArray<ZoneGrowth> zones, NpcTooCloseRule npcRule, Scratch scratch) =>
         npcRule.ThenFirstStuckNpc(
             ZoneGrowth.FirstHit(zones, zone => FindFirstCentreInBoxZone(target, otherModObjects, shapes, zone, scratch.Query)),
-            targetIndex,
+            target,
             scratch.Npcs);
 
     /// <summary>The lowest other-mod object that can cause removals whose bounds centre lies in the target's BoundingBox zone, or null.</summary>

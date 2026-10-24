@@ -38,7 +38,10 @@ internal static partial class Tables
     private static ImmutableArray<CsvTable> BuildTouchTables(RunOutcome outcome, TouchChainEdges touch, float tolerance, ReportContext context)
     {
         var (alsoRemove, final) = (outcome.RestingObjects, outcome.Final);
-        var seeds = alsoRemove.SeedRounds.SelectMany(round => RemovalList.RemovalsIn(final, outcome.Collected, round)).ToList();
+        var seeds = SeedReasons(
+            alsoRemove.SeedRounds.SelectMany(round => RemovalList.RemovalsIn(final, outcome.Collected, round)),
+            alsoRemove.SeedRounds.SelectMany(round => final.LeftTheirSpotIn(round).Where(target => !final.IsRemoved(target))),
+            outcome.Collected.Targets);
         var removals = alsoRemove.Rounds.SelectMany(round => RemovalList.RemovalsIn(final, outcome.Collected, round)).ToList();
         var kept = alsoRemove.Rounds.SelectMany(round => RemovalList.KeptIn(final, round)).ToList();
         return
@@ -48,11 +51,10 @@ internal static partial class Tables
         ];
     }
 
-    /// <param name="seeds">The removals of the seed rounds (changed terrain, too close).</param>
+    /// <param name="seedReasonByTarget">Why each seed of the touch rounds left its spot.</param>
     public static CsvTable BuildEdgesTable(
-        CollectedObjects world, IEnumerable<RemovedObject> seeds, TouchChainEdges touch, float tolerance, ReportContext context)
+        CollectedObjects world, PerIndexTable<string> seedReasonByTarget, TouchChainEdges touch, float tolerance, ReportContext context)
     {
-        var seedReasonByTarget = SeedReasons(seeds, world.Targets);
         var rows = touch.Edges
             .Select(edge => new EdgeRow(
                 edge.ComponentId,
@@ -68,19 +70,18 @@ internal static partial class Tables
         return new CsvTable(ReportFileNames.EdgesFileName, EdgeHeader, [.. rows]);
     }
 
-    /// <param name="seeds">The removals of the seed rounds (changed terrain, too close).</param>
+    /// <param name="seedReasonByTarget">Why each seed of the touch rounds left its spot.</param>
     /// <param name="removals">The follow-up rounds' removals.</param>
     /// <param name="kept">The objects the follow-up rounds held.</param>
     public static CsvTable BuildComponentsTable(
         CollectedObjects world,
-        IEnumerable<RemovedObject> seeds,
+        PerIndexTable<string> seedReasonByTarget,
         IEnumerable<RemovedObject> removals,
         IEnumerable<KeptObject> kept,
         TouchChainEdges touch,
         ReportContext context)
     {
         var components = touch.Components;
-        var seedReasonByTarget = SeedReasons(seeds, world.Targets);
         var removedByComponent = CountByComponent(removals.Select(removal => removal.TargetIndex), components.ComponentOf);
         var keptByComponent = CountByComponent(kept.Select(entry => entry.TargetIndex), components.ComponentOf);
         var rows = components.Members.Select((members, componentId) => ComponentFields(
@@ -118,8 +119,17 @@ internal static partial class Tables
         (int Length, string FormKeys) DeepestChain,
         string SeedReasons);
 
-    private static PerIndexTable<string> SeedReasons(IEnumerable<RemovedObject> seeds, IReadOnlyList<TargetObject> targets) =>
-        PerIndexTable<string>.From(seeds, seed => seed.TargetIndex, seed => DescribeSeedReason(seed, targets));
+    /// <param name="removedSeeds">The removals of the seed rounds (changed terrain, too close).</param>
+    /// <param name="movedBackSeeds">The objects the seed rounds moved back to the placement they replace.</param>
+    private static PerIndexTable<string> SeedReasons(IEnumerable<RemovedObject> removedSeeds, IEnumerable<TargetId> movedBackSeeds, IReadOnlyList<TargetObject> targets)
+    {
+        const string MovedBackSeedReason = "moved back";
+        return PerIndexTable<string>.From(
+            removedSeeds.Select(seed => (seed.TargetIndex, Reason: DescribeSeedReason(seed, targets)))
+                .Concat(movedBackSeeds.Select(seed => (TargetIndex: seed.Index, Reason: MovedBackSeedReason))),
+            seed => seed.TargetIndex,
+            seed => seed.Reason);
+    }
 
     private static string DescribeSeedReason(RemovedObject seed, IReadOnlyList<TargetObject> targets) => seed switch
     {

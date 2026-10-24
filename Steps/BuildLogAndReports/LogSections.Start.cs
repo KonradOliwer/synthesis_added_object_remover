@@ -3,6 +3,7 @@ using System.Diagnostics;
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
+using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
@@ -29,6 +30,7 @@ internal static partial class LogSections
             .. DescribeTrustReasons(settings.TargetAsTyped, settings.ModTrust.MaxOtherMastersOfRequiringMod, trust, plugins),
             DescribeTooClose(settings.TooClose),
             DescribeChangedTerrain(settings.ChangedTerrain),
+            DescribeShrinkOrTurn(settings.Read.MovedDistance, settings.Fit),
             DescribeAlsoRemove(settings.AlsoRemove),
             DescribeLeftBehind(settings),
             DescribeDetailedLogAndReports(settings.Reports),
@@ -72,6 +74,13 @@ internal static partial class LogSections
             ? $"{checks}; remove only when this share of the ground got covered/uncovered: {terrain.MinWaterCoverChangePercent}%"
             : checks;
     }
+
+    private static string DescribeShrinkOrTurn(float movedDistance, FitSettings fit) =>
+        "Shrink or turn objects to make them fit: "
+        + $"Distance that counts as moved: {movedDistance} units; "
+        + $"Shrink down to: {fit.ShrinkLimitPercent}% of its size; "
+        + $"Turn by at most: {fit.TurnLimitDegrees} degrees either way; "
+        + $"Which objects may be shrunk or turned: {fit.Objects}.";
 
     private static string DescribeDetailedLogAndReports(ReportFileSettings? reports) =>
         $"Detailed log and reports: {(reports is null ? "off" : $"on, report files go to {reports.Folder}")}.";

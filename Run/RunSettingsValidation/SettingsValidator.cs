@@ -3,6 +3,7 @@ using System.Diagnostics;
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
@@ -25,6 +26,7 @@ public static class SettingsValidator
     private const float MaxSearchRadius = 8192f;
     private const int MaxOtherMastersLimit = 100;
     private const float MinPercent = 1f;
+    private const int MinShrinkLimitPercent = 1;
 
     /// <summary>The names the settings screen shows, group first, so a warning leads to the setting.</summary>
     private const string CleanedModName = "Mod to clean up";
@@ -32,6 +34,11 @@ public static class SettingsValidator
     private const string TerrainCheckedObjectsName = "Remove objects on terrain changed by other mods > Which of the cleaned mod's objects are checked";
     private const string HeightChangeToleranceName = "Remove objects on terrain changed by other mods > Count only height changes larger than";
     private const string WaterHeightChangeToleranceName = "Remove objects on terrain changed by other mods > Count only water height changes larger than";
+    private const string ShrinkOrTurnGroup = "Shrink or turn objects to make them fit > ";
+    private const string MovedDistanceName = ShrinkOrTurnGroup + "Distance that counts as moved";
+    private const string ShrinkLimitName = ShrinkOrTurnGroup + "Shrink down to";
+    private const string TurnLimitName = ShrinkOrTurnGroup + "Turn by at most";
+    private const string WhichObjectsName = ShrinkOrTurnGroup + "Which objects may be shrunk or turned";
     private const string FollowUpModeName = "Also remove what rests on removed objects > When an object is removed, also remove";
     private const string TouchDistanceName = "Also remove what rests on removed objects > Gap that still counts as touching";
     private const string AnchoringThresholdName = "Also remove what rests on removed objects > OnlyWhatLosesItsSupport: remove when this much support is gone";
@@ -86,6 +93,8 @@ public static class SettingsValidator
         var modTrust = CreateModTrustSettings(records, mods, targetListing.Mod, settings.Trust, warnings);
         var tooClose = CreateTooCloseSettings(settings.TooClose, warnings);
         var changedTerrain = CreateChangedTerrainSettings(settings.TerrainChange, warnings);
+        var movedDistance = NotNegative(settings.ShrinkOrTurn.MovedDistanceInUnits, SettingDefaults.MovedDistanceInUnits, MovedDistanceName, warnings);
+        var fit = CreateFitSettings(settings.ShrinkOrTurn, warnings);
         var alsoRemove = CreateAlsoRemoveSettings(settings.FollowUpRemoval, touchChainsShown: detailedLogAndReports, warnings);
         var leftoverSettings = settings.LeftoverInvisibleObjects;
         var leftBehind = CreateLeftBehindSettings(leftoverSettings, warnings);
@@ -96,10 +105,11 @@ public static class SettingsValidator
             targetListing.Mod,
             targetAsTyped,
             modTrust,
-            CreateWhatToCollect(alsoRemove.Mode, markerMoves, changedTerrain, detailedLogAndReports),
+            CreateWhatToCollect(alsoRemove.Mode, markerMoves, changedTerrain, detailedLogAndReports, movedDistance),
             new SelectionSettings(tooClose.Npcs),
             changedTerrain,
             tooClose,
+            fit,
             alsoRemove,
             leftoverSettings.RemoveLeftoverInvisibleObjects ? leftBehind : null,
             markerMoves,
@@ -325,6 +335,13 @@ public static class SettingsValidator
         return settings with { On = settings.On && countsAChange && hasAnArea };
     }
 
+    /// <summary>A shrink limit of 100 or more and a turn limit of 180 or more are valid: they mean never shrunk and any heading.</summary>
+    private static FitSettings CreateFitSettings(IShrinkOrTurnSettingsValues values, ICollection<SettingWarning> warnings) =>
+        new(
+            AtLeast(values.ShrinkLimitPercent, MinShrinkLimitPercent, ShrinkLimitName, warnings),
+            AtLeast(values.TurnLimitDegrees, 0, TurnLimitName, warnings),
+            ValidateDefined(values.WhichObjects, SettingDefaults.ShrinkOrTurn, WhichObjectsName, warnings));
+
     /// <param name="touchChainsShown">Whether the detailed log and the report files, which show the touch chains, are on.</param>
     private static AlsoRemoveSettings CreateAlsoRemoveSettings(
         IFollowUpSettingsValues followUp, bool touchChainsShown, ICollection<SettingWarning> warnings)
@@ -352,7 +369,9 @@ public static class SettingsValidator
     /// log prints them; every plugin's terrain only when the changed-terrain step runs, its texture layers only when it counts terrain
     /// types, and its water only when it counts a water change.
     /// </summary>
-    private static WhatToCollect CreateWhatToCollect(FollowUpRemovalMode mode, MarkerMoveSettings? markerMoves, ChangedTerrainSettings changedTerrain, bool detailedLog)
+    /// <param name="movedDistance">The validated distance that counts as moved.</param>
+    private static WhatToCollect CreateWhatToCollect(
+        FollowUpRemovalMode mode, MarkerMoveSettings? markerMoves, ChangedTerrainSettings changedTerrain, bool detailedLog, float movedDistance)
     {
         var needsSurroundings = mode == FollowUpRemovalMode.OnlyWhatLosesItsSupport || markerMoves != null;
         return new WhatToCollect(
@@ -362,7 +381,8 @@ public static class SettingsValidator
             detailedLog,
             changedTerrain.On,
             changedTerrain.On && changedTerrain.CountTerrainTypeChanges,
-            changedTerrain.On && changedTerrain.CountsWaterChanges);
+            changedTerrain.On && changedTerrain.CountsWaterChanges,
+            movedDistance);
     }
 
     /// <summary>Built (and its settings validated) even when the step is off, so invalid values are always reported.</summary>

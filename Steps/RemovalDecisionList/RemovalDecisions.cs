@@ -19,7 +19,11 @@ public sealed class RemovalDecisions : IRemovalDecisions
         public List<Round> Rounds { get; } = [];
         public List<ImmutableArray<TargetId>> RemovedIn { get; } = [];
         public List<ImmutableArray<TargetId>> KeptIn { get; } = [];
+        public List<ImmutableArray<TargetId>> FittedIn { get; } = [];
         public List<MarkerMove> Moves { get; } = [];
+
+        /// <summary>By target index: the fit an also-remove round replaced, which the views before that round still show.</summary>
+        public Decision?[] Replaced { get; } = new Decision?[targetCount];
     }
 
     /// <param name="newest">The newest view over the copy's own store.</param>
@@ -67,9 +71,15 @@ public sealed class RemovalDecisions : IRemovalDecisions
 
     public ImmutableArray<MarkerMove> Moves => [.. _store.Moves.Take(_moveCount)];
 
-    public Decision? Of(TargetId id) => _store.Decisions[id.Index] is { } decision && decision.Round.Number <= _roundCount ? decision : null;
+    public Decision? Of(TargetId id)
+    {
+        if (_store.Decisions[id.Index] is { } decision && decision.Round.Number <= _roundCount) return decision;
+        return _store.Replaced[id.Index] is { } replaced && replaced.Round.Number <= _roundCount ? replaced : null;
+    }
 
     public bool IsDecided(TargetId id) => Of(id) != null;
+
+    public bool MayStillBeRemoved(TargetId id) => Of(id) is null or Decision.Fitted { Kind: FitKind.ShrunkOrTurned };
 
     public bool IsRemoved(TargetId id) => Of(id) is Decision.Removed;
 
@@ -78,6 +88,19 @@ public sealed class RemovalDecisions : IRemovalDecisions
     public ImmutableArray<TargetId> RemovedIn(Round round) => _store.RemovedIn[VisibleIndexOf(round)];
 
     public ImmutableArray<TargetId> KeptIn(Round round) => _store.KeptIn[VisibleIndexOf(round)];
+
+    public ImmutableArray<TargetId> FittedIn(Round round) => [.. _store.FittedIn[VisibleIndexOf(round)].Where(target => Of(target) is Decision.Fitted)];
+
+    public bool HasLeftItsSpot(TargetId id) => Of(id) is { } decision && LeavesItsSpot(decision);
+
+    public ImmutableArray<TargetId> LeftTheirSpotIn(Round round) =>
+        [.. RemovedIn(round), .. FittedIn(round).Where(target => LeavesItsSpot(Of(target)!))];
+
+    public ImmutableArray<TargetId> TargetsThatLeftTheirSpot() => [.. All().Where(entry => LeavesItsSpot(entry.Decision)).Select(entry => entry.Target)];
+
+    /// <summary>A removed object is gone from its placement, and so is one moved back; one shrunk or turned still stands there.</summary>
+    private static bool LeavesItsSpot(Decision decision) =>
+        decision is Decision.Removed or Decision.Fitted { Kind: FitKind.MovedBack or FitKind.MovedBackShrunkOrTurned };
 
     public IEnumerable<(TargetId Target, Decision Decision)> All()
     {
@@ -88,14 +111,13 @@ public sealed class RemovalDecisions : IRemovalDecisions
         }
     }
 
-    public ImmutableArray<TargetId> RemovedTargets() => [.. All().Where(entry => entry.Decision is Decision.Removed).Select(entry => entry.Target)];
-
     public ImmutableArray<Round> RoundsAfter(IRemovalDecisions older) => [.. Rounds.Skip(older.Rounds.Length)];
 
     /// <summary>
     /// Opens the next round in two phases. Direct: proposals in target order (for a target proposed
     /// twice the first proposal counts) decide each undecided target: a protected one is kept,
-    /// any other removed. Spread: the undecided members of the linked group of each target removed
+    /// any other removed. An object kept shrunk or turned where it stands still stands there, so an also-remove round decides it
+    /// like an undecided one; the rounds that judge a clash with other mods skip it, since it fits. Spread: the undecided members of the linked group of each target removed
     /// directly are removed as linked to the group's lowest-id direct removal. A protected group
     /// never has a removed member, since protection covers whole groups.
     /// </summary>
@@ -110,7 +132,42 @@ public sealed class RemovalDecisions : IRemovalDecisions
         var (removed, kept) = next.DecideDirectly(round, proposals);
         _store.RemovedIn.Add([.. removed, .. next.SpreadToLinkedMembers(round, removed)]);
         _store.KeptIn.Add([.. kept]);
+        _store.FittedIn.Add([]);
         return next;
+    }
+
+    /// <summary>
+    /// Opens a fit round, when there is a fit: each fitted object is decided as kept at its new placement, so no later round
+    /// judges it, except an also-remove round one shrunk or turned where it stands (see <see cref="Apply"/>). A fit may only be proposed once for an undecided object that is not protected and has no linked partner, so
+    /// fitting never splits a linked group; anything else is a bug.
+    /// </summary>
+    /// <returns>The view that includes the new round; this view when there is no fit.</returns>
+    public RemovalDecisions ApplyFits(IReadOnlyList<ProposedFit> fits)
+    {
+        if (fits.Count == 0) return this;
+        RequireNewestView();
+
+        var round = new Round(_roundCount + 1, RoundKind.Fit);
+        _store.Rounds.Add(round);
+        var fitted = new List<TargetId>();
+        foreach (var fit in fits.OrderBy(fit => fit.Target))
+        {
+            RequireFittable(fit.Target);
+            _store.Decisions[fit.Target.Index] = new Decision.Fitted(round, fit.Clash, fit.Kind, fit.To);
+            fitted.Add(fit.Target);
+        }
+        _store.RemovedIn.Add([]);
+        _store.KeptIn.Add([]);
+        _store.FittedIn.Add([.. fitted]);
+        return new RemovalDecisions(_store, round.Number, _moveCount);
+    }
+
+    private void RequireFittable(TargetId target)
+    {
+        if (_store.Decisions[target.Index] is not null || IsProtected(target) || _store.Protection.Groups.IsLinked(target.Index))
+        {
+            throw new InvalidOperationException($"Target {target.Index} cannot be fitted: it is decided, protected or linked.");
+        }
     }
 
     /// <summary>Opens one round per entry of <paramref name="rounds"/>, in order, each as <see cref="Apply"/> does.</summary>
@@ -137,6 +194,7 @@ public sealed class RemovalDecisions : IRemovalDecisions
         copy.Rounds.AddRange(_store.Rounds.Take(_roundCount));
         copy.RemovedIn.AddRange(_store.RemovedIn.Take(_roundCount));
         copy.KeptIn.AddRange(_store.KeptIn.Take(_roundCount));
+        copy.FittedIn.AddRange(_store.FittedIn.Take(_roundCount));
         copy.Moves.AddRange(_store.Moves.Take(_moveCount));
         return copy;
     }
@@ -156,7 +214,8 @@ public sealed class RemovalDecisions : IRemovalDecisions
         foreach (var proposal in proposals.OrderBy(proposal => proposal.Target))
         {
             var target = proposal.Target;
-            if (IsDecided(target)) continue;
+            if (round.Kind == RoundKind.AlsoRemove ? !MayStillBeRemoved(target) : IsDecided(target)) continue;
+            if (Of(target) is Decision.Fitted fitted) _store.Replaced[target.Index] = fitted;
             if (_store.Protection.TryGetKeepReason(target.Index, out var keepReason))
             {
                 _store.Decisions[target.Index] = new Decision.Kept(round, proposal.Reason, keepReason);

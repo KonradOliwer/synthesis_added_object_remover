@@ -1,6 +1,6 @@
 namespace AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
-/// <summary>What the load-order read collects beyond the target objects and the other mods' objects near them.</summary>
+/// <summary>What the load-order read collects beyond the target objects and the other mods' objects near them, and how it tells a moved replacement.</summary>
 /// <param name="SupportOnlyObjects">Every other placed object of the target spaces, as possible supporters or objects around a marker.</param>
 /// <param name="Terrain">The terrain of the target worldspaces.</param>
 /// <param name="Navmesh">The winning navmeshes of the target spaces.</param>
@@ -8,5 +8,9 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 /// <param name="TerrainVersions">Every plugin's version of the terrain of the target worldspaces' cells.</param>
 /// <param name="TerrainLayers">The texture layers of those versions; needs <paramref name="TerrainVersions"/>.</param>
 /// <param name="Water">Every plugin's water of the target worldspaces' own exterior cells and of the worldspaces that supply their default water.</param>
+/// <param name="MovedDistance">
+/// How far, in game units, a record the target overrides must stand from the version it replaces to count as moved and be judged;
+/// at most this far it stands where it stood.
+/// </param>
 public sealed record WhatToCollect(
-    bool SupportOnlyObjects, bool Terrain, bool Navmesh, bool OtherModDetails, bool TerrainVersions, bool TerrainLayers, bool Water);
+    bool SupportOnlyObjects, bool Terrain, bool Navmesh, bool OtherModDetails, bool TerrainVersions, bool TerrainLayers, bool Water, float MovedDistance);

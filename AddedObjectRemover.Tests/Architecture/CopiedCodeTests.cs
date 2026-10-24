@@ -22,6 +22,8 @@ public class CopiedCodeTests
     private const string SectionForwarders = "One-line members of the log and reports object, each handing one step's result to that step's section builder; no logic to share.";
     private const string ErrorBoundary ="Per-object error boundary of two steps: each catches the failure of its own kind of object under its own part key and recovers in its own way; they share only the shape.";
 
+    private const string PlacementRules = "The placement rule of two steps: each places the object and runs its own step's check, which returns its own result type; they share only the shape.";
+
     private const string Shapes = "Caches/BaseObjectShapeAndKind/BaseObjectShapes.cs:BaseObjectShapes.";
     private const string TooClose = "Steps/RemoveTooCloseObjects/";
     private const string TooCloseContracts = "Steps/RemoveTooCloseObjects.Contracts/";
@@ -43,31 +45,49 @@ public class CopiedCodeTests
         [CopyFamily.KeyOf([Settings + "CreateChangedTerrainSettings", Settings + "CreateTooCloseSettings"])] = SettingChecks,
         [CopyFamily.KeyOf([Settings + "CreateAlsoRemoveSettings", Settings + "CreateChangedTerrainSettings"])] = SettingChecks,
         [CopyFamily.KeyOf([
-            Settings + "AnchoringThresholdName", Settings + "Build", Settings + "CleanedModName", Settings + "FollowUpModeName",
-            Settings + "HeightChangeToleranceName", Settings + "MaxOtherMastersName", Settings + "MinPercent", Settings + "NeverTrustedModsName",
-            Settings + "NpcsName", Settings + "OccupiedDirectionsName", Settings + "OwnChangesModsName", Settings + "SearchRadiusName",
-            Settings + "SurroundingObjectsGroup", Settings + "TerrainCheckedObjectsName",
+            Settings + "Build", Settings + "CleanedModName", Settings + "HeightChangeToleranceName", Settings + "MaxOtherMastersName",
+            Settings + "MinShrinkLimitPercent", Settings + "MovedDistanceName", Settings + "NeverTrustedModsName", Settings + "NpcsName", Settings + "OccupiedDirectionsName",
+            Settings + "OwnChangesModsName", Settings + "ShrinkOrTurnGroup", Settings + "TerrainCheckedObjectsName",
             Settings + "TerrainDistanceMarginName", Settings + "TerrainSizeMarginName", Settings + "TerrainTypeChangePercentName",
-            Settings + "TooCloseDistanceMarginName", Settings + "TooCloseSizeMarginName", Settings + "TouchDistanceName", Settings + "TrustedModsName",
+            Settings + "TooCloseDistanceMarginName", Settings + "TooCloseSizeMarginName", Settings + "TrustedModsName",
             Settings + "WaterCoverChangePercentName", Settings + "WaterHeightChangeToleranceName", KeepText + "Category", KeepText + "CheckFailed", KeepText + "LinkedGroupCategory",
             KeepText + "LocationRoleCategory", KeepText + "OwnLocationRefType", KeepText + "PlacedCategoryPrefix", KeepText + "ScriptCategory",
             KeepText + "TeleportDoor"])] = TextConstants,
+        [CopyFamily.KeyOf([
+            Settings + "AnchoringThresholdName", Settings + "DirectionThresholdName", Settings + "FollowUpModeName", Settings + "HeightChangeToleranceName",
+            Settings + "MovedDistanceName", Settings + "NpcsName", Settings + "OccupiedDirectionsName", Settings + "RemovedDirectionsName",
+            Settings + "SearchRadiusName", Settings + "ShrinkLimitName", Settings + "ShrinkOrTurnGroup", Settings + "SurroundingObjectsGroup",
+            Settings + "TerrainCheckedObjectsName", Settings + "TerrainDistanceMarginName", Settings + "TerrainSizeMarginName",
+            Settings + "TerrainTypeChangePercentName", Settings + "TooCloseDistanceMarginName", Settings + "TooCloseSizeMarginName",
+            Settings + "TouchDistanceName", Settings + "TurnLimitName", Settings + "WaterHeightChangeToleranceName", Settings + "WhichObjectsName"])] = TextConstants,
         [CopyFamily.KeyOf([Describe + "HintType", Describe + "PointReason", Describe + "RemovalReason", Describe + "TimedSuffix"])] = EnumTextArms,
         [CopyFamily.KeyOf([
             Describe + "HintType", Describe + "TimedSuffix",
             LeftBehindText + "Describe", LeftBehindText + "DescribeReason", MeshText + "FailureCategory", MeshText + "ReadFailure"])] = EnumTextArms,
         [CopyFamily.KeyOf([
-            Describe + "HintType", Describe + "LeftBehindReason", KeepText + "Relation", LeftBehindText + "Describe",
-            MeshText + "FailureCategory", MeshText + "Line", VisibilityText + "Describe", VisibilityText + "KindName", PartText + "LinkedStep", PartText + "Word"])] = EnumTextArms,
+            Describe + "HintType", Describe + "LeftBehindReason", KeepText + "Link", KeepText + "Relation", LeftBehindText + "Describe",
+            Report + "LogSections.Fit.cs:LogSections.FittedObjectLine", Report + "LogSections.Fit.cs:LogSections.OutcomeText",
+            MeshText + "FailureCategory", MeshText + "Line", VisibilityText + "Describe", VisibilityText + "KindName", PartText + "LinkedStep", PartText + "Word",
+            Report + "Tables.Fits.cs:Tables.FitRow", Report + "Tables.Fits.cs:Tables.OutcomeName", Report + "Tables.Fits.cs:Tables.OwnShrunkOrTurned"])] = EnumTextArms,
         [CopyFamily.KeyOf([KeepText + "Relation", PartText + "LinkedStep"])] = EnumTextArms,
         [CopyFamily.KeyOf([MeshText + "FailureCategory", MeshText + "Line", MeshText + "ReadFailure"])] = EnumTextArms,
         [CopyFamily.KeyOf([PartText + "Wordings"])] = PartKeyLines,
         [CopyFamily.KeyOf([LogAndReports + "BuildArchiveSections", LogAndReports + "BuildIndexSections", LogAndReports + "BuildStepSections"])] = SectionForwarders,
         [CopyFamily.KeyOf([
+            Report + "Tables.Fits.cs:Tables.BuildFitsTable", Report + "Tables.Fits.cs:Tables.FitsHeader",
             Report + "Tables.LeftBehind.cs", Report + "Tables.LeftBehind.cs:Tables", Report + "Tables.LeftBehind.cs:Tables.LeftBehindHeader",
             Report + "Tables.LeftBehind.cs:Tables.MoveColumnCount", Report + "Tables.Support.cs", Report + "Tables.Support.cs:Tables",
-            Report + "Tables.Support.cs:Tables.MaxListedSupporters", Report + "Tables.Support.cs:Tables.SupportHeader",
+            Report + "Tables.Support.cs:Tables.BuildSupportTable", Report + "Tables.Support.cs:Tables.MaxListedSupporters", Report + "Tables.Support.cs:Tables.SupportHeader",
             Report + "Tables.Touch.cs:Tables.ComponentHeader", Report + "Tables.Touch.cs:Tables.EdgeHeader", Report + "Tables.Touch.cs:Tables.MaxTopBases"])] = TableDeclarations + " " + CsvColumnNames,
+        [CopyFamily.KeyOf([
+            Report + "Tables.Fits.cs", Report + "Tables.Fits.cs:Tables", Report + "Tables.Fits.cs:Tables.FitsHeader",
+            Report + "Tables.Removals.cs", Report + "Tables.Removals.cs:Tables", Report + "Tables.Removals.cs:Tables.RemovalsHeader"])] = TableDeclarations + " " + CsvColumnNames,
+        [CopyFamily.KeyOf([
+            "Steps/RemoveObjectsOnChangedTerrain/ChangedTerrainPlacementRule.cs:ChangedTerrainPlacementRule.Check",
+            TooClose + "TooClosePlacementRule.cs:TooClosePlacementRule.Check"])] = PlacementRules,
+        [CopyFamily.KeyOf([
+            "Steps/RemoveInvisibleObjectsLeftBehind/LeftBehindPlacementRule.cs:LeftBehindPlacementRule.Check",
+            TooClose + "TooCloseSearch.cs:TooCloseSearch.CheckTarget"])] = ErrorBoundary,
         [CopyFamily.KeyOf([
             Report + "Tables.Removals.cs:Tables.BuildRemovalsTable", Report + "Tables.Removals.cs:Tables.RemovalsHeader",
             Report + "Tables.Support.cs:Tables.BuildSupportTable", Report + "Tables.Support.cs:Tables.SupportHeader"])] = CsvColumnNames,

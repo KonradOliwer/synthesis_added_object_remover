@@ -16,12 +16,13 @@ internal sealed class PlacedOverrideWriter(SynthesisWriteCache synthesis, ISkyri
 
     /// <summary>
     /// Mirrors Mutagen's placed-record context: override the cell (without its children), then add a copy of the
-    /// winning record to the child list it was found in.
+    /// winning record to the child list of the given kind.
     /// </summary>
-    public IPlaced GetOrAddOverride(IPlacedGetter record, PlacedRecordLocation location)
+    /// <param name="cellKey">The cell the record was found in, or the cell it is moved into.</param>
+    public IPlaced GetOrAddOverride(IPlacedGetter record, FormKey cellKey, bool inPersistentList)
     {
-        var cell = GetOrAddCellOverride(location.WinningCell.FormKey);
-        var list = location.InPersistentList ? cell.Persistent : cell.Temporary;
+        var cell = GetOrAddCellOverride(cellKey);
+        var list = inPersistentList ? cell.Persistent : cell.Temporary;
         if (!_placedByList.TryGetValue(list, out var byKey))
         {
             byKey = new Dictionary<FormKey, IPlaced>();

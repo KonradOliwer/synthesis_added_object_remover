@@ -34,3 +34,4 @@ MeshProblemText.Required | Report check: a mesh fact the kind needs is present; 
 RunPartText.Unknown | Report check: the bug exception for a part key without wording (a tool's key type, not a domain type).
 Tables.CountByComponent | Report counting: how many targets each touching chain holds; plain integers.
 Tables.DescribeSeedReasons | Report wording: joins the seed reasons of a chain (a tool's table type).
+Tables.PlacementColumns | Report wording: the CSV columns of a placement (a tool's placement type).

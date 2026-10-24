@@ -1,4 +1,5 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
+using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
@@ -29,6 +30,7 @@ public interface ISettingsValues
     ITrustSettingsValues Trust { get; }
     ITooCloseSettingsValues TooClose { get; }
     ITerrainChangeSettingsValues TerrainChange { get; }
+    IShrinkOrTurnSettingsValues ShrinkOrTurn { get; }
     IFollowUpSettingsValues FollowUpRemoval { get; }
     ILeftoverSettingsValues LeftoverInvisibleObjects { get; }
 }
@@ -59,6 +61,14 @@ public interface ITerrainChangeSettingsValues
     float WaterHeightChangeTolerance { get; }
     bool CountWaterAddedOrRemoved { get; }
     int MinWaterCoverChangePercent { get; }
+}
+
+public interface IShrinkOrTurnSettingsValues
+{
+    float MovedDistanceInUnits { get; }
+    int ShrinkLimitPercent { get; }
+    int TurnLimitDegrees { get; }
+    ShrinkOrTurnObjects WhichObjects { get; }
 }
 
 /// <summary>The three lists hold the plugin names as the settings spell them; an unset entry is left out.</summary>

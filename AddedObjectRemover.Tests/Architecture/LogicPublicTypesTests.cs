@@ -91,14 +91,14 @@ public class LogicPublicTypesTests
         ],
         ["RemoveObjectsRestingOnRemovedOnes"] =
         [
-            "static IRestingRule CreateRestingRule(ImmutableArray<TargetObject>, AlsoRemoveSettings, IBaseObjectShapes, ITriangleMeshes, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
+            "static IRestingRule CreateRestingRule(ImmutableArray<TargetObject>, IVisibleTargetObjects, AlsoRemoveSettings, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, IBaseObjectShapes, ITriangleMeshes, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
             "static RestingObjectsResult Find(RestingObjectsInput, IBaseFacts, IBaseObjectShapes, ITriangleMeshes, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>)",
             "static HeldUpTargets FindHeldUpTargets(ImmutableArray<TargetObject>, IVisibleTargetObjects, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, IBaseObjectShapes, ITriangleMeshes, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
             "static OtherModsObjectsResult SettleOtherModsObjects(ImmutableArray<TargetObject>, ImmutableArray<TargetObject>, IRemovalDecisions, IObjectsToKeep, IVisibleTargetObjects, IVisibleTargetObjects, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, AlsoRemoveSettings, IBaseObjectShapes, ITriangleMeshes, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
         ],
         ["RemoveInvisibleObjectsLeftBehind"] =
         [
-            "static LeftBehindResult Find(ImmutableArray<TargetObject>, IObjectsThatCanCauseRemovals, IRemovalDecisions, IVisibleTargetObjects, IBaseFacts, IBaseObjectShapes, WorkOrder, Execution, LeftBehindSettings)",
+            "static LeftBehindResult Find(ImmutableArray<TargetObject>, IObjectsThatCanCauseRemovals, IReadOnlySet<OtherId>, IRemovalDecisions, IVisibleTargetObjects, IBaseFacts, IBaseObjectShapes, WorkOrder, Execution, LeftBehindSettings)",
         ],
         ["MoveKeptMarkers"] =
         [

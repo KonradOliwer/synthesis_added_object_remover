@@ -66,7 +66,8 @@ public class StandardSettings : ISettingsValues
         + "Nothing is deleted: a removed object is disabled; one that is not persistent is also moved below the world.\n"
         + "Always kept, whatever the settings: teleport doors and their destinations; anything another mod's object, a quest, a package,\n"
         + "a scene, a location or a navmesh points to; objects whose own script names a quest or scene, or whose base object\n"
-        + "is this plugin's own and has a script that does; objects with a location role (except map markers). Linked objects are always removed or kept together.\n"
+        + "is this plugin's own and has a script that does; objects with a location role (except map markers); with \"Other mods' objects left without support\"\n"
+        + "on KeepSupportingObject, also the objects another mod's object rests on. Linked objects are always removed or kept together.\n"
         + "Pick it from your load order.")]
     [JsonConverter(typeof(EmptyTextAsNullConverter))]
     // The settings key is CleanedMod (the user's word); the code keeps its target names.
@@ -100,9 +101,10 @@ public class StandardSettings : ISettingsValues
     [SynthesisTooltip(
         "An object of the cleaned mod, or of another mod that the cleaned mod moved, that would be removed for being too close to another mod's object\n"
         + "is first tried shrunk or turned where it stands. If it fits, it is kept that way; otherwise it is removed.\n"
-        + "Never shrunk or turned, but removed as before: an object on terrain another mod changed, and an object other objects rest on\n"
-        + "(as \"Also remove what rests on removed objects\" decides; with \"Nothing\" there, no object counts as having others resting on it).\n"
-        + "Invisible objects, objects that are always kept and linked objects are never shrunk or turned, nor, with KeepSupportingObject, an object another mod's object rests on.\n"
+        + "Never shrunk or turned, but removed as before: an object on terrain another mod changed; an object other objects of the cleaned mod rest on\n"
+        + "(as \"Also remove what rests on removed objects\" decides; with \"Nothing\" there, none counts); and, whatever the settings, an object\n"
+        + "that another mod's object rests on (of the mods \"Other mods' objects left without support\" names).\n"
+        + "Invisible objects, objects that are always kept and linked objects are never shrunk or turned.\n"
         + "Objects of other mods that the cleaned mod left in place are never checked.")]
     public ShrinkOrTurnSettings ShrinkOrTurn { get; set; } = new();
 
@@ -401,7 +403,7 @@ public class FollowUpRemovalSettings : IFollowUpSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName("When an object is removed, also remove")]
     [SynthesisTooltip(
-        "Nothing: only the objects found too close or on changed terrain.\n"
+        "Nothing: of the cleaned mod's objects, only those found too close or on changed terrain.\n"
         + "EverythingTouchingIt: everything connected to it through touching objects, spreading one object at a time; this can reach a whole room.\n"
         + "OnlyWhatLosesItsSupport: a touching object only when enough of what it rests on was removed.")]
     public FollowUpRemovalMode Mode { get; set; } = SettingDefaults.FollowUpMode;
@@ -423,15 +425,16 @@ public class FollowUpRemovalSettings : IFollowUpSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName("Other mods' objects left without support")]
     [SynthesisTooltip(
-        "What happens to another mod's object resting on an object of the cleaned mod that is removed, shrunk or turned.\n"
+        "What happens to another mod's object resting on an object of the cleaned mod that is removed.\n"
         + "Only objects of the base game, of the cleaned mod's masters and of mods trusted in the settings above (listed, requiring the cleaned mod, or loading before it) count; "
         + "objects of untrusted mods, of never trusted mods and of mods trusted only as masters of other mods are ignored.\n"
-        + "KeepSupportingObject: the cleaned mod's object it rests on is kept as it is: never removed, shrunk or turned.\n"
+        + "Whatever is chosen here, an object of the cleaned mod that such an object rests on is never shrunk or turned.\n"
+        + "KeepSupportingObject: the cleaned mod's object it rests on is kept as it is. When it rests on several that hold enough of it only together, all of them are kept.\n"
         + "RemoveFloatingObject: the other mod's object is removed too.\n"
         + "PullObjectToTheGround: the other mod's object is moved straight down onto what is below it, keeping its rotation;\n"
         + "with nothing below it within 2048 units, it is removed.\n"
         + "Other mods' objects that something depends on (persistent ones, ones another object links to, ...) are never removed.\n"
-        + "With the last two, an object of the cleaned mod resting on such an object goes as \"When an object is removed, also remove\" says.")]
+        + "With the last two, an object of the cleaned mod that rests on an object of another mod that is removed or pulled down is removed or kept as \"When an object is removed, also remove\" says.")]
     public OtherModsObjectsHandling OtherModsObjectsLeftWithoutSupport { get; set; } = SettingDefaults.OtherModsObjects;
 }
 

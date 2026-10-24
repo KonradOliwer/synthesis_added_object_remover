@@ -40,18 +40,31 @@ public static class RestingObjects
         return run.Result with { ReportFileDetails = FindReportFileDetails(run, input, bases, shapes, triangles) };
     }
 
-    /// <summary>The step's relation asked before any removal: the objects other target objects rest on (see <see cref="RestingRule"/>).</summary>
+    /// <summary>
+    /// The step's relation asked before any removal: the objects other target objects rest on (see <see cref="RestingRule"/>), and
+    /// those judged objects of other mods rest on, whatever <paramref name="otherModsObjects"/> says (see <see cref="AnyObjectRestingRule"/>).
+    /// </summary>
     /// <param name="targets">Where they stand before any object is shrunk or turned.</param>
-    /// <param name="objectsOfAnyPlugin">Asked only for OnlyWhatLosesItsSupport, when there is an object to check.</param>
+    /// <param name="visibleTargets">The index of <paramref name="targets"/>.</param>
+    /// <param name="trust">Decides whose objects are judged.</param>
+    /// <param name="objectsOfAnyPlugin">Asked only when there is an object to check.</param>
     public static IRestingRule CreateRestingRule(
         ImmutableArray<TargetObject> targets,
+        IVisibleTargetObjects visibleTargets,
         AlsoRemoveSettings settings,
+        ModTrustTable trust,
+        LoadOrderPlugins plugins,
+        OtherModsObjectsSettings otherModsObjects,
         IBaseObjectShapes shapes,
         ITriangleMeshes triangles,
         ITerrainHeights terrain,
         Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin,
         Execution execution) =>
-        new RestingRule(targets, settings, shapes, triangles, terrain, objectsOfAnyPlugin, execution);
+        OtherModsObjects.CreateRestingRule(
+            targets,
+            visibleTargets,
+            new RestingRule(targets, settings, shapes, triangles, terrain, objectsOfAnyPlugin, execution),
+            new OtherModsObjectsContext(trust, plugins, otherModsObjects, shapes, triangles, terrain, objectsOfAnyPlugin, execution));
 
     /// <summary>
     /// KeepSupportingObject: the target objects other mods' objects rest on, directly or through other target objects, each where

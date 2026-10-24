@@ -75,6 +75,7 @@ public class LeftBehindOrderDeterminismTests
         return LeftBehindObjects.Find(
             immutableTargets,
             otherModObjects,
+            new HashSet<OtherId>(),
             decisions,
             scene.VisibleTargets,
             TestBaseFacts.Reader(new SkyrimMod(ModKey.FromNameAndExtension("Facts.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),

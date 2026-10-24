@@ -39,6 +39,8 @@ internal sealed class TestRunCaches(
 
     public IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPlugin() => objectsOfAnyPlugin();
 
+    public IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPluginAsTheyStand(IReadOnlyDictionary<OtherId, OtherObject?> changed) => throw NotRead();
+
     public BoundsStats CountBounds() => throw NotRead();
 
     public int CountEffectOnlyMeshes() => throw NotRead();

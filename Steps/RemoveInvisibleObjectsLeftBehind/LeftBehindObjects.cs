@@ -11,6 +11,7 @@ namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
 public static class LeftBehindObjects
 {
     /// <param name="otherModObjects">The other-mod objects that can cause removals (the selection step's view).</param>
+    /// <param name="otherModObjectsTakenAway">Those of any plugin this run removes or pulls down: no object sits inside them any more.</param>
     /// <param name="decisions">The newest decisions; only the removals already in them count as cleared.</param>
     /// <param name="surroundings">The visible target objects, removed or not.</param>
     /// <param name="settings">Null when the step is switched off.</param>
@@ -24,6 +25,7 @@ public static class LeftBehindObjects
     public static LeftBehindResult Find(
         ImmutableArray<TargetObject> targets,
         IObjectsThatCanCauseRemovals otherModObjects,
+        IReadOnlySet<OtherId> otherModObjectsTakenAway,
         IRemovalDecisions decisions,
         IVisibleTargetObjects surroundings,
         IBaseFacts bases,
@@ -40,7 +42,7 @@ public static class LeftBehindObjects
                         targets,
                         shapes,
                         surroundings,
-                        ContainingObjectFinder.Find(targets, shapes, otherModObjects, order, execution),
+                        ContainingObjectFinder.Find(targets, shapes, otherModObjects, otherModObjectsTakenAway, order, execution),
                         new ReachRule(bases),
                         settings,
                         order)

@@ -13,8 +13,8 @@ public interface IObjectsThatCanCauseRemovals
     /// <summary>The lowest object whose world bounds overlap <paramref name="area"/> and whose bounds centre passes <paramref name="centreIsInside"/>, or null.</summary>
     OtherId? FirstWithCentreInside(RecordKey space, Box area, Func<Vector3, bool> centreIsInside, ObjectQueryScratch scratch);
 
-    /// <summary>The lowest object whose mesh surrounds <paramref name="point"/>, or null.</summary>
-    OtherId? FirstCovering(RecordKey space, Vector3 point, ObjectQueryScratch scratch);
+    /// <summary>The lowest object that <paramref name="include"/> keeps and whose mesh surrounds <paramref name="point"/>, or null.</summary>
+    OtherId? FirstCovering(RecordKey space, Vector3 point, Func<OtherId, bool> include, ObjectQueryScratch scratch);
 
     OtherObject Get(OtherId id);
 

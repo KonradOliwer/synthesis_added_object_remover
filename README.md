@@ -15,8 +15,8 @@ Before an object is removed for being too close, the patcher tries to keep it by
 (see *Shrink or turn objects to make them fit*).
 
 Objects of the base game, of the cleaned mod's masters and of mods you trust (a patch made for the cleaned mod, for example)
-that rest on an object of the cleaned mod are not left floating when that object is removed, shrunk or turned: by default they
-are moved straight down onto what is below them (see *Other mods' objects left without support*).
+that rest on an object of the cleaned mod are not left floating when that object is removed: by default they are moved straight
+down onto what is below them, and the object they rest on is never shrunk or turned (see *Other mods' objects left without support*).
 
 Removal never deletes anything: the object is disabled, the same way xEdit's *Undelete and Disable
 References* does. An object that is not persistent is also moved far below the world; a persistent
@@ -284,10 +284,11 @@ Only objects that are too close are shrunk or turned. These are never shrunk or 
 - an object that other objects of the cleaned mod rest on, as *Also remove what rests on removed objects* decides: with
   `EverythingTouchingIt`, any of them touching it; with `OnlyWhatLosesItsSupport`, one that would lose its support without it.
   Shrinking or turning it would leave them floating; removing it lets that step handle them. With `Nothing`, no object counts
-  as having others resting on it.
-
-With *Other mods' objects left without support* set to `KeepSupportingObject`, an object that another mod's object rests on is
-kept as it is: it is neither shrunk, turned nor removed (see *Other mods' objects left without support*).
+  here;
+- whatever the settings, an object that another mod's object rests on, of the plugins *Other mods' objects left without
+  support* checks (see *When an object rests on another*). When it is removed, that setting decides what becomes of the other
+  mod's object, and *Also remove what rests on removed objects* what becomes of the cleaned mod's objects on that one. With
+  `KeepSupportingObject`, such an object is kept as it is.
 
 Only visible objects are shrunk or turned. Objects that are always kept (see *What is always kept*) and objects linked to
 other objects of the cleaned mod are never shrunk or turned. An object kept shrunk or turned still stands where
@@ -300,7 +301,7 @@ it was: *Also remove what rests on removed objects* removes it like any other ob
 | When an object is removed, also remove | `OnlyWhatLosesItsSupport` | What else goes with a removed object (see below). |
 | Gap that still counts as touching (game units) | `8` | Two objects this close or closer count as touching (0-64). Used by `EverythingTouchingIt` and `OnlyWhatLosesItsSupport`, and, whatever *When an object is removed, also remove* is set to, for other mods' objects (see *Other mods' objects left without support*). |
 | OnlyWhatLosesItsSupport: remove when this much support is gone (%) | `50` | `OnlyWhatLosesItsSupport`: remove an object once this much of its support is gone (1-100). Whatever *When an object is removed, also remove* is set to, it also decides when another mod's object rests on an object or is left without support (see *Other mods' objects left without support*). |
-| Other mods' objects left without support | `PullObjectToTheGround` | What happens to another mod's object resting on an object of the cleaned mod that is removed, shrunk or turned (see *Other mods' objects left without support*). |
+| Other mods' objects left without support | `PullObjectToTheGround` | What happens to another mod's object resting on an object of the cleaned mod that is removed (see *Other mods' objects left without support*). Whatever it is set to, an object such an object rests on is never shrunk or turned. |
 
 - **Nothing**: of the cleaned mod's objects, only those found too close or on changed terrain are removed. (Other mods' objects are decided by *Other mods' objects left without support*, in every mode.)
 - **EverythingTouchingIt**: every object connected to a removed one through touching objects is removed too, spreading outward one touching object at a time until nothing more is added. This can spread through floors and walls to whole rooms. Only the cleaned mod's visible objects are removed this way; a kept object (see *What is always kept*) is not removed and the spread does not pass through it.
@@ -310,12 +311,16 @@ it was: *Also remove what rests on removed objects* removes it like any other ob
 
 This setting is in the *Also remove what rests on removed objects* group. *When an object is removed, also remove* decides only
 about the cleaned mod's objects; this setting decides about the objects of the plugins listed below (see *Which objects are
-checked*) that rest on an object of the cleaned mod the run removes, or shrinks or turns where it stands.
+checked*) that rest on an object of the cleaned mod the run removes. Whatever it is set to, an object of the cleaned mod that
+one of these objects rests on is never shrunk or turned to make it fit (see *Shrink or turn objects to make them fit*): it is
+kept as it stands or removed.
 
 - **KeepSupportingObject**: an object of the cleaned mod that another mod's object rests on is kept as it is: it is never
-  removed, shrunk or turned. So is an object of the cleaned mod that such a kept object rests on, and so on down, so the whole
-  support under the other mod's object stays (a lantern of a patch on a book of the cleaned mod on a rock of the cleaned mod
-  keeps both the book and the rock). Objects linked to a kept object are kept with it, as for every reason to keep.
+  removed. When the other mod's object rests on several objects of the cleaned mod that hold enough of it only together (two
+  crates under one lantern, for example), all of them are kept. So is an object of the cleaned mod that such a kept object
+  rests on, and so on down, so the whole support under the other mod's object stays (a lantern of a patch on a book of the
+  cleaned mod on a rock of the cleaned mod keeps both the book and the rock). Objects linked to a kept object are kept with it,
+  as for every reason to keep.
 - **RemoveFloatingObject**: the cleaned mod's objects are removed, shrunk or turned as decided, and the other mods' objects left
   without support are removed, written the way the cleaned mod's removed objects are. An object resting on such an object
   is checked in turn, so a stack goes as a whole.
@@ -336,20 +341,26 @@ belong to one of these plugins:
 
 A plugin listed under *Never trusted mods* is not one of these, even when it is a base game plugin or a master of the cleaned
 mod. An object belongs to a plugin when that plugin created its record, or when the winning version of the record comes from it.
+Objects that an earlier patcher in your Synthesis group (an earlier run of this one included) added to the patch are not
+checked either; an object such a patcher changed in the patch is checked as an object of the plugin that created it.
 Objects of untrusted mods, of never trusted mods, of mods trusted for their own changes only, and of plugins that are trusted
 only because a trusted mod has them as a master (and that are not masters of the cleaned mod) are ignored: whatever this
 setting is, they neither keep the cleaned mod's object nor are removed or pulled down. Placed NPCs and creatures, markers and
 other invisible objects, effect meshes (fog, light rays) and the cleaned mod's own objects that a later plugin overrides are
 never checked. Any object that stays, of any plugin, and the terrain still count as the ground an object is pulled down onto.
 
-When an object rests on another and when it is left without support:
+**When an object rests on another** and when it is left without support:
 - An object rests on what is below it when it cannot move straight down by more than *Gap that still counts as touching*. An
   object that only touches the cleaned mod's object from the side, with nothing right below it, does not rest on it. An object
-  partly sunk into another one, deeper than the gap, rests on it.
-- With `KeepSupportingObject`, another mod's object rests on an object of the cleaned mod when that object holds at least
-  *remove when this much support is gone (%)* of what the other object touches, measured as for `OnlyWhatLosesItsSupport`, and
-  the other object could move straight down by more than the gap without it. A base game floor under a table of the cleaned
-  mod, for example, does not keep the table.
+  partly sunk into another solid object rests on it when it is sunk deeper than the gap, or when its lower half is sunk in, however
+  thin that object is (a plate sunk into a board). An object whose model is open somewhere (a room shell with an opening, for
+  example) does not hold up what stands inside it.
+- Another mod's object rests on objects of the cleaned mod when, without them, it would lose at least *remove when this much
+  support is gone (%)* of what it touches, measured as for `OnlyWhatLosesItsSupport`, and could move straight down by more than
+  the gap: each object of the cleaned mod that holds that share alone, or, when none does, all of them that hold part of it,
+  if together they hold that share. This decides which objects `KeepSupportingObject` keeps and which objects are never shrunk
+  or turned. A base game floor under a table of the cleaned mod, for example, does not keep the table: the floor does not rest
+  on the table.
 - With the other two choices, another mod's object is left without support when it rested on something before, at least
   *remove when this much support is gone (%)* of its surface that touched anything touches nothing once the cleaned mod's
   objects are removed, shrunk or turned and the other objects left without support are taken away, and it can then move
@@ -357,7 +368,7 @@ When an object rests on another and when it is left without support:
   under a removed table, stays as it is.
 
 Some objects of other mods are never removed, because something may depend on them or control them: persistent ones (quests,
-packages and scripts can only point to those), teleport doors, map markers, objects with an enable parent, objects whose own
+packages and scripts can only point to those), teleport doors, objects that carry a map marker, objects with an enable parent, objects whose own
 script names a quest or scene, objects with a location ref type, and objects another placed object links to (as its enable
 parent, linked reference or script property, for example). When such an object would be removed (with `RemoveFloatingObject`,
 or with `PullObjectToTheGround` when nothing is below it within 2048 units), it is left where it stands instead, and keeps
@@ -379,8 +390,10 @@ objects are then checked again: a lantern of a patch on a removed bowl of the cl
 repeats until no further object of the cleaned mod is removed. A kept object (see *What is always kept*) stays, as always.
 
 The other mods' objects are checked after *Also remove what rests on removed objects* and before *Invisible objects left
-behind*, which also sees the cleaned mod's objects removed this way. The steps for invisible objects left behind and for moving
-kept markers see other mods' objects where they stood.
+behind*, which also sees the cleaned mod's objects removed this way. That step and the step that moves kept markers see the
+other mods' objects as this one leaves them: an invisible object of the cleaned mod does not count as inside another mod's
+object that was removed or pulled down, and a kept marker is moved among the pulled-down objects at their new places, with the
+removed ones gone.
 
 #### Invisible objects left behind
 
@@ -563,7 +576,7 @@ other removals and counted with the follow-up removals; in the detailed log thei
 support)` (with `OnlyWhatLosesItsSupport`). With `KeepSupportingObject`, the detailed log counts the cleaned mod's objects other
 mods' objects rest on, and those these rest on.
 
-With *Detailed log and reports* on, a line like `Objects too close where they stand: 126; not shrunk or turned because other objects rest on them: 6; tried shrunk or turned: 120; fit: 95.` counts the objects that may be shrunk or turned and were too close where they stood, those left alone because other objects rest on them, those tried, and those that fit; the others are removed. The line that reports the written patch, like `Wrote 140 overrides (40 removed, 5 moved, 95 shrunk or turned to fit).`, names the shrunk or turned objects only when there are any, and likewise the other mods' objects pulled down and removed (`Wrote 144 overrides (40 removed, 5 moved, 95 shrunk or turned to fit; other mods' objects: 3 pulled down, 1 removed).`).
+With *Detailed log and reports* on, a line like `Objects too close where they stand: 126; not shrunk or turned because other objects rest on them: 6; tried shrunk or turned: 120; fit: 95.` counts the objects that may be shrunk or turned and were too close where they stood, those not tried because other objects rest on them (of the cleaned mod or of other mods), those tried, and those that fit; the others are removed. The line that reports the written patch, like `Wrote 140 overrides (40 removed, 5 moved, 95 shrunk or turned to fit).`, names the shrunk or turned objects only when there are any, and likewise the other mods' objects pulled down and removed (`Wrote 144 overrides (40 removed, 5 moved, 95 shrunk or turned to fit; other mods' objects: 3 pulled down, 1 removed).`).
 
 Right after the kept summary, each object kept for a reason of its own gets a line saying why: *Kept, script names a quest or scene* (its own script, or its base object's from the cleaned mod), *Kept, location role* (a location ref type of its own) or, with `KeepSupportingObject`, *Kept, another mod's object rests on it* (naming that object, like `...: Lantern [012345:SomePatch.esp].`, or the kept object of the cleaned mod resting on it and what rests on that one, like `...: Book [...] rests on it; Lantern [...] rests on that.`). They are kept on purpose and are not in the *Removed markers and kept objects* section. When an object is kept because another mod's object rests on it, the kept summary's first line also names that reason, and the summary counts these objects on a line of their own, like `another mod's object rests on it: 4`.
 
@@ -635,10 +648,8 @@ With *Detailed log and reports* on, CSV files (UTF-8, comma-separated, header in
   to a removed object. An object whose mesh can't be read is never removed by *Also remove what rests on removed objects*; the log
   lists unreadable meshes.
 - Another mod's object is pulled down by points spread over its surface, so a narrow edge of what is below it that passes
-  between those points may end up slightly inside it. A surface below a point of the object counts whichever way the mesh
-  stores it, except a surface facing down within *Gap that still counts as touching* of the point: that is the underside of
-  something resting on the object, which is passed through. A point inside a closed mesh, more than that gap above the
-  mesh's underside, rests on that mesh.
+  between those points may end up slightly inside it. The underside of something that rests on the object is not taken as
+  ground to land on.
 - A kept marker is moved only up to 2048 units and prefers staying in its own cell; in tight
   interiors a free spot often can't be found, so it may be left where it is (the log says so). A marker moved out of its own cell gets a warning that names the neighbouring cell it was moved into, such as *Warning: SomeMarker was moved into the neighbouring cell (7, 6) because its own cell has no free spot.*
 - The cleaned mod must load above the patch in your plugin list, and so must every enabled mod that requires it;

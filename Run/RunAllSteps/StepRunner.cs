@@ -181,11 +181,12 @@ public static class StepRunner
         var changedTerrain = RunChangedTerrain(scope, runCaches, trust, collected, fitted.Decisions);
         var tooClose = RunTooClose(scope, runCaches, collected, selected, changedTerrain.Decisions);
         var alsoRemove = RunAlsoRemove(scope, runCaches, collected, kept.ObjectsToKeep, tooClose.Decisions);
-        var visibleAfterAlsoRemove = ClashingObjectFitter.IndexAsTheyStand(collected.Targets, alsoRemove.Decisions, runCaches);
-        var otherMods = RunOtherModsObjects(scope, runCaches, trust, collected, kept.ObjectsToKeep, alsoRemove.Decisions, visibleAfterAlsoRemove);
+        var otherMods = RunOtherModsObjects(scope, runCaches, trust, collected, kept.ObjectsToKeep, fitted.Decisions, alsoRemove.Decisions);
         var visibleTargets = ClashingObjectFitter.IndexAsTheyStand(collected.Targets, otherMods.Decisions, runCaches);
-        var leftBehind = RunLeftBehind(scope, runCaches, visibleTargets, collected, selected.ObjectsThatCanCauseRemovals, otherMods.Decisions);
-        var markerMoves = RunMarkerMoves(scope, runCaches, visibleTargets, collected, leftBehind);
+        var otherModsObjectsTakenAway = otherMods.Result.TakenAway();
+        var leftBehind = RunLeftBehind(
+            scope, runCaches, visibleTargets, collected, selected.ObjectsThatCanCauseRemovals, otherModsObjectsTakenAway, otherMods.Decisions);
+        var markerMoves = RunMarkerMoves(scope, runCaches, visibleTargets, collected, otherModsObjectsTakenAway, leftBehind);
         var final = leftBehind.Decisions.AddMoves(markerMoves.Moves);
         return new StepResults(
             Collected: collected,
@@ -214,36 +215,36 @@ public static class StepRunner
                 scope.Settings.Execution),
             (heldUp, elapsed) => scope.Report.BuildStepSections(heldUp, elapsed));
 
-    /// <param name="visibleTargets">The visible targets as they stand after the also-remove rounds.</param>
+    /// <param name="afterFits">The decisions with every fit: the rounds measure an object shrunk or turned and removed later at its new placement.</param>
     private static OtherModsObjectsPhase RunOtherModsObjects(
         RunScope scope,
         IRunCaches runCaches,
         ModTrustTable trust,
         CollectedObjects collected,
         IObjectsToKeep objectsToKeep,
-        RemovalDecisions afterAlsoRemove,
-        IVisibleTargetObjects visibleTargets) =>
+        RemovalDecisions afterFits,
+        RemovalDecisions afterAlsoRemove) =>
         scope.Environment.Log.Timed(
-            () => FindAndApplyOtherModsObjectsRounds(scope, runCaches, trust, collected, objectsToKeep, afterAlsoRemove, visibleTargets),
+            () => FindAndApplyOtherModsObjectsRounds(scope, runCaches, trust, collected, objectsToKeep, afterFits, afterAlsoRemove),
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
 
-    /// <param name="visibleTargets">The visible targets as they stand after the also-remove rounds.</param>
+    /// <param name="afterFits">The decisions with every fit: the rounds measure an object shrunk or turned and removed later at its new placement.</param>
     private static OtherModsObjectsPhase FindAndApplyOtherModsObjectsRounds(
         RunScope scope,
         IRunCaches runCaches,
         ModTrustTable trust,
         CollectedObjects collected,
         IObjectsToKeep objectsToKeep,
-        RemovalDecisions afterAlsoRemove,
-        IVisibleTargetObjects visibleTargets)
+        RemovalDecisions afterFits,
+        RemovalDecisions afterAlsoRemove)
     {
         var result = RestingObjects.SettleOtherModsObjects(
             collected.Targets,
-            ClashingObjectFitter.PlaceAsTheyStand(collected.Targets, afterAlsoRemove),
+            ClashingObjectFitter.PlaceAsTheyStand(collected.Targets, afterFits),
             afterAlsoRemove,
             objectsToKeep,
             runCaches.VisibleTargets,
-            visibleTargets,
+            ClashingObjectFitter.IndexAsTheyStand(collected.Targets, afterFits, runCaches),
             trust,
             scope.Environment.Plugins,
             scope.Settings.OtherModsObjects,
@@ -312,7 +313,11 @@ public static class StepRunner
                 collected, trust, scope.Environment.Plugins, scope.Plugin, runCaches.Shapes, scope.Settings.ChangedTerrain),
             Resting: RestingObjects.CreateRestingRule(
                 collected.Targets,
+                runCaches.VisibleTargets,
                 scope.Settings.AlsoRemove,
+                trust,
+                scope.Environment.Plugins,
+                scope.Settings.OtherModsObjects,
                 runCaches.Shapes,
                 runCaches.Triangles,
                 runCaches.Terrain,
@@ -418,29 +423,34 @@ public static class StepRunner
         return new AlsoRemovePhase(result, afterTooClose.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds));
     }
 
+    /// <param name="otherModsObjectsTakenAway">The other mods' objects pulled down (where they stand now) or removed (null), by id.</param>
     private static LeftBehindPhase RunLeftBehind(
         RunScope scope,
         IRunCaches runCaches,
         IVisibleTargetObjects visibleTargets,
         CollectedObjects collected,
         IObjectsThatCanCauseRemovals objectsThatCanCauseRemovals,
+        IReadOnlyDictionary<OtherId, OtherObject?> otherModsObjectsTakenAway,
         RemovalDecisions afterAlsoRemove) =>
         scope.Environment.Log.Timed(
-            () => FindAndApplyLeftBehindRound(scope, runCaches, visibleTargets, collected, objectsThatCanCauseRemovals, afterAlsoRemove),
+            () => FindAndApplyLeftBehindRound(scope, runCaches, visibleTargets, collected, objectsThatCanCauseRemovals, otherModsObjectsTakenAway, afterAlsoRemove),
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
 
     /// <param name="visibleTargets">The visible targets as they stand.</param>
+    /// <param name="otherModsObjectsTakenAway">The other mods' objects pulled down (where they stand now) or removed (null), by id.</param>
     private static LeftBehindPhase FindAndApplyLeftBehindRound(
         RunScope scope,
         IRunCaches runCaches,
         IVisibleTargetObjects visibleTargets,
         CollectedObjects collected,
         IObjectsThatCanCauseRemovals objectsThatCanCauseRemovals,
+        IReadOnlyDictionary<OtherId, OtherObject?> otherModsObjectsTakenAway,
         RemovalDecisions afterAlsoRemove)
     {
         var result = LeftBehindObjects.Find(
             collected.Targets,
             objectsThatCanCauseRemovals,
+            otherModsObjectsTakenAway.Keys.ToHashSet(),
             afterAlsoRemove,
             visibleTargets,
             runCaches.Bases,
@@ -452,14 +462,20 @@ public static class StepRunner
     }
 
     /// <param name="visibleTargets">The visible targets as they stand.</param>
+    /// <param name="otherModsObjectsTakenAway">The other mods' objects pulled down (where they stand now) or removed (null), by id.</param>
     private static MarkerMoves RunMarkerMoves(
-        RunScope scope, IRunCaches runCaches, IVisibleTargetObjects visibleTargets, CollectedObjects collected, LeftBehindPhase leftBehind)
+        RunScope scope,
+        IRunCaches runCaches,
+        IVisibleTargetObjects visibleTargets,
+        CollectedObjects collected,
+        IReadOnlyDictionary<OtherId, OtherObject?> otherModsObjectsTakenAway,
+        LeftBehindPhase leftBehind)
     {
         var markerMoves = MarkerMovePlanner.Plan(
             collected.Targets,
             leftBehind.Result,
             leftBehind.Decisions,
-            runCaches.VisibleObjectsOfAnyPlugin,
+            () => runCaches.VisibleObjectsOfAnyPluginAsTheyStand(otherModsObjectsTakenAway),
             visibleTargets,
             scope.Plugin,
             runCaches.Navmeshes,

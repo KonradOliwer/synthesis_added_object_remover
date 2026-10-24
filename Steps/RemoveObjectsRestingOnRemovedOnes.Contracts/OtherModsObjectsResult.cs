@@ -40,6 +40,9 @@ public sealed record OtherModsObjectOutcome(OtherObject Object, OtherModsObjectF
 {
     /// <summary>Where it stands now: its position, moved down by <see cref="Drop"/>.</summary>
     public Vector3 NewPosition => Object.Position with { Z = Object.Position.Z - Drop };
+
+    /// <summary>Whether it no longer stands where it stood: pulled down or removed.</summary>
+    public bool IsTakenAway => Fate is OtherModsObjectFate.PulledDown or OtherModsObjectFate.Removed or OtherModsObjectFate.RemovedNothingBelow;
 }
 
 /// <summary>What the step did with the other mods' objects left without support.</summary>
@@ -58,4 +61,9 @@ public sealed record OtherModsObjectsResult(
     PartFailure? Failure)
 {
     public static OtherModsObjectsResult SwitchedOff { get; } = new(StepOutcome.SwitchedOff, [], [], [], Failure: null);
+
+    /// <summary>Each object taken away, where it stands now (pulled down), or null (removed), by id.</summary>
+    public IReadOnlyDictionary<OtherId, OtherObject?> TakenAway() =>
+        Objects.Where(outcome => outcome.IsTakenAway)
+            .ToDictionary(outcome => outcome.Object.Id, outcome => outcome.Fate == OtherModsObjectFate.PulledDown ? outcome.Object with { Position = outcome.NewPosition } : (OtherObject?)null);
 }

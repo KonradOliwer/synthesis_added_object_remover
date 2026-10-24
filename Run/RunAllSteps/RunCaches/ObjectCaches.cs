@@ -59,4 +59,7 @@ internal sealed class ObjectCaches : IObjectCaches
     public IVisibleTargetObjects IndexVisibleTargets(IReadOnlyList<TargetObject> targets) => new VisibleTargetObjects(targets, _shapes, _containment, _execution);
 
     public IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPlugin() => new VisibleObjectsOfAnyPlugin(ObjectsOfAnyPlugin);
+
+    public IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPluginAsTheyStand(IReadOnlyDictionary<OtherId, OtherObject?> changed) =>
+        new VisibleObjectsOfAnyPluginAsTheyStand(ObjectsOfAnyPlugin, changed, _shapes, _containment);
 }

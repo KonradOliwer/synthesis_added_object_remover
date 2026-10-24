@@ -12,7 +12,10 @@ public static class MarkerMovePlanner
 {
     /// <param name="leftBehind">Its evaluations the decisions kept, inside another mod's object, are the candidates.</param>
     /// <param name="final">The decisions with the left-behind round.</param>
-    /// <param name="objectsOfAnyPlugin">Asked only when the step is performed: the first ask builds the supporters' bounds index, which the closing statistics count.</param>
+    /// <param name="objectsOfAnyPlugin">
+    /// As the run leaves them: those pulled down where they stand now, those removed left out. Asked only when the step is
+    /// performed: the first ask builds the supporters' bounds index, which the closing statistics count.
+    /// </param>
     /// <param name="plugin">For the exterior cell each marker belongs to.</param>
     /// <param name="navmeshes">The winning navmeshes of each target space.</param>
     /// <param name="settings">Null when kept markers stay where they are: the step is switched off.</param>

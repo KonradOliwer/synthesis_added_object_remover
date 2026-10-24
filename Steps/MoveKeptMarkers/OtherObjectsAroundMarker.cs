@@ -6,9 +6,10 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 namespace AddedObjectRemover.Steps.MoveKeptMarkers;
 
 /// <summary>
-/// The visible placed objects that remain after this run: every visible object of any plugin and the
+/// The visible placed objects that remain after this run: the visible objects of any plugin as the run leaves them and the
 /// visible target objects that are not removed. Thread-safe.
 /// </summary>
+/// <param name="objectsOfAnyPlugin">Those the run pulled down where they stand now; those it removed left out.</param>
 /// <param name="removed">By <see cref="TargetId"/> index.</param>
 internal sealed class OtherObjectsAroundMarker(
     IVisibleObjectsOfAnyPlugin objectsOfAnyPlugin, IVisibleTargetObjects targets, IReadOnlySet<int> removed, IBaseObjectShapes shapes)

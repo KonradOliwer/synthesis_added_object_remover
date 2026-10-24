@@ -20,10 +20,17 @@ public class OtherModsObjectsTests
     private const float BookHeight = 4f;
     private const float LanternHeight = 6f;
     private const float SlabHeight = 2f;
+    private const float ThinBoardHeight = 4f;
+    private const float PlateHeight = 2f;
+
+    /// <summary>Wider than the thin board is thick.</summary>
+    private const float WideTouchGap = 8f;
     private const float ShrunkScale = 0.8f;
     private const float DropTolerance = 0.01f;
     private const int Table = 0;
     private const int LanternOnTheBook = 1;
+    private const int ManyScenes = 12;
+    private const float ManyScenesSpacing = 100f;
 
     private static readonly ModKey BaseGame = ModKey.FromNameAndExtension("Base.esm");
     private static readonly ModKey OtherMod = ModKey.FromNameAndExtension("Other.esp");
@@ -53,8 +60,26 @@ public class OtherModsObjectsTests
     private static readonly TestStatic BlockModel = new(
         new FormKey(TestTargets.TargetMod, 0x716), @"test\othermods\block.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20, -20, 0), new Vector3(20, 20, 50))));
 
-    private static readonly IBaseObjectShapes Shapes =
-        TestShapes.Create(TestTargets.TargetMod, "OtherModsObjectsData", TableModel, BookModel, LanternModel, FloorModel, SlabModel, BlockModel);
+    /// <summary>
+    /// A room shell around the table, with floor, walls and ceiling, and a stray triangle in a corner that leaves the mesh open
+    /// without breaking the walls around the table.
+    /// </summary>
+    private static readonly TestStatic OpenShellModel = new(
+        new FormKey(TestTargets.TargetMod, 0x717),
+        @"test\othermods\openshell.nif",
+        [
+            .. TestMeshes.BoxTriangles(new Box(new Vector3(-100, -100, 0), new Vector3(100, 100, 200))),
+            new MeshTriangle(new Vector3(-90, -90, 100), new Vector3(-80, -90, 100), new Vector3(-90, -80, 100)),
+        ]);
+
+    private static readonly TestStatic ThinBoardModel = new(
+        new FormKey(TestTargets.TargetMod, 0x718), @"test\othermods\thinboard.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20, -20, 0), new Vector3(20, 20, ThinBoardHeight))));
+
+    private static readonly TestStatic PlateModel = new(
+        new FormKey(TestTargets.TargetMod, 0x719), @"test\othermods\plate.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-3, -3, 0), new Vector3(3, 3, PlateHeight))));
+
+    private static readonly IBaseObjectShapes Shapes = TestShapes.Create(
+        TestTargets.TargetMod, "OtherModsObjectsData", TableModel, BookModel, LanternModel, FloorModel, SlabModel, BlockModel, OpenShellModel, ThinBoardModel, PlateModel);
 
     private static readonly RemovalReason Clash = new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize());
 
@@ -224,6 +249,62 @@ public class OtherModsObjectsTests
         Assert.Empty(Settle(others, RemoveTable, OtherModsObjectsHandling.PullObjectToTheGround, threshold: 0.1f).Objects);
     }
 
+    /// <summary>As above, with the block turned a quarter round and scaled up, so its mesh is asked in its own frame.</summary>
+    [Fact]
+    public void AnObjectPartlySunkIntoATurnedAndScaledObjectThatStaysStillRestsOnIt()
+    {
+        var block = TestShapes.Placed(BaseGame, 1, BlockModel.Base, new Vector3(44, 0, 0), zRadians: MathF.PI / 2) with { Scale = 1.2f };
+
+        Assert.Empty(Settle([Floor(), block, Lantern(OtherMod, 2, new Vector3(20, 0, TableHeight))], RemoveTable, OtherModsObjectsHandling.PullObjectToTheGround, threshold: 0.1f).Objects);
+    }
+
+    /// <summary>
+    /// A flat plate stands half sunk into the table's top and half sunk wholly into a base game board beside it, a board thinner
+    /// than the touch gap. The plate's lower half inside the board holds it up once the table is removed.
+    /// </summary>
+    [Fact]
+    public void AnObjectSunkIntoAThinBoardThatStaysStillRestsOnIt()
+    {
+        List<OtherObject> others =
+        [
+            Floor(),
+            TestShapes.Placed(BaseGame, 1, ThinBoardModel.Base, new Vector3(40, 0, TableHeight - 3f)),
+            TestShapes.Placed(OtherMod, 2, PlateModel.Base, new Vector3(20, 0, TableHeight - PlateHeight)),
+        ];
+        var scene = new Scene([CreateTable()], others, OtherModsObjectsHandling.PullObjectToTheGround) { Threshold = 0.1f, TouchGap = WideTouchGap };
+
+        Assert.Empty(Settle(scene, RemoveTable).Result.Objects);
+    }
+
+    /// <summary>
+    /// The lantern's top is sunk just inside the underside of an untrusted block above it. That block does not hold it up: once
+    /// the table is removed, the lantern is pulled down to the floor through the block's underside.
+    /// </summary>
+    [Fact]
+    public void AnObjectWhoseTopIsSunkIntoTheUndersideOfAnObjectAboveItIsPulledDown()
+    {
+        var block = TestShapes.Placed(UntrustedMod, 1, BlockModel.Base, OnTheTable + new Vector3(0, 0, LanternHeight - 0.5f));
+
+        var outcome = Assert.Single(Settle([Floor(), block, Lantern(OtherMod, 2, OnTheTable)], RemoveTable, OtherModsObjectsHandling.PullObjectToTheGround, threshold: 0.3f).Objects);
+
+        Assert.Equal(OtherModsObjectFate.PulledDown, outcome.Fate);
+        Assert.Equal(0f, outcome.NewPosition.Z, DropTolerance);
+    }
+
+    /// <summary>
+    /// The table and the lantern on it stand inside a base game shell whose mesh is open. An open mesh holds nothing inside it, so
+    /// without the table the lantern would fall to the shell's floor, and the table is kept.
+    /// </summary>
+    [Fact]
+    public void WithKeepSupportingObjectATableInsideAnOpenShellHoldsUpTheObjectOnIt()
+    {
+        List<OtherObject> others = [TestShapes.Placed(BaseGame, 0, OpenShellModel.Base, Vector3.Zero), Lantern(OtherMod, 1, OnTheTable)];
+
+        var heldUp = FindHeldUp([CreateTable()], others, OtherModsObjectsHandling.KeepSupportingObject, threshold: 0.05f);
+
+        Assert.Equal(new TargetId(Table), Assert.Single(heldUp.Targets).Key);
+    }
+
     [Fact]
     public void AnObjectOfABaseGamePluginOrOfAMasterOfTheCleanedModOnARemovedTableIsPulledDown()
     {
@@ -324,6 +405,109 @@ public class OtherModsObjectsTests
         Assert.Equal(single.ProposedRounds.SelectMany(round => round), parallel.ProposedRounds.SelectMany(round => round));
     }
 
+    /// <summary>
+    /// Many copies of the lantern-on-a-book scene side by side, so every parallel part of the step splits its work into ranges
+    /// across the workers.
+    /// </summary>
+    [Fact]
+    public void TheOutcomesAndRoundsOfManyObjectsDoNotDependOnTheThreadCount()
+    {
+        var single = Settle(ManyLanternsOnBooks(threads: 1), RemoveEveryTable).Result;
+        var parallel = Settle(ManyLanternsOnBooks(threads: 4), RemoveEveryTable).Result;
+
+        Assert.Equal(2 * ManyScenes, single.Objects.Length);
+        Assert.Equal(single.Objects.ToArray(), parallel.Objects.ToArray());
+        Assert.Equal(single.ProposedRounds.SelectMany(round => round), parallel.ProposedRounds.SelectMany(round => round));
+    }
+
+    [Fact]
+    public void AProtectedObjectOfTheCleanedModOnAPulledObjectIsKeptAndKeepsHoldingUpWhatRestsOnIt()
+    {
+        var scene = LanternOnABookScene(FollowUpRemovalMode.EverythingTouchingIt, threads: 1) with { KeepReasons = new Dictionary<int, KeepReason> { [LanternOnTheBook] = TestKeepReasons.Quest } };
+
+        var (result, decisions) = Settle(scene, RemoveTable);
+
+        Assert.IsType<Decision.Kept>(decisions.Of(new TargetId(LanternOnTheBook)));
+        Assert.Equal([1], result.Objects.Select(outcome => outcome.Object.Id.Index));
+    }
+
+    [Fact]
+    public void AnObjectLinkedToAnObjectOfTheCleanedModRemovedForAPulledObjectIsRemovedWithIt()
+    {
+        const int linked = 2;
+        var scene = LanternOnABookScene(FollowUpRemovalMode.EverythingTouchingIt, threads: 1);
+        scene = scene with
+        {
+            Targets = [.. scene.Targets, TestTargets.Create(linked, TestTargets.At(new Vector3(300, 0, 0)), TableModel.Base, TestTargets.Space)],
+            Links = [TestTargets.Link(LanternOnTheBook, linked)],
+        };
+
+        var (_, decisions) = Settle(scene, RemoveTable);
+
+        Assert.IsType<Decision.Removed>(decisions.Of(new TargetId(LanternOnTheBook)));
+        Assert.Equal(new RemovalReason.LinkedTo(new TargetId(LanternOnTheBook)), Assert.IsType<Decision.Removed>(decisions.Of(new TargetId(linked))).Reason);
+    }
+
+    [Fact]
+    public void WithRemoveFloatingObjectACleanedModsObjectOnARemovedObjectGoesAndWhatRestsOnItIsRemovedToo()
+    {
+        var scene = LanternOnABookScene(FollowUpRemovalMode.EverythingTouchingIt, threads: 1) with { Handling = OtherModsObjectsHandling.RemoveFloatingObject };
+
+        var (result, decisions) = Settle(scene, RemoveTable);
+
+        Assert.Equal(new RemovalReason.TouchingAnotherModsObject(new OtherId(1)), Assert.IsType<Decision.Removed>(decisions.Of(new TargetId(LanternOnTheBook))).Reason);
+        Assert.Equal([(1, OtherModsObjectFate.Removed), (2, OtherModsObjectFate.Removed)], result.Objects.Select(outcome => (outcome.Object.Id.Index, outcome.Fate)));
+    }
+
+    /// <summary>The cleaned mod's lantern on the book was shrunk to fit; it touches the book where the book stood, so it goes too.</summary>
+    [Fact]
+    public void AShrunkObjectOfTheCleanedModOnAPulledObjectIsRemovedAsTheAlsoRemoveModeSays()
+    {
+        var scene = LanternOnABookScene(FollowUpRemovalMode.EverythingTouchingIt, threads: 1);
+        var onTheBook = scene.Targets[LanternOnTheBook].Transform.Position;
+
+        var (_, decisions) = Settle(
+            scene,
+            decisions => RemoveTable(decisions.ApplyFits([new ProposedFit(new TargetId(LanternOnTheBook), Clash, new EulerPlacement(onTheBook, Vector3.Zero, ShrunkScale))])));
+
+        Assert.Equal(new RemovalReason.TouchingAnotherModsObject(new OtherId(1)), Assert.IsType<Decision.Removed>(decisions.Of(new TargetId(LanternOnTheBook))).Reason);
+    }
+
+    /// <summary>
+    /// A slab of the cleaned mod lies across three books: another mod's book on the removed table (about a ninth of its support),
+    /// a book of the cleaned mod that is removed (a little under half) and a base game book on a base game table. Only together do
+    /// the removed book and the pulled one hold more than half of its support, and less than 60 %.
+    /// </summary>
+    [Theory]
+    [InlineData(0.5f, true)]
+    [InlineData(0.6f, false)]
+    public void WithOnlyWhatLosesItsSupportTheSharesOfRemovedObjectsAndPulledObjectsCountTogether(float threshold, bool removed)
+    {
+        const int removedBook = 1;
+        const int slab = 2;
+        List<TargetObject> targets =
+        [
+            CreateTable(),
+            TestTargets.Create(removedBook, TestTargets.At(new Vector3(28, 0, TableHeight)), BookModel.Base, TestTargets.Space),
+            TestTargets.Create(slab, TestTargets.At(new Vector3(36, 0, TableHeight + BookHeight)), SlabModel.Base, TestTargets.Space),
+        ];
+        List<OtherObject> others = [Floor(), BaseGameTable(1, new Vector3(40, 0, 0)), Book(OtherMod, 2, new Vector3(11, 0, TableHeight)), Book(BaseGame, 3, new Vector3(44, 0, TableHeight))];
+        var scene = new Scene(targets, others, OtherModsObjectsHandling.PullObjectToTheGround) { AlsoRemove = FollowUpRemovalMode.OnlyWhatLosesItsSupport, Threshold = threshold };
+
+        var (result, decisions) = Settle(
+            scene, decisions => decisions.Apply(RoundKind.TooClose, [new ProposedRemoval(new TargetId(Table), Clash), new ProposedRemoval(new TargetId(removedBook), Clash)]));
+
+        Assert.Equal(OtherModsObjectFate.PulledDown, Assert.Single(result.Objects, outcome => outcome.Object.Id.Index == 2).Fate);
+        if (!removed)
+        {
+            Assert.Null(decisions.Of(new TargetId(slab)));
+            return;
+        }
+        var reason = Assert.IsType<RemovalReason.LostSupportWithAnotherModsObject>(Assert.IsType<Decision.Removed>(decisions.Of(new TargetId(slab))).Reason);
+        Assert.Equal(new OtherId(2), reason.MainSupporter);
+        Assert.InRange(reason.RemovedShare, 0.5f, 0.6f);
+    }
+
     [Fact]
     public void WithKeepSupportingObjectNothingIsSettledAndOtherwiseNothingIsKept()
     {
@@ -367,13 +551,51 @@ public class OtherModsObjectsTests
         Assert.Empty(FindHeldUp([CreateTable()], beside, OtherModsObjectsHandling.KeepSupportingObject).Targets);
     }
 
+    /// <summary>
+    /// The lantern stands half on each of two tables of the cleaned mod. Neither holds the threshold share alone, but taking both
+    /// away would leave it without its support, so both are kept.
+    /// </summary>
+    [Fact]
+    public void WithKeepSupportingObjectTablesThatHoldTheThresholdShareOnlyTogetherAreAllHeldUp()
+    {
+        List<TargetObject> targets = [CreateTable(), TestTargets.Create(1, TestTargets.At(new Vector3(40, 0, 0)), TableModel.Base, TestTargets.Space)];
+
+        var heldUp = FindHeldUp(targets, WithFloor(Lantern(OtherMod, 1, new Vector3(20, 0, TableHeight))), OtherModsObjectsHandling.KeepSupportingObject, threshold: 0.6f);
+
+        Assert.Equal([new TargetId(0), new TargetId(1)], heldUp.Targets.Keys.OrderBy(target => target.Index));
+    }
+
+    [Theory]
+    [InlineData(OtherModsObjectsHandling.KeepSupportingObject)]
+    [InlineData(OtherModsObjectsHandling.RemoveFloatingObject)]
+    [InlineData(OtherModsObjectsHandling.PullObjectToTheGround)]
+    public void TheFitStepFindsATableAnotherModsObjectRestsOnWithEveryChoiceAndEveryAlsoRemoveMode(OtherModsObjectsHandling handling)
+    {
+        foreach (var mode in Enum.GetValues<FollowUpRemovalMode>())
+        {
+            Assert.Equal([new TargetId(Table)], FindRestedOn(new Scene([CreateTable()], WithFloor(Lantern(OtherMod, 1, OnTheTable)), handling) { AlsoRemove = mode }));
+            Assert.Empty(FindRestedOn(new Scene([CreateTable()], WithFloor(Lantern(UntrustedMod, 1, OnTheTable)), handling) { AlsoRemove = mode }));
+        }
+    }
+
     /// <summary>The objects of one scene and how the step is set.</summary>
     private sealed record Scene(List<TargetObject> Targets, IReadOnlyList<OtherObject> Others, OtherModsObjectsHandling Handling)
     {
         public FollowUpRemovalMode AlsoRemove { get; init; } = FollowUpRemovalMode.Nothing;
         public ITerrainHeights Terrain { get; init; } = TestGround.NoTerrain();
         public float Threshold { get; init; } = OtherModsObjectsTests.Threshold;
+        public float TouchGap { get; init; } = OtherModsObjectsTests.TouchGap;
         public int Threads { get; init; } = 1;
+        public IReadOnlyList<TargetLink> Links { get; init; } = [];
+
+        /// <summary>The keep reasons of the protected target objects, by index.</summary>
+        public IReadOnlyDictionary<int, KeepReason>? KeepReasons { get; init; }
+
+        public ObjectsToKeep CreateProtection() => ObjectsToKeep.Build(Targets, Links, TestTargets.References(Targets.Count, KeepReasons), TestBaseFacts.Unresolved);
+
+        public OtherModsObjectsSettings OtherModsSettings => new(Handling, TouchGap, Threshold);
+
+        public AlsoRemoveSettings AlsoRemoveSettings => new(AlsoRemove, TouchGap, Threshold, TouchChainsShown: false);
     }
 
     /// <summary>The floor (id 0), the table (target 0) with the other mod's book (id 1) on it, the cleaned mod's lantern (target 1) on the book, and the other mod's lantern (id 2) on that lantern.</summary>
@@ -384,6 +606,27 @@ public class OtherModsObjectsTests
         List<OtherObject> others = [Floor(), Book(OtherMod, 1, OnTheTable), Lantern(OtherMod, 2, onTheBook + new Vector3(0, 0, LanternHeight))];
         return new Scene(targets, others, OtherModsObjectsHandling.PullObjectToTheGround) { AlsoRemove = mode, Threads = threads };
     }
+
+    /// <summary><see cref="ManyScenes"/> copies of <see cref="LanternOnABookScene"/>, each with its own floor, one beside the other.</summary>
+    private static Scene ManyLanternsOnBooks(int threads)
+    {
+        var targets = new List<TargetObject>();
+        var others = new List<OtherObject>();
+        for (var copy = 0; copy < ManyScenes; copy++)
+        {
+            var offset = new Vector3(copy * ManyScenesSpacing, 0, 0);
+            var onTheBook = offset + OnTheTable + new Vector3(0, 0, BookHeight);
+            targets.Add(TestTargets.Create(2 * copy, TestTargets.At(offset), TableModel.Base, TestTargets.Space));
+            targets.Add(TestTargets.Create(2 * copy + 1, TestTargets.At(onTheBook), LanternModel.Base, TestTargets.Space));
+            others.Add(TestShapes.Placed(BaseGame, 3 * copy, FloorModel.Base, offset));
+            others.Add(Book(OtherMod, 3 * copy + 1, offset + OnTheTable));
+            others.Add(Lantern(OtherMod, 3 * copy + 2, onTheBook + new Vector3(0, 0, LanternHeight)));
+        }
+        return new Scene(targets, others, OtherModsObjectsHandling.PullObjectToTheGround) { AlsoRemove = FollowUpRemovalMode.OnlyWhatLosesItsSupport, Threads = threads };
+    }
+
+    private static RemovalDecisions RemoveEveryTable(RemovalDecisions decisions) =>
+        decisions.Apply(RoundKind.TooClose, [.. Enumerable.Range(0, ManyScenes).Select(copy => new ProposedRemoval(new TargetId(2 * copy), Clash))]);
 
     private static OtherModsObjectsResult Settle(
         IReadOnlyList<OtherObject> others,
@@ -397,7 +640,7 @@ public class OtherModsObjectsTests
     private static (OtherModsObjectsResult Result, RemovalDecisions Decisions) Settle(Scene scene, Func<RemovalDecisions, RemovalDecisions> decide)
     {
         var caches = TestScenes.CreateWithSupportOnlyObjects(scene.Targets, scene.Others, Shapes, scene.Threads);
-        var protection = ObjectsToKeep.Build(scene.Targets, [], TestTargets.References(scene.Targets.Count), TestBaseFacts.Unresolved);
+        var protection = scene.CreateProtection();
         var decided = decide(RemovalDecisions.Start(protection, scene.Targets.Count));
         var asTheyStand = ClashingObjectFitter.PlaceAsTheyStand([.. scene.Targets], decided);
         var result = RestingObjects.SettleOtherModsObjects(
@@ -409,8 +652,8 @@ public class OtherModsObjectsTests
             caches.IndexVisibleTargets(asTheyStand),
             Trust,
             Plugins,
-            new OtherModsObjectsSettings(scene.Handling, TouchGap, scene.Threshold),
-            new AlsoRemoveSettings(scene.AlsoRemove, TouchGap, scene.Threshold, TouchChainsShown: false),
+            scene.OtherModsSettings,
+            scene.AlsoRemoveSettings,
             Shapes,
             new TriangleStore(Shapes.ReadTriangles),
             scene.Terrain,
@@ -431,12 +674,31 @@ public class OtherModsObjectsTests
             caches.VisibleTargets,
             Trust,
             Plugins,
-            new OtherModsObjectsSettings(scene.Handling, TouchGap, scene.Threshold),
+            scene.OtherModsSettings,
             Shapes,
             new TriangleStore(Shapes.ReadTriangles),
             scene.Terrain,
             caches.VisibleObjectsOfAnyPlugin,
             new Execution(scene.Threads));
+    }
+
+    /// <summary>The fit step's answer: which of the scene's target objects others rest on.</summary>
+    private static List<TargetId> FindRestedOn(Scene scene)
+    {
+        var caches = TestScenes.CreateWithSupportOnlyObjects(scene.Targets, scene.Others, Shapes);
+        var rule = RestingObjects.CreateRestingRule(
+            [.. scene.Targets],
+            caches.VisibleTargets,
+            scene.AlsoRemoveSettings,
+            Trust,
+            Plugins,
+            scene.OtherModsSettings,
+            Shapes,
+            new TriangleStore(Shapes.ReadTriangles),
+            scene.Terrain,
+            caches.VisibleObjectsOfAnyPlugin,
+            new Execution(scene.Threads));
+        return [.. rule.FindObjectsOthersRestOn([.. scene.Targets.Select(target => target.Id)])];
     }
 
     private static RemovalDecisions RemoveTable(RemovalDecisions decisions) =>

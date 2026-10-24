@@ -96,6 +96,14 @@ public class LeftBehindObjectsTests
     }
 
     [Fact]
+    public void NoObjectIsInsideAnotherModsObjectThatTheRunRemovesOrPullsDown()
+    {
+        var evaluated = Find(StartDecisions(), Settings, takenAway: new HashSet<OtherId> { Others[0].Id });
+
+        Assert.All(evaluated.Evaluations, evaluation => Assert.Null(evaluation.ContainingObject));
+    }
+
+    [Fact]
     public void PlanMovesAKeptMarkerToTheNearestFreeSpotWithinTheMaxDistance()
     {
         var far = Plan(MarkerMoveLimits.MaxDistance);
@@ -142,6 +150,7 @@ public class LeftBehindObjectsTests
         var result = LeftBehindObjects.Find(
             Targets,
             scene.ObjectsThatCanCauseRemovals(Replacements.None(Others.Length), NpcHandling.OnlyWhenStuckInsideTheObject),
+            new HashSet<OtherId>(),
             StartDecisions(),
             new FailingSurroundings(scene.VisibleTargets),
             TestBaseFacts.Reader(new SkyrimMod(ModKey.FromNameAndExtension("Reach.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
@@ -240,12 +249,13 @@ public class LeftBehindObjectsTests
 
     private static ObjectCaches CreateScene() => TestScenes.Create(Targets, Others, Shapes, supportOnlyObjects: []);
 
-    private static LeftBehindResult Find(IRemovalDecisions decisions, LeftBehindSettings? settings)
+    private static LeftBehindResult Find(IRemovalDecisions decisions, LeftBehindSettings? settings, IReadOnlySet<OtherId>? takenAway = null)
     {
         var scene = CreateScene();
         return LeftBehindObjects.Find(
             Targets,
             scene.ObjectsThatCanCauseRemovals(Replacements.None(Others.Length), NpcHandling.OnlyWhenStuckInsideTheObject),
+            takenAway ?? new HashSet<OtherId>(),
             decisions,
             scene.VisibleTargets,
             TestBaseFacts.Reader(new SkyrimMod(ModKey.FromNameAndExtension("Reach.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),

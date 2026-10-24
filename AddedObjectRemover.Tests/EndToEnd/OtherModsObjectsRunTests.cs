@@ -6,10 +6,11 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 
 /// <summary>
 /// Other mods' objects resting on the cleaned mod's crates, through a whole run on a small world of its own, for each value of the
-/// setting. Six columns in the interior, each with a crate of the cleaned mod on a base game floor (none in one column) and a pad on
-/// the crate: of a trusted mod (crate removed), of a trusted mod (crate shrunk), of a trusted mod with no floor below (crate
-/// removed), of an untrusted mod, of a plugin that is only a master of the trusted mod, and of a master of the cleaned mod (crate
-/// removed). An untrusted pad next to each crate makes it too close; in the untrusted column the resting pad itself does.
+/// setting. Seven columns in the interior, each with a crate of the cleaned mod on a base game floor (none in one column) and, in
+/// all but the last, a pad on the crate: of a trusted mod (crate removed), of a trusted mod (shrinking would make the crate fit, but
+/// the pad rests on it, so it is removed), of a trusted mod with no floor below (crate removed), of an untrusted mod, of a plugin
+/// that is only a master of the trusted mod, and of a master of the cleaned mod (crate removed); the last crate has nothing on it
+/// and is shrunk. An untrusted pad next to each crate makes it too close; in the untrusted column the resting pad itself does.
 /// </summary>
 [Collection(ConsoleOutputCollection.Name)]
 public class OtherModsObjectsRunTests
@@ -25,9 +26,6 @@ public class OtherModsObjectsRunTests
     private const float FloorTop = 0f;
     private const float CrateTop = FixtureMeshes.CrateSize;
 
-    /// <summary>The crate shrunk to 90% of its size: its top is at 90 units.</summary>
-    private const float ShrunkCrateTop = 0.9f * CrateTop;
-
     /// <summary>Beside the crate, still 5 units into its footprint after shrinking to 80%: no size from 80% to 100% fits.</summary>
     private const float OverlappingCauseX = 45f;
 
@@ -37,7 +35,7 @@ public class OtherModsObjectsRunTests
     private const string DisabledMark = "disabled True";
     private const string EnabledMark = "disabled False";
 
-    private static readonly Column[] Judged = [Column.Removed, Column.Shrunk, Column.NothingBelow, Column.CleanedModMaster];
+    private static readonly Column[] Judged = [Column.Removed, Column.NotShrunkPadOnIt, Column.NothingBelow, Column.CleanedModMaster];
     private static readonly Column[] Ignored = [Column.UntrustedPad, Column.MasterOfTrustedMod];
 
     public static TheoryData<OtherModsObjectsHandling> Handlings => new(Enum.GetValues<OtherModsObjectsHandling>());
@@ -64,12 +62,23 @@ public class OtherModsObjectsRunTests
         var (run, scene) = Execute(OtherModsObjectsHandling.PullObjectToTheGround, ManyWorkers);
 
         Assert.Contains(DisabledMark, Line(run, scene.Crates[Column.Removed]));
-        Assert.Contains(EnabledMark, Line(run, scene.Crates[Column.Shrunk]));
+        Assert.Contains(DisabledMark, Line(run, scene.Crates[Column.NotShrunkPadOnIt]));
         AssertPulledTo(run, scene, Column.Removed, FloorTop);
-        AssertPulledTo(run, scene, Column.Shrunk, ShrunkCrateTop);
+        AssertPulledTo(run, scene, Column.NotShrunkPadOnIt, FloorTop);
         AssertPulledTo(run, scene, Column.CleanedModMaster, FloorTop);
         Assert.Contains(DisabledMark, Line(run, scene.Pads[Column.NothingBelow]));
         AssertIgnoredObjectsAreUntouched(run, scene);
+    }
+
+    [Theory]
+    [MemberData(nameof(Handlings))]
+    public void OnlyACrateWithNothingOnItIsShrunkWithEveryChoice(OtherModsObjectsHandling handling)
+    {
+        var (run, scene) = Execute(handling, ManyWorkers);
+
+        Assert.Contains($"{EnabledMark}, position ({ColumnX(Column.ShrunkNothingOnIt):F2}, 0.00, 0.00)", Line(run, scene.Crates[Column.ShrunkNothingOnIt]));
+        Assert.Contains($"Kept shrunk or turned: T_Crate_{Column.ShrunkNothingOnIt} ", string.Join('\n', run.Log));
+        Assert.DoesNotContain($"Kept shrunk or turned: T_Crate_{Column.NotShrunkPadOnIt} ", string.Join('\n', run.Log));
     }
 
     [Fact]
@@ -79,7 +88,7 @@ public class OtherModsObjectsRunTests
 
         Assert.All(Judged, column => Assert.Contains(DisabledMark, Line(run, scene.Pads[column])));
         Assert.Contains(DisabledMark, Line(run, scene.Crates[Column.Removed]));
-        Assert.Contains(EnabledMark, Line(run, scene.Crates[Column.Shrunk]));
+        Assert.Contains(DisabledMark, Line(run, scene.Crates[Column.NotShrunkPadOnIt]));
         AssertIgnoredObjectsAreUntouched(run, scene);
     }
 
@@ -145,11 +154,12 @@ public class OtherModsObjectsRunTests
     private enum Column
     {
         Removed,
-        Shrunk,
+        NotShrunkPadOnIt,
         NothingBelow,
         UntrustedPad,
         MasterOfTrustedMod,
         CleanedModMaster,
+        ShrunkNothingOnIt,
     }
 
     /// <summary>The world, in load order: Skyrim.esm, TargetMaster.esm, TrustedBase.esm, Target.esp, Trusted.esp, Untrusted.esp.</summary>
@@ -172,7 +182,7 @@ public class OtherModsObjectsRunTests
             var padOwners = new Dictionary<Column, FixtureMod>
             {
                 [Column.Removed] = trusted,
-                [Column.Shrunk] = trusted,
+                [Column.NotShrunkPadOnIt] = trusted,
                 [Column.NothingBelow] = trusted,
                 [Column.UntrustedPad] = untrusted,
                 [Column.MasterOfTrustedMod] = trustedMaster,
@@ -191,7 +201,7 @@ public class OtherModsObjectsRunTests
             }
             foreach (var column in Enum.GetValues<Column>())
             {
-                var causeX = column == Column.Shrunk ? NearCauseX : OverlappingCauseX;
+                var causeX = column is Column.NotShrunkPadOnIt or Column.ShrunkNothingOnIt ? NearCauseX : OverlappingCauseX;
                 untrusted.Interior.Place($"U_Cause_{column}", causeBase, At(column, 0f) + new Vector3(causeX, 0f, 0f));
             }
         }

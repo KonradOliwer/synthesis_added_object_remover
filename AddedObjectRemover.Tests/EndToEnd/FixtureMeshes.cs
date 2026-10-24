@@ -18,9 +18,9 @@ internal static class FixtureMeshes
     public const string TwinPillarsModel = "aor\\twinpillars.nif";
 
     public const float BuildingHeight = 300f;
+    public const float PadHeight = 20f;
 
     private const float PadWidth = 40f;
-    private const float PadHeight = 20f;
     private const float BuildingWidth = 400f;
     private const float PillarWidth = 40f;
     private const float PillarHeight = 200f;

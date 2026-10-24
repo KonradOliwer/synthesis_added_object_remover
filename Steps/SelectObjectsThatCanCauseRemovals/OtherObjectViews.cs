@@ -33,10 +33,10 @@ internal sealed class ObjectsThatCanCauseRemovals(IOtherModObjectsBySpace otherM
         return candidateCount;
     }
 
-    public OtherId? FirstCovering(RecordKey space, Vector3 point, ObjectQueryScratch scratch)
+    public OtherId? FirstCovering(RecordKey space, Vector3 point, Func<OtherId, bool> include, ObjectQueryScratch scratch)
     {
         var index = otherModObjects.IndexOf(space);
-        var slot = index.FindContainingVisible(point, CanCauseRemovals, scratch);
+        var slot = index.FindContainingVisible(point, other => CanCauseRemovals(other) && include(other.Id), scratch);
         return slot >= 0 ? index[slot].Id : null;
     }
 

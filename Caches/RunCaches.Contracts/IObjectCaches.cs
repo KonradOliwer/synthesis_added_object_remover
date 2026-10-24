@@ -71,4 +71,10 @@ public interface IObjectCaches
 
     /// <summary>The visible objects of C11; asking builds C11.</summary>
     IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPlugin();
+
+    /// <summary>
+    /// The visible objects of C11 with some moved or taken out, without changing C11: each changed object where it stands now, or
+    /// gone when it maps to null. Asking builds C11.
+    /// </summary>
+    IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPluginAsTheyStand(IReadOnlyDictionary<OtherId, OtherObject?> changed);
 }

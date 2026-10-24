@@ -4,6 +4,14 @@ using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
+/// <summary>What a judged object had before any decision, which no decision changes.</summary>
+/// <param name="Weight">The weight of its surface touching anything.</param>
+/// <param name="Rested">Whether it rested on what was below it.</param>
+internal readonly record struct SupportBefore(float Weight, bool Rested);
+
+/// <summary>The <see cref="SupportBefore"/> of each judged object found so far, kept by one step for all its settlings.</summary>
+internal sealed record SupportsBefore(Dictionary<OtherId, SupportBefore> Of);
+
 /// <summary>
 /// RemoveFloatingObject and PullObjectToTheGround. An object is left without support when it lost at least the threshold share of
 /// the weight of its surface touching anything: lost = 1 - (weight touching now) / (weight touching before), with the targets
@@ -17,6 +25,7 @@ namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 /// </summary>
 /// <param name="original">The world before any decision.</param>
 /// <param name="final">The world with the target objects as decided and the objects of any plugin unchanged.</param>
+/// <param name="before">Filled here with the objects not yet in it; it holds only what does not depend on any decision.</param>
 internal sealed class LeftWithoutSupport(
     SupportWorld original,
     SupportWorld final,
@@ -25,24 +34,23 @@ internal sealed class LeftWithoutSupport(
     OtherObjectSupport support,
     DropFinder drops,
     OtherModsObjectsSettings settings,
+    SupportsBefore before,
     Execution execution)
 {
     /// <summary>What one settling has found so far.</summary>
     /// <param name="Changed">The objects moved (their new placement) or taken away (null): removed, or waiting to be pulled down.</param>
     /// <param name="Decided">Each object whose fate is known.</param>
-    /// <param name="WeightBefore">The weight of each judged object touching anything before any decision, found once per object.</param>
     /// <param name="ToPull">The objects waiting to be pulled down, with the share of support they lost.</param>
     private sealed record Progress(
         Dictionary<OtherId, PlacedTransform?> Changed,
         Dictionary<OtherId, OtherModsObjectOutcome> Decided,
-        Dictionary<OtherId, float> WeightBefore,
         List<(OtherObject Object, float LostShare)> ToPull);
 
     /// <param name="changedTargets">The target objects removed, shrunk or turned, where they stood.</param>
     /// <returns>Each object left without support once, in id order.</returns>
     public ImmutableArray<OtherModsObjectOutcome> Settle(IReadOnlyList<BoxInSpace> changedTargets)
     {
-        var progress = new Progress([], [], [], []);
+        var progress = new Progress([], [], []);
         IReadOnlyList<BoxInSpace> frontier = changedTargets;
         while (frontier.Count > 0) frontier = DecideRound(frontier, progress);
         PullDownLowestFirst(progress);
@@ -53,13 +61,13 @@ internal sealed class LeftWithoutSupport(
     private List<BoxInSpace> DecideRound(IReadOnlyList<BoxInSpace> changedLastRound, Progress progress)
     {
         var candidates = near.FindTouchingAny(changedLastRound, isLeftOut: id => progress.Decided.ContainsKey(id) || progress.Changed.ContainsKey(id));
-        FindMissingWeightsBefore(candidates, progress);
+        FindMissingSupportsBefore(candidates);
         var world = final.With(new Dictionary<OtherId, PlacedTransform?>(progress.Changed));
         var lostShares = ParallelMap.Run(
             execution,
             candidates.Count,
             () => new OtherObjectQueries(),
-            (k, queries) => FindSupportLost(candidates[k], progress.WeightBefore[candidates[k].Id], world, queries),
+            (k, queries) => FindSupportLost(candidates[k], before.Of[candidates[k].Id], world, queries),
             ParallelMap.AutomaticRangeSize);
         var takenAway = new List<BoxInSpace>();
         for (var k = 0; k < candidates.Count; k++)
@@ -72,16 +80,16 @@ internal sealed class LeftWithoutSupport(
         return takenAway;
     }
 
-    private void FindMissingWeightsBefore(List<OtherObject> candidates, Progress progress)
+    private void FindMissingSupportsBefore(List<OtherObject> candidates)
     {
-        List<OtherObject> missing = [.. candidates.Where(candidate => !progress.WeightBefore.ContainsKey(candidate.Id))];
-        var weights = ParallelMap.Run(
+        List<OtherObject> missing = [.. candidates.Where(candidate => !before.Of.ContainsKey(candidate.Id))];
+        var found = ParallelMap.Run(
             execution,
             missing.Count,
             () => new OtherObjectQueries(),
-            (k, queries) => support.FindContacts(missing[k], original, queries).TotalWeight,
+            (k, queries) => new SupportBefore(support.FindContacts(missing[k], original, queries).TotalWeight, drops.Rests(missing[k], original, queries)),
             ParallelMap.AutomaticRangeSize);
-        for (var k = 0; k < missing.Count; k++) progress.WeightBefore.Add(missing[k].Id, weights[k]);
+        for (var k = 0; k < missing.Count; k++) before.Of.Add(missing[k].Id, found[k]);
     }
 
     /// <returns>
@@ -90,13 +98,11 @@ internal sealed class LeftWithoutSupport(
     /// nothing was right below it, was not resting. An object that only lost what touched it from above or from the side still
     /// rests on what is below it.
     /// </returns>
-    private float? FindSupportLost(OtherObject candidate, float weightBefore, SupportWorld world, OtherObjectQueries queries)
+    private float? FindSupportLost(OtherObject candidate, SupportBefore supportBefore, SupportWorld world, OtherObjectQueries queries)
     {
-        if (!(weightBefore > 0f)) return null;
-        var lost = 1f - support.FindContacts(candidate, world, queries).TotalWeight / weightBefore;
-        return SupportRule.ReachesThreshold(lost, settings.SupportLostFraction) && drops.Rests(candidate, original, queries) && !drops.Rests(candidate, world, queries)
-            ? lost
-            : null;
+        if (!(supportBefore.Weight > 0f) || !supportBefore.Rested) return null;
+        var lost = 1f - support.FindContacts(candidate, world, queries).TotalWeight / supportBefore.Weight;
+        return SupportRule.ReachesThreshold(lost, settings.SupportLostFraction) && !drops.Rests(candidate, world, queries) ? lost : null;
     }
 
     /// <returns>Whether the object is taken away: removed, or waiting to be pulled down.</returns>

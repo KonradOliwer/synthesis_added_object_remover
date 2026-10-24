@@ -118,7 +118,7 @@ public class SetupDeterminismTests
     {
         var world = CreateWorld(scene, workers);
         var otherModObjects = world.ObjectsThatCanCauseRemovals(Replacements.None(scene.OtherModObjects.Count), NpcHandling.OnlyWhenStuckInsideTheObject);
-        var containingObjects = ContainingObjectFinder.Find(scene.Targets, Shapes, otherModObjects, order, Options(workers));
+        var containingObjects = ContainingObjectFinder.Find(scene.Targets, Shapes, otherModObjects, new HashSet<OtherId>(), order, Options(workers));
         return [.. Enumerable.Range(0, scene.Targets.Count).Select(index => containingObjects.Of(index)?.Id)];
     }
 

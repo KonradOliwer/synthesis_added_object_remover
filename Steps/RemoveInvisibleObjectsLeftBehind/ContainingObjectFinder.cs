@@ -13,11 +13,13 @@ internal static class ContainingObjectFinder
     /// when several contain it. Placed NPCs never host because their bases have no mesh, so whether they can cause removals
     /// does not change the result.
     /// </summary>
+    /// <param name="takenAway">The other-mod objects this run removes or pulls down: no target object sits inside them any more.</param>
     /// <remarks>Only invisible targets have a containing object.</remarks>
     public static ContainingObjects Find(
         IReadOnlyList<TargetObject> targets,
         IBaseObjectShapes shapes,
         IObjectsThatCanCauseRemovals otherModObjects,
+        IReadOnlySet<OtherId> takenAway,
         WorkOrder order,
         Execution execution)
     {
@@ -26,11 +28,14 @@ internal static class ContainingObjectFinder
             order,
             targets.Count,
             () => new ObjectQueryScratch(),
-            (i, scratch) => shapes.VisibilityOf(targets[i]).Kind != null ? FindContainingObject(targets[i], otherModObjects, scratch) : null,
+            (i, scratch) => shapes.VisibilityOf(targets[i]).Kind != null ? FindContainingObject(targets[i], otherModObjects, takenAway, scratch) : null,
             ParallelMap.AutomaticRangeSize)]);
     }
 
     /// <summary>The other-mod object that can cause removals which the target object sits inside; null when none covers it.</summary>
-    private static OtherObject? FindContainingObject(TargetObject target, IObjectsThatCanCauseRemovals otherModObjects, ObjectQueryScratch scratch) =>
-        otherModObjects.FirstCovering(target.SpaceKey, target.Transform.Position, scratch) is { } container ? otherModObjects.Get(container) : null;
+    private static OtherObject? FindContainingObject(
+        TargetObject target, IObjectsThatCanCauseRemovals otherModObjects, IReadOnlySet<OtherId> takenAway, ObjectQueryScratch scratch) =>
+        otherModObjects.FirstCovering(target.SpaceKey, target.Transform.Position, id => !takenAway.Contains(id), scratch) is { } container
+            ? otherModObjects.Get(container)
+            : null;
 }

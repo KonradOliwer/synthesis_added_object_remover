@@ -58,12 +58,49 @@ public class ObjectContainmentTests
     }
 
     [Fact]
+    public void AnObjectLeftOutIsSkippedForTheNextOneContainingThePoint()
+    {
+        var otherModObjects = CreateOtherModObjects(Place(0, Room, new Vector3(60, 0, 0)), Place(1, Room, new Vector3(-60, 0, 0)));
+
+        Assert.Equal(new OtherId(1), otherModObjects.FirstCovering(TestTargets.Space, new Vector3(0, 20, 30), id => id != new OtherId(0), new ObjectQueryScratch()));
+        Assert.Null(otherModObjects.FirstCovering(TestTargets.Space, new Vector3(0, 20, 30), _ => false, new ObjectQueryScratch()));
+    }
+
+    [Fact]
     public void VisibleObjectsOfAnyPluginContainThePointInsideAnyVisibleMesh()
     {
         var objectsOfAnyPlugin = TestScenes.CreateWithSupportOnlyObjects([], [Place(0, Room, Vector3.Zero)], Shapes).VisibleObjectsOfAnyPlugin();
 
         Assert.True(objectsOfAnyPlugin.Contains(TestTargets.Space, new Vector3(10, 20, 30), new ObjectQueryScratch()));
         Assert.False(objectsOfAnyPlugin.Contains(TestTargets.Space, new Vector3(500, 0, 0), new ObjectQueryScratch()));
+    }
+
+    /// <summary>Room 0 is moved 1000 units along X and room 1 taken out; the objects of any plugin as they were stay as they were.</summary>
+    [Fact]
+    public void VisibleObjectsOfAnyPluginAsTheyStandHoldAMovedObjectWhereItStandsNowAndNoTakenOutOne()
+    {
+        var moved = Place(0, Room, Vector3.Zero);
+        var scene = TestScenes.CreateWithSupportOnlyObjects([], [moved, Place(1, Room, new Vector3(0, 3000, 0))], Shapes);
+        var newPlace = new Vector3(1000, 0, 0);
+        var changed = new Dictionary<OtherId, OtherObject?> { [moved.Id] = moved with { Position = newPlace }, [new OtherId(1)] = null };
+
+        var asTheyStand = scene.VisibleObjectsOfAnyPluginAsTheyStand(changed);
+
+        var scratch = new ObjectQueryScratch();
+        Assert.True(asTheyStand.Contains(TestTargets.Space, newPlace + new Vector3(10, 20, 30), scratch));
+        Assert.False(asTheyStand.Contains(TestTargets.Space, new Vector3(10, 20, 30), scratch));
+        Assert.False(asTheyStand.Contains(TestTargets.Space, new Vector3(10, 3020, 30), scratch));
+        Assert.Equal([moved.Id], Overlapping(asTheyStand, new Box(newPlace, newPlace)));
+        Assert.Empty(Overlapping(asTheyStand, new Box(Vector3.Zero, Vector3.Zero)));
+        Assert.Equal(newPlace, asTheyStand.Get(moved.Id).Position);
+        Assert.Equal([moved.Id], Overlapping(scene.VisibleObjectsOfAnyPlugin(), new Box(Vector3.Zero, Vector3.Zero)));
+    }
+
+    private static List<OtherId> Overlapping(IVisibleObjectsOfAnyPlugin objectsOfAnyPlugin, Box area)
+    {
+        var found = new List<OtherId>();
+        objectsOfAnyPlugin.Overlapping(TestTargets.Space, area, new ObjectQueryScratch(), found);
+        return found;
     }
 
     /// <summary>Rooms are turned so the containment test runs in a rotated frame; the far room is not, so its mesh stays at <see cref="FarOffset"/>.</summary>
@@ -77,5 +114,5 @@ public class ObjectContainmentTests
         TestScenes.Create([], otherModObjects, Shapes).ObjectsThatCanCauseRemovals(replacements, NpcHandling.AlwaysLikeAnyObject);
 
     private static OtherId? FirstCovering(IObjectsThatCanCauseRemovals otherModObjects, Vector3 point) =>
-        otherModObjects.FirstCovering(TestTargets.Space, point, new ObjectQueryScratch());
+        otherModObjects.FirstCovering(TestTargets.Space, point, _ => true, new ObjectQueryScratch());
 }

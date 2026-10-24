@@ -189,7 +189,7 @@ public class SceneViewTests
                 var area = new Box(position, position).Grown(QueryRadius);
                 var candidates = active.Overlapping(target.SpaceKey, Upright(area), buffers.Scratch, buffers.Found);
                 var otherModObjectIds = string.Join(' ', buffers.Found.Select(id => id.Index));
-                var covering = active.FirstCovering(target.SpaceKey, position, buffers.Scratch)?.Index;
+                var covering = active.FirstCovering(target.SpaceKey, position, _ => true, buffers.Scratch)?.Index;
                 objectsOfAnyPlugin.Overlapping(target.SpaceKey, area, buffers.Scratch, buffers.Found);
                 var objectsOfAnyPluginIds = string.Join(' ', buffers.Found.Select(id => id.Index));
                 visibleTargets.Around(target.SpaceKey, position, QueryRadius, buffers.Neighbours);

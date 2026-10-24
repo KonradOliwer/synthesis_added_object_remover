@@ -26,7 +26,10 @@ public class CopiedCodeTests
 
     private const string PlacementRules = "The placement rule of two steps: each places the object and runs its own step's check, which returns its own result type; they share only the shape.";
 
-    private const string ParallelCalls = "One call of the order-independent parallel map over a list with per-worker buffers; each asks its own question, so there is no logic to share.";
+    private const string EntryForwarders =
+        "Public methods of a step's entry type that take the run's caches one by one and hand them to the internal code as one context; each forwards to its own method, so there is no logic to share.";
+
+    private const string ParallelCalls ="One call of the order-independent parallel map over a list with per-worker buffers; each asks its own question, so there is no logic to share.";
 
     private const string Shapes = "Caches/BaseObjectShapeAndKind/BaseObjectShapes.cs:BaseObjectShapes.";
     private const string TooClose = "Steps/RemoveTooCloseObjects/";
@@ -89,10 +92,12 @@ public class CopiedCodeTests
             Report + "Tables.Fits.cs:Tables.BuildFitsTable", Report + "Tables.Fits.cs:Tables.FitsHeader",
             Report + "Tables.OtherModsObjects.cs:Tables.BuildLeftWithoutSupportTable", Report + "Tables.OtherModsObjects.cs:Tables.LeftWithoutSupportHeader"])] =
             TableDeclarations + " " + CsvColumnNames,
-        [CopyFamily.KeyOf(["Steps/MoveKeptMarkers/KeptMarkerMover.cs:KeptMarkerMover.Move", Resting + "HeldUpTargetsFinder.cs:HeldUpTargetsFinder.FindTargetsUnderOtherModsObjects"])] =
+        [CopyFamily.KeyOf(["Steps/MoveKeptMarkers/KeptMarkerMover.cs:KeptMarkerMover.Move", Resting + "TargetsHoldingUpOtherModsObjects.cs:TargetsHoldingUpOtherModsObjects.Find"])] =
             ParallelCalls,
-        [CopyFamily.KeyOf([Resting + "HeldUpTargetsFinder.cs:HeldUpTargetsFinder.FindTargetsUnderOtherModsObjects", Resting + "SupportContactFinder.cs:SupportContactFinder.FindContactsOfAll"])] =
+        [CopyFamily.KeyOf([Resting + "SupportContactFinder.cs:SupportContactFinder.FindContactsOfAll", Resting + "TargetsHoldingUpOtherModsObjects.cs:TargetsHoldingUpOtherModsObjects.Find"])] =
             ParallelCalls,
+        [CopyFamily.KeyOf([Resting + "RestingObjects.cs:RestingObjects.CreateRestingRule", Resting + "RestingObjects.cs:RestingObjects.SettleOtherModsObjects"])] = EntryForwarders,
+        [CopyFamily.KeyOf([Resting + "RestingObjects.cs:RestingObjects.CreateRestingRule", Resting + "RestingObjects.cs:RestingObjects.FindHeldUpTargets"])] = EntryForwarders,
         [CopyFamily.KeyOf([
             "Steps/RemoveObjectsOnChangedTerrain/ChangedTerrainPlacementRule.cs:ChangedTerrainPlacementRule.Check",
             TooClose + "TooClosePlacementRule.cs:TooClosePlacementRule.Check"])] = PlacementRules,

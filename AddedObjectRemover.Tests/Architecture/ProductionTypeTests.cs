@@ -73,6 +73,8 @@ public class ProductionTypeTests
         ["OtherObject.Transform"] = "one-line value derived from its own fields",
         ["OtherObject.IsPlacedNpc"] = "one-line value derived from its own fields",
         ["OtherModsObjectOutcome.NewPosition"] = "one-line value derived from its own fields",
+        ["OtherModsObjectOutcome.IsTakenAway"] = "one-line value derived from its own fields",
+        ["OtherModsObjectsResult.TakenAway"] = "the objects as the step leaves them, read by the later steps and derived only from its own outcomes",
         ["TargetObject.Placement"] = "one-line value derived from its own fields",
         ["TargetObject.PlacedAt"] = "one-line copy of itself at a given placement, for the rules asked about a shrunk or turned object",
         ["RunSettings.DetailedLog"] = "one-line value derived from its own fields: the one setting that has the report files, so it is stored once",

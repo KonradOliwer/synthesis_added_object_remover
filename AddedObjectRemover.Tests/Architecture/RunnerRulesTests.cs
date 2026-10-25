@@ -11,9 +11,9 @@ namespace AddedObjectRemover.Tests.Architecture;
 /// checked on the source text (comments and literals removed): it reads no member of a settings record, it has no
 /// conditions of its own, and it holds no error boundary. A new settings read, condition or error boundary fails here.
 /// It also carries nothing from one run to the next, so chained Standard runs equal one Batch run: the only state that
-/// crosses runs is what the patch writing writes into the patch, and which unreadable records the log has named. The runner holds no field, its loop over the requests hands
+/// crosses runs is what the patch writing writes into the patch. The runner holds no field, its loop over the requests hands
 /// each run only its request and the environment, every member of the environment is listed with why no run changes it,
-/// nothing the environment shares holds what a run opens, and each run's link cache is built when that run opens its plugin
+/// nothing the environment shares holds what a run opens, no production type keeps static state a run can change, and each run's link cache is built when that run opens its plugin
 /// records, so it is dropped with them.
 /// </summary>
 public class RunnerRulesTests
@@ -46,7 +46,8 @@ public class RunnerRulesTests
     /// </summary>
     private static readonly Dictionary<string, string> SharedBetweenRuns = new()
     {
-        ["Plugins"] = "The plugin list facts, read once before the first run; no step changes them.",
+        ["Plugins"] =
+            "The plugin list facts, read once before the first run; no step changes them, and the patch's own header, which runs change, is not read into them.",
         ["PluginRecords"] = "Opens a new reader for each run, with a link cache of its own.",
         ["PatchWriting"] = "The one writer: what it writes into the patch is what later runs read, as they read any plugin.",
         ["MeshFiles"] = "Opens a new mesh reader for each run.",
@@ -54,8 +55,6 @@ public class RunnerRulesTests
         ["Log"] = "Only prints; no run reads it back.",
         ["ReportOutput"] = "Writes each run's report files into that run's folder; no run reads them back.",
         ["TimeSinceStart"] = "Reads the clock; the times go into log lines only.",
-        ["UnreadableRecordsReported"] =
-            "Only the log lines read it: a run names an unreadable record once per Synthesis run, so a later run leaves out the lines an earlier run printed. No decision, patch record or report file depends on it.",
     };
 
     /// <summary>What a run opens for itself and drops when it ends; nothing the environment shares may hold one.</summary>
@@ -276,6 +275,55 @@ public class RunnerRulesTests
         Assert.True(
             found.Count == 0,
             $"Shared by every run, but holds what one run opened, which then outlives that run:{Environment.NewLine}{string.Join(Environment.NewLine, found)}");
+    }
+
+    /// <summary>
+    /// A static field lives as long as the process, so a run could leave in it what a later run reads. Every static field of the
+    /// production code is read-only and does not hold a growable collection; a constant array, filled where it is declared, is not checked.
+    /// </summary>
+    [Fact]
+    public void NoProductionTypeHoldsStaticStateThatARunCanChange()
+    {
+        var found = FindStaticStateARunCanChange(ProductionSources.Assemblies().SelectMany(assembly => assembly.GetTypes()));
+
+        Assert.True(
+            found.Count == 0,
+            $"A static field that a run can change, which then outlives that run:{Environment.NewLine}{string.Join(Environment.NewLine, found)}");
+    }
+
+    [Fact]
+    public void TheStaticStateReaderSeesWritableFieldsAndGrowableCollectionsButNotConstantsOrReadOnlyViews()
+    {
+        Assert.Equal(
+            ["RunnerWithMemory.<RunsSoFar>k__BackingField", "Scope.<SeenRuns>k__BackingField"],
+            FindStaticStateARunCanChange([typeof(RunnerWithMemory), typeof(RunnerWithMemory.Scope), typeof(StaticConstants)]));
+    }
+
+    /// <summary>"Type.field" of each static field that is writable or holds a growable collection; compiler-generated types hold lambdas only.</summary>
+    private static IReadOnlyList<string> FindStaticStateARunCanChange(IEnumerable<Type> types) =>
+    [
+        .. types
+            .Where(type => !IsCompilerGenerated(type))
+            .SelectMany(type => type.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+                .Where(field => !field.IsLiteral && (!field.IsInitOnly || IsGrowableCollection(field.FieldType)))
+                .Select(field => $"{type.Name}.{field.Name}"))
+            .Order(StringComparer.Ordinal),
+    ];
+
+    private static bool IsCompilerGenerated(Type type) =>
+        type.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false) || (type.DeclaringType is { } outer && IsCompilerGenerated(outer));
+
+    private static bool IsGrowableCollection(Type type) =>
+        !type.IsInterface && type.Namespace is "System.Collections.Generic" or "System.Collections.Concurrent";
+
+    /// <summary>Static fields no run can change: a constant, a read-only view of a collection and an immutable array.</summary>
+    private static class StaticConstants
+    {
+        public const int Limit = 1;
+
+        public static readonly IReadOnlyList<int> View = [1];
+
+        public static readonly System.Collections.Immutable.ImmutableArray<int> Values = [1];
     }
 
     [Fact]

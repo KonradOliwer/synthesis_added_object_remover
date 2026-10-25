@@ -12,8 +12,7 @@ internal sealed class TestReport
 
     private readonly LogAndReports _report;
 
-    /// <param name="unreadableRecordsReported">The batch's memory of named records; none for a report of a batch of its own.</param>
-    public TestReport(IMeshFiles meshFiles, IUnexpectedErrors unexpectedErrors, UnreadableRecordsReported? unreadableRecordsReported = null)
+    public TestReport(IMeshFiles meshFiles, IUnexpectedErrors unexpectedErrors)
     {
         var settings = new StandardSettings { CleanedMod = ModKey.FromNameAndExtension(Target.ToString()) };
         var plugins = TestLoadOrderPlugins.Of(
@@ -21,15 +20,14 @@ internal sealed class TestReport
             Patch,
             [new PluginListing(Target, true, []), new PluginListing(Patch, true, [])]);
         var ready = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(StandardConfig.Of(settings), new PluginNameParsingPlugin(), plugins, detailedLogAndReports: true, onlyWarnWhenRequiringModLoadsAfterPatch: false, "/out/Patch.esp", 1));
-        _report = new LogAndReports(ready.Settings, new ReportFolderPrepared(StepOutcome.SwitchedOff, null), new MeshFilesOnlyCaches(meshFiles), unexpectedErrors, unreadableRecordsReported ?? new UnreadableRecordsReported());
+        _report = new LogAndReports(ready.Settings, new ReportFolderPrepared(StepOutcome.SwitchedOff, null), new MeshFilesOnlyCaches(meshFiles), unexpectedErrors);
     }
 
     /// <summary>A report whose mesh files hold only the given problem log.</summary>
     public static TestReport Over(AssetProblemLog problems) => new(new MeshFilesWithProblems(problems), new UnexpectedErrors());
 
-    /// <summary>A report of a batch run whose mesh files have no problem.</summary>
-    public static TestReport InBatch(UnreadableRecordsReported unreadableRecordsReported) =>
-        new(new MeshFilesWithProblems(new AssetProblemLog()), new UnexpectedErrors(), unreadableRecordsReported);
+    /// <summary>A report whose mesh files have no problem.</summary>
+    public static TestReport WithoutProblems() => Over(new AssetProblemLog());
 
     /// <summary>The lines of the archive-warnings section, which takes the archive problems met since the last take.</summary>
     public IReadOnlyList<string> TakeArchiveProblemLines() => [.. _report.BuildArchiveSections()[0].Lines];

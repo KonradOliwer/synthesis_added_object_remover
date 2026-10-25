@@ -137,6 +137,38 @@ public sealed class TwoRunsTests : IDisposable
             runs[1]);
     }
 
+    /// <summary>Nothing about the log passes from one run to the next: each run of a batch names the unreadable record it read.</summary>
+    [Fact]
+    public void EachRunOfABatchNamesTheUnreadableRecordItReadInItsOwnLog()
+    {
+        var (world, dataFolder) = CreateWorld();
+        var state = FixturePatcherState.Create(world.LoadOrder, dataFolder, Path.Combine(_root.FullName, FixturePatcherState.PatchModKey.FileName));
+        using var finalWorld = FixturePatcherState.CreateFinalWorld(state);
+        var settings = SettingsVariants.Of(SettingsVariants.Support);
+        var pluginRecords = new PluginRecordsFactory(finalWorld, Workers);
+        var request = SettingsValidator.Build(
+            StandardConfig.Of(settings.Standard),
+            pluginRecords.Open(),
+            finalWorld.Plugins,
+            settings.DetailedLogAndReports,
+            settings.OnlyWarnWhenModRequiringCleanedModLoadsAfterPatch,
+            Program.ReportsFolder(state),
+            Workers);
+        var environment = BuildEnvironment(
+            state, finalWorld, new UnreadableRecordPluginRecordsFactory(pluginRecords), new BaseFactsFactory(finalWorld.Plugins.Mods));
+
+        var log = PipelineRun.CaptureConsole(() => StepRunner.PatchLoadOrder([request, request], environment));
+
+        var summaries = log.Select((line, index) => (line, index)).Where(entry => RunSummaryLine().IsMatch(entry.line)).Select(entry => entry.index).ToList();
+        var warnings = log.Select((line, index) => (line, index))
+            .Where(entry => entry.line.StartsWith("Warning: could not read Perk BrokenPerk", StringComparison.Ordinal))
+            .Select(entry => entry.index)
+            .ToList();
+        Assert.Equal(2, summaries.Count);
+        Assert.Equal(2, warnings.Count);
+        Assert.True(warnings[0] < summaries[0] && summaries[0] < warnings[1] && warnings[1] < summaries[1]);
+    }
+
     /// <returns>The summary of each run of the log, in run order; both runs of a two-run log have one.</returns>
     private static List<RunSummary> RunSummariesOf(IEnumerable<string> log)
     {
@@ -166,8 +198,7 @@ public sealed class TwoRunsTests : IDisposable
             bases,
             new ConsoleLogSink(),
             new CsvReportOutput(),
-            () => TimeSpan.Zero,
-            new UnreadableRecordsReported());
+            () => TimeSpan.Zero);
 
     private sealed class RecordingPluginRecordsFactory(IPluginRecordsFactory inner) : IPluginRecordsFactory
     {
@@ -179,6 +210,11 @@ public sealed class TwoRunsTests : IDisposable
             Opened.Add(opened);
             return opened;
         }
+    }
+
+    private sealed class UnreadableRecordPluginRecordsFactory(IPluginRecordsFactory inner) : IPluginRecordsFactory
+    {
+        public IPluginRecords Open() => new UnreadableRecordPlugin(inner.Open());
     }
 
     private sealed class RecordingBaseFactsFactory(IBaseFactsFactory inner) : IBaseFactsFactory

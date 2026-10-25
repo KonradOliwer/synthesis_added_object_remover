@@ -305,7 +305,7 @@ public sealed class StartSetupTooCloseSectionsTests
     {
         var world = CreateWorld();
 
-        var lines = LogSections.BuildScanSection(world, [], Target.ToPluginName(), Elapsed, Detailed).Lines.ToArray();
+        var lines = LogSections.BuildScanSection(world, Target.ToPluginName(), Elapsed, Detailed).Lines.ToArray();
 
         AssertExpectedOutput(lines, "Scan_GivesTheTextWithTheDetailedLog");
         Assert.Contains("Scanned 9 placed records in 1.5s: 3 Target.esp objects to check, 2 objects from other mods.", lines);
@@ -314,7 +314,7 @@ public sealed class StartSetupTooCloseSectionsTests
     [Fact]
     public void Scan_ForTheNormalLogDropsTheTimingAndTheInternalCounts()
     {
-        var lines = LogSections.BuildScanSection(CreateWorld(), [], Target.ToPluginName(), Elapsed, Normal).Lines.ToArray();
+        var lines = LogSections.BuildScanSection(CreateWorld(), Target.ToPluginName(), Elapsed, Normal).Lines.ToArray();
 
         Assert.Equal(
             [

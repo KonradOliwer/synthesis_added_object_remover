@@ -8,7 +8,7 @@ using Mutagen.Bethesda.Skyrim;
 
 namespace AddedObjectRemover.Tests.LoadOrder;
 
-/// <summary>A record the game library cannot parse is reported once per run of the patcher and the rest is still read; no object is kept because of it.</summary>
+/// <summary>A record the game library cannot parse is reported once per run and the rest is still read; no object is kept because of it.</summary>
 public class UnreadableRecordTests : IDisposable
 {
     private static readonly byte[] ParameterTypeTag = "EPFT"u8.ToArray();
@@ -82,30 +82,26 @@ public class UnreadableRecordTests : IDisposable
     {
         var world = TestScenes.CreateWorld([], []) with { UnreadableRecords = [Unreadable()] };
 
-        var lines = TestReport.InBatch(new UnreadableRecordsReported()).CollectedSectionLines(world);
+        var lines = TestReport.WithoutProblems().CollectedSectionLines(world);
 
         Assert.Equal(
             "Warning: could not read Perk BrokenPerk [000010:Other.esp]: it is malformed. Its links were not all checked.",
             Assert.Single(lines, line => line.StartsWith("Warning")));
         Assert.DoesNotContain(
-            TestReport.InBatch(new UnreadableRecordsReported()).CollectedSectionLines(TestScenes.CreateWorld([], [])),
+            TestReport.WithoutProblems().CollectedSectionLines(TestScenes.CreateWorld([], [])),
             line => line.StartsWith("Warning"));
     }
 
     [Fact]
-    public void TheLogNamesARecordOnceWhicheverRunsOfTheBatchReadIt()
+    public void EachRunOfABatchNamesTheRecordInItsOwnLog()
     {
         var world = TestScenes.CreateWorld([], []) with { UnreadableRecords = [Unreadable()] };
-        var reported = new UnreadableRecordsReported();
 
-        var first = TestReport.InBatch(reported).CollectedSectionLines(world);
-        var second = TestReport.InBatch(reported).CollectedSectionLines(world);
-        var other = Unreadable() with { Key = new RecordKey(OtherPlugin, 0x11) };
-        var third = TestReport.InBatch(reported).CollectedSectionLines(world with { UnreadableRecords = [Unreadable(), other] });
+        var first = TestReport.WithoutProblems().CollectedSectionLines(world);
+        var second = TestReport.WithoutProblems().CollectedSectionLines(world);
 
         Assert.Single(first, line => line.StartsWith("Warning"));
-        Assert.DoesNotContain(second, line => line.StartsWith("Warning"));
-        Assert.Contains("000011", Assert.Single(third, line => line.StartsWith("Warning")));
+        Assert.Equal(first, second);
     }
 
     private static UnreadableRecord Unreadable() => new(new RecordKey(OtherPlugin, 0x10), "BrokenPerk", "Perk", "it is malformed");

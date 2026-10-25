@@ -14,9 +14,7 @@ public static class LoadOrderPluginsReader
     public static LoadOrderPlugins Read(
         ILoadOrderGetter<IModListingGetter<ISkyrimModGetter>> loadOrder, ModKey patch, PluginListRead.Found pluginList, IEnumerable<PluginName> missingPlugins)
     {
-        var listings = loadOrder.ListedOrder
-            .Select(listing => (Plugin: listing.ModKey.ToPluginName(), Masters: ReadMasters(listing.Mod), CarriesPatchMarker: ReadPatchMarker(listing.Mod)))
-            .ToList();
+        var listings = loadOrder.ListedOrder.Select(listing => ReadListing(listing, patch)).ToList();
         var entries = pluginList.Listings.Select(listing => new PluginListEntry(listing.ModKey.ToPluginName(), listing.Enabled)).ToList();
         return Create(listings, patch.ToPluginName(), pluginList.FilePath, entries, missingPlugins);
     }
@@ -51,6 +49,15 @@ public static class LoadOrderPluginsReader
             [.. pluginList.Where(entry => !entry.Enabled).Select(entry => entry.Plugin)],
             [.. missingPlugins]);
     }
+
+    /// <remarks>
+    /// The patch's own header is not read: the runs of a batch change it, and these facts are read once for every run, so a
+    /// later run must not see it as it was before the earlier runs. The patch is listed as read, without masters or marker.
+    /// </remarks>
+    private static (PluginName Plugin, List<PluginName>? Masters, bool CarriesPatchMarker) ReadListing(IModListingGetter<ISkyrimModGetter> listing, ModKey patch) =>
+        listing.ModKey == patch
+            ? (listing.ModKey.ToPluginName(), [], false)
+            : (listing.ModKey.ToPluginName(), ReadMasters(listing.Mod), ReadPatchMarker(listing.Mod));
 
     /// <returns>Null when the plugin could not be read.</returns>
     private static List<PluginName>? ReadMasters(ISkyrimModGetter? mod) =>

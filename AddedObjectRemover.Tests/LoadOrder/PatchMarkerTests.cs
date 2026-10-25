@@ -1,4 +1,5 @@
 using Mutagen.Bethesda.Plugins;
+using Mutagen.Bethesda.Plugins.Records;
 using Mutagen.Bethesda.Skyrim;
 using Mutagen.Bethesda.Synthesis;
 using AddedObjectRemover.Tests.EndToEnd;
@@ -6,8 +7,8 @@ using AddedObjectRemover.Tests.EndToEnd;
 namespace AddedObjectRemover.Tests.LoadOrder;
 
 /// <summary>
-/// The patch marker: the patch writes it once into its header description, and the plugin reader flags every plugin whose header
-/// description holds it.
+/// The patch marker: the patch writes it once into its header description, and the plugin reader flags every other plugin whose
+/// header description holds it.
 /// </summary>
 [Collection(ConsoleOutputCollection.Name)]
 public class PatchMarkerTests
@@ -95,15 +96,31 @@ public class PatchMarkerTests
         Assert.Equal([true, true, false, false], flags);
     }
 
+    /// <summary>Another group's patch, loading above this group's patch, carries the marker its own run wrote.</summary>
     [Fact]
     public void TheMarkerThePatchWritesIsTheOneThePluginReaderFlags()
     {
-        var state = CreateState(description: null);
-        WritingInto(state).WritePatchMarker();
+        var otherGroupPatch = Plugin("OtherGroupPatch.esp", description: null);
+        new PatchWriting(new SynthesisWriteCache(CreateState(description: null).LinkCache), otherGroupPatch).WritePatchMarker();
+        var state = FixturePatcherState.Create([otherGroupPatch], Path.GetTempPath(), Path.GetTempPath());
 
         using var world = FixturePatcherState.CreateFinalWorld(state);
 
-        Assert.True(world.Plugins.Find(FixturePatcherState.PatchModKey.ToPluginName())!.CarriesPatchMarker);
+        Assert.True(world.Plugins.Find(otherGroupPatch.ModKey.ToPluginName())!.CarriesPatchMarker);
+    }
+
+    /// <summary>The runs of a batch change the patch's header, and the plugin facts are read once for every run.</summary>
+    [Fact]
+    public void ThePluginReaderDoesNotReadThePatchsOwnHeader()
+    {
+        var state = CreateState(description: MarkerText);
+        state.PatchMod.ModHeader.MasterReferences.Add(new MasterReference { Master = ModKey.FromNameAndExtension("Skyrim.esm") });
+
+        using var world = FixturePatcherState.CreateFinalWorld(state);
+
+        var patch = world.Plugins.Find(FixturePatcherState.PatchModKey.ToPluginName())!;
+        Assert.False(patch.CarriesPatchMarker);
+        Assert.Empty(patch.Masters);
     }
 
     /// <summary>A run that stops before any processing leaves the patch as Synthesis handed it over.</summary>

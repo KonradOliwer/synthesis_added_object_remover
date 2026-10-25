@@ -51,10 +51,8 @@ public class LinkReaderTests
         list.Items.Add(new FormLink<ISkyrimMajorRecordGetter>(TestTargets.FormKeyOf(2)));
         list.Items.Add(new FormLink<ISkyrimMajorRecordGetter>(TestTargets.FormKeyOf(4)));
         mod.FormLists.Add(list);
-        var facts = new List<LinkFact>();
 
-        LinkReader.ReadFromNonPlaced(
-            [mod], new HashSet<RecordKey> { TestTargets.Key(2), TestTargets.Key(3) }, TestTargets.TargetName, CreateNames(), facts);
+        var facts = ReadNonPlacedLinks(mod,new HashSet<RecordKey> { TestTargets.Key(2), TestTargets.Key(3) });
 
         var fact = Assert.Single(facts);
         Assert.Equal(TestTargets.Key(2), fact.Target);
@@ -72,9 +70,8 @@ public class LinkReaderTests
             LocationRefTypeReferencesStatic = [new LocationRefTypeReference { Ref = new FormLink<IPlacedGetter>(TestTargets.FormKeyOf(1)) }],
         };
         mod.Locations.Add(location);
-        var facts = new List<LinkFact>();
 
-        LinkReader.ReadFromNonPlaced([mod], new HashSet<RecordKey> { TestTargets.Key(1) }, TestTargets.TargetName, CreateNames(), facts);
+        var facts = ReadNonPlacedLinks(mod,new HashSet<RecordKey> { TestTargets.Key(1) });
 
         Assert.Equal(RelationKind.LocationRefType, Assert.Single(facts).Relation);
     }
@@ -87,10 +84,8 @@ public class LinkReaderTests
         location.WorldLocationMarkerRef.SetTo(TestTargets.FormKeyOf(1));
         location.HorseMarkerRef.SetTo(TestTargets.FormKeyOf(2));
         mod.Locations.Add(location);
-        var facts = new List<LinkFact>();
 
-        LinkReader.ReadFromNonPlaced(
-            [mod], new HashSet<RecordKey> { TestTargets.Key(1), TestTargets.Key(2) }, TestTargets.TargetName, CreateNames(), facts);
+        var facts = ReadNonPlacedLinks(mod,new HashSet<RecordKey> { TestTargets.Key(1), TestTargets.Key(2) });
 
         Assert.Equal([TestTargets.Key(1), TestTargets.Key(2)], facts.Select(fact => fact.Target).ToArray());
         Assert.All(facts, fact => Assert.Equal(RelationKind.Other, fact.Relation));
@@ -115,9 +110,8 @@ public class LinkReaderTests
             EnableParentReferencesStatic = [new EnableParentReference { Actor = new FormLink<IPlacedGetter>(listed), Ref = new FormLink<IPlacedGetter>(listed) }],
         };
         mod.Locations.Add(location);
-        var facts = new List<LinkFact>();
 
-        LinkReader.ReadFromNonPlaced([mod], new HashSet<RecordKey> { TestTargets.Key(1) }, TestTargets.TargetName, CreateNames(), facts);
+        var facts = ReadNonPlacedLinks(mod,new HashSet<RecordKey> { TestTargets.Key(1) });
 
         Assert.Empty(facts);
     }
@@ -131,9 +125,8 @@ public class LinkReaderTests
             LocationRefTypeReferencesAdded = [new LocationRefTypeReference { Ref = new FormLink<IPlacedGetter>(TestTargets.FormKeyOf(1)) }],
         };
         mod.Locations.Add(location);
-        var facts = new List<LinkFact>();
 
-        LinkReader.ReadFromNonPlaced([mod], new HashSet<RecordKey> { TestTargets.Key(1) }, TestTargets.TargetName, CreateNames(), facts);
+        var facts = ReadNonPlacedLinks(mod,new HashSet<RecordKey> { TestTargets.Key(1) });
 
         Assert.Equal(RelationKind.LocationRefType, Assert.Single(facts).Relation);
     }
@@ -147,9 +140,8 @@ public class LinkReaderTests
         quest.Aliases.Add(new QuestAlias { UniqueActor = new FormLinkNullable<INpcGetter>(npcBase) });
         quest.Aliases.Add(new QuestAlias { UniqueActor = new FormLinkNullable<INpcGetter>(new FormKey(OtherMod, 0x907)) });
         mod.Quests.Add(quest);
-        var facts = new List<LinkFact>();
 
-        LinkReader.ReadFromNonPlaced([mod], new HashSet<RecordKey>(), TestTargets.TargetName, CreateNames(), facts);
+        var facts = ReadNonPlacedLinks(mod,new HashSet<RecordKey>());
 
         var fact = Assert.Single(facts);
         Assert.Equal(RelationKind.UniqueActor, fact.Relation);
@@ -168,9 +160,8 @@ public class LinkReaderTests
         var quest = new Quest(new FormKey(OtherMod, 0x906), SkyrimRelease.SkyrimSE);
         quest.Aliases.Add(new QuestAlias { UniqueActor = new FormLinkNullable<INpcGetter>(new FormKey(TestTargets.TargetMod, 0x700)), Flags = aliasFlags });
         mod.Quests.Add(quest);
-        var facts = new List<LinkFact>();
 
-        LinkReader.ReadFromNonPlaced([mod], new HashSet<RecordKey>(), TestTargets.TargetName, CreateNames(), facts);
+        var facts = ReadNonPlacedLinks(mod,new HashSet<RecordKey>());
 
         Assert.Equal(expected, Assert.Single(facts).AliasFlags);
     }
@@ -182,17 +173,13 @@ public class LinkReaderTests
         var worldspace = new Worldspace(new FormKey(OtherMod, 0x904), SkyrimRelease.SkyrimSE);
         worldspace.Climate.SetTo(TestTargets.FormKeyOf(1));
         mod.Worldspaces.Add(worldspace);
-        var facts = new List<LinkFact>();
 
-        LinkReader.ReadFromNonPlaced(
-            [mod], new HashSet<RecordKey> { TestTargets.Key(1) }, TestTargets.TargetName, CreateNames(), facts);
+        var facts = ReadNonPlacedLinks(mod,new HashSet<RecordKey> { TestTargets.Key(1) });
 
         Assert.True(Assert.Single(facts).SourceIsWorldspace);
         var outcome = LinkRule.DecideLinkOutcome(TestTargets.CreateMany(4), facts);
         Assert.All(outcome.References, Assert.Null);
     }
-
-    private static PluginNames CreateNames() => new(new KnownPluginNames([TestTargets.TargetName, OtherMod.ToPluginName()]));
 
     [Fact]
     public void EveryRecordAPlacedRecordLinksToButItsBaseAndItselfIsCollectedInTheSameWalk()
@@ -210,6 +197,11 @@ public class LinkReaderTests
         Assert.Empty(facts);
         Assert.Equal(new HashSet<RecordKey> { parent.ToRecordKey(), linkedReference.ToRecordKey() }, linked);
     }
+
+    private static PluginNames CreateNames() => new(new KnownPluginNames([TestTargets.TargetName, OtherMod.ToPluginName()]));
+
+    private static List<LinkFact> ReadNonPlacedLinks(ISkyrimModGetter mod, IReadOnlySet<RecordKey> records) =>
+        [.. LinkReader.ReadFromNonPlaced([mod], records, TestTargets.TargetName, CreateNames(), new Execution(1)).Links];
 
     private static List<LinkFact> ReadFromPlaced(IPlacedGetter record, ISet<RecordKey>? linkedRecords = null)
     {

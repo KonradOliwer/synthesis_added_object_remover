@@ -28,12 +28,14 @@ public static class MeshTouchTest
         var frames = PairFrames.Create(first, firstTransform, second, secondTransform, tolerance);
         if (!frames.OverlapRegion.Overlaps(frames.Walked.Bounds)) return false;
 
-        frames.Walked.CollectLeafTriangles(frames.OverlapRegion, scratch.WalkedTriangles);
-        foreach (var triangle in scratch.WalkedTriangles)
-        {
-            if (IsNearAnyTriangle(frames.Lookup, frames.PlaceInLookup(triangle), frames.LookupTolerance, scratch)) return true;
-        }
-        return false;
+        var nearLookup = new NearLookupTriangle(frames, scratch);
+        return frames.Walked.AnyLeafTriangle(frames.OverlapRegion, ref nearLookup);
+    }
+
+    /// <summary>Accepts a walked triangle that comes within the tolerance of a lookup triangle.</summary>
+    private readonly struct NearLookupTriangle(PairFrames frames, TouchScratch scratch) : ILeafTriangleVisitor
+    {
+        public bool Accepts(int triangle) => IsNearAnyTriangle(frames.Lookup, frames.PlaceInLookup(triangle), frames.LookupTolerance, scratch);
     }
 
     /// <summary>

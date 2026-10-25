@@ -91,9 +91,23 @@ internal static class OtherModsObjects
     /// <summary>The fit step's rule: the objects target objects or judged objects of other mods rest on, whatever the setting.</summary>
     /// <param name="targets">Where they stand before any decision.</param>
     /// <param name="visibleTargets">The index of <paramref name="targets"/>.</param>
+    /// <param name="heldUp">What <see cref="FindHeldUpTargets"/> found for the same targets.</param>
+    /// <remarks>
+    /// When the held-up targets were found, the judged objects' holders are not searched again: that search ran the same test
+    /// before any decision near every target, so every holder the fit's own search would find is a held-up target, and each
+    /// of those is kept, so the fit never checks one.
+    /// </remarks>
     public static IRestingRule CreateRestingRule(
-        ImmutableArray<TargetObject> targets, IVisibleTargetObjects visibleTargets, RestingRule targetObjects, OtherModsObjectsContext context) =>
-        new AnyObjectRestingRule(targets, targetObjects, () => CreateHolding(targets, visibleTargets, context));
+        ImmutableArray<TargetObject> targets, IVisibleTargetObjects visibleTargets, RestingRule targetObjects, HeldUpTargets heldUp, OtherModsObjectsContext context) =>
+        new AnyObjectRestingRule(
+            targetObjects,
+            heldUp.Outcome == StepOutcome.Performed
+                ? _ => []
+                : checkedObjects => FindHeldUpAmong(targets, visibleTargets, context, checkedObjects));
+
+    private static IEnumerable<TargetId> FindHeldUpAmong(
+        ImmutableArray<TargetObject> targets, IVisibleTargetObjects visibleTargets, OtherModsObjectsContext context, IReadOnlySet<TargetId> checkedObjects) =>
+        CreateHolding(targets, visibleTargets, context).Find(checkedObjects.Select(target => targets[target.Index])).Keys.Where(checkedObjects.Contains);
 
     private static HeldUpTargetsFinder CreateHeldUpTargetsFinder(ImmutableArray<TargetObject> targets, IVisibleTargetObjects visibleTargets, OtherModsObjectsContext context) =>
         new(targets, CreateHolding(targets, visibleTargets, context), context.Execution);

@@ -57,9 +57,14 @@ public sealed class EvictingLeasedStore<TKey, T>(
         return new Lease<T>(value, this, slot);
     }
 
+    /// <remarks>A value held through many uses counts as used when it is released, not when it was first leased.</remarks>
     void ILeaseOwner<T>.EndUse(StoreSlot<T> slot)
     {
-        lock (_lock) slot.Users--;
+        lock (_lock)
+        {
+            slot.Users--;
+            slot.LastUse = ++_clock;
+        }
     }
 
     private (StoreSlot<T> Slot, Lazy<T?> Pending) BeginUse(TKey key)

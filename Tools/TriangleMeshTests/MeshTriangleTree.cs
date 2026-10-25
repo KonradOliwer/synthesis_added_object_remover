@@ -90,6 +90,23 @@ public sealed class MeshTriangleTree
     public void CollectLeafTrianglesAlongRay(Vector3 origin, Vector3 direction, List<int> output) =>
         CollectLeafTriangles(new RayFilter(origin, direction), output);
 
+    /// <summary>
+    /// Hands <paramref name="visitor"/> the triangles of the leaves overlapping <paramref name="query"/> in the order
+    /// <see cref="CollectLeafTriangles(Box, List{int})"/> lists them, until it accepts one.
+    /// </summary>
+    /// <returns>Whether the visitor accepted a triangle.</returns>
+    public bool AnyLeafTriangle<TVisitor>(Box query, ref TVisitor visitor) where TVisitor : struct, ILeafTriangleVisitor =>
+        AnyLeafTriangle(new OverlapFilter(query), ref visitor);
+
+    private struct Collector(List<int> output) : ILeafTriangleVisitor
+    {
+        public bool Accepts(int triangle)
+        {
+            output.Add(triangle);
+            return false;
+        }
+    }
+
     private interface INodeFilter
     {
         bool Accepts(Box bounds);
@@ -128,6 +145,14 @@ public sealed class MeshTriangleTree
     private void CollectLeafTriangles<TFilter>(TFilter filter, List<int> output) where TFilter : struct, INodeFilter
     {
         output.Clear();
+        var collector = new Collector(output);
+        AnyLeafTriangle(filter, ref collector);
+    }
+
+    private bool AnyLeafTriangle<TFilter, TVisitor>(TFilter filter, ref TVisitor visitor)
+        where TFilter : struct, INodeFilter
+        where TVisitor : struct, ILeafTriangleVisitor
+    {
         var stackSize = _depth + 1;
         Span<int> stack = stackSize <= StackallocDepth ? stackalloc int[StackallocDepth] : new int[stackSize];
         var top = 0;
@@ -138,12 +163,16 @@ public sealed class MeshTriangleTree
             if (!filter.Accepts(node.Bounds)) continue;
             if (node.IsLeaf)
             {
-                for (var i = node.First; i < node.First + node.Count; i++) output.Add(_order[i]);
+                for (var i = node.First; i < node.First + node.Count; i++)
+                {
+                    if (visitor.Accepts(_order[i])) return true;
+                }
                 continue;
             }
             stack[top++] = node.First + 1;
             stack[top++] = node.First;
         }
+        return false;
     }
 
     private static MeshTriangle GetTriangle(MeshTriangles geometry, int triangle)

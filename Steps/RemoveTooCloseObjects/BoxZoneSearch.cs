@@ -18,5 +18,16 @@ internal sealed class BoxZoneSearch(
     public TooCloseSearchResult FindTooCloseTargets(WorkOrder order, Execution execution) =>
         TooCloseSearch.FindTooCloseTargets(targets, otherModObjects, shapes, zones, npcRule, order, execution);
 
-    public TargetCheck CheckAlone(TargetObject target) => TooCloseSearch.CheckAlone(target, otherModObjects, shapes, zones, npcRule);
+    public ITargetTries StartTries() => new EachCheckedAlone(CheckAlone);
+
+    private TargetCheck CheckAlone(TargetObject placed) => TooCloseSearch.CheckAlone(placed, otherModObjects, shapes, zones, npcRule);
+
+    private sealed class EachCheckedAlone(Func<TargetObject, TargetCheck> checkAlone) : ITargetTries
+    {
+        public TargetCheck Check(TargetObject placed) => checkAlone(placed);
+
+        public void Dispose()
+        {
+        }
+    }
 }

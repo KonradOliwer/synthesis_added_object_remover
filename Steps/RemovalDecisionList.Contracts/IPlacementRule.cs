@@ -1,10 +1,20 @@
 namespace AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
-/// <summary>A removal step's rule asked about one target object standing at a given placement, its own or a shrunk or turned one.</summary>
+/// <summary>A removal step's rule asked about one target object standing at given placements, its own or shrunk or turned ones.</summary>
 public interface IPlacementRule
 {
-    /// <summary>Exactly the step's own check of the object, with the object standing at <paramref name="placement"/>. Thread-safe.</summary>
-    PlacementCheck Check(TargetId target, EulerPlacement placement);
+    /// <summary>The checks of one target object, run one after another on one thread; dispose of them after the last. Thread-safe.</summary>
+    IPlacementTries StartTries(TargetId target);
+}
+
+/// <summary>
+/// The checks of one target object. The first check is exactly the step's own check of the object standing at that placement. A
+/// later check clashes or fails as the step's own check would, unless a part of that check stops unexpectedly, and its clash may
+/// be another one the step finds there.
+/// </summary>
+public interface IPlacementTries : IDisposable
+{
+    PlacementCheck Check(EulerPlacement placement);
 }
 
 /// <param name="Clash">Why the rule would remove the object there; null when it would not.</param>

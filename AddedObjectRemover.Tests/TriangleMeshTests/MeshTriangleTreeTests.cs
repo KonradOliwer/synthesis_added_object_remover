@@ -43,6 +43,33 @@ public class MeshTriangleTreeTests
         }
     }
 
+    /// <summary>The walk stops at the first, a middle or the last listed triangle, or at none.</summary>
+    [Fact]
+    public void TheWalkVisitsTheListedTrianglesInOrderAndStopsAtTheFirstItAccepts()
+    {
+        var random = new Random(11);
+        for (var mesh = 0; mesh < 20; mesh++)
+        {
+            var triangles = Enumerable.Range(0, random.Next(1, 800)).Select(_ => TestMeshes.RandomTriangle(random, 100, 10)).ToList();
+            var tree = TestMeshes.Tree(triangles);
+            var listed = new List<int>();
+            for (var query = 0; query < 20; query++)
+            {
+                var area = Box.FromCorners(TestMeshes.RandomVector(random, 120), TestMeshes.RandomVector(random, 120));
+                tree.CollectLeafTriangles(area, listed);
+                foreach (var stopAt in new[] { 0, listed.Count / 2, listed.Count - 1, -1 }.Where(stop => stop < listed.Count))
+                {
+                    var visitor = new StoppingVisitor(stopAt < 0 ? null : listed[stopAt], []);
+
+                    var accepted = tree.AnyLeafTriangle(area, ref visitor);
+
+                    Assert.Equal(stopAt >= 0, accepted);
+                    Assert.Equal(stopAt < 0 ? listed : listed.Take(stopAt + 1), visitor.Visited);
+                }
+            }
+        }
+    }
+
     [Fact]
     public void RayQueryReturnsEveryTriangleTheRayHits()
     {
@@ -123,5 +150,17 @@ public class MeshTriangleTreeTests
     {
         // TestMeshes.Tree gives every triangle its own three vertices, as texture seams do.
         Assert.True(TestMeshes.Tree(TestMeshes.BoxTriangles(TestMeshes.UnitCube)).IsClosed);
+    }
+
+    /// <summary>Records every triangle it is handed and accepts only <paramref name="stopAt"/>.</summary>
+    private readonly struct StoppingVisitor(int? stopAt, List<int> visited) : ILeafTriangleVisitor
+    {
+        public List<int> Visited => visited;
+
+        public bool Accepts(int triangle)
+        {
+            visited.Add(triangle);
+            return triangle == stopAt;
+        }
     }
 }

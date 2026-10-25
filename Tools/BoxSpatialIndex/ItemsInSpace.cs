@@ -32,6 +32,9 @@ public sealed class ItemsInSpace<T>
         return scratch.Candidates;
     }
 
+    /// <summary>Whether the item's box overlaps <paramref name="area"/>, as the queries test it.</summary>
+    public bool Overlaps(int slot, Box area) => _boxIndex.Value.Overlaps(slot, area);
+
     /// <summary>Replaces <paramref name="into"/> with the ascending slots of the items whose box overlaps <paramref name="area"/> and that pass <paramref name="exact"/>.</summary>
     /// <param name="into">Not <see cref="SpatialQueryScratch.Candidates"/>, which this query fills.</param>
     /// <returns>How many items' boxes overlap the area, before the exact test.</returns>

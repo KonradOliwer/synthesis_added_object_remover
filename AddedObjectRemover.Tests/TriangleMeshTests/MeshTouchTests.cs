@@ -23,10 +23,24 @@ public class MeshTouchTests
         Assert.Equal(expected, MeshContact.SurfacesTouch(Small, SmallAt, Large, LargeAt, tolerance, new TouchScratch()));
     }
 
+    /// <summary>Every triangle of either mesh touches every triangle of the other, so the first pair tested touches.</summary>
+    [Fact]
+    public void TouchStopsAtTheFirstTouchingPair()
+    {
+        var stacked = TestMeshes.Tree([.. Enumerable.Range(0, 10).Select(i => FlatTriangle(z: i * 0.01f))]);
+        var pair = TestMeshes.Tree([FlatTriangle(z: 0f), FlatTriangle(z: 0.05f)]);
+        var scratch = new TouchScratch();
+
+        Assert.True(MeshContact.SurfacesTouch(stacked, LargeAt, pair, LargeAt, 0.5f, scratch));
+        Assert.Equal(1, scratch.TrianglePairsTested);
+    }
+
     [Fact]
     public void MinSurfaceDistanceIsTheGapEitherWay()
     {
         Assert.Equal(0.5f, MeshContact.MinSurfaceDistance(Large, LargeAt, Small, SmallAt, 0.6f, new TouchScratch()), 1e-4f);
         Assert.Equal(0.5f, MeshContact.MinSurfaceDistance(Small, SmallAt, Large, LargeAt, 0.6f, new TouchScratch()), 1e-4f);
     }
+
+    private static MeshTriangle FlatTriangle(float z) => new(new Vector3(0, 0, z), new Vector3(1, 0, z), new Vector3(0, 1, z));
 }

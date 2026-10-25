@@ -87,8 +87,14 @@ public static class ClashingObjectFitter
     /// </returns>
     private static RemovalReason? ClashWhereItStands(TargetObject target, FitRules rules)
     {
-        if (Stops(rules.Unfittable.Check(target.Id, target.Placement))) return null;
-        return rules.Fittable.Check(target.Id, target.Placement) is { Failure: null, Clash: { } clash } ? clash : null;
+        if (Stops(CheckOnce(rules.Unfittable, target))) return null;
+        return CheckOnce(rules.Fittable, target) is { Failure: null, Clash: { } clash } ? clash : null;
+    }
+
+    private static PlacementCheck CheckOnce(IPlacementRule rule, TargetObject target)
+    {
+        using var tries = rule.StartTries(target.Id);
+        return tries.Check(target.Placement);
     }
 
     /// <returns>An empty set and the failure when the search stopped unexpectedly: no object is tried then.</returns>
@@ -97,12 +103,14 @@ public static class ClashingObjectFitter
             () => ((IReadOnlySet<int>)resting.FindObjectsOthersRestOn([.. clashing.Select(index => new TargetId(index))]).Select(target => target.Index).ToHashSet(), (PartFailure?)null),
             failure => (new HashSet<int>(), PartFailure.OfWholePart(FitParts.RestingCheck, failure)));
 
-    private static ObjectFit FitShrunkOrTurned(TargetObject target, RemovalReason clash, ImmutableArray<EulerPlacement> tries, FitRules rules)
+    private static ObjectFit FitShrunkOrTurned(TargetObject target, RemovalReason clash, ImmutableArray<EulerPlacement> placements, FitRules rules)
     {
+        using var fittable = rules.Fittable.StartTries(target.Id);
+        using var unfittable = rules.Unfittable.StartTries(target.Id);
         string? firstFailure = null;
-        foreach (var placement in tries)
+        foreach (var placement in placements)
         {
-            var check = FirstClash(target.Id, placement, rules);
+            var check = FirstClash(placement, fittable, unfittable);
             if (check.Failure is not null) firstFailure ??= check.Failure;
             else if (check.Clash is null) return new ObjectFit(new ProposedFit(target.Id, clash, placement), firstFailure);
         }
@@ -114,10 +122,10 @@ public static class ClashingObjectFitter
     /// A try fits only when both pass, so the order decides only which failure a try records. The fittable check comes first
     /// because most tries clash by it, and the unfittable check is then not needed.
     /// </remarks>
-    private static PlacementCheck FirstClash(TargetId target, EulerPlacement placement, FitRules rules)
+    private static PlacementCheck FirstClash(EulerPlacement placement, IPlacementTries fittable, IPlacementTries unfittable)
     {
-        var fittable = rules.Fittable.Check(target, placement);
-        return Stops(fittable) ? fittable : rules.Unfittable.Check(target, placement);
+        var check = fittable.Check(placement);
+        return Stops(check) ? check : unfittable.Check(placement);
     }
 
     private static bool Stops(PlacementCheck check) => check.Clash is not null || check.Failure is not null;

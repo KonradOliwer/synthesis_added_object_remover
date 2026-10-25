@@ -151,6 +151,22 @@ public class ClashingObjectFitterTests
         Assert.Equal((FitParts.FitCheck, "broken"), (failure.Part, failure.Failure));
     }
 
+    /// <summary>On one thread at most one object's tries of each rule are open at a time, and none is left open.</summary>
+    [Fact]
+    public void EachObjectsTriesAreEndedBeforeTheNextObjectIsTried()
+    {
+        var fittable = new CountingRule(new ScriptedRule(placement => placement.Scale is > 0.92f and < 0.99f
+            ? new PlacementCheck(null, "broken")
+            : new PlacementCheck(placement.Scale <= 0.9f ? null : TooClose, null)));
+        var unfittable = new CountingRule(NoClash);
+
+        var result = Fit(Defaults, onlyTarget: null, fittable, unfittable);
+
+        Assert.Equal((2, 2, 2), (result.Tried, result.Fits.Length, result.Failures.Length));
+        Assert.All([fittable, unfittable], rule => Assert.Equal((0, 1), (rule.Open, rule.MostOpen)));
+        Assert.True(fittable.Started > result.Tried);
+    }
+
     [Fact]
     public void TheFitsDoNotDependOnTheThreadCount()
     {
@@ -201,7 +217,45 @@ public class ClashingObjectFitterTests
 
     private sealed class ScriptedRule(Func<EulerPlacement, PlacementCheck> check) : IPlacementRule
     {
-        public PlacementCheck Check(TargetId target, EulerPlacement placement) => check(placement);
+        public IPlacementTries StartTries(TargetId target) => new ScriptedTries(check);
+    }
+
+    private sealed class ScriptedTries(Func<EulerPlacement, PlacementCheck> check) : IPlacementTries
+    {
+        public PlacementCheck Check(EulerPlacement placement) => check(placement);
+
+        public void Dispose()
+        {
+        }
+    }
+
+    /// <summary>Counts the tries started, those not yet ended, and the most open at once; for one thread.</summary>
+    private sealed class CountingRule(IPlacementRule rule) : IPlacementRule
+    {
+        public int Started { get; private set; }
+
+        public int Open { get; private set; }
+
+        public int MostOpen { get; private set; }
+
+        public IPlacementTries StartTries(TargetId target)
+        {
+            Started++;
+            Open++;
+            MostOpen = Math.Max(MostOpen, Open);
+            return new CountedTries(rule.StartTries(target), () => Open--);
+        }
+    }
+
+    private sealed class CountedTries(IPlacementTries tries, Action ended) : IPlacementTries
+    {
+        public PlacementCheck Check(EulerPlacement placement) => tries.Check(placement);
+
+        public void Dispose()
+        {
+            tries.Dispose();
+            ended();
+        }
     }
 
     /// <param name="restedOn">Which of the asked objects others rest on.</param>

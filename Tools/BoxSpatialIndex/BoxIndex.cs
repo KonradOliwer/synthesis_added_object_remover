@@ -53,8 +53,10 @@ public sealed class BoxIndex
         SpatialGrid.RemoveAdjacentDuplicates(candidates);
     }
 
+    public bool Overlaps(int slot, Box area) => _boxes[slot].Overlaps(area);
+
     private void AddIfOverlapping(int slot, Box area, List<int> candidates)
     {
-        if (_boxes[slot].Overlaps(area)) candidates.Add(slot);
+        if (Overlaps(slot, area)) candidates.Add(slot);
     }
 }

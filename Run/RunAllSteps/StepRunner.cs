@@ -185,7 +185,7 @@ public static class StepRunner
         var heldUp = RunHeldUpTargets(scope, runCaches, trust, collected);
         var kept = RunKeepCheck(scope, runCaches, collected, heldUp);
         var started = RemovalDecisions.Start(kept.ObjectsToKeep, collected.Targets.Length);
-        var fitted = RunFit(scope, runCaches, trust, collected, selected, kept.ObjectsToKeep, started);
+        var fitted = RunFit(scope, runCaches, trust, collected, selected, heldUp, kept.ObjectsToKeep, started);
         var changedTerrain = RunChangedTerrain(scope, runCaches, trust, collected, fitted.Decisions);
         var tooClose = RunTooClose(scope, runCaches, collected, selected, changedTerrain.Decisions);
         var alsoRemove = RunAlsoRemove(scope, runCaches, collected, kept.ObjectsToKeep, tooClose.Decisions);
@@ -288,10 +288,11 @@ public static class StepRunner
         ModTrustTable trust,
         CollectedObjects collected,
         SelectedObjects selected,
+        HeldUpTargets heldUp,
         IObjectsToKeep objectsToKeep,
         RemovalDecisions started) =>
         scope.Environment.Log.Timed(
-            () => FindAndApplyFits(scope, runCaches, trust, collected, selected, objectsToKeep, started),
+            () => FindAndApplyFits(scope, runCaches, trust, collected, selected, heldUp, objectsToKeep, started),
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, elapsed));
 
     /// <remarks>
@@ -304,6 +305,7 @@ public static class StepRunner
         ModTrustTable trust,
         CollectedObjects collected,
         SelectedObjects selected,
+        HeldUpTargets heldUp,
         IObjectsToKeep objectsToKeep,
         RemovalDecisions started)
     {
@@ -331,6 +333,7 @@ public static class StepRunner
                 runCaches.SurfaceSamples,
                 runCaches.Terrain,
                 runCaches.VisibleObjectsOfAnyPlugin,
+                heldUp,
                 scope.Settings.Execution));
         var result = ClashingObjectFitter.Fit(
             collected.Targets, objectsToKeep, rules, runCaches.Shapes, collected.Order, scope.Settings.Execution, scope.Settings.Fit);

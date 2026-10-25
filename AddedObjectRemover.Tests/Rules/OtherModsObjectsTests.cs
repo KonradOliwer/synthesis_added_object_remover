@@ -84,6 +84,9 @@ public class OtherModsObjectsTests
 
     private static readonly RemovalReason Clash = new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize());
 
+    /// <summary>A held-up step that stopped, so the fit step searches on its own.</summary>
+    private static readonly HeldUpTargets OwnSearch = HeldUpTargets.SwitchedOff with { Outcome = StepOutcome.StoppedByUnexpectedError };
+
     private static readonly LoadOrderPlugins Plugins = CreatePlugins();
 
     /// <summary>
@@ -610,13 +613,37 @@ public class OtherModsObjectsTests
     [InlineData(OtherModsObjectsHandling.KeepSupportingObject)]
     [InlineData(OtherModsObjectsHandling.RemoveFloatingObject)]
     [InlineData(OtherModsObjectsHandling.PullObjectToTheGround)]
-    public void TheFitStepFindsATableAnotherModsObjectRestsOnWithEveryChoiceAndEveryAlsoRemoveMode(OtherModsObjectsHandling handling)
+    public void TheFitStepsOwnSearchFindsATableAnotherModsObjectRestsOnWithEveryChoiceAndEveryAlsoRemoveMode(OtherModsObjectsHandling handling)
     {
         foreach (var mode in Enum.GetValues<FollowUpRemovalMode>())
         {
-            Assert.Equal([new TargetId(Table)], FindRestedOn(new Scene([CreateTable()], WithFloor(Lantern(OtherMod, 1, OnTheTable)), handling) { AlsoRemove = mode }));
-            Assert.Empty(FindRestedOn(new Scene([CreateTable()], WithFloor(Lantern(UntrustedMod, 1, OnTheTable)), handling) { AlsoRemove = mode }));
+            Assert.Equal([new TargetId(Table)], FindRestedOnByOwnSearch(new Scene([CreateTable()], WithFloor(Lantern(OtherMod, 1, OnTheTable)), handling) { AlsoRemove = mode }));
+            Assert.Empty(FindRestedOnByOwnSearch(new Scene([CreateTable()], WithFloor(Lantern(UntrustedMod, 1, OnTheTable)), handling) { AlsoRemove = mode }));
         }
+
+        static List<TargetId> FindRestedOnByOwnSearch(Scene scene) => FindRestedOn(scene, OwnSearch, scene.Targets.Select(target => target.Id));
+    }
+
+    /// <summary>
+    /// The table under the cleaned mod's book under another mod's lantern, and a lone table. The held-up step keeps the table and
+    /// the book, so the fit step asks only about the lone table, and both ways find nothing resting on it.
+    /// </summary>
+    [Fact]
+    public void WithKeepSupportingObjectTheFitStepAsksOnlyAboutObjectsNotHeldUpAndBothWaysAgree()
+    {
+        var lantern = Lantern(OtherMod, 1, OnTheTable + new Vector3(0, 0, BookHeight));
+        List<TargetObject> targets =
+        [
+            CreateTable(),
+            TestTargets.Create(1, TestTargets.At(OnTheTable), BookModel.Base, TestTargets.Space),
+            TestTargets.Create(2, TestTargets.At(new Vector3(ManyScenesSpacing, 0, 0)), TableModel.Base, TestTargets.Space),
+        ];
+        var scene = new Scene(targets, WithFloor(lantern), OtherModsObjectsHandling.KeepSupportingObject);
+        var heldUp = FindHeldUp(scene);
+        List<TargetId> notHeldUp = [.. targets.Select(target => target.Id).Where(target => !heldUp.Targets.ContainsKey(target))];
+
+        Assert.Equal([new TargetId(2)], notHeldUp);
+        Assert.Equal(FindRestedOn(scene, OwnSearch, notHeldUp), FindRestedOn(scene, heldUp, notHeldUp));
     }
 
     /// <summary>The cleaned mod's book on the cleaned mod's table: the table holds it up, except with Nothing, where no object of the cleaned mod counts.</summary>
@@ -784,8 +811,12 @@ public class OtherModsObjectsTests
             new Execution(scene.Threads));
     }
 
-    /// <summary>The fit step's answer: which of the scene's target objects others rest on.</summary>
-    private static List<TargetId> FindRestedOn(Scene scene)
+    /// <summary>The fit step's answer after the held-up step: which of the scene's target objects others rest on.</summary>
+    private static List<TargetId> FindRestedOn(Scene scene) => FindRestedOn(scene, FindHeldUp(scene), scene.Targets.Select(target => target.Id));
+
+    /// <param name="heldUp">What the held-up step found.</param>
+    /// <param name="asked">The objects the fit step asks about.</param>
+    private static List<TargetId> FindRestedOn(Scene scene, HeldUpTargets heldUp, IEnumerable<TargetId> asked)
     {
         var caches = TestScenes.CreateWithSupportOnlyObjects(scene.Targets, scene.Others, Shapes);
         var triangles = new TriangleStore(Shapes.ReadTriangles);
@@ -801,8 +832,9 @@ public class OtherModsObjectsTests
             TestSurfaceSamples.Over(triangles),
             scene.Terrain,
             caches.VisibleObjectsOfAnyPlugin,
+            heldUp,
             new Execution(scene.Threads));
-        return [.. rule.FindObjectsOthersRestOn([.. scene.Targets.Select(target => target.Id)])];
+        return [.. rule.FindObjectsOthersRestOn([.. asked])];
     }
 
     private static RemovalDecisions RemoveTable(RemovalDecisions decisions) =>

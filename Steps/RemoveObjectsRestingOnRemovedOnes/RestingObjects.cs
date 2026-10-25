@@ -52,6 +52,7 @@ public static class RestingObjects
     /// <param name="visibleTargets">The index of <paramref name="targets"/>.</param>
     /// <param name="trust">Decides whose objects are judged.</param>
     /// <param name="objectsOfAnyPlugin">Asked only when there is an object to check.</param>
+    /// <param name="heldUp">What <see cref="FindHeldUpTargets"/> found for the same targets.</param>
     public static IRestingRule CreateRestingRule(
         ImmutableArray<TargetObject> targets,
         IVisibleTargetObjects visibleTargets,
@@ -64,11 +65,13 @@ public static class RestingObjects
         ISurfaceSamples surfaces,
         ITerrainHeights terrain,
         Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin,
+        HeldUpTargets heldUp,
         Execution execution) =>
         OtherModsObjects.CreateRestingRule(
             targets,
             visibleTargets,
             new RestingRule(targets, visibleTargets, settings, new OtherModsObjectRules(trust, plugins, shapes), shapes, triangles, surfaces, terrain, objectsOfAnyPlugin, execution),
+            heldUp,
             new OtherModsObjectsContext(trust, plugins, otherModsObjects, shapes, triangles, surfaces, terrain, objectsOfAnyPlugin, execution));
 
     /// <summary>

@@ -2,7 +2,7 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveTooCloseObjects;
 
-/// <summary>The search of the removal zone shape in use, over every target or for one target alone.</summary>
+/// <summary>The search of the removal zone shape in use, over every target or for one target at a time.</summary>
 internal interface ITooCloseSearch
 {
     /// <summary>The large other-mod objects of the spaces with visible targets that the search tests against every target of their space.</summary>
@@ -10,6 +10,15 @@ internal interface ITooCloseSearch
 
     TooCloseSearchResult FindTooCloseTargets(WorkOrder order, Execution execution);
 
-    /// <summary>One target alone, with a scratch of its own, so its work is not counted.</summary>
-    TargetCheck CheckAlone(TargetObject target);
+    /// <summary>The checks of one target at placements tried one after another on one thread; their work is not counted.</summary>
+    ITargetTries StartTries();
+}
+
+/// <summary>
+/// The checks of one target, each given the target at the placement tried. The first is exactly the search's own check; a later
+/// one hits or fails as the search's own check would, unless a mesh test stops unexpectedly, and may hit another object.
+/// </summary>
+internal interface ITargetTries : IDisposable
+{
+    TargetCheck Check(TargetObject placed);
 }

@@ -10,6 +10,9 @@ public interface IObjectsThatCanCauseRemovals
     /// <returns>How many objects' world bounds overlap the world bounds of <paramref name="box"/>, able to cause removals or not, before the oriented boxes are tested: a work counter.</returns>
     int Overlapping(RecordKey space, OrientedBox box, ObjectQueryScratch scratch, List<OtherId> into);
 
+    /// <summary>Whether <see cref="Overlapping"/> over <paramref name="box"/> in the object's space lists the object.</summary>
+    bool Overlaps(OtherId id, OrientedBox box);
+
     /// <summary>The lowest object whose world bounds overlap <paramref name="area"/> and whose bounds centre passes <paramref name="centreIsInside"/>, or null.</summary>
     OtherId? FirstWithCentreInside(RecordKey space, Box area, Func<Vector3, bool> centreIsInside, ObjectQueryScratch scratch);
 

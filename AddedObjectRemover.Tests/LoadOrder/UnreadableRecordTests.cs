@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Numerics;
 using AddedObjectRemover.Tests.EndToEnd;
 using AddedObjectRemover.Tests.Fixtures;
@@ -14,6 +13,9 @@ public class UnreadableRecordTests : IDisposable
     private static readonly byte[] ParameterTypeTag = "EPFT"u8.ToArray();
     private const int ParameterTypeValueOffset = 6;
     private const byte NotAFloatParameterType = 5;
+    private const int LinkingPluginCount = 6;
+    private const int WithoutLinksPosition = LinkingPluginCount / 2;
+    private const int ManyWorkers = 8;
 
     private static readonly PluginName OtherPlugin = new("Other.esp");
     private static readonly WhatToCollect Plan = new(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits);
@@ -54,15 +56,57 @@ public class UnreadableRecordTests : IDisposable
         var location = new Location(broken.NextKey(), FixtureMod.Release);
         location.WorldLocationMarkerRef.SetTo(TestTargets.FormKeyOf(0));
         broken.Mod.Locations.Add(location);
-        var facts = new List<LinkFact>();
+        using var overlay = OpenCorrupted(broken);
 
-        var unreadable = ReadFromCorrupted(broken, facts);
+        var read = LinkReader.ReadFromNonPlaced(
+            [overlay], new HashSet<RecordKey> { TestTargets.Key(0) }, TestTargets.TargetName, CreateNames(broken), new Execution(1));
 
-        var record = Assert.Single(unreadable);
+        var record = Assert.Single(read.Unreadable);
         Assert.Equal("Perk", record.RecordType);
         Assert.Equal("BrokenPerk", record.EditorId);
         Assert.Contains("expected parameter type flag", record.Problem);
-        Assert.Equal("Location", Assert.Single(facts).SourceRecordType);
+        Assert.Equal("Location", Assert.Single(read.Links).SourceRecordType);
+    }
+
+    [Fact]
+    public void ThePluginsLinksAndUnreadableRecordsComeInTheGivenPluginOrderWithOneOrManyWorkers()
+    {
+        var linking = Enumerable.Range(0, LinkingPluginCount).Select(CreateLinkingPlugin).ToArray();
+        var withoutLinks = new FixtureMod("WithoutLinks.esp", _base, _target);
+        var plugins = linking.Take(WithoutLinksPosition).Append(withoutLinks).Concat(linking.Skip(WithoutLinksPosition)).ToArray();
+        var names = CreateNames(plugins);
+        var records = Enumerable.Range(0, LinkingPluginCount).Select(index => TestTargets.Key(index)).ToHashSet();
+        var overlays = new List<ISkyrimModDisposableGetter>();
+        try
+        {
+            foreach (var plugin in plugins) overlays.Add(plugin == withoutLinks ? Open(plugin) : OpenCorrupted(plugin));
+
+            var serial = LinkReader.ReadFromNonPlaced(overlays, records, TestTargets.TargetName, names, new Execution(1));
+            var parallel = LinkReader.ReadFromNonPlaced(overlays, records, TestTargets.TargetName, names, new Execution(ManyWorkers));
+
+            Assert.Equal(linking.SelectMany(ExpectedLinks), serial.Links.Select(link => (link.Source.Plugin, link.Target, link.Relation)));
+            Assert.Equal(linking.Select(plugin => plugin.Key.ToPluginName()), serial.Unreadable.Select(record => record.Key.Plugin));
+            Assert.Equal(serial.Links.ToArray(), parallel.Links.ToArray());
+            Assert.Equal(serial.Unreadable.ToArray(), parallel.Unreadable.ToArray());
+        }
+        finally
+        {
+            foreach (var overlay in overlays) overlay.Dispose();
+        }
+    }
+
+    [Fact]
+    public void ThePluginsThatMayLinkAreReadInPriorityOrderHighestFirst()
+    {
+        var lower = CreatePluginLinkingTo("Lower.esp", 0);
+        var unrelated = new FixtureMod("Unrelated.esp", _base);
+        var higher = CreatePluginLinkingTo("Higher.esp", 1);
+        var state = FixturePatcherState.Create([_base.Mod, _target.Mod, lower.Mod, unrelated.Mod, higher.Mod], _folder, _folder);
+        var plugin = new PluginRecordsFactory(FixturePatcherState.CreateFinalWorld(state), ManyWorkers).Open();
+
+        var read = plugin.ReadLinks(TestTargets.TargetName, new HashSet<RecordKey> { TestTargets.Key(0), TestTargets.Key(1) });
+
+        Assert.Equal(new[] { higher.Key.ToPluginName(), lower.Key.ToPluginName() },read.Links.Select(link => link.Source.Plugin));
     }
 
     [Fact]
@@ -112,16 +156,74 @@ public class UnreadableRecordTests : IDisposable
         Effects = [new PerkEntryPointModifyActorValue { Value = 1f }],
     };
 
-    private ImmutableArray<UnreadableRecord> ReadFromCorrupted(FixtureMod mod, List<LinkFact> facts)
+    /// <summary>
+    /// A quest whose alias fills with a target NPC that is not checked, then a malformed perk between two lists that link to
+    /// checked target records, so each plugin yields both kinds of link and an unreadable record.
+    /// </summary>
+    private FixtureMod CreateLinkingPlugin(int index)
     {
-        var path = Path.Combine(_folder, mod.Key.FileName);
-        mod.Mod.WriteToBinary(path);
+        var plugin = new FixtureMod($"Linking{index}.esp", _base, _target);
+        plugin.Mod.Quests.Add(CreateQuestWithUniqueActor(plugin, UniqueActorIndexOf(index)));
+        plugin.Mod.FormLists.Add(CreateListLinkingTo(plugin, index));
+        plugin.Mod.Perks.Add(CreatePerk(plugin, $"BrokenPerk{index}"));
+        plugin.Mod.FormLists.Add(CreateListLinkingTo(plugin, NextLinkingIndex(index)));
+        return plugin;
+    }
+
+    /// <remarks>The game library reads the quest group before the form list group.</remarks>
+    private static IEnumerable<(PluginName, RecordKey, RelationKind)> ExpectedLinks(FixtureMod plugin, int index)
+    {
+        var name = plugin.Key.ToPluginName();
+        return
+        [
+            (name, TestTargets.Key(UniqueActorIndexOf(index)), RelationKind.UniqueActor),
+            (name, TestTargets.Key(index), RelationKind.Other),
+            (name, TestTargets.Key(NextLinkingIndex(index)), RelationKind.Other),
+        ];
+    }
+
+    private static int UniqueActorIndexOf(int index) => LinkingPluginCount + index;
+
+    private static int NextLinkingIndex(int index) => (index + 1) % LinkingPluginCount;
+
+    private FixtureMod CreatePluginLinkingTo(string name, int targetIndex)
+    {
+        var plugin = new FixtureMod(name, _base, _target);
+        plugin.Mod.FormLists.Add(CreateListLinkingTo(plugin, targetIndex));
+        return plugin;
+    }
+
+    private static Quest CreateQuestWithUniqueActor(FixtureMod mod, int targetIndex)
+    {
+        var quest = new Quest(mod.NextKey(), FixtureMod.Release);
+        quest.Aliases.Add(new QuestAlias { UniqueActor = new FormLinkNullable<INpcGetter>(TestTargets.FormKeyOf(targetIndex)) });
+        return quest;
+    }
+
+    private static FormList CreateListLinkingTo(FixtureMod mod, int targetIndex)
+    {
+        var list = new FormList(mod.NextKey(), FixtureMod.Release);
+        list.Items.Add(new FormLink<ISkyrimMajorRecordGetter>(TestTargets.FormKeyOf(targetIndex)));
+        return list;
+    }
+
+    /// <summary>Writes the plugin with its first perk's parameter type broken and opens it as the game library reads load orders.</summary>
+    private ISkyrimModDisposableGetter OpenCorrupted(FixtureMod mod)
+    {
+        var path = Write(mod);
         var bytes = File.ReadAllBytes(path);
         bytes[bytes.AsSpan().IndexOf(ParameterTypeTag) + ParameterTypeValueOffset] = NotAFloatParameterType;
         File.WriteAllBytes(path, bytes);
-        using var overlay = SkyrimMod.CreateFromBinaryOverlay(path, FixtureMod.Release);
-        return LinkReader.ReadFromNonPlaced(
-            [overlay], new HashSet<RecordKey> { TestTargets.Key(0) }, TestTargets.TargetName, CreateNames(mod), facts);
+        return SkyrimMod.CreateFromBinaryOverlay(path, FixtureMod.Release);
+    }
+
+    private ISkyrimModDisposableGetter Open(FixtureMod mod) => SkyrimMod.CreateFromBinaryOverlay(Write(mod), FixtureMod.Release);
+
+    private string Write(FixtureMod mod)
+    {
+        var path = Path.Combine(_folder, mod.Key.FileName);
+        mod.Mod.WriteToBinary(path);
+        return path;
     }
 
     private PluginNames CreateNames(params FixtureMod[] mods) =>

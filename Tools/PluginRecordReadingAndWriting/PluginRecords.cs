@@ -32,10 +32,9 @@ internal sealed class PluginRecords(
         var referencingMods = order.PriorityOrder
             .Select(listing => listing.Mod)
             .OfType<ISkyrimModGetter>()
-            .Where(mod => LinkablePlugins.MayLinkToAny(mod, linkedPlugins, patch, names));
-        var facts = new List<LinkFact>();
-        var unreadable = LinkReader.ReadFromNonPlaced(referencingMods, records, target, names, facts);
-        return new NonPlacedLinks([.. facts], unreadable);
+            .Where(mod => LinkablePlugins.MayLinkToAny(mod, linkedPlugins, patch, names))
+            .ToList();
+        return LinkReader.ReadFromNonPlaced(referencingMods, records, target, names, execution);
     }
 
     public IWritableRecords ReadWritableRecords() => Scanned.Handles;

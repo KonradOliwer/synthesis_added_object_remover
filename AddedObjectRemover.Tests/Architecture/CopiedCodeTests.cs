@@ -94,12 +94,17 @@ public class CopiedCodeTests
         [CopyFamily.KeyOf([Resting + "SupportContactFinder.cs:SupportContactFinder.FindContactsOfAll", Resting + "TargetsHoldingUpOtherModsObjects.cs:TargetsHoldingUpOtherModsObjects.Find"])] =
             ParallelCalls,
         [CopyFamily.KeyOf([Resting + "LeftWithoutSupport.cs:LeftWithoutSupport.FindMissingWeightsBefore", Resting + "RestingRule.cs:RestingRule.FindResting"])] = ParallelCalls,
+        [CopyFamily.KeyOf([Resting + "RestingObjects.cs:RestingObjects.FindHeldUpTargets", Resting + "RestingObjects.cs:RestingObjects.SettleOtherModsObjects"])] =
+            EntryForwarders,
         [CopyFamily.KeyOf([
-            Resting + "RestingObjects.cs:RestingObjects.CreateRestingRule", Resting + "RestingObjects.cs:RestingObjects.FindHeldUpTargets",
-            Resting + "RestingObjects.cs:RestingObjects.SettleOtherModsObjects"])] = EntryForwarders,
-        [CopyFamily.KeyOf([
-            "Steps/RemoveObjectsOnChangedTerrain/ChangedTerrainPlacementRule.cs:ChangedTerrainPlacementRule.Check",
-            TooClose + "TooClosePlacementRule.cs:TooClosePlacementRule.Check"])] = PlacementRules,
+            "Steps/RemoveObjectsOnChangedTerrain/ChangedTerrainPlacementRule.cs:ChangedTerrainPlacementRule.StartTries",
+            "Steps/RemoveObjectsOnChangedTerrain/ChangedTerrainPlacementRule.cs:ChangedTerrainPlacementRule.Tries",
+            "Steps/RemoveObjectsOnChangedTerrain/ChangedTerrainPlacementRule.cs:ChangedTerrainPlacementRule.Tries.Check",
+            "Steps/RemoveObjectsOnChangedTerrain/ChangedTerrainPlacementRule.cs:ChangedTerrainPlacementRule.Tries.Dispose",
+            TooClose + "TooClosePlacementRule.cs:TooClosePlacementRule.StartTries",
+            TooClose + "TooClosePlacementRule.cs:TooClosePlacementRule.Tries",
+            TooClose + "TooClosePlacementRule.cs:TooClosePlacementRule.Tries.Check",
+            TooClose + "TooClosePlacementRule.cs:TooClosePlacementRule.Tries.Dispose"])] = PlacementRules,
         [CopyFamily.KeyOf([
             "Steps/FitClashingObjects.Contracts/FitParts.cs", "Steps/FitClashingObjects.Contracts/FitParts.cs:FitParts",
             "Steps/FitClashingObjects.Contracts/FitParts.cs:FitParts.FitCheck", "Steps/FitClashingObjects.Contracts/FitParts.cs:FitParts.Owner",

@@ -4,14 +4,23 @@ using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
 
-/// <summary>The changed-terrain check of one target object at a given placement.</summary>
+/// <summary>The changed-terrain check of one target object at given placements; each check is the step's own.</summary>
 /// <param name="check">Null when the step is off: it finds nothing.</param>
 internal sealed class ChangedTerrainPlacementRule(ImmutableArray<TargetObject> targets, ObjectTerrainCheck? check) : IPlacementRule
 {
-    public PlacementCheck Check(TargetId target, EulerPlacement placement)
+    public IPlacementTries StartTries(TargetId target) => new Tries(targets[target.Index], check);
+
+    private sealed class Tries(TargetObject target, ObjectTerrainCheck? check) : IPlacementTries
     {
-        if (check is null) return default;
-        var found = check.Check(targets[target.Index].PlacedAt(placement));
-        return new PlacementCheck(found.Hit is { } hit ? ChangedTerrainObjects.ReasonOf(hit) : null, found.Failure);
+        public PlacementCheck Check(EulerPlacement placement)
+        {
+            if (check is null) return default;
+            var found = check.Check(target.PlacedAt(placement));
+            return new PlacementCheck(found.Hit is { } hit ? ChangedTerrainObjects.ReasonOf(hit) : null, found.Failure);
+        }
+
+        public void Dispose()
+        {
+        }
     }
 }

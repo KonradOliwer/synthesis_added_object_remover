@@ -307,6 +307,21 @@ public class MemoTests
     }
 
     [Fact]
+    public void StoreCountsAValueHeldWhileOthersWereUsedAsUsedWhenItIsReleased()
+    {
+        var builds = new Dictionary<string, int>();
+        var store = NewStore(builds);
+        var heldA = store.Acquire("a");
+        store.Acquire("b").Dispose();
+        heldA.Dispose();
+
+        store.Acquire("c").Dispose();
+        store.Acquire("a").Dispose();
+
+        Assert.Equal(1, builds["a"]);
+    }
+
+    [Fact]
     public void StoreBuildsAnEvictedKeyAgainOnItsNextUse()
     {
         var builds = new Dictionary<string, int>();

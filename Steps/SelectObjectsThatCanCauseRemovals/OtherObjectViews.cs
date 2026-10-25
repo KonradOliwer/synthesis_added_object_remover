@@ -27,11 +27,18 @@ internal sealed class ObjectsThatCanCauseRemovals(IOtherModObjectsBySpace otherM
     {
         into.Clear();
         var index = otherModObjects.IndexOf(space);
-        var candidateCount = index.Bounds.Overlapping(
-            box.WorldAabb(0f), slot => IsActive(index, slot) && box.Intersects(index.OrientedBoxOf(slot), 0f), scratch.Spatial, scratch.Matches);
+        var candidateCount = index.Bounds.Overlapping(box.WorldAabb(0f), slot => PassesBoxFilter(index, slot, box), scratch.Spatial, scratch.Matches);
         into.AddRange(scratch.Matches.Select(slot => index[slot].Id));
         return candidateCount;
     }
+
+    public bool Overlaps(OtherId id, OrientedBox box)
+    {
+        var (index, slot) = otherModObjects.Locate(id);
+        return index.Bounds.Overlaps(slot, box.WorldAabb(0f)) && PassesBoxFilter(index, slot, box);
+    }
+
+    private bool PassesBoxFilter(IOtherObjectIndex index, int slot, OrientedBox box) => IsActive(index, slot) && box.Intersects(index.OrientedBoxOf(slot), 0f);
 
     public OtherId? FirstCovering(RecordKey space, Vector3 point, Func<OtherId, bool> include, ObjectQueryScratch scratch)
     {

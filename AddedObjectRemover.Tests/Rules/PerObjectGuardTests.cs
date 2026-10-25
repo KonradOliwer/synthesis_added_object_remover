@@ -166,7 +166,7 @@ public class PerObjectGuardTests
         var seeded = TestSeededDecisions.Seed(protection, targets.Count, [Healthy]);
         var triangles = new TriangleStore(Shapes.ReadTriangles);
         var input = new RoundsInput(
-            [.. targets], protection, ObjectsOfAnyPlugin: null, Shapes, triangles, TestGround.NoTerrain(), new Execution(1));
+            [.. targets], protection, ObjectsOfAnyPlugin: null, Shapes, triangles, TestSurfaceSamples.Over(triangles), TestGround.NoTerrain(), new Execution(1));
         var restingObjects = TestRestingObjects.Run(
             seeded, input, new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouchingIt, 1f, SupportLostFraction: 1f, TouchChainsShown: false));
 

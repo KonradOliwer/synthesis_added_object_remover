@@ -14,7 +14,7 @@ internal static partial class LogSections
 
     /// <summary>
     /// The detailed log's count of the target objects kept because other mods' objects rest on them, directly or through other
-    /// such objects, when there is one; the not-performed line when an unexpected error stopped the search.
+    /// such objects, when there is one, and otherwise its step-time line; the not-performed line when an unexpected error stopped the search.
     /// </summary>
     public static LogSection BuildHeldUpSection(HeldUpTargets heldUp, PluginName target, TimeSpan elapsed, ReportContext context) =>
         new("held-up", PartLines(
@@ -23,12 +23,14 @@ internal static partial class LogSections
             heldUp.Targets.Count > 0 && context.Detailed,
             () => $"Objects of {target} that other mods' objects rest on, kept: {TextFormat.Count(heldUp.Targets.Count)} "
                 + $"({TextFormat.Count(heldUp.Targets.Values.Count(resting => resting.KeptFor is null))} directly, "
-                + $"{TextFormat.Count(heldUp.Targets.Values.Count(resting => resting.KeptFor is not null))} under those){Describe.TimedSuffix(elapsed, context)}."));
+                + $"{TextFormat.Count(heldUp.Targets.Values.Count(resting => resting.KeptFor is not null))} under those){Describe.TimedSuffix(elapsed, context)}.",
+            elapsed,
+            context));
 
     /// <summary>
     /// The not-performed line when an unexpected error stopped the step; otherwise the objects of the cleaned mod its rounds kept,
     /// and the detailed log's count and time when there is an object, with the objects of the cleaned mod removed with them when
-    /// there is one. The outcomes print at the end of the log.
+    /// there is one, or its step-time line when there is none. The outcomes print at the end of the log.
     /// </summary>
     /// <param name="decisions">The run's decisions with the step's rounds applied.</param>
     public static LogSection BuildLeftWithoutSupportStepSection(
@@ -40,7 +42,9 @@ internal static partial class LogSections
                 settled.Outcome,
                 LeftWithoutSupportName,
                 !settled.Objects.IsEmpty && context.Detailed,
-                () => $"{LeftWithoutSupportName}: {TextFormat.Count(settled.Objects.Length)} found{RemovedWithThem(settled, decisions, target)}{Describe.TimedSuffix(elapsed, context)}."),
+                () => $"{LeftWithoutSupportName}: {TextFormat.Count(settled.Objects.Length)} found{RemovedWithThem(settled, decisions, target)}{Describe.TimedSuffix(elapsed, context)}.",
+                elapsed,
+                context),
         ]);
 
     /// <summary>The removals of the step's rounds the rule itself decided; the linked group members removed with them are not counted.</summary>
@@ -50,12 +54,17 @@ internal static partial class LogSections
         return removed > 0 ? $"; objects of {target} removed with them: {TextFormat.Count(removed)}" : string.Empty;
     }
 
-    /// <summary>The not-performed line when an unexpected error stopped the part; otherwise its line, when it is shown.</summary>
-    private static ImmutableArray<string> PartLines(StepOutcome outcome, string partName, bool shown, Func<string> line) => outcome switch
+    /// <summary>
+    /// The not-performed line when an unexpected error stopped the part; otherwise its line, which carries the part's time, when it is
+    /// shown, and the step-time line when it is not.
+    /// </summary>
+    private static ImmutableArray<string> PartLines(
+        StepOutcome outcome, string partName, bool shown, Func<string> line, TimeSpan elapsed, ReportContext context) => outcome switch
     {
         StepOutcome.StoppedByUnexpectedError => [BuildNotPerformedLine(partName)],
         StepOutcome.Performed when shown => [line()],
-        StepOutcome.Performed or StepOutcome.SwitchedOff => [],
+        StepOutcome.Performed => StepTimeLines(partName, elapsed, context),
+        StepOutcome.SwitchedOff => [],
         _ => throw new UnreachableException($"Unknown step outcome {outcome}."),
     };
 

@@ -121,7 +121,7 @@ public class PlacedObjectCollectorReplacementTests
     {
         var plugin = new FixedFactsPlugin([OwnObject]);
 
-        PlacedObjectCollector.Collect(plugin, Mods, Plan);
+        PlacedObjects.Collect(plugin, Mods, Plan);
 
         Assert.Equal((false, true), (plugin.StopsTheWalk!(Target), plugin.StopsTheWalk!(BaseGame)));
     }
@@ -137,6 +137,6 @@ public class PlacedObjectCollectorReplacementTests
     {
         var winner = versions[^1];
         var record = TestPlacedRecords.Create(key, winner.Plugin, winner.Placement.Position!.Value, winner.Base) with { Versions = [.. versions] };
-        return PlacedObjectCollector.Collect(new FixedFactsPlugin(ImmutableArray.Create(OwnObject, record), [], new HashSet<RecordKey> { key }), Mods, plan);
+        return PlacedObjects.Collect(new FixedFactsPlugin(ImmutableArray.Create(OwnObject, record), [], new HashSet<RecordKey> { key }), Mods, plan);
     }
 }

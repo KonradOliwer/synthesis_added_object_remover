@@ -55,19 +55,35 @@ public sealed class PlacedObjectCollector
         _areaNames = TargetAreaNames.Of(facts.CellAreas);
     }
 
-    public static CollectedObjects Collect(IPluginRecords plugin, ModTrustTable trust, WhatToCollect plan)
+    /// <summary>The first part of the step: reads the placed records and sorts them into objects; <see cref="ReadNonPlacedLinks"/> finishes it.</summary>
+    public static ScannedPlacedRecords ScanPlacedRecords(IPluginRecords plugin, ModTrustTable trust, WhatToCollect plan)
     {
         var facts = plugin.ReadPlacedRecords(
             new PlacedReadScope(trust.CleanedMod, Terrain: true, plan.Navmesh, plan.TerrainVersions, plan.TerrainLayers, plan.Water, HoldLocationKeyword),
             candidate => StopsTheWalk(trust, candidate));
         var collector = new PlacedObjectCollector(trust, plan, facts);
         foreach (var record in facts.Records) collector.Collect(record);
-
-        var targetKeys = collector._targets.Select(target => target.Key).ToHashSet();
-        var nonPlaced = plugin.ReadLinks(trust.CleanedMod, targetKeys);
-        var links = collector.KeepLinksIntoTargets([.. facts.Links, .. nonPlaced.Links], targetKeys);
-        return collector.CreateCollectedObjects(links, nonPlaced.Unreadable);
+        return collector.CreateScannedPlacedRecords();
     }
+
+    /// <summary>Reads the links from records other than placed objects into the scanned targets and adds them after the placed records' links.</summary>
+    public static CollectedObjects ReadNonPlacedLinks(ScannedPlacedRecords scanned, IPluginRecords plugin)
+    {
+        var objects = scanned.Objects;
+        var targetKeys = TargetKeys(objects.Targets);
+        var nonPlaced = plugin.ReadLinks(scanned.CleanedMod, targetKeys);
+        var links = KeepLinksIntoTargets(nonPlaced.Links, scanned.RemovedRecords, scanned.CleanedMod, targetKeys);
+        return objects with { Links = [.. objects.Links, .. links], UnreadableRecords = nonPlaced.Unreadable };
+    }
+
+    private ScannedPlacedRecords CreateScannedPlacedRecords()
+    {
+        var removed = _removedRecords.ToImmutableHashSet();
+        var placedLinks = KeepLinksIntoTargets(_facts.Links, removed, _trust.CleanedMod, TargetKeys(_targets));
+        return new ScannedPlacedRecords(CreateCollectedObjects(placedLinks), _trust.CleanedMod, removed);
+    }
+
+    private static HashSet<RecordKey> TargetKeys(IEnumerable<TargetObject> targets) => targets.Select(target => target.Key).ToHashSet();
 
     /// <remarks>
     /// A fully trusted version's values are accepted whatever lies below it, so no lower version can change a decision. The cleaned
@@ -103,11 +119,9 @@ public sealed class PlacedObjectCollector
     /// The links into the target plugin and into the moved replacements, without those from removed records. The reader also gives
     /// the links into the records the target overrides and leaves where they were, which judge nothing.
     /// </summary>
-    private ImmutableArray<LinkFact> KeepLinksIntoTargets(ImmutableArray<LinkFact> links, IReadOnlySet<RecordKey> targetKeys)
-    {
-        var removed = _removedRecords.ToHashSet();
-        return [.. links.Where(link => !removed.Contains(link.Source) && (link.Target.Plugin == _trust.CleanedMod || targetKeys.Contains(link.Target)))];
-    }
+    private static ImmutableArray<LinkFact> KeepLinksIntoTargets(
+        IEnumerable<LinkFact> links, IReadOnlySet<RecordKey> removed, PluginName cleanedMod, IReadOnlySet<RecordKey> targetKeys) =>
+        [.. links.Where(link => !removed.Contains(link.Source) && (link.Target.Plugin == cleanedMod || targetKeys.Contains(link.Target)))];
 
     /// <remarks>
     /// Targets define the target spaces, so no placement outside them can matter: a record there is hidden. A target record there
@@ -234,7 +248,8 @@ public sealed class PlacedObjectCollector
     private static (Vector3 Position, Vector3 Rotation) PlacementOf(PlacedRecordFact record) =>
         (record.Placement.Position!.Value, record.Placement.EulerRotation!.Value);
 
-    private CollectedObjects CreateCollectedObjects(ImmutableArray<LinkFact> links, ImmutableArray<UnreadableRecord> unreadable)
+    /// <summary>The objects with the placed records' links; the step's second part adds the other links and the unreadable records.</summary>
+    private CollectedObjects CreateCollectedObjects(ImmutableArray<LinkFact> placedLinks)
     {
         var targets = _targets
             .OrderBy(target => target.Key, RecordKeyOrder.Comparer)
@@ -244,8 +259,8 @@ public sealed class PlacedObjectCollector
             targets,
             NumberInKeyOrder(_otherModObjects, firstId: 0),
             NumberInKeyOrder(_supportOnlyObjects, firstId: _otherModObjects.Count),
-            links,
-            unreadable,
+            placedLinks,
+            [],
             _targetSpaces.DistinctBy(space => space.Key).ToDictionary(space => space.Key),
             new ReadCounts(
                 _facts.RecordsScanned,

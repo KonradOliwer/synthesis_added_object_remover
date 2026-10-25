@@ -22,6 +22,12 @@ public static class SettingsValidator
     private const float MaxMarginInUnits = 1024f;
     private const float MaxHeightChangeTolerance = 256f;
     private const float MaxTouchDistance = 64f;
+
+    /// <summary>
+    /// Fails to compile when the largest touch gap is not below the pull limit: an object counts as resting only within the
+    /// touch gap, so the drop test stops at the first distance within it without measuring up to the pull limit.
+    /// </summary>
+    private const byte TouchGapBelowPullLimit = MaxTouchDistance < OtherModsObjectsLimits.MaxPullDistance ? 0 : 256;
     private const float MinSearchRadius = 64f;
     private const float MaxSearchRadius = 8192f;
     private const int MaxOtherMastersLimit = 100;

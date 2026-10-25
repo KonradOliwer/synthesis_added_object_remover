@@ -29,12 +29,16 @@ internal sealed class TestReport
     /// <summary>A report whose mesh files have no problem.</summary>
     public static TestReport WithoutProblems() => Over(new AssetProblemLog());
 
-    /// <summary>The lines of the archive-warnings section, which takes the archive problems met since the last take.</summary>
-    public IReadOnlyList<string> TakeArchiveProblemLines() => [.. _report.BuildArchiveSections()[0].Lines];
+    /// <summary>
+    /// The lines of the archive-warnings section, which takes the archive problems met since the last take; without the detailed
+    /// log's step-time line of the mesh-reading preparation, which ends the section.
+    /// </summary>
+    public IReadOnlyList<string> TakeArchiveProblemLines() =>
+        [.. _report.BuildArchiveSections(TimeSpan.Zero)[0].Lines.Where(line => !line.StartsWith("Step time: ", StringComparison.Ordinal))];
 
     /// <summary>The lines of the sections printed after the placed objects were collected, in order.</summary>
     public IReadOnlyList<string> CollectedSectionLines(CollectedObjects world) =>
-        [.. _report.BuildStepSections(world, TimeSpan.Zero).SelectMany(section => section.Lines)];
+        [.. _report.BuildStepSections(world, TimeSpan.Zero, TimeSpan.Zero).SelectMany(section => section.Lines)];
 
     private sealed class MeshFilesOnlyCaches(IMeshFiles meshFiles) : ILoadOrderCaches
     {
@@ -45,6 +49,8 @@ internal sealed class TestReport
         public IBaseObjectShapes Shapes => null!;
 
         public ITriangleMeshes Triangles => throw NotRead();
+
+        public ISurfaceSamples SurfaceSamples => throw NotRead();
 
         public IBodyMeshBounds BodyBounds => throw NotRead();
 

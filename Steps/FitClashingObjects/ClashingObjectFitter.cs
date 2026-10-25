@@ -109,11 +109,15 @@ public static class ClashingObjectFitter
         return new ObjectFit(Fit: null, firstFailure);
     }
 
-    /// <summary>The unfittable rule's check, then the fittable rule's, in the order of their removal rounds; the first that clashes or fails counts.</summary>
+    /// <summary>The fittable rule's check, then the unfittable rule's; the first that clashes or fails counts.</summary>
+    /// <remarks>
+    /// A try fits only when both pass, so the order decides only which failure a try records. The fittable check comes first
+    /// because most tries clash by it, and the unfittable check is then not needed.
+    /// </remarks>
     private static PlacementCheck FirstClash(TargetId target, EulerPlacement placement, FitRules rules)
     {
-        var unfittable = rules.Unfittable.Check(target, placement);
-        return Stops(unfittable) ? unfittable : rules.Fittable.Check(target, placement);
+        var fittable = rules.Fittable.Check(target, placement);
+        return Stops(fittable) ? fittable : rules.Unfittable.Check(target, placement);
     }
 
     private static bool Stops(PlacementCheck check) => check.Clash is not null || check.Failure is not null;

@@ -17,6 +17,8 @@ internal sealed class TestRunCaches(
 
     public ITriangleMeshes Triangles => triangles;
 
+    public ISurfaceSamples SurfaceSamples { get; } = TestSurfaceSamples.Over(triangles);
+
     public ITerrainHeights Terrain => terrain;
 
     public IMeshFiles MeshFiles => throw NotRead();

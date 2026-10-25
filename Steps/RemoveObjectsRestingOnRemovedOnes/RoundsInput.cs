@@ -15,5 +15,6 @@ internal sealed record RoundsInput(
     IVisibleObjectsOfAnyPlugin? ObjectsOfAnyPlugin,
     IBaseObjectShapes Shapes,
     ITriangleMeshes Triangles,
+    ISurfaceSamples Surfaces,
     ITerrainHeights Terrain,
     Execution Exec);

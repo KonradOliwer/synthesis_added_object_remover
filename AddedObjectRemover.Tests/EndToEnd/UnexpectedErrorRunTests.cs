@@ -35,20 +35,20 @@ public class UnexpectedErrorRunTests
         Assert.Contains("Moved kept markers: not performed because of an unexpected error.", SectionLines(log, "relocations"));
     }
 
-    /// <remarks>The clock is read when the rounds start and when they end, so failing its second reading fails the step after its rounds were decided.</remarks>
+    /// <remarks>Failing the clock reading at the end of the rounds fails the step after its rounds were decided.</remarks>
     [Fact]
     public void AnAlsoRemoveFailureDuringItsRoundsAppliesNothingAndTheLaterStepsSeeTheTooCloseDecisions()
     {
         var healthy = Run(new RecordingLogSink());
-        var log = new RecordingLogSink();
-        var readings = 0;
+        var clock = new AlsoRemoveRoundsEndClock(() => throw new InvalidOperationException("also-remove broke"));
+        var log = new RecordingLogSink { OnPrint = clock.OnPrint };
 
         var outcome = ((RunResult.Done)FixtureRun.Run(
             SettingsVariants.Of(SettingsVariants.TouchWithLeftBehindAndMarkerMoves),
             workers: 1,
             log,
             DefaultMeshFiles,
-            timeSinceStart: () => ++readings == 2 ? throw new InvalidOperationException("also-remove broke") : TimeSpan.Zero)).Outcome;
+            timeSinceStart: clock.Read)).Outcome;
 
         Assert.NotEmpty(healthy.RestingObjects.Rounds);
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, outcome.RestingObjects.Outcome);
@@ -84,17 +84,17 @@ public class UnexpectedErrorRunTests
         Assert.Contains(detailedLines.Skip(3), line => line.StartsWith("         at ", StringComparison.Ordinal));
     }
 
-    /// <remarks>The clock's second reading is when the rounds end, so the rounds fail after they were decided.</remarks>
+    /// <remarks>Failing the clock reading at the end of the rounds fails them after they were decided.</remarks>
     private static RecordingLogSink RunWithFailingAlsoRemoveRounds(string variant)
     {
-        var log = new RecordingLogSink();
-        var readings = 0;
+        var clock = new AlsoRemoveRoundsEndClock(() => throw new InvalidOperationException("also-remove broke"));
+        var log = new RecordingLogSink { OnPrint = clock.OnPrint };
         var outcome = ((RunResult.Done)FixtureRun.Run(
             SettingsVariants.Of(variant),
             workers: 1,
             log,
             DefaultMeshFiles,
-            timeSinceStart: () => ++readings == 2 ? throw new InvalidOperationException("also-remove broke") : TimeSpan.Zero)).Outcome;
+            timeSinceStart: clock.Read)).Outcome;
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, outcome.RestingObjects.Outcome);
         return log;
     }
@@ -151,15 +151,15 @@ public class UnexpectedErrorRunTests
     }
 
     /// <remarks>
-    /// The clock is read when the also-remove rounds start and when they end. The report-file details are computed
-    /// next, and the first base fact they read, a mesh origin's base, fails.
+    /// The report-file details are computed after the clock reading at the end of the also-remove rounds, and the first
+    /// base fact they read, a mesh origin's base, fails.
     /// </remarks>
     [Fact]
     public void AReportFileDetailsFailureIsReportedAfterThePatchIsWrittenWhereItWasBeforeAndTheRunCompletes()
     {
         FailingBaseFacts? bases = null;
-        var readings = 0;
-        var log = new RecordingLogSink();
+        var clock = new AlsoRemoveRoundsEndClock(() => bases!.FailNextRead());
+        var log = new RecordingLogSink { OnPrint = clock.OnPrint };
 
         var result = FixtureRun.Run(
             SettingsVariants.Of(SettingsVariants.Support),
@@ -168,11 +168,7 @@ public class UnexpectedErrorRunTests
             DefaultMeshFiles,
             wrapPlugin: null,
             wrapBases: inner => bases = new FailingBaseFacts(inner),
-            timeSinceStart: () =>
-            {
-                if (++readings == 2) bases!.FailNextRead();
-                return TimeSpan.Zero;
-            });
+            timeSinceStart: clock.Read);
 
         var done = Assert.IsType<RunResult.Done>(result);
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, done.Outcome.RestingObjects.ReportFileDetails.Outcome);
@@ -228,6 +224,31 @@ public class UnexpectedErrorRunTests
         {
             channels.Add(unexpectedErrors);
             return inner.Open(inclusion, unexpectedErrors);
+        }
+    }
+
+    /// <summary>
+    /// The run's clock, which calls the action at the reading that ends the also-remove rounds. The too-close section prints just
+    /// before the also-remove step, which reads the clock when its rounds start and when they end.
+    /// </summary>
+    private sealed class AlsoRemoveRoundsEndClock(Action atRoundsEnd)
+    {
+        private const int RoundsEndReading = 2;
+        private int? _readingsSinceTooClose;
+
+        public void OnPrint(LogSection section)
+        {
+            if (section.Id == "tooClose") _readingsSinceTooClose = 0;
+        }
+
+        public TimeSpan Read()
+        {
+            if (_readingsSinceTooClose is { } readings)
+            {
+                _readingsSinceTooClose = readings + 1;
+                if (_readingsSinceTooClose == RoundsEndReading) atRoundsEnd();
+            }
+            return TimeSpan.Zero;
         }
     }
 

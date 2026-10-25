@@ -15,6 +15,8 @@ internal sealed class CachesOfTheRun(ILoadOrderCaches loadOrder, ObjectCaches ob
 
     public ITriangleMeshes Triangles => loadOrder.Triangles;
 
+    public ISurfaceSamples SurfaceSamples => loadOrder.SurfaceSamples;
+
     public IBodyMeshBounds BodyBounds => loadOrder.BodyBounds;
 
     public INpcBodies Bodies => loadOrder.Bodies;

@@ -17,6 +17,9 @@ public interface ILoadOrderCaches
     /// <summary>C6: the triangle tree of each mesh.</summary>
     ITriangleMeshes Triangles { get; }
 
+    /// <summary>C15: the sampled surface of each mesh, sampled from C6.</summary>
+    ISurfaceSamples SurfaceSamples { get; }
+
     /// <summary>C7: the bounds of each set of body meshes.</summary>
     IBodyMeshBounds BodyBounds { get; }
 

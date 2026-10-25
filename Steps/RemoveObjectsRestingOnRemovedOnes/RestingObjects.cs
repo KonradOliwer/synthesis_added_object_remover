@@ -18,6 +18,9 @@ namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 /// </summary>
 public static class RestingObjects
 {
+    /// <summary>How many points the surface samples (C15) spread over each mesh.</summary>
+    public static int SurfaceSamplesPerMesh => WeightedSurfaceSamples.SamplesPerMesh;
+
     /// <summary>
     /// The rounds, then the touch chains when they are shown, then the report-file details when report files are
     /// written, each stopped on its own by an unexpected failure.
@@ -28,13 +31,14 @@ public static class RestingObjects
         IBaseFacts bases,
         IBaseObjectShapes shapes,
         ITriangleMeshes triangles,
+        ISurfaceSamples surfaces,
         ITerrainHeights terrain,
         Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin)
     {
         if (input.Settings.Mode == FollowUpRemovalMode.Nothing) return NotPerformed(input, StepOutcome.SwitchedOff, failure: null).Result;
 
         var rounds = Failures.Attempt(
-            () => DecideRounds(input, shapes, triangles, terrain, objectsOfAnyPlugin),
+            () => DecideRounds(input, shapes, triangles, surfaces, terrain, objectsOfAnyPlugin),
             failure => NotPerformed(input, StepOutcome.StoppedByUnexpectedError, PartFailure.OfWholePart(RestingObjectsParts.AlsoRemove, failure)));
         var run = rounds with { Result = WithTouchChains(rounds, input) };
         return run.Result with { ReportFileDetails = FindReportFileDetails(run, input, bases, shapes, triangles) };
@@ -57,14 +61,15 @@ public static class RestingObjects
         OtherModsObjectsSettings otherModsObjects,
         IBaseObjectShapes shapes,
         ITriangleMeshes triangles,
+        ISurfaceSamples surfaces,
         ITerrainHeights terrain,
         Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin,
         Execution execution) =>
         OtherModsObjects.CreateRestingRule(
             targets,
             visibleTargets,
-            new RestingRule(targets, visibleTargets, settings, new OtherModsObjectRules(trust, plugins, shapes), shapes, triangles, terrain, objectsOfAnyPlugin, execution),
-            new OtherModsObjectsContext(trust, plugins, otherModsObjects, shapes, triangles, terrain, objectsOfAnyPlugin, execution));
+            new RestingRule(targets, visibleTargets, settings, new OtherModsObjectRules(trust, plugins, shapes), shapes, triangles, surfaces, terrain, objectsOfAnyPlugin, execution),
+            new OtherModsObjectsContext(trust, plugins, otherModsObjects, shapes, triangles, surfaces, terrain, objectsOfAnyPlugin, execution));
 
     /// <summary>
     /// KeepSupportingObject: the target objects other mods' objects rest on, directly or through other target objects, each where
@@ -81,11 +86,12 @@ public static class RestingObjects
         OtherModsObjectsSettings settings,
         IBaseObjectShapes shapes,
         ITriangleMeshes triangles,
+        ISurfaceSamples surfaces,
         ITerrainHeights terrain,
         Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin,
         Execution execution) =>
         OtherModsObjects.FindHeldUpTargets(
-            targets, visibleTargets, new OtherModsObjectsContext(trust, plugins, settings, shapes, triangles, terrain, objectsOfAnyPlugin, execution));
+            targets, visibleTargets, new OtherModsObjectsContext(trust, plugins, settings, shapes, triangles, surfaces, terrain, objectsOfAnyPlugin, execution));
 
     /// <summary>
     /// RemoveFloatingObject and PullObjectToTheGround: what becomes of the other mods' objects left without support once the
@@ -113,13 +119,14 @@ public static class RestingObjects
         AlsoRemoveSettings alsoRemove,
         IBaseObjectShapes shapes,
         ITriangleMeshes triangles,
+        ISurfaceSamples surfaces,
         ITerrainHeights terrain,
         Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin,
         Execution execution) =>
         OtherModsObjects.SettleLeftWithoutSupport(
             new DecidedTargets(targets, targetsAsTheyStand, decided, objectsToKeep, visibleTargets, visibleTargetsAsTheyStand),
             alsoRemove,
-            new OtherModsObjectsContext(trust, plugins, settings, shapes, triangles, terrain, objectsOfAnyPlugin, execution));
+            new OtherModsObjectsContext(trust, plugins, settings, shapes, triangles, surfaces, terrain, objectsOfAnyPlugin, execution));
 
     /// <remarks>
     /// The objects of any plugin are asked for before the rounds' time starts, because the first ask builds the
@@ -129,6 +136,7 @@ public static class RestingObjects
         RestingObjectsInput input,
         IBaseObjectShapes shapes,
         ITriangleMeshes triangles,
+        ISurfaceSamples surfaces,
         ITerrainHeights terrain,
         Func<IVisibleObjectsOfAnyPlugin> askObjectsOfAnyPlugin)
     {
@@ -137,7 +145,7 @@ public static class RestingObjects
         var start = input.TimeSinceStart();
         var plan = Prepare(
             earlierRounds,
-            new RoundsInput(input.Targets, input.ObjectsToKeep, objectsOfAnyPlugin, shapes, triangles, terrain, input.Execution),
+            new RoundsInput(input.Targets, input.ObjectsToKeep, objectsOfAnyPlugin, shapes, triangles, surfaces, terrain, input.Execution),
             settings);
         var run = DecideOnWorkingCopy(plan, earlierRounds);
         return run with { Result = run.Result with { RoundsTime = input.TimeSinceStart() - start } };
@@ -298,7 +306,7 @@ public static class RestingObjects
             input.Triangles,
             settings.TouchGap,
             input.Exec);
-        var contactFinder = CreateSupportContactFinder(input.Targets, search, objectsOfAnyPlugin, input.Shapes, input.Terrain, settings.TouchGap);
+        var contactFinder = CreateSupportContactFinder(input.Targets, search, objectsOfAnyPlugin, input.Shapes, input.Terrain, input.Surfaces, settings.TouchGap);
         return new SupportRule(search, contactFinder, settings.SupportLostFraction, input.Targets.Length, input.Exec);
     }
 
@@ -308,10 +316,11 @@ public static class RestingObjects
         IVisibleObjectsOfAnyPlugin objectsOfAnyPlugin,
         IBaseObjectShapes shapes,
         ITerrainHeights terrain,
+        ISurfaceSamples surfaces,
         float touchGap)
     {
         var supporterFinder = new SupporterFinder(targets, search, objectsOfAnyPlugin, shapes, touchGap);
-        return new SupportContactFinder(targets, search.MeshPaths, supporterFinder, new SurfaceContacts(terrain, search.Cache, touchGap));
+        return new SupportContactFinder(targets, search.MeshPaths, supporterFinder, new SurfaceContacts(terrain, search.Cache, surfaces, touchGap));
     }
 
     private static RestingObjectsWork CountSupportWork(ImmutableArray<RoundDetails> evidence, IRemovalDecisions decisions)

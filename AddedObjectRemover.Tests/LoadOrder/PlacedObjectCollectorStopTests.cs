@@ -39,7 +39,7 @@ public class PlacedObjectCollectorStopTests
     }
 
     private static CollectedObjects Collect(IPluginRecords plugin, WhatToCollect plan) =>
-        PlacedObjectCollector.Collect(plugin, Mods, plan);
+        PlacedObjects.Collect(plugin, Mods, plan);
 
     private static PlacedRecordFact CreateTargetRecord() =>
         TestPlacedRecords.Create(TestTargets.Key(0), TestTargets.TargetName, Vector3.Zero);

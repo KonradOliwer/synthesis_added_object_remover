@@ -32,7 +32,7 @@ internal static class TestTouchCascade
         var seeded = TestSeededDecisions.Seed(protection, targets.Count, seeds, terrainSeeds);
         var triangles = new TriangleStore(shapes.ReadTriangles);
         var input = new RoundsInput(
-            [.. targets], protection, ObjectsOfAnyPlugin: null, shapes, triangles, NoTerrain(), execution);
+            [.. targets], protection, ObjectsOfAnyPlugin: null, shapes, triangles, TestSurfaceSamples.Over(triangles), NoTerrain(), execution);
         var result = TestRestingObjects.Run(
             seeded, input, new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouchingIt, touchDistance, SupportLostFraction: 1f, TouchChainsShown: false));
         return Explain(targets, shapes, triangles, result, execution, collectDiagnostics);

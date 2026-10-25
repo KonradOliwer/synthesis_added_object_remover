@@ -79,6 +79,7 @@ public class TwoCreationPointsOfCachesTests
             new NpcRecordsPlugin(linkCache),
             TestBaseFacts.Reader(linkCache),
             npcBodyRules,
-            TooCloseObjects.PlacedNpcRules);
+            TooCloseObjects.PlacedNpcRules,
+            RestingObjects.SurfaceSamplesPerMesh);
     }
 }

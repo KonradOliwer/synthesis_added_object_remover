@@ -352,7 +352,7 @@ public class PlacedRecordFactReadingTests
             new ModTrustSettings(_target.Key.ToPluginName(), [], [], [], TrustRequiringMods: false, MaxOtherMastersOfRequiringMod: 0, TrustLoadingBefore: false));
         var plugins = world.Order.ListedOrder.Select(listing => listing.ModKey.ToPluginName()).Where(plugin => !table.IsPatch(plugin));
 
-        var collected = PlacedObjectCollector.Collect(
+        var collected = PlacedObjects.Collect(
             new PluginRecordsFactory(world, Environment.ProcessorCount).Open(),
             table,
             new WhatToCollect(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits));

@@ -11,6 +11,8 @@ internal static partial class LogSections
     /// <summary>The step's name, as the settings screen names its group.</summary>
     private const string LeftBehindStepName = "Invisible objects left behind";
 
+    public const string MarkerMovesName = "Moved kept markers";
+
     /// <param name="kept">The objects the left-behind round held.</param>
     /// <remarks>The summary comes first, then the per-object decisions and the kept lines.</remarks>
     public static LogSection BuildLeftBehindSection(
@@ -66,8 +68,8 @@ internal static partial class LogSections
     private static string MarkerMovesClosingLine(MarkerMoves markerMoves) => markerMoves.Outcome switch
     {
         StepOutcome.Performed => MarkerMovesSummaryLine(markerMoves),
-        StepOutcome.StoppedByUnexpectedError => BuildNotPerformedLine("Moved kept markers"),
-        StepOutcome.StoppedByEarlierFailure => BuildNotPerformedBecauseEarlierLine("Moved kept markers", LeftBehindStepName),
+        StepOutcome.StoppedByUnexpectedError => BuildNotPerformedLine(MarkerMovesName),
+        StepOutcome.StoppedByEarlierFailure => BuildNotPerformedBecauseEarlierLine(MarkerMovesName, LeftBehindStepName),
         _ => throw new UnreachableException($"Unexpected marker move outcome {markerMoves.Outcome}."),
     };
 

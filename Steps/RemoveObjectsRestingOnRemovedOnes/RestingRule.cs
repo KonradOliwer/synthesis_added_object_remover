@@ -24,6 +24,7 @@ internal sealed class RestingRule(
     OtherModsObjectRules rules,
     IBaseObjectShapes shapes,
     ITriangleMeshes triangles,
+    ISurfaceSamples surfaces,
     ITerrainHeights terrain,
     Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin,
     Execution execution) : IRestingRule
@@ -63,22 +64,37 @@ internal sealed class RestingRule(
     private IEnumerable<int> FindHoldingUp(List<IndexPair> held, IVisibleObjectsOfAnyPlugin others)
     {
         var world = new SupportWorld(targets, visibleTargets, _ => true, others, SupportWorld.NoChanges, shapes);
-        var drops = new DropFinder(new SurfaceContacts(terrain, triangles, settings.TouchGap), triangles, terrain, settings.TouchGap);
+        var drops = new DropFinder(new SurfaceContacts(terrain, triangles, surfaces, settings.TouchGap), triangles, terrain, settings.TouchGap);
+        var rests = FindResting([.. held.Select(pair => pair.Second).Distinct()], world, drops);
         var holdsUp = ParallelMap.Run(
-            execution, held.Count, () => new OtherObjectQueries(), (k, queries) => RestsOnlyWith(held[k], world, drops, queries), ParallelMap.AutomaticRangeSize);
+            execution,
+            held.Count,
+            () => new OtherObjectQueries(),
+            (k, queries) => rests[held[k].Second] && StopsRestingWithout(held[k], world, drops, queries),
+            ParallelMap.AutomaticRangeSize);
         return held.Zip(holdsUp).Where(entry => entry.Second).Select(entry => entry.First.First);
     }
 
-    /// <param name="pair">The checked object first, then the neighbour that may rest on it.</param>
-    private bool RestsOnlyWith(IndexPair pair, SupportWorld world, DropFinder drops, OtherObjectQueries queries)
+    /// <returns>For each neighbour: whether it rests on what is below it in the world.</returns>
+    private Dictionary<int, bool> FindResting(List<int> neighbours, SupportWorld world, DropFinder drops)
     {
-        var resting = rules.StandingOf(targets[pair.Second]);
-        return drops.Rests(resting, world, queries) && !drops.Rests(resting, world.Without([new TargetId(pair.First)]), queries);
+        var rests = ParallelMap.Run(
+            execution,
+            neighbours.Count,
+            () => new OtherObjectQueries(),
+            (k, queries) => drops.Rests(rules.StandingOf(targets[neighbours[k]]), world, queries),
+            ParallelMap.AutomaticRangeSize);
+        return neighbours.Zip(rests).ToDictionary(entry => entry.First, entry => entry.Second);
     }
+
+    /// <summary>Whether the neighbour no longer rests on what is below it without the checked object.</summary>
+    /// <param name="pair">The checked object first, then the neighbour that may rest on it.</param>
+    private bool StopsRestingWithout(IndexPair pair, SupportWorld world, DropFinder drops, OtherObjectQueries queries) =>
+        !drops.Rests(rules.StandingOf(targets[pair.Second]), world.Without([new TargetId(pair.First)]), queries);
 
     private Dictionary<int, CandidateContacts> FindContactsOf(List<int> resting, TouchSearch search, IVisibleObjectsOfAnyPlugin others)
     {
-        var contactFinder = RestingObjects.CreateSupportContactFinder(targets, search, others, shapes, terrain, settings.TouchGap);
+        var contactFinder = RestingObjects.CreateSupportContactFinder(targets, search, others, shapes, terrain, surfaces, settings.TouchGap);
         var found = contactFinder.FindContactsOfAll(resting, execution);
         return resting.Zip(found).ToDictionary(entry => entry.First, entry => entry.Second.Contacts);
     }

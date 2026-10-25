@@ -27,12 +27,14 @@ internal static class TestSupportCascade
         int threads)
     {
         var seeded = TestSeededDecisions.Seed(protection, targets.Count, seeds);
+        var triangles = new TriangleStore(shapes.ReadTriangles);
         var input = new RoundsInput(
             [.. targets],
             protection,
             objectsOfAnyPlugin,
             shapes,
-            new TriangleStore(shapes.ReadTriangles),
+            triangles,
+            TestSurfaceSamples.Over(triangles),
             terrain,
             new Execution(threads));
         var run = TestRestingObjects.Run(seeded, input, new AlsoRemoveSettings(FollowUpRemovalMode.OnlyWhatLosesItsSupport, touchDistance, threshold, TouchChainsShown: false));

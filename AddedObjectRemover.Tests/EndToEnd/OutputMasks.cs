@@ -21,6 +21,7 @@ internal static partial class OutputMasks
         "  Meshes indexed: ",
         "  NPC body cache: ",
         "Done in ",
+        "Step time: ",
     ];
 
     /// <summary>Whether the game INI of the machine running the test can be read.</summary>

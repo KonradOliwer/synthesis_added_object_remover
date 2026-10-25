@@ -22,6 +22,7 @@ public class OtherModsObjectsTests
     private const float SlabHeight = 2f;
     private const float ThinBoardHeight = 4f;
     private const float PlateHeight = 2f;
+    private const float BlockHeight = 50f;
 
     /// <summary>Wider than the thin board is thick.</summary>
     private const float WideTouchGap = 8f;
@@ -58,7 +59,7 @@ public class OtherModsObjectsTests
 
     /// <summary>Taller than the table with a lantern on it.</summary>
     private static readonly TestStatic BlockModel = new(
-        new FormKey(TestTargets.TargetMod, 0x716), @"test\othermods\block.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20, -20, 0), new Vector3(20, 20, 50))));
+        new FormKey(TestTargets.TargetMod, 0x716), @"test\othermods\block.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20, -20, 0), new Vector3(20, 20, BlockHeight))));
 
     /// <summary>
     /// A room shell around the table, with floor, walls and ceiling, and a stray triangle in a corner that leaves the mesh open
@@ -101,7 +102,7 @@ public class OtherModsObjectsTests
 
     private static readonly Vector3 OnTheTable = new(5, 5, TableHeight);
 
-    /// <summary>On the ground of <see cref="FlatTerrainAtZero"/>.</summary>
+    /// <summary>On the ground of <see cref="TestGround.FlatAtZero"/>.</summary>
     private static readonly Vector3 InTheTerrainCell = new(100, 100, 0);
 
     [Fact]
@@ -120,7 +121,7 @@ public class OtherModsObjectsTests
     {
         var scene = new Scene([CreateTable(InTheTerrainCell)], [Lantern(OtherMod, 0, InTheTerrainCell + OnTheTable)], OtherModsObjectsHandling.PullObjectToTheGround)
         {
-            Terrain = FlatTerrainAtZero(),
+            Terrain = TestGround.FlatAtZero(),
         };
 
         var outcome = Assert.Single(Settle(scene, RemoveTable).Result.Objects);
@@ -212,6 +213,24 @@ public class OtherModsObjectsTests
         List<OtherObject> others = [Floor(), BaseGameTable(1, new Vector3(40, 0, 0)), Lantern(OtherMod, 2, new Vector3(20, 0, TableHeight))];
 
         Assert.Empty(Settle(others, RemoveTable, OtherModsObjectsHandling.PullObjectToTheGround, threshold: 0.6f).Objects);
+    }
+
+    /// <summary>
+    /// The lantern stands half on the table and half over a tall base game block beside it, whose top lies just within or just
+    /// beyond the gap below the lantern. Within the gap it still rests on the block once the table is removed; beyond it, it is
+    /// pulled down onto the block.
+    /// </summary>
+    [Theory]
+    [InlineData(0.9f, false)]
+    [InlineData(1.1f, true)]
+    public void AnObjectOverAnObjectJustBelowTheGapRestsOnItAndOneJustBeyondItIsPulledDown(float blockTopBelowLantern, bool pulledDown)
+    {
+        var block = TestShapes.Placed(BaseGame, 1, BlockModel.Base, new Vector3(40, 0, TableHeight - blockTopBelowLantern - BlockHeight));
+
+        var outcomes = Settle([Floor(), block, Lantern(OtherMod, 2, new Vector3(20, 0, TableHeight))], RemoveTable, OtherModsObjectsHandling.PullObjectToTheGround, threshold: 0.1f).Objects;
+
+        Assert.Equal(pulledDown, outcomes.Any(outcome => outcome.Fate == OtherModsObjectFate.PulledDown));
+        Assert.All(outcomes, outcome => Assert.Equal(blockTopBelowLantern, outcome.Drop, DropTolerance));
     }
 
     /// <summary>
@@ -673,7 +692,7 @@ public class OtherModsObjectsTests
         AgreementScene.OnABoardOnTheTerrain => new Scene(
             [TestTargets.Create(Table, TestTargets.At(InTheTerrainCell), ThinBoardModel.Base, TestTargets.Space)],
             [Lantern(OtherMod, 0, InTheTerrainCell + new Vector3(0, 0, ThinBoardHeight))],
-            OtherModsObjectsHandling.KeepSupportingObject) { Terrain = FlatTerrainAtZero(), TouchGap = WideTouchGap },
+            OtherModsObjectsHandling.KeepSupportingObject) { Terrain = TestGround.FlatAtZero(), TouchGap = WideTouchGap },
         _ => throw new ArgumentOutOfRangeException(nameof(name), name, null),
     };
 
@@ -722,6 +741,7 @@ public class OtherModsObjectsTests
         var protection = scene.CreateProtection();
         var decided = decide(RemovalDecisions.Start(protection, scene.Targets.Count));
         var asTheyStand = ClashingObjectFitter.PlaceAsTheyStand([.. scene.Targets], decided);
+        var triangles = new TriangleStore(Shapes.ReadTriangles);
         var result = RestingObjects.SettleOtherModsObjects(
             [.. scene.Targets],
             asTheyStand,
@@ -734,7 +754,8 @@ public class OtherModsObjectsTests
             scene.OtherModsSettings,
             scene.AlsoRemoveSettings,
             Shapes,
-            new TriangleStore(Shapes.ReadTriangles),
+            triangles,
+            TestSurfaceSamples.Over(triangles),
             scene.Terrain,
             caches.VisibleObjectsOfAnyPlugin,
             new Execution(scene.Threads));
@@ -748,6 +769,7 @@ public class OtherModsObjectsTests
     private static HeldUpTargets FindHeldUp(Scene scene)
     {
         var caches = TestScenes.CreateWithSupportOnlyObjects(scene.Targets, scene.Others, Shapes);
+        var triangles = new TriangleStore(Shapes.ReadTriangles);
         return RestingObjects.FindHeldUpTargets(
             [.. scene.Targets],
             caches.VisibleTargets,
@@ -755,7 +777,8 @@ public class OtherModsObjectsTests
             Plugins,
             scene.OtherModsSettings,
             Shapes,
-            new TriangleStore(Shapes.ReadTriangles),
+            triangles,
+            TestSurfaceSamples.Over(triangles),
             scene.Terrain,
             caches.VisibleObjectsOfAnyPlugin,
             new Execution(scene.Threads));
@@ -765,6 +788,7 @@ public class OtherModsObjectsTests
     private static List<TargetId> FindRestedOn(Scene scene)
     {
         var caches = TestScenes.CreateWithSupportOnlyObjects(scene.Targets, scene.Others, Shapes);
+        var triangles = new TriangleStore(Shapes.ReadTriangles);
         var rule = RestingObjects.CreateRestingRule(
             [.. scene.Targets],
             caches.VisibleTargets,
@@ -773,7 +797,8 @@ public class OtherModsObjectsTests
             Plugins,
             scene.OtherModsSettings,
             Shapes,
-            new TriangleStore(Shapes.ReadTriangles),
+            triangles,
+            TestSurfaceSamples.Over(triangles),
             scene.Terrain,
             caches.VisibleObjectsOfAnyPlugin,
             new Execution(scene.Threads));
@@ -803,15 +828,6 @@ public class OtherModsObjectsTests
     private static OtherObject Book(ModKey mod, int id, Vector3 position) => TestShapes.Placed(mod, id, BookModel.Base, position);
 
     private static OtherObject Lantern(ModKey mod, int id, Vector3 position) => TestShapes.Placed(mod, id, LanternModel.Base, position);
-
-    /// <summary>Flat land at height 0 in the space's cell (0, 0), which reaches from 0 to 4096 on both axes.</summary>
-    private static TerrainHeights FlatTerrainAtZero() =>
-        TestGround.Terrain(
-            new Dictionary<ExteriorCell, ILandscapeGetter>
-            {
-                [new ExteriorCell(TestTargets.Space, 0, 0)] = new Landscape(new FormKey(TestTargets.TargetMod, 0x300), SkyrimRelease.SkyrimSE) { VertexHeightMap = new LandscapeVertexHeightMap() },
-            },
-            new Dictionary<RecordKey, RecordKey> { [TestTargets.Space] = TestTargets.Space });
 
     private static LoadOrderPlugins CreatePlugins()
     {

@@ -8,10 +8,13 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
 internal static partial class LogSections
 {
-    /// <summary>The detailed log's count of the objects that may be shrunk or turned and are too close where they stand; nothing when there is none.</summary>
+    /// <summary>
+    /// The detailed log's count of the objects that may be shrunk or turned and are too close where they stand, with the step's time;
+    /// the detailed log's step-time line alone when there is none.
+    /// </summary>
     public static LogSection BuildFitSection(FitResult found, TimeSpan elapsed, ReportContext context)
     {
-        if (!context.Detailed || found.Clashing == 0) return new LogSection("fit", []);
+        if (!context.Detailed || found.Clashing == 0) return new LogSection("fit", StepTimeLines(FitStepName, elapsed, context));
         return new LogSection(
             "fit",
             [

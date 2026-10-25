@@ -71,7 +71,7 @@ public class UnreadableRecordTests : IDisposable
         var target = TestPlacedRecords.Create(TestTargets.Key(0), TestTargets.TargetName, Vector3.Zero);
         var broken = Unreadable();
 
-        var collected = PlacedObjectCollector.Collect(new FixedFactsPlugin([target]) { Unreadable = [broken] }, Mods, Plan);
+        var collected = PlacedObjects.Collect(new FixedFactsPlugin([target]) { Unreadable = [broken] }, Mods, Plan);
 
         Assert.Empty(collected.Links);
         Assert.Equal(broken, Assert.Single(collected.UnreadableRecords));

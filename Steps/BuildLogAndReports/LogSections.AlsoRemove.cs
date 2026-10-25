@@ -10,6 +10,8 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
 internal static partial class LogSections
 {
+    public const string AlsoRemoveName = "Also remove";
+
     /// <summary>The section of the also-remove step's mode; the empty one when no round ran, and the not-performed line when the step was stopped.</summary>
     /// <remarks>Rounds run exactly when the step was performed and the too-close round removed something.</remarks>
     /// <param name="decisions">The run's decisions with the also-remove rounds applied.</param>
@@ -17,7 +19,7 @@ internal static partial class LogSections
         CollectedObjects world, RestingObjectsResult alsoRemove, IRemovalDecisions decisions, TriangleStoreStats meshes, ReportContext context) =>
         alsoRemove.Outcome switch
         {
-            StepOutcome.StoppedByUnexpectedError => BuildFollowUpSection([BuildNotPerformedLine("Also remove")]),
+            StepOutcome.StoppedByUnexpectedError => BuildFollowUpSection([BuildNotPerformedLine(AlsoRemoveName)]),
             StepOutcome.SwitchedOff => BuildNoFollowUpSection(),
             StepOutcome.Performed => alsoRemove.HadSeeds
                 ? BuildModeSection(world, alsoRemove, decisions, alsoRemove.RoundsTime, meshes, context)
@@ -96,7 +98,7 @@ internal static partial class LogSections
         alsoRemove.Rounds.Sum(round => decisions.KeptIn(round).Length);
 
     private static string AlsoRemoveTime(RestingObjectsResult alsoRemove, TimeSpan elapsed) =>
-        $"Also remove: {TextFormat.Count(alsoRemove.Rounds.Length)} rounds in {TextFormat.Seconds(elapsed)}.";
+        $"{AlsoRemoveName}: {TextFormat.Count(alsoRemove.Rounds.Length)} rounds in {TextFormat.Seconds(elapsed)}.";
 
     private static string AlsoRemovePairs(PairTestStats pairs, int rounds, string roundName) =>
         $"  Pairs: {TextFormat.Count(pairs.PairsTested)} box candidates next to a removal tested over {TextFormat.Count(rounds)} {roundName}, "

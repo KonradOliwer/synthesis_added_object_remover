@@ -82,7 +82,7 @@ public static class MeshContact
     /// <summary>Per sample (in <paramref name="samplesTransform"/>'s frame): whether it is within the gap of the mesh's surface or enclosed by it.</summary>
     /// <param name="scratch">Reused buffer for triangle queries.</param>
     public static bool[] SamplesTouching(
-        Vector3[] samples,
+        ReadOnlySpan<Vector3> samples,
         PlacedTransform samplesTransform,
         MeshTriangleTree tree,
         PlacedTransform treeTransform,

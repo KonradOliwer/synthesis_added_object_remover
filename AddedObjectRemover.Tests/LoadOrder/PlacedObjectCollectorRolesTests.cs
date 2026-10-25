@@ -39,6 +39,6 @@ public class PlacedObjectCollectorRolesTests
     private static ReferenceRoles RolesOf(PlacedRecordFact record, HashSet<RecordKey> linkedFrom)
     {
         var plugin = new FixedFactsPlugin(ImmutableArray.Create(Target, record)) { LinkedFrom = linkedFrom };
-        return Assert.Single(PlacedObjectCollector.Collect(plugin, Mods, Plan).SupportOnlyObjects).Roles;
+        return Assert.Single(PlacedObjects.Collect(plugin, Mods, Plan).SupportOnlyObjects).Roles;
     }
 }

@@ -75,15 +75,19 @@ public sealed class LogAndReports
     public static ImmutableArray<LogSection> BuildStopSections(StopReason reason, SettingsSource source) => [LogSections.BuildStopSection(reason, source)];
 
     /// <summary>The problems met while reading the archive index and starting the mesh loader.</summary>
-    public ImmutableArray<LogSection> BuildArchiveSections() =>
-        [LogSections.BuildArchiveWarningsSection(TakeArchiveProblems()), TakeUnexpectedErrors()];
+    public ImmutableArray<LogSection> BuildArchiveSections(TimeSpan elapsed) =>
+        [WithStepTime(LogSections.BuildArchiveWarningsSection(TakeArchiveProblems()), LogSections.MeshReadingStepName, elapsed), TakeUnexpectedErrors()];
 
-    public ImmutableArray<LogSection> BuildStepSections(ModTrustTable trust, LoadOrderPlugins plugins) => [LogSections.BuildConfigSection(_settings, trust, plugins)];
+    public ImmutableArray<LogSection> BuildStepSections(ModTrustTable trust, LoadOrderPlugins plugins, TimeSpan elapsed) =>
+        [WithStepTime(LogSections.BuildConfigSection(_settings, trust, plugins), LogSections.ModsStepName, elapsed)];
 
+    /// <param name="scanElapsed">The time of the placed-record scan, which the scan line holds.</param>
+    /// <param name="linksElapsed">The time of reading the links from records other than placed objects.</param>
     /// <remarks>The run stops when there is nothing to check, before the threads line; it still logs its starting state, having removed nothing.</remarks>
-    public ImmutableArray<LogSection> BuildStepSections(CollectedObjects world, TimeSpan elapsed)
+    public ImmutableArray<LogSection> BuildStepSections(CollectedObjects world, TimeSpan scanElapsed, TimeSpan linksElapsed)
     {
-        var scan = LogSections.BuildScanSection(world, _settings.TargetAsTyped, elapsed, _context);
+        var scan = WithStepTime(
+            LogSections.BuildScanSection(world, _settings.TargetAsTyped, scanElapsed, _context), LogSections.NonPlacedLinksStepName, linksElapsed);
         return world.Stop is not null
             ? [scan, LogSections.BuildRunSummarySection(world, _settings.TargetAsTyped, removedInThisRun: 0)]
             : [scan, LogSections.BuildThreadsSection(_settings.Execution, _context)];
@@ -118,10 +122,10 @@ public sealed class LogAndReports
     private ImmutableArray<LogSection> LinkedSectionWhenAnyRound(ImmutableArray<Round> rounds, IRemovalDecisions decisions) =>
         rounds.IsEmpty ? [] : [LogSections.BuildLinkedSection(decisions, rounds, RoundKind.AlsoRemove, _context)];
 
-    public ImmutableArray<LogSection> BuildStepSections(ObjectsToKeepResult found)
+    public ImmutableArray<LogSection> BuildStepSections(ObjectsToKeepResult found, TimeSpan elapsed)
     {
         var groups = LogSections.BuildGroupsSection(found.ObjectsToKeep.Groups, found.LinkCount, _settings.TargetAsTyped, _context);
-        return [groups, TakeUnexpectedErrors(found.CheckFailures)];
+        return [WithStepTime(groups, LogSections.ObjectsToKeepStepName, elapsed), TakeUnexpectedErrors(found.CheckFailures)];
     }
 
     public ImmutableArray<LogSection> BuildStepSections(FitResult found, TimeSpan elapsed) =>
@@ -160,13 +164,17 @@ public sealed class LogAndReports
     }
 
     /// <param name="decisions">The run's decisions with the also-remove rounds applied.</param>
-    public ImmutableArray<LogSection> BuildStepSections(RestingObjectsResult alsoRemove, IRemovalDecisions decisions, CollectedObjects world) =>
-        BuildRoundSections(
-            LogSections.BuildAlsoRemoveSection(world, alsoRemove, decisions, _caches.Triangles.GetStats(), _context),
+    /// <param name="elapsed">The whole step's time; the section's own time is that of the rounds alone.</param>
+    public ImmutableArray<LogSection> BuildStepSections(RestingObjectsResult alsoRemove, IRemovalDecisions decisions, CollectedObjects world, TimeSpan elapsed)
+    {
+        var section = LogSections.BuildAlsoRemoveSection(world, alsoRemove, decisions, _caches.Triangles.GetStats(), _context);
+        return BuildRoundSections(
+            WithStepTimeWhenPerformed(section, alsoRemove.Outcome, LogSections.AlsoRemoveName, elapsed),
             decisions,
             alsoRemove.Rounds,
             RoundKind.AlsoRemove,
             Present(alsoRemove.Failure, alsoRemove.TouchChainsFailure));
+    }
 
     /// <param name="final">The decisions whose last round is the left-behind round.</param>
     public ImmutableArray<LogSection> BuildStepSections(LeftBehindResult found, IRemovalDecisions final, CollectedObjects world, TimeSpan elapsed)
@@ -176,10 +184,10 @@ public sealed class LogAndReports
         return BuildRoundSections(leftBehind, final, [lastRound], RoundKind.LeftBehind, Present(found.Failure));
     }
 
-    public ImmutableArray<LogSection> BuildStepSections(MarkerMoves moves, CollectedObjects world)
+    public ImmutableArray<LogSection> BuildStepSections(MarkerMoves moves, CollectedObjects world, TimeSpan elapsed)
     {
         var section = LogSections.BuildKeptMarkerMovesSection(world, moves, _context);
-        return [section, TakeUnexpectedErrors(Present(moves.Failure))];
+        return [WithStepTimeWhenPerformed(section, moves.Outcome, LogSections.MarkerMovesName, elapsed), TakeUnexpectedErrors(Present(moves.Failure))];
     }
 
     public ImmutableArray<LogSection> BuildStepSections(WriteSummary written, TimeSpan elapsed) => [LogSections.BuildWriteSection(written, elapsed, _context)];
@@ -283,6 +291,13 @@ public sealed class LogAndReports
         _archiveProblemsTakenUpTo = problems.Mark();
         return taken;
     }
+
+    private LogSection WithStepTime(LogSection section, string stepName, TimeSpan elapsed) =>
+        LogSections.WithStepTime(section, stepName, elapsed, _context);
+
+    /// <summary>The step-time line only for a performed step: a switched-off step does nothing, and a stopped one says so instead.</summary>
+    private LogSection WithStepTimeWhenPerformed(LogSection section, StepOutcome outcome, string stepName, TimeSpan elapsed) =>
+        outcome == StepOutcome.Performed ? WithStepTime(section, stepName, elapsed) : section;
 
     /// <param name="failures">The failures a result stopped its parts with; null where there was none.</param>
     private static IEnumerable<PartFailure> Present(params PartFailure?[] failures) => failures.OfType<PartFailure>();

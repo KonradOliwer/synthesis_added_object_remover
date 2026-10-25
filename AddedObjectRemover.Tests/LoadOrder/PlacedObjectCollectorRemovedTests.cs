@@ -116,5 +116,5 @@ public class PlacedObjectCollectorRemovedTests
     private static CollectedObjects Collect(ImmutableArray<PlacedRecordFact> records) => Collect(records, []);
 
     private static CollectedObjects Collect(ImmutableArray<PlacedRecordFact> records, ImmutableArray<LinkFact> links) =>
-        PlacedObjectCollector.Collect(new FixedFactsPlugin(records, links), Mods, Plan);
+        PlacedObjects.Collect(new FixedFactsPlugin(records, links), Mods, Plan);
 }

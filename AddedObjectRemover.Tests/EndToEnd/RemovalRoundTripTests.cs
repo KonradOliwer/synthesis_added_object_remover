@@ -75,7 +75,7 @@ public sealed class RemovalRoundTripTests
         var removed = new HashSet<RecordKey> { Key(_plain), Key(_withEnableParent) };
 
         WriteRemovals(state, records, [_plain, _withEnableParent]);
-        var collected = PlacedObjectCollector.Collect(records.Open(), ModsOf(_second), Plan);
+        var collected = PlacedObjects.Collect(records.Open(), ModsOf(_second), Plan);
 
         Assert.Equal([Key(_kept)], collected.OtherModObjects.Select(other => other.Key));
         Assert.DoesNotContain(collected.SupportOnlyObjects, support => removed.Contains(support.Key));
@@ -91,7 +91,7 @@ public sealed class RemovalRoundTripTests
         var records = new PluginRecordsFactory(world, Workers);
 
         WriteMove(state, records, _kept, MovedTo);
-        var collected = PlacedObjectCollector.Collect(records.Open(), ModsOf(_second), Plan);
+        var collected = PlacedObjects.Collect(records.Open(), ModsOf(_second), Plan);
 
         var moved = Assert.Single(collected.OtherModObjects, other => other.Key == Key(_kept));
         Assert.Equal(MovedTo, moved.Position);
@@ -106,7 +106,7 @@ public sealed class RemovalRoundTripTests
         var records = new PluginRecordsFactory(world, Workers);
 
         WriteMove(state, records, _kept, MovedTo);
-        var collected = PlacedObjectCollector.Collect(records.Open(), ModsOf(_cleaned), Plan);
+        var collected = PlacedObjects.Collect(records.Open(), ModsOf(_cleaned), Plan);
 
         Assert.Equal(MovedTo, Assert.Single(collected.Targets, target => target.Key == Key(_kept)).Transform.Position);
         Assert.Equal(0, collected.Counts.TargetsOverriddenLater);
@@ -120,7 +120,7 @@ public sealed class RemovalRoundTripTests
         var records = new PluginRecordsFactory(world, Workers);
 
         WriteRemovals(state, records, [_withEnableParent]);
-        var collected = PlacedObjectCollector.Collect(records.Open(), ModsOf(_cleaned), Plan);
+        var collected = PlacedObjects.Collect(records.Open(), ModsOf(_cleaned), Plan);
 
         Assert.Equal([Key(_plain), Key(_kept)], collected.Targets.Select(target => target.Key));
         Assert.Equal(new CleanedModCounts(Objects: 3, RemovedByEarlierPatchers: 1, RemovedByOtherPlugins: 0), CountsOf(collected));
@@ -139,7 +139,7 @@ public sealed class RemovalRoundTripTests
     {
         var keys = crates.Select(Key).ToHashSet();
         var reader = records.Open();
-        var targets = PlacedObjectCollector.Collect(reader, ModsOf(_cleaned), Plan).Targets;
+        var targets = PlacedObjects.Collect(reader, ModsOf(_cleaned), Plan).Targets;
         var orders = targets
             .Where(target => keys.Contains(target.Key))
             .SelectMany(RemovalWrite.OrdersFor)

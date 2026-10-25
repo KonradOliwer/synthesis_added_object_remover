@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using static AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.SupportContactFinder;
@@ -10,17 +11,14 @@ namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 /// the touch distance of or is enclosed by (<see cref="MeshContact.SamplesTouching"/>), and for terrain when it lies at or
 /// below terrain height plus the touch distance. Thread-safe; results depend only on the inputs.
 /// </summary>
-internal sealed class SurfaceContacts(ITerrainHeights terrain, ITriangleMeshes cache, float touchDistance)
+internal sealed class SurfaceContacts(ITerrainHeights terrain, ITriangleMeshes cache, ISurfaceSamples surfaces, float touchDistance)
 {
-    public WeightedSurfaceSamples SampleSurface(string meshPath)
-    {
-        using var lease = cache.Acquire(meshPath);
-        return lease.Value is { } tree ? WeightedSurfaceSamples.Create(tree) : WeightedSurfaceSamples.Empty;
-    }
+    public WeightedSurfaceSamples SampleSurface(string meshPath) =>
+        surfaces.Of(meshPath) is { } surface ? WeightedSurfaceSamples.Create(surface) : WeightedSurfaceSamples.Empty;
 
     /// <returns>One per mesh supporter, in the given order, then one for the terrain when the space has terrain.</returns>
     public List<SupporterHits> FindHits(
-        Vector3[] points, RecordKey space, PlacedTransform transform, IEnumerable<MeshSupporter> supporters, List<int> scratch)
+        ImmutableArray<Vector3> points, RecordKey space, PlacedTransform transform, IEnumerable<MeshSupporter> supporters, List<int> scratch)
     {
         var hits = supporters.Select(supporter => new SupporterHits(supporter.Supporter, FindSamplesTouchingMesh(points, transform, supporter, scratch))).ToList();
         if (terrain.HasTerrain(space)) hits.Add(new SupporterHits(Supporter.Terrain, FindSamplesOnTerrain(points, space, transform)));
@@ -28,16 +26,16 @@ internal sealed class SurfaceContacts(ITerrainHeights terrain, ITriangleMeshes c
     }
 
     /// <returns>Per sample: whether it is in contact with the supporter's mesh.</returns>
-    private bool[] FindSamplesTouchingMesh(Vector3[] points, PlacedTransform transform, MeshSupporter supporter, List<int> scratch)
+    private bool[] FindSamplesTouchingMesh(ImmutableArray<Vector3> points, PlacedTransform transform, MeshSupporter supporter, List<int> scratch)
     {
         using var lease = cache.Acquire(supporter.MeshPath);
         return lease.Value is { } tree
-            ? MeshContact.SamplesTouching(points, transform, tree, supporter.Transform, touchDistance, scratch)
+            ? MeshContact.SamplesTouching(points.AsSpan(), transform, tree, supporter.Transform, touchDistance, scratch)
             : new bool[points.Length];
     }
 
     /// <returns>Per sample: whether it lies at or below terrain height plus the touch distance.</returns>
-    private bool[] FindSamplesOnTerrain(Vector3[] points, RecordKey space, PlacedTransform transform)
+    private bool[] FindSamplesOnTerrain(ImmutableArray<Vector3> points, RecordKey space, PlacedTransform transform)
     {
         var hits = new bool[points.Length];
         for (var i = 0; i < points.Length; i++)

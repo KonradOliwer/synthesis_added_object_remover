@@ -120,5 +120,5 @@ public class PlacedObjectCollectorFinalVersionTests
         TestPlacedRecords.WithWinningPresence(record, new PresenceFacts(Deleted: false, InitiallyDisabled: true, EnableParent: null));
 
     private static CollectedObjects Collect(ImmutableArray<PlacedRecordFact> records) =>
-        PlacedObjectCollector.Collect(new FixedFactsPlugin(records), Mods, Plan);
+        PlacedObjects.Collect(new FixedFactsPlugin(records), Mods, Plan);
 }

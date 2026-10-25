@@ -7,7 +7,7 @@ using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
 
 /// <summary>
-/// The load-order caches (C2 to C8, C13 and C14), created at the start of the run: the first creation point of
+/// The load-order caches (C2 to C8 and C13 to C15), created at the start of the run: the first creation point of
 /// the run's caches. It also holds the problems the mesh reads meet and the statistics counted from the contents.
 /// </summary>
 internal sealed class LoadOrderCaches : ILoadOrderCaches
@@ -19,6 +19,7 @@ internal sealed class LoadOrderCaches : ILoadOrderCaches
         IMeshFiles meshFiles,
         IBaseObjectShapes shapes,
         ITriangleMeshes triangles,
+        ISurfaceSamples surfaceSamples,
         IBodyMeshBounds bodyBounds,
         INpcBodies bodies,
         ITerrainHeights terrain,
@@ -30,6 +31,7 @@ internal sealed class LoadOrderCaches : ILoadOrderCaches
         MeshFiles = meshFiles;
         Shapes = shapes;
         Triangles = triangles;
+        SurfaceSamples = surfaceSamples;
         BodyBounds = bodyBounds;
         Bodies = bodies;
         Terrain = terrain;
@@ -44,6 +46,8 @@ internal sealed class LoadOrderCaches : ILoadOrderCaches
 
     public ITriangleMeshes Triangles { get; }
 
+    public ISurfaceSamples SurfaceSamples { get; }
+
     public IBodyMeshBounds BodyBounds { get; }
 
     public INpcBodies Bodies { get; }
@@ -56,21 +60,25 @@ internal sealed class LoadOrderCaches : ILoadOrderCaches
     /// <param name="unexpectedErrors">The run's unexpected-error channel, which the mesh files record into.</param>
     /// <param name="npcBodyRules">How C8 works out the bodies of the NPCs.</param>
     /// <param name="placedNpcRules">How C10 picks, places and counts the placed NPCs.</param>
+    /// <param name="surfaceSamplesPerMesh">How many points C15 spreads over each mesh's surface.</param>
     public static LoadOrderCaches Create(
         IMeshFilesFactory meshFilesFactory,
         IUnexpectedErrors unexpectedErrors,
         IPluginRecords plugin,
         IBaseFacts bases,
         NpcBodyRules npcBodyRules,
-        PlacedNpcRules placedNpcRules)
+        PlacedNpcRules placedNpcRules,
+        int surfaceSamplesPerMesh)
     {
         var meshFiles = meshFilesFactory.Open(BaseObjectShapes.SolidShapes, unexpectedErrors);
         var bodyBounds = new BodyMeshBounds(meshFiles);
+        var triangles = new TriangleStore(meshFiles.ReadTriangles);
         return new LoadOrderCaches(
             bases,
             meshFiles,
             new BaseObjectShapes(bases, meshFiles),
-            new TriangleStore(meshFiles.ReadTriangles),
+            triangles,
+            new SurfaceSampleStore(triangles, surfaceSamplesPerMesh),
             bodyBounds,
             new NpcBodyCache(plugin, npcBodyRules.TemplateFlag, npcBodyRules.CreateOwnBodyResolver(meshFiles, bodyBounds), npcBodyRules.DistinctBodies),
             new TerrainHeights(plugin.ReadTerrain, plugin.FindLandWorldspace),

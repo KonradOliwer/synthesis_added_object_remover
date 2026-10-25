@@ -203,7 +203,7 @@ public class PlacedObjectCollectorTrustTests
     {
         var plugin = new FixedFactsPlugin([Target]);
 
-        PlacedObjectCollector.Collect(plugin, Mods, Plan);
+        PlacedObjects.Collect(plugin, Mods, Plan);
 
         var stops = plugin.StopsTheWalk!;
         Assert.Equal((true, true, false, false, false), (stops(BaseGame), stops(Carrier), stops(Birds), stops(City), stops(Patch)));
@@ -240,5 +240,5 @@ public class PlacedObjectCollectorTrustTests
     }
 
     private static CollectedObjects Collect(PlacedRecordFact record) =>
-        PlacedObjectCollector.Collect(new FixedFactsPlugin(ImmutableArray.Create(Target, record)), Mods, Plan);
+        PlacedObjects.Collect(new FixedFactsPlugin(ImmutableArray.Create(Target, record)), Mods, Plan);
 }

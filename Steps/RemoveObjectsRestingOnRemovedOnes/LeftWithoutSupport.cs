@@ -5,10 +5,10 @@ using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
 /// <summary>
-/// The <see cref="SupportBefore"/> of each judged object found so far, before any decision, which no decision changes; kept by one
-/// step for all its settlings.
+/// The weight of the surface touching anything of each judged object found so far, before any decision, which no decision
+/// changes; kept by one step for all its settlings.
 /// </summary>
-internal sealed record SupportsBefore(Dictionary<OtherId, SupportBefore> Of);
+internal sealed record WeightsBefore(Dictionary<OtherId, float> WeightOf);
 
 /// <summary>
 /// RemoveFloatingObject and PullObjectToTheGround. An object is left without support when it loses its support
@@ -31,7 +31,7 @@ internal sealed class LeftWithoutSupport(
     SupportLoss loss,
     DropFinder drops,
     OtherModsObjectsSettings settings,
-    SupportsBefore before,
+    WeightsBefore before,
     Execution execution)
 {
     /// <summary>What one settling has found so far.</summary>
@@ -58,7 +58,7 @@ internal sealed class LeftWithoutSupport(
     private List<BoxInSpace> DecideRound(IReadOnlyList<BoxInSpace> changedLastRound, Progress progress)
     {
         var candidates = near.FindTouchingAny(changedLastRound, isLeftOut: id => progress.Decided.ContainsKey(id) || progress.Changed.ContainsKey(id));
-        FindMissingSupportsBefore(candidates);
+        FindMissingWeightsBefore(candidates);
         var world = final.With(new Dictionary<OtherId, PlacedTransform?>(progress.Changed));
         var lostShares = ParallelMap.Run(
             execution,
@@ -77,21 +77,21 @@ internal sealed class LeftWithoutSupport(
         return takenAway;
     }
 
-    private void FindMissingSupportsBefore(List<OtherObject> candidates)
+    private void FindMissingWeightsBefore(List<OtherObject> candidates)
     {
-        List<OtherObject> missing = [.. candidates.Where(candidate => !before.Of.ContainsKey(candidate.Id))];
+        List<OtherObject> missing = [.. candidates.Where(candidate => !before.WeightOf.ContainsKey(candidate.Id))];
         var found = ParallelMap.Run(
             execution,
             missing.Count,
             () => new OtherObjectQueries(),
-            (k, queries) => loss.FindSupportBefore(rules.StandingOf(missing[k]), original, queries),
+            (k, queries) => loss.FindWeightBefore(rules.StandingOf(missing[k]), original, queries),
             ParallelMap.AutomaticRangeSize);
-        for (var k = 0; k < missing.Count; k++) before.Of.Add(missing[k].Id, found[k]);
+        for (var k = 0; k < missing.Count; k++) before.WeightOf.Add(missing[k].Id, found[k]);
     }
 
     /// <returns>The share of its support the object lost in <paramref name="world"/>, when it is left without support; null otherwise.</returns>
     private float? FindLostShare(OtherObject candidate, SupportWorld world, OtherObjectQueries queries) =>
-        loss.FindLostShare(rules.StandingOf(candidate), before.Of[candidate.Id], world, queries);
+        loss.FindLostShare(rules.StandingOf(candidate), before.WeightOf[candidate.Id], original, world, queries);
 
     /// <returns>Whether the object is taken away: removed, or waiting to be pulled down.</returns>
     private bool Decide(OtherObject other, float lostShare, Progress progress)

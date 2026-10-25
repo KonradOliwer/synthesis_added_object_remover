@@ -43,14 +43,17 @@ public class OtherModsObjectsSectionsTests
     }
 
     [Fact]
-    public void NothingIsPrintedWithoutAnObjectAndTheStoppedStepHasItsNotPerformedLine()
+    public void WithoutAnObjectOnlyTheDetailedStepTimeIsPrintedAndTheStoppedStepHasItsNotPerformedLine()
     {
         var stopped = new OtherModsObjectsResult(StepOutcome.StoppedByUnexpectedError, [], [], [], new PartFailure(OtherModsObjectsParts.LeftWithoutSupport, "broke", Subject: null));
         var none = new OtherModsObjectsResult(StepOutcome.Performed, [], [], [], Failure: null);
         var decisions = RemovalDecisions.Start(ObjectsToKeep.Build([], [], [], TestBaseFacts.Unresolved), 0);
 
         Assert.Empty(LogSections.BuildLeftWithoutSupportSection(World, OtherModsObjectsResult.SwitchedOff, Detailed).Lines);
-        Assert.Empty(LogSections.BuildLeftWithoutSupportStepSection(World, none, decisions, TestTargets.TargetName, TimeSpan.Zero, Detailed).Lines);
+        Assert.Empty(LogSections.BuildLeftWithoutSupportStepSection(World, none, decisions, TestTargets.TargetName, TimeSpan.Zero, Normal).Lines);
+        Assert.Equal(
+            ["Step time: Other mods' objects left without support in 0.0s."],
+            LogSections.BuildLeftWithoutSupportStepSection(World, none, decisions, TestTargets.TargetName, TimeSpan.Zero, Detailed).Lines.ToList());
         Assert.Equal(
             ["Other mods' objects left without support: not performed because of an unexpected error."],
             LogSections.BuildLeftWithoutSupportStepSection(World, stopped, decisions, TestTargets.TargetName, TimeSpan.Zero, Normal).Lines.ToList());

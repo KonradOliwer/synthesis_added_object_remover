@@ -18,13 +18,14 @@ internal sealed record OtherModsObjectsContext(
     OtherModsObjectsSettings Settings,
     IBaseObjectShapes Shapes,
     ITriangleMeshes Triangles,
+    ISurfaceSamples Surfaces,
     ITerrainHeights Terrain,
     Func<IVisibleObjectsOfAnyPlugin> ObjectsOfAnyPlugin,
     Execution Execution)
 {
     public OtherModsObjectRules CreateRules() => new(Trust, Plugins, Shapes);
 
-    public SurfaceContacts CreateSurfaceContacts() => new(Terrain, Triangles, Settings.TouchGap);
+    public SurfaceContacts CreateSurfaceContacts() => new(Terrain, Triangles, Surfaces, Settings.TouchGap);
 
     public OtherObjectSupport CreateSupport() => new(CreateSurfaceContacts(), Settings.TouchGap);
 
@@ -111,7 +112,7 @@ internal static class OtherModsObjects
         if (FindChangedTargets(decided.Targets, decided.Decided, rules).Count == 0) return new OtherModsObjectsResult(StepOutcome.Performed, [], [], [], Failure: null);
 
         var others = context.ObjectsOfAnyPlugin();
-        var before = new SupportsBefore([]);
+        var before = new WeightsBefore([]);
         var copy = decided.Decided.WorkingCopy();
         var current = decided.Decided;
         var rounds = new List<IReadOnlyList<ProposedRemoval>>();
@@ -136,13 +137,13 @@ internal static class OtherModsObjects
     }
 
     /// <summary>The other mods' objects left without support once the target objects are as <paramref name="current"/> decides.</summary>
-    /// <param name="before">What the judged objects had before any decision, shared by every settling of the step.</param>
+    /// <param name="before">The weights the judged objects had before any decision, shared by every settling of the step.</param>
     private static ImmutableArray<OtherModsObjectOutcome> SettleAgainst(
         IRemovalDecisions current,
         DecidedTargets decided,
         IVisibleObjectsOfAnyPlugin others,
         OtherModsObjectRules rules,
-        SupportsBefore before,
+        WeightsBefore before,
         OtherModsObjectsContext context)
     {
         var settler = new LeftWithoutSupport(
@@ -171,7 +172,7 @@ internal static class OtherModsObjects
             context.Execution);
 
     private static RoundsInput CreateRoundsInput(DecidedTargets decided, IVisibleObjectsOfAnyPlugin others, OtherModsObjectsContext context) =>
-        new(decided.AsTheyStand, decided.ObjectsToKeep, others, context.Shapes, context.Triangles, context.Terrain, context.Execution);
+        new(decided.AsTheyStand, decided.ObjectsToKeep, others, context.Shapes, context.Triangles, context.Surfaces, context.Terrain, context.Execution);
 
     /// <summary>The objects removed or pulled down, where they stood, in id order.</summary>
     private static List<OtherObject> TakenAway(ImmutableArray<OtherModsObjectOutcome> outcomes) =>

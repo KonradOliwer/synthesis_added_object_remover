@@ -269,7 +269,7 @@ public class RestingObjectsRunTests
             probe.ReadClock,
             reportFiles);
         return RestingObjects.Find(
-            input, caches.Bases, caches.Shapes, caches.Triangles, caches.Terrain, caches.VisibleObjectsOfAnyPlugin);
+            input, caches.Bases, caches.Shapes, caches.Triangles, caches.SurfaceSamples, caches.Terrain, caches.VisibleObjectsOfAnyPlugin);
     }
 
     private static bool IsLampMesh(string meshPath) => meshPath.EndsWith(LampModel.Model, StringComparison.OrdinalIgnoreCase);

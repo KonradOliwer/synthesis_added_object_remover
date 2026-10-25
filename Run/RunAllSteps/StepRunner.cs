@@ -78,7 +78,8 @@ public static class StepRunner
             plugin,
             bases,
             TooCloseObjects.NpcBodyRules,
-            TooCloseObjects.PlacedNpcRules);
+            TooCloseObjects.PlacedNpcRules,
+            RestingObjects.SurfaceSamplesPerMesh);
         var report = new LogAndReports(settings, reportFolder, loadOrderCaches, unexpectedErrors);
         return new RunScope(settings, source, environment, plugin, loadOrderCaches, unexpectedErrors, report, reportFolder);
     }
@@ -118,23 +119,31 @@ public static class StepRunner
         return new RunResult.Stopped(reason);
     }
 
+    /// <remarks>Timed through the run's clock, since the log times only work that returns a result.</remarks>
     private static void PrepareMeshReading(RunScope scope)
     {
+        var clock = scope.Environment.TimeSinceStart;
+        var start = clock();
         scope.LoadOrderCaches.PrepareMeshReading();
-        Print(scope.Environment.Log, scope.Report.BuildArchiveSections());
+        Print(scope.Environment.Log, scope.Report.BuildArchiveSections(clock() - start));
     }
 
-    private static ModTrustTable ClassifyModTrust(RunScope scope)
-    {
-        var trust = ModTrustClassifier.Classify(scope.Environment.Plugins, scope.Settings.ModTrust);
-        Print(scope.Environment.Log, scope.Report.BuildStepSections(trust, scope.Environment.Plugins));
-        return trust;
-    }
-
-    private static CollectedObjects CollectPlacedObjects(RunScope scope, ModTrustTable trust) =>
+    private static ModTrustTable ClassifyModTrust(RunScope scope) =>
         scope.Environment.Log.Timed(
-            () => PlacedObjectCollector.Collect(scope.Plugin, trust, scope.Settings.Read),
-            scope.Report.BuildStepSections);
+            () => ModTrustClassifier.Classify(scope.Environment.Plugins, scope.Settings.ModTrust),
+            (trust, elapsed) => scope.Report.BuildStepSections(trust, scope.Environment.Plugins, elapsed));
+
+    /// <remarks>Timed through the run's clock, since the log times one piece of work and the two parts print one section.</remarks>
+    private static CollectedObjects CollectPlacedObjects(RunScope scope, ModTrustTable trust)
+    {
+        var clock = scope.Environment.TimeSinceStart;
+        var start = clock();
+        var scanned = PlacedObjectCollector.ScanPlacedRecords(scope.Plugin, trust, scope.Settings.Read);
+        var scanEnd = clock();
+        var collected = PlacedObjectCollector.ReadNonPlacedLinks(scanned, scope.Plugin);
+        Print(scope.Environment.Log, scope.Report.BuildStepSections(collected, scanEnd - start, clock() - scanEnd));
+        return collected;
+    }
 
     private static IRunCaches AddObjectCaches(RunScope scope, CollectedObjects collected) =>
         scope.Environment.Log.Timed(
@@ -209,6 +218,7 @@ public static class StepRunner
                 scope.Settings.OtherModsObjects,
                 runCaches.Shapes,
                 runCaches.Triangles,
+                runCaches.SurfaceSamples,
                 runCaches.Terrain,
                 runCaches.VisibleObjectsOfAnyPlugin,
                 scope.Settings.Execution),
@@ -250,6 +260,7 @@ public static class StepRunner
             scope.Settings.AlsoRemove,
             runCaches.Shapes,
             runCaches.Triangles,
+            runCaches.SurfaceSamples,
             runCaches.Terrain,
             runCaches.VisibleObjectsOfAnyPlugin,
             scope.Settings.Execution);
@@ -266,12 +277,10 @@ public static class StepRunner
                 scope.Settings.Execution),
             (selected, elapsed) => scope.Report.BuildStepSections(selected.Replacements, collected, elapsed));
 
-    private static ObjectsToKeepResult RunKeepCheck(RunScope scope, IRunCaches runCaches, CollectedObjects collected, HeldUpTargets heldUp)
-    {
-        var kept = ObjectsToKeepFinder.Find(collected.Targets, collected.Links, runCaches.Bases, heldUp.Targets);
-        Print(scope.Environment.Log, scope.Report.BuildStepSections(kept));
-        return kept;
-    }
+    private static ObjectsToKeepResult RunKeepCheck(RunScope scope, IRunCaches runCaches, CollectedObjects collected, HeldUpTargets heldUp) =>
+        scope.Environment.Log.Timed(
+            () => ObjectsToKeepFinder.Find(collected.Targets, collected.Links, runCaches.Bases, heldUp.Targets),
+            scope.Report.BuildStepSections);
 
     private static FitPhase RunFit(
         RunScope scope,
@@ -319,6 +328,7 @@ public static class StepRunner
                 scope.Settings.OtherModsObjects,
                 runCaches.Shapes,
                 runCaches.Triangles,
+                runCaches.SurfaceSamples,
                 runCaches.Terrain,
                 runCaches.VisibleObjectsOfAnyPlugin,
                 scope.Settings.Execution));
@@ -385,18 +395,16 @@ public static class StepRunner
         return new TooClosePhase(result, afterChangedTerrain.Apply(RoundKind.TooClose, result.Proposals));
     }
 
-    /// <remarks>Not timed here: the step times its rounds itself, through the run's clock.</remarks>
+    /// <remarks>The step also times its rounds alone, through the run's clock.</remarks>
     private static AlsoRemovePhase RunAlsoRemove(
         RunScope scope,
         IRunCaches runCaches,
         CollectedObjects collected,
         IObjectsToKeep objectsToKeep,
-        RemovalDecisions afterTooClose)
-    {
-        var phase = FindAndApplyAlsoRemoveRounds(scope, runCaches, collected, objectsToKeep, afterTooClose);
-        Print(scope.Environment.Log, scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected));
-        return phase;
-    }
+        RemovalDecisions afterTooClose) =>
+        scope.Environment.Log.Timed(
+            () => FindAndApplyAlsoRemoveRounds(scope, runCaches, collected, objectsToKeep, afterTooClose),
+            (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
 
     private static AlsoRemovePhase FindAndApplyAlsoRemoveRounds(
         RunScope scope,
@@ -417,6 +425,7 @@ public static class StepRunner
             runCaches.Bases,
             runCaches.Shapes,
             runCaches.Triangles,
+            runCaches.SurfaceSamples,
             runCaches.Terrain,
             runCaches.VisibleObjectsOfAnyPlugin);
         return new AlsoRemovePhase(result, afterTooClose.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds));
@@ -468,23 +477,21 @@ public static class StepRunner
         IVisibleTargetObjects visibleTargets,
         CollectedObjects collected,
         IReadOnlyDictionary<OtherId, OtherObject?> otherModsObjectsTakenAway,
-        LeftBehindPhase leftBehind)
-    {
-        var markerMoves = MarkerMovePlanner.Plan(
-            collected.Targets,
-            leftBehind.Result,
-            leftBehind.Decisions,
-            () => runCaches.VisibleObjectsOfAnyPluginAsTheyStand(otherModsObjectsTakenAway),
-            visibleTargets,
-            scope.Plugin,
-            runCaches.Navmeshes,
-            runCaches.Terrain,
-            runCaches.Shapes,
-            scope.Settings.Execution,
-            scope.Settings.MarkerMoves);
-        Print(scope.Environment.Log, scope.Report.BuildStepSections(markerMoves, collected));
-        return markerMoves;
-    }
+        LeftBehindPhase leftBehind) =>
+        scope.Environment.Log.Timed(
+            () => MarkerMovePlanner.Plan(
+                collected.Targets,
+                leftBehind.Result,
+                leftBehind.Decisions,
+                () => runCaches.VisibleObjectsOfAnyPluginAsTheyStand(otherModsObjectsTakenAway),
+                visibleTargets,
+                scope.Plugin,
+                runCaches.Navmeshes,
+                runCaches.Terrain,
+                runCaches.Shapes,
+                scope.Settings.Execution,
+                scope.Settings.MarkerMoves),
+            (markerMoves, elapsed) => scope.Report.BuildStepSections(markerMoves, collected, elapsed));
 
     /// <summary>What every phase method reads besides its own inputs.</summary>
     /// <param name="ReportFolder">What the report writer prepared, which says whether the report files are written.</param>

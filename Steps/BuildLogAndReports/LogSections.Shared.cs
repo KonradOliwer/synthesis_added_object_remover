@@ -67,7 +67,7 @@ internal static partial class LogSections
     private static ImmutableArray<string> DetailsNotPerformedLines(StepOutcome detailsOutcome) => detailsOutcome switch
     {
         StepOutcome.StoppedByUnexpectedError => [BuildNotPerformedLine("Report-file details")],
-        StepOutcome.StoppedByEarlierFailure => [BuildNotPerformedBecauseEarlierLine("Report-file details", "Also remove")],
+        StepOutcome.StoppedByEarlierFailure => [BuildNotPerformedBecauseEarlierLine("Report-file details", AlsoRemoveName)],
         StepOutcome.Performed or StepOutcome.SwitchedOff => [],
         _ => throw new UnreachableException($"Unknown step outcome {detailsOutcome}."),
     };

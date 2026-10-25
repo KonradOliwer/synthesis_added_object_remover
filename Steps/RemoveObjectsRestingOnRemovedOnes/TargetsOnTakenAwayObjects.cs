@@ -102,7 +102,7 @@ internal sealed class TargetsOnTakenAwayObjects(
                 touching.Count,
                 () => new OtherObjectQueries(),
                 (k, queries) => ProposeIfSupportLost(
-                    touching[k].Target, support.FindContacts(targets[touching[k].Target.Index], world, queries), decisions, takenAway),
+                    touching[k].Target, support.FindContacts(rules.StandingOf(targets[touching[k].Target.Index]), world, queries), decisions, takenAway),
                 ParallelMap.AutomaticRangeSize)
             .OfType<ProposedRemoval>(),
     ];

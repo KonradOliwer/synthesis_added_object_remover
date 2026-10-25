@@ -59,10 +59,43 @@ public sealed class SharedReportingTests
     {
         RemovedObject[] removals = [new TooCloseRemoval(0, CreateOtherModObject(), BySize), new TooCloseRemoval(1, CreateOtherModObject(), WithinDistance)];
 
-        var summary = LogSections.BuildRemovalSummarySection(removals, StepOutcome.SwitchedOff);
+        var summary = BuildRemovalSummary(removals, StepOutcome.SwitchedOff);
 
         Assert.Equal(
             "Removed 2 objects (2 too close, 0 follow-up removals, 0 invisible objects left behind, 0 linked to removed objects).",
+            Assert.Single(summary.Lines));
+    }
+
+    /// <summary>Target 1 is shrunk to fit, then removed for touching target 0, which is removed too close.</summary>
+    [Fact]
+    public void TheSummaryCountsTheFollowUpRemovalsThatWereFirstShrunkOrTurned()
+    {
+        var world = CreateWorld();
+        var decisions = RemovalDecisions.Start(ObjectsToKeep.Build(world.Targets, [], TestTargets.References(TargetCount), TestBaseFacts.Unresolved), TargetCount)
+            .ApplyFits([new ProposedFit(new TargetId(1), new RemovalReason.TooClose(new OtherId(0), BySize), new EulerPlacement(Vector3.Zero, Vector3.Zero, 0.8f))])
+            .Apply(RoundKind.TooClose, [Propose(0, new RemovalReason.TooClose(new OtherId(0), BySize))])
+            .Apply(RoundKind.AlsoRemove, [Propose(1, new RemovalReason.Touching(new TargetId(0)))]);
+        var removals = RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(decisions), decisions, world, TestLeftBehind.PerformedWithoutFindings);
+
+        var summary = LogSections.BuildRemovalSummarySection(world, removals, decisions, TestTargets.TargetName, StepOutcome.SwitchedOff);
+
+        Assert.Equal(
+            "Removed 2 objects (1 too close, 1 follow-up removals (1 of them first shrunk or turned), 0 invisible objects left behind, 0 linked to removed objects).",
+            Assert.Single(summary.Lines));
+    }
+
+    [Fact]
+    public void TheSummarySplitsTheRemovalsIntoTheCleanedModsObjectsAndTheMovedOnes()
+    {
+        var world = CreateWorld();
+        var withMoved = world with { Targets = [.. world.Targets.Select(target => target with { IsMovedReplacement = target.Id.Index == 1 })] };
+        RemovedObject[] removals = [new TooCloseRemoval(0, CreateOtherModObject(), BySize), new TooCloseRemoval(1, CreateOtherModObject(), BySize)];
+
+        var summary = LogSections.BuildRemovalSummarySection(withMoved, removals, StartDecisions(world), TestTargets.TargetName, StepOutcome.SwitchedOff);
+
+        Assert.Equal(
+            "Removed 2 objects (2 too close, 0 follow-up removals, 0 invisible objects left behind, 0 linked to removed objects); "
+            + $"1 of them {TestTargets.TargetName} objects, 1 objects of other mods that {TestTargets.TargetName} moved.",
             Assert.Single(summary.Lines));
     }
 
@@ -76,8 +109,17 @@ public sealed class SharedReportingTests
         List<RemovedObject> removals = [new TooCloseRemoval(0, CreateOtherModObject(), BySize)];
         if (onChangedTerrain > 0) removals.Add(new TerrainChangedRemoval(1, new PluginName("Other.esp"), TerrainChangeKind.Height));
 
-        Assert.Equal(expected, Assert.Single(LogSections.BuildRemovalSummarySection(removals, outcome).Lines));
+        Assert.Equal(expected, Assert.Single(BuildRemovalSummary(removals, outcome).Lines));
     }
+
+    /// <summary>The summary of a world with the cleaned mod's objects only, where no object was shrunk or turned.</summary>
+    private static LogSection BuildRemovalSummary(IReadOnlyList<RemovedObject> removals, StepOutcome changedTerrain)
+    {
+        var world = CreateWorld();
+        return LogSections.BuildRemovalSummarySection(world, removals, StartDecisions(world), TestTargets.TargetName, changedTerrain);
+    }
+
+    private static RemovalDecisions StartDecisions(CollectedObjects world) => RemovalDecisions.Start(CreateProtection(world.Targets), TargetCount);
 
     [Theory]
     [InlineData(TerrainChangeKind.Height, "terrain changed by Other.esp (height)")]

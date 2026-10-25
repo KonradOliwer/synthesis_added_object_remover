@@ -1,35 +1,33 @@
 using System.Numerics;
-using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
 /// <summary>
-/// How far another mod's object can move straight down before it meets what is below it: from each sample of its surface a ray
-/// goes straight down to the nearest mesh of the world below it, or to the terrain; the smallest of these distances is the drop.
-/// A sample at or below the terrain, or sunk into a closed mesh, gives no drop at all. The samples stand for the surface, so an
-/// edge of a mesh below that passes between them may sink in slightly. An object rests on what is below it when it cannot move
-/// down by more than the touch gap. Thread-safe; results depend only on the inputs.
+/// How far an object can move straight down before it meets what is below it: from each sample of its surface a ray goes straight
+/// down to the nearest mesh of the world below it, or to the terrain; the smallest of these distances is the drop. A sample at
+/// or below the terrain, or sunk into a closed mesh, gives no drop at all. The samples stand for the surface, so an edge of a
+/// mesh below that passes between them may sink in slightly. An object rests on what is below it when it cannot move down by
+/// more than the touch gap. Thread-safe; results depend only on the inputs.
 /// </summary>
-internal sealed class DropFinder(SurfaceContacts surfaces, ITriangleMeshes cache, ITerrainHeights terrain, OtherModsObjectRules rules, float touchGap)
+internal sealed class DropFinder(SurfaceContacts surfaces, ITriangleMeshes cache, ITerrainHeights terrain, float touchGap)
 {
     private static readonly Vector3 Down = -Vector3.UnitZ;
 
     /// <summary>Whether the object, where it stands, rests on what is below it in the world.</summary>
-    public bool Rests(OtherObject other, SupportWorld world, OtherObjectQueries queries) => FindDrop(other, world, queries) is { } drop && RestsAt(drop);
+    public bool Rests(StandingObject faller, SupportWorld world, OtherObjectQueries queries) => FindDrop(faller, world, queries) is { } drop && RestsAt(drop);
 
     /// <summary>Whether an object that can move down this far rests on what is below it.</summary>
     public bool RestsAt(float drop) => drop <= touchGap;
 
-    /// <param name="other">A judged object, where it stands.</param>
     /// <returns>Null when nothing is below it within <see cref="OtherModsObjectsLimits.MaxPullDistance"/>.</returns>
-    public float? FindDrop(OtherObject other, SupportWorld world, OtherObjectQueries queries)
+    public float? FindDrop(StandingObject faller, SupportWorld world, OtherObjectQueries queries)
     {
-        var bounds = rules.BoxOf(other, other.Transform).WorldAabb(0f);
-        var points = surfaces.SampleSurface(rules.MeshPathOf(other)).Points.Select(other.Transform.ToWorld).ToArray();
-        var below = FindDistancesToTerrain(other.SpaceKey, points);
+        var bounds = faller.Box.WorldAabb(0f);
+        var points = surfaces.SampleSurface(faller.MeshPath).Points.Select(faller.Transform.ToWorld).ToArray();
+        var below = FindDistancesToTerrain(faller.Space, points);
         var columnBelow = bounds with { Min = bounds.Min with { Z = bounds.Min.Z - OtherModsObjectsLimits.MaxPullDistance } };
-        foreach (var supporter in world.FindSupporters(other.SpaceKey, columnBelow, Supporter.Placed(other.Id), queries))
+        foreach (var supporter in world.FindSupporters(faller.Space, columnBelow, faller.Self, queries))
         {
             ShortenToMesh(points, bounds.Center.Z, supporter, below, queries.Query.Triangles);
         }

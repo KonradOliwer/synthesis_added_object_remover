@@ -101,6 +101,9 @@ public class OtherModsObjectsTests
 
     private static readonly Vector3 OnTheTable = new(5, 5, TableHeight);
 
+    /// <summary>On the ground of <see cref="FlatTerrainAtZero"/>.</summary>
+    private static readonly Vector3 InTheTerrainCell = new(100, 100, 0);
+
     [Fact]
     public void AnObjectOnARemovedTableIsPulledDownOntoTheFloor()
     {
@@ -115,8 +118,7 @@ public class OtherModsObjectsTests
     [Fact]
     public void AnObjectOnARemovedTableInAWorldspaceIsPulledDownOntoTheTerrain()
     {
-        var corner = new Vector3(100, 100, 0);
-        var scene = new Scene([CreateTable(corner)], [Lantern(OtherMod, 0, corner + OnTheTable)], OtherModsObjectsHandling.PullObjectToTheGround)
+        var scene = new Scene([CreateTable(InTheTerrainCell)], [Lantern(OtherMod, 0, InTheTerrainCell + OnTheTable)], OtherModsObjectsHandling.PullObjectToTheGround)
         {
             Terrain = FlatTerrainAtZero(),
         };
@@ -292,17 +294,37 @@ public class OtherModsObjectsTests
     }
 
     /// <summary>
-    /// The table and the lantern on it stand inside a base game shell whose mesh is open. An open mesh holds nothing inside it, so
-    /// without the table the lantern would fall to the shell's floor, and the table is kept.
+    /// The table holds up the lantern for every value or for none, by one test: KeepSupportingObject keeps it, the fit step does
+    /// not shrink or turn it, and RemoveFloatingObject removes the lantern once the table is removed. A contact point that also
+    /// touches something that stays is not lost: the lantern on a board lying on the terrain, within the gap of both, keeps
+    /// touching the terrain, and the lantern inside an open shell keeps touching the shell, whose contact test counts the points
+    /// it encloses.
     /// </summary>
-    [Fact]
-    public void WithKeepSupportingObjectATableInsideAnOpenShellHoldsUpTheObjectOnIt()
+    [Theory]
+    [InlineData(AgreementScene.OnTheTable, true)]
+    [InlineData(AgreementScene.HalfOnTheTable, false)]
+    [InlineData(AgreementScene.InsideAnOpenShell, false)]
+    [InlineData(AgreementScene.OnABoardOnTheTerrain, false)]
+    public void EveryValueFindsTheSameTableHoldingUpTheObject(AgreementScene name, bool heldUp)
     {
-        List<OtherObject> others = [TestShapes.Placed(BaseGame, 0, OpenShellModel.Base, Vector3.Zero), Lantern(OtherMod, 1, OnTheTable)];
+        var scene = CreateAgreementScene(name);
+        List<TargetId> expected = heldUp ? [new TargetId(Table)] : [];
 
-        var heldUp = FindHeldUp([CreateTable()], others, OtherModsObjectsHandling.KeepSupportingObject, threshold: 0.05f);
+        var kept = FindHeldUp(scene with { Handling = OtherModsObjectsHandling.KeepSupportingObject }).Targets.Keys;
+        var restedOn = FindRestedOn(scene with { Handling = OtherModsObjectsHandling.RemoveFloatingObject });
+        var settled = Settle(scene with { Handling = OtherModsObjectsHandling.RemoveFloatingObject }, RemoveTable).Result.Objects;
 
-        Assert.Equal(new TargetId(Table), Assert.Single(heldUp.Targets).Key);
+        Assert.Equal(expected, kept);
+        Assert.Equal(expected, restedOn);
+        Assert.Equal(heldUp, settled.Any(outcome => outcome.Fate == OtherModsObjectFate.Removed));
+    }
+
+    public enum AgreementScene
+    {
+        OnTheTable,
+        HalfOnTheTable,
+        InsideAnOpenShell,
+        OnABoardOnTheTerrain,
     }
 
     [Fact]
@@ -578,6 +600,44 @@ public class OtherModsObjectsTests
         }
     }
 
+    /// <summary>The cleaned mod's book on the cleaned mod's table: the table holds it up, except with Nothing, where no object of the cleaned mod counts.</summary>
+    [Theory]
+    [InlineData(FollowUpRemovalMode.Nothing, false)]
+    [InlineData(FollowUpRemovalMode.EverythingTouchingIt, true)]
+    [InlineData(FollowUpRemovalMode.OnlyWhatLosesItsSupport, true)]
+    public void TheFitStepFindsATableTheCleanedModsObjectRestsOnFromAbove(FollowUpRemovalMode mode, bool found)
+    {
+        List<TargetObject> targets = [CreateTable(), TestTargets.Create(1, TestTargets.At(OnTheTable), BookModel.Base, TestTargets.Space)];
+
+        List<TargetId> expected = found ? [new TargetId(Table)] : [];
+
+        Assert.Equal(expected, FindRestedOn(new Scene(targets, [Floor()], OtherModsObjectsHandling.PullObjectToTheGround) { AlsoRemove = mode }));
+    }
+
+    /// <summary>
+    /// Two slabs of the cleaned mod lie side by side, edge to edge within the touch gap, both above nothing or both on the floor.
+    /// Neither rests on the other, so neither keeps the other from being shrunk or turned.
+    /// </summary>
+    [Theory]
+    [InlineData(FollowUpRemovalMode.EverythingTouchingIt, false)]
+    [InlineData(FollowUpRemovalMode.EverythingTouchingIt, true)]
+    [InlineData(FollowUpRemovalMode.OnlyWhatLosesItsSupport, false)]
+    [InlineData(FollowUpRemovalMode.OnlyWhatLosesItsSupport, true)]
+    public void TheFitStepFindsNoObjectForTheCleanedModsObjectsSideBySide(FollowUpRemovalMode mode, bool onTheFloor)
+    {
+        const float slabWidth = 40f;
+        const float height = 100f;
+        var z = onTheFloor ? 0f : height;
+        List<TargetObject> targets =
+        [
+            TestTargets.Create(0, TestTargets.At(new Vector3(0, 0, z)), SlabModel.Base, TestTargets.Space),
+            TestTargets.Create(1, TestTargets.At(new Vector3(slabWidth + TouchGap / 2, 0, z)), SlabModel.Base, TestTargets.Space),
+        ];
+        List<OtherObject> others = onTheFloor ? [Floor()] : [];
+
+        Assert.Empty(FindRestedOn(new Scene(targets, others, OtherModsObjectsHandling.PullObjectToTheGround) { AlsoRemove = mode }));
+    }
+
     /// <summary>The objects of one scene and how the step is set.</summary>
     private sealed record Scene(List<TargetObject> Targets, IReadOnlyList<OtherObject> Others, OtherModsObjectsHandling Handling)
     {
@@ -597,6 +657,25 @@ public class OtherModsObjectsTests
 
         public AlsoRemoveSettings AlsoRemoveSettings => new(AlsoRemove, TouchGap, Threshold, TouchChainsShown: false);
     }
+
+    /// <summary>The table (target 0) and another mod's lantern on it, in the given surroundings.</summary>
+    private static Scene CreateAgreementScene(AgreementScene name) => name switch
+    {
+        AgreementScene.OnTheTable => new Scene([CreateTable()], WithFloor(Lantern(OtherMod, 1, OnTheTable)), OtherModsObjectsHandling.KeepSupportingObject),
+        AgreementScene.HalfOnTheTable => new Scene(
+            [CreateTable()],
+            [Floor(), BaseGameTable(1, new Vector3(40, 0, 0)), Lantern(OtherMod, 2, new Vector3(20, 0, TableHeight))],
+            OtherModsObjectsHandling.KeepSupportingObject) { Threshold = 0.6f },
+        AgreementScene.InsideAnOpenShell => new Scene(
+            [CreateTable()],
+            [TestShapes.Placed(BaseGame, 0, OpenShellModel.Base, Vector3.Zero), Lantern(OtherMod, 1, OnTheTable)],
+            OtherModsObjectsHandling.KeepSupportingObject) { Threshold = 0.05f },
+        AgreementScene.OnABoardOnTheTerrain => new Scene(
+            [TestTargets.Create(Table, TestTargets.At(InTheTerrainCell), ThinBoardModel.Base, TestTargets.Space)],
+            [Lantern(OtherMod, 0, InTheTerrainCell + new Vector3(0, 0, ThinBoardHeight))],
+            OtherModsObjectsHandling.KeepSupportingObject) { Terrain = FlatTerrainAtZero(), TouchGap = WideTouchGap },
+        _ => throw new ArgumentOutOfRangeException(nameof(name), name, null),
+    };
 
     /// <summary>The floor (id 0), the table (target 0) with the other mod's book (id 1) on it, the cleaned mod's lantern (target 1) on the book, and the other mod's lantern (id 2) on that lantern.</summary>
     private static Scene LanternOnABookScene(FollowUpRemovalMode mode, int threads)

@@ -5,8 +5,8 @@ using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
 /// <summary>
-/// The objects others rest on, as the fit step asks: those another target object rests on by the also-remove mode's relation
-/// (<see cref="RestingRule"/>), and those a judged object of another mod rests on (<see cref="TargetsHoldingUpOtherModsObjects"/>)
+/// The objects others rest on, as the fit step asks: those another target object rests on and would lose its support without,
+/// unless the also-remove mode is Nothing (<see cref="RestingRule"/>), and those a judged object of another mod rests on (<see cref="TargetsHoldingUpOtherModsObjects"/>)
 /// whatever the also-remove mode and the setting for other mods' objects are, so no shrinking or turning leaves an object
 /// without support.
 /// </summary>

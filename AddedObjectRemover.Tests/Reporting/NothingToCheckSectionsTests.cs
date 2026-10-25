@@ -20,7 +20,9 @@ public sealed class NothingToCheckSectionsTests
         var lines = TestReport.Over(new AssetProblemLog()).CollectedSectionLines(stopped);
 
         Assert.Equal(
-            "Objects of Target.esp: 3; already removed by earlier patchers in this group: 3; judged in this run: 0; removed in this run: 0.",
+            "Objects of Target.esp: 3; already removed by earlier patchers in this group: 3; "
+            + "not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 0; "
+            + "judged in this run: 0; removed in this run: 0.",
             lines[^1]);
         Assert.DoesNotContain(lines, line => line.StartsWith("Using ", StringComparison.Ordinal));
     }

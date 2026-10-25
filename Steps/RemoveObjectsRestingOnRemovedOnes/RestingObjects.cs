@@ -41,7 +41,7 @@ public static class RestingObjects
     }
 
     /// <summary>
-    /// The step's relation asked before any removal: the objects other target objects rest on (see <see cref="RestingRule"/>), and
+    /// The fit step's question asked before any removal: the objects other target objects rest on (see <see cref="RestingRule"/>), and
     /// those judged objects of other mods rest on, whatever <paramref name="otherModsObjects"/> says (see <see cref="AnyObjectRestingRule"/>).
     /// </summary>
     /// <param name="targets">Where they stand before any object is shrunk or turned.</param>
@@ -63,7 +63,7 @@ public static class RestingObjects
         OtherModsObjects.CreateRestingRule(
             targets,
             visibleTargets,
-            new RestingRule(targets, settings, shapes, triangles, terrain, objectsOfAnyPlugin, execution),
+            new RestingRule(targets, visibleTargets, settings, new OtherModsObjectRules(trust, plugins, shapes), shapes, triangles, terrain, objectsOfAnyPlugin, execution),
             new OtherModsObjectsContext(trust, plugins, otherModsObjects, shapes, triangles, terrain, objectsOfAnyPlugin, execution));
 
     /// <summary>

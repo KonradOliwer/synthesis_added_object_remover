@@ -45,7 +45,7 @@ internal static partial class LogSections
 
     /// <summary>
     /// What the run started from and what it did with the target's own objects: all of them, those earlier patchers in this group
-    /// removed, those it judged and those it removed. The moved replacements have a section of their own.
+    /// removed, those it did not judge, those it judged and those it removed. The moved replacements have a section of their own.
     /// </summary>
     /// <param name="removedInThisRun">The target's own objects removed in this run.</param>
     public static LogSection BuildRunSummarySection(CollectedObjects world, PluginName target, int removedInThisRun)
@@ -56,29 +56,57 @@ internal static partial class LogSections
             [
                 $"Objects of {target}: {TextFormat.Count(counts.CleanedModObjects)}; "
                 + $"already removed by earlier patchers in this group: {TextFormat.Count(counts.RemovedByEarlierPatchers)}; "
+                + $"not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): {TextFormat.Count(CountNotJudged(counts))}; "
                 + $"judged in this run: {TextFormat.Count(CountOwnObjects(world))}; removed in this run: {TextFormat.Count(removedInThisRun)}.",
             ]);
     }
 
+    /// <summary>The target's own objects the setup section lists as ignored.</summary>
+    private static int CountNotJudged(ReadCounts counts) => counts.TargetsOverriddenLater + counts.RemovedByOtherPlugins + counts.TargetsHiddenOrWithoutPlacement;
+
     /// <summary>The target objects that are the target plugin's own, not moved replacements.</summary>
     private static int CountOwnObjects(CollectedObjects world) => world.Targets.Count(target => !target.IsMovedReplacement);
 
+    /// <param name="final">The run's decisions, which tell the follow-up removals that were first shrunk or turned.</param>
     /// <param name="changedTerrain">The changed-terrain step's outcome; the "on changed terrain" item only shows when the step was performed.</param>
-    public static LogSection BuildRemovalSummarySection(IReadOnlyList<RemovedObject> removals, StepOutcome changedTerrain)
+    public static LogSection BuildRemovalSummarySection(
+        CollectedObjects world, IReadOnlyList<RemovedObject> removals, IRemovalDecisions final, PluginName target, StepOutcome changedTerrain)
     {
         var onChangedTerrain = changedTerrain == StepOutcome.Performed
             ? $"{TextFormat.Count(removals.Count(removal => removal is TerrainChangedRemoval))} on changed terrain, "
             : string.Empty;
         var tooClose = removals.Count(removal => removal is TooCloseRemoval);
-        var alsoRemoved = removals.Count(removal => removal is TouchingRemoval or SupportRemoval or TouchingAnotherModsObjectRemoval or SupportWithAnotherModsObjectRemoval);
+        List<RemovedObject> followUps = [.. removals.Where(IsFollowUp)];
         var leftBehind = removals.Count(removal => removal is LeftBehindRemoval);
         var linked = removals.Count(removal => removal is LinkedRemoval);
         return new LogSection(
             "removal-summary",
             [
-                $"Removed {TextFormat.Count(removals.Count)} objects ({onChangedTerrain}{TextFormat.Count(tooClose)} too close, {TextFormat.Count(alsoRemoved)} follow-up removals, "
-                + $"{TextFormat.Count(leftBehind)} invisible objects left behind, {TextFormat.Count(linked)} linked to removed objects).",
+                $"Removed {TextFormat.Count(removals.Count)} objects ({onChangedTerrain}{TextFormat.Count(tooClose)} too close, "
+                + $"{TextFormat.Count(followUps.Count)} follow-up removals{FirstShrunkOrTurned(followUps, final)}, "
+                + $"{TextFormat.Count(leftBehind)} invisible objects left behind, {TextFormat.Count(linked)} linked to removed objects)"
+                + $"{OwnAndMovedRemoved(world, removals, target)}.",
             ]);
+    }
+
+    private static bool IsFollowUp(RemovedObject removal) =>
+        removal is TouchingRemoval or SupportRemoval or TouchingAnotherModsObjectRemoval or SupportWithAnotherModsObjectRemoval;
+
+    /// <summary>" (2 of them first shrunk or turned)", or nothing when none was.</summary>
+    private static string FirstShrunkOrTurned(IEnumerable<RemovedObject> followUps, IRemovalDecisions final)
+    {
+        var firstFitted = final.Rounds.Where(round => round.Kind == RoundKind.Fit).SelectMany(round => final.FittedAtFirstIn(round)).Select(fitted => fitted.Index).ToHashSet();
+        var count = followUps.Count(removal => firstFitted.Contains(removal.TargetIndex));
+        return count > 0 ? $" ({TextFormat.Count(count)} of them first shrunk or turned)" : string.Empty;
+    }
+
+    /// <summary>"; 5 of them Mod.esp objects, 2 objects of other mods that Mod.esp moved", or nothing when no moved object was removed.</summary>
+    private static string OwnAndMovedRemoved(CollectedObjects world, IReadOnlyList<RemovedObject> removals, PluginName target)
+    {
+        var moved = removals.Count(removal => world.Targets[removal.TargetIndex].IsMovedReplacement);
+        return moved > 0
+            ? $"; {TextFormat.Count(removals.Count - moved)} of them {target} objects, {TextFormat.Count(moved)} objects of other mods that {target} moved"
+            : string.Empty;
     }
 
     /// <summary>Each kept target once, counted under the first reason found for it.</summary>

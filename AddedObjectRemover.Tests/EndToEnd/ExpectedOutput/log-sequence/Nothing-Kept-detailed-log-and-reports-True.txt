@@ -39,7 +39,7 @@ Linked groups: 1 groups of linked Target.esp objects (2 objects) from 1 links to
 ## tooClose
 Object-shape zones: 21 candidate pairs, 18 passed the box filter, 18 mesh tests, 18 hits, 0 centre-point fallbacks (other object without mesh triangles), 1 Target.esp objects without mesh triangles used their box; 17 triangle pairs tested exactly.
   0 large other objects tested against every Target.esp object of their space; 0 effect-only meshes (fog, light rays, water spray) ignored.
-Found 19 of 40 Target.esp objects too close to other mods' objects in <time>.
+Found 19 of 40 Target.esp objects too close to other mods' objects in <time>, not counting the shrink or turn check before it.
 NPCs and creatures (only when stuck in the object): 2 placed NPCs evaluated: 0 sized by body mesh, 2 by Object Bounds, 0 by humanoid approximation, 0 sized as a point; 0 skipped because their base is no NPC; 1 NPC-object pairs tested (1 body boxes), 1 objects with an NPC stuck in them.
   Kept T_ReferencedByPlaced [00080F:Target.esp] in interior AorInterior [000800:Skyrim.esm]: Enable Parent of 00080D:Rival.esp.
   Kept T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
@@ -60,7 +60,7 @@ Linked groups: 0 more objects removed with the left-behind removals they are lin
 ## relocations
 ## unexpectedErrors
 ## write
-Wrote 17 overrides (17 removed, 0 moved) in <time>.
+Wrote 17 overrides (17 removed) in <time>.
   1 removed objects had an Enable Parent; it was replaced by the player with "opposite of parent" so they stay disabled.
 ## explanationProblems
 ## meshProblems
@@ -93,7 +93,7 @@ Per cell/worldspace (objects of Target.esp / other objects / removed):
 ## targetVisibility
 Target.esp objects: 35 visible, 5 invisible (by kind: 2 Position markers (XMarker, XMarkerHeading), 2 Sound sources, 1 Lights without a model), 1 deleted, start disabled, or without a valid position or rotation.
 ## run-summary
-Objects of Target.esp: 42; already removed by earlier patchers in this group: 0; judged in this run: 40; removed in this run: 17.
+Objects of Target.esp: 42; already removed by earlier patchers in this group: 0; not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 2; judged in this run: 40; removed in this run: 17.
 ## removal-summary
 Removed 17 objects (16 too close, 0 follow-up removals, 0 invisible objects left behind, 1 linked to removed objects).
 ## kept-summary
@@ -102,20 +102,20 @@ Kept 3 objects that would have been removed, because other records depend on the
   placed object: Enable Parent: 1
   teleport door: 1
 ## hints
-Removed markers and kept objects: 2 objects.
+Kept objects that would have been removed, to check by hand: 2.
   Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
 ## areas
-Removed 17/40 (removed/all mod objects):
+Removed 17/40 (removed/all checked objects):
   AorInterior › unnamed area 16/38
   AorWorld › unnamed area › AorExterior 1/2
-Kept 1/40 (kept/all mod objects), FormList record:
+Kept 1/40 (kept/all checked objects), FormList record:
   AorInterior › unnamed area 1/38
-Kept 1/40 (kept/all mod objects), placed object: Enable Parent:
+Kept 1/40 (kept/all checked objects), placed object: Enable Parent:
   AorInterior › unnamed area 1/38
-Kept 1/40 (kept/all mod objects), teleport door:
+Kept 1/40 (kept/all checked objects), teleport door:
   AorInterior › unnamed area 1/38
-Removed markers and kept objects: 2 of 40:
+Kept objects that would have been removed, to check by hand: 2 of 40:
   AorInterior › unnamed area 2/38
 ## written
 Removals: wrote 17 rows to <root>/Reports/removals.csv.

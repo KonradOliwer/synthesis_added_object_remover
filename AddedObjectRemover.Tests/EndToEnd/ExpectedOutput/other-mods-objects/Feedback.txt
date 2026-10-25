@@ -22,7 +22,7 @@ Linked groups: 0 groups of linked Target.esp objects (0 objects) from 0 links to
 Objects too close where they stand: 1; not shrunk or turned because other objects rest on them: 1; tried shrunk or turned: 0; fit: 0 in <time>.
 Object-shape zones: 1 candidate pairs, 1 passed the box filter, 1 mesh tests, 1 hits, 0 centre-point fallbacks (other object without mesh triangles), 0 Target.esp objects without mesh triangles used their box; 1 triangle pairs tested exactly.
   0 large other objects tested against every Target.esp object of their space; 0 effect-only meshes (fog, light rays, water spray) ignored.
-Found 1 of 2 Target.esp objects too close to other mods' objects in <time>.
+Found 1 of 2 Target.esp objects too close to other mods' objects in <time>, not counting the shrink or turn check before it.
 NPCs and creatures (only when stuck in the object and the object's collision stops characters): 0 placed NPCs evaluated: 0 sized by body mesh, 0 by Object Bounds, 0 by humanoid approximation, 0 sized as a point; 0 skipped because their base is no NPC; 0 NPC-object pairs tested (0 body boxes), 0 objects with an NPC stuck in them, 0 of them not counted because their collision does not stop characters.
 Linked groups: 0 more objects removed with the too-close removals they are linked to.
 Anchoring: 0 removed over 1 iterations; 0 touching objects evaluated (0 evaluations), 0 kept without any contact points, 0 kept as referenced.
@@ -34,19 +34,19 @@ Linked groups: 0 more objects removed with the follow-up removals they are linke
 Invisible objects left behind: 0 evaluated in <time>; removed 0 (0 inside another mod's object, 0 surroundings removed); kept 0 (0 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 0 referenced).
 Linked groups: 0 more objects removed with the left-behind removals they are linked to.
 Moved 0 kept markers out of other mods' objects; 0 left in place.
-Wrote 4 overrides (2 removed, 0 moved; other mods' objects: 2 pulled down) in <time>.
+Wrote 4 overrides (2 removed; other mods' objects: 2 pulled down) in <time>.
   Removed T_Crate [000801:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to U_Cause [000801:Untrusted.esp], changed by Untrusted.esp (new object)
   Removed T_Pad [000803:Target.esp] (base T_PadBase [000802:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; 63 % of its support was removed or pulled down (mostly 000801:Trusted.esp, another mod's object left without support)
 Bounds: 5 bases from NIF, 0 NIF misses, 0 from OBND, 0 without bounds. Meshes: 3 read, 0 effect-only, 0 failed (3 loose, 0 from 0 archives), 0 with a footer root other than their first node.
 Per cell/worldspace (objects of Target.esp / other objects / removed):
   interior AorInterior [000800:Skyrim.esm]: 2 / 1 / 2
 Target.esp objects: 2 visible, 0 invisible (by kind: none), 0 deleted, start disabled, or without a valid position or rotation.
-Objects of Target.esp: 2; already removed by earlier patchers in this group: 0; judged in this run: 2; removed in this run: 2.
+Objects of Target.esp: 2; already removed by earlier patchers in this group: 0; not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 0; judged in this run: 2; removed in this run: 2.
 Removed 2 objects (1 too close, 1 follow-up removals, 0 invisible objects left behind, 0 linked to removed objects).
 Other mods' objects left without support: 2; pulled down: 2.
   000801:Trusted.esp (base Trusted_PadBase [000800:Trusted.esp]) in interior AorInterior [000800:Skyrim.esm] at (0, 0, 100): pulled down by 100.0 units; 100 % of its support gone.
   000802:Trusted.esp (base Trusted_PadBase [000800:Trusted.esp]) in interior AorInterior [000800:Skyrim.esm] at (0, 0, 140): pulled down by 120.0 units; 100 % of its support gone.
-Removed 2/2 (removed/all mod objects):
+Removed 2/2 (removed/all checked objects):
   AorInterior › unnamed area 2/2
 Anchoring diagnostics: wrote 0 evaluations to <root>/Output/Reports/anchoring.csv.
 Mesh origins: 2 meshes of Target.esp objects, 2 origin near bottom, 0 origin near centre, 0 other.

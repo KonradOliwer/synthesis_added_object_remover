@@ -57,6 +57,7 @@ public class LogicPublicTypesTests
             "ImmutableArray<Round> RoundsAfter(IRemovalDecisions)",
             "ImmutableArray<TargetId> KeptIn(Round)",
             "ImmutableArray<TargetId> FittedIn(Round)",
+            "ImmutableArray<TargetId> FittedAtFirstIn(Round)",
             "ImmutableArray<TargetId> RemovedIn(Round)",
             "ImmutableArray<TargetId> RemovedTargets()",
             "Boolean IsDecided(TargetId)",

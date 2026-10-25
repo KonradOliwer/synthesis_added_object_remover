@@ -12,7 +12,7 @@ internal static partial class LogSections
     private const string LeftBehindStepName = "Invisible objects left behind";
 
     /// <param name="kept">The objects the left-behind round held.</param>
-    /// <remarks>The kept lines come first, then the per-object decisions and the summary.</remarks>
+    /// <remarks>The summary comes first, then the per-object decisions and the kept lines.</remarks>
     public static LogSection BuildLeftBehindSection(
         CollectedObjects world,
         LeftBehindResult leftBehind,
@@ -22,9 +22,9 @@ internal static partial class LogSections
     {
         if (leftBehind.Outcome == StepOutcome.SwitchedOff) return new LogSection("leftovers", []);
 
-        List<string> lines = [.. BuildKeptLines(world, kept)];
+        List<string> lines = [LeftBehindStepLine(leftBehind, elapsed, context)];
         if (context.Detailed) lines.AddRange(leftBehind.Evaluations.Select(evaluation => LeftBehindOutcomeLine(world, evaluation)));
-        lines.Add(LeftBehindClosingLine(leftBehind, elapsed, context));
+        lines.AddRange(BuildKeptLines(world, kept));
         return new LogSection("leftovers", [.. lines]);
     }
 
@@ -71,7 +71,7 @@ internal static partial class LogSections
         _ => throw new UnreachableException($"Unexpected marker move outcome {markerMoves.Outcome}."),
     };
 
-    private static string LeftBehindClosingLine(LeftBehindResult leftBehind, TimeSpan elapsed, ReportContext context) => leftBehind.Outcome switch
+    private static string LeftBehindStepLine(LeftBehindResult leftBehind, TimeSpan elapsed, ReportContext context) => leftBehind.Outcome switch
     {
         StepOutcome.Performed => LeftBehindSummaryLine(leftBehind, elapsed, context),
         StepOutcome.StoppedByUnexpectedError => BuildNotPerformedLine(LeftBehindStepName),

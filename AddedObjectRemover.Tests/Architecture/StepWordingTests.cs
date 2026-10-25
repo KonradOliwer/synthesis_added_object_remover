@@ -138,7 +138,6 @@ public class StepWordingTests
         [("Steps/RemoveObjectsRestingOnRemovedOnes/RestingObjects.cs", "Unknown follow-up evidence {round.GetType().Name}.")] = BugMessage,
         [("Steps/RemoveObjectsRestingOnRemovedOnes/RestingObjects.cs", "Unknown follow-up removal mode {plan.Mode}.")] = BugMessage,
         [("Steps/RemoveObjectsRestingOnRemovedOnes/RestingObjects.cs", "Unknown follow-up removal mode {settings.Mode}.")] = BugMessage,
-        [("Steps/RemoveObjectsRestingOnRemovedOnes/RestingRule.cs", "Unknown follow-up removal mode {settings.Mode}.")] = BugMessage,
         [("Steps/RemoveObjectsRestingOnRemovedOnes/SupportRule.cs", "Unknown supporter type {supporter.Type}.")] = BugMessage,
         [("Steps/RemoveObjectsRestingOnRemovedOnes/TargetMeshPaths.cs", "Target {target} has no mesh but was used as a mesh.")] = BugMessage,
         [("Steps/RemoveObjectsRestingOnRemovedOnes/TouchChains.cs", "A touch round has no cause {reason}.")] = BugMessage,

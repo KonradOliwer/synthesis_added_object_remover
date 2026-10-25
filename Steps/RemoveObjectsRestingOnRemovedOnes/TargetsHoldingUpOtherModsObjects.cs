@@ -1,24 +1,18 @@
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
 /// <summary>
-/// The target objects that judged objects of other mods rest on, each where it stands before any decision. Target objects hold
-/// up another object when taking them away would leave it without at least the threshold share of its support, the relation
-/// <see cref="RestingRule"/> uses between target objects: each target object holding that share alone, or, when none does, every
-/// target object holding part of it when they hold that share together. The other object must also rest on what is below it and
-/// no longer rest without those target objects, so a target object standing on it or beside it does not hold it up.
-/// Thread-safe; results depend only on the inputs.
+/// The target objects that judged objects of other mods rest on, each where it stands before any decision: the target objects
+/// the object loses its support without, by the test that decides which objects are left without support
+/// (<see cref="SupportLoss.FindTargetsHoldingUp"/>). Thread-safe; results depend only on the inputs.
 /// </summary>
 /// <param name="world">Every target object and object of any plugin where it stands before any decision.</param>
 internal sealed class TargetsHoldingUpOtherModsObjects(
     SupportWorld world,
     JudgedObjectsNear near,
     OtherModsObjectRules rules,
-    OtherObjectSupport support,
-    DropFinder drops,
-    float threshold,
+    SupportLoss loss,
     Execution execution)
 {
     /// <param name="nearTargets">The judged objects whose box comes within the gap of one of theirs are checked.</param>
@@ -35,33 +29,9 @@ internal sealed class TargetsHoldingUpOtherModsObjects(
         return found;
     }
 
-    /// <summary>The target objects that hold up an object with these contacts by the share of its support they hold.</summary>
-    /// <returns>
-    /// Each target object holding at least the threshold share alone; when none does, all target objects holding part of it, when
-    /// together they hold at least the threshold share; otherwise none.
-    /// </returns>
-    public static List<TargetId> FindTargetsHoldingEnough(CandidateContacts contacts, float threshold)
-    {
-        List<TargetId> alone = [.. SupportRule.FindSupportersHoldingEnough(contacts, threshold).Where(IsTarget).Select(ToTargetId)];
-        if (alone.Count > 0) return alone;
+    /// <summary>The target objects holding up a target object, before any decision.</summary>
+    /// <param name="target">A visible target object with a mesh.</param>
+    public List<TargetId> FindHolding(TargetObject target, OtherObjectQueries queries) => loss.FindTargetsHoldingUp(rules.StandingOf(target), world, queries);
 
-        List<SupporterWeight> together = [.. contacts.Supporters.Where(entry => IsTarget(entry.Supporter))];
-        return together.Count > 0 && SupportRule.ReachesThreshold(together.Sum(entry => entry.Weight) / contacts.TotalWeight, threshold)
-            ? [.. together.Select(entry => ToTargetId(entry.Supporter))]
-            : [];
-    }
-
-    /// <returns>
-    /// None for an object that does not rest on what is below it, which only touches things beside it, and for one that would
-    /// still rest on what is below it without them: those target objects only stand on it or beside it.
-    /// </returns>
-    private List<TargetId> FindTargetsHoldingUp(OtherObject other, OtherObjectQueries queries)
-    {
-        var holders = FindTargetsHoldingEnough(support.FindContacts(other, world, queries), threshold);
-        return holders.Count > 0 && drops.Rests(other, world, queries) && !drops.Rests(other, world.Without(holders), queries) ? holders : [];
-    }
-
-    private static bool IsTarget(Supporter supporter) => supporter.Type == SupporterType.Target;
-
-    private static TargetId ToTargetId(Supporter supporter) => new(supporter.Index);
+    private List<TargetId> FindTargetsHoldingUp(OtherObject other, OtherObjectQueries queries) => loss.FindTargetsHoldingUp(rules.StandingOf(other), world, queries);
 }

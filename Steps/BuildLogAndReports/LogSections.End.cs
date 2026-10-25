@@ -11,7 +11,8 @@ internal static partial class LogSections
         var total = written.Removed.Length + written.Moved + written.Fitted + written.OtherModsObjectsRemoved + written.OtherModsObjectsPulledDown;
         List<string> lines =
         [
-            $"Wrote {TextFormat.Count(total)} overrides ({TextFormat.Count(written.Removed.Length)} removed, {TextFormat.Count(written.Moved)} moved"
+            $"Wrote {TextFormat.Count(total)} overrides ({TextFormat.Count(written.Removed.Length)} removed"
+                + WhenAny(written.Moved, "kept markers moved")
                 + WhenAny(written.Fitted, "shrunk or turned to fit")
                 + OtherModsObjectsWritten(written)
                 + $"){Describe.TimedSuffix(elapsed, context)}.",

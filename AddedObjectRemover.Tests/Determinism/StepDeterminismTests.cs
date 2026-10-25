@@ -246,7 +246,7 @@ public class StepDeterminismTests
     private static LeftBehindResult SelectLeftBehind(
         List<TargetObject> targets, List<OtherObject> rooms, HashSet<int> removed, int threads) =>
         TestLeftBehind.CreateRule(targets, Shapes, rooms, CreateLeftBehindConfig())
-            .SelectRemovals(removed, Options(threads));
+            .SelectRemovals(removed, decidedTargets: removed, Options(threads));
 
     /// <summary>A grid of tables close enough that some touch, items (some stacked) on most of them, random links and seeds.</summary>
     private static RestingObjectsScene CreateRestingObjectsScene()
@@ -300,7 +300,7 @@ public class StepDeterminismTests
     private static float RandomOffset(Random random, float extent) => (float)((random.NextDouble() * 2 - 1) * extent);
 
     private static string DescribeStats(TouchChainStatistics stats) =>
-        $"{stats.Components} {stats.ComponentsWithRemovals} {stats.LargestComponent} {stats.Levels} {stats.MaxDepth} "
+        $"{stats.Components} {stats.ComponentsWithFollowUpRemovals} {stats.LargestComponent} {stats.Levels} {stats.MaxDepth} "
         + $"{stats.Pairs.PairsTested} {stats.Pairs.TouchingPairs} {stats.Pairs.TrianglePairsTested}";
 
     /// <summary>Each round with what it removed and kept, one line per round, so a failure shows where two runs part.</summary>

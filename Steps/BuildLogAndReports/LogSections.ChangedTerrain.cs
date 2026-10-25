@@ -18,7 +18,7 @@ internal static partial class LogSections
         ReportContext context) =>
         new("changedTerrain",
         [
-            $"Found {TextFormat.Count(found.Hits.Length)} of {TextFormat.Count(world.Targets.Length)} {target} objects on terrain changed by other mods"
+            $"Found {TextFormat.Count(found.Hits.Length)} of {DescribeJudgedObjects(world, target)} on terrain changed by other mods"
                 + $"{Describe.TimedSuffix(elapsed, context)}.",
             .. ChangedTerrainCounts(found, context),
             .. BuildKeptLines(world, kept),

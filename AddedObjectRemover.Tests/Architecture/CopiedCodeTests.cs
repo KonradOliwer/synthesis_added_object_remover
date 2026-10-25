@@ -96,6 +96,7 @@ public class CopiedCodeTests
             ParallelCalls,
         [CopyFamily.KeyOf([Resting + "SupportContactFinder.cs:SupportContactFinder.FindContactsOfAll", Resting + "TargetsHoldingUpOtherModsObjects.cs:TargetsHoldingUpOtherModsObjects.Find"])] =
             ParallelCalls,
+        [CopyFamily.KeyOf([Resting + "LeftWithoutSupport.cs:LeftWithoutSupport.DecideRound", Resting + "RestingRule.cs:RestingRule.FindHoldingUp"])] = ParallelCalls,
         [CopyFamily.KeyOf([Resting + "RestingObjects.cs:RestingObjects.CreateRestingRule", Resting + "RestingObjects.cs:RestingObjects.SettleOtherModsObjects"])] = EntryForwarders,
         [CopyFamily.KeyOf([Resting + "RestingObjects.cs:RestingObjects.CreateRestingRule", Resting + "RestingObjects.cs:RestingObjects.FindHeldUpTargets"])] = EntryForwarders,
         [CopyFamily.KeyOf([

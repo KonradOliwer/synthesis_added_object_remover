@@ -25,16 +25,17 @@ internal sealed class LeftBehindRule(
     WorkOrder order)
 {
     /// <param name="removedTargets">Target indices removed by the earlier steps.</param>
-    public LeftBehindResult SelectRemovals(IReadOnlySet<int> removedTargets, Execution execution)
+    /// <param name="decidedTargets">Target indices the earlier steps removed or kept: those are not evaluated again.</param>
+    public LeftBehindResult SelectRemovals(IReadOnlySet<int> removedTargets, IReadOnlySet<int> decidedTargets, Execution execution)
     {
-        var evaluations = EvaluateAll(removedTargets, execution);
+        var evaluations = EvaluateAll(removedTargets, decidedTargets, execution);
         return new LeftBehindResult(StepOutcome.Performed, evaluations, LeftBehindRound.ProposalsOf(evaluations), Failure: null);
     }
 
-    private LeftBehindCheck[] EvaluateAll(IReadOnlySet<int> removedTargets, Execution execution)
+    private LeftBehindCheck[] EvaluateAll(IReadOnlySet<int> removedTargets, IReadOnlySet<int> decidedTargets, Execution execution)
     {
         var candidates = Enumerable.Range(0, targets.Count)
-            .Where(index => shapes.VisibilityOf(targets[index]).Kind != null && !removedTargets.Contains(index))
+            .Where(index => shapes.VisibilityOf(targets[index]).Kind != null && !decidedTargets.Contains(index))
             .ToArray();
 
         return ParallelMap.RunOver(

@@ -2,6 +2,7 @@ using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
@@ -42,6 +43,14 @@ internal sealed class OtherModsObjectRules(ModTrustTable trust, LoadOrderPlugins
         shapes.Of(target.Base).MeshPath ?? throw new InvalidOperationException($"The target object {target.Key} has no mesh but was asked for its support.");
 
     public OrientedBox BoxOf(TargetObject target) => OrientedBox.FromLocal(shapes.Of(target.Base).Box, target.Transform);
+
+    /// <param name="other">A judged object, where it stands.</param>
+    public StandingObject StandingOf(OtherObject other) =>
+        new(other.SpaceKey, other.Transform, MeshPathOf(other), BoxOf(other, other.Transform), Supporter.Placed(other.Id));
+
+    /// <param name="target">A visible target object with a mesh, where it stands.</param>
+    public StandingObject StandingOf(TargetObject target) =>
+        new(target.SpaceKey, target.Transform, MeshPathOf(target), BoxOf(target), Supporter.Target(target.Id.Index));
 
     /// <summary>Where a target object that can hold up others stands: a visible one with a mesh; null for any other.</summary>
     public BoxInSpace? SupportingBoxOf(TargetObject target) =>

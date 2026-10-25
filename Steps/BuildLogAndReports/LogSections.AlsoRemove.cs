@@ -52,7 +52,7 @@ internal static partial class LogSections
         return
         [
             $"Touching objects: {TextFormat.Count(CountRemovedBy<RemovalReason.Touching>(alsoRemove, decisions))} removed in {TextFormat.Count(stats.Components)} components "
-            + $"({TextFormat.Count(stats.ComponentsWithRemovals)} with follow-up removals, largest {TextFormat.Count(stats.LargestComponent)} removed objects, "
+            + $"({TextFormat.Count(stats.ComponentsWithFollowUpRemovals)} with follow-up removals, largest {TextFormat.Count(stats.LargestComponent)} removed objects, "
             + $"longest chain {TextFormat.Count(stats.MaxDepth)} steps); {TextFormat.Count(CountKept(alsoRemove, decisions))} kept as referenced.",
             AlsoRemovePairs(stats.Pairs, stats.Levels, "levels"),
         ];

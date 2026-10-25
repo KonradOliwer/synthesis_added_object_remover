@@ -1,3 +1,4 @@
-Removed markers and kept objects: 2 objects.
+Removed markers that actors or the map use: 1.
   Removed marker 000800:Target.esp in worldspace Tamriel [000100:Target.esp]: DoorMarkers.
+Kept objects that would have been removed, to check by hand: 1.
   Kept, referenced by a non-placed record: 000803:Target.esp in worldspace Tamriel [000100:Target.esp]: linked from QUST MyQuest [000001:Quest.esp].

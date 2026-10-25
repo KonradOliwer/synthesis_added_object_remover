@@ -46,7 +46,7 @@ public static class LeftBehindObjects
                         new ReachRule(bases),
                         settings,
                         order)
-                    .SelectRemovals(RemovedIndexes(decisions), execution),
+                    .SelectRemovals(RemovedIndexes(decisions), DecidedIndexes(targets, decisions), execution),
                 decisions),
             failure => new LeftBehindResult(StepOutcome.StoppedByUnexpectedError, [], [], PartFailure.OfWholePart(LeftBehindParts.LeftBehind, failure)));
     }
@@ -69,4 +69,7 @@ public static class LeftBehindObjects
 
     private static HashSet<int> RemovedIndexes(IRemovalDecisions decisions) =>
         decisions.RemovedTargets().Select(target => target.Index).ToHashSet();
+
+    private static HashSet<int> DecidedIndexes(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions) =>
+        targets.Where(target => decisions.IsDecided(target.Id)).Select(target => target.Id.Index).ToHashSet();
 }

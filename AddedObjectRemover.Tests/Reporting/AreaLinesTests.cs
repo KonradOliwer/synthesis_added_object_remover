@@ -49,7 +49,7 @@ public sealed class AreaLinesTests
 
         Assert.Equal(
             [
-                "Removed 8/9 (removed/all mod objects):",
+                "Removed 8/9 (removed/all checked objects):",
                 "  Skyrim 7/8",
                 "    The Pale hold 3/4",
                 "      Loreius Farm 2/3",
@@ -69,7 +69,7 @@ public sealed class AreaLinesTests
     {
         var lines = LogSections.BuildAreasSection(World(), [new LinkedRemoval(8, 0)], [], [], NoRisks).Lines.ToList();
 
-        Assert.Equal(["Removed 1/9 (removed/all mod objects):","  Bannered Mare › Whiterun hold 1/1"], lines);
+        Assert.Equal(["Removed 1/9 (removed/all checked objects):","  Bannered Mare › Whiterun hold 1/1"], lines);
     }
 
     [Fact]
@@ -78,19 +78,22 @@ public sealed class AreaLinesTests
         var kept = new KeptObject(2, TestKeepReasons.Quest, TouchedTargetIndex: null);
         var keptOfAnotherKind = new KeptObject(4, TestKeepReasons.NonPlaced("FLST", "MyList"), TouchedTargetIndex: null);
         var hint = new ManualPatchHint(ManualPatchHintType.KeptForNonPlacedReference, 2, "detail");
+        var markerHint = new ManualPatchHint(ManualPatchHintType.RemovedMarker, 2, "DoorMarkers");
         var risks = new RemovalRisks([], [new TargetId(5), new TargetId(2)]);
 
-        var lines = LogSections.BuildAreasSection(World(), Removals(), [kept, kept, keptOfAnotherKind], [hint], risks).Lines.ToList();
+        var lines = LogSections.BuildAreasSection(World(), Removals(), [kept, kept, keptOfAnotherKind], [markerHint, hint], risks).Lines.ToList();
 
         Assert.Equal(
             [
-                "Kept 1/9 (kept/all mod objects), FLST record:",
+                "Kept 1/9 (kept/all checked objects), FLST record:",
                 "  Skyrim › Whiterun hold › near Halted Stream Camp 1/1",
-                "Kept 1/9 (kept/all mod objects), QUST record:",
+                "Kept 1/9 (kept/all checked objects), QUST record:",
                 "  Skyrim › The Pale hold › Loreius Farm 1/3",
-                "Removed markers and kept objects: 1 of 9:",
+                "Removed markers that actors or the map use: 1 of 9:",
                 "  Skyrim › The Pale hold › Loreius Farm 1/3",
-                "Removed 1/9 (large-reference list objects/all mod objects):",
+                "Kept objects that would have been removed, to check by hand: 1 of 9:",
+                "  Skyrim › The Pale hold › Loreius Farm 1/3",
+                "Removed 1/9 (large-reference list objects/all checked objects):",
                 "  Skyrim › unnamed area › cell 5,7 1/1",
             ],
             lines.Skip(11).ToList());
@@ -108,7 +111,7 @@ public sealed class AreaLinesTests
 
         Assert.Equal(
             [
-                "Removed 3/6 (removed/all mod objects):",
+                "Removed 3/6 (removed/all checked objects):",
                 "  Skyrim › H hold 3/6",
                 "      Small 1/1",
                 "      Alpha 1/2",
@@ -130,7 +133,7 @@ public sealed class AreaLinesTests
 
         Assert.Equal(
             [
-                "Removed 7/10 (removed/all mod objects):",
+                "Removed 7/10 (removed/all checked objects):",
                 "  Skyrim › H hold 7/10",
                 "      Zed 1/1",
                 "      near Zed 2/2",

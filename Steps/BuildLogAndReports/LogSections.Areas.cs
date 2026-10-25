@@ -11,7 +11,7 @@ internal static partial class LogSections
 
     /// <summary>
     /// Where the objects of each closing summary are, as one tree by worldspace, hold and place: the removals, the kept
-    /// objects, the removed markers and kept objects and each removal warning; only summaries with objects have lines.
+    /// objects, the removed markers, the kept objects to check by hand and each removal warning; only summaries with objects have lines.
     /// </summary>
     public static LogSection BuildAreasSection(
         CollectedObjects world,
@@ -23,24 +23,29 @@ internal static partial class LogSections
         List<int> removedTargets = [.. removals.Select(removal => removal.TargetIndex)];
         var removed = removedTargets.ToHashSet();
         var keptOnce = KeyedGroups.DistinctBy(kept, entry => entry.TargetIndex, EqualityComparer<int>.Default);
-        var hintTargets = hints.Select(hint => hint.TargetIndex).Distinct().ToList();
+        var hintList = hints.ToList();
+        var removedMarkers = HintTargets(hintList.Where(IsRemovedMarker));
+        var keptToCheck = HintTargets(hintList.Where(hint => !IsRemovedMarker(hint)));
         var uniqueActors = RemovedUniqueActors(risks, removed).Select(role => role.Target.Index).Distinct().ToList();
         var largeReferences = RemovedLargeReferences(risks, removed).ToList();
         var tree = AreaTree.Of(world);
         return new LogSection(
             "areas",
             [
-                .. AreaLines(tree, removedTargets, $"Removed {OfAllModObjects(tree, removedTargets.Count, "removed")}:"),
+                .. AreaLines(tree, removedTargets, $"Removed {OfAllCheckedObjects(tree, removedTargets.Count, "removed")}:"),
                 .. KeptAreaLines(tree, keptOnce),
-                .. AreaLines(tree, hintTargets, $"Removed markers and kept objects: {TextFormat.Count(hintTargets.Count)} of {TextFormat.Count(tree.Total)}:"),
-                .. AreaLines(tree, uniqueActors, $"Removed {OfAllModObjects(tree, uniqueActors.Count, "unique NPCs")}:"),
-                .. AreaLines(tree, largeReferences, $"Removed {OfAllModObjects(tree, largeReferences.Count, "large-reference list objects")}:"),
+                .. AreaLines(tree, removedMarkers, $"{RemovedMarkersHeading}: {TextFormat.Count(removedMarkers.Count)} of {TextFormat.Count(tree.Total)}:"),
+                .. AreaLines(tree, keptToCheck, $"{KeptObjectsToCheckHeading}: {TextFormat.Count(keptToCheck.Count)} of {TextFormat.Count(tree.Total)}:"),
+                .. AreaLines(tree, uniqueActors, $"Removed {OfAllCheckedObjects(tree, uniqueActors.Count, "unique NPCs")}:"),
+                .. AreaLines(tree, largeReferences, $"Removed {OfAllCheckedObjects(tree, largeReferences.Count, "large-reference list objects")}:"),
             ]);
     }
 
-    /// <summary>E.g. "3022/4076 (removed/all mod objects)".</summary>
-    private static string OfAllModObjects(AreaTree tree, int count, string what) =>
-        $"{TextFormat.Count(count)}/{TextFormat.Count(tree.Total)} ({what}/all mod objects)";
+    private static List<int> HintTargets(IEnumerable<ManualPatchHint> hints) => [.. hints.Select(hint => hint.TargetIndex).Distinct()];
+
+    /// <summary>E.g. "3022/4076 (removed/all checked objects)": the checked objects are the cleaned mod's and the other mods' objects it moved.</summary>
+    private static string OfAllCheckedObjects(AreaTree tree, int count, string what) =>
+        $"{TextFormat.Count(count)}/{TextFormat.Count(tree.Total)} ({what}/all checked objects)";
 
     /// <summary>One tree per kept kind, the kind with the most objects first, as in the kept summary.</summary>
     private static IEnumerable<string> KeptAreaLines(AreaTree tree, IReadOnlyList<KeptObject> keptOnce) =>
@@ -50,7 +55,7 @@ internal static partial class LogSections
             .SelectMany(kind => AreaLines(
                 tree,
                 [.. kind.Indices.Select(index => keptOnce[index].TargetIndex)],
-                $"Kept {OfAllModObjects(tree, kind.Indices.Count, "kept")}, {kind.Key}:"));
+                $"Kept {OfAllCheckedObjects(tree, kind.Indices.Count, "kept")}, {kind.Key}:"));
 
     private static IEnumerable<string> AreaLines(AreaTree tree, IReadOnlyList<int> targets, string header) =>
         targets.Count == 0 ? [] : [header, .. tree.NodesOf(targets).SelectMany(worldspace => AreaNodeLines(worldspace, depth: 0))];

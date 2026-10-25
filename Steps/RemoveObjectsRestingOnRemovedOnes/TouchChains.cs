@@ -128,10 +128,12 @@ internal sealed class TouchChains
             .ToList();
         return new TouchChainStatistics(
             _componentMembers.Count,
-            removedPerComponent.Count(removed => removed > 1),
+            _componentMembers.Count(members => members.Any(IsRemovedForTouching)),
             removedPerComponent.DefaultIfEmpty(0).Max(),
             rounds.Count(round => !round.Reached.IsEmpty),
             _nodes.Select(node => _depth[node]).DefaultIfEmpty(0).Max(),
             Work.Sum(rounds.Select(round => round.Work)));
     }
+
+    private bool IsRemovedForTouching(int node) => _decisions.Of(new TargetId(node)) is Decision.Removed { Reason: RemovalReason.Touching };
 }

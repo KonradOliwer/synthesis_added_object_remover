@@ -26,15 +26,17 @@ internal sealed record OtherModsObjectsContext(
 
     public SurfaceContacts CreateSurfaceContacts() => new(Terrain, Triangles, Settings.TouchGap);
 
-    public OtherObjectSupport CreateSupport(OtherModsObjectRules rules) => new(CreateSurfaceContacts(), rules, Settings.TouchGap);
+    public OtherObjectSupport CreateSupport() => new(CreateSurfaceContacts(), Settings.TouchGap);
 
-    public DropFinder CreateDropFinder(OtherModsObjectRules rules) => new(CreateSurfaceContacts(), Triangles, Terrain, rules, Settings.TouchGap);
+    public DropFinder CreateDropFinder() => new(CreateSurfaceContacts(), Triangles, Terrain, Settings.TouchGap);
+
+    public SupportLoss CreateSupportLoss() => new(CreateSupport(), CreateDropFinder(), Settings.SupportLostFraction);
 
     public JudgedObjectsNear CreateNear(IVisibleObjectsOfAnyPlugin others, OtherModsObjectRules rules) => new(others, rules, Settings.TouchGap, Execution);
 
     /// <param name="world">Every target object and object of any plugin where it stands before any decision.</param>
     public TargetsHoldingUpOtherModsObjects CreateHolding(SupportWorld world, IVisibleObjectsOfAnyPlugin others, OtherModsObjectRules rules) =>
-        new(world, CreateNear(others, rules), rules, CreateSupport(rules), CreateDropFinder(rules), Settings.SupportLostFraction, Execution);
+        new(world, CreateNear(others, rules), rules, CreateSupportLoss(), Execution);
 }
 
 /// <summary>The target objects as the also-remove step left them.</summary>
@@ -64,8 +66,6 @@ internal sealed record DecidedTargets(
 /// </summary>
 internal static class OtherModsObjects
 {
-    private static readonly IReadOnlyDictionary<OtherId, PlacedTransform?> NoChanges = new Dictionary<OtherId, PlacedTransform?>();
-
     /// <param name="targets">Where they stand before any decision.</param>
     /// <param name="visibleTargets">The index of <paramref name="targets"/>.</param>
     public static HeldUpTargets FindHeldUpTargets(ImmutableArray<TargetObject> targets, IVisibleTargetObjects visibleTargets, OtherModsObjectsContext context)
@@ -95,21 +95,13 @@ internal static class OtherModsObjects
         new AnyObjectRestingRule(targets, targetObjects, () => CreateHolding(targets, visibleTargets, context));
 
     private static HeldUpTargetsFinder CreateHeldUpTargetsFinder(ImmutableArray<TargetObject> targets, IVisibleTargetObjects visibleTargets, OtherModsObjectsContext context) =>
-        new(
-            targets,
-            CreateHolding(targets, visibleTargets, context),
-            context.ObjectsOfAnyPlugin(),
-            context.Shapes,
-            context.Triangles,
-            context.Terrain,
-            context.Settings,
-            context.Execution);
+        new(targets, CreateHolding(targets, visibleTargets, context), context.Execution);
 
     private static TargetsHoldingUpOtherModsObjects CreateHolding(ImmutableArray<TargetObject> targets, IVisibleTargetObjects visibleTargets, OtherModsObjectsContext context)
     {
         var others = context.ObjectsOfAnyPlugin();
         var rules = context.CreateRules();
-        return context.CreateHolding(new SupportWorld(targets, visibleTargets, _ => true, others, NoChanges, context.Shapes), others, rules);
+        return context.CreateHolding(new SupportWorld(targets, visibleTargets, _ => true, others, SupportWorld.NoChanges, context.Shapes), others, rules);
     }
 
     /// <remarks>Without a changed target object nothing can have lost its support, so the objects of any plugin are not asked for.</remarks>
@@ -154,12 +146,12 @@ internal static class OtherModsObjects
         OtherModsObjectsContext context)
     {
         var settler = new LeftWithoutSupport(
-            new SupportWorld(decided.Targets, decided.Visible, _ => true, others, NoChanges, context.Shapes),
-            new SupportWorld(decided.AsTheyStand, decided.VisibleAsTheyStand, target => !current.IsRemoved(target), others, NoChanges, context.Shapes),
+            new SupportWorld(decided.Targets, decided.Visible, _ => true, others, SupportWorld.NoChanges, context.Shapes),
+            new SupportWorld(decided.AsTheyStand, decided.VisibleAsTheyStand, target => !current.IsRemoved(target), others, SupportWorld.NoChanges, context.Shapes),
             context.CreateNear(others, rules),
             rules,
-            context.CreateSupport(rules),
-            context.CreateDropFinder(rules),
+            context.CreateSupportLoss(),
+            context.CreateDropFinder(),
             context.Settings,
             before,
             context.Execution);
@@ -171,8 +163,8 @@ internal static class OtherModsObjects
         new(
             decided.AsTheyStand,
             decided.VisibleAsTheyStand,
-            new SupportWorld(decided.AsTheyStand, decided.VisibleAsTheyStand, _ => true, others, NoChanges, context.Shapes),
-            context.CreateSupport(rules),
+            new SupportWorld(decided.AsTheyStand, decided.VisibleAsTheyStand, _ => true, others, SupportWorld.NoChanges, context.Shapes),
+            context.CreateSupport(),
             rules,
             context.Triangles,
             alsoRemove,

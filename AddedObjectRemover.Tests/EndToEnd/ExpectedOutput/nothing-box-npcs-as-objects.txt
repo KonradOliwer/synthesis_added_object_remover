@@ -25,14 +25,14 @@ Indexed 28 other objects in 2 cells/worldspaces in <time>.
   Ignored replaced object R_Replacement_Crate [000808:Rival.esp] from Rival.esp: replaced by T_Replaced [00080A:Target.esp], distance 10.0, size ratio 1.00.
 Replacement matching: 1 other-mod objects excluded in <time>.
 Linked groups: 1 groups of linked Target.esp objects (2 objects) from 1 links to Target.esp records.
-Found 21 of 40 Target.esp objects too close to other mods' objects in <time>.
+Found 21 of 40 Target.esp objects too close to other mods' objects in <time>, not counting the shrink or turn check before it.
   Kept T_ReferencedByPlaced [00080F:Target.esp] in interior AorInterior [000800:Skyrim.esm]: Enable Parent of 00080D:Rival.esp.
   Kept T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
 Linked groups: 1 more objects removed with the too-close removals they are linked to.
 Linked groups: 0 more objects removed with the follow-up removals they are linked to.
 Linked groups: 0 more objects removed with the left-behind removals they are linked to.
-Wrote 19 overrides (19 removed, 0 moved) in <time>.
+Wrote 19 overrides (19 removed) in <time>.
   1 removed objects had an Enable Parent; it was replaced by the player with "opposite of parent" so they stay disabled.
   Removed T_TooClose [000807:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_TooClose_Pad [000805:Rival.esp], changed by Rival.esp (new object)
   Removed T_TwinPillars [000808:Target.esp] (base T_TwinPillarsBase [000801:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_TwinPillars_GapPad [000806:Rival.esp], changed by Rival.esp (new object)
@@ -58,25 +58,25 @@ Per cell/worldspace (objects of Target.esp / other objects / removed):
   interior AorInterior [000800:Skyrim.esm]: 38 / 26 / 18
   worldspace AorWorld [000801:Skyrim.esm]: 2 / 2 / 1
 Target.esp objects: 35 visible, 5 invisible (by kind: 2 Position markers (XMarker, XMarkerHeading), 2 Sound sources, 1 Lights without a model), 1 deleted, start disabled, or without a valid position or rotation.
-Objects of Target.esp: 42; already removed by earlier patchers in this group: 0; judged in this run: 40; removed in this run: 19.
+Objects of Target.esp: 42; already removed by earlier patchers in this group: 0; not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 2; judged in this run: 40; removed in this run: 19.
 Removed 19 objects (18 too close, 0 follow-up removals, 0 invisible objects left behind, 1 linked to removed objects).
 Kept 3 objects that would have been removed, because other records depend on them or because of their own script or location ref type.
   FormList record: 1
   placed object: Enable Parent: 1
   teleport door: 1
-Removed markers and kept objects: 2 objects.
+Kept objects that would have been removed, to check by hand: 2.
   Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
-Removed 19/40 (removed/all mod objects):
+Removed 19/40 (removed/all checked objects):
   AorInterior › unnamed area 18/38
   AorWorld › unnamed area › AorExterior 1/2
-Kept 1/40 (kept/all mod objects), FormList record:
+Kept 1/40 (kept/all checked objects), FormList record:
   AorInterior › unnamed area 1/38
-Kept 1/40 (kept/all mod objects), placed object: Enable Parent:
+Kept 1/40 (kept/all checked objects), placed object: Enable Parent:
   AorInterior › unnamed area 1/38
-Kept 1/40 (kept/all mod objects), teleport door:
+Kept 1/40 (kept/all checked objects), teleport door:
   AorInterior › unnamed area 1/38
-Removed markers and kept objects: 2 of 40:
+Kept objects that would have been removed, to check by hand: 2 of 40:
   AorInterior › unnamed area 2/38
 Removals: wrote 19 rows to <root>/Output/Reports/removals.csv.
 Removed markers and kept objects: wrote 2 rows to <root>/Output/Reports/removed-markers-and-kept-objects.csv.

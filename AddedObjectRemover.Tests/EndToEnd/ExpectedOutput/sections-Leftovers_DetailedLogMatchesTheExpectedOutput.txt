@@ -1,4 +1,4 @@
-  Kept 000803:Target.esp in worldspace Tamriel [000100:Target.esp]: linked from QUST MyQuest [000001:Quest.esp].
+Invisible objects left behind: 2 evaluated in 1.5s; removed 1 (1 inside another mod's object, 0 surroundings removed); kept 1 (0 too few surrounding objects, 0 surroundings mostly kept, 1 protected type, 0 referenced).
   Left behind: 000803:Target.esp (Map markers) in worldspace Tamriel [000100:Target.esp]: kept, protected type; radius 500, removed/total ground area East 400/400, NorthEast -, North 0/100, NorthWest -, West -, SouthWest -, South -, SouthEast -.
   Left behind: 000804:Target.esp (Position markers (XMarker, XMarkerHeading)) in worldspace Tamriel [000100:Target.esp]: removed, inside another mod's object (inside 000010:Other.esp); radius 300, removed/total ground area East 400/400, NorthEast -, North 0/100, NorthWest -, West -, SouthWest -, South -, SouthEast -.
-Invisible objects left behind: 2 evaluated in 1.5s; removed 1 (1 inside another mod's object, 0 surroundings removed); kept 1 (0 too few surrounding objects, 0 surroundings mostly kept, 1 protected type, 0 referenced).
+  Kept 000803:Target.esp in worldspace Tamriel [000100:Target.esp]: linked from QUST MyQuest [000001:Quest.esp].

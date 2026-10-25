@@ -348,7 +348,7 @@ public sealed class LogAndReports
             LogSections.BuildSpacesSection(world, removals, _settings.TargetAsTyped, _context),
             LogSections.BuildTargetVisibilitySection(world.Targets, world.Counts.TargetsHiddenOrWithoutPlacement, _settings.TargetAsTyped, _context),
             LogSections.BuildRunSummarySection(world, _settings.TargetAsTyped, ownRemoved),
-            LogSections.BuildRemovalSummarySection(removals, outcome.ChangedTerrain.Outcome),
+            LogSections.BuildRemovalSummarySection(world, removals, outcome.Final, _settings.TargetAsTyped, outcome.ChangedTerrain.Outcome),
             .. WhenItHasLines(movedReplacements),
             .. WhenItHasLines(ownShrunkOrTurned),
             .. WhenItHasLines(leftWithoutSupport),

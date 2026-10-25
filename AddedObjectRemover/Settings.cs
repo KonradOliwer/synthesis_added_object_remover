@@ -101,8 +101,9 @@ public class StandardSettings : ISettingsValues
     [SynthesisTooltip(
         "An object of the cleaned mod, or of another mod that the cleaned mod moved, that would be removed for being too close to another mod's object\n"
         + "is first tried shrunk or turned where it stands. If it fits, it is kept that way; otherwise it is removed.\n"
-        + "Never shrunk or turned, but removed as before: an object on terrain another mod changed; an object other objects of the cleaned mod rest on\n"
-        + "(as \"Also remove what rests on removed objects\" decides; with \"Nothing\" there, none counts); and, whatever the settings, an object\n"
+        + "Never shrunk or turned, but removed as before: an object on terrain another mod changed; an object that another object of the cleaned mod\n"
+        + "rests on from above and would lose its support without (objects that only touch it from the side do not count; with \"Nothing\" in\n"
+        + "\"Also remove what rests on removed objects\", none counts); and, whatever the settings, an object\n"
         + "that another mod's object rests on (of the mods \"Other mods' objects left without support\" names).\n"
         + "Invisible objects, objects that are always kept and linked objects are never shrunk or turned.\n"
         + "Objects of other mods that the cleaned mod left in place are never checked.")]
@@ -419,7 +420,8 @@ public class FollowUpRemovalSettings : IFollowUpSettingsValues
     [SynthesisSettingName("OnlyWhatLosesItsSupport: remove when this much support is gone (%)")]
     [SynthesisTooltip(
         "The ground and every plugin's objects count as support. 1-100.\n"
-        + "Also decides when another mod's object rests on an object or is left without support (the last setting of this group).")]
+        + "Also decides when another mod's object rests on an object or is left without support (the last setting of this group),\n"
+        + "and, unless \"Nothing\" is chosen above, when an object of the cleaned mod rests on another that is then never shrunk or turned.")]
     public float AnchoringThresholdPercent { get; set; } = SettingDefaults.AnchoringThresholdPercent;
 
     [SynthesisOrder]
@@ -429,7 +431,8 @@ public class FollowUpRemovalSettings : IFollowUpSettingsValues
         + "Only objects of the base game, of the cleaned mod's masters and of mods trusted in the settings above (listed, requiring the cleaned mod, or loading before it) count; "
         + "objects of untrusted mods, of never trusted mods and of mods trusted only as masters of other mods are ignored.\n"
         + "Whatever is chosen here, an object of the cleaned mod that such an object rests on is never shrunk or turned.\n"
-        + "KeepSupportingObject: the cleaned mod's object it rests on is kept as it is. When it rests on several that hold enough of it only together, all of them are kept.\n"
+        + "KeepSupportingObject: the cleaned mod's object it rests on is kept as it is when, without it, the other mod's object would be left without support, judged as the other two choices judge it.\n"
+        + "When only taking several of them away together would do that, all of them are kept.\n"
         + "RemoveFloatingObject: the other mod's object is removed too.\n"
         + "PullObjectToTheGround: the other mod's object is moved straight down onto what is below it, keeping its rotation;\n"
         + "with nothing below it within 2048 units, it is removed.\n"

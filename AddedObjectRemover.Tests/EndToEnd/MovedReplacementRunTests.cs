@@ -156,15 +156,29 @@ public class MovedReplacementRunTests
         Assert.Equal(bottom.Id, Assert.IsType<RemovalReason.LostSupport>(Assert.IsType<Decision.Removed>(outcome.Final.Of(top.Id)).Reason).MainSupporter);
     }
 
-    /// <summary>With EverythingTouchingIt, the bottom crate touching the top crate counts as resting on it.</summary>
+    /// <summary>
+    /// With EverythingTouchingIt too, the bottom crate only touches the top crate from below and does not rest on it, so the top
+    /// crate is shrunk to fit and the bottom crate stays.
+    /// </summary>
     [Fact]
-    public void WithEverythingTouchingItAnObjectAnotherTouchesIsRemovedInsteadOfShrunk()
+    public void WithEverythingTouchingItAnObjectOnlyTouchedFromBelowIsShrunk()
     {
         var outcome = RunStackWorld(ShrinkSettings(), [BesideTheTop]);
 
         var (top, bottom) = StackOf(outcome);
-        Assert.IsType<RemovalReason.TooClose>(Assert.IsType<Decision.Removed>(outcome.Final.Of(top.Id)).Reason);
-        Assert.Equal(new RemovalReason.Touching(top.Id), Assert.IsType<Decision.Removed>(outcome.Final.Of(bottom.Id)).Reason);
+        Assert.IsType<Decision.Fitted>(outcome.Final.Of(top.Id));
+        Assert.Null(outcome.Final.Of(bottom.Id));
+    }
+
+    /// <summary>With EverythingTouchingIt, as with OnlyWhatLosesItsSupport, the top crate resting on the bottom crate keeps it from being shrunk.</summary>
+    [Fact]
+    public void WithEverythingTouchingItAnObjectOthersRestOnIsRemovedInsteadOfShrunkAndWhatTouchesItGoesWithIt()
+    {
+        var outcome = RunStackWorld(ShrinkSettings(), [BesideTheBottom]);
+
+        var (top, bottom) = StackOf(outcome);
+        Assert.IsType<RemovalReason.TooClose>(Assert.IsType<Decision.Removed>(outcome.Final.Of(bottom.Id)).Reason);
+        Assert.Equal(new RemovalReason.Touching(bottom.Id), Assert.IsType<Decision.Removed>(outcome.Final.Of(top.Id)).Reason);
     }
 
     [Fact]

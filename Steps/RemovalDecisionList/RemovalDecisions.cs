@@ -89,7 +89,9 @@ public sealed class RemovalDecisions : IRemovalDecisions
 
     public ImmutableArray<TargetId> KeptIn(Round round) => _store.KeptIn[VisibleIndexOf(round)];
 
-    public ImmutableArray<TargetId> FittedIn(Round round) => [.. _store.FittedIn[VisibleIndexOf(round)].Where(target => Of(target) is Decision.Fitted)];
+    public ImmutableArray<TargetId> FittedIn(Round round) => [.. FittedAtFirstIn(round).Where(target => Of(target) is Decision.Fitted)];
+
+    public ImmutableArray<TargetId> FittedAtFirstIn(Round round) => _store.FittedIn[VisibleIndexOf(round)];
 
     public ImmutableArray<TargetId> RemovedTargets() => [.. All().Where(entry => entry.Decision is Decision.Removed).Select(entry => entry.Target)];
 

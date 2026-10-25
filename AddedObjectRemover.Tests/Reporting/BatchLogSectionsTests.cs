@@ -88,22 +88,37 @@ public sealed class BatchLogSectionsTests
         Assert.Equal(["warnings"], LogAndReports.BuildStartSections(request).Select(section => section.Id));
     }
 
-    /// <summary>Two runs of a batch: the first starts from a patch earlier patchers already wrote into, the second from its own mod's objects only.</summary>
+    /// <summary>
+    /// Two runs of a batch: the first starts from a patch earlier patchers already wrote into and has objects it does not judge
+    /// (one won by a later plugin, one a later plugin removes, one deleted), the second from its own mod's objects only.
+    /// </summary>
     [Fact]
     public void EachRunsSummaryGivesItsStartingStateAndWhatItRemoved()
     {
         Assert.Equal(
-            ["Objects of Target.esp: 9; already removed by earlier patchers in this group: 2; judged in this run: 6; removed in this run: 4."],
-            RunSummaryLines(Target, objects: 9, removedByEarlierPatchers: 2, judged: 6, removed: 4));
+            ["Objects of Target.esp: 11; already removed by earlier patchers in this group: 2; "
+                + "not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 3; "
+                + "judged in this run: 6; removed in this run: 4."],
+            RunSummaryLines(Target, objects: 11, removedByEarlierPatchers: 2, eachNotJudgedKind: 1, judged: 6, removed: 4));
         Assert.Equal(
-            ["Objects of Second.esp: 3; already removed by earlier patchers in this group: 0; judged in this run: 3; removed in this run: 0."],
-            RunSummaryLines(ModKey.FromNameAndExtension("Second.esp"), objects: 3, removedByEarlierPatchers: 0, judged: 3, removed: 0));
+            ["Objects of Second.esp: 3; already removed by earlier patchers in this group: 0; "
+                + "not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 0; "
+                + "judged in this run: 3; removed in this run: 0."],
+            RunSummaryLines(ModKey.FromNameAndExtension("Second.esp"), objects: 3, removedByEarlierPatchers: 0, eachNotJudgedKind: 0, judged: 3, removed: 0));
     }
 
-    private static string[] RunSummaryLines(ModKey cleanedMod, int objects, int removedByEarlierPatchers, int judged, int removed)
+    /// <param name="eachNotJudgedKind">The objects won by a later plugin, and as many removed by a later plugin, and as many deleted.</param>
+    private static string[] RunSummaryLines(ModKey cleanedMod, int objects, int removedByEarlierPatchers, int eachNotJudgedKind, int judged, int removed)
     {
         var world = TestScenes.CreateWorld(TestTargets.CreateMany(judged), []);
-        var counts = world.Counts with { CleanedModObjects = objects, RemovedByEarlierPatchers = removedByEarlierPatchers };
+        var counts = world.Counts with
+        {
+            CleanedModObjects = objects,
+            RemovedByEarlierPatchers = removedByEarlierPatchers,
+            TargetsOverriddenLater = eachNotJudgedKind,
+            RemovedByOtherPlugins = eachNotJudgedKind,
+            TargetsHiddenOrWithoutPlacement = eachNotJudgedKind,
+        };
         return [.. LogSections.BuildRunSummarySection(world with { Counts = counts }, cleanedMod.ToPluginName(), removed).Lines];
     }
 

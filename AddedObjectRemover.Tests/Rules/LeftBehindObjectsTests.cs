@@ -43,7 +43,7 @@ public class LeftBehindObjectsTests
     public void EvaluateGivesTheSelectorsEvaluations()
     {
         var expected = TestLeftBehind.CreateRule(Targets, Shapes, Others, Settings)
-            .SelectRemovals(new HashSet<int>(), new Execution(Environment.ProcessorCount));
+            .SelectRemovals(new HashSet<int>(), new HashSet<int>(), new Execution(Environment.ProcessorCount));
 
         var actual = Find(StartDecisions(), Settings);
 
@@ -81,6 +81,22 @@ public class LeftBehindObjectsTests
         Assert.NotEmpty(result.Proposals);
         Assert.Empty(decisions.Rounds);
         Assert.Empty(decisions.RemovedTargets());
+    }
+
+    /// <summary>The marker inside the room is protected and was kept by an earlier round, so the step neither evaluates nor proposes it.</summary>
+    [Fact]
+    public void AnObjectAnEarlierRoundKeptIsNotEvaluatedAgain()
+    {
+        var protection = ObjectsToKeep.Build(
+            Targets, [], TestTargets.References(Targets.Length, new Dictionary<int, KeepReason> { [0] = TestKeepReasons.Quest }), TestBaseFacts.Unresolved);
+        var decisions = RemovalDecisions.Start(protection, Targets.Length)
+            .Apply(RoundKind.TooClose, [new ProposedRemoval(new TargetId(0), new RemovalReason.TooClose(Others[0].Id, new TooCloseCause.ObjectSize()))]);
+        Assert.IsType<Decision.Kept>(decisions.Of(new TargetId(0)));
+
+        var result = Find(decisions, Settings);
+
+        Assert.DoesNotContain(result.Evaluations, evaluation => evaluation.TargetIndex == 0);
+        Assert.Empty(result.Proposals);
     }
 
     [Fact]

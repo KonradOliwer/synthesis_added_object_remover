@@ -4,19 +4,16 @@ using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
-/// <summary>What a judged object had before any decision, which no decision changes.</summary>
-/// <param name="Weight">The weight of its surface touching anything.</param>
-/// <param name="Rested">Whether it rested on what was below it.</param>
-internal readonly record struct SupportBefore(float Weight, bool Rested);
-
-/// <summary>The <see cref="SupportBefore"/> of each judged object found so far, kept by one step for all its settlings.</summary>
+/// <summary>
+/// The <see cref="SupportBefore"/> of each judged object found so far, before any decision, which no decision changes; kept by one
+/// step for all its settlings.
+/// </summary>
 internal sealed record SupportsBefore(Dictionary<OtherId, SupportBefore> Of);
 
 /// <summary>
-/// RemoveFloatingObject and PullObjectToTheGround. An object is left without support when it lost at least the threshold share of
-/// the weight of its surface touching anything: lost = 1 - (weight touching now) / (weight touching before), with the targets
-/// removed, the targets shrunk or turned at their new placement, and the objects already found left without support taken away;
-/// and when it rested on what was below it before and can now move down by more than the gap.
+/// RemoveFloatingObject and PullObjectToTheGround. An object is left without support when it loses its support
+/// (<see cref="SupportLoss"/>) between the world before any decision and the world with the targets removed, the targets shrunk
+/// or turned at their new placement, and the objects already found left without support taken away.
 /// The rounds start from the changed targets; each round judges the judged objects whose box comes within the gap of a supporter
 /// changed in the round before, against the world after that round, so the result does not depend on order. An object the patch
 /// cannot change stays as it is, and so, with RemoveFloatingObject, does one that may not be removed; both keep holding up others.
@@ -31,7 +28,7 @@ internal sealed class LeftWithoutSupport(
     SupportWorld final,
     JudgedObjectsNear near,
     OtherModsObjectRules rules,
-    OtherObjectSupport support,
+    SupportLoss loss,
     DropFinder drops,
     OtherModsObjectsSettings settings,
     SupportsBefore before,
@@ -67,7 +64,7 @@ internal sealed class LeftWithoutSupport(
             execution,
             candidates.Count,
             () => new OtherObjectQueries(),
-            (k, queries) => FindSupportLost(candidates[k], before.Of[candidates[k].Id], world, queries),
+            (k, queries) => FindLostShare(candidates[k], world, queries),
             ParallelMap.AutomaticRangeSize);
         var takenAway = new List<BoxInSpace>();
         for (var k = 0; k < candidates.Count; k++)
@@ -87,23 +84,14 @@ internal sealed class LeftWithoutSupport(
             execution,
             missing.Count,
             () => new OtherObjectQueries(),
-            (k, queries) => new SupportBefore(support.FindContacts(missing[k], original, queries).TotalWeight, drops.Rests(missing[k], original, queries)),
+            (k, queries) => loss.FindSupportBefore(rules.StandingOf(missing[k]), original, queries),
             ParallelMap.AutomaticRangeSize);
         for (var k = 0; k < missing.Count; k++) before.Of.Add(missing[k].Id, found[k]);
     }
 
-    /// <returns>
-    /// The share of its support the object lost, when that reaches the threshold, the object rested on something before and can
-    /// move down by more than the gap now; null otherwise. An object that touched nothing, or only touched things beside it while
-    /// nothing was right below it, was not resting. An object that only lost what touched it from above or from the side still
-    /// rests on what is below it.
-    /// </returns>
-    private float? FindSupportLost(OtherObject candidate, SupportBefore supportBefore, SupportWorld world, OtherObjectQueries queries)
-    {
-        if (!(supportBefore.Weight > 0f) || !supportBefore.Rested) return null;
-        var lost = 1f - support.FindContacts(candidate, world, queries).TotalWeight / supportBefore.Weight;
-        return SupportRule.ReachesThreshold(lost, settings.SupportLostFraction) && !drops.Rests(candidate, world, queries) ? lost : null;
-    }
+    /// <returns>The share of its support the object lost in <paramref name="world"/>, when it is left without support; null otherwise.</returns>
+    private float? FindLostShare(OtherObject candidate, SupportWorld world, OtherObjectQueries queries) =>
+        loss.FindLostShare(rules.StandingOf(candidate), before.Of[candidate.Id], world, queries);
 
     /// <returns>Whether the object is taken away: removed, or waiting to be pulled down.</returns>
     private bool Decide(OtherObject other, float lostShare, Progress progress)
@@ -147,7 +135,7 @@ internal sealed class LeftWithoutSupport(
         var queries = new OtherObjectQueries();
         foreach (var (other, lostShare) in progress.ToPull.OrderBy(entry => BottomOf(entry.Object)).ThenBy(entry => entry.Object.Id.Index))
         {
-            PullDown(other, lostShare, drops.FindDrop(other, world, queries), progress);
+            PullDown(other, lostShare, drops.FindDrop(rules.StandingOf(other), world, queries), progress);
         }
     }
 

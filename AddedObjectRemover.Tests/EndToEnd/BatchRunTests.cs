@@ -30,6 +30,9 @@ public sealed class BatchRunTests : IDisposable
     private const string Banner = "=== Added Object Remover ===";
     private const string DoneLinePrefix = "Done";
     private const string RunSummaryPrefix = "Objects of ";
+
+    private const string NothingNotJudged =
+        "not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 0; ";
     private const string ReportsFolder = Program.ReportsFolderName;
     private const float PadCentre = 75f;
 
@@ -78,8 +81,8 @@ public sealed class BatchRunTests : IDisposable
         Assert.Equal([Crate], run.RemovedRecords());
         Assert.Equal(
             [
-                "Objects of First.esp: 1; already removed by earlier patchers in this group: 0; judged in this run: 1; removed in this run: 1.",
-                "Objects of Second.esp: 1; already removed by earlier patchers in this group: 0; judged in this run: 1; removed in this run: 0.",
+                $"Objects of First.esp: 1; already removed by earlier patchers in this group: 0; {NothingNotJudged}judged in this run: 1; removed in this run: 1.",
+                $"Objects of Second.esp: 1; already removed by earlier patchers in this group: 0; {NothingNotJudged}judged in this run: 1; removed in this run: 0.",
             ],
             run.Log.Where(line => line.StartsWith(RunSummaryPrefix, StringComparison.Ordinal)));
     }

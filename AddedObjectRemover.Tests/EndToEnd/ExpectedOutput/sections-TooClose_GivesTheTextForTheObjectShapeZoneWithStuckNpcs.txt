@@ -1,7 +1,7 @@
 Object-shape zones: 10 candidate pairs, 8 passed the box filter, 6 mesh tests, 3 hits, 2 centre-point fallbacks (other object without mesh triangles), 1 Target.esp objects without mesh triangles used their box; 40 triangle pairs tested exactly.
   2 large other objects tested against every Target.esp object of their space; 9 effect-only meshes (fog, light rays, water spray) ignored.
   Meshes indexed: 4 (900 triangles).
-Found 1 of 3 Target.esp objects too close to other mods' objects in 1.5s.
+Found 1 of 3 Target.esp objects too close to other mods' objects in 1.5s, not counting the shrink or turn check before it.
   Ignored 4 other-mod objects that are invisible (markers, lights, sounds, decals, trigger boxes, ...).
     Lights: 3
     Sounds: 1

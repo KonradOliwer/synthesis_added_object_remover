@@ -17,8 +17,8 @@ internal static partial class LogSections
         new("tooClose",
         [
             .. context.Detailed && report.Result.Zone == ZoneShape.ObjectShape ? ShapeZoneLines(report) : [],
-            $"Found {TextFormat.Count(report.Result.Hits.Length)} of {TextFormat.Count(report.World.Targets.Length)} {report.Target} objects {DescribeDistance(report.Result)}"
-                + $"{Describe.TimedSuffix(report.Elapsed, context)}{DescribeAlreadyRemoved(report.AlreadyRemoved)}.",
+            $"Found {TextFormat.Count(report.Result.Hits.Length)} of {DescribeJudgedObjects(report.World, report.Target)} {DescribeDistance(report.Result)}"
+                + $"{TooCloseTime(report.Elapsed, context)}{DescribeAlreadyRemoved(report.AlreadyRemoved)}.",
             .. context.Detailed ? InvisibleOthers(report.Census) : [],
             .. context.Detailed ? NpcLines(report) : [],
             .. BuildKeptLines(report.World, report.Kept),
@@ -34,6 +34,13 @@ internal static partial class LogSections
         var bySize = result.Hits.Length - byDistance;
         return $"too close to other mods' objects ({TextFormat.Count(bySize)} by object size, {TextFormat.Count(byDistance)} by distance)";
     }
+
+    /// <summary>
+    /// The step's own time: the shrink or turn check runs first and checks the objects it may shrink or turn where they stand,
+    /// and that work is timed with it, not here.
+    /// </summary>
+    private static string TooCloseTime(TimeSpan elapsed, ReportContext context) =>
+        context.Detailed ? $"{Describe.TimedSuffix(elapsed, context)}, not counting the shrink or turn check before it" : string.Empty;
 
     private static string DescribeAlreadyRemoved(int count) =>
         count > 0 ? $"; {TextFormat.Count(count)} of them were already removed on changed terrain" : string.Empty;

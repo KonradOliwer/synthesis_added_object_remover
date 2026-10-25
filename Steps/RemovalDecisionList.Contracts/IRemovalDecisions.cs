@@ -30,6 +30,9 @@ public interface IRemovalDecisions
     /// <summary>The objects the round kept shrunk or turned where they stand, in target order.</summary>
     ImmutableArray<TargetId> FittedIn(Round round);
 
+    /// <summary>The objects the round kept shrunk or turned, also those a later round removed, in target order.</summary>
+    ImmutableArray<TargetId> FittedAtFirstIn(Round round);
+
     /// <summary>Every removed object, in target order.</summary>
     ImmutableArray<TargetId> RemovedTargets();
 

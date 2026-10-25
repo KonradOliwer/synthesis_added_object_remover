@@ -62,10 +62,23 @@ public class RestingObjectsLinkedGroupTests
             },
             alsoRemoveRounds.SelectMany(round => decisions.RemovedIn(round)).Select(target => (target.Index, decisions.Of(target)!.Reason)));
         Assert.Equal(1, stats.Components);
-        Assert.Equal(1, stats.ComponentsWithRemovals);
+        Assert.Equal(1, stats.ComponentsWithFollowUpRemovals);
         Assert.Equal(4, stats.LargestComponent);
         Assert.Equal(2, stats.Levels);
         Assert.Equal(3, stats.MaxDepth);
+    }
+
+    /// <summary>Two seed tables touching each other form one component with two removed objects, but neither is a follow-up removal.</summary>
+    [Fact]
+    public void AComponentOfSeedsOnlyHasNoFollowUpRemovals()
+    {
+        const float besideWithinTouch = 40.5f;
+        List<TargetObject> targets = [Place(0, TableModel, TestTargets.Space, Vector3.Zero), Place(1, TableModel, TestTargets.Space, new Vector3(besideWithinTouch, 0, 0))];
+        var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Count), TestBaseFacts.Unresolved);
+
+        var stats = TestTouchCascade.Execute(targets, Shapes, protection, [0, 1], TouchDistance, threads: 1, collectDiagnostics: false).TouchChains.Stats;
+
+        Assert.Equal((1, 0, 2), (stats.Components, stats.ComponentsWithFollowUpRemovals, stats.LargestComponent));
     }
 
     [Fact]

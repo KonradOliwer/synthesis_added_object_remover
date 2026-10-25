@@ -333,6 +333,7 @@ public sealed class ChainEqualsBatchTests : IDisposable
 
     private static string RunSummary(Config config, int alreadyRemoved, int judged, int removed) =>
         $"{RunSummaryPrefix}{config.Plugin}: {ObjectsPerMod}; already removed by earlier patchers in this group: {alreadyRemoved}; "
+        + "not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 0; "
         + $"judged in this run: {judged}; removed in this run: {removed}.";
 
     private static StandardSettings StandardOf(Config config, World world) => new()

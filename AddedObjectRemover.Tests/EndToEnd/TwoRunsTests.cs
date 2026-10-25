@@ -178,7 +178,7 @@ public sealed class TwoRunsTests : IDisposable
     }
 
     private static Regex RunSummaryLine() =>
-        new(@"^Objects of \S+: (\d+); already removed by earlier patchers in this group: (\d+); judged in this run: (\d+); removed in this run: (\d+)\.$");
+        new(@"^Objects of \S+: (\d+); already removed by earlier patchers in this group: (\d+); not judged \([^)]*\): \d+; judged in this run: (\d+); removed in this run: (\d+)\.$");
 
     private sealed record RunSummary(int Objects, int AlreadyRemoved, int Judged, int Removed)
     {

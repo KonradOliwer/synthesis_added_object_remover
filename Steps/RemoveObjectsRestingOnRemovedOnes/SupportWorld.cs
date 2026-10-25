@@ -27,6 +27,9 @@ internal sealed class SupportWorld(
     IReadOnlyDictionary<OtherId, PlacedTransform?> changed,
     IBaseObjectShapes shapes)
 {
+    /// <summary>No object of any plugin moved or taken away.</summary>
+    public static readonly IReadOnlyDictionary<OtherId, PlacedTransform?> NoChanges = new Dictionary<OtherId, PlacedTransform?>();
+
     /// <summary>The world with the objects of any plugin as <paramref name="changes"/> leaves them.</summary>
     public SupportWorld With(IReadOnlyDictionary<OtherId, PlacedTransform?> changes) => new(targets, targetIndex, stands, others, changes, shapes);
 

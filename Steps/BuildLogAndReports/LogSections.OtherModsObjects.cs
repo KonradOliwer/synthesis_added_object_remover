@@ -21,8 +21,9 @@ internal static partial class LogSections
             heldUp.Outcome,
             HeldUpName,
             heldUp.Targets.Count > 0 && context.Detailed,
-            () => $"Objects of {target} that other mods' objects rest on: {TextFormat.Count(heldUp.Targets.Values.Count(resting => resting.KeptFor is null))}; "
-                + $"objects of {target} those rest on: {TextFormat.Count(heldUp.Targets.Values.Count(resting => resting.KeptFor is not null))}{Describe.TimedSuffix(elapsed, context)}."));
+            () => $"Objects of {target} that other mods' objects rest on, kept: {TextFormat.Count(heldUp.Targets.Count)} "
+                + $"({TextFormat.Count(heldUp.Targets.Values.Count(resting => resting.KeptFor is null))} directly, "
+                + $"{TextFormat.Count(heldUp.Targets.Values.Count(resting => resting.KeptFor is not null))} under those){Describe.TimedSuffix(elapsed, context)}."));
 
     /// <summary>
     /// The not-performed line when an unexpected error stopped the step; otherwise the objects of the cleaned mod its rounds kept,

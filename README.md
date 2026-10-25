@@ -39,7 +39,7 @@ A linked partner of an object removed for being too close, for standing on chang
 2. Leave *Mode* on `Standard` and set *Mod to clean up* under *Standard*. To clean up several mods in one run, see *Batch mode*.
 3. Run the group and keep the patch enabled, below the cleaned mod in your plugin list.
 
-Near the end of the log, a *Removed markers and kept objects* section lists the removed markers and the kept objects it names (only when there are any).
+Near the end of the log, a *Removed markers that actors or the map use* list and a *Kept objects that would have been removed, to check by hand* list name the objects you may want to check (each only when there are any).
 
 The cleaned mod must be enabled in your plugin list and load above the patch. Before anything is changed, the patcher checks this and stops with one of these messages (positions count from 0 in your plugin list):
 - *SomeMod.esp is not in your plugin list*
@@ -281,10 +281,12 @@ With *Shrink down to* `100` and *Turn by at most* `0`, nothing is shrunk or turn
 
 Only objects that are too close are shrunk or turned. These are never shrunk or turned, and are removed as before:
 - an object on terrain another mod changed (see *Remove objects on terrain changed by other mods*);
-- an object that other objects of the cleaned mod rest on, as *Also remove what rests on removed objects* decides: with
-  `EverythingTouchingIt`, any of them touching it; with `OnlyWhatLosesItsSupport`, one that would lose its support without it.
-  Shrinking or turning it would leave them floating; removing it lets that step handle them. With `Nothing`, no object counts
-  here;
+- an object that another object of the cleaned mod rests on: that object stands on it from above, it holds at least *remove
+  when this much support is gone (%)* of that object's support, and without it that object would no longer rest on what is
+  below it (see *When an object rests on another*). This is the same with `EverythingTouchingIt` and `OnlyWhatLosesItsSupport`;
+  objects that only touch it from the side, such as flat plants lying edge to edge, do not count. Shrinking or turning it
+  would leave the object on it floating; removing it lets *Also remove what rests on removed objects* handle that object.
+  With `Nothing`, no object of the cleaned mod counts here;
 - whatever the settings, an object that another mod's object rests on, of the plugins *Other mods' objects left without
   support* checks (see *When an object rests on another*). When it is removed, that setting decides what becomes of the other
   mod's object, and *Also remove what rests on removed objects* what becomes of the cleaned mod's objects on that one. With
@@ -300,7 +302,7 @@ it was: *Also remove what rests on removed objects* removes it like any other ob
 | --- | --- | --- |
 | When an object is removed, also remove | `OnlyWhatLosesItsSupport` | What else goes with a removed object (see below). |
 | Gap that still counts as touching (game units) | `8` | Two objects this close or closer count as touching (0-64). Used by `EverythingTouchingIt` and `OnlyWhatLosesItsSupport`, and, whatever *When an object is removed, also remove* is set to, for other mods' objects (see *Other mods' objects left without support*). |
-| OnlyWhatLosesItsSupport: remove when this much support is gone (%) | `50` | `OnlyWhatLosesItsSupport`: remove an object once this much of its support is gone (1-100). Whatever *When an object is removed, also remove* is set to, it also decides when another mod's object rests on an object or is left without support (see *Other mods' objects left without support*). |
+| OnlyWhatLosesItsSupport: remove when this much support is gone (%) | `50` | `OnlyWhatLosesItsSupport`: remove an object once this much of its support is gone (1-100). Whatever *When an object is removed, also remove* is set to, it also decides when another mod's object rests on an object or is left without support (see *Other mods' objects left without support*). Unless that is `Nothing`, it also decides when an object of the cleaned mod rests on another, which is then never shrunk or turned (see *Shrink or turn objects to make them fit*). |
 | Other mods' objects left without support | `PullObjectToTheGround` | What happens to another mod's object resting on an object of the cleaned mod that is removed (see *Other mods' objects left without support*). Whatever it is set to, an object such an object rests on is never shrunk or turned. |
 
 - **Nothing**: of the cleaned mod's objects, only those found too close or on changed terrain are removed. (Other mods' objects are decided by *Other mods' objects left without support*, in every mode.)
@@ -316,9 +318,9 @@ one of these objects rests on is never shrunk or turned to make it fit (see *Shr
 kept as it stands or removed.
 
 - **KeepSupportingObject**: an object of the cleaned mod that another mod's object rests on is kept as it is: it is never
-  removed. When the other mod's object rests on several objects of the cleaned mod that hold enough of it only together (two
-  crates under one lantern, for example), all of them are kept. So is an object of the cleaned mod that such a kept object
-  rests on, and so on down, so the whole support under the other mod's object stays (a lantern of a patch on a book of the
+  removed. When the other mod's object would be left without support only if several objects of the cleaned mod were all taken
+  away (two crates under one lantern, for example), all of them are kept. So is an object of the cleaned mod that such a kept
+  object rests on, by the same test, and so on down, so the whole support under the other mod's object stays (a lantern of a patch on a book of the
   cleaned mod on a rock of the cleaned mod keeps both the book and the rock). Objects linked to a kept object are kept with it,
   as for every reason to keep.
 - **RemoveFloatingObject**: the cleaned mod's objects are removed, shrunk or turned as decided, and the other mods' objects left
@@ -354,18 +356,20 @@ never checked. Any object that stays, of any plugin, and the terrain still count
   object that only touches the cleaned mod's object from the side, with nothing right below it, does not rest on it. An object
   partly sunk into another solid object rests on it when it is sunk deeper than the gap, or when its lower half is sunk in, however
   thin that object is (a plate sunk into a board). An object whose model is open somewhere (a room shell with an opening, for
-  example) does not hold up what stands inside it.
-- Another mod's object rests on objects of the cleaned mod when, without them, it would lose at least *remove when this much
-  support is gone (%)* of what it touches, measured as for `OnlyWhatLosesItsSupport`, and could move straight down by more than
-  the gap: each object of the cleaned mod that holds that share alone, or, when none does, all of them that hold part of it,
-  if together they hold that share. This decides which objects `KeepSupportingObject` keeps and which objects are never shrunk
-  or turned. A base game floor under a table of the cleaned mod, for example, does not keep the table: the floor does not rest
+  example) does not hold up what stands inside it, but it still counts as touching it, so an object standing inside such a model is
+  never found left without support.
+- An object is left without support when it rested on something before, at least *remove when this much support is gone (%)*
+  of its surface that touched anything touches nothing any more, and it can then move straight down by more than the gap. A
+  part of its surface that also touches the terrain or an object that stays is not lost. An object that only lost what stood
+  on it or beside it, such as a base game floor under a removed table, stays as it is. All three choices use this one test.
+- With `RemoveFloatingObject` and `PullObjectToTheGround`, the test is made once the cleaned mod's objects are removed, shrunk
+  or turned and the other objects left without support are taken away.
+- Another mod's object rests on objects of the cleaned mod when it would be left without support without them: each object
+  of the cleaned mod that this is true of when it alone is taken away, or, when none is, all the cleaned mod's objects it
+  touches, when it is true with all of them taken away. This decides which objects `KeepSupportingObject` keeps and which
+  objects are never shrunk or turned, so an object that the other two choices would not find left without support keeps
+  nothing. A base game floor under a table of the cleaned mod, for example, does not keep the table: the floor does not rest
   on the table.
-- With the other two choices, another mod's object is left without support when it rested on something before, at least
-  *remove when this much support is gone (%)* of its surface that touched anything touches nothing once the cleaned mod's
-  objects are removed, shrunk or turned and the other objects left without support are taken away, and it can then move
-  straight down by more than the gap. An object that only lost what stood on it or beside it, such as a base game floor
-  under a removed table, stays as it is.
 
 Some objects of other mods are never removed, because something may depend on them or control them: persistent ones (quests,
 packages and scripts can only point to those), teleport doors, objects that carry a map marker, objects with an enable parent, objects whose own
@@ -549,7 +553,7 @@ the object. A change that only the patch holds is named only when there is no ot
 instead of a plugin only when the patch alone holds every change of the object. The scan lines of the detailed log also count
 the objects of other mods that the game shows with their accepted values.
 
-Every run's summary, in both logs, has one line with where the run started and what it did, like `Objects of SomeTownMod.esp: 1240; already removed by earlier patchers in this group: 12; judged in this run: 1228; removed in this run: 37.` The first number counts all objects of the cleaned mod. The second counts those a patcher that ran earlier in the same Synthesis group (an earlier config of the same Batch run, or an earlier copy of this patcher, included) already removed in the patch; they are not checked again. The third counts those this run checked, the fourth those this run removed. Objects that a later-loading plugin changes or removes, and objects that are deleted, start disabled or have no valid position, count only in the first number. The line is printed in every run, also in one that stops with *Nothing to check*; the third and fourth numbers are then 0.
+Every run's summary, in both logs, has one line with where the run started and what it did, like `Objects of SomeTownMod.esp: 1240; already removed by earlier patchers in this group: 12; not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 5; judged in this run: 1223; removed in this run: 37.` The first number counts all objects of the cleaned mod. The second counts those a patcher that ran earlier in the same Synthesis group (an earlier config of the same Batch run, or an earlier copy of this patcher, included) already removed in the patch; they are not checked again. The third counts those this run does not check: objects whose winning version comes from a later-loading plugin, objects a later-loading plugin removes, and objects that are deleted, start disabled or have no valid position or rotation (the scan lines count each kind). The fourth counts those this run checked, the fifth those this run removed. The line is printed in every run, also in one that stops with *Nothing to check*; the fourth and fifth numbers are then 0.
 
 In `Batch` mode the banner prints once, then each config has its own section that starts with a line like `=== Config 1 of 2: town_walls.json, mod to clean up: SomeTownMod.esp ===`. Inside it come that config's notes (keys that were ignored, settings left at their defaults) and then the usual log of that run, ending with its own *Done* line. The notes look like this:
 
@@ -562,6 +566,10 @@ Every setting the config leaves out is listed with its key and the default used,
 
 After the removal summary, when the cleaned mod moved objects of other mods, a line counts them and what became of them, like `Objects of other mods that SomeTownMod.esp moved: 9; kept where SomeTownMod.esp put them: 7; kept there shrunk or turned: 1; removed: 1.`, and a line like `SomeTownMod.esp objects kept shrunk or turned: 4.` counts the cleaned mod's own objects kept shrunk or turned. The detailed log lists each of these objects, with its new size and turn. These moved objects are not counted in the run summary line; the removed ones are listed with the other removals.
 
+The removal summary, in both logs, counts every removed object by why it was removed, like `Removed 2842 objects (238 on changed terrain, 2494 too close, 48 follow-up removals (24 of them first shrunk or turned), 3 invisible objects left behind, 59 linked to removed objects); 2769 of them SomeTownMod.esp objects, 73 objects of other mods that SomeTownMod.esp moved.` A follow-up removal *first shrunk or turned* was kept shrunk or turned to fit at first, then removed because what it rested on was removed. The split into the cleaned mod's objects and the moved objects of other mods is printed only when a moved object was removed; the first number matches *removed in this run* of the run summary line.
+
+The lines that report how many objects were found on changed terrain or too close, like `Found 3071 of 4436 objects (4076 SomeTownMod.esp objects and 360 objects of other mods that SomeTownMod.esp moved) too close to other mods' objects.`, count the moved objects of other mods with the cleaned mod's objects and name both numbers; without moved objects they read like `Found 25 of 1098 SomeTownMod.esp objects too close to other mods' objects.` In the detailed log, the time on the too-close line does not include the shrink or turn check, which runs before it and checks many of the same objects; the line says so.
+
 After those lines, when another mod's object was left without support, a line counts them by what became of them, like
 `Other mods' objects left without support: 5; pulled down: 3; removed, nothing below within 2048 units: 1; left where they stand, not removable: 1.`
 Only the outcomes that happened are named. They are: pulled down; removed (with `RemoveFloatingObject`); removed, nothing below
@@ -573,14 +581,16 @@ time, with the number of the cleaned mod's objects removed with them when there 
 other removals and counted with the follow-up removals; in the detailed log their reason names the other mod's object, like
 `touches Lantern [012345:SomePatch.esp], another mod's object left without support` (with `EverythingTouchingIt`) or
 `60 % of its support was removed or pulled down (mostly Lantern [012345:SomePatch.esp], another mod's object left without
-support)` (with `OnlyWhatLosesItsSupport`). With `KeepSupportingObject`, the detailed log counts the cleaned mod's objects other
-mods' objects rest on, and those these rest on.
+support)` (with `OnlyWhatLosesItsSupport`). With `KeepSupportingObject`, the detailed log counts the cleaned mod's objects kept
+because other mods' objects rest on them, like `Objects of SomeTownMod.esp that other mods' objects rest on, kept: 29 (22
+directly, 7 under those).`: those another mod's object rests on directly, and those these rest on, and so on down. Only the
+ones that would otherwise have been removed get a *Kept* line.
 
-With *Detailed log and reports* on, a line like `Objects too close where they stand: 126; not shrunk or turned because other objects rest on them: 6; tried shrunk or turned: 120; fit: 95.` counts the objects that may be shrunk or turned and were too close where they stood, those not tried because other objects rest on them (of the cleaned mod or of other mods), those tried, and those that fit; the others are removed. The line that reports the written patch, like `Wrote 140 overrides (40 removed, 5 moved, 95 shrunk or turned to fit).`, names the shrunk or turned objects only when there are any, and likewise the other mods' objects pulled down and removed (`Wrote 144 overrides (40 removed, 5 moved, 95 shrunk or turned to fit; other mods' objects: 3 pulled down, 1 removed).`).
+With *Detailed log and reports* on, a line like `Objects too close where they stand: 126; not shrunk or turned because other objects rest on them: 6; tried shrunk or turned: 120; fit: 95.` counts the objects that may be shrunk or turned and were too close where they stood, those not tried because other objects rest on them (of the cleaned mod or of other mods), those tried, and those that fit; the others are removed. The line that reports the written patch, like `Wrote 140 overrides (40 removed, 5 kept markers moved, 95 shrunk or turned to fit).`, names the kept markers moved out of other mods' objects (see *Invisible objects left behind*) and the shrunk or turned objects only when there are any, and likewise the other mods' objects pulled down and removed (`Wrote 144 overrides (40 removed, 5 kept markers moved, 95 shrunk or turned to fit; other mods' objects: 3 pulled down, 1 removed).`).
 
-Right after the kept summary, each object kept for a reason of its own gets a line saying why: *Kept, script names a quest or scene* (its own script, or its base object's from the cleaned mod), *Kept, location role* (a location ref type of its own) or, with `KeepSupportingObject`, *Kept, another mod's object rests on it* (naming that object, like `...: Lantern [012345:SomePatch.esp].`, or the kept object of the cleaned mod resting on it and what rests on that one, like `...: Book [...] rests on it; Lantern [...] rests on that.`). They are kept on purpose and are not in the *Removed markers and kept objects* section. When an object is kept because another mod's object rests on it, the kept summary's first line also names that reason, and the summary counts these objects on a line of their own, like `another mod's object rests on it: 4`.
+Right after the kept summary, each object kept for a reason of its own gets a line saying why: *Kept, script names a quest or scene* (its own script, or its base object's from the cleaned mod), *Kept, location role* (a location ref type of its own) or, with `KeepSupportingObject`, *Kept, another mod's object rests on it* (naming that object, like `...: Lantern [012345:SomePatch.esp].`, or the kept object of the cleaned mod resting on it and what rests on that one, like `...: Book [...] rests on it; Lantern [...] rests on that.`). They are kept on purpose and are not in the *Kept objects that would have been removed, to check by hand* list. When an object is kept because another mod's object rests on it, the kept summary's first line also names that reason, and the summary counts these objects on a line of their own, like `another mod's object rests on it: 4`.
 
-Near the end of the log, a *Removed markers and kept objects* section (printed only when it has rows) lists removed door, map, idle and furniture markers (which actors or the map use), and objects that would have been removed but were kept, grouped by why (part of a linked group, kept because something depends on it, or a teleport door). With *Detailed log and reports* on, the locations of the written files follow.
+Near the end of the log come two lists, each under its own heading and printed only when it has objects: *Removed markers that actors or the map use* (removed door, map, idle and furniture markers) and *Kept objects that would have been removed, to check by hand* (grouped by why: part of a linked group, kept because something depends on it, or a teleport door). With *Detailed log and reports* on, the locations of the written files follow.
 
 A record whose data is malformed in its plugin does not stop the run. The log has one warning line for it, right after the scan section, for example *Warning: could not read Perk SomePerk [...]: PerkEntryPointModifyActorValue did not have expected parameter type flag: Float. Its links were not all checked.* A record is reported once per run: in `Batch` mode, each config that reads it reports it in its own part of the log. The links of the record that were read before the problem count as usual, and nothing is kept or removed because of the record. The rest of that plugin is still read.
 
@@ -588,17 +598,17 @@ Before that section, the log warns about removed objects that can still affect t
 - each removed unique NPC that a quest fills an alias with (as its *Unique Actor*), when that alias is neither *Optional* nor *Allow Disabled*, for example *Warning: removed unique NPC BanditChief [...] in ...: Quest SomeQuest [...] fills an alias with it as a Unique Actor; a disabled actor cannot fill that alias.*;
 - the number of removed objects in their worldspace's large-reference list: *Warning: 3 removed objects are in their worldspace's large-reference list; distant LOD made before this run still shows them.*
 
-The last section of the log says where these objects are: the removed objects of the cleaned mod, the kept ones (one tree for each reason they were kept), the removed markers and kept objects, removed unique NPCs and removed large references, each only when there are any. Each is shown as a tree of three levels, each level indented further:
+The last section of the log says where these objects are: the removed objects, the kept ones (one tree for each reason they were kept), the removed markers that actors or the map use, the kept objects to check by hand, removed unique NPCs and removed large references, each only when there are any. Each is shown as a tree of three levels, each level indented further:
 - **worldspace**: the worldspace (for example *Skyrim*), or for an object in an interior, the interior's name;
 - **hold**: the hold-level location the object's cell belongs to (for example *The Pale hold*): the nearest location of the cell's location chain that the game marks as a hold; without one, the location just below the top of the chain;
 - **place**: the most specific name: the cell's location (*Loreius Farm*), else the cell's own name, else *near* the location of the nearest named cell within 3 cells (*near Loreius Farm*), else the cell grid (*cell 7,6*).
 
 Names are what the game shows (the location or cell name), or their editor ID when they have none. A cell without a location takes the hold of the nearest cell within 3 cells that has one; when there is none, the hold is *unnamed area*. Objects in a worldspace's persistent cell are counted in the grid cell they stand in.
 
-Every area of the tree is listed. Each line ends with two numbers: the objects of that list in the area, and all of the cleaned mod's objects there (for the removals: *removed / the cleaned mod's objects there*). The first line of each tree gives the same two numbers for the whole tree, e.g. *Removed 1284/9850 (removed/all mod objects):*; the other trees have matching headers (*Kept 12/9850 (kept/all mod objects), teleport door:*, *Removed markers and kept objects: 7 of 9850:*). Areas with the most objects come first; areas with the same number come in order of fewer of the cleaned mod's objects there (a larger share removed), then by name. A place and the *near* place of the same name (e.g. *Loreius Farm* and *near Loreius Farm*) stay together, the place first, and are ranked as one by their combined numbers. A worldspace or hold with only one area below it gets no line of its own: its name is joined to that area's line with *›*, and the joined line sits at the level of its first name. A name that repeats an earlier name of the joined line is left out.
+Every area of the tree is listed. Each line ends with two numbers: the objects of that list in the area, and all checked objects there: the cleaned mod's objects and the objects of other mods it moved (for the removals: *removed / checked objects there*). The first line of each tree gives the same two numbers for the whole tree, e.g. *Removed 1284/9850 (removed/all checked objects):*; the other trees have matching headers (*Kept 12/9850 (kept/all checked objects), teleport door:*, *Removed markers that actors or the map use: 7 of 9850:*, *Kept objects that would have been removed, to check by hand: 3 of 9850:*). Areas with the most objects come first; areas with the same number come in order of fewer of the cleaned mod's objects there (a larger share removed), then by name. A place and the *near* place of the same name (e.g. *Loreius Farm* and *near Loreius Farm*) stay together, the place first, and are ranked as one by their combined numbers. A worldspace or hold with only one area below it gets no line of its own: its name is joined to that area's line with *›*, and the joined line sits at the level of its first name. A name that repeats an earlier name of the joined line is left out.
 
 ```
-Removed 1284/9850 (removed/all mod objects):
+Removed 1284/9850 (removed/all checked objects):
   Skyrim 1223/9850
     The Pale hold 402/1310
       Loreius Farm 41/52
@@ -627,7 +637,7 @@ With *Detailed log and reports* on, CSV files (UTF-8, comma-separated, header in
 - **`removals.csv`**: every removed object of the cleaned mod (and every removed object of another mod that the cleaned mod moved) with where it is, always written. Columns: formKey, editorId, base, reason, worldspace, hold, place, cellFormKey, cellEditorId, gridX, gridY, x, y, z. Sorted by worldspace, hold and place, then by form key.
 - **`moved-and-fitted-objects.csv`**: every object of another mod that the cleaned mod moved, with what became of it (kept where the cleaned mod put it, kept there shrunk or turned, removed), and every object of the cleaned mod kept shrunk or turned. Only when there is such an object. Columns: outcome, formKey, editorId, base, worldspace, x, y, z, rotZDeg, scale, and the new placement newX, newY, newZ, newRotZDeg, newScale (empty when the placement did not change). x, y, z, rotZDeg and scale are the placement before shrinking or turning. The outcome is `moved object kept where moved`, `moved object kept shrunk or turned` or `moved object removed` for an object of another mod that the cleaned mod moved, and `own object shrunk or turned` for an object of the cleaned mod.
 - **`other-mods-objects-left-without-support.csv`**: every other mod's object left without support, with what became of it. Only when there is such an object. Columns: outcome, formKey, editorId, base, winningMod, worldspace, x, y, z, newZ (the height it was pulled down to; empty when it was not pulled down), supportGoneShare (0-1), notRemovableBecause (what kept it from being removed; empty otherwise). The outcome is worded as in the detailed log's lines, for example `pulled down`, `removed`, `left where it stands, not removable`. Other mods' objects removed this way are listed only here and in the detailed log.
-- **`removed-markers-and-kept-objects.csv`**: the rows of the *Removed markers and kept objects* section, always written. Columns: kind, formKey, editorId, space, cell, detail.
+- **`removed-markers-and-kept-objects.csv`**: the rows of the *Removed markers that actors or the map use* and *Kept objects that would have been removed, to check by hand* lists, always written. Columns: kind (`RemovedMarker` for a removed marker; `KeptLinkedGroup`, `KeptForNonPlacedReference` or `KeptTeleportDoor` for a kept object), formKey, editorId, space, cell, detail.
 
 ## Known limitations
 

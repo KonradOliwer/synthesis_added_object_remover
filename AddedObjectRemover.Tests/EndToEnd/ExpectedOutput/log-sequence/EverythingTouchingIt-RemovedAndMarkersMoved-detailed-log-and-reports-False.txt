@@ -43,15 +43,15 @@ Found 19 of 40 Target.esp objects too close to other mods' objects.
 ## left-without-support-step
 ## unexpectedErrors
 ## leftovers
-  Kept T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
 Invisible objects left behind: 5 evaluated; removed 4 (2 inside another mod's object, 2 surroundings removed); kept 1 (0 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 1 referenced).
+  Kept T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
 ## linked
 ## unexpectedErrors
 ## relocations
 Moved 1 kept markers out of other mods' objects; 0 left in place.
 ## unexpectedErrors
 ## write
-Wrote 26 overrides (25 removed, 1 moved).
+Wrote 26 overrides (25 removed, 1 kept markers moved).
   1 removed objects had an Enable Parent; it was replaced by the player with "opposite of parent" so they stay disabled.
 ## explanationProblems
 ## meshProblems
@@ -62,7 +62,7 @@ Wrote 26 overrides (25 removed, 1 moved).
 ## spaces
 ## targetVisibility
 ## run-summary
-Objects of Target.esp: 42; already removed by earlier patchers in this group: 0; judged in this run: 40; removed in this run: 25.
+Objects of Target.esp: 42; already removed by earlier patchers in this group: 0; not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 2; judged in this run: 40; removed in this run: 25.
 ## removal-summary
 Removed 25 objects (16 too close, 4 follow-up removals, 4 invisible objects left behind, 1 linked to removed objects).
 ## kept-summary
@@ -73,22 +73,22 @@ Kept 5 objects that would have been removed, because other records depend on the
 ## markers-by-type
 Removed markers by type: 1 Position markers (XMarker, XMarkerHeading), 1 Lights without a model, 2 Sound sources.
 ## hints
-Removed markers and kept objects: 3 objects.
+Kept objects that would have been removed, to check by hand: 3.
   Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept, referenced by a non-placed record: T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm], cell AorExterior [000802:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
 ## areas
-Removed 25/40 (removed/all mod objects):
+Removed 25/40 (removed/all checked objects):
   AorInterior › unnamed area 24/38
   AorWorld › unnamed area › AorExterior 1/2
-Kept 2/40 (kept/all mod objects), FormList record:
+Kept 2/40 (kept/all checked objects), FormList record:
   AorWorld › unnamed area › AorExterior 1/2
   AorInterior › unnamed area 1/38
-Kept 2/40 (kept/all mod objects), placed object: Enable Parent:
+Kept 2/40 (kept/all checked objects), placed object: Enable Parent:
   AorInterior › unnamed area 2/38
-Kept 1/40 (kept/all mod objects), teleport door:
+Kept 1/40 (kept/all checked objects), teleport door:
   AorInterior › unnamed area 1/38
-Removed markers and kept objects: 3 of 40:
+Kept objects that would have been removed, to check by hand: 3 of 40:
   AorInterior › unnamed area 2/38
   AorWorld › unnamed area › AorExterior 1/2
 ## written

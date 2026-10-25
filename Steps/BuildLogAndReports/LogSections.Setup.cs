@@ -56,9 +56,24 @@ internal static partial class LogSections
     /// <summary>The moved replacements to check, when there are any.</summary>
     private static string DescribeMovedReplacements(CollectedObjects world, PluginName target)
     {
-        var moved = world.Targets.Length - CountOwnObjects(world);
+        var moved = CountMovedReplacements(world);
         return moved > 0 ? $"{TextFormat.Count(moved)} objects of other mods that {target} moved, " : string.Empty;
     }
+
+    /// <summary>
+    /// The objects the run judges: "4 Mod.esp objects", or, when it moved objects of other mods,
+    /// "6 objects (4 Mod.esp objects and 2 objects of other mods that Mod.esp moved)".
+    /// </summary>
+    private static string DescribeJudgedObjects(CollectedObjects world, PluginName target)
+    {
+        var own = CountOwnObjects(world);
+        var moved = CountMovedReplacements(world);
+        return moved > 0
+            ? $"{TextFormat.Count(world.Targets.Length)} objects ({TextFormat.Count(own)} {target} objects and {TextFormat.Count(moved)} objects of other mods that {target} moved)"
+            : $"{TextFormat.Count(own)} {target} objects";
+    }
+
+    private static int CountMovedReplacements(CollectedObjects world) => world.Targets.Length - CountOwnObjects(world);
 
     public static LogSection BuildThreadsSection(Execution execution, ReportContext context) =>
         new("threads", context.Detailed ? [$"Using {execution.Workers} threads."] : []);

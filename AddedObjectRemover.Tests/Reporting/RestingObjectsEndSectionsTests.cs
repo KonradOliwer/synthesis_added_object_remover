@@ -29,7 +29,7 @@ public sealed class RestingObjectsEndSectionsTests
     private static readonly ReportContext Detailed = new(null!, null!, Detailed: true);
     private static readonly TriangleStoreStats Meshes = new(Built: 3, TooLarge: 2, Triangles: 900);
     private static readonly PairTestStats Pairs = new(PairsTested: 10, TouchingPairs: 4, PairsWithoutGeometry: 1, TrianglePairsTested: 77);
-    private static readonly TouchChainStatistics TouchStatistics = new(Components: 1, ComponentsWithRemovals: 1, LargestComponent: 3, Levels: 1, MaxDepth: 1, Pairs);
+    private static readonly TouchChainStatistics TouchStatistics = new(Components: 1, ComponentsWithFollowUpRemovals: 1, LargestComponent: 3, Levels: 1, MaxDepth: 1, Pairs);
     private static readonly TimeSpan Elapsed = TimeSpan.FromSeconds(1.5);
 
     [Theory]
@@ -215,16 +215,16 @@ public sealed class RestingObjectsEndSectionsTests
     }
 
     [Fact]
-    public void Leftovers_NormalLogShowsKeptAndTheSummaryWithoutTiming()
+    public void Leftovers_NormalLogShowsTheSummaryWithoutTimingThenKept()
     {
         var (world, leftBehind) = LeftBehindScene();
 
         var lines = LogSections.BuildLeftBehindSection(world, leftBehind, [new KeptObject(Protected, QuestReason, null)], Elapsed, Normal).Lines.ToList();
 
         Assert.Equal(2, lines.Count);
-        Assert.StartsWith("  Kept ", lines[0]);
-        Assert.StartsWith("Invisible objects left behind: 2 evaluated; removed 1 (", lines[1]);
-        Assert.DoesNotContain(" in 1.5s", lines[1]);
+        Assert.StartsWith("Invisible objects left behind: 2 evaluated; removed 1 (", lines[0]);
+        Assert.DoesNotContain(" in 1.5s", lines[0]);
+        Assert.StartsWith("  Kept ", lines[1]);
     }
 
     [Fact]
@@ -329,7 +329,7 @@ public sealed class RestingObjectsEndSectionsTests
 
         Assert.Equal(
             [
-                "Wrote 7 overrides (5 removed, 2 moved).",
+                "Wrote 7 overrides (5 removed, 2 kept markers moved).",
                 "  3 removed objects had an Enable Parent; it was replaced by the player with \"opposite of parent\" so they stay disabled.",
             ],
             LogSections.BuildWriteSection(written, Elapsed, Normal).Lines.ToList());
@@ -348,7 +348,7 @@ public sealed class RestingObjectsEndSectionsTests
         var written = new WriteSummary([new TargetId(0)], Moved: 0, EnableParentsReplaced: 0, Fitted: 1, OtherModsObjectsRemoved: 2, OtherModsObjectsPulledDown: 3);
 
         Assert.Equal(
-            "Wrote 7 overrides (1 removed, 0 moved, 1 shrunk or turned to fit; other mods' objects: 3 pulled down, 2 removed).",
+            "Wrote 7 overrides (1 removed, 1 shrunk or turned to fit; other mods' objects: 3 pulled down, 2 removed).",
             LogSections.BuildWriteSection(written, Elapsed, Normal).Lines[0]);
     }
 
@@ -432,7 +432,7 @@ public sealed class RestingObjectsEndSectionsTests
             })
             .ToList();
 
-        AssertExpectedOutput(LogSections.BuildRemovalSummarySection(removals, StepOutcome.SwitchedOff).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "removal-summary");
+        AssertExpectedOutput(LogSections.BuildRemovalSummarySection(world, removals, decisions, TestTargets.TargetName, StepOutcome.SwitchedOff).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "removal-summary");
         AssertExpectedOutput(LogSections.BuildKeptSummarySection(kept).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "kept-summary");
         AssertExpectedOutput(LogSections.BuildMarkersByTypeSection(targets, removals, context).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "markers");
         Assert.Equal(["Removed markers by type: 1 Invisible marker doors."], LogSections.BuildMarkersByTypeSection(targets, removals, context).Lines.ToList());

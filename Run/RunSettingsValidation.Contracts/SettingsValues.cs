@@ -26,6 +26,7 @@ public interface IModeSettingsValues
 public interface ISettingsValues
 {
     string? CleanedMod { get; }
+    float MovedDistanceInUnits { get; }
     ITrustSettingsValues Trust { get; }
     ITooCloseSettingsValues TooClose { get; }
     ITerrainChangeSettingsValues TerrainChange { get; }
@@ -64,7 +65,6 @@ public interface ITerrainChangeSettingsValues
 
 public interface IShrinkOrTurnSettingsValues
 {
-    float MovedDistanceInUnits { get; }
     int ShrinkLimitPercent { get; }
     int TurnLimitDegrees { get; }
 }

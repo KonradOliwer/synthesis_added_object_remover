@@ -195,7 +195,7 @@ public sealed class StartSetupTooCloseSectionsTests
                 "Requires Target.esp but not trusted, 6 other masters (limit 5): Merged.esp",
                 "Trusted, loading before Target.esp: 1 mod",
             ],
-            lines.Skip(1).Take(9));
+            lines.Skip(2).Take(9));
     }
 
     [Fact]
@@ -229,7 +229,7 @@ public sealed class StartSetupTooCloseSectionsTests
                 "Requires Target.esp but not trusted, Added Object Remover patch of another group: Second Group Patch.esp, First Group Patch.esp",
                 "Loads before Target.esp but not trusted, Added Object Remover patch of another group: Second Before Patch.esp, First Before Patch.esp",
             ],
-            lines.Skip(2).Take(3));
+            lines.Skip(3).Take(3));
     }
 
     /// <summary>The patch marker decides before the other-master limit, so raising the limit would not change the line.</summary>
@@ -286,7 +286,7 @@ public sealed class StartSetupTooCloseSectionsTests
                 "Trusted, requires Target.esp: Compat.esp",
                 "Master of a mod that requires Target.esp but not trusted, Added Object Remover patch of another group: Other Group Patch.esp",
             ],
-            lines.Skip(2).Take(3));
+            lines.Skip(3).Take(3));
     }
 
     [Fact]

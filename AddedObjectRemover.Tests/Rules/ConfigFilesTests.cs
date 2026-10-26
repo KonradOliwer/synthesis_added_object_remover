@@ -369,7 +369,7 @@ public sealed class ConfigFilesTests : IDisposable
         var notInFile = NotesOf(config).NotInFile;
 
         Assert.Contains(new SettingInFile("CleanedMod", "Mod to clean up", "null"), notInFile);
-        Assert.Equal(["CleanedMod", "Trust.TrustedModsAndTheirMasters", "Trust.ModsTrustedForOwnChangesOnly"], notInFile.Take(3).Select(setting => setting.KeyPath));
+        Assert.Equal(["CleanedMod", "MovedDistanceInUnits", "Trust.TrustedModsAndTheirMasters"], notInFile.Take(3).Select(setting => setting.KeyPath));
     }
 
     [Fact]

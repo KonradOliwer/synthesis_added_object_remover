@@ -25,12 +25,13 @@ internal static partial class LogSections
         new("config",
         [
             $"Mod to clean up: {settings.TargetAsTyped}",
+            $"Check other mods' objects the cleaned mod moved farther than: {settings.Read.MovedDistance} units.",
             .. settings.DetailedLog ? [DescribePluginList(plugins)] : ImmutableArray<string>.Empty,
             DescribeTrustSettings(settings.ModTrust),
             .. DescribeTrustReasons(settings.TargetAsTyped, settings.ModTrust.MaxOtherMastersOfRequiringMod, trust, plugins),
             DescribeTooClose(settings.TooClose),
             DescribeChangedTerrain(settings.ChangedTerrain),
-            DescribeShrinkOrTurn(settings.Read.MovedDistance, settings.Fit),
+            DescribeShrinkOrTurn(settings.Fit),
             DescribeAlsoRemove(settings.AlsoRemove, settings.OtherModsObjects),
             DescribeLeftBehind(settings),
             DescribeDetailedLogAndReports(settings.Reports),
@@ -75,9 +76,8 @@ internal static partial class LogSections
             : checks;
     }
 
-    private static string DescribeShrinkOrTurn(float movedDistance, FitSettings fit) =>
+    private static string DescribeShrinkOrTurn(FitSettings fit) =>
         "Shrink or turn objects to make them fit: "
-        + $"Distance that counts as moved: {movedDistance} units; "
         + $"Shrink down to: {fit.ShrinkLimitPercent}% of its size; "
         + $"Turn by at most: {fit.TurnLimitDegrees} degrees either way.";
 

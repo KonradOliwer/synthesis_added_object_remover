@@ -41,7 +41,7 @@ public static class SettingsValidator
     private const string HeightChangeToleranceName = "Remove objects on terrain changed by other mods > Count only height changes larger than";
     private const string WaterHeightChangeToleranceName = "Remove objects on terrain changed by other mods > Count only water height changes larger than";
     private const string ShrinkOrTurnGroup = "Shrink or turn objects to make them fit > ";
-    private const string MovedDistanceName = ShrinkOrTurnGroup + "Distance that counts as moved";
+    private const string MovedDistanceName = "Check other mods' objects the cleaned mod moved farther than";
     private const string ShrinkLimitName = ShrinkOrTurnGroup + "Shrink down to";
     private const string TurnLimitName = ShrinkOrTurnGroup + "Turn by at most";
     private const string FollowUpModeName = "Also remove what rests on removed objects > When an object is removed, also remove";
@@ -99,7 +99,7 @@ public static class SettingsValidator
         var modTrust = CreateModTrustSettings(records, mods, targetListing.Mod, settings.Trust, warnings);
         var tooClose = CreateTooCloseSettings(settings.TooClose, warnings);
         var changedTerrain = CreateChangedTerrainSettings(settings.TerrainChange, warnings);
-        var movedDistance = NotNegative(settings.ShrinkOrTurn.MovedDistanceInUnits, SettingDefaults.MovedDistanceInUnits, MovedDistanceName, warnings);
+        var movedDistance = NotNegative(settings.MovedDistanceInUnits, SettingDefaults.MovedDistanceInUnits, MovedDistanceName, warnings);
         var fit = CreateFitSettings(settings.ShrinkOrTurn, warnings);
         var alsoRemove = CreateAlsoRemoveSettings(settings.FollowUpRemoval, touchChainsShown: detailedLogAndReports, warnings);
         var otherModsObjects = CreateOtherModsObjectsSettings(settings.FollowUpRemoval, alsoRemove, warnings);

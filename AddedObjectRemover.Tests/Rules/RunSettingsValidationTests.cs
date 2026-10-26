@@ -90,7 +90,7 @@ public class RunSettingsValidationTests
         Assert.Equal(10f, BuildReady(SettingsFor()).Settings.Read.MovedDistance);
 
         var settings = SettingsFor();
-        settings.ShrinkOrTurn = new ShrinkOrTurnSettings { MovedDistanceInUnits = 0f };
+        settings.MovedDistanceInUnits = 0f;
         var ready = BuildReady(settings);
 
         Assert.Equal(0f, ready.Settings.Read.MovedDistance);
@@ -98,12 +98,12 @@ public class RunSettingsValidationTests
     }
 
     [Theory]
-    [InlineData(-3f, "Warning: Shrink or turn objects to make them fit > Distance that counts as moved -3 is below 0; using 10.")]
-    [InlineData(float.NaN, "Warning: Shrink or turn objects to make them fit > Distance that counts as moved is not a valid number; using 10.")]
+    [InlineData(-3f, "Warning: Check other mods' objects the cleaned mod moved farther than -3 is below 0; using 10.")]
+    [InlineData(float.NaN, "Warning: Check other mods' objects the cleaned mod moved farther than is not a valid number; using 10.")]
     public void ANegativeDistanceThatCountsAsMovedIsReplacedByTheDefaultWithAWarning(float distance, string warning)
     {
         var settings = SettingsFor();
-        settings.ShrinkOrTurn = new ShrinkOrTurnSettings { MovedDistanceInUnits = distance };
+        settings.MovedDistanceInUnits = distance;
 
         var ready = BuildReady(settings);
 

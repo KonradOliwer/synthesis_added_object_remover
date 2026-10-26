@@ -1,5 +1,6 @@
 {
   "CleanedMod": "Ulvenwald.esp",
+  "MovedDistanceInUnits": 10.0,
   "Trust": {
     "TrustedModsAndTheirMasters": [],
     "ModsTrustedForOwnChangesOnly": [],
@@ -41,7 +42,6 @@
     "MinWaterCoverChangePercent": 20
   },
   "ShrinkOrTurn": {
-    "MovedDistanceInUnits": 10.0,
     "ShrinkLimitPercent": 80,
     "TurnLimitDegrees": 360
   },

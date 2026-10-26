@@ -3,6 +3,7 @@
 ## unexpectedErrors
 ## config
 Mod to clean up: Target.esp
+Check other mods' objects the cleaned mod moved farther than: 10 units.
 Which other mods can cause removals: Trusted mods, and their masters: Trusted.esp; Mods trusted for their own changes only: (none); Never trusted mods: Rival.esp; Also trust mods that require the cleaned mod, and their masters: on, only if it has at most 5 other masters; Trust mods loading before the cleaned mod: on.
 Trusted, base game: Skyrim.esm
 Trusted, listed with masters: Trusted.esp
@@ -10,7 +11,7 @@ Trusted, requires Target.esp: TargetPatch.esp (masters: Patched.esp)
 Never trusted, listed: Rival.esp
 Remove objects too close to other mods' objects: Margin by object size: on, 0.5 x object size; Margin by fixed distance: off; Use rough boxes instead of exact shapes (faster): off; Other mods' NPCs and creatures cause removal: OnlyWhenStuckInsideTheObject.
 Remove objects on terrain changed by other mods: off.
-Shrink or turn objects to make them fit: Distance that counts as moved: 10 units; Shrink down to: 100% of its size; Turn by at most: 0 degrees either way.
+Shrink or turn objects to make them fit: Shrink down to: 100% of its size; Turn by at most: 0 degrees either way.
 Also remove what rests on removed objects: EverythingTouchingIt; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
 Invisible objects left behind: off.
 Detailed log and reports: off.

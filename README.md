@@ -84,6 +84,12 @@ Every setting below is in the *Standard* section of the settings screen. Only us
 | --- | --- | --- |
 | Mod to clean up | *(empty)* | The cleaned mod: the plugin whose added objects are checked, picked from your load order, e.g. `SomeMod.esp`. It must be enabled and load above the patch. If it is empty, not in your plugin list, disabled, loads after the patch, was not loaded by Synthesis or is the patch itself, the run stops and nothing is changed (see *How to use*). |
 
+#### Check other mods' objects the cleaned mod moved
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| Check other mods' objects the cleaned mod moved farther than (game units) | `10` | The cleaned mod can override an object of another mod or of the base game and move it. Moved farther than this from where that object stood before, it is checked like the cleaned mod's own objects: it can be removed, shrunk or turned. Moved this far or less, it counts as standing where it stood and is always kept, even if the cleaned mod changed its model, rotation or size. Distance is measured in a straight line, in any direction. 0 or more; 0 checks every one that moved at all. A negative value, or text that is not a number, is replaced by the default (10), with a warning in the log. See *Objects of other mods that the cleaned mod moved*. |
+
 #### Which other mods can cause removals
 
 Only untrusted mods' objects and terrain changes can remove the cleaned mod's objects. Every other plugin is one of three kinds:
@@ -257,7 +263,7 @@ out of it.
 #### Objects of other mods that the cleaned mod moved
 
 The cleaned mod can change an object another mod (or the base game) placed. When it leaves the object where that mod
-placed it (within *Distance that counts as moved*, see below), other mods were made to fit it there, so the object is never checked, even if the cleaned
+placed it (within *Check other mods' objects the cleaned mod moved farther than*), other mods were made to fit it there, so the object is never checked, even if the cleaned
 mod gave it another model, rotation or size. When it moves the object, the moved object is checked like the cleaned mod's
 own objects (too close to other mods' objects, NPCs stuck in it, terrain changed by other mods, and, for an invisible object
 such as a sound or a marker, sitting inside another mod's object). If it fits where the cleaned mod put it, it stays there.
@@ -269,11 +275,10 @@ mod's own objects (see *What is always kept*); a moved object linked to another 
 
 #### Shrink or turn objects to make them fit
 
-The first setting decides which objects of other mods count as moved (see *Objects of other mods that the cleaned mod moved*); the other two control the shrinking and turning.
+These two settings control the shrinking and turning of the cleaned mod's objects and of the moved objects of other mods (see *Objects of other mods that the cleaned mod moved*).
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| Distance that counts as moved (game units) | `10` | An object of another mod that the cleaned mod changed counts as moved when it now stands more than this many game units from where that mod placed it. A moved one is judged like the cleaned mod's own objects; one that stayed is always kept. 0 or more. A negative value, or text that is not a number, is replaced by the default (10), with a warning in the log. |
 | Shrink down to (% of its size) | `80` | An object that would be removed for being too close to another mod's object may be shrunk where it stands, down to this share of its size, to make it fit, in steps of 5%; the largest size that fits is used. Applies to the cleaned mod's own objects and to the moved ones of other mods. 100 or more: objects are never shrunk. At least 1: a lower value is raised to 1, with a warning in the log. |
 | Turn by at most (degrees either way) | `360` | Such an object may be turned about its upright axis by up to this many degrees to the left or to the right to make it fit, in steps of 15 degrees; the smallest turn that fits is used. It is never tilted. 0: objects are never turned. 180 or more: objects may face any way. A negative value becomes 0, with a warning in the log. |
 

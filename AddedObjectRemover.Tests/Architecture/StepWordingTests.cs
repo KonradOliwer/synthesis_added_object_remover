@@ -123,7 +123,7 @@ public class StepWordingTests
         [("Run/RunSettingsValidation/SettingsValidator.cs", "too close")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Shrink or turn objects to make them fit > ")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Shrink down to")] = SettingsWarning,
-        [("Run/RunSettingsValidation/SettingsValidator.cs", "Distance that counts as moved")] = SettingsWarning,
+        [("Run/RunSettingsValidation/SettingsValidator.cs", "Check other mods' objects the cleaned mod moved farther than")] = SettingsWarning,
         [("Run/RunSettingsValidation/SettingsValidator.cs", "Turn by at most")] = SettingsWarning,
         [("Steps/RemovalDecisionList/RemovalDecisions.cs", "Only the newest view of the removal decisions can be added to.")] = BugMessage,
         [("Steps/RemovalDecisionList/RemovalDecisions.cs", "The round is not part of this view.")] = BugMessage,

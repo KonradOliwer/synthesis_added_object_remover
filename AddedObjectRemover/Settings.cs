@@ -74,6 +74,15 @@ public class StandardSettings : ISettingsValues
     public ModKey CleanedMod { get; set; } = ModKey.Null;
 
     [SynthesisOrder]
+    [SynthesisSettingName("Check other mods' objects the cleaned mod moved farther than (game units)")]
+    [SynthesisTooltip(
+        "The cleaned mod can override an object of another mod or of the base game and move it.\n"
+        + "Moved farther than this from where that object stood before, it is checked like the cleaned mod's own objects: it can be removed, shrunk or turned.\n"
+        + "Moved this far or less, it counts as standing where it stood and is always kept, even if the cleaned mod changed its model, rotation or size.\n"
+        + "Distance is measured in a straight line, in any direction. 0 or more; 0 checks every one that moved at all.")]
+    public float MovedDistanceInUnits { get; set; } = SettingDefaults.MovedDistanceInUnits;
+
+    [SynthesisOrder]
     [SynthesisSettingName("Which other mods can cause removals")]
     [SynthesisTooltip(
         "Only untrusted mods' objects and terrain changes can remove the cleaned mod's objects.\n"
@@ -99,7 +108,7 @@ public class StandardSettings : ISettingsValues
     [SynthesisOrder]
     [SynthesisSettingName("Shrink or turn objects to make them fit")]
     [SynthesisTooltip(
-        "An object of the cleaned mod, or of another mod that the cleaned mod moved, that would be removed for being too close to another mod's object\n"
+        "An object of the cleaned mod, or of another mod that the cleaned mod moved (see \"Check other mods' objects the cleaned mod moved farther than\"), that would be removed for being too close to another mod's object\n"
         + "is first tried shrunk or turned where it stands. If it fits, it is kept that way; otherwise it is removed.\n"
         + "Never shrunk or turned, but removed as before: an object on terrain another mod changed; an object that another object of the cleaned mod\n"
         + "rests on from above and would lose its support without (objects that only touch it from the side do not count; with \"Nothing\" in\n"
@@ -124,6 +133,7 @@ public class StandardSettings : ISettingsValues
     public LeftoverInvisibleObjectSettings LeftoverInvisibleObjects { get; set; } = new();
 
     string? ISettingsValues.CleanedMod => CleanedMod.IsNull ? null : CleanedMod.ToString();
+    float ISettingsValues.MovedDistanceInUnits => MovedDistanceInUnits;
     ITrustSettingsValues ISettingsValues.Trust => Trust ?? new TrustSettings();
     ITooCloseSettingsValues ISettingsValues.TooClose => TooClose ?? new TooCloseRemovalSettings();
     ITerrainChangeSettingsValues ISettingsValues.TerrainChange => TerrainChange ?? new TerrainChangeSettings();
@@ -374,13 +384,6 @@ public class TerrainChangeSettings : ITerrainChangeSettingsValues
 
 public class ShrinkOrTurnSettings : IShrinkOrTurnSettingsValues
 {
-    [SynthesisOrder]
-    [SynthesisSettingName("Distance that counts as moved (game units)")]
-    [SynthesisTooltip(
-        "An object of another mod that the cleaned mod changed counts as moved when it now stands more than this many game units from where that mod placed it.\n"
-        + "A moved one is judged like the cleaned mod's own objects; one that stayed is always kept. 0 or more.")]
-    public float MovedDistanceInUnits { get; set; } = SettingDefaults.MovedDistanceInUnits;
-
     [SynthesisOrder]
     [SynthesisSettingName("Shrink down to (% of its size)")]
     [SynthesisTooltip(

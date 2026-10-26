@@ -3,6 +3,7 @@ using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
+using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
@@ -24,18 +25,17 @@ internal sealed class LeftBehindRule(
     LeftBehindSettings config,
     WorkOrder order)
 {
-    /// <param name="removedTargets">Target indices removed by the earlier steps.</param>
-    /// <param name="decidedTargets">Target indices the earlier steps removed or kept: those are not evaluated again.</param>
-    public LeftBehindResult SelectRemovals(IReadOnlySet<int> removedTargets, IReadOnlySet<int> decidedTargets, Execution execution)
+    /// <param name="decisions">The decisions of the earlier steps: their removals count as cleared, and the objects they decided are not evaluated again.</param>
+    public LeftBehindResult SelectRemovals(IRemovalDecisions decisions, Execution execution)
     {
-        var evaluations = EvaluateAll(removedTargets, decidedTargets, execution);
+        var evaluations = EvaluateAll(decisions, execution);
         return new LeftBehindResult(StepOutcome.Performed, evaluations, LeftBehindRound.ProposalsOf(evaluations), Failure: null);
     }
 
-    private LeftBehindCheck[] EvaluateAll(IReadOnlySet<int> removedTargets, IReadOnlySet<int> decidedTargets, Execution execution)
+    private LeftBehindCheck[] EvaluateAll(IRemovalDecisions decisions, Execution execution)
     {
         var candidates = Enumerable.Range(0, targets.Count)
-            .Where(index => shapes.VisibilityOf(targets[index]).Kind != null && !decidedTargets.Contains(index))
+            .Where(index => shapes.VisibilityOf(targets[index]).Kind != null && !decisions.IsDecided(targets[index].Id))
             .ToArray();
 
         return ParallelMap.RunOver(
@@ -43,18 +43,18 @@ internal sealed class LeftBehindRule(
             order,
             candidates,
             () => new List<VisibleTargetNear>(),
-            (targetIndex, neighbours) => Evaluate(targetIndex, removedTargets, neighbours),
+            (targetIndex, neighbours) => Evaluate(targetIndex, decisions, neighbours),
             ParallelMap.AutomaticRangeSize);
     }
 
     /// <param name="neighbours">The calling worker's buffer.</param>
-    private LeftBehindCheck Evaluate(int targetIndex, IReadOnlySet<int> removedTargets, List<VisibleTargetNear> neighbours)
+    private LeftBehindCheck Evaluate(int targetIndex, IRemovalDecisions decisions, List<VisibleTargetNear> neighbours)
     {
         var target = targets[targetIndex];
         var kind = shapes.VisibilityOf(target).Kind!.Value;
         var radius = GetEffectiveRadius(target);
         var containingObject = containingObjects.Of(targetIndex);
-        var areas = MeasureSurroundings(target, radius, removedTargets, neighbours);
+        var areas = MeasureSurroundings(target, radius, decisions, neighbours);
         var ruleDecision = containingObject != null ? LeftBehindOutcome.RemovedInsideOtherObject : DecideByDirections(areas, config);
         return new LeftBehindCheck(targetIndex, kind, radius, containingObject, areas, ApplyProtectedTypes(kind, ruleDecision), KeepReason: null);
     }
@@ -65,37 +65,22 @@ internal sealed class LeftBehindRule(
     private SectorAreas MeasureSurroundings(
         TargetObject target,
         float radius,
-        IReadOnlySet<int> removedTargets,
+        IRemovalDecisions decisions,
         List<VisibleTargetNear> neighbours)
     {
-        var areas = new SectorAreaTally(config.DirectionClearedPercent);
         surroundings.Around(target.SpaceKey, target.Transform.Position, radius, neighbours);
-        // Ascending target id fixes the order of the float sums, so a share right at the threshold
-        // is decided the same way whatever the spatial index's layout.
-        foreach (var neighbour in neighbours)
+        // The neighbours come in ascending target id, which fixes the order of the float sums.
+        var boxes = neighbours.Select(neighbour => (neighbour.Box, decisions.IsRemoved(neighbour.Target)));
+        return SectorAreaTally.Measure(boxes, target.Transform.Position, config.DirectionClearedPercent);
+    }
+
+    internal static LeftBehindOutcome DecideByDirections(SectorAreas areas, LeftBehindSettings config) =>
+        SectorRule.Decide(areas, config.MinOccupiedDirections, config.ClearedDirectionsPercent) switch
         {
-            var removed = removedTargets.Contains(neighbour.Target.Index);
-            foreach (var sector in FindSectors(neighbour.Box, target.Transform.Position)) areas.Add(sector, neighbour.Box.GroundArea, removed);
-        }
-        return areas.Build();
-    }
-
-    /// <summary>
-    /// Every direction when the box contains the point. Otherwise exactly one: towards the box
-    /// centre's horizontal offset when the box lies straight above or below the point (however
-    /// small that offset), else towards the box's closest point.
-    /// </summary>
-    internal static IReadOnlyList<DirectionSector> FindSectors(OrientedBox box, Vector3 point) =>
-        box.Contains(point) ? CompassDirections.All : [CompassDirections.Towards(point, box)];
-
-    internal static LeftBehindOutcome DecideByDirections(SectorAreas areas, LeftBehindSettings config)
-    {
-        var occupied = areas.OccupiedCount;
-        if (!SharePercent.AtLeast(occupied, CompassDirections.SectorCount, config.OccupiedDirectionsPercent)) return LeftBehindOutcome.KeptTooFewSurroundingObjects;
-        return SharePercent.AtLeast(areas.RemovedCount, occupied, config.ClearedDirectionsPercent)
-            ? LeftBehindOutcome.RemovedSurroundingsRemoved
-            : LeftBehindOutcome.KeptSurroundingsMostlyKept;
-    }
+            SectorVerdict.TooFewOccupiedDirections => LeftBehindOutcome.KeptTooFewSurroundingObjects,
+            SectorVerdict.TooFewClearedDirections => LeftBehindOutcome.KeptSurroundingsMostlyKept,
+            _ => LeftBehindOutcome.RemovedSurroundingsRemoved,
+        };
 
     /// <summary>Protected types stay whatever the rules decided; referenced objects are kept by the removal decisions.</summary>
     private LeftBehindOutcome ApplyProtectedTypes(InvisibleObjectKind kind, LeftBehindOutcome ruleDecision) =>

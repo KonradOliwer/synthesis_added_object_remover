@@ -23,6 +23,7 @@ public class LogicPublicTypesTests
         ["RemoveObjectsOnChangedTerrain"] = "ChangedTerrainObjects",
         ["RemoveTooCloseObjects"] = "TooCloseObjects",
         ["RemoveObjectsRestingOnRemovedOnes"] = "RestingObjects",
+        ["RemoveVisibleObjectsLeftBehind"] = "VisibleLeftBehindObjects",
         ["RemoveInvisibleObjectsLeftBehind"] = "LeftBehindObjects",
         ["MoveKeptMarkers"] = "MarkerMovePlanner",
         ["WriteThePatch"] = "PatchWriter",
@@ -70,6 +71,7 @@ public class LogicPublicTypesTests
             "Boolean IsRemoved(TargetId)",
             "Decision Of(TargetId)",
             "IRemovalDecisionsCopy WorkingCopy()",
+            "IReadOnlyDictionary<TargetId, Decision> DecideRoundOnCopy(RoundKind, IReadOnlyList<ProposedRemoval>)",
             "RemovalDecisions AddMoves(IReadOnlyList<MarkerMove>)",
             "RemovalDecisions ApplyFits(IReadOnlyList<ProposedFit>)",
             "RemovalDecisions Apply(RoundKind, IReadOnlyList<ProposedRemoval>)",
@@ -102,6 +104,10 @@ public class LogicPublicTypesTests
             "static HeldUpTargets FindHeldUpTargets(ImmutableArray<TargetObject>, IVisibleTargetObjects, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
             "static OtherModsObjectsResult SettleOtherModsObjects(ImmutableArray<TargetObject>, ImmutableArray<TargetObject>, IRemovalDecisions, IObjectsToKeep, IVisibleTargetObjects, IVisibleTargetObjects, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, AlsoRemoveSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
         ],
+        ["RemoveVisibleObjectsLeftBehind"] =
+        [
+            "static VisibleLeftBehindResult Find(ImmutableArray<TargetObject>, IRemovalDecisions, IVisibleTargetObjects, IBaseFacts, IBaseObjectShapes, WorkOrder, Execution, VisibleLeftBehindSettings)",
+        ],
         ["RemoveInvisibleObjectsLeftBehind"] =
         [
             "static LeftBehindResult Find(ImmutableArray<TargetObject>, IObjectsThatCanCauseRemovals, IReadOnlySet<OtherId>, IRemovalDecisions, IVisibleTargetObjects, IBaseFacts, IBaseObjectShapes, WorkOrder, Execution, LeftBehindSettings)",
@@ -129,6 +135,8 @@ public class LogicPublicTypesTests
             "ImmutableArray<LogSection> BuildStepSections(ChangedTerrainResult, IRemovalDecisions, CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(TooCloseResult, IRemovalDecisions, CollectedObjects, IVisibleTargetObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(RestingObjectsResult, IRemovalDecisions, CollectedObjects, TimeSpan)",
+            "ImmutableArray<LogSection> BuildFollowUpAfterVisibleLeftBehindSections(RestingObjectsResult, IRemovalDecisions, CollectedObjects, TimeSpan)",
+            "ImmutableArray<LogSection> BuildStepSections(VisibleLeftBehindResult, IRemovalDecisions, CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(LeftBehindResult, IRemovalDecisions, CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(MarkerMoves, CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(WriteSummary, TimeSpan)",

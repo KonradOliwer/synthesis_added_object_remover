@@ -19,7 +19,9 @@ LogSections.AddRowsLine | Report wording: the "wrote N rows" line of a written r
 LogSections.DescribePluginList | Report wording: prints where the game's plugin list was read from and how many listings it has (a plugin-facts type outside the domain list).
 LogSections.OnOff | Report wording: prints a setting's switch as on or off.
 LogSections.WhenAny | Report wording: one counted item of the write line, left out when its count is 0; it takes only the count and the words.
+LogSections.CountOutcomes | Report wording: counts each outcome of a step's evaluations as "N outcome text" (a step's own outcome enum and text function are given in).
 LogSections.OnWith | Report wording: prints a setting's switch as off, or as on with the detail that matters when it is on.
+LogSections.DescribeSurroundings | Report wording: prints the four numbers of a step's surroundings rule as the config line words them; it takes only numbers.
 LogSections.JoinOrNone | Report wording: joins names or prints "(none)".
 LogSections.TrustReasonLine | Report wording: one trust reason's line of described plugins, or no line when no plugin has that reason.
 LogSections.OtherMasters | Report wording: a number of other masters, singular for 1.
@@ -33,6 +35,10 @@ MeshProblemText.InvalidCoordinatesText | Report wording: the invalid-coordinates
 MeshProblemText.ShapeCountsText | Report wording: the shape counts of a mesh without geometry (a mesh tool's fact, not a domain type).
 MeshProblemText.Required | Report check: a mesh fact the kind needs is present; a missing one is a bug.
 RunPartText.Unknown | Report check: the bug exception for a part key without wording (a tool's key type, not a domain type).
+SectorAreasText.Describe | Report wording: prints the per-direction areas (a tool's area type, not a domain type).
 Tables.CountByComponent | Report counting: how many targets each touching chain holds; plain integers.
 Tables.DescribeSeedReasons | Report wording: joins the seed reasons of a chain (a tool's table type).
+Tables.LeftBehindObjectHeader | Report columns: the leading column names the two left-behind tables share; it takes only the name of the kind column.
+Tables.SectorHeader | Report columns: the per-direction column names of the left-behind tables (a tool's compass type).
+Tables.SectorColumns | Report columns: the per-direction fields of a step's surroundings (a tool's area type).
 Tables.PlacementColumns | Report wording: the CSV columns of a placement (a tool's placement type).

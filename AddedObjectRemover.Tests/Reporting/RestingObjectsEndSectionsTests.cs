@@ -108,6 +108,48 @@ public sealed class RestingObjectsEndSectionsTests
     }
 
     [Fact]
+    public void AlsoRemoveAfterVisibleLeftBehind_PrintsTheSectionOfTheModeUnderItsOwnIdAndName()
+    {
+        var (touchWorld, touch, touchDecisions) = TouchScene();
+        var (supportWorld, support, supportDecisions) = SupportScene();
+
+        var touchSection = LogSections.BuildAlsoRemoveAfterVisibleLeftBehindSection(touchWorld, touch, touchDecisions, Meshes, Detailed);
+        var supportSection = LogSections.BuildAlsoRemoveAfterVisibleLeftBehindSection(supportWorld, support, supportDecisions, Meshes, Detailed);
+
+        Assert.Equal("touch-after-visible", touchSection.Id);
+        Assert.Equal("anchoring-after-visible", supportSection.Id);
+        Assert.Equal("Also remove after visible objects left behind: 1 rounds in 1.5s.", touchSection.Lines[^1]);
+        Assert.Equal("Also remove after visible objects left behind: 1 rounds in 1.5s.", supportSection.Lines[^1]);
+        Assert.Equal(
+            LogSections.BuildModeSection(touchWorld, touch, touchDecisions, Elapsed, Meshes, Detailed).Lines.Take(touchSection.Lines.Length - 1),
+            touchSection.Lines.Take(touchSection.Lines.Length - 1));
+    }
+
+    [Fact]
+    public void AlsoRemoveAfterVisibleLeftBehind_AStoppedPassPrintsTheNotPerformedLineUnderItsOwnId()
+    {
+        var (world, alsoRemove, decisions) = TouchScene();
+        var stopped = alsoRemove with { Outcome = StepOutcome.StoppedByUnexpectedError, HadSeeds = false, Rounds = [], Failure = Broke(RestingObjectsParts.AlsoRemove) };
+
+        var section = LogSections.BuildAlsoRemoveAfterVisibleLeftBehindSection(world, stopped, decisions, Meshes, Detailed);
+
+        Assert.Equal("follow-up-after-visible", section.Id);
+        Assert.Equal(["Also remove after visible objects left behind: not performed because of an unexpected error."], section.Lines.ToList());
+    }
+
+    [Theory]
+    [InlineData(StepOutcome.Performed, true, true)]
+    [InlineData(StepOutcome.Performed, false, false)]
+    [InlineData(StepOutcome.SwitchedOff, false, false)]
+    [InlineData(StepOutcome.StoppedByUnexpectedError, false, true)]
+    public void AlsoRemoveAfterVisibleLeftBehind_IsPrintedOnlyWithSeedsOrWhenStopped(StepOutcome outcome, bool hadSeeds, bool expected)
+    {
+        var (_, alsoRemove, _) = TouchScene();
+
+        Assert.Equal(expected, LogSections.PrintsAfterVisibleLeftBehind(alsoRemove with { Outcome = outcome, HadSeeds = hadSeeds }));
+    }
+
+    [Fact]
     public void Touch_NormalLogShowsKeptOnly()
     {
         var (world, alsoRemove, decisions) = TouchScene();
@@ -356,7 +398,7 @@ public sealed class RestingObjectsEndSectionsTests
     public void Removals_AndSpaces_AreDetailedOnlyAndMatchTheExpectedOutput()
     {
         var (world, decisions) = RunRounds();
-        var removals = RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(decisions), decisions, world, TestLeftBehind.PerformedWithoutFindings);
+        var removals = RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(decisions), decisions, world, VisibleLeftBehindResult.SwitchedOff, TestLeftBehind.PerformedWithoutFindings);
         var detailed = Detailed with { Bases = null! };
 
         Assert.Empty(LogSections.BuildRemovalsSection(world, removals, Normal).Lines.ToList());
@@ -422,7 +464,7 @@ public sealed class RestingObjectsEndSectionsTests
     public void Summaries_AlwaysShowAndMatchTheExpectedOutput()
     {
         var (world, decisions) = RunRounds();
-        var removals = RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(decisions), decisions, world, TestLeftBehind.PerformedWithoutFindings);
+        var removals = RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(decisions), decisions, world, VisibleLeftBehindResult.SwitchedOff, TestLeftBehind.PerformedWithoutFindings);
         var kept = RemovalList.Kept(decisions);
         var context = Detailed with { Shapes = TestVisibility.OfTaggedBasesOnly() };
         var targets = Enumerable.Range(0, TargetCount)
@@ -432,7 +474,7 @@ public sealed class RestingObjectsEndSectionsTests
             })
             .ToList();
 
-        AssertExpectedOutput(LogSections.BuildRemovalSummarySection(world, removals, decisions, TestTargets.TargetName, StepOutcome.SwitchedOff).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "removal-summary");
+        AssertExpectedOutput(LogSections.BuildRemovalSummarySection(world, removals, decisions, TestTargets.TargetName, StepOutcome.SwitchedOff, StepOutcome.SwitchedOff).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "removal-summary");
         AssertExpectedOutput(LogSections.BuildKeptSummarySection(kept).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "kept-summary");
         AssertExpectedOutput(LogSections.BuildMarkersByTypeSection(targets, removals, context).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "markers");
         Assert.Equal(["Removed markers by type: 1 Invisible marker doors."], LogSections.BuildMarkersByTypeSection(targets, removals, context).Lines.ToList());

@@ -12,6 +12,7 @@ Remove objects too close to other mods' objects: Margin by object size: on, 0.5 
 Remove objects on terrain changed by other mods: off.
 Shrink or turn objects to make them fit: Shrink down to: 100% of its size; Turn by at most: 0 degrees either way.
 Also remove what rests on removed objects: Nothing; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
+Visible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 6; A direction is cleared when this much of it was removed: 80%; Remove when this share of the directions with objects is cleared: 80%; Never remove these as visible objects left behind: none.
 Invisible objects left behind: off.
 Detailed log and reports: on, report files go to <root>/Output/Reports.
 Only warn (don't stop) when a mod that requires the cleaned mod loads after the patch: off.
@@ -32,8 +33,11 @@ Found 21 of 40 Target.esp objects too close to other mods' objects in <time>, no
   Kept T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
 Linked groups: 1 more objects removed with the too-close removals they are linked to.
 Linked groups: 0 more objects removed with the follow-up removals they are linked to.
+Visible objects left behind: 13 evaluated in <time>; removed 1 (1 surroundings removed); kept 12 (12 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 0 referenced).
+  Visible left behind: T_SupportedByOnlyTheSeed [000818:Target.esp] (Other visible objects) in interior AorInterior [000800:Skyrim.esm]: removed, surroundings removed; removed/total ground area East 10000/10000, NorthEast 10000/10000, North 20000/30000, NorthWest 10000/10000, West 10000/10000, SouthWest 10000/10000, South 10000/10000, SouthEast 10000/10000.
+Linked groups: 0 more objects removed with the visible left-behind removals they are linked to.
 Linked groups: 0 more objects removed with the left-behind removals they are linked to.
-Wrote 19 overrides (19 removed) in <time>.
+Wrote 20 overrides (20 removed) in <time>.
   1 removed objects had an Enable Parent; it was replaced by the player with "opposite of parent" so they stay disabled.
   Removed T_TooClose [000807:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_TooClose_Pad [000805:Rival.esp], changed by Rival.esp (new object)
   Removed T_TwinPillars [000808:Target.esp] (base T_TwinPillarsBase [000801:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_TwinPillars_GapPad [000806:Rival.esp], changed by Rival.esp (new object)
@@ -54,13 +58,14 @@ Wrote 19 overrides (19 removed) in <time>.
   Removed T_SoundRing3 [000827:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_SoundRing3_Pad [00081C:Rival.esp], changed by Rival.esp (new object)
   Removed T_ExteriorCrate [00082A:Target.esp] (base T_CrateBase [000800:Target.esp]) in worldspace AorWorld [000801:Skyrim.esm], cell AorExterior [000802:Skyrim.esm], place AorExterior, hold unnamed area, grid 0,0; too close to R_ExteriorCrate_Pad [00081E:Rival.esp], changed by Rival.esp (new object)
   Removed T_LinkedFar [00080E:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; linked to removed T_LinkedNear [00080D:Target.esp]
+  Removed T_SupportedByOnlyTheSeed [000818:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; visible, surroundings removed
 Bounds: 10 bases from NIF, 0 NIF misses, 4 from OBND, 0 without bounds. Meshes: 4 read, 0 effect-only, 0 failed (4 loose, 0 from 0 archives), 0 with a footer root other than their first node.
 Per cell/worldspace (objects of Target.esp / other objects / removed):
-  interior AorInterior [000800:Skyrim.esm]: 38 / 26 / 18
+  interior AorInterior [000800:Skyrim.esm]: 38 / 26 / 19
   worldspace AorWorld [000801:Skyrim.esm]: 2 / 2 / 1
 Target.esp objects: 35 visible, 5 invisible (by kind: 2 Position markers (XMarker, XMarkerHeading), 2 Sound sources, 1 Lights without a model), 1 deleted, start disabled, or without a valid position or rotation.
-Objects of Target.esp: 42; already removed by earlier patchers in this group: 0; not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 2; judged in this run: 40; removed in this run: 19.
-Removed 19 objects (18 too close, 0 follow-up removals, 0 invisible objects left behind, 1 linked to removed objects).
+Objects of Target.esp: 42; already removed by earlier patchers in this group: 0; not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 2; judged in this run: 40; removed in this run: 20.
+Removed 20 objects (18 too close, 0 follow-up removals, 1 visible objects left behind, 0 invisible objects left behind, 1 linked to removed objects).
 Kept 3 objects that would have been removed, because other records depend on them or because of their own script or location ref type.
   FormList record: 1
   placed object: Enable Parent: 1
@@ -68,8 +73,8 @@ Kept 3 objects that would have been removed, because other records depend on the
 Kept objects that would have been removed, to check by hand: 2.
   Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
-Removed 19/40 (removed/all checked objects):
-  AorInterior › unnamed area 18/38
+Removed 20/40 (removed/all checked objects):
+  AorInterior › unnamed area 19/38
   AorWorld › unnamed area › AorExterior 1/2
 Kept 1/40 (kept/all checked objects), FormList record:
   AorInterior › unnamed area 1/38
@@ -79,7 +84,8 @@ Kept 1/40 (kept/all checked objects), teleport door:
   AorInterior › unnamed area 1/38
 Kept objects that would have been removed, to check by hand: 2 of 40:
   AorInterior › unnamed area 2/38
-Removals: wrote 19 rows to <root>/Output/Reports/removals.csv.
+Visible objects left behind diagnostics: wrote 13 evaluations to <root>/Output/Reports/leftover-visible-objects.csv.
+Removals: wrote 20 rows to <root>/Output/Reports/removals.csv.
 Removed markers and kept objects: wrote 2 rows to <root>/Output/Reports/removed-markers-and-kept-objects.csv.
 ## patch
 000807:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (0.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
@@ -91,6 +97,7 @@ Removed markers and kept objects: wrote 2 rows to <root>/Output/Reports/removed-
 00080E:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (25500.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent 000014:Skyrim.esm SetEnableStateToOppositeOfParent
 000813:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (40000.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
 000817:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (44000.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+000818:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (44000.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
 000819:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (43920.00, 1000.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
 00081E:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (52400.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
 00081F:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (52000.00, 400.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
@@ -101,6 +108,21 @@ Removed markers and kept objects: wrote 2 rows to <root>/Output/Reports/removed-
 000826:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (55600.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
 000827:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (56000.00, -400.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
 00082A:Target.esp in 000802:Skyrim.esm (temporary): disabled True, position (600.00, 600.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+## report leftover-visible-objects.csv
+formKey,editorId,base,baseType,visibleType,space,cell,x,y,z,EastTotal,EastRemoved,EastState,NorthEastTotal,NorthEastRemoved,NorthEastState,NorthTotal,NorthRemoved,NorthState,NorthWestTotal,NorthWestRemoved,NorthWestState,WestTotal,WestRemoved,WestState,SouthWestTotal,SouthWestRemoved,SouthWestState,SouthTotal,SouthRemoved,SouthState,SouthEastTotal,SouthEastRemoved,SouthEastState,occupiedDirections,removedDirections,decision,reason
+00080A:Target.esp,T_Replaced,T_CrateBase [000800:Target.esp],Static,Other visible objects,interior AorInterior [000800:Skyrim.esm],,20000,0,0,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,kept,too few surrounding objects
+000812:Target.esp,T_TeleportDoorB,T_DoorBase [000803:Target.esp],Door,Doors,interior AorInterior [000800:Skyrim.esm],,37500,0,0,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,kept,too few surrounding objects
+000814:Target.esp,T_TouchLink1,T_CrateBase [000800:Target.esp],Static,Other visible objects,interior AorInterior [000800:Skyrim.esm],,40104,0,0,20000,0,Kept,0,0,Empty,0,0,Empty,0,0,Empty,10000,10000,Removed,0,0,Empty,0,0,Empty,0,0,Empty,2,1,kept,too few surrounding objects
+000815:Target.esp,T_TouchLink2,T_CrateBase [000800:Target.esp],Static,Other visible objects,interior AorInterior [000800:Skyrim.esm],,40208,0,0,10000,0,Kept,0,0,Empty,0,0,Empty,0,0,Empty,20000,10000,Kept,0,0,Empty,0,0,Empty,0,0,Empty,2,0,kept,too few surrounding objects
+000816:Target.esp,T_TouchReferenced,T_CrateBase [000800:Target.esp],Static,Other visible objects,interior AorInterior [000800:Skyrim.esm],,40312,0,0,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,30000,10000,Kept,0,0,Empty,0,0,Empty,0,0,Empty,1,0,kept,too few surrounding objects
+000818:Target.esp,T_SupportedByOnlyTheSeed,T_CrateBase [000800:Target.esp],Static,Other visible objects,interior AorInterior [000800:Skyrim.esm],,44000,0,100,10000,10000,Removed,10000,10000,Removed,30000,20000,Kept,10000,10000,Removed,10000,10000,Removed,10000,10000,Removed,10000,10000,Removed,10000,10000,Removed,8,7,removed,surroundings removed
+00081A:Target.esp,T_SupportedPartlyBySeed,T_CrateBase [000800:Target.esp],Static,Other visible objects,interior AorInterior [000800:Skyrim.esm],,44000,1000,100,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,10000,10000,Removed,0,0,Empty,20000,10000,Kept,0,0,Empty,2,1,kept,too few surrounding objects
+000822:Target.esp,T_LightRingKept,T_CrateBase [000800:Target.esp],Static,Other visible objects,interior AorInterior [000800:Skyrim.esm],,52283,283,0,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,20000,20000,Removed,0,0,Empty,20000,20000,Removed,0,0,Empty,2,2,kept,too few surrounding objects
+000828:Target.esp,T_SoundRingKept,T_CrateBase [000800:Target.esp],Static,Other visible objects,interior AorInterior [000800:Skyrim.esm],,56283,283,0,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,20000,20000,Removed,0,0,Empty,20000,20000,Removed,0,0,Empty,2,2,kept,too few surrounding objects
+00082D:Target.esp,T_OverriddenByTarget,T_CrateBase [000800:Target.esp],Static,Other visible objects,interior AorInterior [000800:Skyrim.esm],,60000,1600,0,0,0,Empty,0,0,Empty,10000,0,Kept,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,1,0,kept,too few surrounding objects
+00082E:Target.esp,T_NearBaseGamePad,T_CrateBase [000800:Target.esp],Static,Other visible objects,interior AorInterior [000800:Skyrim.esm],,60000,2400,0,0,0,Empty,0,0,Empty,10000,0,Kept,0,0,Empty,0,0,Empty,0,0,Empty,10000,0,Kept,0,0,Empty,2,0,kept,too few surrounding objects
+00082F:Target.esp,T_NearPatchedPad,T_CrateBase [000800:Target.esp],Static,Other visible objects,interior AorInterior [000800:Skyrim.esm],,60000,3200,0,0,0,Empty,0,0,Empty,10000,0,Kept,0,0,Empty,0,0,Empty,0,0,Empty,10000,0,Kept,0,0,Empty,2,0,kept,too few surrounding objects
+000830:Target.esp,T_NearTrustedPad,T_CrateBase [000800:Target.esp],Static,Other visible objects,interior AorInterior [000800:Skyrim.esm],,60000,4000,0,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,10000,0,Kept,0,0,Empty,1,0,kept,too few surrounding objects
 ## report removals.csv
 formKey,editorId,base,reason,worldspace,hold,place,cellFormKey,cellEditorId,gridX,gridY,x,y,z
 000807:Target.esp,T_TooClose,T_CrateBase [000800:Target.esp],"too close to R_TooClose_Pad [000805:Rival.esp], changed by Rival.esp (new object)",AorInterior,unnamed area,AorInterior,000800:Skyrim.esm,AorInterior,,,0,0,0
@@ -112,6 +134,7 @@ formKey,editorId,base,reason,worldspace,hold,place,cellFormKey,cellEditorId,grid
 00080E:Target.esp,T_LinkedFar,T_CrateBase [000800:Target.esp],linked to removed T_LinkedNear [00080D:Target.esp],AorInterior,unnamed area,AorInterior,000800:Skyrim.esm,AorInterior,,,25500,0,0
 000813:Target.esp,T_TouchSeed,T_CrateBase [000800:Target.esp],"too close to R_TouchSeed_Pad [000810:Rival.esp], changed by Rival.esp (new object)",AorInterior,unnamed area,AorInterior,000800:Skyrim.esm,AorInterior,,,40000,0,0
 000817:Target.esp,T_SupportSeed,T_CrateBase [000800:Target.esp],"too close to R_SupportSeed_Pad [000812:Rival.esp], changed by Rival.esp (new object)",AorInterior,unnamed area,AorInterior,000800:Skyrim.esm,AorInterior,,,44000,0,0
+000818:Target.esp,T_SupportedByOnlyTheSeed,T_CrateBase [000800:Target.esp],"visible, surroundings removed",AorInterior,unnamed area,AorInterior,000800:Skyrim.esm,AorInterior,,,44000,0,100
 000819:Target.esp,T_SupportSeedPartial,T_CrateBase [000800:Target.esp],"too close to R_SupportSeedPartial_Pad [000813:Rival.esp], changed by Rival.esp (new object)",AorInterior,unnamed area,AorInterior,000800:Skyrim.esm,AorInterior,,,43920,1000,0
 00081E:Target.esp,T_LightRing0,T_CrateBase [000800:Target.esp],"too close to R_LightRing0_Pad [000815:Rival.esp], changed by Rival.esp (new object)",AorInterior,unnamed area,AorInterior,000800:Skyrim.esm,AorInterior,,,52400,0,0
 00081F:Target.esp,T_LightRing1,T_CrateBase [000800:Target.esp],"too close to R_LightRing1_Pad [000816:Rival.esp], changed by Rival.esp (new object)",AorInterior,unnamed area,AorInterior,000800:Skyrim.esm,AorInterior,,,52000,400,0

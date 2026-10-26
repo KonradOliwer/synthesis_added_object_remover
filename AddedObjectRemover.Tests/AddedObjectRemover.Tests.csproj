@@ -45,6 +45,8 @@
     <Using Include="AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts" />
     <Using Include="AddedObjectRemover.Steps.RemoveTooCloseObjects" />
     <Using Include="AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts" />
+    <Using Include="AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind" />
+    <Using Include="AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts" />
     <Using Include="AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals" />
     <Using Include="AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts" />
     <Using Include="AddedObjectRemover.Steps.WriteThePatch" />
@@ -60,6 +62,7 @@
     <ProjectReference Include="..\Tools\DenseIdTables\DenseIdTables.csproj" />
     <ProjectReference Include="..\Tools\IndexGraphQueries\IndexGraphQueries.csproj" />
     <ProjectReference Include="..\Tools\NumericRanges\NumericRanges.csproj" />
+    <ProjectReference Include="..\Tools\CompassSectorAreas\CompassSectorAreas.csproj" />
     <ProjectReference Include="..\Tools\FileSystemAccess\FileSystemAccess.csproj" />
     <ProjectReference Include="..\Tools\ComputedOnceLookups\ComputedOnceLookups.csproj" />
     <ProjectReference Include="..\Tools\TriangleMeshTests\TriangleMeshTests.csproj" />
@@ -93,6 +96,8 @@
     <ProjectReference Include="..\Steps\RemoveTooCloseObjects\RemoveTooCloseObjects.csproj" />
     <ProjectReference Include="..\Steps\RemoveObjectsRestingOnRemovedOnes.Contracts\RemoveObjectsRestingOnRemovedOnes.Contracts.csproj" />
     <ProjectReference Include="..\Steps\RemoveObjectsRestingOnRemovedOnes\RemoveObjectsRestingOnRemovedOnes.csproj" />
+    <ProjectReference Include="..\Steps\RemoveVisibleObjectsLeftBehind.Contracts\RemoveVisibleObjectsLeftBehind.Contracts.csproj" />
+    <ProjectReference Include="..\Steps\RemoveVisibleObjectsLeftBehind\RemoveVisibleObjectsLeftBehind.csproj" />
     <ProjectReference Include="..\Steps\RemoveInvisibleObjectsLeftBehind.Contracts\RemoveInvisibleObjectsLeftBehind.Contracts.csproj" />
     <ProjectReference Include="..\Steps\RemoveInvisibleObjectsLeftBehind\RemoveInvisibleObjectsLeftBehind.csproj" />
     <ProjectReference Include="..\Steps\MoveKeptMarkers.Contracts\MoveKeptMarkers.Contracts.csproj" />

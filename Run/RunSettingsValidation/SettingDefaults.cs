@@ -36,6 +36,10 @@ public static class SettingDefaults
     public const OtherModsObjectsHandling OtherModsObjects = OtherModsObjectsHandling.PullObjectToTheGround;
     public const float SearchRadius = 1024f;
     public const int DirectionThresholdPercent = 50;
-    public const int RemovedDirectionsPercent = 60;
-    public const int OccupiedDirectionsPercent = 50;
+    public const int ClearedDirectionsPercent = 60;
+    public const int MinOccupiedDirections = 4;
+    public const bool RemoveLeftoverVisibleObjects = true;
+    public const int VisibleMinOccupiedDirections = 6;
+    public const int VisibleDirectionThresholdPercent = 80;
+    public const int VisibleClearedDirectionsPercent = 80;
 }

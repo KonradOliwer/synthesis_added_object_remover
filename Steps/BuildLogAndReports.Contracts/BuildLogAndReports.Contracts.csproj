@@ -21,6 +21,7 @@
     <ProjectReference Include="..\RemoveObjectsOnChangedTerrain.Contracts\RemoveObjectsOnChangedTerrain.Contracts.csproj" />
     <ProjectReference Include="..\RemoveTooCloseObjects.Contracts\RemoveTooCloseObjects.Contracts.csproj" />
     <ProjectReference Include="..\RemoveObjectsRestingOnRemovedOnes.Contracts\RemoveObjectsRestingOnRemovedOnes.Contracts.csproj" />
+    <ProjectReference Include="..\RemoveVisibleObjectsLeftBehind.Contracts\RemoveVisibleObjectsLeftBehind.Contracts.csproj" />
     <ProjectReference Include="..\RemoveInvisibleObjectsLeftBehind.Contracts\RemoveInvisibleObjectsLeftBehind.Contracts.csproj" />
     <ProjectReference Include="..\MoveKeptMarkers.Contracts\MoveKeptMarkers.Contracts.csproj" />
     <ProjectReference Include="..\WriteThePatch.Contracts\WriteThePatch.Contracts.csproj" />

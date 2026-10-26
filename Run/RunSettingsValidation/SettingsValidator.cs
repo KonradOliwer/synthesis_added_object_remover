@@ -10,6 +10,7 @@ using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
+using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 using static AddedObjectRemover.SettingCorrections;
 
@@ -48,11 +49,12 @@ public static class SettingsValidator
     private const string TouchDistanceName = "Also remove what rests on removed objects > Gap that still counts as touching";
     private const string AnchoringThresholdName = "Also remove what rests on removed objects > OnlyWhatLosesItsSupport: remove when this much support is gone";
     private const string OtherModsObjectsName = "Also remove what rests on removed objects > Other mods' objects left without support";
-    private const string SurroundingObjectsGroup = "Invisible objects left behind > When the cleaned mod's visible objects around it were removed > ";
-    private const string SearchRadiusName = SurroundingObjectsGroup + "Look this far around it";
-    private const string DirectionThresholdName = SurroundingObjectsGroup + "A direction is cleared when this much of it was removed";
-    private const string RemovedDirectionsName = SurroundingObjectsGroup + "Remove when this share of those directions is cleared";
-    private const string OccupiedDirectionsName = SurroundingObjectsGroup + "Decide only if this share of the 8 directions has objects";
+    private const string InvisibleSurroundingObjectsGroup = "Invisible objects left behind > When the cleaned mod's visible objects around it were removed > ";
+    private const string VisibleSurroundingObjectsGroup = "Visible objects left behind > When the cleaned mod's visible objects around it were removed > ";
+    private const string SearchRadiusName = "Look this far around it";
+    private const string DirectionThresholdName = "A direction is cleared when this much of it was removed";
+    private const string ClearedDirectionsName = "Remove when this share of the directions with objects is cleared";
+    private const string MinOccupiedDirectionsName = "Decide only if at least this many of the 8 directions have objects";
     private const string TooCloseSizeMarginName = "Remove objects too close to other mods' objects > Margin by object size > Margin on every side";
     private const string TooCloseDistanceMarginName = "Remove objects too close to other mods' objects > Margin by fixed distance > Margin on every side";
     private const string TerrainSizeMarginName = "Remove objects on terrain changed by other mods > Margin by object size > Margin on every side";
@@ -103,6 +105,7 @@ public static class SettingsValidator
         var fit = CreateFitSettings(settings.ShrinkOrTurn, warnings);
         var alsoRemove = CreateAlsoRemoveSettings(settings.FollowUpRemoval, touchChainsShown: detailedLogAndReports, warnings);
         var otherModsObjects = CreateOtherModsObjectsSettings(settings.FollowUpRemoval, alsoRemove, warnings);
+        var visibleLeftBehind = CreateVisibleLeftBehindSettings(settings.LeftoverVisibleObjects, warnings);
         var leftoverSettings = settings.LeftoverInvisibleObjects;
         var leftBehind = CreateLeftBehindSettings(leftoverSettings, warnings);
         var markerMoves = CreateMarkerMoveSettings(leftoverSettings);
@@ -119,6 +122,7 @@ public static class SettingsValidator
             fit,
             alsoRemove,
             otherModsObjects,
+            settings.LeftoverVisibleObjects.RemoveLeftoverVisibleObjects ? visibleLeftBehind : null,
             leftoverSettings.RemoveLeftoverInvisibleObjects ? leftBehind : null,
             markerMoves,
             reports,
@@ -398,15 +402,41 @@ public static class SettingsValidator
     }
 
     /// <summary>Built (and its settings validated) even when the step is off, so invalid values are always reported.</summary>
-    private static LeftBehindSettings CreateLeftBehindSettings(ILeftoverSettingsValues leftovers, ICollection<SettingWarning> warnings)
-    {
-        return new LeftBehindSettings(
-            LookAround: Clamp(leftovers.SearchRadius, MinSearchRadius, MaxSearchRadius, SettingDefaults.SearchRadius, SearchRadiusName, warnings),
-            DirectionClearedPercent: WholeTens(leftovers.DirectionThresholdPercent, DirectionThresholdName, warnings),
-            ClearedDirectionsPercent: WholeTens(leftovers.RemovedDirectionsPercent, RemovedDirectionsName, warnings),
-            OccupiedDirectionsPercent: WholeTens(leftovers.OccupiedDirectionsPercent, OccupiedDirectionsName, warnings),
-            NeverRemove: leftovers.NeverRemove.ToHashSet());
-    }
+    private static LeftBehindSettings CreateLeftBehindSettings(ILeftoverSettingsValues leftovers, ICollection<SettingWarning> warnings) =>
+        ValidateSurroundings(
+            InvisibleSurroundingObjectsGroup,
+            leftovers.SurroundingObjects,
+            warnings,
+            (lookAround, directionCleared, clearedDirections, minOccupied) =>
+                new LeftBehindSettings(
+                    LookAround: lookAround,
+                    MinOccupiedDirections: minOccupied,
+                    DirectionClearedPercent: directionCleared,
+                    ClearedDirectionsPercent: clearedDirections,
+                    NeverRemove: leftovers.NeverRemove.ToHashSet()));
+
+    /// <summary>Built (and its settings validated) even when the step is off, so invalid values are always reported.</summary>
+    private static VisibleLeftBehindSettings CreateVisibleLeftBehindSettings(IVisibleLeftoverSettingsValues leftovers, ICollection<SettingWarning> warnings) =>
+        ValidateSurroundings(
+            VisibleSurroundingObjectsGroup,
+            leftovers.SurroundingObjects,
+            warnings,
+            (lookAround, directionCleared, clearedDirections, minOccupied) =>
+                new VisibleLeftBehindSettings(
+                    LookAround: lookAround,
+                    MinOccupiedDirections: minOccupied,
+                    DirectionClearedPercent: directionCleared,
+                    ClearedDirectionsPercent: clearedDirections,
+                    NeverRemove: leftovers.NeverRemove.ToHashSet()));
+
+    /// <param name="create">Builds the step's settings from the validated radius, direction share, cleared-directions share and occupied-directions count.</param>
+    private static TSettings ValidateSurroundings<TSettings>(
+        string group, ISurroundingObjectsSettingsValues values, ICollection<SettingWarning> warnings, Func<float, int, int, int, TSettings> create) =>
+        create(
+            Clamp(values.SearchRadius, MinSearchRadius, MaxSearchRadius, SettingDefaults.SearchRadius, group + SearchRadiusName, warnings),
+            WholeTens(values.DirectionThresholdPercent, group + DirectionThresholdName, warnings),
+            WholeTens(values.ClearedDirectionsPercent, group + ClearedDirectionsName, warnings),
+            Clamp(values.MinOccupiedDirections, 1, CompassDirections.SectorCount, group + MinOccupiedDirectionsName, warnings));
 
     private static StopReason? FindTarget(IPluginRecords records, LoadOrderPlugins mods, string? targetPlugin, out PluginName target, out PluginListing targetListing)
     {

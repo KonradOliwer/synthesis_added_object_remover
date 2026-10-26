@@ -8,7 +8,7 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 internal static partial class LogSections
 {
     /// <summary>
-    /// Where the report files went, in the order touch, support, mesh origins, leftovers, removals, moved and fitted objects, other mods'
+    /// Where the report files went, in the order touch, support, mesh origins, visible leftovers, invisible leftovers, removals, moved and fitted objects, other mods'
     /// objects left without support, hints. The mesh-origin summary
     /// comes from the explanations, so it shows even when its file could not be written. Only written files have lines;
     /// when writing the files was stopped, the not-performed line comes first.
@@ -32,6 +32,10 @@ internal static partial class LogSections
         if (WrittenTables.Find(tables, ReportFileNames.MeshOriginsFileName) is { } meshOrigins)
         {
             lines.Add($"  Wrote {TextFormat.Count(meshOrigins.Rows)} mesh origins to {meshOrigins.Path}.");
+        }
+        if (WrittenTables.Find(tables, ReportFileNames.VisibleLeftBehindFileName) is { } visibleLeftovers)
+        {
+            lines.Add($"{VisibleLeftBehindStepName} diagnostics: wrote {TextFormat.Count(visibleLeftovers.Rows)} evaluations to {visibleLeftovers.Path}.");
         }
         if (WrittenTables.Find(tables, ReportFileNames.LeftBehindFileName) is { } leftovers)
         {

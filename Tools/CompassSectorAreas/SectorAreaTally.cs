@@ -1,18 +1,28 @@
 using System.Collections.Immutable;
-using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using System.Numerics;
 
-namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
+namespace AddedObjectRemover;
 
 /// <summary>
-/// Adds up the ground area of the visible objects around an invisible object per direction. A direction
-/// without objects is empty; otherwise it is removed when its removed share of the area reaches the threshold.
+/// Adds up the ground area of the boxes around a point per direction. A direction without boxes is
+/// empty; otherwise it is removed when its removed share of the area reaches the threshold.
 /// </summary>
-internal sealed class SectorAreaTally(int thresholdPercent)
+public sealed class SectorAreaTally(int thresholdPercent)
 {
     private readonly float[] _total = new float[CompassDirections.SectorCount];
     private readonly float[] _removed = new float[CompassDirections.SectorCount];
     private readonly int[] _objects = new int[CompassDirections.SectorCount];
     private readonly int[] _removedObjects = new int[CompassDirections.SectorCount];
+
+    /// <param name="boxes">In ascending id order: that fixes the order of the float sums, so a share right at
+    /// the threshold is decided the same way whatever the spatial index's layout.</param>
+    public static SectorAreas Measure(IEnumerable<(OrientedBox Box, bool Removed)> boxes, Vector3 point, int directionClearedPercent)
+    {
+        var tally = new SectorAreaTally(directionClearedPercent);
+        foreach (var (box, removed) in boxes)
+            foreach (var sector in CompassDirections.TowardsOrAll(point, box)) tally.Add(sector, box.GroundArea, removed);
+        return tally.Build();
+    }
 
     public void Add(DirectionSector sector, float area, bool removed)
     {

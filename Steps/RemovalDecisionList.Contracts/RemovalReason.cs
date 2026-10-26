@@ -50,6 +50,8 @@ public abstract record RemovalReason
 
     public sealed record SurroundingsRemoved : RemovalReason;
 
+    public sealed record VisibleObjectSurroundingsRemoved : RemovalReason;
+
     /// <param name="To">The member of the object's linked group whose removal took the group along.</param>
     public sealed record LinkedTo(TargetId To) : RemovalReason;
 }

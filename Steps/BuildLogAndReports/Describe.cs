@@ -4,6 +4,7 @@ using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
+using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
@@ -83,6 +84,7 @@ internal static class Describe
         SupportWithAnotherModsObjectRemoval support =>
             $"{TextFormat.Percent(support.RemovedShare)} of its support was removed or pulled down (mostly {OtherObject(support.MainSupporter)}, "
             + "another mod's object left without support)",
+        VisibleLeftBehindRemoval { Evaluation: var evaluation } => $"visible, {VisibleLeftBehindOutcomeText.DescribeReason(evaluation)}",
         LeftBehindRemoval { Evaluation: var evaluation } => $"invisible, {LeftBehindReason(evaluation)}",
         LinkedRemoval linked => $"linked to removed {RecordNames.Describe(world.Targets[linked.LinkedToTargetIndex])}",
         _ => throw new UnreachableException($"Unknown removal type {removal.GetType().Name}."),

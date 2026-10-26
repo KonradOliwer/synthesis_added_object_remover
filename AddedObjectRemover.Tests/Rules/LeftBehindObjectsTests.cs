@@ -26,7 +26,7 @@ public class LeftBehindObjectsTests
         LookAround: 1024,
         DirectionClearedPercent: 50,
         ClearedDirectionsPercent: 60,
-        OccupiedDirectionsPercent: 50,
+        MinOccupiedDirections: 4,
         NeverRemove: new HashSet<InvisibleObjectKind>());
 
     private static readonly BaseKey XMarker = TestVisibility.TaggedBase(ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers));
@@ -43,7 +43,7 @@ public class LeftBehindObjectsTests
     public void EvaluateGivesTheSelectorsEvaluations()
     {
         var expected = TestLeftBehind.CreateRule(Targets, Shapes, Others, Settings)
-            .SelectRemovals(new HashSet<int>(), new HashSet<int>(), new Execution(Environment.ProcessorCount));
+            .SelectRemovals(StartDecisions(), new Execution(Environment.ProcessorCount));
 
         var actual = Find(StartDecisions(), Settings);
 
@@ -69,6 +69,19 @@ public class LeftBehindObjectsTests
         var proposal = Assert.Single(result.Proposals);
         Assert.Equal(0, proposal.Target.Index);
         Assert.Equal(result.Evaluations.Where(evaluation => evaluation.IsRemoved).Select(evaluation => evaluation.TargetIndex), result.Proposals.Select(p => p.Target.Index));
+    }
+
+    [Fact]
+    public void AKeptObjectThatTheRoundRemovesAsALinkedGroupMemberIsEvaluatedAsRemovedLinked()
+    {
+        var protection = ObjectsToKeep.Build(Targets, [TestTargets.Link(0, 1)], TestTargets.References(Targets.Length), TestBaseFacts.Unresolved);
+
+        var result = Find(RemovalDecisions.Start(protection, Targets.Length), Settings);
+
+        var member = result.Evaluations.Single(evaluation => evaluation.TargetIndex == 1);
+        Assert.Equal(LeftBehindOutcome.RemovedLinkedToRemoval, member.Decision);
+        Assert.True(member.IsRemoved);
+        Assert.Equal(0, Assert.Single(result.Proposals).Target.Index);
     }
 
     [Fact]

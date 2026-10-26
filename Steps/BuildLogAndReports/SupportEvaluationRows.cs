@@ -10,11 +10,12 @@ internal static class SupportEvaluationRows
 {
     /// <param name="alsoRemove">A result of the support rounds.</param>
     /// <param name="decisions">The run's decisions with the support rounds applied.</param>
+    /// <param name="iterationsBefore">The iterations of the passes before, which this pass's iterations are counted after.</param>
     /// <returns>Round by round, each in target order.</returns>
-    public static ImmutableArray<SupportEvaluationRow> Join(RestingObjectsResult alsoRemove, IRemovalDecisions decisions) =>
+    public static ImmutableArray<SupportEvaluationRow> Join(RestingObjectsResult alsoRemove, IRemovalDecisions decisions, int iterationsBefore = 0) =>
     [
         .. alsoRemove.Rounds.SelectMany((round, index) => ((SupportRoundDetails)alsoRemove.Evidence[index]).Evaluations
-            .Select(evaluation => Join(evaluation, round, iteration: index + 1, decisions))),
+            .Select(evaluation => Join(evaluation, round, iteration: iterationsBefore + index + 1, decisions))),
     ];
 
     private static SupportEvaluationRow Join(SupportEvaluation evaluation, Round round, int iteration, IRemovalDecisions decisions)

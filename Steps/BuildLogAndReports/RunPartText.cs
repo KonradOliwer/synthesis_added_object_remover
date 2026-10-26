@@ -8,6 +8,7 @@ using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
+using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
@@ -25,6 +26,8 @@ internal static class RunPartText
         [ReportFileParts.ReportFiles] = new("the report files", "Some or all of the report files are missing; the patch is not affected.", Subjects: null),
         [RestingObjectsParts.AlsoRemove] = new("the also-remove step", "The also-remove rounds did not complete, so objects resting on removed ones were not removed.", Subjects: null),
         [RestingObjectsParts.TouchChains] = new("the touch-chain search", "The chains of touching objects that the detailed log and the report files list are missing.", Subjects: null),
+        [VisibleLeftBehindParts.VisibleLeftBehind] = new(
+            "the step for visible objects left behind", "That step did not run, so visible objects whose surroundings were removed were not removed.", Subjects: null),
         [LeftBehindParts.LeftBehind] = new("the step for invisible objects left behind", "That step did not run, so invisible objects whose surroundings were removed were not removed.", Subjects: null),
         [MarkerMoveParts.MarkerMoves] = new("the marker moves", "No kept marker was moved, so markers inside other mods' objects stay where they are.", Subjects: null),
         [OtherModsObjectsParts.HeldUpTargets] = new(
@@ -67,6 +70,7 @@ internal static class RunPartText
             RoundKind.ChangedTerrain => "changed-terrain",
             RoundKind.TooClose => "too-close",
             RoundKind.AlsoRemove => "follow-up",
+            RoundKind.VisibleLeftBehind => "visible left-behind",
             RoundKind.LeftBehind => "left-behind",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "The round kind has no linked-groups wording."),
         };

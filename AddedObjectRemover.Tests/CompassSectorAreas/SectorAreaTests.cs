@@ -1,6 +1,7 @@
 using System.Numerics;
+using AddedObjectRemover.Tests.Fixtures;
 
-namespace AddedObjectRemover.Tests.Rules;
+namespace AddedObjectRemover.Tests.CompassSectorAreas;
 
 public class SectorAreaTests
 {
@@ -73,6 +74,38 @@ public class SectorAreaTests
         var areas = tally.Build();
         Assert.Equal(3, areas.OccupiedCount);
         Assert.Equal(2, areas.RemovedCount);
-        Assert.StartsWith("East 10/10, NorthEast -, North 10/10, NorthWest -, West 0/10", SectorAreasText.Describe(areas));
+        Assert.Equal(10, areas.Total(DirectionSector.East));
+        Assert.Equal(10, areas.Removed(DirectionSector.East));
+        Assert.Equal(10, areas.Total(DirectionSector.West));
+        Assert.Equal(0, areas.Removed(DirectionSector.West));
+    }
+
+    [Fact]
+    public void MeasureAddsEachBoxToTheDirectionsItCountsIn()
+    {
+        var east = OrientedBox.FromLocal(new Box(new Vector3(-5), new Vector3(5)), TestTargets.At(new Vector3(100, 0, 0), 0f));
+        var west = OrientedBox.FromLocal(new Box(new Vector3(-5), new Vector3(5)), TestTargets.At(new Vector3(-100, 0, 0), 0f));
+        var around = OrientedBox.FromLocal(new Box(new Vector3(-50), new Vector3(50)), TestTargets.At(Vector3.Zero, 0f));
+
+        var beside = SectorAreaTally.Measure([(east, true), (west, false)], Vector3.Zero + new Vector3(0, 0, 200), HalfThreshold);
+        var inside = SectorAreaTally.Measure([(around, true)], Vector3.Zero, HalfThreshold);
+
+        Assert.Equal(SectorState.Removed, beside.State(DirectionSector.East));
+        Assert.Equal(SectorState.Kept, beside.State(DirectionSector.West));
+        Assert.Equal(CompassDirections.SectorCount, inside.RemovedCount);
+    }
+
+    [Theory]
+    [InlineData(3, 3, 60, nameof(SectorVerdict.TooFewOccupiedDirections))]
+    [InlineData(4, 3, 60, nameof(SectorVerdict.Cleared))]
+    [InlineData(4, 2, 60, nameof(SectorVerdict.TooFewClearedDirections))]
+    [InlineData(8, 7, 100, nameof(SectorVerdict.TooFewClearedDirections))]
+    [InlineData(8, 8, 100, nameof(SectorVerdict.Cleared))]
+    public void RuleNeedsEnoughOccupiedAndClearedDirections(int occupied, int cleared, int clearedPercent, string expected)
+    {
+        var tally = new SectorAreaTally(HalfThreshold);
+        foreach (var sector in CompassDirections.All.Take(occupied)) tally.Add(sector, 10, removed: (int)sector < cleared);
+
+        Assert.Equal(Enum.Parse<SectorVerdict>(expected), SectorRule.Decide(tally.Build(), minOccupiedDirections: 4, clearedPercent));
     }
 }

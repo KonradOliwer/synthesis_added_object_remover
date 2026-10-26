@@ -13,6 +13,7 @@ Remove objects too close to other mods' objects: Margin by object size: on, 0.5 
 Remove objects on terrain changed by other mods: off.
 Shrink or turn objects to make them fit: Shrink down to: 100% of its size; Turn by at most: 0 degrees either way.
 Also remove what rests on removed objects: Nothing; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
+Visible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 6; A direction is cleared when this much of it was removed: 80%; Remove when this share of the directions with objects is cleared: 80%; Never remove these as visible objects left behind: none.
 Invisible objects left behind: off.
 Detailed log and reports: off.
 Only warn (don't stop) when a mod that requires the cleaned mod loads after the patch: off.
@@ -40,6 +41,10 @@ Found 19 of 40 Target.esp objects too close to other mods' objects.
 ## follow-up
 ## linked
 ## unexpectedErrors
+## visible-leftovers
+Visible objects left behind: 15 evaluated; removed 1 (1 surroundings removed); kept 14 (14 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 0 referenced).
+## linked
+## unexpectedErrors
 ## left-without-support-step
 ## unexpectedErrors
 ## leftovers
@@ -48,7 +53,7 @@ Found 19 of 40 Target.esp objects too close to other mods' objects.
 ## relocations
 ## unexpectedErrors
 ## write
-Wrote 17 overrides (17 removed).
+Wrote 18 overrides (18 removed).
   1 removed objects had an Enable Parent; it was replaced by the player with "opposite of parent" so they stay disabled.
 ## explanationProblems
 ## meshProblems
@@ -59,9 +64,9 @@ Wrote 17 overrides (17 removed).
 ## spaces
 ## targetVisibility
 ## run-summary
-Objects of Target.esp: 42; already removed by earlier patchers in this group: 0; not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 2; judged in this run: 40; removed in this run: 17.
+Objects of Target.esp: 42; already removed by earlier patchers in this group: 0; not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 2; judged in this run: 40; removed in this run: 18.
 ## removal-summary
-Removed 17 objects (16 too close, 0 follow-up removals, 0 invisible objects left behind, 1 linked to removed objects).
+Removed 18 objects (16 too close, 0 follow-up removals, 1 visible objects left behind, 0 invisible objects left behind, 1 linked to removed objects).
 ## kept-summary
 Kept 3 objects that would have been removed, because other records depend on them or because of their own script or location ref type.
   FormList record: 1
@@ -72,8 +77,8 @@ Kept objects that would have been removed, to check by hand: 2.
   Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
 ## areas
-Removed 17/40 (removed/all checked objects):
-  AorInterior › unnamed area 16/38
+Removed 18/40 (removed/all checked objects):
+  AorInterior › unnamed area 17/38
   AorWorld › unnamed area › AorExterior 1/2
 Kept 1/40 (kept/all checked objects), FormList record:
   AorInterior › unnamed area 1/38

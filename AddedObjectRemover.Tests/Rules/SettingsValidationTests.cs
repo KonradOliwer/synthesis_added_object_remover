@@ -63,8 +63,8 @@ public class SettingsValidationTests
     {
         var surroundings = new LeftoverInvisibleObjectSettings().SurroundingObjects;
         Assert.Equal(surroundings.DirectionThresholdPercent, SettingCorrections.WholeTens(surroundings.DirectionThresholdPercent, "direction", []));
-        Assert.Equal(surroundings.RemovedDirectionsPercent, SettingCorrections.WholeTens(surroundings.RemovedDirectionsPercent, "removed", []));
-        Assert.Equal(surroundings.OccupiedDirectionsPercent, SettingCorrections.WholeTens(surroundings.OccupiedDirectionsPercent, "occupied", []));
+        Assert.Equal(surroundings.ClearedDirectionsPercent, SettingCorrections.WholeTens(surroundings.ClearedDirectionsPercent, "cleared", []));
+        Assert.Equal(surroundings.MinOccupiedDirections, SettingCorrections.Clamp(surroundings.MinOccupiedDirections, 1, CompassDirections.SectorCount, "occupied", []));
         Assert.False(new TooCloseRemovalSettings().UseRoughBoxes);
         Assert.Equal(NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision, new TooCloseRemovalSettings().NpcHandling);
         Assert.Equal(FollowUpRemovalMode.OnlyWhatLosesItsSupport, new FollowUpRemovalSettings().Mode);

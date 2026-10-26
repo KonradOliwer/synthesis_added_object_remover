@@ -14,6 +14,7 @@ Remove objects too close to other mods' objects: Margin by object size: on, 0.5 
 Remove objects on terrain changed by other mods: off.
 Shrink or turn objects to make them fit: Shrink down to: 100% of its size; Turn by at most: 0 degrees either way.
 Also remove what rests on removed objects: Nothing; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
+Visible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 6; A direction is cleared when this much of it was removed: 80%; Remove when this share of the directions with objects is cleared: 80%; Never remove these as visible objects left behind: none.
 Invisible objects left behind: off.
 Detailed log and reports: on, report files go to <root>/Reports.
 Only warn (don't stop) when a mod that requires the cleaned mod loads after the patch: off.
@@ -52,6 +53,12 @@ Linked groups: 1 more objects removed with the too-close removals they are linke
 ## linked
 Linked groups: 0 more objects removed with the follow-up removals they are linked to.
 ## unexpectedErrors
+## visible-leftovers
+Visible objects left behind: 15 evaluated in <time>; removed 1 (1 surroundings removed); kept 14 (14 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 0 referenced).
+  Visible left behind: T_SupportedByOnlyTheSeed [000818:Target.esp] (Other visible objects) in interior AorInterior [000800:Skyrim.esm]: removed, surroundings removed; removed/total ground area East 10000/10000, NorthEast 10000/10000, North 20000/30000, NorthWest 10000/10000, West 10000/10000, SouthWest 10000/10000, South 10000/10000, SouthEast 10000/10000.
+## linked
+Linked groups: 0 more objects removed with the visible left-behind removals they are linked to.
+## unexpectedErrors
 ## left-without-support-step
 ## unexpectedErrors
 ## leftovers
@@ -61,7 +68,7 @@ Linked groups: 0 more objects removed with the left-behind removals they are lin
 ## relocations
 ## unexpectedErrors
 ## write
-Wrote 17 overrides (17 removed) in <time>.
+Wrote 18 overrides (18 removed) in <time>.
   1 removed objects had an Enable Parent; it was replaced by the player with "opposite of parent" so they stay disabled.
 ## explanationProblems
 ## meshProblems
@@ -85,18 +92,19 @@ Wrote 17 overrides (17 removed) in <time>.
   Removed T_SoundRing3 [000827:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to R_SoundRing3_Pad [00081C:Rival.esp], changed by Rival.esp (new object)
   Removed T_ExteriorCrate [00082A:Target.esp] (base T_CrateBase [000800:Target.esp]) in worldspace AorWorld [000801:Skyrim.esm], cell AorExterior [000802:Skyrim.esm], place AorExterior, hold unnamed area, grid 0,0; too close to R_ExteriorCrate_Pad [00081E:Rival.esp], changed by Rival.esp (new object)
   Removed T_LinkedFar [00080E:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; linked to removed T_LinkedNear [00080D:Target.esp]
+  Removed T_SupportedByOnlyTheSeed [000818:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; visible, surroundings removed
 ## bounds
 Bounds: 10 bases from NIF, 0 NIF misses, 4 from OBND, 0 without bounds. Meshes: 4 read, 0 effect-only, 0 failed (4 loose, 0 from 0 archives), 0 with a footer root other than their first node.
 ## spaces
 Per cell/worldspace (objects of Target.esp / other objects / removed):
-  interior AorInterior [000800:Skyrim.esm]: 38 / 26 / 16
+  interior AorInterior [000800:Skyrim.esm]: 38 / 26 / 17
   worldspace AorWorld [000801:Skyrim.esm]: 2 / 2 / 1
 ## targetVisibility
 Target.esp objects: 35 visible, 5 invisible (by kind: 2 Position markers (XMarker, XMarkerHeading), 2 Sound sources, 1 Lights without a model), 1 deleted, start disabled, or without a valid position or rotation.
 ## run-summary
-Objects of Target.esp: 42; already removed by earlier patchers in this group: 0; not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 2; judged in this run: 40; removed in this run: 17.
+Objects of Target.esp: 42; already removed by earlier patchers in this group: 0; not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 2; judged in this run: 40; removed in this run: 18.
 ## removal-summary
-Removed 17 objects (16 too close, 0 follow-up removals, 0 invisible objects left behind, 1 linked to removed objects).
+Removed 18 objects (16 too close, 0 follow-up removals, 1 visible objects left behind, 0 invisible objects left behind, 1 linked to removed objects).
 ## kept-summary
 Kept 3 objects that would have been removed, because other records depend on them or because of their own script or location ref type.
   FormList record: 1
@@ -107,8 +115,8 @@ Kept objects that would have been removed, to check by hand: 2.
   Kept, referenced by a non-placed record: T_ReferencedByFormList [000810:Target.esp] in interior AorInterior [000800:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
   Kept teleport door T_TeleportDoorA [000811:Target.esp] in interior AorInterior [000800:Skyrim.esm]: teleport door.
 ## areas
-Removed 17/40 (removed/all checked objects):
-  AorInterior › unnamed area 16/38
+Removed 18/40 (removed/all checked objects):
+  AorInterior › unnamed area 17/38
   AorWorld › unnamed area › AorExterior 1/2
 Kept 1/40 (kept/all checked objects), FormList record:
   AorInterior › unnamed area 1/38
@@ -119,7 +127,8 @@ Kept 1/40 (kept/all checked objects), teleport door:
 Kept objects that would have been removed, to check by hand: 2 of 40:
   AorInterior › unnamed area 2/38
 ## written
-Removals: wrote 17 rows to <root>/Reports/removals.csv.
+Visible objects left behind diagnostics: wrote 15 evaluations to <root>/Reports/leftover-visible-objects.csv.
+Removals: wrote 18 rows to <root>/Reports/removals.csv.
 Removed markers and kept objects: wrote 2 rows to <root>/Reports/removed-markers-and-kept-objects.csv.
 ## reportFileWarnings
 ## unexpectedErrors

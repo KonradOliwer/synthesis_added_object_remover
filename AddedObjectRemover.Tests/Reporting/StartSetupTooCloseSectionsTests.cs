@@ -157,6 +157,7 @@ public sealed class StartSetupTooCloseSectionsTests
         {
             Mode = everythingOn ? FollowUpRemovalMode.OnlyWhatLosesItsSupport : FollowUpRemovalMode.Nothing,
         };
+        settings.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings { RemoveLeftoverVisibleObjects = everythingOn };
         settings.LeftoverInvisibleObjects = new LeftoverInvisibleObjectSettings
         {
             RemoveLeftoverInvisibleObjects = everythingOn,
@@ -169,6 +170,33 @@ public sealed class StartSetupTooCloseSectionsTests
         var lines = LogSections.BuildConfigSection(runSettings, trust, mods).Lines.Select(line => line.Replace('\\', '/')).ToArray();
 
         AssertExpectedOutput(lines, "Config_GivesTheTextWithAndWithoutPatchesAndLeftovers", $"{everythingOn}");
+    }
+
+    [Fact]
+    public void Config_GivesTheVisibleLeftBehindLineOffAndOnWithTheTickedKinds()
+    {
+        var settings = SettingsFor();
+        settings.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings { RemoveLeftoverVisibleObjects = false };
+        var mods = Facts();
+        string VisibleLine()
+        {
+            var runSettings = Assert.IsType<RunRequest.Ready>(Build(settings, mods)).Settings;
+            return LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(mods, runSettings.ModTrust), mods).Lines
+                .Single(line => line.StartsWith("Visible objects left behind: ", StringComparison.Ordinal));
+        }
+
+        Assert.Equal("Visible objects left behind: off.", VisibleLine());
+
+        settings.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings
+        {
+            RemoveLeftoverVisibleObjects = true,
+            AlwaysKeep = new KeptVisibleObjectSettings { Doors = true, LooseItems = true },
+        };
+        Assert.Equal(
+            "Visible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 6; "
+            + "A direction is cleared when this much of it was removed: 80%; Remove when this share of the directions with objects is cleared: 80%; "
+            + "Never remove these as visible objects left behind: Doors, Loose items.",
+            VisibleLine());
     }
 
     [Fact]

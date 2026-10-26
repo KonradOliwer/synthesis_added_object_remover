@@ -124,10 +124,10 @@ public class RunnerRulesTests
         var settings = SettingsOfRunSettings();
 
         Assert.Equal(
-            ["AlsoRemoveSettings", "ChangedTerrainSettings", "Execution", "FitSettings", "LeftBehindSettings", "MarkerMoveSettings", "ModTrustSettings", "OtherModsObjectsSettings", "ReportFileSettings", "SelectionSettings", "TooCloseSettings", "WhatToCollect"],
+            ["AlsoRemoveSettings", "ChangedTerrainSettings", "Execution", "FitSettings", "LeftBehindSettings", "MarkerMoveSettings", "ModTrustSettings", "OtherModsObjectsSettings", "ReportFileSettings", "SelectionSettings", "TooCloseSettings", "VisibleLeftBehindSettings", "WhatToCollect"],
             settings.RecordTypes.Order(StringComparer.Ordinal));
         Assert.Equal(
-            ["AlsoRemove", "ChangedTerrain", "Execution", "Fit", "LeftBehind", "MarkerMoves", "ModTrust", "OtherModsObjects", "Read", "Reports", "Selection", "TooClose"],
+            ["AlsoRemove", "ChangedTerrain", "Execution", "Fit", "LeftBehind", "MarkerMoves", "ModTrust", "OtherModsObjects", "Read", "Reports", "Selection", "TooClose", "VisibleLeftBehind"],
             settings.RecordProperties.Order(StringComparer.Ordinal));
         Assert.Equal(
             ["DetailedLog", "OnlyWarnWhenRequiringModLoadsAfterPatch", "Target", "TargetAsTyped"],

@@ -14,7 +14,8 @@ Remove objects too close to other mods' objects: Margin by object size: on, 0.5 
 Remove objects on terrain changed by other mods: off.
 Shrink or turn objects to make them fit: Shrink down to: 100% of its size; Turn by at most: 0 degrees either way.
 Also remove what rests on removed objects: EverythingTouchingIt; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
-Invisible objects left behind: on; Look this far around it: 1024 units; Decide only if this share of the 8 directions has objects: 50%; A direction is cleared when this much of it was removed: 50%; Remove when this share of those directions is cleared: 60%; Never remove these as left behind: none; Move kept markers out of other mods' objects: off.
+Visible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 6; A direction is cleared when this much of it was removed: 80%; Remove when this share of the directions with objects is cleared: 80%; Never remove these as visible objects left behind: none.
+Invisible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 4; A direction is cleared when this much of it was removed: 50%; Remove when this share of the directions with objects is cleared: 60%; Never remove these as left behind: none; Move kept markers out of other mods' objects: off.
 Detailed log and reports: on, report files go to <root>/Reports.
 Only warn (don't stop) when a mod that requires the cleaned mod loads after the patch: off.
 ## scan
@@ -55,6 +56,11 @@ Touching objects: 4 removed in 17 components (3 with follow-up removals, largest
 Also remove: 3 rounds in <time>.
 ## linked
 Linked groups: 0 more objects removed with the follow-up removals they are linked to.
+## unexpectedErrors
+## visible-leftovers
+Visible objects left behind: 10 evaluated in <time>; removed 0 (0 surroundings removed); kept 10 (10 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 0 referenced).
+## linked
+Linked groups: 0 more objects removed with the visible left-behind removals they are linked to.
 ## unexpectedErrors
 ## left-without-support-step
 ## unexpectedErrors
@@ -115,7 +121,7 @@ Target.esp objects: 35 visible, 5 invisible (by kind: 2 Position markers (XMarke
 ## run-summary
 Objects of Target.esp: 42; already removed by earlier patchers in this group: 0; not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 2; judged in this run: 40; removed in this run: 25.
 ## removal-summary
-Removed 25 objects (16 too close, 4 follow-up removals, 4 invisible objects left behind, 1 linked to removed objects).
+Removed 25 objects (16 too close, 4 follow-up removals, 0 visible objects left behind, 4 invisible objects left behind, 1 linked to removed objects).
 ## kept-summary
 Kept 5 objects that would have been removed, because other records depend on them or because of their own script or location ref type.
   FormList record: 2
@@ -144,6 +150,7 @@ Kept objects that would have been removed, to check by hand: 3 of 40:
   AorWorld › unnamed area › AorExterior 1/2
 ## written
 Touch diagnostics: wrote 5 edges, 17 components in <time> to <root>/Reports/edges.csv / <root>/Reports/components.csv.
+Visible objects left behind diagnostics: wrote 10 evaluations to <root>/Reports/leftover-visible-objects.csv.
 Invisible objects left behind diagnostics: wrote 5 evaluations to <root>/Reports/leftover-invisible-objects.csv.
 Removals: wrote 25 rows to <root>/Reports/removals.csv.
 Removed markers and kept objects: wrote 3 rows to <root>/Reports/removed-markers-and-kept-objects.csv.

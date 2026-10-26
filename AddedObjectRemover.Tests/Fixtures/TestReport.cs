@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using Mutagen.Bethesda.Plugins;
@@ -39,6 +40,10 @@ internal sealed class TestReport
     /// <summary>The lines of the sections printed after the placed objects were collected, in order.</summary>
     public IReadOnlyList<string> CollectedSectionLines(CollectedObjects world) =>
         [.. _report.BuildStepSections(world, TimeSpan.Zero, TimeSpan.Zero).SelectMany(section => section.Lines)];
+
+    /// <summary>The sections the visible left-behind step prints as it ends, in order.</summary>
+    public ImmutableArray<LogSection> VisibleLeftBehindSections(VisibleLeftBehindResult found, IRemovalDecisions decisions, CollectedObjects world) =>
+        _report.BuildStepSections(found, decisions, world, TimeSpan.Zero);
 
     private sealed class MeshFilesOnlyCaches(IMeshFiles meshFiles) : ILoadOrderCaches
     {

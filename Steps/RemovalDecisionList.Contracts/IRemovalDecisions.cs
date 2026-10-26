@@ -42,6 +42,10 @@ public interface IRemovalDecisions
     /// <summary>The rounds this view has beyond <paramref name="older"/>, an earlier state of the same decisions: the run's earlier view, or the view a working copy started from.</summary>
     ImmutableArray<Round> RoundsAfter(IRemovalDecisions older);
 
+    /// <summary>Decides one round of <paramref name="kind"/> from the proposals on a copy; this view and the run never see it.</summary>
+    /// <returns>What the round decided, by target: the proposed objects, kept or removed, and the linked group members it removed with them.</returns>
+    IReadOnlyDictionary<TargetId, Decision> DecideRoundOnCopy(RoundKind kind, IReadOnlyList<ProposedRemoval> proposals);
+
     /// <summary>A copy holding the decisions of this view, with a store of its own.</summary>
     IRemovalDecisionsCopy WorkingCopy();
 }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Tests.Fixtures;
@@ -90,6 +91,46 @@ public class RestingObjectsRunTests
         Assert.Equal(new[] { new Round(1, RoundKind.ChangedTerrain), new Round(2, RoundKind.TooClose) }, result.SeedRounds.ToArray());
         Assert.True(applied.IsRemoved(new TargetId(ItemOnTable)));
         Assert.False(applied.IsDecided(new TargetId(2)));
+    }
+
+    [Theory]
+    [InlineData(FollowUpRemovalMode.EverythingTouchingIt)]
+    [InlineData(FollowUpRemovalMode.OnlyWhatLosesItsSupport)]
+    public void TheRoundsAreSeededByTheGivenSeedRoundsAloneAndRemoveWhatRestsOnTheirRemovals(FollowUpRemovalMode mode)
+    {
+        var earlier = Decisions().Apply(RoundKind.TooClose, [Removal(2, new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()))]);
+        var afterVisible = earlier.Apply(RoundKind.VisibleLeftBehind, [Removal(Table, new RemovalReason.VisibleObjectSurroundingsRemoved())]);
+
+        var result = Run(new Probe(), mode, afterVisible, reportFiles: StepOutcome.SwitchedOff, seedRounds: afterVisible.RoundsAfter(earlier));
+        var applied = afterVisible.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds);
+
+        Assert.Equal(new[] { new Round(2, RoundKind.VisibleLeftBehind) }, result.SeedRounds.ToArray());
+        Assert.True(applied.IsRemoved(new TargetId(ItemOnTable)));
+        Assert.Equal(StepOutcome.SwitchedOff, result.ReportFileDetails.Outcome);
+    }
+
+    [Theory]
+    [InlineData(FollowUpRemovalMode.EverythingTouchingIt)]
+    [InlineData(FollowUpRemovalMode.OnlyWhatLosesItsSupport)]
+    public void ARemovalOfARoundOutsideTheSeedRoundsDoesNotSeedTheRounds(FollowUpRemovalMode mode)
+    {
+        var earlier = Decisions().Apply(RoundKind.TooClose, [Removal(Table, new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()))]);
+        var afterVisible = earlier.Apply(RoundKind.VisibleLeftBehind, [Removal(2, new RemovalReason.VisibleObjectSurroundingsRemoved())]);
+
+        var result = Run(new Probe(), mode, afterVisible, reportFiles: StepOutcome.SwitchedOff, seedRounds: afterVisible.RoundsAfter(earlier));
+        var applied = afterVisible.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds);
+
+        Assert.True(result.HadSeeds);
+        Assert.False(applied.IsRemoved(new TargetId(ItemOnTable)));
+    }
+
+    [Fact]
+    public void WithoutSeedRoundsThereAreNoSeedsWhateverTheEarlierRoundsRemoved()
+    {
+        var result = Run(new Probe(), FollowUpRemovalMode.EverythingTouchingIt, AfterTooClose(), seedRounds: []);
+
+        Assert.False(result.HadSeeds);
+        Assert.Empty(result.ProposedRounds);
     }
 
     [Fact]
@@ -237,6 +278,11 @@ public class RestingObjectsRunTests
         Assert.Null(details.MeshOrigins);
     }
 
+    private static RemovalDecisions Decisions() =>
+        RemovalDecisions.Start(ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Count), TestBaseFacts.Unresolved), Targets.Count);
+
+    private static ProposedRemoval Removal(int target, RemovalReason reason) => new(new TargetId(target), reason);
+
     private static RemovalDecisions AfterTooClose() =>
         TestSeededDecisions.Seed(ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Count), TestBaseFacts.Unresolved), Targets.Count, [Table]);
 
@@ -246,7 +292,8 @@ public class RestingObjectsRunTests
         FollowUpRemovalMode mode,
         RemovalDecisions? afterTooClose = null,
         bool touchChainsShown = false,
-        StepOutcome reportFiles = StepOutcome.Performed)
+        StepOutcome reportFiles = StepOutcome.Performed,
+        ImmutableArray<Round>? seedRounds = null)
     {
         var decisions = afterTooClose ?? AfterTooClose();
         var objectsOfAnyPlugin = TestScenes.CreateWithSupportOnlyObjects(Targets, [], Shapes);
@@ -264,6 +311,7 @@ public class RestingObjectsRunTests
             [.. Targets],
             ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Count), TestBaseFacts.Unresolved),
             decisions,
+            seedRounds ?? decisions.Rounds,
             new AlsoRemoveSettings(mode, TouchDistance, Threshold, touchChainsShown || reportFiles == StepOutcome.Performed),
             new Execution(1),
             probe.ReadClock,

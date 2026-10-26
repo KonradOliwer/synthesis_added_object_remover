@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AddedObjectRemover</RootNamespace>
+    <Description>The visible target objects checked for being left behind, the ground area around each, and the settings of that check. It references RemovalDecisionList.Contracts, FindTargetObjectsToKeep.Contracts, CompassSectorAreas and UnexpectedFailureHandling (for its part key) and holds no packages.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FindTargetObjectsToKeep.Contracts\FindTargetObjectsToKeep.Contracts.csproj" />
+    <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
+    <ProjectReference Include="..\..\Tools\CompassSectorAreas\CompassSectorAreas.csproj" />
+    <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AddedObjectRemover.Tests" />
+  </ItemGroup>
+</Project>

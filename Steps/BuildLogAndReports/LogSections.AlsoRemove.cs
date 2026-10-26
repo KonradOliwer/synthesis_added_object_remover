@@ -11,21 +11,45 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 internal static partial class LogSections
 {
     public const string AlsoRemoveName = "Also remove";
+    public const string AlsoRemoveAfterVisibleLeftBehindName = "Also remove after visible objects left behind";
+
+    /// <summary>One of the two also-remove passes: the first, and the one that follows the visible left-behind removals.</summary>
+    /// <param name="LinkedStep">How the pass's "Linked groups" line names the removals the linked ones followed.</param>
+    internal sealed record AlsoRemovePass(string StepName, string IdSuffix, string LinkedStep)
+    {
+        public static readonly AlsoRemovePass First = new(AlsoRemoveName, string.Empty, RunPartText.LinkedStep(RoundKind.AlsoRemove));
+        public static readonly AlsoRemovePass AfterVisibleLeftBehind = new(AlsoRemoveAfterVisibleLeftBehindName, "-after-visible", "follow-up after visible left-behind");
+    }
 
     /// <summary>The section of the also-remove step's mode; the empty one when no round ran, and the not-performed line when the step was stopped.</summary>
-    /// <remarks>Rounds run exactly when the step was performed and the too-close round removed something.</remarks>
+    /// <remarks>Rounds run exactly when the step was performed and the earlier rounds removed something.</remarks>
     /// <param name="decisions">The run's decisions with the also-remove rounds applied.</param>
     public static LogSection BuildAlsoRemoveSection(
         CollectedObjects world, RestingObjectsResult alsoRemove, IRemovalDecisions decisions, TriangleStoreStats meshes, ReportContext context) =>
         alsoRemove.Outcome switch
         {
-            StepOutcome.StoppedByUnexpectedError => BuildFollowUpSection([BuildNotPerformedLine(AlsoRemoveName)]),
+            StepOutcome.StoppedByUnexpectedError => BuildStoppedSection(AlsoRemovePass.First),
             StepOutcome.SwitchedOff => BuildNoFollowUpSection(),
             StepOutcome.Performed => alsoRemove.HadSeeds
                 ? BuildModeSection(world, alsoRemove, decisions, alsoRemove.RoundsTime, meshes, context)
                 : BuildNoFollowUpSection(),
             _ => throw new UnreachableException($"Unexpected also-remove outcome {alsoRemove.Outcome}."),
         };
+
+    /// <summary>The also-remove section for the visible left-behind removals; printed only when the pass was stopped or had seeds.</summary>
+    /// <param name="decisions">The run's decisions with the second pass's rounds applied.</param>
+    public static LogSection BuildAlsoRemoveAfterVisibleLeftBehindSection(
+        CollectedObjects world, RestingObjectsResult alsoRemove, IRemovalDecisions decisions, TriangleStoreStats meshes, ReportContext context) =>
+        alsoRemove.Outcome == StepOutcome.StoppedByUnexpectedError
+            ? BuildStoppedSection(AlsoRemovePass.AfterVisibleLeftBehind)
+            : BuildModeSection(AlsoRemovePass.AfterVisibleLeftBehind, world, alsoRemove, decisions, alsoRemove.RoundsTime, meshes, context);
+
+    private static LogSection BuildStoppedSection(AlsoRemovePass pass) =>
+        new(FollowUpSectionId + pass.IdSuffix, [BuildNotPerformedLine(pass.StepName)]);
+
+    /// <summary>Whether the second pass has anything to say: it ran rounds from seeds, or was stopped.</summary>
+    public static bool PrintsAfterVisibleLeftBehind(RestingObjectsResult alsoRemove) =>
+        alsoRemove.HadSeeds || alsoRemove.Outcome == StepOutcome.StoppedByUnexpectedError;
 
     /// <summary>The section of the rounds that ran: the touch section or the anchoring section, by the step's mode.</summary>
     /// <param name="decisions">The run's decisions with the also-remove rounds applied.</param>
@@ -36,12 +60,22 @@ internal static partial class LogSections
         TimeSpan elapsed,
         TriangleStoreStats meshes,
         ReportContext context) =>
+        BuildModeSection(AlsoRemovePass.First, world, alsoRemove, decisions, elapsed, meshes, context);
+
+    private static LogSection BuildModeSection(
+        AlsoRemovePass pass,
+        CollectedObjects world,
+        RestingObjectsResult alsoRemove,
+        IRemovalDecisions decisions,
+        TimeSpan elapsed,
+        TriangleStoreStats meshes,
+        ReportContext context) =>
         alsoRemove.Mode switch
         {
             FollowUpRemovalMode.EverythingTouchingIt =>
-                AlsoRemoveSection("touch", world, alsoRemove, decisions, meshes, elapsed, context, () => TouchChainLines(alsoRemove, decisions)),
+                AlsoRemoveSection(pass, "touch", world, alsoRemove, decisions, meshes, elapsed, context, () => TouchChainLines(alsoRemove, decisions)),
             FollowUpRemovalMode.OnlyWhatLosesItsSupport =>
-                AlsoRemoveSection("anchoring", world, alsoRemove, decisions, meshes, elapsed, context, () => SupportLines(world, alsoRemove, decisions)),
+                AlsoRemoveSection(pass, "anchoring", world, alsoRemove, decisions, meshes, elapsed, context, () => SupportLines(world, alsoRemove, decisions)),
             _ => throw new UnreachableException($"Unknown follow-up removal mode {alsoRemove.Mode}."),
         };
 
@@ -75,6 +109,7 @@ internal static partial class LogSections
 
     /// <param name="statistics">The detailed log's statistics of the rule; only called for the detailed log.</param>
     private static LogSection AlsoRemoveSection(
+        AlsoRemovePass pass,
         string id,
         CollectedObjects world,
         RestingObjectsResult alsoRemove,
@@ -85,8 +120,8 @@ internal static partial class LogSections
         Func<string[]> statistics)
     {
         List<string> lines = [.. BuildKeptLines(world, alsoRemove.Rounds.SelectMany(round => RemovalList.KeptIn(decisions, round)))];
-        if (context.Detailed) lines.AddRange([.. statistics(), AlsoRemoveMeshes(meshes), AlsoRemoveTime(alsoRemove, elapsed)]);
-        return new LogSection(id, [.. lines]);
+        if (context.Detailed) lines.AddRange([.. statistics(), AlsoRemoveMeshes(meshes), AlsoRemoveTime(pass, alsoRemove, elapsed)]);
+        return new LogSection(id + pass.IdSuffix, [.. lines]);
     }
 
     /// <summary>The also-remove rounds' removals the rule itself decided; the linked group members removed with them are not counted.</summary>
@@ -97,8 +132,8 @@ internal static partial class LogSections
     private static int CountKept(RestingObjectsResult alsoRemove, IRemovalDecisions decisions) =>
         alsoRemove.Rounds.Sum(round => decisions.KeptIn(round).Length);
 
-    private static string AlsoRemoveTime(RestingObjectsResult alsoRemove, TimeSpan elapsed) =>
-        $"{AlsoRemoveName}: {TextFormat.Count(alsoRemove.Rounds.Length)} rounds in {TextFormat.Seconds(elapsed)}.";
+    private static string AlsoRemoveTime(AlsoRemovePass pass, RestingObjectsResult alsoRemove, TimeSpan elapsed) =>
+        $"{pass.StepName}: {TextFormat.Count(alsoRemove.Rounds.Length)} rounds in {TextFormat.Seconds(elapsed)}.";
 
     private static string AlsoRemovePairs(PairTestStats pairs, int rounds, string roundName) =>
         $"  Pairs: {TextFormat.Count(pairs.PairsTested)} box candidates next to a removal tested over {TextFormat.Count(rounds)} {roundName}, "

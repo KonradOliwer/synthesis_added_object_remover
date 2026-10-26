@@ -7,6 +7,7 @@ using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
+using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
@@ -33,6 +34,7 @@ internal static partial class LogSections
             DescribeChangedTerrain(settings.ChangedTerrain),
             DescribeShrinkOrTurn(settings.Fit),
             DescribeAlsoRemove(settings.AlsoRemove, settings.OtherModsObjects),
+            DescribeVisibleLeftBehind(settings.VisibleLeftBehind),
             DescribeLeftBehind(settings),
             DescribeDetailedLogAndReports(settings.Reports),
             DescribeOnlyWarnWhenRequiringModLoadsAfterPatch(settings),
@@ -111,15 +113,28 @@ internal static partial class LogSections
         + $"Remove when this much support is gone: {TextFormat.Percent(settings.SupportLostFraction)}; "
         + $"Other mods' objects left without support: {otherModsObjects.Handling}.";
 
+    private static string DescribeVisibleLeftBehind(VisibleLeftBehindSettings? visible)
+    {
+        if (visible is null) return $"{VisibleLeftBehindStepName}: off.";
+        var protectedKinds = TextLists.JoinOr(
+            visible.NeverRemove.Order().Select(VisibleLeftBehindOutcomeText.KindName), Describe.ListSeparator, Describe.NoEntries);
+        return $"{VisibleLeftBehindStepName}: on; "
+            + $"{DescribeSurroundings(visible.LookAround, visible.MinOccupiedDirections, visible.DirectionClearedPercent, visible.ClearedDirectionsPercent)}; "
+            + $"Never remove these as visible objects left behind: {protectedKinds}.";
+    }
+
+    private static string DescribeSurroundings(float lookAround, int minOccupiedDirections, int directionClearedPercent, int clearedDirectionsPercent) =>
+        $"Look this far around it: {lookAround} units; "
+        + $"Decide only if at least this many of the 8 directions have objects: {minOccupiedDirections}; "
+        + $"A direction is cleared when this much of it was removed: {directionClearedPercent}%; "
+        + $"Remove when this share of the directions with objects is cleared: {clearedDirectionsPercent}%";
+
     private static string DescribeLeftBehind(RunSettings settings)
     {
-        const string group = "Invisible objects left behind";
-        if (settings.LeftBehind is not { } leftovers) return $"{group}: off.";
+        if (settings.LeftBehind is not { } leftovers) return $"{LeftBehindStepName}: off.";
         var protectedKinds = TextLists.JoinOr(leftovers.NeverRemove.Order().Select(ObjectVisibilityText.KindName), Describe.ListSeparator, Describe.NoEntries);
-        return $"{group}: on; Look this far around it: {leftovers.LookAround} units; "
-            + $"Decide only if this share of the 8 directions has objects: {leftovers.OccupiedDirectionsPercent}%; "
-            + $"A direction is cleared when this much of it was removed: {leftovers.DirectionClearedPercent}%; "
-            + $"Remove when this share of those directions is cleared: {leftovers.ClearedDirectionsPercent}%; "
+        return $"{LeftBehindStepName}: on; "
+            + $"{DescribeSurroundings(leftovers.LookAround, leftovers.MinOccupiedDirections, leftovers.DirectionClearedPercent, leftovers.ClearedDirectionsPercent)}; "
             + $"Never remove these as left behind: {protectedKinds}; "
             + $"Move kept markers out of other mods' objects: {OnOff(settings.MarkerMoves != null)}.";
     }

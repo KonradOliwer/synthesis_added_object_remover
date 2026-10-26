@@ -42,9 +42,11 @@ public class UnexpectedErrorRunTests
         var healthy = Run(new RecordingLogSink());
         var clock = new AlsoRemoveRoundsEndClock(() => throw new InvalidOperationException("also-remove broke"));
         var log = new RecordingLogSink { OnPrint = clock.OnPrint };
+        var settings = SettingsVariants.Of(SettingsVariants.TouchWithLeftBehindAndMarkerMoves);
+        settings.Standard.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings { RemoveLeftoverVisibleObjects = false };
 
         var outcome = ((RunResult.Done)FixtureRun.Run(
-            SettingsVariants.Of(SettingsVariants.TouchWithLeftBehindAndMarkerMoves),
+            settings,
             workers: 1,
             log,
             DefaultMeshFiles,
@@ -53,7 +55,7 @@ public class UnexpectedErrorRunTests
         Assert.NotEmpty(healthy.RestingObjects.Rounds);
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, outcome.RestingObjects.Outcome);
         Assert.Empty(outcome.RestingObjects.Rounds);
-        Assert.Equal([RoundKind.ChangedTerrain, RoundKind.TooClose, RoundKind.LeftBehind], outcome.Final.Rounds.Select(round => round.Kind));
+        Assert.Equal([RoundKind.ChangedTerrain, RoundKind.TooClose, RoundKind.VisibleLeftBehind, RoundKind.LeftBehind], outcome.Final.Rounds.Select(round => round.Kind));
         Assert.NotEmpty(outcome.Removals);
         Assert.Equal(outcome.Removals.Select(removal => removal.TargetIndex), outcome.Written.Removed.Select(id => id.Index));
         Assert.Equal(

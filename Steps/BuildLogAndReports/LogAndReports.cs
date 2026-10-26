@@ -13,6 +13,7 @@ using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
+using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 using AddedObjectRemover.Steps.WriteThePatch.Contracts;
 
@@ -23,7 +24,7 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 /// sections it returns, unchanged and in order. It decides which sections print, words the unexpected errors,
 /// and takes the mesh problems, archive problems and unexpected errors only where the log shows them.
 /// </summary>
-public sealed class LogAndReports
+public sealed partial class LogAndReports
 {
     private readonly RunSettings _settings;
     private readonly ILoadOrderCaches _caches;
@@ -154,6 +155,17 @@ public sealed class LogAndReports
         return BuildRoundSections(tooClose, decisions, [decisions.Rounds[^1]], RoundKind.TooClose, found.Failures);
     }
 
+    /// <param name="decisions">The decisions whose last round is the visible left-behind round.</param>
+    /// <remarks>A switched-off step prints nothing, not even an empty section.</remarks>
+    public ImmutableArray<LogSection> BuildStepSections(VisibleLeftBehindResult found, IRemovalDecisions decisions, CollectedObjects world, TimeSpan elapsed)
+    {
+        if (found.Outcome == StepOutcome.SwitchedOff) return [];
+
+        var lastRound = decisions.Rounds[^1];
+        var section = LogSections.BuildVisibleLeftBehindSection(world, found, RemovalList.KeptIn(decisions, lastRound), elapsed, _context);
+        return BuildRoundSections(section, decisions, [lastRound], RoundKind.VisibleLeftBehind, Present(found.Failure));
+    }
+
     /// <summary>The step's section, the line for the removals linked to its own, then the step's unexpected errors.</summary>
     /// <param name="rounds">The step's rounds in <paramref name="decisions"/>.</param>
     private ImmutableArray<LogSection> BuildRoundSections(
@@ -161,19 +173,6 @@ public sealed class LogAndReports
     {
         var linked = LogSections.BuildLinkedSection(decisions, rounds, kind, _context);
         return [section, linked, TakeUnexpectedErrors(failures)];
-    }
-
-    /// <param name="decisions">The run's decisions with the also-remove rounds applied.</param>
-    /// <param name="elapsed">The whole step's time; the section's own time is that of the rounds alone.</param>
-    public ImmutableArray<LogSection> BuildStepSections(RestingObjectsResult alsoRemove, IRemovalDecisions decisions, CollectedObjects world, TimeSpan elapsed)
-    {
-        var section = LogSections.BuildAlsoRemoveSection(world, alsoRemove, decisions, _caches.Triangles.GetStats(), _context);
-        return BuildRoundSections(
-            WithStepTimeWhenPerformed(section, alsoRemove.Outcome, LogSections.AlsoRemoveName, elapsed),
-            decisions,
-            alsoRemove.Rounds,
-            RoundKind.AlsoRemove,
-            Present(alsoRemove.Failure, alsoRemove.TouchChainsFailure));
     }
 
     /// <param name="final">The decisions whose last round is the left-behind round.</param>
@@ -332,7 +331,7 @@ public sealed class LogAndReports
 
     private RunOutcome BuildOutcome(StepResults decided, WriteSummary written)
     {
-        ImmutableArray<RemovedObject> removals = [.. RemovalList.Removals(written.Removed, decided.Final, decided.Collected, decided.LeftBehind)];
+        ImmutableArray<RemovedObject> removals = [.. RemovalList.Removals(written.Removed, decided.Final, decided.Collected, decided.VisibleLeftBehind, decided.LeftBehind)];
         var hints = ManualPatchHints.FindManualPatchHints(decided, _caches.Shapes, removals);
         return new RunOutcome(decided, removals, hints, written, _caches.CountBounds());
     }
@@ -363,7 +362,7 @@ public sealed class LogAndReports
             LogSections.BuildSpacesSection(world, removals, _settings.TargetAsTyped, _context),
             LogSections.BuildTargetVisibilitySection(world.Targets, world.Counts.TargetsHiddenOrWithoutPlacement, _settings.TargetAsTyped, _context),
             LogSections.BuildRunSummarySection(world, _settings.TargetAsTyped, ownRemoved),
-            LogSections.BuildRemovalSummarySection(world, removals, outcome.Final, _settings.TargetAsTyped, outcome.ChangedTerrain.Outcome),
+            LogSections.BuildRemovalSummarySection(world, removals, outcome.Final, _settings.TargetAsTyped, outcome.ChangedTerrain.Outcome, outcome.VisibleLeftBehind.Outcome),
             .. WhenItHasLines(movedReplacements),
             .. WhenItHasLines(ownShrunkOrTurned),
             .. WhenItHasLines(leftWithoutSupport),

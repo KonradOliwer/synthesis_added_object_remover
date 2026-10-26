@@ -59,7 +59,7 @@ public class ChangedTerrainRunTests
             SectionLines(log, "config"));
         Assert.Equal([$"Found 6 of 9 {FixtureWorld.TargetName} objects on terrain changed by other mods."], SectionLines(log, "changedTerrain"));
         Assert.Equal(
-            ["Removed 6 objects (6 on changed terrain, 0 too close, 0 follow-up removals, 0 invisible objects left behind, 0 linked to removed objects)."],
+            ["Removed 6 objects (6 on changed terrain, 0 too close, 0 follow-up removals, 0 visible objects left behind, 0 invisible objects left behind, 0 linked to removed objects)."],
             SectionLines(log, "removal-summary"));
         Assert.All(log.Sections.Where(section => section.Id == "linked"), section => Assert.Empty(section.Lines));
     }

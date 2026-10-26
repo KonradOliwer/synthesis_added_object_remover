@@ -2,8 +2,8 @@ using System.Collections.Immutable;
 
 namespace AddedObjectRemover;
 
-/// <summary>The base record types that decide how a base object looks.</summary>
-public enum BaseRecordKind { Npc, Light, SoundMarker, AcousticSpace, TextureSet, IdleMarker, Static, Furniture, Activator, Door, Other }
+/// <summary>The base record types that the shape rules and the visible left-behind kinds tell apart.</summary>
+public enum BaseRecordKind { Npc, Light, SoundMarker, AcousticSpace, TextureSet, IdleMarker, Static, Furniture, Activator, Door, Container, TreeOrPlant, LooseItem, Other }
 
 /// <summary>The engine's IsMarker record flag, by the base types that define it with that meaning.</summary>
 public enum MarkerFlagKind { XMarker, FurnitureMarker, DoorMarker, OtherMarker }

@@ -2,6 +2,7 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
@@ -10,15 +11,16 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 internal static class RemovalList
 {
     /// <summary>Every removal, in the order given: the order the patch was written in.</summary>
-    public static List<RemovedObject> Removals(IEnumerable<TargetId> inWriteOrder, IRemovalDecisions decisions, CollectedObjects world, LeftBehindResult leftBehind)
+    public static List<RemovedObject> Removals(
+        IEnumerable<TargetId> inWriteOrder, IRemovalDecisions decisions, CollectedObjects world, VisibleLeftBehindResult visibleLeftBehind, LeftBehindResult leftBehind)
     {
-        var leftBehindByTarget = LeftBehindByTarget(leftBehind.Evaluations);
-        return [.. inWriteOrder.Select(target => ToRemoval(target, decisions.Of(target)!.Reason, world, leftBehindByTarget))];
+        var checks = new LeftBehindChecks(VisibleLeftBehindByTarget(visibleLeftBehind.Evaluations), LeftBehindByTarget(leftBehind.Evaluations));
+        return [.. inWriteOrder.Select(target => ToRemoval(target, decisions.Of(target)!.Reason, world, checks))];
     }
 
     /// <summary>The removals of a round that holds no left-behind removal.</summary>
     public static IEnumerable<RemovedObject> RemovalsIn(IRemovalDecisions decisions, CollectedObjects world, Round round) =>
-        RemovalsIn(decisions, world, LeftBehindByTarget([]), round);
+        RemovalsIn(decisions, world, new LeftBehindChecks(VisibleLeftBehindByTarget([]), LeftBehindByTarget([])), round);
 
     /// <summary>Every kept object: round by round, in target order.</summary>
     public static List<KeptObject> Kept(IRemovalDecisions decisions) => [.. decisions.Rounds.SelectMany(round => KeptIn(decisions, round))];
@@ -29,15 +31,17 @@ internal static class RemovalList
     public static int CountLinkedIn(IRemovalDecisions decisions, Round round) =>
         decisions.RemovedIn(round).Count(target => decisions.Of(target)!.Reason is RemovalReason.LinkedTo);
 
+    private static PerIndexTable<VisibleLeftBehindCheck> VisibleLeftBehindByTarget(IEnumerable<VisibleLeftBehindCheck> evaluations) =>
+        PerIndexTable<VisibleLeftBehindCheck>.From(evaluations, evaluation => evaluation.TargetIndex);
+
     private static PerIndexTable<LeftBehindCheck> LeftBehindByTarget(IEnumerable<LeftBehindCheck> evaluations) =>
         PerIndexTable<LeftBehindCheck>.From(evaluations, evaluation => evaluation.TargetIndex);
 
     private static IEnumerable<RemovedObject> RemovalsIn(
-        IRemovalDecisions decisions, CollectedObjects world, PerIndexTable<LeftBehindCheck> leftBehindByTarget, Round round) =>
-        decisions.RemovedIn(round).Select(target => ToRemoval(target, decisions.Of(target)!.Reason, world, leftBehindByTarget));
+        IRemovalDecisions decisions, CollectedObjects world, LeftBehindChecks checks, Round round) =>
+        decisions.RemovedIn(round).Select(target => ToRemoval(target, decisions.Of(target)!.Reason, world, checks));
 
-    private static RemovedObject ToRemoval(
-        TargetId target, RemovalReason reason, CollectedObjects world, PerIndexTable<LeftBehindCheck> leftBehindByTarget) => reason switch
+    private static RemovedObject ToRemoval(TargetId target, RemovalReason reason, CollectedObjects world, LeftBehindChecks checks) => reason switch
     {
         RemovalReason.TerrainChanged changed => new TerrainChangedRemoval(target.Index, changed.ChangedBy, changed.Kind),
         RemovalReason.TooClose tooClose => new TooCloseRemoval(target.Index, world.OtherModObjects[tooClose.Other.Index], tooClose.Cause),
@@ -45,10 +49,14 @@ internal static class RemovalList
         RemovalReason.LostSupport lost => new SupportRemoval(target.Index, lost.RemovedShare, lost.MainSupporter.Index),
         RemovalReason.TouchingAnotherModsObject touching => new TouchingAnotherModsObjectRemoval(target.Index, world.Other(touching.Touched)),
         RemovalReason.LostSupportWithAnotherModsObject lost => new SupportWithAnotherModsObjectRemoval(target.Index, lost.RemovedShare, world.Other(lost.MainSupporter)),
-        RemovalReason.InsideAnotherModsObject or RemovalReason.SurroundingsRemoved => new LeftBehindRemoval(target.Index, leftBehindByTarget.Get(target.Index)),
+        RemovalReason.VisibleObjectSurroundingsRemoved => new VisibleLeftBehindRemoval(target.Index, checks.Visible.Get(target.Index)),
+        RemovalReason.InsideAnotherModsObject or RemovalReason.SurroundingsRemoved => new LeftBehindRemoval(target.Index, checks.Invisible.Get(target.Index)),
         RemovalReason.LinkedTo linked => new LinkedRemoval(target.Index, linked.To.Index),
         _ => throw new InvalidOperationException($"Unknown removal reason {reason}."),
     };
+
+    /// <summary>The left-behind steps' checks of the removed objects, by target.</summary>
+    private sealed record LeftBehindChecks(PerIndexTable<VisibleLeftBehindCheck> Visible, PerIndexTable<LeftBehindCheck> Invisible);
 
     private static KeptObject ToKept(TargetId target, Decision.Kept kept) =>
         new(target.Index, kept.KeepReason, TouchedRemovedTarget(kept.Reason));

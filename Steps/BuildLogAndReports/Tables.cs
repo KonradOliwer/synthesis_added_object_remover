@@ -20,9 +20,15 @@ internal static partial class Tables
         var tables = ImmutableArray.CreateBuilder<CsvTable>();
         var restingObjects = outcome.RestingObjects;
         if (ExplanationEvidence.HasTouch(restingObjects)) tables.AddRange(BuildTouchTables(outcome, ExplanationEvidence.Touch(restingObjects), alsoRemove.TouchGap, context));
-        if (restingObjects.Outcome == StepOutcome.Performed && restingObjects.Mode == FollowUpRemovalMode.OnlyWhatLosesItsSupport && restingObjects.HadSeeds)
-            tables.Add(BuildSupportTable(outcome.Collected, SupportEvaluationRows.Join(restingObjects, outcome.Final), alsoRemove.SupportLostFraction, context));
+        var afterVisibleLeftBehind = outcome.RestingObjectsAfterVisibleLeftBehind;
+        if (HasAnchoring(restingObjects) || HasAnchoring(afterVisibleLeftBehind))
+        {
+            var evaluations = SupportEvaluationRows.Join(restingObjects, outcome.Final)
+                .AddRange(SupportEvaluationRows.Join(afterVisibleLeftBehind, outcome.Final, iterationsBefore: restingObjects.Rounds.Length));
+            tables.Add(BuildSupportTable(outcome.Collected, evaluations, alsoRemove.SupportLostFraction, context));
+        }
         if (ExplanationEvidence.HasMeshOrigins(restingObjects)) tables.Add(BuildMeshOriginsTable(ExplanationEvidence.MeshOrigins(restingObjects)));
+        if (outcome.VisibleLeftBehind.Outcome != StepOutcome.SwitchedOff) tables.Add(BuildVisibleLeftBehindTable(outcome.Collected, outcome.VisibleLeftBehind.Evaluations, context));
         if (outcome.LeftBehind.Outcome != StepOutcome.SwitchedOff) tables.Add(BuildLeftBehindTable(outcome.Collected, outcome.LeftBehind.Evaluations, outcome.MarkerMoves, context));
         tables.Add(BuildRemovalsTable(outcome.Collected, outcome.Removals, context));
         if (BuildFitsTable(outcome.Collected, outcome.Final, context) is { } fits) tables.Add(fits);
@@ -30,6 +36,9 @@ internal static partial class Tables
         tables.Add(BuildHintsTable(outcome.Collected, outcome.Hints));
         return tables.ToImmutable();
     }
+
+    private static bool HasAnchoring(RestingObjectsResult alsoRemove) =>
+        alsoRemove.Outcome == StepOutcome.Performed && alsoRemove.Mode == FollowUpRemovalMode.OnlyWhatLosesItsSupport && alsoRemove.HadSeeds;
 
     /// <summary>The columns that name a target object's record: its form key, its Editor ID and its base.</summary>
     private static IEnumerable<string> RecordColumns(TargetObject target, ReportContext context) =>

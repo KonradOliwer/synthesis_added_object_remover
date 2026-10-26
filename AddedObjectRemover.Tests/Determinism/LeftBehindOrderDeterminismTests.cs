@@ -33,7 +33,7 @@ public class LeftBehindOrderDeterminismTests
         LookAround: 100,
         DirectionClearedPercent: 50,
         ClearedDirectionsPercent: 60,
-        OccupiedDirectionsPercent: 50,
+        MinOccupiedDirections: 4,
         NeverRemove: new HashSet<InvisibleObjectKind>());
 
     [Fact]

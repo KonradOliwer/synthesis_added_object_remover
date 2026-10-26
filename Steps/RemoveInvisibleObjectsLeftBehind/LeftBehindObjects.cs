@@ -46,30 +46,30 @@ public static class LeftBehindObjects
                         new ReachRule(bases),
                         settings,
                         order)
-                    .SelectRemovals(RemovedIndexes(decisions), DecidedIndexes(targets, decisions), execution),
+                    .SelectRemovals(decisions, execution),
                 decisions),
             failure => new LeftBehindResult(StepOutcome.StoppedByUnexpectedError, [], [], PartFailure.OfWholePart(LeftBehindParts.LeftBehind, failure)));
     }
 
-    /// <returns>The result with the round decided on a copy of the decisions: an object the round kept is kept as referenced.</returns>
+    /// <returns>
+    /// The result with the round decided on a copy of the decisions: an object the round kept is kept as referenced, and one it removed
+    /// as a linked group member is removed as linked.
+    /// </returns>
     private static LeftBehindResult JoinVerdicts(LeftBehindResult evaluated, IRemovalDecisions decisions)
     {
-        var decided = decisions.WorkingCopy().DecideRound(RoundKind.LeftBehind, [.. evaluated.Proposals]);
+        var decided = decisions.DecideRoundOnCopy(RoundKind.LeftBehind, [.. evaluated.Proposals]);
         return evaluated with
         {
             Evaluations =
             [
                 .. evaluated.Evaluations.Select(evaluation =>
-                    decided.Of(new TargetId(evaluation.TargetIndex)) is Decision.Kept { Round.Kind: RoundKind.LeftBehind } kept
-                        ? evaluation with { Decision = LeftBehindOutcome.KeptReferenced, KeepReason = kept.KeepReason }
-                        : evaluation),
+                    decided.GetValueOrDefault(new TargetId(evaluation.TargetIndex)) switch
+                    {
+                        Decision.Kept kept => evaluation with { Decision = LeftBehindOutcome.KeptReferenced, KeepReason = kept.KeepReason },
+                        Decision.Removed { Reason: RemovalReason.LinkedTo } => evaluation with { Decision = LeftBehindOutcome.RemovedLinkedToRemoval },
+                        _ => evaluation,
+                    }),
             ],
         };
     }
-
-    private static HashSet<int> RemovedIndexes(IRemovalDecisions decisions) =>
-        decisions.RemovedTargets().Select(target => target.Index).ToHashSet();
-
-    private static HashSet<int> DecidedIndexes(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions) =>
-        targets.Where(target => decisions.IsDecided(target.Id)).Select(target => target.Id.Index).ToHashSet();
 }

@@ -40,7 +40,7 @@ public class RestingObjectsGatingTests
     {
         var decisions = AfterTooClose(seeded ? [1] : []);
 
-        Assert.Equal(expected, RestingObjects.NeedsObjectsOfAnyPlugin(decisions, Options((FollowUpRemovalMode)mode)));
+        Assert.Equal(expected, RestingObjects.NeedsObjectsOfAnyPlugin(decisions, decisions.Rounds, Options((FollowUpRemovalMode)mode)));
     }
 
     [Theory]

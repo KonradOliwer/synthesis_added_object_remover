@@ -168,6 +168,13 @@ public sealed class RemovalDecisions : IRemovalDecisions
     public RemovalDecisions ApplyRounds(RoundKind kind, IReadOnlyList<IReadOnlyList<ProposedRemoval>> rounds) =>
         rounds.Aggregate(this, (decisions, proposals) => decisions.Apply(kind, proposals));
 
+    public IReadOnlyDictionary<TargetId, Decision> DecideRoundOnCopy(RoundKind kind, IReadOnlyList<ProposedRemoval> proposals)
+    {
+        var decided = WorkingCopy().DecideRound(kind, proposals);
+        var round = decided.Rounds[^1];
+        return decided.RemovedIn(round).Concat(decided.KeptIn(round)).ToDictionary(target => target, target => decided.Of(target)!);
+    }
+
     public IRemovalDecisionsCopy WorkingCopy() => new Copy(new RemovalDecisions(CopyStore(), _roundCount, _moveCount));
 
     /// <returns>The view that includes the new moves.</returns>

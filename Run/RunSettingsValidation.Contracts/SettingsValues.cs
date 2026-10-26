@@ -1,6 +1,7 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover;
@@ -32,6 +33,7 @@ public interface ISettingsValues
     ITerrainChangeSettingsValues TerrainChange { get; }
     IShrinkOrTurnSettingsValues ShrinkOrTurn { get; }
     IFollowUpSettingsValues FollowUpRemoval { get; }
+    IVisibleLeftoverSettingsValues LeftoverVisibleObjects { get; }
     ILeftoverSettingsValues LeftoverInvisibleObjects { get; }
 }
 
@@ -88,13 +90,26 @@ public interface IFollowUpSettingsValues
     OtherModsObjectsHandling OtherModsObjectsLeftWithoutSupport { get; }
 }
 
+/// <summary>How the cleaned mod's visible objects around an object decide whether it is left behind; both left-behind steps read it.</summary>
+public interface ISurroundingObjectsSettingsValues
+{
+    float SearchRadius { get; }
+    int MinOccupiedDirections { get; }
+    int DirectionThresholdPercent { get; }
+    int ClearedDirectionsPercent { get; }
+}
+
+public interface IVisibleLeftoverSettingsValues
+{
+    bool RemoveLeftoverVisibleObjects { get; }
+    ISurroundingObjectsSettingsValues SurroundingObjects { get; }
+    IReadOnlyList<VisibleObjectKind> NeverRemove { get; }
+}
+
 public interface ILeftoverSettingsValues
 {
     bool RemoveLeftoverInvisibleObjects { get; }
-    float SearchRadius { get; }
-    int DirectionThresholdPercent { get; }
-    int RemovedDirectionsPercent { get; }
-    int OccupiedDirectionsPercent { get; }
+    ISurroundingObjectsSettingsValues SurroundingObjects { get; }
     IReadOnlyList<InvisibleObjectKind> NeverRemove { get; }
     bool MoveKeptMarkersOutOfOtherModsObjects { get; }
 }

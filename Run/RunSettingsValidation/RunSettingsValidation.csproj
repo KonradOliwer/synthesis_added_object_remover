@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>Builds the run settings from the user's settings, correcting each invalid value with one warning. It holds the setting limits and messages, references AddedObjectRemover.Ids, RunSettingsValidation.Contracts, PluginRecordFacts, NumericRanges, FileSystemAccess and the contracts of the steps, and holds no packages.</Description>
+    <Description>Builds the run settings from the user's settings, correcting each invalid value with one warning. It holds the setting limits and messages, references AddedObjectRemover.Ids, RunSettingsValidation.Contracts, PluginRecordFacts, NumericRanges, BoxAndTransformMath, FileSystemAccess and the contracts of the steps, and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
@@ -12,6 +12,7 @@
     <ProjectReference Include="..\..\Tools\PluginRecordFacts\PluginRecordFacts.csproj" />
     <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
     <ProjectReference Include="..\..\Tools\NumericRanges\NumericRanges.csproj" />
+    <ProjectReference Include="..\..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
     <ProjectReference Include="..\..\Tools\FileSystemAccess\FileSystemAccess.csproj" />
     <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\IdentifyTheMods.Contracts\IdentifyTheMods.Contracts.csproj" />
@@ -21,6 +22,7 @@
     <ProjectReference Include="..\..\Steps\RemoveTooCloseObjects.Contracts\RemoveTooCloseObjects.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\FitClashingObjects.Contracts\FitClashingObjects.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\RemoveObjectsRestingOnRemovedOnes.Contracts\RemoveObjectsRestingOnRemovedOnes.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\RemoveVisibleObjectsLeftBehind.Contracts\RemoveVisibleObjectsLeftBehind.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\RemoveInvisibleObjectsLeftBehind.Contracts\RemoveInvisibleObjectsLeftBehind.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\MoveKeptMarkers.Contracts\MoveKeptMarkers.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\BuildLogAndReports.Contracts\BuildLogAndReports.Contracts.csproj" />

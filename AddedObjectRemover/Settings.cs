@@ -2,6 +2,7 @@ using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Synthesis.Settings;
@@ -121,9 +122,16 @@ public class StandardSettings : ISettingsValues
     [SynthesisOrder]
     [SynthesisSettingName("Also remove what rests on removed objects")]
     [SynthesisTooltip(
-        "When an object is removed, the cleaned mod's objects resting on it or touching it would be left floating. This removes them too.\n"
+        "When an object is removed by any removal step (too close, changed terrain, visible objects left behind), the cleaned mod's objects resting on it or touching it would be left floating. This removes them too.\n"
         + "Only the cleaned mod's own visible objects are removed this way; the last setting of this group decides about other mods' objects.")]
     public FollowUpRemovalSettings FollowUpRemoval { get; set; } = new();
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Visible objects left behind")]
+    [SynthesisTooltip(
+        "The cleaned mod's visible objects are removed when most of the cleaned mod's visible objects around them were removed by the other removal steps\n"
+        + "(too close, changed terrain, also remove). Only the cleaned mod's objects count as surroundings.")]
+    public LeftoverVisibleObjectSettings LeftoverVisibleObjects { get; set; } = new();
 
     [SynthesisOrder]
     [SynthesisSettingName("Invisible objects left behind")]
@@ -139,6 +147,7 @@ public class StandardSettings : ISettingsValues
     ITerrainChangeSettingsValues ISettingsValues.TerrainChange => TerrainChange ?? new TerrainChangeSettings();
     IShrinkOrTurnSettingsValues ISettingsValues.ShrinkOrTurn => ShrinkOrTurn ?? new ShrinkOrTurnSettings();
     IFollowUpSettingsValues ISettingsValues.FollowUpRemoval => FollowUpRemoval ?? new FollowUpRemovalSettings();
+    IVisibleLeftoverSettingsValues ISettingsValues.LeftoverVisibleObjects => LeftoverVisibleObjects ?? new LeftoverVisibleObjectSettings();
     ILeftoverSettingsValues ISettingsValues.LeftoverInvisibleObjects => LeftoverInvisibleObjects ?? new LeftoverInvisibleObjectSettings();
 }
 
@@ -407,7 +416,7 @@ public class FollowUpRemovalSettings : IFollowUpSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName("When an object is removed, also remove")]
     [SynthesisTooltip(
-        "Nothing: of the cleaned mod's objects, only those found too close or on changed terrain.\n"
+        "Nothing: of the cleaned mod's objects, only those the removal steps remove (too close, changed terrain, visible objects left behind).\n"
         + "EverythingTouchingIt: everything connected to it through touching objects, spreading one object at a time; this can reach a whole room.\n"
         + "OnlyWhatLosesItsSupport: a touching object only when enough of what it rests on was removed.")]
     public FollowUpRemovalMode Mode { get; set; } = SettingDefaults.FollowUpMode;
@@ -444,6 +453,123 @@ public class FollowUpRemovalSettings : IFollowUpSettingsValues
     public OtherModsObjectsHandling OtherModsObjectsLeftWithoutSupport { get; set; } = SettingDefaults.OtherModsObjects;
 }
 
+public class LeftoverVisibleObjectSettings : IVisibleLeftoverSettingsValues
+{
+    [SynthesisOrder]
+    [SynthesisSettingName("Remove visible objects whose surroundings were removed")]
+    [SynthesisTooltip("Turns this removal on. Objects it removes are followed up as \"Also remove what rests on removed objects\" says.")]
+    public bool RemoveLeftoverVisibleObjects { get; set; } = SettingDefaults.RemoveLeftoverVisibleObjects;
+
+    [SynthesisOrder]
+    [SynthesisSettingName("When the cleaned mod's visible objects around it were removed")]
+    [SynthesisTooltip(
+        "For each visible object, the cleaned mod's other visible objects around it (never other mods' objects) are sorted into 8 directions\n"
+        + "(north, north-east, ...) and measured by the ground area they cover. Objects removed by the earlier steps count as removed.\n"
+        + "The object is removed when enough of those directions were mostly cleared. The settings are applied in the order listed; the percentages go in steps of 10.")]
+    public VisibleSurroundingObjectsSettings SurroundingObjects { get; set; } = new();
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Never remove these as visible objects left behind (ticked = kept)")]
+    [SynthesisTooltip(
+        "Ticked kinds are kept by this step (unless linked to a removed object); unticked kinds can be removed by it. "
+        + "Only this step is affected, not the too-close or changed-terrain removals.\n"
+        + "What \"Mod to clean up\" lists as always kept stays kept, ticked or not.")]
+    public KeptVisibleObjectSettings AlwaysKeep { get; set; } = new();
+
+    ISurroundingObjectsSettingsValues IVisibleLeftoverSettingsValues.SurroundingObjects => SurroundingObjects ?? new();
+    IReadOnlyList<VisibleObjectKind> IVisibleLeftoverSettingsValues.NeverRemove => (AlwaysKeep ?? new()).Kinds();
+}
+
+public class VisibleSurroundingObjectsSettings : ISurroundingObjectsSettingsValues
+{
+    [SynthesisOrder]
+    [SynthesisSettingName("Look this far around it (game units)")]
+    [SynthesisTooltip("Other visible objects of the cleaned mod within this distance are its surroundings. 64-8192.")]
+    public float SearchRadius { get; set; } = SettingDefaults.SearchRadius;
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Decide only if at least this many of the 8 directions have objects")]
+    [SynthesisTooltip("A direction has objects when another visible object of the cleaned mod lies that way. With fewer such directions the object is kept. 1-8.")]
+    public int MinOccupiedDirections { get; set; } = SettingDefaults.VisibleMinOccupiedDirections;
+
+    [SynthesisOrder]
+    [SynthesisSettingName("A direction is cleared when this much of it was removed (%)")]
+    [SynthesisTooltip("Measured by the ground area the cleaned mod's visible objects cover in that direction. 10-100, in steps of 10.")]
+    public int DirectionThresholdPercent { get; set; } = SettingDefaults.VisibleDirectionThresholdPercent;
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Remove when this share of the directions with objects is cleared (%)")]
+    [SynthesisTooltip(
+        "Counted only among the directions that have objects, not among all 8. Example: objects lie in 5 directions and 4 of them are cleared: "
+        + "4 of 5 is 80%, so it is removed with 80 or less and kept with 90 or more. 10-100, in steps of 10.")]
+    public int ClearedDirectionsPercent { get; set; } = SettingDefaults.VisibleClearedDirectionsPercent;
+}
+
+public class KeptVisibleObjectSettings
+{
+    [SynthesisOrder]
+    [SynthesisSettingName("NPCs and creatures")]
+    [SynthesisTooltip("Placed NPCs and creatures.")]
+    public bool NpcsAndCreatures { get; set; }
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Doors")]
+    [SynthesisTooltip("Doors, including doors that do not teleport. Teleport doors and their destinations are always kept.")]
+    public bool Doors { get; set; }
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Containers")]
+    [SynthesisTooltip("Chests, barrels, sacks and other objects that hold items.")]
+    public bool Containers { get; set; }
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Furniture")]
+    [SynthesisTooltip("Beds, chairs, workbenches and other furniture a character can use.")]
+    public bool Furniture { get; set; }
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Activators")]
+    [SynthesisTooltip("Levers, buttons, pull chains, and other objects the player can activate.")]
+    public bool Activators { get; set; }
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Lights with a model")]
+    [SynthesisTooltip("Torches, candles, lanterns and other light sources with a visible model.")]
+    public bool LightsWithModel { get; set; }
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Trees and plants")]
+    [SynthesisTooltip("Trees, and plants that can be gathered from.")]
+    public bool TreesAndPlants { get; set; }
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Loose items")]
+    [SynthesisTooltip("Items lying about that can be picked up: miscellaneous items, weapons, armour, books, ingredients and similar.")]
+    public bool LooseItems { get; set; }
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Other visible objects")]
+    [SynthesisTooltip("Every other visible object that is none of the kinds above, such as static architecture and clutter.")]
+    public bool OtherVisibleObjects { get; set; }
+
+    /// <summary>The ticked kinds, in the order of <see cref="VisibleObjectKind"/>.</summary>
+    public IReadOnlyList<VisibleObjectKind> Kinds() =>
+        KindFlags().Where(flag => flag.Ticked).Select(flag => flag.Kind).ToArray();
+
+    private IEnumerable<(VisibleObjectKind Kind, bool Ticked)> KindFlags() =>
+    [
+        (VisibleObjectKind.NpcsAndCreatures, NpcsAndCreatures),
+        (VisibleObjectKind.Doors, Doors),
+        (VisibleObjectKind.Containers, Containers),
+        (VisibleObjectKind.Furniture, Furniture),
+        (VisibleObjectKind.Activators, Activators),
+        (VisibleObjectKind.LightsWithModel, LightsWithModel),
+        (VisibleObjectKind.TreesAndPlants, TreesAndPlants),
+        (VisibleObjectKind.LooseItems, LooseItems),
+        (VisibleObjectKind.OtherVisibleObjects, OtherVisibleObjects),
+    ];
+}
+
 public class LeftoverInvisibleObjectSettings : ILeftoverSettingsValues
 {
     [SynthesisOrder]
@@ -456,7 +582,7 @@ public class LeftoverInvisibleObjectSettings : ILeftoverSettingsValues
     [SynthesisTooltip(
         "For each invisible object, the cleaned mod's visible objects around it (never other mods' objects) are sorted into 8 directions\n"
         + "(north, north-east, ...) and measured by the ground area they cover. Objects removed by the earlier steps count as removed.\n"
-        + "The invisible object is removed when enough of those directions were mostly cleared. The percentages are applied in the order listed, in steps of 10.")]
+        + "The invisible object is removed when enough of those directions were mostly cleared. The settings are applied in the order listed; the percentages go in steps of 10.")]
     public SurroundingObjectsSettings SurroundingObjects { get; set; } = new();
 
     [SynthesisOrder]
@@ -474,14 +600,11 @@ public class LeftoverInvisibleObjectSettings : ILeftoverSettingsValues
         + "Only its position changes. Lights, sounds, furniture and door markers are never moved. Needs the switch at the top of this group.")]
     public bool MoveKeptMarkersOutOfOtherModsObjects { get; set; } = true;
 
-    float ILeftoverSettingsValues.SearchRadius => (SurroundingObjects ?? new()).SearchRadius;
-    int ILeftoverSettingsValues.OccupiedDirectionsPercent => (SurroundingObjects ?? new()).OccupiedDirectionsPercent;
-    int ILeftoverSettingsValues.DirectionThresholdPercent => (SurroundingObjects ?? new()).DirectionThresholdPercent;
-    int ILeftoverSettingsValues.RemovedDirectionsPercent => (SurroundingObjects ?? new()).RemovedDirectionsPercent;
+    ISurroundingObjectsSettingsValues ILeftoverSettingsValues.SurroundingObjects => SurroundingObjects ?? new();
     IReadOnlyList<InvisibleObjectKind> ILeftoverSettingsValues.NeverRemove => (AlwaysKeep ?? new()).Kinds();
 }
 
-public class SurroundingObjectsSettings
+public class SurroundingObjectsSettings : ISurroundingObjectsSettingsValues
 {
     [SynthesisOrder]
     [SynthesisSettingName("Look this far around it (game units)")]
@@ -489,9 +612,9 @@ public class SurroundingObjectsSettings
     public float SearchRadius { get; set; } = SettingDefaults.SearchRadius;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Decide only if this share of the 8 directions has objects (%)")]
-    [SynthesisTooltip("A direction has objects when a visible object of the cleaned mod lies that way. With fewer such directions the invisible object is kept. 10-100, in steps of 10.")]
-    public int OccupiedDirectionsPercent { get; set; } = SettingDefaults.OccupiedDirectionsPercent;
+    [SynthesisSettingName("Decide only if at least this many of the 8 directions have objects")]
+    [SynthesisTooltip("A direction has objects when a visible object of the cleaned mod lies that way. With fewer such directions the invisible object is kept. 1-8.")]
+    public int MinOccupiedDirections { get; set; } = SettingDefaults.MinOccupiedDirections;
 
     [SynthesisOrder]
     [SynthesisSettingName("A direction is cleared when this much of it was removed (%)")]
@@ -499,9 +622,11 @@ public class SurroundingObjectsSettings
     public int DirectionThresholdPercent { get; set; } = SettingDefaults.DirectionThresholdPercent;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Remove when this share of those directions is cleared (%)")]
-    [SynthesisTooltip("Counted among the directions that have objects. 10-100, in steps of 10.")]
-    public int RemovedDirectionsPercent { get; set; } = SettingDefaults.RemovedDirectionsPercent;
+    [SynthesisSettingName("Remove when this share of the directions with objects is cleared (%)")]
+    [SynthesisTooltip(
+        "Counted only among the directions that have objects, not among all 8. Example: objects lie in 5 directions and 3 of them are cleared: "
+        + "3 of 5 is 60%, so it is removed with 60 or less and kept with 70 or more. 10-100, in steps of 10.")]
+    public int ClearedDirectionsPercent { get; set; } = SettingDefaults.ClearedDirectionsPercent;
 }
 
 public class KeptInvisibleObjectSettings

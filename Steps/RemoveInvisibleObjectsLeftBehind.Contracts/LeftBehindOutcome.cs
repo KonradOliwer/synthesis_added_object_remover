@@ -4,6 +4,7 @@ public enum LeftBehindOutcome
 {
     RemovedInsideOtherObject,
     RemovedSurroundingsRemoved,
+    RemovedLinkedToRemoval,
     KeptTooFewSurroundingObjects,
     KeptSurroundingsMostlyKept,
     KeptProtectedType,
@@ -13,5 +14,5 @@ public enum LeftBehindOutcome
 public static class LeftBehindOutcomes
 {
     public static bool IsRemoval(LeftBehindOutcome outcome) =>
-        outcome is LeftBehindOutcome.RemovedInsideOtherObject or LeftBehindOutcome.RemovedSurroundingsRemoved;
+        outcome is LeftBehindOutcome.RemovedInsideOtherObject or LeftBehindOutcome.RemovedSurroundingsRemoved or LeftBehindOutcome.RemovedLinkedToRemoval;
 }

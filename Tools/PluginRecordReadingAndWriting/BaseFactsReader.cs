@@ -67,6 +67,10 @@ public sealed class BaseFactsReader(ILinkCache linkCache, KnownPluginNames known
         IFurnitureGetter => BaseRecordKind.Furniture,
         IActivatorGetter => BaseRecordKind.Activator,
         IDoorGetter => BaseRecordKind.Door,
+        IContainerGetter => BaseRecordKind.Container,
+        ITreeGetter or IFloraGetter => BaseRecordKind.TreeOrPlant,
+        IMiscItemGetter or IWeaponGetter or IArmorGetter or IBookGetter or IIngredientGetter or IIngestibleGetter
+            or IAmmunitionGetter or IScrollGetter or ISoulGemGetter or IKeyGetter => BaseRecordKind.LooseItem,
         _ => BaseRecordKind.Other,
     };
 

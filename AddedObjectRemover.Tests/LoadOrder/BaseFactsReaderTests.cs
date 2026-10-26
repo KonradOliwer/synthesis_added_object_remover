@@ -99,7 +99,7 @@ public class BaseFactsReaderTests
         var facts = Read<IContainerGetter>(container);
 
         Assert.Null(facts.MarkerFlag);
-        Assert.Equal(BaseRecordKind.Other, facts.Kind);
+        Assert.Equal(BaseRecordKind.Container, facts.Kind);
     }
 
     [Fact]
@@ -114,7 +114,12 @@ public class BaseFactsReaderTests
         Assert.Equal(BaseRecordKind.Furniture, Read<IFurnitureGetter>(_mod.Furniture.AddNew()).Kind);
         Assert.Equal(BaseRecordKind.Activator, Read<IActivatorGetter>(_mod.Activators.AddNew()).Kind);
         Assert.Equal(BaseRecordKind.Door, Read<IDoorGetter>(_mod.Doors.AddNew()).Kind);
-        Assert.Equal(BaseRecordKind.Other, Read<IContainerGetter>(_mod.Containers.AddNew()).Kind);
+        Assert.Equal(BaseRecordKind.Container, Read<IContainerGetter>(_mod.Containers.AddNew()).Kind);
+        Assert.Equal(BaseRecordKind.TreeOrPlant, Read<ITreeGetter>(_mod.Trees.AddNew()).Kind);
+        Assert.Equal(BaseRecordKind.TreeOrPlant, Read<IFloraGetter>(_mod.Florae.AddNew()).Kind);
+        Assert.Equal(BaseRecordKind.LooseItem, Read<IMiscItemGetter>(_mod.MiscItems.AddNew()).Kind);
+        Assert.Equal(BaseRecordKind.LooseItem, Read<IWeaponGetter>(_mod.Weapons.AddNew()).Kind);
+        Assert.Equal(BaseRecordKind.Other, Read<IGrassGetter>(_mod.Grasses.AddNew()).Kind);
     }
 
     [Fact]

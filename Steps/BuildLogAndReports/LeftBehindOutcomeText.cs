@@ -10,6 +10,7 @@ internal static class LeftBehindOutcomeText
     {
         LeftBehindOutcome.RemovedInsideOtherObject => "inside another mod's object",
         LeftBehindOutcome.RemovedSurroundingsRemoved => "surroundings removed",
+        LeftBehindOutcome.RemovedLinkedToRemoval => "linked to a removed object",
         LeftBehindOutcome.KeptTooFewSurroundingObjects => "too few surrounding objects",
         LeftBehindOutcome.KeptSurroundingsMostlyKept => "surroundings mostly kept",
         LeftBehindOutcome.KeptProtectedType => "protected type",

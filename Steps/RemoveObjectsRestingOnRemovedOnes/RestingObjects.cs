@@ -11,7 +11,7 @@ using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
 /// <summary>
-/// The also-remove step: seeded with the removals of every earlier removal round, its rounds remove what
+/// The also-remove step: seeded with the removals of the rounds the run names as its seed rounds, its rounds remove what
 /// goes with them, as the also-remove mode says, until a round removes nothing. It decides the rounds on its own copy
 /// of the decisions and proposes them as one proposal, which the runner applies to the run's decisions. It also judges the
 /// other mods' objects resting on target objects, and the target objects resting on those (<see cref="OtherModsObjects"/>).
@@ -143,21 +143,23 @@ public static class RestingObjects
         ITerrainHeights terrain,
         Func<IVisibleObjectsOfAnyPlugin> askObjectsOfAnyPlugin)
     {
-        var (earlierRounds, settings) = (input.EarlierRounds, input.Settings);
-        var objectsOfAnyPlugin = NeedsObjectsOfAnyPlugin(earlierRounds, settings) ? askObjectsOfAnyPlugin() : null;
+        var (earlierRounds, seedRounds, settings) = (input.EarlierRounds, input.SeedRounds, input.Settings);
+        var objectsOfAnyPlugin = NeedsObjectsOfAnyPlugin(earlierRounds, seedRounds, settings) ? askObjectsOfAnyPlugin() : null;
         var start = input.TimeSinceStart();
         var plan = Prepare(
             earlierRounds,
+            seedRounds,
             new RoundsInput(input.Targets, input.ObjectsToKeep, objectsOfAnyPlugin, shapes, triangles, surfaces, terrain, input.Execution),
             settings);
-        var run = DecideOnWorkingCopy(plan, earlierRounds);
+        var run = DecideOnWorkingCopy(plan, earlierRounds, seedRounds);
         return run with { Result = run.Result with { RoundsTime = input.TimeSinceStart() - start } };
     }
 
-    /// <param name="earlierRounds">The decisions with the earlier removal rounds, which seed this step.</param>
-    internal static RestingObjectsPlan Prepare(IRemovalDecisions earlierRounds, RoundsInput input, AlsoRemoveSettings settings)
+    /// <param name="earlierRounds">The decisions with the earlier removal rounds.</param>
+    /// <param name="seedRounds">The rounds of <paramref name="earlierRounds"/> whose removals seed this step.</param>
+    internal static RestingObjectsPlan Prepare(IRemovalDecisions earlierRounds, ImmutableArray<Round> seedRounds, RoundsInput input, AlsoRemoveSettings settings)
     {
-        var seeds = SeedsOf(earlierRounds).Select(target => target.Index).ToList();
+        var seeds = SeedsOf(earlierRounds, seedRounds).Select(target => target.Index).ToList();
         var hadSeeds = seeds.Count > 0;
         if (!hadSeeds) return new RestingObjectsPlan(settings.Mode, hadSeeds, Rounds: null, Search: null);
 
@@ -175,20 +177,25 @@ public static class RestingObjects
         };
 
     /// <summary>The plan's rounds, decided on a working copy of <paramref name="earlierRounds"/>, which never changes.</summary>
-    internal static RestingObjectsRun DecideOnWorkingCopy(RestingObjectsPlan plan, IRemovalDecisions earlierRounds)
+    internal static RestingObjectsRun DecideOnWorkingCopy(RestingObjectsPlan plan, IRemovalDecisions earlierRounds, ImmutableArray<Round> seedRounds)
     {
-        if (plan.Rounds is not { } rounds) return SummarizeRounds(plan, earlierRounds, earlierRounds, []);
+        if (plan.Rounds is not { } rounds) return SummarizeRounds(plan, earlierRounds, seedRounds, earlierRounds, []);
 
-        var (decisions, decided) = earlierRounds.WorkingCopy().DecideRoundsUntilNothingRemoved(rounds, SeedsOf(earlierRounds));
-        return SummarizeRounds(plan, earlierRounds, decisions, decided);
+        var (decisions, decided) = earlierRounds.WorkingCopy().DecideRoundsUntilNothingRemoved(rounds, SeedsOf(earlierRounds, seedRounds));
+        return SummarizeRounds(plan, earlierRounds, seedRounds, decisions, decided);
     }
 
     /// <summary>The result of the rounds decided for <paramref name="plan"/>.</summary>
     /// <param name="earlierRounds">The decisions the rounds started from.</param>
+    /// <param name="seedRounds">The rounds of <paramref name="earlierRounds"/> whose removals seeded the rounds.</param>
     /// <param name="decisions">The decisions with the rounds; <paramref name="earlierRounds"/> when none ran.</param>
     /// <param name="rounds">One per round, in round order.</param>
     internal static RestingObjectsRun SummarizeRounds(
-        RestingObjectsPlan plan, IRemovalDecisions earlierRounds, IRemovalDecisions decisions, ImmutableArray<RoundProposals<RoundDetails>> rounds)
+        RestingObjectsPlan plan,
+        IRemovalDecisions earlierRounds,
+        ImmutableArray<Round> seedRounds,
+        IRemovalDecisions decisions,
+        ImmutableArray<RoundProposals<RoundDetails>> rounds)
     {
         if (plan.Rounds == null) return new RestingObjectsRun(WithoutRounds(StepOutcome.Performed, plan.Mode, plan.HadSeeds, failure: null), earlierRounds, Search: null);
 
@@ -203,7 +210,7 @@ public static class RestingObjects
             StepOutcome.Performed,
             plan.Mode,
             HadSeeds: true,
-            earlierRounds.Rounds,
+            seedRounds,
             decisions.RoundsAfter(earlierRounds),
             [.. rounds.Select(round => round.Proposals)],
             evidence,
@@ -217,9 +224,10 @@ public static class RestingObjects
     }
 
     /// <summary>Whether <see cref="Prepare"/> needs <see cref="RoundsInput.ObjectsOfAnyPlugin"/>: only the support rounds use them, and only when they have seeds.</summary>
-    /// <param name="earlierRounds">The decisions with the earlier removal rounds, which seed this step.</param>
-    internal static bool NeedsObjectsOfAnyPlugin(IRemovalDecisions earlierRounds, AlsoRemoveSettings settings) =>
-        settings.Mode == FollowUpRemovalMode.OnlyWhatLosesItsSupport && !SeedsOf(earlierRounds).IsEmpty;
+    /// <param name="earlierRounds">The decisions with the earlier removal rounds.</param>
+    /// <param name="seedRounds">The rounds of <paramref name="earlierRounds"/> that seed this step.</param>
+    internal static bool NeedsObjectsOfAnyPlugin(IRemovalDecisions earlierRounds, ImmutableArray<Round> seedRounds, AlsoRemoveSettings settings) =>
+        settings.Mode == FollowUpRemovalMode.OnlyWhatLosesItsSupport && !SeedsOf(earlierRounds, seedRounds).IsEmpty;
 
     /// <summary>Finding the touch chains tests the touching pairs again, so only the detailed log and the report files ask for them.</summary>
     internal static bool NeedsTouchChains(RestingObjectsResult result, AlsoRemoveSettings settings) =>
@@ -273,9 +281,9 @@ public static class RestingObjects
             TouchChainsFailure: null,
             ReportFileDetails.SwitchedOff);
 
-    /// <summary>The objects the also-remove rounds start from: those every earlier round removed.</summary>
-    private static ImmutableArray<TargetId> SeedsOf(IRemovalDecisions earlierRounds) =>
-        [.. earlierRounds.Rounds.SelectMany(round => earlierRounds.RemovedIn(round))];
+    /// <summary>The objects the also-remove rounds start from: those the seed rounds removed.</summary>
+    private static ImmutableArray<TargetId> SeedsOf(IRemovalDecisions earlierRounds, ImmutableArray<Round> seedRounds) =>
+        [.. seedRounds.SelectMany(round => earlierRounds.RemovedIn(round))];
 
     private static RestingObjectsPlan PrepareTouchRounds(IRemovalDecisions earlierRounds, IReadOnlyList<int> seeds, RoundsInput input, AlsoRemoveSettings settings)
     {
@@ -286,7 +294,7 @@ public static class RestingObjects
     private static RestingObjectsPlan PrepareSupportRounds(IReadOnlyList<int> seeds, RoundsInput input, AlsoRemoveSettings settings) =>
         new(FollowUpRemovalMode.OnlyWhatLosesItsSupport, HadSeeds: true, CreateSupportRule(seeds, input, settings), Search: null);
 
-    /// <remarks>The objects kept in the seed rounds never take part, so the touch never spreads through them.</remarks>
+    /// <remarks>The objects kept in the earlier rounds never take part, so the touch never spreads through them.</remarks>
     private static TouchSearch CreateTouchSearch(IRemovalDecisions earlierRounds, IReadOnlyList<int> seeds, RoundsInput input, AlsoRemoveSettings settings) =>
         TouchSearch.Create(
             input.Targets,
@@ -297,7 +305,7 @@ public static class RestingObjects
             settings.TouchGap,
             input.Exec);
 
-    /// <remarks>Objects kept in the seed rounds are decided, so they are never candidates, and they keep supporting others.</remarks>
+    /// <remarks>Objects kept in the earlier rounds are decided, so they are never candidates, and they keep supporting others.</remarks>
     private static SupportRule CreateSupportRule(IReadOnlyList<int> seeds, RoundsInput input, AlsoRemoveSettings settings)
     {
         var objectsOfAnyPlugin = input.ObjectsOfAnyPlugin ?? throw new ArgumentException("OnlyWhatLosesItsSupport needs the objects of any plugin.", nameof(input));

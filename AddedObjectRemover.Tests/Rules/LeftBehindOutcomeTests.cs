@@ -15,11 +15,11 @@ public class LeftBehindOutcomeTests
 
     private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(OtherMod, "LeftBehindOutcomeData", Room));
 
-    private static LeftBehindSettings Config(int occupiedPercent = 50, int removedPercent = 60, params InvisibleObjectKind[] protectedKinds) => new(
+    private static LeftBehindSettings Config(int minOccupied = 4, int removedPercent = 60, params InvisibleObjectKind[] protectedKinds) => new(
         LookAround: 1024,
         DirectionClearedPercent: 50,
         ClearedDirectionsPercent: removedPercent,
-        OccupiedDirectionsPercent: occupiedPercent,
+        MinOccupiedDirections: minOccupied,
         NeverRemove: protectedKinds.ToHashSet());
 
     [Theory]
@@ -37,7 +37,7 @@ public class LeftBehindOutcomeTests
     public void NoSurroundingsKeepsTheObject() =>
         Assert.Equal(
             LeftBehindOutcome.KeptTooFewSurroundingObjects,
-            LeftBehindRule.DecideByDirections(new SectorAreaTally(50).Build(),Config(occupiedPercent: 10)));
+            LeftBehindRule.DecideByDirections(new SectorAreaTally(50).Build(),Config(minOccupied: 1)));
 
     [Fact]
     public void FullRemovalRequirementNeedsEveryOccupiedDirection()

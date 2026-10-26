@@ -13,6 +13,7 @@ Remove objects too close to other mods' objects: Margin by object size: on, 0.5 
 Remove objects on terrain changed by other mods: off.
 Shrink or turn objects to make them fit: Shrink down to: 100% of its size; Turn by at most: 0 degrees either way.
 Also remove what rests on removed objects: OnlyWhatLosesItsSupport; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
+Visible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 6; A direction is cleared when this much of it was removed: 80%; Remove when this share of the directions with objects is cleared: 80%; Never remove these as visible objects left behind: none.
 Invisible objects left behind: off.
 Detailed log and reports: off.
 Only warn (don't stop) when a mod that requires the cleaned mod loads after the patch: off.
@@ -40,6 +41,10 @@ Found 19 of 40 Target.esp objects too close to other mods' objects.
 ## anchoring
 ## linked
 ## unexpectedErrors
+## visible-leftovers
+Visible objects left behind: 14 evaluated; removed 0 (0 surroundings removed); kept 14 (14 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 0 referenced).
+## linked
+## unexpectedErrors
 ## left-without-support-step
 ## unexpectedErrors
 ## leftovers
@@ -61,7 +66,7 @@ Wrote 18 overrides (18 removed).
 ## run-summary
 Objects of Target.esp: 42; already removed by earlier patchers in this group: 0; not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 2; judged in this run: 40; removed in this run: 18.
 ## removal-summary
-Removed 18 objects (16 too close, 1 follow-up removals, 0 invisible objects left behind, 1 linked to removed objects).
+Removed 18 objects (16 too close, 1 follow-up removals, 0 visible objects left behind, 0 invisible objects left behind, 1 linked to removed objects).
 ## kept-summary
 Kept 3 objects that would have been removed, because other records depend on them or because of their own script or location ref type.
   FormList record: 1

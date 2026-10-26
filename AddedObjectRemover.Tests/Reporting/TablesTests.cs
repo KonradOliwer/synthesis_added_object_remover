@@ -129,6 +129,25 @@ public sealed class TablesTests : IDisposable
     }
 
     [Fact]
+    public void VisibleLeftBehindTable_IsOrderedByRecordKeyAndMatchesItsExpectedOutputFile()
+    {
+        var world = CreateWorld(CreateTargets(), out _);
+        var tally = new SectorAreaTally(80);
+        tally.Add(DirectionSector.East, 100f, removed: true);
+        tally.Add(DirectionSector.West, 40.5f, removed: false);
+        VisibleLeftBehindCheck[] evaluations =
+        [
+            new(3, VisibleObjectKind.Doors, tally.Build(), VisibleLeftBehindOutcome.KeptProtectedType, KeepReason: null),
+            new(1, VisibleObjectKind.OtherVisibleObjects, new SectorAreaTally(80).Build(), VisibleLeftBehindOutcome.KeptReferenced, QuestReason),
+        ];
+
+        var table = Tables.BuildVisibleLeftBehindTable(world, evaluations, Context);
+
+        AssertMatchesExpectedOutput("tables-visible-leftovers", ReportFileNames.VisibleLeftBehindFileName, [table]);
+        Assert.Equal(2, table.Rows.Length);
+    }
+
+    [Fact]
     public void HintsTable_MatchesTheOldWriterByteForByte()
     {
         var world = CreateWorld(CreateTargets(), out _);
@@ -257,6 +276,7 @@ public sealed class TablesTests : IDisposable
         var outcome = scene.Outcome with
         {
             RestingObjects = scene.Outcome.RestingObjects with { Mode = settings.Mode, Rounds = [], Evidence = [] },
+            VisibleLeftBehind = new VisibleLeftBehindResult(StepOutcome.Performed, [], [], Failure: null),
             LeftBehind = TestLeftBehind.PerformedWithoutFindings,
         };
         var origins = new ReportFileDetails(
@@ -265,7 +285,10 @@ public sealed class TablesTests : IDisposable
         var tables = Tables.BuildTables(WithDetails(outcome, origins), settings, Context);
 
         Assert.Equal(
-            [ReportFileNames.SupportFileName, ReportFileNames.MeshOriginsFileName, ReportFileNames.LeftBehindFileName, ReportFileNames.RemovalsFileName, ReportFileNames.HintsFileName],
+            [
+                ReportFileNames.SupportFileName, ReportFileNames.MeshOriginsFileName, ReportFileNames.VisibleLeftBehindFileName, ReportFileNames.LeftBehindFileName,
+                ReportFileNames.RemovalsFileName, ReportFileNames.HintsFileName,
+            ],
             tables.Select(table => table.FileName));
     }
 
@@ -291,9 +314,9 @@ public sealed class TablesTests : IDisposable
             targets, Shapes, protection, terrainSeeds is null ? [0, 2] : [2], TouchDistance, threads: 2, collectDiagnostics: true, terrainSeeds);
         var world = CreateWorld(targets, out _);
         var decided = new StepResults(
-            world, protection, new RemovalRisks([], []), ChangedTerrainResult.SwitchedOff, run.Result, LeftBehindResult.SwitchedOff, MarkerMoves.SwitchedOff,
+            world, protection, new RemovalRisks([], []), ChangedTerrainResult.SwitchedOff, run.Result, VisibleLeftBehindResult.SwitchedOff, TestRestingObjects.SwitchedOff, LeftBehindResult.SwitchedOff, MarkerMoves.SwitchedOff,
             OtherModsObjectsResult.SwitchedOff, run.RemovalDecisions);
-        var removals = RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(run.RemovalDecisions), run.RemovalDecisions, world, TestLeftBehind.PerformedWithoutFindings).ToImmutableArray();
+        var removals = RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(run.RemovalDecisions), run.RemovalDecisions, world, VisibleLeftBehindResult.SwitchedOff, TestLeftBehind.PerformedWithoutFindings).ToImmutableArray();
         var outcome = new RunOutcome(decided, removals, ManualPatchHints.FindManualPatchHints(decided, Shapes, removals), null!, default);
         return new Scene(outcome, run);
     }

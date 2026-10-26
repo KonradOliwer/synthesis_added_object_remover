@@ -218,8 +218,8 @@ public class RunSettingsValidationTests
             {
                 SearchRadius = 1f,
                 DirectionThresholdPercent = 45,
-                RemovedDirectionsPercent = 44,
-                OccupiedDirectionsPercent = 5,
+                ClearedDirectionsPercent = 44,
+                MinOccupiedDirections = 0,
             },
         };
 
@@ -236,14 +236,107 @@ public class RunSettingsValidationTests
             "Warning: Also remove what rests on removed objects > OnlyWhatLosesItsSupport: remove when this much support is gone",
             "Warning: Invisible objects left behind > When the cleaned mod's visible objects around it were removed > Look this far around it",
             "Warning: Invisible objects left behind > When the cleaned mod's visible objects around it were removed > A direction is cleared when this much of it was removed 45 is not a multiple",
-            "Warning: Invisible objects left behind > When the cleaned mod's visible objects around it were removed > Remove when this share of those directions is cleared 44 is not a multiple",
-            "Warning: Invisible objects left behind > When the cleaned mod's visible objects around it were removed > Decide only if this share of the 8 directions has objects 5 is outside",
+            "Warning: Invisible objects left behind > When the cleaned mod's visible objects around it were removed > Remove when this share of the directions with objects is cleared 44 is not a multiple",
+            "Warning: Invisible objects left behind > When the cleaned mod's visible objects around it were removed > Decide only if at least this many of the 8 directions have objects 0 is outside 1-8; using 1",
         ];
         Assert.Equal(expectedStarts.Length, messages.Count);
         for (var i = 0; i < expectedStarts.Length; i++)
         {
             Assert.StartsWith(expectedStarts[i], messages[i]);
         }
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(9, 8)]
+    [InlineData(1, 1)]
+    [InlineData(8, 8)]
+    public void TheMinimumOccupiedDirectionsAreLimitedToTheEightDirections(int configured, int expected)
+    {
+        var settings = SettingsFor();
+        settings.LeftoverInvisibleObjects = new LeftoverInvisibleObjectSettings
+        {
+            SurroundingObjects = new SurroundingObjectsSettings { MinOccupiedDirections = configured },
+        };
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(expected, ready.Settings.LeftBehind!.MinOccupiedDirections);
+        Assert.Equal(configured != expected, ready.Warnings.Any(warning => warning.Message.Contains("directions have objects")));
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(9, 8)]
+    [InlineData(1, 1)]
+    [InlineData(8, 8)]
+    public void TheVisibleMinimumOccupiedDirectionsAreLimitedToTheEightDirections(int configured, int expected)
+    {
+        var settings = SettingsFor();
+        settings.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings
+        {
+            RemoveLeftoverVisibleObjects = true,
+            SurroundingObjects = new VisibleSurroundingObjectsSettings { MinOccupiedDirections = configured },
+        };
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(expected, ready.Settings.VisibleLeftBehind!.MinOccupiedDirections);
+        Assert.Equal(
+            configured != expected,
+            ready.Warnings.Any(warning => warning.Message.StartsWith("Warning: Visible objects left behind > ", StringComparison.Ordinal) && warning.Message.Contains("directions have objects")));
+    }
+
+    [Fact]
+    public void TheVisibleStepIsOnByDefaultWithItsOwnDefaultsAndNullWhenSwitchedOff()
+    {
+        var settings = SettingsFor();
+        settings.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings { RemoveLeftoverVisibleObjects = false };
+
+        var off = BuildReady(settings);
+        var on = BuildReady(SettingsFor());
+
+        Assert.Null(off.Settings.VisibleLeftBehind);
+        var visible = on.Settings.VisibleLeftBehind!;
+        Assert.Equal((1024f, 6, 80, 80), (visible.LookAround, visible.MinOccupiedDirections, visible.DirectionClearedPercent, visible.ClearedDirectionsPercent));
+        Assert.Empty(visible.NeverRemove);
+        Assert.Empty(on.Warnings);
+    }
+
+    [Fact]
+    public void InvalidVisibleSettingsAreReportedAndCorrectedEvenWhenTheStepIsOff()
+    {
+        var settings = SettingsFor();
+        settings.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings
+        {
+            RemoveLeftoverVisibleObjects = false,
+            SurroundingObjects = new VisibleSurroundingObjectsSettings { SearchRadius = 1f, DirectionThresholdPercent = 45, ClearedDirectionsPercent = 44 },
+        };
+
+        var messages = BuildReady(settings).Warnings.Select(warning => warning.Message).ToList();
+
+        const string group = "Warning: Visible objects left behind > When the cleaned mod's visible objects around it were removed > ";
+        Assert.Equal(3, messages.Count);
+        Assert.StartsWith(group + "Look this far around it", messages[0]);
+        Assert.StartsWith(group + "A direction is cleared when this much of it was removed 45 is not a multiple", messages[1]);
+        Assert.StartsWith(group + "Remove when this share of the directions with objects is cleared 44 is not a multiple", messages[2]);
+    }
+
+    [Fact]
+    public void TheTickedVisibleKindsAreTheOnesNeverRemoved()
+    {
+        var settings = SettingsFor();
+        settings.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings
+        {
+            RemoveLeftoverVisibleObjects = true,
+            AlwaysKeep = new KeptVisibleObjectSettings { Doors = true, LooseItems = true, OtherVisibleObjects = true },
+        };
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(
+            [VisibleObjectKind.Doors, VisibleObjectKind.LooseItems, VisibleObjectKind.OtherVisibleObjects],
+            ready.Settings.VisibleLeftBehind!.NeverRemove.Order());
     }
 
     [Fact]

@@ -69,6 +69,7 @@ public class RunPartTextTests
     [InlineData(RoundKind.ChangedTerrain, "changed-terrain")]
     [InlineData(RoundKind.TooClose, "too-close")]
     [InlineData(RoundKind.AlsoRemove, "follow-up")]
+    [InlineData(RoundKind.VisibleLeftBehind, "visible left-behind")]
     [InlineData(RoundKind.LeftBehind, "left-behind")]
     public void TheLinkedGroupsLabelNamesTheStepOfTheRoundKind(RoundKind kind, string step)
     {

@@ -51,13 +51,33 @@
     "AnchoringThresholdPercent": 50.0,
     "OtherModsObjectsLeftWithoutSupport": "PullObjectToTheGround"
   },
+  "LeftoverVisibleObjects": {
+    "RemoveLeftoverVisibleObjects": true,
+    "SurroundingObjects": {
+      "SearchRadius": 1024.0,
+      "MinOccupiedDirections": 6,
+      "DirectionThresholdPercent": 80,
+      "ClearedDirectionsPercent": 80
+    },
+    "AlwaysKeep": {
+      "NpcsAndCreatures": false,
+      "Doors": false,
+      "Containers": false,
+      "Furniture": false,
+      "Activators": false,
+      "LightsWithModel": false,
+      "TreesAndPlants": false,
+      "LooseItems": false,
+      "OtherVisibleObjects": false
+    }
+  },
   "LeftoverInvisibleObjects": {
     "RemoveLeftoverInvisibleObjects": true,
     "SurroundingObjects": {
       "SearchRadius": 1024.0,
-      "OccupiedDirectionsPercent": 50,
+      "MinOccupiedDirections": 4,
       "DirectionThresholdPercent": 50,
-      "RemovedDirectionsPercent": 60
+      "ClearedDirectionsPercent": 60
     },
     "AlwaysKeep": {
       "MapMarkers": false,

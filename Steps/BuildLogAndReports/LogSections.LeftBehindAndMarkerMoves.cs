@@ -24,7 +24,10 @@ internal static partial class LogSections
     {
         if (leftBehind.Outcome == StepOutcome.SwitchedOff) return new LogSection("leftovers", []);
 
-        List<string> lines = [LeftBehindStepLine(leftBehind, elapsed, context)];
+        List<string> lines =
+        [
+            BuildPerformedOrNotPerformedLine(leftBehind.Outcome, LeftBehindStepName, () => LeftBehindSummaryLine(leftBehind, elapsed, context)),
+        ];
         if (context.Detailed) lines.AddRange(leftBehind.Evaluations.Select(evaluation => LeftBehindOutcomeLine(world, evaluation)));
         lines.AddRange(BuildKeptLines(world, kept));
         return new LogSection("leftovers", [.. lines]);
@@ -73,13 +76,6 @@ internal static partial class LogSections
         _ => throw new UnreachableException($"Unexpected marker move outcome {markerMoves.Outcome}."),
     };
 
-    private static string LeftBehindStepLine(LeftBehindResult leftBehind, TimeSpan elapsed, ReportContext context) => leftBehind.Outcome switch
-    {
-        StepOutcome.Performed => LeftBehindSummaryLine(leftBehind, elapsed, context),
-        StepOutcome.StoppedByUnexpectedError => BuildNotPerformedLine(LeftBehindStepName),
-        _ => throw new UnreachableException($"Unexpected left-behind outcome {leftBehind.Outcome}."),
-    };
-
     private static string MarkerMovesSummaryLine(MarkerMoves markerMoves) =>
         $"Moved {TextFormat.Count(markerMoves.Moves.Length)} kept markers out of other mods' objects; {TextFormat.Count(markerMoves.LeftInPlace.Count)} left in place.";
 
@@ -91,18 +87,13 @@ internal static partial class LogSections
             + $"removed/total ground area {SectorAreasText.Describe(evaluation.Surroundings)}.";
     }
 
-    private static string LeftBehindSummaryLine(LeftBehindResult leftBehind, TimeSpan elapsed, ReportContext context)
-    {
-        var outcomes = Enum.GetValues<LeftBehindOutcome>();
-        var removedCount = leftBehind.Evaluations.Count(evaluation => evaluation.IsRemoved);
-        return $"{LeftBehindStepName}: {TextFormat.Count(leftBehind.Evaluations.Count)} evaluated{Describe.TimedSuffix(elapsed, context)}; "
-            + $"removed {TextFormat.Count(removedCount)} ({CountOutcomes(leftBehind, outcomes.Where(LeftBehindOutcomes.IsRemoval))}); "
-            + $"kept {TextFormat.Count(leftBehind.Evaluations.Count - removedCount)} "
-            + $"({CountOutcomes(leftBehind, outcomes.Where(outcome => !LeftBehindOutcomes.IsRemoval(outcome)))}).";
-    }
-
-    private static string CountOutcomes(LeftBehindResult leftBehind, IEnumerable<LeftBehindOutcome> outcomes) =>
-        string.Join(
-            Describe.ListSeparator,
-            TextLists.Counts(outcomes.Select(outcome => KeyValuePair.Create(LeftBehindOutcomeText.Describe(outcome), leftBehind.Evaluations.Count(evaluation => evaluation.Decision == outcome)))));
+    private static string LeftBehindSummaryLine(LeftBehindResult leftBehind, TimeSpan elapsed, ReportContext context) =>
+        BuildOutcomeSummaryLine(
+            LeftBehindStepName,
+            [.. leftBehind.Evaluations.Select(evaluation => evaluation.Decision)],
+            LeftBehindOutcomes.IsRemoval,
+            outcome => outcome == LeftBehindOutcome.RemovedLinkedToRemoval,
+            LeftBehindOutcomeText.Describe,
+            elapsed,
+            context);
 }

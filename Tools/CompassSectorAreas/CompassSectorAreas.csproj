@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AddedObjectRemover</RootNamespace>
+    <Description>Adds up the ground area of the boxes around a point per compass direction, how much of it was removed, and decides from the directions whether the surroundings are cleared. It references BoxAndTransformMath and NumericRanges and holds no packages.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BoxAndTransformMath\BoxAndTransformMath.csproj" />
+    <ProjectReference Include="..\NumericRanges\NumericRanges.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AddedObjectRemover.Tests" />
+  </ItemGroup>
+</Project>

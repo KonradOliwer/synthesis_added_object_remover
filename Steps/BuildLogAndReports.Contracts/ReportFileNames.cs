@@ -7,6 +7,7 @@ public static class ReportFileNames
     public const string ComponentsFileName = "components.csv";
     public const string SupportFileName = "anchoring.csv";
     public const string MeshOriginsFileName = "mesh-origins.csv";
+    public const string VisibleLeftBehindFileName = "leftover-visible-objects.csv";
     public const string LeftBehindFileName = "leftover-invisible-objects.csv";
     public const string HintsFileName = "removed-markers-and-kept-objects.csv";
     public const string RemovalsFileName = "removals.csv";

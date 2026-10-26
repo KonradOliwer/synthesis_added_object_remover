@@ -20,15 +20,54 @@ internal static partial class LogSections
 
     /// <summary>How many objects a step's rounds removed as linked to their own removals.</summary>
     public static LogSection BuildLinkedSection(IRemovalDecisions decisions, IEnumerable<Round> rounds, RoundKind kind, ReportContext context) =>
-        new("linked", BuildLinkedRemovalLines(rounds.Sum(round => RemovalList.CountLinkedIn(decisions, round)), RunPartText.LinkedStep(kind), context));
+        BuildLinkedSection(decisions, rounds, RunPartText.LinkedStep(kind), string.Empty, context);
+
+    public static LogSection BuildLinkedSection(
+        IRemovalDecisions decisions, IEnumerable<Round> rounds, string step, string idSuffix, ReportContext context) =>
+        new("linked" + idSuffix, BuildLinkedRemovalLines(rounds.Sum(round => RemovalList.CountLinkedIn(decisions, round)), step, context));
+
+    /// <summary>E.g. "2 inside another mod's object, 2 surroundings removed", with a count for each outcome.</summary>
+    public static string CountOutcomes<TOutcome>(IEnumerable<TOutcome> outcomes, Func<TOutcome, string> describe, Func<TOutcome, int> countOf) =>
+        string.Join(Describe.ListSeparator, TextLists.Counts(outcomes.Select(outcome => KeyValuePair.Create(describe(outcome), countOf(outcome)))));
+
+    /// <summary>E.g. "Step: 5 evaluated; removed 2 (2 surroundings removed); kept 3 (3 protected type)." for the outcomes of a step's evaluations.</summary>
+    /// <param name="decisions">The final outcome of each evaluated object.</param>
+    /// <param name="isListedOnlyWhenCounted">Outcomes that are named only when an object has them; every other outcome is named with its count, also zero.</param>
+    public static string BuildOutcomeSummaryLine<TOutcome>(
+        string stepName,
+        IReadOnlyCollection<TOutcome> decisions,
+        Func<TOutcome, bool> isRemoval,
+        Func<TOutcome, bool> isListedOnlyWhenCounted,
+        Func<TOutcome, string> describe,
+        TimeSpan elapsed,
+        ReportContext context)
+        where TOutcome : struct, Enum
+    {
+        Func<TOutcome, int> countOf = outcome => decisions.Count(decision => decision.Equals(outcome));
+        var listed = Enum.GetValues<TOutcome>().Where(outcome => !isListedOnlyWhenCounted(outcome) || countOf(outcome) > 0).ToList();
+        var removedCount = decisions.Count(isRemoval);
+        return $"{stepName}: {TextFormat.Count(decisions.Count)} evaluated{Describe.TimedSuffix(elapsed, context)}; "
+            + $"removed {TextFormat.Count(removedCount)} ({CountOutcomes(listed.Where(isRemoval), describe, countOf)}); "
+            + $"kept {TextFormat.Count(decisions.Count - removedCount)} ({CountOutcomes(listed.Where(outcome => !isRemoval(outcome)), describe, countOf)}).";
+    }
 
     /// <summary>The also-remove section when no round ran.</summary>
     public static LogSection BuildNoFollowUpSection() => BuildFollowUpSection([]);
 
-    private static LogSection BuildFollowUpSection(ImmutableArray<string> lines) => new("follow-up", lines);
+    private const string FollowUpSectionId = "follow-up";
+
+    private static LogSection BuildFollowUpSection(ImmutableArray<string> lines) => new(FollowUpSectionId, lines);
 
     /// <summary>The one line that replaces the summary of a step or the report files that an unexpected error stopped.</summary>
     public static string BuildNotPerformedLine(string sectionName) => $"{sectionName}: not performed because of an unexpected error.";
+
+    /// <summary>A step's summary line when it was performed, or the not-performed line when an unexpected error stopped it; a switched-off step has no line.</summary>
+    public static string BuildPerformedOrNotPerformedLine(StepOutcome outcome, string sectionName, Func<string> summary) => outcome switch
+    {
+        StepOutcome.Performed => summary(),
+        StepOutcome.StoppedByUnexpectedError => BuildNotPerformedLine(sectionName),
+        _ => throw new UnreachableException($"Unexpected outcome {outcome} of {sectionName}."),
+    };
 
     /// <summary>The one line that replaces the summary of a step that did not run because an earlier section's step was not performed.</summary>
     public static string BuildNotPerformedBecauseEarlierLine(string sectionName, string earlierSectionName) =>

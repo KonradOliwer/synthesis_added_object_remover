@@ -1,6 +1,7 @@
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 
@@ -24,6 +25,9 @@ public sealed record TouchingAnotherModsObjectRemoval(int TargetIndex, OtherObje
 /// <param name="RemovedShare">Fraction of the object's support held by removed objects and other mods' objects taken away.</param>
 /// <param name="MainSupporter">The other mod's object left without support, removed or pulled down, holding the largest share of its support.</param>
 public sealed record SupportWithAnotherModsObjectRemoval(int TargetIndex, float RemovedShare, OtherObject MainSupporter) : RemovedObject(TargetIndex);
+
+/// <summary>A visible target object whose surrounding visible target objects were removed.</summary>
+public sealed record VisibleLeftBehindRemoval(int TargetIndex, VisibleLeftBehindCheck Evaluation) : RemovedObject(TargetIndex);
 
 /// <summary>An invisible target object inside another mod's object or whose surrounding visible target objects were removed.</summary>
 public sealed record LeftBehindRemoval(int TargetIndex, LeftBehindCheck Evaluation) : RemovedObject(TargetIndex);

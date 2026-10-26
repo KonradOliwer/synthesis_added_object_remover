@@ -13,6 +13,7 @@ internal sealed class CsvReportOutput : IReportOutput
         ReportFileNames.SupportFileName,
         ReportFileNames.EdgesFileName,
         ReportFileNames.ComponentsFileName,
+        ReportFileNames.VisibleLeftBehindFileName,
         ReportFileNames.LeftBehindFileName,
         ReportFileNames.RemovalsFileName,
         ReportFileNames.FitsFileName,

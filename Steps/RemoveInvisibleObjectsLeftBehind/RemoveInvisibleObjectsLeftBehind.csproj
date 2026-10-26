@@ -19,7 +19,7 @@
     <ProjectReference Include="..\..\Tools\PluginRecordFacts\PluginRecordFacts.csproj" />
     <ProjectReference Include="..\..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
     <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
-    <ProjectReference Include="..\..\Tools\NumericRanges\NumericRanges.csproj" />
+    <ProjectReference Include="..\..\Tools\CompassSectorAreas\CompassSectorAreas.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />

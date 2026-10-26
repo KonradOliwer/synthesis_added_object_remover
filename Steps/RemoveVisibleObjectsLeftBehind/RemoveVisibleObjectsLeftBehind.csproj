@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AddedObjectRemover</RootNamespace>
+    <Description>Proposes removing visible target objects whose surrounding visible target objects were removed. It references its contracts, the contracts of the steps and caches it reads, Ids, PluginRecordFacts and the package-free tools it uses, and holds no packages.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\RemoveVisibleObjectsLeftBehind.Contracts\RemoveVisibleObjectsLeftBehind.Contracts.csproj" />
+    <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
+    <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
+    <ProjectReference Include="..\FindTargetObjectsToKeep.Contracts\FindTargetObjectsToKeep.Contracts.csproj" />
+    <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
+    <ProjectReference Include="..\..\Caches\RunCaches.Contracts\RunCaches.Contracts.csproj" />
+    <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
+    <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
+    <ProjectReference Include="..\..\Tools\PluginRecordFacts\PluginRecordFacts.csproj" />
+    <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
+    <ProjectReference Include="..\..\Tools\CompassSectorAreas\CompassSectorAreas.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AddedObjectRemover.Tests" />
+  </ItemGroup>
+</Project>

@@ -1,10 +1,10 @@
 using System.Collections.Immutable;
 
-namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+namespace AddedObjectRemover;
 
 /// <summary>
-/// Ground area of the visible target objects around an invisible object and how much of it was
-/// removed, per direction, with the state each direction was judged to have.
+/// Ground area of the boxes around a point and how much of it was removed, per direction, with the
+/// state each direction was judged to have.
 /// </summary>
 /// <param name="TotalAreas">Per direction, indexed by <see cref="DirectionSector"/>.</param>
 /// <param name="RemovedAreas">Per direction, indexed by <see cref="DirectionSector"/>.</param>

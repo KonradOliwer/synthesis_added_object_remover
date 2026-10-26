@@ -9,6 +9,7 @@ Remove objects too close to other mods' objects: Margin by object size: on, 0.5 
 Remove objects on terrain changed by other mods: off.
 Shrink or turn objects to make them fit: Shrink down to: 80% of its size; Turn by at most: 360 degrees either way.
 Also remove what rests on removed objects: OnlyWhatLosesItsSupport; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
-Invisible objects left behind: on; Look this far around it: 1024 units; Decide only if this share of the 8 directions has objects: 50%; A direction is cleared when this much of it was removed: 50%; Remove when this share of those directions is cleared: 60%; Never remove these as left behind: none; Move kept markers out of other mods' objects: on.
+Visible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 6; A direction is cleared when this much of it was removed: 80%; Remove when this share of the directions with objects is cleared: 80%; Never remove these as visible objects left behind: none.
+Invisible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 4; A direction is cleared when this much of it was removed: 50%; Remove when this share of the directions with objects is cleared: 60%; Never remove these as left behind: none; Move kept markers out of other mods' objects: on.
 Detailed log and reports: on, report files go to /out/Reports.
 Only warn (don't stop) when a mod that requires the cleaned mod loads after the patch: off.

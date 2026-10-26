@@ -69,11 +69,20 @@ internal static partial class LogSections
 
     /// <param name="final">The run's decisions, which tell the follow-up removals that were first shrunk or turned.</param>
     /// <param name="changedTerrain">The changed-terrain step's outcome; the "on changed terrain" item only shows when the step was performed.</param>
+    /// <param name="visibleLeftBehind">The visible left-behind step's outcome; the "visible objects left behind" item only shows when the step was performed.</param>
     public static LogSection BuildRemovalSummarySection(
-        CollectedObjects world, IReadOnlyList<RemovedObject> removals, IRemovalDecisions final, PluginName target, StepOutcome changedTerrain)
+        CollectedObjects world,
+        IReadOnlyList<RemovedObject> removals,
+        IRemovalDecisions final,
+        PluginName target,
+        StepOutcome changedTerrain,
+        StepOutcome visibleLeftBehind)
     {
         var onChangedTerrain = changedTerrain == StepOutcome.Performed
             ? $"{TextFormat.Count(removals.Count(removal => removal is TerrainChangedRemoval))} on changed terrain, "
+            : string.Empty;
+        var visibleLeftBehindItem = visibleLeftBehind == StepOutcome.Performed
+            ? $"{TextFormat.Count(removals.Count(removal => removal is VisibleLeftBehindRemoval))} visible objects left behind, "
             : string.Empty;
         var tooClose = removals.Count(removal => removal is TooCloseRemoval);
         List<RemovedObject> followUps = [.. removals.Where(IsFollowUp)];
@@ -84,7 +93,7 @@ internal static partial class LogSections
             [
                 $"Removed {TextFormat.Count(removals.Count)} objects ({onChangedTerrain}{TextFormat.Count(tooClose)} too close, "
                 + $"{TextFormat.Count(followUps.Count)} follow-up removals{FirstShrunkOrTurned(followUps, final)}, "
-                + $"{TextFormat.Count(leftBehind)} invisible objects left behind, {TextFormat.Count(linked)} linked to removed objects)"
+                + $"{visibleLeftBehindItem}{TextFormat.Count(leftBehind)} invisible objects left behind, {TextFormat.Count(linked)} linked to removed objects)"
                 + $"{OwnAndMovedRemoved(world, removals, target)}.",
             ]);
     }

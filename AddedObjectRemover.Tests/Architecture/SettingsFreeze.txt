@@ -51,13 +51,8 @@ Standard.LeftoverVisibleObjects
 Standard.LeftoverVisibleObjects.AlwaysKeep
 Standard.LeftoverVisibleObjects.AlwaysKeep.Activators
 Standard.LeftoverVisibleObjects.AlwaysKeep.Containers
-Standard.LeftoverVisibleObjects.AlwaysKeep.Doors
 Standard.LeftoverVisibleObjects.AlwaysKeep.Furniture
-Standard.LeftoverVisibleObjects.AlwaysKeep.LightsWithModel
-Standard.LeftoverVisibleObjects.AlwaysKeep.LooseItems
 Standard.LeftoverVisibleObjects.AlwaysKeep.NpcsAndCreatures
-Standard.LeftoverVisibleObjects.AlwaysKeep.OtherVisibleObjects
-Standard.LeftoverVisibleObjects.AlwaysKeep.TreesAndPlants
 Standard.LeftoverVisibleObjects.RemoveLeftoverVisibleObjects
 Standard.LeftoverVisibleObjects.SurroundingObjects
 Standard.LeftoverVisibleObjects.SurroundingObjects.ClearedDirectionsPercent
@@ -67,6 +62,7 @@ Standard.LeftoverVisibleObjects.SurroundingObjects.SearchRadius
 Standard.MovedDistanceInUnits
 Standard.ShrinkOrTurn
 Standard.ShrinkOrTurn.ShrinkLimitPercent
+Standard.ShrinkOrTurn.ShrinkOrTurnObjects
 Standard.ShrinkOrTurn.TurnLimitDegrees
 Standard.TerrainChange
 Standard.TerrainChange.ByDistance

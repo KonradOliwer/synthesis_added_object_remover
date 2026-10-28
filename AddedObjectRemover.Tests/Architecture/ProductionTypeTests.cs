@@ -64,6 +64,7 @@ public class ProductionTypeTests
         ["NpcBodySet.FirstPoint"] = "one-line value derived from its own bodies",
         ["LeftBehindCheck.IsRemoved"] = "one-line rule over its own outcome",
         ["VisibleLeftBehindCheck.IsRemoved"] = "one-line rule over its own outcome",
+        ["FitSettings.ShrinksOrTurns"] = "one-line rule over its own limits",
         ["NpcBody.FromBox"] = "factory",
         ["NpcBody.Point"] = "factory",
         ["NpcSizeCounts.Add"] = "one-line sum of two counts",

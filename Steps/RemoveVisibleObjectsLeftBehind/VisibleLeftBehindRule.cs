@@ -64,12 +64,12 @@ internal sealed class VisibleLeftBehindRule(
     }
 
     /// <summary>Protected kinds stay whatever the surroundings say; referenced objects are kept by the removal decisions.</summary>
-    private VisibleLeftBehindOutcome Decide(SectorAreas areas, VisibleObjectKind kind) =>
+    private VisibleLeftBehindOutcome Decide(SectorAreas areas, VisibleObjectKind? kind) =>
         SectorRule.Decide(areas, config.MinOccupiedDirections, config.ClearedDirectionsPercent) switch
         {
             SectorVerdict.TooFewOccupiedDirections => VisibleLeftBehindOutcome.KeptTooFewSurroundingObjects,
             SectorVerdict.TooFewClearedDirections => VisibleLeftBehindOutcome.KeptSurroundingsMostlyKept,
-            _ when config.NeverRemove.Contains(kind) => VisibleLeftBehindOutcome.KeptProtectedType,
+            _ when kind is { } listed && config.NeverRemove.Contains(listed) => VisibleLeftBehindOutcome.KeptProtectedType,
             _ => VisibleLeftBehindOutcome.RemovedSurroundingsRemoved,
         };
 }

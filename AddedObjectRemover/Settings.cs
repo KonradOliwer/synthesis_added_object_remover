@@ -1,5 +1,6 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
+using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
@@ -110,7 +111,7 @@ public class StandardSettings : ISettingsValues
     [SynthesisSettingName("Shrink or turn objects to make them fit")]
     [SynthesisTooltip(
         "An object of the cleaned mod, or of another mod that the cleaned mod moved (see \"Check other mods' objects the cleaned mod moved farther than\"), that would be removed for being too close to another mod's object\n"
-        + "is first tried shrunk or turned where it stands. If it fits, it is kept that way; otherwise it is removed.\n"
+        + "is first tried shrunk or turned where it stands, when \"Shrink or turn objects that are too close\" is on. If it fits, it is kept that way; otherwise it is removed.\n"
         + "Never shrunk or turned, but removed as before: an object on terrain another mod changed; an object that another object of the cleaned mod\n"
         + "rests on from above and would lose its support without (objects that only touch it from the side do not count; with \"Nothing\" in\n"
         + "\"Also remove what rests on removed objects\", none counts); and, whatever the settings, an object\n"
@@ -394,11 +395,17 @@ public class TerrainChangeSettings : ITerrainChangeSettingsValues
 public class ShrinkOrTurnSettings : IShrinkOrTurnSettingsValues
 {
     [SynthesisOrder]
+    [SynthesisSettingName("Shrink or turn objects that are too close")]
+    [SynthesisTooltip(
+        "Off: an object too close to another mod's object is removed without first being tried shrunk or turned; the two settings below are then not used.")]
+    public bool ShrinkOrTurnObjects { get; set; } = SettingDefaults.ShrinkOrTurnObjects;
+
+    [SynthesisOrder]
     [SynthesisSettingName("Shrink down to (% of its size)")]
     [SynthesisTooltip(
         "An object that would be removed for being too close to another mod's object may be shrunk where it stands, down to this share of its size, to make it fit,\n"
         + "in steps of 5%; the largest size that fits is used. This applies to the cleaned mod's own objects and to the objects of other mods it moved.\n"
-        + "100 or more: objects are never shrunk. With 100 here and 0 in the turn setting, nothing is shrunk or turned. At least 1 (a lower value becomes 1).")]
+        + "100 or more: objects are never shrunk. At least 1 (a lower value becomes 1). Not used when the switch above is off.")]
     public int ShrinkLimitPercent { get; set; } = SettingDefaults.ShrinkLimitPercent;
 
     [SynthesisOrder]
@@ -406,9 +413,12 @@ public class ShrinkOrTurnSettings : IShrinkOrTurnSettingsValues
     [SynthesisTooltip(
         "An object may be turned about its upright axis by up to this many degrees to the left or to the right to make it fit,\n"
         + "in steps of 15 degrees; the smallest turn that fits is used. It is never tilted.\n"
-        + "0: objects are never turned. 180 or more: objects may face any way. With 0 here and 100 in the shrink setting, nothing is shrunk or turned.\n"
-        + "Not below 0 (a lower value becomes 0).")]
+        + "0: objects are never turned. 180 or more: objects may face any way.\n"
+        + "Not below 0 (a lower value becomes 0). Not used when the switch above is off.")]
     public int TurnLimitDegrees { get; set; } = SettingDefaults.TurnLimitDegrees;
+
+    int IShrinkOrTurnSettingsValues.ShrinkLimitPercent => ShrinkOrTurnObjects ? ShrinkLimitPercent : FitSettings.Off.ShrinkLimitPercent;
+    int IShrinkOrTurnSettingsValues.TurnLimitDegrees => ShrinkOrTurnObjects ? TurnLimitDegrees : FitSettings.Off.TurnLimitDegrees;
 }
 
 public class FollowUpRemovalSettings : IFollowUpSettingsValues
@@ -513,11 +523,6 @@ public class KeptVisibleObjectSettings
     public bool NpcsAndCreatures { get; set; }
 
     [SynthesisOrder]
-    [SynthesisSettingName("Doors")]
-    [SynthesisTooltip("Doors, including doors that do not teleport. Teleport doors and their destinations are always kept.")]
-    public bool Doors { get; set; }
-
-    [SynthesisOrder]
     [SynthesisSettingName("Containers")]
     [SynthesisTooltip("Chests, barrels, sacks and other objects that hold items.")]
     public bool Containers { get; set; }
@@ -532,26 +537,6 @@ public class KeptVisibleObjectSettings
     [SynthesisTooltip("Levers, buttons, pull chains, and other objects the player can activate.")]
     public bool Activators { get; set; }
 
-    [SynthesisOrder]
-    [SynthesisSettingName("Lights with a model")]
-    [SynthesisTooltip("Torches, candles, lanterns and other light sources with a visible model.")]
-    public bool LightsWithModel { get; set; }
-
-    [SynthesisOrder]
-    [SynthesisSettingName("Trees and plants")]
-    [SynthesisTooltip("Trees, and plants that can be gathered from.")]
-    public bool TreesAndPlants { get; set; }
-
-    [SynthesisOrder]
-    [SynthesisSettingName("Loose items")]
-    [SynthesisTooltip("Items lying about that can be picked up: miscellaneous items, weapons, armour, books, ingredients and similar.")]
-    public bool LooseItems { get; set; }
-
-    [SynthesisOrder]
-    [SynthesisSettingName("Other visible objects")]
-    [SynthesisTooltip("Every other visible object that is none of the kinds above, such as static architecture and clutter.")]
-    public bool OtherVisibleObjects { get; set; }
-
     /// <summary>The ticked kinds, in the order of <see cref="VisibleObjectKind"/>.</summary>
     public IReadOnlyList<VisibleObjectKind> Kinds() =>
         KindFlags().Where(flag => flag.Ticked).Select(flag => flag.Kind).ToArray();
@@ -559,14 +544,9 @@ public class KeptVisibleObjectSettings
     private IEnumerable<(VisibleObjectKind Kind, bool Ticked)> KindFlags() =>
     [
         (VisibleObjectKind.NpcsAndCreatures, NpcsAndCreatures),
-        (VisibleObjectKind.Doors, Doors),
         (VisibleObjectKind.Containers, Containers),
         (VisibleObjectKind.Furniture, Furniture),
         (VisibleObjectKind.Activators, Activators),
-        (VisibleObjectKind.LightsWithModel, LightsWithModel),
-        (VisibleObjectKind.TreesAndPlants, TreesAndPlants),
-        (VisibleObjectKind.LooseItems, LooseItems),
-        (VisibleObjectKind.OtherVisibleObjects, OtherVisibleObjects),
     ];
 }
 

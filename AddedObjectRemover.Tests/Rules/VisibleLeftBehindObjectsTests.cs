@@ -246,16 +246,16 @@ public class VisibleLeftBehindObjectsTests
 
     [Theory]
     [InlineData(BaseRecordKind.Npc, VisibleObjectKind.NpcsAndCreatures)]
-    [InlineData(BaseRecordKind.Door, VisibleObjectKind.Doors)]
     [InlineData(BaseRecordKind.Container, VisibleObjectKind.Containers)]
     [InlineData(BaseRecordKind.Furniture, VisibleObjectKind.Furniture)]
     [InlineData(BaseRecordKind.Activator, VisibleObjectKind.Activators)]
-    [InlineData(BaseRecordKind.Light, VisibleObjectKind.LightsWithModel)]
-    [InlineData(BaseRecordKind.TreeOrPlant, VisibleObjectKind.TreesAndPlants)]
-    [InlineData(BaseRecordKind.LooseItem, VisibleObjectKind.LooseItems)]
-    [InlineData(BaseRecordKind.Static, VisibleObjectKind.OtherVisibleObjects)]
-    [InlineData(BaseRecordKind.Other, VisibleObjectKind.OtherVisibleObjects)]
-    public void AVisibleObjectsKindFollowsTheRecordTypeOfItsBase(BaseRecordKind recordKind, VisibleObjectKind expected)
+    [InlineData(BaseRecordKind.Door, null)]
+    [InlineData(BaseRecordKind.Light, null)]
+    [InlineData(BaseRecordKind.TreeOrPlant, null)]
+    [InlineData(BaseRecordKind.LooseItem, null)]
+    [InlineData(BaseRecordKind.Static, null)]
+    [InlineData(BaseRecordKind.Other, null)]
+    public void AVisibleObjectsKindFollowsTheRecordTypeOfItsBase(BaseRecordKind recordKind, VisibleObjectKind? expected)
     {
         var target = Visible(0, Vector3.Zero);
 
@@ -266,15 +266,15 @@ public class VisibleLeftBehindObjectsTests
     public void ATickedKindIsKeptAndTheOtherKindsAreStillRemoved()
     {
         ImmutableArray<TargetObject> targets = [.. Ring(SixDirections).Select(target => target.Id.Index == 0 ? target with { Base = DoorBlock.Base } : target)];
-        var bases = new KindsOfBases(new Dictionary<RecordKey, BaseRecordKind> { [DoorBlock.Base.Record] = BaseRecordKind.Door });
+        var bases = new KindsOfBases(new Dictionary<RecordKey, BaseRecordKind> { [DoorBlock.Base.Record] = BaseRecordKind.Container });
         var decisions = DecisionsRemoving(targets, 1, 2, 3, 4, 5, 6);
 
-        var ticked = Find(targets, decisions, Settings with { NeverRemove = new HashSet<VisibleObjectKind> { VisibleObjectKind.Doors } }, bases: bases);
-        var unticked = Find(targets, decisions, Settings with { NeverRemove = new HashSet<VisibleObjectKind> { VisibleObjectKind.Containers } }, bases: bases);
+        var ticked = Find(targets, decisions, Settings with { NeverRemove = new HashSet<VisibleObjectKind> { VisibleObjectKind.Containers } }, bases: bases);
+        var unticked = Find(targets, decisions, Settings with { NeverRemove = new HashSet<VisibleObjectKind> { VisibleObjectKind.Furniture } }, bases: bases);
 
-        var keptDoor = Assert.Single(ticked.Evaluations);
-        Assert.Equal(VisibleLeftBehindOutcome.KeptProtectedType, keptDoor.Decision);
-        Assert.Equal(VisibleObjectKind.Doors, keptDoor.Kind);
+        var keptContainer = Assert.Single(ticked.Evaluations);
+        Assert.Equal(VisibleLeftBehindOutcome.KeptProtectedType, keptContainer.Decision);
+        Assert.Equal(VisibleObjectKind.Containers, keptContainer.Kind);
         Assert.Empty(ticked.Proposals);
         Assert.Equal(VisibleLeftBehindOutcome.RemovedSurroundingsRemoved, Assert.Single(unticked.Evaluations).Decision);
         Assert.Single(unticked.Proposals);

@@ -12,7 +12,7 @@ Trusted, requires Target.esp: TargetPatch.esp (masters: Patched.esp)
 Never trusted, listed: Rival.esp
 Remove objects too close to other mods' objects: Margin by object size: on, 0.5 x object size; Margin by fixed distance: off; Use rough boxes instead of exact shapes (faster): off; Other mods' NPCs and creatures cause removal: OnlyWhenStuckInsideTheObject.
 Remove objects on terrain changed by other mods: off.
-Shrink or turn objects to make them fit: Shrink down to: 100% of its size; Turn by at most: 0 degrees either way.
+Shrink or turn objects to make them fit: off.
 Also remove what rests on removed objects: Nothing; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
 Visible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 6; A direction is cleared when this much of it was removed: 80%; Remove when this share of the directions with objects is cleared: 80%; Never remove these as visible objects left behind: none.
 Invisible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 4; A direction is cleared when this much of it was removed: 50%; Remove when this share of the directions with objects is cleared: 60%; Never remove these as invisible objects left behind: none; Move kept markers out of other mods' objects: on.
@@ -55,7 +55,7 @@ Linked groups: 0 more objects removed with the follow-up removals they are linke
 ## unexpectedErrors
 ## visible-leftovers
 Visible objects left behind: 15 evaluated in <time>; removed 1 (1 surroundings removed); kept 14 (14 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 0 referenced).
-  Visible left behind: T_SupportedByOnlyTheSeed [000818:Target.esp] (Other visible objects) in interior AorInterior [000800:Skyrim.esm]: removed, surroundings removed; removed/total ground area East 10000/10000, NorthEast 10000/10000, North 20000/30000, NorthWest 10000/10000, West 10000/10000, SouthWest 10000/10000, South 10000/10000, SouthEast 10000/10000.
+  Visible left behind: T_SupportedByOnlyTheSeed [000818:Target.esp] in interior AorInterior [000800:Skyrim.esm]: removed, surroundings removed; removed/total ground area East 10000/10000, NorthEast 10000/10000, North 20000/30000, NorthWest 10000/10000, West 10000/10000, SouthWest 10000/10000, South 10000/10000, SouthEast 10000/10000.
 ## linked
 Linked groups: 0 more objects removed with the visible left-behind removals they are linked to.
 ## unexpectedErrors

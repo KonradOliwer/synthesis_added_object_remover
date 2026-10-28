@@ -26,7 +26,7 @@ internal static partial class Tables
     private static ImmutableArray<string> VisibleLeftBehindRow(VisibleLeftBehindCheck evaluation, CollectedObjects world, IBaseFacts bases) =>
         CsvRow.Of(
         [
-            .. LeftBehindObjectColumns(world.Targets[evaluation.TargetIndex], VisibleLeftBehindOutcomeText.KindName(evaluation.Kind), world, bases),
+            .. LeftBehindObjectColumns(world.Targets[evaluation.TargetIndex], VisibleLeftBehindOutcomeText.KindNameOrEmpty(evaluation.Kind), world, bases),
             .. SectorColumns(evaluation.Surroundings),
             Quote(evaluation.IsRemoved ? "removed" : "kept"),
             Quote(VisibleLeftBehindOutcomeText.DescribeReason(evaluation)),

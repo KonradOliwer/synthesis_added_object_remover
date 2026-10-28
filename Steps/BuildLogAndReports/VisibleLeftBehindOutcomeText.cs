@@ -27,14 +27,12 @@ internal static class VisibleLeftBehindOutcomeText
     public static string KindName(VisibleObjectKind kind) => kind switch
     {
         VisibleObjectKind.NpcsAndCreatures => "NPCs and creatures",
-        VisibleObjectKind.Doors => "Doors",
         VisibleObjectKind.Containers => "Containers",
         VisibleObjectKind.Furniture => "Furniture",
         VisibleObjectKind.Activators => "Activators",
-        VisibleObjectKind.LightsWithModel => "Lights with a model",
-        VisibleObjectKind.TreesAndPlants => "Trees and plants",
-        VisibleObjectKind.LooseItems => "Loose items",
-        VisibleObjectKind.OtherVisibleObjects => "Other visible objects",
         _ => throw new UnreachableException($"Unknown visible object kind {kind}."),
     };
+
+    /// <summary>Empty for an object of no listed kind.</summary>
+    public static string KindNameOrEmpty(VisibleObjectKind? kind) => kind is { } listed ? KindName(listed) : string.Empty;
 }

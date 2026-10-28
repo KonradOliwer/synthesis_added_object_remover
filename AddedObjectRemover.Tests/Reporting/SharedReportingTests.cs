@@ -126,7 +126,7 @@ public sealed class SharedReportingTests
         ];
         if (visibleLeftBehind == StepOutcome.Performed)
         {
-            removals.Add(new VisibleLeftBehindRemoval(1, new VisibleLeftBehindCheck(1, VisibleObjectKind.OtherVisibleObjects, surroundings, VisibleLeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null)));
+            removals.Add(new VisibleLeftBehindRemoval(1, new VisibleLeftBehindCheck(1, null, surroundings, VisibleLeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null)));
         }
 
         var world = CreateWorld();
@@ -138,7 +138,7 @@ public sealed class SharedReportingTests
     [Fact]
     public void AVisibleLeftBehindRemovalIsDescribedAsVisibleWithItsSurroundingsRemoved()
     {
-        var check = new VisibleLeftBehindCheck(1, VisibleObjectKind.Doors, new SectorAreaTally(50).Build(), VisibleLeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null);
+        var check = new VisibleLeftBehindCheck(1, VisibleObjectKind.Containers, new SectorAreaTally(50).Build(), VisibleLeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null);
 
         Assert.Equal("visible, surroundings removed", Describe.RemovalReason(null!, new VisibleLeftBehindRemoval(1, check)));
     }

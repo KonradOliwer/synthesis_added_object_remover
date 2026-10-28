@@ -48,9 +48,9 @@ public sealed class VisibleLeftBehindSectionTests
         var detail = lines.Where(line => line.StartsWith("  Visible left behind: ", StringComparison.Ordinal)).ToList();
         Assert.Equal(4, detail.Count);
         AssertLine(detail[0], world, result.Evaluations[Removed], "NPCs and creatures", "removed, surroundings removed");
-        AssertLine(detail[1], world, result.Evaluations[Referenced], "Doors", "kept, referenced: ");
-        AssertLine(detail[2], world, result.Evaluations[ProtectedKind], "Doors", "kept, protected type");
-        AssertLine(detail[3], world, result.Evaluations[NearMiss], "Other visible objects", "kept, surroundings mostly kept");
+        AssertLine(detail[1], world, result.Evaluations[Referenced], "Containers", "kept, referenced: ");
+        AssertLine(detail[2], world, result.Evaluations[ProtectedKind], "Containers", "kept, protected type");
+        AssertLine(detail[3], world, result.Evaluations[NearMiss], null, "kept, surroundings mostly kept");
         foreach (var index in new[] { NoClearedDirection, TooFewObjects })
         {
             Assert.DoesNotContain(detail, line => line.Contains(RecordNames.Describe(world.Targets[index]), StringComparison.Ordinal));
@@ -76,7 +76,7 @@ public sealed class VisibleLeftBehindSectionTests
     {
         var (world, scene, decisions) = Scene();
         var linkedMember = new VisibleLeftBehindCheck(
-            LinkedPartner, VisibleObjectKind.OtherVisibleObjects, Areas(northCleared: false), VisibleLeftBehindOutcome.RemovedLinkedToRemoval, null);
+            LinkedPartner, null, Areas(northCleared: false), VisibleLeftBehindOutcome.RemovedLinkedToRemoval, null);
         var result = scene with { Evaluations = [.. scene.Evaluations, linkedMember] };
 
         var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Detailed).Lines.ToList();
@@ -86,7 +86,7 @@ public sealed class VisibleLeftBehindSectionTests
             + "kept 5 (1 too few surrounding objects, 2 surroundings mostly kept, 1 protected type, 1 referenced).",
             lines[0]);
         AssertLine(lines.Single(line => line.Contains(RecordNames.Describe(world.Targets[LinkedPartner]), StringComparison.Ordinal) && line.StartsWith("  Visible left behind", StringComparison.Ordinal)),
-            world, linkedMember, "Other visible objects", "removed, linked to a removed object");
+            world, linkedMember, null, "removed, linked to a removed object");
     }
 
     [Fact]
@@ -116,9 +116,10 @@ public sealed class VisibleLeftBehindSectionTests
             StringComparison.Ordinal);
     }
 
-    private static void AssertLine(string line, CollectedObjects world, VisibleLeftBehindCheck evaluation, string kind, string verdict)
+    private static void AssertLine(string line, CollectedObjects world, VisibleLeftBehindCheck evaluation, string? kind, string verdict)
     {
-        Assert.StartsWith($"  Visible left behind: {RecordNames.Describe(world.Targets[evaluation.TargetIndex])} ({kind}) in ", line, StringComparison.Ordinal);
+        var kindText = kind is null ? string.Empty : $" ({kind})";
+        Assert.StartsWith($"  Visible left behind: {RecordNames.Describe(world.Targets[evaluation.TargetIndex])}{kindText} in ", line, StringComparison.Ordinal);
         Assert.Contains($": {verdict}", line, StringComparison.Ordinal);
         Assert.EndsWith($"; removed/total ground area {SectorAreasText.Describe(evaluation.Surroundings)}.", line, StringComparison.Ordinal);
     }
@@ -149,11 +150,11 @@ public sealed class VisibleLeftBehindSectionTests
         VisibleLeftBehindCheck[] evaluations =
         [
             new(Removed, VisibleObjectKind.NpcsAndCreatures, Areas(northCleared: true), VisibleLeftBehindOutcome.RemovedSurroundingsRemoved, null),
-            new(Referenced, VisibleObjectKind.Doors, Areas(northCleared: true), VisibleLeftBehindOutcome.KeptReferenced, TestKeepReasons.Quest),
-            new(ProtectedKind, VisibleObjectKind.Doors, Areas(northCleared: true), VisibleLeftBehindOutcome.KeptProtectedType, null),
-            new(NearMiss, VisibleObjectKind.OtherVisibleObjects, Areas(northCleared: false), VisibleLeftBehindOutcome.KeptSurroundingsMostlyKept, null),
-            new(NoClearedDirection, VisibleObjectKind.OtherVisibleObjects, new SectorAreaTally(50).Build(), VisibleLeftBehindOutcome.KeptSurroundingsMostlyKept, null),
-            new(TooFewObjects, VisibleObjectKind.OtherVisibleObjects, new SectorAreaTally(50).Build(), VisibleLeftBehindOutcome.KeptTooFewSurroundingObjects, null),
+            new(Referenced, VisibleObjectKind.Containers, Areas(northCleared: true), VisibleLeftBehindOutcome.KeptReferenced, TestKeepReasons.Quest),
+            new(ProtectedKind, VisibleObjectKind.Containers, Areas(northCleared: true), VisibleLeftBehindOutcome.KeptProtectedType, null),
+            new(NearMiss, null, Areas(northCleared: false), VisibleLeftBehindOutcome.KeptSurroundingsMostlyKept, null),
+            new(NoClearedDirection, null, new SectorAreaTally(50).Build(), VisibleLeftBehindOutcome.KeptSurroundingsMostlyKept, null),
+            new(TooFewObjects, null, new SectorAreaTally(50).Build(), VisibleLeftBehindOutcome.KeptTooFewSurroundingObjects, null),
         ];
         var protection = ObjectsToKeep.Build(
             [.. targets],

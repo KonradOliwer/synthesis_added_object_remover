@@ -78,10 +78,13 @@ internal static partial class LogSections
             : checks;
     }
 
-    private static string DescribeShrinkOrTurn(FitSettings fit) =>
-        "Shrink or turn objects to make them fit: "
-        + $"Shrink down to: {fit.ShrinkLimitPercent}% of its size; "
-        + $"Turn by at most: {fit.TurnLimitDegrees} degrees either way.";
+    private static string DescribeShrinkOrTurn(FitSettings fit)
+    {
+        const string group = "Shrink or turn objects to make them fit";
+        return fit.ShrinksOrTurns
+            ? $"{group}: Shrink down to: {fit.ShrinkLimitPercent}% of its size; Turn by at most: {fit.TurnLimitDegrees} degrees either way."
+            : $"{group}: off.";
+    }
 
     private static string DescribeDetailedLogAndReports(ReportFileSettings? reports) =>
         $"Detailed log and reports: {(reports is null ? "off" : $"on, report files go to {reports.Folder}")}.";

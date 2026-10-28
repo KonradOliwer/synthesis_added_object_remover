@@ -26,6 +26,7 @@ public static class SettingDefaults
     public const bool CountWaterAddedOrRemoved = true;
     public const int MinWaterCoverChangePercent = 20;
     public const float MovedDistanceInUnits = 10f;
+    public const bool ShrinkOrTurnObjects = true;
     public const int ShrinkLimitPercent = 80;
     public const int TurnLimitDegrees = 360;
     public const int MaxOtherMastersOfRequiringModToTrust = 5;

@@ -42,6 +42,7 @@
     "MinWaterCoverChangePercent": 20
   },
   "ShrinkOrTurn": {
+    "ShrinkOrTurnObjects": true,
     "ShrinkLimitPercent": 80,
     "TurnLimitDegrees": 360
   },
@@ -61,14 +62,9 @@
     },
     "AlwaysKeep": {
       "NpcsAndCreatures": false,
-      "Doors": false,
       "Containers": false,
       "Furniture": false,
-      "Activators": false,
-      "LightsWithModel": false,
-      "TreesAndPlants": false,
-      "LooseItems": false,
-      "OtherVisibleObjects": false
+      "Activators": false
     }
   },
   "LeftoverInvisibleObjects": {

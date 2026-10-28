@@ -4,10 +4,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The settings of trying clashing objects shrunk or turned where they stand, the rules the step asks, the fits found, and the step's part keys. It references Ids, RemovalDecisionList.Contracts and UnexpectedFailureHandling (for its part key) and holds no packages.</Description>
+    <Description>The settings of trying clashing objects shrunk or turned where they stand, the rules the step asks, the fits found, and the step's part keys. It references Ids, NumericRanges, RemovalDecisionList.Contracts and UnexpectedFailureHandling (for its part key) and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
+    <ProjectReference Include="..\..\Tools\NumericRanges\NumericRanges.csproj" />
     <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
     <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
   </ItemGroup>

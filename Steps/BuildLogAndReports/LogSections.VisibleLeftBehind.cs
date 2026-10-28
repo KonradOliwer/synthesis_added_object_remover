@@ -40,7 +40,7 @@ internal static partial class LogSections
     private static string VisibleLeftBehindOutcomeLine(CollectedObjects world, VisibleLeftBehindCheck evaluation)
     {
         var target = world.Targets[evaluation.TargetIndex];
-        return $"  Visible left behind: {RecordNames.Describe(target)} ({VisibleLeftBehindOutcomeText.KindName(evaluation.Kind)}) in {Describe.Space(world, target.SpaceKey)}: "
+        return $"  Visible left behind: {RecordNames.Describe(target)}{(evaluation.Kind is { } kind ? $" ({VisibleLeftBehindOutcomeText.KindName(kind)})" : string.Empty)} in {Describe.Space(world, target.SpaceKey)}: "
             + $"{(evaluation.IsRemoved ? "removed" : "kept")}, {VisibleLeftBehindOutcomeText.DescribeReason(evaluation)}; "
             + $"removed/total ground area {SectorAreasText.Describe(evaluation.Surroundings)}.";
     }

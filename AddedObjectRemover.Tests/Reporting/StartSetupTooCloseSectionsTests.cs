@@ -190,13 +190,32 @@ public sealed class StartSetupTooCloseSectionsTests
         settings.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings
         {
             RemoveLeftoverVisibleObjects = true,
-            AlwaysKeep = new KeptVisibleObjectSettings { Doors = true, LooseItems = true },
+            AlwaysKeep = new KeptVisibleObjectSettings { Containers = true, Furniture = true },
         };
         Assert.Equal(
             "Visible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 6; "
             + "A direction is cleared when this much of it was removed: 80%; Remove when this share of the directions with objects is cleared: 80%; "
-            + "Never remove these as visible objects left behind: Doors, Loose items.",
+            + "Never remove these as visible objects left behind: Containers, Furniture.",
             VisibleLine());
+    }
+
+    [Theory]
+    [InlineData(true, 80, 15, "Shrink or turn objects to make them fit: Shrink down to: 80% of its size; Turn by at most: 15 degrees either way.")]
+    [InlineData(true, 100, 15, "Shrink or turn objects to make them fit: Shrink down to: 100% of its size; Turn by at most: 15 degrees either way.")]
+    [InlineData(true, 80, 0, "Shrink or turn objects to make them fit: Shrink down to: 80% of its size; Turn by at most: 0 degrees either way.")]
+    [InlineData(true, 100, 0, "Shrink or turn objects to make them fit: off.")]
+    [InlineData(false, 80, 15, "Shrink or turn objects to make them fit: off.")]
+    public void Config_GivesTheShrinkOrTurnLineOffWhenNothingCanBeShrunkOrTurned(bool switchOn, int shrink, int turn, string expected)
+    {
+        var settings = SettingsFor();
+        settings.ShrinkOrTurn = new ShrinkOrTurnSettings { ShrinkOrTurnObjects = switchOn, ShrinkLimitPercent = shrink, TurnLimitDegrees = turn };
+        var mods = Facts();
+        var runSettings = Assert.IsType<RunRequest.Ready>(Build(settings, mods)).Settings;
+
+        var line = LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(mods, runSettings.ModTrust), mods).Lines
+            .Single(line => line.StartsWith("Shrink or turn objects to make them fit", StringComparison.Ordinal));
+
+        Assert.Equal(expected, line);
     }
 
     [Fact]

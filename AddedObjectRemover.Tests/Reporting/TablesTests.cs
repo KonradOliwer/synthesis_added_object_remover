@@ -137,8 +137,8 @@ public sealed class TablesTests : IDisposable
         tally.Add(DirectionSector.West, 40.5f, removed: false);
         VisibleLeftBehindCheck[] evaluations =
         [
-            new(3, VisibleObjectKind.Doors, tally.Build(), VisibleLeftBehindOutcome.KeptProtectedType, KeepReason: null),
-            new(1, VisibleObjectKind.OtherVisibleObjects, new SectorAreaTally(80).Build(), VisibleLeftBehindOutcome.KeptReferenced, QuestReason),
+            new(3, VisibleObjectKind.Containers, tally.Build(), VisibleLeftBehindOutcome.KeptProtectedType, KeepReason: null),
+            new(1, null, new SectorAreaTally(80).Build(), VisibleLeftBehindOutcome.KeptReferenced, QuestReason),
         ];
 
         var table = Tables.BuildVisibleLeftBehindTable(world, evaluations, Context);

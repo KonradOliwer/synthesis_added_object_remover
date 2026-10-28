@@ -68,6 +68,18 @@ public class RunSettingsValidationTests
     }
 
     [Fact]
+    public void WithShrinkingAndTurningOffTheLimitsAreNeverShrinkAndNeverTurnWithoutWarnings()
+    {
+        var settings = SettingsFor();
+        settings.ShrinkOrTurn = new ShrinkOrTurnSettings { ShrinkOrTurnObjects = false, ShrinkLimitPercent = 0, TurnLimitDegrees = -10 };
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(new FitSettings(100, 0), ready.Settings.Fit);
+        Assert.Empty(ready.Warnings);
+    }
+
+    [Fact]
     public void AShrinkLimitBelow1AndANegativeTurnLimitAreRaisedWithAWarningEach()
     {
         var settings = SettingsFor();
@@ -331,13 +343,13 @@ public class RunSettingsValidationTests
         settings.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings
         {
             RemoveLeftoverVisibleObjects = true,
-            AlwaysKeep = new KeptVisibleObjectSettings { Doors = true, LooseItems = true, OtherVisibleObjects = true },
+            AlwaysKeep = new KeptVisibleObjectSettings { Containers = true, Furniture = true, Activators = true },
         };
 
         var ready = BuildReady(settings);
 
         Assert.Equal(
-            [VisibleObjectKind.Doors, VisibleObjectKind.LooseItems, VisibleObjectKind.OtherVisibleObjects],
+            [VisibleObjectKind.Containers, VisibleObjectKind.Furniture, VisibleObjectKind.Activators],
             ready.Settings.VisibleLeftBehind!.NeverRemove.Order());
     }
 

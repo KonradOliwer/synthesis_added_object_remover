@@ -36,16 +36,12 @@ public class CopiedCodeTests
     private const string RuleSkeleton =
         "Two rules' entry and parallel evaluation of candidates: each reads its own settings, candidate test and check type. " + NoSharedStepTypes;
 
-    private const string VerdictSwitch = "Two rules' switch from the shared sector verdict to the step's own outcome. " + NoSharedStepTypes;
-
     private const string OutcomeLines =
         "The per-object outcome line of two steps (the invisible step's also names the radius) and their call of the shared summary line; each reads its own outcome and wording types.";
 
     private const string SettingsLines = "The settings lines of two steps: each prints its own group name, switch and kind names with the shared surroundings wording.";
 
     private const string StepSections = "Overloads of the log's entry type: each hands one step's result to its own section builder under the same skeleton; they share only the shape.";
-
-    private const string KindTable = "A table with one entry per record kind; each entry names its own kind, so there is no logic to share.";
 
     private const string PartKeyHolders = "Part key holders of two steps with an owner and two keys each; each key names its own part, so there is no logic to share.";
 
@@ -107,8 +103,6 @@ public class CopiedCodeTests
         [CopyFamily.KeyOf([
             Invisible + "LeftBehindRule.cs:LeftBehindRule.Evaluate", Invisible + "LeftBehindRule.cs:LeftBehindRule.EvaluateAll",
             VisibleStep + "VisibleLeftBehindRule.cs:VisibleLeftBehindRule.Evaluate", VisibleStep + "VisibleLeftBehindRule.cs:VisibleLeftBehindRule.EvaluateAll"])] = RuleSkeleton,
-        [CopyFamily.KeyOf([Invisible + "LeftBehindRule.cs:LeftBehindRule.DecideByDirections", VisibleStep + "VisibleLeftBehindRule.cs:VisibleLeftBehindRule.Decide"])] = VerdictSwitch,
-        [CopyFamily.KeyOf([VisibleStep + "VisibleObjectKinds.cs:VisibleObjectKinds.ByRecordKind"])] = KindTable,
         [CopyFamily.KeyOf([Shapes + "CountBounds", TooClose + "TooCloseObjects.cs:TooCloseObjects.CountSizes"])] = CountLines + " " + CounterRecord,
         [CopyFamily.KeyOf([Settings + "ClampMarginInUnits", Settings + "CreateChangedTerrainSettings", Settings + "CreateTooCloseSettings", Settings + "WarnOfUnlistableNeverTrusted"])] = SettingChecks,
         [CopyFamily.KeyOf([Settings + "CreateChangedTerrainSettings", Settings + "CreateTooCloseSettings"])] = SettingChecks,
@@ -130,7 +124,7 @@ public class CopiedCodeTests
             LeftBehindText + "Describe", LeftBehindText + "DescribeReason", MeshText + "FailureCategory", MeshText + "Line", MeshText + "ReadFailure",
             Report + "VisibleLeftBehindOutcomeText.cs", Report + "VisibleLeftBehindOutcomeText.cs:VisibleLeftBehindOutcomeText",
             Report + "VisibleLeftBehindOutcomeText.cs:VisibleLeftBehindOutcomeText.Describe", Report + "VisibleLeftBehindOutcomeText.cs:VisibleLeftBehindOutcomeText.DescribeReason",
-            Report + "VisibleLeftBehindOutcomeText.cs:VisibleLeftBehindOutcomeText.KindName",
+            Report + "VisibleLeftBehindOutcomeText.cs:VisibleLeftBehindOutcomeText.KindName", Report + "VisibleLeftBehindOutcomeText.cs:VisibleLeftBehindOutcomeText.KindNameOrEmpty",
             VisibilityText + "Describe", VisibilityText + "KindName", OtherModsText + "NothingBelow", OtherModsText + "Outcome", OtherModsText + "RoleName",
             OtherModsText + "Roles", OtherModsText + "Summary", PartText + "LinkedStep", PartText + "Word"])] = EnumTextArms,
         [CopyFamily.KeyOf([MeshText + "FailureCategory", MeshText + "Line", MeshText + "ReadFailure"])] = EnumTextArms,

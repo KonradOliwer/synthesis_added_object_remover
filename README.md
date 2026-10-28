@@ -153,7 +153,7 @@ masters.
 #### Remove objects too close to other mods' objects
 
 An object of the cleaned mod is removed when an object from another mod comes within a margin around it. There are two margins; switch on one or both.
-Before an object is removed here, it is first tried shrunk or turned where it stands (see *Shrink or turn objects to make them fit*).
+When *Shrink or turn objects that are too close* is on, an object is first tried shrunk or turned where it stands before it is removed here (see *Shrink or turn objects to make them fit*).
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
@@ -277,14 +277,15 @@ mod's own objects (see *What is always kept*); a moved object linked to another 
 
 #### Shrink or turn objects to make them fit
 
-These two settings control the shrinking and turning of the cleaned mod's objects and of the moved objects of other mods (see *Objects of other mods that the cleaned mod moved*).
+These settings control the shrinking and turning of the cleaned mod's objects and of the moved objects of other mods (see *Objects of other mods that the cleaned mod moved*).
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
+| Shrink or turn objects that are too close | `true` | Off: an object too close to another mod's object is removed without first being tried shrunk or turned; the two settings below are then not used. Shrink 100 with Turn 0 also means nothing is shrunk or turned, and the log then shows this group as off. |
 | Shrink down to (% of its size) | `80` | An object that would be removed for being too close to another mod's object may be shrunk where it stands, down to this share of its size, to make it fit, in steps of 5%; the largest size that fits is used. Applies to the cleaned mod's own objects and to the moved ones of other mods. 100 or more: objects are never shrunk. At least 1: a lower value is raised to 1, with a warning in the log. |
 | Turn by at most (degrees either way) | `360` | Such an object may be turned about its upright axis by up to this many degrees to the left or to the right to make it fit, in steps of 15 degrees; the smallest turn that fits is used. It is never tilted. 0: objects are never turned. 180 or more: objects may face any way. A negative value becomes 0, with a warning in the log. |
 
-With *Shrink down to* `100` and *Turn by at most* `0`, nothing is shrunk or turned. The larger size always comes first: each size is tried with no turn, then with the smallest turns, one way before the other. The limit itself is always the last size tried (for `82`: 100, 95, 90, 85, 82). A shrunk or turned object must also stay off terrain another mod changed. An object that fits nowhere is removed.
+The larger size always comes first: each size is tried with no turn, then with the smallest turns, one way before the other. The limit itself is always the last size tried (for `82`: 100, 95, 90, 85, 82). A shrunk or turned object must also stay off terrain another mod changed. An object that fits nowhere is removed.
 
 Only objects that are too close are shrunk or turned. These are never shrunk or turned, and are removed as before:
 - an object on terrain another mod changed (see *Remove objects on terrain changed by other mods*);
@@ -433,9 +434,8 @@ step removes do not count towards each other.
 
 Only the cleaned mod's visible objects, including other mods' objects it moved, count as surroundings, never an object itself or invisible objects.
 The objects listed under *What is always kept* are kept in any case, and so are the kinds ticked under *Never remove these as visible objects left behind*,
-unless they are linked to a removed object. Every kind can be removed by default. The tick boxes are: NPCs and creatures, doors, containers, furniture,
-activators, lights with a model, trees and plants, loose items (miscellaneous items, weapons, armour, books, ingredients and the like) and, last,
-other visible objects.
+unless they are linked to a removed object. Every kind can be removed by default. The tick boxes are: NPCs and creatures, containers, furniture and activators.
+Other visible objects (doors, lights, trees and plants, loose items, statics) have no tick box: only their surroundings decide.
 
 Numbers out of range are corrected to the nearest valid value (a value that is not a number becomes
 the default), and percentages are rounded to the nearest step of 10, each with a warning in the log.

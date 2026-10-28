@@ -8,16 +8,12 @@ internal static class VisibleObjectKinds
     private static readonly IReadOnlyDictionary<BaseRecordKind, VisibleObjectKind> ByRecordKind = new Dictionary<BaseRecordKind, VisibleObjectKind>
     {
         [BaseRecordKind.Npc] = VisibleObjectKind.NpcsAndCreatures,
-        [BaseRecordKind.Door] = VisibleObjectKind.Doors,
         [BaseRecordKind.Container] = VisibleObjectKind.Containers,
         [BaseRecordKind.Furniture] = VisibleObjectKind.Furniture,
         [BaseRecordKind.Activator] = VisibleObjectKind.Activators,
-        [BaseRecordKind.Light] = VisibleObjectKind.LightsWithModel,
-        [BaseRecordKind.TreeOrPlant] = VisibleObjectKind.TreesAndPlants,
-        [BaseRecordKind.LooseItem] = VisibleObjectKind.LooseItems,
     };
 
-    /// <summary>By the record type of the object's base; a visible object always has a base.</summary>
-    public static VisibleObjectKind Of(TargetObject target, IBaseFacts bases) =>
-        ByRecordKind.GetValueOrDefault(bases.Of(target.Base!.Value).Kind, VisibleObjectKind.OtherVisibleObjects);
+    /// <summary>By the record type of the object's base, which a visible object always has; null for an object of no listed kind.</summary>
+    public static VisibleObjectKind? Of(TargetObject target, IBaseFacts bases) =>
+        ByRecordKind.TryGetValue(bases.Of(target.Base!.Value).Kind, out var kind) ? kind : null;
 }

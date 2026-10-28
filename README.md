@@ -266,7 +266,8 @@ out of it.
 The cleaned mod can change an object another mod (or the base game) placed. When it leaves the object where that mod
 placed it (within *Check other mods' objects the cleaned mod moved farther than*), other mods were made to fit it there, so the object is never checked, even if the cleaned
 mod gave it another model, rotation or size. When it moves the object, the moved object is checked like the cleaned mod's
-own objects (too close to other mods' objects, NPCs stuck in it, terrain changed by other mods, and, for an invisible object
+own objects (too close to other mods' objects, NPCs stuck in it, terrain changed by other mods, for a visible object whether its
+surroundings were removed (see *Visible objects left behind*), and, for an invisible object
 such as a sound or a marker, sitting inside another mod's object). If it fits where the cleaned mod put it, it stays there.
 If it is too close to another mod's object, it is shrunk or turned there when that makes it fit (see below); otherwise it is
 removed, the same way as the cleaned mod's objects. Objects resting on a removed moved object are handled
@@ -419,8 +420,8 @@ The objects it removes are then followed up by *Also remove what rests on remove
 | When the cleaned mod's visible objects around it were removed: Look this far around it (game units) | `1024` | How far around to look for the cleaned mod's other visible objects (64-8192). |
 | When the cleaned mod's visible objects around it were removed: Decide only if at least this many of the 8 directions have objects | `6` | A direction has objects when another visible object of the cleaned mod lies that way. With fewer such directions the object is kept (1-8). |
 | When the cleaned mod's visible objects around it were removed: A direction is cleared when this much of it was removed (%) | `80` | Share removed for a direction to count as cleared. |
-| When the cleaned mod's visible objects around it were removed: Remove when this share of the directions with objects is cleared (%) | `80` | Counted only among the directions that have objects, not among all 8. Example: objects lie in 5 directions and 4 of them are cleared: 4 of 5 is 80%, so it is removed with 80 or less and kept with 90 or more. |
-| Never remove these as visible objects left behind (ticked = kept) | *(none ticked)* | One tick box per kind (see below). A ticked kind is kept by this step, an unticked kind can be removed by it. Does not affect the too-close or changed-terrain removals. |
+| When the cleaned mod's visible objects around it were removed: Remove when this share of the directions with objects is cleared (%) | `80` | Counted only among the directions that have objects, not among all 8. Example: objects lie in 7 directions and 6 of them are cleared: 6 of 7 is 86%, so it is removed with 80 or less and kept with 90 or more. |
+| Never remove these as visible objects left behind (ticked = kept) | *(none ticked)* | One tick box per kind (see below). A ticked kind is kept by this step, an unticked kind can be removed by it. Does not affect the too-close or changed-terrain removals, and *Also remove what rests on removed objects* can still remove a ticked kind. |
 
 The two percentages take values from 10 to 100 in steps of 10.
 
@@ -430,7 +431,7 @@ and at least *Remove when this share of the directions with objects is cleared (
 when this much of it was removed (%)* of their ground area. Each object is judged against what the earlier steps removed; objects this
 step removes do not count towards each other.
 
-Only the cleaned mod's own visible objects count as surroundings, never an object itself, invisible objects or other mods' objects.
+Only the cleaned mod's visible objects, including other mods' objects it moved, count as surroundings, never an object itself or invisible objects.
 The objects listed under *What is always kept* are kept in any case, and so are the kinds ticked under *Never remove these as visible objects left behind*,
 unless they are linked to a removed object. Every kind can be removed by default. The tick boxes are: NPCs and creatures, doors, containers, furniture,
 activators, lights with a model, trees and plants, loose items (miscellaneous items, weapons, armour, books, ingredients and the like) and, last,
@@ -448,8 +449,8 @@ the default), and percentages are rounded to the nearest step of 10, each with a
 | When the cleaned mod's visible objects around it were removed: Decide only if at least this many of the 8 directions have objects | `4` | A direction has objects when a visible object of the cleaned mod lies that way. With fewer such directions the invisible object is kept (1-8). |
 | When the cleaned mod's visible objects around it were removed: A direction is cleared when this much of it was removed (%) | `50` | Share removed for a direction to count as cleared. |
 | When the cleaned mod's visible objects around it were removed: Remove when this share of the directions with objects is cleared (%) | `60` | Counted only among the directions that have objects, not among all 8. Example: objects lie in 5 directions and 3 of them are cleared: 3 of 5 is 60%, so it is removed with 60 or less and kept with 70 or more. |
-| Never remove these as left behind (ticked = kept) | *(none ticked)* | One tick box per kind (see below). A ticked kind is kept by this step, an unticked kind can be removed by it. Does not affect the too-close or changed-terrain removals. |
-| Move kept markers out of other mods' objects | `true` | Move a kept map, X (including heading), idle or other marker that sits inside another mod's object to the nearest free spot on the navmesh or, failing that, the ground. Only its position changes. Needs *Remove invisible objects left inside other mods' objects or alone* on; markers are kept when *Never remove these as left behind* ticks them or something depends on them. Lights, sounds, acoustic spaces, trigger boxes, critter spawners, decals, furniture and door markers are never moved. |
+| Never remove these as invisible objects left behind (ticked = kept) | *(none ticked)* | One tick box per kind (see below). A ticked kind is kept by this step, an unticked kind can be removed by it. Does not affect the too-close or changed-terrain removals, and *Also remove what rests on removed objects* can still remove a ticked kind. |
+| Move kept markers out of other mods' objects | `true` | Move a kept map, X (including heading), idle or other marker that sits inside another mod's object to the nearest free spot on the navmesh or, failing that, the ground. Only its position changes. Needs *Remove invisible objects left inside other mods' objects or alone* on; markers are kept when *Never remove these as invisible objects left behind* ticks them or something depends on them. Lights, sounds, acoustic spaces, trigger boxes, critter spawners, decals, furniture and door markers are never moved. |
 
 The two percentages take values from 10 to 100 in steps of 10.
 
@@ -460,8 +461,8 @@ An invisible object is removed when:
   and at least *Remove when this share of the directions with objects is cleared (%)* of those lost at least *A direction is cleared
   when this much of it was removed (%)* of their ground area. An object of the cleaned mod that the invisible object sits in counts in every direction.
 
-Only the cleaned mod's own objects count as surroundings. The objects listed under *What is always
-kept* are kept in any case, and so are the kinds ticked under *Never remove these as left behind*,
+Only the cleaned mod's visible objects, including other mods' objects it moved, count as surroundings. The objects listed under *What is always
+kept* are kept in any case, and so are the kinds ticked under *Never remove these as invisible objects left behind*,
 unless they are linked to a removed object.
 The tick boxes are: map markers, position markers (XMarker, XMarkerHeading), idle animation spots, furniture use spots,
 invisible marker doors (doors flagged as markers that lead nowhere), lights without a model, sound sources, echo areas (acoustic spaces), critter spawners,

@@ -27,10 +27,10 @@ internal static partial class LogSections
         new("linked" + idSuffix, BuildLinkedRemovalLines(rounds.Sum(round => RemovalList.CountLinkedIn(decisions, round)), step, context));
 
     /// <summary>E.g. "2 inside another mod's object, 2 surroundings removed", with a count for each outcome.</summary>
-    public static string CountOutcomes<TOutcome>(IEnumerable<TOutcome> outcomes, Func<TOutcome, string> describe, Func<TOutcome, int> countOf) =>
+    private static string CountOutcomes<TOutcome>(IEnumerable<TOutcome> outcomes, Func<TOutcome, string> describe, Func<TOutcome, int> countOf) =>
         string.Join(Describe.ListSeparator, TextLists.Counts(outcomes.Select(outcome => KeyValuePair.Create(describe(outcome), countOf(outcome)))));
 
-    /// <summary>E.g. "Step: 5 evaluated; removed 2 (2 surroundings removed); kept 3 (3 protected type)." for the outcomes of a step's evaluations.</summary>
+    /// <summary>E.g. "Step: 14 evaluated; removed 2 (2 surroundings removed); kept 12 (12 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 0 referenced)." for the outcomes of a step's evaluations.</summary>
     /// <param name="decisions">The final outcome of each evaluated object.</param>
     /// <param name="isListedOnlyWhenCounted">Outcomes that are named only when an object has them; every other outcome is named with its count, also zero.</param>
     public static string BuildOutcomeSummaryLine<TOutcome>(

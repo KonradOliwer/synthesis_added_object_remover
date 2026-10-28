@@ -13,7 +13,7 @@ internal static class ObjectVisibilityText
         return visibility.Kind is { } kind ? KindName(kind) : "visible";
     }
 
-    /// <summary>The kind's name as the settings screen lists it under "Never remove these as left behind".</summary>
+    /// <summary>The kind's name as the settings screen lists it under "Never remove these as invisible objects left behind".</summary>
     public static string KindName(InvisibleObjectKind kind) => kind switch
     {
         InvisibleObjectKind.MapMarkers => "Map markers",

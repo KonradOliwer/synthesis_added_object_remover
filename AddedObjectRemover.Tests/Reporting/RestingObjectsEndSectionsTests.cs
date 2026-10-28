@@ -137,6 +137,18 @@ public sealed class RestingObjectsEndSectionsTests
         Assert.Equal(["Also remove after visible objects left behind: not performed because of an unexpected error."], section.Lines.ToList());
     }
 
+    [Fact]
+    public void AlsoRemoveAfterVisibleLeftBehind_LinkedSectionHasItsOwnIdAndNamesTheVisibleStep()
+    {
+        var (_, _, decisions) = TouchScene();
+        var pass = LogSections.AlsoRemovePass.AfterVisibleLeftBehind;
+
+        var section = LogSections.BuildLinkedSection(decisions, [], pass.LinkedStep, pass.IdSuffix, Detailed);
+
+        Assert.Equal("linked-after-visible", section.Id);
+        Assert.Equal(["Linked groups: 0 more objects removed with the follow-up after visible left-behind removals they are linked to."], section.Lines.ToList());
+    }
+
     [Theory]
     [InlineData(StepOutcome.Performed, true, true)]
     [InlineData(StepOutcome.Performed, false, false)]
@@ -480,7 +492,7 @@ public sealed class RestingObjectsEndSectionsTests
         Assert.Equal(["Removed markers by type: 1 Invisible marker doors."], LogSections.BuildMarkersByTypeSection(targets, removals, context).Lines.ToList());
     }
 
-    /// <summary>Each kind's log name is the name its tick box has under "Never remove these as left behind".</summary>
+    /// <summary>Each kind's log name is the name its tick box has under "Never remove these as invisible objects left behind".</summary>
     [Fact]
     public void TheLogNamesEachInvisibleObjectKindAsTheSettingsScreenDoes()
     {

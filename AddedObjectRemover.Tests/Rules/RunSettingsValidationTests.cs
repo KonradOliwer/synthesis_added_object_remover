@@ -203,6 +203,7 @@ public class RunSettingsValidationTests
     public void WarningsComeInTheOrderSettingsAreCheckedWithEachInvalidValueReportedOnce()
     {
         var settings = SettingsFor();
+        settings.MovedDistanceInUnits = -5f;
         settings.Trust = new TrustSettings { MaxOtherMastersOfRequiringModToTrust = 500 };
         settings.TooClose.NpcHandling = (NpcHandling)99;
         settings.TooClose.BySize.SizeMultiplier = 9f;
@@ -228,6 +229,7 @@ public class RunSettingsValidationTests
         string[] expectedStarts =
         [
             "Warning: could not read Target.esp",
+            "Warning: Check other mods' objects the cleaned mod moved farther than",
             "Warning: Which other mods can cause removals > ...only if it has at most this many other masters 500 is outside 0-100",
             "Warning: Remove objects too close to other mods' objects > Other mods' NPCs and creatures cause removal",
             "Warning: Remove objects too close to other mods' objects > Margin by object size > Margin on every side",
@@ -235,9 +237,9 @@ public class RunSettingsValidationTests
             "Warning: Also remove what rests on removed objects > Gap that still counts as touching",
             "Warning: Also remove what rests on removed objects > OnlyWhatLosesItsSupport: remove when this much support is gone",
             "Warning: Invisible objects left behind > When the cleaned mod's visible objects around it were removed > Look this far around it",
+            "Warning: Invisible objects left behind > When the cleaned mod's visible objects around it were removed > Decide only if at least this many of the 8 directions have objects 0 is outside 1-8; using 1",
             "Warning: Invisible objects left behind > When the cleaned mod's visible objects around it were removed > A direction is cleared when this much of it was removed 45 is not a multiple",
             "Warning: Invisible objects left behind > When the cleaned mod's visible objects around it were removed > Remove when this share of the directions with objects is cleared 44 is not a multiple",
-            "Warning: Invisible objects left behind > When the cleaned mod's visible objects around it were removed > Decide only if at least this many of the 8 directions have objects 0 is outside 1-8; using 1",
         ];
         Assert.Equal(expectedStarts.Length, messages.Count);
         for (var i = 0; i < expectedStarts.Length; i++)

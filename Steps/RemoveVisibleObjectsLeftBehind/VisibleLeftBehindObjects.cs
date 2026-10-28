@@ -14,7 +14,7 @@ public static class VisibleLeftBehindObjects
     /// <param name="settings">Null when the step is switched off.</param>
     /// <returns>
     /// The evaluations, and the proposals. An object the round keeps as referenced is already <see cref="VisibleLeftBehindOutcome.KeptReferenced"/>
-    /// with its keep reason: the step decides its round on a working copy of <paramref name="decisions"/> and joins the verdicts itself.
+    /// with its keep reason, and one the round removes as a linked member is <see cref="VisibleLeftBehindOutcome.RemovedLinkedToRemoval"/>: the step decides its round on a working copy of <paramref name="decisions"/> and joins the verdicts itself.
     /// When <paramref name="settings"/> is null the result is <see cref="StepOutcome.SwitchedOff"/>. An unexpected failure stops the step:
     /// <see cref="StepOutcome.StoppedByUnexpectedError"/>, with the failure and no proposals.
     /// </returns>

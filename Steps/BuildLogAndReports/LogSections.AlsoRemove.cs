@@ -18,7 +18,10 @@ internal static partial class LogSections
     internal sealed record AlsoRemovePass(string StepName, string IdSuffix, string LinkedStep)
     {
         public static readonly AlsoRemovePass First = new(AlsoRemoveName, string.Empty, RunPartText.LinkedStep(RoundKind.AlsoRemove));
-        public static readonly AlsoRemovePass AfterVisibleLeftBehind = new(AlsoRemoveAfterVisibleLeftBehindName, "-after-visible", "follow-up after visible left-behind");
+        public static readonly AlsoRemovePass AfterVisibleLeftBehind = new(
+            AlsoRemoveAfterVisibleLeftBehindName,
+            "-after-visible",
+            $"{RunPartText.LinkedStep(RoundKind.AlsoRemove)} after {RunPartText.LinkedStep(RoundKind.VisibleLeftBehind)}");
     }
 
     /// <summary>The section of the also-remove step's mode; the empty one when no round ran, and the not-performed line when the step was stopped.</summary>
@@ -36,7 +39,7 @@ internal static partial class LogSections
             _ => throw new UnreachableException($"Unexpected also-remove outcome {alsoRemove.Outcome}."),
         };
 
-    /// <summary>The also-remove section for the visible left-behind removals; printed only when the pass was stopped or had seeds.</summary>
+    /// <summary>The also-remove section for the visible left-behind removals.</summary>
     /// <param name="decisions">The run's decisions with the second pass's rounds applied.</param>
     public static LogSection BuildAlsoRemoveAfterVisibleLeftBehindSection(
         CollectedObjects world, RestingObjectsResult alsoRemove, IRemovalDecisions decisions, TriangleStoreStats meshes, ReportContext context) =>

@@ -135,7 +135,7 @@ internal static partial class LogSections
         var protectedKinds = TextLists.JoinOr(leftovers.NeverRemove.Order().Select(ObjectVisibilityText.KindName), Describe.ListSeparator, Describe.NoEntries);
         return $"{LeftBehindStepName}: on; "
             + $"{DescribeSurroundings(leftovers.LookAround, leftovers.MinOccupiedDirections, leftovers.DirectionClearedPercent, leftovers.ClearedDirectionsPercent)}; "
-            + $"Never remove these as left behind: {protectedKinds}; "
+            + $"Never remove these as invisible objects left behind: {protectedKinds}; "
             + $"Move kept markers out of other mods' objects: {OnOff(settings.MarkerMoves != null)}.";
     }
 }

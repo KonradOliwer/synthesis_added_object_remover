@@ -17,7 +17,7 @@ namespace AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 /// <param name="TargetAsTyped">The target plugin as the settings spell it; printed in the log and reports.</param>
 /// <param name="VisibleLeftBehind">Null when the left-behind visible objects step is off.</param>
 /// <param name="LeftBehind">Null when the left-behind invisible objects step is off.</param>
-/// <param name="MarkerMoves">Null unless kept markers are moved, which needs the left-behind step.</param>
+/// <param name="MarkerMoves">Null unless kept markers are moved, which needs the invisible left-behind step.</param>
 /// <param name="Reports">Null when the detailed log and reports are off.</param>
 /// <param name="OnlyWarnWhenRequiringModLoadsAfterPatch">Whether a mod that requires the cleaned mod and loads after the patch is a warning instead of a stop.</param>
 public sealed record RunSettings(

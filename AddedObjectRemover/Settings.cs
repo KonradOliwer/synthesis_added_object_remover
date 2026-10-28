@@ -130,7 +130,7 @@ public class StandardSettings : ISettingsValues
     [SynthesisSettingName("Visible objects left behind")]
     [SynthesisTooltip(
         "The cleaned mod's visible objects are removed when most of the cleaned mod's visible objects around them were removed by the other removal steps\n"
-        + "(too close, changed terrain, also remove). Only the cleaned mod's objects count as surroundings.")]
+        + "(too close, changed terrain, also remove). Only the cleaned mod's objects, including other mods' objects it moved, count as surroundings.")]
     public LeftoverVisibleObjectSettings LeftoverVisibleObjects { get; set; } = new();
 
     [SynthesisOrder]
@@ -463,7 +463,7 @@ public class LeftoverVisibleObjectSettings : IVisibleLeftoverSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName("When the cleaned mod's visible objects around it were removed")]
     [SynthesisTooltip(
-        "For each visible object, the cleaned mod's other visible objects around it (never other mods' objects) are sorted into 8 directions\n"
+        "For each visible object, the cleaned mod's other visible objects around it (the cleaned mod's objects, including other mods' objects it moved) are sorted into 8 directions\n"
         + "(north, north-east, ...) and measured by the ground area they cover. Objects removed by the earlier steps count as removed.\n"
         + "The object is removed when enough of those directions were mostly cleared. The settings are applied in the order listed; the percentages go in steps of 10.")]
     public VisibleSurroundingObjectsSettings SurroundingObjects { get; set; } = new();
@@ -472,7 +472,7 @@ public class LeftoverVisibleObjectSettings : IVisibleLeftoverSettingsValues
     [SynthesisSettingName("Never remove these as visible objects left behind (ticked = kept)")]
     [SynthesisTooltip(
         "Ticked kinds are kept by this step (unless linked to a removed object); unticked kinds can be removed by it. "
-        + "Only this step is affected, not the too-close or changed-terrain removals.\n"
+        + "Only this left-behind step is affected, not the too-close or changed-terrain removals; \"Also remove what rests on removed objects\" can still remove a ticked kind.\n"
         + "What \"Mod to clean up\" lists as always kept stays kept, ticked or not.")]
     public KeptVisibleObjectSettings AlwaysKeep { get; set; } = new();
 
@@ -500,8 +500,8 @@ public class VisibleSurroundingObjectsSettings : ISurroundingObjectsSettingsValu
     [SynthesisOrder]
     [SynthesisSettingName("Remove when this share of the directions with objects is cleared (%)")]
     [SynthesisTooltip(
-        "Counted only among the directions that have objects, not among all 8. Example: objects lie in 5 directions and 4 of them are cleared: "
-        + "4 of 5 is 80%, so it is removed with 80 or less and kept with 90 or more. 10-100, in steps of 10.")]
+        "Counted only among the directions that have objects, not among all 8. Example: objects lie in 7 directions and 6 of them are cleared: "
+        + "6 of 7 is 86%, so it is removed with 80 or less and kept with 90 or more. 10-100, in steps of 10.")]
     public int ClearedDirectionsPercent { get; set; } = SettingDefaults.VisibleClearedDirectionsPercent;
 }
 
@@ -580,16 +580,16 @@ public class LeftoverInvisibleObjectSettings : ILeftoverSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName("When the cleaned mod's visible objects around it were removed")]
     [SynthesisTooltip(
-        "For each invisible object, the cleaned mod's visible objects around it (never other mods' objects) are sorted into 8 directions\n"
+        "For each invisible object, the cleaned mod's visible objects around it (the cleaned mod's objects, including other mods' objects it moved) are sorted into 8 directions\n"
         + "(north, north-east, ...) and measured by the ground area they cover. Objects removed by the earlier steps count as removed.\n"
         + "The invisible object is removed when enough of those directions were mostly cleared. The settings are applied in the order listed; the percentages go in steps of 10.")]
     public SurroundingObjectsSettings SurroundingObjects { get; set; } = new();
 
     [SynthesisOrder]
-    [SynthesisSettingName("Never remove these as left behind (ticked = kept)")]
+    [SynthesisSettingName("Never remove these as invisible objects left behind (ticked = kept)")]
     [SynthesisTooltip(
         "Ticked kinds are kept by this step (unless linked to a removed object); unticked kinds can be removed by it. "
-        + "Only this left-behind step is affected, not the too-close or changed-terrain removals.\n"
+        + "Only this left-behind step is affected, not the too-close or changed-terrain removals; \"Also remove what rests on removed objects\" can still remove a ticked kind.\n"
         + "What \"Mod to clean up\" lists as always kept stays kept, ticked or not.")]
     public KeptInvisibleObjectSettings AlwaysKeep { get; set; } = new();
 

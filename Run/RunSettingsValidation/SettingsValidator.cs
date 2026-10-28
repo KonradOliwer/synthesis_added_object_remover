@@ -31,6 +31,7 @@ public static class SettingsValidator
     private const byte TouchGapBelowPullLimit = MaxTouchDistance < OtherModsObjectsLimits.MaxPullDistance ? 0 : 256;
     private const float MinSearchRadius = 64f;
     private const float MaxSearchRadius = 8192f;
+    private const int MinOccupiedDirectionsLowest = 1;
     private const int MaxOtherMastersLimit = 100;
     private const float MinPercent = 1f;
     private const int MinShrinkLimitPercent = 1;
@@ -98,10 +99,10 @@ public static class SettingsValidator
 
         WarnOfRequiringModsAfterPatch(requiringModsAfterPatch, targetAsTyped.ToString(), warnings);
         WarnIfMastersUnreadable(targetListing, warnings);
+        var movedDistance = NotNegative(settings.MovedDistanceInUnits, SettingDefaults.MovedDistanceInUnits, MovedDistanceName, warnings);
         var modTrust = CreateModTrustSettings(records, mods, targetListing.Mod, settings.Trust, warnings);
         var tooClose = CreateTooCloseSettings(settings.TooClose, warnings);
         var changedTerrain = CreateChangedTerrainSettings(settings.TerrainChange, warnings);
-        var movedDistance = NotNegative(settings.MovedDistanceInUnits, SettingDefaults.MovedDistanceInUnits, MovedDistanceName, warnings);
         var fit = CreateFitSettings(settings.ShrinkOrTurn, warnings);
         var alsoRemove = CreateAlsoRemoveSettings(settings.FollowUpRemoval, touchChainsShown: detailedLogAndReports, warnings);
         var otherModsObjects = CreateOtherModsObjectsSettings(settings.FollowUpRemoval, alsoRemove, warnings);
@@ -388,7 +389,7 @@ public static class SettingsValidator
     /// plugin's terrain only when the changed-terrain step runs, its texture layers only when it counts terrain types, and its water
     /// only when it counts a water change.
     /// </summary>
-    /// <param name="movedDistance">The validated distance that counts as moved.</param>
+    /// <param name="movedDistance">The validated moved distance.</param>
     private static WhatToCollect CreateWhatToCollect(
         MarkerMoveSettings? markerMoves, ChangedTerrainSettings changedTerrain, bool detailedLog, float movedDistance)
     {
@@ -407,7 +408,7 @@ public static class SettingsValidator
             InvisibleSurroundingObjectsGroup,
             leftovers.SurroundingObjects,
             warnings,
-            (lookAround, directionCleared, clearedDirections, minOccupied) =>
+            (lookAround, minOccupied, directionCleared, clearedDirections) =>
                 new LeftBehindSettings(
                     LookAround: lookAround,
                     MinOccupiedDirections: minOccupied,
@@ -421,7 +422,7 @@ public static class SettingsValidator
             VisibleSurroundingObjectsGroup,
             leftovers.SurroundingObjects,
             warnings,
-            (lookAround, directionCleared, clearedDirections, minOccupied) =>
+            (lookAround, minOccupied, directionCleared, clearedDirections) =>
                 new VisibleLeftBehindSettings(
                     LookAround: lookAround,
                     MinOccupiedDirections: minOccupied,
@@ -429,14 +430,14 @@ public static class SettingsValidator
                     ClearedDirectionsPercent: clearedDirections,
                     NeverRemove: leftovers.NeverRemove.ToHashSet()));
 
-    /// <param name="create">Builds the step's settings from the validated radius, direction share, cleared-directions share and occupied-directions count.</param>
+    /// <param name="create">Builds the step's settings from the validated radius, occupied-directions count, direction share and cleared-directions share.</param>
     private static TSettings ValidateSurroundings<TSettings>(
         string group, ISurroundingObjectsSettingsValues values, ICollection<SettingWarning> warnings, Func<float, int, int, int, TSettings> create) =>
         create(
             Clamp(values.SearchRadius, MinSearchRadius, MaxSearchRadius, SettingDefaults.SearchRadius, group + SearchRadiusName, warnings),
+            Clamp(values.MinOccupiedDirections, MinOccupiedDirectionsLowest, CompassDirections.SectorCount, group + MinOccupiedDirectionsName, warnings),
             WholeTens(values.DirectionThresholdPercent, group + DirectionThresholdName, warnings),
-            WholeTens(values.ClearedDirectionsPercent, group + ClearedDirectionsName, warnings),
-            Clamp(values.MinOccupiedDirections, 1, CompassDirections.SectorCount, group + MinOccupiedDirectionsName, warnings));
+            WholeTens(values.ClearedDirectionsPercent, group + ClearedDirectionsName, warnings));
 
     private static StopReason? FindTarget(IPluginRecords records, LoadOrderPlugins mods, string? targetPlugin, out PluginName target, out PluginListing targetListing)
     {

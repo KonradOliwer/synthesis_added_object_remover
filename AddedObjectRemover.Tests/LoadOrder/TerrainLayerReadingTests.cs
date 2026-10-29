@@ -181,7 +181,7 @@ public class TerrainLayerReadingTests
     {
         var state = FixturePatcherState.Create([_base.Mod, _target.Mod], Path.GetTempPath(), Path.GetTempPath());
         var plugin = new PluginRecordsFactory(FixturePatcherState.CreateFinalWorld(state), Environment.ProcessorCount).Open();
-        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: layers, Water: false, TestRecordKeys.HoldKeyword), TestVersionWalks.NoStop);
+        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: layers, Water: false, TestRecordKeys.HoldKeyword, TerrainReadsNeedAnOverride: false), TestVersionWalks.NoStop);
         return plugin;
     }
 }

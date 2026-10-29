@@ -30,6 +30,14 @@ internal sealed class FixtureMod
 
     public FormKey NextKey() => Mod.GetNextFormKey();
 
+    /// <summary>One plugin's copy of an exterior cell of the fixture's worldspace, at grid (x, 0).</summary>
+    public FixtureCell AddExteriorCell(FormKey key, string editorId, int x)
+    {
+        var cell = new Cell(key, Release) { EditorID = editorId, Grid = new CellGrid { Point = new P2Int(x, 0) } };
+        Mod.Worldspaces.First().AddCell(cell);
+        return new FixtureCell(this, cell);
+    }
+
     public FormKey AddModeledStatic(string editorId, string model)
     {
         var record = new Static(NextKey(), Release) { EditorID = editorId, Model = new Model { File = model } };

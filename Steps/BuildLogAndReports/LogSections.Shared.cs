@@ -13,30 +13,49 @@ internal static partial class LogSections
         [.. kept.Select(entry => KeptLine(world, entry))];
 
     /// <remarks>Only the detailed log shows it: the removal summary repeats the count.</remarks>
-    public static ImmutableArray<string> BuildLinkedRemovalLines(int count, string step, ReportContext context) =>
-        context.Detailed
-            ? [$"Linked groups: {TextFormat.Count(count)} more objects removed with the {step} removals they are linked to."]
-            : [];
+    /// <param name="removedAfterRestoredCount">How many of the removed members followed a member that was restored.</param>
+    public static ImmutableArray<string> BuildLinkedRemovalLines(int removedCount, int restoredCount, int removedAfterRestoredCount, string step, ReportContext context)
+    {
+        if (!context.Detailed) return [];
+        var restored = restoredCount > 0 ? $" and {TextFormat.Count(restoredCount)} restored" : string.Empty;
+        var restorations = restoredCount > 0 || removedAfterRestoredCount > 0 ? " and restorations" : string.Empty;
+        return [$"Linked groups: {TextFormat.Count(removedCount)} more objects removed{restored} with the {step} removals{restorations} they are linked to."];
+    }
 
-    /// <summary>How many objects a step's rounds removed as linked to their own removals.</summary>
+    /// <summary>How many objects a step's rounds removed, and how many they restored, as members of a linked group.</summary>
     public static LogSection BuildLinkedSection(IRemovalDecisions decisions, IEnumerable<Round> rounds, RoundKind kind, ReportContext context) =>
         BuildLinkedSection(decisions, rounds, RunPartText.LinkedStep(kind), string.Empty, context);
 
     public static LogSection BuildLinkedSection(
         IRemovalDecisions decisions, IEnumerable<Round> rounds, string step, string idSuffix, ReportContext context) =>
-        new("linked" + idSuffix, BuildLinkedRemovalLines(rounds.Sum(round => RemovalList.CountLinkedIn(decisions, round)), step, context));
+        new(
+            "linked" + idSuffix,
+            BuildLinkedRemovalLines(
+                rounds.Sum(round => RemovalList.CountLinkedIn(decisions, round)),
+                rounds.Sum(round => RemovalList.CountRestoredLinkedIn(decisions, round)),
+                rounds.Sum(round => RemovalList.CountLinkedToRestoredIn(decisions, round)),
+                step,
+                context));
+
+    /// <summary>"; 2 of them restored" at the end of a step's finding, or nothing when none of the found objects was restored.</summary>
+    private static string DescribeRestoredOfFound(int restoredCount) =>
+        restoredCount > 0 ? $"; {TextFormat.Count(restoredCount)} of them restored" : string.Empty;
 
     /// <summary>E.g. "2 inside another mod's object, 2 surroundings removed", with a count for each outcome.</summary>
     private static string CountOutcomes<TOutcome>(IEnumerable<TOutcome> outcomes, Func<TOutcome, string> describe, Func<TOutcome, int> countOf) =>
         string.Join(Describe.ListSeparator, TextLists.Counts(outcomes.Select(outcome => KeyValuePair.Create(describe(outcome), countOf(outcome)))));
 
-    /// <summary>E.g. "Step: 14 evaluated; removed 2 (2 surroundings removed); kept 12 (12 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 0 referenced)." for the outcomes of a step's evaluations.</summary>
+    /// <summary>
+    /// E.g. "Step: 14 evaluated; removed 2 (2 surroundings removed); kept 12 (12 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 0 referenced)." for the outcomes of a step's evaluations.
+    /// With restored objects, "restored 1 (1 surroundings removed); " comes between the two.
+    /// </summary>
     /// <param name="decisions">The final outcome of each evaluated object.</param>
     /// <param name="isListedOnlyWhenCounted">Outcomes that are named only when an object has them; every other outcome is named with its count, also zero.</param>
     public static string BuildOutcomeSummaryLine<TOutcome>(
         string stepName,
         IReadOnlyCollection<TOutcome> decisions,
         Func<TOutcome, bool> isRemoval,
+        Func<TOutcome, bool> isRestoration,
         Func<TOutcome, bool> isListedOnlyWhenCounted,
         Func<TOutcome, string> describe,
         TimeSpan elapsed,
@@ -46,9 +65,13 @@ internal static partial class LogSections
         Func<TOutcome, int> countOf = outcome => decisions.Count(decision => decision.Equals(outcome));
         var listed = Enum.GetValues<TOutcome>().Where(outcome => !isListedOnlyWhenCounted(outcome) || countOf(outcome) > 0).ToList();
         var removedCount = decisions.Count(isRemoval);
+        var restoredCount = decisions.Count(isRestoration);
+        var restored = restoredCount > 0 ? $"restored {TextFormat.Count(restoredCount)} ({CountOutcomes(listed.Where(isRestoration), describe, countOf)}); " : string.Empty;
         return $"{stepName}: {TextFormat.Count(decisions.Count)} evaluated{Describe.TimedSuffix(elapsed, context)}; "
             + $"removed {TextFormat.Count(removedCount)} ({CountOutcomes(listed.Where(isRemoval), describe, countOf)}); "
-            + $"kept {TextFormat.Count(decisions.Count - removedCount)} ({CountOutcomes(listed.Where(outcome => !isRemoval(outcome)), describe, countOf)}).";
+            + restored
+            + $"kept {TextFormat.Count(decisions.Count - removedCount - restoredCount)} "
+            + $"({CountOutcomes(listed.Where(outcome => !isRemoval(outcome) && !isRestoration(outcome)), describe, countOf)}).";
     }
 
     /// <summary>The also-remove section when no round ran.</summary>
@@ -115,7 +138,7 @@ internal static partial class LogSections
     {
         var target = world.Targets[entry.TargetIndex];
         var touched = entry.TouchedTargetIndex is { } touchedIndex
-            ? $" (touches removed {RecordNames.Describe(world.Targets[touchedIndex])})"
+            ? $" (touches {Describe.Fate(entry.TouchedDecision)} {RecordNames.Describe(world.Targets[touchedIndex])})"
             : string.Empty;
         return $"  Kept {RecordNames.Describe(target)} in {Describe.Space(world, target.SpaceKey)}: {KeepReasonText.Detail(entry.Reason)}{touched}.";
     }

@@ -34,24 +34,33 @@ public sealed record ModTrustTable(
     public bool IsNeverTrusted(PluginName plugin) => Plugins.TryGetValue(plugin, out var trust) && trust.Reason == TrustReason.NeverTrusted;
 
     /// <summary>
-    /// The trust of the plugin's version of a record in the accepted-value rule (<see cref="AcceptedVersions"/>): the one mapping of
-    /// plugin trust to version trust. The patch is transparent: it holds what earlier patchers of the group wrote, which is never
-    /// accepted, and a value it only carries is traced to the plugin it came from.
+    /// The world the cleaned mod's objects are judged in (<see cref="AcceptedVersions"/>): the one mapping of plugin trust to version
+    /// trust. A value the patch only carries is traced to the plugin it came from.
     /// </summary>
-    public VersionTrust VersionTrustOf(PluginName plugin) =>
-        IsPatch(plugin)
-            ? VersionTrust.Transparent
-            : Plugins[plugin].Trust switch
-            {
-                ModTrust.Trusted => VersionTrust.Full,
-                ModTrust.TrustedForOwnChanges => VersionTrust.OwnEdits,
-                ModTrust.Untrusted => VersionTrust.None,
-                var unknown => throw new UnreachableException($"Unknown trust {unknown}."),
-            };
+    public AcceptedWorld AcceptedWorld { get; } = new(Patch, Plugins.ToImmutableDictionary(entry => entry.Key, entry => VersionTrustOf(entry.Value.Trust)));
+
+    /// <summary>
+    /// The world without the cleaned mod: what the game shows when the cleaned mod is not installed. Every plugin that loads without it
+    /// is believed, whatever the trust settings say; the cleaned mod and the plugins that cannot load without it are not.
+    /// </summary>
+    public AcceptedWorld AcceptedWorldWithoutCleanedMod { get; } = new(
+        Patch,
+        Plugins.ToImmutableDictionary(entry => entry.Key, entry => entry.Key == CleanedMod || entry.Value.NeedsCleanedMod ? VersionTrust.None : VersionTrust.Full));
+
+    private static VersionTrust VersionTrustOf(ModTrust trust) =>
+        trust switch
+        {
+            ModTrust.Trusted => VersionTrust.Full,
+            ModTrust.TrustedForOwnChanges => VersionTrust.OwnEdits,
+            ModTrust.Untrusted => VersionTrust.None,
+            var unknown => throw new UnreachableException($"Unknown trust {unknown}."),
+        };
 }
 
 /// <param name="Reason">Null for an untrusted plugin that no rule names.</param>
 /// <param name="RequiresCleanedMod">Whether the plugin has the cleaned mod as a master, trusted or not.</param>
 /// <param name="OtherMasterCount">The plugin's masters other than the base game, the cleaned mod and the cleaned mod's masters.</param>
 /// <param name="IsMasterOfCleanedMod">Whether the cleaned mod lists the plugin as a master, whatever rule trusts it.</param>
-public sealed record PluginTrust(ModTrust Trust, TrustReason? Reason, bool RequiresCleanedMod, int OtherMasterCount, bool IsMasterOfCleanedMod = false);
+/// <param name="NeedsCleanedMod">Whether the plugin cannot load without the cleaned mod: it has it as a master, directly or through another plugin that needs it.</param>
+public sealed record PluginTrust(
+    ModTrust Trust, TrustReason? Reason, bool RequiresCleanedMod, int OtherMasterCount, bool IsMasterOfCleanedMod, bool NeedsCleanedMod);

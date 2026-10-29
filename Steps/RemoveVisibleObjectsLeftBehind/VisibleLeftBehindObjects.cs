@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
@@ -10,11 +11,11 @@ namespace AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
 public static class VisibleLeftBehindObjects
 {
     /// <param name="decisions">The newest decisions; only the removals already in them count as cleared.</param>
-    /// <param name="surroundings">The visible target objects, removed or not.</param>
+    /// <param name="surroundings">The visible target objects, removed or not, where the rounds measure them: a restored one where the cleaned mod put it.</param>
     /// <param name="settings">Null when the step is switched off.</param>
     /// <returns>
     /// The evaluations, and the proposals. An object the round keeps as referenced is already <see cref="VisibleLeftBehindOutcome.KeptReferenced"/>
-    /// with its keep reason, and one the round removes as a linked member is <see cref="VisibleLeftBehindOutcome.RemovedLinkedToRemoval"/>: the step decides its round on a working copy of <paramref name="decisions"/> and joins the verdicts itself.
+    /// with its keep reason, and one the round removes as a linked member is <see cref="VisibleLeftBehindOutcome.RemovedLinkedToRemoval"/> or <see cref="VisibleLeftBehindOutcome.RemovedLinkedToRestoration"/>: the step decides its round on a working copy of <paramref name="decisions"/> and joins the verdicts itself.
     /// When <paramref name="settings"/> is null the result is <see cref="StepOutcome.SwitchedOff"/>. An unexpected failure stops the step:
     /// <see cref="StepOutcome.StoppedByUnexpectedError"/>, with the failure and no proposals.
     /// </returns>
@@ -50,14 +51,25 @@ public static class VisibleLeftBehindObjects
         {
             Evaluations =
             [
-                .. evaluated.Evaluations.Select(evaluation =>
-                    decided.GetValueOrDefault(new TargetId(evaluation.TargetIndex)) switch
-                    {
-                        Decision.Kept kept => evaluation with { Decision = VisibleLeftBehindOutcome.KeptReferenced, KeepReason = kept.KeepReason },
-                        Decision.Removed { Reason: RemovalReason.LinkedTo } => evaluation with { Decision = VisibleLeftBehindOutcome.RemovedLinkedToRemoval },
-                        _ => evaluation,
-                    }),
+                .. evaluated.Evaluations.Select(evaluation => Join(evaluation, decided.GetValueOrDefault(new TargetId(evaluation.TargetIndex)), decided)),
             ],
         };
     }
+
+    private static VisibleLeftBehindCheck Join(VisibleLeftBehindCheck evaluation, Decision? decision, IReadOnlyDictionary<TargetId, Decision> decided)
+    {
+        var effect = RoundEffects.Of(decision);
+        return effect switch
+        {
+            { Outcome: RoundOutcome.KeptAsReferenced } => evaluation with { Decision = VisibleLeftBehindOutcome.KeptReferenced, KeepReason = effect.KeepReason },
+            { Outcome: RoundOutcome.Removed, AsLinked: true } => evaluation with { Decision = RemovedAsLinked(decision, decided) },
+            { Outcome: RoundOutcome.Untouched or RoundOutcome.Removed } => evaluation,
+            { Outcome: RoundOutcome.Restored, AsLinked: true } => evaluation with { Decision = VisibleLeftBehindOutcome.RestoredAsLinked },
+            { Outcome: RoundOutcome.Restored } => evaluation with { Decision = VisibleLeftBehindOutcomes.AsRestored(evaluation.Decision) },
+            _ => throw new UnreachableException($"Unexpected round effect {effect} in a left-behind round."),
+        };
+    }
+
+    private static VisibleLeftBehindOutcome RemovedAsLinked(Decision? decision, IReadOnlyDictionary<TargetId, Decision> decided) =>
+        RoundEffects.FollowedARestoredMember(decision, target => decided.GetValueOrDefault(target)) ? VisibleLeftBehindOutcome.RemovedLinkedToRestoration : VisibleLeftBehindOutcome.RemovedLinkedToRemoval;
 }

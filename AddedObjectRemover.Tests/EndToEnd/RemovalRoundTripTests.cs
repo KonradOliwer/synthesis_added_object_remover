@@ -19,7 +19,7 @@ public sealed class RemovalRoundTripTests
 
     private static readonly Vector3 MovedTo = new(Spacing, Spacing, 0);
 
-    private static readonly WhatToCollect Plan = new(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits);
+    private static readonly WhatToCollect Plan = new(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false);
 
     private readonly FixtureMod _baseGame = new("Skyrim.esm");
     private readonly FixtureMod _second;
@@ -177,7 +177,7 @@ public sealed class RemovalRoundTripTests
             untrusted: [_second.Key.ToPluginName(), _cleaned.Key.ToPluginName()]);
 
     private static PlacedReadScope ScopeOf(FixtureMod cleaned) =>
-        new(cleaned.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: false, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword);
+        new(cleaned.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: false, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword, TerrainReadsNeedAnOverride: false);
 
     private static RecordKey Key(PlacedObject record) => record.FormKey.ToRecordKey();
 }

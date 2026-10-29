@@ -119,7 +119,7 @@ public class VisibleLeftBehindObjectsTests
     {
         var targets = Ring(SixDirections);
         var protection = ObjectsToKeep.Build(targets, [], References(targets.Length, [0]), UnresolvedBases);
-        var decisions = RemovalDecisions.Start(protection, targets.Length)
+        var decisions = TestSeededDecisions.StartDisablingAll(protection, targets.Length)
             .Apply(RoundKind.TooClose, [.. new[] { 0, 1, 2, 3, 4, 5, 6 }.Select(TooClose)]);
         Assert.IsType<Decision.Kept>(decisions.Of(new TargetId(0)));
 
@@ -133,7 +133,7 @@ public class VisibleLeftBehindObjectsTests
     {
         var targets = Ring(SixDirections);
         var protection = ObjectsToKeep.Build(targets, [], References(targets.Length, [0]), UnresolvedBases);
-        var decisions = RemovalDecisions.Start(protection, targets.Length).Apply(RoundKind.TooClose, [.. new[] { 1, 2, 3, 4, 5, 6 }.Select(TooClose)]);
+        var decisions = TestSeededDecisions.StartDisablingAll(protection, targets.Length).Apply(RoundKind.TooClose, [.. new[] { 1, 2, 3, 4, 5, 6 }.Select(TooClose)]);
 
         var result = Find(targets, decisions, Settings);
 
@@ -150,7 +150,7 @@ public class VisibleLeftBehindObjectsTests
         var partner = 7;
         var targets = Ring(SixDirections).Add(Visible(partner, new Vector3(5000, 0, 0)));
         var protection = ObjectsToKeep.Build(targets, [TestTargets.Link(0, partner)], References(targets.Length, []), UnresolvedBases);
-        var decisions = RemovalDecisions.Start(protection, targets.Length).Apply(RoundKind.TooClose, [.. new[] { 1, 2, 3, 4, 5, 6 }.Select(TooClose)]);
+        var decisions = TestSeededDecisions.StartDisablingAll(protection, targets.Length).Apply(RoundKind.TooClose, [.. new[] { 1, 2, 3, 4, 5, 6 }.Select(TooClose)]);
 
         var result = Find(targets, decisions, Settings);
         var applied = decisions.Apply(RoundKind.VisibleLeftBehind, result.Proposals);
@@ -165,7 +165,7 @@ public class VisibleLeftBehindObjectsTests
         var partner = 7;
         var targets = Ring(SixDirections).Add(Visible(partner, new Vector3(5000, 0, 0)));
         var protection = ObjectsToKeep.Build(targets, [TestTargets.Link(0, partner)], References(targets.Length, []), UnresolvedBases);
-        var decisions = RemovalDecisions.Start(protection, targets.Length).Apply(RoundKind.TooClose, [.. new[] { 1, 2, 3, 4, 5, 6 }.Select(TooClose)]);
+        var decisions = TestSeededDecisions.StartDisablingAll(protection, targets.Length).Apply(RoundKind.TooClose, [.. new[] { 1, 2, 3, 4, 5, 6 }.Select(TooClose)]);
 
         var result = Find(targets, decisions, Settings);
 
@@ -173,6 +173,60 @@ public class VisibleLeftBehindObjectsTests
         Assert.Equal(VisibleLeftBehindOutcome.RemovedLinkedToRemoval, member.Decision);
         Assert.True(member.IsRemoved);
         Assert.Equal(new TargetId(0), Assert.Single(result.Proposals).Target);
+    }
+
+    [Fact]
+    public void AnObjectTheRoundRestoresIsEvaluatedAsRestoredAndItsLinkedGroupMemberAsRestoredLinkedNeverAsRemoved()
+    {
+        var partner = 7;
+        var targets = Ring(SixDirections).Add(Visible(partner, new Vector3(5000, 0, 0)));
+        var protection = ObjectsToKeep.Build(targets, [TestTargets.Link(0, partner)], References(targets.Length, []), UnresolvedBases);
+        var restore = new WhenRemoved.Restore(TestTargets.EarlierVersionAt(new PluginName("Earlier.esp"), targets[0].Placement));
+        var decisions = RemovalDecisions.Start(protection, [restore, .. Enumerable.Repeat<WhenRemoved>(new WhenRemoved.Disable(), 6), restore])
+            .Apply(RoundKind.TooClose, [.. new[] { 1, 2, 3, 4, 5, 6 }.Select(TooClose)]);
+
+        var result = Find(targets, decisions, Settings);
+
+        var restored = result.Evaluations.Single(check => check.TargetIndex == 0);
+        var member = result.Evaluations.Single(check => check.TargetIndex == partner);
+        Assert.Equal((VisibleLeftBehindOutcome.RestoredSurroundingsRemoved, true, false), (restored.Decision, restored.IsRestored, restored.IsRemoved));
+        Assert.Equal((VisibleLeftBehindOutcome.RestoredAsLinked, true, false), (member.Decision, member.IsRestored, member.IsRemoved));
+    }
+
+    [Theory]
+    [InlineData(false, VisibleLeftBehindOutcome.RemovedSurroundingsRemovedAndRestored)]
+    [InlineData(true, VisibleLeftBehindOutcome.RestoredSurroundingsRemovedAndRestored)]
+    public void ARestoredNeighbourGivesTheReasonSurroundingsRemovedAndRestoredWhateverBecomesOfTheObject(bool objectIsRestored, VisibleLeftBehindOutcome expected)
+    {
+        var targets = Ring(SixDirections);
+        var protection = ObjectsToKeep.Build(targets, [], References(targets.Length, []), UnresolvedBases);
+        WhenRemoved WhenRestored(int index) => new WhenRemoved.Restore(TestTargets.EarlierVersionAt(new PluginName("Earlier.esp"), targets[index].Placement));
+        var decisions = RemovalDecisions.Start(
+                protection,
+                [objectIsRestored ? WhenRestored(0) : new WhenRemoved.Disable(), WhenRestored(1), .. Enumerable.Repeat<WhenRemoved>(new WhenRemoved.Disable(), 5)])
+            .Apply(RoundKind.TooClose, [.. new[] { 1, 2, 3, 4, 5, 6 }.Select(TooClose)]);
+
+        var evaluation = Assert.Single(Find(targets, decisions, Settings).Evaluations);
+
+        Assert.Equal(expected, evaluation.Decision);
+        Assert.Equal(objectIsRestored, evaluation.IsRestored);
+        Assert.Equal(!objectIsRestored, evaluation.IsRemoved);
+    }
+
+    [Fact]
+    public void ALinkedGroupMemberTheRoundRemovesAlongWithARestoredObjectIsEvaluatedAsRemovedLinkedToARestoredObject()
+    {
+        var partner = 7;
+        var targets = Ring(SixDirections).Add(Visible(partner, new Vector3(5000, 0, 0)));
+        var protection = ObjectsToKeep.Build(targets, [TestTargets.Link(0, partner)], References(targets.Length, []), UnresolvedBases);
+        var restore = new WhenRemoved.Restore(TestTargets.EarlierVersionAt(new PluginName("Earlier.esp"), targets[0].Placement));
+        var decisions = RemovalDecisions.Start(protection, [restore, .. Enumerable.Repeat<WhenRemoved>(new WhenRemoved.Disable(), 7)])
+            .Apply(RoundKind.TooClose, [.. new[] { 1, 2, 3, 4, 5, 6 }.Select(TooClose)]);
+
+        var result = Find(targets, decisions, Settings);
+
+        var member = result.Evaluations.Single(check => check.TargetIndex == partner);
+        Assert.Equal((VisibleLeftBehindOutcome.RemovedLinkedToRestoration, true), (member.Decision, member.IsRemoved));
     }
 
     [Fact]
@@ -184,7 +238,7 @@ public class VisibleLeftBehindObjectsTests
             .ApplyFits([new ProposedFit(neighbour.Id, new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()), neighbour.Placement with { Scale = 0.5f })]);
         var shrunkSector = DirectionSector.SouthWest;
 
-        var shrunk = Assert.Single(FindWhereTheyStand(targets, decisions).Evaluations).Surroundings;
+        var shrunk = Assert.Single(FindAsTheRoundsMeasureThem(targets, decisions).Evaluations).Surroundings;
         var unchanged = Assert.Single(Find(targets, decisions, Settings).Evaluations).Surroundings;
 
         Assert.True(shrunk.Total(shrunkSector) < unchanged.Total(shrunkSector));
@@ -393,7 +447,7 @@ public class VisibleLeftBehindObjectsTests
         new(new TargetId(index), new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()));
 
     private static RemovalDecisions DecisionsRemoving(ImmutableArray<TargetObject> targets, params int[] removed) =>
-        RemovalDecisions.Start(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), UnresolvedBases), targets.Length)
+        TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), UnresolvedBases), targets.Length)
             .Apply(RoundKind.TooClose, [.. removed.Select(TooClose)]);
 
     private static ObjectCaches Scene(ImmutableArray<TargetObject> targets, IReadOnlyList<OtherObject> others) => TestScenes.Create(targets, others, Shapes);
@@ -415,11 +469,11 @@ public class VisibleLeftBehindObjectsTests
             new Execution(workers),
             settings);
 
-    private static VisibleLeftBehindResult FindWhereTheyStand(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions) =>
+    private static VisibleLeftBehindResult FindAsTheRoundsMeasureThem(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions) =>
         VisibleLeftBehindObjects.Find(
             targets,
             decisions,
-            ClashingObjectFitter.IndexAsTheyStand(targets, decisions, Scene(targets, [])),
+            ClashingObjectFitter.IndexAsTheRoundsMeasureThem(targets, decisions, Scene(targets, [])),
             UnresolvedBases,
             Shapes,
             TargetWorkOrder.Of(targets),

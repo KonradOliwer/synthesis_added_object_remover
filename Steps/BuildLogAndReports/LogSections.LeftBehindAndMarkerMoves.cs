@@ -83,7 +83,7 @@ internal static partial class LogSections
     {
         var target = world.Targets[evaluation.TargetIndex];
         return $"  Left behind: {RecordNames.Describe(target)} ({ObjectVisibilityText.KindName(evaluation.Kind)}) in {Describe.Space(world, target.SpaceKey)}: "
-            + $"{(evaluation.IsRemoved ? "removed" : "kept")}, {Describe.LeftBehindReason(evaluation)}; radius {TextFormat.Fixed(evaluation.Radius, 0)}, "
+            + $"{LeftBehindOutcomeText.Verdict(evaluation)}, {Describe.LeftBehindReason(evaluation)}; radius {TextFormat.Fixed(evaluation.Radius, 0)}, "
             + $"removed/total ground area {SectorAreasText.Describe(evaluation.Surroundings)}.";
     }
 
@@ -92,7 +92,9 @@ internal static partial class LogSections
             LeftBehindStepName,
             [.. leftBehind.Evaluations.Select(evaluation => evaluation.Decision)],
             LeftBehindOutcomes.IsRemoval,
-            outcome => outcome == LeftBehindOutcome.RemovedLinkedToRemoval,
+            LeftBehindOutcomes.IsRestoration,
+            outcome => LeftBehindOutcomes.IsRemovedAsLinked(outcome) || LeftBehindOutcomes.IsRestoration(outcome)
+                || outcome == LeftBehindOutcome.RemovedSurroundingsRemovedAndRestored,
             LeftBehindOutcomeText.Describe,
             elapsed,
             context);

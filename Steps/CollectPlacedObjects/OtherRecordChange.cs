@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using System.Numerics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 
 namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 
@@ -31,10 +30,10 @@ internal static class OtherRecordChange
     ];
 
     /// <returns>Null when the game shows every object property as accepted.</returns>
-    public static ObjectChange? Decide(PlacedRecordFact record, ModTrustTable trust)
+    public static ObjectChange? Decide(PlacedRecordFact record, AcceptedWorld world)
     {
         var versions = record.Versions;
-        VersionTrust[] trusts = [.. versions.Select(version => trust.VersionTrustOf(version.Plugin))];
+        VersionTrust[] trusts = [.. versions.Select(version => world.TrustOf(version.Plugin))];
         Func<int, int, bool>[] differs =
             [.. ObjectProperties.Select(property => (Func<int, int, bool>)((first, second) => property(versions[first], versions[second])))];
         var acceptances = AcceptedVersions.Decide(trusts, differs);

@@ -76,7 +76,7 @@ public class RunPartTextTests
         Assert.Equal(step, RunPartText.LinkedStep(kind));
         Assert.Equal(
             $"Linked groups: 3 more objects removed with the {step} removals they are linked to.",
-            Assert.Single(LogSections.BuildLinkedRemovalLines(3, RunPartText.LinkedStep(kind), Detailed)));
+            Assert.Single(LogSections.BuildLinkedRemovalLines(3, 0, 0, RunPartText.LinkedStep(kind), Detailed)));
     }
 
     [Fact]

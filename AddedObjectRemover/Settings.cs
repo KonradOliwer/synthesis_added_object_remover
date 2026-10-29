@@ -1,6 +1,7 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
+using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
@@ -59,7 +60,7 @@ public class BatchSettings
     public string GroupFileName { get; set; } = string.Empty;
 }
 
-public class StandardSettings : ISettingsValues
+public class StandardSettings : ISettingsValues, ICollisionSettingsValues
 {
     [SynthesisOrder]
     [SynthesisSettingName("Mod to clean up")]
@@ -76,13 +77,11 @@ public class StandardSettings : ISettingsValues
     public ModKey CleanedMod { get; set; } = ModKey.Null;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Check other mods' objects the cleaned mod moved farther than (game units)")]
+    [SynthesisSettingName("Other mods' objects the cleaned mod changed")]
     [SynthesisTooltip(
-        "The cleaned mod can override an object of another mod or of the base game and move it.\n"
-        + "Moved farther than this from where that object stood before, it is checked like the cleaned mod's own objects: it can be removed, shrunk or turned.\n"
-        + "Moved this far or less, it counts as standing where it stood and is always kept, even if the cleaned mod changed its model, rotation or size.\n"
-        + "Distance is measured in a straight line, in any direction. 0 or more; 0 checks every one that moved at all.")]
-    public float MovedDistanceInUnits { get; set; } = SettingDefaults.MovedDistanceInUnits;
+        "The cleaned mod can override an object of the base game, of one of its masters or of another mod: move it, or give it another model.\n"
+        + "These settings decide how such an object is checked and what happens when it would be removed. The cleaned mod's own objects are not affected.")]
+    public OtherModsChangedObjectsSettings ChangedObjects { get; set; } = new();
 
     [SynthesisOrder]
     [SynthesisSettingName("Which other mods can cause removals")]
@@ -110,14 +109,14 @@ public class StandardSettings : ISettingsValues
     [SynthesisOrder]
     [SynthesisSettingName("Shrink or turn objects to make them fit")]
     [SynthesisTooltip(
-        "An object of the cleaned mod, or of another mod that the cleaned mod moved (see \"Check other mods' objects the cleaned mod moved farther than\"), that would be removed for being too close to another mod's object\n"
+        "An object of the cleaned mod that would be removed for being too close to another mod's object\n"
         + "is first tried shrunk or turned where it stands, when \"Shrink or turn objects that are too close\" is on. If it fits, it is kept that way; otherwise it is removed.\n"
+        + "Only the cleaned mod's own objects follow this group. Other mods' objects the cleaned mod changed follow \"Attempt resizing before removal\" under \"Other mods' objects the cleaned mod changed\".\n"
         + "Never shrunk or turned, but removed as before: an object on terrain another mod changed; an object that another object of the cleaned mod\n"
         + "rests on from above and would lose its support without (objects that only touch it from the side do not count; with \"Nothing\" in\n"
         + "\"Also remove what rests on removed objects\", none counts); and, whatever the settings, an object\n"
         + "that another mod's object rests on (of the mods \"Other mods' objects left without support\" names).\n"
-        + "Invisible objects, objects that are always kept and linked objects are never shrunk or turned.\n"
-        + "Objects of other mods that the cleaned mod left in place are never checked.")]
+        + "Invisible objects, objects that are always kept and linked objects are never shrunk or turned.")]
     public ShrinkOrTurnSettings ShrinkOrTurn { get; set; } = new();
 
     [SynthesisOrder]
@@ -131,7 +130,7 @@ public class StandardSettings : ISettingsValues
     [SynthesisSettingName("Visible objects left behind")]
     [SynthesisTooltip(
         "The cleaned mod's visible objects are removed when most of the cleaned mod's visible objects around them were removed by the other removal steps\n"
-        + "(too close, changed terrain, also remove). Only the cleaned mod's objects, including other mods' objects it moved, count as surroundings.")]
+        + "(too close, changed terrain, also remove). Only the cleaned mod's objects, including other mods' objects it changed, count as surroundings.")]
     public LeftoverVisibleObjectSettings LeftoverVisibleObjects { get; set; } = new();
 
     [SynthesisOrder]
@@ -142,14 +141,143 @@ public class StandardSettings : ISettingsValues
     public LeftoverInvisibleObjectSettings LeftoverInvisibleObjects { get; set; } = new();
 
     string? ISettingsValues.CleanedMod => CleanedMod.IsNull ? null : CleanedMod.ToString();
-    float ISettingsValues.MovedDistanceInUnits => MovedDistanceInUnits;
+    IChangedObjectsSettingsValues ISettingsValues.ChangedObjects => ChangedObjects ?? new OtherModsChangedObjectsSettings();
     ITrustSettingsValues ISettingsValues.Trust => Trust ?? new TrustSettings();
-    ITooCloseSettingsValues ISettingsValues.TooClose => TooClose ?? new TooCloseRemovalSettings();
-    ITerrainChangeSettingsValues ISettingsValues.TerrainChange => TerrainChange ?? new TerrainChangeSettings();
-    IShrinkOrTurnSettingsValues ISettingsValues.ShrinkOrTurn => ShrinkOrTurn ?? new ShrinkOrTurnSettings();
+    ICollisionSettingsValues ISettingsValues.Collision => this;
+    ITooCloseSettingsValues ICollisionSettingsValues.TooClose => TooClose ?? new TooCloseRemovalSettings();
+    ITerrainChangeSettingsValues ICollisionSettingsValues.TerrainChange => TerrainChange ?? new TerrainChangeSettings();
+    IShrinkOrTurnSettingsValues ICollisionSettingsValues.ShrinkOrTurn => ShrinkOrTurn ?? new ShrinkOrTurnSettings();
     IFollowUpSettingsValues ISettingsValues.FollowUpRemoval => FollowUpRemoval ?? new FollowUpRemovalSettings();
     IVisibleLeftoverSettingsValues ISettingsValues.LeftoverVisibleObjects => LeftoverVisibleObjects ?? new LeftoverVisibleObjectSettings();
     ILeftoverSettingsValues ISettingsValues.LeftoverInvisibleObjects => LeftoverInvisibleObjects ?? new LeftoverInvisibleObjectSettings();
+}
+
+public class OtherModsChangedObjectsSettings : IChangedObjectsSettingsValues
+{
+    [SynthesisOrder]
+    [SynthesisSettingName("Moved objects")]
+    [SynthesisTooltip("Objects the cleaned mod moved farther than the distance below from where they stood before it.")]
+    public MovedObjectSettings Moved { get; set; } = new();
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Replaced objects")]
+    [SynthesisTooltip("Objects the cleaned mod left in place (within the distance above) but gave another model.")]
+    public ReplacedObjectSettings Replaced { get; set; } = new();
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Collision handling")]
+    [SynthesisTooltip(
+        "How these objects are checked, where the cleaned mod put them and, for RestoreIfNoCollision, where they stood before.\n"
+        + "The same settings as the cleaned mod's own objects have, with the same defaults.")]
+    public ChangedObjectCollisionSettings Collision { get; set; } = new();
+
+    IMovedObjectsSettingsValues IChangedObjectsSettingsValues.Moved => Moved ?? new();
+    IReplacedObjectsSettingsValues IChangedObjectsSettingsValues.Replaced => Replaced ?? new();
+    ICollisionSettingsValues IChangedObjectsSettingsValues.Collision => Collision ?? new();
+}
+
+public class MovedObjectSettings : IMovedObjectsSettingsValues
+{
+    [SynthesisOrder]
+    [SynthesisSettingName("Count as moved when moved farther than (game units)")]
+    [SynthesisTooltip(
+        "Moved this far or less, the object counts as standing where it stood: it is checked only when it got another model and \"Process replaced objects\" is on.\n"
+        + "Measured in a straight line, in any direction. 0 or more; 0 counts every move.")]
+    public float MovedDistanceInUnits { get; set; } = SettingDefaults.MovedDistanceInUnits;
+
+    [SynthesisOrder]
+    [SynthesisSettingName("When it would be removed")]
+    [SynthesisTooltip(ChangedObjectTexts.WhenRemovedForMoved)]
+    public RestoreMode WhenRemoved { get; set; } = SettingDefaults.MovedObjectsWhenRemoved;
+
+    [SynthesisOrder]
+    [SynthesisSettingName(ChangedObjectTexts.AttemptResizingName)]
+    [SynthesisTooltip(ChangedObjectTexts.AttemptResizingTooltip)]
+    public bool AttemptResizingBeforeRemoval { get; set; } = SettingDefaults.ResizeMovedObjects;
+}
+
+public class ReplacedObjectSettings : IReplacedObjectsSettingsValues
+{
+    [SynthesisOrder]
+    [SynthesisSettingName("Process replaced objects")]
+    [SynthesisTooltip("Off: these objects are never checked; the cleaned mod's model stays. On: they are checked like moved objects, with the two settings below.")]
+    public bool Process { get; set; } = SettingDefaults.ProcessReplacedObjects;
+
+    [SynthesisOrder]
+    [SynthesisSettingName("When it would be removed")]
+    [SynthesisTooltip(ChangedObjectTexts.WhenRemovedForReplaced)]
+    public RestoreMode WhenRemoved { get; set; } = SettingDefaults.ReplacedObjectsWhenRemoved;
+
+    [SynthesisOrder]
+    [SynthesisSettingName(ChangedObjectTexts.AttemptResizingName)]
+    [SynthesisTooltip(ChangedObjectTexts.AttemptResizingTooltip + "\nOnly used when \"Process replaced objects\" is on.")]
+    public bool AttemptResizingBeforeRemoval { get; set; } = SettingDefaults.ResizeReplacedObjects;
+}
+
+internal static class ChangedObjectTexts
+{
+    public const string AttemptResizingName = "Attempt resizing before removal";
+
+    public const string AttemptResizingTooltip =
+        "When it is too close where the cleaned mod put it, first try shrinking or turning it there, within the limits under \"Collision handling\".\n"
+        + "If that fits, it stays there; otherwise \"When it would be removed\" decides.";
+
+    public const string WhenRemovedForMoved =
+        "Restore: put it back as it stood before the cleaned mod (as the plugin loading just before the cleaned mod has it): its position, rotation and size;\n"
+        + "when the cleaned mod also gave it another model, the whole object as it was.\n"
+        + "RestoreIfNoCollision: the same, but only when it does not collide there under \"Collision handling\" with something that exists only because of the cleaned mod:\n"
+        + "its objects, its changes to other objects or to the terrain, or the objects of mods that need it; otherwise it is removed.\n"
+        + "Remove: it is disabled like the cleaned mod's own objects.";
+
+    public const string WhenRemovedForReplaced =
+        "Restore: write back the object as the plugin loading just before the cleaned mod has it, with its own model.\n"
+        + "RestoreIfNoCollision: the same, but only when that object does not collide there under \"Collision handling\" (as for moved objects); otherwise it is removed.\n"
+        + "Remove: it is disabled like the cleaned mod's own objects.\n"
+        + "Only used when \"Process replaced objects\" is on.";
+}
+
+public class ChangedObjectCollisionSettings : ICollisionSettingsValues
+{
+    [SynthesisOrder]
+    [SynthesisSettingName("Remove objects too close to other mods' objects")]
+    [SynthesisTooltip(
+        "The main check, the same as for the cleaned mod's own objects. An object would be removed when an object from another mod comes within a margin around it.\n"
+        + "Turn on one or both margins; an object caught by either is removed once. With both off, nothing is removed for being too close.")]
+    public TooCloseRemovalSettings TooClose { get; set; } = new();
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Remove objects on terrain changed by other mods")]
+    [SynthesisTooltip(
+        "Removes an object when another mod changed the terrain under or around it: raised, lowered or flattened it,\n"
+        + "changed the kind of ground (for example grass to road), or raised, lowered, added or removed the water there,\n"
+        + "so the object may float, sink, stand under water or look out of place.\n"
+        + "Interiors and worlds without terrain are not checked.\n"
+        + "If the cleaned mod overrides no object of another plugin and the same check for the cleaned mod's own objects is off,\n"
+        + "this check reads nothing and costs no time.")]
+    public TerrainChangeSettings TerrainChange { get; set; } = new();
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Shrink down to (% of its size)")]
+    [SynthesisTooltip(
+        "An object that would be removed for being too close to another mod's object may be shrunk where it stands, down to this share of its size, to make it fit,\n"
+        + "in steps of 5%; the largest size that fits is used.\n"
+        + "100 or more: objects are never shrunk. At least 1 (a lower value becomes 1). Only used for moved or replaced objects whose \"Attempt resizing before removal\" is on.")]
+    public int ShrinkLimitPercent { get; set; } = SettingDefaults.ShrinkLimitPercent;
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Turn by at most (degrees either way)")]
+    [SynthesisTooltip(
+        "An object may be turned about its upright axis by up to this many degrees to the left or to the right to make it fit,\n"
+        + "in steps of 15 degrees; the smallest turn that fits is used. It is never tilted.\n"
+        + "0: objects are never turned. 180 or more: objects may face any way.\n"
+        + "Not below 0 (a lower value becomes 0). Only used for moved or replaced objects whose \"Attempt resizing before removal\" is on.")]
+    public int TurnLimitDegrees { get; set; } = SettingDefaults.TurnLimitDegrees;
+
+    ITooCloseSettingsValues ICollisionSettingsValues.TooClose => TooClose ?? new TooCloseRemovalSettings();
+    ITerrainChangeSettingsValues ICollisionSettingsValues.TerrainChange => TerrainChange ?? new TerrainChangeSettings();
+    IShrinkOrTurnSettingsValues ICollisionSettingsValues.ShrinkOrTurn => new ResizeLimitValues(ShrinkLimitPercent, TurnLimitDegrees);
+
+    private sealed record ResizeLimitValues(int ShrinkLimitPercent, int TurnLimitDegrees) : IShrinkOrTurnSettingsValues;
 }
 
 public class TrustSettings : ITrustSettingsValues
@@ -404,7 +532,7 @@ public class ShrinkOrTurnSettings : IShrinkOrTurnSettingsValues
     [SynthesisSettingName("Shrink down to (% of its size)")]
     [SynthesisTooltip(
         "An object that would be removed for being too close to another mod's object may be shrunk where it stands, down to this share of its size, to make it fit,\n"
-        + "in steps of 5%; the largest size that fits is used. This applies to the cleaned mod's own objects and to the objects of other mods it moved.\n"
+        + "in steps of 5%; the largest size that fits is used. This applies to the cleaned mod's own objects.\n"
         + "100 or more: objects are never shrunk. At least 1 (a lower value becomes 1). Not used when the switch above is off.")]
     public int ShrinkLimitPercent { get; set; } = SettingDefaults.ShrinkLimitPercent;
 
@@ -473,7 +601,7 @@ public class LeftoverVisibleObjectSettings : IVisibleLeftoverSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName("When the cleaned mod's visible objects around it were removed")]
     [SynthesisTooltip(
-        "For each visible object, the cleaned mod's other visible objects around it (the cleaned mod's objects, including other mods' objects it moved) are sorted into 8 directions\n"
+        "For each visible object, the cleaned mod's other visible objects around it (the cleaned mod's objects, including other mods' objects it changed) are sorted into 8 directions\n"
         + "(north, north-east, ...) and measured by the ground area they cover. Objects removed by the earlier steps count as removed.\n"
         + "The object is removed when enough of those directions were mostly cleared. The settings are applied in the order listed; the percentages go in steps of 10.")]
     public VisibleSurroundingObjectsSettings SurroundingObjects { get; set; } = new();
@@ -560,7 +688,7 @@ public class LeftoverInvisibleObjectSettings : ILeftoverSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName("When the cleaned mod's visible objects around it were removed")]
     [SynthesisTooltip(
-        "For each invisible object, the cleaned mod's visible objects around it (the cleaned mod's objects, including other mods' objects it moved) are sorted into 8 directions\n"
+        "For each invisible object, the cleaned mod's visible objects around it (the cleaned mod's objects, including other mods' objects it changed) are sorted into 8 directions\n"
         + "(north, north-east, ...) and measured by the ground area they cover. Objects removed by the earlier steps count as removed.\n"
         + "The invisible object is removed when enough of those directions were mostly cleared. The settings are applied in the order listed; the percentages go in steps of 10.")]
     public SurroundingObjectsSettings SurroundingObjects { get; set; } = new();

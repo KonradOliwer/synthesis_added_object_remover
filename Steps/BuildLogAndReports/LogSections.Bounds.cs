@@ -37,14 +37,18 @@ internal static partial class LogSections
         return string.Join(Describe.ListSeparator, TextLists.Counts(KeyedGroups.Rank(worded, StringComparer.Ordinal)));
     }
 
-    public static LogSection BuildSpacesSection(CollectedObjects world, IReadOnlyList<RemovedObject> removals, PluginName target, ReportContext context)
+    /// <remarks>Counts the target's own objects and their removals only, like <see cref="BuildRunSummarySection"/>.</remarks>
+    public static LogSection BuildSpacesSection(CollectedObjects world, IReadOnlyList<ObjectWithReason> removals, PluginName target, ReportContext context)
     {
         if (!context.Detailed) return new LogSection("spaces", []);
 
-        var removedBySpace = removals.CountBy(removal => world.Targets[removal.TargetIndex].SpaceKey).ToDictionary();
+        var ownObjects = TargetOrigins.Of(world.Targets, TargetOrigin.CleanedMod).ToList();
+        var removedBySpace = TargetOrigins.Of(TargetOrigins.At(world, removals.Select(removal => removal.TargetIndex)), TargetOrigin.CleanedMod)
+            .CountBy(removed => removed.SpaceKey)
+            .ToDictionary();
         var otherModObjectsBySpace = world.OtherModObjects.CountBy(other => other.SpaceKey).ToDictionary();
-        List<string> lines = [$"Per cell/worldspace (objects of {target} / other objects / removed):"];
-        foreach (var group in world.Targets
+        List<string> lines = [$"Per cell/worldspace (objects of {target} / other objects / {target} objects removed):"];
+        foreach (var group in ownObjects
                      .GroupBy(targetObject => targetObject.SpaceKey)
                      .OrderBy(group => Describe.Space(world, group.Key), StringComparer.OrdinalIgnoreCase))
         {

@@ -30,6 +30,17 @@ internal sealed class TestReport
     /// <summary>A report whose mesh files have no problem.</summary>
     public static TestReport WithoutProblems() => Over(new AssetProblemLog());
 
+    /// <summary>A report whose mesh files have no problem and whose unexpected errors are the given channel.</summary>
+    public static TestReport OverErrors(IUnexpectedErrors errors) => new(new MeshFilesWithProblems(new AssetProblemLog()), errors);
+
+    /// <summary>The sections the judge step prints as it ends, in order.</summary>
+    public ImmutableArray<LogSection> JudgeSections(ChangedObjectJudgingResult judged, CollectedObjects world, CollectedObjects? oldPlaceWorld) =>
+        _report.BuildStepSections(judged, world, oldPlaceWorld, TimeSpan.Zero);
+
+    /// <summary>The sections the selection step prints as it ends, in order; the last takes the unexpected errors recorded since the step before.</summary>
+    public ImmutableArray<LogSection> ReplacementSections(Replacements found, CollectedObjects world) =>
+        _report.BuildStepSections(found, world, TimeSpan.Zero);
+
     /// <summary>
     /// The lines of the archive-warnings section, which takes the archive problems met since the last take; without the detailed
     /// log's step-time line of the mesh-reading preparation, which ends the section.

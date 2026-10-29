@@ -18,4 +18,6 @@ public sealed record LeftBehindCheck(
     KeepReason? KeepReason)
 {
     public bool IsRemoved => LeftBehindOutcomes.IsRemoval(Decision);
+
+    public bool IsRestored => LeftBehindOutcomes.IsRestoration(Decision);
 }

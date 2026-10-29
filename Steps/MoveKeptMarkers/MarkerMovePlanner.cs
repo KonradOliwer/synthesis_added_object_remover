@@ -71,6 +71,6 @@ public static class MarkerMovePlanner
     internal static ImmutableArray<LeftBehindCheck> Candidates(LeftBehindResult leftBehind, IRemovalDecisions final) =>
     [
         .. leftBehind.Evaluations
-            .Where(evaluation => evaluation.ContainingObject != null && !final.IsRemoved(new TargetId(evaluation.TargetIndex))),
+            .Where(evaluation => evaluation.ContainingObject != null && !final.HasLeftItsPlace(new TargetId(evaluation.TargetIndex))),
     ];
 }

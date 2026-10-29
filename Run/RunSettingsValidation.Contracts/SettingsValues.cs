@@ -1,4 +1,5 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
+using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
@@ -27,14 +28,45 @@ public interface IModeSettingsValues
 public interface ISettingsValues
 {
     string? CleanedMod { get; }
-    float MovedDistanceInUnits { get; }
+    IChangedObjectsSettingsValues ChangedObjects { get; }
     ITrustSettingsValues Trust { get; }
-    ITooCloseSettingsValues TooClose { get; }
-    ITerrainChangeSettingsValues TerrainChange { get; }
-    IShrinkOrTurnSettingsValues ShrinkOrTurn { get; }
+    ICollisionSettingsValues Collision { get; }
     IFollowUpSettingsValues FollowUpRemoval { get; }
     IVisibleLeftoverSettingsValues LeftoverVisibleObjects { get; }
     ILeftoverSettingsValues LeftoverInvisibleObjects { get; }
+}
+
+/// <summary>How other mods' objects the cleaned mod changed are checked, and what happens when one would be removed.</summary>
+public interface IChangedObjectsSettingsValues
+{
+    IMovedObjectsSettingsValues Moved { get; }
+    IReplacedObjectsSettingsValues Replaced { get; }
+    ICollisionSettingsValues Collision { get; }
+}
+
+/// <summary>What both kinds of changed object have in common.</summary>
+public interface IChangedKindSettingsValues
+{
+    RestoreMode WhenRemoved { get; }
+    bool AttemptResizingBeforeRemoval { get; }
+}
+
+public interface IMovedObjectsSettingsValues : IChangedKindSettingsValues
+{
+    float MovedDistanceInUnits { get; }
+}
+
+public interface IReplacedObjectsSettingsValues : IChangedKindSettingsValues
+{
+    bool Process { get; }
+}
+
+/// <summary>The groups that decide whether an object clashes where it stands, and what may be done to it before it is removed.</summary>
+public interface ICollisionSettingsValues
+{
+    ITooCloseSettingsValues TooClose { get; }
+    ITerrainChangeSettingsValues TerrainChange { get; }
+    IShrinkOrTurnSettingsValues ShrinkOrTurn { get; }
 }
 
 public interface ITooCloseSettingsValues

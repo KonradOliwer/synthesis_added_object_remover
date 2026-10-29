@@ -19,6 +19,7 @@ internal sealed record SubjectKind(string Singular, string Plural)
 {
     public static readonly SubjectKind Object = new("object", "objects");
     public static readonly SubjectKind Mesh = new("mesh", "meshes");
+    public static readonly SubjectKind OldPlaceObject = new("old-place object", "old-place objects");
 }
 
 /// <param name="Label">How the log names it.</param>

@@ -34,6 +34,15 @@ public class LeftBehindOutcomeTests
             LeftBehindRule.DecideByDirections(Areas(occupied, removed), Config()));
 
     [Fact]
+    public void ARestoredObjectInAClearedDirectionGivesTheReasonSurroundingsRemovedAndRestored()
+    {
+        var tally = new SectorAreaTally(50);
+        for (var i = 0; i < 4; i++) tally.Add(Sectors[i], 100, i == 0 ? BoxFate.Restored : BoxFate.Removed);
+
+        Assert.Equal(LeftBehindOutcome.RemovedSurroundingsRemovedAndRestored, LeftBehindRule.DecideByDirections(tally.Build(), Config()));
+    }
+
+    [Fact]
     public void NoSurroundingsKeepsTheObject() =>
         Assert.Equal(
             LeftBehindOutcome.KeptTooFewSurroundingObjects,

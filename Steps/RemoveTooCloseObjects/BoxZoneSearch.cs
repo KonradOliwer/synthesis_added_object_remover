@@ -15,8 +15,8 @@ internal sealed class BoxZoneSearch(
 {
     public int LargeOtherObjects => 0;
 
-    public TooCloseSearchResult FindTooCloseTargets(WorkOrder order, Execution execution) =>
-        TooCloseSearch.FindTooCloseTargets(targets, otherModObjects, shapes, zones, npcRule, order, execution);
+    public TooCloseSearchResult FindTooCloseTargets(ImmutableArray<TargetId> judged, WorkOrder order, Execution execution) =>
+        TooCloseSearch.FindTooCloseTargets(targets, otherModObjects, shapes, zones, npcRule, judged, order, execution);
 
     public ITargetTries StartTries() => new EachCheckedAlone(CheckAlone);
 

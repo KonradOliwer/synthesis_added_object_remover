@@ -8,4 +8,7 @@ public sealed class ComputedOnce<T>(Func<T> compute)
     public T Value => _lazy.Value;
 
     public bool IsComputed => _lazy.IsValueCreated;
+
+    /// <summary>The value when it has been computed; otherwise the default, which asking for it does not compute.</summary>
+    public T? ValueIfComputed => _lazy.IsValueCreated ? _lazy.Value : default;
 }

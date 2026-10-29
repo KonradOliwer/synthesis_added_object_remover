@@ -25,7 +25,8 @@ public static class ModTrustClassifier
         var undecidedRequiringMods = requiringMods.Where(plugin => fixedDecisions[plugin] is null).ToImmutableHashSet();
         var automaticRules = AutomaticRules.Of(plugins, settings, listings, undecidedRequiringMods, otherMasterCounts);
         var decisions = known.ToImmutableDictionary(plugin => plugin, plugin => fixedDecisions[plugin] ?? automaticRules.Decide(plugin));
-        return BuildTable(settings.Target, plugins.PatchMod, decisions, requiringMods, otherMasterCounts, alwaysTrusted.CleanedModMasters);
+        return BuildTable(
+            settings.Target, plugins.PatchMod, decisions, requiringMods, NeedingMods(plugins, settings.Target), otherMasterCounts, alwaysTrusted.CleanedModMasters);
     }
 
     private static ModTrustTable BuildTable(
@@ -33,13 +34,19 @@ public static class ModTrustClassifier
         PluginName patch,
         IReadOnlyDictionary<PluginName, TrustDecision> decisions,
         ImmutableHashSet<PluginName> requiringMods,
+        ImmutableHashSet<PluginName> needingMods,
         IReadOnlyDictionary<PluginName, int> otherMasterCounts,
         ImmutableHashSet<PluginName> cleanedModMasters)
     {
         var trust = decisions.ToImmutableDictionary(
             entry => entry.Key,
             entry => new PluginTrust(
-                entry.Value.Trust, entry.Value.Reason, requiringMods.Contains(entry.Key), otherMasterCounts[entry.Key], cleanedModMasters.Contains(entry.Key)));
+                entry.Value.Trust,
+                entry.Value.Reason,
+                requiringMods.Contains(entry.Key),
+                otherMasterCounts[entry.Key],
+                cleanedModMasters.Contains(entry.Key),
+                needingMods.Contains(entry.Key)));
         return new ModTrustTable(cleanedMod, patch, trust, trust.Values.Count(entry => entry.Reason == TrustReason.LoadsBeforeCleanedMod));
     }
 
@@ -67,6 +74,21 @@ public static class ModTrustClassifier
 
     private static ImmutableHashSet<PluginName> RequiringMods(LoadOrderPlugins plugins, PluginName cleanedMod) =>
         [.. plugins.ListingsRequiring(cleanedMod).Select(listing => listing.Mod)];
+
+    /// <summary>The listed plugins that cannot load without the cleaned mod: the mods requiring it, and the mods requiring those.</summary>
+    private static ImmutableHashSet<PluginName> NeedingMods(LoadOrderPlugins plugins, PluginName cleanedMod)
+    {
+        var needing = ImmutableHashSet.CreateBuilder<PluginName>();
+        var pending = new Queue<PluginName>([cleanedMod]);
+        while (pending.TryDequeue(out var master))
+        {
+            foreach (var listing in plugins.ListingsRequiring(master))
+            {
+                if (needing.Add(listing.Mod)) pending.Enqueue(listing.Mod);
+            }
+        }
+        return needing.ToImmutable();
+    }
 
     private static ImmutableHashSet<PluginName> CarryingPatchMarker(LoadOrderPlugins plugins) =>
         [.. plugins.Listed.Where(listing => listing.CarriesPatchMarker).Select(listing => listing.Mod)];

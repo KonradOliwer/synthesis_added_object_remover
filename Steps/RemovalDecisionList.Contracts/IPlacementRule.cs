@@ -1,10 +1,15 @@
+using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+
 namespace AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
-/// <summary>A removal step's rule asked about one target object standing at given placements, its own or shrunk or turned ones.</summary>
+/// <summary>A removal step's rule asked about a given object standing at given placements, its own or shrunk or turned ones.</summary>
 public interface IPlacementRule
 {
-    /// <summary>The checks of one target object, run one after another on one thread; dispose of them after the last. Thread-safe.</summary>
-    IPlacementTries StartTries(TargetId target);
+    /// <summary>
+    /// The checks of the given object, with its own base and shape, run one after another on one thread; dispose of them after the
+    /// last. Thread-safe.
+    /// </summary>
+    IPlacementTries StartTries(TargetObject target);
 }
 
 /// <summary>

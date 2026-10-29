@@ -19,6 +19,7 @@ internal static class FixtureRun
     /// <param name="createLoadOrder">Builds the listed mods, lowest priority first, and writes their meshes under the Data folder; none for the fixture world.</param>
     /// <param name="patchPosition">How many of the listed mods load above the patch; the others load below it. None puts the patch last.</param>
     /// <param name="inspectPatch">Reads the patch once the run is over.</param>
+    /// <param name="inspectRunFolder">Reads the folder the run's output and reports folder are in once the run is over; the report folder is in it.</param>
     public static RunResult Run(
         Settings settings,
         int workers,
@@ -29,7 +30,8 @@ internal static class FixtureRun
         Func<TimeSpan>? timeSinceStart = null,
         Func<string, IReadOnlyList<ISkyrimMod>>? createLoadOrder = null,
         int? patchPosition = null,
-        Action<ISkyrimModGetter>? inspectPatch = null)
+        Action<ISkyrimModGetter>? inspectPatch = null,
+        Action<string>? inspectRunFolder = null)
     {
         var root = Directory.CreateTempSubdirectory("aor-run-");
         try
@@ -60,12 +62,36 @@ internal static class FixtureRun
                 timeSinceStart ?? (() => TimeSpan.Zero));
             var result = Assert.Single(StepRunner.PatchLoadOrder([request], environment));
             inspectPatch?.Invoke(state.PatchMod);
+            inspectRunFolder?.Invoke(root.FullName);
             return result;
         }
         finally
         {
             root.Delete(recursive: true);
         }
+    }
+
+    /// <summary>Runs with the log recorded and the reports read, and returns what the run printed, patched and reported, masked like the output of a whole run through the entry.</summary>
+    public static (RunOutcome Outcome, RunOutput Output) Capture(Settings settings, int workers, Func<string, IReadOnlyList<ISkyrimMod>> createLoadOrder)
+    {
+        var log = new RecordingLogSink();
+        IReadOnlyList<string> patch = [];
+        IReadOnlyList<ReportFile> reports = [];
+        var runFolder = string.Empty;
+        var result = Run(
+            settings,
+            workers,
+            log,
+            DefaultMeshFiles,
+            createLoadOrder: createLoadOrder,
+            inspectPatch: mod => patch = PatchDump.Describe(mod),
+            inspectRunFolder: folder =>
+            {
+                runFolder = folder;
+                reports = PipelineRun.ReadReports(Path.Combine(folder, Program.ReportsFolderName), folder);
+            });
+        var printed = log.Sections.SelectMany(section => section.Lines).ToList();
+        return (((RunResult.Done)result).Outcome, new RunOutput(OutputMasks.MaskLog(printed, runFolder), patch, reports, printed));
     }
 
     private static IMeshFilesFactory DefaultMeshFiles(string dataFolder, GameRelease release, IReadOnlyList<ModKey> listedPlugins) =>

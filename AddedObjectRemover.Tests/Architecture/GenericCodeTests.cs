@@ -18,6 +18,8 @@ public partial class GenericCodeTests
     {
         ["IRemovalRounds"] = "Steps supply their own round details; the decision list can't name them.",
         ["RoundProposals"] = "The proposals an IRemovalRounds<TDetails> returns, carrying the same step-specific details.",
+        ["ObjectsJudgedWith"] = "Steps supply their own settings record; the decision list can't name them.",
+        ["JudgedPasses"] = "Steps supply their own pass record; the decision list can't name them.",
     };
 
     private static readonly BindingFlags AllDeclared =

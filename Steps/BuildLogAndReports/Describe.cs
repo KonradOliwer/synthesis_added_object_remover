@@ -17,6 +17,10 @@ internal static class Describe
     /// <summary>The text for a list with no entries.</summary>
     public const string NoEntries = "none";
 
+    private const string RemovedVerb = "removed";
+
+    private const string RestoredVerb = "restored";
+
     /// <summary>Named for a change only the patch holds, which this run did not make.</summary>
     private const string EarlierPatcher = "an earlier patcher in this group";
 
@@ -72,23 +76,49 @@ internal static class Describe
         _ => throw new UnreachableException($"Unknown point reason {reason.Kind}."),
     };
 
-    public static string RemovalReason(CollectedObjects world, RemovedObject removal) => removal switch
+    /// <param name="final">The decisions, which tell a target object the reason names as taken from its place, restored or removed.</param>
+    public static string RemovalReason(CollectedObjects world, ObjectWithReason removal, IRemovalDecisions final) => removal switch
     {
-        TerrainChangedRemoval changed => $"terrain changed by {ChangingMod(changed.ChangedBy)} ({TerrainChange(changed.Kind)})",
-        TooCloseRemoval { TooCloseTo: var other, Cause: TooCloseCause.ObjectSize } => $"too close to {OtherObject(other)}, {Change(other)}",
-        TooCloseRemoval { TooCloseTo: var other, Cause: TooCloseCause.Distance distance } => $"within {distance.Units} units of {OtherObject(other)}, {Change(other)}",
-        TouchingRemoval touching => $"touches removed {RecordNames.Describe(world.Targets[touching.TouchedTargetIndex])}",
-        SupportRemoval support =>
-            $"{TextFormat.Percent(support.RemovedShare)} of its support was removed (mostly {RecordNames.Describe(world.Targets[support.MainRemovedSupporter])})",
-        TouchingAnotherModsObjectRemoval touching => $"touches {OtherObject(touching.Touched)}, another mod's object left without support",
-        SupportWithAnotherModsObjectRemoval support =>
-            $"{TextFormat.Percent(support.RemovedShare)} of its support was removed or pulled down (mostly {OtherObject(support.MainSupporter)}, "
-            + "another mod's object left without support)",
-        VisibleLeftBehindRemoval { Evaluation: var evaluation } => $"visible, {VisibleLeftBehindOutcomeText.DescribeReason(evaluation)}",
-        LeftBehindRemoval { Evaluation: var evaluation } => $"invisible, {LeftBehindReason(evaluation)}",
-        LinkedRemoval linked => $"linked to removed {RecordNames.Describe(world.Targets[linked.LinkedToTargetIndex])}",
+        ObjectWithReason.TerrainChanged or ObjectWithReason.TooClose => CollisionReason(removal),
+        ObjectWithReason.Touching touching => $"touches {FateOf(final, touching.TouchedTargetIndex)} {RecordNames.Describe(world.Targets[touching.TouchedTargetIndex])}",
+        ObjectWithReason.LostSupport support => LostSupportReason(world, support, final),
+        ObjectWithReason.TouchingAnotherModsObject touching => $"touches {OtherObject(touching.Touched)}, another mod's object left without support",
+        ObjectWithReason.LostSupportWithAnotherModsObject support =>
+            $"{TextFormat.Percent(support.LeftItsPlaceShare)} of its support {(support.RestoredShare > 0 ? "left its place or was pulled down" : "was removed or pulled down")} "
+            + $"(mostly {OtherObject(support.MainSupporter)}, another mod's object left without support)",
+        ObjectWithReason.VisibleLeftBehind { Evaluation: var evaluation } => $"visible, {VisibleLeftBehindOutcomeText.DescribeReason(evaluation)}",
+        ObjectWithReason.LeftBehind { Evaluation: var evaluation } => $"invisible, {LeftBehindReason(evaluation)}",
+        ObjectWithReason.LinkedTo linked => $"linked to {FateOf(final, linked.LinkedToTargetIndex)} {RecordNames.Describe(world.Targets[linked.LinkedToTargetIndex])}",
         _ => throw new UnreachableException($"Unknown removal type {removal.GetType().Name}."),
     };
+
+    /// <summary>
+    /// "100 % of its support was removed (mostly X)", or, when restored objects held part of it, "100 % of its support left its place
+    /// (mostly X, restored)" with what became of the main supporter at the end.
+    /// </summary>
+    private static string LostSupportReason(CollectedObjects world, ObjectWithReason.LostSupport support, IRemovalDecisions final)
+    {
+        var share = TextFormat.Percent(support.LeftItsPlaceShare);
+        var main = RecordNames.Describe(world.Targets[support.MainSupporter]);
+        return support.RestoredShare > 0
+            ? $"{share} of its support left its place (mostly {main}, {FateOf(final, support.MainSupporter)})"
+            : $"{share} of its support was removed (mostly {main})";
+    }
+
+    /// <summary>The reason of an object that clashes with a change of the terrain or with another mod's object.</summary>
+    public static string CollisionReason(ObjectWithReason collision) => collision switch
+    {
+        ObjectWithReason.TerrainChanged changed => $"terrain changed by {ChangingMod(changed.ChangedBy)} ({TerrainChange(changed.Kind)})",
+        ObjectWithReason.TooClose { TooCloseTo: var other, Cause: TooCloseCause.ObjectSize } => $"too close to {OtherObject(other)}, {Change(other)}",
+        ObjectWithReason.TooClose { TooCloseTo: var other, Cause: TooCloseCause.Distance distance } => $"within {distance.Units} units of {OtherObject(other)}, {Change(other)}",
+        _ => throw new UnreachableException($"Unexpected collision type {collision.GetType().Name}."),
+    };
+
+    /// <summary>"restored" for a target object that was restored, "removed" for any other that was taken from its place.</summary>
+    private static string FateOf(IRemovalDecisions final, int targetIndex) => Fate(final.Of(new TargetId(targetIndex)));
+
+    /// <summary>"restored" for a target object that was restored, "removed" for any other that was taken from its place.</summary>
+    public static string Fate(Decision? decision) => decision is Decision.Restored ? RestoredVerb : RemovedVerb;
 
     /// <param name="changedBy">Null when only the patch holds the change.</param>
     public static string ChangingMod(PluginName? changedBy) => changedBy?.ToString() ?? EarlierPatcher;

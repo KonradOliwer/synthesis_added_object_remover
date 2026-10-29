@@ -15,9 +15,9 @@ namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 /// threshold share, named after the object taken away holding the largest share. Only visible target objects with a mesh that an
 /// also-remove round may still decide take part. Thread-safe; results depend only on the inputs.
 /// </summary>
-/// <param name="targets">Where they stand: an object kept shrunk or turned at its new placement.</param>
+/// <param name="targets">Where the rounds measure them: an object kept shrunk or turned at its new placement, a restored one where the cleaned mod put it.</param>
 /// <param name="visibleTargets">The index of <paramref name="targets"/>.</param>
-/// <param name="world">Every target object where it stands, removed or not, and the objects of any plugin where they stood.</param>
+/// <param name="world">Every target object where the rounds measure it, removed or not, and the objects of any plugin where they stood.</param>
 internal sealed class TargetsOnTakenAwayObjects(
     ImmutableArray<TargetObject> targets,
     IVisibleTargetObjects visibleTargets,
@@ -119,15 +119,24 @@ internal sealed class TargetsOnTakenAwayObjects(
         ];
         if (heldByTakenAway.Count == 0) return null;
 
-        var share = contacts.Supporters.Where(entry => IsGone(entry.Supporter, decisions, takenAway)).Sum(entry => entry.Weight) / contacts.TotalWeight;
+        var share = ShareOf(contacts, supporter => IsGone(supporter, decisions, takenAway));
         return SupportRule.ReachesThreshold(share, settings.SupportLostFraction)
-            ? new ProposedRemoval(target, new RemovalReason.LostSupportWithAnotherModsObject(share, new OtherId(heldByTakenAway[0].Supporter.Index)))
+            ? new ProposedRemoval(
+                target,
+                new RemovalReason.LostSupportWithAnotherModsObject(
+                    share, ShareOf(contacts, supporter => IsRestoredTarget(supporter, decisions)), new OtherId(heldByTakenAway[0].Supporter.Index)))
             : null;
     }
 
+    private static float ShareOf(CandidateContacts contacts, Func<Supporter, bool> isCounted) =>
+        contacts.Supporters.Where(entry => isCounted(entry.Supporter)).Sum(entry => entry.Weight) / contacts.TotalWeight;
+
+    private static bool IsRestoredTarget(Supporter supporter, IRemovalDecisions decisions) =>
+        supporter.Type == SupporterType.Target && decisions.Of(new TargetId(supporter.Index)) is Decision.Restored;
+
     private static bool IsGone(Supporter supporter, IRemovalDecisions decisions, HashSet<OtherId> takenAway) => supporter.Type switch
     {
-        SupporterType.Target => decisions.IsRemoved(new TargetId(supporter.Index)),
+        SupporterType.Target => decisions.HasLeftItsPlace(new TargetId(supporter.Index)),
         SupporterType.PlacedObject => takenAway.Contains(new OtherId(supporter.Index)),
         SupporterType.Terrain => false,
         _ => throw new UnreachableException($"Unknown supporter type {supporter.Type}."),

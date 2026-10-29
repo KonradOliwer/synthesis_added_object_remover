@@ -28,6 +28,7 @@ public partial class ToolWordingTests
         [("Tools/TriangleMeshTests/PointContactTest.cs", "Unknown line axis {axis}.")] = BugMessage,
         [("Tools/TriangleMeshTests/BoxMesh.cs", "A box mesh always has 12 triangles.")] = BugMessage,
         [("Tools/PluginRecordReadingAndWriting/PlacedRecordWriter.cs", "Unknown write order.")] = BugMessage,
+        [("Tools/PluginRecordReadingAndWriting/PlacedOverrideWriter.cs", "Record {record.FormKey} was already moved to another cell by this writer.")] = BugMessage,
         [("Tools/PluginRecordReadingAndWriting/PluginRecords.cs", "The placed records must be read before they are used.")] = BugMessage,
         [("Tools/PluginRecordReadingAndWriting/PatchWriting.cs", "The records to write were not read by this plugin tool.")] = BugMessage,
         [("Tools/PluginRecordReadingAndWriting/PatchMarker.cs", "Added Object Remover patch")] = "Header description text that marks a plugin as this patcher's output; plugin file content, never log wording.",

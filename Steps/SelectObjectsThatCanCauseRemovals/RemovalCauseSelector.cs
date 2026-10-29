@@ -19,8 +19,26 @@ public static class RemovalCauseSelector
     {
         var replacements = ReplacementMatcher.Find(
             world.Targets, new OtherModObjectPositions(otherModObjects), world.OtherModObjects.Length, shapes, world.Order, execution);
-        return new SelectedObjects(replacements, new ObjectsThatCanCauseRemovals(otherModObjects, replacements, settings.Npcs));
+        return new SelectedObjects(replacements, ViewsOf(otherModObjects, replacements), settings.Npcs);
     }
+
+    /// <summary>
+    /// The views for an earlier version standing at its old place: every object of <paramref name="otherModObjects"/> can cause
+    /// removals except <paramref name="excluded"/>, the cleaned mod's own version of the record being checked, which the earlier
+    /// version replaces.
+    /// </summary>
+    /// <param name="otherModObjects">The objects of the old-place world (C9).</param>
+    /// <param name="otherModObjectCount">The number of objects in <paramref name="otherModObjects"/>.</param>
+    public static SelectedObjects SelectForOldPlace(
+        IOtherModObjectsBySpace otherModObjects, int otherModObjectCount, OtherId excluded, NpcHandling npcs)
+    {
+        var replacements = Replacements.Excluding(otherModObjectCount, excluded);
+        return new SelectedObjects(replacements, ViewsOf(otherModObjects, replacements), npcs);
+    }
+
+    private static Dictionary<NpcHandling, IObjectsThatCanCauseRemovals> ViewsOf(IOtherModObjectsBySpace otherModObjects, Replacements replacements) =>
+        Enum.GetValues<NpcHandling>().ToDictionary(
+            npcs => npcs, npcs => (IObjectsThatCanCauseRemovals)new ObjectsThatCanCauseRemovals(otherModObjects, replacements, npcs));
 
     /// <summary>
     /// The other mods' objects count an object that cannot be measured as invisible, so it causes no removals; the failure is

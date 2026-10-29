@@ -35,16 +35,18 @@ public abstract record RemovalReason
 
     public sealed record Touching(TargetId Touched) : RemovalReason;
 
-    /// <param name="RemovedShare">Fraction of the object's support held by removed objects.</param>
-    /// <param name="MainSupporter">The removed target holding the largest share of its support.</param>
-    public sealed record LostSupport(float RemovedShare, TargetId MainSupporter) : RemovalReason;
+    /// <param name="LeftItsPlaceShare">Fraction of the object's support held by objects that left their place, removed or restored.</param>
+    /// <param name="RestoredShare">The part of <paramref name="LeftItsPlaceShare"/> held by restored objects.</param>
+    /// <param name="MainSupporter">The target that left its place and holds the largest share of its support.</param>
+    public sealed record LostSupport(float LeftItsPlaceShare, float RestoredShare, TargetId MainSupporter) : RemovalReason;
 
     /// <param name="Touched">Another mod's object left without support, removed or pulled down, that the object touched where it stood.</param>
     public sealed record TouchingAnotherModsObject(OtherId Touched) : RemovalReason;
 
-    /// <param name="RemovedShare">Fraction of the object's support held by removed objects and other mods' objects taken away.</param>
+    /// <param name="LeftItsPlaceShare">Fraction of the object's support held by target objects that left their place, removed or restored, and other mods' objects taken away.</param>
+    /// <param name="RestoredShare">The part of <paramref name="LeftItsPlaceShare"/> held by restored target objects.</param>
     /// <param name="MainSupporter">The other mod's object left without support, removed or pulled down, holding the largest share of its support.</param>
-    public sealed record LostSupportWithAnotherModsObject(float RemovedShare, OtherId MainSupporter) : RemovalReason;
+    public sealed record LostSupportWithAnotherModsObject(float LeftItsPlaceShare, float RestoredShare, OtherId MainSupporter) : RemovalReason;
 
     public sealed record InsideAnotherModsObject(OtherId Container) : RemovalReason;
 
@@ -52,6 +54,6 @@ public abstract record RemovalReason
 
     public sealed record VisibleObjectSurroundingsRemoved : RemovalReason;
 
-    /// <param name="To">The member of the object's linked group whose removal took the group along.</param>
+    /// <param name="To">The member of the object's linked group whose removal or restoration took the group along.</param>
     public sealed record LinkedTo(TargetId To) : RemovalReason;
 }

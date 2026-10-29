@@ -9,13 +9,22 @@ internal static class VisibleLeftBehindOutcomeText
     public static string Describe(VisibleLeftBehindOutcome outcome) => outcome switch
     {
         VisibleLeftBehindOutcome.RemovedSurroundingsRemoved => "surroundings removed",
+        VisibleLeftBehindOutcome.RemovedSurroundingsRemovedAndRestored => "surroundings removed and restored",
         VisibleLeftBehindOutcome.RemovedLinkedToRemoval => "linked to a removed object",
+        VisibleLeftBehindOutcome.RemovedLinkedToRestoration => "linked to a restored object",
+        VisibleLeftBehindOutcome.RestoredSurroundingsRemoved => "surroundings removed",
+        VisibleLeftBehindOutcome.RestoredSurroundingsRemovedAndRestored => "surroundings removed and restored",
+        VisibleLeftBehindOutcome.RestoredAsLinked => "linked to an object that left its place",
         VisibleLeftBehindOutcome.KeptTooFewSurroundingObjects => "too few surrounding objects",
         VisibleLeftBehindOutcome.KeptSurroundingsMostlyKept => "surroundings mostly kept",
         VisibleLeftBehindOutcome.KeptProtectedType => "protected type",
         VisibleLeftBehindOutcome.KeptReferenced => "referenced",
         _ => throw new UnreachableException($"Unknown visible left-behind outcome {outcome}."),
     };
+
+    /// <summary>What the step did with the object.</summary>
+    public static string Verdict(VisibleLeftBehindCheck evaluation) =>
+        evaluation.IsRemoved ? "removed" : evaluation.IsRestored ? "restored" : "kept";
 
     /// <summary>The outcome's reason, with the linking record for a referenced object.</summary>
     public static string DescribeReason(VisibleLeftBehindCheck evaluation) =>

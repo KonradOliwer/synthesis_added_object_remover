@@ -90,6 +90,58 @@ public sealed class VisibleLeftBehindSectionTests
     }
 
     [Fact]
+    public void AnObjectRemovedAlongWithARestoredMemberIsLinkedToARestoredObjectNeverToARemovedOne()
+    {
+        var (world, scene, decisions) = Scene();
+        var linkedMember = new VisibleLeftBehindCheck(
+            LinkedPartner, null, Areas(northCleared: false), VisibleLeftBehindOutcome.RemovedLinkedToRestoration, null);
+        var result = scene with { Evaluations = [.. scene.Evaluations, linkedMember] };
+
+        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Detailed).Lines.ToList();
+
+        Assert.Contains("removed 2 (1 surroundings removed, 1 linked to a restored object); ", lines[0], StringComparison.Ordinal);
+        AssertLine(lines.Single(line => line.Contains(RecordNames.Describe(world.Targets[LinkedPartner]), StringComparison.Ordinal) && line.StartsWith("  Visible left behind", StringComparison.Ordinal)),
+            world, linkedMember, null, "removed, linked to a restored object");
+    }
+
+    [Fact]
+    public void ARestoredObjectIsCountedAndPrintedAsRestoredBesideTheRemovedAndNeverAsRemoved()
+    {
+        var (world, scene, decisions) = Scene();
+        var restored = new VisibleLeftBehindCheck(
+            LinkedPartner, VisibleObjectKind.Furniture, Areas(northCleared: true), VisibleLeftBehindOutcome.RestoredSurroundingsRemoved, null);
+        var result = scene with { Evaluations = [.. scene.Evaluations, restored] };
+
+        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Detailed).Lines.ToList();
+
+        Assert.Equal(
+            "Visible objects left behind: 7 evaluated in 1.5s; removed 1 (1 surroundings removed); restored 1 (1 surroundings removed); "
+            + "kept 5 (1 too few surrounding objects, 2 surroundings mostly kept, 1 protected type, 1 referenced).",
+            lines[0]);
+        AssertLine(lines.Single(line => line.StartsWith("  Visible left behind: ", StringComparison.Ordinal) && line.Contains(RecordNames.Describe(world.Targets[LinkedPartner]), StringComparison.Ordinal)),
+            world, restored, "Furniture", "restored, surroundings removed");
+    }
+
+    [Fact]
+    public void AnObjectWhoseSurroundingsWereRemovedAndSomeRestoredIsCountedUnderThatReasonOnlyWhenThereIsOne()
+    {
+        var (world, scene, decisions) = Scene();
+        var removedWithRestored = new VisibleLeftBehindCheck(
+            LinkedPartner, null, Areas(northCleared: true), VisibleLeftBehindOutcome.RemovedSurroundingsRemovedAndRestored, null);
+        var restoredWithRestored = removedWithRestored with { TargetIndex = NoClearedDirection, Decision = VisibleLeftBehindOutcome.RestoredSurroundingsRemovedAndRestored };
+
+        var plain = LogSections.BuildVisibleLeftBehindSection(world, scene, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Detailed).Lines.ToList();
+        var counted = LogSections.BuildVisibleLeftBehindSection(
+            world, scene with { Evaluations = [.. scene.Evaluations, removedWithRestored, restoredWithRestored] }, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Detailed).Lines.ToList();
+
+        Assert.DoesNotContain("and restored", plain[0], StringComparison.Ordinal);
+        Assert.Contains("removed 2 (1 surroundings removed, 1 surroundings removed and restored); restored 1 (1 surroundings removed and restored); ", counted[0], StringComparison.Ordinal);
+        AssertLine(
+            counted.Single(line => line.StartsWith("  Visible left behind: ", StringComparison.Ordinal) && line.Contains(RecordNames.Describe(world.Targets[LinkedPartner]), StringComparison.Ordinal)),
+            world, removedWithRestored, null, "removed, surroundings removed and restored");
+    }
+
+    [Fact]
     public void ASwitchedOffStepPrintsNothing()
     {
         var (world, _, decisions) = Scene();
@@ -161,7 +213,7 @@ public sealed class VisibleLeftBehindSectionTests
             [TestTargets.Link(Removed, LinkedPartner)],
             TestTargets.References(TargetCount, new Dictionary<int, KeepReason> { [Referenced] = TestKeepReasons.Quest }),
             TestBaseFacts.Unresolved);
-        var decisions = RemovalDecisions.Start(protection, TargetCount).Apply(
+        var decisions = TestSeededDecisions.StartDisablingAll(protection, TargetCount).Apply(
             RoundKind.VisibleLeftBehind,
             [
                 new ProposedRemoval(new TargetId(Removed), new RemovalReason.VisibleObjectSurroundingsRemoved()),

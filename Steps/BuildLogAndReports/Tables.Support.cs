@@ -15,7 +15,7 @@ internal static partial class Tables
     [
         "iteration", "formKey", "editorId", "base", "modelPath", "space",
         "contactPoints", "totalWeight",
-        "removedCleanedModShare", "keptCleanedModShare", "otherModShare", "terrainShare",
+        "removedCleanedModShare", "restoredShare", "keptCleanedModShare", "otherModShare", "terrainShare",
         "threshold", "decision", "topSupporters",
     ];
 
@@ -42,6 +42,7 @@ internal static partial class Tables
             Int(evaluation.Contacts.ContactPoints),
             Number(evaluation.Contacts.TotalWeight),
             Number(ShareOf(SupportCategory.RemovedTarget)),
+            Number(ShareOf(SupportCategory.RestoredTarget)),
             Number(ShareOf(SupportCategory.KeptTarget)),
             Number(ShareOf(SupportCategory.OtherMod)),
             Number(ShareOf(SupportCategory.Terrain)),
@@ -54,7 +55,10 @@ internal static partial class Tables
     private static string DescribeDecision(SupportEvaluationRow evaluation)
     {
         if (evaluation.Removed) return "removed";
+        if (evaluation.RemovedAsLinkedToRestored) return "removed (linked to a restored object)";
         if (evaluation.RemovedAsLinked) return "removed (linked to a removed object)";
+        if (evaluation.Restored) return "restored";
+        if (evaluation.RestoredAsLinked) return "restored (linked to an object that left its place)";
         if (evaluation.Held) return "kept (referenced)";
         return evaluation.Contacts.ContactPoints == 0 ? "kept (no contact points)" : "kept";
     }
@@ -69,6 +73,7 @@ internal static partial class Tables
     private static string DescribeCategory(SupportCategory category) => category switch
     {
         SupportCategory.RemovedTarget => "RemovedCleanedMod",
+        SupportCategory.RestoredTarget => "Restored",
         SupportCategory.KeptTarget => "KeptCleanedMod",
         SupportCategory.OtherMod => nameof(SupportCategory.OtherMod),
         SupportCategory.Terrain => nameof(SupportCategory.Terrain),

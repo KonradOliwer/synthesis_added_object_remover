@@ -8,6 +8,8 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 /// <summary>One plugin's copy of a cell, with helpers that place records into its child lists.</summary>
 internal sealed class FixtureCell(FixtureMod owner, Cell cell)
 {
+    public FormKey Key => cell.FormKey;
+
     public PlacedObject Place(string editorId, FormKey baseKey, Vector3 position, bool persistent = false)
     {
         var placed = new PlacedObject(owner.NextKey(), FixtureMod.Release)
@@ -33,10 +35,10 @@ internal sealed class FixtureCell(FixtureMod owner, Cell cell)
     }
 
     /// <summary>Adds this plugin's version of a record another plugin created.</summary>
-    public PlacedObject PlaceCopyOf(PlacedObject original)
+    public PlacedObject PlaceCopyOf(PlacedObject original, bool persistent = false)
     {
         var copy = original.DeepCopy();
-        Add(copy, persistent: false);
+        Add(copy, persistent);
         return copy;
     }
 

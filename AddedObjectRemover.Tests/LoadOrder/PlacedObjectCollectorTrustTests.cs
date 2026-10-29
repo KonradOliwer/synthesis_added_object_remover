@@ -27,11 +27,21 @@ public class PlacedObjectCollectorTrustTests
     private static readonly BaseKey OtherWall = new(new RecordKey(BaseGame, 0x101), BaseLinkKind.PlaceableObject);
     private static readonly PresenceFacts Shown = new(Deleted: false, InitiallyDisabled: false, EnableParent: null);
 
-    private static readonly WhatToCollect Plan = new(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits);
+    private static readonly WhatToCollect Plan = new(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false);
+    private static readonly WhatToCollect OldPlacesJudged = Plan with { JudgeOldPlaces = true };
     private static readonly ModTrustTable Mods = TestModTrust.Of(
         TestTargets.TargetName, Patch, trusted: [BaseGame, Carrier], untrusted: [City, Later], trustedForOwnChanges: [Birds]);
 
+    private static readonly PluginName Needing = new("Needing.esp");
+
+    private static readonly ModTrustTable ModsWithNeedingPlugin = TestModTrust.Of(
+        TestTargets.TargetName, Patch, trusted: [BaseGame, Carrier], untrusted: [City, Later], trustedForOwnChanges: [Birds], needingCleanedMod: [Needing]);
+
     private static readonly PlacedRecordFact Target = TestPlacedRecords.Create(TestTargets.Key(0), TestTargets.TargetName, Vector3.Zero);
+
+    /// <summary>A record of the base game that the target plugin moved: the changed object that makes a run judge old places.</summary>
+    private static readonly PlacedRecordFact MovedByTarget =
+        Record(BaseGame, At(BaseGame, Placed), At(TestTargets.TargetName, Moved)) with { Key = new RecordKey(BaseGame, 2) };
 
     [Fact]
     public void AnObjectATrustedModPlacedAndNoOneChangedIsSupportOnly()
@@ -68,8 +78,7 @@ public class PlacedObjectCollectorTrustTests
     [Fact]
     public void AnUntrustedReSaveWithinTheTolerancesChangesNothing()
     {
-        var resaved = new PlacedVersionFact(
-            City, new PlacementFacts(Shown, Placed + new Vector3(0.005f, 0, 0), new Vector3(0, 0, 0.00005f)), Scale: 1.00005f, Wall);
+        var resaved = TestPlacedRecords.Version(City, new PlacementFacts(Shown, Placed + new Vector3(0.005f, 0, 0), new Vector3(0, 0, 0.00005f)), Wall) with { Scale = 1.00005f };
 
         Assert.Null(ChangeOf(Record(BaseGame, At(BaseGame, Placed), resaved)));
     }
@@ -190,6 +199,33 @@ public class PlacedObjectCollectorTrustTests
                 At(City, Moved) with { Scale = 2f },
                 At(Later, Moved) with { Scale = 3f })));
 
+    /// <summary>The same versions of one record: City.esp's move is a change where City.esp is not accepted and the accepted value where it is.</summary>
+    [Theory]
+    [InlineData(VersionTrust.None, true)]
+    [InlineData(VersionTrust.Full, false)]
+    public void TheSameObjectCanCauseRemovalsOnlyWhenTheChangerIsNotAcceptedInTheWorld(VersionTrust cityTrust, bool canCauseRemovals)
+    {
+        var world = Mods.AcceptedWorld with { Plugins = Mods.AcceptedWorld.Plugins.SetItem(City, cityTrust) };
+        var record = Record(BaseGame, At(BaseGame, Placed), At(City, Moved));
+
+        var collected = PlacedObjects.Collect(new FixedFactsPlugin(ImmutableArray.Create(Target, record)), Mods, world, Plan);
+
+        Assert.Equal(canCauseRemovals, !collected.OtherModObjects.IsEmpty);
+    }
+
+    [Theory]
+    [InlineData(VersionTrust.None, false)]
+    [InlineData(VersionTrust.Full, true)]
+    public void TheScanStopsAtThePluginsTheWorldBelievesFully(VersionTrust cityTrust, bool stops)
+    {
+        var world = Mods.AcceptedWorld with { Plugins = Mods.AcceptedWorld.Plugins.SetItem(City, cityTrust) };
+        var plugin = new FixedFactsPlugin([Target]);
+
+        PlacedObjects.Collect(plugin, Mods, world, Plan);
+
+        Assert.Equal(stops, plugin.StopsTheWalk!(City));
+    }
+
     [Fact]
     public void AnUnchangedObjectOutsideTheTargetSpacesIsNotCounted()
     {
@@ -209,8 +245,96 @@ public class PlacedObjectCollectorTrustTests
         Assert.Equal((true, true, false, false, false), (stops(BaseGame), stops(Carrier), stops(Birds), stops(City), stops(Patch)));
     }
 
+    [Fact]
+    public void AnObjectOfAnUntrustedModThatLoadsWithoutTheCleanedModIsNoChangeInTheWorldWithoutIt()
+    {
+        var other = Assert.Single(CollectWithChangedObject(Record(City, At(City, Placed)), Mods, OldPlacesJudged).OtherModObjects);
+
+        Assert.Equal(((ObjectChange?)new ObjectChange(City, AcceptedFrom: null), (ObjectChange?)null), (other.Change, other.ChangeWithoutCleanedMod));
+    }
+
+    /// <summary>The patch that exists only for the cleaned mod is believed in its world, and a change in the world without it.</summary>
+    [Fact]
+    public void AnObjectOfATrustedModThatNeedsTheCleanedModIsSupportOnlyHereAndAChangeInTheWorldWithoutIt()
+    {
+        var collected = CollectWithChangedObject(Record(Needing, At(Needing, Placed)), ModsWithNeedingPlugin, OldPlacesJudged);
+
+        var other = Assert.Single(collected.SupportOnlyObjects);
+        Assert.Equal(((ObjectChange?)null, (ObjectChange?)new ObjectChange(Needing, AcceptedFrom: null)), (other.Change, other.ChangeWithoutCleanedMod));
+    }
+
+    [Fact]
+    public void AnOverrideOfTheTargetPluginIsAChangeInTheWorldWithoutItOnlyWhenItDiffersFromTheVersionBelow()
+    {
+        var keptAsItWas = RecordOverriddenByTarget(OldPlacesJudged, At(BaseGame, Placed), At(TestTargets.TargetName, Placed));
+        var scaled = RecordOverriddenByTarget(OldPlacesJudged, At(BaseGame, Placed), At(TestTargets.TargetName, Placed) with { Scale = 2f });
+
+        Assert.Equal(
+            ((ObjectChange?)null, (ObjectChange?)new ObjectChange(TestTargets.TargetName, BaseGame)),
+            (SingleSupportOnly(keptAsItWas).ChangeWithoutCleanedMod, SingleSupportOnly(scaled).ChangeWithoutCleanedMod));
+    }
+
+    /// <summary>Without a changed object there is no old place to judge, so the other objects are not decided in the world without the cleaned mod.</summary>
+    [Fact]
+    public void WithoutAChangedObjectNoObjectIsDecidedInTheWorldWithoutTheCleanedModWhateverTheOldPlacesJudged()
+    {
+        var changedByUntrusted = Assert.Single(Collect(Record(City, At(City, Placed)), OldPlacesJudged).OtherModObjects);
+        var needing = Assert.Single(PlacedObjects.Collect(
+            new FixedFactsPlugin(ImmutableArray.Create(Target, Record(Needing, At(Needing, Placed)))), ModsWithNeedingPlugin, OldPlacesJudged).SupportOnlyObjects);
+
+        Assert.Equal(((ObjectChange?)null, (ObjectChange?)null), (changedByUntrusted.ChangeWithoutCleanedMod, needing.ChangeWithoutCleanedMod));
+    }
+
+    /// <summary>A run that judges no old place keeps nothing of the world without the cleaned mod.</summary>
+    [Fact]
+    public void WithoutJudgingTheOldPlacesNoObjectIsDecidedInTheWorldWithoutTheCleanedMod()
+    {
+        var changedByUntrusted = Assert.Single(CollectWithChangedObject(Record(City, At(City, Placed)), Mods, Plan).OtherModObjects);
+        var needing = Assert.Single(CollectWithChangedObject(Record(Needing, At(Needing, Placed)), ModsWithNeedingPlugin, Plan).SupportOnlyObjects);
+        var overridden = SingleSupportOnly(RecordOverriddenByTarget(Plan, At(BaseGame, Placed), At(TestTargets.TargetName, Placed) with { Scale = 2f }));
+
+        Assert.Equal(
+            ((ObjectChange?)null, (ObjectChange?)null, (ObjectChange?)null),
+            (changedByUntrusted.ChangeWithoutCleanedMod, needing.ChangeWithoutCleanedMod, overridden.ChangeWithoutCleanedMod));
+    }
+
+    [Fact]
+    public void WhenTheOldPlacesAreJudgedTheScanStopsAtNeitherTheCleanedModNorATrustedPluginThatNeedsIt()
+    {
+        var plugin = new FixedFactsPlugin([Target]);
+
+        PlacedObjects.Collect(plugin, ModsWithNeedingPlugin, OldPlacesJudged);
+
+        var stops = plugin.StopsTheWalk!;
+        Assert.Equal((true, false, false), (stops(BaseGame), stops(Needing), stops(TestTargets.TargetName)));
+    }
+
+    [Fact]
+    public void WithoutJudgingTheOldPlacesTheScanStopsAtATrustedPluginThatNeedsTheCleanedModButNotAtTheCleanedMod()
+    {
+        var plugin = new FixedFactsPlugin([Target]);
+
+        PlacedObjects.Collect(plugin, ModsWithNeedingPlugin, Plan);
+
+        var stops = plugin.StopsTheWalk!;
+        Assert.Equal((true, true, false), (stops(BaseGame), stops(Needing), stops(TestTargets.TargetName)));
+    }
+
+    private static OtherObject SingleSupportOnly(CollectedObjects collected) => Assert.Single(collected.SupportOnlyObjects);
+
+    private static CollectedObjects RecordOverriddenByTarget(WhatToCollect plan, params PlacedVersionFact[] versions)
+    {
+        var record = Record(BaseGame, versions);
+        return PlacedObjects.Collect(
+            new FixedFactsPlugin(ImmutableArray.Create(Target, MovedByTarget, record), [], new HashSet<RecordKey> { MovedByTarget.Key, record.Key }), Mods, plan);
+    }
+
+    private static CollectedObjects CollectWithChangedObject(PlacedRecordFact record, ModTrustTable mods, WhatToCollect plan) =>
+        PlacedObjects.Collect(
+            new FixedFactsPlugin(ImmutableArray.Create(Target, MovedByTarget, record), [], new HashSet<RecordKey> { MovedByTarget.Key }), mods, plan);
+
     private static PlacedVersionFact At(PluginName plugin, Vector3 position) =>
-        new(plugin, new PlacementFacts(Shown, position, Vector3.Zero), Scale: null, Wall);
+        TestPlacedRecords.Version(plugin, new PlacementFacts(Shown, position, Vector3.Zero), Wall);
 
     private static PlacedVersionFact Changed(PlacedVersionFact version, Property property) => property switch
     {
@@ -239,6 +363,8 @@ public class PlacedObjectCollectorTrustTests
         return collected.OtherModObjects.IsEmpty ? null : Assert.Single(collected.OtherModObjects).Change;
     }
 
-    private static CollectedObjects Collect(PlacedRecordFact record) =>
-        PlacedObjects.Collect(new FixedFactsPlugin(ImmutableArray.Create(Target, record)), Mods, Plan);
+    private static CollectedObjects Collect(PlacedRecordFact record) => Collect(record, Plan);
+
+    private static CollectedObjects Collect(PlacedRecordFact record, WhatToCollect plan) =>
+        PlacedObjects.Collect(new FixedFactsPlugin(ImmutableArray.Create(Target, record)), Mods, plan);
 }

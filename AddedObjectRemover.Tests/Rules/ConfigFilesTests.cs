@@ -295,7 +295,7 @@ public sealed class ConfigFilesTests : IDisposable
         WriteConfig(TownWalls, "{\"CleanedMod\": \"A.esp\"}");
         var config = Assert.Single(Assert.IsType<ConfigsRead.Ready>(ReadBatch("group", standard)).Configs);
 
-        Assert.Equal(SettingDefaults.SizeMultiplier, config.Settings.TooClose.SizeMultiplier);
+        Assert.Equal(SettingDefaults.SizeMultiplier, config.Settings.Collision.TooClose.SizeMultiplier);
     }
 
     [Fact]
@@ -369,7 +369,65 @@ public sealed class ConfigFilesTests : IDisposable
         var notInFile = NotesOf(config).NotInFile;
 
         Assert.Contains(new SettingInFile("CleanedMod", "Mod to clean up", "null"), notInFile);
-        Assert.Equal(["CleanedMod", "MovedDistanceInUnits", "Trust.TrustedModsAndTheirMasters"], notInFile.Take(3).Select(setting => setting.KeyPath));
+        Assert.Equal(["CleanedMod", "ChangedObjects.Moved.MovedDistanceInUnits", "ChangedObjects.Moved.WhenRemoved"], notInFile.Take(3).Select(setting => setting.KeyPath));
+    }
+
+    [Fact]
+    public void TheChangedObjectsSettingsAreReadFromAConfigFileByTheirKeys()
+    {
+        var config = ReadOnlyConfig(
+            """
+            {
+              "CleanedMod": "A.esp",
+              "ChangedObjects": {
+                "Moved": { "MovedDistanceInUnits": 25, "WhenRemoved": "Restore", "AttemptResizingBeforeRemoval": true },
+                "Replaced": { "Process": true, "WhenRemoved": "Remove", "AttemptResizingBeforeRemoval": true },
+                "Collision": {
+                  "TooClose": { "NpcHandling": "Never", "BySize": { "SizeMultiplier": 1.5 } },
+                  "TerrainChange": { "RemoveOnChangedTerrain": false },
+                  "ShrinkLimitPercent": 50,
+                  "TurnLimitDegrees": 90
+                }
+              }
+            }
+            """);
+
+        var changed = config.Settings.ChangedObjects;
+
+        Assert.Equal((25f, RestoreMode.Restore, true), (changed.Moved.MovedDistanceInUnits, changed.Moved.WhenRemoved, changed.Moved.AttemptResizingBeforeRemoval));
+        Assert.Equal((true, RestoreMode.Remove, true), (changed.Replaced.Process, changed.Replaced.WhenRemoved, changed.Replaced.AttemptResizingBeforeRemoval));
+        Assert.Equal((NpcHandling.Never, 1.5f, false), (changed.Collision.TooClose.Npcs, changed.Collision.TooClose.SizeMultiplier, changed.Collision.TerrainChange.RemoveOnChangedTerrain));
+        Assert.Equal((50, 90), (changed.Collision.ShrinkOrTurn.ShrinkLimitPercent, changed.Collision.ShrinkOrTurn.TurnLimitDegrees));
+        Assert.Equal(SettingDefaults.SizeMultiplier, config.Settings.Collision.TooClose.SizeMultiplier);
+        Assert.Empty(NotesOf(config).UnknownKeys);
+        Assert.Contains(NotesOf(config).ChangedFromDefault, setting => setting.KeyPath == "ChangedObjects.Moved.WhenRemoved" && setting.ValueAsJson == "\"Restore\"");
+    }
+
+    [Fact]
+    public void AChangedObjectsSettingLeftOutOfAConfigTakesItsBuiltInDefault()
+    {
+        var config = ReadOnlyConfig("{\"CleanedMod\": \"A.esp\", \"ChangedObjects\": {\"Moved\": {\"WhenRemoved\": \"Remove\"}}}");
+
+        var changed = config.Settings.ChangedObjects;
+        var notInFile = NotesOf(config).NotInFile;
+
+        Assert.Equal(
+            (SettingDefaults.MovedDistanceInUnits, RestoreMode.Remove, false, false, SettingDefaults.ReplacedObjectsWhenRemoved, false),
+            (changed.Moved.MovedDistanceInUnits, changed.Moved.WhenRemoved, changed.Moved.AttemptResizingBeforeRemoval, changed.Replaced.Process, changed.Replaced.WhenRemoved, changed.Replaced.AttemptResizingBeforeRemoval));
+        Assert.Equal(
+            (SettingDefaults.ShrinkLimitPercent, SettingDefaults.TurnLimitDegrees, SettingDefaults.SizeMultiplier),
+            (changed.Collision.ShrinkOrTurn.ShrinkLimitPercent, changed.Collision.ShrinkOrTurn.TurnLimitDegrees, changed.Collision.TooClose.SizeMultiplier));
+        Assert.Contains(
+            new SettingInFile(
+                "ChangedObjects.Moved.MovedDistanceInUnits",
+                "Other mods' objects the cleaned mod changed > Moved objects > Count as moved when moved farther than (game units)",
+                "10.0"),
+            notInFile);
+        Assert.Contains(
+            new SettingInFile("ChangedObjects.Replaced.WhenRemoved", "Other mods' objects the cleaned mod changed > Replaced objects > When it would be removed", "\"RestoreIfNoCollision\""),
+            notInFile);
+        Assert.Contains(new SettingInFile("ChangedObjects.Collision.TurnLimitDegrees", "Other mods' objects the cleaned mod changed > Collision handling > Turn by at most (degrees either way)", "360"), notInFile);
+        Assert.DoesNotContain(notInFile, setting => setting.KeyPath is "ChangedObjects" or "ChangedObjects.Moved" or "ChangedObjects.Moved.WhenRemoved");
     }
 
     [Fact]
@@ -426,7 +484,7 @@ public sealed class ConfigFilesTests : IDisposable
             }
             """);
 
-        var terrain = config.Settings.TerrainChange;
+        var terrain = config.Settings.Collision.TerrainChange;
 
         Assert.Equal((false, 40f, false, 60), (terrain.CountWaterHeightChanges, terrain.WaterHeightChangeTolerance, terrain.CountWaterAddedOrRemoved, terrain.MinWaterCoverChangePercent));
         Assert.Empty(NotesOf(config).UnknownKeys);

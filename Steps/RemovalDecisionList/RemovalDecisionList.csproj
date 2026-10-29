@@ -4,10 +4,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>Holds the decisions about which target objects are removed or kept, round by round. It references its contracts, FindTargetObjectsToKeep.Contracts and Ids, and holds no packages.</Description>
+    <Description>Holds the decisions about which target objects are removed or kept, round by round. It references its contracts, CollectPlacedObjects.Contracts (for the target objects it places as they stand), FindTargetObjectsToKeep.Contracts and Ids, and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
+    <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
     <ProjectReference Include="..\FindTargetObjectsToKeep.Contracts\FindTargetObjectsToKeep.Contracts.csproj" />
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
   </ItemGroup>

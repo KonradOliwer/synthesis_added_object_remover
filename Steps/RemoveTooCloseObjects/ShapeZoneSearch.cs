@@ -155,10 +155,10 @@ internal sealed class ShapeZoneSearch : ITooCloseSearch
         return new ShapeZoneSearch(targets, otherModObjects, largeOtherObjects, shapes, meshCache, zones, npcRule);
     }
 
-    public TooCloseSearchResult FindTooCloseTargets(WorkOrder order, Execution execution)
+    public TooCloseSearchResult FindTooCloseTargets(ImmutableArray<TargetId> judged, WorkOrder order, Execution execution)
     {
         return TooCloseSearch.FindForVisibleTargets(
-            _targets, _otherModObjects, _shapes, order, execution, CreateScratch, FindFirstTooCloseOtherHoldingMeshesForTheTarget, scratch => scratch.Harvest());
+            _targets, _otherModObjects, _shapes, judged, order, execution, CreateScratch, FindFirstTooCloseOtherHoldingMeshesForTheTarget, scratch => scratch.Harvest());
     }
 
     public ITargetTries StartTries() => new TriesOfOneTarget(this);

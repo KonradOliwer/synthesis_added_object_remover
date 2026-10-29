@@ -242,7 +242,7 @@ public sealed class StartSetupTooCloseSectionsTests
                 "Requires Target.esp but not trusted, 6 other masters (limit 5): Merged.esp",
                 "Trusted, loading before Target.esp: 1 mod",
             ],
-            lines.Skip(2).Take(9));
+            lines.Skip(3).Take(9));
     }
 
     [Fact]
@@ -276,7 +276,7 @@ public sealed class StartSetupTooCloseSectionsTests
                 "Requires Target.esp but not trusted, Added Object Remover patch of another group: Second Group Patch.esp, First Group Patch.esp",
                 "Loads before Target.esp but not trusted, Added Object Remover patch of another group: Second Before Patch.esp, First Before Patch.esp",
             ],
-            lines.Skip(3).Take(3));
+            lines.Skip(4).Take(3));
     }
 
     /// <summary>The patch marker decides before the other-master limit, so raising the limit would not change the line.</summary>
@@ -333,7 +333,7 @@ public sealed class StartSetupTooCloseSectionsTests
                 "Trusted, requires Target.esp: Compat.esp",
                 "Master of a mod that requires Target.esp but not trusted, Added Object Remover patch of another group: Other Group Patch.esp",
             ],
-            lines.Skip(3).Take(3));
+            lines.Skip(4).Take(3));
     }
 
     [Fact]
@@ -506,7 +506,7 @@ public sealed class StartSetupTooCloseSectionsTests
     public void TooClose_ThrowsWhenTheStepHandledNpcsOnlyWhenStuckButGaveNoSummary()
     {
         var report = CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.AlwaysLikeAnyObject);
-        var inconsistent = report with { Result = report.Result with { Npcs = NpcHandling.OnlyWhenStuckInsideTheObject } };
+        var inconsistent = report with { Passes = [report.Passes[0] with { Pass = report.Passes[0].Pass with { Npcs = NpcHandling.OnlyWhenStuckInsideTheObject } }] };
 
         Assert.Throws<InvalidOperationException>(() => LogSections.BuildTooCloseSection(inconsistent, Detailed));
     }
@@ -537,7 +537,7 @@ public sealed class StartSetupTooCloseSectionsTests
 
         var ready = Assert.IsType<RunRequest.Ready>(Build(settings, Facts()));
 
-        Assert.False(ready.Settings.TooClose.BySize);
+        Assert.False(ready.Settings.Collision.TooClose.BySize);
         Assert.Empty(ready.Warnings);
     }
 
@@ -554,11 +554,79 @@ public sealed class StartSetupTooCloseSectionsTests
     [Fact]
     public void TooClose_FoundLineSaysHowManyWereAlreadyRemovedOnChangedTerrain()
     {
-        var report = CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.Never) with { AlreadyRemoved = 1 };
+        var report = CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.Never);
+        var removedBefore = report with { Passes = [report.Passes[0] with { AlreadyRemoved = 1 }] };
 
-        var lines = LogSections.BuildTooCloseSection(report, Normal).Lines;
+        var lines = LogSections.BuildTooCloseSection(removedBefore, Normal).Lines;
 
         Assert.Equal("Found 1 of 3 Target.esp objects too close to other mods' objects; 1 of them were already removed on changed terrain.", lines[0]);
+    }
+
+    [Fact]
+    public void TooClose_PrintsOneFoundLineForEachSettingsSet()
+    {
+        var report = CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.Never, [BySize], BySize);
+        var distance = CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.Never, [WithinDistance], WithinDistance, WithinDistance).Passes[0].Pass with
+        {
+            Objects = [new TargetId(2)],
+        };
+        var bySize = report.Passes[0].Pass with { Objects = [new TargetId(0), new TargetId(1)] };
+        var twoSets = report with { Passes = [new TooClosePassReport(bySize, 0, 0), new TooClosePassReport(distance, 0, 0)] };
+
+        var lines = LogSections.BuildTooCloseSection(twoSets, Normal).Lines.ToArray();
+
+        Assert.Equal(
+            [
+                "Found 1 of 2 Target.esp objects too close to other mods' objects.",
+                "Found 2 of 1 Target.esp objects within 32 units of other mods' objects.",
+                $"  Kept {RecordNames.Describe(report.World.Targets[2])} in {Describe.Space(report.World, TestTargets.Space)}: {TestKeepReasons.QuestDetail}.",
+            ],
+            lines);
+    }
+
+    [Fact]
+    public void TooClose_ASettingsSetOfObjectsOfOtherModsNamesThemWithoutAnOwnPartAndCountsTheRestoredOnes()
+    {
+        var report = CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.Never, [BySize], BySize);
+        var world = report.World with { Targets = [.. report.World.Targets.Select(target => target with { Origin = target.Id.Index == 2 ? TargetOrigin.Moved : TargetOrigin.CleanedMod })] };
+        var own = report.Passes[0].Pass with { Objects = [new TargetId(0), new TargetId(1)] };
+        var changed = report.Passes[0].Pass with { Objects = [new TargetId(2)] };
+        var twoSets = report with { World = world, Passes = [new TooClosePassReport(own, 0, 0), new TooClosePassReport(changed, 0, 1)] };
+
+        var lines = LogSections.BuildTooCloseSection(twoSets, Normal).Lines.Where(line => line.StartsWith("Found ")).ToArray();
+
+        Assert.Equal(
+            [
+                "Found 1 of 2 Target.esp objects too close to other mods' objects.",
+                "Found 1 of 1 objects of other mods that Target.esp moved too close to other mods' objects; 1 of them restored.",
+            ],
+            lines);
+    }
+
+    [Fact]
+    public void TooClose_ASettingsSetOfMixedOriginsKeepsTheMixedWording()
+    {
+        var report = CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.Never, [BySize], BySize);
+        var world = report.World with { Targets = [.. report.World.Targets.Select(target => target with { Origin = target.Id.Index == 2 ? TargetOrigin.Replaced : TargetOrigin.CleanedMod })] };
+
+        var line = LogSections.BuildTooCloseSection(report with { World = world }, Normal).Lines[0];
+
+        Assert.Equal(
+            "Found 1 of 3 objects (2 Target.esp objects and 1 objects of other mods that Target.esp gave another model) too close to other mods' objects.",
+            line);
+    }
+
+    [Fact]
+    public void TooClose_PrintsTheStepsTimeAfterTheLastFoundLineOnly()
+    {
+        var report = CreateTooCloseSection(ZoneShape.BoundingBox, NpcHandling.Never);
+        var twoSets = report with { Passes = [report.Passes[0], report.Passes[0]] };
+
+        var found = LogSections.BuildTooCloseSection(twoSets, Detailed).Lines.Where(line => line.StartsWith("Found ")).ToArray();
+
+        Assert.Equal(2, found.Length);
+        Assert.DoesNotContain("not counting the shrink or turn check", found[0]);
+        Assert.Contains("not counting the shrink or turn check", found[1]);
     }
 
     [Fact]
@@ -604,8 +672,8 @@ public sealed class StartSetupTooCloseSectionsTests
 
         var ready = Assert.IsType<RunRequest.Ready>(Build(settings, Facts()));
 
-        Assert.True(ready.Settings.TooClose.ByDistance);
-        Assert.Equal(1024f, ready.Settings.TooClose.DistanceInUnits);
+        Assert.True(ready.Settings.Collision.TooClose.ByDistance);
+        Assert.Equal(1024f, ready.Settings.Collision.TooClose.DistanceInUnits);
         Assert.Single(ready.Warnings);
     }
 
@@ -700,6 +768,89 @@ public sealed class StartSetupTooCloseSectionsTests
             lines);
     }
 
+    [Fact]
+    public void Config_SaysWhatIsDoneWithOtherModsObjectsTheCleanedModChangedAndThatTheirCollisionHandlingIsTheSame()
+    {
+        var lines = ConfigLines(_ => { });
+
+        Assert.Equal(
+            [
+                "Mod to clean up: Target.esp",
+                "Other mods' objects Target.esp changed: moved farther than 10 units: RestoreIfNoCollision, no resizing; replaced: not processed.",
+                "  Collision handling: as for Target.esp's objects.",
+            ],
+            lines.Take(3));
+    }
+
+    [Fact]
+    public void Config_NamesTheModeAndTheResizingOfMovedAndProcessedReplacedObjects()
+    {
+        var lines = ConfigLines(settings =>
+        {
+            settings.ChangedObjects.Moved.MovedDistanceInUnits = 25;
+            settings.ChangedObjects.Moved.WhenRemoved = RestoreMode.Remove;
+            settings.ChangedObjects.Replaced.Process = true;
+            settings.ChangedObjects.Replaced.AttemptResizingBeforeRemoval = true;
+        });
+
+        Assert.Equal(
+            "Other mods' objects Target.esp changed: moved farther than 25 units: Remove, no resizing; "
+            + "replaced: RestoreIfNoCollision, resizing tried first (down to 80%, at most 360 degrees).",
+            lines[1]);
+    }
+
+    [Fact]
+    public void Config_SaysResizingIsTriedFirstForMovedObjectsAndLeavesOutTheReplacedModeWhileTheyAreNotProcessed()
+    {
+        var lines = ConfigLines(settings =>
+        {
+            settings.ChangedObjects.Moved.AttemptResizingBeforeRemoval = true;
+            settings.ChangedObjects.Replaced.WhenRemoved = RestoreMode.Restore;
+        });
+
+        Assert.Equal(
+            "Other mods' objects Target.esp changed: moved farther than 10 units: RestoreIfNoCollision, resizing tried first (down to 80%, at most 360 degrees); replaced: not processed.",
+            lines[1]);
+    }
+
+    [Fact]
+    public void Config_GivesTwoCollisionLinesOfOtherModsObjectsTheCleanedModChangedWhenTheirTooCloseOptionsDiffer()
+    {
+        var lines = ConfigLines(settings => settings.ChangedObjects.Collision.TooClose.ByDistance.DistanceInUnits = 77f);
+
+        Assert.DoesNotContain(lines, line => line.StartsWith("  Collision handling: as for", StringComparison.Ordinal));
+        Assert.StartsWith("  Collision handling: Remove objects too close to other mods' objects: ", lines[2]);
+        Assert.Contains("Margin by fixed distance: on, 77 units;", lines[2]);
+        Assert.StartsWith("  Collision handling: Remove objects on terrain changed by other mods: ", lines[3]);
+        Assert.DoesNotContain(lines, line => line.StartsWith("  Collision handling: Shrink or turn", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Config_NamesTheResizeLimitsOnTheLineOfEachKindThatTriesResizing()
+    {
+        var lines = ConfigLines(settings =>
+        {
+            settings.ChangedObjects.Moved.AttemptResizingBeforeRemoval = true;
+            settings.ChangedObjects.Collision.ShrinkLimitPercent = 60;
+        });
+
+        Assert.Equal(
+            "Other mods' objects Target.esp changed: moved farther than 10 units: RestoreIfNoCollision, resizing tried first (down to 60%, at most 360 degrees); replaced: not processed.",
+            lines[1]);
+        Assert.Equal("  Collision handling: as for Target.esp's objects.", lines[2]);
+    }
+
+    [Fact]
+    public void Config_ComparesOnlyTheTooCloseAndTerrainOptionsWithTheStandardOnes()
+    {
+        var onlyStandardShrinkOff = ConfigLines(settings => settings.ShrinkOrTurn.ShrinkOrTurnObjects = false);
+        var onlyLimitsChanged = ConfigLines(settings => settings.ChangedObjects.Collision.TurnLimitDegrees = 90);
+
+        Assert.Equal("  Collision handling: as for Target.esp's objects.", onlyStandardShrinkOff[2]);
+        Assert.Equal("  Collision handling: as for Target.esp's objects.", onlyLimitsChanged[2]);
+        Assert.DoesNotContain("degrees", onlyLimitsChanged[1], StringComparison.Ordinal);
+    }
+
     private ImmutableArray<string> ConfigLines(bool byDistance) =>
         ConfigLines(settings => settings.TooClose.ByDistance.Use = byDistance);
 
@@ -741,7 +892,8 @@ public sealed class StartSetupTooCloseSectionsTests
         var stuck = npcs is NpcHandling.OnlyWhenStuckInsideTheObject or NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision
             ? new NpcStuckSummary(new NpcSizeCounts(5, 2, 1, 1, 1, 3), 12, 30, 4, 1, [new PointNpc(world.OtherModObjects[1], new PointReason(PointReasonKind.NoBodyMeshNoBoundsNotPlayable, TestTargets.SpaceKey(0x7000), "TestRace"))])
             : null;
-        var result = new TooCloseResult(
+        var pass = new TooClosePass(
+            [.. world.Targets.Select(target => target.Id)],
             StepOutcome.Performed,
             [.. causes.Select(cause => new TooCloseObject(0, world.OtherModObjects[0], cause))],
             [],
@@ -757,7 +909,7 @@ public sealed class StartSetupTooCloseSectionsTests
         return new TooCloseSection(
             world,
             Target.ToPluginName(),
-            result,
+            [new TooClosePassReport(pass, AlreadyRemoved: 0, Restored: 0)],
             census,
             [kept],
             MeshesIndexed: 4,
@@ -810,7 +962,9 @@ public sealed class StartSetupTooCloseSectionsTests
             Scale: 1f,
             IsPrimitive: false,
             HasMapMarker: false,
-            new ObjectChange(Other.ToPluginName(), AcceptedFrom: null));
+            new ObjectChange(Other.ToPluginName(), AcceptedFrom: null),
+            ReferenceRoles.None,
+            ChangeWithoutCleanedMod: null);
 
     private static StandardSettings SettingsFor() => new() { CleanedMod = Target };
 

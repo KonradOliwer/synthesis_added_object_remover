@@ -1,9 +1,7 @@
-using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
-
 namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
 
-/// <summary>What each plugin is to the terrain and the water: how far its versions are believed, and where it loads.</summary>
-internal sealed class TerrainPlugins(ModTrustTable trust, LoadOrderPlugins loadOrder)
+/// <summary>What each plugin is to the terrain and the water: how far its versions are believed in the accepted world, and where it loads.</summary>
+internal sealed class TerrainPlugins(AcceptedWorld accepted, LoadOrderPlugins loadOrder)
 {
     /// <summary>
     /// The position a change only the patch holds is named at: below every plugin, so that the later loading of several changers is
@@ -14,7 +12,7 @@ internal sealed class TerrainPlugins(ModTrustTable trust, LoadOrderPlugins loadO
     private readonly LoadOrderPositions _positions = new(loadOrder.Listed);
 
     /// <summary>How far the plugin's version of a land record, a cell or a worldspace is believed.</summary>
-    public VersionTrust TrustOf(PluginName plugin) => trust.VersionTrustOf(plugin);
+    public VersionTrust TrustOf(PluginName plugin) => accepted.TrustOf(plugin);
 
     /// <summary>The plugin's position in the load order: a plugin loading later has a higher position.</summary>
     public int PositionOf(PluginName plugin) => _positions.Of(plugin);

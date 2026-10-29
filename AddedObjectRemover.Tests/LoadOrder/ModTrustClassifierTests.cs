@@ -245,6 +245,45 @@ public class ModTrustClassifierTests
         Assert.Equal(new[] { Addon, CityPatch, Merged, OtherGroupPatch }.ToHashSet(), requiring);
     }
 
+    /// <summary>A plugin that has a mod needing the cleaned mod as its master needs it too, though its own masters do not list it.</summary>
+    [Fact]
+    public void ANeedForTheCleanedModPassesOnToTheModsThatRequireTheModsNeedingIt()
+    {
+        var table = Classify(
+            Settings(never: [CityPatch]),
+            Listing(CityMod, Skyrim),
+            Listing(Addon, Skyrim, CleanedMod),
+            Listing(CityPatch, Skyrim, Addon, CityMod),
+            Listing(Merged, Skyrim, CityPatch));
+
+        var needing = table.Plugins.Where(entry => entry.Value.NeedsCleanedMod).Select(entry => entry.Key).ToHashSet();
+
+        Assert.Equal(new[] { Addon, CityPatch, Merged }.ToHashSet(), needing);
+        Assert.False(table.Plugins[CityPatch].RequiresCleanedMod);
+    }
+
+    /// <summary>Whatever the trust settings say, the world without the cleaned mod believes every plugin that loads without it.</summary>
+    [Fact]
+    public void TheWorldWithoutTheCleanedModBelievesEveryPluginThatLoadsWithoutIt()
+    {
+        var table = Classify(
+            Settings(never: [Birds]),
+            Listing(CityMod, Skyrim),
+            Listing(Birds, Skyrim),
+            Listing(Addon, Skyrim, CleanedMod),
+            Listing(CityPatch, Skyrim, Addon, CityMod));
+
+        var world = table.AcceptedWorldWithoutCleanedMod;
+
+        Assert.Equal(
+            [VersionTrust.Full, VersionTrust.Full, VersionTrust.Full, VersionTrust.Full],
+            new[] { Skyrim, CityMod, Birds, CleanedModMaster }.Select(world.TrustOf));
+        Assert.Equal(
+            [VersionTrust.None, VersionTrust.None, VersionTrust.None, VersionTrust.Transparent],
+            new[] { CleanedMod, Addon, CityPatch, Patch }.Select(world.TrustOf));
+        Assert.Equal(VersionTrust.None, table.AcceptedWorld.TrustOf(Birds));
+    }
+
     [Fact]
     public void WithTheLoadBeforeRuleOnThePluginsBeforeTheCleanedModAreTrustedAndCounted()
     {
@@ -368,6 +407,24 @@ public class ModTrustClassifierTests
         Assert.False(table.Plugins.ContainsKey(Patch));
         Assert.True(table.IsPatch(Patch));
         Assert.False(table.IsPatch(CleanedMod));
+    }
+
+    [Fact]
+    public void TheAcceptedWorldMapsPluginTrustToVersionTrustAndThePatchToTransparent()
+    {
+        var table = Classify(
+            Settings(trusted: [CityMod], ownChanges: [CityModMaster]),
+            Listing(Skyrim),
+            Listing(CityModMaster, Skyrim),
+            Listing(CleanedMod, Skyrim),
+            Listing(CityMod, Skyrim),
+            Listing(Birds, Skyrim),
+            Listing(Patch, Skyrim));
+        var world = table.AcceptedWorld;
+
+        Assert.Equal(
+            [VersionTrust.Full, VersionTrust.Full, VersionTrust.OwnEdits, VersionTrust.None, VersionTrust.Transparent],
+            [world.TrustOf(Skyrim), world.TrustOf(CityMod), world.TrustOf(CityModMaster), world.TrustOf(Birds), world.TrustOf(Patch)]);
     }
 
     private static PluginListing[] LoadOrderAroundTheCleanedMod() =>

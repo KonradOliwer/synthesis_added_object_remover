@@ -30,7 +30,8 @@ internal static partial class Tables
         if (ExplanationEvidence.HasMeshOrigins(restingObjects)) tables.Add(BuildMeshOriginsTable(ExplanationEvidence.MeshOrigins(restingObjects)));
         if (outcome.VisibleLeftBehind.Outcome != StepOutcome.SwitchedOff) tables.Add(BuildVisibleLeftBehindTable(outcome.Collected, outcome.VisibleLeftBehind.Evaluations, context));
         if (outcome.LeftBehind.Outcome != StepOutcome.SwitchedOff) tables.Add(BuildLeftBehindTable(outcome.Collected, outcome.LeftBehind.Evaluations, outcome.MarkerMoves, context));
-        tables.Add(BuildRemovalsTable(outcome.Collected, outcome.Removals, context));
+        tables.Add(BuildRemovalsTable(outcome.Collected, outcome.Removals, outcome.Final, context));
+        if (BuildRestoredTable(outcome.Collected, outcome.Restorations, outcome, context) is { } restored) tables.Add(restored);
         if (BuildFitsTable(outcome.Collected, outcome.Final, context) is { } fits) tables.Add(fits);
         if (BuildLeftWithoutSupportTable(outcome.Collected, outcome.OtherModsObjects, context) is { } leftWithoutSupport) tables.Add(leftWithoutSupport);
         tables.Add(BuildHintsTable(outcome.Collected, outcome.Hints));

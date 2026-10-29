@@ -1,0 +1,83 @@
+## log
+Mod to clean up: Target.esp
+Other mods' objects Target.esp changed: moved farther than 10 units: Restore, no resizing; replaced: not processed.
+  Collision handling: as for Target.esp's objects.
+Plugin list read from Plugins.txt: 4 listings.
+Which other mods can cause removals: Trusted mods, and their masters: (none); Mods trusted for their own changes only: (none); Never trusted mods: (none); Also trust mods that require the cleaned mod, and their masters: on, only if it has at most 5 other masters; Trust mods loading before the cleaned mod: on.
+Trusted, base game: Skyrim.esm
+Remove objects too close to other mods' objects: Margin by object size: on, 0.1 x object size; Margin by fixed distance: on, 32 units; Use rough boxes instead of exact shapes (faster): off; Other mods' NPCs and creatures cause removal: OnlyWhenStuckInsideTheObjectWithCollision.
+Remove objects on terrain changed by other mods: off.
+Shrink or turn objects to make them fit: Shrink down to: 80% of its size; Turn by at most: 360 degrees either way.
+Also remove what rests on removed objects: OnlyWhatLosesItsSupport; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
+Visible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 6; A direction is cleared when this much of it was removed: 80%; Remove when this share of the directions with objects is cleared: 80%; Never remove these as visible objects left behind: none.
+Invisible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 4; A direction is cleared when this much of it was removed: 50%; Remove when this share of the directions with objects is cleared: 60%; Never remove these as invisible objects left behind: none; Move kept markers out of other mods' objects: on.
+Detailed log and reports: on, report files go to <root>/Reports.
+Only warn (don't stop) when a mod that requires the cleaned mod loads after the patch: off.
+Scanned 4 placed records in <time>: 2 Target.esp objects to check, 1 objects of other mods that Target.esp moved, 1 objects from other mods.
+  Recorded 1 placed objects of any plugin as possible supporters or obstacles.
+Indexed 1 other objects in 1 cells/worldspaces in <time>.
+Replacement matching: 0 other-mod objects excluded in <time>.
+Linked groups: 0 groups of linked Target.esp objects (0 objects) from 0 links to Target.esp records.
+Object-shape zones: 1 candidate pairs, 1 passed the box filter, 1 mesh tests, 1 hits, 0 centre-point fallbacks (other object without mesh triangles), 0 Target.esp objects without mesh triangles used their box; 1 triangle pairs tested exactly.
+  0 large other objects tested against every Target.esp object of their space; 0 effect-only meshes (fog, light rays, water spray) ignored.
+Found 1 of 3 objects (2 Target.esp objects and 1 objects of other mods that Target.esp moved) too close to other mods' objects (1 by object size, 0 by distance) in <time>, not counting the shrink or turn check before it; 1 of them restored.
+NPCs and creatures (only when stuck in the object and the object's collision stops characters): 0 placed NPCs evaluated: 0 sized by body mesh, 0 by Object Bounds, 0 by humanoid approximation, 0 sized as a point; 0 skipped because their base is no NPC; 0 NPC-object pairs tested (0 body boxes), 0 objects with an NPC stuck in them, 0 of them not counted because their collision does not stop characters.
+Linked groups: 0 more objects removed with the too-close removals they are linked to.
+Anchoring: 1 removed over 2 iterations; 1 touching objects evaluated (1 evaluations), 0 kept without any contact points, 0 kept as referenced.
+  Pairs: 1 box candidates next to a removal tested over 2 iterations, 1 touching, 0 without mesh triangles (never touching); 1 triangle pairs tested exactly.
+Also remove: 2 rounds in <time>.
+Linked groups: 0 more objects removed with the follow-up removals they are linked to.
+Visible objects left behind: 1 evaluated in <time>; removed 0 (0 surroundings removed); kept 1 (1 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 0 referenced).
+Linked groups: 0 more objects removed with the visible left-behind removals they are linked to.
+Invisible objects left behind: 0 evaluated in <time>; removed 0 (0 inside another mod's object, 0 surroundings removed); kept 0 (0 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 0 referenced).
+Linked groups: 0 more objects removed with the left-behind removals they are linked to.
+Moved 0 kept markers out of other mods' objects; 0 left in place.
+Wrote 2 overrides (1 removed, 1 restored) in <time>.
+  Removed T_OnTheMovedCrate [000803:Target.esp] (base T_OnTopBase [000802:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; 100 % of its support left its place (mostly B_Crate [000805:Skyrim.esm], restored)
+Restored:
+  B_Crate [000805:Skyrim.esm] (base B_CrateBase [000804:Skyrim.esm]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to C_Wall0 [000801:CityMod.esp], changed by CityMod.esp (new object)
+Bounds: 4 bases from NIF, 0 NIF misses, 0 from OBND, 0 without bounds. Meshes: 2 read, 0 effect-only, 0 failed (2 loose, 0 from 0 archives), 0 with a footer root other than their first node.
+Per cell/worldspace (objects of Target.esp / other objects / Target.esp objects removed):
+  interior AorInterior [000800:Skyrim.esm]: 2 / 1 / 1
+Target.esp objects: 2 visible, 0 invisible (by kind: none), 0 deleted, start disabled, or without a valid position or rotation.
+Objects of Target.esp: 2; already removed by earlier patchers in this group: 0; not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 0; judged in this run: 2; removed in this run: 1.
+Removed 1 objects (0 too close, 1 follow-up removals, 0 visible objects left behind, 0 invisible objects left behind, 0 linked to removed objects).
+Restored 1 objects of other mods that Target.esp changed (1 too close, 0 follow-up, 0 visible objects left behind, 0 invisible objects left behind, 0 linked).
+Objects of other mods that Target.esp changed: 1 (1 moved); kept where Target.esp put them: 0; kept there shrunk or turned: 0; restored: 1; removed: 0.
+  Restored where it stood before Target.esp: B_Crate [000805:Skyrim.esm] in interior AorInterior [000800:Skyrim.esm].
+Removed 1/3 (removed/all checked objects):
+  AorInterior › unnamed area 1/3
+Anchoring diagnostics: wrote 1 evaluations to <root>/Reports/anchoring.csv.
+Mesh origins: 1 meshes of Target.esp objects, 1 origin near bottom, 0 origin near centre, 0 other.
+  Wrote 1 mesh origins to <root>/Reports/mesh-origins.csv.
+Visible objects left behind diagnostics: wrote 1 evaluations to <root>/Reports/leftover-visible-objects.csv.
+Invisible objects left behind diagnostics: wrote 0 evaluations to <root>/Reports/leftover-invisible-objects.csv.
+Removals: wrote 1 rows to <root>/Reports/removals.csv.
+Restored objects: wrote 1 rows to <root>/Reports/restored.csv.
+Changed and fitted objects: wrote 1 rows to <root>/Reports/changed-and-fitted-objects.csv.
+Removed markers and kept objects: wrote 0 rows to <root>/Reports/removed-markers-and-kept-objects.csv.
+## patch
+000803:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (1000.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
+000805:Skyrim.esm in 000800:Skyrim.esm (temporary): disabled False, position (0.00, 0.00, 0.00), rotation (0.00, 0.00, 0.00), enable parent none
+## report anchoring.csv
+iteration,formKey,editorId,base,modelPath,space,contactPoints,totalWeight,removedCleanedModShare,restoredShare,keptCleanedModShare,otherModShare,terrainShare,threshold,decision,topSupporters
+1,000803:Target.esp,T_OnTheMovedCrate,T_OnTopBase [000802:Target.esp],meshes\aor\crate.nif,interior AorInterior [000800:Skyrim.esm],897,475.22208,0,1,0,0,0,0.5,removed,000805:Skyrim.esm Restored 1
+## report changed-and-fitted-objects.csv
+kind,outcome,formKey,editorId,base,worldspace,x,y,z,rotZDeg,scale,newX,newY,newZ,newRotZDeg,newScale,newBase
+moved,changed object restored,000805:Skyrim.esm,B_Crate,B_CrateBase [000804:Skyrim.esm],AorInterior,1000,0,0,0,1,0,0,0,0,1,
+## report leftover-invisible-objects.csv
+formKey,editorId,base,baseType,invisibleType,space,cell,x,y,z,radius,insideObject,insideObjectPlugin,EastTotal,EastRemoved,EastState,NorthEastTotal,NorthEastRemoved,NorthEastState,NorthTotal,NorthRemoved,NorthState,NorthWestTotal,NorthWestRemoved,NorthWestState,WestTotal,WestRemoved,WestState,SouthWestTotal,SouthWestRemoved,SouthWestState,SouthTotal,SouthRemoved,SouthState,SouthEastTotal,SouthEastRemoved,SouthEastState,occupiedDirections,removedDirections,EastRestored,NorthEastRestored,NorthRestored,NorthWestRestored,WestRestored,SouthWestRestored,SouthRestored,SouthEastRestored,restoredDirections,decision,reason,movedToX,movedToY,movedToZ,moveDistance,movedOnto
+## report leftover-visible-objects.csv
+formKey,editorId,base,baseType,visibleType,space,cell,x,y,z,EastTotal,EastRemoved,EastState,NorthEastTotal,NorthEastRemoved,NorthEastState,NorthTotal,NorthRemoved,NorthState,NorthWestTotal,NorthWestRemoved,NorthWestState,WestTotal,WestRemoved,WestState,SouthWestTotal,SouthWestRemoved,SouthWestState,SouthTotal,SouthRemoved,SouthState,SouthEastTotal,SouthEastRemoved,SouthEastState,occupiedDirections,removedDirections,EastRestored,NorthEastRestored,NorthRestored,NorthWestRestored,WestRestored,SouthWestRestored,SouthRestored,SouthEastRestored,restoredDirections,decision,reason
+000801:Target.esp,T_Crate,T_CrateBase [000800:Target.esp],Static,,interior AorInterior [000800:Skyrim.esm],,5000,0,0,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,0,0,0,0,0,0,0,0,0,kept,too few surrounding objects
+## report mesh-origins.csv
+modelPath,baseEditorIds,referenceCount,localMinX,localMinY,localMinZ,localMaxX,localMaxY,localMaxZ,originFractionX,originFractionY,originFractionZ,classification
+meshes\aor\crate.nif,B_CrateBase; T_CrateBase; T_OnTopBase,3,-50,-50,0,50,50,100,0.5,0.5,-0,origin near bottom
+## report removals.csv
+formKey,editorId,base,reason,worldspace,hold,place,cellFormKey,cellEditorId,gridX,gridY,x,y,z
+000803:Target.esp,T_OnTheMovedCrate,T_OnTopBase [000802:Target.esp],"100 % of its support left its place (mostly B_Crate [000805:Skyrim.esm], restored)",AorInterior,unnamed area,AorInterior,000800:Skyrim.esm,AorInterior,,,1000,0,100
+## report removed-markers-and-kept-objects.csv
+kind,formKey,editorId,space,cell,detail
+## report restored.csv
+formKey,editorId,base,reason,worldspace,hold,place,cellFormKey,cellEditorId,gridX,gridY,x,y,z,earlierPlugin,newX,newY,newZ,newRotZDeg,newScale,newBase,oldPlaceCheck
+000805:Skyrim.esm,B_Crate,B_CrateBase [000804:Skyrim.esm],"too close to C_Wall0 [000801:CityMod.esp], changed by CityMod.esp (new object)",AorInterior,unnamed area,AorInterior,000800:Skyrim.esm,AorInterior,,,1000,0,0,Skyrim.esm,0,0,0,0,1,,not checked

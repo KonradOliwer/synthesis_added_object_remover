@@ -35,7 +35,7 @@ public class VisibleLeftBehindFollowUpRunTests
     {
         var outcome = FixtureRun.Execute(CreateSettings(mode), workers: 1, Create);
 
-        var removal = Assert.Single(outcome.Removals.OfType<VisibleLeftBehindRemoval>());
+        var removal = Assert.Single(outcome.Removals.OfType<ObjectWithReason.VisibleLeftBehind>());
         Assert.Equal(MiddleCrate, outcome.Collected.Targets[removal.TargetIndex].EditorId);
         var door = Assert.Single(outcome.VisibleLeftBehind.Evaluations, check => outcome.Collected.Targets[check.TargetIndex].EditorId == Door);
         Assert.Equal(VisibleLeftBehindOutcome.KeptSurroundingsMostlyKept, door.Decision);

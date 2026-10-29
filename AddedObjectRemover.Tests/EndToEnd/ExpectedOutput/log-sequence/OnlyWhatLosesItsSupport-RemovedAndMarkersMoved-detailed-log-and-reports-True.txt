@@ -3,7 +3,9 @@
 ## unexpectedErrors
 ## config
 Mod to clean up: Target.esp
-Check other mods' objects the cleaned mod moved farther than: 10 units.
+Other mods' objects Target.esp changed: moved farther than 10 units: RestoreIfNoCollision, no resizing; replaced: not processed.
+  Collision handling: Remove objects too close to other mods' objects: Margin by object size: on, 0.5 x object size; Margin by fixed distance: on, 50 units; Use rough boxes instead of exact shapes (faster): off; Other mods' NPCs and creatures cause removal: OnlyWhenStuckInsideTheObjectWithCollision.
+  Collision handling: Remove objects on terrain changed by other mods: on; Which of the cleaned mod's objects are checked: AllObjectsIncludingInvisibleOnes; Margin by object size: on, 0.5 x object size; Margin by fixed distance: on, 64 units; Count height changes: on, ignoring changes up to 16 units; Count ground type changes: on, remove only when this share of the ground points changed type: 20%; Count water height changes: on, ignoring changes up to 16 units; Count water added/removed changes: on; remove only when this share of the ground got covered/uncovered: 20%.
 Plugin list read from Plugins.txt: 7 listings.
 Which other mods can cause removals: Trusted mods, and their masters: Trusted.esp; Mods trusted for their own changes only: (none); Never trusted mods: Rival.esp; Also trust mods that require the cleaned mod, and their masters: on, only if it has at most 5 other masters; Trust mods loading before the cleaned mod: on.
 Trusted, base game: Skyrim.esm
@@ -111,7 +113,7 @@ Wrote 23 overrides (22 removed, 1 kept markers moved) in <time>.
 ## bounds
 Bounds: 10 bases from NIF, 0 NIF misses, 4 from OBND, 0 without bounds. Meshes: 4 read, 0 effect-only, 0 failed (4 loose, 0 from 0 archives), 0 with a footer root other than their first node.
 ## spaces
-Per cell/worldspace (objects of Target.esp / other objects / removed):
+Per cell/worldspace (objects of Target.esp / other objects / Target.esp objects removed):
   interior AorInterior [000800:Skyrim.esm]: 38 / 26 / 21
   worldspace AorWorld [000801:Skyrim.esm]: 2 / 2 / 1
 ## targetVisibility

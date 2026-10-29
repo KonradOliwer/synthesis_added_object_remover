@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
+using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using Mutagen.Bethesda.Plugins.Cache;
 
 namespace AddedObjectRemover.Tests.Architecture;
@@ -21,8 +22,18 @@ public class RunnerRulesTests
     private const string RunnerFolder = "Run/RunAllSteps";
     private const string RunCachesFolder = "Run/RunAllSteps/RunCaches";
 
-    /// <summary>"file: Record.Member" of a member read on a settings record, and why the runner may read it. Expected empty.</summary>
-    private static readonly Dictionary<string, string> AllowedSettingsReads = new();
+    /// <summary>"file: Record.Member" of a member read on a settings record or on the settings of a group, and why the runner may read it.</summary>
+    private static readonly Dictionary<string, string> AllowedSettingsReads = new()
+    {
+        ["StepRunner.cs: CollisionGroup.TooClose.Settings"] =
+            "The fit step takes the too-close rule built with the settings of its group; the step builds the rule.",
+        ["StepRunner.cs: CollisionGroup.ChangedTerrain.Settings"] =
+            "The fit step takes the changed-terrain rule built with the settings of its group; the step builds the rule.",
+        ["StepRunner.cs: ChangedObjectCollision.TooClose"] =
+            "The old-place check takes the too-close rule built with the too-close settings of the changed objects; the step builds the rule.",
+        ["StepRunner.cs: ChangedObjectCollision.ChangedTerrain"] =
+            "The old-place check takes the changed-terrain rule built with the changed-terrain settings of the changed objects; the step builds the rule.",
+    };
 
     /// <summary>"file: condition line (whitespace collapsed)" in the runner, and why the runner decides it.</summary>
     private static readonly Dictionary<string, string> AllowedConditions = new()
@@ -75,7 +86,7 @@ public class RunnerRulesTests
         var settings = SettingsOfRunSettings();
 
         var found = RunnerAndRunCachesFiles()
-            .SelectMany(file => FindSettingsReads(file.Code, settings).Select(read => $"{FileName(file)}: {read}"))
+            .SelectMany(file => FindSettingsReads(file.Code, settings).Concat(FindGroupSettingsReads(file.Code)).Select(read => $"{FileName(file)}: {read}"))
             .ToHashSet();
 
         AssertOnlyAllowed(found, AllowedSettingsReads.Keys, "Member read on the settings in the runner; the step reads its own settings", nameof(AllowedSettingsReads));
@@ -124,10 +135,10 @@ public class RunnerRulesTests
         var settings = SettingsOfRunSettings();
 
         Assert.Equal(
-            ["AlsoRemoveSettings", "ChangedTerrainSettings", "Execution", "FitSettings", "LeftBehindSettings", "MarkerMoveSettings", "ModTrustSettings", "OtherModsObjectsSettings", "ReportFileSettings", "SelectionSettings", "TooCloseSettings", "VisibleLeftBehindSettings", "WhatToCollect"],
+            ["AlsoRemoveSettings", "ChangedObjectCollision", "ChangedObjectSettings", "CollisionSettings", "Execution", "LeftBehindSettings", "MarkerMoveSettings", "ModTrustSettings", "OtherModsObjectsSettings", "ReportFileSettings", "SelectionSettings", "VisibleLeftBehindSettings", "WhatToCollect"],
             settings.RecordTypes.Order(StringComparer.Ordinal));
         Assert.Equal(
-            ["AlsoRemove", "ChangedTerrain", "Execution", "Fit", "LeftBehind", "MarkerMoves", "ModTrust", "OtherModsObjects", "Read", "Reports", "Selection", "TooClose", "VisibleLeftBehind"],
+            ["AlsoRemove", "ChangedObjectCollision", "ChangedObjects", "Collision", "Execution", "LeftBehind", "MarkerMoves", "ModTrust", "OtherModsObjects", "Read", "Reports", "Selection", "VisibleLeftBehind"],
             settings.RecordProperties.Order(StringComparer.Ordinal));
         Assert.Equal(
             ["DetailedLog", "OnlyWarnWhenRequiringModLoadsAfterPatch", "Target", "TargetAsTyped"],
@@ -139,7 +150,7 @@ public class RunnerRulesTests
     {
         var settings = SettingsOfRunSettings();
         const string code = """
-            var a = settings.TooClose.Npcs;
+            var a = settings.Collision.TooClose;
             var b = settings.Selection?.Npcs;
             var local = settings.LeftBehind;
             use(local.Radius);
@@ -153,8 +164,27 @@ public class RunnerRulesTests
         var reads = FindSettingsReads(code, settings);
 
         Assert.Equal(
-            ["LeftBehind.Radius", "MarkerMoveSettings moves.Distance", "RunSettings.DetailedLog", "RunSettings.TargetAsTyped", "Selection.Npcs", "TooClose.Npcs"],
+            ["Collision.TooClose", "LeftBehind.Radius", "MarkerMoveSettings moves.Distance", "RunSettings.DetailedLog", "RunSettings.TargetAsTyped", "Selection.Npcs"],
             reads.Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void TheGroupSettingsReaderSeesTheSettingsOfGroupPartsAndOfTypedGroupsButNotTheirObjects()
+    {
+        const string code = """
+            use(group.TooClose.Settings);
+            use(group.Fit);
+            use(group.Fit.Objects);
+            use(groups.Select(group => group.Settings.Fit));
+            use(scope.Settings.Execution);
+            void Use(ObjectsJudgedWith<FitSettings> judged, CollisionGroup all) => use(judged.Settings, all.Settings, judged.Objects);
+            """;
+
+        var reads = FindGroupSettingsReads(code);
+
+        Assert.Equal(
+            ["CollisionGroup all.Settings", "CollisionGroup.Settings.Fit", "CollisionGroup.TooClose.Settings", "ObjectsJudgedWith judged.Settings"],
+            reads.Distinct().Order(StringComparer.Ordinal));
     }
 
     [Fact]
@@ -430,6 +460,30 @@ public class RunnerRulesTests
         }
 
         return reads;
+    }
+
+    /// <summary>
+    /// "CollisionGroup.Part.Settings" for a read of the settings of a collision group's part (<c>group.TooClose.Settings</c>),
+    /// "CollisionGroup.Settings.Part" for a read of a part of a group's own settings from any name (<c>group.Settings.Fit</c>;
+    /// RunSettings has no property named like a part, so <c>scope.Settings.Execution</c> is no read of a group), and
+    /// "Type name.Settings" for a read on a name declared as a collision group or as objects judged with settings.
+    /// </summary>
+    private static IReadOnlyList<string> FindGroupSettingsReads(string code)
+    {
+        var parts = string.Join("|", typeof(CollisionGroup).GetProperties()
+            .Where(property => property.PropertyType.IsGenericType && property.PropertyType.GetGenericTypeDefinition() == typeof(ObjectsJudgedWith<>))
+            .Select(property => property.Name));
+        var settingsParts = string.Join("|", typeof(CollisionSettings).GetProperties().Select(property => property.Name));
+
+        var throughParts = Regex.Matches(code, $@"\.(?<part>{parts})\s*\??\.\s*Settings\b")
+            .Select(match => $"CollisionGroup.{match.Groups["part"].Value}.Settings");
+        var throughOwnSettings = Regex.Matches(code, $@"\.Settings\s*\??\.\s*(?<part>{settingsParts})\b")
+            .Select(match => $"CollisionGroup.Settings.{match.Groups["part"].Value}");
+        var throughNames = Regex.Matches(code, @"\b(?<type>CollisionGroup|ObjectsJudgedWith)(?:<[^<>]*>)?\??\s+(?<name>\w+)\b")
+            .SelectMany(typed => Regex.Matches(code, $@"(?<![\w.]){Regex.Escape(typed.Groups["name"].Value)}\s*\??\.\s*Settings\b")
+                .Select(_ => $"{typed.Groups["type"].Value} {typed.Groups["name"].Value}.Settings"));
+
+        return [.. throughParts, .. throughOwnSettings, .. throughNames];
     }
 
     /// <summary>

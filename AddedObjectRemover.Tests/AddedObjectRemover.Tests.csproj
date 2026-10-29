@@ -33,6 +33,8 @@
     <Using Include="AddedObjectRemover.Steps.FitClashingObjects.Contracts" />
     <Using Include="AddedObjectRemover.Steps.IdentifyTheMods" />
     <Using Include="AddedObjectRemover.Steps.IdentifyTheMods.Contracts" />
+    <Using Include="AddedObjectRemover.Steps.JudgeChangedObjects" />
+    <Using Include="AddedObjectRemover.Steps.JudgeChangedObjects.Contracts" />
     <Using Include="AddedObjectRemover.Steps.RemovalDecisionList" />
     <Using Include="AddedObjectRemover.Steps.RemovalDecisionList.Contracts" />
     <Using Include="AddedObjectRemover.Steps.MoveKeptMarkers" />
@@ -88,6 +90,8 @@
     <ProjectReference Include="..\Steps\FindTargetObjectsToKeep\FindTargetObjectsToKeep.csproj" />
     <ProjectReference Include="..\Steps\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
     <ProjectReference Include="..\Steps\RemovalDecisionList\RemovalDecisionList.csproj" />
+    <ProjectReference Include="..\Steps\JudgeChangedObjects.Contracts\JudgeChangedObjects.Contracts.csproj" />
+    <ProjectReference Include="..\Steps\JudgeChangedObjects\JudgeChangedObjects.csproj" />
     <ProjectReference Include="..\Steps\FitClashingObjects.Contracts\FitClashingObjects.Contracts.csproj" />
     <ProjectReference Include="..\Steps\FitClashingObjects\FitClashingObjects.csproj" />
     <ProjectReference Include="..\Steps\RemoveObjectsOnChangedTerrain.Contracts\RemoveObjectsOnChangedTerrain.Contracts.csproj" />

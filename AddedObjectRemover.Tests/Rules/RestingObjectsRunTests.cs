@@ -279,7 +279,7 @@ public class RestingObjectsRunTests
     }
 
     private static RemovalDecisions Decisions() =>
-        RemovalDecisions.Start(ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Count), TestBaseFacts.Unresolved), Targets.Count);
+        TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Count), TestBaseFacts.Unresolved), Targets.Count);
 
     private static ProposedRemoval Removal(int target, RemovalReason reason) => new(new TargetId(target), reason);
 

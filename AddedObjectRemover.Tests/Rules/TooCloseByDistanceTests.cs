@@ -23,7 +23,7 @@ public class TooCloseByDistanceTests
     private static readonly IBaseObjectShapes Shapes = TestShapes.Create(Mod, "TooCloseByDistanceData", Table);
 
     /// <summary>Each offset is the east-west distance between the centres of a target table and the other-mod table beside it.</summary>
-    private static TooCloseResult Find(TooCloseSettings settings, params float[] offsets)
+    private static TooClosePass Find(TooCloseSettings settings, params float[] offsets)
     {
         var targets = Enumerable.Range(0, offsets.Length)
             .Select(i => TestTargets.Create(i, TestTargets.At(new Vector3(i * Spacing, 0, 0)), Table.Base, TestTargets.Space))
@@ -38,12 +38,12 @@ public class TooCloseByDistanceTests
                 [.. targets],
                 world.VisibleTargets,
                 TargetWorkOrder.Of(targets),
-                world.ObjectsThatCanCauseRemovals(replacements, NpcHandling.Never),
+                world.Selected(replacements, NpcHandling.Never),
                 world.NpcsThatCanSpawn(replacements),
                 Shapes,
                 new TriangleStore(Shapes.ReadTriangles),
                 new Execution(1)),
-            settings);
+            [TestJudgedGroups.OfAll(targets, settings)]).Passes.Single();
     }
 
     private static TooCloseSettings DistanceOnly(ZoneShape zone, float units) =>

@@ -71,7 +71,7 @@ internal static class PipelineRun
         return captured.ToString().Split(Environment.NewLine).SkipLast(1).ToList();
     }
 
-    private static List<ReportFile> ReadReports(string reportFolder, string root) =>
+    internal static List<ReportFile> ReadReports(string reportFolder, string root) =>
         Directory.Exists(reportFolder)
             ? Directory.EnumerateFiles(reportFolder)
                 .Order(StringComparer.Ordinal)

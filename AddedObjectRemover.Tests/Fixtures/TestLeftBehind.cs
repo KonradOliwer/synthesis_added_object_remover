@@ -51,7 +51,7 @@ internal static class TestLeftBehind
             [.. targets],
             scene.ObjectsThatCanCauseRemovals(Replacements.None(others.Count), NpcHandling.OnlyWhenStuckInsideTheObject),
             new HashSet<OtherId>(),
-            RemovalDecisions.Start(protection, targets.Count),
+            TestSeededDecisions.StartDisablingAll(protection, targets.Count),
             scene.VisibleTargets,
             TestBaseFacts.Reader(new SkyrimMod(ReachRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
             shapes,

@@ -47,7 +47,7 @@ public class OtherModsObjectsSectionsTests
     {
         var stopped = new OtherModsObjectsResult(StepOutcome.StoppedByUnexpectedError, [], [], [], new PartFailure(OtherModsObjectsParts.LeftWithoutSupport, "broke", Subject: null));
         var none = new OtherModsObjectsResult(StepOutcome.Performed, [], [], [], Failure: null);
-        var decisions = RemovalDecisions.Start(ObjectsToKeep.Build([], [], [], TestBaseFacts.Unresolved), 0);
+        var decisions = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build([], [], [], TestBaseFacts.Unresolved), 0);
 
         Assert.Empty(LogSections.BuildLeftWithoutSupportSection(World, OtherModsObjectsResult.SwitchedOff, Detailed).Lines);
         Assert.Empty(LogSections.BuildLeftWithoutSupportStepSection(World, none, decisions, TestTargets.TargetName, TimeSpan.Zero, Normal).Lines);
@@ -64,7 +64,7 @@ public class OtherModsObjectsSectionsTests
     {
         var targets = TestTargets.CreateMany(2);
         var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(2), TestBaseFacts.Unresolved);
-        var decisions = RemovalDecisions.Start(protection, 2)
+        var decisions = TestSeededDecisions.StartDisablingAll(protection, 2)
             .Apply(RoundKind.TooClose, [new ProposedRemoval(new TargetId(0), new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()))])
             .Apply(RoundKind.AlsoRemove, [new ProposedRemoval(new TargetId(1), new RemovalReason.TouchingAnotherModsObject(new OtherId(0)))]);
         var settled = Settled with { Rounds = [decisions.Rounds[^1]] };
@@ -82,10 +82,13 @@ public class OtherModsObjectsSectionsTests
 
         Assert.Equal(
             "touches Lantern [000900:Other.esp], another mod's object left without support",
-            Describe.RemovalReason(world, new TouchingAnotherModsObjectRemoval(0, other)));
+            Describe.RemovalReason(world, new ObjectWithReason.TouchingAnotherModsObject(0, other), null!));
         Assert.Equal(
             "60 % of its support was removed or pulled down (mostly Lantern [000900:Other.esp], another mod's object left without support)",
-            Describe.RemovalReason(world, new SupportWithAnotherModsObjectRemoval(0, 0.6f, other)));
+            Describe.RemovalReason(world, new ObjectWithReason.LostSupportWithAnotherModsObject(0, 0.6f, 0f, other), null!));
+        Assert.Equal(
+            "60 % of its support left its place or was pulled down (mostly Lantern [000900:Other.esp], another mod's object left without support)",
+            Describe.RemovalReason(world, new ObjectWithReason.LostSupportWithAnotherModsObject(0, 0.6f, 0.2f, other), null!));
     }
 
     [Fact]

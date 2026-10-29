@@ -90,6 +90,51 @@ public sealed class TablesTests : IDisposable
     }
 
     [Fact]
+    public void SupportTable_NamesARestoredEvaluationRestoredAndNeverRemoved()
+    {
+        var world = CreateWorld(CreateTargets(), out _);
+
+        var table = Tables.BuildSupportTable(
+            world, [Evaluation(2, iteration: 1, restored: true), Evaluation(1, iteration: 1, restoredAsLinked: true)], Threshold, Context);
+
+        var decisionColumn = table.Header.IndexOf("decision");
+        Assert.Equivalent(
+            new[] { "restored", "restored (linked to an object that left its place)" }, table.Rows.Select(row => row[decisionColumn]).ToArray(), strict: true);
+    }
+
+    [Fact]
+    public void SupportTable_NamesALinkedMemberOfARestoredObjectRemovedLinkedToARestoredObject()
+    {
+        var world = CreateWorld(CreateTargets(), out _);
+
+        var table = Tables.BuildSupportTable(
+            world, [Evaluation(1, iteration: 1, removedAsLinkedToRestored: true), Evaluation(2, iteration: 1, removedAsLinked: true)], Threshold, Context);
+
+        var decisionColumn = table.Header.IndexOf("decision");
+        Assert.Equal(
+            new[] { "removed (linked to a restored object)", "removed (linked to a removed object)" }, table.Rows.Select(row => row[decisionColumn]).ToArray());
+    }
+
+    [Fact]
+    public void SupportTable_CountsARestoredSupporterInItsOwnColumnAndNeverAsRemoved()
+    {
+        var world = CreateWorld(CreateTargets(), out _);
+        List<SupporterShare> shares =
+        [
+            new(Supporter.Target(2), SupportCategory.RestoredTarget, 0.75f),
+            new(Supporter.Target(0), SupportCategory.RemovedTarget, 0.25f),
+        ];
+        var evaluation = new SupportEvaluationRow(1, 1, new CandidateContacts(12, 7.5f, []), shares, true, false, false, false, false, false);
+
+        var row = Assert.Single(Tables.BuildSupportTable(world, [evaluation], Threshold, Context).Rows);
+
+        var header = Tables.BuildSupportTable(world, [], Threshold, Context).Header;
+        Assert.Equal(new[] { "0.25", "0.75" }, new[] { row[header.IndexOf("removedCleanedModShare")], row[header.IndexOf("restoredShare")] });
+        Assert.Contains("Restored 0.75", row[header.IndexOf("topSupporters")], StringComparison.Ordinal);
+        Assert.DoesNotContain("RemovedCleanedMod 0.75", row[header.IndexOf("topSupporters")], StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MeshOriginTable_MatchesTheOldWriterByteForByte()
     {
         MeshOrigin[] origins =
@@ -126,6 +171,23 @@ public sealed class TablesTests : IDisposable
 
         AssertMatchesExpectedOutput("tables-leftovers", ReportFileNames.LeftBehindFileName, [table]);
         Assert.Equal(2, table.Rows.Length);
+    }
+
+    [Fact]
+    public void LeftBehindTable_CountsRestoredNeighboursInTheirOwnColumnsAndNotAsRemoved()
+    {
+        var world = CreateWorld(CreateTargets(), out _);
+        var tally = new SectorAreaTally(50);
+        tally.Add(DirectionSector.East, 100f, BoxFate.Restored);
+        tally.Add(DirectionSector.West, 40f, BoxFate.Removed);
+        LeftBehindCheck[] evaluations = [new(3, InvisibleObjectKind.IdleMarkers, 100f, null, tally.Build(), LeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null)];
+
+        var table = Tables.BuildLeftBehindTable(world, evaluations, new MarkerMoves(StepOutcome.Performed, [], [], [], MarkerMoveLimits.MaxDistance, Failure: null), Context);
+
+        var row = Assert.Single(table.Rows);
+        string Cell(string column) => row[table.Header.IndexOf(column)];
+        Assert.Equal(("0", "40", "100", "0"), (Cell("EastRemoved"), Cell("WestRemoved"), Cell("EastRestored"), Cell("WestRestored")));
+        Assert.Equal(("1", "1", "Restored", "Removed"), (Cell("removedDirections"), Cell("restoredDirections"), Cell("EastState"), Cell("WestState")));
     }
 
     [Fact]
@@ -169,15 +231,17 @@ public sealed class TablesTests : IDisposable
         targets[2] = targets[2] with { Area = new TargetArea(null, null, PlaceSource.GridOnly, new CellGridPoint(0, 0)) };
         targets[4] = targets[4] with { Area = new TargetArea("The Pale", "Loreius Farm", PlaceSource.OwnLocation, new CellGridPoint(7, 6)) };
         var world = CreateWorld(targets, out var otherModObject);
-        RemovedObject[] removals =
+        ObjectWithReason[] removals =
         [
-            new TooCloseRemoval(4, otherModObject, new TooCloseCause.ObjectSize()),
-            new TouchingRemoval(2, 4),
-            new LinkedRemoval(1, 4),
-            new TooCloseRemoval(0, otherModObject, new TooCloseCause.ObjectSize()),
+            new ObjectWithReason.TooClose(4, otherModObject, new TooCloseCause.ObjectSize()),
+            new ObjectWithReason.Touching(2, 4),
+            new ObjectWithReason.LinkedTo(1, 4),
+            new ObjectWithReason.TooClose(0, otherModObject, new TooCloseCause.ObjectSize()),
         ];
 
-        AssertMatchesExpectedOutput("tables-removals", ReportFileNames.RemovalsFileName, [Tables.BuildRemovalsTable(world, removals, Context)]);
+        var decisions = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build([.. targets], [], TestTargets.References(targets.Count), TestBaseFacts.Unresolved), targets.Count);
+
+        AssertMatchesExpectedOutput("tables-removals", ReportFileNames.RemovalsFileName, [Tables.BuildRemovalsTable(world, removals, decisions, Context)]);
     }
 
     [Fact]
@@ -314,10 +378,10 @@ public sealed class TablesTests : IDisposable
             targets, Shapes, protection, terrainSeeds is null ? [0, 2] : [2], TouchDistance, threads: 2, collectDiagnostics: true, terrainSeeds);
         var world = CreateWorld(targets, out _);
         var decided = new StepResults(
-            world, protection, new RemovalRisks([], []), ChangedTerrainResult.SwitchedOff, run.Result, VisibleLeftBehindResult.SwitchedOff, TestRestingObjects.SwitchedOff, LeftBehindResult.SwitchedOff, MarkerMoves.SwitchedOff,
+            world, protection, new RemovalRisks([], []), new ChangedObjectJudgingResult([], [], []), OldPlaceWorld: null, new ChangedTerrainResult([]), run.Result, VisibleLeftBehindResult.SwitchedOff, TestRestingObjects.SwitchedOff, LeftBehindResult.SwitchedOff, MarkerMoves.SwitchedOff,
             OtherModsObjectsResult.SwitchedOff, run.RemovalDecisions);
-        var removals = RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(run.RemovalDecisions), run.RemovalDecisions, world, VisibleLeftBehindResult.SwitchedOff, TestLeftBehind.PerformedWithoutFindings).ToImmutableArray();
-        var outcome = new RunOutcome(decided, removals, ManualPatchHints.FindManualPatchHints(decided, Shapes, removals), null!, default);
+        var removals = RemovalList.WithReasons(PatchWriter.ListRemovalsInWriteOrder(run.RemovalDecisions), run.RemovalDecisions, world, VisibleLeftBehindResult.SwitchedOff, TestLeftBehind.PerformedWithoutFindings).ToImmutableArray();
+        var outcome = new RunOutcome(decided, removals, [], ManualPatchHints.FindManualPatchHints(decided, Shapes, removals), null!, default);
         return new Scene(outcome, run);
     }
 
@@ -347,7 +411,9 @@ public sealed class TablesTests : IDisposable
             Scale: 1f,
             IsPrimitive: false,
             HasMapMarker: false,
-            Change: new ObjectChange(new PluginName("Other.esp"), AcceptedFrom: null));
+            Change: new ObjectChange(new PluginName("Other.esp"), AcceptedFrom: null),
+            Roles: ReferenceRoles.None,
+            ChangeWithoutCleanedMod: null);
         return new CollectedObjects(
             [.. targets],
             [otherModObject],
@@ -362,7 +428,15 @@ public sealed class TablesTests : IDisposable
     }
 
     private static SupportEvaluationRow Evaluation(
-        int target, int iteration, bool removed = false, bool removedAsLinked = false, bool held = false, bool noContacts = false)
+        int target,
+        int iteration,
+        bool removed = false,
+        bool removedAsLinked = false,
+        bool held = false,
+        bool noContacts = false,
+        bool restored = false,
+        bool restoredAsLinked = false,
+        bool removedAsLinkedToRestored = false)
     {
         var supporters = noContacts
             ? []
@@ -374,7 +448,7 @@ public sealed class TablesTests : IDisposable
                 new(Supporter.Target(0), SupportCategory.KeptTarget, 0.0625f),
             };
         var contacts = new CandidateContacts(noContacts ? 0 : 12, noContacts ? 0f : 7.5f, []);
-        return new SupportEvaluationRow(target, iteration, contacts, supporters, removed, removedAsLinked, held);
+        return new SupportEvaluationRow(target, iteration, contacts, supporters, removed, removedAsLinked || removedAsLinkedToRestored, removedAsLinkedToRestored, restored, restoredAsLinked, held);
     }
 
     private ReportFileSettings Reports(string name) => new(Folder(name));

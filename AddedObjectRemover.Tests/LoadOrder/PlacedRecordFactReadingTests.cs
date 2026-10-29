@@ -317,15 +317,129 @@ public class PlacedRecordFactReadingTests
         laterVersion.Scale = LaterScale;
         laterVersion.Base.SetTo(otherBase);
         laterVersion.MajorRecordFlagsRaw |= (int)SkyrimMajorRecord.SkyrimMajorRecordFlag.InitiallyDisabled;
+        var cell = CellFactOf(_cell);
+        var space = _worldspace.FormKey.ToRecordKey();
         List<PlacedVersionFact> expected =
         [
-            new(new PluginName(TargetPlugin), new PlacementFacts(Shown, Vector3.Zero, Vector3.Zero), Scale: null, PlaceableBase(_marker)),
-            new(new PluginName(LaterPlugin), new PlacementFacts(Shown with { InitiallyDisabled = true }, Moved, Turned), LaterScale, PlaceableBase(otherBase)),
+            new(new PluginName(TargetPlugin), new PlacementFacts(Shown, Vector3.Zero, Vector3.Zero), Scale: null, PlaceableBase(_marker), cell, space, IsPersistent: false, TestPlacedRecords.PlainReference),
+            new(new PluginName(LaterPlugin), new PlacementFacts(Shown with { InitiallyDisabled = true }, Moved, Turned), LaterScale, PlaceableBase(otherBase), cell, space, IsPersistent: false, TestPlacedRecords.PlainReference),
         ];
 
         var versions = ReadVersions(placed, TestVersionWalks.NoStop, later);
 
         Assert.Equal(expected, versions.ToList());
+    }
+
+    /// <summary>The target plugin puts the record in one cell; the later plugin moves it into another and flags its version persistent.</summary>
+    [Fact]
+    public void EachVersionHoldsTheCellItsPluginPutsTheRecordInAndItsOwnPersistentFlag()
+    {
+        var placed = AddPlaced(_ => { }, persistentList: false);
+        var otherCell = AddCell(1);
+        var later = new FixtureMod(LaterPlugin, _base, _target);
+        var laterVersion = CopyOf(placed);
+        laterVersion.MajorRecordFlagsRaw |= (int)PlacedObject.DefaultMajorFlag.Persistent;
+        AddCellCopy(later.Mod, otherCell).Persistent.Add(laterVersion);
+
+        var versions = ReadVersions(placed, TestVersionWalks.NoStop, later);
+
+        Assert.Equal([CellFactOf(_cell), CellFactOf(otherCell)], versions.Select(version => version.Cell));
+        Assert.Equal([false, true], versions.Select(version => version.IsPersistent));
+    }
+
+    /// <summary>The target plugin puts the record in a worldspace cell; the later plugin moves it into an interior.</summary>
+    [Fact]
+    public void EachVersionHoldsTheWorldspaceOrInteriorItsCellBelongsTo()
+    {
+        var placed = AddPlaced(_ => { }, persistentList: false);
+        var interior = new Cell(_target.NextKey(), FixtureMod.Release) { Flags = Cell.Flag.IsInteriorCell };
+        var later = new FixtureMod(LaterPlugin, _base, _target);
+        var laterInterior = new Cell(interior.FormKey, FixtureMod.Release) { Flags = Cell.Flag.IsInteriorCell };
+        laterInterior.Temporary.Add(CopyOf(placed));
+        later.Mod.Cells.AddInteriorCell(laterInterior);
+
+        var versions = ReadVersions(placed, TestVersionWalks.NoStop, later);
+
+        Assert.Equal([_worldspace.FormKey.ToRecordKey(), interior.FormKey.ToRecordKey()], versions.Select(version => version.SpaceKey));
+    }
+
+    /// <summary>The base plugin puts the record at <c>Moved</c>; the target plugin overrides it at the origin. Only the version below the target plugin's is kept.</summary>
+    [Fact]
+    public void TheVersionJustBelowTheTargetPluginIsKeptAsARecordForARecordTheTargetPluginOverrides()
+    {
+        var basePlaced = AddRecordTheBasePluginPlacesAndTheTargetPluginOverrides(out _, out _);
+        using var world = FixturePatcherState.CreateFinalWorld(CreateState());
+        var plugin = new PluginRecordsFactory(world, Environment.ProcessorCount).Open();
+
+        ReadWith(plugin);
+        var earlier = ((RecordHandles)plugin.ReadWritableRecords()).EarlierRecordOf(basePlaced.FormKey.ToRecordKey());
+
+        Assert.Equal((basePlaced.FormKey, Moved), (earlier.FormKey, earlier.Placement!.GetPosition()));
+    }
+
+    /// <summary>
+    /// A middle plugin loads between the base plugin and the target plugin, and the patch above the target plugin overrides the record
+    /// too. The version kept is the middle plugin's, the one just below the target plugin's: neither the patch's nor the base plugin's.
+    /// </summary>
+    [Fact]
+    public void TheVersionKeptIsTheOneJustBelowTheTargetPluginWhateverLiesAboveAndBelowIt()
+    {
+        var middle = new FixtureMod(MiddlePlugin, _base);
+        var middleSpot = new Vector3(1, 2, 3);
+        var basePlaced = AddRecordTheBasePluginPlacesAndTheTargetPluginOverrides(out var worldspace, out var cell);
+        AddPlacedCopy(middle.Mod, worldspace, cell, basePlaced, middleSpot);
+        var state = FixturePatcherState.Create([_base.Mod, middle.Mod, _target.Mod], Path.GetTempPath(), Path.GetTempPath());
+        AddPlacedCopy(state.PatchMod, worldspace, cell, basePlaced, new Vector3(7, 8, 9));
+        using var world = FixturePatcherState.CreateFinalWorld(state);
+        var plugin = new PluginRecordsFactory(world, Environment.ProcessorCount).Open();
+
+        ReadWith(plugin);
+        var earlier = ((RecordHandles)plugin.ReadWritableRecords()).EarlierRecordOf(basePlaced.FormKey.ToRecordKey());
+
+        Assert.Equal(middleSpot, earlier.Placement!.GetPosition());
+    }
+
+    /// <summary>A record the base plugin puts at <c>Moved</c> in a cell of its own worldspace, which the target plugin overrides at the origin.</summary>
+    private PlacedObject AddRecordTheBasePluginPlacesAndTheTargetPluginOverrides(out Worldspace worldspace, out Cell cell)
+    {
+        cell = new Cell(_base.NextKey(), FixtureMod.Release) { Grid = new CellGrid { Point = new P2Int(5, 5) } };
+        worldspace = new Worldspace(_base.NextKey(), FixtureMod.Release);
+        worldspace.AddCell(cell);
+        _base.Mod.Worldspaces.Add(worldspace);
+        var basePlaced = new PlacedObject(_base.NextKey(), FixtureMod.Release) { Placement = new Placement { Position = ToP3Float(Moved) } };
+        basePlaced.Base.SetTo(_marker);
+        cell.Temporary.Add(basePlaced);
+        AddPlacedCopy(_target.Mod, worldspace, cell, basePlaced, Vector3.Zero);
+        return basePlaced;
+    }
+
+    /// <summary>The plugin's copy of the worldspace and the cell, holding its version of the record at the given position.</summary>
+    private static void AddPlacedCopy(ISkyrimMod mod, Worldspace worldspace, Cell cell, PlacedObject record, Vector3 position)
+    {
+        var cellCopy = new Cell(cell.FormKey, FixtureMod.Release) { Grid = cell.Grid!.DeepCopy() };
+        var worldspaceCopy = new Worldspace(worldspace.FormKey, FixtureMod.Release);
+        worldspaceCopy.AddCell(cellCopy);
+        mod.Worldspaces.Add(worldspaceCopy);
+        var version = (PlacedObject)record.DeepCopy();
+        version.Placement = new Placement { Position = ToP3Float(position) };
+        cellCopy.Temporary.Add(version);
+    }
+
+    /// <summary>A later plugin's version says it is a map marker and a teleport door; the target plugin's version says neither.</summary>
+    [Fact]
+    public void EachVersionHoldsWhatItsPluginSaysAboutTheReferenceItself()
+    {
+        var placed = AddPlaced(_ => { }, persistentList: false);
+        var later = new FixtureMod(LaterPlugin, _base, _target);
+        var laterVersion = AddOverride(later.Mod, placed);
+        laterVersion.MapMarker = new MapMarker();
+        laterVersion.TeleportDestination = new TeleportDestination();
+
+        var versions = ReadVersions(placed, TestVersionWalks.NoStop, later);
+
+        Assert.Equal(
+            [TestPlacedRecords.PlainReference, TestPlacedRecords.PlainReference with { HasMapMarker = true, IsTeleportDoor = true }],
+            versions.Select(version => version.Reference));
     }
 
     /// <summary>The patch's version is kept like any other, and the walk goes on below it into the plugins after the patch.</summary>
@@ -355,7 +469,7 @@ public class PlacedRecordFactReadingTests
         var collected = PlacedObjects.Collect(
             new PluginRecordsFactory(world, Environment.ProcessorCount).Open(),
             table,
-            new WhatToCollect(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits));
+            new WhatToCollect(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false));
 
         Assert.All(plugins, plugin => Assert.True(table.Plugins.ContainsKey(plugin)));
         Assert.Contains(new PluginName(BelowPlugin), table.Plugins.Keys);
@@ -427,6 +541,8 @@ public class PlacedRecordFactReadingTests
     private static ImmutableArray<PlacedVersionFact> VersionsOf(PlacedRecordFacts facts, FormKey record) =>
         facts.Records.Single(fact => fact.Key.ToFormKey() == record).Versions;
 
+    private static CellFact CellFactOf(Cell cell) => new(cell.FormKey.ToRecordKey(), cell.EditorID);
+
     private static BaseKey PlaceableBase(FormKey record) => new(record.ToRecordKey(), BaseLinkKind.PlaceableObject);
 
     private static P3Float ToP3Float(Vector3 value) => new(value.X, value.Y, value.Z);
@@ -470,7 +586,7 @@ public class PlacedRecordFactReadingTests
 
     private PlacedRecordFacts ReadWith(IPluginRecords plugin, Func<PluginName, bool> stopsTheWalk) =>
         plugin.ReadPlacedRecords(
-            new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: false, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword),
+            new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: false, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword, TerrainReadsNeedAnOverride: false),
             stopsTheWalk);
 
     /// <param name="abovePatch">Plugins loading after the target plugin and above the patch.</param>
@@ -486,10 +602,11 @@ public class PlacedRecordFactReadingTests
         return version;
     }
 
-    /// <summary>The plugin's copy of the target's worldspace and cell, without records.</summary>
-    private Cell AddCellCopy(ISkyrimMod mod)
+    /// <summary>The plugin's copy of the target's worldspace and the given cell, the target cell when none is given, without records.</summary>
+    private Cell AddCellCopy(ISkyrimMod mod, Cell? source = null)
     {
-        var cell = new Cell(_cell.FormKey, FixtureMod.Release) { Grid = _cell.Grid!.DeepCopy() };
+        source ??= _cell;
+        var cell = new Cell(source.FormKey, FixtureMod.Release) { Grid = source.Grid!.DeepCopy() };
         var worldspace = new Worldspace(_worldspace.FormKey, FixtureMod.Release);
         worldspace.AddCell(cell);
         mod.Worldspaces.Add(worldspace);

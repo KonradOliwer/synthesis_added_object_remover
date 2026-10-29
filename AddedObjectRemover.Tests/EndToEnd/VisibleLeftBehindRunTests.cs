@@ -36,7 +36,7 @@ public class VisibleLeftBehindRunTests
         var visible = Assert.Single(rounds, round => round.Kind == RoundKind.VisibleLeftBehind);
         Assert.Empty(outcome.Final.RemovedIn(visible));
         Assert.Equal(rounds.Single(round => round.Kind == RoundKind.LeftBehind).Number, visible.Number + 1);
-        Assert.DoesNotContain(outcome.Removals, removal => removal is VisibleLeftBehindRemoval);
+        Assert.DoesNotContain(outcome.Removals, removal => removal is ObjectWithReason.VisibleLeftBehind);
     }
 
     [Fact]
@@ -50,7 +50,7 @@ public class VisibleLeftBehindRunTests
         var ids = log.Sections.Select(section => section.Id).ToList();
         Assert.True(ids.IndexOf("follow-up") < ids.IndexOf("visible-leftovers"));
         Assert.True(ids.IndexOf("visible-leftovers") < ids.IndexOf("leftovers"));
-        var visibleRemovals = outcome.Removals.OfType<VisibleLeftBehindRemoval>().ToList();
+        var visibleRemovals = outcome.Removals.OfType<ObjectWithReason.VisibleLeftBehind>().ToList();
         Assert.NotEmpty(visibleRemovals);
         Assert.Equal(outcome.VisibleLeftBehind.Evaluations.Count(evaluation => evaluation.IsRemoved), visibleRemovals.Count);
         var summary = Assert.Single(log.Sections.Single(section => section.Id == "removal-summary").Lines);

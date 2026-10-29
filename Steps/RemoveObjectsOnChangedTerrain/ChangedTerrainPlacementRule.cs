@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
@@ -6,9 +5,9 @@ namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
 
 /// <summary>The changed-terrain check of one target object at given placements; each check is the step's own.</summary>
 /// <param name="check">Null when the step is off: it finds nothing.</param>
-internal sealed class ChangedTerrainPlacementRule(ImmutableArray<TargetObject> targets, ObjectTerrainCheck? check) : IPlacementRule
+internal sealed class ChangedTerrainPlacementRule(ObjectTerrainCheck? check) : IPlacementRule
 {
-    public IPlacementTries StartTries(TargetId target) => new Tries(targets[target.Index], check);
+    public IPlacementTries StartTries(TargetObject target) => new Tries(target, check);
 
     private sealed class Tries(TargetObject target, ObjectTerrainCheck? check) : IPlacementTries
     {

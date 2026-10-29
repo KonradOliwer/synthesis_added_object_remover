@@ -25,6 +25,9 @@ public static class PatchWriter
         var fitted = ListFitsInWriteOrder(final, targets);
         orders.AddRange(fitted);
 
+        var restored = ListRestoresInWriteOrder(final);
+        orders.AddRange(restored.SelectMany(id => RestoreWrite.OrdersFor(targets[id.Index], ((Decision.Restored)final.Of(id)!).EarlierVersion)));
+
         var moves = final.Moves.Select(move => new SetPosition(targets[move.Target.Index].Key, move.To)).ToList();
         orders.AddRange(moves);
 
@@ -34,20 +37,26 @@ public static class PatchWriter
         orders.AddRange(pulled);
 
         writing.Write(plugin.ReadWritableRecords(), orders);
-        return new WriteSummary(removed, moves.Count, enableParentsReplaced, fitted.Count, otherRemovals.Count, pulled.Count);
+        return new WriteSummary(removed, restored, moves.Count, enableParentsReplaced, fitted.Count, otherRemovals.Count, pulled.Count);
     }
 
     /// <summary>Round by round, each round's direct removals in target order, then the linked ones.</summary>
     internal static ImmutableArray<TargetId> ListRemovalsInWriteOrder(IRemovalDecisions final) =>
         [.. final.Rounds.SelectMany(round => final.RemovedIn(round))];
 
+    /// <summary>Round by round, in the order of <see cref="ListRemovalsInWriteOrder"/>.</summary>
+    private static ImmutableArray<TargetId> ListRestoresInWriteOrder(IRemovalDecisions final) =>
+        [.. final.Rounds.SelectMany(round => final.RestoredIn(round))];
+
     /// <summary>Each fitted object's new placement, round by round, in target order.</summary>
     private static List<SetPlacement> ListFitsInWriteOrder(IRemovalDecisions final, ImmutableArray<TargetObject> targets) =>
     [
         .. final.Rounds
             .SelectMany(round => final.FittedIn(round))
-            .Select(id => new SetPlacement(targets[id.Index].Key, ((Decision.Fitted)final.Of(id)!).To)),
+            .Select(id => ToSetPlacement(targets[id.Index].Key, ((Decision.Fitted)final.Of(id)!).To)),
     ];
+
+    private static SetPlacement ToSetPlacement(RecordKey key, EulerPlacement placement) => new(key, placement.Position, placement.Rotation, placement.Scale);
 
     private static bool IsRemoved(OtherModsObjectOutcome outcome) => outcome.Fate is OtherModsObjectFate.Removed or OtherModsObjectFate.RemovedNothingBelow;
 }

@@ -5,6 +5,7 @@ using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
+using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
@@ -38,14 +39,26 @@ public static class SettingsValidator
 
     /// <summary>The names the settings screen shows, group first, so a warning leads to the setting.</summary>
     private const string CleanedModName = "Mod to clean up";
-    private const string NpcsName = "Remove objects too close to other mods' objects > Other mods' NPCs and creatures cause removal";
-    private const string TerrainCheckedObjectsName = "Remove objects on terrain changed by other mods > Which of the cleaned mod's objects are checked";
-    private const string HeightChangeToleranceName = "Remove objects on terrain changed by other mods > Count only height changes larger than";
-    private const string WaterHeightChangeToleranceName = "Remove objects on terrain changed by other mods > Count only water height changes larger than";
+    private const string StandardGroupPath = "";
+    private const string TooCloseGroup = "Remove objects too close to other mods' objects > ";
+    private const string TerrainGroup = "Remove objects on terrain changed by other mods > ";
     private const string ShrinkOrTurnGroup = "Shrink or turn objects to make them fit > ";
-    private const string MovedDistanceName = "Check other mods' objects the cleaned mod moved farther than";
-    private const string ShrinkLimitName = ShrinkOrTurnGroup + "Shrink down to";
-    private const string TurnLimitName = ShrinkOrTurnGroup + "Turn by at most";
+    private const string NpcsName = "Other mods' NPCs and creatures cause removal";
+    private const string SizeMarginName = "Margin by object size > Margin on every side";
+    private const string DistanceMarginName = "Margin by fixed distance > Margin on every side";
+    private const string TerrainCheckedObjectsName = "Which of the cleaned mod's objects are checked";
+    private const string HeightChangeToleranceName = "Count only height changes larger than";
+    private const string WaterHeightChangeToleranceName = "Count only water height changes larger than";
+    private const string TerrainTypeChangePercentName = "Remove only when this share of the ground points changed type";
+    private const string WaterCoverChangePercentName = "Remove only when this share of the ground got covered/uncovered";
+    private const string ChangedObjectsGroup = "Other mods' objects the cleaned mod changed > ";
+    private const string MovedObjectsGroup = ChangedObjectsGroup + "Moved objects > ";
+    private const string ReplacedObjectsGroup = ChangedObjectsGroup + "Replaced objects > ";
+    private const string ChangedCollisionGroup = ChangedObjectsGroup + "Collision handling > ";
+    private const string MovedDistanceName = MovedObjectsGroup + "Count as moved when moved farther than";
+    private const string WhenRemovedName = "When it would be removed";
+    private const string ShrinkLimitName = "Shrink down to";
+    private const string TurnLimitName = "Turn by at most";
     private const string FollowUpModeName = "Also remove what rests on removed objects > When an object is removed, also remove";
     private const string TouchDistanceName = "Also remove what rests on removed objects > Gap that still counts as touching";
     private const string AnchoringThresholdName = "Also remove what rests on removed objects > OnlyWhatLosesItsSupport: remove when this much support is gone";
@@ -56,16 +69,26 @@ public static class SettingsValidator
     private const string DirectionThresholdName = "A direction is cleared when this much of it was removed";
     private const string ClearedDirectionsName = "Remove when this share of the directions with objects is cleared";
     private const string MinOccupiedDirectionsName = "Decide only if at least this many of the 8 directions have objects";
-    private const string TooCloseSizeMarginName = "Remove objects too close to other mods' objects > Margin by object size > Margin on every side";
-    private const string TooCloseDistanceMarginName = "Remove objects too close to other mods' objects > Margin by fixed distance > Margin on every side";
-    private const string TerrainSizeMarginName = "Remove objects on terrain changed by other mods > Margin by object size > Margin on every side";
-    private const string TerrainDistanceMarginName = "Remove objects on terrain changed by other mods > Margin by fixed distance > Margin on every side";
-    private const string TerrainTypeChangePercentName = "Remove objects on terrain changed by other mods > Remove only when this share of the ground points changed type";
-    private const string WaterCoverChangePercentName = "Remove objects on terrain changed by other mods > Remove only when this share of the ground got covered/uncovered";
     private const string TrustedModsName = "Which other mods can cause removals > Trusted mods, and their masters";
     private const string OwnChangesModsName = "Which other mods can cause removals > Mods trusted for their own changes only";
     private const string NeverTrustedModsName = "Which other mods can cause removals > Never trusted mods";
     private const string MaxOtherMastersName = "Which other mods can cause removals > ...only if it has at most this many other masters";
+    private const string NoClashFoundAtEitherPlace = ", neither where the cleaned mod put it nor at its old place";
+
+    private static readonly CollisionGroupTexts CleanedModCollisionTexts = new(
+        StandardGroupPath, ShrinkOrTurnGroup, "no object is removed for being too close", "no object is removed for changed terrain");
+
+    private static readonly CollisionGroupTexts ChangedObjectsCollisionTexts = new(
+        ChangedCollisionGroup,
+        ChangedCollisionGroup,
+        $"no changed object is found too close{NoClashFoundAtEitherPlace}",
+        $"no changed object is found on changed terrain{NoClashFoundAtEitherPlace}");
+
+    /// <param name="GroupPath">The names, ending in " > ", of the groups that hold the too-close and changed-terrain groups; empty at the top of the settings.</param>
+    /// <param name="FitGroupPath">The names, ending in " > ", of the groups that hold the two limits for shrinking and turning.</param>
+    /// <param name="TooCloseEffect">What a warning says no longer happens when neither too-close margin is on.</param>
+    /// <param name="ChangedTerrainEffect">What a warning says no longer happens when the changed-terrain check can find nothing.</param>
+    private sealed record CollisionGroupTexts(string GroupPath, string FitGroupPath, string TooCloseEffect, string ChangedTerrainEffect);
 
     /// <summary>Validation runs in a fixed order because the warnings are reported in the order found.</summary>
     /// <param name="detailedLogAndReports">The one setting for every run that turns on both the detailed log and the report files.</param>
@@ -99,11 +122,12 @@ public static class SettingsValidator
 
         WarnOfRequiringModsAfterPatch(requiringModsAfterPatch, targetAsTyped.ToString(), warnings);
         WarnIfMastersUnreadable(targetListing, warnings);
-        var movedDistance = NotNegative(settings.MovedDistanceInUnits, SettingDefaults.MovedDistanceInUnits, MovedDistanceName, warnings);
+        var changed = settings.ChangedObjects;
+        var movedDistance = NotNegative(changed.Moved.MovedDistanceInUnits, SettingDefaults.MovedDistanceInUnits, MovedDistanceName, warnings);
+        var changedObjects = CreateChangedObjectSettings(changed, warnings);
+        var changedCollision = CreateChangedObjectCollision(changed, warnings);
         var modTrust = CreateModTrustSettings(records, mods, targetListing.Mod, settings.Trust, warnings);
-        var tooClose = CreateTooCloseSettings(settings.TooClose, warnings);
-        var changedTerrain = CreateChangedTerrainSettings(settings.TerrainChange, warnings);
-        var fit = CreateFitSettings(settings.ShrinkOrTurn, warnings);
+        var collision = CreateCollisionSettings(settings.Collision, CleanedModCollisionTexts, warnings);
         var alsoRemove = CreateAlsoRemoveSettings(settings.FollowUpRemoval, touchChainsShown: detailedLogAndReports, warnings);
         var otherModsObjects = CreateOtherModsObjectsSettings(settings.FollowUpRemoval, alsoRemove, warnings);
         var visibleLeftBehind = CreateVisibleLeftBehindSettings(settings.LeftoverVisibleObjects, warnings);
@@ -116,11 +140,12 @@ public static class SettingsValidator
             targetListing.Mod,
             targetAsTyped,
             modTrust,
-            CreateWhatToCollect(markerMoves, changedTerrain, detailedLogAndReports, movedDistance),
-            new SelectionSettings(tooClose.Npcs),
-            changedTerrain,
-            tooClose,
-            fit,
+            CreateWhatToCollect(
+                markerMoves, collision.ChangedTerrain, changedCollision.ChangedTerrain, changedObjects, changed.Replaced.Process, detailedLogAndReports, movedDistance),
+            new SelectionSettings(collision.TooClose.Npcs),
+            collision,
+            changedObjects,
+            changedCollision,
             alsoRemove,
             otherModsObjects,
             settings.LeftoverVisibleObjects.RemoveLeftoverVisibleObjects ? visibleLeftBehind : null,
@@ -278,18 +303,40 @@ public static class SettingsValidator
         }
     }
 
-    /// <summary>With neither margin on, the step switches itself off and removes nothing, so a warning says so.</summary>
-    private static TooCloseSettings CreateTooCloseSettings(ITooCloseSettingsValues values, ICollection<SettingWarning> warnings)
+    private static ChangedObjectSettings CreateChangedObjectSettings(IChangedObjectsSettingsValues values, ICollection<SettingWarning> warnings) =>
+        new(
+            ValidateDefined(values.Moved.WhenRemoved, SettingDefaults.MovedObjectsWhenRemoved, MovedObjectsGroup + WhenRemovedName, warnings),
+            ValidateDefined(values.Replaced.WhenRemoved, SettingDefaults.ReplacedObjectsWhenRemoved, ReplacedObjectsGroup + WhenRemovedName, warnings));
+
+    /// <summary>Validated even when no object is checked with it, so invalid values are always reported.</summary>
+    private static ChangedObjectCollision CreateChangedObjectCollision(IChangedObjectsSettingsValues values, ICollection<SettingWarning> warnings)
     {
-        var npcs = ValidateDefined(values.Npcs, SettingDefaults.Npcs, NpcsName, warnings);
-        var sizeMultiplier = ClampSizeMultiplier(values.SizeMultiplier, TooCloseSizeMarginName, warnings);
-        var distanceInUnits = ClampMarginInUnits(values.DistanceInUnits, SettingDefaults.RemovalDistanceInUnits, TooCloseDistanceMarginName, warnings);
+        var collision = CreateCollisionSettings(values.Collision, ChangedObjectsCollisionTexts, warnings);
+        return new ChangedObjectCollision(
+            collision.TooClose, collision.ChangedTerrain, collision.Fit, values.Moved.AttemptResizingBeforeRemoval, values.Replaced.AttemptResizingBeforeRemoval);
+    }
+
+    private static CollisionSettings CreateCollisionSettings(
+        ICollisionSettingsValues values, CollisionGroupTexts texts, ICollection<SettingWarning> warnings) =>
+        new(
+            CreateTooCloseSettings(values.TooClose, texts, warnings),
+            CreateChangedTerrainSettings(values.TerrainChange, texts, warnings),
+            CreateFitSettings(values.ShrinkOrTurn, texts.FitGroupPath, warnings));
+
+    /// <summary>With neither margin on, the step switches itself off and finds nothing, so a warning says so.</summary>
+    private static TooCloseSettings CreateTooCloseSettings(ITooCloseSettingsValues values, CollisionGroupTexts texts, ICollection<SettingWarning> warnings)
+    {
+        var groupPath = texts.GroupPath;
+        var group = groupPath + TooCloseGroup;
+        var npcs = ValidateDefined(values.Npcs, SettingDefaults.Npcs, group + NpcsName, warnings);
+        var sizeMultiplier = ClampSizeMultiplier(values.SizeMultiplier, group + SizeMarginName, warnings);
+        var distanceInUnits = ClampMarginInUnits(values.DistanceInUnits, SettingDefaults.RemovalDistanceInUnits, group + DistanceMarginName, warnings);
         var zoneShape = values.UseRoughBoxes ? ZoneShape.BoundingBox : ZoneShape.ObjectShape;
         if (!values.BySize && !values.ByDistance)
         {
             warnings.Add(new SettingWarning(
-                "too close",
-                "Warning: neither too-close margin is on; no object is removed for being too close."));
+                groupPath + "too close",
+                $"Warning: {groupPath}neither too-close margin is on; {texts.TooCloseEffect}."));
         }
         return new TooCloseSettings(values.BySize, sizeMultiplier, values.ByDistance, distanceInUnits, zoneShape, npcs);
     }
@@ -305,17 +352,20 @@ public static class SettingsValidator
     /// no height, ground type or water changes counted, or with neither terrain area on, it is passed as off, with a warning,
     /// because it could remove nothing.
     /// </summary>
-    private static ChangedTerrainSettings CreateChangedTerrainSettings(ITerrainChangeSettingsValues terrain, ICollection<SettingWarning> warnings)
+    private static ChangedTerrainSettings CreateChangedTerrainSettings(
+        ITerrainChangeSettingsValues terrain, CollisionGroupTexts texts, ICollection<SettingWarning> warnings)
     {
-        var objects = ValidateDefined(terrain.TerrainCheckedObjects, SettingDefaults.TerrainChecked, TerrainCheckedObjectsName, warnings);
+        var groupPath = texts.GroupPath;
+        var group = groupPath + TerrainGroup;
+        var objects = ValidateDefined(terrain.TerrainCheckedObjects, SettingDefaults.TerrainChecked, group + TerrainCheckedObjectsName, warnings);
         var tolerance = Clamp(
-            terrain.HeightChangeTolerance, 0, MaxHeightChangeTolerance, SettingDefaults.HeightChangeTolerance, HeightChangeToleranceName, warnings);
-        var sizeMultiplier = ClampSizeMultiplier(terrain.AreaSizeMultiplier, TerrainSizeMarginName, warnings);
-        var distanceInUnits = ClampMarginInUnits(terrain.AreaDistanceInUnits, SettingDefaults.TerrainAreaDistanceInUnits, TerrainDistanceMarginName, warnings);
-        var typeChangePercent = Clamp(terrain.MinTerrainTypeChangePercent, 0, Percent.PerWhole, TerrainTypeChangePercentName, warnings);
+            terrain.HeightChangeTolerance, 0, MaxHeightChangeTolerance, SettingDefaults.HeightChangeTolerance, group + HeightChangeToleranceName, warnings);
+        var sizeMultiplier = ClampSizeMultiplier(terrain.AreaSizeMultiplier, group + SizeMarginName, warnings);
+        var distanceInUnits = ClampMarginInUnits(terrain.AreaDistanceInUnits, SettingDefaults.TerrainAreaDistanceInUnits, group + DistanceMarginName, warnings);
+        var typeChangePercent = Clamp(terrain.MinTerrainTypeChangePercent, 0, Percent.PerWhole, group + TerrainTypeChangePercentName, warnings);
         var waterTolerance = Clamp(
-            terrain.WaterHeightChangeTolerance, 0, MaxHeightChangeTolerance, SettingDefaults.WaterHeightChangeTolerance, WaterHeightChangeToleranceName, warnings);
-        var waterCoverPercent = Clamp(terrain.MinWaterCoverChangePercent, 0, Percent.PerWhole, WaterCoverChangePercentName, warnings);
+            terrain.WaterHeightChangeTolerance, 0, MaxHeightChangeTolerance, SettingDefaults.WaterHeightChangeTolerance, group + WaterHeightChangeToleranceName, warnings);
+        var waterCoverPercent = Clamp(terrain.MinWaterCoverChangePercent, 0, Percent.PerWhole, group + WaterCoverChangePercentName, warnings);
         var settings = new ChangedTerrainSettings(
             terrain.RemoveOnChangedTerrain,
             objects,
@@ -336,23 +386,23 @@ public static class SettingsValidator
         if (settings.On && !countsAChange)
         {
             warnings.Add(new SettingWarning(
-                "changed terrain",
-                "Warning: changed terrain is on, but no height, ground type or water changes are counted; no object is removed for changed terrain."));
+                groupPath + "changed terrain",
+                $"Warning: {groupPath}changed terrain is on, but no height, ground type or water changes are counted; {texts.ChangedTerrainEffect}."));
         }
         if (settings.On && !hasAnArea)
         {
             warnings.Add(new SettingWarning(
-                "changed terrain",
-                "Warning: changed terrain is on, but neither terrain margin is on; no object is removed for changed terrain."));
+                groupPath + "changed terrain",
+                $"Warning: {groupPath}changed terrain is on, but neither terrain margin is on; {texts.ChangedTerrainEffect}."));
         }
         return settings with { On = settings.On && countsAChange && hasAnArea };
     }
 
     /// <summary>A shrink limit of 100 or more and a turn limit of 180 or more are valid: they mean never shrunk and any heading.</summary>
-    private static FitSettings CreateFitSettings(IShrinkOrTurnSettingsValues values, ICollection<SettingWarning> warnings) =>
+    private static FitSettings CreateFitSettings(IShrinkOrTurnSettingsValues values, string group, ICollection<SettingWarning> warnings) =>
         new(
-            AtLeast(values.ShrinkLimitPercent, MinShrinkLimitPercent, ShrinkLimitName, warnings),
-            AtLeast(values.TurnLimitDegrees, 0, TurnLimitName, warnings));
+            AtLeast(values.ShrinkLimitPercent, MinShrinkLimitPercent, group + ShrinkLimitName, warnings),
+            AtLeast(values.TurnLimitDegrees, 0, group + TurnLimitName, warnings));
 
     /// <param name="touchChainsShown">Whether the detailed log and the report files, which show the touch chains, are on.</param>
     private static AlsoRemoveSettings CreateAlsoRemoveSettings(
@@ -386,21 +436,40 @@ public static class SettingsValidator
 
     /// <summary>
     /// The navmeshes are read only when relocation needs them; the Editor ID lists only when the detailed log prints them; every
-    /// plugin's terrain only when the changed-terrain step runs, its texture layers only when it counts terrain types, and its water
-    /// only when it counts a water change.
+    /// plugin's terrain only when a changed-terrain step runs, its texture layers only when one counts terrain types, and its water
+    /// only when one counts a water change; the old places only when a mode checks them.
+    /// When only the changed objects' terrain check is on, the scan reads terrain only if the cleaned mod overrides a record of
+    /// another plugin; whether an override is a changed object is known only after the scan, and every changed object, in any
+    /// mode, is checked where the cleaned mod put it.
     /// </summary>
+    /// <param name="cleanedModTerrain">The changed-terrain settings of the cleaned mod's own objects.</param>
+    /// <param name="changedObjectsTerrain">The changed-terrain settings of the objects the cleaned mod changed.</param>
     /// <param name="movedDistance">The validated moved distance.</param>
     private static WhatToCollect CreateWhatToCollect(
-        MarkerMoveSettings? markerMoves, ChangedTerrainSettings changedTerrain, bool detailedLog, float movedDistance)
+        MarkerMoveSettings? markerMoves,
+        ChangedTerrainSettings cleanedModTerrain,
+        ChangedTerrainSettings changedObjectsTerrain,
+        ChangedObjectSettings changedObjects,
+        bool processReplaced,
+        bool detailedLog,
+        float movedDistance)
     {
+        ChangedTerrainSettings[] changedTerrains = [cleanedModTerrain, changedObjectsTerrain];
         return new WhatToCollect(
             markerMoves != null,
             detailedLog,
-            changedTerrain.On,
-            changedTerrain.On && changedTerrain.CountTerrainTypeChanges,
-            changedTerrain.On && changedTerrain.CountsWaterChanges,
-            movedDistance);
+            changedTerrains.Any(terrain => terrain.On),
+            changedTerrains.Any(terrain => terrain.On && terrain.CountTerrainTypeChanges),
+            changedTerrains.Any(terrain => terrain.On && terrain.CountsWaterChanges),
+            movedDistance,
+            processReplaced,
+            JudgeOldPlaces: JudgesOldPlaces(changedObjects, processReplaced),
+            TerrainForChangedObjectsOnly: !cleanedModTerrain.On && changedObjectsTerrain.On);
     }
+
+    /// <summary>A replaced object is judged only when replaced objects are processed, so its mode counts only then.</summary>
+    private static bool JudgesOldPlaces(ChangedObjectSettings changedObjects, bool processReplaced) =>
+        changedObjects.Moved == RestoreMode.RestoreIfNoCollision || (processReplaced && changedObjects.Replaced == RestoreMode.RestoreIfNoCollision);
 
     /// <summary>Built (and its settings validated) even when the step is off, so invalid values are always reported.</summary>
     private static LeftBehindSettings CreateLeftBehindSettings(ILeftoverSettingsValues leftovers, ICollection<SettingWarning> warnings) =>

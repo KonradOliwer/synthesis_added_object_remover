@@ -58,6 +58,9 @@ internal sealed class PlacedRecordReader
     /// </summary>
     private readonly Dictionary<RecordKey, List<PlacedVersionFact>> _openVersions = new();
     private readonly Dictionary<RecordKey, PlacedRecordHandle> _handles = new();
+
+    /// <summary>For each record the target plugin overrides: the version just below the target plugin's, as its plugin stores it.</summary>
+    private readonly Dictionary<RecordKey, IPlacedGetter> _earlierRecords = new();
     private readonly List<LinkFact> _links = [];
     private readonly HashSet<RecordKey> _linkedFromPlacedRecords = [];
     private readonly Dictionary<RecordKey, RecordKey> _landWorldspaceOf = new();
@@ -85,7 +88,8 @@ internal sealed class PlacedRecordReader
         _stopsTheWalk = stopsTheWalk;
         _targetPlugin = [scope.Target];
         _footprint = AnalyzeTarget();
-        if (scope.Terrain || scope.TerrainVersions || scope.Water) FindLandAndWaterWorldspaces();
+        _scope = DropTerrainReadsWithoutAnOverride(scope, _footprint);
+        if (_scope.Terrain || _scope.TerrainVersions || _scope.Water) FindLandAndWaterWorldspaces();
         _landWorldspaces = _landWorldspaceOf.Values.ToHashSet();
     }
 
@@ -102,6 +106,12 @@ internal sealed class PlacedRecordReader
         reader.ScanLoadOrder();
         return reader.CreateScannedRecords(CellAreaReader.Read(reader._targetSpaceCells, new LocationNameReader(linkCache, scope.HoldKeyword.ToFormKey()), execution));
     }
+
+    /// <remarks>The footprint is analyzed with the scope as given; this narrows it afterwards, since the footprint decides it.</remarks>
+    private static PlacedReadScope DropTerrainReadsWithoutAnOverride(PlacedReadScope scope, TargetFootprint footprint) =>
+        scope.TerrainReadsNeedAnOverride && footprint.OverriddenRecords.Count == 0
+            ? scope with { TerrainVersions = false, TerrainLayers = false, Water = false }
+            : scope;
 
     private void FindLandAndWaterWorldspaces()
     {
@@ -278,6 +288,7 @@ internal sealed class PlacedRecordReader
     private void KeepLowerVersion(IPlacedGetter record, RecordKey key, ScannedCell cell)
     {
         if (!_openVersions.TryGetValue(key, out var versions) || versions[^1].Plugin == cell.Plugin) return;
+        if (versions[^1].Plugin == _scope.Target && _footprint.OverriddenRecords.Contains(key)) _earlierRecords.Add(key, record);
         versions.Add(ReadVersion(record, cell));
         if (_stopsTheWalk(cell.Plugin)) _openVersions.Remove(key);
     }
@@ -305,21 +316,30 @@ internal sealed class PlacedRecordReader
         cell.Space,
         cell.Cell,
         cell.InTargetSpace,
-        record is IPlacedObjectGetter { TeleportDestination: not null },
-        record is IPlacedObjectGetter { Primitive: not null },
-        record is IPlacedObjectGetter { MapMarker: not null },
+        winner.Reference.IsTeleportDoor,
+        winner.Reference.IsPrimitive,
+        winner.Reference.HasMapMarker,
         record.IsPersistent(),
         ScriptPropertyReader.FindQuestOrScene(record.VirtualMachineAdapter, _linkCache, _names),
         record.LocationRefTypes is { Count: > 0 },
-        record.GetReferenceRadius(),
-        record.GetPrimitiveBounds(),
+        winner.Reference.ReferenceRadius,
+        winner.Reference.PrimitiveBounds,
         Versions: [winner]);
 
     private PlacedVersionFact ReadVersion(IPlacedGetter record, ScannedCell cell) => new(
         cell.Plugin,
         new PlacementFacts(ReadPresence(record), record.Placement?.GetPosition(), record.Placement?.GetRotation()),
         record.Scale,
-        record.GetBaseKey(_names));
+        record.GetBaseKey(_names),
+        cell.Cell,
+        cell.Space.Key,
+        record.IsPersistent(),
+        new ReferenceFacts(
+            record is IPlacedObjectGetter { TeleportDestination: not null },
+            record is IPlacedObjectGetter { Primitive: not null },
+            record is IPlacedObjectGetter { MapMarker: not null },
+            record.GetReferenceRadius(),
+            record.GetPrimitiveBounds()));
 
     private PresenceFacts ReadPresence(IPlacedGetter record) => new(
         record.IsDeleted,
@@ -340,7 +360,7 @@ internal sealed class PlacedRecordReader
             cellAreas,
             _linkedFromPlacedRecords);
         var water = new CellWater(_scope.Water ? _cellWaterCopies : null, CollectWorldspaceWater(), _waterWorldspaceOf);
-        return new ScannedRecords(facts, new ScanLookups(new RecordHandles(_handles), terrain, water, new NavmeshRecords(_navmeshes)));
+        return new ScannedRecords(facts, new ScanLookups(new RecordHandles(_handles, _earlierRecords), terrain, water, new NavmeshRecords(_navmeshes)));
     }
 
     private PlacedRecordFact WithVersions(PlacedRecordFact fact) => fact with { Versions = [.. Enumerable.Reverse(_versions[fact.Key])] };

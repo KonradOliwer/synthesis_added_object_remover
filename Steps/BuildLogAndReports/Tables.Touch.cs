@@ -39,9 +39,9 @@ internal static partial class Tables
     {
         var (alsoRemove, final) = (outcome.RestingObjects, outcome.Final);
         var seeds = SeedReasons(
-            alsoRemove.SeedRounds.SelectMany(round => RemovalList.RemovalsIn(final, outcome.Collected, round)),
+            RemovalList.WithReasons(alsoRemove.SeedRounds.SelectMany(round => final.LeftIn(round)), final, outcome.Collected),
             outcome.Collected.Targets);
-        var removals = alsoRemove.Rounds.SelectMany(round => RemovalList.RemovalsIn(final, outcome.Collected, round)).ToList();
+        var removals = RemovalList.WithReasons(alsoRemove.Rounds.SelectMany(round => final.RemovedIn(round)), final, outcome.Collected).ToList();
         var kept = alsoRemove.Rounds.SelectMany(round => RemovalList.KeptIn(final, round)).ToList();
         return
         [
@@ -75,7 +75,7 @@ internal static partial class Tables
     public static CsvTable BuildComponentsTable(
         CollectedObjects world,
         PerIndexTable<string> seedReasonByTarget,
-        IEnumerable<RemovedObject> removals,
+        IEnumerable<ObjectWithReason> removals,
         IEnumerable<KeptObject> kept,
         TouchChainEdges touch,
         ReportContext context)
@@ -118,18 +118,18 @@ internal static partial class Tables
         (int Length, string FormKeys) DeepestChain,
         string SeedReasons);
 
-    /// <param name="removedSeeds">The removals of the seed rounds (changed terrain, too close).</param>
-    private static PerIndexTable<string> SeedReasons(IEnumerable<RemovedObject> removedSeeds, IReadOnlyList<TargetObject> targets) =>
+    /// <param name="removedSeeds">The objects the seed rounds (changed terrain, too close) took from their place, disabled or restored.</param>
+    private static PerIndexTable<string> SeedReasons(IEnumerable<ObjectWithReason> removedSeeds, IReadOnlyList<TargetObject> targets) =>
         PerIndexTable<string>.From(
             removedSeeds.Select(seed => (seed.TargetIndex, Reason: DescribeSeedReason(seed, targets))),
             seed => seed.TargetIndex,
             seed => seed.Reason);
 
-    private static string DescribeSeedReason(RemovedObject seed, IReadOnlyList<TargetObject> targets) => seed switch
+    private static string DescribeSeedReason(ObjectWithReason seed, IReadOnlyList<TargetObject> targets) => seed switch
     {
-        TerrainChangedRemoval changed => $"terrain changed by {Describe.ChangingMod(changed.ChangedBy)}",
-        TooCloseRemoval { TooCloseTo: var other } => $"{other.Key} ({other.WinningMod})",
-        LinkedRemoval linked => $"linked to {targets[linked.LinkedToTargetIndex].Key}",
+        ObjectWithReason.TerrainChanged changed => $"terrain changed by {Describe.ChangingMod(changed.ChangedBy)}",
+        ObjectWithReason.TooClose { TooCloseTo: var other } => $"{other.Key} ({other.WinningMod})",
+        ObjectWithReason.LinkedTo linked => $"linked to {targets[linked.LinkedToTargetIndex].Key}",
         _ => throw new UnreachableException($"Unexpected seed removal type {seed.GetType().Name}."),
     };
 

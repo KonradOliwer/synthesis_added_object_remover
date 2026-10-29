@@ -282,6 +282,34 @@ public sealed class RestingObjectsEndSectionsTests
     }
 
     [Fact]
+    public void Leftovers_ARemovalAndARestorationWithRestoredNeighboursAreCountedUnderTheirOwnReason()
+    {
+        var (world, leftBehind) = LeftBehindScene();
+        var removed = leftBehind.Evaluations[1] with { ContainingObject = null, Decision = LeftBehindOutcome.RemovedSurroundingsRemovedAndRestored };
+        var restored = leftBehind.Evaluations[1] with { TargetIndex = Protected, ContainingObject = null, Decision = LeftBehindOutcome.RestoredSurroundingsRemovedAndRestored };
+
+        var lines = LogSections.BuildLeftBehindSection(world, leftBehind with { Evaluations = [removed, restored] }, [], Elapsed, Detailed).Lines.ToList();
+
+        Assert.Contains(
+            "removed 1 (0 inside another mod's object, 0 surroundings removed, 1 surroundings removed and restored); restored 1 (1 surroundings removed and restored); ",
+            lines[0]);
+        Assert.Contains(lines, line => line.StartsWith("  Left behind: ", StringComparison.Ordinal) && line.Contains(": removed, surroundings removed and restored;", StringComparison.Ordinal));
+        Assert.Contains(lines, line => line.StartsWith("  Left behind: ", StringComparison.Ordinal) && line.Contains(": restored, surroundings removed and restored;", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Leftovers_ASurroundingsRemovalWithoutARestoredNeighbourDoesNotNameTheRestoredReason()
+    {
+        var (world, leftBehind) = LeftBehindScene();
+        var removed = leftBehind.Evaluations[1] with { ContainingObject = null, Decision = LeftBehindOutcome.RemovedSurroundingsRemoved };
+
+        var lines = LogSections.BuildLeftBehindSection(world, leftBehind with { Evaluations = [removed] }, [], Elapsed, Detailed).Lines.ToList();
+
+        Assert.DoesNotContain("and restored", lines[0], StringComparison.Ordinal);
+        Assert.StartsWith("Invisible objects left behind: 1 evaluated in 1.5s; removed 1 (0 inside another mod's object, 1 surroundings removed); kept 0 (", lines[0]);
+    }
+
+    [Fact]
     public void Leftovers_DetailedLogMatchesTheExpectedOutput()
     {
         var (world, leftBehind) = LeftBehindScene();
@@ -379,7 +407,7 @@ public sealed class RestingObjectsEndSectionsTests
     public void Write_ShowsTheTimeOnlyInTheDetailedLogAndTheEnableParentLineAlways()
     {
         var written = new WriteSummary(
-            Removed: [.. Enumerable.Range(0, 5).Select(index => new TargetId(index))], Moved: 2, EnableParentsReplaced: 3, Fitted: 0, OtherModsObjectsRemoved: 0, OtherModsObjectsPulledDown: 0);
+            Removed: [.. Enumerable.Range(0, 5).Select(index => new TargetId(index))], Restored: [], Moved: 2, EnableParentsReplaced: 3, Fitted: 0, OtherModsObjectsRemoved: 0, OtherModsObjectsPulledDown: 0);
 
         Assert.Equal(
             [
@@ -393,13 +421,23 @@ public sealed class RestingObjectsEndSectionsTests
     [Fact]
     public void Write_OmitsTheEnableParentLineWhenNoneWasReplaced()
     {
-        Assert.Single(LogSections.BuildWriteSection(new WriteSummary([new TargetId(0)], 0, 0, 0, 0, 0), Elapsed, Normal).Lines.ToList());
+        Assert.Single(LogSections.BuildWriteSection(new WriteSummary([new TargetId(0)], [], 0, 0, 0, 0, 0), Elapsed, Normal).Lines.ToList());
+    }
+
+    [Fact]
+    public void Write_CountsTheRestoredObjectsInTheTotalAndNamesThemAfterTheRemovedOnlyWhenThereAreAny()
+    {
+        var withRestored = new WriteSummary([new TargetId(0)], Restored: [new TargetId(1), new TargetId(2)], Moved: 1, EnableParentsReplaced: 0, Fitted: 0, OtherModsObjectsRemoved: 0, OtherModsObjectsPulledDown: 0);
+        var withoutRestored = withRestored with { Restored = [] };
+
+        Assert.Equal("Wrote 4 overrides (1 removed, 2 restored, 1 kept markers moved).", LogSections.BuildWriteSection(withRestored, Elapsed, Normal).Lines[0]);
+        Assert.Equal("Wrote 2 overrides (1 removed, 1 kept markers moved).", LogSections.BuildWriteSection(withoutRestored, Elapsed, Normal).Lines[0]);
     }
 
     [Fact]
     public void Write_NamesTheOtherModsObjectsPulledDownAndRemovedOnlyWhenThereAreAny()
     {
-        var written = new WriteSummary([new TargetId(0)], Moved: 0, EnableParentsReplaced: 0, Fitted: 1, OtherModsObjectsRemoved: 2, OtherModsObjectsPulledDown: 3);
+        var written = new WriteSummary([new TargetId(0)], Restored: [], Moved: 0, EnableParentsReplaced: 0, Fitted: 1, OtherModsObjectsRemoved: 2, OtherModsObjectsPulledDown: 3);
 
         Assert.Equal(
             "Wrote 7 overrides (1 removed, 1 shrunk or turned to fit; other mods' objects: 3 pulled down, 2 removed).",
@@ -410,12 +448,12 @@ public sealed class RestingObjectsEndSectionsTests
     public void Removals_AndSpaces_AreDetailedOnlyAndMatchTheExpectedOutput()
     {
         var (world, decisions) = RunRounds();
-        var removals = RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(decisions), decisions, world, VisibleLeftBehindResult.SwitchedOff, TestLeftBehind.PerformedWithoutFindings);
+        var removals = RemovalList.WithReasons(PatchWriter.ListRemovalsInWriteOrder(decisions), decisions, world, VisibleLeftBehindResult.SwitchedOff, TestLeftBehind.PerformedWithoutFindings);
         var detailed = Detailed with { Bases = null! };
 
-        Assert.Empty(LogSections.BuildRemovalsSection(world, removals, Normal).Lines.ToList());
+        Assert.Empty(LogSections.BuildRemovalsSection(world, removals, decisions, Normal).Lines.ToList());
         Assert.Empty(LogSections.BuildSpacesSection(world, removals, Target, Normal).Lines.ToList());
-        AssertExpectedOutput(LogSections.BuildRemovalsSection(world, removals, detailed).Lines.ToList(), "Removals_AndSpaces_AreDetailedOnlyAndMatchTheExpectedOutput", "removals");
+        AssertExpectedOutput(LogSections.BuildRemovalsSection(world, removals, decisions, detailed).Lines.ToList(), "Removals_AndSpaces_AreDetailedOnlyAndMatchTheExpectedOutput", "removals");
         AssertExpectedOutput(LogSections.BuildSpacesSection(world, removals, Target, detailed).Lines.ToList(), "Removals_AndSpaces_AreDetailedOnlyAndMatchTheExpectedOutput", "spaces");
     }
 
@@ -476,7 +514,7 @@ public sealed class RestingObjectsEndSectionsTests
     public void Summaries_AlwaysShowAndMatchTheExpectedOutput()
     {
         var (world, decisions) = RunRounds();
-        var removals = RemovalList.Removals(PatchWriter.ListRemovalsInWriteOrder(decisions), decisions, world, VisibleLeftBehindResult.SwitchedOff, TestLeftBehind.PerformedWithoutFindings);
+        var removals = RemovalList.WithReasons(PatchWriter.ListRemovalsInWriteOrder(decisions), decisions, world, VisibleLeftBehindResult.SwitchedOff, TestLeftBehind.PerformedWithoutFindings);
         var kept = RemovalList.Kept(decisions);
         var context = Detailed with { Shapes = TestVisibility.OfTaggedBasesOnly() };
         var targets = Enumerable.Range(0, TargetCount)
@@ -642,7 +680,7 @@ public sealed class RestingObjectsEndSectionsTests
 
     private static (CollectedObjects World, RestingObjectsResult AlsoRemove, RemovalDecisions Decisions) SupportScene()
     {
-        var (world, decisions) = RunRounds(alsoRemoveReason: index => new RemovalReason.LostSupport(0.6f, new TargetId(0)));
+        var (world, decisions) = RunRounds(alsoRemoveReason: index => new RemovalReason.LostSupport(0.6f, 0f, new TargetId(0)));
         return (world, AlsoRemoveOf(FollowUpRemovalMode.OnlyWhatLosesItsSupport, decisions), decisions);
     }
 
@@ -721,7 +759,7 @@ public sealed class RestingObjectsEndSectionsTests
             [],
             TargetWorkOrder.Of(targets),
             null);
-        var decisions = RemovalDecisions.Start(protection, TargetCount)
+        var decisions = TestSeededDecisions.StartDisablingAll(protection, TargetCount)
             .Apply(RoundKind.TooClose, [Propose(0, new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize())), Propose(Protected, new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()))])
             .Apply(RoundKind.AlsoRemove, [Propose(1, reasonOf(1)), Propose(ProtectedAlsoRemove, reasonOf(ProtectedAlsoRemove))]);
         return (world, decisions);
@@ -742,7 +780,9 @@ public sealed class RestingObjectsEndSectionsTests
             Scale: 1f,
             IsPrimitive: false,
             HasMapMarker: false,
-            Change: new ObjectChange(OtherMod.ToPluginName(), AcceptedFrom: null));
+            Change: new ObjectChange(OtherMod.ToPluginName(), AcceptedFrom: null),
+            Roles: ReferenceRoles.None,
+            ChangeWithoutCleanedMod: null);
 
     private static (CollectedObjects World, RestingObjectsResult AlsoRemove, IRemovalDecisions Decisions) RunFixture(Settings settings)
     {

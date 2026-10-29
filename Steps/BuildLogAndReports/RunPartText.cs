@@ -2,6 +2,7 @@ using System.Diagnostics;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
+using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
@@ -39,6 +40,8 @@ internal static class RunPartText
         [FitParts.RestingCheck] = new("finding the objects other objects rest on", "No object was shrunk or turned; the objects that were too close were removed.", Subjects: null),
         [ChangedTerrainParts.TerrainCheck] = new("checking objects for changed terrain", "They were not removed.", SubjectKind.Object),
         [TooCloseParts.TooCloseCheck] = new("checking objects for being too close", "They were not removed.", SubjectKind.Object),
+        [JudgeChangedObjectsParts.OldPlace] = new(
+            "checking the old places of objects the cleaned mod changed", "Each was treated as colliding at its old place.", SubjectKind.OldPlaceObject),
         [KeepParts.KeepCheck] = new("finding the cleaned mod's objects to keep", "They were kept.", SubjectKind.Object),
         [SelectionParts.RemovalCauseSelection] = new("selecting the objects that can cause removals", "They were not used to remove the cleaned mod's objects.", SubjectKind.Object),
         [MeshReadingParts.MeshShapes] = new("reading mesh shapes", "Objects using the mesh are treated as having no mesh shape.", SubjectKind.Mesh),

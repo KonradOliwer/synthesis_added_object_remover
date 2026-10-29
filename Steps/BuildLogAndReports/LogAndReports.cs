@@ -7,6 +7,7 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
+using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
@@ -129,6 +130,20 @@ public sealed partial class LogAndReports
         return [WithStepTime(groups, LogSections.ObjectsToKeepStepName, elapsed), TakeUnexpectedErrors(found.CheckFailures)];
     }
 
+    /// <param name="oldPlaceWorld">The objects the old-place checks were made among; null when no check was made.</param>
+    /// <remarks>
+    /// A step that checked no old place prints nothing, not even an empty section. The checks' own cache failures land in the shared
+    /// channel, so they print here, under the step's line.
+    /// </remarks>
+    public ImmutableArray<LogSection> BuildStepSections(ChangedObjectJudgingResult judged, CollectedObjects world, CollectedObjects? oldPlaceWorld, TimeSpan elapsed) =>
+        judged.OldPlaceChecks.IsEmpty
+            ? []
+            :
+            [
+                LogSections.BuildOldPlaceChecksSection(world, judged, oldPlaceWorld, _settings.TargetAsTyped, elapsed, _context),
+                TakeUnexpectedErrors(judged.Failures),
+            ];
+
     public ImmutableArray<LogSection> BuildStepSections(FitResult found, TimeSpan elapsed) =>
         [LogSections.BuildFitSection(found, elapsed, _context), TakeUnexpectedErrors(found.Failures)];
 
@@ -139,7 +154,7 @@ public sealed partial class LogAndReports
         if (found.Outcome == StepOutcome.SwitchedOff) return [];
 
         var kept = RemovalList.KeptIn(decisions, decisions.Rounds[^1]);
-        var section = LogSections.BuildChangedTerrainSection(world, _settings.TargetAsTyped, found, kept, elapsed, _context);
+        var section = LogSections.BuildChangedTerrainSection(world, _settings.TargetAsTyped, found, decisions, kept, elapsed, _context);
         return BuildRoundSections(section, decisions, [decisions.Rounds[^1]], RoundKind.ChangedTerrain, found.Failures);
     }
 
@@ -309,7 +324,10 @@ public sealed partial class LogAndReports
         return new TooCloseSection(
             world,
             _settings.TargetAsTyped,
-            found,
+            [.. found.Passes.Where(pass => pass.Outcome == StepOutcome.Performed).Select(pass => new TooClosePassReport(
+                pass,
+                CountRemovedBeforeThisRound(pass, decisions),
+                RemovalList.CountRestored(decisions, pass.Hits.Select(hit => new TargetId(hit.TargetIndex)))))],
             census,
             [.. RemovalList.KeptIn(decisions, decisions.Rounds[^1])],
             meshes.Built,
@@ -319,21 +337,23 @@ public sealed partial class LogAndReports
             bodies.ListsResolved,
             _caches.CountBodyMeshSets(),
             _caches.CountEffectOnlyMeshes(),
-            elapsed,
-            CountRemovedBeforeThisRound(found, decisions));
+            elapsed);
     }
 
-    private static int CountRemovedBeforeThisRound(TooCloseResult found, IRemovalDecisions decisions)
+    private static int CountRemovedBeforeThisRound(TooClosePass found, IRemovalDecisions decisions)
     {
         var thisRound = decisions.Rounds[^1];
-        return found.Hits.Count(hit => decisions.Of(new TargetId(hit.TargetIndex)) is Decision.Removed { Round: var round } && round != thisRound);
+        return found.Hits
+            .Select(hit => new TargetId(hit.TargetIndex))
+            .Count(target => decisions.IsRemoved(target) && decisions.Of(target)!.Round != thisRound);
     }
 
     private RunOutcome BuildOutcome(StepResults decided, WriteSummary written)
     {
-        ImmutableArray<RemovedObject> removals = [.. RemovalList.Removals(written.Removed, decided.Final, decided.Collected, decided.VisibleLeftBehind, decided.LeftBehind)];
+        ImmutableArray<ObjectWithReason> removals = [.. RemovalList.WithReasons(written.Removed, decided.Final, decided.Collected, decided.VisibleLeftBehind, decided.LeftBehind)];
+        ImmutableArray<ObjectWithReason> restorations = [.. RemovalList.WithReasons(written.Restored, decided.Final, decided.Collected, decided.VisibleLeftBehind, decided.LeftBehind)];
         var hints = ManualPatchHints.FindManualPatchHints(decided, _caches.Shapes, removals);
-        return new RunOutcome(decided, removals, hints, written, _caches.CountBounds());
+        return new RunOutcome(decided, removals, restorations, hints, written, _caches.CountBounds());
     }
 
     /// <summary>
@@ -345,25 +365,30 @@ public sealed partial class LogAndReports
     {
         var world = outcome.Collected;
         var removals = outcome.Removals;
+        var restoredObjects = LogSections.BuildRestoredSection(world, outcome.Restorations, outcome.Final, _context);
+        var restoreSummary = LogSections.BuildRestoreSummarySection(
+            outcome.Restorations, outcome.Final, _settings.TargetAsTyped, outcome.ChangedTerrain.Outcome, outcome.VisibleLeftBehind.Outcome);
         var warnings = LogSections.BuildRemovalWarningsSection(world, removals, outcome.RemovalRisks);
         var kept = RemovalList.Kept(outcome.Final);
         var keptOnPurpose = LogSections.BuildKeptOnPurposeSection(world, kept);
         var keptSummary = LogSections.BuildKeptSummarySection(kept);
         var markersByType = LogSections.BuildMarkersByTypeSection(world.Targets, removals, _context);
         var hints = LogSections.BuildHintsSection(world, outcome.Hints);
-        var movedReplacements = LogSections.BuildMovedReplacementsSection(world, outcome.Final, _settings.TargetAsTyped, _context);
+        var changedObjects = LogSections.BuildChangedObjectsSection(world, outcome.Final, _settings.TargetAsTyped, _context);
         var ownShrunkOrTurned = LogSections.BuildOwnObjectsShrunkOrTurnedSection(world, outcome.Final, _settings.TargetAsTyped, _context);
         var leftWithoutSupport = LogSections.BuildLeftWithoutSupportSection(world, outcome.OtherModsObjects, _context);
-        var ownRemoved = outcome.Written.Removed.Count(id => !world[id].IsMovedReplacement);
+        var ownRemoved = TargetOrigins.CountOwn(outcome.Written.Removed.Select(id => world[id]));
         return
         [
-            LogSections.BuildRemovalsSection(world, removals, _context),
+            LogSections.BuildRemovalsSection(world, removals, outcome.Final, _context),
+            .. WhenItHasLines(restoredObjects),
             LogSections.BuildBoundsSection(outcome.Shapes, _caches.MeshFiles.CountTriangleFailures(), _context),
             LogSections.BuildSpacesSection(world, removals, _settings.TargetAsTyped, _context),
             LogSections.BuildTargetVisibilitySection(world.Targets, world.Counts.TargetsHiddenOrWithoutPlacement, _settings.TargetAsTyped, _context),
             LogSections.BuildRunSummarySection(world, _settings.TargetAsTyped, ownRemoved),
             LogSections.BuildRemovalSummarySection(world, removals, outcome.Final, _settings.TargetAsTyped, outcome.ChangedTerrain.Outcome, outcome.VisibleLeftBehind.Outcome),
-            .. WhenItHasLines(movedReplacements),
+            .. WhenItHasLines(restoreSummary),
+            .. WhenItHasLines(changedObjects),
             .. WhenItHasLines(ownShrunkOrTurned),
             .. WhenItHasLines(leftWithoutSupport),
             .. WhenItHasLines(keptSummary),

@@ -9,4 +9,8 @@ internal static class TestSceneViews
 
     public static IObjectsThatCanCauseRemovals ObjectsThatCanCauseRemovals(this IObjectCaches scene, Replacements replaced, NpcHandling npcs) =>
         new ObjectsThatCanCauseRemovals(scene.OtherModObjects, replaced, npcs);
+
+    /// <summary>What the select step hands on: a view for each NPC handling.</summary>
+    public static SelectedObjects Selected(this IObjectCaches scene, Replacements replaced, NpcHandling standardNpcs) =>
+        new(replaced, Enum.GetValues<NpcHandling>().ToDictionary(npcs => npcs, npcs => scene.ObjectsThatCanCauseRemovals(replaced, npcs)), standardNpcs);
 }

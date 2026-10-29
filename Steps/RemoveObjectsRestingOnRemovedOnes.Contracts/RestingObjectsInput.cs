@@ -5,7 +5,7 @@ using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 
-/// <param name="Targets">Where they stand: an object kept shrunk or turned at its new placement.</param>
+/// <param name="Targets">Where the rounds measure them: an object kept shrunk or turned at its new placement, a restored one where the cleaned mod put it.</param>
 /// <param name="EarlierRounds">The run's decisions with the removal rounds of the steps before this one, which the step never adds to; the objects they kept never take part in the touch rounds.</param>
 /// <param name="SeedRounds">The rounds of <paramref name="EarlierRounds"/> whose removals the step starts from, in round order.</param>
 /// <param name="TimeSinceStart">The run's clock, which measures the rounds.</param>

@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 
@@ -17,63 +16,81 @@ namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
 /// </summary>
 public static class ChangedTerrainObjects
 {
+    /// <summary>
+    /// Runs once for each distinct set of settings over the objects judged with it, and proposes the removals of all of them in target order.
+    /// </summary>
     /// <param name="loadOrder">Decides which of several changing plugins loads last.</param>
     /// <param name="records">Its terrain and water versions must have been read.</param>
-    /// <remarks>When the step is off it reads no terrain and the result is <see cref="StepOutcome.SwitchedOff"/>.</remarks>
+    /// <remarks>A pass whose step is off reads no terrain and is <see cref="StepOutcome.SwitchedOff"/>.</remarks>
     public static ChangedTerrainResult Find(
         CollectedObjects world,
-        ModTrustTable trust,
+        AcceptedWorld accepted,
         LoadOrderPlugins loadOrder,
         IPluginRecords records,
         IBaseObjectShapes shapes,
         Execution execution,
-        ChangedTerrainSettings settings)
-    {
-        if (!settings.On) return ChangedTerrainResult.SwitchedOff;
-
-        var check = CreateCheck(trust, loadOrder, records, shapes, settings);
-        var checks = ParallelMap.Run(
-            execution,
-            world.Order,
-            world.Targets.Length,
-            index => check.Check(world.Targets[index]),
-            ParallelMap.AutomaticRangeSize);
-        ImmutableArray<ObjectOnChangedTerrain> hits = [.. checks.Select(objectCheck => objectCheck.Hit).OfType<ObjectOnChangedTerrain>()];
-        return new ChangedTerrainResult(
-            StepOutcome.Performed,
-            hits,
-            [.. hits.Select(ProposalOf)],
-            FailuresOf(world.Targets, checks),
-            check.CellsCompared(),
-            checks.Count(objectCheck => objectCheck.WithoutTerrain));
-    }
+        IEnumerable<ObjectsJudgedWith<ChangedTerrainSettings>> groups) =>
+        new([.. JudgedGroups.MergeEqualSettings(groups).Select(group => FindPass(world, accepted, loadOrder, records, shapes, execution, group))]);
 
     /// <summary>The step's check of one target object at a given placement; it finds nothing when the step is off.</summary>
     /// <param name="loadOrder">Decides which of several changing plugins loads last.</param>
     /// <param name="records">Its terrain and water versions must have been read.</param>
     public static IPlacementRule CreatePlacementRule(
-        CollectedObjects world,
-        ModTrustTable trust,
+        AcceptedWorld accepted,
         LoadOrderPlugins loadOrder,
         IPluginRecords records,
         IBaseObjectShapes shapes,
         ChangedTerrainSettings settings) =>
-        new ChangedTerrainPlacementRule(world.Targets, settings.On ? CreateCheck(trust, loadOrder, records, shapes, settings) : null);
+        new ChangedTerrainPlacementRule(settings.On ? CreateCheck(accepted, loadOrder, records, shapes, settings) : null);
 
     /// <summary>How the step words a finding as the reason of a removal.</summary>
     internal static RemovalReason ReasonOf(ObjectOnChangedTerrain hit) => new RemovalReason.TerrainChanged(hit.ChangedBy, hit.Kind);
 
+    private static ChangedTerrainPass FindPass(
+        CollectedObjects world,
+        AcceptedWorld accepted,
+        LoadOrderPlugins loadOrder,
+        IPluginRecords records,
+        IBaseObjectShapes shapes,
+        Execution execution,
+        ObjectsJudgedWith<ChangedTerrainSettings> group)
+    {
+        if (!group.Settings.On) return ChangedTerrainPass.SwitchedOff(group.Objects);
+
+        var check = CreateCheck(accepted, loadOrder, records, shapes, group.Settings);
+        List<int> indexes = [.. group.Objects.Select(target => target.Index)];
+        var checks = ParallelMap.RunOver(
+            execution,
+            world.Order,
+            indexes,
+            static () => (object?)null,
+            (index, _) => check.Check(world.Targets[index]),
+            ParallelMap.AutomaticRangeSize);
+        ImmutableArray<ObjectOnChangedTerrain> hits = [.. checks.Select(objectCheck => objectCheck.Hit).OfType<ObjectOnChangedTerrain>()];
+        return new ChangedTerrainPass(
+            group.Objects,
+            StepOutcome.Performed,
+            hits,
+            [.. hits.Select(ProposalOf)],
+            FailuresOf(world.Targets, indexes, checks),
+            check.CellsCompared(),
+            checks.Count(objectCheck => objectCheck.WithoutTerrain));
+    }
+
     private static ObjectTerrainCheck CreateCheck(
-        ModTrustTable trust, LoadOrderPlugins loadOrder, IPluginRecords records, IBaseObjectShapes shapes, ChangedTerrainSettings settings) =>
-        new(records, shapes, new TerrainPlugins(trust, loadOrder), settings);
+        AcceptedWorld accepted, LoadOrderPlugins loadOrder, IPluginRecords records, IBaseObjectShapes shapes, ChangedTerrainSettings settings) =>
+        new(records, shapes, new TerrainPlugins(accepted, loadOrder), settings);
 
     private static ProposedRemoval ProposalOf(ObjectOnChangedTerrain hit) => new(hit.Target, ReasonOf(hit));
 
-    private static ImmutableArray<PartFailure> FailuresOf(ImmutableArray<TargetObject> targets, ObjectCheck[] checks) =>
+    /// <param name="indexes">The target index of each check.</param>
+    private static ImmutableArray<PartFailure> FailuresOf(ImmutableArray<TargetObject> targets, IReadOnlyList<int> indexes, ObjectCheck[] checks) =>
     [
-        .. targets
-            .Where(target => checks[target.Id.Index].Failure != null)
-            .Select(target => new PartFailure(
-                ChangedTerrainParts.TerrainCheck, checks[target.Id.Index].Failure, new FailureSubject(target.Key.ToString(), target.EditorId, target.Id.Index))),
+        .. Enumerable.Range(0, checks.Length)
+            .Where(position => checks[position].Failure != null)
+            .Select(position => FailureOf(targets[indexes[position]], checks[position].Failure)),
     ];
+
+    private static PartFailure FailureOf(TargetObject target, string? failure) =>
+        new(ChangedTerrainParts.TerrainCheck, failure, new FailureSubject(target.Key.ToString(), target.EditorId, target.Id.Index));
 }

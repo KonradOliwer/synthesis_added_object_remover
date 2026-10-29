@@ -28,7 +28,7 @@ internal static partial class Tables
         [
             .. LeftBehindObjectColumns(world.Targets[evaluation.TargetIndex], VisibleLeftBehindOutcomeText.KindNameOrEmpty(evaluation.Kind), world, bases),
             .. SectorColumns(evaluation.Surroundings),
-            Quote(evaluation.IsRemoved ? "removed" : "kept"),
+            Quote(VisibleLeftBehindOutcomeText.Verdict(evaluation)),
             Quote(VisibleLeftBehindOutcomeText.DescribeReason(evaluation)),
         ]);
 }

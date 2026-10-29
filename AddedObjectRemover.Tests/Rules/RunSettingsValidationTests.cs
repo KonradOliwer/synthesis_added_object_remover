@@ -34,6 +34,14 @@ public class RunSettingsValidationTests
     private static StandardSettings SettingsFor(string target = "Target.esp") =>
         new() { CleanedMod = ModKey.FromNameAndExtension(target) };
 
+    /// <summary>For the tests that ask what the standard settings alone read: the changed objects check no terrain and no old place.</summary>
+    private static StandardSettings WithoutChangedObjectsTerrainAndOldPlaces(StandardSettings settings)
+    {
+        settings.ChangedObjects.Collision.TerrainChange.RemoveOnChangedTerrain = false;
+        settings.ChangedObjects.Moved.WhenRemoved = RestoreMode.Remove;
+        return settings;
+    }
+
     private static RunRequest Build(StandardSettings settings, LoadOrderPlugins? facts = null, bool detailedLogAndReports = false, int workers = 3) =>
         SettingsValidator.Build(StandardConfig.Of(settings), new PluginNameParsingPlugin(), facts ?? Facts(), detailedLogAndReports, onlyWarnWhenRequiringModLoadsAfterPatch: false, ReportsFolder, workers);
 
@@ -48,7 +56,7 @@ public class RunSettingsValidationTests
     {
         var ready = BuildReady(SettingsFor());
 
-        Assert.Equal(new FitSettings(80, 360), ready.Settings.Fit);
+        Assert.Equal(new FitSettings(80, 360), ready.Settings.Collision.Fit);
         Assert.Empty(ready.Warnings);
     }
 
@@ -63,7 +71,7 @@ public class RunSettingsValidationTests
 
         var ready = BuildReady(settings);
 
-        Assert.Equal((shrink, turn), (ready.Settings.Fit.ShrinkLimitPercent, ready.Settings.Fit.TurnLimitDegrees));
+        Assert.Equal((shrink, turn), (ready.Settings.Collision.Fit.ShrinkLimitPercent, ready.Settings.Collision.Fit.TurnLimitDegrees));
         Assert.Empty(ready.Warnings);
     }
 
@@ -75,7 +83,7 @@ public class RunSettingsValidationTests
 
         var ready = BuildReady(settings);
 
-        Assert.Equal(new FitSettings(100, 0), ready.Settings.Fit);
+        Assert.Equal(new FitSettings(100, 0), ready.Settings.Collision.Fit);
         Assert.Empty(ready.Warnings);
     }
 
@@ -87,7 +95,7 @@ public class RunSettingsValidationTests
 
         var ready = BuildReady(settings);
 
-        Assert.Equal((1, 0), (ready.Settings.Fit.ShrinkLimitPercent, ready.Settings.Fit.TurnLimitDegrees));
+        Assert.Equal((1, 0), (ready.Settings.Collision.Fit.ShrinkLimitPercent, ready.Settings.Collision.Fit.TurnLimitDegrees));
         Assert.Equal(
             [
                 "Warning: Shrink or turn objects to make them fit > Shrink down to 0 is below 1; using 1.",
@@ -102,7 +110,7 @@ public class RunSettingsValidationTests
         Assert.Equal(10f, BuildReady(SettingsFor()).Settings.Read.MovedDistance);
 
         var settings = SettingsFor();
-        settings.MovedDistanceInUnits = 0f;
+        settings.ChangedObjects.Moved.MovedDistanceInUnits = 0f;
         var ready = BuildReady(settings);
 
         Assert.Equal(0f, ready.Settings.Read.MovedDistance);
@@ -110,12 +118,12 @@ public class RunSettingsValidationTests
     }
 
     [Theory]
-    [InlineData(-3f, "Warning: Check other mods' objects the cleaned mod moved farther than -3 is below 0; using 10.")]
-    [InlineData(float.NaN, "Warning: Check other mods' objects the cleaned mod moved farther than is not a valid number; using 10.")]
+    [InlineData(-3f, "Warning: Other mods' objects the cleaned mod changed > Moved objects > Count as moved when moved farther than -3 is below 0; using 10.")]
+    [InlineData(float.NaN, "Warning: Other mods' objects the cleaned mod changed > Moved objects > Count as moved when moved farther than is not a valid number; using 10.")]
     public void ANegativeDistanceThatCountsAsMovedIsReplacedByTheDefaultWithAWarning(float distance, string warning)
     {
         var settings = SettingsFor();
-        settings.MovedDistanceInUnits = distance;
+        settings.ChangedObjects.Moved.MovedDistanceInUnits = distance;
 
         var ready = BuildReady(settings);
 
@@ -174,7 +182,7 @@ public class RunSettingsValidationTests
 
         var ready = BuildReady(settings);
 
-        Assert.False(ready.Settings.TooClose.BySize || ready.Settings.TooClose.ByDistance);
+        Assert.False(ready.Settings.Collision.TooClose.BySize || ready.Settings.Collision.TooClose.ByDistance);
         Assert.Equal(
             "Warning: neither too-close margin is on; no object is removed for being too close.",
             Assert.Single(ready.Warnings).Message);
@@ -215,7 +223,7 @@ public class RunSettingsValidationTests
     public void WarningsComeInTheOrderSettingsAreCheckedWithEachInvalidValueReportedOnce()
     {
         var settings = SettingsFor();
-        settings.MovedDistanceInUnits = -5f;
+        settings.ChangedObjects.Moved.MovedDistanceInUnits = -5f;
         settings.Trust = new TrustSettings { MaxOtherMastersOfRequiringModToTrust = 500 };
         settings.TooClose.NpcHandling = (NpcHandling)99;
         settings.TooClose.BySize.SizeMultiplier = 9f;
@@ -241,7 +249,7 @@ public class RunSettingsValidationTests
         string[] expectedStarts =
         [
             "Warning: could not read Target.esp",
-            "Warning: Check other mods' objects the cleaned mod moved farther than",
+            "Warning: Other mods' objects the cleaned mod changed > Moved objects > Count as moved when moved farther than",
             "Warning: Which other mods can cause removals > ...only if it has at most this many other masters 500 is outside 0-100",
             "Warning: Remove objects too close to other mods' objects > Other mods' NPCs and creatures cause removal",
             "Warning: Remove objects too close to other mods' objects > Margin by object size > Margin on every side",
@@ -258,6 +266,26 @@ public class RunSettingsValidationTests
         {
             Assert.StartsWith(expectedStarts[i], messages[i]);
         }
+    }
+
+    [Fact]
+    public void TheCollisionWarningsComeInTheOrderTooCloseThenChangedTerrainThenFit()
+    {
+        var settings = SettingsFor();
+        settings.ShrinkOrTurn = new ShrinkOrTurnSettings { ShrinkLimitPercent = 0 };
+        settings.TerrainChange = new TerrainChangeSettings { TerrainCheckedObjects = (TerrainCheckedObjects)99 };
+        settings.TooClose.NpcHandling = (NpcHandling)99;
+
+        var messages = BuildReady(settings).Warnings.Select(warning => warning.Message).ToList();
+
+        string[] expectedStarts =
+        [
+            "Warning: Remove objects too close to other mods' objects > Other mods' NPCs and creatures cause removal",
+            "Warning: Remove objects on terrain changed by other mods > Which of the cleaned mod's objects are checked",
+            "Warning: Shrink or turn objects to make them fit > Shrink down to",
+        ];
+        Assert.Equal(expectedStarts.Length, messages.Count);
+        Assert.All(expectedStarts.Zip(messages), pair => Assert.StartsWith(pair.First, pair.Second));
     }
 
     [Theory]
@@ -457,7 +485,7 @@ public class RunSettingsValidationTests
         var ready = BuildReady(settings);
 
         Assert.Equal(Enum.Parse<NpcHandling>(handling), ready.Settings.Selection.Npcs);
-        Assert.Equal(ready.Settings.TooClose.Npcs, ready.Settings.Selection.Npcs);
+        Assert.Equal(ready.Settings.Collision.TooClose.Npcs, ready.Settings.Selection.Npcs);
     }
 
     [Fact]
@@ -469,13 +497,13 @@ public class RunSettingsValidationTests
         var ready = BuildReady(settings);
 
         Assert.Equal(SettingDefaults.Npcs, ready.Settings.Selection.Npcs);
-        Assert.Equal(SettingDefaults.Npcs, ready.Settings.TooClose.Npcs);
+        Assert.Equal(SettingDefaults.Npcs, ready.Settings.Collision.TooClose.Npcs);
     }
 
     [Fact]
     public void SurroundingsAreAlwaysReadAndNavmeshesOnlyForMarkerMoves()
     {
-        var relocating = SettingsFor();
+        var relocating = WithoutChangedObjectsTerrainAndOldPlaces(SettingsFor());
         relocating.TerrainChange.RemoveOnChangedTerrain = false;
         relocating.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.EverythingTouchingIt };
         relocating.LeftoverInvisibleObjects = new LeftoverInvisibleObjectSettings
@@ -484,14 +512,14 @@ public class RunSettingsValidationTests
             MoveKeptMarkersOutOfOtherModsObjects = true,
         };
         var runSettings = BuildReady(relocating).Settings;
-        Assert.Equal(new WhatToCollect(true, false, false, false, false, 10f), runSettings.Read);
+        Assert.Equal(new WhatToCollect(true, false, false, false, false, 10f, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false), runSettings.Read);
         Assert.NotNull(runSettings.MarkerMoves);
 
-        var neither = SettingsFor();
+        var neither = WithoutChangedObjectsTerrainAndOldPlaces(SettingsFor());
         neither.TerrainChange.RemoveOnChangedTerrain = false;
         neither.LeftoverInvisibleObjects.MoveKeptMarkersOutOfOtherModsObjects = false;
         neither.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.Nothing };
-        Assert.Equal(new WhatToCollect(false, false, false, false, false, 10f), BuildReady(neither).Settings.Read);
+        Assert.Equal(new WhatToCollect(false, false, false, false, false, 10f, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false), BuildReady(neither).Settings.Read);
     }
 
     [Fact]
@@ -534,7 +562,7 @@ public class RunSettingsValidationTests
     [InlineData(true, false, true, true)]
     public void WaterIsReadOnlyForTheChangedTerrainStepCountingAWaterChange(bool on, bool waterHeights, bool waterAddedOrRemoved, bool water)
     {
-        var settings = SettingsFor();
+        var settings = WithoutChangedObjectsTerrainAndOldPlaces(SettingsFor());
         settings.TerrainChange = new TerrainChangeSettings
         {
             RemoveOnChangedTerrain = on,
@@ -551,7 +579,7 @@ public class RunSettingsValidationTests
     [InlineData(true, true, true, true)]
     public void TerrainVersionsAreReadOnlyForTheChangedTerrainStepAndLayersOnlyForTerrainTypes(bool on, bool types, bool versions, bool layers)
     {
-        var settings = SettingsFor();
+        var settings = WithoutChangedObjectsTerrainAndOldPlaces(SettingsFor());
         settings.TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = on, CountTerrainTypeChanges = types };
 
         var read = BuildReady(settings).Settings.Read;
@@ -562,7 +590,7 @@ public class RunSettingsValidationTests
     [Fact]
     public void TheChangedTerrainSettingsAreOnByDefaultAndPassedThrough()
     {
-        var defaults = BuildReady(SettingsFor()).Settings.ChangedTerrain;
+        var defaults = BuildReady(SettingsFor()).Settings.Collision.ChangedTerrain;
         Assert.Equal(
             new ChangedTerrainSettings(
                 On: true, TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes, CountHeightChanges: true, HeightTolerance: 16f, CountTerrainTypeChanges: true,
@@ -592,13 +620,13 @@ public class RunSettingsValidationTests
             new ChangedTerrainSettings(
                 On: true, TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes, false, 0f, true, 50, false, 32f, false, 40,
                 AreaBySize: true, AreaMultiplier: 2f, AreaByDistance: true, AreaDistanceInUnits: 128f),
-            ready.Settings.ChangedTerrain);
+            ready.Settings.Collision.ChangedTerrain);
     }
 
     [Fact]
     public void ChangedTerrainWithNeitherTerrainMarginOnIsSwitchedOffWithAWarning()
     {
-        var settings = SettingsFor();
+        var settings = WithoutChangedObjectsTerrainAndOldPlaces(SettingsFor());
         settings.TerrainChange = new TerrainChangeSettings
         {
             RemoveOnChangedTerrain = true,
@@ -608,7 +636,7 @@ public class RunSettingsValidationTests
 
         var ready = BuildReady(settings);
 
-        Assert.False(ready.Settings.ChangedTerrain.On);
+        Assert.False(ready.Settings.Collision.ChangedTerrain.On);
         Assert.False(ready.Settings.Read.TerrainVersions);
         Assert.Equal(
             "Warning: changed terrain is on, but neither terrain margin is on; no object is removed for changed terrain.",
@@ -624,8 +652,8 @@ public class RunSettingsValidationTests
 
         var ready = BuildReady(settings);
 
-        Assert.Equal(5f, ready.Settings.ChangedTerrain.AreaMultiplier);
-        Assert.Equal(1024f, ready.Settings.ChangedTerrain.AreaDistanceInUnits);
+        Assert.Equal(5f, ready.Settings.Collision.ChangedTerrain.AreaMultiplier);
+        Assert.Equal(1024f, ready.Settings.Collision.ChangedTerrain.AreaDistanceInUnits);
         string[] expectedStarts =
         [
             "Warning: Remove objects on terrain changed by other mods > Margin by object size > Margin on every side 9",
@@ -646,7 +674,7 @@ public class RunSettingsValidationTests
 
         var ready = BuildReady(settings);
 
-        Assert.Equal(percent, ready.Settings.ChangedTerrain.MinTerrainTypeChangePercent);
+        Assert.Equal(percent, ready.Settings.Collision.ChangedTerrain.MinTerrainTypeChangePercent);
         Assert.Empty(ready.Warnings);
     }
 
@@ -660,7 +688,7 @@ public class RunSettingsValidationTests
 
         var ready = BuildReady(settings);
 
-        Assert.Equal(expected, ready.Settings.ChangedTerrain.MinTerrainTypeChangePercent);
+        Assert.Equal(expected, ready.Settings.Collision.ChangedTerrain.MinTerrainTypeChangePercent);
         Assert.StartsWith(expectedStart, Assert.Single(ready.Warnings).Message);
     }
 
@@ -672,7 +700,7 @@ public class RunSettingsValidationTests
         var settings = SettingsFor();
         settings.TooClose.UseRoughBoxes = useRoughBoxes;
 
-        Assert.Equal(expected, BuildReady(settings).Settings.TooClose.Zone);
+        Assert.Equal(expected, BuildReady(settings).Settings.Collision.TooClose.Zone);
     }
 
     [Fact]
@@ -695,7 +723,7 @@ public class RunSettingsValidationTests
     [Fact]
     public void ChangedTerrainCountingNoChangeIsSwitchedOffWithAWarning()
     {
-        var settings = SettingsFor();
+        var settings = WithoutChangedObjectsTerrainAndOldPlaces(SettingsFor());
         settings.TerrainChange = new TerrainChangeSettings
         {
             RemoveOnChangedTerrain = true,
@@ -707,7 +735,7 @@ public class RunSettingsValidationTests
 
         var ready = BuildReady(settings);
 
-        Assert.False(ready.Settings.ChangedTerrain.On);
+        Assert.False(ready.Settings.Collision.ChangedTerrain.On);
         Assert.False(ready.Settings.Read.TerrainVersions);
         Assert.Equal(
             "Warning: changed terrain is on, but no height, ground type or water changes are counted; no object is removed for changed terrain.",
@@ -731,7 +759,7 @@ public class RunSettingsValidationTests
 
         var ready = BuildReady(settings);
 
-        Assert.True(ready.Settings.ChangedTerrain.On);
+        Assert.True(ready.Settings.Collision.ChangedTerrain.On);
         Assert.True(ready.Settings.Read.TerrainVersions);
         Assert.Empty(ready.Warnings);
     }
@@ -745,7 +773,7 @@ public class RunSettingsValidationTests
 
         var ready = BuildReady(settings);
 
-        Assert.Equal((0f, 100), (ready.Settings.ChangedTerrain.WaterHeightTolerance, ready.Settings.ChangedTerrain.MinWaterCoverChangePercent));
+        Assert.Equal((0f, 100), (ready.Settings.Collision.ChangedTerrain.WaterHeightTolerance, ready.Settings.Collision.ChangedTerrain.MinWaterCoverChangePercent));
         string[] expectedStarts =
         [
             "Warning: Remove objects on terrain changed by other mods > Count only water height changes larger than -5",
@@ -774,7 +802,7 @@ public class RunSettingsValidationTests
             new ChangedTerrainSettings(
                 On: false, TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes, true, 256f, true, 20, true, 16f, true, 20,
                 AreaBySize: true, AreaMultiplier: 0.5f, AreaByDistance: true, AreaDistanceInUnits: 0f),
-            ready.Settings.ChangedTerrain);
+            ready.Settings.Collision.ChangedTerrain);
         string[] expectedStarts =
         [
             "Warning: Remove objects on terrain changed by other mods > Which of the cleaned mod's objects are checked",
@@ -971,4 +999,275 @@ public class RunSettingsValidationTests
         Assert.Equal(0.5f, SettingCorrections.Clamp(float.NaN, 0f, 5f, 0.5f, "test number", warnings));
         Assert.Equal("Warning: test number is not a valid number; using 0.5.", Assert.Single(warnings).Message);
     }
+
+    private const string ChangedCollisionGroup = "Warning: Other mods' objects the cleaned mod changed > Collision handling > ";
+
+    [Fact]
+    public void TheChangedObjectsDefaultToRestoringWhenTheOldPlaceIsFreeWithoutResizingAndWithoutProcessingReplacedObjects()
+    {
+        var ready = BuildReady(SettingsFor());
+
+        Assert.Equal(new ChangedObjectSettings(RestoreMode.RestoreIfNoCollision, RestoreMode.RestoreIfNoCollision), ready.Settings.ChangedObjects);
+        Assert.False(ready.Settings.Read.ProcessReplaced);
+        Assert.True(ready.Settings.Read.JudgeOldPlaces);
+        Assert.Equal(ready.Settings.Collision with { Fit = FitSettings.Off }, ready.Settings.ChangedObjectCollision.ForMoved());
+        Assert.Equal(ready.Settings.Collision with { Fit = FitSettings.Off }, ready.Settings.ChangedObjectCollision.ForReplaced());
+        Assert.Equal(ready.Settings.Collision, ready.Settings.ChangedObjectCollision.Section());
+        Assert.Empty(ready.Warnings);
+    }
+
+    [Fact]
+    public void TheChangedObjectsSettingsReachTheRun()
+    {
+        var settings = SettingsFor();
+        settings.ChangedObjects.Moved.WhenRemoved = RestoreMode.Restore;
+        settings.ChangedObjects.Replaced = new ReplacedObjectSettings { Process = true, WhenRemoved = RestoreMode.Remove };
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(new ChangedObjectSettings(RestoreMode.Restore, RestoreMode.Remove), ready.Settings.ChangedObjects);
+        Assert.True(ready.Settings.Read.ProcessReplaced);
+        Assert.Empty(ready.Warnings);
+    }
+
+    [Fact]
+    public void AnUndefinedWhenRemovedValueIsReplacedByTheDefaultWithAWarningNamingItsGroup()
+    {
+        var settings = SettingsFor();
+        settings.ChangedObjects.Moved.WhenRemoved = (RestoreMode)99;
+        settings.ChangedObjects.Replaced.WhenRemoved = (RestoreMode)98;
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(new ChangedObjectSettings(SettingDefaults.MovedObjectsWhenRemoved, SettingDefaults.ReplacedObjectsWhenRemoved), ready.Settings.ChangedObjects);
+        Assert.Equal(
+            [
+                "Warning: Other mods' objects the cleaned mod changed > Moved objects > When it would be removed 99 is invalid; using RestoreIfNoCollision.",
+                "Warning: Other mods' objects the cleaned mod changed > Replaced objects > When it would be removed 98 is invalid; using RestoreIfNoCollision.",
+            ],
+            ready.Warnings.Select(warning => warning.Message));
+    }
+
+    [Fact]
+    public void TheChangedObjectsCollisionIsValidatedLikeTheStandardOneUnderItsOwnGroupPathInScreenOrder()
+    {
+        var settings = SettingsFor();
+        settings.ChangedObjects.Collision.TooClose.NpcHandling = (NpcHandling)99;
+        settings.ChangedObjects.Collision.TooClose.BySize.SizeMultiplier = 9f;
+        settings.ChangedObjects.Collision.TerrainChange.TerrainCheckedObjects = (TerrainCheckedObjects)99;
+        settings.ChangedObjects.Collision.ShrinkLimitPercent = 0;
+        settings.ChangedObjects.Collision.TurnLimitDegrees = -10;
+        settings.ChangedObjects.Moved.MovedDistanceInUnits = -1f;
+        settings.ChangedObjects.Moved.WhenRemoved = (RestoreMode)99;
+        settings.Trust = new TrustSettings { MaxOtherMastersOfRequiringModToTrust = 500 };
+        settings.TooClose.NpcHandling = (NpcHandling)99;
+
+        var messages = BuildReady(settings).Warnings.Select(warning => warning.Message).ToList();
+
+        string[] expectedStarts =
+        [
+            "Warning: Other mods' objects the cleaned mod changed > Moved objects > Count as moved when moved farther than -1 is below 0",
+            "Warning: Other mods' objects the cleaned mod changed > Moved objects > When it would be removed 99 is invalid",
+            ChangedCollisionGroup + "Remove objects too close to other mods' objects > Other mods' NPCs and creatures cause removal 99 is invalid",
+            ChangedCollisionGroup + "Remove objects too close to other mods' objects > Margin by object size > Margin on every side 9 is outside 0-5; using 5.",
+            ChangedCollisionGroup + "Remove objects on terrain changed by other mods > Which of the cleaned mod's objects are checked 99 is invalid",
+            ChangedCollisionGroup + "Shrink down to 0 is below 1; using 1.",
+            ChangedCollisionGroup + "Turn by at most -10 is below 0; using 0.",
+            "Warning: Which other mods can cause removals > ...only if it has at most this many other masters 500 is outside 0-100",
+            "Warning: Remove objects too close to other mods' objects > Other mods' NPCs and creatures cause removal 99 is invalid",
+        ];
+        Assert.Equal(expectedStarts.Length, messages.Count);
+        for (var i = 0; i < expectedStarts.Length; i++)
+        {
+            Assert.StartsWith(expectedStarts[i], messages[i]);
+        }
+    }
+
+    [Fact]
+    public void TheChangedObjectsCollisionIsValidatedEvenWhenNoObjectIsProcessedWithIt()
+    {
+        var settings = SettingsFor();
+        settings.ChangedObjects.Moved.WhenRemoved = RestoreMode.Remove;
+        settings.ChangedObjects.Collision.TooClose.BySize.SizeMultiplier = 9f;
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(5f, ready.Settings.ChangedObjectCollision.TooClose.Multiplier);
+        Assert.Equal(SettingDefaults.SizeMultiplier, ready.Settings.Collision.TooClose.Multiplier);
+        Assert.StartsWith(ChangedCollisionGroup + "Remove objects too close to other mods' objects > Margin by object size", Assert.Single(ready.Warnings).Message);
+    }
+
+    [Fact]
+    public void TheChangedObjectsTooCloseWithNeitherMarginOnGivesAWarningNamingItsGroup()
+    {
+        var settings = SettingsFor();
+        settings.ChangedObjects.Collision.TooClose.BySize.Use = false;
+        settings.ChangedObjects.Collision.TooClose.ByDistance.Use = false;
+
+        var ready = BuildReady(settings);
+
+        Assert.False(ready.Settings.ChangedObjectCollision.TooClose.BySize || ready.Settings.ChangedObjectCollision.TooClose.ByDistance);
+        Assert.True(ready.Settings.Collision.TooClose.BySize);
+        Assert.Equal(
+            ChangedCollisionGroup + "neither too-close margin is on; no changed object is found too close, neither where the cleaned mod put it nor at its old place.",
+            Assert.Single(ready.Warnings).Message);
+    }
+
+    [Fact]
+    public void TheChangedObjectsTerrainIsSwitchedOffWithAWarningNamingItsGroupWhenItCountsNothing()
+    {
+        var settings = SettingsFor();
+        settings.ChangedObjects.Collision.TerrainChange = new TerrainChangeSettings
+        {
+            CountHeightChanges = false,
+            CountTerrainTypeChanges = false,
+            CountWaterHeightChanges = false,
+            CountWaterAddedOrRemoved = false,
+        };
+
+        var ready = BuildReady(settings);
+
+        Assert.False(ready.Settings.ChangedObjectCollision.ChangedTerrain.On);
+        Assert.True(ready.Settings.Collision.ChangedTerrain.On);
+        Assert.Equal(
+            ChangedCollisionGroup + "changed terrain is on, but no height, ground type or water changes are counted; "
+            + "no changed object is found on changed terrain, neither where the cleaned mod put it nor at its old place.",
+            Assert.Single(ready.Warnings).Message);
+    }
+
+    [Fact]
+    public void TheChangedObjectsTerrainIsSwitchedOffWithAWarningNamingItsGroupWhenNeitherMarginIsOn()
+    {
+        var settings = SettingsFor();
+        settings.ChangedObjects.Collision.TerrainChange.BySize.Use = false;
+        settings.ChangedObjects.Collision.TerrainChange.ByDistance.Use = false;
+
+        var ready = BuildReady(settings);
+
+        Assert.False(ready.Settings.ChangedObjectCollision.ChangedTerrain.On);
+        Assert.Equal(
+            ChangedCollisionGroup + "changed terrain is on, but neither terrain margin is on; "
+            + "no changed object is found on changed terrain, neither where the cleaned mod put it nor at its old place.",
+            Assert.Single(ready.Warnings).Message);
+    }
+
+    [Theory]
+    [InlineData(RestoreMode.RestoreIfNoCollision, RestoreMode.Remove, false, true)]
+    [InlineData(RestoreMode.RestoreIfNoCollision, RestoreMode.RestoreIfNoCollision, false, true)]
+    [InlineData(RestoreMode.Remove, RestoreMode.RestoreIfNoCollision, false, false)]
+    [InlineData(RestoreMode.Remove, RestoreMode.RestoreIfNoCollision, true, true)]
+    [InlineData(RestoreMode.Restore, RestoreMode.Restore, true, false)]
+    [InlineData(RestoreMode.Remove, RestoreMode.Remove, true, false)]
+    public void TheOldPlacesAreJudgedOnlyWhenAMovedObjectOrAProcessedReplacedObjectChecksThem(RestoreMode moved, RestoreMode replaced, bool process, bool judged)
+    {
+        var settings = SettingsFor();
+        settings.ChangedObjects.Moved.WhenRemoved = moved;
+        settings.ChangedObjects.Replaced = new ReplacedObjectSettings { Process = process, WhenRemoved = replaced };
+
+        var read = BuildReady(settings).Settings.Read;
+
+        Assert.Equal((process, judged), (read.ProcessReplaced, read.JudgeOldPlaces));
+    }
+
+    [Theory]
+    [InlineData(false, true, false, true, false, false, false)]
+    [InlineData(true, false, false, false, true, false, false)]
+    [InlineData(true, true, false, false, true, true, false)]
+    [InlineData(true, false, true, false, true, false, true)]
+    public void TheTerrainIsReadWhenOnlyTheChangedObjectsTerrainNeedsIt(
+        bool on, bool types, bool waterHeights, bool waterAddedOrRemoved, bool versions, bool layers, bool water)
+    {
+        var settings = SettingsFor();
+        settings.TerrainChange.RemoveOnChangedTerrain = false;
+        settings.ChangedObjects.Moved.WhenRemoved = RestoreMode.Remove;
+        settings.ChangedObjects.Collision.TerrainChange = new TerrainChangeSettings
+        {
+            RemoveOnChangedTerrain = on,
+            CountTerrainTypeChanges = types,
+            CountWaterHeightChanges = waterHeights,
+            CountWaterAddedOrRemoved = waterAddedOrRemoved,
+        };
+
+        var read = BuildReady(settings).Settings.Read;
+
+        Assert.Equal((versions, layers, water), (read.TerrainVersions, read.TerrainLayers, read.Water));
+    }
+
+    [Fact]
+    public void TheTerrainIsReadWhenOnlyTheStandardTerrainNeedsItAndWhenBothDo()
+    {
+        var settings = SettingsFor();
+        settings.ChangedObjects.Collision.TerrainChange.RemoveOnChangedTerrain = false;
+
+        Assert.Equal((true, true, true), TerrainReadsOf(settings));
+
+        settings.ChangedObjects.Collision.TerrainChange.RemoveOnChangedTerrain = true;
+
+        Assert.Equal((true, true, true), TerrainReadsOf(settings));
+    }
+
+    [Theory]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, false, false)]
+    public void TheTerrainReadsNeedAnOverrideOnlyWhenNothingButTheChangedObjectsTerrainAsksForThem(bool standard, bool changedObjects, bool needsAnOverride)
+    {
+        var settings = SettingsFor();
+        settings.TerrainChange.RemoveOnChangedTerrain = standard;
+        settings.ChangedObjects.Collision.TerrainChange.RemoveOnChangedTerrain = changedObjects;
+
+        Assert.Equal(needsAnOverride, BuildReady(settings).Settings.Read.TerrainForChangedObjectsOnly);
+    }
+
+    private static (bool Versions, bool Layers, bool Water) TerrainReadsOf(StandardSettings settings)
+    {
+        var read = BuildReady(settings).Settings.Read;
+        return (read.TerrainVersions, read.TerrainLayers, read.Water);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void AnObjectIsFittedOnlyWhenItsOwnOriginsResizingSwitchIsOn(bool resizeMoved, bool resizeReplaced)
+    {
+        var limits = new FitSettings(60, 90);
+        var settings = SettingsFor();
+        settings.ChangedObjects.Moved.AttemptResizingBeforeRemoval = resizeMoved;
+        settings.ChangedObjects.Replaced.AttemptResizingBeforeRemoval = resizeReplaced;
+        settings.ChangedObjects.Collision.ShrinkLimitPercent = limits.ShrinkLimitPercent;
+        settings.ChangedObjects.Collision.TurnLimitDegrees = limits.TurnLimitDegrees;
+
+        var ready = BuildReady(settings);
+
+        var collision = ready.Settings.ChangedObjectCollision;
+        Assert.Equal(resizeMoved ? limits : FitSettings.Off, collision.ForMoved().Fit);
+        Assert.Equal(resizeReplaced ? limits : FitSettings.Off, collision.ForReplaced().Fit);
+        Assert.Equal(limits, collision.Section().Fit);
+        Assert.Equal(new FitSettings(80, 360), ready.Settings.Collision.Fit);
+        Assert.Empty(ready.Warnings);
+    }
+
+    [Fact]
+    public void ThereIsOneCollisionGroupForEachOriginThatHasObjectsInTargetOrderAndNoEmptyGroup()
+    {
+        var settings = SettingsFor();
+        settings.ChangedObjects.Moved.AttemptResizingBeforeRemoval = true;
+        var run = BuildReady(settings).Settings;
+        TargetObject[] targets =
+        [
+            TargetOf(0, TargetOrigin.Replaced), TargetOf(1, TargetOrigin.CleanedMod), TargetOf(2, TargetOrigin.Replaced), TargetOf(3, TargetOrigin.CleanedMod),
+        ];
+
+        var groups = run.CollisionGroupsOf([.. targets]);
+
+        Assert.Equal([[1, 3], [0, 2]], groups.Select(group => group.Objects.Select(id => id.Index).ToArray()));
+        Assert.Equal([run.Collision, run.ChangedObjectCollision.ForReplaced()], groups.Select(group => group.Settings));
+        Assert.Empty(run.CollisionGroupsOf([]));
+        Assert.Equal(run.ChangedObjectCollision.ForMoved(), Assert.Single(run.CollisionGroupsOf([TargetOf(4, TargetOrigin.Moved)])).Settings);
+    }
+
+    private static TargetObject TargetOf(int index, TargetOrigin origin) => TestTargets.Create(index, TestTargets.At(default)) with { Origin = origin };
 }

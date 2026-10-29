@@ -1,3 +1,4 @@
+using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
@@ -26,6 +27,11 @@ public static class SettingDefaults
     public const bool CountWaterAddedOrRemoved = true;
     public const int MinWaterCoverChangePercent = 20;
     public const float MovedDistanceInUnits = 10f;
+    public const RestoreMode MovedObjectsWhenRemoved = RestoreMode.RestoreIfNoCollision;
+    public const bool ResizeMovedObjects = false;
+    public const bool ProcessReplacedObjects = false;
+    public const RestoreMode ReplacedObjectsWhenRemoved = RestoreMode.RestoreIfNoCollision;
+    public const bool ResizeReplacedObjects = false;
     public const bool ShrinkOrTurnObjects = true;
     public const int ShrinkLimitPercent = 80;
     public const int TurnLimitDegrees = 360;

@@ -119,21 +119,25 @@ public class ChangedTerrainObjectsTests
     private static TargetObject Placed(int index, BaseKey baseKey, Vector3? position = null, RecordKey? space = null) =>
         TestTargets.Create(index, TestTargets.At(position ?? Spot), baseKey, space ?? Worldspace);
 
-    private static ChangedTerrainResult Find(
+    private static ChangedTerrainPass Find(
         IReadOnlyDictionary<ExteriorCell, TerrainVersion[]> terrain, ChangedTerrainSettings settings, int threads = 1, params TargetObject[] targets) =>
         Find(new TerrainPlugin(terrain), settings, threads, targets);
 
-    private static ChangedTerrainResult Find(TerrainPlugin plugin, ChangedTerrainSettings settings, int threads = 1, params TargetObject[] targets) =>
-        ChangedTerrainObjects.Find(
-            TestScenes.CreateWorld(targets.Length == 0 ? [Placed(0, Rock)] : targets, []),
-            Mods,
-            LoadOrder,
-            plugin,
-            new BoxShapes(),
-            new Execution(threads),
-            settings);
+    private static ChangedTerrainPass Find(TerrainPlugin plugin, ChangedTerrainSettings settings, int threads = 1, params TargetObject[] targets)
+    {
+        var world = TestScenes.CreateWorld(targets.Length == 0 ? [Placed(0, Rock)] : targets, []);
+        return ChangedTerrainObjects.Find(
+                world,
+                Mods.AcceptedWorld,
+                LoadOrder,
+                plugin,
+                new BoxShapes(),
+                new Execution(threads),
+                [TestJudgedGroups.OfAll(world.Targets, settings)])
+            .Passes.Single();
+    }
 
-    private static ChangedTerrainResult FindInCell(params TerrainVersion[] versions) =>
+    private static ChangedTerrainPass FindInCell(params TerrainVersion[] versions) =>
         Find(new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = versions }, Settings());
 
     /// <param name="changedBy">Null for a change only the patch holds.</param>
@@ -143,12 +147,31 @@ public class ChangedTerrainObjectsTests
     [Fact]
     public void ASwitchedOffStepReadsNoTerrainAndProposesNothing()
     {
+        var world = TestScenes.CreateWorld([Placed(0, Rock)], []);
+
         var result = ChangedTerrainObjects.Find(
-            TestScenes.CreateWorld([Placed(0, Rock)], []), Mods, LoadOrder, new PluginNameParsingPlugin(), new BoxShapes(), new Execution(1),
-            Settings() with { On = false });
+            world, Mods.AcceptedWorld, LoadOrder, new PluginNameParsingPlugin(), new BoxShapes(), new Execution(1),
+            [TestJudgedGroups.OfAll(world.Targets, Settings() with { On = false })]);
 
         Assert.Equal(StepOutcome.SwitchedOff, result.Outcome);
         Assert.Empty(result.Proposals);
+    }
+
+    /// <summary>The same terrain: a change in one accepted world is the accepted value in another where its plugin is believed.</summary>
+    [Theory]
+    [InlineData(VersionTrust.None, true)]
+    [InlineData(VersionTrust.Full, false)]
+    public void TheSameTerrainChangesTheObjectOnlyWhenTheChangerIsNotAcceptedInTheWorld(VersionTrust otherTrust, bool removed)
+    {
+        var world = Mods.AcceptedWorld with { Plugins = Mods.AcceptedWorld.Plugins.SetItem(Other, otherTrust) };
+        var terrain = new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(Target), RaisedAt(Other, Near)] };
+
+        var collected = TestScenes.CreateWorld([Placed(0, Rock)], []);
+
+        var result = ChangedTerrainObjects.Find(
+            collected, world, LoadOrder, new TerrainPlugin(terrain), new BoxShapes(), new Execution(1), [TestJudgedGroups.OfAll(collected.Targets, Settings())]);
+
+        Assert.Equal(removed, result.Proposals.Any());
     }
 
     [Fact]
@@ -159,6 +182,66 @@ public class ChangedTerrainObjectsTests
         Assert.Equal(StepOutcome.Performed, result.Outcome);
         Assert.Equal([Removal(0, Other)], result.Proposals.AsEnumerable());
         Assert.Equal(1, result.CellsCompared);
+    }
+
+    /// <summary>Every object stands at <see cref="Spot"/>, over terrain that Other.esp raised by <see cref="Raised"/>.</summary>
+    private static ChangedTerrainResult FindGroups(int threads, params ObjectsJudgedWith<ChangedTerrainSettings>[] groups)
+    {
+        var plugin = new TerrainPlugin(new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(Target), RaisedAt(Other, Near)] });
+        var world = TestScenes.CreateWorld([Placed(0, Rock), Placed(1, Rock), Placed(2, Rock), Placed(3, Rock)], []);
+        return ChangedTerrainObjects.Find(world, Mods.AcceptedWorld, LoadOrder, plugin, new BoxShapes(), new Execution(threads), groups);
+    }
+
+    [Fact]
+    public void GroupsWithDifferentSettingsRunOnceEachOverTheirOwnObjects()
+    {
+        var result = FindGroups(
+            threads: 1,
+            TestJudgedGroups.Of([0, 2], Settings()),
+            TestJudgedGroups.Of([1], Settings(tolerance: Raised / 2)),
+            TestJudgedGroups.Of([3], Settings(tolerance: Raised)));
+
+        Assert.Equal(["0,2", "1", "3"], result.Passes.Select(pass => string.Join(",", pass.Objects.Select(target => target.Index))));
+        Assert.Equal(["0,2", "1", ""], result.Passes.Select(pass => string.Join(",", pass.Hits.Select(hit => hit.Target.Index))));
+        Assert.Equal([Removal(0, Other), Removal(1, Other), Removal(2, Other)], result.Proposals.AsEnumerable());
+        Assert.All(result.Passes, pass => Assert.Equal(1, pass.CellsCompared));
+    }
+
+    [Fact]
+    public void GroupsWithEqualSettingsAreMergedIntoOneRunOverAllTheirObjects()
+    {
+        var result = FindGroups(threads: 1, TestJudgedGroups.Of([2, 0], Settings()), TestJudgedGroups.Of([1], Settings()));
+
+        var pass = Assert.Single(result.Passes);
+        Assert.Equal([0, 1, 2], pass.Objects.Select(target => target.Index));
+        Assert.Equal([Removal(0, Other), Removal(1, Other), Removal(2, Other)], result.Proposals.AsEnumerable());
+        Assert.Equal(1, pass.CellsCompared);
+    }
+
+    [Fact]
+    public void AGroupWhoseStepIsOffReadsNothingWhileTheOthersRun()
+    {
+        var result = FindGroups(threads: 1, TestJudgedGroups.Of([0], Settings() with { On = false }), TestJudgedGroups.Of([1], Settings()));
+
+        Assert.Equal([StepOutcome.SwitchedOff, StepOutcome.Performed], result.Passes.Select(pass => pass.Outcome));
+        Assert.Equal(StepOutcome.Performed, result.Outcome);
+        Assert.Equal([Removal(1, Other)], result.Proposals.AsEnumerable());
+    }
+
+    [Fact]
+    public void TheGroupsFindTheSameWithOneThreadAndWithMany()
+    {
+        ObjectsJudgedWith<ChangedTerrainSettings>[] groups =
+        [
+            TestJudgedGroups.Of([0, 2], Settings()),
+            TestJudgedGroups.Of([1, 3], Settings(tolerance: Raised / 2)),
+        ];
+
+        var one = FindGroups(1, groups);
+        var many = FindGroups(4, groups);
+
+        Assert.Equal(one.Passes.Select(pass => pass.Hits.ToList()), many.Passes.Select(pass => pass.Hits.ToList()));
+        Assert.Equal(one.Proposals.AsEnumerable(), many.Proposals.AsEnumerable());
     }
 
     [Fact]
@@ -358,7 +441,7 @@ public class ChangedTerrainObjectsTests
     public void TheAcceptedHeightsTakeEachVertexFromItsOwnAcceptedVersion()
     {
         var comparison = new CellTerrainComparison(
-            new TerrainPlugins(Mods, LoadOrder), new TerrainTypes(new TerrainPlugin(new Dictionary<ExteriorCell, TerrainVersion[]>())), Settings());
+            new TerrainPlugins(Mods.AcceptedWorld, LoadOrder), new TerrainTypes(new TerrainPlugin(new Dictionary<ExteriorCell, TerrainVersion[]>())), Settings());
 
         var terrain = comparison.Compare([Flat(Target), RaisedAt(Other, Near), OwnChangesRaisingBeside]);
 
@@ -824,7 +907,7 @@ public class ChangedTerrainObjectsTests
     /// <summary>The worldspace copies of a test that gives none: only the base game's.</summary>
     private static readonly WorldspaceWaterCopy[] BaseGameWorldspace = [Default(BaseGame, BelowTheGround)];
 
-    private static ChangedTerrainResult FindWithWater(
+    private static ChangedTerrainPass FindWithWater(
         TerrainVersion[] terrain,
         CellWaterCopy[] water,
         ChangedTerrainSettings? settings = null,

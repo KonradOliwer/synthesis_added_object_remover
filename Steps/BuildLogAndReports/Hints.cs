@@ -25,10 +25,10 @@ internal sealed class ManualPatchHints(
         InvisibleObjectKind.FurnitureMarkers,
     ];
 
-    public static ImmutableArray<ManualPatchHint> FindManualPatchHints(StepResults decided, IBaseObjectShapes shapes, IEnumerable<RemovedObject> removals) =>
+    public static ImmutableArray<ManualPatchHint> FindManualPatchHints(StepResults decided, IBaseObjectShapes shapes, IEnumerable<ObjectWithReason> removals) =>
         [.. new ManualPatchHints(decided.Collected.Targets, shapes, decided.ObjectsToKeep).Collect(removals, RemovalList.Kept(decided.Final))];
 
-    public List<ManualPatchHint> Collect(IEnumerable<RemovedObject> removals, IEnumerable<KeptObject> kept)
+    public List<ManualPatchHint> Collect(IEnumerable<ObjectWithReason> removals, IEnumerable<KeptObject> kept)
     {
         var keptIndices = kept.Select(entry => entry.TargetIndex).Distinct().ToList();
         return CollectRemovedMarkers(removals)
@@ -41,7 +41,7 @@ internal sealed class ManualPatchHints(
             .ToList();
     }
 
-    private IEnumerable<ManualPatchHint> CollectRemovedMarkers(IEnumerable<RemovedObject> removals) =>
+    private IEnumerable<ManualPatchHint> CollectRemovedMarkers(IEnumerable<ObjectWithReason> removals) =>
         from removal in removals
         let kind = shapes.VisibilityOf(targets[removal.TargetIndex]).Kind
         where kind is { } markerKind && UsedMarkerKinds.Contains(markerKind)

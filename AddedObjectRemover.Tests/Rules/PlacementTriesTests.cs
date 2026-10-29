@@ -28,7 +28,7 @@ public class PlacementTriesTests
 
     [Fact]
     public void ADifferentKindOfObjectIsTriedTheSame() =>
-        Assert.Equal(Tries(new FitSettings(90, 0), Own), Tries(new FitSettings(90, 0), Own with { IsMovedReplacement = true }));
+        Assert.Equal(Tries(new FitSettings(90, 0), Own), Tries(new FitSettings(90, 0), Own with { Origin = TargetOrigin.Moved }));
 
     [Fact]
     public void TheShrinkLimitItselfIsTheLastSize() =>

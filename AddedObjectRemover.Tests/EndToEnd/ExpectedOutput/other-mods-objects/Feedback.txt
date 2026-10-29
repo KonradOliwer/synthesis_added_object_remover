@@ -1,7 +1,9 @@
 ## log
 === Added Object Remover ===
 Mod to clean up: Target.esp
-Check other mods' objects the cleaned mod moved farther than: 10 units.
+Other mods' objects Target.esp changed: moved farther than 10 units: RestoreIfNoCollision, no resizing; replaced: not processed.
+  Collision handling: Remove objects too close to other mods' objects: Margin by object size: on, 0.5 x object size; Margin by fixed distance: on, 50 units; Use rough boxes instead of exact shapes (faster): off; Other mods' NPCs and creatures cause removal: OnlyWhenStuckInsideTheObjectWithCollision.
+  Collision handling: Remove objects on terrain changed by other mods: on; Which of the cleaned mod's objects are checked: AllObjectsIncludingInvisibleOnes; Margin by object size: on, 0.5 x object size; Margin by fixed distance: on, 64 units; Count height changes: on, ignoring changes up to 16 units; Count ground type changes: on, remove only when this share of the ground points changed type: 20%; Count water height changes: on, ignoring changes up to 16 units; Count water added/removed changes: on; remove only when this share of the ground got covered/uncovered: 20%.
 Plugin list read from <root>/Output/Plugins.txt: 5 listings.
 Which other mods can cause removals: Trusted mods, and their masters: Trusted.esp; Mods trusted for their own changes only: (none); Never trusted mods: Untrusted.esp; Also trust mods that require the cleaned mod, and their masters: off; Trust mods loading before the cleaned mod: off.
 Trusted, base game: Skyrim.esm
@@ -42,7 +44,7 @@ Wrote 4 overrides (2 removed; other mods' objects: 2 pulled down) in <time>.
   Removed T_Crate [000801:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to U_Cause [000801:Untrusted.esp], changed by Untrusted.esp (new object)
   Removed T_Pad [000803:Target.esp] (base T_PadBase [000802:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; 63 % of its support was removed or pulled down (mostly 000801:Trusted.esp, another mod's object left without support)
 Bounds: 5 bases from NIF, 0 NIF misses, 0 from OBND, 0 without bounds. Meshes: 3 read, 0 effect-only, 0 failed (3 loose, 0 from 0 archives), 0 with a footer root other than their first node.
-Per cell/worldspace (objects of Target.esp / other objects / removed):
+Per cell/worldspace (objects of Target.esp / other objects / Target.esp objects removed):
   interior AorInterior [000800:Skyrim.esm]: 2 / 1 / 2
 Target.esp objects: 2 visible, 0 invisible (by kind: none), 0 deleted, start disabled, or without a valid position or rotation.
 Objects of Target.esp: 2; already removed by earlier patchers in this group: 0; not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 0; judged in this run: 2; removed in this run: 2.
@@ -66,12 +68,12 @@ Removed markers and kept objects: wrote 0 rows to <root>/Output/Reports/removed-
 000802:Trusted.esp in 000800:Skyrim.esm (temporary): disabled False, position (0.00, 0.00, 20.00), rotation (0.00, 0.00, 0.00), enable parent none
 000803:Target.esp in 000800:Skyrim.esm (temporary): disabled True, position (0.00, 0.00, -30000.00), rotation (0.00, 0.00, 0.00), enable parent none
 ## report anchoring.csv
-iteration,formKey,editorId,base,modelPath,space,contactPoints,totalWeight,removedCleanedModShare,keptCleanedModShare,otherModShare,terrainShare,threshold,decision,topSupporters
+iteration,formKey,editorId,base,modelPath,space,contactPoints,totalWeight,removedCleanedModShare,restoredShare,keptCleanedModShare,otherModShare,terrainShare,threshold,decision,topSupporters
 ## report leftover-invisible-objects.csv
-formKey,editorId,base,baseType,invisibleType,space,cell,x,y,z,radius,insideObject,insideObjectPlugin,EastTotal,EastRemoved,EastState,NorthEastTotal,NorthEastRemoved,NorthEastState,NorthTotal,NorthRemoved,NorthState,NorthWestTotal,NorthWestRemoved,NorthWestState,WestTotal,WestRemoved,WestState,SouthWestTotal,SouthWestRemoved,SouthWestState,SouthTotal,SouthRemoved,SouthState,SouthEastTotal,SouthEastRemoved,SouthEastState,occupiedDirections,removedDirections,decision,reason,movedToX,movedToY,movedToZ,moveDistance,movedOnto
+formKey,editorId,base,baseType,invisibleType,space,cell,x,y,z,radius,insideObject,insideObjectPlugin,EastTotal,EastRemoved,EastState,NorthEastTotal,NorthEastRemoved,NorthEastState,NorthTotal,NorthRemoved,NorthState,NorthWestTotal,NorthWestRemoved,NorthWestState,WestTotal,WestRemoved,WestState,SouthWestTotal,SouthWestRemoved,SouthWestState,SouthTotal,SouthRemoved,SouthState,SouthEastTotal,SouthEastRemoved,SouthEastState,occupiedDirections,removedDirections,EastRestored,NorthEastRestored,NorthRestored,NorthWestRestored,WestRestored,SouthWestRestored,SouthRestored,SouthEastRestored,restoredDirections,decision,reason,movedToX,movedToY,movedToZ,moveDistance,movedOnto
 ## report leftover-visible-objects.csv
-formKey,editorId,base,baseType,visibleType,space,cell,x,y,z,EastTotal,EastRemoved,EastState,NorthEastTotal,NorthEastRemoved,NorthEastState,NorthTotal,NorthRemoved,NorthState,NorthWestTotal,NorthWestRemoved,NorthWestState,WestTotal,WestRemoved,WestState,SouthWestTotal,SouthWestRemoved,SouthWestState,SouthTotal,SouthRemoved,SouthState,SouthEastTotal,SouthEastRemoved,SouthEastState,occupiedDirections,removedDirections,decision,reason
-000803:Target.esp,T_Pad,T_PadBase [000802:Target.esp],Static,,interior AorInterior [000800:Skyrim.esm],,0,0,120,10000,10000,Removed,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,1,1,kept,too few surrounding objects
+formKey,editorId,base,baseType,visibleType,space,cell,x,y,z,EastTotal,EastRemoved,EastState,NorthEastTotal,NorthEastRemoved,NorthEastState,NorthTotal,NorthRemoved,NorthState,NorthWestTotal,NorthWestRemoved,NorthWestState,WestTotal,WestRemoved,WestState,SouthWestTotal,SouthWestRemoved,SouthWestState,SouthTotal,SouthRemoved,SouthState,SouthEastTotal,SouthEastRemoved,SouthEastState,occupiedDirections,removedDirections,EastRestored,NorthEastRestored,NorthRestored,NorthWestRestored,WestRestored,SouthWestRestored,SouthRestored,SouthEastRestored,restoredDirections,decision,reason
+000803:Target.esp,T_Pad,T_PadBase [000802:Target.esp],Static,,interior AorInterior [000800:Skyrim.esm],,0,0,120,10000,10000,Removed,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,0,0,Empty,1,1,0,0,0,0,0,0,0,0,0,kept,too few surrounding objects
 ## report mesh-origins.csv
 modelPath,baseEditorIds,referenceCount,localMinX,localMinY,localMinZ,localMaxX,localMaxY,localMaxZ,originFractionX,originFractionY,originFractionZ,classification
 meshes\aor\crate.nif,T_CrateBase,1,-50,-50,0,50,50,100,0.5,0.5,-0,origin near bottom

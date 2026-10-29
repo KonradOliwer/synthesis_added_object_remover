@@ -1,3 +1,4 @@
+using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 
 namespace AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
@@ -12,7 +13,12 @@ public readonly record struct Round(int Number, RoundKind Kind);
 /// <param name="Reason">Why a step proposed to remove it; for a fitted object, why it did not fit where it stood.</param>
 public abstract record Decision(Round Round, RemovalReason Reason)
 {
+    /// <summary>The object is disabled in the patch, so it stands nowhere.</summary>
     public sealed record Removed(Round Round, RemovalReason Reason) : Decision(Round, Reason);
+
+    /// <summary>The object is gone from where the cleaned mod put it and goes back to its earlier version, where it stands.</summary>
+    /// <param name="EarlierVersion">The version it goes back to.</param>
+    public sealed record Restored(Round Round, RemovalReason Reason, EarlierVersion EarlierVersion) : Decision(Round, Reason);
 
     /// <summary>A step proposed to remove the object, but it is kept.</summary>
     public sealed record Kept(Round Round, RemovalReason Reason, KeepReason KeepReason) : Decision(Round, Reason);

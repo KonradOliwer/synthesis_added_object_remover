@@ -12,7 +12,7 @@ namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 /// support also counts enclosed samples, so an object buried inside a removed one must become a
 /// candidate although no surfaces come close. Each candidate's support is split among its
 /// supporters by weighted contact points (<see cref="SupportContactFinder"/>), and its removal is
-/// proposed when the share held by removed target objects reaches the threshold. Protected
+/// proposed when the share held by target objects that left their place, removed or restored, reaches the threshold. Protected
 /// candidates are judged like any other, so the decisions hold only those that would really lose
 /// their support; kept objects keep supporting others. Every candidate of a round is
 /// judged against the removals of earlier rounds only, so the result does not depend on order.
@@ -87,18 +87,25 @@ internal sealed class SupportRule(
             .ThenBy(share => share.Supporter.Index)
             .ToList();
         var evaluation = new SupportEvaluation(candidate, contacts, shares, Proposed: false);
-        return evaluation with { Proposed = ReachesThreshold(evaluation.RemovedShare, threshold) };
+        return evaluation with { Proposed = ReachesThreshold(evaluation.LeftItsPlaceShare, threshold) };
     }
 
     private static SupportCategory Categorize(IRemovalDecisions decisions, Supporter supporter) => supporter.Type switch
     {
-        SupporterType.Target => decisions.IsRemoved(new TargetId(supporter.Index)) ? SupportCategory.RemovedTarget : SupportCategory.KeptTarget,
+        SupporterType.Target => CategorizeTarget(decisions, new TargetId(supporter.Index)),
         SupporterType.PlacedObject => SupportCategory.OtherMod,
         SupporterType.Terrain => SupportCategory.Terrain,
         _ => throw new UnreachableException($"Unknown supporter type {supporter.Type}."),
     };
 
+    private static SupportCategory CategorizeTarget(IRemovalDecisions decisions, TargetId target) => NeighbourFates.Of(decisions, target) switch
+    {
+        BoxFate.Removed => SupportCategory.RemovedTarget,
+        BoxFate.Restored => SupportCategory.RestoredTarget,
+        _ => SupportCategory.KeptTarget,
+    };
+
     private static ProposedRemoval ToProposal(SupportEvaluation evaluation) => new(
         new TargetId(evaluation.TargetIndex),
-        new RemovalReason.LostSupport(evaluation.RemovedShare, new TargetId(evaluation.MainRemovedSupporter)));
+        new RemovalReason.LostSupport(evaluation.LeftItsPlaceShare, evaluation.RestoredShare, new TargetId(evaluation.MainLeftItsPlaceSupporter)));
 }

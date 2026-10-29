@@ -73,7 +73,8 @@ public class ClashingObjectFitterTests
     {
         var targets = Scene(replacementBase: Invisible);
 
-        var result = ClashingObjectFitter.Fit(targets, Unprotected(targets), Rules(Rule(placement => placement.Scale < 1f)), Shapes, TargetWorkOrder.Of(targets), new Execution(1), Defaults);
+        var result = ClashingObjectFitter.Fit(
+            targets, Unprotected(targets), OneGroup(targets, Defaults, Rule(placement => placement.Scale < 1f)), NothingRestsOnAnything(), Shapes, TargetWorkOrder.Of(targets), new Execution(1));
 
         Assert.Equal((1, new TargetId(0)), (result.Tried, Assert.Single(result.Fits).Target));
     }
@@ -89,7 +90,7 @@ public class ClashingObjectFitterTests
         Assert.Equal(0, FitWith(targets, linkedReplacement).Tried);
 
         FitResult FitWith(ImmutableArray<TargetObject> scene, IObjectsToKeep objectsToKeep) =>
-            ClashingObjectFitter.Fit(scene, objectsToKeep, Rules(Rule(_ => false)), Shapes, TargetWorkOrder.Of(scene), new Execution(1), Defaults);
+            ClashingObjectFitter.Fit(scene, objectsToKeep, OneGroup(scene, Defaults, Rule(_ => false)), NothingRestsOnAnything(), Shapes, TargetWorkOrder.Of(scene), new Execution(1));
     }
 
     [Fact]
@@ -119,7 +120,7 @@ public class ClashingObjectFitterTests
         var resting = new ScriptedResting(_ => [new TargetId(1)]);
 
         var result = ClashingObjectFitter.Fit(
-            targets, Unprotected(targets), new FitRules(Rule(placement => placement.Scale <= 0.9f), NoClash, resting), Shapes, TargetWorkOrder.Of(targets), new Execution(1), Defaults);
+            targets, Unprotected(targets), OneGroup(targets, Defaults, Rule(placement => placement.Scale <= 0.9f)), resting, Shapes, TargetWorkOrder.Of(targets), new Execution(1));
 
         Assert.Equal((2, 1, 1), (result.Clashing, result.RestedOn, result.Tried));
         Assert.Equal(new TargetId(0), Assert.Single(result.Fits).Target);
@@ -133,7 +134,7 @@ public class ClashingObjectFitterTests
         var failing = new ScriptedResting(_ => throw new InvalidOperationException("broken"));
 
         var result = ClashingObjectFitter.Fit(
-            targets, Unprotected(targets), new FitRules(Rule(placement => placement.Scale <= 0.9f), NoClash, failing), Shapes, TargetWorkOrder.Of(targets), new Execution(1), Defaults);
+            targets, Unprotected(targets), OneGroup(targets, Defaults, Rule(placement => placement.Scale <= 0.9f)), failing, Shapes, TargetWorkOrder.Of(targets), new Execution(1));
 
         Assert.Equal((2, 0, 0, 0), (result.Clashing, result.RestedOn, result.Tried, result.Fits.Length));
         Assert.Equal(FitParts.RestingCheck, Assert.Single(result.Failures).Part);
@@ -168,18 +169,56 @@ public class ClashingObjectFitterTests
     }
 
     [Fact]
+    public void EachGroupIsTriedWithItsOwnSettingsAndRules()
+    {
+        var targets = Scene();
+        FitGroup[] groups =
+        [
+            new(TestJudgedGroups.Of([0], Defaults), Rule(placement => placement.Scale <= 0.9f), NoClash),
+            new(TestJudgedGroups.Of([1], new FitSettings(40, 360)), Rule(placement => placement.Scale <= 0.6f), NoClash),
+        ];
+
+        var result = ClashingObjectFitter.Fit(targets, Unprotected(targets), groups, NothingRestsOnAnything(), Shapes, TargetWorkOrder.Of(targets), new Execution(1));
+
+        Assert.Equal([(0, 0.9f), (1, 0.6f)], result.Fits.Select(fit => (fit.Target.Index, fit.To.Scale)));
+    }
+
+    [Fact]
+    public void AGroupLeavesTheObjectsOfOtherGroupsAlone()
+    {
+        var targets = Scene();
+        FitGroup[] groups = [new(TestJudgedGroups.Of([1], Defaults), Rule(placement => placement.Scale <= 0.9f), NoClash)];
+
+        var result = ClashingObjectFitter.Fit(targets, Unprotected(targets), groups, NothingRestsOnAnything(), Shapes, TargetWorkOrder.Of(targets), new Execution(1));
+
+        Assert.Equal(new TargetId(1), Assert.Single(result.Fits).Target);
+    }
+
+    [Fact]
+    public void AnObjectInTwoGroupsIsRefused()
+    {
+        var targets = Scene();
+        FitGroup[] groups =
+        [
+            new(TestJudgedGroups.Of([0, 1], Defaults), Rule(placement => placement.Scale <= 0.9f), NoClash),
+            new(TestJudgedGroups.Of([1], new FitSettings(40, 360)), Rule(placement => placement.Scale <= 0.6f), NoClash),
+        ];
+
+        Assert.Throws<System.Diagnostics.UnreachableException>(
+            () => ClashingObjectFitter.Fit(targets, Unprotected(targets), groups, NothingRestsOnAnything(), Shapes, TargetWorkOrder.Of(targets), new Execution(1)));
+    }
+
+    [Fact]
     public void TheFitsDoNotDependOnTheThreadCount()
     {
         var targets = Enumerable.Range(0, 40)
-            .Select(index => TestTargets.Create(index, TestTargets.At(new Vector3(index * 10, 0, 0)), Visible, TestTargets.Space) with { IsMovedReplacement = index % 2 == 0 })
+            .Select(index => TestTargets.Create(index, TestTargets.At(new Vector3(index * 10, 0, 0)), Visible, TestTargets.Space) with { Origin = index % 2 == 0 ? TargetOrigin.Moved : TargetOrigin.CleanedMod })
             .ToImmutableArray();
-        var rules = new FitRules(
-            Rule(placement => placement.Scale < 1f + placement.Position.X / 1000f - 0.15f),
-            NoClash,
-            new ScriptedResting(asked => [.. asked.Where(target => target.Index % 7 == 0)]));
+        var groups = OneGroup(targets, Defaults, Rule(placement => placement.Scale < 1f + placement.Position.X / 1000f - 0.15f));
+        var resting = new ScriptedResting(asked => [.. asked.Where(target => target.Index % 7 == 0)]);
 
-        var one = ClashingObjectFitter.Fit(targets, Unprotected(targets), rules, Shapes, TargetWorkOrder.Of(targets), new Execution(1), Defaults);
-        var eight = ClashingObjectFitter.Fit(targets, Unprotected(targets), rules, Shapes, TargetWorkOrder.Of(targets), new Execution(8), Defaults);
+        var one = ClashingObjectFitter.Fit(targets, Unprotected(targets), groups, resting, Shapes, TargetWorkOrder.Of(targets), new Execution(1));
+        var eight = ClashingObjectFitter.Fit(targets, Unprotected(targets), groups, resting, Shapes, TargetWorkOrder.Of(targets), new Execution(8));
 
         Assert.Equal(Describe(one), Describe(eight));
 
@@ -196,17 +235,19 @@ public class ClashingObjectFitterTests
         var objectsToKeep = onlyTarget is { } tried
             ? ObjectsToKeep.Build(targets, [], TestTargets.References(2, new Dictionary<int, KeepReason> { [1 - tried] = TestKeepReasons.Quest }), TestBaseFacts.Unresolved)
             : Unprotected(targets);
-        return ClashingObjectFitter.Fit(targets, objectsToKeep, Rules(fittable, unfittable), Shapes, TargetWorkOrder.Of(targets), new Execution(1), settings);
+        return ClashingObjectFitter.Fit(
+            targets, objectsToKeep, OneGroup(targets, settings, fittable, unfittable), NothingRestsOnAnything(), Shapes, TargetWorkOrder.Of(targets), new Execution(1));
     }
 
-    /// <summary>Nothing rests on any object.</summary>
-    private static FitRules Rules(IPlacementRule fittable, IPlacementRule? unfittable = null) =>
-        new(fittable, unfittable ?? NoClash, new ScriptedResting(_ => []));
+    private static ImmutableArray<FitGroup> OneGroup(ImmutableArray<TargetObject> targets, FitSettings settings, IPlacementRule fittable, IPlacementRule? unfittable = null) =>
+        [new FitGroup(TestJudgedGroups.OfAll(targets, settings), fittable, unfittable ?? NoClash)];
+
+    private static ScriptedResting NothingRestsOnAnything() => new(_ => []);
 
     private static ImmutableArray<TargetObject> Scene(BaseKey? replacementBase = null) =>
     [
         TestTargets.Create(0, TestTargets.At(Vector3.Zero), Visible, TestTargets.Space),
-        TestTargets.Create(1, TestTargets.At(Moved), replacementBase ?? Visible, TestTargets.Space) with { IsMovedReplacement = true },
+        TestTargets.Create(1, TestTargets.At(Moved), replacementBase ?? Visible, TestTargets.Space) with { Origin = TargetOrigin.Moved },
     ];
 
     private static IObjectsToKeep Unprotected(ImmutableArray<TargetObject> targets) =>
@@ -217,7 +258,7 @@ public class ClashingObjectFitterTests
 
     private sealed class ScriptedRule(Func<EulerPlacement, PlacementCheck> check) : IPlacementRule
     {
-        public IPlacementTries StartTries(TargetId target) => new ScriptedTries(check);
+        public IPlacementTries StartTries(TargetObject target) => new ScriptedTries(check);
     }
 
     private sealed class ScriptedTries(Func<EulerPlacement, PlacementCheck> check) : IPlacementTries
@@ -238,7 +279,7 @@ public class ClashingObjectFitterTests
 
         public int MostOpen { get; private set; }
 
-        public IPlacementTries StartTries(TargetId target)
+        public IPlacementTries StartTries(TargetObject target)
         {
             Started++;
             Open++;

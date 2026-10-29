@@ -42,18 +42,20 @@ internal sealed record OtherModsObjectsContext(
 
 /// <summary>The target objects as the also-remove step left them.</summary>
 /// <param name="Targets">Where they stood before any decision.</param>
-/// <param name="AsTheyStand">Each target object shrunk or turned at its new placement, also one removed later, as the rounds measured it.</param>
+/// <param name="AsMeasured">Each target object shrunk or turned at its new placement, also one removed later, as the rounds measured it.</param>
 /// <param name="Decided">The decisions of every removal round so far.</param>
 /// <param name="ObjectsToKeep">The protection the also-remove rounds keep to.</param>
 /// <param name="Visible">The index of <paramref name="Targets"/>.</param>
-/// <param name="VisibleAsTheyStand">The index of <paramref name="AsTheyStand"/>.</param>
+/// <param name="VisibleAsMeasured">The index of <paramref name="AsMeasured"/>.</param>
+/// <param name="IndexTargets">The index of the given target objects.</param>
 internal sealed record DecidedTargets(
     ImmutableArray<TargetObject> Targets,
-    ImmutableArray<TargetObject> AsTheyStand,
+    ImmutableArray<TargetObject> AsMeasured,
     IRemovalDecisions Decided,
     IObjectsToKeep ObjectsToKeep,
     IVisibleTargetObjects Visible,
-    IVisibleTargetObjects VisibleAsTheyStand);
+    IVisibleTargetObjects VisibleAsMeasured,
+    Func<ImmutableArray<TargetObject>, IVisibleTargetObjects> IndexTargets);
 
 /// <summary>
 /// Other mods' objects resting on target objects, judged by the support relation whatever the also-remove mode is: that mode
@@ -129,10 +131,12 @@ internal static class OtherModsObjects
         var before = new WeightsBefore([]);
         var copy = decided.Decided.WorkingCopy();
         var current = decided.Decided;
+        var standing = new StandingTargets(decided.AsMeasured, decided.VisibleAsMeasured, RoundsChecked: 0);
         var rounds = new List<IReadOnlyList<ProposedRemoval>>();
         while (true)
         {
-            var outcomes = SettleAgainst(current, decided, others, rules, before, context);
+            standing = StandingAfter(standing, current, decided);
+            var outcomes = SettleAgainst(current, standing, decided, others, rules, before, context);
             var proposals = alsoRemove.Mode == FollowUpRemovalMode.Nothing
                 ? []
                 : CreateTargetsOnTakenAway(decided, others, rules, alsoRemove, context).Propose(current, TakenAway(outcomes));
@@ -140,7 +144,7 @@ internal static class OtherModsObjects
 
             current = copy.DecideRound(RoundKind.AlsoRemove, proposals);
             rounds.Add(proposals);
-            var removed = current.RemovedIn(current.Rounds[^1]);
+            var removed = current.LeftIn(current.Rounds[^1]);
             if (removed.IsEmpty) return Summarize(outcomes, decided.Decided, current, rounds);
 
             var spread = RestingObjects.PrepareFrom(current, [.. removed.Select(target => target.Index)], CreateRoundsInput(decided, others, context), alsoRemove);
@@ -150,10 +154,32 @@ internal static class OtherModsObjects
         }
     }
 
+    /// <remarks>
+    /// Without a restored object the target objects stand where the rounds measured them (a removed one is left out by the
+    /// world's own test), so a world is built from the decisions only when a round has restored an object since the last one.
+    /// </remarks>
+    private static StandingTargets StandingAfter(StandingTargets standing, IRemovalDecisions current, DecidedTargets decided)
+    {
+        var restoredSince = current.Rounds.Skip(standing.RoundsChecked).Any(round => !current.RestoredIn(round).IsEmpty);
+        return restoredSince ? PlaceStanding(current, decided) : standing with { RoundsChecked = current.Rounds.Length };
+    }
+
+    private static StandingTargets PlaceStanding(IRemovalDecisions current, DecidedTargets decided)
+    {
+        var targets = current.TargetsAsTheyStand(decided.Targets);
+        return new StandingTargets(targets, decided.IndexTargets(targets), current.Rounds.Length);
+    }
+
+    /// <summary>The target objects where they stand, and the index of them.</summary>
+    /// <param name="RoundsChecked">The number of the decisions' first rounds whose restored objects this world already places at their earlier placement.</param>
+    private sealed record StandingTargets(ImmutableArray<TargetObject> Targets, IVisibleTargetObjects Index, int RoundsChecked);
+
     /// <summary>The other mods' objects left without support once the target objects are as <paramref name="current"/> decides.</summary>
+    /// <param name="standing">The target objects where they stand under <paramref name="current"/>.</param>
     /// <param name="before">The weights the judged objects had before any decision, shared by every settling of the step.</param>
     private static ImmutableArray<OtherModsObjectOutcome> SettleAgainst(
         IRemovalDecisions current,
+        StandingTargets standing,
         DecidedTargets decided,
         IVisibleObjectsOfAnyPlugin others,
         OtherModsObjectRules rules,
@@ -162,7 +188,7 @@ internal static class OtherModsObjects
     {
         var settler = new LeftWithoutSupport(
             new SupportWorld(decided.Targets, decided.Visible, _ => true, others, SupportWorld.NoChanges, context.Shapes),
-            new SupportWorld(decided.AsTheyStand, decided.VisibleAsTheyStand, target => !current.IsRemoved(target), others, SupportWorld.NoChanges, context.Shapes),
+            new SupportWorld(standing.Targets, standing.Index, target => !current.IsRemoved(target), others, SupportWorld.NoChanges, context.Shapes),
             context.CreateNear(others, rules),
             rules,
             context.CreateSupportLoss(),
@@ -176,9 +202,9 @@ internal static class OtherModsObjects
     private static TargetsOnTakenAwayObjects CreateTargetsOnTakenAway(
         DecidedTargets decided, IVisibleObjectsOfAnyPlugin others, OtherModsObjectRules rules, AlsoRemoveSettings alsoRemove, OtherModsObjectsContext context) =>
         new(
-            decided.AsTheyStand,
-            decided.VisibleAsTheyStand,
-            new SupportWorld(decided.AsTheyStand, decided.VisibleAsTheyStand, _ => true, others, SupportWorld.NoChanges, context.Shapes),
+            decided.AsMeasured,
+            decided.VisibleAsMeasured,
+            new SupportWorld(decided.AsMeasured, decided.VisibleAsMeasured, _ => true, others, SupportWorld.NoChanges, context.Shapes),
             context.CreateSupport(),
             rules,
             context.Triangles,
@@ -186,7 +212,7 @@ internal static class OtherModsObjects
             context.Execution);
 
     private static RoundsInput CreateRoundsInput(DecidedTargets decided, IVisibleObjectsOfAnyPlugin others, OtherModsObjectsContext context) =>
-        new(decided.AsTheyStand, decided.ObjectsToKeep, others, context.Shapes, context.Triangles, context.Surfaces, context.Terrain, context.Execution);
+        new(decided.AsMeasured, decided.ObjectsToKeep, others, context.Shapes, context.Triangles, context.Surfaces, context.Terrain, context.Execution);
 
     /// <summary>The objects removed or pulled down, where they stood, in id order.</summary>
     private static List<OtherObject> TakenAway(ImmutableArray<OtherModsObjectOutcome> outcomes) =>
@@ -200,5 +226,5 @@ internal static class OtherModsObjects
 
     /// <summary>The target objects that could hold up others and were removed, shrunk or turned, where they stood, in target order.</summary>
     private static List<BoxInSpace> FindChangedTargets(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions, OtherModsObjectRules rules) =>
-        [.. targets.Where(target => decisions.Of(target.Id) is Decision.Removed or Decision.Fitted).Select(rules.SupportingBoxOf).OfType<BoxInSpace>()];
+        [.. targets.Where(target => decisions.HasLeftItsPlace(target.Id) || decisions.Of(target.Id) is Decision.Fitted).Select(rules.SupportingBoxOf).OfType<BoxInSpace>()];
 }

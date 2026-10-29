@@ -1,6 +1,53 @@
 {
   "CleanedMod": "Nature of the Wild Lands.esp",
-  "MovedDistanceInUnits": 10.0,
+  "ChangedObjects": {
+    "Moved": {
+      "MovedDistanceInUnits": 10.0,
+      "WhenRemoved": "RestoreIfNoCollision",
+      "AttemptResizingBeforeRemoval": false
+    },
+    "Replaced": {
+      "Process": false,
+      "WhenRemoved": "RestoreIfNoCollision",
+      "AttemptResizingBeforeRemoval": false
+    },
+    "Collision": {
+      "TooClose": {
+        "BySize": {
+          "Use": true,
+          "SizeMultiplier": 0.5
+        },
+        "ByDistance": {
+          "Use": true,
+          "DistanceInUnits": 50.0
+        },
+        "UseRoughBoxes": false,
+        "NpcHandling": "OnlyWhenStuckInsideTheObjectWithCollision"
+      },
+      "TerrainChange": {
+        "RemoveOnChangedTerrain": true,
+        "TerrainCheckedObjects": "AllObjectsIncludingInvisibleOnes",
+        "BySize": {
+          "Use": true,
+          "SizeMultiplier": 0.5
+        },
+        "ByDistance": {
+          "Use": true,
+          "DistanceInUnits": 64.0
+        },
+        "CountHeightChanges": true,
+        "HeightChangeTolerance": 16.0,
+        "CountTerrainTypeChanges": true,
+        "MinTerrainTypeChangePercent": 20,
+        "CountWaterHeightChanges": true,
+        "WaterHeightChangeTolerance": 16.0,
+        "CountWaterAddedOrRemoved": true,
+        "MinWaterCoverChangePercent": 20
+      },
+      "ShrinkLimitPercent": 80,
+      "TurnLimitDegrees": 360
+    }
+  },
   "Trust": {
     "TrustedModsAndTheirMasters": [],
     "ModsTrustedForOwnChangesOnly": [],

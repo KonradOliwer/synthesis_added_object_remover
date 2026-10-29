@@ -87,12 +87,31 @@ public class SectorAreaTests
         var west = OrientedBox.FromLocal(new Box(new Vector3(-5), new Vector3(5)), TestTargets.At(new Vector3(-100, 0, 0), 0f));
         var around = OrientedBox.FromLocal(new Box(new Vector3(-50), new Vector3(50)), TestTargets.At(Vector3.Zero, 0f));
 
-        var beside = SectorAreaTally.Measure([(east, true), (west, false)], Vector3.Zero + new Vector3(0, 0, 200), HalfThreshold);
-        var inside = SectorAreaTally.Measure([(around, true)], Vector3.Zero, HalfThreshold);
+        var beside = SectorAreaTally.Measure([(east, BoxFate.Removed), (west, BoxFate.Stands)], Vector3.Zero + new Vector3(0, 0, 200), HalfThreshold);
+        var inside = SectorAreaTally.Measure([(around, BoxFate.Removed)], Vector3.Zero, HalfThreshold);
 
         Assert.Equal(SectorState.Removed, beside.State(DirectionSector.East));
         Assert.Equal(SectorState.Kept, beside.State(DirectionSector.West));
         Assert.Equal(CompassDirections.SectorCount, inside.RemovedCount);
+    }
+
+    [Fact]
+    public void AClearedDirectionNamesWhetherRemovedRestoredOrBothBoxesClearedIt()
+    {
+        var tally = new SectorAreaTally(HalfThreshold);
+        tally.Add(DirectionSector.East, 10, BoxFate.Removed);
+        tally.Add(DirectionSector.East, 10, BoxFate.Restored);
+        tally.Add(DirectionSector.West, 10, BoxFate.Restored);
+        tally.Add(DirectionSector.North, 10, BoxFate.Removed);
+        tally.Add(DirectionSector.South, 10, BoxFate.Stands);
+
+        var areas = tally.Build();
+
+        Assert.Equal(
+            [SectorState.RemovedAndRestored, SectorState.Restored, SectorState.Removed, SectorState.Kept],
+            new[] { DirectionSector.East, DirectionSector.West, DirectionSector.North, DirectionSector.South }.Select(areas.State));
+        Assert.Equal((3, 2, 2), (areas.ClearedCount, areas.RemovedCount, areas.RestoredCount));
+        Assert.Equal((10f, 10f), (areas.Removed(DirectionSector.East), areas.Restored(DirectionSector.East)));
     }
 
     [Theory]

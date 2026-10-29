@@ -17,6 +17,8 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 /// The configs do not trust the mods loading before their cleaned mod, so the first mod's objects count in the second mod's run.
 /// A second world adds a plugin below the patch, which the final world opens from the Data folder, and switches the changed-terrain
 /// rule on: the plugin raises the terrain under a crate of each mod and places a pad 5 units from another crate of the first mod.
+/// A third world has both mods move the same crate of the base game and a city mod put a wall beside each place the crate stands in
+/// (see <see cref="ChainedStandardRunsGiveTheResultOfOneBatchRunWhenBothModsMovedTheSameObjectAndEachRunRestoresItToTheVersionBelowItsOwnCleanedMod"/>).
 /// </summary>
 [Collection(ConsoleOutputCollection.Name)]
 public sealed class ChainEqualsBatchTests : IDisposable
@@ -31,6 +33,7 @@ public sealed class ChainEqualsBatchTests : IDisposable
     private const string FirstCrateOnRaisedTerrain = "First_CrateOnRaisedTerrain";
     private const string SecondCrateOnRaisedTerrain = "Second_CrateOnRaisedTerrain";
     private const string FirstCrateNextToBelowPad = "First_CrateNextToBelowPad";
+    private const string CityPlugin = "City.esp";
     private const string ChainRunFolderPrefix = "chain-";
     private const string BatchRunFolder = "batch";
     private const string Banner = "=== Added Object Remover ===";
@@ -52,6 +55,12 @@ public sealed class ChainEqualsBatchTests : IDisposable
     private const float PadCentre = 75f;
 
     private const float SceneSpacing = 1000f;
+
+    /// <summary>The three places of the crate both mods move stand in a row of the interior that no other scene uses.</summary>
+    private static readonly Vector3 CrateInBaseGame = new(0, 5 * SceneSpacing, 0);
+
+    private static readonly Vector3 CrateInFirstMod = CrateInBaseGame + new Vector3(SceneSpacing, 0, 0);
+    private static readonly Vector3 CrateInSecondMod = CrateInBaseGame + new Vector3(2 * SceneSpacing, 0, 0);
 
     /// <summary>The crates of the world with a plugin below the patch stand in the exterior cells beside the shared one, at these distances from the cell's west edge.</summary>
     private const float FirstCrateX = SceneSpacing;
@@ -122,6 +131,48 @@ public sealed class ChainEqualsBatchTests : IDisposable
         Assert.Contains(batch.Log, line => IsTerrainRemoval(line, FirstCrateOnRaisedTerrain));
         Assert.Contains(batch.Log, line => IsTerrainRemoval(line, SecondCrateOnRaisedTerrain));
     }
+
+    public static TheoryData<bool, RestoreMode, int> MovedCrateCases()
+    {
+        var cases = new TheoryData<bool, RestoreMode, int>();
+        foreach (var secondModFirst in new[] { false, true })
+        {
+            foreach (var mode in new[] { RestoreMode.Restore, RestoreMode.RestoreIfNoCollision })
+            {
+                foreach (var workers in new[] { 1, Workers }) cases.Add(secondModFirst, mode, workers);
+            }
+        }
+
+        return cases;
+    }
+
+    /// <summary>
+    /// The base game puts a crate at A in the interior, the first mod moves it to B, the second mod (loading after it, not needing
+    /// it) moves it to C, and a city mod puts a wall beside B and beside C. The crate stands too close to the wall at C and, once
+    /// the second mod's run wrote it to B, at B. Each run restores it to the version just below its own cleaned mod: the second
+    /// mod's run to B, the first mod's run to A. When the first mod runs first, the second mod wins the crate and the first mod's
+    /// run has nothing to restore; the second mod's run then restores it to B. When the second mod runs first, the first mod's run
+    /// judges the patch's crate at B against the base game's at A. The wall stood at B without either mod, so it is no collision.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(MovedCrateCases))]
+    public void ChainedStandardRunsGiveTheResultOfOneBatchRunWhenBothModsMovedTheSameObjectAndEachRunRestoresItToTheVersionBelowItsOwnCleanedMod(
+        bool secondModFirst, RestoreMode mode, int workers)
+    {
+        var world = CreateWorld(_dataFolder, withPluginBelowPatch: false, withMovedCrate: true) with { WhenMovedObjectsAreRemoved = mode };
+        var order = Order(secondModFirst);
+
+        var chain = RunChain(order, world, workers);
+        var batch = RunBatch(order, world, workers);
+
+        AssertChainEqualsBatch(order, chain, batch);
+        var crate = LineOf(batch.Patch, world.MovedCrate!.Value);
+        Assert.Contains(RestoredAt(secondModFirst ? CrateInBaseGame : CrateInFirstMod), crate);
+        Assert.Contains(KeptLineMark, crate);
+    }
+
+    private static string RestoredAt(Vector3 position) =>
+        FormattableString.Invariant($"position ({position.X:F2}, {position.Y:F2}, {position.Z:F2})");
 
     private static void AssertChainEqualsBatch(IReadOnlyList<Config> order, IReadOnlyList<StandardRun> chain, BatchRun batch)
     {
@@ -205,6 +256,8 @@ public sealed class ChainEqualsBatchTests : IDisposable
     /// <param name="BelowPatch">The plugins the plugin list names below the patch, which are files in the Data folder; none in the small world.</param>
     /// <param name="RemovedBecauseOfBelowPatch">The objects only a plugin below the patch makes the runs remove; none in the small world.</param>
     /// <param name="RemoveOnChangedTerrain">Whether the world's configs switch the changed-terrain rule on; only the world with a plugin below the patch has terrain changes.</param>
+    /// <param name="MovedCrate">The base game's crate that both mods move; none in the worlds without that scene.</param>
+    /// <param name="WhenMovedObjectsAreRemoved">What the world's configs do with a moved object that a step would remove.</param>
     private sealed record World(
         IReadOnlyList<ISkyrimMod> LoadOrder,
         IReadOnlyDictionary<string, FormKey> NextToLever,
@@ -212,22 +265,24 @@ public sealed class ChainEqualsBatchTests : IDisposable
         FormKey Marker,
         IReadOnlyList<ISkyrimMod> BelowPatch,
         IReadOnlyList<FormKey> RemovedBecauseOfBelowPatch,
-        bool RemoveOnChangedTerrain);
+        bool RemoveOnChangedTerrain,
+        FormKey? MovedCrate = null,
+        RestoreMode WhenMovedObjectsAreRemoved = SettingDefaults.MovedObjectsWhenRemoved);
 
     private static IReadOnlyList<Config> Order(bool secondModFirst) => secondModFirst ? [Second, First] : [First, Second];
 
     /// <summary>The objects a mod's run removes when it runs first.</summary>
     private IReadOnlyList<FormKey> ObjectsOf(Config config) => [_world.NextToLever[config.Plugin], _world.Persistent[config.Plugin]];
 
-    private List<StandardRun> RunChain(IReadOnlyList<Config> order, World world)
+    private List<StandardRun> RunChain(IReadOnlyList<Config> order, World world, int workers = Workers)
     {
         var runs = new List<StandardRun>();
-        foreach (var config in order) runs.Add(RunStandard(config, world, ChainRunFolderPrefix + runs.Count, runs.LastOrDefault()?.PatchFile));
+        foreach (var config in order) runs.Add(RunStandard(config, world, ChainRunFolderPrefix + runs.Count, runs.LastOrDefault()?.PatchFile, workers));
         return runs;
     }
 
     /// <param name="earlierPatchFile">The output file of the run before it in the chain; none for the first run.</param>
-    private StandardRun RunStandard(Config config, World world, string folderName, string? earlierPatchFile)
+    private StandardRun RunStandard(Config config, World world, string folderName, string? earlierPatchFile, int workers)
     {
         var folder = CreateRunFolder(folderName);
         var outputPath = Path.Combine(folder, FixturePatcherState.PatchModKey.FileName);
@@ -237,7 +292,7 @@ public sealed class ChainEqualsBatchTests : IDisposable
         var settings = new Settings { DetailedLogAndReports = true, Standard = StandardOf(config, world) };
 
         var log = PipelineRun.CaptureConsole(
-            () => Program.RunPatch(state, () => settings, Workers, FixturePatcherState.WritePluginsFile(state, world.BelowPatch, patchEnabled: true)));
+            () => Program.RunPatch(state, () => settings, workers, FixturePatcherState.WritePluginsFile(state, world.BelowPatch, patchEnabled: true)));
         state.PatchMod.WriteToBinary(outputPath);
 
         Assert.Equal(Banner, log[0]);
@@ -249,7 +304,7 @@ public sealed class ChainEqualsBatchTests : IDisposable
             outputPath);
     }
 
-    private BatchRun RunBatch(IReadOnlyList<Config> order, World world)
+    private BatchRun RunBatch(IReadOnlyList<Config> order, World world, int workers = Workers)
     {
         var folder = CreateRunFolder(BatchRunFolder);
         BatchFiles.WriteGroup(_dataFolder, GroupName, [.. order.Select(config => config.Name)]);
@@ -259,7 +314,7 @@ public sealed class ChainEqualsBatchTests : IDisposable
 
         var log = Mask(
             PipelineRun.CaptureConsole(
-                () => Program.RunPatch(state, () => settings, Workers, FixturePatcherState.WritePluginsFile(state, world.BelowPatch, patchEnabled: true))),
+                () => Program.RunPatch(state, () => settings, workers, FixturePatcherState.WritePluginsFile(state, world.BelowPatch, patchEnabled: true))),
             folder);
 
         return new BatchRun(
@@ -336,19 +391,23 @@ public sealed class ChainEqualsBatchTests : IDisposable
         + "not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 0; "
         + $"judged in this run: {judged}; removed in this run: {removed}.";
 
-    private static StandardSettings StandardOf(Config config, World world) => new()
-    {
-        CleanedMod = ModKey.FromNameAndExtension(config.Plugin),
-        Trust = new TrustSettings { TrustModsLoadingBeforeCleanedMod = false },
-        TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = world.RemoveOnChangedTerrain },
-        TooClose = new TooCloseRemovalSettings
+    private static StandardSettings StandardOf(Config config, World world) =>
+        new Settings
         {
-            BySize = new TooCloseBySizeSettings { Use = true, SizeMultiplier = SizeMultiplier },
-            ByDistance = new TooCloseByDistanceSettings { Use = true, DistanceInUnits = DistanceInUnits },
-        },
-    };
+            Standard = new StandardSettings
+            {
+                CleanedMod = ModKey.FromNameAndExtension(config.Plugin),
+                Trust = new TrustSettings { TrustModsLoadingBeforeCleanedMod = false },
+                TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = world.RemoveOnChangedTerrain },
+                TooClose = new TooCloseRemovalSettings
+                {
+                    BySize = new TooCloseBySizeSettings { Use = true, SizeMultiplier = SizeMultiplier },
+                    ByDistance = new TooCloseByDistanceSettings { Use = true, DistanceInUnits = DistanceInUnits },
+                },
+            },
+        }.WithTheCollisionOfTheCleanedModsObjects().WithMovedObjects(world.WhenMovedObjectsAreRemoved).Standard;
 
-    private static World CreateWorld(string dataFolder, bool withPluginBelowPatch)
+    private static World CreateWorld(string dataFolder, bool withPluginBelowPatch, bool withMovedCrate = false)
     {
         FixtureMeshes.WriteAll(dataFolder);
         var baseGame = new FixtureMod(BaseGamePlugin);
@@ -382,15 +441,35 @@ public sealed class ChainEqualsBatchTests : IDisposable
         IReadOnlyList<FormKey> removedBecauseOfBelowPatch = [];
         if (withPluginBelowPatch) (belowPatch, removedBecauseOfBelowPatch) = AddPluginBelowPatchScene(dataFolder, baseGame, spaces, first, second);
 
-        return new World(
-            [baseGame.Mod, first.Mod, second.Mod, keeper.Mod],
-            nextToLever,
-            persistent,
-            marker.FormKey,
-            belowPatch,
-            removedBecauseOfBelowPatch,
-            RemoveOnChangedTerrain: withPluginBelowPatch);
+        ISkyrimMod[] loadOrder = [baseGame.Mod, first.Mod, second.Mod, keeper.Mod];
+        FormKey? movedCrate = null;
+        if (withMovedCrate)
+        {
+            var (city, baseGameCrate) = AddMovedCrateScene(baseGame, spaces, first, second);
+            loadOrder = [.. loadOrder, city.Mod];
+            movedCrate = baseGameCrate;
+        }
+
+        return new World(loadOrder, nextToLever, persistent, marker.FormKey, belowPatch, removedBecauseOfBelowPatch, RemoveOnChangedTerrain: withPluginBelowPatch, movedCrate);
     }
+
+    /// <summary>In the interior, a crate of the base game that both mods move, and a wall of a city mod loading after them beside each of the mods' places.</summary>
+    /// <returns>The city mod, and the crate.</returns>
+    private static (FixtureMod City, FormKey Crate) AddMovedCrateScene(FixtureMod baseGame, FixtureSpaces spaces, FixtureMod first, FixtureMod second)
+    {
+        var city = new FixtureMod(CityPlugin, baseGame);
+        spaces.AddOverridesTo(city);
+        var crate = baseGame.Interior.Place("Base_MovedCrate", baseGame.AddModeledStatic("Base_MovedCrateBase", FixtureMeshes.CrateModel), CrateInBaseGame);
+        MoveTo(first.Interior.PlaceCopyOf(crate), CrateInFirstMod);
+        MoveTo(second.Interior.PlaceCopyOf(crate), CrateInSecondMod);
+
+        var wall = city.AddModeledStatic("City_WallBase", FixtureMeshes.PadModel);
+        city.Interior.Place("City_WallBesideFirstModsCrate", wall, CrateInFirstMod + new Vector3(PadCentre, 0, 0));
+        city.Interior.Place("City_WallBesideSecondModsCrate", wall, CrateInSecondMod + new Vector3(PadCentre, 0, 0));
+        return (city, crate.FormKey);
+    }
+
+    private static void MoveTo(PlacedObject copy, Vector3 position) => copy.Placement!.Position = new P3Float(position.X, position.Y, position.Z);
 
     /// <summary>
     /// Two exterior cells beside the shared one. In the first, a crate of each mod stands on terrain that the plugin below the patch

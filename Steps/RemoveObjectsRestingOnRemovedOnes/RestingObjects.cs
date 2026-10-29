@@ -103,19 +103,21 @@ public static class RestingObjects
     /// <paramref name="decided"/>, which never changes, and proposed for the runner to apply.
     /// </summary>
     /// <param name="targets">Where they stood before any decision.</param>
-    /// <param name="targetsAsTheyStand">Each target object kept shrunk or turned at its new placement.</param>
+    /// <param name="targetsAsMeasured">Each target object kept shrunk or turned at its new placement, as the rounds measure it.</param>
     /// <param name="decided">The decisions of every removal round so far, the also-remove rounds included.</param>
     /// <param name="visibleTargets">The index of <paramref name="targets"/>.</param>
-    /// <param name="visibleTargetsAsTheyStand">The index of <paramref name="targetsAsTheyStand"/>.</param>
+    /// <param name="visibleTargetsAsMeasured">The index of <paramref name="targetsAsMeasured"/>.</param>
+    /// <param name="indexTargets">The index of the given target objects.</param>
     /// <param name="trust">Decides whose objects are judged.</param>
     /// <param name="objectsOfAnyPlugin">Asked only when a target object was removed, shrunk or turned.</param>
     public static OtherModsObjectsResult SettleOtherModsObjects(
         ImmutableArray<TargetObject> targets,
-        ImmutableArray<TargetObject> targetsAsTheyStand,
+        ImmutableArray<TargetObject> targetsAsMeasured,
         IRemovalDecisions decided,
         IObjectsToKeep objectsToKeep,
         IVisibleTargetObjects visibleTargets,
-        IVisibleTargetObjects visibleTargetsAsTheyStand,
+        IVisibleTargetObjects visibleTargetsAsMeasured,
+        Func<ImmutableArray<TargetObject>, IVisibleTargetObjects> indexTargets,
         ModTrustTable trust,
         LoadOrderPlugins plugins,
         OtherModsObjectsSettings settings,
@@ -127,7 +129,7 @@ public static class RestingObjects
         Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin,
         Execution execution) =>
         OtherModsObjects.SettleLeftWithoutSupport(
-            new DecidedTargets(targets, targetsAsTheyStand, decided, objectsToKeep, visibleTargets, visibleTargetsAsTheyStand),
+            new DecidedTargets(targets, targetsAsMeasured, decided, objectsToKeep, visibleTargets, visibleTargetsAsMeasured, indexTargets),
             alsoRemove,
             new OtherModsObjectsContext(trust, plugins, settings, shapes, triangles, surfaces, terrain, objectsOfAnyPlugin, execution));
 
@@ -283,7 +285,7 @@ public static class RestingObjects
 
     /// <summary>The objects the also-remove rounds start from: those the seed rounds removed.</summary>
     private static ImmutableArray<TargetId> SeedsOf(IRemovalDecisions earlierRounds, ImmutableArray<Round> seedRounds) =>
-        [.. seedRounds.SelectMany(round => earlierRounds.RemovedIn(round))];
+        [.. seedRounds.SelectMany(round => earlierRounds.LeftIn(round))];
 
     private static RestingObjectsPlan PrepareTouchRounds(IRemovalDecisions earlierRounds, IReadOnlyList<int> seeds, RoundsInput input, AlsoRemoveSettings settings)
     {

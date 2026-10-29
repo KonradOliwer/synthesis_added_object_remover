@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Numerics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
@@ -6,8 +7,8 @@ using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 
 /// <summary>
-/// Turns the placed record facts into target objects (the target plugin's own and the moved replacements,
-/// <see cref="MovedReplacement"/>), other mods' objects the game shows changed from their accepted values
+/// Turns the placed record facts into target objects (the target plugin's own and the other plugins' objects it changed,
+/// <see cref="ChangedObjectKind"/>), other mods' objects the game shows changed from their accepted values
 /// (<see cref="OtherRecordChange"/>), and support-only objects, with their roles, and joins the links into the target objects. A
 /// removed record (<see cref="RemovedForm"/>) is none of them and its links are dropped. The facts are the final world, which
 /// includes what earlier patchers in this group wrote into the patch. The facts come in the order the plugins were read; the
@@ -15,18 +16,30 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 /// </summary>
 public sealed class PlacedObjectCollector
 {
-    private enum RecordRole { Target, TargetOverriddenLater, MovedReplacement, OverriddenByTarget, OtherUnchanged, OtherChanged }
+    private enum RecordRole { Target, TargetOverriddenLater, Moved, Replaced, OverriddenByTarget, OtherUnchanged, OtherChanged }
 
     /// <param name="Change">Only for <see cref="RecordRole.OtherChanged"/>.</param>
-    private readonly record struct Classification(RecordRole Role, ObjectChange? Change)
+    /// <param name="EarlierVersion">Only for <see cref="RecordRole.Moved"/> and <see cref="RecordRole.Replaced"/>.</param>
+    private readonly record struct Classification(RecordRole Role, ObjectChange? Change, PlacedVersionFact? EarlierVersion)
     {
-        public bool IsJudged => Role is RecordRole.Target or RecordRole.MovedReplacement;
+        /// <summary>Null for a record that is not a target object.</summary>
+        public TargetOrigin? Origin => Role switch
+        {
+            RecordRole.Target => TargetOrigin.CleanedMod,
+            RecordRole.Moved => TargetOrigin.Moved,
+            RecordRole.Replaced => TargetOrigin.Replaced,
+            RecordRole.TargetOverriddenLater or RecordRole.OverriddenByTarget or RecordRole.OtherUnchanged or RecordRole.OtherChanged => null,
+            _ => throw new UnreachableException($"Unknown record role {Role}."),
+        };
+
+        public bool IsJudged => Origin is not null;
     }
 
     /// <summary>Vanilla keyword LocTypeHold. Only the Location of the hold itself is sure to have it: the Major and Minor variants are not on every hold.</summary>
     private static readonly RecordKey HoldLocationKeyword = new(new PluginName("Skyrim.esm"), 0x016771);
 
     private readonly ModTrustTable _trust;
+    private readonly AcceptedWorld _world;
     private readonly WhatToCollect _plan;
     private readonly PlacedRecordFacts _facts;
     private readonly TargetAreaNames _areaNames;
@@ -47,22 +60,26 @@ public sealed class PlacedObjectCollector
     private int _othersUnchanged;
     private int _otherInvalidPlacements;
 
-    private PlacedObjectCollector(ModTrustTable trust, WhatToCollect plan, PlacedRecordFacts facts)
+    private PlacedObjectCollector(ModTrustTable trust, AcceptedWorld world, WhatToCollect plan, PlacedRecordFacts facts)
     {
         _trust = trust;
+        _world = world;
         _plan = plan;
         _facts = facts;
         _areaNames = TargetAreaNames.Of(facts.CellAreas);
     }
 
     /// <summary>The first part of the step: reads the placed records and sorts them into objects; <see cref="ReadNonPlacedLinks"/> finishes it.</summary>
-    public static ScannedPlacedRecords ScanPlacedRecords(IPluginRecords plugin, ModTrustTable trust, WhatToCollect plan)
+    /// <param name="world">The accepted world the other mods' records are judged in.</param>
+    public static ScannedPlacedRecords ScanPlacedRecords(IPluginRecords plugin, ModTrustTable trust, AcceptedWorld world, WhatToCollect plan)
     {
         var facts = plugin.ReadPlacedRecords(
-            new PlacedReadScope(trust.CleanedMod, Terrain: true, plan.Navmesh, plan.TerrainVersions, plan.TerrainLayers, plan.Water, HoldLocationKeyword),
-            candidate => StopsTheWalk(trust, candidate));
-        var collector = new PlacedObjectCollector(trust, plan, facts);
+            new PlacedReadScope(
+                trust.CleanedMod, Terrain: true, plan.Navmesh, plan.TerrainVersions, plan.TerrainLayers, plan.Water, HoldLocationKeyword, plan.TerrainForChangedObjectsOnly),
+            candidate => StopsTheWalk(trust, world, plan, candidate));
+        var collector = new PlacedObjectCollector(trust, world, plan, facts);
         foreach (var record in facts.Records) collector.Collect(record);
+        collector.DecideChangesWithoutCleanedModIfOldPlacesAreJudged();
         return collector.CreateScannedPlacedRecords();
     }
 
@@ -86,12 +103,16 @@ public sealed class PlacedObjectCollector
     private static HashSet<RecordKey> TargetKeys(IEnumerable<TargetObject> targets) => targets.Select(target => target.Key).ToHashSet();
 
     /// <remarks>
-    /// A fully trusted version's values are accepted whatever lies below it, so no lower version can change a decision. The cleaned
-    /// mod is fully trusted but does not stop the walk: a record it overrides keeps the version it replaces, which tells whether it
-    /// moved the record (<see cref="MovedReplacement"/>); a record it creates has no version below it.
+    /// A version fully trusted in the accepted world has its values accepted whatever lies below it, so no lower version can change
+    /// a decision in it. When the old places are judged, the same must hold in the world without the cleaned mod, so the walk goes
+    /// on below a trusted plugin that needs the cleaned mod. The cleaned mod never stops the walk: a record it overrides keeps the
+    /// version it replaces, which tells whether it changed the record (<see cref="ChangedObjectKind"/>); a record it creates has
+    /// no version below it.
     /// </remarks>
-    private static bool StopsTheWalk(ModTrustTable trust, PluginName plugin) =>
-        plugin != trust.CleanedMod && trust.VersionTrustOf(plugin) == VersionTrust.Full;
+    private static bool StopsTheWalk(ModTrustTable trust, AcceptedWorld world, WhatToCollect plan, PluginName plugin) =>
+        plugin != trust.CleanedMod
+        && world.TrustOf(plugin) == VersionTrust.Full
+        && (!plan.JudgeOldPlaces || trust.AcceptedWorldWithoutCleanedMod.TrustOf(plugin) == VersionTrust.Full);
 
     private void Collect(PlacedRecordFact record)
     {
@@ -116,7 +137,7 @@ public sealed class PlacedObjectCollector
     }
 
     /// <summary>
-    /// The links into the target plugin and into the moved replacements, without those from removed records. The reader also gives
+    /// The links into the target plugin and into the changed objects, without those from removed records. The reader also gives
     /// the links into the records the target overrides and leaves where they were, which judge nothing.
     /// </summary>
     private static ImmutableArray<LinkFact> KeepLinksIntoTargets(
@@ -146,7 +167,7 @@ public sealed class PlacedObjectCollector
             return;
         }
 
-        if (classification.IsJudged) AddTarget(record, isMovedReplacement: role == RecordRole.MovedReplacement);
+        if (classification.Origin is { } origin) AddTarget(record, origin, classification.EarlierVersion);
         else _otherModObjects.Add(CreateOtherObject(record, _plan.OtherModDetails ? record.EditorId : null, classification.Change));
     }
 
@@ -174,14 +195,21 @@ public sealed class PlacedObjectCollector
     /// <summary>Creator first: the target's own records, then the records the target overrides, then the rule decides once.</summary>
     private Classification Classify(PlacedRecordFact record)
     {
-        if (IsCreatedByTarget(record)) return new(WinsInTargetOrPatch(record) ? RecordRole.Target : RecordRole.TargetOverriddenLater, null);
-        if (_facts.OverriddenRecords.Contains(record.Key))
+        if (IsCreatedByTarget(record)) return new(WinsInTargetOrPatch(record) ? RecordRole.Target : RecordRole.TargetOverriddenLater, null, null);
+        if (_facts.OverriddenRecords.Contains(record.Key)) return ClassifyOverriddenRecord(record);
+        var change = OtherRecordChange.Decide(record, _world);
+        return new(change is null ? RecordRole.OtherUnchanged : RecordRole.OtherChanged, change, null);
+    }
+
+    private Classification ClassifyOverriddenRecord(PlacedRecordFact record)
+    {
+        var changed = ChangedObjectKind.Of(record, _trust.CleanedMod, _world, _plan.MovedDistance);
+        return changed switch
         {
-            var isMoved = MovedReplacement.Is(record, _trust.CleanedMod, _trust.Patch, _plan.MovedDistance);
-            return new(isMoved ? RecordRole.MovedReplacement : RecordRole.OverriddenByTarget, null);
-        }
-        var change = OtherRecordChange.Decide(record, _trust);
-        return new(change is null ? RecordRole.OtherUnchanged : RecordRole.OtherChanged, change);
+            { Origin: TargetOrigin.Moved } => new(RecordRole.Moved, null, changed.Value.EarlierVersion),
+            { Origin: TargetOrigin.Replaced } when _plan.ProcessReplaced => new(RecordRole.Replaced, null, changed.Value.EarlierVersion),
+            _ => new(RecordRole.OverriddenByTarget, null, null),
+        };
     }
 
     private bool IsCreatedByTarget(PlacedRecordFact record) => record.Key.Plugin == _trust.CleanedMod;
@@ -189,7 +217,7 @@ public sealed class PlacedObjectCollector
     /// <remarks>The patch's version holds what earlier patchers in this group wrote, so a target record it wins is judged as the patch left it.</remarks>
     private bool WinsInTargetOrPatch(PlacedRecordFact record) => record.WinningMod == _trust.CleanedMod || record.WinningMod == _trust.Patch;
 
-    private void AddTarget(PlacedRecordFact record, bool isMovedReplacement)
+    private void AddTarget(PlacedRecordFact record, TargetOrigin origin, PlacedVersionFact? earlierVersion)
     {
         _targetSpaces.Add(record.Space);
 
@@ -213,8 +241,19 @@ public sealed class PlacedObjectCollector
             ReferenceRadius: record.ReferenceRadius,
             PrimitiveBounds: record.PrimitiveBounds,
             Area: _areaNames.Name(record.Space, record.Cell.Key, position),
-            IsMovedReplacement: isMovedReplacement));
+            Origin: origin,
+            EarlierVersion: earlierVersion is { } earlier ? CreateEarlierVersion(record, earlier) : null));
     }
+
+    private static EarlierVersion CreateEarlierVersion(PlacedRecordFact record, PlacedVersionFact earlier) => new(
+        earlier.Plugin,
+        new EulerPlacement(earlier.Placement.Position!.Value, earlier.Placement.EulerRotation!.Value, ReferenceScale.Normalize(earlier.Scale)),
+        earlier.Scale,
+        earlier.Base,
+        earlier.Cell,
+        earlier.IsPersistent,
+        RestoresWholeRecord: earlier.Base != record.Base,
+        earlier.Reference);
 
     private OtherObject CreateOtherObject(PlacedRecordFact record, string? editorId, ObjectChange? change)
     {
@@ -232,7 +271,27 @@ public sealed class PlacedObjectCollector
             record.IsPrimitive,
             record.HasMapMarker,
             change,
-            RolesOf(record));
+            RolesOf(record),
+            ChangeWithoutCleanedMod: null);
+    }
+
+    /// <remarks>Only a changed object has an old place to judge, so a run without one decides nothing in the world without the cleaned mod.</remarks>
+    private void DecideChangesWithoutCleanedModIfOldPlacesAreJudged()
+    {
+        if (!_plan.JudgeOldPlaces || _targets.All(target => target.Origin == TargetOrigin.CleanedMod)) return;
+
+        var recordOf = _facts.Records.ToDictionary(record => record.Key);
+        DecideChangesWithoutCleanedMod(_otherModObjects, recordOf);
+        DecideChangesWithoutCleanedMod(_supportOnlyObjects, recordOf);
+    }
+
+    private void DecideChangesWithoutCleanedMod(List<OtherObject> objects, IReadOnlyDictionary<RecordKey, PlacedRecordFact> recordOf)
+    {
+        for (var index = 0; index < objects.Count; index++)
+        {
+            var change = OtherRecordChange.Decide(recordOf[objects[index].Key], _trust.AcceptedWorldWithoutCleanedMod);
+            objects[index] = objects[index] with { ChangeWithoutCleanedMod = change };
+        }
     }
 
     private ReferenceRoles RolesOf(PlacedRecordFact record) =>

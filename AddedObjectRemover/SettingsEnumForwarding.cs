@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using AddedObjectRemover;
+using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
@@ -11,3 +12,4 @@ using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 [assembly: TypeForwardedTo(typeof(NpcHandling))]
 [assembly: TypeForwardedTo(typeof(FollowUpRemovalMode))]
 [assembly: TypeForwardedTo(typeof(OtherModsObjectsHandling))]
+[assembly: TypeForwardedTo(typeof(RestoreMode))]

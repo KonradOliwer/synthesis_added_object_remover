@@ -18,18 +18,25 @@ public class CopiedCodeTests
     private const string ViewForwarders ="One-line members of a read-only view, each forwarding one question of the index to its caller; no logic to share.";
     private const string SettingChecks = "Setting-by-setting check lines; each reads another setting with its own default, limit and wording.";
     private const string TableDeclarations = "Declaration of a report class with a constant or header list; the tables share only the shape of the declaration.";
-    private const string TextConstants = "Lists of text constants; each names its own setting or wording, so there is no logic to share.";
     private const string ErrorBoundary ="Per-object error boundary of two steps: each catches the failure of its own kind of object under its own part key and recovers in its own way; they share only the shape.";
 
     private const string NoSharedStepTypes =
         "The generic parts live in CompassSectorAreas and the decision list; a tool may not reference step types, and a logic project may not reference another logic project.";
 
-    private const string ResultRecords = "Result records of two steps (outcome, evaluations, proposals, failure), each over its own check type. " + NoSharedStepTypes;
+    private const string CheckRecords = "Check records of two steps (one object checked, its outcome and the rules over the outcome), each over its own outcome type. " + NoSharedStepTypes;
+
+    private const string ResultRecords ="Result records of two steps (outcome, evaluations, proposals, failure), each over its own check type. " + NoSharedStepTypes;
 
     private const string FindSkeleton = "Two steps' Find: switched-off check and the Failures.Attempt wrapper, around each step's own rule and result types. " + NoSharedStepTypes;
 
     private const string JoinSkeleton =
         "Two steps' Find and the mapping of a round's decisions onto the step's own outcomes, over each step's own rule, result and outcome types. " + NoSharedStepTypes;
+
+    private const string OutcomeEnums =
+        "Outcome enums of two steps and the predicates over their values: each lists the outcomes of its own step. " + NoSharedStepTypes;
+
+    private const string OutcomeVerdicts =
+        "Two rules' verdict from the sector verdict: each maps the same verdicts onto the outcomes of its own step. " + NoSharedStepTypes;
 
     private const string ProposalLists = "Two steps' removal proposals: one proposal per removed evaluation, with each step's own removal reason. " + NoSharedStepTypes;
 
@@ -77,7 +84,7 @@ public class CopiedCodeTests
     /// <summary>Each copy by the places it occurs in (see <see cref="CopyFamily.Key"/>), with the reason it is not shared.</summary>
     private static readonly Dictionary<string, string> Allowed = new()
     {
-        [CopyFamily.KeyOf([Settings + "CreateLeftBehindSettings", Settings + "CreateVisibleLeftBehindSettings", Settings + "CreateWhatToCollect", Settings + "ValidateSurroundings"])] = SettingChecks,
+        [CopyFamily.KeyOf([Settings + "CreateLeftBehindSettings", Settings + "CreateVisibleLeftBehindSettings", Settings + "JudgesOldPlaces", Settings + "ValidateSurroundings"])] = SettingChecks,
         [CopyFamily.KeyOf([Report + "LogAndReports.cs:LogAndReports.BuildStepSections"])] = StepSections,
         [CopyFamily.KeyOf([
             LeftBehindSections + "LeftBehindOutcomeLine", LeftBehindSections + "LeftBehindSummaryLine",
@@ -89,9 +96,21 @@ public class CopiedCodeTests
             VisibleContracts + "VisibleLeftBehindResult.cs:VisibleLeftBehindResult.SwitchedOff"])] = ResultRecords,
         [CopyFamily.KeyOf([Invisible + "LeftBehindObjects.cs:LeftBehindObjects.Find", VisibleStep + "VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.Find"])] = FindSkeleton,
         [CopyFamily.KeyOf([
-            Invisible + "LeftBehindObjects.cs:LeftBehindObjects.Find", Invisible + "LeftBehindObjects.cs:LeftBehindObjects.JoinVerdicts",
-            VisibleStep + "VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.Find", VisibleStep + "VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.JoinVerdicts"])] =
+            Invisible + "LeftBehindObjects.cs:LeftBehindObjects.Find", Invisible + "LeftBehindObjects.cs:LeftBehindObjects.Join", Invisible + "LeftBehindObjects.cs:LeftBehindObjects.JoinVerdicts",
+            Invisible + "LeftBehindObjects.cs:LeftBehindObjects.RemovedAsLinked",
+            VisibleStep + "VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.Find", VisibleStep + "VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.Join",
+            VisibleStep + "VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.JoinVerdicts", VisibleStep + "VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.RemovedAsLinked"])] =
             JoinSkeleton,
+        [CopyFamily.KeyOf([
+            InvisibleContracts + "LeftBehindOutcome.cs:LeftBehindOutcome", InvisibleContracts + "LeftBehindOutcome.cs:LeftBehindOutcomes",
+            InvisibleContracts + "LeftBehindOutcome.cs:LeftBehindOutcomes.IsRemoval",
+            VisibleContracts + "VisibleLeftBehindOutcome.cs:VisibleLeftBehindOutcome", VisibleContracts + "VisibleLeftBehindOutcome.cs:VisibleLeftBehindOutcomes",
+            VisibleContracts + "VisibleLeftBehindOutcome.cs:VisibleLeftBehindOutcomes.IsRemoval"])] = OutcomeEnums,
+        [CopyFamily.KeyOf([
+            InvisibleContracts + "LeftBehindOutcome.cs:LeftBehindOutcomes.IsRemoval", InvisibleContracts + "LeftBehindOutcome.cs:LeftBehindOutcomes.IsRemovedAsLinked",
+            InvisibleContracts + "LeftBehindOutcome.cs:LeftBehindOutcomes.IsRestoration",
+            VisibleContracts + "VisibleLeftBehindOutcome.cs:VisibleLeftBehindOutcomes.IsRemoval", VisibleContracts + "VisibleLeftBehindOutcome.cs:VisibleLeftBehindOutcomes.IsRemovedAsLinked",
+            VisibleContracts + "VisibleLeftBehindOutcome.cs:VisibleLeftBehindOutcomes.IsRestoration"])] = OutcomeEnums,
         [CopyFamily.KeyOf([
             Invisible + "LeftBehindRound.cs", Invisible + "LeftBehindRound.cs:LeftBehindRound", Invisible + "LeftBehindRound.cs:LeftBehindRound.ProposalsOf",
             VisibleStep + "VisibleLeftBehindRound.cs", VisibleStep + "VisibleLeftBehindRound.cs:VisibleLeftBehindRound",
@@ -104,39 +123,46 @@ public class CopiedCodeTests
             Invisible + "LeftBehindRule.cs:LeftBehindRule.Evaluate", Invisible + "LeftBehindRule.cs:LeftBehindRule.EvaluateAll",
             VisibleStep + "VisibleLeftBehindRule.cs:VisibleLeftBehindRule.Evaluate", VisibleStep + "VisibleLeftBehindRule.cs:VisibleLeftBehindRule.EvaluateAll"])] = RuleSkeleton,
         [CopyFamily.KeyOf([Shapes + "CountBounds", TooClose + "TooCloseObjects.cs:TooCloseObjects.CountSizes"])] = CountLines + " " + CounterRecord,
-        [CopyFamily.KeyOf([Settings + "ClampMarginInUnits", Settings + "CreateChangedTerrainSettings", Settings + "CreateTooCloseSettings", Settings + "WarnOfUnlistableNeverTrusted"])] = SettingChecks,
         [CopyFamily.KeyOf([Settings + "CreateChangedTerrainSettings", Settings + "CreateTooCloseSettings"])] = SettingChecks,
-        [CopyFamily.KeyOf([Settings + "CreateAlsoRemoveSettings", Settings + "CreateChangedTerrainSettings"])] = SettingChecks,
+        [CopyFamily.KeyOf([Settings + "CreateChangedTerrainSettings"])] = SettingChecks,
+        [CopyFamily.KeyOf([Settings + "ClampMarginInUnits", Settings + "CreateChangedTerrainSettings", Settings + "CreateCollisionSettings", Settings + "CreateTooCloseSettings"])] = SettingChecks,
         [CopyFamily.KeyOf([
-            Settings + "AnchoringThresholdName", Settings + "Build", Settings + "CleanedModName", Settings + "ClearedDirectionsName", Settings + "DirectionThresholdName", Settings + "FollowUpModeName",
-            Settings + "HeightChangeToleranceName", Settings + "MaxOtherMastersName", Settings + "MinOccupiedDirectionsName", Settings + "MinShrinkLimitPercent", Settings + "MovedDistanceName",
-            Settings + "NeverTrustedModsName", Settings + "NpcsName", Settings + "OtherModsObjectsName", Settings + "OwnChangesModsName",
-            Settings + "SearchRadiusName", Settings + "ShrinkLimitName", Settings + "ShrinkOrTurnGroup", Settings + "InvisibleSurroundingObjectsGroup", Settings + "VisibleSurroundingObjectsGroup",
-            Settings + "TerrainCheckedObjectsName", Settings + "TerrainDistanceMarginName", Settings + "TerrainSizeMarginName", Settings + "TerrainTypeChangePercentName",
-            Settings + "TooCloseDistanceMarginName", Settings + "TooCloseSizeMarginName", Settings + "TouchDistanceName", Settings + "TrustedModsName",
-            Settings + "TurnLimitName", Settings + "WaterCoverChangePercentName", Settings + "WaterHeightChangeToleranceName",
-            KeepText + "Category", KeepText + "CheckFailed", KeepText + "LinkedGroupCategory", KeepText + "LocationRoleCategory", KeepText + "OtherModsObjectRestsOnIt",
-            KeepText + "OwnLocationRefType", KeepText + "PlacedCategoryPrefix", KeepText + "ScriptCategory", KeepText + "TeleportDoor"])] = TextConstants,
-        [CopyFamily.KeyOf([Describe + "HintType", Describe + "PointReason", Describe + "RemovalReason", Describe + "TimedSuffix"])] = EnumTextArms,
+            Describe + "HintType", Describe + "PointReason", Describe + "RemovalReason", Describe + "TimedSuffix"])] = EnumTextArms,
         [CopyFamily.KeyOf([
             Describe + "HintType", Describe + "LeftBehindReason", Describe + "TimedSuffix", KeepText + "Link", KeepText + "Relation",
             Report + "LeftBehindOutcomeText.cs", Report + "LeftBehindOutcomeText.cs:LeftBehindOutcomeText",
-            LeftBehindText + "Describe", LeftBehindText + "DescribeReason", MeshText + "FailureCategory", MeshText + "Line", MeshText + "ReadFailure",
+            LeftBehindText + "Describe", LeftBehindText + "DescribeReason", LeftBehindText + "Verdict",
+            MeshText + "FailureCategory", MeshText + "Line", MeshText + "ReadFailure",
             Report + "VisibleLeftBehindOutcomeText.cs", Report + "VisibleLeftBehindOutcomeText.cs:VisibleLeftBehindOutcomeText",
             Report + "VisibleLeftBehindOutcomeText.cs:VisibleLeftBehindOutcomeText.Describe", Report + "VisibleLeftBehindOutcomeText.cs:VisibleLeftBehindOutcomeText.DescribeReason",
             Report + "VisibleLeftBehindOutcomeText.cs:VisibleLeftBehindOutcomeText.KindName", Report + "VisibleLeftBehindOutcomeText.cs:VisibleLeftBehindOutcomeText.KindNameOrEmpty",
+            Report + "VisibleLeftBehindOutcomeText.cs:VisibleLeftBehindOutcomeText.Verdict",
             VisibilityText + "Describe", VisibilityText + "KindName", OtherModsText + "NothingBelow", OtherModsText + "Outcome", OtherModsText + "RoleName",
-            OtherModsText + "Roles", OtherModsText + "Summary", PartText + "LinkedStep", PartText + "Word"])] = EnumTextArms,
-        [CopyFamily.KeyOf([MeshText + "FailureCategory", MeshText + "Line", MeshText + "ReadFailure"])] = EnumTextArms,
-        [CopyFamily.KeyOf([Describe + "OriginPlace", Report + "Tables.Fits.cs:Tables.OutcomeName"])] = EnumTextArms,
+            OtherModsText + "Roles", OtherModsText + "Summary", PartText + "LinkedStep", PartText + "Word",
+            Report + "Tables.Fits.cs:Tables.ChangedObjectOutcomeName", Report + "Tables.Fits.cs:Tables.OwnShrunkOrTurned",
+            Report + "Tables.Support.cs:Tables.DescribeCategory", Report + "Tables.Support.cs:Tables.DescribeTopSupporters",
+            Report + "TargetOrigins.cs:TargetOrigins.ChangedPhrase", Report + "TargetOrigins.cs:TargetOrigins.Phrase"])] = EnumTextArms,
+        [CopyFamily.KeyOf([Describe + "OriginPlace", Describe + "TimedSuffix", Report + "TargetOrigins.cs:TargetOrigins.ChangedHeading", Report + "TargetOrigins.cs:TargetOrigins.KindName"])] =
+            EnumTextArms,
         [CopyFamily.KeyOf([
-            Report + "LogSections.Fit.cs:LogSections.FittedObjectLine", Report + "LogSections.Fit.cs:LogSections.OutcomeText",
-            Report + "Tables.Fits.cs:Tables.FitRow", Report + "Tables.Fits.cs:Tables.OutcomeName"])] = EnumTextArms,
+            Report + "TargetOrigins.cs:TargetOrigins.ChangedPhrase", Report + "TargetOrigins.cs:TargetOrigins.CountedOtherOrigins",
+            Report + "TargetOrigins.cs:TargetOrigins.KindName", Report + "TargetOrigins.cs:TargetOrigins.Phrase"])] = EnumTextArms,
+        [CopyFamily.KeyOf([
+            InvisibleContracts + "LeftBehindOutcome.cs:LeftBehindOutcomes.AsRestored", InvisibleContracts + "LeftBehindOutcome.cs:LeftBehindOutcomes.IsRestoration",
+            VisibleContracts + "VisibleLeftBehindOutcome.cs:VisibleLeftBehindOutcomes.AsRestored", VisibleContracts + "VisibleLeftBehindOutcome.cs:VisibleLeftBehindOutcomes.IsRestoration"])] =
+            OutcomeEnums,
+        [CopyFamily.KeyOf([Invisible + "LeftBehindRule.cs:LeftBehindRule.DecideByDirections", VisibleStep + "VisibleLeftBehindRule.cs:VisibleLeftBehindRule.Decide"])] = OutcomeVerdicts,
+        [CopyFamily.KeyOf([
+            InvisibleContracts + "LeftBehindCheck.cs:LeftBehindCheck", InvisibleContracts + "LeftBehindCheck.cs:LeftBehindCheck.IsRemoved",
+            InvisibleContracts + "LeftBehindCheck.cs:LeftBehindCheck.IsRestored",
+            VisibleContracts + "VisibleLeftBehindCheck.cs:VisibleLeftBehindCheck", VisibleContracts + "VisibleLeftBehindCheck.cs:VisibleLeftBehindCheck.IsRemoved",
+            VisibleContracts + "VisibleLeftBehindCheck.cs:VisibleLeftBehindCheck.IsRestored"])] = CheckRecords,
+        [CopyFamily.KeyOf([MeshText + "FailureCategory", MeshText + "Line", MeshText + "ReadFailure"])] = EnumTextArms,
         [CopyFamily.KeyOf([PartText + "Wordings"])] = PartKeyLines,
         [CopyFamily.KeyOf([
-            Report + "Tables.Fits.cs:Tables.BuildFitsTable", Report + "Tables.Fits.cs:Tables.FitsHeader",
-            Report + "Tables.Support.cs:Tables.BuildSupportTable", Report + "Tables.Support.cs:Tables.MaxListedSupporters", Report + "Tables.Support.cs:Tables.SupportHeader",
-            Report + "Tables.Touch.cs:Tables.ComponentHeader", Report + "Tables.Touch.cs:Tables.EdgeHeader", Report + "Tables.Touch.cs:Tables.MaxTopBases"])] = TableDeclarations + " " + CsvColumnNames,
+            Report + "Tables.Fits.cs:Tables.FitsHeader", Report + "Tables.Support.cs:Tables.MaxListedSupporters", Report + "Tables.Support.cs:Tables.SupportHeader",
+            Report + "Tables.Touch.cs:Tables.ComponentHeader", Report + "Tables.Touch.cs:Tables.EdgeHeader", Report + "Tables.Touch.cs:Tables.MaxTopBases"])] =
+            TableDeclarations + " " + CsvColumnNames,
         [CopyFamily.KeyOf([
             Report + "Tables.Fits.cs", Report + "Tables.Fits.cs:Tables", Report + "Tables.Fits.cs:Tables.FitsHeader",
             Report + "Tables.OtherModsObjects.cs", Report + "Tables.OtherModsObjects.cs:Tables", Report + "Tables.OtherModsObjects.cs:Tables.LeftWithoutSupportHeader",
@@ -145,9 +171,15 @@ public class CopiedCodeTests
             Report + "Tables.Fits.cs:Tables.BuildFitsTable", Report + "Tables.Fits.cs:Tables.FitsHeader",
             Report + "Tables.OtherModsObjects.cs:Tables.BuildLeftWithoutSupportTable", Report + "Tables.OtherModsObjects.cs:Tables.LeftWithoutSupportHeader"])] =
             TableDeclarations + " " + CsvColumnNames,
+        [CopyFamily.KeyOf([
+            Report + "Tables.Removals.cs:Tables.BuildRemovalsTable", Report + "Tables.Removals.cs:Tables.RemovalsHeader",
+            Report + "Tables.Support.cs:Tables.BuildSupportTable", Report + "Tables.Support.cs:Tables.SupportHeader"])] =
+            TableDeclarations + " " + CsvColumnNames,
         [CopyFamily.KeyOf(["Steps/MoveKeptMarkers/KeptMarkerMover.cs:KeptMarkerMover.Move", Resting + "TargetsHoldingUpOtherModsObjects.cs:TargetsHoldingUpOtherModsObjects.Find"])] =
             ParallelCalls,
         [CopyFamily.KeyOf([Resting + "SupportContactFinder.cs:SupportContactFinder.FindContactsOfAll", Resting + "TargetsHoldingUpOtherModsObjects.cs:TargetsHoldingUpOtherModsObjects.Find"])] =
+            ParallelCalls,
+        [CopyFamily.KeyOf(["Steps/JudgeChangedObjects/ChangedObjectJudging.cs:ChangedObjectJudging.Prepare", "Steps/RemoveObjectsOnChangedTerrain/ChangedTerrainObjects.cs:ChangedTerrainObjects.FindPass"])] =
             ParallelCalls,
         [CopyFamily.KeyOf([Resting + "LeftWithoutSupport.cs:LeftWithoutSupport.FindMissingWeightsBefore", Resting + "RestingRule.cs:RestingRule.FindResting"])] = ParallelCalls,
         [CopyFamily.KeyOf([Resting + "RestingObjects.cs:RestingObjects.FindHeldUpTargets", Resting + "RestingObjects.cs:RestingObjects.SettleOtherModsObjects"])] =
@@ -172,9 +204,6 @@ public class CopiedCodeTests
             "Steps/RemoveObjectsRestingOnRemovedOnes.Contracts/RestingObjectsParts.cs:RestingObjectsParts.AlsoRemove",
             "Steps/RemoveObjectsRestingOnRemovedOnes.Contracts/RestingObjectsParts.cs:RestingObjectsParts.Owner",
             "Steps/RemoveObjectsRestingOnRemovedOnes.Contracts/RestingObjectsParts.cs:RestingObjectsParts.TouchChains"])] = PartKeyHolders,
-        [CopyFamily.KeyOf([
-            Report + "Tables.Removals.cs:Tables.BuildRemovalsTable", Report + "Tables.Removals.cs:Tables.RemovalsHeader",
-            Report + "Tables.Support.cs:Tables.BuildSupportTable", Report + "Tables.Support.cs:Tables.SupportHeader"])] = CsvColumnNames,
         [CopyFamily.KeyOf([
             "Steps/FindTargetObjectsToKeep/ObjectsToKeep.cs:ObjectsToKeep.FindOwnReason",
             "Steps/SelectObjectsThatCanCauseRemovals/RemovalCauseSelector.cs:RemovalCauseSelector.MeasureCountingFailuresAsInvisible"])] = ErrorBoundary,

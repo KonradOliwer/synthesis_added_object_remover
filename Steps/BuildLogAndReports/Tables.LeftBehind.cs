@@ -29,6 +29,8 @@ internal static partial class Tables
     [
         .. CompassDirections.All.SelectMany(sector => new[] { $"{sector}Total", $"{sector}Removed", $"{sector}State" }),
         "occupiedDirections", "removedDirections",
+        .. CompassDirections.All.Select(sector => $"{sector}Restored"),
+        "restoredDirections",
     ];
 
     /// <param name="evaluations">Listed ordered by record key.</param>
@@ -58,7 +60,7 @@ internal static partial class Tables
             OptionalText(inside?.Key.ToString()),
             OptionalText(inside?.WinningMod.ToString()),
             .. SectorColumns(evaluation.Surroundings),
-            Quote(evaluation.IsRemoved ? "removed" : "kept"),
+            Quote(LeftBehindOutcomeText.Verdict(evaluation)),
             Quote(LeftBehindOutcomeText.DescribeReason(evaluation)),
             .. CsvRow.EmptyOrValues(
                 move, MoveColumnCount, reported => [.. Numbers(reported.Move.To), Number(reported.Distance), Quote(reported.Detail.Surface.ToString())]),
@@ -87,6 +89,8 @@ internal static partial class Tables
         }),
         Int(surroundings.OccupiedCount),
         Int(surroundings.RemovedCount),
+        .. CompassDirections.All.Select(sector => Number(surroundings.Restored(sector))),
+        Int(surroundings.RestoredCount),
     ];
 
     private static string DescribeBaseType(IBaseFacts bases, BaseKey? baseKey) =>

@@ -13,7 +13,19 @@ namespace AddedObjectRemover;
 /// default water, for <see cref="IPluginRecords.ReadWaterCopies"/>.
 /// </param>
 /// <param name="HoldKeyword">The keyword a Location carries when it is a hold; the nearest such Location in a cell's Location chain names the cell's hold.</param>
-public sealed record PlacedReadScope(PluginName Target, bool Terrain, bool Navmeshes, bool TerrainVersions, bool TerrainLayers, bool Water, RecordKey HoldKeyword);
+/// <param name="TerrainReadsNeedAnOverride">
+/// <paramref name="TerrainVersions"/>, <paramref name="TerrainLayers"/> and <paramref name="Water"/> are asked for only to check records the
+/// target plugin overrides: they are skipped when it overrides no placed record of another plugin.
+/// </param>
+public sealed record PlacedReadScope(
+    PluginName Target,
+    bool Terrain,
+    bool Navmeshes,
+    bool TerrainVersions,
+    bool TerrainLayers,
+    bool Water,
+    RecordKey HoldKeyword,
+    bool TerrainReadsNeedAnOverride);
 
 /// <summary>One placed record: its winning version as its plugin stores it, and the versions below it that were kept. It is not judged here.</summary>
 /// <param name="Cell">The cell whose child list holds the winning version; for an interior it is the space itself.</param>

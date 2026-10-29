@@ -58,7 +58,7 @@ public class LeftBehindAfterVisibleRemovalsTests
     private static ProposedRemoval Removed(int index) => new(new TargetId(index), new RemovalReason.VisibleObjectSurroundingsRemoved());
 
     private static RemovalDecisions StartDecisions() =>
-        RemovalDecisions.Start(ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Length), TestBaseFacts.Unresolved), Targets.Length);
+        TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Length), TestBaseFacts.Unresolved), Targets.Length);
 
     private static LeftBehindResult Find(IRemovalDecisions decisions)
     {

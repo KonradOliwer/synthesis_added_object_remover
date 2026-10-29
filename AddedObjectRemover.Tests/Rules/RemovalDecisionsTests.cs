@@ -24,6 +24,10 @@ public class RemovalDecisionsTests
 
     private static readonly RemovalReason TooClose = new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize());
 
+    private static readonly EulerPlacement FitPlacement = new(Vector3.One, Vector3.Zero, 1f);
+
+    private static readonly EarlierVersion Earlier = TestTargets.EarlierVersionAt(new PluginName("Earlier.esp"), new EulerPlacement(new Vector3(7, 8, 9), Vector3.Zero, 1f));
+
     [Fact]
     public void RoundsDecidedOnAWorkingCopyLeaveTheRunsDecisionsUnchanged()
     {
@@ -415,6 +419,217 @@ public class RemovalDecisionsTests
         Assert.Equal(Ids(10), final.RemovedTargets().ToArray());
     }
 
+    /// <summary>Linked group {0,1,2} removed through target 0; target 3 proposed but kept with its protected partner 4; target 8 fitted; target 10 removed alone.</summary>
+    [Fact]
+    public void WhenNothingIsRestoredAnObjectHasLeftItsPlaceExactlyWhenItIsRemoved()
+    {
+        var final = Start(new Dictionary<int, KeepReason> { [4] = QuestReason })
+            .ApplyFits([Fit(8)])
+            .Apply(RoundKind.TooClose, [Propose(0, TooClose), Propose(3, TooClose), Propose(10, TooClose)]);
+
+        Assert.Equal(Ids(0, 1, 2, 10), Ids([.. Enumerable.Range(0, TargetCount).Where(index => final.HasLeftItsPlace(Id(index)))]));
+        Assert.All(Enumerable.Range(0, TargetCount), index => Assert.Equal(final.IsRemoved(Id(index)), final.HasLeftItsPlace(Id(index))));
+    }
+
+    [Fact]
+    public void WhenNothingIsRestoredTheObjectsThatLeftTheirPlaceInARoundAreTheOnesItRemoved()
+    {
+        var final = Start().ApplyFits([Fit(8)]).Apply(RoundKind.TooClose, [Propose(0, TooClose), Propose(10, TooClose)]);
+
+        Assert.All(final.Rounds, round => Assert.Equal(final.RemovedIn(round).ToArray(), final.LeftIn(round).ToArray()));
+        Assert.Equal(Ids(0, 10, 1, 2), final.LeftIn(final.Rounds[1]).ToArray());
+        Assert.Empty(final.LeftIn(final.Rounds[0]));
+    }
+
+    [Fact]
+    public void TargetsAsTheyStandPlaceOnlyTheFittedObjectsAtTheirNewPlacement()
+    {
+        var targets = TestTargets.CreateMany(TargetCount);
+        var final = Start().ApplyFits([Fit(9)]).Apply(RoundKind.TooClose, [Propose(10, TooClose)]);
+
+        var standing = final.TargetsAsTheyStand([.. targets]);
+
+        Assert.Equal(FitPlacement, standing[9].Placement);
+        Assert.All(Enumerable.Range(0, TargetCount).Where(index => index != 9), index => Assert.Equal(targets[index], standing[index]));
+    }
+
+    [Fact]
+    public void AnyStandsElsewhereIsTrueExactlyWhenAnObjectIsKeptFitted()
+    {
+        var removedOnly = Start().Apply(RoundKind.TooClose, [Propose(10, TooClose)]);
+
+        Assert.False(Start().AnyStandsElsewhere());
+        Assert.False(removedOnly.AnyStandsElsewhere());
+        Assert.True(Start().ApplyFits([Fit(9)]).AnyStandsElsewhere());
+        Assert.True(Start().ApplyFits([Fit(9)]).Apply(RoundKind.TooClose, [Propose(10, TooClose)]).AnyStandsElsewhere());
+        Assert.False(Start().ApplyFits([Fit(9)]).Apply(RoundKind.AlsoRemove, [Propose(9, TooClose)]).AnyStandsElsewhere());
+    }
+
+    [Fact]
+    public void AFitThatAnAlsoRemoveRoundReplacedStandsAndIsMeasuredWhereItStoodAndTheOlderViewStillPlacesItAtTheFit()
+    {
+        var targets = TestTargets.CreateMany(TargetCount);
+        var fitted = Start().ApplyFits([Fit(9)]);
+
+        var replaced = fitted.Apply(RoundKind.AlsoRemove, [Propose(9, TooClose)]);
+
+        Assert.Equal(targets[9], replaced.TargetsAsTheyStand([.. targets])[9]);
+        Assert.Equal(targets[9], replaced.TargetsAsTheRoundsMeasureThem([.. targets])[9]);
+        Assert.Equal(FitPlacement, fitted.TargetsAsTheyStand([.. targets])[9].Placement);
+        Assert.Equal(FitPlacement, fitted.TargetsAsTheRoundsMeasureThem([.. targets])[9].Placement);
+    }
+
+    [Fact]
+    public void AnObjectMarkedRestoreIsRestoredNotDisabledWhenARoundRemovesIt()
+    {
+        var decisions = StartRestoring([10]).Apply(RoundKind.TooClose, [Propose(10, TooClose), Propose(11, TooClose)]);
+        var round = decisions.Rounds[0];
+
+        var restored = Assert.IsType<Decision.Restored>(decisions.Of(Id(10)));
+
+        Assert.Equal((round, TooClose, Earlier), (restored.Round, restored.Reason, restored.EarlierVersion));
+        Assert.IsType<Decision.Removed>(decisions.Of(Id(11)));
+        Assert.Equal((true, false), (decisions.HasLeftItsPlace(Id(10)), decisions.IsRemoved(Id(10))));
+        Assert.Equal((true, true), (decisions.HasLeftItsPlace(Id(11)), decisions.IsRemoved(Id(11))));
+        Assert.Equal(Ids(10, 11), decisions.LeftIn(round).ToArray());
+        Assert.Equal(Ids(11), decisions.RemovedIn(round).ToArray());
+        Assert.Equal(Ids(11), decisions.RemovedTargets().ToArray());
+        Assert.True(decisions.IsDecided(Id(10)));
+        Assert.False(decisions.MayStillBeRemoved(Id(10)));
+    }
+
+    /// <summary>Linked group {0,1,2}: 0 and 1 are marked restore, 2 is not.</summary>
+    [Fact]
+    public void ARestoredObjectTakesItsLinkedGroupAlongAndEachMemberGetsItsOwnOutcome()
+    {
+        var decisions = StartRestoring([0, 1]).Apply(RoundKind.TooClose, [Propose(1, TooClose)]);
+        var round = decisions.Rounds[0];
+
+        Assert.Equal(TooClose, Assert.IsType<Decision.Restored>(decisions.Of(Id(1))).Reason);
+        Assert.Equal(new RemovalReason.LinkedTo(Id(1)), Assert.IsType<Decision.Restored>(decisions.Of(Id(0))).Reason);
+        Assert.Equal(new RemovalReason.LinkedTo(Id(1)), Removed(decisions, 2).Reason);
+        Assert.Equal(Ids(1, 0, 2), decisions.LeftIn(round).ToArray());
+        Assert.Equal(Ids(2), decisions.RemovedIn(round).ToArray());
+        Assert.Equal(
+            new[]
+            {
+                new RoundEffect(RoundOutcome.Restored, AsLinked: false, KeepReason: null),
+                new RoundEffect(RoundOutcome.Restored, AsLinked: true, KeepReason: null),
+                new RoundEffect(RoundOutcome.Removed, AsLinked: true, KeepReason: null),
+            },
+            Ids(1, 0, 2).Select(target => RoundEffects.Of(decisions.Of(target), round)).ToArray());
+    }
+
+    [Fact]
+    public void AProtectedObjectMarkedRestoreIsKeptAndHasNotLeftItsPlace()
+    {
+        var decisions = StartRestoring([7], new Dictionary<int, KeepReason> { [7] = QuestReason }).Apply(RoundKind.TooClose, [Propose(7, TooClose)]);
+
+        Assert.IsType<Decision.Kept>(decisions.Of(Id(7)));
+        Assert.False(decisions.HasLeftItsPlace(Id(7)));
+    }
+
+    [Fact]
+    public void AWorkingCopyRestoresAsTheTableSaysAndLeavesTheRunsDecisionsUnchanged()
+    {
+        var start = StartRestoring([10]).Apply(RoundKind.TooClose, []);
+
+        var decided = start.DecideRoundOnCopy(RoundKind.LeftBehind, [Propose(10, TooClose), Propose(11, TooClose)]);
+
+        Assert.IsType<Decision.Restored>(decided[Id(10)]);
+        Assert.IsType<Decision.Removed>(decided[Id(11)]);
+        Assert.False(start.IsDecided(Id(10)));
+    }
+
+    [Fact]
+    public void ARestoredObjectSeedsTheRoundLoopLikeARemovedOne()
+    {
+        var rule = new ScriptedRounds([Propose(9, TooClose)], []);
+        var start = StartRestoring([8]).Apply(RoundKind.TooClose, [Propose(8, TooClose)]);
+
+        var (decisions, _) = start.WorkingCopy().DecideRoundsUntilNothingRemoved(rule, start.LeftIn(start.Rounds[^1]));
+
+        Assert.Equal(Ids(8), rule.RemovedLastRound[0]);
+        Assert.Equal(Ids(9), rule.RemovedLastRound[1]);
+        Assert.IsType<Decision.Removed>(decisions.Of(Id(9)));
+    }
+
+    /// <summary>The rounds and the left-behind steps measure a restored object where the cleaned mod put it, so what rests on it there loses its support; the standing world and the marker obstacles place it at its earlier placement.</summary>
+    [Fact]
+    public void TheRoundsMeasureARestoredObjectWhereTheCleanedModPutItAndItStandsAtItsEarlierPlacement()
+    {
+        var targets = TestTargets.CreateMany(TargetCount);
+        var final = StartRestoring([10]).ApplyFits([Fit(9)]).Apply(RoundKind.TooClose, [Propose(10, TooClose)]);
+
+        var measured = final.TargetsAsTheRoundsMeasureThem([.. targets]);
+        var standing = final.TargetsAsTheyStand([.. targets]);
+
+        Assert.Equal(targets[10], measured[10]);
+        Assert.Equal(Earlier.Placement, standing[10].Placement);
+        Assert.Equal(FitPlacement, measured[9].Placement);
+        Assert.Equal(FitPlacement, standing[9].Placement);
+        Assert.All(
+            Enumerable.Range(0, TargetCount).Where(index => index is not (9 or 10)),
+            index => Assert.Equal((targets[index], targets[index]), (measured[index], standing[index])));
+    }
+
+    [Fact]
+    public void AWholeRecordRestoreStandsWithTheEarlierBaseWhileTheRoundsMeasureItWithTheCleanedModsBase()
+    {
+        var cleanedModsBase = new BaseKey(new RecordKey(new PluginName("Target.esp"), 0x300), BaseLinkKind.PlaceableObject);
+        var earlierBase = new BaseKey(new RecordKey(new PluginName("Earlier.esp"), 0x301), BaseLinkKind.PlaceableObject);
+        var targets = TestTargets.CreateMany(TargetCount);
+        targets[10] = targets[10] with { Base = cleanedModsBase };
+        var wholeRecord = Earlier with { Base = earlierBase, RestoresWholeRecord = true };
+        var start = RemovalDecisions.Start(
+            Protection(references: null),
+            [.. Enumerable.Range(0, TargetCount).Select(index => index == 10 ? (WhenRemoved)new WhenRemoved.Restore(wholeRecord) : new WhenRemoved.Disable())]);
+
+        var final = start.Apply(RoundKind.TooClose, [Propose(10, TooClose)]);
+
+        Assert.Equal(targets[10], final.TargetsAsTheRoundsMeasureThem([.. targets])[10]);
+        var standing = final.TargetsAsTheyStand([.. targets])[10];
+        Assert.Equal((earlierBase, Earlier.Placement), (standing.Base, standing.Placement));
+    }
+
+    /// <summary>The whole record comes back, so the earlier version's primitive, marker, door and radius facts decide how the object shows, not the cleaned mod's.</summary>
+    [Fact]
+    public void AWholeRecordRestoreStandsWithTheReferenceFactsOfTheEarlierVersionAndAPlacementOnlyRestoreKeepsTheCleanedModsOwn()
+    {
+        var target = TestTargets.Create(0, TestTargets.At(Vector3.Zero));
+        var reference = new ReferenceFacts(IsTeleportDoor: true, IsPrimitive: true, HasMapMarker: true, ReferenceRadius: 8f, PrimitiveBounds: new Vector3(1, 2, 3));
+
+        var wholeRecord = target.RestoredAs(Earlier with { RestoresWholeRecord = true, Reference = reference });
+        var placementOnly = target.RestoredAs(Earlier with { Reference = reference });
+
+        Assert.Equal(
+            (true, true, true, (float?)8f, (Vector3?)new Vector3(1, 2, 3)),
+            (wholeRecord.IsTeleportDoor, wholeRecord.IsPrimitive, wholeRecord.HasMapMarker, wholeRecord.ReferenceRadius, wholeRecord.PrimitiveBounds));
+        Assert.Equal(target.PlacedAt(Earlier.Placement), placementOnly);
+    }
+
+    [Fact]
+    public void AFitThatAnAlsoRemoveRoundRestoredStandsAtItsEarlierPlacementAndIsMeasuredWhereTheCleanedModPutIt()
+    {
+        var targets = TestTargets.CreateMany(TargetCount);
+        var final = StartRestoring([9]).ApplyFits([Fit(9)]).Apply(RoundKind.AlsoRemove, [Propose(9, TooClose)]);
+
+        Assert.IsType<Decision.Restored>(final.Of(Id(9)));
+        Assert.Equal(targets[9], final.TargetsAsTheRoundsMeasureThem([.. targets])[9]);
+        Assert.Equal(Earlier.Placement, final.TargetsAsTheyStand([.. targets])[9].Placement);
+    }
+
+    [Fact]
+    public void ARestoredObjectStandsElsewhereButIsMeasuredElsewhereOnlyWhenFitted()
+    {
+        var restored = StartRestoring([10]).Apply(RoundKind.TooClose, [Propose(10, TooClose)]);
+        var fitted = Start().ApplyFits([Fit(9)]);
+
+        Assert.Equal((true, false), (restored.AnyStandsElsewhere(), restored.AnyMeasuredElsewhere()));
+        Assert.Equal((true, true), (fitted.AnyStandsElsewhere(), fitted.AnyMeasuredElsewhere()));
+        Assert.Equal((false, false), (StartRestoring([10]).AnyStandsElsewhere(), StartRestoring([10]).AnyMeasuredElsewhere()));
+    }
+
     [Fact]
     public void NoFitOpensNoRound()
     {
@@ -441,10 +656,19 @@ public class RemovalDecisionsTests
         Assert.IsType<Decision.Fitted>(copy.Of(Id(9)));
     }
 
-    private static ProposedFit Fit(int index) => new(Id(index), TooClose, new EulerPlacement(Vector3.One, Vector3.Zero, 1f));
+    private static ProposedFit Fit(int index) => new(Id(index), TooClose, FitPlacement);
 
     private static RemovalDecisions Start(IReadOnlyDictionary<int, KeepReason>? references = null) =>
-        RemovalDecisions.Start(ObjectsToKeep.Build(TestTargets.CreateMany(TargetCount), Links, TestTargets.References(TargetCount, references), TestBaseFacts.Unresolved), TargetCount);
+        TestSeededDecisions.StartDisablingAll(Protection(references), TargetCount);
+
+    /// <param name="restored">The targets marked restore; every other target is marked disable.</param>
+    private static RemovalDecisions StartRestoring(IReadOnlyCollection<int> restored, IReadOnlyDictionary<int, KeepReason>? references = null) =>
+        RemovalDecisions.Start(
+            Protection(references),
+            [.. Enumerable.Range(0, TargetCount).Select(index => restored.Contains(index) ? (WhenRemoved)new WhenRemoved.Restore(Earlier) : new WhenRemoved.Disable())]);
+
+    private static IObjectsToKeep Protection(IReadOnlyDictionary<int, KeepReason>? references) =>
+        ObjectsToKeep.Build(TestTargets.CreateMany(TargetCount), Links, TestTargets.References(TargetCount, references), TestBaseFacts.Unresolved);
 
     private static ImmutableArray<TargetId> LastRoundRemovals(IRemovalDecisions decisions) => decisions.RemovedIn(decisions.Rounds[^1]);
 

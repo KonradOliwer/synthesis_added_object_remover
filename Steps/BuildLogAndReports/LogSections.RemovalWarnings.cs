@@ -10,7 +10,7 @@ internal static partial class LogSections
     /// One line per removed unique NPC, in target order, then one line with the number of removed large references;
     /// empty when no such object was removed.
     /// </summary>
-    public static LogSection BuildRemovalWarningsSection(CollectedObjects world, IEnumerable<RemovedObject> removals, RemovalRisks risks)
+    public static LogSection BuildRemovalWarningsSection(CollectedObjects world, IEnumerable<ObjectWithReason> removals, RemovalRisks risks)
     {
         var removed = removals.Select(removal => removal.TargetIndex).ToHashSet();
         var uniqueActorLines = RemovedUniqueActors(risks, removed).Select(role => UniqueActorLine(world, role));

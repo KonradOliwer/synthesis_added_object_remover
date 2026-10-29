@@ -38,6 +38,7 @@ internal static class TooCloseSearch
         IBaseObjectShapes shapes,
         ImmutableArray<ZoneGrowth> zones,
         NpcTooCloseRule npcRule,
+        ImmutableArray<TargetId> judged,
         WorkOrder order,
         Execution execution)
     {
@@ -45,6 +46,7 @@ internal static class TooCloseSearch
             targets,
             otherModObjects,
             shapes,
+            judged,
             order,
             execution,
             () => new Scratch(),
@@ -57,26 +59,29 @@ internal static class TooCloseSearch
         TargetObject target, IObjectsThatCanCauseRemovals otherModObjects, IBaseObjectShapes shapes, ImmutableArray<ZoneGrowth> zones, NpcTooCloseRule npcRule) =>
         CheckTarget(target, shapes, new Scratch(), (placed, scratch) => FindFirstTooCloseOther(placed, otherModObjects, shapes, zones, npcRule, scratch));
 
-    /// <summary>Runs the search for every visible target on worker threads; each worker has its own scratch.</summary>
+    /// <summary>Runs the search for every visible judged target on worker threads; each worker has its own scratch.</summary>
+    /// <param name="judged">The targets to search, in target order.</param>
     public static TooCloseSearchResult FindForVisibleTargets<TScratch>(
         IReadOnlyList<TargetObject> targets,
         IObjectsThatCanCauseRemovals otherModObjects,
         IBaseObjectShapes shapes,
+        ImmutableArray<TargetId> judged,
         WorkOrder order,
         Execution execution,
         Func<TScratch> createScratch,
         Func<TargetObject, TScratch, ZoneHit?> findFirstTooCloseOther,
         Func<TScratch, TooCloseWork> harvest)
     {
-        var (checks, work) = ParallelMap.Run(
+        List<int> indexes = [.. judged.Select(target => target.Index)];
+        var (checks, work) = ParallelMap.RunOver(
             execution,
             order,
-            targets.Count,
+            indexes,
             createScratch,
             (targetIndex, scratch) => CheckTarget(targets[targetIndex], shapes, scratch, findFirstTooCloseOther),
             harvest,
             ParallelMap.AutomaticRangeSize);
-        return new TooCloseSearchResult(ToHits(otherModObjects, checks), work, ToFailures(targets, checks));
+        return new TooCloseSearchResult(ToHits(otherModObjects, indexes, checks), work, ToFailures(targets, indexes, checks));
     }
 
     /// <remarks>A target whose check fails is not too close to anything, so it is not removed.</remarks>
@@ -93,23 +98,26 @@ internal static class TooCloseSearch
         }
     }
 
-    /// <returns>The hits in target order.</returns>
-    private static List<TooCloseObject> ToHits(IObjectsThatCanCauseRemovals otherModObjects, IReadOnlyList<TargetCheck> checks)
+    /// <param name="indexes">The target index of each check.</param>
+    /// <returns>The hits in the order of <paramref name="indexes"/>.</returns>
+    private static List<TooCloseObject> ToHits(IObjectsThatCanCauseRemovals otherModObjects, IReadOnlyList<int> indexes, IReadOnlyList<TargetCheck> checks)
     {
         var hits = new List<TooCloseObject>();
-        for (var target = 0; target < checks.Count; target++)
+        for (var position = 0; position < checks.Count; position++)
         {
-            if (checks[target].TooCloseTo is { } hit) hits.Add(new TooCloseObject(target, otherModObjects.Get(hit.Other), hit.Cause));
+            if (checks[position].TooCloseTo is { } hit) hits.Add(new TooCloseObject(indexes[position], otherModObjects.Get(hit.Other), hit.Cause));
         }
         return hits;
     }
 
-    private static ImmutableArray<PartFailure> ToFailures(IReadOnlyList<TargetObject> targets, IReadOnlyList<TargetCheck> checks) =>
+    private static ImmutableArray<PartFailure> ToFailures(IReadOnlyList<TargetObject> targets, IReadOnlyList<int> indexes, IReadOnlyList<TargetCheck> checks) =>
     [
         .. Enumerable.Range(0, checks.Count)
-            .Where(index => checks[index].Failure != null)
-            .Select(index => new PartFailure(
-                TooCloseParts.TooCloseCheck, checks[index].Failure, new FailureSubject(targets[index].Key.ToString(), targets[index].EditorId, targets[index].Id.Index))),
+            .Where(position => checks[position].Failure != null)
+            .Select(position => new PartFailure(
+                TooCloseParts.TooCloseCheck,
+                checks[position].Failure,
+                new FailureSubject(targets[indexes[position]].Key.ToString(), targets[indexes[position]].EditorId, targets[indexes[position]].Id.Index))),
     ];
 
     private static ZoneHit? FindFirstTooCloseOther(

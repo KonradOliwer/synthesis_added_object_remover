@@ -58,7 +58,7 @@ internal sealed class VisibleLeftBehindRule(
         return SectorAreaTally.Measure(
             neighbours
                 .Where(neighbour => neighbour.Target != target.Id)
-                .Select(neighbour => (neighbour.Box, decisions.IsRemoved(neighbour.Target))),
+                .Select(neighbour => (neighbour.Box, NeighbourFates.Of(decisions, neighbour.Target))),
             target.Transform.Position,
             config.DirectionClearedPercent);
     }
@@ -70,6 +70,7 @@ internal sealed class VisibleLeftBehindRule(
             SectorVerdict.TooFewOccupiedDirections => VisibleLeftBehindOutcome.KeptTooFewSurroundingObjects,
             SectorVerdict.TooFewClearedDirections => VisibleLeftBehindOutcome.KeptSurroundingsMostlyKept,
             _ when kind is { } listed && config.NeverRemove.Contains(listed) => VisibleLeftBehindOutcome.KeptProtectedType,
+            _ when areas.RestoredCount > 0 => VisibleLeftBehindOutcome.RemovedSurroundingsRemovedAndRestored,
             _ => VisibleLeftBehindOutcome.RemovedSurroundingsRemoved,
         };
 }

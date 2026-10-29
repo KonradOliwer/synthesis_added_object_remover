@@ -5,6 +5,9 @@ namespace AddedObjectRemover.Tests.Fixtures;
 /// <summary>Placed record facts in the test target space, shown in game, unrotated, with the winning version as their only version.</summary>
 internal static class TestPlacedRecords
 {
+    /// <summary>A reference that is no teleport door, primitive or map marker and has no radius.</summary>
+    public static readonly ReferenceFacts PlainReference = new(IsTeleportDoor: false, IsPrimitive: false, HasMapMarker: false, ReferenceRadius: null, PrimitiveBounds: null);
+
     public static PlacedRecordFact Create(RecordKey key, PluginName winningMod, Vector3 position, BaseKey? baseKey = null)
     {
         var placement = new PlacementFacts(new PresenceFacts(Deleted: false, InitiallyDisabled: false, EnableParent: null), position, Vector3.Zero);
@@ -22,8 +25,12 @@ internal static class TestPlacedRecords
             HasLocationRefType: false,
             ReferenceRadius: null,
             PrimitiveBounds: null,
-            Versions: [new PlacedVersionFact(winningMod, placement, Scale: null, baseKey)]);
+            Versions: [Version(winningMod, placement, baseKey)]);
     }
+
+    /// <summary>A version in the test target space's cell, not persistent and without a stored scale.</summary>
+    public static PlacedVersionFact Version(PluginName plugin, PlacementFacts placement, BaseKey? baseKey) =>
+        new(plugin, placement, Scale: null, baseKey, new CellFact(TestTargets.Space, null), TestTargets.Space, IsPersistent: false, PlainReference);
 
     /// <summary>The record with its winning version's presence flags replaced.</summary>
     public static PlacedRecordFact WithWinningPresence(PlacedRecordFact record, PresenceFacts presence) =>

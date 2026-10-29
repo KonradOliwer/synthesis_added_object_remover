@@ -67,7 +67,7 @@ public sealed class AreaLinesTests
     [Fact]
     public void ANameThatRepeatsAnEarlierNameOfAJoinedChainIsLeftOut()
     {
-        var lines = LogSections.BuildAreasSection(World(), [new LinkedRemoval(8, 0)], [], [], NoRisks).Lines.ToList();
+        var lines = LogSections.BuildAreasSection(World(), [new ObjectWithReason.LinkedTo(8, 0)], [], [], NoRisks).Lines.ToList();
 
         Assert.Equal(["Removed 1/9 (removed/all checked objects):","  Bannered Mare › Whiterun hold 1/1"], lines);
     }
@@ -155,10 +155,10 @@ public sealed class AreaLinesTests
 
     private static TargetArea NearPlace(string place) => Exterior("H", place, PlaceSource.NearbyLocation, 1, 1);
 
-    private static List<RemovedObject> Removed(params int[] targetIndices) => [.. targetIndices.Select(index => new LinkedRemoval(index, 0))];
+    private static List<ObjectWithReason> Removed(params int[] targetIndices) => [.. targetIndices.Select(index => new ObjectWithReason.LinkedTo(index, 0))];
 
     /// <summary>Removes every target object but 2.</summary>
-    private static List<RemovedObject> Removals() => Removed(0, 1, 3, 4, 5, 6, 7, 8);
+    private static List<ObjectWithReason> Removals() => Removed(0, 1, 3, 4, 5, 6, 7, 8);
 
     /// <summary>Targets 0-2 at Loreius Farm, 3 in Dawnstar, 4 near a camp, 5 unnamed, 6-7 in Falkreath, 8 in an interior.</summary>
     private static CollectedObjects World() =>

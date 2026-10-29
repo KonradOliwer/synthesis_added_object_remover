@@ -24,6 +24,7 @@ public class TerrainVersionReadingTests
     private readonly FixtureMod _late;
     private readonly FormKey _worldspace;
     private readonly FormKey _cell;
+    private readonly Cell _targetCell;
 
     public TerrainVersionReadingTests()
     {
@@ -33,13 +34,13 @@ public class TerrainVersionReadingTests
         _worldspace = _base.NextKey();
         _cell = _base.NextKey();
         AddCell(_base, BaseOffset);
-        var targetCell = AddCell(_target, TargetOffset);
+        _targetCell = AddCell(_target, TargetOffset);
         AddCell(_noLand, landOffset: null);
         AddCell(_late, LateOffset);
 
         var placed = new PlacedObject(_target.NextKey(), FixtureMod.Release);
         placed.Base.SetTo(_base.AddMarkerStatic("BaseStatic"));
-        targetCell.Temporary.Add(placed);
+        _targetCell.Temporary.Add(placed);
     }
 
     private ExteriorCell ExteriorCell => new(_worldspace.ToRecordKey(), 0, 0);
@@ -48,7 +49,7 @@ public class TerrainVersionReadingTests
     public void VersionsHoldEveryPluginsOwnHeightsInLoadOrder()
     {
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword), TestVersionWalks.NoStop);
+        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword, TerrainReadsNeedAnOverride: false), TestVersionWalks.NoStop);
 
         var versions = plugin.ReadTerrainVersions(ExteriorCell);
 
@@ -64,7 +65,7 @@ public class TerrainVersionReadingTests
     public void WinningHeightsAreStillTheLastVersions()
     {
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: true, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword), TestVersionWalks.NoStop);
+        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: true, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword, TerrainReadsNeedAnOverride: false), TestVersionWalks.NoStop);
 
         Assert.Equal(LateOffset * UnitsPerHeightStep, plugin.ReadTerrain(ExteriorCell)![0]);
     }
@@ -73,9 +74,32 @@ public class TerrainVersionReadingTests
     public void VersionsAreNotKeptUnlessAskedFor()
     {
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: true, Navmeshes: false, TerrainVersions: false, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword), TestVersionWalks.NoStop);
+        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: true, Navmeshes: false, TerrainVersions: false, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword, TerrainReadsNeedAnOverride: false), TestVersionWalks.NoStop);
 
         Assert.Throws<InvalidOperationException>(() => plugin.ReadTerrainVersions(ExteriorCell));
+    }
+
+    [Fact]
+    public void ReadsThatNeedAnOverrideAreSkippedWhenTheTargetOverridesNothing()
+    {
+        var plugin = OpenPlugin();
+        plugin.ReadPlacedRecords(OverrideScope(), TestVersionWalks.NoStop);
+
+        Assert.Throws<InvalidOperationException>(() => plugin.ReadTerrainVersions(ExteriorCell));
+        Assert.Throws<InvalidOperationException>(() => plugin.ReadWaterCopies(ExteriorCell));
+    }
+
+    [Fact]
+    public void ReadsThatNeedAnOverrideAreMadeWhenTheTargetOverridesARecordOfAnotherPlugin()
+    {
+        var overridden = new PlacedObject(_base.NextKey(), FixtureMod.Release);
+        overridden.Base.SetTo(_base.AddMarkerStatic("OverriddenStatic"));
+        _targetCell.Temporary.Add(overridden);
+        var plugin = OpenPlugin();
+        plugin.ReadPlacedRecords(OverrideScope(), TestVersionWalks.NoStop);
+
+        Assert.Equal(3, plugin.ReadTerrainVersions(ExteriorCell).Length);
+        Assert.NotEmpty(plugin.ReadWaterCopies(ExteriorCell).Cell);
     }
 
     [Fact]
@@ -89,7 +113,7 @@ public class TerrainVersionReadingTests
         childCell.Temporary.Add(placed);
         AddChildWorldspace(_target, child, childCell);
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword), TestVersionWalks.NoStop);
+        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword, TerrainReadsNeedAnOverride: false), TestVersionWalks.NoStop);
 
         Assert.Equal(_worldspace.ToRecordKey(), plugin.FindLandWorldspace(child.ToRecordKey()));
         Assert.Equal(
@@ -107,7 +131,7 @@ public class TerrainVersionReadingTests
         };
         _late.Mod.Worldspaces.RecordCache[_worldspace].AddCell(secondCell);
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: true, TestRecordKeys.HoldKeyword), TestVersionWalks.NoStop);
+        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: true, TestRecordKeys.HoldKeyword, TerrainReadsNeedAnOverride: false), TestVersionWalks.NoStop);
 
         var late = _late.Key.ToPluginName();
         Assert.Equal(
@@ -123,7 +147,7 @@ public class TerrainVersionReadingTests
     public void WaterIsNotKeptUnlessAskedFor()
     {
         var plugin = OpenPlugin();
-        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword), TestVersionWalks.NoStop);
+        plugin.ReadPlacedRecords(new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword, TerrainReadsNeedAnOverride: false), TestVersionWalks.NoStop);
 
         Assert.Throws<InvalidOperationException>(() => plugin.ReadWaterCopies(ExteriorCell));
     }
@@ -200,8 +224,10 @@ public class TerrainVersionReadingTests
             plugin.ReadWaterCopies(new ExteriorCell(child.ToRecordKey(), 0, 0)).Worldspace);
     }
 
+    private PlacedReadScope OverrideScope() => WaterScope() with { TerrainReadsNeedAnOverride = true };
+
     private PlacedReadScope WaterScope() =>
-        new(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: true, TestRecordKeys.HoldKeyword);
+        new(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: true, TerrainLayers: false, Water: true, TestRecordKeys.HoldKeyword, TerrainReadsNeedAnOverride: false);
 
     private static void SetDefaultWater(FixtureMod mod, FormKey worldspace, float height) =>
         mod.Mod.Worldspaces.RecordCache[worldspace].LandDefaults = new WorldspaceLandDefaults { DefaultWaterHeight = height };

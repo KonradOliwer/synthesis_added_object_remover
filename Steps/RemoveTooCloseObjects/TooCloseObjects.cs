@@ -46,59 +46,67 @@ public static class TooCloseObjects
         bodies.Count(body => body.Source == NpcSizeSource.Point),
         withoutNpc);
 
-    /// <param name="placedNpcs">C10; the step leaves out the NPCs <paramref name="replacements"/> replaces.</param>
+    /// <summary>
+    /// Runs once for each distinct set of settings over the objects judged with it, and proposes the removals of all of them in target order.
+    /// </summary>
+    /// <param name="selected">Each pass takes the objects that can cause removals for its own NPC handling.</param>
+    /// <param name="placedNpcs">C10; the step leaves out the NPCs the replacements in <paramref name="selected"/> replace.</param>
     public static TooCloseResult Find(
         CollectedObjects world,
         IVisibleTargetObjects visibleTargets,
-        IObjectsThatCanCauseRemovals otherModObjects,
+        SelectedObjects selected,
         IPlacedNpcsBySpace placedNpcs,
-        Replacements replacements,
         IBaseObjectShapes shapes,
         ITriangleMeshes triangles,
         Execution execution,
-        TooCloseSettings settings) =>
+        IEnumerable<ObjectsJudgedWith<TooCloseSettings>> groups) =>
         Find(
             new TooCloseInput(
-                world.Targets, visibleTargets, world.Order, otherModObjects, new NpcsThatCanSpawn(placedNpcs, replacements), shapes, triangles, execution),
-            settings);
+                world.Targets, visibleTargets, world.Order, selected, new NpcsThatCanSpawn(placedNpcs, selected.Replacements), shapes, triangles, execution),
+            groups);
+
+    internal static TooCloseResult Find(TooCloseInput input, IEnumerable<ObjectsJudgedWith<TooCloseSettings>> groups) =>
+        new([.. JudgedGroups.MergeEqualSettings(groups).Select(group => FindPass(input, group))]);
 
     /// <summary>The step's check of one target object at a given placement; it finds nothing when no removal zone is on.</summary>
-    /// <param name="placedNpcs">C10; the rule leaves out the NPCs <paramref name="replacements"/> replaces.</param>
+    /// <param name="selected">The rule takes the objects that can cause removals for the NPC handling of <paramref name="settings"/>.</param>
+    /// <param name="placedNpcs">C10; the rule leaves out the NPCs the replacements in <paramref name="selected"/> replace.</param>
     public static IPlacementRule CreatePlacementRule(
-        CollectedObjects world,
+        IReadOnlyList<TargetObject> targets,
         IVisibleTargetObjects visibleTargets,
-        IObjectsThatCanCauseRemovals otherModObjects,
+        SelectedObjects selected,
         IPlacedNpcsBySpace placedNpcs,
-        Replacements replacements,
         IBaseObjectShapes shapes,
         ITriangleMeshes triangles,
         TooCloseSettings settings)
     {
         var zones = ZoneGrowth.Active(settings);
         return new TooClosePlacementRule(
-            world.Targets,
             zones.IsEmpty
                 ? null
                 : new ComputedOnce<ITooCloseSearch>(() =>
                 {
-                    var npcRule = CreateNpcRule(visibleTargets, new NpcsThatCanSpawn(placedNpcs, replacements), shapes, triangles, settings.Npcs);
-                    return CreateSearch(world.Targets, visibleTargets, otherModObjects, shapes, triangles, zones, npcRule, settings.Zone);
+                    var npcRule = CreateNpcRule(visibleTargets, new NpcsThatCanSpawn(placedNpcs, selected.Replacements), shapes, triangles, settings.Npcs);
+                    return CreateSearch(targets, visibleTargets, selected.ViewFor(settings.Npcs), shapes, triangles, zones, npcRule, settings.Zone);
                 }));
     }
 
     /// <summary>How the step words a too-close finding as the reason of a removal.</summary>
     internal static RemovalReason ReasonOf(ZoneHit hit) => new RemovalReason.TooClose(hit.Other, hit.Cause);
 
-    /// <remarks>When no removal zone is on, the step looks at nothing, not even for stuck NPCs, and the result is <see cref="StepOutcome.SwitchedOff"/>.</remarks>
-    internal static TooCloseResult Find(TooCloseInput input, TooCloseSettings settings)
+    /// <remarks>When no removal zone is on, the pass looks at nothing, not even for stuck NPCs, and its outcome is <see cref="StepOutcome.SwitchedOff"/>.</remarks>
+    private static TooClosePass FindPass(TooCloseInput input, ObjectsJudgedWith<TooCloseSettings> group)
     {
+        var settings = group.Settings;
         var zones = ZoneGrowth.Active(settings);
-        if (zones.IsEmpty) return SwitchedOff(settings);
+        if (zones.IsEmpty) return SwitchedOff(group);
 
         var npcRule = CreateNpcRule(input.VisibleTargets, input.Npcs, input.Shapes, input.Triangles, settings.Npcs);
-        var search = CreateSearch(input.Targets, input.VisibleTargets, input.OtherModObjects, input.Shapes, input.Triangles, zones, npcRule, settings.Zone);
-        var found = search.FindTooCloseTargets(input.Order, input.Exec);
-        return new TooCloseResult(
+        var search = CreateSearch(
+            input.Targets, input.VisibleTargets, input.Selected.ViewFor(settings.Npcs), input.Shapes, input.Triangles, zones, npcRule, settings.Zone);
+        var found = search.FindTooCloseTargets(group.Objects, input.Order, input.Exec);
+        return new TooClosePass(
+            group.Objects,
             StepOutcome.Performed,
             [.. found.Hits],
             [.. found.Hits.Select(hit => new ProposedRemoval(new TargetId(hit.TargetIndex), ReasonOf(new ZoneHit(hit.TooCloseTo.Id, hit.Cause))))],
@@ -111,8 +119,8 @@ public static class TooCloseObjects
             settings.Npcs);
     }
 
-    private static TooCloseResult SwitchedOff(TooCloseSettings settings) =>
-        new(StepOutcome.SwitchedOff, [], [], TooCloseWork.Zero, Npc: null, LargeOtherObjects: 0, [], ZonesTested: [], settings.Zone, settings.Npcs);
+    private static TooClosePass SwitchedOff(ObjectsJudgedWith<TooCloseSettings> group) =>
+        new(group.Objects, StepOutcome.SwitchedOff, [], [], TooCloseWork.Zero, Npc: null, LargeOtherObjects: 0, [], ZonesTested: [], group.Settings.Zone, group.Settings.Npcs);
 
     private static NpcTooCloseRule CreateNpcRule(
         IVisibleTargetObjects visibleTargets, INpcsThatCanSpawn npcs, IBaseObjectShapes shapes, ITriangleMeshes triangles, NpcHandling handling) =>

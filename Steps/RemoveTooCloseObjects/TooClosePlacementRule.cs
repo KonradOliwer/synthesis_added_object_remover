@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
@@ -9,9 +8,9 @@ namespace AddedObjectRemover.Steps.RemoveTooCloseObjects;
 /// first object is tried, so a run that asks nothing builds nothing.
 /// </summary>
 /// <param name="search">Null when no removal zone is on: the step is switched off and finds nothing.</param>
-internal sealed class TooClosePlacementRule(ImmutableArray<TargetObject> targets, ComputedOnce<ITooCloseSearch>? search) : IPlacementRule
+internal sealed class TooClosePlacementRule(ComputedOnce<ITooCloseSearch>? search) : IPlacementRule
 {
-    public IPlacementTries StartTries(TargetId target) => new Tries(targets[target.Index], search?.Value.StartTries());
+    public IPlacementTries StartTries(TargetObject target) => new Tries(target, search?.Value.StartTries());
 
     /// <param name="tries">Null when the step is switched off.</param>
     private sealed class Tries(TargetObject target, ITargetTries? tries) : IPlacementTries

@@ -22,7 +22,16 @@ internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records,
     public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk)
     {
         StopsTheWalk = stopsTheWalk;
-        return new(records, records.Length, overridden, links, NavmeshCount: 0, UnnamedCellsOf(records), LinkedFrom);
+        var walked = records.Select(record => record with { Versions = VersionsKeptBy(stopsTheWalk, record.Versions) }).ToImmutableArray();
+        return new(walked, walked.Length, overridden, links, NavmeshCount: 0, UnnamedCellsOf(walked), LinkedFrom);
+    }
+
+    /// <summary>The versions from the winner down to and including the first one whose plugin stops the walk, as the real reader keeps them.</summary>
+    private static ImmutableArray<PlacedVersionFact> VersionsKeptBy(Func<PluginName, bool> stopsTheWalk, ImmutableArray<PlacedVersionFact> versions)
+    {
+        var lowestKept = versions.Length - 1;
+        while (lowestKept > 0 && !stopsTheWalk(versions[lowestKept].Plugin)) lowestKept--;
+        return versions.RemoveRange(0, lowestKept);
     }
 
     /// <summary>Each cell of the records once, without grid, name or Location.</summary>

@@ -37,6 +37,12 @@ internal static class PlacedRecordExtensions
     public static bool IsPersistent(this IPlacedGetter record) =>
         (record.MajorRecordFlagsRaw & (int)PlacedObject.DefaultMajorFlag.Persistent) != 0;
 
+    public static void SetPersistent(this IPlaced record, bool persistent)
+    {
+        if (persistent) record.MajorRecordFlagsRaw |= (int)PlacedObject.DefaultMajorFlag.Persistent;
+        else record.MajorRecordFlagsRaw &= ~(int)PlacedObject.DefaultMajorFlag.Persistent;
+    }
+
     /// <summary>Base object of any placed record type, with the kind of record the base link expects.</summary>
     public static BaseKey? GetBaseKey(this IPlacedGetter record, PluginNames names) => record switch
     {

@@ -19,8 +19,8 @@ internal static partial class LogSections
         if (context.Detailed) lines.AddRange(OverriddenOthers(world, target));
         lines.Add(
             $"Scanned {TextFormat.Count(counts.RecordsScanned)} placed records{Describe.TimedSuffix(elapsed, context)}: "
-            + $"{TextFormat.Count(CountOwnObjects(world))} {target} objects to check, "
-            + DescribeMovedReplacements(world, target)
+            + $"{TextFormat.Count(TargetOrigins.CountOwn(world.Targets))} {TargetOrigins.Phrase(TargetOrigin.CleanedMod, target)} to check, "
+            + string.Concat(TargetOrigins.CountedOtherOrigins(world.Targets, target).Select(counted => $"{counted}, "))
             + $"{TextFormat.Count(world.OtherModObjects.Length)} objects from other mods.");
         if (counts.TargetsOverriddenLater > 0)
         {
@@ -53,27 +53,22 @@ internal static partial class LogSections
         return new LogSection("scan", lines.ToImmutable());
     }
 
-    /// <summary>The moved replacements to check, when there are any.</summary>
-    private static string DescribeMovedReplacements(CollectedObjects world, PluginName target)
-    {
-        var moved = CountMovedReplacements(world);
-        return moved > 0 ? $"{TextFormat.Count(moved)} objects of other mods that {target} moved, " : string.Empty;
-    }
-
     /// <summary>
     /// The objects the run judges: "4 Mod.esp objects", or, when it moved objects of other mods,
-    /// "6 objects (4 Mod.esp objects and 2 objects of other mods that Mod.esp moved)".
+    /// "6 objects (4 Mod.esp objects and 2 objects of other mods that Mod.esp moved)"; "3 objects of other mods that Mod.esp moved" when
+    /// there is no object of Mod.esp.
     /// </summary>
-    private static string DescribeJudgedObjects(CollectedObjects world, PluginName target)
+    private static string DescribeJudgedObjects(IReadOnlyCollection<TargetObject> judged, PluginName target)
     {
-        var own = CountOwnObjects(world);
-        var moved = CountMovedReplacements(world);
-        return moved > 0
-            ? $"{TextFormat.Count(world.Targets.Length)} objects ({TextFormat.Count(own)} {target} objects and {TextFormat.Count(moved)} objects of other mods that {target} moved)"
-            : $"{TextFormat.Count(own)} {target} objects";
-    }
+        var ownCount = TargetOrigins.CountOwn(judged);
+        var own = $"{TextFormat.Count(ownCount)} {TargetOrigins.Phrase(TargetOrigin.CleanedMod, target)}";
+        var others = TargetOrigins.CountedOtherOrigins(judged, target);
+        if (others.Count == 0) return own;
+        if (ownCount == 0 && others.Count == 1) return others[0];
 
-    private static int CountMovedReplacements(CollectedObjects world) => world.Targets.Length - CountOwnObjects(world);
+        var parts = ownCount == 0 ? string.Join(", ", others) : $"{own} and {string.Join(", ", others)}";
+        return $"{TextFormat.Count(judged.Count)} objects ({parts})";
+    }
 
     public static LogSection BuildThreadsSection(Execution execution, ReportContext context) =>
         new("threads", context.Detailed ? [$"Using {execution.Workers} threads."] : []);

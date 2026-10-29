@@ -24,29 +24,37 @@ public static class ClashingObjectFitter
     /// <param name="Failure">The first failed check among its tries; null when none failed.</param>
     private readonly record struct ObjectFit(ProposedFit? Fit, string? Failure);
 
+    /// <summary>The placements to try an object at, and the group whose rules judge them.</summary>
+    private readonly record struct Trial(int Target, FitGroup Group, ImmutableArray<EulerPlacement> Placements);
+
+    /// <param name="groups">The objects of each group are tried with its own settings and rules; an object is in one group.</param>
+    /// <param name="resting">Names the objects others rest on, which are left to the removal rounds.</param>
     public static FitResult Fit(
         ImmutableArray<TargetObject> targets,
         IObjectsToKeep objectsToKeep,
-        FitRules rules,
+        IEnumerable<FitGroup> groups,
+        IRestingRule resting,
         IBaseObjectShapes shapes,
         WorkOrder order,
-        Execution execution,
-        FitSettings settings)
+        Execution execution)
     {
-        var tries = new PlacementTries(settings);
-        var triesByTarget = targets
-            .Where(target => MayBeAdjusted(target, objectsToKeep))
-            .Select(target => (Target: target.Id.Index, Tries: tries.For(target, adjustable: shapes.VisibilityOf(target).IsVisible)))
-            .Where(candidate => !candidate.Tries.IsEmpty)
-            .ToDictionary(candidate => candidate.Target, candidate => candidate.Tries);
-        List<int> candidates = [.. triesByTarget.Keys.Order()];
-        var clashes = CheckEach(targets, candidates, target => ClashWhereItStands(target, rules), order, execution);
+        var fitGroups = groups.ToList();
+        JudgedGroups.RequireEachObjectInOneGroup(fitGroups.Select(group => group.Judged));
+        var trialOf = fitGroups
+            .SelectMany(group => TrialsOf(group, targets, objectsToKeep, shapes))
+            .ToDictionary(trial => trial.Target);
+        List<int> candidates = [.. trialOf.Keys.Order()];
+        var clashes = CheckEach(targets, candidates, target => ClashWhereItStands(target, trialOf[target.Id.Index].Group), order, execution);
         var clashOf = candidates.Zip(clashes).Where(pair => pair.Second is not null).ToDictionary(pair => pair.First, pair => pair.Second!);
         List<int> clashing = [.. clashOf.Keys.Order()];
-        var (restedOn, restingFailure) = FindRestedOn(clashing, rules.Resting);
+        var (restedOn, restingFailure) = FindRestedOn(clashing, resting);
         List<int> tried = restingFailure is null ? [.. clashing.Where(index => !restedOn.Contains(index))] : [];
         var fits = CheckEach(
-            targets, tried, target => FitShrunkOrTurned(target, clashOf[target.Id.Index], triesByTarget[target.Id.Index], rules), order, execution);
+            targets,
+            tried,
+            target => FitShrunkOrTurned(target, clashOf[target.Id.Index], trialOf[target.Id.Index]),
+            order,
+            execution);
         return new FitResult(
             [.. fits.Select(fit => fit.Fit).OfType<ProposedFit>()],
             clashing.Count,
@@ -58,25 +66,41 @@ public static class ClashingObjectFitter
             ]);
     }
 
-    /// <summary>The targets where they stand: each object kept shrunk or turned at its new placement.</summary>
-    public static ImmutableArray<TargetObject> PlaceAsTheyStand(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions) =>
-        [.. targets.Select(target => decisions.Of(target.Id) is Decision.Fitted fitted ? target.PlacedAt(fitted.To) : target)];
+    /// <summary>
+    /// The visible targets where the rounds measure them: a new index with each object kept shrunk or turned at its new placement
+    /// and every other object, a restored one too, where the cleaned mod put it, or the collected index when there is no fit. An
+    /// object kept shrunk or turned and removed later stands where it stood, as the patch leaves it.
+    /// </summary>
+    public static IVisibleTargetObjects IndexAsTheRoundsMeasureThem(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions, IObjectCaches caches) =>
+        IndexPlaced(decisions.AnyMeasuredElsewhere(), decisions.TargetsAsTheRoundsMeasureThem, targets, caches);
 
     /// <summary>
-    /// The visible targets where they stand: a new index with each object kept shrunk or turned at its new placement, or the
-    /// collected index when there is none. An object kept shrunk or turned and removed later stands where it stood, as the patch
-    /// leaves it.
+    /// The visible targets where they stand: a new index with each object kept shrunk or turned at its new placement and each
+    /// restored object at its earlier placement, or the collected index when none stands elsewhere. An object kept shrunk or turned
+    /// and removed later stands where it stood, as the patch leaves it.
     /// </summary>
     public static IVisibleTargetObjects IndexAsTheyStand(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions, IObjectCaches caches) =>
-        decisions.All().Any(entry => entry.Decision is Decision.Fitted)
-            ? caches.IndexVisibleTargets(PlaceAsTheyStand(targets, decisions))
-            : caches.VisibleTargets;
+        IndexPlaced(decisions.AnyStandsElsewhere(), decisions.TargetsAsTheyStand, targets, caches);
+
+    private static IVisibleTargetObjects IndexPlaced(
+        bool anyElsewhere, Func<ImmutableArray<TargetObject>, ImmutableArray<TargetObject>> placeTargets, ImmutableArray<TargetObject> targets, IObjectCaches caches) =>
+        anyElsewhere ? caches.IndexVisibleTargets(placeTargets(targets)) : caches.VisibleTargets;
 
     /// <summary>One object at a time per worker: an object's checks differ too much in cost to hand out several at once.</summary>
     /// <returns>One result per index, in the given order.</returns>
     private static T[] CheckEach<T>(
         ImmutableArray<TargetObject> targets, IReadOnlyList<int> indexes, Func<TargetObject, T> check, WorkOrder order, Execution execution) =>
         ParallelMap.RunOver(execution, order, indexes, static () => (object?)null, (index, _) => check(targets[index]), ParallelMap.OneItemPerRange);
+
+    private static IEnumerable<Trial> TrialsOf(FitGroup group, ImmutableArray<TargetObject> targets, IObjectsToKeep objectsToKeep, IBaseObjectShapes shapes)
+    {
+        var tries = new PlacementTries(group.Judged.Settings);
+        return group.Judged.Objects
+            .Select(id => targets[id.Index])
+            .Where(target => MayBeAdjusted(target, objectsToKeep))
+            .Select(target => new Trial(target.Id.Index, group, tries.For(target, adjustable: shapes.VisibilityOf(target).IsVisible)))
+            .Where(trial => !trial.Placements.IsEmpty);
+    }
 
     private static bool MayBeAdjusted(TargetObject target, IObjectsToKeep objectsToKeep) =>
         !objectsToKeep.IsProtected(target.Id.Index) && !objectsToKeep.Groups.IsLinked(target.Id.Index);
@@ -85,15 +109,15 @@ public static class ClashingObjectFitter
     /// The fittable rule's clash; null when the object fits where it stands, clashes there by the unfittable rule, or a check
     /// failed there: the removal rounds then judge it as it stands.
     /// </returns>
-    private static RemovalReason? ClashWhereItStands(TargetObject target, FitRules rules)
+    private static RemovalReason? ClashWhereItStands(TargetObject target, FitGroup group)
     {
-        if (Stops(CheckOnce(rules.Unfittable, target))) return null;
-        return CheckOnce(rules.Fittable, target) is { Failure: null, Clash: { } clash } ? clash : null;
+        if (Stops(CheckOnce(group.Unfittable, target))) return null;
+        return CheckOnce(group.Fittable, target) is { Failure: null, Clash: { } clash } ? clash : null;
     }
 
     private static PlacementCheck CheckOnce(IPlacementRule rule, TargetObject target)
     {
-        using var tries = rule.StartTries(target.Id);
+        using var tries = rule.StartTries(target);
         return tries.Check(target.Placement);
     }
 
@@ -103,12 +127,12 @@ public static class ClashingObjectFitter
             () => ((IReadOnlySet<int>)resting.FindObjectsOthersRestOn([.. clashing.Select(index => new TargetId(index))]).Select(target => target.Index).ToHashSet(), (PartFailure?)null),
             failure => (new HashSet<int>(), PartFailure.OfWholePart(FitParts.RestingCheck, failure)));
 
-    private static ObjectFit FitShrunkOrTurned(TargetObject target, RemovalReason clash, ImmutableArray<EulerPlacement> placements, FitRules rules)
+    private static ObjectFit FitShrunkOrTurned(TargetObject target, RemovalReason clash, Trial trial)
     {
-        using var fittable = rules.Fittable.StartTries(target.Id);
-        using var unfittable = rules.Unfittable.StartTries(target.Id);
+        using var fittable = trial.Group.Fittable.StartTries(target);
+        using var unfittable = trial.Group.Unfittable.StartTries(target);
         string? firstFailure = null;
-        foreach (var placement in placements)
+        foreach (var placement in trial.Placements)
         {
             var check = FirstClash(placement, fittable, unfittable);
             if (check.Failure is not null) firstFailure ??= check.Failure;

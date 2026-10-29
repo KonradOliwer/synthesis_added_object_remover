@@ -42,7 +42,7 @@ internal sealed class TouchChains
         var search = run.Search ?? throw new ArgumentException("Touch chains need the touch rounds' search.", nameof(run));
         var alsoRemove = run.Result;
         var decisions = run.Decisions;
-        ImmutableArray<TargetId> seeds = [.. alsoRemove.SeedRounds.SelectMany(round => decisions.RemovedIn(round))];
+        ImmutableArray<TargetId> seeds = [.. alsoRemove.SeedRounds.SelectMany(round => decisions.LeftIn(round))];
         var chains = new TouchChains(decisions, targetCount, search, execution);
         chains.RecordDiscovery(seeds, alsoRemove.Rounds);
         chains.AssignComponents(seeds, alsoRemove.Rounds);
@@ -62,7 +62,7 @@ internal sealed class TouchChains
         foreach (var seed in seeds.Order()) _nodes.Add(seed.Index);
         foreach (var round in alsoRemoveRounds)
         {
-            var reached = _decisions.RemovedIn(round).Concat(_decisions.KeptIn(round)).ToList();
+            var reached = _decisions.LeftIn(round).Concat(_decisions.KeptIn(round)).ToList();
             foreach (var node in reached) RecordCause(node);
             _nodes.AddRange(reached.Order().Select(node => node.Index));
         }
@@ -83,11 +83,11 @@ internal sealed class TouchChains
 
     private void AssignComponents(ImmutableArray<TargetId> seeds, ImmutableArray<Round> alsoRemoveRounds)
     {
-        var removed = _nodes.Where(node => _decisions.IsRemoved(new TargetId(node))).ToList();
+        var removed = _nodes.Where(node => _decisions.HasLeftItsPlace(new TargetId(node))).ToList();
         var roots = new UnionFind(_componentId.Length);
         foreach (var pair in FindTouchingPairs(removed)) roots.Join(pair.First, pair.Second);
         // A pair near the touch distance can test apart here although its round found it touching, so the causes are edges too.
-        foreach (var node in alsoRemoveRounds.SelectMany(round => _decisions.RemovedIn(round))) roots.Join(node.Index, _parentOf[node.Index]);
+        foreach (var node in alsoRemoveRounds.SelectMany(round => _decisions.LeftIn(round))) roots.Join(node.Index, _parentOf[node.Index]);
 
         var componentOfRoot = new Dictionary<int, int>();
         foreach (var seed in seeds.Order())
@@ -99,7 +99,7 @@ internal sealed class TouchChains
         }
         foreach (var node in _nodes)
         {
-            var component = _decisions.IsRemoved(new TargetId(node)) ? componentOfRoot[roots.Find(node)] : _componentId[_parentOf[node]];
+            var component = _decisions.HasLeftItsPlace(new TargetId(node)) ? componentOfRoot[roots.Find(node)] : _componentId[_parentOf[node]];
             _componentId[node] = component;
             _componentMembers[component].Add(node);
         }
@@ -135,5 +135,9 @@ internal sealed class TouchChains
             Work.Sum(rounds.Select(round => round.Work)));
     }
 
-    private bool IsRemovedForTouching(int node) => _decisions.Of(new TargetId(node)) is Decision.Removed { Reason: RemovalReason.Touching };
+    private bool IsRemovedForTouching(int node)
+    {
+        var id = new TargetId(node);
+        return _decisions.IsRemoved(id) && _decisions.Of(id)!.Reason is RemovalReason.Touching;
+    }
 }

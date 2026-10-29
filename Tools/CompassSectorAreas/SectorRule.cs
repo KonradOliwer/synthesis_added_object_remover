@@ -7,7 +7,7 @@ public static class SectorRule
     {
         var occupied = areas.OccupiedCount;
         if (occupied < minOccupiedDirections) return SectorVerdict.TooFewOccupiedDirections;
-        return SharePercent.AtLeast(areas.RemovedCount, occupied, clearedDirectionsPercent)
+        return SharePercent.AtLeast(areas.ClearedCount, occupied, clearedDirectionsPercent)
             ? SectorVerdict.Cleared
             : SectorVerdict.TooFewClearedDirections;
     }

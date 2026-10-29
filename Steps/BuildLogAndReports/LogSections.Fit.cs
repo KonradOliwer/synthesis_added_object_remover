@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
@@ -25,23 +26,24 @@ internal static partial class LogSections
             ]);
     }
 
-    /// <summary>What became of the moved replacements; the detailed log lists them by outcome. Nothing when there are none.</summary>
-    public static LogSection BuildMovedReplacementsSection(CollectedObjects world, IRemovalDecisions final, PluginName target, ReportContext context)
+    /// <summary>What became of the other mods' objects the cleaned mod changed; the detailed log lists them by outcome. Nothing when there are none.</summary>
+    public static LogSection BuildChangedObjectsSection(CollectedObjects world, IRemovalDecisions final, PluginName target, ReportContext context)
     {
-        var byOutcome = FitOutcomes.MovedReplacements(world).ToLookup(replacement => FitOutcomes.OutcomeOf(final, replacement.Id));
-        var total = byOutcome.Sum(group => group.Count());
-        if (total == 0) return new LogSection("moved-replacements", []);
-        int CountOf(ReplacementOutcome outcome) => byOutcome[outcome].Count();
+        var changed = FitOutcomes.ChangedObjects(world).ToImmutableArray();
+        if (changed.IsEmpty) return new LogSection("changed-objects", []);
+        var byOutcome = changed.ToLookup(changedObject => FitOutcomes.OutcomeOf(final, changedObject.Id));
+        int CountOf(ChangedObjectOutcome outcome) => byOutcome[outcome].Count();
         return new LogSection(
-            "moved-replacements",
+            "changed-objects",
             [
-                $"Objects of other mods that {target} moved: {TextFormat.Count(total)}; "
-                + $"kept where {target} put them: {TextFormat.Count(CountOf(ReplacementOutcome.KeptWhereMoved))}; "
-                + $"kept there shrunk or turned: {TextFormat.Count(CountOf(ReplacementOutcome.KeptShrunkOrTurned))}; "
-                + $"removed: {TextFormat.Count(CountOf(ReplacementOutcome.Removed))}.",
+                $"{TargetOrigins.ChangedHeading(target)}: {TextFormat.Count(changed.Length)} ({TargetOrigins.CountedKinds(changed)}); "
+                + $"kept where {target} put them: {TextFormat.Count(CountOf(ChangedObjectOutcome.KeptWherePut))}; "
+                + $"kept there shrunk or turned: {TextFormat.Count(CountOf(ChangedObjectOutcome.KeptShrunkOrTurned))}; "
+                + (CountOf(ChangedObjectOutcome.Restored) is > 0 and var restored ? $"restored: {TextFormat.Count(restored)}; " : string.Empty)
+                + $"removed: {TextFormat.Count(CountOf(ChangedObjectOutcome.Removed))}.",
                 .. context.Detailed
-                    ? Enum.GetValues<ReplacementOutcome>().SelectMany(outcome => byOutcome[outcome].Select(replacement =>
-                        FittedObjectLine(OutcomeText(outcome, target), world, final, replacement)))
+                    ? Enum.GetValues<ChangedObjectOutcome>().SelectMany(outcome => byOutcome[outcome].Select(changedObject =>
+                        FittedObjectLine(OutcomeText(outcome, target, final, changedObject), world, final, changedObject)))
                     : [],
             ]);
     }
@@ -59,12 +61,15 @@ internal static partial class LogSections
             ]);
     }
 
-    private static string OutcomeText(ReplacementOutcome outcome, PluginName target) => outcome switch
+    private static string OutcomeText(ChangedObjectOutcome outcome, PluginName target, IRemovalDecisions final, TargetObject changedObject) => outcome switch
     {
-        ReplacementOutcome.KeptWhereMoved => $"Kept where {target} put it",
-        ReplacementOutcome.KeptShrunkOrTurned => "Kept there, shrunk or turned",
-        ReplacementOutcome.Removed => "Removed",
-        _ => throw new UnreachableException($"Unknown replacement outcome {outcome}."),
+        ChangedObjectOutcome.KeptWherePut => $"Kept where {target} put it",
+        ChangedObjectOutcome.KeptShrunkOrTurned => "Kept there, shrunk or turned",
+        ChangedObjectOutcome.Restored => ((Decision.Restored)final.Of(changedObject.Id)!).EarlierVersion.RestoresWholeRecord
+            ? $"Restored as it was before {target}"
+            : $"Restored where it stood before {target}",
+        ChangedObjectOutcome.Removed => "Removed",
+        _ => throw new UnreachableException($"Unknown changed object outcome {outcome}."),
     };
 
     private static string FittedObjectLine(string outcome, CollectedObjects world, IRemovalDecisions final, TargetObject fitted)

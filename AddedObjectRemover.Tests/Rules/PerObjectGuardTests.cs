@@ -65,19 +65,20 @@ public class PerObjectGuardTests
     private static PartFailure TargetFailure(PartKey part, TargetObject target) =>
         new(part, "InvalidDataException: " + FailureMessage, new FailureSubject(target.Key.ToString(), target.EditorId, Faulty));
 
-    private static TooCloseResult FindTooClose(
+    private static TooClosePass FindTooClose(
         List<TargetObject> targets, ObjectCaches world, IBaseObjectShapes shapes, int threads, Replacements replacements) =>
         TooCloseObjects.Find(
             new TooCloseInput(
                 [.. targets],
                 world.VisibleTargets,
                 TargetWorkOrder.Of(targets),
-                world.ObjectsThatCanCauseRemovals(replacements, NpcHandling.Never),
+                world.Selected(replacements, NpcHandling.Never),
                 world.NpcsThatCanSpawn(replacements),
                 shapes,
                 new TriangleStore(shapes.ReadTriangles),
                 new Execution(threads)),
-            new TooCloseSettings(BySize: true, Multiplier, ByDistance: false, DistanceInUnits: 0f, ZoneShape.BoundingBox, NpcHandling.Never));
+            [TestJudgedGroups.OfAll(targets, new TooCloseSettings(BySize: true, Multiplier, ByDistance: false, DistanceInUnits: 0f, ZoneShape.BoundingBox, NpcHandling.Never))])
+            .Passes.Single();
 
     [Theory]
     [InlineData(1)]

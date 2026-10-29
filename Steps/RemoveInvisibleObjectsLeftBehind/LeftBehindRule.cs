@@ -70,7 +70,7 @@ internal sealed class LeftBehindRule(
     {
         surroundings.Around(target.SpaceKey, target.Transform.Position, radius, neighbours);
         // The neighbours come in ascending target id, which fixes the order of the float sums.
-        var boxes = neighbours.Select(neighbour => (neighbour.Box, decisions.IsRemoved(neighbour.Target)));
+        var boxes = neighbours.Select(neighbour => (neighbour.Box, NeighbourFates.Of(decisions, neighbour.Target)));
         return SectorAreaTally.Measure(boxes, target.Transform.Position, config.DirectionClearedPercent);
     }
 
@@ -79,6 +79,7 @@ internal sealed class LeftBehindRule(
         {
             SectorVerdict.TooFewOccupiedDirections => LeftBehindOutcome.KeptTooFewSurroundingObjects,
             SectorVerdict.TooFewClearedDirections => LeftBehindOutcome.KeptSurroundingsMostlyKept,
+            _ when areas.RestoredCount > 0 => LeftBehindOutcome.RemovedSurroundingsRemovedAndRestored,
             _ => LeftBehindOutcome.RemovedSurroundingsRemoved,
         };
 

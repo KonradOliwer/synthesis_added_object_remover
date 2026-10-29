@@ -126,7 +126,7 @@ public class TooCloseObjectsTests
         var found = FindWithFacade(scene, settings).Proposals.ToDictionary(proposal => proposal.Target, proposal => proposal.Reason);
 
         Assert.NotEmpty(found);
-        Assert.All(scene.Targets, target => Assert.Equal(found.GetValueOrDefault(target.Id), CheckOnce(rule, target.Id, target.Placement).Clash));
+        Assert.All(scene.Targets, target => Assert.Equal(found.GetValueOrDefault(target.Id), CheckOnce(rule, target, target.Placement).Clash));
     }
 
     [Fact]
@@ -138,7 +138,18 @@ public class TooCloseObjectsTests
         var hit = FindWithFacade(scene, settings).Proposals[0].Target;
         var farAway = new EulerPlacement(new Vector3(-10 * SceneExtent, 0, 0), Vector3.Zero, 1f);
 
-        Assert.Equal(new PlacementCheck(null, null), CheckOnce(rule, hit, farAway));
+        Assert.Equal(new PlacementCheck(null, null), CheckOnce(rule, scene.Targets[hit.Index], farAway));
+    }
+
+    [Fact]
+    public void ThePlacementRuleChecksTheGivenObjectsOwnBase()
+    {
+        var scene = CreateSideBySideScene(Table.Base, Table.Base);
+        var rule = CreatePlacementRule(scene, SizeOnlyMeshZone);
+        var table = scene.Targets[0];
+
+        Assert.Null(CheckOnce(rule, table, Beside(0f)).Clash);
+        Assert.NotNull(CheckOnce(rule, table with { Base = Boulder.Base }, Beside(0f)).Clash);
     }
 
     [Fact]
@@ -147,7 +158,7 @@ public class TooCloseObjectsTests
         var scene = CreateScene();
         var rule = CreatePlacementRule(scene, new TooCloseSettings(BySize: false, Multiplier, ByDistance: false, DistanceInUnits: 0f, ZoneShape.ObjectShape, NpcHandling.AlwaysLikeAnyObject));
 
-        Assert.All(scene.Targets, target => Assert.Null(CheckOnce(rule, target.Id, target.Placement).Clash));
+        Assert.All(scene.Targets, target => Assert.Null(CheckOnce(rule, target, target.Placement).Clash));
     }
 
     [Theory]
@@ -166,6 +177,95 @@ public class TooCloseObjectsTests
         Assert.Equal(default, result.Work);
         Assert.Null(result.Npc);
         Assert.Equal(0, result.LargeOtherObjects);
+    }
+
+    [Theory]
+    [InlineData(ZoneShape.BoundingBox)]
+    [InlineData(ZoneShape.ObjectShape)]
+    public void GroupsWithDifferentSettingsRunOnceEachOverTheirOwnObjects(ZoneShape zone)
+    {
+        var scene = CreateScene();
+        var wide = new TooCloseSettings(BySize: true, Multiplier, ByDistance: false, DistanceInUnits: 0f, zone, NpcHandling.Never);
+        var narrow = wide with { Multiplier = 0f };
+        Func<int, bool> isEven = index => index % 2 == 0;
+        Func<int, bool> isOdd = index => index % 2 == 1;
+
+        var result = FindGroupsWithFacade(
+            scene, NewTriangles(), Threads, TestJudgedGroups.Of(TargetsWhere(scene, isEven), wide), TestJudgedGroups.Of(TargetsWhere(scene, isOdd), narrow));
+
+        var (wideAlone, narrowAlone) = (FindWithFacade(scene, wide), FindWithFacade(scene, narrow));
+        Assert.Equal(2, result.Passes.Length);
+        Assert.Equal(TargetsWhere(scene, isEven), result.Passes[0].Objects.Select(target => target.Index));
+        Assert.Equal(TargetsWhere(scene, isOdd), result.Passes[1].Objects.Select(target => target.Index));
+        Assert.NotEmpty(result.Passes[0].Hits);
+        Assert.Equal(HitsOf(wideAlone, isEven), HitsOf(result.Passes[0], isEven));
+        Assert.Equal(HitsOf(narrowAlone, isOdd), HitsOf(result.Passes[1], isOdd));
+        Assert.NotEqual(HitsOf(wideAlone, isOdd), HitsOf(result.Passes[1], isOdd));
+        Assert.Equal(
+            result.Passes.SelectMany(pass => pass.Hits).Select(hit => hit.TargetIndex).Order(),
+            result.Proposals.Select(proposal => proposal.Target.Index));
+    }
+
+    [Theory]
+    [InlineData(ZoneShape.BoundingBox)]
+    [InlineData(ZoneShape.ObjectShape)]
+    public void GroupsWithEqualSettingsAreMergedIntoOneRunOverAllTheirObjects(ZoneShape zone)
+    {
+        var scene = CreateScene();
+        var settings = new TooCloseSettings(BySize: true, Multiplier, ByDistance: false, DistanceInUnits: 0f, zone, NpcHandling.AlwaysLikeAnyObject);
+
+        var result = FindGroupsWithFacade(
+            scene,
+            NewTriangles(),
+            Threads,
+            TestJudgedGroups.Of(TargetsWhere(scene, index => index % 2 == 0), settings),
+            TestJudgedGroups.Of(TargetsWhere(scene, index => index % 2 == 1), settings with { Multiplier = Multiplier }));
+
+        var all = FindWithFacade(scene, settings);
+        var merged = Assert.Single(result.Passes);
+        Assert.Equal(TargetsWhere(scene, _ => true), merged.Objects.Select(target => target.Index));
+        Assert.NotEmpty(all.Hits);
+        Assert.Equal(all.Hits.AsEnumerable(), merged.Hits.AsEnumerable());
+        Assert.Equal(all.Work, merged.Work);
+        Assert.Equal(all.Proposals.AsEnumerable(), result.Proposals.AsEnumerable());
+    }
+
+    [Fact]
+    public void EachPassTakesTheObjectsThatCanCauseRemovalsForItsOwnNpcHandling()
+    {
+        var scene = CreateScene();
+        var withNpcs = new TooCloseSettings(BySize: true, Multiplier, ByDistance: false, DistanceInUnits: 0f, ZoneShape.BoundingBox, NpcHandling.AlwaysLikeAnyObject);
+
+        var result = FindGroupsWithFacade(
+            scene,
+            NewTriangles(),
+            Threads,
+            TestJudgedGroups.Of(TargetsWhere(scene, index => index % 2 == 0), withNpcs),
+            TestJudgedGroups.Of(TargetsWhere(scene, index => index % 2 == 1), withNpcs with { Npcs = NpcHandling.Never }));
+
+        Assert.Contains(result.Passes[0].Hits, hit => hit.TooCloseTo.IsPlacedNpc);
+        Assert.NotEmpty(result.Passes[1].Hits);
+        Assert.DoesNotContain(result.Passes[1].Hits, hit => hit.TooCloseTo.IsPlacedNpc);
+    }
+
+    [Fact]
+    public void TheGroupsFindTheSameWithOneThreadAndWithMany()
+    {
+        var scene = CreateScene();
+        var wide = new TooCloseSettings(BySize: true, Multiplier, ByDistance: true, Distance, ZoneShape.ObjectShape, NpcHandling.AlwaysLikeAnyObject);
+        var groups = new[]
+        {
+            TestJudgedGroups.Of(TargetsWhere(scene, index => index % 2 == 0), wide),
+            TestJudgedGroups.Of(TargetsWhere(scene, index => index % 2 == 1), wide with { BySize = false, ByDistance = true, Zone = ZoneShape.BoundingBox }),
+        };
+
+        var one = FindGroupsWithFacade(scene, NewTriangles(), threads: 1, groups);
+        var many = FindGroupsWithFacade(scene, NewTriangles(), threads: 8, groups);
+
+        Assert.Equal(2, one.Passes.Length);
+        Assert.Equal(one.Passes.Select(pass => pass.Hits.ToList()), many.Passes.Select(pass => pass.Hits.ToList()));
+        Assert.Equal(one.Passes.Select(pass => pass.Work), many.Passes.Select(pass => pass.Work));
+        Assert.Equal(one.Proposals.AsEnumerable(), many.Proposals.AsEnumerable());
     }
 
     [Theory]
@@ -243,10 +343,10 @@ public class TooCloseObjectsTests
 
         foreach (var target in scene.Targets)
         {
-            using var tries = rule.StartTries(target.Id);
+            using var tries = rule.StartTries(target);
             foreach (var placement in TriedPlacements(target))
             {
-                var own = CheckOnce(rule, target.Id, placement);
+                var own = CheckOnce(rule, target, placement);
                 var tried = tries.Check(placement);
 
                 Assert.Equal((own.Clash is null, own.Failure), (tried.Clash is null, tried.Failure));
@@ -266,10 +366,11 @@ public class TooCloseObjectsTests
     {
         var scene = CreateSideBySideScene(Table.Base, Table.Base);
         var rule = CreatePlacementRule(scene, SizeOnlyMeshZone);
-        using var tries = rule.StartTries(new TargetId(0));
+        var target = scene.Targets[0];
+        using var tries = rule.StartTries(target);
 
         Assert.Equal(ReasonOf(TableB), tries.Check(Beside(OnlyB)).Clash);
-        Assert.Equal(ReasonOf(TableA), CheckOnce(rule, new TargetId(0), Beside(OnBoth)).Clash);
+        Assert.Equal(ReasonOf(TableA), CheckOnce(rule, target, Beside(OnBoth)).Clash);
         Assert.Equal(ReasonOf(TableB), tries.Check(Beside(OnBoth)).Clash);
         Assert.Equal(ReasonOf(TableA), tries.Check(Beside(OnlyA)).Clash);
         Assert.Equal(new PlacementCheck(null, null), tries.Check(Beside(OnNeither)));
@@ -286,10 +387,11 @@ public class TooCloseObjectsTests
         var scene = CreateSideBySideScene(Unreadable.Base, Table.Base);
         var triangles = new TriangleStore(path => path.Contains(UnreadableName, StringComparison.OrdinalIgnoreCase) ? throw new IOException(UnreadableName) : Shapes.ReadTriangles(path));
         var rule = CreatePlacementRule(scene, SizeOnlyMeshZone, triangles);
-        using var tries = rule.StartTries(new TargetId(0));
+        var target = scene.Targets[0];
+        using var tries = rule.StartTries(target);
 
         Assert.Equal(ReasonOf(TableB), tries.Check(Beside(OnlyB)).Clash);
-        Assert.NotNull(CheckOnce(rule, new TargetId(0), Beside(OnBoth)).Failure);
+        Assert.NotNull(CheckOnce(rule, target, Beside(OnBoth)).Failure);
         Assert.Equal(new PlacementCheck(ReasonOf(TableB), null), tries.Check(Beside(OnBoth)));
         Assert.NotNull(tries.Check(Beside(OnlyA)).Failure);
     }
@@ -303,10 +405,11 @@ public class TooCloseObjectsTests
     {
         var scene = CreateSideBySideScene(Table.Base, BrokenParts.Base);
         var rule = CreatePlacementRule(scene, DistanceOnlyMeshZone, new TriangleStore(WithBrokenParts));
-        using var tries = rule.StartTries(new TargetId(0));
+        var target = scene.Targets[0];
+        using var tries = rule.StartTries(target);
 
         Assert.Equal(DistanceReasonOf(TableB), tries.Check(At(RightOfBX, 0f)).Clash);
-        Assert.Equal(new PlacementCheck(DistanceReasonOf(TableA), null), CheckOnce(rule, new TargetId(0), At(BesideAOnlyX, BesideY)));
+        Assert.Equal(new PlacementCheck(DistanceReasonOf(TableA), null), CheckOnce(rule, target, At(BesideAOnlyX, BesideY)));
         var tried = tries.Check(At(BesideAOnlyX, BesideY));
         Assert.Null(tried.Clash);
         Assert.NotNull(tried.Failure);
@@ -321,10 +424,11 @@ public class TooCloseObjectsTests
     {
         var scene = CreateSideBySideScene(Table.Base, Table.Base);
         var rule = CreatePlacementRule(scene, SizeOnlyMeshZone with { ByDistance = true, DistanceInUnits = NearDistance });
-        using var tries = rule.StartTries(new TargetId(0));
+        var target = scene.Targets[0];
+        using var tries = rule.StartTries(target);
 
         Assert.Equal(DistanceReasonOf(TableB), tries.Check(At(BesideOnlyBX, BesideY)).Clash);
-        Assert.Equal(DistanceReasonOf(TableA), CheckOnce(rule, new TargetId(0), At(BesideBothX, BesideY)).Clash);
+        Assert.Equal(DistanceReasonOf(TableA), CheckOnce(rule, target, At(BesideBothX, BesideY)).Clash);
         Assert.Equal(DistanceReasonOf(TableB), tries.Check(At(BesideBothX, BesideY)).Clash);
     }
 
@@ -342,7 +446,7 @@ public class TooCloseObjectsTests
         FindWithFacade(scene, settings, searched);
         foreach (var target in scene.Targets)
         {
-            using var tries = rule.StartTries(target.Id);
+            using var tries = rule.StartTries(target);
             failures += TriedPlacements(target).Count(placement => tries.Check(placement).Failure is not null);
         }
 
@@ -365,7 +469,7 @@ public class TooCloseObjectsTests
         var search = settings.Zone switch
         {
             ZoneShape.BoundingBox => TooCloseSearch.FindTooCloseTargets(
-                scene.Targets, otherModObjects, Shapes, ZoneGrowth.Active(settings), npcRule, order, execution),
+                scene.Targets, otherModObjects, Shapes, ZoneGrowth.Active(settings), npcRule, TestJudgedGroups.IdsOf(scene.Targets), order, execution),
             _ => FindInShapeZone(scene, settings, world.VisibleTargets, otherModObjects, npcRule, order, execution, out largeOtherObjects),
         };
         return (search, largeOtherObjects, npcRule.StuckSearch?.GetSummary(search.Work.Npcs));
@@ -376,26 +480,35 @@ public class TooCloseObjectsTests
     {
         var zone = ShapeZoneSearch.Create(scene.Targets, visibleTargets, otherModObjects, Shapes, NewTriangles(), ZoneGrowth.Active(settings), npcRule);
         largeOtherObjects = zone.LargeOtherObjects;
-        return zone.FindTooCloseTargets(order, execution);
+        return zone.FindTooCloseTargets(TestJudgedGroups.IdsOf(scene.Targets), order, execution);
     }
 
-    private static TooCloseResult FindWithFacade(TooCloseScene scene, TooCloseSettings settings) => FindWithFacade(scene, settings, NewTriangles());
+    private static TooClosePass FindWithFacade(TooCloseScene scene, TooCloseSettings settings) => FindWithFacade(scene, settings, NewTriangles());
 
-    private static TooCloseResult FindWithFacade(TooCloseScene scene, TooCloseSettings settings, ITriangleMeshes triangles)
+    private static TooClosePass FindWithFacade(TooCloseScene scene, TooCloseSettings settings, ITriangleMeshes triangles) =>
+        Assert.Single(FindGroupsWithFacade(scene, triangles, Threads, TestJudgedGroups.OfAll(scene.Targets, settings)).Passes);
+
+    private static TooCloseResult FindGroupsWithFacade(
+        TooCloseScene scene, ITriangleMeshes triangles, int threads, params ObjectsJudgedWith<TooCloseSettings>[] groups)
     {
         var replacements = Replacements.None(scene.OtherModObjects.Count);
         var caches = CreateWorld(scene);
         return TooCloseObjects.Find(
             TestScenes.CreateWorld(scene.Targets, scene.OtherModObjects),
             caches.VisibleTargets,
-            caches.ObjectsThatCanCauseRemovals(replacements, settings.Npcs),
+            caches.Selected(replacements, NpcHandling.AlwaysLikeAnyObject),
             caches.PlacedNpcs,
-            replacements,
             Shapes,
             triangles,
-            new Execution(Threads),
-            settings);
+            new Execution(threads),
+            groups);
     }
+
+    private static IEnumerable<int> TargetsWhere(TooCloseScene scene, Func<int, bool> includes) =>
+        scene.Targets.Select(target => target.Id.Index).Where(includes);
+
+    private static IEnumerable<(int Target, OtherId Other, TooCloseCause Cause)> HitsOf(TooClosePass pass, Func<int, bool> includes) =>
+        pass.Hits.Where(hit => includes(hit.TargetIndex)).Select(hit => (hit.TargetIndex, hit.TooCloseTo.Id, hit.Cause));
 
     /// <summary>
     /// The scene's targets turn only about Z, but store no Euler rotation; each gets the stored rotation of its turn, and the
@@ -421,17 +534,16 @@ public class TooCloseObjectsTests
         var replacements = Replacements.None(scene.OtherModObjects.Count);
         var caches = CreateWorld(scene);
         return TooCloseObjects.CreatePlacementRule(
-            TestScenes.CreateWorld(scene.Targets, scene.OtherModObjects),
+            scene.Targets,
             caches.VisibleTargets,
-            caches.ObjectsThatCanCauseRemovals(replacements, settings.Npcs),
+            caches.Selected(replacements, settings.Npcs),
             caches.PlacedNpcs,
-            replacements,
             Shapes,
             triangles,
             settings);
     }
 
-    private static PlacementCheck CheckOnce(IPlacementRule rule, TargetId target, EulerPlacement placement)
+    private static PlacementCheck CheckOnce(IPlacementRule rule, TargetObject target, EulerPlacement placement)
     {
         using var tries = rule.StartTries(target);
         return tries.Check(placement);

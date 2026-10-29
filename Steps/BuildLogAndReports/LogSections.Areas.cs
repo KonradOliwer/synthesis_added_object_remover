@@ -15,7 +15,7 @@ internal static partial class LogSections
     /// </summary>
     public static LogSection BuildAreasSection(
         CollectedObjects world,
-        IReadOnlyList<RemovedObject> removals,
+        IReadOnlyList<ObjectWithReason> removals,
         IEnumerable<KeptObject> kept,
         IEnumerable<ManualPatchHint> hints,
         RemovalRisks risks)

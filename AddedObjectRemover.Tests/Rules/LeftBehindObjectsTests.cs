@@ -76,12 +76,38 @@ public class LeftBehindObjectsTests
     {
         var protection = ObjectsToKeep.Build(Targets, [TestTargets.Link(0, 1)], TestTargets.References(Targets.Length), TestBaseFacts.Unresolved);
 
-        var result = Find(RemovalDecisions.Start(protection, Targets.Length), Settings);
+        var result = Find(TestSeededDecisions.StartDisablingAll(protection, Targets.Length), Settings);
 
         var member = result.Evaluations.Single(evaluation => evaluation.TargetIndex == 1);
         Assert.Equal(LeftBehindOutcome.RemovedLinkedToRemoval, member.Decision);
         Assert.True(member.IsRemoved);
         Assert.Equal(0, Assert.Single(result.Proposals).Target.Index);
+    }
+
+    [Fact]
+    public void AnObjectTheRoundRestoresIsEvaluatedAsRestoredAndItsLinkedGroupMemberAsRestoredLinkedNeverAsRemoved()
+    {
+        var protection = ObjectsToKeep.Build(Targets, [TestTargets.Link(0, 1)], TestTargets.References(Targets.Length), TestBaseFacts.Unresolved);
+        var restore = new WhenRemoved.Restore(TestTargets.EarlierVersionAt(new PluginName("Earlier.esp"), Targets[0].Placement));
+
+        var result = Find(RemovalDecisions.Start(protection, [restore, restore]), Settings);
+
+        var restored = result.Evaluations.Single(evaluation => evaluation.TargetIndex == 0);
+        var member = result.Evaluations.Single(evaluation => evaluation.TargetIndex == 1);
+        Assert.Equal((LeftBehindOutcome.RestoredInsideOtherObject, true, false), (restored.Decision, restored.IsRestored, restored.IsRemoved));
+        Assert.Equal((LeftBehindOutcome.RestoredAsLinked, true, false), (member.Decision, member.IsRestored, member.IsRemoved));
+    }
+
+    [Fact]
+    public void ALinkedGroupMemberTheRoundRemovesAlongWithARestoredObjectIsEvaluatedAsRemovedLinkedToARestoredObject()
+    {
+        var protection = ObjectsToKeep.Build(Targets, [TestTargets.Link(0, 1)], TestTargets.References(Targets.Length), TestBaseFacts.Unresolved);
+        var restore = new WhenRemoved.Restore(TestTargets.EarlierVersionAt(new PluginName("Earlier.esp"), Targets[0].Placement));
+
+        var result = Find(RemovalDecisions.Start(protection, [restore, new WhenRemoved.Disable()]), Settings);
+
+        var member = result.Evaluations.Single(evaluation => evaluation.TargetIndex == 1);
+        Assert.Equal((LeftBehindOutcome.RemovedLinkedToRestoration, true), (member.Decision, member.IsRemoved));
     }
 
     [Fact]
@@ -102,7 +128,7 @@ public class LeftBehindObjectsTests
     {
         var protection = ObjectsToKeep.Build(
             Targets, [], TestTargets.References(Targets.Length, new Dictionary<int, KeepReason> { [0] = TestKeepReasons.Quest }), TestBaseFacts.Unresolved);
-        var decisions = RemovalDecisions.Start(protection, Targets.Length)
+        var decisions = TestSeededDecisions.StartDisablingAll(protection, Targets.Length)
             .Apply(RoundKind.TooClose, [new ProposedRemoval(new TargetId(0), new RemovalReason.TooClose(Others[0].Id, new TooCloseCause.ObjectSize()))]);
         Assert.IsType<Decision.Kept>(decisions.Of(new TargetId(0)));
 
@@ -274,7 +300,7 @@ public class LeftBehindObjectsTests
     private static IEnumerable<(int Target, InvisibleObjectKind Kind, float Radius, OtherId? Host, LeftBehindOutcome Decision, int Occupied, int Removed)> Summarize(LeftBehindResult result) =>
         result.Evaluations.Select(e => (e.TargetIndex, e.Kind, e.Radius, e.ContainingObject?.Id, e.Decision, e.Surroundings.OccupiedCount, e.Surroundings.RemovedCount));
 
-    private static RemovalDecisions StartDecisions() => RemovalDecisions.Start(ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Length), TestBaseFacts.Unresolved), Targets.Length);
+    private static RemovalDecisions StartDecisions() => TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Length), TestBaseFacts.Unresolved), Targets.Length);
 
     private static ObjectCaches CreateScene() => TestScenes.Create(Targets, Others, Shapes, supportOnlyObjects: []);
 

@@ -32,7 +32,7 @@ internal static partial class LogSections
     /// </summary>
     private static bool HasDetailedLine(VisibleLeftBehindCheck evaluation) => evaluation.Decision switch
     {
-        VisibleLeftBehindOutcome.KeptSurroundingsMostlyKept => evaluation.Surroundings.RemovedCount > 0,
+        VisibleLeftBehindOutcome.KeptSurroundingsMostlyKept => evaluation.Surroundings.ClearedCount > 0,
         VisibleLeftBehindOutcome.KeptTooFewSurroundingObjects => false,
         _ => true,
     };
@@ -41,7 +41,7 @@ internal static partial class LogSections
     {
         var target = world.Targets[evaluation.TargetIndex];
         return $"  Visible left behind: {RecordNames.Describe(target)}{(evaluation.Kind is { } kind ? $" ({VisibleLeftBehindOutcomeText.KindName(kind)})" : string.Empty)} in {Describe.Space(world, target.SpaceKey)}: "
-            + $"{(evaluation.IsRemoved ? "removed" : "kept")}, {VisibleLeftBehindOutcomeText.DescribeReason(evaluation)}; "
+            + $"{VisibleLeftBehindOutcomeText.Verdict(evaluation)}, {VisibleLeftBehindOutcomeText.DescribeReason(evaluation)}; "
             + $"removed/total ground area {SectorAreasText.Describe(evaluation.Surroundings)}.";
     }
 
@@ -50,7 +50,9 @@ internal static partial class LogSections
             VisibleLeftBehindStepName,
             [.. visibleLeftBehind.Evaluations.Select(evaluation => evaluation.Decision)],
             VisibleLeftBehindOutcomes.IsRemoval,
-            outcome => outcome == VisibleLeftBehindOutcome.RemovedLinkedToRemoval,
+            VisibleLeftBehindOutcomes.IsRestoration,
+            outcome => VisibleLeftBehindOutcomes.IsRemovedAsLinked(outcome) || VisibleLeftBehindOutcomes.IsRestoration(outcome)
+                || outcome == VisibleLeftBehindOutcome.RemovedSurroundingsRemovedAndRestored,
             VisibleLeftBehindOutcomeText.Describe,
             elapsed,
             context);

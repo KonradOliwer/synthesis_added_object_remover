@@ -13,4 +13,6 @@ public sealed record VisibleLeftBehindCheck(
     KeepReason? KeepReason)
 {
     public bool IsRemoved => VisibleLeftBehindOutcomes.IsRemoval(Decision);
+
+    public bool IsRestored => VisibleLeftBehindOutcomes.IsRestoration(Decision);
 }

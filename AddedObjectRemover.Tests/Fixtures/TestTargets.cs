@@ -48,7 +48,13 @@ internal static class TestTargets
             ReferenceRadius: null,
             PrimitiveBounds: null,
             UnnamedArea,
-            IsMovedReplacement: false);
+            TargetOrigin.CleanedMod,
+            EarlierVersion: null);
+
+    /// <summary>An earlier version in the test target space's cell, not persistent and without a stored scale, that restores only the placement.</summary>
+    /// <param name="baseKey">The base of the target object it belongs to, which a placement-only restore keeps.</param>
+    public static EarlierVersion EarlierVersionAt(PluginName plugin, EulerPlacement placement, BaseKey? baseKey = null) =>
+        new(plugin, placement, StoredScale: null, baseKey, new CellFact(Space, null), IsPersistent: false, RestoresWholeRecord: false, TestPlacedRecords.PlainReference);
 
     /// <summary>The area of a target object whose space and cell have no names, such as an interior cell without a name.</summary>
     public static readonly TargetArea UnnamedArea = new(Hold: null, Place: null, PlaceSource.CellName, Grid: null);

@@ -8,10 +8,11 @@ internal static partial class LogSections
 {
     public static LogSection BuildWriteSection(WriteSummary written, TimeSpan elapsed, ReportContext context)
     {
-        var total = written.Removed.Length + written.Moved + written.Fitted + written.OtherModsObjectsRemoved + written.OtherModsObjectsPulledDown;
+        var total = written.Removed.Length + written.Restored.Length + written.Moved + written.Fitted + written.OtherModsObjectsRemoved + written.OtherModsObjectsPulledDown;
         List<string> lines =
         [
             $"Wrote {TextFormat.Count(total)} overrides ({TextFormat.Count(written.Removed.Length)} removed"
+                + WhenAny(written.Restored.Length, "restored")
                 + WhenAny(written.Moved, "kept markers moved")
                 + WhenAny(written.Fitted, "shrunk or turned to fit")
                 + OtherModsObjectsWritten(written)

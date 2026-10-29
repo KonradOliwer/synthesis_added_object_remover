@@ -61,7 +61,7 @@ public class TooCloseOrderDeterminismTests
         }
     }
 
-    private static TooCloseResult Find(TooCloseScene scene, TooCloseSettings settings, WorkOrder order)
+    private static TooClosePass Find(TooCloseScene scene, TooCloseSettings settings, WorkOrder order)
     {
         var replacements = Replacements.None(scene.OtherModObjects.Count);
         var world = TestScenes.Create(scene.Targets, scene.OtherModObjects, Shapes, bodies: NewBodies(), threads: Threads);
@@ -70,12 +70,12 @@ public class TooCloseOrderDeterminismTests
                 [.. scene.Targets],
                 world.VisibleTargets,
                 order,
-                world.ObjectsThatCanCauseRemovals(replacements, settings.Npcs),
+                world.Selected(replacements, settings.Npcs),
                 world.NpcsThatCanSpawn(replacements),
                 Shapes,
                 new TriangleStore(Shapes.ReadTriangles),
                 new Execution(Threads)),
-            settings);
+            [TestJudgedGroups.OfAll(scene.Targets, settings)]).Passes.Single();
     }
 
     private static TooCloseScene CreateScene()

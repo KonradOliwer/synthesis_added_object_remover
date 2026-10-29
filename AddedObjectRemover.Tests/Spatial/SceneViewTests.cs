@@ -60,28 +60,48 @@ public class SceneViewTests
 
     /// <summary>
     /// The slab is 1000 units long east to west and 1200 north to south; kept turned a quarter, it reaches 600 units east. The
-    /// left-behind step and the marker moves read this index.
+    /// left-behind steps read the index as the rounds measure the targets, the marker moves the index as they stand.
     /// </summary>
     [Fact]
     public void TheVisibleTargetsAsTheyStandSeeAnObjectKeptTurnedWhereItIsNowAndLeaveTheCollectedIndexAsItIs()
     {
         ImmutableArray<TargetObject> targets = [TestTargets.Create(0, TestTargets.At(Vector3.Zero), Slab.Base, TestTargets.Space)];
         var caches = TestScenes.Create(targets, [], Shapes);
-        var started = RemovalDecisions.Start(ObjectsToKeep.Build(targets, [], TestTargets.References(1), TestBaseFacts.Unresolved), targets.Length);
+        var started = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(1), TestBaseFacts.Unresolved), targets.Length);
         var turnedAQuarter = targets[0].Placement with { Rotation = new Vector3(0, 0, MathF.PI / 2) };
         var kept = started.ApplyFits([new ProposedFit(targets[0].Id, new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()), turnedAQuarter)]);
-        var eastOfTheSlab = new Vector3(550, 0, 5);
 
-        Assert.Equal([new TargetId(0)], Near(ClashingObjectFitter.IndexAsTheyStand(targets, kept, caches)));
-        Assert.Empty(Near(caches.VisibleTargets));
+        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(ClashingObjectFitter.IndexAsTheyStand(targets, kept, caches)));
+        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(ClashingObjectFitter.IndexAsTheRoundsMeasureThem(targets, kept, caches)));
+        Assert.Empty(NearEastOfTheSlab(caches.VisibleTargets));
         Assert.Same(caches.VisibleTargets, ClashingObjectFitter.IndexAsTheyStand(targets, started, caches));
+        Assert.Same(caches.VisibleTargets, ClashingObjectFitter.IndexAsTheRoundsMeasureThem(targets, started, caches));
+    }
 
-        List<TargetId> Near(IVisibleTargetObjects index)
-        {
-            List<VisibleTargetNear> neighbours = [];
-            index.Around(TestTargets.Space, eastOfTheSlab, radius: 10f, neighbours);
-            return [.. neighbours.Select(neighbour => neighbour.Target)];
-        }
+    /// <summary>
+    /// A restored slab stands at its earlier placement, turned a quarter, which reaches 600 units east; the rounds still measure it
+    /// where the cleaned mod put it. The marker obstacles read the first index, the left-behind steps the second.
+    /// </summary>
+    [Fact]
+    public void ARestoredObjectIsIndexedAtItsEarlierPlacementAsItStandsAndWhereTheCleanedModPutItAsTheRoundsMeasureIt()
+    {
+        ImmutableArray<TargetObject> targets = [TestTargets.Create(0, TestTargets.At(Vector3.Zero), Slab.Base, TestTargets.Space)];
+        var caches = TestScenes.Create(targets, [], Shapes);
+        var earlierVersion = TestTargets.EarlierVersionAt(new PluginName("Earlier.esp"), targets[0].Placement with { Rotation = new Vector3(0, 0, MathF.PI / 2) }, targets[0].Base);
+        var started = RemovalDecisions.Start(
+            ObjectsToKeep.Build(targets, [], TestTargets.References(1), TestBaseFacts.Unresolved), [new WhenRemoved.Restore(earlierVersion)]);
+        var restored = started.Apply(
+            RoundKind.TooClose, [new ProposedRemoval(targets[0].Id, new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()))]);
+
+        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(ClashingObjectFitter.IndexAsTheyStand(targets, restored, caches)));
+        Assert.Same(caches.VisibleTargets, ClashingObjectFitter.IndexAsTheRoundsMeasureThem(targets, restored, caches));
+    }
+
+    private static List<TargetId> NearEastOfTheSlab(IVisibleTargetObjects index)
+    {
+        List<VisibleTargetNear> neighbours = [];
+        index.Around(TestTargets.Space, new Vector3(550, 0, 5), radius: 10f, neighbours);
+        return [.. neighbours.Select(neighbour => neighbour.Target)];
     }
 
     [Theory]
@@ -99,6 +119,20 @@ public class SceneViewTests
         active.Overlapping(TestTargets.Space, Upright(new Box(new Vector3(-5), new Vector3(5))), new ObjectQueryScratch(), found);
 
         Assert.Equal(npcIsActive ? [new OtherId(0), new OtherId(1)] : new[] { new OtherId(0) }, found);
+    }
+
+    [Fact]
+    public void AnExcludedOtherModObjectCausesNoRemovalsAndListsNoReplacement()
+    {
+        List<OtherObject> otherModObjects = [TestShapes.Placed(Mod, 0, Crate.Base, Vector3.Zero), TestShapes.Placed(Mod, 1, Crate.Base, Vector3.Zero)];
+        var excluding = Replacements.Excluding(otherModObjects.Count, new OtherId(0));
+        var active = TestScenes.Create([], otherModObjects, Shapes).ObjectsThatCanCauseRemovals(excluding, NpcHandling.Never);
+        List<OtherId> found = [];
+
+        active.Overlapping(TestTargets.Space, Upright(new Box(new Vector3(-5), new Vector3(5))), new ObjectQueryScratch(), found);
+
+        Assert.Equal(new[] { new OtherId(1) }, found);
+        Assert.Empty(excluding.List);
     }
 
     [Fact]

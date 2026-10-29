@@ -24,9 +24,12 @@ internal static class TestSupportCascade
         TerrainHeights terrain,
         float touchDistance,
         float threshold,
-        int threads)
+        int threads,
+        IReadOnlyCollection<int>? restoredTargets = null)
     {
-        var seeded = TestSeededDecisions.Seed(protection, targets.Count, seeds);
+        var seeded = restoredTargets is null
+            ? TestSeededDecisions.Seed(protection, targets.Count, seeds)
+            : TestSeededDecisions.SeedRestoring(protection, targets, restoredTargets, seeds);
         var triangles = new TriangleStore(shapes.ReadTriangles);
         var input = new RoundsInput(
             [.. targets],

@@ -59,7 +59,7 @@ internal static class TestShapes
 
     public static OtherObject Placed(ModKey mod, int index, BaseKey baseKey, Vector3 position, float zRadians = 0f) =>
         new(new OtherId(index), new FormKey(mod, 0x900 + (uint)index).ToRecordKey(), TestTargets.Space, mod.ToPluginName(), EditorId: null, baseKey, position, new Vector3(0, 0, zRadians), 1f,
-            IsPrimitive: false, HasMapMarker: false, new ObjectChange(mod.ToPluginName(), AcceptedFrom: null));
+            IsPrimitive: false, HasMapMarker: false, new ObjectChange(mod.ToPluginName(), AcceptedFrom: null), ReferenceRoles.None, ChangeWithoutCleanedMod: null);
 
     /// <summary>Writes a loose NIF of the triangles at the model path under the Data folder.</summary>
     /// <param name="collision">The layer of a collision rigid body on the root node; null for none.</param>

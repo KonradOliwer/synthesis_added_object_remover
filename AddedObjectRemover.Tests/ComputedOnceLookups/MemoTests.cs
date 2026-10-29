@@ -91,6 +91,22 @@ public class MemoTests
     }
 
     [Fact]
+    public void TheValueIfComputedComputesNothing()
+    {
+        var computations = 0;
+        var once = new ComputedOnce<string>(() =>
+        {
+            computations++;
+            return "value";
+        });
+
+        var before = once.ValueIfComputed;
+        _ = once.Value;
+
+        Assert.Equal(((string?)null, (string?)"value", 1), (before, once.ValueIfComputed, computations));
+    }
+
+    [Fact]
     public void ContentsHoldsOnlyValuesComputedSoFar()
     {
         var memo = new ComputedOncePerKey<string, int>(Publication.BuiltOnce, StringComparer.OrdinalIgnoreCase);

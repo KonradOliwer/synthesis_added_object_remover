@@ -107,6 +107,18 @@ public static class ParallelMap
         int rangeSize) =>
         Run(execution, order.Among(indices), newScratch, (position, scratch) => body(indices[position], scratch), rangeSize);
 
+    /// <summary>As the other <c>RunOver</c>, also summing the work counts.</summary>
+    public static (TOut[] Results, TWork Work) RunOver<TScratch, TOut, TWork>(
+        Execution execution,
+        WorkOrder order,
+        IReadOnlyList<int> indices,
+        Func<TScratch> newScratch,
+        Func<int, TScratch, TOut> body,
+        Func<TScratch, TWork> harvest,
+        int rangeSize)
+        where TWork : IWork<TWork> =>
+        Run(execution, order.Among(indices), newScratch, (position, scratch) => body(indices[position], scratch), harvest, rangeSize);
+
     /// <summary>
     /// Finds each group's first matching member. A group's members are tested one after another in
     /// the group's own order and the rest are skipped once one matches, so first means first in that

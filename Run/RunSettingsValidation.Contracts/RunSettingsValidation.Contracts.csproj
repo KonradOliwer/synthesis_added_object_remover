@@ -13,6 +13,8 @@
     <ProjectReference Include="..\..\Steps\IdentifyTheMods.Contracts\IdentifyTheMods.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\SelectObjectsThatCanCauseRemovals.Contracts\SelectObjectsThatCanCauseRemovals.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\JudgeChangedObjects.Contracts\JudgeChangedObjects.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\RemoveObjectsOnChangedTerrain.Contracts\RemoveObjectsOnChangedTerrain.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\RemoveTooCloseObjects.Contracts\RemoveTooCloseObjects.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\FitClashingObjects.Contracts\FitClashingObjects.Contracts.csproj" />

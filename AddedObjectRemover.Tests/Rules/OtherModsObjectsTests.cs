@@ -33,6 +33,7 @@ public class OtherModsObjectsTests
     private const int ManyScenes = 12;
     private const float ManyScenesSpacing = 100f;
 
+    private static readonly PluginName EarlierPlugin = new("Earlier.esp");
     private static readonly ModKey BaseGame = ModKey.FromNameAndExtension("Base.esm");
     private static readonly ModKey OtherMod = ModKey.FromNameAndExtension("Other.esp");
     private static readonly ModKey LateMod = ModKey.FromNameAndExtension("Late.esp");
@@ -425,7 +426,7 @@ public class OtherModsObjectsTests
 
         RemovalReason expected = mode == FollowUpRemovalMode.EverythingTouchingIt
             ? new RemovalReason.TouchingAnotherModsObject(new OtherId(1))
-            : new RemovalReason.LostSupportWithAnotherModsObject(1f, new OtherId(1));
+            : new RemovalReason.LostSupportWithAnotherModsObject(1f, 0f, new OtherId(1));
         var removed = Assert.IsType<Decision.Removed>(lantern);
         Assert.Equal(expected.GetType(), removed.Reason.GetType());
         Assert.Equal(new OtherId(1), removed.Reason switch
@@ -517,15 +518,58 @@ public class OtherModsObjectsTests
         Assert.Equal(new RemovalReason.TouchingAnotherModsObject(new OtherId(1)), Assert.IsType<Decision.Removed>(decisions.Of(new TargetId(LanternOnTheBook))).Reason);
     }
 
+    /// <summary>The restored table stands at its earlier placement, a shrunk one, so the lantern that rested on it where the cleaned mod put it lands on that top.</summary>
+    [Fact]
+    public void AnObjectOnATableRestoredBeforeTheStepIsPulledDownOntoTheTableAtItsEarlierPlacement()
+    {
+        var scene = new Scene([CreateTable()], WithFloor(Lantern(OtherMod, 1, OnTheTable)), OtherModsObjectsHandling.PullObjectToTheGround)
+        {
+            EarlierPlacements = new Dictionary<int, EulerPlacement> { [Table] = new(Vector3.Zero, Vector3.Zero, ShrunkScale) },
+        };
+
+        var (result, decisions) = Settle(scene, RemoveTable);
+
+        Assert.IsType<Decision.Restored>(decisions.Of(new TargetId(Table)));
+        var outcome = Assert.Single(result.Objects);
+        Assert.Equal(TableHeight * (1f - ShrunkScale), outcome.Drop, DropTolerance);
+    }
+
+    /// <summary>
+    /// The scene of <see cref="ACleanedModsObjectOnAPulledObjectGoesAsTheAlsoRemoveModeSaysAndWhatRestsOnItIsJudgedAgain"/>, with the
+    /// cleaned mod's lantern restored where it stood before, 20 units above the floor. The step's first pass cannot know that; the
+    /// pass after the also-remove round places the restored lantern there, so the book that rested on the table lands on its top
+    /// and the other mod's lantern lands on that book.
+    /// </summary>
+    [Fact]
+    public void AnObjectOnAnObjectRestoredByTheStepsOwnRoundIsPulledDownOntoItAtItsEarlierPlacement()
+    {
+        const float restoredHeight = 20f;
+        var scene = LanternOnABookScene(FollowUpRemovalMode.EverythingTouchingIt, threads: 1) with
+        {
+            EarlierPlacements = new Dictionary<int, EulerPlacement> { [LanternOnTheBook] = new(new Vector3(OnTheTable.X, OnTheTable.Y, restoredHeight), Vector3.Zero, 1f) },
+        };
+
+        var (result, decisions) = Settle(scene, RemoveTable);
+
+        Assert.IsType<Decision.Restored>(decisions.Of(new TargetId(LanternOnTheBook)));
+        Assert.All(result.Objects, outcome => Assert.Equal(OtherModsObjectFate.PulledDown, outcome.Fate));
+        var landedHeights = result.Objects.Select(outcome => (outcome.Object.Id.Index, outcome.NewPosition.Z)).ToArray();
+        Assert.Equal([1, 2], landedHeights.Select(landed => landed.Index));
+        Assert.Equal(restoredHeight + LanternHeight, landedHeights[0].Z, DropTolerance);
+        Assert.Equal(restoredHeight + LanternHeight + BookHeight, landedHeights[1].Z, DropTolerance);
+    }
+
     /// <summary>
     /// A slab of the cleaned mod lies across three books: another mod's book on the removed table (about a ninth of its support),
     /// a book of the cleaned mod that is removed (a little under half) and a base game book on a base game table. Only together do
-    /// the removed book and the pulled one hold more than half of its support, and less than 60 %.
+    /// the removed book and the pulled one hold more than half of its support, and less than 60 %. A restored book holds its share too,
+    /// and the reason carries it as the restored part.
     /// </summary>
     [Theory]
-    [InlineData(0.5f, true)]
-    [InlineData(0.6f, false)]
-    public void WithOnlyWhatLosesItsSupportTheSharesOfRemovedObjectsAndPulledObjectsCountTogether(float threshold, bool removed)
+    [InlineData(0.5f, true, false)]
+    [InlineData(0.6f, false, false)]
+    [InlineData(0.5f, true, true)]
+    public void WithOnlyWhatLosesItsSupportTheSharesOfRemovedObjectsAndPulledObjectsCountTogether(float threshold, bool removed, bool bookRestored)
     {
         const int removedBook = 1;
         const int slab = 2;
@@ -537,6 +581,10 @@ public class OtherModsObjectsTests
         ];
         List<OtherObject> others = [Floor(), BaseGameTable(1, new Vector3(40, 0, 0)), Book(OtherMod, 2, new Vector3(11, 0, TableHeight)), Book(BaseGame, 3, new Vector3(44, 0, TableHeight))];
         var scene = new Scene(targets, others, OtherModsObjectsHandling.PullObjectToTheGround) { AlsoRemove = FollowUpRemovalMode.OnlyWhatLosesItsSupport, Threshold = threshold };
+        if (bookRestored)
+        {
+            scene = scene with { EarlierPlacements = new Dictionary<int, EulerPlacement> { [removedBook] = new(new Vector3(28, 0, TableHeight), Vector3.Zero, 1f) } };
+        }
 
         var (result, decisions) = Settle(
             scene, decisions => decisions.Apply(RoundKind.TooClose, [new ProposedRemoval(new TargetId(Table), Clash), new ProposedRemoval(new TargetId(removedBook), Clash)]));
@@ -549,7 +597,8 @@ public class OtherModsObjectsTests
         }
         var reason = Assert.IsType<RemovalReason.LostSupportWithAnotherModsObject>(Assert.IsType<Decision.Removed>(decisions.Of(new TargetId(slab))).Reason);
         Assert.Equal(new OtherId(2), reason.MainSupporter);
-        Assert.InRange(reason.RemovedShare, 0.5f, 0.6f);
+        Assert.InRange(reason.LeftItsPlaceShare, 0.5f, 0.6f);
+        Assert.Equal(bookRestored, reason.RestoredShare > 0f);
     }
 
     [Fact]
@@ -694,10 +743,20 @@ public class OtherModsObjectsTests
         public int Threads { get; init; } = 1;
         public IReadOnlyList<TargetLink> Links { get; init; } = [];
 
+        /// <summary>By target index: the earlier placement of each target object that goes back to its earlier version when a round removes it; any other is disabled.</summary>
+        public IReadOnlyDictionary<int, EulerPlacement> EarlierPlacements { get; init; } = new Dictionary<int, EulerPlacement>();
+
         /// <summary>The keep reasons of the protected target objects, by index.</summary>
         public IReadOnlyDictionary<int, KeepReason>? KeepReasons { get; init; }
 
         public ObjectsToKeep CreateProtection() => ObjectsToKeep.Build(Targets, Links, TestTargets.References(Targets.Count, KeepReasons), TestBaseFacts.Unresolved);
+
+        public ImmutableArray<WhenRemoved> CreateWhenRemoved() =>
+        [
+            .. Enumerable.Range(0, Targets.Count).Select(index => EarlierPlacements.TryGetValue(index, out var placement)
+                ? (WhenRemoved)new WhenRemoved.Restore(TestTargets.EarlierVersionAt(EarlierPlugin, placement, Targets[index].Base))
+                : new WhenRemoved.Disable()),
+        ];
 
         public OtherModsObjectsSettings OtherModsSettings => new(Handling, TouchGap, Threshold);
 
@@ -766,16 +825,17 @@ public class OtherModsObjectsTests
     {
         var caches = TestScenes.CreateWithSupportOnlyObjects(scene.Targets, scene.Others, Shapes, scene.Threads);
         var protection = scene.CreateProtection();
-        var decided = decide(RemovalDecisions.Start(protection, scene.Targets.Count));
-        var asTheyStand = ClashingObjectFitter.PlaceAsTheyStand([.. scene.Targets], decided);
+        var decided = decide(RemovalDecisions.Start(protection, scene.CreateWhenRemoved()));
+        var asMeasured = decided.TargetsAsTheRoundsMeasureThem([.. scene.Targets]);
         var triangles = new TriangleStore(Shapes.ReadTriangles);
         var result = RestingObjects.SettleOtherModsObjects(
             [.. scene.Targets],
-            asTheyStand,
+            asMeasured,
             decided,
             protection,
             caches.VisibleTargets,
-            caches.IndexVisibleTargets(asTheyStand),
+            caches.IndexVisibleTargets(asMeasured),
+            placed => caches.IndexVisibleTargets(placed),
             Trust,
             Plugins,
             scene.OtherModsSettings,

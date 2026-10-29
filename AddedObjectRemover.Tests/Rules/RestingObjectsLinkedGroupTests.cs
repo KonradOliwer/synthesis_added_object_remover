@@ -103,8 +103,10 @@ public class RestingObjectsLinkedGroupTests
             run.Evaluations.Select(evaluation => (evaluation.TargetIndex, evaluation.Iteration)));
     }
 
-    [Fact]
-    public void CandidateKeptByItsSupportButRemovedWithItsLinkedPartnerIsReportedAsRemovedAsLinked()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CandidateKeptByItsSupportButRemovedWithItsLinkedPartnerIsReportedAsRemovedAsLinkedAndNamesARestoredPartner(bool partnerRestored)
     {
         const int seedTable = 0;
         const int itemOnTable = 1;
@@ -127,13 +129,18 @@ public class RestingObjectsLinkedGroupTests
             NoTerrain(),
             TouchDistance,
             threshold: 0.9f,
-            threads: 4);
+            threads: 4,
+            restoredTargets: partnerRestored ? [itemOnTable] : null);
 
-        Assert.Equal(new[] { (itemOnTable, typeof(RemovalReason.LostSupport)), (crateBesideTable, typeof(RemovalReason.LinkedTo)) }, DescribeRemovals(run));
+        var item = run.RemovalDecisions.Of(new TargetId(itemOnTable))!;
+        Assert.IsType<RemovalReason.LostSupport>(item.Reason);
+        Assert.Equal(partnerRestored ? typeof(Decision.Restored) : typeof(Decision.Removed), item.GetType());
+        Assert.IsType<RemovalReason.LinkedTo>(Assert.IsType<Decision.Removed>(run.RemovalDecisions.Of(new TargetId(crateBesideTable))).Reason);
         var evaluations = run.Evaluations;
         var crate = Assert.Single(evaluations, evaluation => evaluation.TargetIndex == crateBesideTable);
         Assert.False(crate.Removed);
         Assert.True(crate.RemovedAsLinked);
+        Assert.Equal(partnerRestored, crate.RemovedAsLinkedToRestored);
         Assert.False(Assert.Single(evaluations, evaluation => evaluation.TargetIndex == itemOnTable).RemovedAsLinked);
     }
 

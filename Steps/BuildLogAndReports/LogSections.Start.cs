@@ -4,6 +4,7 @@ using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
+using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
@@ -26,19 +27,41 @@ internal static partial class LogSections
         new("config",
         [
             $"Mod to clean up: {settings.TargetAsTyped}",
-            $"Check other mods' objects the cleaned mod moved farther than: {settings.Read.MovedDistance} units.",
+            .. DescribeChangedObjects(settings),
             .. settings.DetailedLog ? [DescribePluginList(plugins)] : ImmutableArray<string>.Empty,
             DescribeTrustSettings(settings.ModTrust),
             .. DescribeTrustReasons(settings.TargetAsTyped, settings.ModTrust.MaxOtherMastersOfRequiringMod, trust, plugins),
-            DescribeTooClose(settings.TooClose),
-            DescribeChangedTerrain(settings.ChangedTerrain),
-            DescribeShrinkOrTurn(settings.Fit),
+            .. DescribeCollision(settings.Collision),
             DescribeAlsoRemove(settings.AlsoRemove, settings.OtherModsObjects),
             DescribeVisibleLeftBehind(settings.VisibleLeftBehind),
             DescribeLeftBehind(settings),
             DescribeDetailedLogAndReports(settings.Reports),
             DescribeOnlyWarnWhenRequiringModLoadsAfterPatch(settings),
         ]);
+
+    private static ImmutableArray<string> DescribeChangedObjects(RunSettings settings)
+    {
+        const string collisionLabel = "  Collision handling: ";
+        var target = settings.TargetAsTyped;
+        var collision = settings.ChangedObjectCollision;
+        var replaced = settings.Read.ProcessReplaced
+            ? DescribeWhenRemoved(settings.ChangedObjects.Replaced, collision.ResizeReplaced, collision.ResizeLimits)
+            : "not processed";
+        return
+        [
+            $"Other mods' objects {target} changed: moved farther than {settings.Read.MovedDistance} units: "
+                + $"{DescribeWhenRemoved(settings.ChangedObjects.Moved, collision.ResizeMoved, collision.ResizeLimits)}; replaced: {replaced}.",
+            .. collision.TooClose == settings.Collision.TooClose && collision.ChangedTerrain == settings.Collision.ChangedTerrain
+                ? [$"{collisionLabel}as for {target}'s objects."]
+                : DescribeTooCloseAndChangedTerrain(collision.TooClose, collision.ChangedTerrain, collisionLabel),
+        ];
+    }
+
+    /// <summary>The limits are shown only for a kind that tries resizing, which is the only kind that uses them.</summary>
+    private static string DescribeWhenRemoved(RestoreMode mode, bool triesResizing, FitSettings limits) =>
+        triesResizing
+            ? $"{mode}, resizing tried first (down to {limits.ShrinkLimitPercent}%, at most {limits.TurnLimitDegrees} degrees)"
+            : $"{mode}, no resizing";
 
     private static string DescribePluginList(LoadOrderPlugins plugins) =>
         $"Plugin list read from {plugins.PluginsFilePath}: {TextFormat.Count(plugins.Positions.Count)} listings.";
@@ -47,6 +70,19 @@ internal static partial class LogSections
 
     /// <summary>"off", or "on" with the detail that only matters when it is on.</summary>
     private static string OnWith(bool on, string detail) => on ? $"on, {detail}" : "off";
+
+    private static ImmutableArray<string> DescribeCollision(CollisionSettings collision) =>
+    [
+        .. DescribeTooCloseAndChangedTerrain(collision.TooClose, collision.ChangedTerrain, string.Empty),
+        DescribeShrinkOrTurn(collision.Fit),
+    ];
+
+    /// <param name="label">Starts each of the two lines.</param>
+    private static ImmutableArray<string> DescribeTooCloseAndChangedTerrain(TooCloseSettings tooClose, ChangedTerrainSettings terrain, string label) =>
+    [
+        label + DescribeTooClose(tooClose),
+        label + DescribeChangedTerrain(terrain),
+    ];
 
     private static string DescribeTooClose(TooCloseSettings tooClose) =>
         "Remove objects too close to other mods' objects: "

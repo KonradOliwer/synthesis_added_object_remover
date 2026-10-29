@@ -13,19 +13,29 @@ internal static partial class LogSections
     /// <summary>The too-close section when the step is switched off: it prints nothing.</summary>
     public static LogSection BuildSwitchedOffTooCloseSection() => new("tooClose", []);
 
+    /// <summary>One finding for each settings set, then the lines all of them share; the step's time ends the last finding.</summary>
     public static LogSection BuildTooCloseSection(TooCloseSection report, ReportContext context) =>
         new("tooClose",
         [
-            .. context.Detailed && report.Result.Zone == ZoneShape.ObjectShape ? ShapeZoneLines(report) : [],
-            $"Found {TextFormat.Count(report.Result.Hits.Length)} of {DescribeJudgedObjects(report.World, report.Target)} {DescribeDistance(report.Result)}"
-                + $"{TooCloseTime(report.Elapsed, context)}{DescribeAlreadyRemoved(report.AlreadyRemoved)}.",
+            .. report.Passes.SelectMany((pass, position) => PassLines(report, pass, context, position == report.Passes.Length - 1 ? report.Elapsed : null)),
             .. context.Detailed ? InvisibleOthers(report.Census) : [],
-            .. context.Detailed ? NpcLines(report) : [],
+            .. context.Detailed ? report.Passes.SelectMany(pass => NpcLines(report, pass.Pass)) : [],
             .. BuildKeptLines(report.World, report.Kept),
         ]);
 
+    /// <param name="elapsed">The step's time to print after the finding; null for none.</param>
+    private static IEnumerable<string> PassLines(TooCloseSection report, TooClosePassReport pass, ReportContext context, TimeSpan? elapsed)
+    {
+        if (context.Detailed && pass.Pass.Zone == ZoneShape.ObjectShape)
+        {
+            foreach (var line in ShapeZoneLines(report, pass.Pass)) yield return line;
+        }
+        yield return $"Found {TextFormat.Count(pass.Pass.Hits.Length)} of {DescribeJudgedObjects(TargetOrigins.At(report.World, pass.Pass.Objects.Select(id => id.Index)), report.Target)} {DescribeDistance(pass.Pass)}"
+            + $"{(elapsed is { } time ? TooCloseTime(time, context) : string.Empty)}{DescribeAlreadyRemoved(pass.AlreadyRemoved)}{DescribeRestoredOfFound(pass.Restored)}.";
+    }
+
     /// <summary>How close the found objects are to other mods' objects; with both removal zones on, how many each zone found.</summary>
-    private static string DescribeDistance(TooCloseResult result)
+    private static string DescribeDistance(TooClosePass result)
     {
         if (result.ZonesTested is [TooCloseCause.Distance { Units: var units }]) return $"within {units} units of other mods' objects";
         if (result.ZonesTested.Length == 1) return "too close to other mods' objects";
@@ -45,16 +55,16 @@ internal static partial class LogSections
     private static string DescribeAlreadyRemoved(int count) =>
         count > 0 ? $"; {TextFormat.Count(count)} of them were already removed on changed terrain" : string.Empty;
 
-    private static ImmutableArray<string> ShapeZoneLines(TooCloseSection report)
+    private static ImmutableArray<string> ShapeZoneLines(TooCloseSection report, TooClosePass pass)
     {
-        var stats = report.Result.Work.Zone;
+        var stats = pass.Work.Zone;
         return
         [
             $"Object-shape zones: {TextFormat.Count(stats.CandidatePairs)} candidate pairs, {TextFormat.Count(stats.BoxFilterPasses)} passed the box filter, "
                 + $"{TextFormat.Count(stats.NarrowTests)} mesh tests, {TextFormat.Count(stats.Hits)} hits, {TextFormat.Count(stats.CentrePointFallbacks)} centre-point fallbacks "
                 + $"(other object without mesh triangles), {TextFormat.Count(stats.BoxZoneTargets)} {report.Target} objects without mesh triangles used their box; "
                 + $"{TextFormat.Count(stats.TrianglePairsTested)} triangle pairs tested exactly.",
-            $"  {TextFormat.Count(report.Result.LargeOtherObjects)} large other objects tested against every {report.Target} object of their space; "
+            $"  {TextFormat.Count(pass.LargeOtherObjects)} large other objects tested against every {report.Target} object of their space; "
                 + $"{TextFormat.Count(report.EffectOnlyMeshes)} effect-only meshes (fog, light rays, water spray) ignored.",
             $"  Meshes indexed: {TextFormat.Count(report.MeshesIndexed)} ({TextFormat.Count(report.MeshTriangles)} triangles).",
         ];
@@ -68,17 +78,17 @@ internal static partial class LogSections
         foreach (var (reason, count) in census.InvisibleByReason) yield return $"    {reason}: {TextFormat.Count(count)}";
     }
 
-    private static IEnumerable<string> NpcLines(TooCloseSection report) => report.Result.Npcs switch
+    private static IEnumerable<string> NpcLines(TooCloseSection report, TooClosePass pass) => pass.Npcs switch
     {
-        NpcHandling.OnlyWhenStuckInsideTheObject => StuckNpcLines(GetStuckNpcSummary(report), report, withCollision: false),
-        NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision => StuckNpcLines(GetStuckNpcSummary(report), report, withCollision: true),
+        NpcHandling.OnlyWhenStuckInsideTheObject => StuckNpcLines(GetStuckNpcSummary(pass), report, withCollision: false),
+        NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision => StuckNpcLines(GetStuckNpcSummary(pass), report, withCollision: true),
         NpcHandling.Never => [$"NPCs and creatures: ignored; {TextFormat.Count(report.Census.PlacedNpcs)} placed NPCs of other mods never cause removals."],
         NpcHandling.AlwaysLikeAnyObject => [],
-        _ => throw new UnreachableException($"Unknown NPC handling {report.Result.Npcs}."),
+        _ => throw new UnreachableException($"Unknown NPC handling {pass.Npcs}."),
     };
 
-    private static NpcStuckSummary GetStuckNpcSummary(TooCloseSection report) =>
-        report.Result.Npc ?? throw new InvalidOperationException("The too-close step handled NPCs only when stuck but gave no stuck-NPC summary.");
+    private static NpcStuckSummary GetStuckNpcSummary(TooClosePass pass) =>
+        pass.Npc ?? throw new InvalidOperationException("The too-close step handled NPCs only when stuck but gave no stuck-NPC summary.");
 
     /// <param name="withCollision">Only objects whose mesh collision stops characters count.</param>
     private static IEnumerable<string> StuckNpcLines(NpcStuckSummary summary, TooCloseSection report, bool withCollision)

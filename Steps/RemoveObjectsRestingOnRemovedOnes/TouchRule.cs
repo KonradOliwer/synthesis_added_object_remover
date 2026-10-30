@@ -10,7 +10,7 @@ namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 /// target order, then neighbour order) that touches it. Kept objects never spread, because the
 /// decisions never list them as removed.
 /// </summary>
-/// <param name="search">Built once from the seeds; its participants exclude the objects kept in the too-close round.</param>
+/// <param name="search">Its participants exclude the objects kept before the rounds start.</param>
 internal sealed class TouchRule(TouchSearch search) : IRemovalRounds<RoundDetails>
 {
     public RoundProposals<RoundDetails> Next(IRemovalDecisions decisions, ImmutableArray<TargetId> removedLastRound)

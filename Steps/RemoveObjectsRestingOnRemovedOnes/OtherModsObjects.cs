@@ -44,7 +44,6 @@ internal sealed record OtherModsObjectsContext(
 /// <param name="Targets">Where they stood before any decision.</param>
 /// <param name="AsMeasured">Each target object shrunk or turned at its new placement, also one removed later, as the rounds measured it.</param>
 /// <param name="Decided">The decisions of every removal round so far.</param>
-/// <param name="ObjectsToKeep">The protection the also-remove rounds keep to.</param>
 /// <param name="Visible">The index of <paramref name="Targets"/>.</param>
 /// <param name="VisibleAsMeasured">The index of <paramref name="AsMeasured"/>.</param>
 /// <param name="IndexTargets">The index of the given target objects.</param>
@@ -52,7 +51,6 @@ internal sealed record DecidedTargets(
     ImmutableArray<TargetObject> Targets,
     ImmutableArray<TargetObject> AsMeasured,
     IRemovalDecisions Decided,
-    IObjectsToKeep ObjectsToKeep,
     IVisibleTargetObjects Visible,
     IVisibleTargetObjects VisibleAsMeasured,
     Func<ImmutableArray<TargetObject>, IVisibleTargetObjects> IndexTargets);
@@ -147,9 +145,8 @@ internal static class OtherModsObjects
             var removed = current.LeftIn(current.Rounds[^1]);
             if (removed.IsEmpty) return Summarize(outcomes, decided.Decided, current, rounds);
 
-            var spread = RestingObjects.PrepareFrom(current, [.. removed.Select(target => target.Index)], CreateRoundsInput(decided, others, context), alsoRemove);
-            (current, var spreadRounds) = copy.DecideRoundsUntilNothingRemoved(
-                spread.Rounds ?? throw new InvalidOperationException($"The also-remove mode {alsoRemove.Mode} has no rounds."), removed);
+            var spread = RestingObjects.PrepareFrom(current, CreateRoundsInput(decided, others, context), alsoRemove);
+            (current, var spreadRounds) = copy.DecideRoundsUntilNothingRemoved(spread.Rounds, removed);
             rounds.AddRange(spreadRounds.Select(round => round.Proposals));
         }
     }
@@ -212,7 +209,7 @@ internal static class OtherModsObjects
             context.Execution);
 
     private static RoundsInput CreateRoundsInput(DecidedTargets decided, IVisibleObjectsOfAnyPlugin others, OtherModsObjectsContext context) =>
-        new(decided.AsMeasured, decided.ObjectsToKeep, others, context.Shapes, context.Triangles, context.Surfaces, context.Terrain, context.Execution);
+        new(decided.AsMeasured, others,context.Shapes, context.Triangles, context.Surfaces, context.Terrain, context.Execution);
 
     /// <summary>The objects removed or pulled down, where they stood, in id order.</summary>
     private static List<OtherObject> TakenAway(ImmutableArray<OtherModsObjectOutcome> outcomes) =>

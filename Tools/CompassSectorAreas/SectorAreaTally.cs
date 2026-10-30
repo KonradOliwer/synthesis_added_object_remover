@@ -29,9 +29,13 @@ public sealed class SectorAreaTally(int thresholdPercent)
     public static SectorAreas Measure(IEnumerable<(OrientedBox Box, BoxFate Fate)> boxes, Vector3 point, int directionClearedPercent)
     {
         var tally = new SectorAreaTally(directionClearedPercent);
-        foreach (var (box, fate) in boxes)
-            foreach (var sector in CompassDirections.TowardsOrAll(point, box)) tally.Add(sector, box.GroundArea, fate);
+        foreach (var (box, fate) in boxes) tally.Add(SectorFootprint.Of(point, box), fate);
         return tally.Build();
+    }
+
+    public void Add(SectorFootprint footprint, BoxFate fate)
+    {
+        foreach (var sector in footprint.Sectors) Add(sector, footprint.GroundArea, fate);
     }
 
     public void Add(DirectionSector sector, float area, BoxFate fate)
@@ -39,6 +43,37 @@ public sealed class SectorAreaTally(int thresholdPercent)
         var index = (int)sector;
         _total[index] += area;
         _objects[index]++;
+        AddFate(index, area, fate);
+    }
+
+    /// <summary>
+    /// The areas of a tally that holds every box of this one, the boxes in <paramref name="goneInAscendingId"/> with
+    /// their fates and the others standing. This tally supplies only the totals, so it holds every box standing; it is
+    /// not changed. The removed and restored sums start at zero and take the boxes in the given order, exactly as
+    /// <see cref="Measure"/> adds them, so the result is bit for bit the one a full measurement gives.
+    /// </summary>
+    public SectorAreas WithGone(IEnumerable<(SectorFootprint Footprint, BoxFate Fate)> goneInAscendingId)
+    {
+        RequireNothingGone();
+        var withGone = new SectorAreaTally(thresholdPercent);
+        _total.CopyTo(withGone._total, 0);
+        _objects.CopyTo(withGone._objects, 0);
+        foreach (var (footprint, fate) in goneInAscendingId)
+            foreach (var sector in footprint.Sectors) withGone.AddFate((int)sector, footprint.GroundArea, fate);
+        return withGone.Build();
+    }
+
+    public SectorAreas Build() =>
+        new([.. _total], [.. _removed], [.. _restored], [.. CompassDirections.All.Select(StateOf)]);
+
+    private void RequireNothingGone()
+    {
+        if (_removedObjects.Any(count => count > 0) || _restoredObjects.Any(count => count > 0))
+            throw new InvalidOperationException("The tally holds removed or restored boxes, so it has no totals with every box standing.");
+    }
+
+    private void AddFate(int index, float area, BoxFate fate)
+    {
         switch (fate)
         {
             case BoxFate.Removed:
@@ -51,9 +86,6 @@ public sealed class SectorAreaTally(int thresholdPercent)
                 break;
         }
     }
-
-    public SectorAreas Build() =>
-        new([.. _total], [.. _removed], [.. _restored], [.. CompassDirections.All.Select(StateOf)]);
 
     /// <summary>A direction whose objects all have no ground area is judged by object count instead.</summary>
     private SectorState StateOf(DirectionSector sector)

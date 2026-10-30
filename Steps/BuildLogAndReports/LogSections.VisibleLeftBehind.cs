@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
@@ -9,8 +10,12 @@ internal static partial class LogSections
     /// <summary>The step's name, as the settings screen names its group.</summary>
     public const string VisibleLeftBehindStepName = "Visible objects left behind";
 
-    /// <param name="kept">The objects the visible left-behind round held.</param>
-    /// <remarks>The summary comes first, then the detailed log's lines for the objects that have one (see <see cref="HasDetailedLine"/>) and the kept lines.</remarks>
+    /// <param name="kept">The objects the visible left-behind rounds held.</param>
+    /// <param name="elapsed">The whole step's time as the run measured it: the rounds, their also-remove follow-ups and the measuring before the first round.</param>
+    /// <remarks>
+    /// The summary comes first, then the detailed log's rounds line, its lines for the objects that have one (see <see cref="HasDetailedLine"/>)
+    /// and the kept lines.
+    /// </remarks>
     public static LogSection BuildVisibleLeftBehindSection(
         CollectedObjects world,
         VisibleLeftBehindResult visibleLeftBehind,
@@ -23,8 +28,19 @@ internal static partial class LogSections
             : [];
         return new LogSection(
             "visible-leftovers",
-            [BuildPerformedOrNotPerformedLine(visibleLeftBehind.Outcome, VisibleLeftBehindStepName, () => VisibleLeftBehindSummaryLine(visibleLeftBehind, elapsed, context)), .. evaluationLines, .. BuildKeptLines(world, kept)]);
+            [
+                BuildPerformedOrNotPerformedLine(visibleLeftBehind.Outcome, VisibleLeftBehindStepName, () => VisibleLeftBehindSummaryLine(visibleLeftBehind, elapsed, context)),
+                .. VisibleRoundsLines(visibleLeftBehind, context),
+                .. evaluationLines,
+                .. BuildKeptLines(world, kept),
+            ]);
     }
+
+    /// <summary>The detailed log's line for the rounds that judged at least one object, with the time of those rounds alone; none when no round ran.</summary>
+    private static ImmutableArray<string> VisibleRoundsLines(VisibleLeftBehindResult visibleLeftBehind, ReportContext context) =>
+        context.Detailed && !visibleLeftBehind.Rounds.IsEmpty
+            ? [$"{VisibleLeftBehindStepName}: {TextFormat.Count(visibleLeftBehind.Rounds.Length)} rounds in {TextFormat.Seconds(visibleLeftBehind.RoundsTime)}."]
+            : [];
 
     /// <summary>
     /// Removed objects, objects kept because something refers to them or because their kind is ticked, and objects whose

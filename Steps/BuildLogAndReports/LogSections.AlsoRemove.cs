@@ -13,8 +13,8 @@ internal static partial class LogSections
     public const string AlsoRemoveName = "Also remove";
     public const string AlsoRemoveAfterVisibleLeftBehindName = "Also remove after visible objects left behind";
 
-    /// <summary>One of the two also-remove passes: the first, and the one that follows the visible left-behind removals.</summary>
-    /// <param name="LinkedStep">How the pass's "Linked groups" line names the removals the linked ones followed.</param>
+    /// <summary>The also-remove step, or the follow-ups of the visible left-behind rounds as one section.</summary>
+    /// <param name="LinkedStep">How the section's "Linked groups" line names the removals the linked ones followed.</param>
     internal sealed record AlsoRemovePass(string StepName, string IdSuffix, string LinkedStep)
     {
         public static readonly AlsoRemovePass First = new(AlsoRemoveName, string.Empty, RunPartText.LinkedStep(RoundKind.AlsoRemove));
@@ -39,8 +39,8 @@ internal static partial class LogSections
             _ => throw new UnreachableException($"Unexpected also-remove outcome {alsoRemove.Outcome}."),
         };
 
-    /// <summary>The also-remove section for the visible left-behind removals.</summary>
-    /// <param name="decisions">The run's decisions with the second pass's rounds applied.</param>
+    /// <summary>The also-remove section for the visible left-behind removals: the rounds of all its passes, numbered on from one pass to the next.</summary>
+    /// <param name="decisions">The run's decisions with the follow-up rounds applied.</param>
     public static LogSection BuildAlsoRemoveAfterVisibleLeftBehindSection(
         CollectedObjects world, RestingObjectsResult alsoRemove, IRemovalDecisions decisions, TriangleStoreStats meshes, ReportContext context) =>
         alsoRemove.Outcome == StepOutcome.StoppedByUnexpectedError
@@ -50,7 +50,7 @@ internal static partial class LogSections
     private static LogSection BuildStoppedSection(AlsoRemovePass pass) =>
         new(FollowUpSectionId + pass.IdSuffix, [BuildNotPerformedLine(pass.StepName)]);
 
-    /// <summary>Whether the second pass has anything to say: it ran rounds from seeds, or was stopped.</summary>
+    /// <summary>Whether the follow-up has anything to say: some pass ran rounds from seeds, or the follow-ups were stopped.</summary>
     public static bool PrintsAfterVisibleLeftBehind(RestingObjectsResult alsoRemove) =>
         alsoRemove.HadSeeds || alsoRemove.Outcome == StepOutcome.StoppedByUnexpectedError;
 

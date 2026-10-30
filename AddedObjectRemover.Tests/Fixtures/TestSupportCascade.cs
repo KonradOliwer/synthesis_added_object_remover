@@ -33,7 +33,6 @@ internal static class TestSupportCascade
         var triangles = new TriangleStore(shapes.ReadTriangles);
         var input = new RoundsInput(
             [.. targets],
-            protection,
             objectsOfAnyPlugin,
             shapes,
             triangles,

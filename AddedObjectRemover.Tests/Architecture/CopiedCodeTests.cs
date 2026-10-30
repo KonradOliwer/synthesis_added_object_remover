@@ -25,12 +25,8 @@ public class CopiedCodeTests
 
     private const string CheckRecords = "Check records of two steps (one object checked, its outcome and the rules over the outcome), each over its own outcome type. " + NoSharedStepTypes;
 
-    private const string ResultRecords ="Result records of two steps (outcome, evaluations, proposals, failure), each over its own check type. " + NoSharedStepTypes;
-
-    private const string FindSkeleton = "Two steps' Find: switched-off check and the Failures.Attempt wrapper, around each step's own rule and result types. " + NoSharedStepTypes;
-
     private const string JoinSkeleton =
-        "Two steps' Find and the mapping of a round's decisions onto the step's own outcomes, over each step's own rule, result and outcome types. " + NoSharedStepTypes;
+        "Two steps' mapping of their decisions onto the step's own outcomes, over each step's own rule, result and outcome types. " + NoSharedStepTypes;
 
     private const string OutcomeEnums =
         "Outcome enums of two steps and the predicates over their values: each lists the outcomes of its own step. " + NoSharedStepTypes;
@@ -39,9 +35,6 @@ public class CopiedCodeTests
         "Two rules' verdict from the sector verdict: each maps the same verdicts onto the outcomes of its own step. " + NoSharedStepTypes;
 
     private const string ProposalLists = "Two steps' removal proposals: one proposal per removed evaluation, with each step's own removal reason. " + NoSharedStepTypes;
-
-    private const string RuleSkeleton =
-        "Two rules' entry and parallel evaluation of candidates: each reads its own settings, candidate test and check type. " + NoSharedStepTypes;
 
     private const string OutcomeLines =
         "The per-object outcome line of two steps (the invisible step's also names the radius) and their call of the shared summary line; each reads its own outcome and wording types.";
@@ -91,15 +84,8 @@ public class CopiedCodeTests
             VisibleSections + "VisibleLeftBehindOutcomeLine", VisibleSections + "VisibleLeftBehindSummaryLine"])] = OutcomeLines,
         [CopyFamily.KeyOf([StartSections + "DescribeLeftBehind", StartSections + "DescribeVisibleLeftBehind"])] = SettingsLines,
         [CopyFamily.KeyOf([
-            InvisibleContracts + "LeftBehindResult.cs", InvisibleContracts + "LeftBehindResult.cs:LeftBehindResult", InvisibleContracts + "LeftBehindResult.cs:LeftBehindResult.SwitchedOff",
-            VisibleContracts + "VisibleLeftBehindResult.cs", VisibleContracts + "VisibleLeftBehindResult.cs:VisibleLeftBehindResult",
-            VisibleContracts + "VisibleLeftBehindResult.cs:VisibleLeftBehindResult.SwitchedOff"])] = ResultRecords,
-        [CopyFamily.KeyOf([Invisible + "LeftBehindObjects.cs:LeftBehindObjects.Find", VisibleStep + "VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.Find"])] = FindSkeleton,
-        [CopyFamily.KeyOf([
-            Invisible + "LeftBehindObjects.cs:LeftBehindObjects.Find", Invisible + "LeftBehindObjects.cs:LeftBehindObjects.Join", Invisible + "LeftBehindObjects.cs:LeftBehindObjects.JoinVerdicts",
-            Invisible + "LeftBehindObjects.cs:LeftBehindObjects.RemovedAsLinked",
-            VisibleStep + "VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.Find", VisibleStep + "VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.Join",
-            VisibleStep + "VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.JoinVerdicts", VisibleStep + "VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.RemovedAsLinked"])] =
+            Invisible + "LeftBehindObjects.cs:LeftBehindObjects.Join", Invisible + "LeftBehindObjects.cs:LeftBehindObjects.RemovedAsLinked",
+            VisibleStep + "VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.Join", VisibleStep + "VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.RemovedAsLinked"])] =
             JoinSkeleton,
         [CopyFamily.KeyOf([
             InvisibleContracts + "LeftBehindOutcome.cs:LeftBehindOutcome", InvisibleContracts + "LeftBehindOutcome.cs:LeftBehindOutcomes",
@@ -113,15 +99,8 @@ public class CopiedCodeTests
             VisibleContracts + "VisibleLeftBehindOutcome.cs:VisibleLeftBehindOutcomes.IsRestoration"])] = OutcomeEnums,
         [CopyFamily.KeyOf([
             Invisible + "LeftBehindRound.cs", Invisible + "LeftBehindRound.cs:LeftBehindRound", Invisible + "LeftBehindRound.cs:LeftBehindRound.ProposalsOf",
-            VisibleStep + "VisibleLeftBehindRound.cs", VisibleStep + "VisibleLeftBehindRound.cs:VisibleLeftBehindRound",
-            VisibleStep + "VisibleLeftBehindRound.cs:VisibleLeftBehindRound.ProposalsOf"])] = ProposalLists,
-        [CopyFamily.KeyOf([
-            Invisible + "LeftBehindRule.cs:LeftBehindRule", Invisible + "LeftBehindRule.cs:LeftBehindRule.EvaluateAll", Invisible + "LeftBehindRule.cs:LeftBehindRule.SelectRemovals",
-            VisibleStep + "VisibleLeftBehindRule.cs:VisibleLeftBehindRule", VisibleStep + "VisibleLeftBehindRule.cs:VisibleLeftBehindRule.EvaluateAll",
-            VisibleStep + "VisibleLeftBehindRule.cs:VisibleLeftBehindRule.SelectRemovals"])] = RuleSkeleton,
-        [CopyFamily.KeyOf([
-            Invisible + "LeftBehindRule.cs:LeftBehindRule.Evaluate", Invisible + "LeftBehindRule.cs:LeftBehindRule.EvaluateAll",
-            VisibleStep + "VisibleLeftBehindRule.cs:VisibleLeftBehindRule.Evaluate", VisibleStep + "VisibleLeftBehindRule.cs:VisibleLeftBehindRule.EvaluateAll"])] = RuleSkeleton,
+            VisibleStep + "VisibleLeftBehindProposals.cs", VisibleStep + "VisibleLeftBehindProposals.cs:VisibleLeftBehindProposals",
+            VisibleStep + "VisibleLeftBehindProposals.cs:VisibleLeftBehindProposals.ProposalsOf"])] = ProposalLists,
         [CopyFamily.KeyOf([Shapes + "CountBounds", TooClose + "TooCloseObjects.cs:TooCloseObjects.CountSizes"])] = CountLines + " " + CounterRecord,
         [CopyFamily.KeyOf([Settings + "CreateChangedTerrainSettings", Settings + "CreateTooCloseSettings"])] = SettingChecks,
         [CopyFamily.KeyOf([Settings + "CreateChangedTerrainSettings"])] = SettingChecks,

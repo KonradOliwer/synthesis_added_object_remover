@@ -43,6 +43,7 @@ Anchoring: 1 removed over 2 iterations; 3 touching objects evaluated (3 evaluati
 Also remove: 2 rounds in <time>.
 Linked groups: 0 more objects removed with the follow-up removals they are linked to.
 Visible objects left behind: 14 evaluated in <time>; removed 0 (0 surroundings removed); kept 14 (14 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 0 referenced).
+Visible objects left behind: 1 rounds in <time>.
 Linked groups: 0 more objects removed with the visible left-behind removals they are linked to.
 Invisible objects left behind: 5 evaluated in <time>; removed 4 (2 inside another mod's object, 2 surroundings removed); kept 1 (0 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 1 referenced).
   Left behind: T_MarkerInsideBuilding [00081B:Target.esp] (Position markers (XMarker, XMarkerHeading)) in interior AorInterior [000800:Skyrim.esm]: removed, inside another mod's object (inside R_InsideBuilding [000814:Rival.esp]); radius 1024, removed/total ground area East -, NorthEast -, North -, NorthWest -, West -, SouthWest -, South -, SouthEast -.

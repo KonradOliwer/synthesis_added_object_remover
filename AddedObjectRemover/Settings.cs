@@ -595,14 +595,14 @@ public class LeftoverVisibleObjectSettings : IVisibleLeftoverSettingsValues
 {
     [SynthesisOrder]
     [SynthesisSettingName("Remove visible objects whose surroundings were removed")]
-    [SynthesisTooltip("Turns this removal on. Objects it removes are followed up as \"Also remove what rests on removed objects\" says.")]
+    [SynthesisTooltip("Turns this removal on. Each round's removals are followed up as \"Also remove what rests on removed objects\" says, and the rounds repeat until nothing more is removed.")]
     public bool RemoveLeftoverVisibleObjects { get; set; } = SettingDefaults.RemoveLeftoverVisibleObjects;
 
     [SynthesisOrder]
     [SynthesisSettingName("When the cleaned mod's visible objects around it were removed")]
     [SynthesisTooltip(
         "For each visible object, the cleaned mod's other visible objects around it (the cleaned mod's objects, including other mods' objects it changed) are sorted into 8 directions\n"
-        + "(north, north-east, ...) and measured by the ground area they cover. Objects removed by the earlier steps count as removed.\n"
+        + "(north, north-east, ...) and measured by the ground area they cover. Objects removed by the earlier steps, by this step's earlier rounds and by their follow-ups count as removed.\n"
         + "The object is removed when enough of those directions were mostly cleared. The settings are applied in the order listed; the percentages go in steps of 10.")]
     public VisibleSurroundingObjectsSettings SurroundingObjects { get; set; } = new();
 

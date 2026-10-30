@@ -5,7 +5,7 @@ using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover.Tests.Fixtures;
 
-/// <summary>A log-and-reports object over a fake run whose caches serve only the mesh files; asking any other cache fails the test.</summary>
+/// <summary>A log-and-reports object over a fake run whose caches serve only the mesh files and the triangle meshes' statistics; asking any other cache fails the test.</summary>
 internal sealed class TestReport
 {
     private static readonly PluginName Target = new("Target.esp");
@@ -53,8 +53,10 @@ internal sealed class TestReport
         [.. _report.BuildStepSections(world, TimeSpan.Zero, TimeSpan.Zero).SelectMany(section => section.Lines)];
 
     /// <summary>The sections the visible left-behind step prints as it ends, in order.</summary>
-    public ImmutableArray<LogSection> VisibleLeftBehindSections(VisibleLeftBehindResult found, IRemovalDecisions decisions, CollectedObjects world) =>
-        _report.BuildStepSections(found, decisions, world, TimeSpan.Zero);
+    /// <param name="elapsed">The whole step's time as the run measured it.</param>
+    public ImmutableArray<LogSection> VisibleLeftBehindSections(
+        VisibleLeftBehindResult found, IRemovalDecisions decisions, CollectedObjects world, TimeSpan elapsed = default) =>
+        _report.BuildStepSections(found, decisions, world, elapsed);
 
     private sealed class MeshFilesOnlyCaches(IMeshFiles meshFiles) : ILoadOrderCaches
     {
@@ -64,7 +66,7 @@ internal sealed class TestReport
 
         public IBaseObjectShapes Shapes => null!;
 
-        public ITriangleMeshes Triangles => throw NotRead();
+        public ITriangleMeshes Triangles => new TriangleStatsOnly();
 
         public ISurfaceSamples SurfaceSamples => throw NotRead();
 
@@ -83,6 +85,14 @@ internal sealed class TestReport
         public int CountBodyMeshSets() => throw NotRead();
 
         private static InvalidOperationException NotRead() => new("The problem takes read only the mesh files' problem log.");
+    }
+
+    /// <summary>Triangle meshes with nothing indexed, whose statistics the also-remove sections print.</summary>
+    private sealed class TriangleStatsOnly : ITriangleMeshes
+    {
+        public Lease<MeshTriangleTree> Acquire(string meshPath) => throw new InvalidOperationException("The report reads only the statistics of the triangle meshes.");
+
+        public TriangleStoreStats GetStats() => new(Built: 0, TooLarge: 0, Triangles: 0);
     }
 
     private sealed class MeshFilesWithProblems(AssetProblemLog problems) : IMeshFiles

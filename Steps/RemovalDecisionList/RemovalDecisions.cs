@@ -199,10 +199,15 @@ public sealed class RemovalDecisions : IRemovalDecisions
         }
     }
 
-    /// <summary>Opens one round per entry of <paramref name="rounds"/>, in order, each as <see cref="Apply"/> does.</summary>
+    /// <summary>Opens one round per entry of <paramref name="rounds"/>, in order, each as <see cref="Apply"/> does with the entry's kind.</summary>
+    /// <returns>The view that includes the new rounds.</returns>
+    public RemovalDecisions ApplyRounds(IReadOnlyList<ProposedRound> rounds) =>
+        rounds.Aggregate(this, (decisions, round) => decisions.Apply(round.Kind, round.Proposals));
+
+    /// <summary>Opens one round of <paramref name="kind"/> per entry of <paramref name="rounds"/>, in order.</summary>
     /// <returns>The view that includes the new rounds.</returns>
     public RemovalDecisions ApplyRounds(RoundKind kind, IReadOnlyList<IReadOnlyList<ProposedRemoval>> rounds) =>
-        rounds.Aggregate(this, (decisions, proposals) => decisions.Apply(kind, proposals));
+        ApplyRounds([.. rounds.Select(proposals => new ProposedRound(kind, proposals))]);
 
     public IReadOnlyDictionary<TargetId, Decision> DecideRoundOnCopy(RoundKind kind, IReadOnlyList<ProposedRemoval> proposals)
     {

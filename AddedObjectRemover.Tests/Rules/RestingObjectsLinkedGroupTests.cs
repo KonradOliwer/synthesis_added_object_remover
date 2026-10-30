@@ -144,13 +144,6 @@ public class RestingObjectsLinkedGroupTests
         Assert.False(Assert.Single(evaluations, evaluation => evaluation.TargetIndex == itemOnTable).RemovedAsLinked);
     }
 
-    [Fact]
-    public void ReachableSpacesFollowLinkedGroups()
-    {
-        Assert.Equal(new HashSet<RecordKey> { TestTargets.Space, OtherSpace }, ReachableSpaces.CollectReachableSpaces(SceneProtection.Groups, Targets, [Table]));
-        Assert.Equal(new HashSet<RecordKey> { OtherSpace }, ReachableSpaces.CollectReachableSpaces(LinkedGroups.Build(Targets.Count, []), Targets, [Shelf]));
-    }
-
     /// <returns>The follow-up rounds' removals in decision order, with the type of their reason.</returns>
     private static IEnumerable<(int, Type)> DescribeRemovals(TestSupportCascade.Run run) =>
         run.AlsoRemoveRounds.SelectMany(round => run.RemovalDecisions.RemovedIn(round)).Select(target => (target.Index, run.RemovalDecisions.Of(target)!.Reason.GetType()));

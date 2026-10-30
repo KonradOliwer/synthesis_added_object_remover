@@ -12,12 +12,14 @@
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
     <ProjectReference Include="..\FindTargetObjectsToKeep.Contracts\FindTargetObjectsToKeep.Contracts.csproj" />
     <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
+    <ProjectReference Include="..\RemoveObjectsRestingOnRemovedOnes.Contracts\RemoveObjectsRestingOnRemovedOnes.Contracts.csproj" />
     <ProjectReference Include="..\..\Caches\RunCaches.Contracts\RunCaches.Contracts.csproj" />
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
     <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
     <ProjectReference Include="..\..\Tools\PluginRecordFacts\PluginRecordFacts.csproj" />
     <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
     <ProjectReference Include="..\..\Tools\CompassSectorAreas\CompassSectorAreas.csproj" />
+    <ProjectReference Include="..\..\Tools\IndexGraphQueries\IndexGraphQueries.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />

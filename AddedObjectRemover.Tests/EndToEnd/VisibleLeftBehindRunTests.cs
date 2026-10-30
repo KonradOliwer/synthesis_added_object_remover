@@ -27,15 +27,12 @@ public class VisibleLeftBehindRunTests
     }
 
     [Fact]
-    public void SwitchedOffTheStepDoesNothingAndLeavesAnEmptyRoundBetweenAlsoRemoveAndLeftBehind()
+    public void SwitchedOffTheStepDoesNothingAndOpensNoRound()
     {
         var outcome = FixtureRun.Execute(SettingsWith(visibleOn: false), workers: 1);
 
         Assert.Equal(StepOutcome.SwitchedOff, outcome.VisibleLeftBehind.Outcome);
-        var rounds = outcome.Final.Rounds;
-        var visible = Assert.Single(rounds, round => round.Kind == RoundKind.VisibleLeftBehind);
-        Assert.Empty(outcome.Final.RemovedIn(visible));
-        Assert.Equal(rounds.Single(round => round.Kind == RoundKind.LeftBehind).Number, visible.Number + 1);
+        Assert.DoesNotContain(outcome.Final.Rounds, round => round.Kind == RoundKind.VisibleLeftBehind);
         Assert.DoesNotContain(outcome.Removals, removal => removal is ObjectWithReason.VisibleLeftBehind);
     }
 

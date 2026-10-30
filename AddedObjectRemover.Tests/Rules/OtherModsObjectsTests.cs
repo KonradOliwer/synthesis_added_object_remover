@@ -832,7 +832,6 @@ public class OtherModsObjectsTests
             [.. scene.Targets],
             asMeasured,
             decided,
-            protection,
             caches.VisibleTargets,
             caches.IndexVisibleTargets(asMeasured),
             placed => caches.IndexVisibleTargets(placed),

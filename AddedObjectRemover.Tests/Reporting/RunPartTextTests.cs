@@ -24,6 +24,7 @@ public class RunPartTextTests
     {
         { "ReportFiles", "  Unexpected error in the report files (InvalidOperationException: broke). Some or all of the report files are missing; the patch is not affected." },
         { "AlsoRemove", "  Unexpected error in the also-remove step (InvalidOperationException: broke). The also-remove rounds did not complete, so objects resting on removed ones were not removed." },
+        { "FollowUp", "  Unexpected error in the also-remove follow-ups of the visible objects left behind (InvalidOperationException: broke). The follow-ups stopped there: the removals of the passes before stand, and objects resting on what the later rounds removed were not removed." },
         { "TouchChains", "  Unexpected error in the touch-chain search (InvalidOperationException: broke). The chains of touching objects that the detailed log and the report files list are missing." },
         { "LeftBehind", "  Unexpected error in the step for invisible objects left behind (InvalidOperationException: broke). That step did not run, so invisible objects whose surroundings were removed were not removed." },
         { "MarkerMoves", "  Unexpected error in the marker moves (InvalidOperationException: broke). No kept marker was moved, so markers inside other mods' objects stay where they are." },
@@ -111,7 +112,7 @@ public class RunPartTextTests
     private static PartKey KeyNamed(string name) =>
         new[]
         {
-            ReportFileParts.ReportFiles, RestingObjectsParts.AlsoRemove, RestingObjectsParts.TouchChains, LeftBehindParts.LeftBehind, MarkerMoveParts.MarkerMoves,
+            ReportFileParts.ReportFiles, RestingObjectsParts.AlsoRemove, RestingObjectsParts.FollowUp, RestingObjectsParts.TouchChains, LeftBehindParts.LeftBehind, MarkerMoveParts.MarkerMoves,
             RestingObjectsParts.ReportFileDetails, ChangedTerrainParts.TerrainCheck, TooCloseParts.TooCloseCheck, KeepParts.KeepCheck, SelectionParts.RemovalCauseSelection,
             MeshReadingParts.MeshShapes, MeshReadingParts.MeshTriangles, MeshReadingParts.LoaderStartUp,
         }.Single(key => key.Name == name);

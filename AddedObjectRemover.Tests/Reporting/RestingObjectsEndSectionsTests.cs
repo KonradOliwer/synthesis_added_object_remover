@@ -31,6 +31,9 @@ public sealed class RestingObjectsEndSectionsTests
     private static readonly PairTestStats Pairs = new(PairsTested: 10, TouchingPairs: 4, PairsWithoutGeometry: 1, TrianglePairsTested: 77);
     private static readonly TouchChainStatistics TouchStatistics = new(Components: 1, ComponentsWithFollowUpRemovals: 1, LargestComponent: 3, Levels: 1, MaxDepth: 1, Pairs);
     private static readonly TimeSpan Elapsed = TimeSpan.FromSeconds(1.5);
+    private static readonly TimeSpan StepTime = TimeSpan.FromSeconds(9);
+    private static readonly TimeSpan VisibleRoundsTime = TimeSpan.FromSeconds(0.5);
+    private static readonly TimeSpan FollowUpTime = TimeSpan.FromSeconds(2.5);
 
     [Theory]
     [InlineData(SettingsVariants.TouchWithLeftBehindAndMarkerMoves, 4, 1)]
@@ -129,7 +132,7 @@ public sealed class RestingObjectsEndSectionsTests
     public void AlsoRemoveAfterVisibleLeftBehind_AStoppedPassPrintsTheNotPerformedLineUnderItsOwnId()
     {
         var (world, alsoRemove, decisions) = TouchScene();
-        var stopped = alsoRemove with { Outcome = StepOutcome.StoppedByUnexpectedError, HadSeeds = false, Rounds = [], Failure = Broke(RestingObjectsParts.AlsoRemove) };
+        var stopped = alsoRemove with { Outcome = StepOutcome.StoppedByUnexpectedError, HadSeeds = false, Rounds = [], Failure = Broke(RestingObjectsParts.FollowUp) };
 
         var section = LogSections.BuildAlsoRemoveAfterVisibleLeftBehindSection(world, stopped, decisions, Meshes, Detailed);
 
@@ -251,10 +254,7 @@ public sealed class RestingObjectsEndSectionsTests
     public void Anchoring_DetailedLogDescribesACandidateWithContactPointsButNoSupportWeight()
     {
         var (world, alsoRemove, decisions) = SupportScene();
-        var diagnostic = new ZeroWeightDiagnostic(
-            1, "m.nif", 2, 0.75f, 1.25f, new Box(Vector3.Zero, new Vector3(3, 4, 0)), 3,
-            new SampleWeightCounts(1, 1, 1), double.NaN, 0.5, [new SupporterSamples(Supporter.Terrain, 2, float.NaN)]);
-        var withCase = alsoRemove with { Evidence = [new SupportRoundDetails([], Pairs, [new ZeroWeightCase(5, diagnostic)])] };
+        var withCase = alsoRemove with { Evidence = [new SupportRoundDetails([], Pairs, [new ZeroWeightCase(5, ZeroWeightOf(1))])] };
 
         var detailed = LogSections.BuildModeSection(world, withCase, decisions, Elapsed, Meshes, Detailed).Lines.ToList();
         var normal = LogSections.BuildModeSection(world, withCase, decisions, Elapsed, Meshes, Normal).Lines.ToList();
@@ -266,6 +266,100 @@ public sealed class RestingObjectsEndSectionsTests
             + "weights add up to NaN (0.5 for the touching samples); supporters: terrain 2 touching samples, raw weight NaN.",
             line);
         Assert.DoesNotContain(normal, text => text.Contains("no support weight", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Anchoring_ZeroWeightLinesOfAMergedFollowUpNumberTheIterationsAndTheEvaluatedCandidatesOnAcrossPasses()
+    {
+        var (world, alsoRemove, decisions) = SupportScene();
+        var firstPass = new SupportRoundDetails([], Pairs, [new ZeroWeightCase(0, ZeroWeightOf(1))]);
+        var secondPass = new SupportRoundDetails([], Pairs, [new ZeroWeightCase(3, ZeroWeightOf(2))]);
+        var merged = alsoRemove with { Rounds = [decisions.Rounds[0], decisions.Rounds[^1]], Evidence = [firstPass, secondPass] };
+
+        var lines = LogSections.BuildAlsoRemoveAfterVisibleLeftBehindSection(world, merged, decisions, Meshes, Detailed).Lines;
+
+        var zeroWeights = lines.Where(line => line.StartsWith("  Anchoring found no support weight for ", StringComparison.Ordinal)).ToList();
+        Assert.Equal(2, zeroWeights.Count);
+        Assert.Contains("(mesh m.nif, iteration 1, 0 candidates evaluated before it in this run)", zeroWeights[0], StringComparison.Ordinal);
+        Assert.Contains("(mesh m.nif, iteration 2, 3 candidates evaluated before it in this run)", zeroWeights[1], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AlsoRemoveAfterVisibleLeftBehind_TheFollowUpsTimeIsOnItsRoundsLineAloneAndTheVisibleStepKeepsItsOwn()
+    {
+        var (world, touch, decisions) = TouchScene();
+        var followUp = touch with { RoundsTime = FollowUpTime };
+        var found = new VisibleLeftBehindResult(StepOutcome.Performed, [], [], [decisions.Rounds[0]], VisibleRoundsTime, followUp, Failure: null);
+
+        var sections = TestReport.WithoutProblems().VisibleLeftBehindSections(found, decisions, world, StepTime);
+
+        Assert.Equal(
+            ["visible-leftovers", "linked", "unexpectedErrors", "touch-after-visible", "linked-after-visible", "unexpectedErrors"], sections.Select(section => section.Id));
+        Assert.StartsWith("Visible objects left behind: 0 evaluated in 9.0s; ", sections[0].Lines[0], StringComparison.Ordinal);
+        Assert.Equal("Visible objects left behind: 1 rounds in 0.5s.", sections[0].Lines[1]);
+        Assert.Equal("Also remove after visible objects left behind: 1 rounds in 2.5s.", sections[3].Lines[^1]);
+        Assert.DoesNotContain(sections[3].Lines, line => line.StartsWith("Step time: ", StringComparison.Ordinal));
+    }
+
+    /// <summary>The follow-up rounds run inside the visible step, so a cache error recorded meanwhile cannot be told apart from the step's own.</summary>
+    [Fact]
+    public void AlsoRemoveAfterVisibleLeftBehind_ACacheErrorRecordedWhileTheStepRanPrintsUnderTheVisibleStepOnly()
+    {
+        var (world, touch, decisions) = TouchScene();
+        var found = new VisibleLeftBehindResult(StepOutcome.Performed, [], [], [decisions.Rounds[0]], VisibleRoundsTime, touch, Failure: null);
+        var errors = new UnexpectedErrors();
+        var report = TestReport.OverErrors(errors);
+        errors.Add(new PartFailure(SelectionParts.RemovalCauseSelection, "InvalidOperationException: it broke", new FailureSubject("000810:Other.esp", "Lantern", 2)));
+
+        var sections = report.VisibleLeftBehindSections(found, decisions, world, StepTime);
+
+        Assert.Contains("Unexpected error while selecting the objects that can cause removals", Assert.Single(sections[2].Lines), StringComparison.Ordinal);
+        Assert.Empty(sections[^1].Lines);
+    }
+
+    [Fact]
+    public void AlsoRemoveAfterVisibleLeftBehind_AFollowUpFailurePrintsUnderTheFollowUpOnly()
+    {
+        var (world, touch, decisions) = TouchScene();
+        var failed = touch with { Failure = Broke(RestingObjectsParts.FollowUp) };
+        var found = new VisibleLeftBehindResult(StepOutcome.Performed, [], [], [decisions.Rounds[0]], VisibleRoundsTime, failed, Failure: null);
+
+        var sections = TestReport.WithoutProblems().VisibleLeftBehindSections(found, decisions, world, StepTime);
+
+        Assert.Empty(sections[2].Lines);
+        Assert.NotEmpty(sections[^1].Lines);
+    }
+
+    [Fact]
+    public void AlsoRemoveAfterVisibleLeftBehind_AFailureAfterEarlierPassesKeepsTheirSectionAndSaysTheirRemovalsStand()
+    {
+        var (world, touch, decisions) = TouchScene();
+        var failed = touch with { Failure = Broke(RestingObjectsParts.FollowUp) };
+        var found = new VisibleLeftBehindResult(StepOutcome.Performed, [], [], [decisions.Rounds[0]], VisibleRoundsTime, failed, Failure: null);
+
+        var sections = TestReport.WithoutProblems().VisibleLeftBehindSections(found, decisions, world, StepTime);
+
+        Assert.DoesNotContain(sections[3].Lines, line => line.Contains("not performed", StringComparison.Ordinal));
+        Assert.Equal(
+            "  Unexpected error in the also-remove follow-ups of the visible objects left behind (it broke). "
+            + "The follow-ups stopped there: the removals of the passes before stand, and objects resting on what the later rounds removed were not removed.",
+            Assert.Single(sections[^1].Lines));
+    }
+
+    [Fact]
+    public void AlsoRemoveAfterVisibleLeftBehind_AFailureOfTheFirstPassPrintsTheNotPerformedLineAndTheSameErrorText()
+    {
+        var (world, touch, decisions) = TouchScene();
+        var stopped = touch with { Outcome = StepOutcome.StoppedByUnexpectedError, HadSeeds = false, Rounds = [], Failure = Broke(RestingObjectsParts.FollowUp) };
+        var found = new VisibleLeftBehindResult(StepOutcome.Performed, [], [], [decisions.Rounds[0]], VisibleRoundsTime, stopped, Failure: null);
+
+        var sections = TestReport.WithoutProblems().VisibleLeftBehindSections(found, decisions, world, StepTime);
+
+        Assert.Equal(["Also remove after visible objects left behind: not performed because of an unexpected error."], sections[3].Lines.ToList());
+        Assert.Equal(
+            "  Unexpected error in the also-remove follow-ups of the visible objects left behind (it broke). "
+            + "The follow-ups stopped there: the removals of the passes before stand, and objects resting on what the later rounds removed were not removed.",
+            Assert.Single(sections[^1].Lines));
     }
 
     [Fact]
@@ -448,7 +542,7 @@ public sealed class RestingObjectsEndSectionsTests
     public void Removals_AndSpaces_AreDetailedOnlyAndMatchTheExpectedOutput()
     {
         var (world, decisions) = RunRounds();
-        var removals = RemovalList.WithReasons(PatchWriter.ListRemovalsInWriteOrder(decisions), decisions, world, VisibleLeftBehindResult.SwitchedOff, TestLeftBehind.PerformedWithoutFindings);
+        var removals = RemovalList.WithReasons(PatchWriter.ListRemovalsInWriteOrder(decisions), decisions, world, TestVisibleLeftBehind.SwitchedOff, TestLeftBehind.PerformedWithoutFindings);
         var detailed = Detailed with { Bases = null! };
 
         Assert.Empty(LogSections.BuildRemovalsSection(world, removals, decisions, Normal).Lines.ToList());
@@ -514,7 +608,7 @@ public sealed class RestingObjectsEndSectionsTests
     public void Summaries_AlwaysShowAndMatchTheExpectedOutput()
     {
         var (world, decisions) = RunRounds();
-        var removals = RemovalList.WithReasons(PatchWriter.ListRemovalsInWriteOrder(decisions), decisions, world, VisibleLeftBehindResult.SwitchedOff, TestLeftBehind.PerformedWithoutFindings);
+        var removals = RemovalList.WithReasons(PatchWriter.ListRemovalsInWriteOrder(decisions), decisions, world, TestVisibleLeftBehind.SwitchedOff, TestLeftBehind.PerformedWithoutFindings);
         var kept = RemovalList.Kept(decisions);
         var context = Detailed with { Shapes = TestVisibility.OfTaggedBasesOnly() };
         var targets = Enumerable.Range(0, TargetCount)
@@ -639,6 +733,11 @@ public sealed class RestingObjectsEndSectionsTests
     private static ReportFilesResult Performed(ImmutableArray<WrittenTable> tables) => new(StepOutcome.Performed, tables, [], Failure: null);
 
     private static PartFailure Broke(PartKey part) => new(part, "it broke", Subject: null);
+
+    private static ZeroWeightDiagnostic ZeroWeightOf(int target) =>
+        new(
+            target, "m.nif", 2, 0.75f, 1.25f, new Box(Vector3.Zero, new Vector3(3, 4, 0)), 3,
+            new SampleWeightCounts(1, 1, 1), double.NaN, 0.5, [new SupporterSamples(Supporter.Terrain, 2, float.NaN)]);
 
     [Fact]
     public void Done_ShowsTheTimeOnlyInTheDetailedLog()

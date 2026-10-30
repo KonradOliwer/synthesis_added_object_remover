@@ -320,6 +320,38 @@ public sealed class TablesTests : IDisposable
         Assert.DoesNotContain(tables, table => table.FileName == ReportFileNames.SupportFileName);
     }
 
+    /// <summary>The rounds of the follow-up's passes are one list, with the visible rounds between the passes left out of it.</summary>
+    [Fact]
+    public void Build_NumbersTheIterationsOfEveryFollowUpPassOnFromTheAlsoRemoveStepsIterations()
+    {
+        var scene = TouchScene();
+        var settings = new AlsoRemoveSettings(FollowUpRemovalMode.OnlyWhatLosesItsSupport, TouchDistance, Threshold, TouchChainsShown: true);
+        var alsoRemove = AsSupportRounds(scene.Outcome.RestingObjects, scene.Outcome.RestingObjects.Rounds);
+        ImmutableArray<Round> followUpRounds = [new Round(10, RoundKind.AlsoRemove), new Round(11, RoundKind.AlsoRemove), new Round(13, RoundKind.AlsoRemove)];
+        var followUp = AsSupportRounds(TestRestingObjects.SwitchedOff, followUpRounds);
+
+        var outcome = scene.Outcome with { RestingObjects = alsoRemove, VisibleLeftBehind = scene.Outcome.VisibleLeftBehind with { FollowUp = followUp } };
+        var tables = Tables.BuildTables(WithDetails(outcome, ReportFileDetails.SwitchedOff), settings, Context);
+
+        var support = tables.Single(table => table.FileName == ReportFileNames.SupportFileName);
+        var iterations = support.Rows.Select(row => row[support.Header.IndexOf("iteration")]);
+        Assert.Equal(Enumerable.Range(1, alsoRemove.Rounds.Length + followUpRounds.Length).Select(iteration => $"{iteration}"), iterations);
+    }
+
+    /// <summary>The result with the given rounds, in the support mode, each round evaluating one candidate.</summary>
+    private static RestingObjectsResult AsSupportRounds(RestingObjectsResult result, ImmutableArray<Round> rounds)
+    {
+        var evaluation = new SupportEvaluation(3, new CandidateContacts(12, 7.5f, []), [new SupporterShare(Supporter.Terrain, SupportCategory.Terrain, 1f)], Proposed: false);
+        return result with
+        {
+            Outcome = StepOutcome.Performed,
+            Mode = FollowUpRemovalMode.OnlyWhatLosesItsSupport,
+            HadSeeds = true,
+            Rounds = rounds,
+            Evidence = [.. rounds.Select(_ => (RoundDetails)new SupportRoundDetails([evaluation], PairTestStats.Zero, []))],
+        };
+    }
+
     [Fact]
     public void Build_AStoppedLeftBehindStepStillGetsItsHeaderOnlyTable()
     {
@@ -340,7 +372,7 @@ public sealed class TablesTests : IDisposable
         var outcome = scene.Outcome with
         {
             RestingObjects = scene.Outcome.RestingObjects with { Mode = settings.Mode, Rounds = [], Evidence = [] },
-            VisibleLeftBehind = new VisibleLeftBehindResult(StepOutcome.Performed, [], [], Failure: null),
+            VisibleLeftBehind = new VisibleLeftBehindResult(StepOutcome.Performed, [], [], [], TimeSpan.Zero, TestRestingObjects.SwitchedOff, Failure: null),
             LeftBehind = TestLeftBehind.PerformedWithoutFindings,
         };
         var origins = new ReportFileDetails(
@@ -378,9 +410,9 @@ public sealed class TablesTests : IDisposable
             targets, Shapes, protection, terrainSeeds is null ? [0, 2] : [2], TouchDistance, threads: 2, collectDiagnostics: true, terrainSeeds);
         var world = CreateWorld(targets, out _);
         var decided = new StepResults(
-            world, protection, new RemovalRisks([], []), new ChangedObjectJudgingResult([], [], []), OldPlaceWorld: null, new ChangedTerrainResult([]), run.Result, VisibleLeftBehindResult.SwitchedOff, TestRestingObjects.SwitchedOff, LeftBehindResult.SwitchedOff, MarkerMoves.SwitchedOff,
+            world, protection, new RemovalRisks([], []), new ChangedObjectJudgingResult([], [], []), OldPlaceWorld: null, new ChangedTerrainResult([]), run.Result, TestVisibleLeftBehind.SwitchedOff, LeftBehindResult.SwitchedOff, MarkerMoves.SwitchedOff,
             OtherModsObjectsResult.SwitchedOff, run.RemovalDecisions);
-        var removals = RemovalList.WithReasons(PatchWriter.ListRemovalsInWriteOrder(run.RemovalDecisions), run.RemovalDecisions, world, VisibleLeftBehindResult.SwitchedOff, TestLeftBehind.PerformedWithoutFindings).ToImmutableArray();
+        var removals = RemovalList.WithReasons(PatchWriter.ListRemovalsInWriteOrder(run.RemovalDecisions), run.RemovalDecisions, world, TestVisibleLeftBehind.SwitchedOff, TestLeftBehind.PerformedWithoutFindings).ToImmutableArray();
         var outcome = new RunOutcome(decided, removals, [], ManualPatchHints.FindManualPatchHints(decided, Shapes, removals), null!, default);
         return new Scene(outcome, run);
     }

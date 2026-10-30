@@ -8,8 +8,8 @@ using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
 /// <summary>
-/// The touch search among target objects of the follow-up removal: the broad phase over the given
-/// spaces, the narrow phase, and the triangle trees they read. Targets without a mesh or not visible
+/// The touch search among target objects of the follow-up removal: the broad phase, built per space
+/// as the spaces are asked about, the narrow phase, and the triangle trees they read. Targets without a mesh or not visible
 /// never take part.
 /// </summary>
 internal sealed class TouchSearch
@@ -38,11 +38,9 @@ internal sealed class TouchSearch
 
     public ITriangleMeshes Cache { get; }
 
-    /// <param name="spaces">The spaces whose targets take part.</param>
     /// <param name="excluded">Targets that never take part, in addition to those without a mesh or not visible.</param>
     public static TouchSearch Create(
         IReadOnlyList<TargetObject> targets,
-        IReadOnlySet<RecordKey> spaces,
         IReadOnlyList<int> excluded,
         IBaseObjectShapes shapes,
         ITriangleMeshes cache,
@@ -52,7 +50,6 @@ internal sealed class TouchSearch
         var meshPaths = new TargetMeshPaths(targets, shapes);
         var candidateFinder = TouchCandidateFinder.Create(
             targets,
-            spaces,
             MarkExcluded(targets, shapes, excluded, meshPaths),
             shapes,
             tolerance,

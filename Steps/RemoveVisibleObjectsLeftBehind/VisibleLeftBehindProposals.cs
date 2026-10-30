@@ -3,7 +3,7 @@ using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
 
-internal static class VisibleLeftBehindRound
+internal static class VisibleLeftBehindProposals
 {
     /// <summary>A removal proposal for each object the rules would remove.</summary>
     public static IReadOnlyList<ProposedRemoval> ProposalsOf(IEnumerable<VisibleLeftBehindCheck> evaluations) =>

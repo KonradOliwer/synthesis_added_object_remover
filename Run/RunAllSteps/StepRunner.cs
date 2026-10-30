@@ -174,8 +174,8 @@ public static class StepRunner
 
     /// <summary>
     /// Selects the objects that can cause removals and finds the objects to keep, other mods' objects rest on included, then
-    /// decides the fits of clashing objects and the removal rounds in order (changed terrain, too close, also remove, visible objects left behind,
-    /// also remove again for the visible objects left behind, other mods' objects left without support with the target objects that go
+    /// decides the fits of clashing objects and the removal rounds in order (changed terrain, too close, also remove, visible objects left behind
+    /// with the also-remove follow-up of each of its rounds, other mods' objects left without support with the target objects that go
     /// with them, leftover invisible objects), then the moves of the kept markers.
     /// </summary>
     /// <remarks>
@@ -194,11 +194,9 @@ public static class StepRunner
         var fitted = RunFit(scope, runCaches, trust, collected, selected, groups, heldUp, kept.ObjectsToKeep, started);
         var changedTerrain = RunChangedTerrain(scope, runCaches, trust, collected, groups, fitted.Decisions);
         var tooClose = RunTooClose(scope, runCaches, collected, selected, groups, changedTerrain.Decisions);
-        var alsoRemove = RunAlsoRemove(scope, runCaches, collected, kept.ObjectsToKeep, tooClose.Decisions);
+        var alsoRemove = RunAlsoRemove(scope, runCaches, collected, tooClose.Decisions);
         var visibleLeftBehind = RunVisibleLeftBehind(scope, runCaches, collected, alsoRemove.Decisions);
-        var alsoRemoveAfterVisibleLeftBehind = RunAlsoRemoveAfterVisibleLeftBehind(
-            scope, runCaches, collected, kept.ObjectsToKeep, visibleLeftBehind.Decisions, alsoRemove.Decisions);
-        var otherMods = RunOtherModsObjects(scope, runCaches, trust, collected, kept.ObjectsToKeep, fitted.Decisions, alsoRemoveAfterVisibleLeftBehind.Decisions);
+        var otherMods = RunOtherModsObjects(scope, runCaches, trust, collected, fitted.Decisions, visibleLeftBehind.Decisions);
         var otherModsObjectsTakenAway = otherMods.Result.TakenAway();
         var leftBehind = RunLeftBehind(
             scope,
@@ -225,7 +223,6 @@ public static class StepRunner
             ChangedTerrain: changedTerrain.Result,
             RestingObjects: alsoRemove.Result,
             VisibleLeftBehind: visibleLeftBehind.Result,
-            RestingObjectsAfterVisibleLeftBehind: alsoRemoveAfterVisibleLeftBehind.Result,
             LeftBehind: leftBehind.Result,
             MarkerMoves: markerMoves,
             OtherModsObjects: otherMods.Result,
@@ -254,11 +251,10 @@ public static class StepRunner
         IRunCaches runCaches,
         ModTrustTable trust,
         CollectedObjects collected,
-        IObjectsToKeep objectsToKeep,
         RemovalDecisions afterFits,
-        RemovalDecisions afterAlsoRemove) =>
+        RemovalDecisions afterVisibleLeftBehind) =>
         scope.Environment.Log.Timed(
-            () => FindAndApplyOtherModsObjectsRounds(scope, runCaches, trust, collected, objectsToKeep, afterFits, afterAlsoRemove),
+            () => FindAndApplyOtherModsObjectsRounds(scope, runCaches, trust, collected, afterFits, afterVisibleLeftBehind),
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
 
     /// <param name="afterFits">The decisions with every fit: the rounds measure an object shrunk or turned and removed later at its new placement.</param>
@@ -267,15 +263,13 @@ public static class StepRunner
         IRunCaches runCaches,
         ModTrustTable trust,
         CollectedObjects collected,
-        IObjectsToKeep objectsToKeep,
         RemovalDecisions afterFits,
-        RemovalDecisions afterAlsoRemove)
+        RemovalDecisions afterVisibleLeftBehind)
     {
         var result = RestingObjects.SettleOtherModsObjects(
             collected.Targets,
             afterFits.TargetsAsTheRoundsMeasureThem(collected.Targets),
-            afterAlsoRemove,
-            objectsToKeep,
+            afterVisibleLeftBehind,
             runCaches.VisibleTargets,
             ClashingObjectFitter.IndexAsTheRoundsMeasureThem(collected.Targets, afterFits, runCaches),
             placed => runCaches.IndexVisibleTargets(placed),
@@ -289,7 +283,7 @@ public static class StepRunner
             runCaches.Terrain,
             runCaches.VisibleObjectsOfAnyPlugin,
             scope.Settings.Execution);
-        return new OtherModsObjectsPhase(result, afterAlsoRemove.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds));
+        return new OtherModsObjectsPhase(result, afterVisibleLeftBehind.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds));
     }
 
     private static SelectedObjects RunSelection(RunScope scope, IRunCaches runCaches, CollectedObjects collected) =>
@@ -485,50 +479,27 @@ public static class StepRunner
         RunScope scope,
         IRunCaches runCaches,
         CollectedObjects collected,
-        IObjectsToKeep objectsToKeep,
         RemovalDecisions afterTooClose) =>
         scope.Environment.Log.Timed(
-            () => FindAndApplyAlsoRemoveRounds(scope, runCaches, collected, objectsToKeep, afterTooClose, afterTooClose.Rounds, scope.ReportFolder.Outcome),
+            () => FindAndApplyAlsoRemoveRounds(scope, runCaches, collected, afterTooClose),
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
 
-    /// <remarks>
-    /// Seeded by the visible left-behind round alone: what the earlier also-remove rounds started from was followed up already. The
-    /// report files of the first also-remove step cover its rounds only.
-    /// </remarks>
-    private static AlsoRemovePhase RunAlsoRemoveAfterVisibleLeftBehind(
-        RunScope scope,
-        IRunCaches runCaches,
-        CollectedObjects collected,
-        IObjectsToKeep objectsToKeep,
-        RemovalDecisions afterVisibleLeftBehind,
-        RemovalDecisions afterAlsoRemove) =>
-        scope.Environment.Log.Timed(
-            () => FindAndApplyAlsoRemoveRounds(
-                scope, runCaches, collected, objectsToKeep, afterVisibleLeftBehind, afterVisibleLeftBehind.RoundsAfter(afterAlsoRemove), StepOutcome.SwitchedOff),
-            (phase, elapsed) => scope.Report.BuildFollowUpAfterVisibleLeftBehindSections(phase.Result, phase.Decisions, collected, elapsed));
-
-    /// <param name="earlierRounds">The decisions with the rounds of the steps before.</param>
-    /// <param name="seedRounds">The rounds of <paramref name="earlierRounds"/> whose removals the rounds follow up.</param>
-    /// <param name="reportFiles">Whether the step computes the details of the report files.</param>
+    /// <param name="earlierRounds">The decisions with the rounds of the steps before, whose removals the rounds follow up.</param>
     private static AlsoRemovePhase FindAndApplyAlsoRemoveRounds(
         RunScope scope,
         IRunCaches runCaches,
         CollectedObjects collected,
-        IObjectsToKeep objectsToKeep,
-        RemovalDecisions earlierRounds,
-        ImmutableArray<Round> seedRounds,
-        StepOutcome reportFiles)
+        RemovalDecisions earlierRounds)
     {
         var result = RestingObjects.Find(
             new RestingObjectsInput(
                 earlierRounds.TargetsAsTheRoundsMeasureThem(collected.Targets),
-                objectsToKeep,
                 earlierRounds,
-                seedRounds,
+                earlierRounds.Rounds,
                 scope.Settings.AlsoRemove,
                 scope.Settings.Execution,
                 scope.Environment.TimeSinceStart,
-                reportFiles),
+                scope.ReportFolder.Outcome),
             runCaches.Bases,
             runCaches.Shapes,
             runCaches.Triangles,
@@ -544,10 +515,10 @@ public static class StepRunner
         CollectedObjects collected,
         RemovalDecisions afterAlsoRemove) =>
         scope.Environment.Log.Timed(
-            () => FindAndApplyVisibleLeftBehindRound(scope, runCaches, collected, afterAlsoRemove),
+            () => FindAndApplyVisibleLeftBehindRounds(scope, runCaches, collected, afterAlsoRemove),
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
 
-    private static VisibleLeftBehindPhase FindAndApplyVisibleLeftBehindRound(
+    private static VisibleLeftBehindPhase FindAndApplyVisibleLeftBehindRounds(
         RunScope scope,
         IRunCaches runCaches,
         CollectedObjects collected,
@@ -559,11 +530,26 @@ public static class StepRunner
             ClashingObjectFitter.IndexAsTheRoundsMeasureThem(collected.Targets, afterAlsoRemove, runCaches),
             runCaches.Bases,
             runCaches.Shapes,
+            CreateAlsoRemoveFollowUp(scope, runCaches, afterAlsoRemove.TargetsAsTheRoundsMeasureThem(collected.Targets)),
+            scope.Environment.TimeSinceStart,
             collected.Order,
             scope.Settings.Execution,
             scope.Settings.VisibleLeftBehind);
-        return new VisibleLeftBehindPhase(result, afterAlsoRemove.Apply(RoundKind.VisibleLeftBehind, result.Proposals));
+        return new VisibleLeftBehindPhase(result, afterAlsoRemove.ApplyRounds(result.ProposedRounds));
     }
+
+    /// <param name="targetsAsMeasured">Where the rounds measure the targets when the follow-ups start.</param>
+    private static IAlsoRemoveFollowUp CreateAlsoRemoveFollowUp(RunScope scope, IRunCaches runCaches, ImmutableArray<TargetObject> targetsAsMeasured) =>
+        RestingObjects.CreateFollowUp(
+            targetsAsMeasured,
+            scope.Settings.AlsoRemove,
+            scope.Settings.Execution,
+            scope.Environment.TimeSinceStart,
+            runCaches.Shapes,
+            runCaches.Triangles,
+            runCaches.SurfaceSamples,
+            runCaches.Terrain,
+            runCaches.VisibleObjectsOfAnyPlugin);
 
     /// <param name="visibleTargets">The visible targets where the rounds measure them.</param>
     /// <param name="otherModsObjectsTakenAway">The other mods' objects pulled down (where they stand now) or removed (null), by id.</param>
@@ -652,10 +638,10 @@ public static class StepRunner
     /// <param name="Decisions">The decisions with the too-close round.</param>
     private sealed record TooClosePhase(TooCloseResult Result, RemovalDecisions Decisions);
 
-    /// <param name="Decisions">The decisions with the rounds of one also-remove pass.</param>
+    /// <param name="Decisions">The decisions with the also-remove rounds.</param>
     private sealed record AlsoRemovePhase(RestingObjectsResult Result, RemovalDecisions Decisions);
 
-    /// <param name="Decisions">The decisions with the visible left-behind round.</param>
+    /// <param name="Decisions">The decisions with the visible left-behind rounds and their follow-up rounds.</param>
     private sealed record VisibleLeftBehindPhase(VisibleLeftBehindResult Result, RemovalDecisions Decisions);
 
     /// <param name="Decisions">The decisions with the rounds for the target objects that went with other mods' objects taken away.</param>

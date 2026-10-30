@@ -170,15 +170,24 @@ public sealed partial class LogAndReports
         return BuildRoundSections(tooClose, decisions, [decisions.Rounds[^1]], RoundKind.TooClose, found.Failures);
     }
 
-    /// <param name="decisions">The decisions whose last round is the visible left-behind round.</param>
+    /// <summary>The visible left-behind step's sections, then those of the also-remove follow-up of its rounds.</summary>
+    /// <param name="decisions">The decisions that include the visible left-behind rounds and their follow-up rounds.</param>
+    /// <param name="elapsed">The whole step's time as the run measured it, the follow-ups included; it is the time of the step's summary line only.</param>
+    /// <remarks>
+    /// The follow-ups run inside the step, so the unexpected errors the caches recorded while it ran print under the step, not under the
+    /// follow-up's sections, which print the follow-up's own failure; the log cannot tell which round recorded a cache error.
+    /// </remarks>
+    public ImmutableArray<LogSection> BuildStepSections(VisibleLeftBehindResult found, IRemovalDecisions decisions, CollectedObjects world, TimeSpan elapsed) =>
+        [.. BuildVisibleLeftBehindSections(found, decisions, world, elapsed), .. BuildFollowUpAfterVisibleLeftBehindSections(found.FollowUp, decisions, world)];
+
     /// <remarks>A switched-off step prints nothing, not even an empty section.</remarks>
-    public ImmutableArray<LogSection> BuildStepSections(VisibleLeftBehindResult found, IRemovalDecisions decisions, CollectedObjects world, TimeSpan elapsed)
+    private ImmutableArray<LogSection> BuildVisibleLeftBehindSections(VisibleLeftBehindResult found, IRemovalDecisions decisions, CollectedObjects world, TimeSpan elapsed)
     {
         if (found.Outcome == StepOutcome.SwitchedOff) return [];
 
-        var lastRound = decisions.Rounds[^1];
-        var section = LogSections.BuildVisibleLeftBehindSection(world, found, RemovalList.KeptIn(decisions, lastRound), elapsed, _context);
-        return BuildRoundSections(section, decisions, [lastRound], RoundKind.VisibleLeftBehind, Present(found.Failure));
+        var kept = found.Rounds.SelectMany(round => RemovalList.KeptIn(decisions, round));
+        var section = LogSections.BuildVisibleLeftBehindSection(world, found, kept, elapsed, _context);
+        return BuildRoundSections(section, decisions, found.Rounds, RoundKind.VisibleLeftBehind, Present(found.Failure));
     }
 
     /// <summary>The step's section, the line for the removals linked to its own, then the step's unexpected errors.</summary>

@@ -79,6 +79,33 @@ public class RemovalDecisionsTests
         Assert.Equal(new RemovalReason.LinkedTo(Id(5)), Removed(applied, 7).Reason);
     }
 
+    /// <summary>Object 9 is kept shrunk or turned: the visible left-behind round leaves it as it is, the also-remove round removes it.</summary>
+    [Fact]
+    public void ApplyingMixedRoundsOpensEachRoundWithItsKindInOrder()
+    {
+        var afterTooClose = Start().ApplyFits([Fit(9)]).Apply(RoundKind.TooClose, [Propose(0, TooClose)]);
+        ProposedRound[] rounds =
+        [
+            new(RoundKind.VisibleLeftBehind, [Propose(8, TooClose), Propose(9, TooClose)]),
+            new(RoundKind.AlsoRemove, [Propose(9, TooClose), Propose(10, TooClose)]),
+            new(RoundKind.VisibleLeftBehind, []),
+        ];
+
+        var applied = afterTooClose.ApplyRounds(rounds);
+        var copy = afterTooClose.WorkingCopy();
+        IRemovalDecisions oneByOne = afterTooClose;
+        foreach (var round in rounds) oneByOne = copy.DecideRound(round.Kind, round.Proposals);
+
+        Assert.Equal(
+            new[] { RoundKind.Fit, RoundKind.TooClose, RoundKind.VisibleLeftBehind, RoundKind.AlsoRemove, RoundKind.VisibleLeftBehind },
+            applied.Rounds.Select(round => round.Kind).ToArray());
+        Assert.Equal(new[] { Id(8) }, applied.RemovedIn(applied.Rounds[2]).ToArray());
+        Assert.Equal(new[] { Id(9), Id(10) }, applied.RemovedIn(applied.Rounds[3]).ToArray());
+        Assert.Empty(applied.LeftIn(applied.Rounds[4]));
+        Assert.Equal(oneByOne.All().ToList(), applied.All().ToList());
+        Assert.Empty(afterTooClose.ApplyRounds([]).RoundsAfter(afterTooClose));
+    }
+
     /// <summary>One round decided on a working copy is the round <see cref="RemovalDecisions.Apply"/> makes on the shared list, and leaves the shared list as it was.</summary>
     [Fact]
     public void DecidingOneRoundOnAWorkingCopyGivesTheSameDecisionsAsApplyOnTheSharedList()

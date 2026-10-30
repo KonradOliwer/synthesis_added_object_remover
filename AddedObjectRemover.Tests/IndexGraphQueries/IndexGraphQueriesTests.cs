@@ -37,36 +37,6 @@ public class IndexGraphQueriesTests
     }
 
     [Fact]
-    public void SetClosureSpreadsThroughGroupsThatShareAnItemWithTheResult()
-    {
-        IReadOnlyCollection<int>[] groups = [new HashSet<int> { 3, 4 }, new HashSet<int> { 1, 2 }, new HashSet<int> { 2, 3 }, new HashSet<int> { 8, 9 }];
-
-        var closure = SetClosure.Of([1], groups, EqualityComparer<int>.Default);
-
-        Assert.Equal([1, 2, 3, 4], closure.Order());
-    }
-
-    [Fact]
-    public void SetClosureOfSeedsWithoutOverlappingGroupsIsTheSeeds()
-    {
-        IReadOnlyCollection<string>[] groups = [new HashSet<string> { "x", "y" }];
-
-        var closure = SetClosure.Of(["a"], groups, StringComparer.Ordinal);
-
-        Assert.Equal(["a"], closure);
-    }
-
-    [Fact]
-    public void SetClosureUsesTheGivenComparer()
-    {
-        IReadOnlyCollection<string>[] groups = [new HashSet<string> { "A", "B" }];
-
-        var closure = SetClosure.Of(["a"], groups, StringComparer.OrdinalIgnoreCase);
-
-        Assert.Equal(2, closure.Count);
-    }
-
-    [Fact]
     public void ParentChainRunsFromTheRootDownToTheNode()
     {
         int[] parentOf = [-1, 0, 1, -1, 2];
@@ -87,6 +57,38 @@ public class IndexGraphQueriesTests
         var pairs = AdjacencyPairs.From(nodes, neighbors, (_, _) => true, (first, second) => (first, second));
 
         Assert.Equal([(4, 7), (4, 9), (1, 4), (1, 7)], pairs);
+    }
+
+    [Fact]
+    public void InvertedListsGiveEachIdTheNodesListingItInAscendingOrder()
+    {
+        IReadOnlyList<int>[] idsOfNode = [[2, 0], [], [3, 2, 0], [2]];
+
+        var inverted = InvertedLists.Of(4, idsOfNode);
+
+        Assert.Equal([0, 2], inverted.NodesListing(0).ToArray());
+        Assert.Equal([0, 2, 3], inverted.NodesListing(2).ToArray());
+        Assert.Equal([2], inverted.NodesListing(3).ToArray());
+    }
+
+    [Fact]
+    public void InvertedListsAreEmptyForIdsNobodyListsAndForNoNodes()
+    {
+        var inverted = InvertedLists.Of(3, [[1], []]);
+        var withoutNodes = InvertedLists.Of(2, []);
+
+        Assert.True(inverted.NodesListing(0).IsEmpty);
+        Assert.True(inverted.NodesListing(2).IsEmpty);
+        Assert.True(withoutNodes.NodesListing(0).IsEmpty);
+        Assert.True(withoutNodes.NodesListing(1).IsEmpty);
+    }
+
+    [Fact]
+    public void AnIdANodeListsTwiceCountsTwice()
+    {
+        var inverted = InvertedLists.Of(2, [[1, 1]]);
+
+        Assert.Equal([0, 0], inverted.NodesListing(1).ToArray());
     }
 
     [Fact]

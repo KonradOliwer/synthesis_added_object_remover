@@ -6,12 +6,12 @@ namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
 /// <summary>
 /// The connected chains of the touch cascade, read from the removal decisions. Nodes are the seeds (every
-/// object the earlier rounds removed) and every object the also-remove rounds removed or kept. Edges
+/// object the seed rounds removed, of every pass) and every object the also-remove rounds removed or kept. Edges
 /// join every touching pair of removed objects, whether or not the touch was an object's cause,
 /// and each also-remove removal to its cause: the object it touched or the member of its group it
 /// was linked to. The seed rounds' linked removals are seeds of their own. Kept objects are
 /// leaves in the chain of the object they touch and join nothing. Chains are numbered by
-/// their lowest seed.
+/// their lowest seed of the earliest pass they hold a seed of.
 /// </summary>
 internal sealed class TouchChains
 {
@@ -39,14 +39,23 @@ internal sealed class TouchChains
     /// <param name="run">A run of the touch rounds; its decisions end with them, right after the seed rounds.</param>
     public static TouchChainSet Find(RestingObjectsRun run, int targetCount, Execution execution)
     {
-        var search = run.Search ?? throw new ArgumentException("Touch chains need the touch rounds' search.", nameof(run));
         var alsoRemove = run.Result;
-        var decisions = run.Decisions;
-        ImmutableArray<TargetId> seeds = [.. alsoRemove.SeedRounds.SelectMany(round => decisions.LeftIn(round))];
-        var chains = new TouchChains(decisions, targetCount, search, execution);
-        chains.RecordDiscovery(seeds, alsoRemove.Rounds);
-        chains.AssignComponents(seeds, alsoRemove.Rounds);
-        return chains.CreateSet([.. alsoRemove.Evidence.Cast<TouchRoundDetails>()]);
+        ImmutableArray<TargetId> seeds = [.. alsoRemove.SeedRounds.SelectMany(round => run.Decisions.LeftIn(round))];
+        return Find([new TouchPass(seeds, alsoRemove.Rounds)], run.Decisions, run.Search, alsoRemove.Evidence, targetCount, execution);
+    }
+
+    /// <param name="passes">The passes of touch rounds in the order they were decided; each pass's seeds become roots before its rounds.</param>
+    /// <param name="decisions">The decisions with every pass's rounds.</param>
+    /// <param name="search">The touch rounds' search.</param>
+    /// <param name="evidence">One per round of every pass, in round order.</param>
+    public static TouchChainSet Find(
+        IReadOnlyList<TouchPass> passes, IRemovalDecisions decisions, TouchSearch? search, ImmutableArray<RoundDetails> evidence, int targetCount, Execution execution)
+    {
+        var touchSearch = search ?? throw new ArgumentException("Touch chains need the touch rounds' search.", nameof(search));
+        var chains = new TouchChains(decisions, targetCount, touchSearch, execution);
+        chains.RecordDiscovery(passes);
+        chains.AssignComponents(passes);
+        return chains.CreateSet([.. evidence.Cast<TouchRoundDetails>()]);
     }
 
     /// <returns>The candidate pairs from each of <paramref name="nodes"/> to a larger neighbour <paramref name="include"/> accepts, each once with First &lt; Second.</returns>
@@ -56,15 +65,18 @@ internal sealed class TouchChains
         return AdjacencyPairs.From(nodes, neighbors, include, (first, second) => new IndexPair(first, second));
     }
 
-    /// <summary>Seeds in target order at depth 0, then each also-remove round's objects in target order, one step beyond their cause.</summary>
-    private void RecordDiscovery(ImmutableArray<TargetId> seeds, ImmutableArray<Round> alsoRemoveRounds)
+    /// <summary>Per pass: its seeds in target order at depth 0, then each of its rounds' objects in target order, one step beyond their cause.</summary>
+    private void RecordDiscovery(IReadOnlyList<TouchPass> passes)
     {
-        foreach (var seed in seeds.Order()) _nodes.Add(seed.Index);
-        foreach (var round in alsoRemoveRounds)
+        foreach (var pass in passes)
         {
-            var reached = _decisions.LeftIn(round).Concat(_decisions.KeptIn(round)).ToList();
-            foreach (var node in reached) RecordCause(node);
-            _nodes.AddRange(reached.Order().Select(node => node.Index));
+            foreach (var seed in pass.Seeds.Order()) _nodes.Add(seed.Index);
+            foreach (var round in pass.Rounds)
+            {
+                var reached = _decisions.LeftIn(round).Concat(_decisions.KeptIn(round)).ToList();
+                foreach (var node in reached) RecordCause(node);
+                _nodes.AddRange(reached.Order().Select(node => node.Index));
+            }
         }
     }
 
@@ -81,16 +93,16 @@ internal sealed class TouchChains
         _depth[node.Index] = _depth[parent] + 1;
     }
 
-    private void AssignComponents(ImmutableArray<TargetId> seeds, ImmutableArray<Round> alsoRemoveRounds)
+    private void AssignComponents(IReadOnlyList<TouchPass> passes)
     {
         var removed = _nodes.Where(node => _decisions.HasLeftItsPlace(new TargetId(node))).ToList();
         var roots = new UnionFind(_componentId.Length);
         foreach (var pair in FindTouchingPairs(removed)) roots.Join(pair.First, pair.Second);
         // A pair near the touch distance can test apart here although its round found it touching, so the causes are edges too.
-        foreach (var node in alsoRemoveRounds.SelectMany(round => _decisions.LeftIn(round))) roots.Join(node.Index, _parentOf[node.Index]);
+        foreach (var node in passes.SelectMany(pass => pass.Rounds).SelectMany(round => _decisions.LeftIn(round))) roots.Join(node.Index, _parentOf[node.Index]);
 
         var componentOfRoot = new Dictionary<int, int>();
-        foreach (var seed in seeds.Order())
+        foreach (var seed in passes.SelectMany(pass => pass.Seeds.Order()))
         {
             var root = roots.Find(seed.Index);
             if (componentOfRoot.ContainsKey(root)) continue;
@@ -141,3 +153,6 @@ internal sealed class TouchChains
         return _decisions.IsRemoved(id) && _decisions.Of(id)!.Reason is RemovalReason.Touching;
     }
 }
+
+/// <summary>One pass of touch rounds: the objects it was seeded with and its rounds, in order.</summary>
+internal sealed record TouchPass(ImmutableArray<TargetId> Seeds, ImmutableArray<Round> Rounds);

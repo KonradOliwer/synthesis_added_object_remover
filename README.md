@@ -396,7 +396,7 @@ it was: *Also remove what rests on removed objects* removes it like any other ob
 #### Other mods' objects left without support
 
 This setting is in the *Also remove what rests on removed objects* group. *When an object is removed, also remove* applies to the
-objects removed by any removal step (too close, changed terrain, visible objects left behind) and decides only
+objects removed by any removal step (too close, changed terrain, visible objects left behind, after each of its rounds) and decides only
 about the cleaned mod's objects; this setting decides about the objects of the plugins listed below (see *Which objects are
 checked*) that rest on an object of the cleaned mod the run removes. Whatever it is set to, an object of the cleaned mod that
 one of these objects rests on is never shrunk or turned to make it fit (see *Shrink or turn objects to make them fit*): it is
@@ -478,8 +478,8 @@ What goes with these removals goes as usual (touching or resting objects of the 
 objects are then checked again: a lantern of a patch on a removed bowl of the cleaned mod is pulled down or removed in turn. This
 repeats until no further object of the cleaned mod is removed. A kept object (see *What is always kept*) stays, as always.
 
-The other mods' objects are checked once, after *Also remove what rests on removed objects* has followed up the main removals, *Visible objects left behind*
-has run and *Also remove what rests on removed objects* has followed up the objects that step removed, and before
+The other mods' objects are checked once, after *Also remove what rests on removed objects* has followed up the main removals and *Visible objects left behind*
+has run, each of its rounds followed up by *Also remove what rests on removed objects*, until neither removes anything; and before
 *Invisible objects left behind*, which also sees the cleaned mod's objects removed this way. That step and the step that moves kept markers see the
 other mods' objects as this one leaves them: an invisible object of the cleaned mod does not count as inside another mod's
 object that was removed or pulled down, and a kept marker is moved among the pulled-down objects at their new places, with the
@@ -489,11 +489,12 @@ removed ones gone.
 
 Removes the cleaned mod's visible objects when most of the cleaned mod's visible objects around them were removed. It runs after
 *Also remove what rests on removed objects* has followed up the main removals (too close, changed terrain), so it sees all of those removals.
-The objects it removes are then followed up by *Also remove what rests on removed objects* as well, the same way.
+The objects each of its rounds removes are followed up by *Also remove what rests on removed objects* before the next round, and the rounds
+repeat until a round removes nothing, so what one round or its follow-up removes can clear the surroundings of objects judged in the next.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| Remove visible objects whose surroundings were removed | `true` | Turns this removal on. |
+| Remove visible objects whose surroundings were removed | `true` | Turns this removal on. Each round's removals are followed up as *Also remove what rests on removed objects* says, and the rounds repeat until nothing more is removed. |
 | When the cleaned mod's visible objects around it were removed: Look this far around it (game units) | `1024` | How far around to look for the cleaned mod's other visible objects (64-8192). |
 | When the cleaned mod's visible objects around it were removed: Decide only if at least this many of the 8 directions have objects | `6` | A direction has objects when another visible object of the cleaned mod lies that way. With fewer such directions the object is kept (1-8). |
 | When the cleaned mod's visible objects around it were removed: A direction is cleared when this much of it was removed (%) | `80` | Share removed for a direction to count as cleared. |
@@ -505,8 +506,10 @@ The two percentages take values from 10 to 100 in steps of 10.
 A visible object is removed when its surroundings were removed: the area around it is split into 8 directions (north, north-east,
 east, ...), and at least *Decide only if at least this many of the 8 directions have objects* of the directions hold other visible objects of the cleaned mod,
 and at least *Remove when this share of the directions with objects is cleared (%)* of those lost at least *A direction is cleared
-when this much of it was removed (%)* of their ground area. Each object is judged against what the earlier steps removed; objects this
-step removes do not count towards each other.
+when this much of it was removed (%)* of their ground area. The step works in rounds. In each round every object is judged against what was
+removed before that round: by the earlier steps, by this step's earlier rounds and by their follow-ups. Objects removed in the same round
+do not count towards each other, so the order of the objects never matters. An object kept in one round is judged again in the next
+round when its surroundings changed since, so an object removed in one round can clear the surroundings of the objects around it.
 
 Only the cleaned mod's visible objects, including the checked objects of other mods that it changed, count as surroundings, never an object itself or invisible objects. A surrounding object that was restored counts as one that left its place.
 The objects listed under *What is always kept* are kept in any case, and so are the kinds ticked under *Never remove these as visible objects left behind*,
@@ -707,7 +710,7 @@ because other mods' objects rest on them, like `Objects of SomeTownMod.esp that 
 directly, 7 under those).`: those another mod's object rests on directly, and those these rest on, and so on down. Only the
 ones that would otherwise have been removed get a *Kept* line.
 
-With *Detailed log and reports* on, a line like `Objects too close where they stand: 126; not shrunk or turned because other objects rest on them: 6; tried shrunk or turned: 120; fit: 95.` counts the objects that may be shrunk or turned and were too close where they stood, those not tried because other objects rest on them (of the cleaned mod or of other mods), those tried, and those that fit; the others are removed. The line that reports the written patch, like `Wrote 140 overrides (40 removed, 2 restored, 5 kept markers moved, 95 shrunk or turned to fit).`, names the restored objects, the kept markers moved out of other mods' objects (see *Invisible objects left behind*) and the shrunk or turned objects only when there are any, and likewise the other mods' objects pulled down and removed (`Wrote 144 overrides (40 removed, 5 kept markers moved, 95 shrunk or turned to fit; other mods' objects: 3 pulled down, 1 removed).`).
+With *Detailed log and reports* on, a line like `Objects too close where they stand: 126; not shrunk or turned because other objects rest on them: 6; tried shrunk or turned: 120; fit: 95.` counts the objects that may be shrunk or turned and were too close where they stood, those not tried because other objects rest on them (of the cleaned mod or of other mods), those tried, and those that fit; the others are removed. The line that reports the written patch, like `Wrote 140 overrides (40 removed, 2 restored, 5 kept markers moved, 95 shrunk or turned to fit).`, names the restored objects, the kept markers moved out of other mods' objects (see *Invisible objects left behind*) and the shrunk or turned objects only when there are any, and likewise the other mods' objects pulled down and removed (`Wrote 144 overrides (40 removed, 5 kept markers moved, 95 shrunk or turned to fit; other mods' objects: 3 pulled down, 1 removed).`). Under the summary line of *Visible objects left behind*, a line like `Visible objects left behind: 2 rounds in 0.4s.` gives the number of rounds that judged at least one object and the time of those rounds, without the follow-ups between them.
 
 Right after the kept summary, each object kept for a reason of its own gets a line saying why: *Kept, script names a quest or scene* (its own script, or its base object's from the cleaned mod), *Kept, location role* (a location ref type of its own) or, with `KeepSupportingObject`, *Kept, another mod's object rests on it* (naming that object, like `...: Lantern [012345:SomePatch.esp].`, or the kept object of the cleaned mod resting on it and what rests on that one, like `...: Book [...] rests on it; Lantern [...] rests on that.`). They are kept on purpose and are not in the *Kept objects that would have been removed, to check by hand* list. When an object is kept because another mod's object rests on it, the kept summary's first line also names that reason, and the summary counts these objects on a line of their own, like `another mod's object rests on it: 4`.
 
@@ -745,7 +748,7 @@ Both logs show the same tree. In the detailed log, each removed object's line al
 
 If something goes wrong that the patcher did not expect, the log shows a line starting with "Unexpected error" that names the part that failed, the error, and what is missing from the results because of it. The run carries on and the patch is still written. When it happens for single objects (an object of the cleaned mod that is too close or on changed terrain, an other-mod object that can cause removals, an object of the cleaned mod that might have to be kept, or an object tried shrunk or turned), only that object is skipped: an object of the cleaned mod whose check failed is kept and not removed, an other-mod object that failed causes no removals, and a size or turn whose check failed is not used. When finding the objects other objects rest on fails, no object is shrunk or turned, so the objects that were too close are removed. Objects with the same error are grouped into one line with their number and a few examples; turn on the detailed log to list all of them. Besides the stops described in *How to use* and *What stops the whole run*, the run stops only if a plugin can't be read or the patch can't be written.
 
-When such an error stops a whole part of the run (*Also remove what rests on removed objects* (either time it runs), *Visible objects left behind*, *Invisible objects left behind*, moving kept markers, finding the cleaned mod's objects other mods' objects rest on, the step for other mods' objects left without support, the report files, or the details in them), the log says so with a line like "Also remove: not performed because of an unexpected error.", and the rest of the run still goes on. When finding the objects other mods' objects rest on fails, no object is kept for that reason; when the step for other mods' objects left without support fails, no other mod's object is removed or pulled down, and no object of the cleaned mod is removed because of them.
+When such an error stops a whole part of the run (*Also remove what rests on removed objects* (after the main removals), *Visible objects left behind*, *Invisible objects left behind*, moving kept markers, finding the cleaned mod's objects other mods' objects rest on, the step for other mods' objects left without support, the report files, or the details in them), the log says so with a line like "Also remove: not performed because of an unexpected error.", and the rest of the run still goes on. When finding the objects other mods' objects rest on fails, no object is kept for that reason; when the step for other mods' objects left without support fails, no other mod's object is removed or pulled down, and no object of the cleaned mod is removed because of them. When *Also remove what rests on removed objects* fails while following up the rounds of *Visible objects left behind*, the rounds of *Visible objects left behind* go on and no further follow-up runs. If the first follow-up fails, the log says "Also remove after visible objects left behind: not performed because of an unexpected error."; if a later one fails, the section of the earlier follow-ups stays, their removals stand, and the "Unexpected error" line says the follow-ups stopped there.
 
 If the report files from earlier runs cannot be deleted or a report file cannot be written, the log has a line like "Warning: writing removals.csv in <folder> failed: <error>" (or "Warning: deleting earlier diagnostics files in <folder> failed: <error>") that names the folder, the file and the error. When a game archive, the folder of archives or the archive list in the game INI cannot be read, the log has a line like "Warning: could not read archive <name>: <error>", "Warning: could not list archives in <folder>: <error>" or "Warning: could not read archive list from game INI: <error>".
 

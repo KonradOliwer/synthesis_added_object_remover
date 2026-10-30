@@ -22,7 +22,7 @@ public class CompassDirectionTests
         var box = Place(Table, position, zRadians: 0.7f);
         var point = position + TestTargets.At(Vector3.Zero, 0.7f).ToWorld(new Vector3(x, y, z));
 
-        Assert.Equal(CompassDirections.All, CompassDirections.TowardsOrAll(point, box));
+        Assert.Equal(CompassDirections.All, CountsIn(point, box));
     }
 
     [Theory]
@@ -35,8 +35,8 @@ public class CompassDirectionTests
         var box = Place(Table, Vector3.Zero);
         var sector = Enum.Parse<DirectionSector>(expected);
 
-        AssertOnly(sector, CompassDirections.TowardsOrAll(new Vector3(pointX, pointY, 41f), box));
-        AssertOnly(sector, CompassDirections.TowardsOrAll(new Vector3(pointX, pointY, -500f), box));
+        AssertOnly(sector, CountsIn(new Vector3(pointX, pointY, 41f), box));
+        AssertOnly(sector, CountsIn(new Vector3(pointX, pointY, -500f), box));
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public class CompassDirectionTests
     {
         var box = Place(Table, new Vector3(300, 400, 0));
 
-        AssertOnly(CompassDirections.NoHorizontalOffset, CompassDirections.TowardsOrAll(new Vector3(300, 400, 41f), box));
+        AssertOnly(CompassDirections.NoHorizontalOffset, CountsIn(new Vector3(300, 400, 41f), box));
     }
 
     [Fact]
@@ -56,9 +56,9 @@ public class CompassDirectionTests
         var besideTheBeam = new Vector3(50, 50, 20);
 
         Assert.True(beam.IsCrossedByVerticalLine(overTheBeam));
-        AssertOnly(DirectionSector.NorthWest, CompassDirections.TowardsOrAll(overTheBeam, beam));
+        AssertOnly(DirectionSector.NorthWest, CountsIn(overTheBeam, beam));
         Assert.False(beam.IsCrossedByVerticalLine(besideTheBeam));
-        AssertOnly(DirectionSector.SouthWest, CompassDirections.TowardsOrAll(besideTheBeam, beam));
+        AssertOnly(DirectionSector.SouthWest, CountsIn(besideTheBeam, beam));
     }
 
     [Fact]
@@ -66,12 +66,14 @@ public class CompassDirectionTests
     {
         var box = Place(Table, new Vector3(100, 60, 0));
 
-        AssertOnly(DirectionSector.East, CompassDirections.TowardsOrAll(new Vector3(0, 40, 20), box));
-        AssertOnly(DirectionSector.NorthEast, CompassDirections.TowardsOrAll(new Vector3(0, 0, 20), box));
+        AssertOnly(DirectionSector.East, CountsIn(new Vector3(0, 40, 20), box));
+        AssertOnly(DirectionSector.NorthEast, CountsIn(new Vector3(0, 0, 20), box));
     }
 
     private static void AssertOnly(DirectionSector expected, IReadOnlyList<DirectionSector> actual) =>
         Assert.Equal(expected, Assert.Single(actual));
+
+    private static IReadOnlyList<DirectionSector> CountsIn(Vector3 point, OrientedBox box) => SectorFootprint.Of(point, box).Sectors;
 
     [Fact]
     public void VerticalLineTestIncludesTheFootprintBorder()

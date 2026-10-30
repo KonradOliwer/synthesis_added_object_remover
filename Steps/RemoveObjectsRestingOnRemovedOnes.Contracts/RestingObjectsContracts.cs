@@ -20,7 +20,7 @@ public sealed record RestingObjectsWork(int Rounds, int Candidates, int Evaluati
 /// <param name="Evidence">One per also-remove round, in round order.</param>
 /// <param name="RoundsTime">The time of the rounds alone, without building the supporters' index and without the touch-chain search.</param>
 /// <param name="TouchChains">Null unless touch rounds with seeds ran, the detailed log or the report files show them, and their search did not fail.</param>
-/// <param name="Failure">The failure that stopped the rounds; null unless they were stopped.</param>
+/// <param name="Failure">The failure that stopped the rounds, or the follow-up passes after those it keeps; null unless they were stopped.</param>
 /// <param name="TouchChainsFailure">The failure that stopped the touch-chain search; null unless it was stopped.</param>
 /// <param name="ReportFileDetails">
 /// Computed after the rounds and the touch chains, through the same caches as the rounds, only when report files are written;

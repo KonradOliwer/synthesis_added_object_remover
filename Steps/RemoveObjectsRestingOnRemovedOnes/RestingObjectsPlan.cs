@@ -3,6 +3,10 @@ using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
+/// <summary>The rounds that spread from the seeds they are given as the mode says.</summary>
+/// <param name="Search">Null unless touch rounds.</param>
+internal sealed record SpreadRule(IRemovalRounds<RoundDetails> Rounds, TouchSearch? Search);
+
 /// <summary>The rule whose rounds the step decides on its own copy of the decisions.</summary>
 /// <param name="Rounds">Null when no round runs: no seeds, or the mode is Nothing.</param>
 /// <param name="Search">Null unless touch rounds run.</param>

@@ -55,7 +55,7 @@ public class UnexpectedErrorRunTests
         Assert.NotEmpty(healthy.RestingObjects.Rounds);
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, outcome.RestingObjects.Outcome);
         Assert.Empty(outcome.RestingObjects.Rounds);
-        Assert.Equal([RoundKind.ChangedTerrain, RoundKind.TooClose, RoundKind.VisibleLeftBehind, RoundKind.LeftBehind], outcome.Final.Rounds.Select(round => round.Kind));
+        Assert.Equal([RoundKind.ChangedTerrain, RoundKind.TooClose, RoundKind.LeftBehind], outcome.Final.Rounds.Select(round => round.Kind));
         Assert.NotEmpty(outcome.Removals);
         Assert.Equal(outcome.Removals.Select(removal => removal.TargetIndex), outcome.Written.Removed.Select(id => id.Index));
         Assert.Equal(

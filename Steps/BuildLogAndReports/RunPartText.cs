@@ -26,6 +26,10 @@ internal static class RunPartText
     {
         [ReportFileParts.ReportFiles] = new("the report files", "Some or all of the report files are missing; the patch is not affected.", Subjects: null),
         [RestingObjectsParts.AlsoRemove] = new("the also-remove step", "The also-remove rounds did not complete, so objects resting on removed ones were not removed.", Subjects: null),
+        [RestingObjectsParts.FollowUp] = new(
+            "the also-remove follow-ups of the visible objects left behind",
+            "The follow-ups stopped there: the removals of the passes before stand, and objects resting on what the later rounds removed were not removed.",
+            Subjects: null),
         [RestingObjectsParts.TouchChains] = new("the touch-chain search", "The chains of touching objects that the detailed log and the report files list are missing.", Subjects: null),
         [VisibleLeftBehindParts.VisibleLeftBehind] = new(
             "the step for visible objects left behind", "That step did not run, so visible objects whose surroundings were removed were not removed.", Subjects: null),

@@ -36,7 +36,6 @@ internal sealed class RestingRule(
         var checkedObjects = objects.Select(target => target.Index).Distinct().Order().ToList();
         var search = TouchSearch.Create(
             targets,
-            checkedObjects.Select(index => targets[index].SpaceKey).ToHashSet(),
             excluded: [],
             shapes,
             triangles,

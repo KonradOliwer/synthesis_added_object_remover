@@ -18,6 +18,7 @@ public sealed class VisibleLeftBehindSectionTests
     private static readonly ReportContext Normal = new(null!, null!, Detailed: false);
     private static readonly ReportContext Detailed = new(null!, null!, Detailed: true);
     private static readonly TimeSpan Elapsed = TimeSpan.FromSeconds(1.5);
+    private static readonly TimeSpan RoundsTime = TimeSpan.FromSeconds(0.5);
 
     [Fact]
     public void TheSummaryCountsEveryOutcomeAndTheNormalLogShowsOnlyItAndTheKeptLines()
@@ -57,6 +58,49 @@ public sealed class VisibleLeftBehindSectionTests
         }
 
         Assert.StartsWith("  Kept ", lines[^1]);
+    }
+
+    [Fact]
+    public void TheDetailedLogNamesTheRoundsThatJudgedAnObjectAndTheirOwnTimeBesideTheStepsTime()
+    {
+        var (world, result, decisions) = Scene();
+
+        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Detailed).Lines.ToList();
+
+        Assert.StartsWith("Visible objects left behind: 6 evaluated in 1.5s; ", lines[0]);
+        Assert.Equal("Visible objects left behind: 1 rounds in 0.5s.", lines[1]);
+    }
+
+    [Fact]
+    public void TheRoundsLineCountsEveryVisibleRoundOfTheStep()
+    {
+        var (world, scene, decisions) = Scene();
+        var result = scene with { Rounds = [decisions.Rounds[^1], decisions.Rounds[^1], decisions.Rounds[^1]] };
+
+        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, [], Elapsed, Detailed).Lines.ToList();
+
+        Assert.Equal("Visible objects left behind: 3 rounds in 0.5s.", lines[1]);
+    }
+
+    [Fact]
+    public void TheNormalLogHasNoRoundsLine()
+    {
+        var (world, result, decisions) = Scene();
+
+        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Normal).Lines.ToList();
+
+        Assert.DoesNotContain(lines, line => line.Contains(" rounds in ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AStepThatRanNoRoundHasNoRoundsLine()
+    {
+        var (world, scene, decisions) = Scene();
+        var result = scene with { Rounds = [], RoundsTime = TimeSpan.Zero };
+
+        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Detailed).Lines.ToList();
+
+        Assert.DoesNotContain(lines, line => line.Contains(" rounds in ", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -146,7 +190,7 @@ public sealed class VisibleLeftBehindSectionTests
     {
         var (world, _, decisions) = Scene();
 
-        Assert.Empty(TestReport.WithoutProblems().VisibleLeftBehindSections(VisibleLeftBehindResult.SwitchedOff, decisions, world));
+        Assert.Empty(TestReport.WithoutProblems().VisibleLeftBehindSections(TestVisibleLeftBehind.SwitchedOff, decisions, world));
     }
 
     [Fact]
@@ -157,6 +201,9 @@ public sealed class VisibleLeftBehindSectionTests
             StepOutcome.StoppedByUnexpectedError,
             [],
             [],
+            [],
+            TimeSpan.Zero,
+            TestRestingObjects.SwitchedOff,
             new PartFailure(VisibleLeftBehindParts.VisibleLeftBehind, "InvalidOperationException: it broke", Subject: null));
 
         var sections = TestReport.WithoutProblems().VisibleLeftBehindSections(stopped, decisions, world);
@@ -219,6 +266,6 @@ public sealed class VisibleLeftBehindSectionTests
                 new ProposedRemoval(new TargetId(Removed), new RemovalReason.VisibleObjectSurroundingsRemoved()),
                 new ProposedRemoval(new TargetId(Referenced), new RemovalReason.VisibleObjectSurroundingsRemoved()),
             ]);
-        return (world, new VisibleLeftBehindResult(StepOutcome.Performed, evaluations, [], Failure: null), decisions);
+        return (world, new VisibleLeftBehindResult(StepOutcome.Performed, evaluations, [], [decisions.Rounds[^1]], RoundsTime, TestRestingObjects.SwitchedOff, Failure: null), decisions);
     }
 }

@@ -34,6 +34,7 @@ CompassDirections.FullTurnDegrees | math | Degrees in a turn.
 CompassDirections.SectorDegrees | math | Degrees per sector.
 CompassDirections.CentredSectorShift | math | Half a sector, so sectors are centred on their direction.
 CompassDirections.Sectors | math | All sector values.
+SectorFootprint.SingleSectors | internal | Each sector as a list of its own, shared so that no footprint allocates one.
 TerrainHeights.VerticesPerSide | game format | A cell's terrain height grid is 33 by 33 vertices.
 TerrainHeights.VertexSpacing | game format | Cell size divided by the 32 gaps between vertices (the same value as TerrainGrid.VertexSpacing).
 TerrainQuadrants.PerSide | game format | A cell's terrain textures are split into 2 by 2 quadrants.

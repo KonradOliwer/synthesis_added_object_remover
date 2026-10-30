@@ -31,6 +31,9 @@ public abstract record Decision(Round Round, RemovalReason Reason)
 /// <summary>A step's proposal to remove one target object.</summary>
 public readonly record struct ProposedRemoval(TargetId Target, RemovalReason Reason);
 
+/// <summary>A step's proposals for one round, with the kind of round they open.</summary>
+public readonly record struct ProposedRound(RoundKind Kind, IReadOnlyList<ProposedRemoval> Proposals);
+
 /// <summary>A step's proposal to keep one target object where it stands, shrunk or turned until it fits.</summary>
 /// <param name="Clash">Why it would be removed as it is.</param>
 /// <param name="To">The placement it fits at.</param>

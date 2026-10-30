@@ -32,7 +32,7 @@ internal static class TestTouchCascade
         var seeded = TestSeededDecisions.Seed(protection, targets.Count, seeds, terrainSeeds);
         var triangles = new TriangleStore(shapes.ReadTriangles);
         var input = new RoundsInput(
-            [.. targets], protection, ObjectsOfAnyPlugin: null, shapes, triangles, TestSurfaceSamples.Over(triangles), NoTerrain(), execution);
+            [.. targets], ObjectsOfAnyPlugin: null, shapes, triangles, TestSurfaceSamples.Over(triangles), NoTerrain(), execution);
         var result = TestRestingObjects.Run(
             seeded, input, new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouchingIt, touchDistance, SupportLostFraction: 1f, TouchChainsShown: false));
         return Explain(targets, shapes, triangles, result, execution, collectDiagnostics);
@@ -55,7 +55,6 @@ internal static class TestTouchCascade
         var triangles = new TriangleStore(shapes.ReadTriangles);
         var search = TouchSearch.Create(
             targets,
-            ReachableSpaces.CollectReachableSpaces(protection.Groups, targets, [.. seeded.RemovedIn(seedRound).Select(target => target.Index)]),
             excluded: [.. seeded.KeptIn(seedRound).Select(target => target.Index)],
             shapes,
             triangles,

@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
@@ -11,7 +10,6 @@ namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 /// <param name="Terrain">Empty unless OnlyWhatLosesItsSupport or relocation is on.</param>
 internal sealed record RoundsInput(
     ImmutableArray<TargetObject> Targets,
-    IObjectsToKeep Protection,
     IVisibleObjectsOfAnyPlugin? ObjectsOfAnyPlugin,
     IBaseObjectShapes Shapes,
     ITriangleMeshes Triangles,

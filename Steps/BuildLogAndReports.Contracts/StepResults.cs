@@ -16,7 +16,6 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 /// <param name="OldPlaceWorld">The objects the old-place checks were made among, which their collisions' ids refer to; null when no check was made.</param>
 /// <param name="OtherModsObjects">What became of the other mods' objects left without support.</param>
 /// <param name="RestingObjects">The also-remove rounds that follow the removals before the visible left-behind step.</param>
-/// <param name="RestingObjectsAfterVisibleLeftBehind">The also-remove rounds that follow the visible left-behind removals.</param>
 /// <param name="Final">The removal decisions with every round and every move.</param>
 public record StepResults(
     CollectedObjects Collected,
@@ -27,7 +26,6 @@ public record StepResults(
     ChangedTerrainResult ChangedTerrain,
     RestingObjectsResult RestingObjects,
     VisibleLeftBehindResult VisibleLeftBehind,
-    RestingObjectsResult RestingObjectsAfterVisibleLeftBehind,
     LeftBehindResult LeftBehind,
     MarkerMoves MarkerMoves,
     OtherModsObjectsResult OtherModsObjects,

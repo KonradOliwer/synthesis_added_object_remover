@@ -84,6 +84,7 @@ public class LogicPublicTypesTests
             "RemovalDecisions AddMoves(IReadOnlyList<MarkerMove>)",
             "RemovalDecisions ApplyFits(IReadOnlyList<ProposedFit>)",
             "RemovalDecisions Apply(RoundKind, IReadOnlyList<ProposedRemoval>)",
+            "RemovalDecisions ApplyRounds(IReadOnlyList<ProposedRound>)",
             "RemovalDecisions ApplyRounds(RoundKind, IReadOnlyList<IReadOnlyList<ProposedRemoval>>)",
             "static RemovalDecisions Start(IObjectsToKeep, ImmutableArray<WhenRemoved>)",
         ],
@@ -114,14 +115,15 @@ public class LogicPublicTypesTests
         ["RemoveObjectsRestingOnRemovedOnes"] =
         [
             "static Int32 SurfaceSamplesPerMesh { get; }",
+            "static IAlsoRemoveFollowUp CreateFollowUp(ImmutableArray<TargetObject>, AlsoRemoveSettings, Execution, Func<TimeSpan>, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>)",
             "static IRestingRule CreateRestingRule(ImmutableArray<TargetObject>, IVisibleTargetObjects, AlsoRemoveSettings, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, HeldUpTargets, Execution)",
             "static RestingObjectsResult Find(RestingObjectsInput, IBaseFacts, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>)",
             "static HeldUpTargets FindHeldUpTargets(ImmutableArray<TargetObject>, IVisibleTargetObjects, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
-            "static OtherModsObjectsResult SettleOtherModsObjects(ImmutableArray<TargetObject>, ImmutableArray<TargetObject>, IRemovalDecisions, IObjectsToKeep, IVisibleTargetObjects, IVisibleTargetObjects, Func<ImmutableArray<TargetObject>, IVisibleTargetObjects>, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, AlsoRemoveSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
+            "static OtherModsObjectsResult SettleOtherModsObjects(ImmutableArray<TargetObject>, ImmutableArray<TargetObject>, IRemovalDecisions, IVisibleTargetObjects, IVisibleTargetObjects, Func<ImmutableArray<TargetObject>, IVisibleTargetObjects>, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, AlsoRemoveSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
         ],
         ["RemoveVisibleObjectsLeftBehind"] =
         [
-            "static VisibleLeftBehindResult Find(ImmutableArray<TargetObject>, IRemovalDecisions, IVisibleTargetObjects, IBaseFacts, IBaseObjectShapes, WorkOrder, Execution, VisibleLeftBehindSettings)",
+            "static VisibleLeftBehindResult Find(ImmutableArray<TargetObject>, IRemovalDecisions, IVisibleTargetObjects, IBaseFacts, IBaseObjectShapes, IAlsoRemoveFollowUp, Func<TimeSpan>, WorkOrder, Execution, VisibleLeftBehindSettings)",
         ],
         ["RemoveInvisibleObjectsLeftBehind"] =
         [
@@ -151,7 +153,6 @@ public class LogicPublicTypesTests
             "ImmutableArray<LogSection> BuildStepSections(ChangedTerrainResult, IRemovalDecisions, CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(TooCloseResult, IRemovalDecisions, CollectedObjects, IVisibleTargetObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(RestingObjectsResult, IRemovalDecisions, CollectedObjects, TimeSpan)",
-            "ImmutableArray<LogSection> BuildFollowUpAfterVisibleLeftBehindSections(RestingObjectsResult, IRemovalDecisions, CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(VisibleLeftBehindResult, IRemovalDecisions, CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(LeftBehindResult, IRemovalDecisions, CollectedObjects, TimeSpan)",
             "ImmutableArray<LogSection> BuildStepSections(MarkerMoves, CollectedObjects, TimeSpan)",

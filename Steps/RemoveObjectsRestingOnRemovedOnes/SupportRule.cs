@@ -17,7 +17,7 @@ namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 /// their support; kept objects keep supporting others. Every candidate of a round is
 /// judged against the removals of earlier rounds only, so the result does not depend on order.
 /// </summary>
-/// <param name="search">Built once from the seeds.</param>
+/// <param name="search">Built once and shared by every round.</param>
 internal sealed class SupportRule(
     TouchSearch search,
     SupportContactFinder contactFinder,

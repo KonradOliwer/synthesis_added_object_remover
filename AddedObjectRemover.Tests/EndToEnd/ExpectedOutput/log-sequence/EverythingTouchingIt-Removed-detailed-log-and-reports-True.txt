@@ -61,6 +61,7 @@ Linked groups: 0 more objects removed with the follow-up removals they are linke
 ## unexpectedErrors
 ## visible-leftovers
 Visible objects left behind: 10 evaluated in <time>; removed 0 (0 surroundings removed); kept 10 (10 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 0 referenced).
+Visible objects left behind: 1 rounds in <time>.
 ## linked
 Linked groups: 0 more objects removed with the visible left-behind removals they are linked to.
 ## unexpectedErrors

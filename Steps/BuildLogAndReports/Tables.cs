@@ -20,7 +20,7 @@ internal static partial class Tables
         var tables = ImmutableArray.CreateBuilder<CsvTable>();
         var restingObjects = outcome.RestingObjects;
         if (ExplanationEvidence.HasTouch(restingObjects)) tables.AddRange(BuildTouchTables(outcome, ExplanationEvidence.Touch(restingObjects), alsoRemove.TouchGap, context));
-        var afterVisibleLeftBehind = outcome.RestingObjectsAfterVisibleLeftBehind;
+        var afterVisibleLeftBehind = outcome.VisibleLeftBehind.FollowUp;
         if (HasAnchoring(restingObjects) || HasAnchoring(afterVisibleLeftBehind))
         {
             var evaluations = SupportEvaluationRows.Join(restingObjects, outcome.Final)

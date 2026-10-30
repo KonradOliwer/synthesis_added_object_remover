@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
@@ -12,7 +11,6 @@ namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 /// <param name="ReportFiles">Whether the report files are written; the report-file details are computed only when they are performed.</param>
 public sealed record RestingObjectsInput(
     ImmutableArray<TargetObject> Targets,
-    IObjectsToKeep ObjectsToKeep,
     IRemovalDecisions EarlierRounds,
     ImmutableArray<Round> SeedRounds,
     AlsoRemoveSettings Settings,

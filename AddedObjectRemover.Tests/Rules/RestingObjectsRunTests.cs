@@ -309,7 +309,6 @@ public class RestingObjectsRunTests
             });
         var input = new RestingObjectsInput(
             [.. Targets],
-            ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Count), TestBaseFacts.Unresolved),
             decisions,
             seedRounds ?? decisions.Rounds,
             new AlsoRemoveSettings(mode, TouchDistance, Threshold, touchChainsShown || reportFiles == StepOutcome.Performed),

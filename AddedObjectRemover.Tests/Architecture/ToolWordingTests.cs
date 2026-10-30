@@ -21,6 +21,7 @@ public partial class ToolWordingTests
         [("Tools/MeshFileReading/NifShapeCollector.cs", "Shapes of kind {kind} cannot be left out of the geometry.")] = BugMessage,
         [("Tools/DenseIdTables/PerIndexTable.cs", "Index {index} has more than one item.")] = BugMessage,
         [("Tools/DenseIdTables/PerIndexTable.cs", "No item has index {index}.")] = BugMessage,
+        [("Tools/CompassSectorAreas/SectorAreaTally.cs", "The tally holds removed or restored boxes, so it has no totals with every box standing.")] = BugMessage,
         [("Tools/OrderIndependentParallelWork/WorkOrder.cs", "The work order covers {ItemsInOrder.Length} items, not {itemCount}.")] = BugMessage,
         [("Tools/OrderIndependentParallelWork/WorkOrder.cs", "The work order covers {_rank.Length} items.")] = BugMessage,
         [("Tools/OrderIndependentParallelWork/Permutation.cs", "Not a permutation of 0 to {order.Length - 1}: {item} is out of range or repeated.")] = BugMessage,

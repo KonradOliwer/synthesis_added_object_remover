@@ -41,12 +41,4 @@ public static class CompassDirections
         var towards = box.IsCrossedByVerticalLine(point) ? box.Center : box.ClosestPoint(point);
         return Of(new Vector2(towards.X - point.X, towards.Y - point.Y));
     }
-
-    /// <summary>
-    /// Every direction when the box contains the point. Otherwise exactly one: towards the box
-    /// centre's horizontal offset when the box lies straight above or below the point (however
-    /// small that offset), else towards the box's closest point.
-    /// </summary>
-    public static IReadOnlyList<DirectionSector> TowardsOrAll(Vector3 point, OrientedBox box) =>
-        box.Contains(point) ? All : [Towards(point, box)];
 }

@@ -16,21 +16,32 @@ namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
 /// </summary>
 public static class ChangedTerrainObjects
 {
+    /// <param name="LoadOrder">Decides which of several changing plugins loads last.</param>
+    /// <param name="Records">Its terrain and water versions must have been read.</param>
+    /// <param name="Decisions">The run's decisions so far, which the step's round is added to.</param>
+    public sealed record Input(
+        CollectedObjects World,
+        IRunDecisions Decisions,
+        AcceptedWorld Accepted,
+        LoadOrderPlugins LoadOrder,
+        IPluginRecords Records,
+        IBaseObjectShapes Shapes,
+        Execution Execution,
+        IEnumerable<ObjectsJudgedWith<ChangedTerrainSettings>> Groups);
+
     /// <summary>
     /// Runs once for each distinct set of settings over the objects judged with it, and proposes the removals of all of them in target order.
     /// </summary>
-    /// <param name="loadOrder">Decides which of several changing plugins loads last.</param>
-    /// <param name="records">Its terrain and water versions must have been read.</param>
     /// <remarks>A pass whose step is off reads no terrain and is <see cref="StepOutcome.SwitchedOff"/>.</remarks>
-    public static ChangedTerrainResult Find(
-        CollectedObjects world,
-        AcceptedWorld accepted,
-        LoadOrderPlugins loadOrder,
-        IPluginRecords records,
-        IBaseObjectShapes shapes,
-        Execution execution,
-        IEnumerable<ObjectsJudgedWith<ChangedTerrainSettings>> groups) =>
-        new([.. JudgedGroups.MergeEqualSettings(groups).Select(group => FindPass(world, accepted, loadOrder, records, shapes, execution, group))]);
+    public static Decided<ChangedTerrainResult> Find(Input input)
+    {
+        ChangedTerrainResult result = new(
+            [
+                .. JudgedGroups.MergeEqualSettings(input.Groups)
+                    .Select(group => FindPass(input.World, input.Accepted, input.LoadOrder, input.Records, input.Shapes, input.Execution, group)),
+            ]);
+        return new Decided<ChangedTerrainResult>(result, input.Decisions.Apply(RoundKind.ChangedTerrain, result.Proposals));
+    }
 
     /// <summary>The step's check of one target object at a given placement; it finds nothing when the step is off.</summary>
     /// <param name="loadOrder">Decides which of several changing plugins loads last.</param>

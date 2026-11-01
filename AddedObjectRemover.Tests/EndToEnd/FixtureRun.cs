@@ -59,7 +59,7 @@ internal static class FixtureRun
                 world.Plugins,
                 new WrappedPluginRecordsFactory(pluginRecords, wrapPlugin),
                 new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod),
-                openMeshFiles(state.DataFolderPath.Path, state.GameRelease, [.. world.Order.ListedOrder.Select(listing => listing.ModKey)]),
+                openMeshFiles(state.DataFolderPath.Path, state.GameRelease, world.ListedPlugins),
                 new WrappedBaseFactsFactory(new BaseFactsFactory(world.Plugins.Mods), wrapBases),
                 log,
                 new CsvReportOutput(),

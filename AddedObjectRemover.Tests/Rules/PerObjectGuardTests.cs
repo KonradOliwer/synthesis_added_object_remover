@@ -35,7 +35,7 @@ public class PerObjectGuardTests
         public BaseShape Of(BaseKey? baseKey) => inner.Of(baseKey);
 
         public ObjectVisibility VisibilityOf(BaseKey? baseKey, bool isPrimitive, bool hasMapMarker) =>
-            baseKey == faultyBase ? throw new InvalidDataException(FailureMessage) : inner.VisibilityOf(baseKey, isPrimitive, hasMapMarker);
+            baseKey == faultyBase ? throw new PlantedUserDataException(FailureMessage) : inner.VisibilityOf(baseKey, isPrimitive, hasMapMarker);
 
         public bool LayerBlocksActors(uint collisionLayer) => inner.LayerBlocksActors(collisionLayer);
 
@@ -65,7 +65,7 @@ public class PerObjectGuardTests
 
     /// <summary>The failure the step itself returns for the faulty target, keyed by the step's own part.</summary>
     private static PartFailure TargetFailure(PartKey part, TargetObject target) =>
-        new(part, "InvalidDataException: " + FailureMessage, new FailureSubject(target.Key.ToString(), target.EditorId, Faulty));
+        new(part, "PlantedUserDataException: " + FailureMessage, new FailureSubject(target.Key.ToString(), target.EditorId, Faulty));
 
     private static TooClosePass FindTooClose(
         List<TargetObject> targets, ObjectCaches world, IBaseObjectShapes shapes, int threads, Replacements replacements) =>
@@ -128,7 +128,7 @@ public class PerObjectGuardTests
         Assert.Equal(
             new PartFailure(
                 SelectionParts.RemovalCauseSelection,
-                "InvalidDataException: " + FailureMessage,
+                "PlantedUserDataException: " + FailureMessage,
                 new FailureSubject(others[Faulty].Key.ToString(), others[Faulty].EditorId, Faulty)),
             failure);
     }
@@ -198,7 +198,7 @@ public class PerObjectGuardTests
     {
         public int Count => inner.Count;
 
-        public KeepReason? this[int index] => index == faultyIndex ? throw new InvalidDataException(FailureMessage) : inner[index];
+        public KeepReason? this[int index] => index == faultyIndex ? throw new PlantedUserDataException(FailureMessage) : inner[index];
 
         public IEnumerator<KeepReason?> GetEnumerator() => inner.GetEnumerator();
 

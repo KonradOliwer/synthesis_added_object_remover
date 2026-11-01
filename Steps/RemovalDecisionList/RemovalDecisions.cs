@@ -12,7 +12,7 @@ namespace AddedObjectRemover.Steps.RemovalDecisionList;
 /// Adding never changes an older view. Only the newest view may add to the run; the run is linear.
 /// A working copy has a store of its own, so what is decided on it never reaches the run.
 /// </summary>
-public sealed class RemovalDecisions : IRemovalDecisions
+public sealed class RemovalDecisions : IRunDecisions
 {
     private sealed class Store(IObjectsToKeep protection, ImmutableArray<WhenRemoved> whenRemoved)
     {
@@ -228,6 +228,16 @@ public sealed class RemovalDecisions : IRemovalDecisions
         _store.Moves.AddRange(moves);
         return new RemovalDecisions(_store, _roundCount, _store.Moves.Count);
     }
+
+    IRunDecisions IRunDecisions.ApplyFits(IReadOnlyList<ProposedFit> fits) => ApplyFits(fits);
+
+    IRunDecisions IRunDecisions.Apply(RoundKind kind, IReadOnlyList<ProposedRemoval> proposals) => Apply(kind, proposals);
+
+    IRunDecisions IRunDecisions.ApplyRounds(IReadOnlyList<ProposedRound> rounds) => ApplyRounds(rounds);
+
+    IRunDecisions IRunDecisions.ApplyRounds(RoundKind kind, IReadOnlyList<IReadOnlyList<ProposedRemoval>> rounds) => ApplyRounds(kind, rounds);
+
+    IRunDecisions IRunDecisions.AddMoves(IReadOnlyList<MarkerMove> moves) => AddMoves(moves);
 
     /// <summary>A store holding exactly what this view shows.</summary>
     private Store CopyStore()

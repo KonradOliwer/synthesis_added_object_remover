@@ -46,7 +46,7 @@ internal sealed class NavmeshWorld
     private const float Size = 100f;
     private const int CellX = 6;
     private const int CellY = 7;
-    private const int Side = TerrainHeights.VerticesPerSide;
+    private const int Side = TerrainGrid.VerticesPerSide;
     private const int EastSide = 1;
     private const int WestSide = 2;
     private const int CornerOffTheSharedEdge = 3;

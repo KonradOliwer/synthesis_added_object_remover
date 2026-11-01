@@ -5,8 +5,8 @@ namespace AddedObjectRemover.Tests.RecordParts;
 /// <summary>Heights encoded as a LAND height map read back as they were, within the steps the map can store.</summary>
 public class LandHeightEncoderTests
 {
-    private const int Side = TerrainHeights.VerticesPerSide;
-    private const float Step = LandHeightEncoder.UnitsPerStep;
+    private const int Side = TerrainGrid.VerticesPerSide;
+    private const float Step = TerrainGrid.UnitsPerHeightStep;
 
     [Theory]
     [InlineData(1)]

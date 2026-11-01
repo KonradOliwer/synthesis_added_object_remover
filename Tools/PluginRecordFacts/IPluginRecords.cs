@@ -42,7 +42,7 @@ public interface IPluginRecords
     /// <returns>Null where that cell has no grid: an interior cell, or the persistent cell of a worldspace.</returns>
     CellGridPoint? ReadHomeCellGrid(RecordKey record);
 
-    /// <summary>The terrain heights of an exterior cell, row by row (<see cref="TerrainHeights.VerticesPerSide"/> per row); the placed records must have been read before.</summary>
+    /// <summary>The terrain heights of an exterior cell, row by row (<see cref="TerrainGrid.VerticesPerSide"/> per row); the placed records must have been read before.</summary>
     /// <returns>Null where the cell has no terrain (no, a deleted, or an empty land record).</returns>
     float[]? ReadTerrain(ExteriorCell cell);
 

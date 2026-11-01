@@ -121,7 +121,7 @@ public class MarkerMoveTests
 public class FreeSpotSearchTests
 {
     private static readonly ModKey OtherMod = ModKey.FromNameAndExtension("ObjectsAroundMarker.esp");
-    private const float TerrainHeight = 5 * 8f;
+    private const float TerrainHeight = 5 * TerrainGrid.UnitsPerHeightStep;
 
     private static readonly TestStatic Wall = new(
         new FormKey(OtherMod, 0x801), @"test\wall.nif", TestMeshes.BoxTriangles(new Box(new Vector3(380, -100, -50), new Vector3(620, 1100, 200))));

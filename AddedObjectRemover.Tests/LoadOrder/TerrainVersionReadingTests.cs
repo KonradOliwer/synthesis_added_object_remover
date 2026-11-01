@@ -15,7 +15,7 @@ public class TerrainVersionReadingTests
     private const float BaseOffset = 10f;
     private const float TargetOffset = 12f;
     private const float LateOffset = 20f;
-    private const float UnitsPerHeightStep = 8f;
+    private const float UnitsPerHeightStep = TerrainGrid.UnitsPerHeightStep;
     private const float SecondCellWater = -30f;
 
     private readonly FixtureMod _base = new("Base.esm");

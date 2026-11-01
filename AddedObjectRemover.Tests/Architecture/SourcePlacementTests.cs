@@ -136,12 +136,27 @@ public class SourcePlacementTests
     public void OnlyTheParallelAndLookupToolsUseAtomicOperations() =>
         PlacementCheck.AssertUsedOnlyIn(file => ContainsAny(file, AtomicApis), [ParallelTool, LookupTool]);
 
-    /// <summary>The tools are allowed as a whole: they cannot name the decision list (see ToolsNameNoBusinessTypeTests), so their Apply is the geometry transform.</summary>
+    /// <summary>
+    /// Each step that decides rounds or moves adds them to the run's decisions in its entry, outside the step's error boundary. The tools
+    /// are allowed as a whole: they cannot name the decision list (see ToolsNameNoBusinessTypeTests), so their Apply is the geometry transform.
+    /// </summary>
     [Fact]
-    public void OnlyTheRunnerAndTheDecisionListApplyDecisions() =>
+    public void OnlyTheDecisionListAndTheEntriesOfTheDecidingStepsAddToTheDecisions() =>
         PlacementCheck.AssertUsedOnlyIn(
-            file => Regex.IsMatch(file.Code, @"\b(Apply|ApplyRounds|AddMoves)\("),
-            [.. Runner, "Steps/RemovalDecisionList", "Tools"]);
+            file => Regex.IsMatch(file.Code, @"\b(Apply|ApplyFits|ApplyRounds|AddMoves)\("),
+            [
+                "Steps/RemovalDecisionList",
+                "Steps/RemovalDecisionList.Contracts",
+                "Steps/FitClashingObjects/ClashingObjectFitter.cs",
+                "Steps/RemoveObjectsOnChangedTerrain/ChangedTerrainObjects.cs",
+                "Steps/RemoveTooCloseObjects/TooCloseObjects.cs",
+                "Steps/RemoveObjectsRestingOnRemovedOnes/RestingObjects.cs",
+                "Steps/RemoveVisibleObjectsLeftBehind/VisibleLeftBehindObjects.cs",
+                "Steps/OtherModsObjectsLeftWithoutSupport/OtherModsObjects.cs",
+                "Steps/RemoveInvisibleObjectsLeftBehind/LeftBehindObjects.cs",
+                "Steps/MoveKeptMarkers/MarkerMovePlanner.cs",
+                "Tools",
+            ]);
 
     [Fact]
     public void CommentsAndTextInQuotesDoNotCountAsCode()

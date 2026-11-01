@@ -15,7 +15,27 @@ namespace AddedObjectRemover.Steps.JudgeChangedObjects;
 /// </summary>
 public static class ChangedObjectJudging
 {
-    public static ChangedObjectJudgingResult Prepare(CollectedObjects collected, OldPlaceRules rules, ChangedObjectSettings settings, Execution execution)
+    /// <param name="Read">What the scan collected; an old-place check needs the scan to have judged the old places.</param>
+    /// <param name="ChangedTerrain">The changed-terrain rule, in the world without the cleaned mod.</param>
+    public sealed record Input(
+        CollectedObjects Collected,
+        PluginName CleanedMod,
+        WhatToCollect Read,
+        IOldPlaceTooCloseRule TooClose,
+        IPlacementRule ChangedTerrain,
+        ChangedObjectSettings Settings,
+        Execution Execution);
+
+    /// <remarks>The old-place world is built when the first earlier version is checked, so a run whose changed objects need no check builds none.</remarks>
+    public static ChangedObjectsJudged Judge(Input input)
+    {
+        var world = new ComputedOnce<CollectedObjects>(() => CreateOldPlaceWorld(input.Collected, input.CleanedMod, input.Read));
+        var rules = new OldPlaceRules(target => input.TooClose.Create(world.Value, OldPlaceIdOf(target)), input.ChangedTerrain);
+        var result = Prepare(input.Collected, rules, input.Settings, input.Execution);
+        return new ChangedObjectsJudged(result, world.ValueIfComputed);
+    }
+
+    internal static ChangedObjectJudgingResult Prepare(CollectedObjects collected, OldPlaceRules rules, ChangedObjectSettings settings, Execution execution)
     {
         List<int> toCheck =
             [.. collected.Targets.Where(target => ModeOf(target, settings) == RestoreMode.RestoreIfNoCollision && RestoreCanBeWritten(target)).Select(target => target.Id.Index)];
@@ -40,7 +60,7 @@ public static class ChangedObjectJudging
     /// In this world every object's <see cref="OtherObject.Change"/> is its change without the cleaned mod.
     /// </summary>
     /// <param name="read">What the scan collected; the world needs the scan to have judged the old places.</param>
-    public static CollectedObjects CreateOldPlaceWorld(CollectedObjects collected, PluginName cleanedMod, WhatToCollect read)
+    internal static CollectedObjects CreateOldPlaceWorld(CollectedObjects collected, PluginName cleanedMod, WhatToCollect read)
     {
         if (!read.JudgeOldPlaces) throw new InvalidOperationException("The old-place world was asked for, but the scan did not judge the old places.");
 
@@ -57,7 +77,7 @@ public static class ChangedObjectJudging
     }
 
     /// <returns>The id, in the world of <see cref="CreateOldPlaceWorld"/>, of the cleaned mod's object that is the target.</returns>
-    public static OtherId OldPlaceIdOf(TargetObject target) => new(target.Id.Index);
+    internal static OtherId OldPlaceIdOf(TargetObject target) => new(target.Id.Index);
 
     private static RestoreMode ModeOf(TargetObject target, ChangedObjectSettings settings) => target.Origin switch
     {

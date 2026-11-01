@@ -74,9 +74,23 @@ public sealed class PlacedObjectCollector
             trust.Patch, facts.Records.Where(record => record.PartDifferences is not null).ToDictionary(record => record.Key, record => record.PartDifferences!));
     }
 
+    /// <param name="World">The accepted world the other mods' records are judged in.</param>
+    /// <param name="TimeSinceStart">The run's clock, which times the two parts of the step.</param>
+    public sealed record Input(IPluginRecords Plugin, ModTrustTable Trust, AcceptedWorld World, WhatToCollect Plan, Func<TimeSpan> TimeSinceStart);
+
+    public static PlacedObjectsCollected Collect(Input input)
+    {
+        var clock = input.TimeSinceStart;
+        var start = clock();
+        var scanned = ScanPlacedRecords(input.Plugin, input.Trust, input.World, input.Plan);
+        var scanEnd = clock();
+        var collected = ReadNonPlacedLinks(scanned, input.Plugin);
+        return new PlacedObjectsCollected(collected, scanEnd - start, clock() - scanEnd);
+    }
+
     /// <summary>The first part of the step: reads the placed records and sorts them into objects; <see cref="ReadNonPlacedLinks"/> finishes it.</summary>
     /// <param name="world">The accepted world the other mods' records are judged in.</param>
-    public static ScannedPlacedRecords ScanPlacedRecords(IPluginRecords plugin, ModTrustTable trust, AcceptedWorld world, WhatToCollect plan)
+    internal static ScannedPlacedRecords ScanPlacedRecords(IPluginRecords plugin, ModTrustTable trust, AcceptedWorld world, WhatToCollect plan)
     {
         var facts = plugin.ReadPlacedRecords(
             new PlacedReadScope(
@@ -106,7 +120,7 @@ public sealed class PlacedObjectCollector
     /// Only the plugins that can link to a target are read: the changed records and cells count only links from the cleaned mod's
     /// records, which lie in plugins that can link to the cleaned mod, so they add no plugin to read.
     /// </remarks>
-    public static CollectedObjects ReadNonPlacedLinks(ScannedPlacedRecords scanned, IPluginRecords plugin)
+    internal static CollectedObjects ReadNonPlacedLinks(ScannedPlacedRecords scanned, IPluginRecords plugin)
     {
         var objects = scanned.Objects;
         var targetKeys = TargetKeys(objects.Targets);

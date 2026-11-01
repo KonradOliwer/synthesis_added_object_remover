@@ -26,9 +26,12 @@ public sealed class FinalWorld : IDisposable
     }
 
     /// <summary>Lowest priority first; below the patch it holds only enabled plugins whose file exists.</summary>
-    public ILoadOrderGetter<IModListingGetter<ISkyrimModGetter>> Order { get; }
+    internal ILoadOrderGetter<IModListingGetter<ISkyrimModGetter>> Order { get; }
 
-    public ModKey Patch { get; }
+    internal ModKey Patch { get; }
+
+    /// <summary>The plugins of <see cref="Order"/>, lowest priority first.</summary>
+    public IReadOnlyList<ModKey> ListedPlugins => [.. Order.ListedOrder.Select(listing => listing.ModKey)];
 
     public LoadOrderPlugins Plugins { get; }
 

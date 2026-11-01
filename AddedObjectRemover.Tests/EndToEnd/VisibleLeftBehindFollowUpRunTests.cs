@@ -1,3 +1,4 @@
+using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Skyrim;
 using static AddedObjectRemover.Tests.EndToEnd.RingWorld;
@@ -142,7 +143,7 @@ public class VisibleLeftBehindFollowUpRunTests
         var door = Assert.IsType<Decision.Removed>(outcome.Final.Of(IdOf(outcome, DoorEditorId)));
         Assert.Equal(outcome.VisibleLeftBehind.Rounds[1], door.Round);
         Assert.Equal(
-            $"  Unexpected error in the also-remove follow-ups of the visible objects left behind (InvalidOperationException: {FailingAfterSectionClock.FailureMessage}). "
+            $"  Unexpected error in the also-remove follow-ups of the visible objects left behind (PlantedUserDataException: {FailingAfterSectionClock.FailureMessage}). "
             + "The follow-ups stopped there: the removals of the passes before stand, and objects resting on what the later rounds removed were not removed.",
             Assert.Single(log.Sections.Where(section => section.Id == "unexpectedErrors").SelectMany(section => section.Lines), line => line.StartsWith("  Unexpected error ", StringComparison.Ordinal)));
         Assert.Equal(
@@ -177,7 +178,7 @@ public class VisibleLeftBehindFollowUpRunTests
             if (!_armed || ++_readingsSinceArmed <= VisibleRoundReadings) return TimeSpan.Zero;
 
             _armed = false;
-            throw new InvalidOperationException(FailureMessage);
+            throw new PlantedUserDataException(FailureMessage);
         }
     }
 }

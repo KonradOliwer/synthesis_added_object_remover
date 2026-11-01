@@ -54,16 +54,16 @@ public class MeshFilesTriangleFailureTests
     }
 
     [Fact]
-    public void ATrianglesReadThatThrowsIsCountedAsAnUnexpectedErrorAndRecordedAsAnError()
+    public void ATrianglesReadThatHitsABugEndsTheRunAndCountsNoFailure()
     {
         var errors = new UnexpectedErrors();
         var files = new MeshFiles(
             new MeshFileSource(null!, GameRelease.SkyrimSE, [], new AssetProblemLog()), new NifGeometryReader(), new AssetProblemLog(), errors, BaseObjectShapes.SolidShapes);
 
-        Assert.Null(files.ReadTriangles(@"meshes\broken.nif"));
+        Assert.Throws<ArgumentNullException>(() => files.ReadTriangles(@"meshes\broken.nif"));
 
-        Assert.Equal([KeyValuePair.Create(new MeshFailureCategory(MeshReadError.UnexpectedException, null), 1)], files.CountTriangleFailures().ByKind);
-        Assert.Equal(MeshReadingParts.MeshTriangles, Assert.Single(errors.Since(default)).Part);
+        Assert.Empty(files.CountTriangleFailures().ByKind);
+        Assert.Empty(errors.Since(default));
     }
 
     [Fact]

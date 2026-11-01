@@ -14,7 +14,7 @@ internal sealed class FixtureSpaces
     private const float TerrainOffsetSteps = 16f;
 
     /// <summary>A LAND height step in game units.</summary>
-    private const float UnitsPerHeightStep = 8f;
+    private const float UnitsPerHeightStep = TerrainGrid.UnitsPerHeightStep;
 
     private const string InteriorEditorId = "AorInterior";
     private const string WorldspaceEditorId = "AorWorld";

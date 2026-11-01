@@ -10,8 +10,8 @@ public class TerrainHeightsGridTests
 
     private static float[] SlopeInX()
     {
-        var heights = new float[TerrainHeights.VerticesPerSide * TerrainHeights.VerticesPerSide];
-        for (var i = 0; i < heights.Length; i++) heights[i] = i % TerrainHeights.VerticesPerSide * 10f;
+        var heights = new float[TerrainGrid.VertexCount];
+        for (var i = 0; i < heights.Length; i++) heights[i] = i % TerrainGrid.VerticesPerSide * 10f;
         return heights;
     }
 

@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using AddedObjectRemover.Tests.Fixtures;
 
 namespace AddedObjectRemover.Tests.EndToEnd;
 
@@ -25,7 +26,7 @@ internal sealed class FailingTerrainVersionsPlugin(IPluginRecords inner) : IPlug
 
     public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => inner.ReadTerrainBelow(plugin, cell);
 
-    public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new InvalidOperationException(FailureMessage);
+    public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new PlantedUserDataException(FailureMessage);
 
     public WaterCopies ReadWaterCopies(ExteriorCell cell) => inner.ReadWaterCopies(cell);
 

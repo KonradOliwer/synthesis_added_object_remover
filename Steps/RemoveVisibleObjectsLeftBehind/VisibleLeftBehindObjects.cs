@@ -12,6 +12,30 @@ namespace AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
 
 public static class VisibleLeftBehindObjects
 {
+    /// <param name="Decisions">The newest decisions, which the step's rounds and their follow-ups are added to.</param>
+    /// <param name="Caches">Index the visible target objects where the rounds measure them; their base facts and shapes are read.</param>
+    /// <param name="FollowUp">Follows up the removals of each round that took something from its place before the next round; no pass ran yet.</param>
+    /// <param name="TimeSinceStart">The run's clock, which measures the visible rounds.</param>
+    /// <param name="Settings">Null when the step is switched off.</param>
+    public sealed record Input(
+        ImmutableArray<TargetObject> Targets,
+        IRunDecisions Decisions,
+        IRunCaches Caches,
+        IAlsoRemoveFollowUp FollowUp,
+        Func<TimeSpan> TimeSinceStart,
+        WorkOrder Order,
+        Execution Execution,
+        VisibleLeftBehindSettings? Settings);
+
+    public static Decided<VisibleLeftBehindResult> Find(Input input)
+    {
+        var (targets, decisions, caches) = (input.Targets, input.Decisions, input.Caches);
+        var surroundings = caches.IndexVisibleTargetsAsTheRoundsMeasureThem(targets, decisions);
+        var result = Find(
+            targets, decisions, surroundings, caches.Bases, caches.Shapes, input.FollowUp, input.TimeSinceStart, input.Order, input.Execution, input.Settings);
+        return new Decided<VisibleLeftBehindResult>(result, decisions.ApplyRounds(result.ProposedRounds));
+    }
+
     /// <param name="decisions">The newest decisions; the removals in them, and those of the step's earlier rounds and their follow-ups, count as cleared.</param>
     /// <param name="surroundings">The visible target objects, removed or not, where the rounds measure them: a restored one where the cleaned mod put it.</param>
     /// <param name="followUp">Follows up the removals of each round that took something from its place before the next round; no pass ran yet.</param>
@@ -27,7 +51,7 @@ public static class VisibleLeftBehindObjects
     /// <see cref="StepOutcome.StoppedByUnexpectedError"/>, with the failure and no proposed rounds. A step that proposes nothing carries
     /// the follow-up's summary without rounds.
     /// </returns>
-    public static VisibleLeftBehindResult Find(
+    internal static VisibleLeftBehindResult Find(
         ImmutableArray<TargetObject> targets,
         IRemovalDecisions decisions,
         IVisibleTargetObjects surroundings,

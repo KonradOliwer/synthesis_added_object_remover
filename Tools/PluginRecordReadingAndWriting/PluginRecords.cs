@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Mutagen.Bethesda.Plugins;
+using Mutagen.Bethesda.Plugins.Exceptions;
 using Mutagen.Bethesda.Plugins.Order;
 using Mutagen.Bethesda.Skyrim;
 
@@ -42,29 +43,42 @@ internal sealed class PluginRecords(
     public IRecordIndex ReadRecordIndex() => runCache;
 
     public CellGridPoint? ReadHomeCellGrid(RecordKey record) =>
-        Scanned.Handles.LocationOf(record).WinningCell.Grid is { } grid ? new CellGridPoint(grid.Point.X, grid.Point.Y) : null;
+        ReadLazily(() => Scanned.Handles.LocationOf(record).WinningCell.Grid is { } grid ? new CellGridPoint(grid.Point.X, grid.Point.Y) : (CellGridPoint?)null);
 
-    public float[]? ReadTerrain(ExteriorCell cell) => Scanned.Terrain.ReadHeights(cell);
+    public float[]? ReadTerrain(ExteriorCell cell) => ReadLazily(() => Scanned.Terrain.ReadHeights(cell));
 
-    public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => Scanned.Terrain.ReadHeightsBelow(plugin, cell);
+    public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => ReadLazily(() => Scanned.Terrain.ReadHeightsBelow(plugin, cell));
 
-    public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => Scanned.Terrain.ReadVersions(cell);
+    public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => ReadLazily(() => Scanned.Terrain.ReadVersions(cell));
 
-    public WaterCopies ReadWaterCopies(ExteriorCell cell) => Scanned.Water.ReadCopies(cell);
+    public WaterCopies ReadWaterCopies(ExteriorCell cell) => ReadLazily(() => Scanned.Water.ReadCopies(cell));
 
-    public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => _materials.ChainOf(texture);
+    public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => ReadLazily(() => _materials.ChainOf(texture));
 
-    public RecordKey? FindLandWorldspace(RecordKey space) => Scanned.Terrain.FindLandWorldspace(space);
+    public RecordKey? FindLandWorldspace(RecordKey space) => ReadLazily(() => Scanned.Terrain.FindLandWorldspace(space));
 
-    public NavmeshWorldTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => Scanned.Navmeshes.ReadTriangles(bucket);
+    public NavmeshWorldTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => ReadLazily(() => Scanned.Navmeshes.ReadTriangles(bucket));
 
-    public NpcTraits? NpcTraitsOf(BaseKey npc) => _npcReads.NpcTraitsOf(npc);
+    public NpcTraits? NpcTraitsOf(BaseKey npc) => ReadLazily(() => _npcReads.NpcTraitsOf(npc));
 
-    public TraitSupplier? TraitSupplierOf(BaseKey spawn, NpcTemplateFlag templateFlag) => _npcReads.TraitSupplierOf(spawn, templateFlag);
+    public TraitSupplier? TraitSupplierOf(BaseKey spawn, NpcTemplateFlag templateFlag) => ReadLazily(() => _npcReads.TraitSupplierOf(spawn, templateFlag));
 
-    public IReadOnlyList<RecordKey> LeveledEntriesOf(RecordKey list, NpcTemplateFlag templateFlag) => _npcReads.LeveledEntriesOf(list, templateFlag);
+    public IReadOnlyList<RecordKey> LeveledEntriesOf(RecordKey list, NpcTemplateFlag templateFlag) => ReadLazily(() => _npcReads.LeveledEntriesOf(list, templateFlag));
 
     public bool TryParsePluginName(string text, out PluginName name) => PluginNameParser.TryParsePluginName(text, out name);
+
+    /// <remarks>Mutagen reads a record's subrecords lazily, so a malformed one throws when the read reaches it; that is a failure of the user's data.</remarks>
+    private static T ReadLazily<T>(Func<T> read)
+    {
+        try
+        {
+            return read();
+        }
+        catch (MalformedDataException ex)
+        {
+            throw new MalformedRecordException(ex);
+        }
+    }
 
     private ScanLookups Scanned => _scanned ?? throw new InvalidOperationException(NotReadMessage);
 }

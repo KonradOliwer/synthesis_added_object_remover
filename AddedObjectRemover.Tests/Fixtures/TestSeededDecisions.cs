@@ -13,6 +13,10 @@ internal static class TestSeededDecisions
     public static RemovalDecisions StartDisablingAll(IObjectsToKeep protection, int targetCount) =>
         RemovalDecisions.Start(protection, [.. Enumerable.Repeat<WhenRemoved>(new WhenRemoved.Disable(), targetCount)]);
 
+    /// <summary>No round has run, no target is kept or linked, and every removed object is disabled.</summary>
+    public static RemovalDecisions StartUnprotected(IReadOnlyList<TargetObject> targets) =>
+        StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Count), TestBaseFacts.Unresolved), targets.Count);
+
     public static RemovalDecisions Seed(ObjectsToKeep protection, int targetCount, IReadOnlyList<int> seeds, IReadOnlyList<int>? terrainSeeds = null) =>
         SeedFrom(StartDisablingAll(protection, targetCount), seeds, terrainSeeds);
 

@@ -7,7 +7,7 @@ namespace AddedObjectRemover.Tests.Fixtures;
 /// <summary>Heights stored in a LAND record's height map and read back as the game reads them.</summary>
 internal static class TestLandHeights
 {
-    private const int Side = TerrainHeights.VerticesPerSide;
+    private const int Side = TerrainGrid.VerticesPerSide;
 
     /// <summary>Writes the encoded heights into a LAND record's height map and reads them back.</summary>
     public static float[] Decode(float[] heights)

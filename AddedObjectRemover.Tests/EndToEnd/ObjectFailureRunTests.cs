@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
+using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;
 
@@ -11,7 +12,7 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 /// </summary>
 public partial class ObjectFailureRunTests
 {
-    private const string TooCloseLinePrefix = "  Unexpected error while checking objects for being too close (InvalidOperationException: crate triangles broke): ";
+    private const string TooCloseLinePrefix = "  Unexpected error while checking objects for being too close (PlantedUserDataException: crate triangles broke): ";
     private const string DetailedListIndent = "    ";
 
     [GeneratedRegex(@"^(?<count>\d+) objects?, e\.g\. .+\. They were not removed\.$")]
@@ -95,7 +96,7 @@ public partial class ObjectFailureRunTests
 
         public MeshTriangles? ReadTriangles(string meshPath) =>
             string.Equals(meshPath, brokenMesh, StringComparison.OrdinalIgnoreCase)
-                ? throw new InvalidOperationException("crate triangles broke")
+                ? throw new PlantedUserDataException("crate triangles broke")
                 : inner.ReadTriangles(meshPath);
 
         public TriangleFailureCounts CountTriangleFailures() => inner.CountTriangleFailures();

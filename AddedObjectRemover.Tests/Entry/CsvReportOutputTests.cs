@@ -82,17 +82,11 @@ public sealed class CsvReportOutputTests : IDisposable
     }
 
     [Fact]
-    public void AFailureOfTheWritingAsAWholeIsReturnedNotThrown()
+    public void ABugInTheWritingAsAWholeEndsTheRun()
     {
         var brokenTable = new CsvTable("x.csv", ["a", "b"], default);
 
-        var result = _output.Write(new ReportFileSettings(_folder), Performed(brokenTable));
-
-        Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
-        Assert.Empty(result.Written);
-        Assert.Empty(result.Warnings);
-        Assert.Equal(ReportFileParts.ReportFiles, result.Failure?.Part);
-        Assert.StartsWith("NullReferenceException", result.Failure?.Failure);
+        Assert.Throws<NullReferenceException>(() => _output.Write(new ReportFileSettings(_folder), Performed(brokenTable)));
     }
 
     [Fact]

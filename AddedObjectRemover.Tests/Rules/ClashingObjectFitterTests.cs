@@ -131,7 +131,7 @@ public class ClashingObjectFitterTests
     public void WhenFindingTheObjectsOthersRestOnFailsNoObjectIsTried()
     {
         var targets = Scene();
-        var failing = new ScriptedResting(_ => throw new InvalidOperationException("broken"));
+        var failing = new ScriptedResting(_ => throw new PlantedUserDataException("broken"));
 
         var result = ClashingObjectFitter.Fit(
             targets, Unprotected(targets), OneGroup(targets, Defaults, Rule(placement => placement.Scale <= 0.9f)), failing, Shapes, TargetWorkOrder.Of(targets), new Execution(1));

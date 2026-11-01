@@ -10,8 +10,9 @@ namespace AddedObjectRemover.Tests.Architecture;
 internal sealed record ProjectRule(string Name, string Kind, string Folder, IReadOnlyList<string> References, IReadOnlyList<string> Packages);
 
 /// <summary>
-/// The project table from ProjectRules.json: one row per project. Kinds: E entry, X test, R runner, L logic, B cache builder,
-/// V settings validation; the other kinds (contracts, tools, cache catalog) have no rule of their own.
+/// The project table from ProjectRules.json: one row per project, listing exactly the projects its csproj references.
+/// Kinds: K shared ids, A and T tools, C contracts, Q cache catalog, E entry, X test, R runner, L logic, B cache builder,
+/// V settings validation.
 /// </summary>
 internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IReadOnlyList<ProjectRule> Projects)
 {
@@ -19,12 +20,19 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
     public const string TestKind = "X";
     public const string RunnerKind = "R";
     public const string ValidationKind = "V";
+    public const string IdsKind = "K";
 
-    public const string ContractsKind = "C";
+    private const string ContractsKind = "C";
+    private const string CacheCatalogKind = "Q";
     private const string StepsFolderPrefix = "Steps/";
+    private const string CachesFolderPrefix = "Caches/";
     private const string RunCachesContractsName = "RunCaches.Contracts";
 
     public static readonly IReadOnlyList<string> LogicKinds = ["L", "B"];
+
+    public static readonly IReadOnlyList<string> ToolKinds = ["A", "T"];
+
+    private static readonly IReadOnlyList<string> ContractsKinds = [ContractsKind, CacheCatalogKind];
 
     public static ProjectRules Load([CallerFilePath] string sourceFile = "") =>
         JsonSerializer.Deserialize<ProjectRules>(
@@ -35,8 +43,19 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
 
     public bool IsLogic(ProjectRule project) => LogicKinds.Contains(project.Kind);
 
+    public bool IsTool(ProjectRule project) => ToolKinds.Contains(project.Kind);
+
+    public bool IsContracts(ProjectRule project) => ContractsKinds.Contains(project.Kind);
+
+    private static bool IsIds(ProjectRule project) => project.Kind == IdsKind;
+
     private static bool IsStepContracts(ProjectRule project) =>
-        project.Kind == ContractsKind && project.Folder.StartsWith(StepsFolderPrefix, StringComparison.Ordinal);
+        project.Kind == ContractsKind && InFolder(project, StepsFolderPrefix);
+
+    private bool IsCacheContracts(ProjectRule project) => IsContracts(project) && InFolder(project, CachesFolderPrefix);
+
+    private static bool InFolder(ProjectRule project, string folderPrefix) =>
+        project.Folder.StartsWith(folderPrefix, StringComparison.Ordinal);
 
     /// <summary>Projects that only the entry and the tests may reference.</summary>
     public bool IsEntryOnly(ProjectRule project) => project.Kind == ValidationKind || EntryOnlyProjects.Contains(project.Name);
@@ -51,6 +70,16 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
 
     public IReadOnlyList<string> FindStepContractsReferencingRunCachesContracts() =>
         FindReferences(IsStepContracts, project => project.Name == RunCachesContractsName);
+
+    public IReadOnlyList<string> FindToolsReferencingNonTools() =>
+        FindReferences(IsTool, project => !IsTool(project) && !IsIds(project));
+
+    public IReadOnlyList<string> FindContractsReferencingNonContractsAndNonTools() =>
+        FindReferences(IsContracts, project => !IsContracts(project) && !IsTool(project) && !IsIds(project));
+
+    /// <summary>Cache contracts sit between the steps and the caches: they may see step contracts and other cache contracts, but not the run's own contracts.</summary>
+    public IReadOnlyList<string> FindCacheContractsReferencingRunContracts() =>
+        FindReferences(IsCacheContracts, project => IsContracts(project) && !InFolder(project, StepsFolderPrefix) && !InFolder(project, CachesFolderPrefix));
 
     /// <summary>One line per reference that closes a loop, written as the loop's path, e.g. "A -> B -> A".</summary>
     public IReadOnlyList<string> FindCycles()

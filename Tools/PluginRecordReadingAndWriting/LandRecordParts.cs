@@ -14,8 +14,6 @@ namespace AddedObjectRemover;
 /// </remarks>
 internal sealed class LandRecordParts
 {
-    private const int PointCount = TerrainHeights.VerticesPerSide * TerrainHeights.VerticesPerSide;
-
     /// <summary>Never compared, never written: the writer derives the flags from what the record holds.</summary>
     public static readonly ImmutableArray<string> ExcludedFields =[.. RecordHeader.Fields, nameof(ILandscapeGetter.Flags)];
 
@@ -32,8 +30,8 @@ internal sealed class LandRecordParts
     /// <param name="heightTolerance">The largest height gap at a point that is no change, in game units.</param>
     public LandRecordParts(float heightTolerance)
     {
-        Points = [.. Enumerable.Range(0, PointCount).Select(index => PointPart(index, heightTolerance))];
-        Colours = [.. Enumerable.Range(0, PointCount).Select(ColourPart)];
+        Points = [.. Enumerable.Range(0, TerrainGrid.VertexCount).Select(index => PointPart(index, heightTolerance))];
+        Colours = [.. Enumerable.Range(0, TerrainGrid.VertexCount).Select(ColourPart)];
         var quarters = new RecordPart<ILandscapeGetter, ILandscape>[LandLayerReader.QuadrantPlaces.Length];
         foreach (var (quadrant, x, y) in LandLayerReader.QuadrantPlaces) quarters[TerrainQuadrants.IndexOf(x, y)] = LayerPart(quadrant);
         Quarters = quarters;

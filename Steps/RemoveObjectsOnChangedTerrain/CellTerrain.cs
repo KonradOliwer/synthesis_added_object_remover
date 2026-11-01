@@ -18,8 +18,6 @@ namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
 /// </param>
 internal sealed record CellTerrain(float[]? AcceptedHeights, float[]? WinnerHeights, VertexChange[]? Changes, bool[]? UncheckedVertices)
 {
-    public const int VertexCount = TerrainHeights.VerticesPerSide * TerrainHeights.VerticesPerSide;
-
     public bool IsCheckedAt(int vertex) => UncheckedVertices?[vertex] != true;
 }
 

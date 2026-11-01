@@ -1,4 +1,5 @@
 using Mutagen.Bethesda.Skyrim;
+using static AddedObjectRemover.TerrainGrid;
 
 namespace AddedObjectRemover;
 
@@ -7,20 +8,17 @@ namespace AddedObjectRemover;
 /// last row and column shared with the neighbouring cells. Heights are stored as deltas: the first
 /// byte of each row is relative to the first vertex of the previous row (the first row to the
 /// record's offset), every other byte to the vertex before it in its row, and the running value
-/// times 8 is the height in game units.
+/// times <see cref="TerrainGrid.UnitsPerHeightStep"/> is the height in game units.
 /// </summary>
 internal static class LandHeightReader
 {
-    private const int VerticesPerSide = TerrainHeights.VerticesPerSide;
-    private const float UnitsPerHeightStep = LandHeightEncoder.UnitsPerStep;
-
-    /// <returns>Heights row by row (<see cref="VerticesPerSide"/> per row); null for a deleted record or one without a height map.</returns>
+    /// <returns>Heights row by row (<see cref="TerrainGrid.VerticesPerSide"/> per row); null for a deleted record or one without a height map.</returns>
     public static float[]? Read(ILandscapeGetter landscape)
     {
         if (landscape.IsDeleted) return null;
         if (landscape.VertexHeightMap is not { } map) return null;
 
-        var heights = new float[VerticesPerSide * VerticesPerSide];
+        var heights = new float[VertexCount];
         var rowStart = map.Offset;
         for (var y = 0; y < VerticesPerSide; y++)
         {

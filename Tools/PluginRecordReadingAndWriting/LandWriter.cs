@@ -1,6 +1,7 @@
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Skyrim;
 using Noggog;
+using static AddedObjectRemover.TerrainGrid;
 
 namespace AddedObjectRemover;
 
@@ -10,8 +11,6 @@ namespace AddedObjectRemover;
 /// </summary>
 internal sealed class LandWriter(SynthesisWriteCache synthesis, CellOverrides cells, RecordHandles handles)
 {
-    private const int VerticesPerSide = TerrainHeights.VerticesPerSide;
-
     /// <summary>A normal component of 1 as the vertex normals (VNML) store it: each component is a signed byte.</summary>
     private const float StoredUnitNormal = 127f;
 

@@ -13,14 +13,14 @@ namespace AddedObjectRemover.Tests.Rules;
 /// </summary>
 public sealed class RestoreWhereRemovedTerrainTests
 {
-    private const int Side = TerrainHeights.VerticesPerSide;
+    private const int Side = TerrainGrid.VerticesPerSide;
     private const int Last = Side - 1;
     private const int Middle = Last / 2;
     private const float Raised = 80f;
     private const float QuarterCentre = ExteriorGrid.CellSize / 4;
     private const float HeightTolerance = 8f;
     private const float GridStep = TerrainGrid.VertexSpacing;
-    private const float Step = LandHeightEncoder.UnitsPerStep;
+    private const float Step = TerrainGrid.UnitsPerHeightStep;
 
     private static readonly ModKey ShapeMod = ModKey.FromNameAndExtension("RestoreTerrainShapes.esp");
     private static readonly TestStatic Block = new(new FormKey(ShapeMod, 0x801), @"test\restoreterrain\block.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20), new Vector3(20))));
@@ -85,7 +85,7 @@ public sealed class RestoreWhereRemovedTerrainTests
 
         var land = Assert.Single(Plan(ClearedAround(0, 0).Land(0, 0, withoutMap)).Lands);
 
-        Assert.Equal(PointSet.PointCount, KeptFor(land, TerrainKeptReason.WithoutHeightMap).Points.Count);
+        Assert.Equal(TerrainGrid.VertexCount, KeptFor(land, TerrainKeptReason.WithoutHeightMap).Points.Count);
         Assert.True(land.Heights.IsEmpty);
     }
 
@@ -556,9 +556,9 @@ public sealed class RestoreWhereRemovedTerrainTests
         new([.. lands.Select(AllCleared)], _ => new LandHeights(null, null), HeightTolerance, blendDistance);
 
     private static PointSet PointsWhere(Func<int, int, bool> include) =>
-        PointSet.Of(Enumerable.Range(0, PointSet.PointCount).Where(point => include(point % Side, point / Side)));
+        PointSet.Of(Enumerable.Range(0, TerrainGrid.VertexCount).Where(point => include(point % Side, point / Side)));
 
-    private static float[] Heights(Func<int, int, float> heightAt) => [.. Enumerable.Range(0, PointSet.PointCount).Select(point => heightAt(point % Side, point / Side))];
+    private static float[] Heights(Func<int, int, float> heightAt) => [.. Enumerable.Range(0, TerrainGrid.VertexCount).Select(point => heightAt(point % Side, point / Side))];
 
     private static Vector3 QuarterCentreOf(int cellX, int cellY, int quarterX, int quarterY) =>
         new(cellX * ExteriorGrid.CellSize + (2 * quarterX + 1) * QuarterCentre, cellY * ExteriorGrid.CellSize + (2 * quarterY + 1) * QuarterCentre, Raised);
@@ -604,23 +604,23 @@ public sealed class RestoreWhereRemovedTerrainTests
         var final = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved), targets.Length)
             .Apply(RoundKind.TooClose, [.. scene.Removals.Select(index => new ProposedRemoval(new TargetId(index), new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);
         return WhereRemovedRestorer.Plan(
-            collected,
-            final,
-            OtherModsObjectsResult.SwitchedOff,
-            TestScenes.Create(targets, [], Shapes).VisibleTargets,
-            rules.IndexObjects,
-            rules.TooClose,
-            rules.FindHoldersOfObjectsThatStay,
-            rules.Support,
-            Shapes,
-            NoNavmeshes,
-            space => space == ChildSpace ? Space : space,
-            _ => new LandHeights(null, null),
-            _ => null,
-            Plugins,
-            TestTargets.TargetName,
-            new Execution(workers),
-            settings ?? Settings);
+            new(
+                collected,
+                final,
+                OtherModsObjectsResult.SwitchedOff,
+                TestScenes.Create(targets, [], Shapes).VisibleTargets,
+                rules.WorldCaches,
+                rules.TooCloseRule(),
+                rules.HoldersOfObjectsThatStay,
+                TestNavmeshCheck.NoFault,
+                rules.Support,
+                Shapes,
+                NoNavmeshes,
+                new TestLandPlugin(space => space == ChildSpace ? Space : space, _ => new LandHeights(null, null)),
+                Plugins,
+                TestTargets.TargetName,
+                new Execution(workers),
+                settings ?? Settings));
     }
 
     /// <summary>Target objects (each a block) with the ones removed, and the LAND facts, built up one by one.</summary>

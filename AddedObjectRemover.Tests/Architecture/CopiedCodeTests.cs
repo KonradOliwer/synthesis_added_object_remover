@@ -78,8 +78,14 @@ public class CopiedCodeTests
     private const string RestoreContracts = "Steps/RestoreWhereRemoved.Contracts/";
     private const string Restore = "Steps/RestoreWhereRemoved/";
 
-    private const string EntryInputs =
-        "The entry's parameter list and the record that carries the same values to the step's own methods once the step is switched on; they share only the list.";
+    private const string StepEntries =
+        "Steps' entries and their input records: each entry hands the record's values to the step's own code, which the step's tests call "
+        + "with values the run never passes, and adds the step's rounds or moves to the run's decisions; they share only that shape.";
+
+    private const string Fitter = "Steps/FitClashingObjects/ClashingObjectFitter.cs:ClashingObjectFitter.";
+    private const string RestingEntry = Resting + "RestingObjects.cs";
+    private const string VisibleEntry = VisibleStep + "VisibleLeftBehindObjects.cs";
+    private const string OtherModsEntry = OtherMods + "OtherModsObjects.cs:OtherModsObjects.";
     private const string RestoreText = Report + "RestoreWhereRemovedText.cs:RestoreWhereRemovedText.";
     private const string ReportContracts = "Steps/BuildLogAndReports.Contracts/ReportFileNames.cs:ReportFileNames.";
 
@@ -99,7 +105,16 @@ public class CopiedCodeTests
     {
         [CopyFamily.KeyOf([Settings + "CreateLeftBehindSettings", Settings + "CreateVisibleLeftBehindSettings", Settings + "JudgesOldPlaces", Settings + "ValidateSurroundings"])] = SettingChecks,
         [CopyFamily.KeyOf([Report + "LogAndReports.cs:LogAndReports.BuildStepSections"])] = StepSections,
-        [CopyFamily.KeyOf([Restore + "WhereRemovedRestorer.cs:WhereRemovedRestorer.Plan", Restore + "WhereRemovedRestorer.cs:WhereRemovedRestorer.StepInputs"])] = EntryInputs,
+        [CopyFamily.KeyOf([Fitter + "Fit", VisibleEntry + ":VisibleLeftBehindObjects.Find"])] = StepEntries,
+        [CopyFamily.KeyOf([Fitter + "Fit", OtherModsEntry + "Settle"])] = StepEntries,
+        [CopyFamily.KeyOf([
+            "Steps/MoveKeptMarkers/MarkerMovePlanner.cs:MarkerMovePlanner.Plan", OtherModsEntry + "Settle", RestingEntry + ":RestingObjects.Find",
+            VisibleEntry + ":VisibleLeftBehindObjects.Find"])] = StepEntries,
+        [CopyFamily.KeyOf([OtherModsEntry + "Input", OtherModsEntry + "Settle", RestingEntry + ":RestingObjects.Find", RestingEntry + ":RestingObjects.Input"])] = StepEntries,
+        [CopyFamily.KeyOf([Invisible + "LeftBehindObjects.cs:LeftBehindObjects.Find", RestingEntry + ":RestingObjects.Find"])] = StepEntries,
+        [CopyFamily.KeyOf([
+            RestingEntry, RestingEntry + ":RestingObjects", RestingEntry + ":RestingObjects.Input",
+            VisibleEntry, VisibleEntry + ":VisibleLeftBehindObjects", VisibleEntry + ":VisibleLeftBehindObjects.Input"])] = StepEntries,
         [CopyFamily.KeyOf([
             LeftBehindSections + "LeftBehindOutcomeLine", LeftBehindSections + "LeftBehindSummaryLine",
             VisibleSections + "VisibleLeftBehindOutcomeLine", VisibleSections + "VisibleLeftBehindSummaryLine"])] = OutcomeLines,

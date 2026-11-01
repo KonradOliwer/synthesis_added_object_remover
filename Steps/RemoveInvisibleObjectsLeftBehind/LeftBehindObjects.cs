@@ -12,6 +12,40 @@ namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
 
 public static class LeftBehindObjects
 {
+    /// <param name="OtherModObjects">The other-mod objects that can cause removals (the selection step's view).</param>
+    /// <param name="OtherModObjectsTakenAway">Those of any plugin this run removes or pulls down, by id: no object sits inside them any more.</param>
+    /// <param name="Decisions">The newest decisions, which the step's round is added to.</param>
+    /// <param name="Surroundings">The visible target objects, removed or not, where the rounds measure them: a restored one where the cleaned mod put it.</param>
+    /// <param name="Caches">Its base facts and shapes are read.</param>
+    /// <param name="Settings">Null when the step is switched off.</param>
+    public sealed record Input(
+        ImmutableArray<TargetObject> Targets,
+        IObjectsThatCanCauseRemovals OtherModObjects,
+        IReadOnlyDictionary<OtherId, OtherObject?> OtherModObjectsTakenAway,
+        IRunDecisions Decisions,
+        IVisibleTargetObjects Surroundings,
+        IRunCaches Caches,
+        WorkOrder Order,
+        Execution Execution,
+        LeftBehindSettings? Settings);
+
+    public static Decided<LeftBehindResult> Find(Input input)
+    {
+        var decisions = input.Decisions;
+        var result = Find(
+            input.Targets,
+            input.OtherModObjects,
+            input.OtherModObjectsTakenAway.Keys.ToHashSet(),
+            decisions,
+            input.Surroundings,
+            input.Caches.Bases,
+            input.Caches.Shapes,
+            input.Order,
+            input.Execution,
+            input.Settings);
+        return new Decided<LeftBehindResult>(result, decisions.Apply(RoundKind.LeftBehind, result.Proposals));
+    }
+
     /// <param name="otherModObjects">The other-mod objects that can cause removals (the selection step's view).</param>
     /// <param name="otherModObjectsTakenAway">Those of any plugin this run removes or pulls down: no object sits inside them any more.</param>
     /// <param name="decisions">The newest decisions; only the removals already in them count as cleared.</param>
@@ -24,7 +58,7 @@ public static class LeftBehindObjects
     /// <see cref="StepOutcome.SwitchedOff"/>. An unexpected failure stops the step: <see cref="StepOutcome.StoppedByUnexpectedError"/>,
     /// with the failure and no proposals.
     /// </returns>
-    public static LeftBehindResult Find(
+    internal static LeftBehindResult Find(
         ImmutableArray<TargetObject> targets,
         IObjectsThatCanCauseRemovals otherModObjects,
         IReadOnlySet<OtherId> otherModObjectsTakenAway,

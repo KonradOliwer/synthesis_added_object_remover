@@ -26,7 +26,8 @@ public class ProjectScaffoldingTests
             yield break;
         }
         if (row.Folder != folder) yield return $"{name} is in {folder}, the table says {row.Folder}";
-        foreach (var reference in references.Except(row.References)) yield return $"{name} references {reference}, which the table does not allow";
+        foreach (var reference in references.Except(row.References)) yield return $"{name} references {reference}, which the table does not list";
+        foreach (var reference in row.References.Except(references)) yield return $"{name} has no reference to {reference}, which the table lists";
     }
 
     /// <summary>The table rows of the projects in the solution, each with the references its csproj really has.</summary>
@@ -44,5 +45,8 @@ public class ProjectScaffoldingTests
             .Concat(actual.FindLogicReferencedByNonRunners().Select(reference => $"{reference}: logic referenced by a non-runner"))
             .Concat(actual.FindEntryOnlyReferencedByOthers().Select(reference => $"{reference}: entry-only project referenced by another project"))
             .Concat(actual.FindStepContractsReferencingRunCachesContracts().Select(reference => $"{reference}: step contracts reference the run caches"))
+            .Concat(actual.FindToolsReferencingNonTools().Select(reference => $"{reference}: tool references something other than tools and ids"))
+            .Concat(actual.FindContractsReferencingNonContractsAndNonTools().Select(reference => $"{reference}: contracts reference something other than contracts, tools and ids"))
+            .Concat(actual.FindCacheContractsReferencingRunContracts().Select(reference => $"{reference}: cache contracts reference the run's contracts"))
             .Concat(actual.FindCycles().Select(cycle => $"{cycle}: reference cycle"));
 }

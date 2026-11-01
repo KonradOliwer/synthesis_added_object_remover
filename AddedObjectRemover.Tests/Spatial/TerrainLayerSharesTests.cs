@@ -6,7 +6,7 @@ namespace AddedObjectRemover.Tests.Spatial;
 public class TerrainLayerSharesTests
 {
     private const float Tolerance = 1e-6f;
-    private const int LastVertex = TerrainHeights.VerticesPerSide - 1;
+    private const int LastVertex = TerrainGrid.VerticesPerSide - 1;
     private const int QuadrantEdge = TerrainQuadrants.VerticesPerSide - 1;
 
     private static readonly RecordKey Grass = TestTargets.SpaceKey(0x10);

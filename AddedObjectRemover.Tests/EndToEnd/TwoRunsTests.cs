@@ -194,7 +194,7 @@ public sealed class TwoRunsTests : IDisposable
             world.Plugins,
             pluginRecords,
             new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod),
-            new MeshFilesFactory(state.DataFolderPath.Path, state.GameRelease, [.. world.Order.ListedOrder.Select(listing => listing.ModKey)]),
+            new MeshFilesFactory(state.DataFolderPath.Path, state.GameRelease, world.ListedPlugins),
             bases,
             new ConsoleLogSink(),
             new CsvReportOutput(),

@@ -303,7 +303,7 @@ public class AlsoRemoveFollowUpTests
     public void ModeNothingProposesNothingAndIsSwitchedOff()
     {
         var scene = Scene.Of(TwoRows, SceneShapes, FollowUpRemovalMode.Nothing, Threshold);
-        var followUp = scene.CreateFollowUp(() => throw new InvalidOperationException(Failure));
+        var followUp = scene.CreateFollowUp(() => throw new PlantedUserDataException(Failure));
         var seeded = scene.Seed([RowStart]);
 
         var pass = followUp.FollowUp(seeded, NewestLeft(seeded));
@@ -317,7 +317,7 @@ public class AlsoRemoveFollowUpTests
     public void WithoutSeedsNoRoundRunsAndTheSummaryHadNoSeeds()
     {
         var scene = Scene.Of(TwoRows, SceneShapes, FollowUpRemovalMode.EverythingTouchingIt, Threshold);
-        var followUp = scene.CreateFollowUp(() => throw new InvalidOperationException(Failure));
+        var followUp = scene.CreateFollowUp(() => throw new PlantedUserDataException(Failure));
         var seeded = scene.Seed([]);
 
         var pass = followUp.FollowUp(seeded, []);
@@ -499,7 +499,7 @@ public class AlsoRemoveFollowUpTests
     private sealed class FailingPlankSurfaceSamples(ISurfaceSamples inner) : ISurfaceSamples
     {
         public SampledSurface? Of(string meshPath) =>
-            meshPath.EndsWith(PlankMeshFile, StringComparison.OrdinalIgnoreCase) ? throw new InvalidOperationException(Failure) : inner.Of(meshPath);
+            meshPath.EndsWith(PlankMeshFile, StringComparison.OrdinalIgnoreCase) ? throw new PlantedUserDataException(Failure) : inner.Of(meshPath);
     }
 
     /// <summary>A clock one second further on each reading, which throws at the failing reading.</summary>
@@ -518,7 +518,7 @@ public class AlsoRemoveFollowUpTests
         public TimeSpan Read()
         {
             _readings++;
-            if (_readings == FailingReading) throw new InvalidOperationException(Failure);
+            if (_readings == FailingReading) throw new PlantedUserDataException(Failure);
             return TimeSpan.FromSeconds(_readings);
         }
     }

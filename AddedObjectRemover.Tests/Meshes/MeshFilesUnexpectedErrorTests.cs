@@ -4,7 +4,7 @@ using Mutagen.Bethesda;
 
 namespace AddedObjectRemover.Tests.Meshes;
 
-/// <summary>A mesh whose reading throws unexpectedly is reported as unreadable with its scope; other meshes are still read.</summary>
+/// <summary>A mesh whose reading hits a bug ends the run; it is not reported as an unreadable mesh.</summary>
 public class MeshFilesUnexpectedErrorTests
 {
     private const string Mesh = @"meshes\broken.nif";
@@ -16,29 +16,23 @@ public class MeshFilesUnexpectedErrorTests
         new(new MeshFileSource(null!, GameRelease.SkyrimSE, [], problems), new NifGeometryReader(), problems, errors, BaseObjectShapes.SolidShapes);
 
     [Fact]
-    public void ABoundsReadThatThrowsGivesFailedBoundsAndReportsTheMesh()
+    public void ABoundsReadThatHitsABugEndsTheRunAndReportsNothing()
     {
         var errors = new UnexpectedErrors();
-        var bounds = OpenBroken(new AssetProblemLog(), errors).Of(Mesh);
 
-        Assert.Equal(MeshReadStatus.Failed, bounds.Status);
-        Assert.Null(bounds.Box);
-        var error = Assert.Single(errors.Since(default));
-        Assert.Equal(MeshReadingParts.MeshShapes, error.Part);
-        Assert.Equal(new FailureSubject(Mesh, Name: null, Position: 0), error.Subject);
-        Assert.StartsWith("ArgumentNullException:", error.Failure, StringComparison.Ordinal);
+        Assert.Throws<ArgumentNullException>(() => OpenBroken(new AssetProblemLog(), errors).Of(Mesh));
+
+        Assert.Empty(errors.Since(default));
     }
 
     [Fact]
-    public void ATrianglesReadThatThrowsGivesNoTrianglesAndReportsTheMesh()
+    public void ATrianglesReadThatHitsABugEndsTheRunAndReportsNothing()
     {
         var errors = new UnexpectedErrors();
 
-        Assert.Null(OpenBroken(new AssetProblemLog(), errors).ReadTriangles(Mesh));
+        Assert.Throws<ArgumentNullException>(() => OpenBroken(new AssetProblemLog(), errors).ReadTriangles(Mesh));
 
-        var error = Assert.Single(errors.Since(default));
-        Assert.Equal(MeshReadingParts.MeshTriangles, error.Part);
-        Assert.Equal(new FailureSubject(Mesh, Name: null, Position: 0), error.Subject);
+        Assert.Empty(errors.Since(default));
     }
 
     [Fact]

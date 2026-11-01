@@ -25,13 +25,13 @@ public class RunnerRulesTests
     /// <summary>"file: Record.Member" of a member read on a settings record or on the settings of a group, and why the runner may read it.</summary>
     private static readonly Dictionary<string, string> AllowedSettingsReads = new()
     {
-        ["StepRunner.cs: CollisionGroup.TooClose.Settings"] =
+        ["StepRunner.Rules.cs: CollisionGroup.TooClose.Settings"] =
             "The fit step takes the too-close rule built with the settings of its group; the step builds the rule.",
-        ["StepRunner.cs: CollisionGroup.ChangedTerrain.Settings"] =
+        ["StepRunner.Rules.cs: CollisionGroup.ChangedTerrain.Settings"] =
             "The fit step takes the changed-terrain rule built with the settings of its group; the step builds the rule.",
-        ["StepRunner.cs: ChangedObjectCollision.TooClose"] =
+        ["StepRunner.Rules.cs: ChangedObjectCollision.TooClose"] =
             "The old-place check takes the too-close rule built with the too-close settings of the changed objects; the step builds the rule.",
-        ["StepRunner.cs: ChangedObjectCollision.ChangedTerrain"] =
+        ["StepRunner.Rules.cs: ChangedObjectCollision.ChangedTerrain"] =
             "The old-place check takes the changed-terrain rule built with the changed-terrain settings of the changed objects; the step builds the rule.",
     };
 
@@ -104,6 +104,21 @@ public class RunnerRulesTests
             .ToHashSet();
 
         AssertOnlyAllowed(found, AllowedConditions.Keys, "Condition in the runner; the domain decision belongs to a step", nameof(AllowedConditions));
+    }
+
+    /// <summary>The runner makes one call per step: each step's one entry is called once, and the step runs its own phases.</summary>
+    [Fact]
+    public void TheRunnerCallsEachStepsEntryOnce()
+    {
+        var code = string.Concat(RunnerFiles().Select(file => file.Code));
+
+        var wrong = LogicPublicTypesTests.StepEntries()
+            .Select(entry => (Call: $"{entry.DeclaringType!.Name}.{entry.Name}", Count: Regex.Matches(code, $@"\b{entry.DeclaringType!.Name}\.{entry.Name}\(").Count))
+            .Where(entry => entry.Count != 1)
+            .Select(entry => $"{entry.Call}: {entry.Count} calls")
+            .ToList();
+
+        Assert.True(wrong.Count == 0, $"Step entries the runner does not call exactly once:{Environment.NewLine}{string.Join(Environment.NewLine, wrong)}");
     }
 
     [Fact]

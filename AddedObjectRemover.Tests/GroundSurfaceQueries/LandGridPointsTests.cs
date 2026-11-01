@@ -8,7 +8,7 @@ namespace AddedObjectRemover.Tests.GroundSurfaceQueries;
 /// </summary>
 public class LandGridPointsTests
 {
-    private const int Side = TerrainHeights.VerticesPerSide;
+    private const int Side = TerrainGrid.VerticesPerSide;
     private const int Last = Side - 1;
 
     private static readonly RecordKey Worldspace = new(new PluginName("Base.esm"), 0x100);

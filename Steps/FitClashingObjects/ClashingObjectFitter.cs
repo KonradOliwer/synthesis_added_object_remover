@@ -27,9 +27,28 @@ public static class ClashingObjectFitter
     /// <summary>The placements to try an object at, and the group whose rules judge them.</summary>
     private readonly record struct Trial(int Target, FitGroup Group, ImmutableArray<EulerPlacement> Placements);
 
+    /// <param name="Groups">The objects of each group are tried with its own settings and rules; an object is in one group.</param>
+    /// <param name="Resting">Names the objects others rest on, which are left to the removal rounds.</param>
+    /// <param name="Decisions">The run's decisions before any round, which the fits are added to.</param>
+    public sealed record Input(
+        ImmutableArray<TargetObject> Targets,
+        IObjectsToKeep ObjectsToKeep,
+        IEnumerable<FitGroup> Groups,
+        IRestingRule Resting,
+        IBaseObjectShapes Shapes,
+        WorkOrder Order,
+        Execution Execution,
+        IRunDecisions Decisions);
+
+    public static Decided<FitResult> Fit(Input input)
+    {
+        var result = Fit(input.Targets, input.ObjectsToKeep, input.Groups, input.Resting, input.Shapes, input.Order, input.Execution);
+        return new Decided<FitResult>(result, input.Decisions.ApplyFits(result.Fits));
+    }
+
     /// <param name="groups">The objects of each group are tried with its own settings and rules; an object is in one group.</param>
     /// <param name="resting">Names the objects others rest on, which are left to the removal rounds.</param>
-    public static FitResult Fit(
+    internal static FitResult Fit(
         ImmutableArray<TargetObject> targets,
         IObjectsToKeep objectsToKeep,
         IEnumerable<FitGroup> groups,

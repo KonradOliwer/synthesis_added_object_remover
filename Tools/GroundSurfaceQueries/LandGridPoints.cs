@@ -9,11 +9,11 @@ public readonly record struct LandGridPoint(ExteriorCell Cell, int Point);
 /// <summary>A grid point of a worldspace's land, counted in grid steps from the world origin.</summary>
 public readonly record struct WorldGridPoint(RecordKey Worldspace, int X, int Y)
 {
-    private const int Side = TerrainHeights.VerticesPerSide;
-    private const int Squares = TerrainGrid.SquaresPerSide;
-
     public static WorldGridPoint Of(LandGridPoint point) =>
-        new(point.Cell.WorldspaceKey, point.Cell.X * Squares + point.Point % Side, point.Cell.Y * Squares + point.Point / Side);
+        new(
+            point.Cell.WorldspaceKey,
+            point.Cell.X * TerrainGrid.SquaresPerSide + point.Point % TerrainGrid.VerticesPerSide,
+            point.Cell.Y * TerrainGrid.SquaresPerSide + point.Point / TerrainGrid.VerticesPerSide);
 
     public WorldGridPoint StepBy(GridStep step) => this with { X = X + step.X, Y = Y + step.Y };
 
@@ -23,9 +23,9 @@ public readonly record struct WorldGridPoint(RecordKey Worldspace, int X, int Y)
     /// </summary>
     public LandGridPointHolders Holders()
     {
-        var cellX = (int)MathF.Floor((float)X / Squares);
-        var cellY = (int)MathF.Floor((float)Y / Squares);
-        return new LandGridPointHolders(Worldspace, cellX, X - cellX * Squares, cellY, Y - cellY * Squares);
+        var cellX = (int)MathF.Floor((float)X / TerrainGrid.SquaresPerSide);
+        var cellY = (int)MathF.Floor((float)Y / TerrainGrid.SquaresPerSide);
+        return new LandGridPointHolders(Worldspace, cellX, X - cellX * TerrainGrid.SquaresPerSide, cellY, Y - cellY * TerrainGrid.SquaresPerSide);
     }
 }
 
@@ -35,9 +35,6 @@ public readonly record struct WorldGridPoint(RecordKey Worldspace, int X, int Y)
 /// </summary>
 public readonly struct LandGridPointHolders : IReadOnlyList<LandGridPoint>
 {
-    private const int Side = TerrainHeights.VerticesPerSide;
-    private const int Squares = TerrainGrid.SquaresPerSide;
-
     private readonly RecordKey _worldspace;
     private readonly int _cellX;
     private readonly int _x;
@@ -59,9 +56,9 @@ public readonly struct LandGridPointHolders : IReadOnlyList<LandGridPoint>
             ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, Count);
             var west = index / CellsAlong(_y) == 1;
             var south = index % CellsAlong(_y) == 1;
-            var (cellX, x) = west ? (_cellX - 1, Squares) : (_cellX, _x);
-            var (cellY, y) = south ? (_cellY - 1, Squares) : (_cellY, _y);
-            return new LandGridPoint(new ExteriorCell(_worldspace, cellX, cellY), y * Side + x);
+            var (cellX, x) = west ? (_cellX - 1, TerrainGrid.SquaresPerSide) : (_cellX, _x);
+            var (cellY, y) = south ? (_cellY - 1, TerrainGrid.SquaresPerSide) : (_cellY, _y);
+            return new LandGridPoint(new ExteriorCell(_worldspace, cellX, cellY), y * TerrainGrid.VerticesPerSide + x);
         }
     }
 

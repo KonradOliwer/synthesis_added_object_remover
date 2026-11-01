@@ -10,7 +10,7 @@ namespace AddedObjectRemover.Tests.RecordParts;
 public class LandRecordPartsTests
 {
     private const float HeightTolerance = 8f;
-    private const int Side = 33;
+    private const int Side = TerrainGrid.VerticesPerSide;
     private const int LastIndex = Side * Side - 1;
     private const int InnerIndex = 5 * Side + 5;
 

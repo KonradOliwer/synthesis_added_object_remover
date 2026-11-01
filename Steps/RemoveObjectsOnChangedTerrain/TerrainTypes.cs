@@ -33,7 +33,7 @@ internal sealed class TerrainTypes(IPluginRecords records)
     /// </summary>
     public TerrainType[] AtEveryVertex(TerrainVersion version)
     {
-        var types = new TerrainType[CellTerrain.VertexCount];
+        var types = new TerrainType[TerrainGrid.VertexCount];
         if (version.Layers is not { } layers)
         {
             Array.Fill(types, TerrainType.DefaultTerrain);
@@ -44,7 +44,7 @@ internal sealed class TerrainTypes(IPluginRecords records)
         var sums = new List<(TerrainType Type, double Share)>();
         for (var vertex = 0; vertex < types.Length; vertex++)
         {
-            var shares = TerrainLayerShares.At(layers, vertex % TerrainHeights.VerticesPerSide, vertex / TerrainHeights.VerticesPerSide);
+            var shares = TerrainLayerShares.At(layers, vertex % TerrainGrid.VerticesPerSide, vertex / TerrainGrid.VerticesPerSide);
             types[vertex] = LargestType(SumByType(shares, textureTypes, sums));
         }
         return types;

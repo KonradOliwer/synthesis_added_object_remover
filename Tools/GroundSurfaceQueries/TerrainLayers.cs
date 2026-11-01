@@ -17,8 +17,8 @@ public static class TerrainQuadrants
 
     /// <summary>The quadrants holding a vertex of the cell's grid (row by row from the bottom, x fastest), ascending: one, or two or four on their common edges.</summary>
     public static IEnumerable<int> Holding(int vertex) =>
-        from quadrantY in Along(vertex / TerrainHeights.VerticesPerSide)
-        from quadrantX in Along(vertex % TerrainHeights.VerticesPerSide)
+        from quadrantY in Along(vertex / TerrainGrid.VerticesPerSide)
+        from quadrantX in Along(vertex % TerrainGrid.VerticesPerSide)
         select IndexOf(quadrantX, quadrantY);
 
     /// <summary>The world position, seen from above, of the centre of a quadrant of an exterior cell.</summary>

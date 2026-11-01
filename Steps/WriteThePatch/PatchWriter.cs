@@ -13,7 +13,21 @@ namespace AddedObjectRemover.Steps.WriteThePatch;
 /// </summary>
 public static class PatchWriter
 {
-    public static WriteSummary Write(
+    public sealed record Input(
+        IRemovalDecisions Final,
+        ImmutableArray<TargetObject> Targets,
+        OtherModsObjectsResult OtherModsObjects,
+        RestoreWhereRemovedResult WhereRemoved,
+        IPluginRecords Plugin,
+        IPatchWriting Writing);
+
+    public static WriteSummary Write(Input input) =>
+        Write(input.Final, input.Targets, input.OtherModsObjects, input.WhereRemoved, input.Plugin, input.Writing);
+
+    /// <summary>The restore step's navmesh check, which has the patch writing try the write orders without writing them.</summary>
+    public static INavmeshCheckIfWritten CreateNavmeshCheck(IPluginRecords plugin, IPatchWriting writing) => new NavmeshCheckIfWritten(plugin, writing);
+
+    internal static WriteSummary Write(
         IRemovalDecisions final,
         ImmutableArray<TargetObject> targets,
         OtherModsObjectsResult otherModsObjects,

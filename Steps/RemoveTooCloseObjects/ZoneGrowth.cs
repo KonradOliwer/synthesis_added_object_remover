@@ -42,8 +42,6 @@ internal abstract record ZoneGrowth
     /// </summary>
     public sealed record BySize(float Multiplier) : ZoneGrowth
     {
-        private const float SidesPerAxis = 2f;
-
         private const float IntersectionTolerance = 0f;
 
         public override TooCloseCause Cause { get; } = new TooCloseCause.ObjectSize();
@@ -52,9 +50,8 @@ internal abstract record ZoneGrowth
 
         public override ShapeZone CreateShapeZone(Box localBox, PlacedTransform transform)
         {
-            var factor = 1f + SidesPerAxis * Multiplier;
             var zoneBox = OrientedBox.FromLocal(Boxes.ExpandedLocalBox(localBox, 1f, Multiplier), transform);
-            return new ShapeZone(zoneBox, Boxes.EnlargeAroundCentre(transform, localBox.Center, factor), IntersectionTolerance);
+            return new ShapeZone(zoneBox, TooCloseZoneReach.EnlargeBySize(transform, localBox.Center, Multiplier), IntersectionTolerance);
         }
     }
 

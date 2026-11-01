@@ -215,8 +215,8 @@ public class LeftBehindObjectsTests
             Settings);
 
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
-        Assert.Equal(new PartFailure(LeftBehindParts.LeftBehind, "InvalidOperationException: it broke", Subject: null), result.Failure! with { Details = null });
-        Assert.StartsWith("System.InvalidOperationException: it broke.", result.Failure.Details, StringComparison.Ordinal);
+        Assert.Equal(new PartFailure(LeftBehindParts.LeftBehind, "PlantedUserDataException: it broke", Subject: null), result.Failure! with { Details = null });
+        Assert.StartsWith("AddedObjectRemover.Tests.Fixtures.PlantedUserDataException: it broke.", result.Failure.Details, StringComparison.Ordinal);
         Assert.Empty(result.Evaluations);
         Assert.Empty(result.Proposals);
     }
@@ -224,10 +224,10 @@ public class LeftBehindObjectsTests
     [Fact]
     public void AFailureInsideTheMarkerMoveStepStopsItWithTheFailureAndNoMoves()
     {
-        var result = Plan(new MarkerMoveSettings(MarkerMoveLimits.MaxDistance), () => throw new InvalidOperationException("it broke."));
+        var result = Plan(new MarkerMoveSettings(MarkerMoveLimits.MaxDistance), () => throw new PlantedUserDataException("it broke."));
 
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
-        Assert.Equal(new PartFailure(MarkerMoveParts.MarkerMoves, "InvalidOperationException: it broke", Subject: null), result.Failure! with { Details = null });
+        Assert.Equal(new PartFailure(MarkerMoveParts.MarkerMoves, "PlantedUserDataException: it broke", Subject: null), result.Failure! with { Details = null });
         Assert.Empty(result.Moves);
         Assert.Empty(result.Details);
         Assert.Empty(result.LeftInPlace);
@@ -242,7 +242,7 @@ public class LeftBehindObjectsTests
         var result = MarkerMovePlanner.Plan(
             Targets,
             new LeftBehindResult(
-                StepOutcome.StoppedByUnexpectedError, [], [], new PartFailure(LeftBehindParts.LeftBehind, "InvalidOperationException: it broke", Subject: null)),
+                StepOutcome.StoppedByUnexpectedError, [], [], new PartFailure(LeftBehindParts.LeftBehind, "PlantedUserDataException: it broke", Subject: null)),
             StartDecisions(),
             () =>
             {
@@ -271,7 +271,7 @@ public class LeftBehindObjectsTests
     {
         public IReadOnlyList<RecordKey> Spaces => inner.Spaces;
 
-        public void Around(RecordKey space, Vector3 point, float radius, List<VisibleTargetNear> into) => throw new InvalidOperationException("it broke.");
+        public void Around(RecordKey space, Vector3 point, float radius, List<VisibleTargetNear> into) => throw new PlantedUserDataException("it broke.");
 
         public void InColumn(RecordKey space, Vector2 point, float radius, List<VisibleTargetNear> into) => inner.InColumn(space, point, radius, into);
 

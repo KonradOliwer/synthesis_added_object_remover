@@ -46,24 +46,39 @@ public static class TooCloseObjects
         bodies.Count(body => body.Source == NpcSizeSource.Point),
         withoutNpc);
 
+    /// <param name="Selected">Each pass takes the objects that can cause removals for its own NPC handling.</param>
+    /// <param name="PlacedNpcs">The step leaves out the NPCs the replacements in <paramref name="Selected"/> replace.</param>
+    /// <param name="Decisions">The run's decisions so far, which the step's round is added to.</param>
+    public sealed record Input(
+        CollectedObjects World,
+        IVisibleTargetObjects VisibleTargets,
+        SelectedObjects Selected,
+        IPlacedNpcsBySpace PlacedNpcs,
+        IBaseObjectShapes Shapes,
+        ITriangleMeshes Triangles,
+        Execution Execution,
+        IEnumerable<ObjectsJudgedWith<TooCloseSettings>> Groups,
+        IRunDecisions Decisions);
+
     /// <summary>
     /// Runs once for each distinct set of settings over the objects judged with it, and proposes the removals of all of them in target order.
     /// </summary>
-    /// <param name="selected">Each pass takes the objects that can cause removals for its own NPC handling.</param>
-    /// <param name="placedNpcs">The step leaves out the NPCs the replacements in <paramref name="selected"/> replace.</param>
-    public static TooCloseResult Find(
-        CollectedObjects world,
-        IVisibleTargetObjects visibleTargets,
-        SelectedObjects selected,
-        IPlacedNpcsBySpace placedNpcs,
-        IBaseObjectShapes shapes,
-        ITriangleMeshes triangles,
-        Execution execution,
-        IEnumerable<ObjectsJudgedWith<TooCloseSettings>> groups) =>
-        Find(
+    public static Decided<TooCloseResult> Find(Input input)
+    {
+        var selected = input.Selected;
+        var result = Find(
             new TooCloseInput(
-                world.Targets, visibleTargets, world.Order, selected, new NpcsThatCanSpawn(placedNpcs, selected.Replacements), shapes, triangles, execution),
-            groups);
+                input.World.Targets,
+                input.VisibleTargets,
+                input.World.Order,
+                selected,
+                new NpcsThatCanSpawn(input.PlacedNpcs, selected.Replacements),
+                input.Shapes,
+                input.Triangles,
+                input.Execution),
+            input.Groups);
+        return new Decided<TooCloseResult>(result, input.Decisions.Apply(RoundKind.TooClose, result.Proposals));
+    }
 
     internal static TooCloseResult Find(TooCloseInput input, IEnumerable<ObjectsJudgedWith<TooCloseSettings>> groups) =>
         new([.. JudgedGroups.MergeEqualSettings(groups).Select(group => FindPass(input, group))]);

@@ -215,8 +215,8 @@ public class RestingObjectsRunTests
         var result = Run(probe, FollowUpRemovalMode.EverythingTouchingIt, afterTooClose, touchChainsShown: true);
 
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
-        Assert.Equal(new PartFailure(RestingObjectsParts.AlsoRemove, $"InvalidOperationException: {Failure}", Subject: null), result.Failure! with { Details = null });
-        Assert.StartsWith($"System.InvalidOperationException: {Failure}", result.Failure.Details, StringComparison.Ordinal);
+        Assert.Equal(new PartFailure(RestingObjectsParts.AlsoRemove, $"PlantedUserDataException: {Failure}", Subject: null), result.Failure! with { Details = null });
+        Assert.StartsWith($"AddedObjectRemover.Tests.Fixtures.PlantedUserDataException: {Failure}", result.Failure.Details, StringComparison.Ordinal);
         Assert.Empty(result.ProposedRounds);
         Assert.Empty(result.Rounds);
         Assert.Null(result.TouchChains);
@@ -234,7 +234,7 @@ public class RestingObjectsRunTests
         Assert.Equal(StepOutcome.Performed, result.Outcome);
         Assert.NotEmpty(result.ProposedRounds);
         Assert.Null(result.TouchChains);
-        Assert.Equal(new PartFailure(RestingObjectsParts.TouchChains, $"InvalidOperationException: {Failure}", Subject: null), result.TouchChainsFailure! with { Details = null });
+        Assert.Equal(new PartFailure(RestingObjectsParts.TouchChains, $"PlantedUserDataException: {Failure}", Subject: null), result.TouchChainsFailure! with { Details = null });
         Assert.Same(ReportFileDetails.StoppedByEarlierFailure, result.ReportFileDetails);
         Assert.Equal(StepOutcome.StoppedByEarlierFailure, result.ReportFileDetails.Outcome);
     }
@@ -274,7 +274,7 @@ public class RestingObjectsRunTests
 
         Assert.Equal(StepOutcome.Performed, result.Outcome);
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, details.Outcome);
-        Assert.Equal(new PartFailure(RestingObjectsParts.ReportFileDetails, $"InvalidOperationException: {Failure}", Subject: null), details.Failure! with { Details = null });
+        Assert.Equal(new PartFailure(RestingObjectsParts.ReportFileDetails, $"PlantedUserDataException: {Failure}", Subject: null), details.Failure! with { Details = null });
         Assert.Null(details.MeshOrigins);
     }
 
@@ -354,7 +354,7 @@ public class RestingObjectsRunTests
         {
             Record(ClockReading);
             _clockReadings++;
-            if (_clockReadings == FailingClockReading) throw new InvalidOperationException(Failure);
+            if (_clockReadings == FailingClockReading) throw new PlantedUserDataException(Failure);
             return TimeSpan.FromSeconds(_clockReadings);
         }
 
@@ -368,8 +368,8 @@ public class RestingObjectsRunTests
         {
             public Lease<MeshTriangleTree> Acquire(string meshPath)
             {
-                if (probe._clockReadings >= probe.MeshesFailAfterClockReading) throw new InvalidOperationException(Failure);
-                if (probe.LampMeshFails && IsLampMesh(meshPath)) throw new InvalidOperationException(Failure);
+                if (probe._clockReadings >= probe.MeshesFailAfterClockReading) throw new PlantedUserDataException(Failure);
+                if (probe.LampMeshFails && IsLampMesh(meshPath)) throw new PlantedUserDataException(Failure);
                 probe.Record(MeshUse);
                 lock (probe.Events) probe.MeshesUsed.Add(meshPath);
                 return inner.Acquire(meshPath);

@@ -124,7 +124,7 @@ public class ChangedTerrainRunTests
         Assert.Empty(outcome.Final.RemovedTargets());
         var error = Assert.Single(log.Sections, section => section.Id == "unexpectedErrors" && section.Lines.Length > 0).Lines;
         Assert.StartsWith(
-            $"  Unexpected error while checking objects for changed terrain (InvalidOperationException: {FailingTerrainVersionsPlugin.FailureMessage}): 9 objects, e.g. ",
+            $"  Unexpected error while checking objects for changed terrain (PlantedUserDataException: {FailingTerrainVersionsPlugin.FailureMessage}): 9 objects, e.g. ",
             Assert.Single(error));
         Assert.EndsWith(" They were not removed.", error[0]);
     }

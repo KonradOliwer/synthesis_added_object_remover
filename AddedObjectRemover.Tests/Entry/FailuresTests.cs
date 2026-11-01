@@ -1,15 +1,46 @@
+using System.Diagnostics;
+using AddedObjectRemover.Tests.Fixtures;
+
 namespace AddedObjectRemover.Tests.Entry;
 
 public class FailuresTests
 {
     [Fact]
-    public void AnAttemptedPartThatThrowsGivesTheStoppedResultBuiltFromItsFailure()
+    public void AnAttemptedPartThatFindsTheUsersDataUnreadableGivesTheStoppedResultBuiltFromItsFailure()
     {
-        var result = Failures.Attempt<string>(() => throw new InvalidOperationException("it broke."), failure => $"stopped: {failure.Description}");
+        var result = Failures.Attempt<string>(() => throw new IOException("it broke."), failure => $"stopped: {failure.Description}");
 
-        Assert.Equal("stopped: InvalidOperationException: it broke", result);
+        Assert.Equal("stopped: IOException: it broke", result);
         Assert.Equal("worked", Failures.Attempt(() => "worked", failure => failure.Description));
-        Assert.Throws<OutOfMemoryException>(() => Failures.Attempt<string>(() => throw new OutOfMemoryException(), failure => failure.Description));
+    }
+
+    [Fact]
+    public void EachKnownUserDataFailureIsRecoverable()
+    {
+        Assert.True(Failures.IsRecoverable(new IOException()));
+        Assert.True(Failures.IsRecoverable(new FileNotFoundException()));
+        Assert.True(Failures.IsRecoverable(new UnauthorizedAccessException()));
+        Assert.True(Failures.IsRecoverable(new PlantedUserDataException()));
+    }
+
+    [Fact]
+    public void ABugEndsTheRunInsteadOfBeingRecorded()
+    {
+        Exception[] bugs =
+        [
+            new UnreachableException("A bug of ours."),
+            new InvalidOperationException("A bug of ours."),
+            new NullReferenceException(),
+            new ArgumentException("A bug of ours."),
+            new IndexOutOfRangeException(),
+            new OutOfMemoryException(),
+        ];
+
+        foreach (var bug in bugs)
+        {
+            Assert.False(Failures.IsRecoverable(bug));
+            Assert.Same(bug, Assert.Throws(bug.GetType(), () => Failures.Attempt<string>(() => throw bug, failure => failure.Description)));
+        }
     }
 
     [Fact]
@@ -17,7 +48,7 @@ public class FailuresTests
     {
         var details = Failures.Attempt<string>(ThrowFromNamedMethod, failure => failure.Details);
 
-        Assert.StartsWith("System.InvalidOperationException: it broke.", details, StringComparison.Ordinal);
+        Assert.StartsWith("System.IO.IOException: it broke.", details, StringComparison.Ordinal);
         Assert.Contains(nameof(ThrowFromNamedMethod), details, StringComparison.Ordinal);
     }
 
@@ -29,7 +60,7 @@ public class FailuresTests
         Assert.StartsWith("System.ArgumentException: a", Failures.Catch(wrapped).Details, StringComparison.Ordinal);
     }
 
-    private static string ThrowFromNamedMethod() => throw new InvalidOperationException("it broke.");
+    private static string ThrowFromNamedMethod() => throw new IOException("it broke.");
 
     [Fact]
     public void AMultiLineMessageIsReportedOnOneLine()
@@ -47,19 +78,15 @@ public class FailuresTests
     }
 
     [Fact]
-    public void RunningOutOfMemoryInsideParallelWorkIsNotCarriedOnFrom()
+    public void AFailureWrappedByParallelWorkIsRecoverableOnlyWhenEveryInnerFailureIs()
     {
-        var wrapped = new AggregateException(
-            new InvalidOperationException("a"), new AggregateException(new OutOfMemoryException()));
+        var onlyUserData = new AggregateException(new IOException("a"), new AggregateException(new PlantedUserDataException()));
+        var withABug = new AggregateException(new IOException("a"), new AggregateException(new InvalidOperationException("b")));
+        var withOutOfMemory = new AggregateException(new IOException("a"), new AggregateException(new OutOfMemoryException()));
 
-        Assert.False(Failures.IsRecoverable(wrapped));
-        Assert.Throws<AggregateException>(() => Failures.Attempt<int>(() => throw wrapped, _ => -1));
-        Assert.True(Failures.IsRecoverable(new AggregateException(new InvalidOperationException("a"))));
-    }
-
-    [Fact]
-    public void RunningOutOfMemoryIsNotCarriedOnFrom()
-    {
-        Assert.Throws<OutOfMemoryException>(() => Failures.Attempt<int>(() => throw new OutOfMemoryException(), _ => -1));
+        Assert.True(Failures.IsRecoverable(onlyUserData));
+        Assert.False(Failures.IsRecoverable(withABug));
+        Assert.False(Failures.IsRecoverable(withOutOfMemory));
+        Assert.Throws<AggregateException>(() => Failures.Attempt<int>(() => throw withABug, _ => -1));
     }
 }

@@ -41,6 +41,59 @@ public class ProjectRulesTests
     }
 
     [Fact]
+    public void ToolsReferenceOnlyToolsAndIds() =>
+        Assert.Empty(Rules.FindToolsReferencingNonTools());
+
+    [Fact]
+    public void ContractsReferenceOnlyContractsToolsAndIds() =>
+        Assert.Empty(Rules.FindContractsReferencingNonContractsAndNonTools());
+
+    [Fact]
+    public void CacheContractsReferenceNoRunContracts() =>
+        Assert.Empty(Rules.FindCacheContractsReferencingRunContracts());
+
+    [Fact]
+    public void ToolsReferencingAnythingButToolsAndIdsAreReported()
+    {
+        var bad = Table(
+            Project("Facts", "A", "Reading", "Contracts", "Ids", "Logic"),
+            Project("Reading", "T"),
+            Project("Contracts", "C"),
+            Project("Ids", "K"),
+            Project("Logic", "L"));
+
+        Assert.Equal(["Facts -> Contracts", "Facts -> Logic"], bad.FindToolsReferencingNonTools());
+    }
+
+    [Fact]
+    public void ContractsReferencingAnythingButContractsToolsAndIdsAreReported()
+    {
+        var bad = Table(
+            Project("Step.Contracts", "C", "Other.Contracts", "Catalog", "Tool", "Ids", "Logic", "Runner"),
+            Project("Catalog", "Q", "Logic"),
+            Project("Other.Contracts", "C"),
+            Project("Tool", "T"),
+            Project("Ids", "K"),
+            Project("Logic", "L"),
+            Project("Runner", "R"));
+
+        Assert.Equal(["Step.Contracts -> Logic", "Step.Contracts -> Runner", "Catalog -> Logic"], bad.FindContractsReferencingNonContractsAndNonTools());
+    }
+
+    [Fact]
+    public void CacheContractsReferencingRunContractsAreReported()
+    {
+        var bad = Table(
+            new ProjectRule("Cache.Contracts", "C", "Caches/Cache.Contracts", ["Step.Contracts", "Other.Cache.Contracts", "Run.Contracts"], []),
+            new ProjectRule("Catalog", "Q", "Caches/Catalog", ["Run.Contracts"], []),
+            new ProjectRule("Step.Contracts", "C", "Steps/Step.Contracts", ["Run.Contracts"], []),
+            new ProjectRule("Other.Cache.Contracts", "C", "Caches/Other.Cache.Contracts", [], []),
+            new ProjectRule("Run.Contracts", "C", "Run/Run.Contracts", [], []));
+
+        Assert.Equal(["Cache.Contracts -> Run.Contracts", "Catalog -> Run.Contracts"], bad.FindCacheContractsReferencingRunContracts());
+    }
+
+    [Fact]
     public void TheReferencesHaveNoCycle() =>
         Assert.Empty(Rules.FindCycles());
 

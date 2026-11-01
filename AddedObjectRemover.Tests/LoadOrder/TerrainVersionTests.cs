@@ -39,7 +39,7 @@ public class TerrainVersionTests
 
         Assert.Equal([Early, Late, Deleter], versions.Select(version => version.Plugin));
         Assert.Equal(10 * 8f, versions[0].Heights![0]);
-        Assert.Equal(TerrainHeights.VerticesPerSide * TerrainHeights.VerticesPerSide, versions[0].Heights!.Length);
+        Assert.Equal(TerrainGrid.VertexCount, versions[0].Heights!.Length);
         Assert.Null(versions[1].Heights);
         Assert.Null(versions[2].Heights);
     }

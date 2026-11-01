@@ -16,8 +16,8 @@ public sealed class ChangedCellAndLandCollectingTests
 {
     private const float HeightTolerance = 8f;
     private const float WaterHeightTolerance = 8f;
-    private const float UnitsPerHeightStep = 8f;
-    private const int Side = TerrainHeights.VerticesPerSide;
+    private const float UnitsPerHeightStep = TerrainGrid.UnitsPerHeightStep;
+    private const int Side = TerrainGrid.VerticesPerSide;
     private const int LastColumn = Side - 1;
     private const float BaseWaterHeight = -100f;
     private const float CleanedWaterHeight = 0f;

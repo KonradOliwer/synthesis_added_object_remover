@@ -1,5 +1,6 @@
 using Mutagen.Bethesda.Skyrim;
 using Noggog;
+using static AddedObjectRemover.TerrainGrid;
 
 namespace AddedObjectRemover;
 
@@ -10,8 +11,6 @@ namespace AddedObjectRemover;
 /// <param name="heights">In game units.</param>
 internal sealed class LandPoints(float[]? heights, P3UInt8[]? normals, P3UInt8[]? colours)
 {
-    private const int VerticesPerSide = TerrainHeights.VerticesPerSide;
-
     public float[]? Heights => heights;
 
     public P3UInt8[]? Normals => normals;
@@ -24,7 +23,7 @@ internal sealed class LandPoints(float[]? heights, P3UInt8[]? normals, P3UInt8[]
     private static P3UInt8[]? ReadGrid(IReadOnlyArray2d<P3UInt8>? grid)
     {
         if (grid is null) return null;
-        var values = new P3UInt8[VerticesPerSide * VerticesPerSide];
+        var values = new P3UInt8[VertexCount];
         for (var y = 0; y < VerticesPerSide; y++)
         {
             for (var x = 0; x < VerticesPerSide; x++) values[y * VerticesPerSide + x] = grid[x, y];

@@ -25,7 +25,7 @@ public sealed class RestoreLoopTests
     private const float NavmeshHalfSize = 100f;
     private const float EarlierWater = 50f;
     private const float CleanedModsWater = -100f;
-    private const int Side = TerrainHeights.VerticesPerSide;
+    private const int Side = TerrainGrid.VerticesPerSide;
 
     private static readonly ModKey ShapeMod = ModKey.FromNameAndExtension("RestoreLoopShapes.esp");
     private static readonly TestStatic Block = new(new FormKey(ShapeMod, 0x801), @"test\restoreloop\block.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-RockHalfSize), new Vector3(RockHalfSize))));
@@ -149,8 +149,8 @@ public sealed class RestoreLoopTests
     [InlineData(4f, true)]
     public void ARockGoingBackOntoGroundALaterPluginRaisedIsRefused(float raisedBy, bool restored)
     {
-        var flat = new float[PointSet.PointCount];
-        var raised = Enumerable.Repeat(raisedBy, PointSet.PointCount).ToArray();
+        var flat = new float[TerrainGrid.VertexCount];
+        var raised = Enumerable.Repeat(raisedBy, TerrainGrid.VertexCount).ToArray();
         var scene = new Scene
         {
             Rocks = [Rock(0, new Vector3(1500, 1500, RockHalfSize), RockNowPlace)],
@@ -1021,11 +1021,11 @@ public sealed class RestoreLoopTests
         List<RecordChangedByCleanedMod> cleared = [.. scene.Rocks.OrderBy(rock => rock.Key, RecordKeyOrder.Comparer)];
         var world = AfterRemovalWorld.Of(collected, final, OtherModsObjectsResult.SwitchedOff, TestTargets.TargetName, cleared, reach);
         var rules = TestPlacedGuardRules.Create(Shapes, Trust, Plugins, Support, TestGround.NoTerrain(), threads: 1);
-        var caches = rules.IndexObjects(world.World);
+        var caches = rules.WorldCaches.Of(world.World);
         var inputs = new PlacedGuardInputs(
             caches,
             excluded => rules.TooClose(world.World, caches, excluded, AllOn.TooClose),
-            rules.FindHoldersOfObjectsThatStay,
+            rules.HoldersOfObjectsThatStay.Over(world.World, world.Now),
             Shapes,
             new ObjectsThatBlockActors(Shapes, new Dictionary<RecordKey, ReferenceFacts>()),
             new NavmeshIndex(_ => null),
@@ -1097,7 +1097,7 @@ public sealed class RestoreLoopTests
     /// <summary>The cleaned mod raised every point of the base game's flat ground of cell (0, 0).</summary>
     private static LandChangedByCleanedMod RaisedLand()
     {
-        var all = PointSet.Of(Enumerable.Range(0, PointSet.PointCount));
+        var all = PointSet.Of(Enumerable.Range(0, TerrainGrid.VertexCount));
         return new LandChangedByCleanedMod(
             new ExteriorCell(TestTargets.Space, 0, 0),
             new RecordKey(BaseGame, 0x600),
@@ -1107,7 +1107,7 @@ public sealed class RestoreLoopTests
             UndoRest: false,
             new LandLeftToLater(PointSet.Of([]), PointSet.Of([]), default, Rest: false, []),
             TestTargets.TargetName,
-            new LandHeights([.. Enumerable.Repeat(0f, PointSet.PointCount)], [.. Enumerable.Repeat(Raised, PointSet.PointCount)]));
+            new LandHeights([.. Enumerable.Repeat(0f, TerrainGrid.VertexCount)], [.. Enumerable.Repeat(Raised, TerrainGrid.VertexCount)]));
     }
 
     /// <summary>Cell (0, 0), whose music and water level the cleaned mod changed: it lowered the water from 50 to −100.</summary>
@@ -1257,23 +1257,23 @@ public sealed class RestoreLoopTests
         var final = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved), targets.Length)
             .Apply(RoundKind.TooClose, [.. removedTargets.Select(target => new ProposedRemoval(target.Id, new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);
         return WhereRemovedRestorer.Plan(
-            collected,
-            final,
-            OtherModsObjectsResult.SwitchedOff,
-            TestScenes.Create(targets, [], Shapes).VisibleTargets,
-            rules.IndexObjects,
-            tooClose,
-            rules.FindHoldersOfObjectsThatStay,
-            rules.Support,
-            Shapes,
-            new NavmeshIndex(bucket => bucket.Grid is null && !winning.IsEmpty ? [.. winning] : null),
-            space => space,
-            scene.ReadHeights,
-            scene.FindFault,
-            Plugins,
-            TestTargets.TargetName,
-            new Execution(scene.Workers),
-            scene.Settings);
+            new(
+                collected,
+                final,
+                OtherModsObjectsResult.SwitchedOff,
+                TestScenes.Create(targets, [], Shapes).VisibleTargets,
+                rules.WorldCaches,
+                rules.TooCloseRule(tooClose),
+                rules.HoldersOfObjectsThatStay,
+                new TestNavmeshCheck(scene.FindFault),
+                rules.Support,
+                Shapes,
+                new NavmeshIndex(bucket => bucket.Grid is null && !winning.IsEmpty ? [.. winning] : null),
+                new TestLandPlugin(space => space, scene.ReadHeights),
+                Plugins,
+                TestTargets.TargetName,
+                new Execution(scene.Workers),
+                scene.Settings));
     }
 
     /// <summary>What the cleaned mod changed besides its own removed objects, and the other plugins' objects that stand now, numbered in this order.</summary>

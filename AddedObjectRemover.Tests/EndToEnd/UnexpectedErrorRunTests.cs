@@ -1,10 +1,11 @@
 using System.Collections.Immutable;
+using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover.Tests.EndToEnd;
 
-/// <summary>An error nobody planned for stops only the part it happened in: it is reported with its scope and the patch is still written.</summary>
+/// <summary>A failure of the user's data stops only the part it happened in: it is reported with its scope and the patch is still written.</summary>
 public class UnexpectedErrorRunTests
 {
     private static IMeshFilesFactory DefaultMeshFiles(string dataFolder, GameRelease release, IReadOnlyList<ModKey> listedPlugins) =>
@@ -29,7 +30,7 @@ public class UnexpectedErrorRunTests
         Assert.Equal(outcome.Removals.Select(removal => removal.TargetIndex), outcome.Written.Removed.Select(id => id.Index));
         var errorSection = Assert.Single(log.Sections, section => section.Id == "unexpectedErrors" && section.Lines.Length > 0);
         Assert.Equal(
-            $"  Unexpected error in the marker moves (InvalidOperationException: {FailingHomeCellPlugin.FailureMessage}). "
+            $"  Unexpected error in the marker moves (PlantedUserDataException: {FailingHomeCellPlugin.FailureMessage}). "
             + "No kept marker was moved, so markers inside other mods' objects stay where they are.",
             Assert.Single(errorSection.Lines, IsErrorLine));
         Assert.Contains("Moved kept markers: not performed because of an unexpected error.", SectionLines(log, "relocations"));
@@ -40,7 +41,7 @@ public class UnexpectedErrorRunTests
     public void AnAlsoRemoveFailureDuringItsRoundsAppliesNothingAndTheLaterStepsSeeTheTooCloseDecisions()
     {
         var healthy = Run(new RecordingLogSink());
-        var clock = new AlsoRemoveRoundsEndClock(() => throw new InvalidOperationException("also-remove broke"));
+        var clock = new AlsoRemoveRoundsEndClock(() => throw new PlantedUserDataException("also-remove broke"));
         var log = new RecordingLogSink { OnPrint = clock.OnPrint };
         var settings = SettingsVariants.Of(SettingsVariants.TouchWithLeftBehindAndMarkerMoves);
         settings.Standard.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings { RemoveLeftoverVisibleObjects = false };
@@ -59,7 +60,7 @@ public class UnexpectedErrorRunTests
         Assert.NotEmpty(outcome.Removals);
         Assert.Equal(outcome.Removals.Select(removal => removal.TargetIndex), outcome.Written.Removed.Select(id => id.Index));
         Assert.Equal(
-            "  Unexpected error in the also-remove step (InvalidOperationException: also-remove broke). "
+            "  Unexpected error in the also-remove step (PlantedUserDataException: also-remove broke). "
             + "The also-remove rounds did not complete, so objects resting on removed ones were not removed.",
             Assert.Single(UnexpectedErrorLines(log)));
         Assert.Equal("Also remove: not performed because of an unexpected error.", Assert.Single(SectionLines(log, "follow-up")));
@@ -73,7 +74,7 @@ public class UnexpectedErrorRunTests
     public void AnAlsoRemoveFailureDuringItsRoundsShowsInTheNormalLogAndItsStackTraceInTheDetailedLog()
     {
         const string errorLine =
-            "  Unexpected error in the also-remove step (InvalidOperationException: also-remove broke). "
+            "  Unexpected error in the also-remove step (PlantedUserDataException: also-remove broke). "
             + "The also-remove rounds did not complete, so objects resting on removed ones were not removed.";
 
         var normal = RunWithFailingAlsoRemoveRounds(SettingsVariants.TouchWithLeftBehindAndMarkerMovesNormalLog);
@@ -82,14 +83,14 @@ public class UnexpectedErrorRunTests
         Assert.Equal([errorLine], SectionLines(normal, "unexpectedErrors").ToList());
         Assert.Equal("Also remove: not performed because of an unexpected error.", Assert.Single(SectionLines(normal, "follow-up")));
         var detailedLines = SectionLines(detailed, "unexpectedErrors");
-        Assert.Equal([errorLine, "    Stack trace:", "      System.InvalidOperationException: also-remove broke"], detailedLines.Take(3).ToList());
+        Assert.Equal([errorLine, "    Stack trace:", "      AddedObjectRemover.Tests.Fixtures.PlantedUserDataException: also-remove broke"], detailedLines.Take(3).ToList());
         Assert.Contains(detailedLines.Skip(3), line => line.StartsWith("         at ", StringComparison.Ordinal));
     }
 
     /// <remarks>Failing the clock reading at the end of the rounds fails them after they were decided.</remarks>
     private static RecordingLogSink RunWithFailingAlsoRemoveRounds(string variant)
     {
-        var clock = new AlsoRemoveRoundsEndClock(() => throw new InvalidOperationException("also-remove broke"));
+        var clock = new AlsoRemoveRoundsEndClock(() => throw new PlantedUserDataException("also-remove broke"));
         var log = new RecordingLogSink { OnPrint = clock.OnPrint };
         var outcome = ((RunResult.Done)FixtureRun.Run(
             SettingsVariants.Of(variant),
@@ -122,7 +123,7 @@ public class UnexpectedErrorRunTests
         Assert.DoesNotContain(outcome.LeftBehind.Evaluations, evaluation => evaluation.IsRemoved);
         Assert.Equal(outcome.Removals.Select(removal => removal.TargetIndex), outcome.Written.Removed.Select(id => id.Index));
         Assert.Equal(
-            $"  Unexpected error in the step for invisible objects left behind (InvalidOperationException: {FailingBaseFacts.FailureMessage}). "
+            $"  Unexpected error in the step for invisible objects left behind (PlantedUserDataException: {FailingBaseFacts.FailureMessage}). "
             + "That step did not run, so invisible objects whose surroundings were removed were not removed.",
             Assert.Single(UnexpectedErrorLines(log)));
         Assert.Contains("Invisible objects left behind: not performed because of an unexpected error.", SectionLines(log, "leftovers"));
@@ -145,7 +146,7 @@ public class UnexpectedErrorRunTests
 
         Assert.IsType<RunResult.Done>(result);
         Assert.Equal(
-            $"  Unexpected error in the report files (InvalidOperationException: {BaseFactsFailingInReportTables.FailureMessage}). "
+            $"  Unexpected error in the report files (PlantedUserDataException: {BaseFactsFailingInReportTables.FailureMessage}). "
             + "Some or all of the report files are missing; the patch is not affected.",
             Assert.Single(UnexpectedErrorLines(log)));
         Assert.Equal("Report files: not performed because of an unexpected error.", Assert.Single(SectionLines(log, "written")));
@@ -175,7 +176,7 @@ public class UnexpectedErrorRunTests
         var done = Assert.IsType<RunResult.Done>(result);
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, done.Outcome.RestingObjects.ReportFileDetails.Outcome);
         var errorLine =
-            $"  Unexpected error in the report-file details (InvalidOperationException: {FailingBaseFacts.FailureMessage}). "
+            $"  Unexpected error in the report-file details (PlantedUserDataException: {FailingBaseFacts.FailureMessage}). "
             + "The touching pairs or mesh origins that the report files list are missing from them.";
         Assert.Equal(errorLine, Assert.Single(UnexpectedErrorLines(log)));
         var write = log.Sections.FindIndex(section => section.Id == "write");

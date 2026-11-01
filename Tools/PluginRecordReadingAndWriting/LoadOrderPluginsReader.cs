@@ -8,7 +8,7 @@ namespace AddedObjectRemover;
 /// Reads the final world's plugin names, masters, whether each could be read and whether its header description holds the patch
 /// marker, with the game's plugin list; once, before the settings are checked.
 /// </summary>
-public static class LoadOrderPluginsReader
+internal static class LoadOrderPluginsReader
 {
     /// <param name="missingPlugins">The enabled entries of the plugin list whose file was not found.</param>
     public static LoadOrderPlugins Read(

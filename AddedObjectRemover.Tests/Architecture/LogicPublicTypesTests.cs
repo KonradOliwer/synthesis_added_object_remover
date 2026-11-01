@@ -4,11 +4,19 @@ namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
 /// The public surface of each logic project (a step, the removal decision list and the base-object shapes) is its one
-/// entry type. Everything else in the project is internal; the data it passes lives in the contracts projects.
+/// entry type. Everything else in the project is internal; the data it passes lives in the contracts projects. A step's entry
+/// type also declares the record its entry takes, <c>Input</c>, since that record holds the run caches, which no step contract
+/// may name. A step has one entry, which takes that record; its other public members provide the rules other modules ask of it.
 /// </summary>
 public class LogicPublicTypesTests
 {
     private static readonly ProjectRules Rules = ProjectRules.Load();
+
+    /// <summary>The name of the record a step's entry takes, declared in its entry type.</summary>
+    private const string InputRecordName = "Input";
+
+    /// <summary>The logic projects that are not pipeline steps: the shapes cache, the decision list the steps add to, and the log, which words each step's result.</summary>
+    private static readonly string[] NotSteps = ["BaseObjectShapeAndKind", "RemovalDecisionList", "BuildLogAndReports"];
 
     /// <summary>The entry type of each logic project, by project name.</summary>
     private static readonly Dictionary<string, string> EntryTypes = new()
@@ -46,20 +54,16 @@ public class LogicPublicTypesTests
             "ObjectVisibility VisibilityOf(BaseKey?, Boolean, Boolean)",
             "Boolean LayerBlocksActors(UInt32)",
         ],
-        ["IdentifyTheMods"] = ["static ModTrustTable Classify(LoadOrderPlugins, ModTrustSettings)"],
-        ["CollectPlacedObjects"] =
-        [
-            "static ScannedPlacedRecords ScanPlacedRecords(IPluginRecords, ModTrustTable, AcceptedWorld, WhatToCollect)",
-            "static CollectedObjects ReadNonPlacedLinks(ScannedPlacedRecords, IPluginRecords)",
-        ],
+        ["IdentifyTheMods"] = ["static ModTrustTable Classify(Input)"],
+        ["CollectPlacedObjects"] = ["static PlacedObjectsCollected Collect(Input)"],
         ["SelectObjectsThatCanCauseRemovals"] =
         [
             "static ObjectMeasurementRules MeasurementRules(IUnexpectedErrors)",
             "static ObjectMeasurementRules MeasurementRules(IUnexpectedErrors, PartKey)",
-            "static SelectedObjects Select(CollectedObjects, IOtherModObjectsBySpace, IBaseObjectShapes, SelectionSettings, Execution)",
+            "static SelectedObjects Select(Input)",
             "static SelectedObjects SelectForOldPlace(IOtherModObjectsBySpace, Int32, IEnumerable<OtherId>, NpcHandling)",
         ],
-        ["FindTargetObjectsToKeep"] = ["static ObjectsToKeepResult Find(IReadOnlyList<TargetObject>, IReadOnlyList<LinkFact>, IBaseFacts, IReadOnlyDictionary<TargetId, RestingObject>)"],
+        ["FindTargetObjectsToKeep"] = ["static ObjectsToKeepResult Find(Input)"],
         ["RemovalDecisionList"] =
         [
             "IEnumerable<ValueTuple<TargetId, Decision>> All()",
@@ -93,59 +97,44 @@ public class LogicPublicTypesTests
             "RemovalDecisions ApplyRounds(RoundKind, IReadOnlyList<IReadOnlyList<ProposedRemoval>>)",
             "static RemovalDecisions Start(IObjectsToKeep, ImmutableArray<WhenRemoved>)",
         ],
-        ["JudgeChangedObjects"] =
-        [
-            "static ChangedObjectJudgingResult Prepare(CollectedObjects, OldPlaceRules, ChangedObjectSettings, Execution)",
-            "static CollectedObjects CreateOldPlaceWorld(CollectedObjects, PluginName, WhatToCollect)",
-            "static OtherId OldPlaceIdOf(TargetObject)",
-        ],
-        ["FitClashingObjects"] =
-        [
-            "static FitResult Fit(ImmutableArray<TargetObject>, IObjectsToKeep, IEnumerable<FitGroup>, IRestingRule, IBaseObjectShapes, WorkOrder, Execution)",        ],
+        ["JudgeChangedObjects"] = ["static ChangedObjectsJudged Judge(Input)"],
+        ["FitClashingObjects"] = ["static Decided<FitResult> Fit(Input)"],
         ["RemoveObjectsOnChangedTerrain"] =
         [
             "static IPlacementRule CreatePlacementRule(AcceptedWorld, LoadOrderPlugins, IPluginRecords, IBaseObjectShapes, ChangedTerrainSettings)",
-            "static ChangedTerrainResult Find(CollectedObjects, AcceptedWorld, LoadOrderPlugins, IPluginRecords, IBaseObjectShapes, Execution, IEnumerable<ObjectsJudgedWith<ChangedTerrainSettings>>)",
+            "static Decided<ChangedTerrainResult> Find(Input)",
         ],
         ["RemoveTooCloseObjects"] =
         [
             "static NpcBodyRules NpcBodyRules { get; }",
             "static PlacedNpcRules PlacedNpcRules { get; }",
             "static IPlacementRule CreatePlacementRule(IReadOnlyList<TargetObject>, IVisibleTargetObjects, SelectedObjects, IPlacedNpcsBySpace, IBaseObjectShapes, ITriangleMeshes, TooCloseSettings)",
-            "static TooCloseResult Find(CollectedObjects, IVisibleTargetObjects, SelectedObjects, IPlacedNpcsBySpace, IBaseObjectShapes, ITriangleMeshes, Execution, IEnumerable<ObjectsJudgedWith<TooCloseSettings>>)",
+            "static Decided<TooCloseResult> Find(Input)",
         ],
         ["RemoveObjectsRestingOnRemovedOnes"] =
         [
             "static IAlsoRemoveFollowUp CreateFollowUp(ImmutableArray<TargetObject>, AlsoRemoveSettings, Execution, Func<TimeSpan>, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>)",
             "static IRestingRule CreateRestingRule(ImmutableArray<TargetObject>, AlsoRemoveSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, ITargetObjectsDropTest, Execution)",
-            "static IRemovalRounds<RoundDetails> CreateRoundsAfter(IRemovalDecisions, ImmutableArray<TargetObject>, IVisibleObjectsOfAnyPlugin, AlsoRemoveSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Execution)",
-            "static RestingObjectsResult Find(RestingObjectsInput, IBaseFacts, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>)",
+            "static IAlsoRemoveRoundsAfter CreateAlsoRemoveRoundsAfter(AlsoRemoveSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
+            "static Decided<RestingObjectsResult> Find(Input)",
         ],
         ["OtherModsObjectsLeftWithoutSupport"] =
         [
             "static HeldUpTargets FindHeldUpTargets(ImmutableArray<TargetObject>, IVisibleTargetObjects, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
             "static IRestingRule CreateRestingRule(IRestingRule, ImmutableArray<TargetObject>, IVisibleTargetObjects, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, HeldUpTargets, Execution)",
             "static ITargetObjectsDropTest CreateDropTest(ImmutableArray<TargetObject>, IVisibleTargetObjects, ModTrustTable, LoadOrderPlugins, AlsoRemoveSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
-            "static IReadOnlyDictionary<TargetId, OtherObject> FindHoldersOfObjectsThatStay(IReadOnlyList<TargetObject>, IVisibleTargetObjects, Func<TargetId, Boolean>, IVisibleObjectsOfAnyPlugin, IReadOnlySet<OtherId>, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Execution)",
-            "static OtherModsObjectsResult SettleLeftWithoutSupport(ImmutableArray<TargetObject>, ImmutableArray<TargetObject>, IRemovalDecisions, IVisibleTargetObjects, IVisibleTargetObjects, Func<ImmutableArray<TargetObject>, IVisibleTargetObjects>, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, AlsoRemoveSettings, Func<IRemovalDecisions, IRemovalRounds<RoundDetails>>, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
+            "static IHoldersOfObjectsThatStay CreateHoldersOfObjectsThatStay(IObjectCachesOfWorlds, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Execution)",
+            "static Decided<OtherModsObjectsResult> Settle(Input)",
         ],
-        ["RemoveVisibleObjectsLeftBehind"] =
+        ["RemoveVisibleObjectsLeftBehind"] = ["static Decided<VisibleLeftBehindResult> Find(Input)"],
+        ["RemoveInvisibleObjectsLeftBehind"] = ["static Decided<LeftBehindResult> Find(Input)"],
+        ["MoveKeptMarkers"] = ["static Decided<MarkerMoves> Plan(Input)"],
+        ["RestoreWhereRemoved"] = ["static RestoreWhereRemovedResult Plan(Input)"],
+        ["WriteThePatch"] =
         [
-            "static VisibleLeftBehindResult Find(ImmutableArray<TargetObject>, IRemovalDecisions, IVisibleTargetObjects, IBaseFacts, IBaseObjectShapes, IAlsoRemoveFollowUp, Func<TimeSpan>, WorkOrder, Execution, VisibleLeftBehindSettings)",
+            "static INavmeshCheckIfWritten CreateNavmeshCheck(IPluginRecords, IPatchWriting)",
+            "static WriteSummary Write(Input)",
         ],
-        ["RemoveInvisibleObjectsLeftBehind"] =
-        [
-            "static LeftBehindResult Find(ImmutableArray<TargetObject>, IObjectsThatCanCauseRemovals, IReadOnlySet<OtherId>, IRemovalDecisions, IVisibleTargetObjects, IBaseFacts, IBaseObjectShapes, WorkOrder, Execution, LeftBehindSettings)",
-        ],
-        ["MoveKeptMarkers"] =
-        [
-            "static MarkerMoves Plan(ImmutableArray<TargetObject>, LeftBehindResult, IRemovalDecisions, Func<IVisibleObjectsOfAnyPlugin>, IVisibleTargetObjects, IPluginRecords, INavmeshes, ITerrainHeights, IBaseObjectShapes, Execution, MarkerMoveSettings)",
-        ],
-        ["RestoreWhereRemoved"] =
-        [
-            "static RestoreWhereRemovedResult Plan(CollectedObjects, IRemovalDecisions, OtherModsObjectsResult, IVisibleTargetObjects, Func<CollectedObjects, IObjectCaches>, Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule>, Func<IReadOnlyList<TargetObject>, IVisibleTargetObjects, Func<TargetId, Boolean>, IVisibleObjectsOfAnyPlugin, IReadOnlySet<OtherId>, IReadOnlyDictionary<TargetId, OtherObject>>, OtherModsObjectsSettings, IBaseObjectShapes, INavmeshes, Func<RecordKey, RecordKey?>, Func<ExteriorCell, LandHeights>, Func<IReadOnlyList<WriteOrder>, NavmeshFault>, LoadOrderPlugins, PluginName, Execution, WhereRemovedRestoreSettings)",
-        ],
-        ["WriteThePatch"] = ["static WriteSummary Write(IRemovalDecisions, ImmutableArray<TargetObject>, OtherModsObjectsResult, RestoreWhereRemovedResult, IPluginRecords, IPatchWriting)"],
         ["BuildLogAndReports"] =
         [
             "LogAndReports(RunSettings, ReportFolderPrepared, ILoadOrderCaches, IUnexpectedErrors)",
@@ -184,14 +173,57 @@ public class LogicPublicTypesTests
     }
 
     [Fact]
-    public void EveryLogicProjectPublishesOnlyItsEntryType()
+    public void EveryLogicProjectPublishesOnlyItsEntryTypeAndAStepItsInputRecord()
     {
         var wrong = LogicProjectNames()
-            .SelectMany(project => PublicTypeNames(project).Where(name => name != EntryTypes[project]).Select(name => $"{project}: {name}"))
+            .SelectMany(project => PublicTypeNames(project).Except(AllowedPublicTypeNames(project)).Select(name => $"{project}: {name}"))
             .ToList();
 
         Assert.Empty(wrong);
     }
+
+    [Fact]
+    public void EveryStepHasOnePublicEntryThatTakesItsInputRecord()
+    {
+        var wrong = StepProjectNames()
+            .Where(project => EntryMethodsOf(project).Count != 1)
+            .Select(project => $"{project}: {string.Join(", ", EntryMethodsOf(project).Select(method => method.Name))}")
+            .ToList();
+
+        Assert.True(wrong.Count == 0, $"Steps without exactly one public method that takes their {InputRecordName} record:{Environment.NewLine}{string.Join(Environment.NewLine, wrong)}");
+    }
+
+    [Fact]
+    public void EveryStepsInputRecordIsARecord()
+    {
+        var wrong = StepProjectNames().Where(project => InputRecordOf(project) is not { } input || !IsRecord(input)).ToList();
+
+        Assert.Empty(wrong);
+    }
+
+    /// <summary>
+    /// The method of each step that takes its <c>Input</c> record, the step's one entry, by step project; the runner calls it once
+    /// (see <see cref="RunnerRulesTests"/>).
+    /// </summary>
+    internal static IReadOnlyList<MethodInfo> StepEntries() => [.. StepProjectNames().Select(project => EntryMethodsOf(project).Single())];
+
+    private static IEnumerable<string> StepProjectNames() => LogicProjectNames().Except(NotSteps);
+
+    private static IEnumerable<string> AllowedPublicTypeNames(string project) =>
+        NotSteps.Contains(project) ? [EntryTypes[project]] : [EntryTypes[project], $"{EntryTypes[project]}.{InputRecordName}"];
+
+    private static Type EntryTypeOf(string project) =>
+        Assembly.Load(project).GetTypes().Single(type => type.IsVisible && BusinessCode.PathName(type) == EntryTypes[project]);
+
+    private static Type? InputRecordOf(string project) => EntryTypeOf(project).GetNestedType(InputRecordName, BindingFlags.Public);
+
+    private static List<MethodInfo> EntryMethodsOf(string project) =>
+        InputRecordOf(project) is { } input
+            ? [.. EntryTypeOf(project).GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                .Where(method => method.GetParameters() is [var only] && only.ParameterType == input)]
+            : [];
+
+    private static bool IsRecord(Type type) => type.GetMethod("<Clone>$", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance) is not null;
 
     [Fact]
     public void EveryLogicProjectsEntryTypeIsPublic()
@@ -230,7 +262,7 @@ public class LogicPublicTypesTests
     /// </summary>
     private static List<string> PublicMemberNames(string project)
     {
-        var entry = Assembly.Load(project).GetTypes().Single(type => type.IsVisible && BusinessCode.PathName(type) == EntryTypes[project]);
+        var entry = EntryTypeOf(project);
         const BindingFlags Declared = BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
 
         var constructors = entry.GetConstructors(Declared).Select(constructor => $"{BusinessCode.NameWithoutArity(entry)}({ParameterTypes(constructor)})");

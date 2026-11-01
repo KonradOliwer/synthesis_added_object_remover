@@ -14,7 +14,11 @@ public static class ModTrustClassifier
     /// <summary>Creation Club plugins are deliberately not part of the base game.</summary>
     private static readonly ImmutableArray<string> BaseGameFileNames = ["Skyrim.esm", "Update.esm", "Dawnguard.esm", "HearthFires.esm", "Dragonborn.esm"];
 
-    public static ModTrustTable Classify(LoadOrderPlugins plugins, ModTrustSettings settings)
+    public sealed record Input(LoadOrderPlugins Plugins, ModTrustSettings Settings);
+
+    public static ModTrustTable Classify(Input input) => Classify(input.Plugins, input.Settings);
+
+    internal static ModTrustTable Classify(LoadOrderPlugins plugins, ModTrustSettings settings)
     {
         var listings = ListingsByPlugin(plugins);
         var known = KnownPlugins(plugins);

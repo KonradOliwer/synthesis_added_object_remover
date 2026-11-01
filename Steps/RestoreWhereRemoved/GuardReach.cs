@@ -17,9 +17,6 @@ internal sealed class GuardReach(IBaseObjectShapes shapes, TooCloseSettings tooC
     /// <summary>Covers the rounding slack of the boxes the caches index and the tolerances of the exact tests behind them.</summary>
     private const float Slack = 16f;
 
-    /// <summary>A box grown by a distance on each axis reaches this many times the distance from its centre at a corner.</summary>
-    private static readonly float CornerReach = MathF.Sqrt(3f);
-
     /// <summary>
     /// Whether each object can meet a guard: within the too-close reach of a candidate as it goes back, within the touch reach of a
     /// candidate where it stands now or of an object within that, or a placed NPC, whose body the rules for NPCs measure on their own.
@@ -49,10 +46,7 @@ internal sealed class GuardReach(IBaseObjectShapes shapes, TooCloseSettings tooC
     public Box TooCloseReachOf(TargetObject restored)
     {
         var box = BaseBoxes.Of(shapes, restored.Base, restored.Transform);
-        var corner = box.HalfExtents.Length();
-        var bySize = tooClose.BySize ? corner * (1f + 2f * tooClose.Multiplier) : 0f;
-        var byDistance = tooClose.ByDistance ? corner + tooClose.DistanceInUnits * CornerReach : 0f;
-        var radius = MathF.Max(bySize, byDistance) + Slack;
+        var radius = TooCloseZoneReach.ReachRadius(tooClose, box.HalfExtents) + Slack;
         return new Box(box.Center - new Vector3(radius), box.Center + new Vector3(radius));
     }
 

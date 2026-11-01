@@ -29,7 +29,7 @@ internal static class RestoreWhereRemovedWorlds
     public const float CleanedModLandSteps = 24f;
 
     public const float BaseLandSteps = 16f;
-    public const float UnitsPerLandStep = 8f;
+    public const float UnitsPerLandStep = TerrainGrid.UnitsPerHeightStep;
 
     /// <summary>Where the other mods' objects stand in the village, along a line.</summary>
     public static readonly Vector3 RockAt = At(2000, 0);
@@ -45,7 +45,7 @@ internal static class RestoreWhereRemovedWorlds
     /// <summary>A tiny object 5 units from the side of a crate: too close to it, yet far too small to count against clearing the area.</summary>
     private const float PebbleDistance = 60f;
     private const int InitiallyDisabled = (int)SkyrimMajorRecord.SkyrimMajorRecordFlag.InitiallyDisabled;
-    private const int Side = TerrainHeights.VerticesPerSide;
+    private const int Side = TerrainGrid.VerticesPerSide;
 
     /// <summary>
     /// The interior, where the cleaned mod has two crates of its own, each with a city pad beside it, so all of its objects there are

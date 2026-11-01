@@ -31,7 +31,6 @@ internal sealed class TerrainUndoPlan
     /// <summary>Two records whose offsets lie closer than this to a whole number of steps apart store heights on the same steps.</summary>
     private const float SameStepsTolerance = 1e-3f;
 
-    private const float UnitsPerStep = LandHeightEncoder.UnitsPerStep;
 
     private readonly Lands _lands;
 
@@ -409,7 +408,7 @@ internal sealed class TerrainUndoPlan
         var first = _lands.HeightsOf(holders[0].Cell).Current![0];
         foreach (var holder in holders)
         {
-            var steps = (_lands.HeightsOf(holder.Cell).Current![0] - first) / UnitsPerStep;
+            var steps = (_lands.HeightsOf(holder.Cell).Current![0] - first) / TerrainGrid.UnitsPerHeightStep;
             if (MathF.Abs(steps - MathF.Floor(steps + 0.5f)) > SameStepsTolerance) return false;
         }
         return true;

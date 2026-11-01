@@ -2,11 +2,17 @@ using System.Numerics;
 
 namespace AddedObjectRemover;
 
-/// <summary>The terrain's square lattice: vertices 128 units apart, 32 squares across each 4096-unit cell.</summary>
+/// <summary>
+/// The terrain's square lattice: 33 by 33 vertices per cell, 128 units apart, 32 squares across each 4096-unit cell, and the
+/// stored height of a vertex counted in steps of 8 units. The one place these values are written down.
+/// </summary>
 public static class TerrainGrid
 {
-    public const int SquaresPerSide = TerrainHeights.VerticesPerSide - 1;
+    public const int VerticesPerSide = 33;
+    public const int SquaresPerSide = VerticesPerSide - 1;
+    public const int VertexCount = VerticesPerSide * VerticesPerSide;
     public const float VertexSpacing = ExteriorGrid.CellSize / SquaresPerSide;
+    public const float UnitsPerHeightStep = 8f;
 
     /// <summary>
     /// The corner vertices of every terrain square the rectangle overlaps (a rectangle that only touches a square's edge does not
@@ -47,7 +53,7 @@ public static class TerrainGrid
         var indices = new List<int>();
         for (var y = localFirstY; y <= localLastY + 1; y++)
         {
-            for (var x = localFirstX; x <= localLastX + 1; x++) indices.Add(y * TerrainHeights.VerticesPerSide + x);
+            for (var x = localFirstX; x <= localLastX + 1; x++) indices.Add(y * VerticesPerSide + x);
         }
         return [.. indices];
     }

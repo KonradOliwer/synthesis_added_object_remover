@@ -7,13 +7,6 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
-using FindHolders = System.Func<
-    System.Collections.Generic.IReadOnlyList<AddedObjectRemover.Steps.CollectPlacedObjects.Contracts.TargetObject>,
-    AddedObjectRemover.Caches.RunCaches.Contracts.IVisibleTargetObjects,
-    System.Func<AddedObjectRemover.TargetId, bool>,
-    AddedObjectRemover.Caches.RunCaches.Contracts.IVisibleObjectsOfAnyPlugin,
-    System.Collections.Generic.IReadOnlySet<AddedObjectRemover.OtherId>,
-    System.Collections.Generic.IReadOnlyDictionary<AddedObjectRemover.TargetId, AddedObjectRemover.Steps.CollectPlacedObjects.Contracts.OtherObject>>;
 
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 
@@ -31,16 +24,13 @@ internal sealed record PlacedChecks(PlacedRefusal?[] Found, IReadOnlySet<OtherId
 /// <summary>What the placed guards read besides the after-removal world.</summary>
 /// <param name="Caches">The object caches over the after-removal world.</param>
 /// <param name="TooClose">The too-close rule over the after-removal world in which the given objects cause no removals.</param>
-/// <param name="FindHoldersOfObjectsThatStay">
-/// Given objects where they stand now, their index, which of them move away, the visible objects of the after-removal world and the
-/// copies of the moving ones among those: each moving one that an object that stays rests on, with the first such object in id order.
-/// </param>
+/// <param name="HoldersOfObjectsThatStay">The support test over the after-removal world, among the candidates that stand now.</param>
 /// <param name="FindLandWorldspace">A space → the worldspace whose land it uses; null for a space without land.</param>
 /// <param name="ChangedTerrain">The areas around an object whose ground the collision settings of the objects the cleaned mod changed look at.</param>
 internal sealed record PlacedGuardInputs(
     IObjectCaches Caches,
     Func<IEnumerable<OtherId>, IPlacementRule> TooClose,
-    FindHolders FindHoldersOfObjectsThatStay,
+    IHoldersSearch HoldersOfObjectsThatStay,
     IBaseObjectShapes Shapes,
     ObjectsThatBlockActors Blocking,
     INavmeshes Navmeshes,
@@ -56,9 +46,6 @@ internal sealed record PlacedGuardInputs(
 internal sealed class PlacedGuards(
     AfterRemovalWorld world, PlacedGuardInputs inputs, GuardReach reach, FinalPresence presence, DoorLinkGuard doors, Execution execution)
 {
-    private readonly ComputedOnce<IVisibleTargetObjects> _standingNow = new(() => inputs.Caches.IndexVisibleTargets(world.Now));
-    private readonly ComputedOnce<IVisibleObjectsOfAnyPlugin> _staying = new(inputs.Caches.VisibleObjectsOfAnyPlugin);
-
     /// <summary>P4 for every candidate: which other candidates go back does not change which invisible object a candidate holds.</summary>
     private readonly ComputedOnce<Dictionary<int, RecordKey>> _holdingInvisible = new(() => FindCandidatesHoldingInvisibleObjects(world, inputs.Caches, inputs.Shapes, execution));
 
@@ -223,8 +210,7 @@ internal sealed class PlacedGuards(
     /// <summary>The candidates going back that an object that stays rests on where they stand now, each with the first such object.</summary>
     private Dictionary<int, RecordKey> FindCandidatesCarryingObjectsThatStay(IReadOnlySet<int> goingBack)
     {
-        var holders = inputs.FindHoldersOfObjectsThatStay(
-            world.Now, _standingNow.Value, holder => goingBack.Contains(world.StandingNow[holder.Index]), _staying.Value, world.CopiesNowOf(goingBack).ToHashSet());
+        var holders = inputs.HoldersOfObjectsThatStay.Find(holder => goingBack.Contains(world.StandingNow[holder.Index]), world.CopiesNowOf(goingBack).ToHashSet());
         return holders.ToDictionary(entry => world.StandingNow[entry.Key.Index], entry => entry.Value.Key);
     }
 }

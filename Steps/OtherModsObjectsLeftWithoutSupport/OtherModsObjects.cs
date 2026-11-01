@@ -7,6 +7,7 @@ using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport;
 
@@ -166,6 +167,21 @@ public static class OtherModsObjects
             objectsOfAnyPlugin,
             execution);
 
+    /// <summary>The restore step's question about the objects that move away, asked in worlds of what stays (see <see cref="FindHoldersOfObjectsThatStay"/>).</summary>
+    /// <param name="worldCaches">The object caches of the worlds asked about.</param>
+    /// <param name="trust">Decides whose objects are judged.</param>
+    public static IHoldersOfObjectsThatStay CreateHoldersOfObjectsThatStay(
+        IObjectCachesOfWorlds worldCaches,
+        ModTrustTable trust,
+        LoadOrderPlugins plugins,
+        OtherModsObjectsSettings settings,
+        IBaseObjectShapes shapes,
+        ITriangleMeshes triangles,
+        ISurfaceSamples surfaces,
+        ITerrainHeights terrain,
+        Execution execution) =>
+        new HoldersOfObjectsThatStay(worldCaches, trust, plugins, settings, shapes, triangles, surfaces, terrain, execution);
+
     /// <summary>
     /// The objects that move away from where they stand now and that an object that stays rests on there, by the test that finds the
     /// other mods' objects left without support. Every object of <paramref name="staying"/> that can rest counts, whichever plugin it
@@ -177,7 +193,7 @@ public static class OtherModsObjects
     /// <param name="staying">The visible objects of any plugin as they stand once the run is done, with a copy of each holder.</param>
     /// <param name="copiesOfMoving">The copies in <paramref name="staying"/> of the holders that move away, which neither rest nor hold up.</param>
     /// <returns>Each holder that moves away and holds up an object that stays, with the first such object in id order.</returns>
-    public static IReadOnlyDictionary<TargetId, OtherObject> FindHoldersOfObjectsThatStay(
+    internal static IReadOnlyDictionary<TargetId, OtherObject> FindHoldersOfObjectsThatStay(
         IReadOnlyList<TargetObject> holders,
         IVisibleTargetObjects holderIndex,
         Func<TargetId, bool> movesAway,
@@ -198,11 +214,57 @@ public static class OtherModsObjects
         return context.CreateHolding(world, staying, rules, rules.CanRest).Find(holders.Where(holder => movesAway(holder.Id)), copiesOfMoving.Contains);
     }
 
+    /// <param name="Targets">Where they stood before any decision.</param>
+    /// <param name="AfterFits">The decisions with every fit: the rounds measure an object shrunk or turned and removed later at its new placement.</param>
+    /// <param name="Decisions">The decisions of every removal round so far, the also-remove rounds included; the step's rounds are added to them.</param>
+    /// <param name="Caches">Index the target objects; their objects of any plugin are asked only when a target object was removed, shrunk or turned.</param>
+    /// <param name="Trust">Decides whose objects are judged.</param>
+    /// <param name="AlsoRemoveRounds">Asked only when <paramref name="AlsoRemove"/> is not Nothing.</param>
+    public sealed record Input(
+        ImmutableArray<TargetObject> Targets,
+        IRemovalDecisions AfterFits,
+        IRunDecisions Decisions,
+        IRunCaches Caches,
+        ModTrustTable Trust,
+        LoadOrderPlugins Plugins,
+        OtherModsObjectsSettings Settings,
+        AlsoRemoveSettings AlsoRemove,
+        IAlsoRemoveRoundsAfter AlsoRemoveRounds,
+        Execution Execution);
+
     /// <summary>
-    /// RemoveFloatingObject and PullObjectToTheGround: what becomes of the other mods' objects left without support once the
-    /// also-remove rounds are decided, and the also-remove rounds for the target objects resting on or touching those taken away;
-    /// switched off with KeepSupportingObject. The rounds are decided on a working copy of <paramref name="decided"/>, which never
-    /// changes, and proposed for the runner to apply.
+    /// RemoveFloatingObject and PullObjectToTheGround: what becomes of the other mods' objects left without support (see
+    /// <see cref="SettleLeftWithoutSupport"/>), with the step's also-remove rounds added to the run's decisions.
+    /// </summary>
+    public static Decided<OtherModsObjectsResult> Settle(Input input)
+    {
+        var (targets, caches) = (input.Targets, input.Caches);
+        var targetsAsMeasured = input.AfterFits.TargetsAsTheRoundsMeasureThem(targets);
+        var result = SettleLeftWithoutSupport(
+            targets,
+            targetsAsMeasured,
+            input.Decisions,
+            caches.VisibleTargets,
+            caches.IndexVisibleTargetsAsTheRoundsMeasureThem(targets, input.AfterFits),
+            placed => caches.IndexVisibleTargets(placed),
+            input.Trust,
+            input.Plugins,
+            input.Settings,
+            input.AlsoRemove,
+            decided => input.AlsoRemoveRounds.After(decided, targetsAsMeasured),
+            caches.Shapes,
+            caches.Triangles,
+            caches.SurfaceSamples,
+            caches.Terrain,
+            caches.VisibleObjectsOfAnyPlugin,
+            input.Execution);
+        return new Decided<OtherModsObjectsResult>(result, input.Decisions.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds));
+    }
+
+    /// <summary>
+    /// What becomes of the other mods' objects left without support once the also-remove rounds are decided, and the also-remove
+    /// rounds for the target objects resting on or touching those taken away; switched off with KeepSupportingObject. The rounds
+    /// are decided on a working copy of <paramref name="decided"/>, which never changes, and proposed.
     /// </summary>
     /// <param name="targets">Where they stood before any decision.</param>
     /// <param name="targetsAsMeasured">Each target object kept shrunk or turned at its new placement, as the rounds measure it.</param>
@@ -216,7 +278,7 @@ public static class OtherModsObjects
     /// <paramref name="targetsAsMeasured"/>; asked only when <paramref name="alsoRemove"/> is not Nothing.
     /// </param>
     /// <param name="objectsOfAnyPlugin">Asked only when a target object was removed, shrunk or turned.</param>
-    public static OtherModsObjectsResult SettleLeftWithoutSupport(
+    internal static OtherModsObjectsResult SettleLeftWithoutSupport(
         ImmutableArray<TargetObject> targets,
         ImmutableArray<TargetObject> targetsAsMeasured,
         IRemovalDecisions decided,

@@ -13,7 +13,7 @@ namespace AddedObjectRemover.Tests.Reporting;
 public sealed class RestoreWhereRemovedReportTests
 {
     private const string Heading = "Restored where the cleaned mod was removed";
-    private const int HeightRowLength = 33;
+    private const int HeightRowLength = TerrainGrid.VerticesPerSide;
 
     private static readonly ReportContext Normal = new(Bases: null!, Shapes: null!, Detailed: false);
     private static readonly ReportContext Detailed = new(Bases: null!, Shapes: null!, Detailed: true);

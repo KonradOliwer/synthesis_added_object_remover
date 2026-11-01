@@ -551,8 +551,8 @@ public class VisibleLeftBehindObjectsTests
 
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
         Assert.Equal(
-            new PartFailure(VisibleLeftBehindParts.VisibleLeftBehind, "InvalidOperationException: it broke", Subject: null), result.Failure! with { Details = null });
-        Assert.StartsWith("System.InvalidOperationException: it broke.", result.Failure.Details, StringComparison.Ordinal);
+            new PartFailure(VisibleLeftBehindParts.VisibleLeftBehind, "PlantedUserDataException: it broke", Subject: null), result.Failure! with { Details = null });
+        Assert.StartsWith("AddedObjectRemover.Tests.Fixtures.PlantedUserDataException: it broke.", result.Failure.Details, StringComparison.Ordinal);
         Assert.Empty(result.Evaluations);
         Assert.Empty(result.ProposedRounds);
         Assert.Empty(result.Rounds);
@@ -990,7 +990,7 @@ public class VisibleLeftBehindObjectsTests
     {
         public IReadOnlyList<RecordKey> Spaces => inner.Spaces;
 
-        public void Around(RecordKey space, Vector3 point, float radius, List<VisibleTargetNear> into) => throw new InvalidOperationException("it broke.");
+        public void Around(RecordKey space, Vector3 point, float radius, List<VisibleTargetNear> into) => throw new PlantedUserDataException("it broke.");
 
         public void InColumn(RecordKey space, Vector2 point, float radius, List<VisibleTargetNear> into) => inner.InColumn(space, point, radius, into);
 

@@ -538,23 +538,23 @@ public sealed class RestoreWhereRemovedGuardTests
         var rules = TestPlacedGuardRules.Create(Shapes, Trust, Plugins, Support, TestGround.NoTerrain(), scene.Workers);
         ImmutableArray<NavmeshWorldTriangle> navmesh = [.. scene.Navmesh];
         return WhereRemovedRestorer.Plan(
-            collected,
-            DecisionsRemoving(targets, scene.Removed),
-            scene.OtherMods,
-            TestScenes.Create(targets, [], Shapes).VisibleTargets,
-            rules.IndexObjects,
-            rules.TooClose,
-            rules.FindHoldersOfObjectsThatStay,
-            rules.Support,
-            Shapes,
-            new NavmeshIndex(bucket => bucket.Grid is null && !navmesh.IsEmpty ? [.. navmesh] : null),
-            space => space,
-            _ => new LandHeights(null, null),
-            _ => null,
-            Plugins,
-            TestTargets.TargetName,
-            new Execution(scene.Workers),
-            Settings);
+            new(
+                collected,
+                DecisionsRemoving(targets, scene.Removed),
+                scene.OtherMods,
+                TestScenes.Create(targets, [], Shapes).VisibleTargets,
+                rules.WorldCaches,
+                rules.TooCloseRule(),
+                rules.HoldersOfObjectsThatStay,
+                TestNavmeshCheck.NoFault,
+                rules.Support,
+                Shapes,
+                new NavmeshIndex(bucket => bucket.Grid is null && !navmesh.IsEmpty ? [.. navmesh] : null),
+                TestLandPlugin.Flat,
+                Plugins,
+                TestTargets.TargetName,
+                new Execution(scene.Workers),
+                Settings));
     }
 
     private static RemovalDecisions DecisionsRemoving(ImmutableArray<TargetObject> targets, int[] removed) =>

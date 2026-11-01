@@ -1,20 +1,20 @@
 namespace AddedObjectRemover;
 
 /// <summary>
-/// Handles unexpected failures, which are caught only where one independent part of the run is processed.
-/// Known user-data problems are caught separately, each recorded as a problem of its own kind.
+/// Handles failures of the user's data, which are caught only where one independent part of the run is processed.
+/// Known user-data problems with a recorded kind of their own are caught separately.
 /// </summary>
 public static class Failures
 {
     /// <summary>
-    /// Whether the run may carry on without the part that threw. OutOfMemory is deliberately excluded: it cannot be
-    /// told apart from real memory pressure, so skipping a part would make the results depend on memory.
-    /// That includes one wrapped by parallel work.
+    /// Whether the failure comes from the user's data, so the run may carry on without the part that threw: a file that
+    /// cannot be read (including one wrapped by parallel work) or data a library found malformed. Any other exception is
+    /// a bug of ours or of a library and ends the run.
     /// </summary>
     public static bool IsRecoverable(Exception ex) =>
         ex is AggregateException aggregate
             ? aggregate.Flatten().InnerExceptions.All(IsRecoverable)
-            : ex is not OutOfMemoryException;
+            : ex is IOException or UnauthorizedAccessException or UserDataException;
 
     /// <remarks>Parallel work wraps its failures; the distinct inner ones are listed in a fixed order, so the text does not depend on which worker failed first.</remarks>
     public static string DescribeFailure(Exception ex) =>
@@ -30,7 +30,7 @@ public static class Failures
             ? DetailsOf(first)
             : ex.ToString();
 
-    /// <summary>Runs one part of the run; if it throws unexpectedly, gives the result of the part not having run, built from the caught failure.</summary>
+    /// <summary>Runs one part of the run; if it throws a failure of the user's data, gives the result of the part not having run, built from the caught failure. Any other exception ends the run.</summary>
     /// <param name="stopped">Builds that result from <see cref="Catch"/>; only called when the part threw.</param>
     public static T Attempt<T>(Func<T> work, Func<CaughtFailure, T> stopped)
     {

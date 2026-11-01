@@ -97,7 +97,7 @@ public static class Program
             world.Plugins,
             pluginRecords,
             patchWriting,
-            new MeshFilesFactory(state.DataFolderPath.Path, state.GameRelease, [.. world.Order.ListedOrder.Select(listing => listing.ModKey)]),
+            new MeshFilesFactory(state.DataFolderPath.Path, state.GameRelease, world.ListedPlugins),
             new BaseFactsFactory(world.Plugins.Mods),
             new ConsoleLogSink(),
             new CsvReportOutput(),

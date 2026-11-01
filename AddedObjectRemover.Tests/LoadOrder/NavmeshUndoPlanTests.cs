@@ -22,7 +22,7 @@ public sealed class NavmeshUndoPlanTests
     private const float HeightTolerance = 8f;
     private const int CellX = 6;
     private const int CellY = 7;
-    private const int Side = TerrainHeights.VerticesPerSide;
+    private const int Side = TerrainGrid.VerticesPerSide;
     private const short DoorTriangle = 1;
     private const int EastSide = 1;
     private const int WestSide = 2;
@@ -353,7 +353,7 @@ public sealed class NavmeshUndoPlanTests
     {
         DeleteWestAndUnlinkEastAndDoor();
         var raised = (Landscape)_cell.Landscape!.DeepCopy();
-        raised.VertexHeightMap!.Offset = raisedBy / LandHeightEncoder.UnitsPerStep;
+        raised.VertexHeightMap!.Offset = raisedBy / TerrainGrid.UnitsPerHeightStep;
         CellCopyIn(_later.Mod).Landscape = raised;
 
         var (plan, _) = Run(then: (plan, records, _) =>

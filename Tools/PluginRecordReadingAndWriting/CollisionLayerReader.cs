@@ -5,7 +5,7 @@ using Mutagen.Bethesda.Skyrim;
 namespace AddedObjectRemover;
 
 /// <summary>Reads the load order's collision layer records (COLL) at their winning versions.</summary>
-public static class CollisionLayerReader
+internal static class CollisionLayerReader
 {
     /// <returns>By layer number; of two records with one number, the one whose winner loads last.</returns>
     public static IReadOnlyDictionary<uint, CollisionLayerFact> Read(ILinkCache linkCache)

@@ -18,7 +18,7 @@ public class ChangedObjectJudgingTests
     private const int Ground = 0;
 
     /// <summary>The terrain vertex under the barrel's old place (1024, 1024 is the eighth vertex of the eighth row), and its height when something raised it.</summary>
-    private const int UnderTheOldPlace = 8 * TerrainHeights.VerticesPerSide + 8;
+    private const int UnderTheOldPlace = 8 * TerrainGrid.VerticesPerSide + 8;
     private const float Raised = 64f;
     private const float HeightTolerance = 16f;
     private const float AreaDistance = 64f;
@@ -512,7 +512,7 @@ public class ChangedObjectJudgingTests
 
     private static float[] FlatHeights(params (int Vertex, float Height)[] raised)
     {
-        var heights = Enumerable.Repeat((float)Ground, TerrainHeights.VerticesPerSide * TerrainHeights.VerticesPerSide).ToArray();
+        var heights = Enumerable.Repeat((float)Ground, TerrainGrid.VertexCount).ToArray();
         foreach (var (vertex, height) in raised) heights[vertex] = height;
         return heights;
     }

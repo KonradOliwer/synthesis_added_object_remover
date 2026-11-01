@@ -10,8 +10,13 @@ namespace AddedObjectRemover.Steps.FindTargetObjectsToKeep;
 /// </summary>
 public static class ObjectsToKeepFinder
 {
+    /// <param name="RestingOn">The target objects other mods' objects rest on, with what rests on each; empty unless they are kept.</param>
+    public sealed record Input(IReadOnlyList<TargetObject> Targets, IReadOnlyList<LinkFact> Links, IBaseFacts Bases, IReadOnlyDictionary<TargetId, RestingObject> RestingOn);
+
+    public static ObjectsToKeepResult Find(Input input) => Find(input.Targets, input.Links, input.Bases, input.RestingOn);
+
     /// <param name="restingOn">The target objects other mods' objects rest on, with what rests on each; empty unless they are kept.</param>
-    public static ObjectsToKeepResult Find(
+    internal static ObjectsToKeepResult Find(
         IReadOnlyList<TargetObject> targets, IReadOnlyList<LinkFact> links, IBaseFacts bases, IReadOnlyDictionary<TargetId, RestingObject> restingOn)
     {
         var outcome = LinkRule.DecideLinkOutcome(targets, links);

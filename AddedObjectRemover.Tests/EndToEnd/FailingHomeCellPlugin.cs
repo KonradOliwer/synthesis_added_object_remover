@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using AddedObjectRemover.Tests.Fixtures;
 
 namespace AddedObjectRemover.Tests.EndToEnd;
 
@@ -19,7 +20,7 @@ internal sealed class FailingHomeCellPlugin(IPluginRecords inner) : IPluginRecor
 
     public IRecordIndex ReadRecordIndex() => inner.ReadRecordIndex();
 
-    public CellGridPoint? ReadHomeCellGrid(RecordKey record) => throw new InvalidOperationException(FailureMessage);
+    public CellGridPoint? ReadHomeCellGrid(RecordKey record) => throw new PlantedUserDataException(FailureMessage);
 
     public float[]? ReadTerrain(ExteriorCell cell) => inner.ReadTerrain(cell);
 

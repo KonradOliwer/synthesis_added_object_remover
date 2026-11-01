@@ -5,9 +5,8 @@ namespace AddedObjectRemover;
 /// <summary>A set of a LAND record's grid points (row by row from the bottom, x fastest), as a fixed bitset. Immutable.</summary>
 public sealed class PointSet : IEquatable<PointSet>
 {
-    public const int PointCount = TerrainHeights.VerticesPerSide * TerrainHeights.VerticesPerSide;
     private const int BitsPerWord = 64;
-    private const int WordCount = (PointCount + BitsPerWord - 1) / BitsPerWord;
+    private const int WordCount = (TerrainGrid.VertexCount + BitsPerWord - 1) / BitsPerWord;
 
     private readonly ulong[] _words;
 
@@ -19,7 +18,7 @@ public sealed class PointSet : IEquatable<PointSet>
         foreach (var point in points)
         {
             ArgumentOutOfRangeException.ThrowIfNegative(point);
-            ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(point, PointCount);
+            ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(point, TerrainGrid.VertexCount);
             words[point / BitsPerWord] |= 1UL << (point % BitsPerWord);
         }
         return new PointSet(words);
@@ -32,7 +31,7 @@ public sealed class PointSet : IEquatable<PointSet>
     public bool IsEmpty => _words.All(word => word == 0);
 
     /// <summary>In ascending order.</summary>
-    public IEnumerable<int> Points => Enumerable.Range(0, PointCount).Where(Contains);
+    public IEnumerable<int> Points => Enumerable.Range(0, TerrainGrid.VertexCount).Where(Contains);
 
     public bool Equals(PointSet? other) => other is not null && _words.AsSpan().SequenceEqual(other._words);
 

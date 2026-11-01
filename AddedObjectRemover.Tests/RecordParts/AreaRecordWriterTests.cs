@@ -15,7 +15,7 @@ namespace AddedObjectRemover.Tests.RecordParts;
 /// </summary>
 public sealed class AreaRecordWriterTests
 {
-    private const int Side = TerrainHeights.VerticesPerSide;
+    private const int Side = TerrainGrid.VerticesPerSide;
     private const float Size = 100f;
     private const float RaisedHeight = 80f;
     private const short DoorTriangle = 1;
@@ -88,7 +88,7 @@ public sealed class AreaRecordWriterTests
     public void TheHeightsGoInWithTheEarlierNormalWhereTheGroundAroundIsEarlierANewOneBetweenAndTheWinnersWhereNothingGoesBack()
     {
         var raised = LandCopyIn(_cleaned.Mod);
-        raised.VertexHeightMap!.Offset = RaisedHeight / LandHeightEncoder.UnitsPerStep;
+        raised.VertexHeightMap!.Offset = RaisedHeight / TerrainGrid.UnitsPerHeightStep;
         Fill(raised.VertexNormals!, WinningNormal);
         raised.VertexColors![4, 4] = CleanedColour;
         // West of x = 11 the earlier ground, east of it the raised ground, at x = 11 halfway.
@@ -108,7 +108,7 @@ public sealed class AreaRecordWriterTests
     public void HeightsTooSteepToStoreAreNotWritten()
     {
         var raised = LandCopyIn(_cleaned.Mod);
-        var heights = Heights((x, _) => x == 3 ? LandHeightEncoder.UnitsPerStep * 200 : 0f);
+        var heights = Heights((x, _) => x == 3 ? TerrainGrid.UnitsPerHeightStep * 200 : 0f);
 
         Assert.Throws<InvalidOperationException>(() => Write(LandHandles(raised), new SetLandHeights(LandKey, heights, PointsWhere((_, _) => true), CellEdgeHeights.Unknown)));
     }
@@ -118,7 +118,7 @@ public sealed class AreaRecordWriterTests
     public void ThePointsThatDoNotGoBackKeepTheWinnersNormalsBesideARestoredSlope()
     {
         var raised = LandCopyIn(_cleaned.Mod);
-        raised.VertexHeightMap!.Offset = RaisedHeight / LandHeightEncoder.UnitsPerStep;
+        raised.VertexHeightMap!.Offset = RaisedHeight / TerrainGrid.UnitsPerHeightStep;
         Fill(raised.VertexNormals!, WinningNormal);
         var laterNormal = new P3UInt8(5, 6, 127);
         raised.VertexNormals![12, 5] = laterNormal;

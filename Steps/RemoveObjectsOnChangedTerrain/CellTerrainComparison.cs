@@ -26,7 +26,7 @@ internal sealed class CellTerrainComparison(TerrainPlugins plugins, TerrainTypes
         if (versions.Length == 0) return null;
         var compared = versions.Select(ToCompared).ToArray();
         var trusts = versions.Select(version => plugins.TrustOf(version.Plugin)).ToArray();
-        var vertices = Enumerable.Range(0, CellTerrain.VertexCount).Select(vertex => DecideAt(compared, trusts, vertex)).ToArray();
+        var vertices = Enumerable.Range(0, TerrainGrid.VertexCount).Select(vertex => DecideAt(compared, trusts, vertex)).ToArray();
         if (!vertices.Any(vertex => vertex.IsChecked)) return null;
 
         var shown = compared[^1].Heights;
@@ -55,7 +55,7 @@ internal sealed class CellTerrainComparison(TerrainPlugins plugins, TerrainTypes
     /// <returns>Null when a vertex needs the shown height and the shown version holds none.</returns>
     private float[]? ComposeAcceptedHeights(ComparedVersion[] compared, VertexAcceptance[] vertices, float[]? shown)
     {
-        var heights = new float[CellTerrain.VertexCount];
+        var heights = new float[TerrainGrid.VertexCount];
         for (var vertex = 0; vertex < heights.Length; vertex++)
         {
             if ((AcceptedHeightAt(compared, vertices[vertex], vertex) ?? shown?[vertex]) is not { } height) return null;
@@ -77,7 +77,7 @@ internal sealed class CellTerrainComparison(TerrainPlugins plugins, TerrainTypes
                 settings.CountHeightChanges ? FindChangerOf(compared, vertices[vertex].Height) : null,
                 FindChangerOf(compared, vertices[vertex].Type));
             if (!change.Any) continue;
-            changes ??= new VertexChange[CellTerrain.VertexCount];
+            changes ??= new VertexChange[TerrainGrid.VertexCount];
             changes[vertex] = change;
         }
         return changes;

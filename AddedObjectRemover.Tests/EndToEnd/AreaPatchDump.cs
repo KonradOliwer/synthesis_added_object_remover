@@ -9,7 +9,7 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 /// </summary>
 internal static class AreaPatchDump
 {
-    private const int Side = TerrainHeights.VerticesPerSide;
+    private const int Side = TerrainGrid.VerticesPerSide;
     private const string HeightFormat = "F0";
     private const string None = "none";
 

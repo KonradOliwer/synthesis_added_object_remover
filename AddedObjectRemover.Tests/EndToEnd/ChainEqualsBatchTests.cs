@@ -70,7 +70,7 @@ public sealed class ChainEqualsBatchTests : IDisposable
     private const int PaddedCell = 2;
 
     /// <summary>A LAND height step in game units.</summary>
-    private const float HeightStepUnits = 8f;
+    private const float HeightStepUnits = TerrainGrid.UnitsPerHeightStep;
 
     /// <summary>8 steps of 8 units: 64 units, above the default tolerance of 16 units.</summary>
     private const float RaisedSteps = 8f;

@@ -53,6 +53,7 @@ public class ProductionTypeTests
         ["SupporterShares"] = "one-line rule over contract records: the total share of a support category",
         ["SurfaceContacts"] = "the support rule the also-remove step and the step for other mods' objects share: the contact points of a mesh with what may hold it up",
         ["SupportContactWeights"] = "the support rule the also-remove step and the step for other mods' objects share: the contact weights split among the supporters, and the lost-share threshold",
+        ["TooCloseZoneReach"] = "the zone reach the too-close step and the restore step's guards share: how far the zones that are on reach from the centre of a box, and the size zone's enlargement of a placement",
         ["ContainingObjects"] = "read-only lookup of the object containing each target",
         ["Replacements"] = "read-only lookup of the replaced other-mod objects",
         ["ObjectQueryScratch"] = "per-worker buffers for the object queries",
@@ -161,7 +162,6 @@ public class ProductionTypeTests
         ["PlacedNpcRules.IsPlacedNpc"] = "a step's rule handed to a cache at creation (Q3)",
         ["PlacedNpcRules.BodyTransform"] = "a step's rule handed to a cache at creation (Q3)",
         ["PlacedNpcRules.CountSizes"] = "a step's rule handed to a cache at creation (Q3)",
-        ["OldPlaceRules.TooClose"] = "the too-close rule is built for each checked object, because the cleaned mod's version of that object is left out of its causes",
     };
 
     [Fact]

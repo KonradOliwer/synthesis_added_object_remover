@@ -17,8 +17,8 @@ public class ChangedTerrainObjectsTests
 
     /// <summary>The height tolerance of <see cref="Settings"/>, and the smallest height step terrain heights come in.</summary>
     private const float Tolerance = 16f;
-    private const float HeightStep = 8f;
-    private const int VertexCount = TerrainHeights.VerticesPerSide * TerrainHeights.VerticesPerSide;
+    private const float HeightStep = TerrainGrid.UnitsPerHeightStep;
+    private const int VertexCount = TerrainGrid.VertexCount;
 
     /// <summary>The share of an area's vertices whose terrain type must change in <see cref="Settings"/>: 4 of the 16 at <see cref="WideSpot"/>.</summary>
     private const int TypePercent = 25;
@@ -30,8 +30,8 @@ public class ChangedTerrainObjectsTests
     private const float FullOpacity = 1f;
 
     /// <summary>A terrain vertex inside the check area of an object at <see cref="Spot"/>, and one far outside it.</summary>
-    private const int Near = 8 * TerrainHeights.VerticesPerSide + 8;
-    private const int Far = 20 * TerrainHeights.VerticesPerSide + 20;
+    private const int Near = 8 * TerrainGrid.VerticesPerSide + 8;
+    private const int Far = 20 * TerrainGrid.VerticesPerSide + 20;
 
     /// <summary>The vertex next to <see cref="Near"/>, also inside the check area (column 9 of row 8).</summary>
     private const int Beside = Near + 1;
@@ -126,15 +126,7 @@ public class ChangedTerrainObjectsTests
     private static ChangedTerrainPass Find(TerrainPlugin plugin, ChangedTerrainSettings settings, int threads = 1, params TargetObject[] targets)
     {
         var world = TestScenes.CreateWorld(targets.Length == 0 ? [Placed(0, Rock)] : targets, []);
-        return ChangedTerrainObjects.Find(
-                world,
-                Mods.AcceptedWorld,
-                LoadOrder,
-                plugin,
-                new BoxShapes(),
-                new Execution(threads),
-                [TestJudgedGroups.OfAll(world.Targets, settings)])
-            .Passes.Single();
+        return Find(world, Mods.AcceptedWorld, plugin, threads, TestJudgedGroups.OfAll(world.Targets, settings)).Passes.Single();
     }
 
     private static ChangedTerrainPass FindInCell(params TerrainVersion[] versions) =>
@@ -149,9 +141,7 @@ public class ChangedTerrainObjectsTests
     {
         var world = TestScenes.CreateWorld([Placed(0, Rock)], []);
 
-        var result = ChangedTerrainObjects.Find(
-            world, Mods.AcceptedWorld, LoadOrder, new PluginNameParsingPlugin(), new BoxShapes(), new Execution(1),
-            [TestJudgedGroups.OfAll(world.Targets, Settings() with { On = false })]);
+        var result = Find(world, Mods.AcceptedWorld, new PluginNameParsingPlugin(), threads: 1, TestJudgedGroups.OfAll(world.Targets, Settings() with { On = false }));
 
         Assert.Equal(StepOutcome.SwitchedOff, result.Outcome);
         Assert.Empty(result.Proposals);
@@ -168,8 +158,7 @@ public class ChangedTerrainObjectsTests
 
         var collected = TestScenes.CreateWorld([Placed(0, Rock)], []);
 
-        var result = ChangedTerrainObjects.Find(
-            collected, world, LoadOrder, new TerrainPlugin(terrain), new BoxShapes(), new Execution(1), [TestJudgedGroups.OfAll(collected.Targets, Settings())]);
+        var result = Find(collected, world, new TerrainPlugin(terrain), threads: 1, TestJudgedGroups.OfAll(collected.Targets, Settings()));
 
         Assert.Equal(removed, result.Proposals.Any());
     }
@@ -189,8 +178,14 @@ public class ChangedTerrainObjectsTests
     {
         var plugin = new TerrainPlugin(new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(Target), RaisedAt(Other, Near)] });
         var world = TestScenes.CreateWorld([Placed(0, Rock), Placed(1, Rock), Placed(2, Rock), Placed(3, Rock)], []);
-        return ChangedTerrainObjects.Find(world, Mods.AcceptedWorld, LoadOrder, plugin, new BoxShapes(), new Execution(threads), groups);
+        return Find(world, Mods.AcceptedWorld, plugin, threads, groups);
     }
+
+    /// <summary>The step over the world's targets, none of them kept, decided before.</summary>
+    private static ChangedTerrainResult Find(
+        CollectedObjects world, AcceptedWorld accepted, IPluginRecords plugin, int threads, params ObjectsJudgedWith<ChangedTerrainSettings>[] groups) =>
+        ChangedTerrainObjects.Find(
+            new(world, TestSeededDecisions.StartUnprotected(world.Targets), accepted, LoadOrder, plugin, new BoxShapes(), new Execution(threads), groups)).Result;
 
     [Fact]
     public void GroupsWithDifferentSettingsRunOnceEachOverTheirOwnObjects()
@@ -369,8 +364,8 @@ public class ChangedTerrainObjectsTests
     [Fact]
     public void TheLastLoadingChangingModIsNamedOverEveryCellTheAreaCrosses()
     {
-        const int westCellEastEdge = 8 * TerrainHeights.VerticesPerSide + TerrainGrid.SquaresPerSide;
-        const int eastCellWestEdgeNeighbour = 8 * TerrainHeights.VerticesPerSide + 1;
+        const int westCellEastEdge = 8 * TerrainGrid.VerticesPerSide + TerrainGrid.SquaresPerSide;
+        const int eastCellWestEdgeNeighbour = 8 * TerrainGrid.VerticesPerSide + 1;
         var terrain = new Dictionary<ExteriorCell, TerrainVersion[]>
         {
             [Cell] = [Flat(Target), RaisedAt(Later, westCellEastEdge)],
@@ -495,7 +490,7 @@ public class ChangedTerrainObjectsTests
     [InlineData(10f, true)]
     public void TheDistanceCanBeAMultipleOfTheObjectsSize(float multiplier, bool removed)
     {
-        var aside = (int)(Spot.Y / TerrainGrid.VertexSpacing) * TerrainHeights.VerticesPerSide + 10;
+        var aside = (int)(Spot.Y / TerrainGrid.VertexSpacing) * TerrainGrid.VerticesPerSide + 10;
         var terrain = new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(Target), RaisedAt(Other, aside)] };
 
         var result = Find(terrain, Settings(bySize: true, multiplier: multiplier, byDistance: false));
@@ -511,7 +506,7 @@ public class ChangedTerrainObjectsTests
     [InlineData(10f, 11, false)]
     public void WithBothAreasOnAChangeInEitherAreaRemovesTheObject(float multiplier, int changedColumn, bool removed)
     {
-        var changed = 8 * TerrainHeights.VerticesPerSide + changedColumn;
+        var changed = 8 * TerrainGrid.VerticesPerSide + changedColumn;
         var terrain = new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(Target), RaisedAt(Other, changed)] };
 
         var result = Find(terrain, Settings(bySize: true, multiplier: multiplier, byDistance: true));
@@ -531,7 +526,7 @@ public class ChangedTerrainObjectsTests
 
         Assert.Equal([0, 2], result.Proposals.Select(proposal => proposal.Target.Index));
         Assert.Equal(
-            new PartFailure(ChangedTerrainParts.TerrainCheck, "InvalidDataException: broken base", new FailureSubject(targets[1].Key.ToString(), null, 1)),
+            new PartFailure(ChangedTerrainParts.TerrainCheck, "PlantedUserDataException: broken base", new FailureSubject(targets[1].Key.ToString(), null, 1)),
             Assert.Single(result.Failures));
     }
 
@@ -824,7 +819,7 @@ public class ChangedTerrainObjectsTests
     [InlineData(1, 0, false)]
     public void AVertexOnACellEdgeIsComparedInEachCellWhoseSquaresTheAreaOverlaps(int changedCellX, int changedColumn, bool removed)
     {
-        var changed = 8 * TerrainHeights.VerticesPerSide + changedColumn;
+        var changed = 8 * TerrainGrid.VerticesPerSide + changedColumn;
         var terrain = Enumerable.Range(0, 2).ToDictionary(
             cellX => new ExteriorCell(Worldspace, cellX, 0),
             cellX => new[] { Flat(Target), cellX == changedCellX ? RaisedAt(Other, changed) : Flat(Other) });
@@ -989,7 +984,7 @@ public class ChangedTerrainObjectsTests
     [InlineData(CoverChangesAtShare, true)]
     public void AWaterChangeRemovesTheObjectOnlyFromTheShareOfCoveredOrUncoveredVerticesOn(int covered, bool removed)
     {
-        var land = new TerrainVersion(Target, Heights(High, [.. WideSpotVertices.Take(covered).Select(vertex => (vertex.Row * TerrainHeights.VerticesPerSide + vertex.Column, Ground))]), Layers: null);
+        var land = new TerrainVersion(Target, Heights(High, [.. WideSpotVertices.Take(covered).Select(vertex => (vertex.Row * TerrainGrid.VerticesPerSide + vertex.Column, Ground))]), Layers: null);
 
         var result = FindWithWater([land], [Water(Target, BelowTheGround), Water(Other, AboveTheGround)], position: WideSpot);
 
@@ -1264,7 +1259,7 @@ public class ChangedTerrainObjectsTests
             baseKey == Marker ? new BaseShape(Box.Zero, null, InvisibleObjectKind.XMarkers) : new BaseShape(new Box(new Vector3(-10, -10, 0), new Vector3(10, 10, 20)), null, null);
 
         public ObjectVisibility VisibilityOf(BaseKey? baseKey, bool isPrimitive, bool hasMapMarker) =>
-            baseKey == Broken ? throw new InvalidDataException("broken base")
+            baseKey == Broken ? throw new PlantedUserDataException("broken base")
             : baseKey == Marker ? ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers)
             : ObjectVisibility.Visible;
 

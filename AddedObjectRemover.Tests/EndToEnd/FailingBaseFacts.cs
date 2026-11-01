@@ -1,3 +1,5 @@
+using AddedObjectRemover.Tests.Fixtures;
+
 namespace AddedObjectRemover.Tests.EndToEnd;
 
 /// <summary>
@@ -15,5 +17,5 @@ internal sealed class FailingBaseFacts(IBaseFacts inner) : IBaseFacts
     public void FailNextRead() => Interlocked.Exchange(ref _failNextRead, 1);
 
     public BaseFacts Of(BaseKey baseKey) =>
-        Armed || Interlocked.Exchange(ref _failNextRead, 0) == 1 ? throw new InvalidOperationException(FailureMessage) : inner.Of(baseKey);
+        Armed || Interlocked.Exchange(ref _failNextRead, 0) == 1 ? throw new PlantedUserDataException(FailureMessage) : inner.Of(baseKey);
 }

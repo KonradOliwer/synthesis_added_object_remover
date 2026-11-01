@@ -3,24 +3,64 @@ using System.Diagnostics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
 /// <summary>
-/// The also-remove step: seeded with the removals of the rounds the run names as its seed rounds, its rounds remove what
-/// goes with them, as the also-remove mode says, until a round removes nothing. It decides the rounds on its own copy
-/// of the decisions and proposes them as one proposal, which the runner applies to the run's decisions.
+/// The also-remove step: seeded with the removals of the rounds before it, its rounds remove what goes with them, as the
+/// also-remove mode says, until a round removes nothing. It decides the rounds on its own copy of the decisions, then adds
+/// them to the run's decisions.
 /// </summary>
 public static class RestingObjects
 {
+    /// <param name="Targets">Where they stood before any decision.</param>
+    /// <param name="Decisions">The decisions with the rounds of the steps before, whose removals the rounds follow up; the step's rounds are added to them.</param>
+    /// <param name="TimeSinceStart">The run's clock, which times the rounds alone.</param>
+    /// <param name="ReportFiles">Whether the report files are written, which decides whether their details are found.</param>
+    /// <param name="Caches">
+    /// Its base facts, shapes, triangles, surface samples and terrain are read; its objects of any plugin are asked only when the
+    /// support rounds have seeds: the first ask builds the supporters' bounds index.
+    /// </param>
+    public sealed record Input(
+        ImmutableArray<TargetObject> Targets,
+        IRunDecisions Decisions,
+        AlsoRemoveSettings Settings,
+        Execution Execution,
+        Func<TimeSpan> TimeSinceStart,
+        StepOutcome ReportFiles,
+        IRunCaches Caches);
+
+    /// <remarks>Seeded with the removals of every round so far, measuring the target objects where those rounds measure them.</remarks>
+    public static Decided<RestingObjectsResult> Find(Input input)
+    {
+        var (earlierRounds, caches) = (input.Decisions, input.Caches);
+        var result = Find(
+            new RestingObjectsInput(
+                earlierRounds.TargetsAsTheRoundsMeasureThem(input.Targets),
+                earlierRounds,
+                earlierRounds.Rounds,
+                input.Settings,
+                input.Execution,
+                input.TimeSinceStart,
+                input.ReportFiles),
+            caches.Bases,
+            caches.Shapes,
+            caches.Triangles,
+            caches.SurfaceSamples,
+            caches.Terrain,
+            caches.VisibleObjectsOfAnyPlugin);
+        return new Decided<RestingObjectsResult>(result, earlierRounds.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds));
+    }
+
     /// <summary>
     /// The rounds, then the touch chains when they are shown, then the report-file details when report files are
     /// written, each stopped on its own by an unexpected failure.
     /// </summary>
     /// <param name="objectsOfAnyPlugin">Asked only when the support rounds have seeds: the first ask builds the supporters' bounds index.</param>
-    public static RestingObjectsResult Find(
+    internal static RestingObjectsResult Find(
         RestingObjectsInput input,
         IBaseFacts bases,
         IBaseObjectShapes shapes,
@@ -76,13 +116,25 @@ public static class RestingObjects
         Execution execution) =>
         new RestingRule(targets, settings, shapes, triangles, surfaces, terrain, objectsOfAnyPlugin, drops, execution);
 
+    /// <summary>The also-remove rounds the step for other mods' objects decides on its own working copy (see <see cref="CreateRoundsAfter"/>).</summary>
+    /// <param name="objectsOfAnyPlugin">Asked each time the rounds are created.</param>
+    public static IAlsoRemoveRoundsAfter CreateAlsoRemoveRoundsAfter(
+        AlsoRemoveSettings settings,
+        IBaseObjectShapes shapes,
+        ITriangleMeshes triangles,
+        ISurfaceSamples surfaces,
+        ITerrainHeights terrain,
+        Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin,
+        Execution execution) =>
+        new AlsoRemoveRoundsAfter(settings, shapes, triangles, surfaces, terrain, objectsOfAnyPlugin, execution);
+
     /// <summary>
     /// The also-remove rounds that spread, as the mode says, from removals made in <paramref name="decided"/>, for another step to
     /// decide on its own working copy; asked only for a mode other than Nothing.
     /// </summary>
     /// <param name="decided">The decisions the seeds were removed in; the objects they kept never take part in the touch rounds.</param>
     /// <param name="targets">Where the rounds measure them.</param>
-    public static IRemovalRounds<RoundDetails> CreateRoundsAfter(
+    internal static IRemovalRounds<RoundDetails> CreateRoundsAfter(
         IRemovalDecisions decided,
         ImmutableArray<TargetObject> targets,
         IVisibleObjectsOfAnyPlugin objectsOfAnyPlugin,

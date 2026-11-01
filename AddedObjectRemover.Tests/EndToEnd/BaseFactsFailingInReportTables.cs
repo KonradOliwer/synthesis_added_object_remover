@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using AddedObjectRemover.Tests.Fixtures;
 
 namespace AddedObjectRemover.Tests.EndToEnd;
 
@@ -10,7 +11,7 @@ internal sealed class BaseFactsFailingInReportTables(IBaseFacts inner) : IBaseFa
     private const string TableBuilderTypeName = "AddedObjectRemover.Steps.BuildLogAndReports.Tables";
 
     public BaseFacts Of(BaseKey baseKey) =>
-        IsBuildingReportTables() ? throw new InvalidOperationException(FailureMessage) : inner.Of(baseKey);
+        IsBuildingReportTables() ? throw new PlantedUserDataException(FailureMessage) : inner.Of(baseKey);
 
     private static bool IsBuildingReportTables() =>
         new StackTrace().GetFrames().Any(frame => frame.GetMethod()?.DeclaringType?.FullName?.StartsWith(TableBuilderTypeName, StringComparison.Ordinal) == true);

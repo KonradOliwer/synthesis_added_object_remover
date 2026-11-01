@@ -13,13 +13,16 @@ public static class RemovalCauseSelector
 {
     private static readonly ObjectMeasurement Invisible = new(IsVisible: false, Center: default);
 
-    /// <param name="otherModObjects">The objects added by other mods.</param>
-    public static SelectedObjects Select(
-        CollectedObjects world, IOtherModObjectsBySpace otherModObjects, IBaseObjectShapes shapes, SelectionSettings settings, Execution execution)
+    /// <param name="OtherModObjects">The objects added by other mods.</param>
+    public sealed record Input(
+        CollectedObjects World, IOtherModObjectsBySpace OtherModObjects, IBaseObjectShapes Shapes, SelectionSettings Settings, Execution Execution);
+
+    public static SelectedObjects Select(Input input)
     {
+        var (world, otherModObjects) = (input.World, input.OtherModObjects);
         var replacements = ReplacementMatcher.Find(
-            world.Targets, new OtherModObjectPositions(otherModObjects), world.OtherModObjects.Length, shapes, world.Order, execution);
-        return new SelectedObjects(replacements, ViewsOf(otherModObjects, replacements), settings.Npcs);
+            world.Targets, new OtherModObjectPositions(otherModObjects), world.OtherModObjects.Length, input.Shapes, world.Order, input.Execution);
+        return new SelectedObjects(replacements, ViewsOf(otherModObjects, replacements), input.Settings.Npcs);
     }
 
     /// <summary>

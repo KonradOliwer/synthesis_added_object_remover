@@ -8,8 +8,8 @@ namespace AddedObjectRemover.Tests.LoadOrder;
 
 public class TerrainHeightTests
 {
-    private const int VerticesPerSide = 33;
-    private const float VertexSpacing = 128f;
+    private const int VerticesPerSide = TerrainGrid.VerticesPerSide;
+    private const float VertexSpacing = TerrainGrid.VertexSpacing;
     private const float Offset = 10f;
 
     private static readonly RecordKey Worldspace = TestTargets.SpaceKey(0x200);

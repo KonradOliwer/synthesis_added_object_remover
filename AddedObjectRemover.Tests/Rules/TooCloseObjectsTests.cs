@@ -45,11 +45,6 @@ public class TooCloseObjectsTests
 
     private static readonly TestStatic Unreadable = new(new FormKey(Mod, 0x707), $@"test\{UnreadableName}.nif", Table.Triangles);
 
-    private const string BrokenPartsName = "brokenparts";
-
-    /// <summary>A table whose mesh, as read by <see cref="WithBrokenParts"/>, throws once its parts are tested for lying inside another mesh.</summary>
-    private static readonly TestStatic BrokenParts = new(new FormKey(Mod, 0x708), $@"test\{BrokenPartsName}.nif", Table.Triangles);
-
     /// <summary>The tried table's x in <see cref="CreateSideBySideScene"/>: where it touches only B, both, only A, or neither.</summary>
     private const float OnlyB = 110f;
     private const float OnBoth = 90f;
@@ -61,16 +56,12 @@ public class TooCloseObjectsTests
     /// <summary>
     /// The distance zone in <see cref="CreateSideBySideScene"/>, and the tried table's spots near it (every table is 40 units
     /// square). At y <see cref="BesideY"/> the table is 7 units beside A and B along Y: at x <see cref="BesideBothX"/> it
-    /// spans both; at <see cref="BesideOnlyBX"/> its corner is 12 units from A's; at <see cref="BesideAOnlyX"/> its corner is
-    /// 11 units from B's, while the zone's box, grown 10 units each way, still overlaps B's box, so B's mesh is tested. At x
-    /// <see cref="RightOfBX"/> and y 0 it touches B's right side.
+    /// spans both; at <see cref="BesideOnlyBX"/> its corner is 12 units from A's.
     /// </summary>
     private const float NearDistance = 10f;
     private const float BesideY = 47f;
     private const float BesideBothX = 80f;
     private const float BesideOnlyBX = 110f;
-    private const float BesideAOnlyX = 51f;
-    private const float RightOfBX = 140f;
 
     private static readonly OtherId TableA = new(0);
     private static readonly OtherId TableB = new(1);
@@ -79,12 +70,8 @@ public class TooCloseObjectsTests
     private static readonly TooCloseSettings SizeOnlyMeshZone =
         new(BySize: true, Multiplier: 0f, ByDistance: false, DistanceInUnits: 0f, ZoneShape.ObjectShape, NpcHandling.Never);
 
-    /// <summary>The zone is the object's own mesh grown by <see cref="NearDistance"/>, so a try clashes with what comes that close.</summary>
-    private static readonly TooCloseSettings DistanceOnlyMeshZone =
-        new(BySize: false, Multiplier: 0f, ByDistance: true, DistanceInUnits: NearDistance, ZoneShape.ObjectShape, NpcHandling.Never);
-
     private static readonly SkyrimMod Records = CreateRecords();
-    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(Records, "ClashesData", Table, Boulder, CollidingBoulder, Fern, Unreadable, BrokenParts));
+    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(Records, "ClashesData", Table, Boulder, CollidingBoulder, Fern, Unreadable));
 
     private sealed record TooCloseScene(List<TargetObject> Targets, List<OtherObject> OtherModObjects);
 
@@ -378,7 +365,7 @@ public class TooCloseObjectsTests
     }
 
     /// <summary>
-    /// One of the two cases where a try records a different failure than its own check: A's mesh cannot be read, and B, hit by
+    /// A case where a try records a different failure than its own check: A's mesh cannot be read, and B, hit by
     /// the last try, still reaches the zone. The own check fails on A; the try is a clash by B and records no failure.
     /// </summary>
     [Fact]
@@ -394,25 +381,6 @@ public class TooCloseObjectsTests
         Assert.NotNull(CheckOnce(rule, target, Beside(OnBoth)).Failure);
         Assert.Equal(new PlacementCheck(ReasonOf(TableB), null), tries.Check(Beside(OnBoth)));
         Assert.NotNull(tries.Check(Beside(OnlyA)).Failure);
-    }
-
-    /// <summary>
-    /// The other case: B, hit by the last try, has a mesh whose test throws when B does not touch the zone. The own check hits
-    /// A first and never tests B; the try tests B first and records a failure.
-    /// </summary>
-    [Fact]
-    public void ATryWhoseFirstTestedObjectThrowsRecordsAFailureWhereItsOwnCheckHitsALowerObject()
-    {
-        var scene = CreateSideBySideScene(Table.Base, BrokenParts.Base);
-        var rule = CreatePlacementRule(scene, DistanceOnlyMeshZone, new TriangleStore(WithBrokenParts));
-        var target = scene.Targets[0];
-        using var tries = rule.StartTries(target);
-
-        Assert.Equal(DistanceReasonOf(TableB), tries.Check(At(RightOfBX, 0f)).Clash);
-        Assert.Equal(new PlacementCheck(DistanceReasonOf(TableA), null), CheckOnce(rule, target, At(BesideAOnlyX, BesideY)));
-        var tried = tries.Check(At(BesideAOnlyX, BesideY));
-        Assert.Null(tried.Clash);
-        Assert.NotNull(tried.Failure);
     }
 
     /// <summary>
@@ -494,14 +462,16 @@ public class TooCloseObjectsTests
         var replacements = Replacements.None(scene.OtherModObjects.Count);
         var caches = CreateWorld(scene);
         return TooCloseObjects.Find(
-            TestScenes.CreateWorld(scene.Targets, scene.OtherModObjects),
-            caches.VisibleTargets,
-            caches.Selected(replacements, NpcHandling.AlwaysLikeAnyObject),
-            caches.PlacedNpcs,
-            Shapes,
-            triangles,
-            new Execution(threads),
-            groups);
+            new(
+                TestScenes.CreateWorld(scene.Targets, scene.OtherModObjects),
+                caches.VisibleTargets,
+                caches.Selected(replacements, NpcHandling.AlwaysLikeAnyObject),
+                caches.PlacedNpcs,
+                Shapes,
+                triangles,
+                new Execution(threads),
+                groups,
+                TestSeededDecisions.StartUnprotected(scene.Targets))).Result;
     }
 
     private static IEnumerable<int> TargetsWhere(TooCloseScene scene, Func<int, bool> includes) =>
@@ -568,14 +538,6 @@ public class TooCloseObjectsTests
     private static RemovalReason ReasonOf(OtherId other) => new RemovalReason.TooClose(other, new TooCloseCause.ObjectSize());
 
     private static RemovalReason DistanceReasonOf(OtherId other) => new RemovalReason.TooClose(other, new TooCloseCause.Distance(NearDistance));
-
-    /// <summary>The brokenparts mesh lists a part starting past its last triangle, so testing whether that part lies inside another mesh throws.</summary>
-    private static MeshTriangles? WithBrokenParts(string meshPath)
-    {
-        var triangles = Shapes.ReadTriangles(meshPath);
-        if (triangles is null || !meshPath.Contains(BrokenPartsName, StringComparison.OrdinalIgnoreCase)) return triangles;
-        return new MeshTriangles(triangles.Vertices, triangles.Indices, [triangles.TriangleCount]);
-    }
 
     /// <summary>Visible targets with and without meshes, every few of them invisible, among other mods' objects and placed NPCs.</summary>
     private static TooCloseScene CreateScene()

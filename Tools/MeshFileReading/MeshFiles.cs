@@ -90,7 +90,7 @@ internal sealed class MeshFiles(
         {
             unexpectedErrors.Add(new PartFailure(MeshReadingParts.MeshShapes, Failures.DescribeFailure(ex), MeshSubject(meshPath)));
             return new MeshBounds(
-                null, MeshReadStatus.Failed, MeshSource.NotFound, HasFooterRoot: false, MeshReadError.UnexpectedException, FailureExceptionType: null, CollisionLayers: null);
+                null, MeshReadStatus.Failed, MeshSource.Unknown, HasFooterRoot: false, MeshReadError.UnexpectedException, FailureExceptionType: null, CollisionLayers: null);
         }
     }
 

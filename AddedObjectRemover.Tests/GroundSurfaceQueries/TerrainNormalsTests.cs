@@ -5,7 +5,7 @@ namespace AddedObjectRemover.Tests.GroundSurfaceQueries;
 /// <summary>Terrain normals point up on flat ground and lean away from the rising side of a slope.</summary>
 public class TerrainNormalsTests
 {
-    private const int Side = TerrainHeights.VerticesPerSide;
+    private const int Side = TerrainGrid.VerticesPerSide;
     private const float Spacing = TerrainGrid.VertexSpacing;
     private const float Precision = 1e-5f;
 

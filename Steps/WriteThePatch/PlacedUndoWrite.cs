@@ -18,6 +18,6 @@ internal static class PlacedUndoWrite
         else if (earlier.GoesBackToEarlierCell(cellNow, persistentNow))
             yield return new PlaceInCell(key, earlier.Cell.Key, InPersistentList: false);
 
-        yield return new UndoPlacedParts(key, earlier.Undo);
+        yield return new CopyEarlierPlacedParts(key, earlier.Undo);
     }
 }

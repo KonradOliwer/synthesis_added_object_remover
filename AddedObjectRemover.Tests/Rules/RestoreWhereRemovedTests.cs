@@ -273,7 +273,7 @@ public sealed class RestoreWhereRemovedTests
     {
         ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0), BigBlock), Own(1, new Vector3(-100, 0, 0))];
         var shrunk = DecisionsRemoving(targets, 1).ApplyFits([new ProposedFit(targets[0].Id, TooClose(0).Reason, targets[0].Placement with { Scale = 0.5f })]);
-        var asTheRoundsMeasureThem = ClashingObjectFitter.IndexAsTheRoundsMeasureThem(targets, shrunk, TestScenes.Create(targets, [], Shapes));
+        var asTheRoundsMeasureThem = TestScenes.Create(targets, [], Shapes).IndexVisibleTargetsAsTheRoundsMeasureThem(targets, shrunk);
 
         var judged = Assert.Single(Plan(targets, shrunk, [ChangedRock(0x900, Vector3.Zero)], visibleTargets: asTheRoundsMeasureThem).Objects);
 

@@ -17,7 +17,7 @@ internal static class OtherRecordChange
     private const int PatchOnlyRank = -1;
 
     /// <summary>The object properties, each as "the two versions differ": position, rotation, scale, base and presence.</summary>
-    private static readonly Func<PlacedVersionFact, PlacedVersionFact, bool>[] ObjectProperties =
+    private static readonly ImmutableArray<Func<PlacedVersionFact, PlacedVersionFact, bool>> ObjectProperties =
     [
         static (first, second) => DiffersBeyond(
             first.Placement.Position, second.Placement.Position, static (one, other) => Vector3.Abs(one - other), Tolerances.Position),

@@ -45,6 +45,7 @@ public sealed class PlacedObjectCollector
     private readonly WhatToCollect _plan;
     private readonly PlacedRecordFacts _facts;
     private readonly TargetAreaNames _areaNames;
+    private readonly AreaRecordChanges _areaRecordChanges;
 
     private readonly List<TargetObject> _targets = [];
     private readonly List<OtherObject> _otherModObjects = [];
@@ -69,6 +70,8 @@ public sealed class PlacedObjectCollector
         _plan = plan;
         _facts = facts;
         _areaNames = TargetAreaNames.Of(facts.CellAreas);
+        _areaRecordChanges = new AreaRecordChanges(
+            trust.Patch, facts.Records.Where(record => record.PartDifferences is not null).ToDictionary(record => record.Key, record => record.PartDifferences!));
     }
 
     /// <summary>The first part of the step: reads the placed records and sorts them into objects; <see cref="ReadNonPlacedLinks"/> finishes it.</summary>
@@ -160,7 +163,7 @@ public sealed class PlacedObjectCollector
     /// </returns>
     private RecordChangedByCleanedMod? CreateChangedRecord(PlacedRecordFact record)
     {
-        if (record.CleanedModChanges is null) return null;
+        if (record.PartDifferences is null) return null;
         var earlier = record.Versions[ChangedObjectKind.CleanedModIndexOf(record, _trust.CleanedMod) - 1];
         if (earlier.SpaceKey != record.Space.Key || earlier.Placement is not { Position: not null, EulerRotation: not null, Presence.Deleted: false }) return null;
 
@@ -180,7 +183,7 @@ public sealed class PlacedObjectCollector
             Target: null,
             LinkedFromCleanedMod: false,
             RemovedForm.PresenceOf(earlier.Placement.Presence, isWinningTarget: false),
-            _facts.OverriddenDoorLinks.GetValueOrDefault(record.Key),
+            _facts.OverriddenDoorLinks.TryGetValue(record.Key, out var door) ? _areaRecordChanges.DoorOf(door) : null,
             IsInDeletedCell(record, earlier));
     }
 
@@ -333,8 +336,9 @@ public sealed class PlacedObjectCollector
     /// <remarks>A record that a version above the cleaned mod's removes was taken out after it, so none of its parts goes back.</remarks>
     private EarlierVersion CreateEarlierVersion(PlacedRecordFact record, PlacedVersionFact earlier)
     {
-        var changes = record.CleanedModChanges
-            ?? throw new UnreachableException($"The reader judged no parts of the record {record.Key}, which the cleaned mod overrides.");
+        var differences = record.PartDifferences
+            ?? throw new UnreachableException($"The reader compared no parts of the record {record.Key}, which the cleaned mod overrides.");
+        var changes = PlacedPartChanges.Of(differences, _trust.Patch);
         var removedLater = record.Versions
             .Skip(ChangedObjectKind.CleanedModIndexOf(record, _trust.CleanedMod) + 1)
             .Any(version => RemovedForm.IsRemoved(version.Placement.Presence));
@@ -496,53 +500,16 @@ public sealed class PlacedObjectCollector
         return InKeyOrder(_changedRecords, changed => changed.Key, changed => targetIds.TryGetValue(changed.Key, out var id) ? changed with { Target = id } : changed);
     }
 
-    private ImmutableArray<CellChangedByCleanedMod> ChangedCellsInKeyOrder() => InKeyOrder(_facts.ChangedCells, cell => cell.Key, ToChangedCell);
+    private ImmutableArray<CellChangedByCleanedMod> ChangedCellsInKeyOrder() => InKeyOrder(_facts.ChangedCells, cell => cell.Key, _areaRecordChanges.CellOf);
 
-    private ImmutableArray<LandChangedByCleanedMod> ChangedLandsInKeyOrder() => InKeyOrder(_facts.ChangedLands, land => land.Key, ToChangedLand);
+    private ImmutableArray<LandChangedByCleanedMod> ChangedLandsInKeyOrder() => InKeyOrder(_facts.ChangedLands, land => land.Key, _areaRecordChanges.LandOf);
 
-    private ImmutableArray<NavmeshChangedByCleanedMod> ChangedNavmeshesInKeyOrder() => InKeyOrder(_facts.ChangedNavmeshes, navmesh => navmesh.Key, ToChangedNavmesh);
+    private ImmutableArray<NavmeshChangedByCleanedMod> ChangedNavmeshesInKeyOrder() => InKeyOrder(_facts.ChangedNavmeshes, navmesh => navmesh.Key, _areaRecordChanges.NavmeshOf);
 
-    private static ImmutableArray<TChanged> InKeyOrder<TFact, TChanged>(IEnumerable<TFact> facts, Func<TFact, RecordKey> keyOf, Func<TFact, TChanged> toChanged) =>
-        [.. facts.OrderBy(keyOf, RecordKeyOrder.Comparer).Select(toChanged)];
-
-    private static CellChangedByCleanedMod ToChangedCell(CellRecordFact cell) =>
-        new(cell.Key, cell.SpaceKey, cell.Grid, cell.Parts, LinkedFromCleanedMod: false, cell.WinningMod, cell.EarlierWater, cell.CurrentWater, cell.DefaultWaterLevel);
-
-    private static LandChangedByCleanedMod ToChangedLand(LandRecordFact land)
-    {
-        var changes = land.Changes;
-        return new(
-            land.Cell,
-            land.Key,
-            changes.UndoPoints,
-            changes.UndoColours,
-            changes.UndoQuarters,
-            changes.UndoRest,
-            changes.LeftToLater,
-            land.WinningMod,
-            land.Heights,
-            land.CellDeletedInAVersion);
-    }
-
-    private static NavmeshChangedByCleanedMod ToChangedNavmesh(NavmeshRecordFact navmesh) => new(
-        navmesh.Key,
-        navmesh.SpaceKey,
-        navmesh.Cell,
-        navmesh.WinningMod,
-        navmesh.Case,
-        navmesh.Geometry,
-        navmesh.Presence,
-        navmesh.MapEntry,
-        navmesh.Earlier,
-        navmesh.Current,
-        navmesh.ReplacedBy,
-        navmesh.Neighbours,
-        navmesh.Doors,
-        navmesh.NamedInPreferredPaths,
-        navmesh.WinningMapMod,
-        navmesh.CellDeletedInAVersion,
-        navmesh.LaterWinner,
-        navmesh.WinningMapEntry);
+    /// <param name="toChanged">Null for a record with no change to list.</param>
+    private static ImmutableArray<TChanged> InKeyOrder<TFact, TChanged>(IEnumerable<TFact> facts, Func<TFact, RecordKey> keyOf, Func<TFact, TChanged?> toChanged)
+        where TChanged : class =>
+        [.. facts.OrderBy(keyOf, RecordKeyOrder.Comparer).Select(toChanged).OfType<TChanged>()];
 
     private static ImmutableArray<OtherObject> NumberInKeyOrder(IEnumerable<OtherObject> others, int firstId) =>
         DenseNumbering.InOrder(

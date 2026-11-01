@@ -1,3 +1,5 @@
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
+
 namespace AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 
 /// <param name="Sizes">Per placed NPC of the spaces holding a visible target, how its size was found.</param>

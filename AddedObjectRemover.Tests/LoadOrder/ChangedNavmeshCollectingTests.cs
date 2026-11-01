@@ -296,9 +296,9 @@ public sealed class ChangedNavmeshCollectingTests
         var link = new NavDoorLinkFact(NavmeshKey, DoorTriangle);
         Assert.Equal(
             [
-                new DoorLinkFact(_door.FormKey.ToRecordKey(), new PartOutcome.Unchanged(), link, link, InDeletedCell: false),
-                new DoorLinkFact(_doorOnlyInTheEntry.ToRecordKey(), new PartOutcome.Unchanged(), null, null, InDeletedCell: false),
-                new DoorLinkFact(doorLinkedOneWay.FormKey.ToRecordKey(), new PartOutcome.Unchanged(), link, link, InDeletedCell: false),
+                new DoorLinkChange(_door.FormKey.ToRecordKey(), new PartOutcome.Unchanged(), link, link, InDeletedCell: false),
+                new DoorLinkChange(_doorOnlyInTheEntry.ToRecordKey(), new PartOutcome.Unchanged(), null, null, InDeletedCell: false),
+                new DoorLinkChange(doorLinkedOneWay.FormKey.ToRecordKey(), new PartOutcome.Unchanged(), link, link, InDeletedCell: false),
             ],
             doors.OrderBy(door => door.Door.Id));
     }
@@ -314,7 +314,7 @@ public sealed class ChangedNavmeshCollectingTests
         var doorLink = Assert.Single(ChangedNavmeshOf(Collect()).Doors, fact => fact.Door == _door.FormKey.ToRecordKey());
 
         Assert.Equal(
-            new DoorLinkFact(_door.FormKey.ToRecordKey(), new PartOutcome.Undo(), new NavDoorLinkFact(NavmeshKey, DoorTriangle), new NavDoorLinkFact(NavmeshKey, 0), InDeletedCell: false),
+            new DoorLinkChange(_door.FormKey.ToRecordKey(), new PartOutcome.Undo(), new NavDoorLinkFact(NavmeshKey, DoorTriangle), new NavDoorLinkFact(NavmeshKey, 0), InDeletedCell: false),
             doorLink);
     }
 
@@ -356,7 +356,7 @@ public sealed class ChangedNavmeshCollectingTests
 
         Assert.Empty(collected.ChangedNavmeshes);
         var changed = Assert.Single(collected.ChangedRecords, record => record.Key == _door.FormKey.ToRecordKey());
-        Assert.Equal(new DoorLinkFact(changed.Key, new PartOutcome.Undo(), new NavDoorLinkFact(NavmeshKey, DoorTriangle), Current: null, cellDeletedLater), changed.DoorLink);
+        Assert.Equal(new DoorLinkChange(changed.Key, new PartOutcome.Undo(), new NavDoorLinkFact(NavmeshKey, DoorTriangle), Current: null, cellDeletedLater), changed.DoorLink);
         Assert.Equal(cellDeletedLater, changed.InDeletedCell);
     }
 

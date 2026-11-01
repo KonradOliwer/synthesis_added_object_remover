@@ -37,7 +37,7 @@ public sealed record NavmeshChangedByCleanedMod(
     NavmeshShape Current,
     ImmutableArray<RecordKey> ReplacedBy,
     ImmutableArray<NeighbourNavmesh> Neighbours,
-    ImmutableArray<DoorLinkFact> Doors,
+    ImmutableArray<DoorLinkChange> Doors,
     bool NamedInPreferredPaths,
     PluginName? WinningMapMod,
     bool CellDeletedInAVersion,
@@ -50,3 +50,10 @@ public sealed record NavmeshChangedByCleanedMod(
     /// <summary>The cleaned mod changed its triangles or whether it is there; a navmesh whose only change is its map entry keeps its earlier triangles.</summary>
     public bool ChangesTriangles => Geometry is not PartOutcome.Unchanged || Presence is not PartOutcome.Unchanged;
 }
+
+/// <summary>A door whose navmesh link names a navmesh, or that a navmesh's door triangles or map entry name, in any version read.</summary>
+/// <param name="NavDoorLink">What the cleaned mod last changed in the door's navmesh link; <see cref="PartOutcome.Unchanged"/> when it does not override the door.</param>
+/// <param name="Earlier">The link of the door's version just below the cleaned mod's; null when it has none or that version has no link.</param>
+/// <param name="Current">The link of the door's winning version; null when it has none.</param>
+/// <param name="InDeletedCell">A version read deletes the cell whose child list holds the door's winning version.</param>
+public sealed record DoorLinkChange(RecordKey Door, PartOutcome NavDoorLink, NavDoorLinkFact? Earlier, NavDoorLinkFact? Current, bool InDeletedCell);

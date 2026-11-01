@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
-using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 

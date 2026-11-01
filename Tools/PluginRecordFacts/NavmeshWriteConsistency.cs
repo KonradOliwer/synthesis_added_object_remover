@@ -13,12 +13,12 @@ public static class NavmeshWriteConsistency
     public static NavmeshFault? FirstFault(IReadOnlyList<WriteOrder> orders, IReadOnlySet<RecordKey> doorsLeftRemoved, Func<INavmeshWorldView> readWorld)
     {
         var navmeshes = WrittenNavmeshes(orders).ToHashSet();
-        var doors = orders.OfType<UndoPlacedParts>().Where(undo => undo.Parts.HasFlag(PlacedParts.NavDoorLink)).Select(undo => undo.Record).ToList();
+        var doors = orders.OfType<CopyEarlierPlacedParts>().Where(copy => copy.Parts.HasFlag(PlacedParts.NavDoorLink)).Select(copy => copy.Record).ToList();
         if (navmeshes.Count == 0 && doors.Count == 0) return null;
 
         var world = readWorld();
         navmeshes.UnionWith(doors.Select(door => world.DoorOf(door)?.Link).OfType<NavDoorLinkFact>().Select(link => link.Navmesh));
-        var broughtBack = orders.Where(order => order is CopyNavmeshGeometry or BringBackNavmesh).Select(order => order.Record).ToHashSet();
+        var broughtBack = orders.Where(order => order is CopyEarlierNavmeshGeometry or CopyEarlierNavmesh).Select(order => order.Record).ToHashSet();
         var doorsThatDoNotStand = orders.OfType<SetInitiallyDisabled>().Select(order => order.Record).Concat(doorsLeftRemoved).ToHashSet();
         return NavmeshConsistency.FirstFault(world, navmeshes, broughtBack, doorsThatDoNotStand);
     }
@@ -26,7 +26,7 @@ public static class NavmeshWriteConsistency
     private static IEnumerable<RecordKey> WrittenNavmeshes(IReadOnlyList<WriteOrder> orders) =>
         orders.SelectMany(order => order switch
         {
-            CopyNavmeshGeometry or BringBackNavmesh or SinkNavmesh => [order.Record],
+            CopyEarlierNavmeshGeometry or CopyEarlierNavmesh or SetNavmeshZ => [order.Record],
             WriteNavmeshMapEntries entries => entries.Entries.Select(entry => entry.Navmesh),
             _ => [],
         });

@@ -21,49 +21,49 @@ public sealed record SetPlacement(RecordKey Record, Vector3 Position, Vector3 Ro
 public sealed record PlaceInCell(RecordKey Record, RecordKey Cell, bool InPersistentList) : WriteOrder(Record);
 
 /// <summary>
-/// Gives each of the parts the value of the version just below the target plugin's; every other part keeps the value the game
-/// shows now. A deleted record whose presence goes back becomes a whole copy of that version.
+/// Gives each of the parts the value of the record's earlier version, the one just below the plugin the records were read around;
+/// every other part keeps the value the game shows now. A deleted record whose presence is copied becomes a whole copy of that version.
 /// </summary>
-public sealed record UndoPlacedParts(RecordKey Record, PlacedParts Parts) : WriteOrder(Record);
+public sealed record CopyEarlierPlacedParts(RecordKey Record, PlacedParts Parts) : WriteOrder(Record);
 
 /// <summary>Removes the door's navmesh link (XNDP).</summary>
 public sealed record ClearNavDoorLink(RecordKey Record) : WriteOrder(Record);
 
 /// <summary>
-/// Gives each of the parts of a cell record the value of the version just below the target plugin's; every other part keeps the
-/// value the game shows now.
+/// Gives each of the parts of a cell record the value of the record's earlier version (<see cref="CopyEarlierPlacedParts"/>); every
+/// other part keeps the value the game shows now.
 /// </summary>
-public sealed record UndoCellParts(RecordKey Record, ImmutableArray<CellPartName> Parts) : WriteOrder(Record);
+public sealed record CopyEarlierCellParts(RecordKey Record, ImmutableArray<CellPartName> Parts) : WriteOrder(Record);
 
 /// <summary>
-/// Gives the listed parts of a LAND record the values of the version just below the target plugin's: the vertex colours of the
-/// points, the texture layers of the quarters and, with <paramref name="Rest"/>, the rest of the record. It comes before the
-/// record's <see cref="SetLandHeights"/>, so the heights are written into the grids the rest brings back.
+/// Gives the listed parts of a LAND record the values of the record's earlier version (<see cref="CopyEarlierPlacedParts"/>): the
+/// vertex colours of the points, the texture layers of the quarters and, with <paramref name="Rest"/>, the rest of the record. It
+/// comes before the record's <see cref="SetLandHeights"/>, so the heights are written into the grids the rest brings back.
 /// </summary>
-public sealed record UndoLandParts(RecordKey Record, PointSet Colours, QuarterSet Quarters, bool Rest) : WriteOrder(Record);
+public sealed record CopyEarlierLandParts(RecordKey Record, PointSet Colours, QuarterSet Quarters, bool Rest) : WriteOrder(Record);
 
 /// <summary>
 /// Sets the height of every grid point of a LAND record, and the normal of each restored one: a restored point whose own height and
-/// those of its neighbours in the cell all equal the version just below the target plugin's takes that version's normal; one whose
-/// all equal the winner's keeps the winner's; every other restored point gets the normal of the new heights. Every point not restored
-/// keeps the winner's normal, or gets the normal of the new heights when the winner holds none.
+/// those of its neighbours in the cell all equal the record's earlier version takes that version's normal; one whose all equal the
+/// winner's keeps the winner's; every other restored point gets the normal of the new heights. Every point not restored keeps the
+/// winner's normal, or gets the normal of the new heights when the winner holds none.
 /// </summary>
 /// <param name="Heights">In game units, row by row from the bottom, x fastest; they must be storable (<see cref="LandHeightEncoder"/>).</param>
 /// <param name="Restored">The points whose height and normal go back.</param>
 /// <param name="Beyond">The final heights just outside the cell, for the normals at its edges.</param>
 public sealed record SetLandHeights(RecordKey Record, float[] Heights, PointSet Restored, CellEdgeHeights Beyond) : WriteOrder(Record);
 
-/// <summary>The navmesh takes the geometry of its version just below the target plugin's; its deleted state and its parent stay.</summary>
-public sealed record CopyNavmeshGeometry(RecordKey Record) : WriteOrder(Record);
+/// <summary>The navmesh takes the geometry of its earlier version (<see cref="CopyEarlierPlacedParts"/>); its deleted state and its parent stay.</summary>
+public sealed record CopyEarlierNavmeshGeometry(RecordKey Record) : WriteOrder(Record);
 
-/// <summary>The navmesh's version just below the target plugin's comes back whole and not deleted, in the cell that holds that version.</summary>
-public sealed record BringBackNavmesh(RecordKey Record) : WriteOrder(Record);
+/// <summary>The navmesh's earlier version (<see cref="CopyEarlierPlacedParts"/>) is copied whole and not deleted, into the cell that holds that version.</summary>
+public sealed record CopyEarlierNavmesh(RecordKey Record) : WriteOrder(Record);
 
 /// <summary>
-/// Lowers every vertex of the navmesh to <paramref name="Z"/> and cuts it off: no edge link, door, cover or preferred triangle stays.
-/// X and Y, the triangles in their order, the inner edges and the grid stay; it is not deleted.
+/// Sets every vertex of the navmesh to the height <paramref name="Z"/> and cuts it off: no edge link, door, cover or preferred
+/// triangle stays. X and Y, the triangles in their order, the inner edges and the grid stay; it is not deleted.
 /// </summary>
-public sealed record SinkNavmesh(RecordKey Record, float Z) : WriteOrder(Record);
+public sealed record SetNavmeshZ(RecordKey Record, float Z) : WriteOrder(Record);
 
 /// <summary>
 /// The patch's navmesh info map holds the given entries besides those it already holds, in navmesh key order, with the winning
@@ -72,10 +72,10 @@ public sealed record SinkNavmesh(RecordKey Record, float Z) : WriteOrder(Record)
 public sealed record WriteNavmeshMapEntries(RecordKey Record, ImmutableArray<NavmeshEntryOrder> Entries) : WriteOrder(Record);
 
 /// <param name="From">The plugin whose navmesh info map carries the entry copied.</param>
-/// <param name="SinkTo">
-/// Null for an entry copied as it is; otherwise the depth its point and island are lowered to, and its merges and doors are emptied.
+/// <param name="SetZ">
+/// Null for an entry copied as it is; otherwise the height its point and island are set to, and its merges and doors are emptied.
 /// </param>
-public sealed record NavmeshEntryOrder(RecordKey Navmesh, PluginName From, float? SinkTo);
+public sealed record NavmeshEntryOrder(RecordKey Navmesh, PluginName From, float? SetZ);
 
 /// <param name="Opposite">The record's enable state is the opposite of the parent's.</param>
 public sealed record SetEnableParent(RecordKey Record, RecordKey Parent, bool Opposite) : WriteOrder(Record);

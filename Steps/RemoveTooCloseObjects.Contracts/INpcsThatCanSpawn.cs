@@ -1,3 +1,4 @@
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;

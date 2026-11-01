@@ -13,18 +13,18 @@ public class SupportDecisionTests
     [InlineData(0.999995f, 1f, true)]
     [InlineData(0f, 0.01f, false)]
     public void RemovedWhenRemovedShareReachesThreshold(float removedShare, float threshold, bool expected) =>
-        Assert.Equal(expected, SupportRule.ReachesThreshold(removedShare, threshold));
+        Assert.Equal(expected, SupportContactWeights.ReachesThreshold(removedShare, threshold));
 
     [Fact]
     public void PointTouchingSeveralSupportersSplitsItsWeight()
     {
         var first = Supporter.Target(3);
         var second = Supporter.Placed(new OtherId(0));
-        var contacts = SupportContactFinder.SplitWeightsAmongSupporters(
+        var contacts = SupportContactWeights.SplitWeightsAmongSupporters(
             [
-                new SupportContactFinder.SupporterHits(first, [true, true, false]),
-                new SupportContactFinder.SupporterHits(second, [false, true, false]),
-                new SupportContactFinder.SupporterHits(Supporter.Terrain, [false, false, false]),
+                new SupporterHits(first, [true, true, false]),
+                new SupporterHits(second, [false, true, false]),
+                new SupporterHits(Supporter.Terrain, [false, false, false]),
             ],
             [1f, 2f, 4f]);
 
@@ -37,7 +37,7 @@ public class SupportDecisionTests
     public void ContactPointsWithoutWeightKeepNoSupportersAndAreDescribed()
     {
         var first = Supporter.Target(3);
-        SupportContactFinder.SupporterHits[] hits =
+        SupporterHits[] hits =
         [
             new(first, [true, true, false]),
             new(Supporter.Terrain, [false, true, false]),
@@ -45,7 +45,7 @@ public class SupportDecisionTests
         float[] weights = [float.NaN, 0f, 2f];
         var samples = new WeightedSurfaceSamples([Vector3.Zero, Vector3.Zero, Vector3.Zero], weights, new Box(Vector3.Zero, new Vector3(3, 4, 0)), Falloff: 0.75f);
 
-        var contacts = SupportContactFinder.SplitWeightsAmongSupporters(hits, weights);
+        var contacts = SupportContactWeights.SplitWeightsAmongSupporters(hits, weights);
         var diagnostic = ZeroWeightDiagnosis.Of(7, "m.nif", samples, hits, contacts);
 
         Assert.Equal(2, contacts.ContactPoints);
@@ -81,11 +81,11 @@ public class SupportDecisionTests
     [Fact]
     public void ContactsWithWeightAreNotDescribed()
     {
-        SupportContactFinder.SupporterHits[] hits = [new(Supporter.Terrain, [true, false])];
+        SupporterHits[] hits = [new(Supporter.Terrain, [true, false])];
         float[] weights = [1f, 1f];
         var samples = new WeightedSurfaceSamples([Vector3.Zero, Vector3.Zero], weights, Box.Zero, Falloff: 0f);
 
-        var contacts = SupportContactFinder.SplitWeightsAmongSupporters(hits, weights);
+        var contacts = SupportContactWeights.SplitWeightsAmongSupporters(hits, weights);
 
         Assert.Null(ZeroWeightDiagnosis.Of(0, "m.nif", samples, hits, contacts));
     }
@@ -93,8 +93,8 @@ public class SupportDecisionTests
     [Fact]
     public void NoContactsGiveNoWeight()
     {
-        var contacts = SupportContactFinder.SplitWeightsAmongSupporters(
-            [new SupportContactFinder.SupporterHits(Supporter.Terrain, [false, false])],
+        var contacts = SupportContactWeights.SplitWeightsAmongSupporters(
+            [new SupporterHits(Supporter.Terrain, [false, false])],
             [1f, 1f]);
         Assert.Equal(0, contacts.ContactPoints);
         Assert.Empty(contacts.Supporters);

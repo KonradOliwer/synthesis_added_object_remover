@@ -7,15 +7,13 @@ namespace AddedObjectRemover;
 /// <param name="landWorldspaces">Target worldspace -> the worldspace whose LAND records it uses (itself, or a parent whose land data it uses).</param>
 /// <param name="versions">Every plugin's own LAND record by cell, highest priority first; null when the versions were not asked for.</param>
 /// <param name="layerNames">Spells the plugins of the texture keys when the versions' texture layers are decoded; null when the layers were not asked for.</param>
-/// <param name="landscapesBelowTarget">
-/// The LAND record versions just below the target plugin's by cell; null when the LAND area record versions were not asked for.
-/// </param>
+/// <param name="landscapesBelow">The LAND record versions just below a plugin's, by cell; null when the LAND area record versions were not asked for.</param>
 internal sealed class LandscapeTerrain(
     IReadOnlyDictionary<ExteriorCell, ILandscapeGetter> landscapes,
     IReadOnlyDictionary<RecordKey, RecordKey> landWorldspaces,
     IReadOnlyDictionary<ExteriorCell, List<LandscapeVersion>>? versions,
     PluginNames? layerNames,
-    IReadOnlyDictionary<ExteriorCell, ILandscapeGetter>? landscapesBelowTarget)
+    LandscapesBelow? landscapesBelow)
 {
     private readonly IReadOnlySet<RecordKey> _worldspacesWithTerrain = landscapes.Keys.Select(cell => cell.WorldspaceKey).ToHashSet();
 
@@ -29,11 +27,12 @@ internal sealed class LandscapeTerrain(
     public float[]? ReadHeights(ExteriorCell cell) =>
         landscapes.TryGetValue(cell, out var landscape) ? LandHeightReader.Read(landscape) : null;
 
-    /// <returns>Null where no plugin below the target plugin has a LAND record for the cell, or it is deleted or empty.</returns>
-    public float[]? ReadHeightsBelowTarget(ExteriorCell cell)
+    /// <returns>Null where no plugin below the given plugin has a LAND record for the cell, or it is deleted or empty.</returns>
+    public float[]? ReadHeightsBelow(PluginName plugin, ExteriorCell cell)
     {
-        if (landscapesBelowTarget is null) throw new InvalidOperationException("The LAND area record versions were not read; ask for them in the read scope.");
-        return landscapesBelowTarget.TryGetValue(cell, out var landscape) ? LandHeightReader.Read(landscape) : null;
+        if (landscapesBelow is null) throw new InvalidOperationException("The LAND area record versions were not read; ask for them in the read scope.");
+        if (landscapesBelow.Plugin != plugin) throw new InvalidOperationException($"The LAND versions were read below {landscapesBelow.Plugin}, not below {plugin}.");
+        return landscapesBelow.Landscapes.TryGetValue(cell, out var landscape) ? LandHeightReader.Read(landscape) : null;
     }
 
     /// <returns>Every plugin's version of the cell in load order (lowest priority first); empty where no plugin has a LAND record for it.</returns>
@@ -50,3 +49,6 @@ internal sealed class LandscapeTerrain(
         LandHeightReader.Read(version.Landscape),
         layerNames is null ? null : LandLayerReader.Read(version.Landscape, layerNames));
 }
+
+/// <summary>The LAND record versions just below a plugin's, by cell.</summary>
+internal sealed record LandscapesBelow(PluginName Plugin, IReadOnlyDictionary<ExteriorCell, ILandscapeGetter> Landscapes);

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Numerics;
 
@@ -16,7 +17,7 @@ public static class PointContactTest
 {
     private enum LineAxis { Z, X, Y }
 
-    private static readonly LineAxis[] LineAxes = [LineAxis.Z, LineAxis.X, LineAxis.Y];
+    private static readonly ImmutableArray<LineAxis> LineAxes = [LineAxis.Z, LineAxis.X, LineAxis.Y];
 
     /// <param name="scratch">Reused buffer for triangle queries.</param>
     public static bool IsInContact(MeshTriangleTree tree, Vector3 point, float tolerance, List<int> scratch) =>

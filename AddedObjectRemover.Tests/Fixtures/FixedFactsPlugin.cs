@@ -51,7 +51,7 @@ internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records,
             ChangedLands: [],
             ChangedNavmeshes: [],
             DeletedCells: new HashSet<RecordKey>(),
-            OverriddenDoorLinks: new Dictionary<RecordKey, DoorLinkFact>(),
+            OverriddenDoorLinks: new Dictionary<RecordKey, NavDoorLinkVersions>(),
             CellsDeletedInFinalWorld: new Dictionary<RecordKey, PluginName>(),
             Spaces: walked.Select(record => record.Space).DistinctBy(space => space.Key).ToDictionary(space => space.Key));
     }
@@ -59,7 +59,7 @@ internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records,
     /// <summary>
     /// As the real reader keeps them: the versions from the winner down to and including the first one whose plugin stops the walk.
     /// A record the target plugin overrides is walked on down to its version just below the target plugin's, and its parts are
-    /// judged from there up, unless the record comes with its changes.
+    /// compared from there up, unless the record comes with its part differences.
     /// </summary>
     private PlacedRecordFact Walk(PlacedRecordFact record, PluginName target, Func<PluginName, bool> stopsTheWalk)
     {
@@ -71,13 +71,13 @@ internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records,
         return record with
         {
             Versions = versions.RemoveRange(0, lowestKept),
-            CleanedModChanges = record.CleanedModChanges ?? (isJudged ? ChangesOf(versions[(targetIndex - 1)..]) : null),
+            PartDifferences = record.PartDifferences ?? (isJudged ? DifferencesOf(versions[(targetIndex - 1)..]) : null),
         };
     }
 
     /// <param name="versions">From the version just below the target plugin's up to the winner.</param>
-    private static PlacedPartChanges ChangesOf(ImmutableArray<PlacedVersionFact> versions) =>
-        PlacedPartJudging.Judge(VersionParts, versions, [.. versions.Select(version => version.Plugin)], TestTargets.PatchName);
+    private static PlacedPartDifferences DifferencesOf(ImmutableArray<PlacedVersionFact> versions) =>
+        PlacedPartComparison.Compare(VersionParts, versions, [.. versions.Select(version => version.Plugin)]);
 
     /// <summary>Each cell of the records once, without grid, name or Location.</summary>
     private static Dictionary<RecordKey, CellAreaFact> UnnamedCellsOf(ImmutableArray<PlacedRecordFact> records) =>
@@ -101,7 +101,7 @@ internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records,
 
     public float[]? ReadTerrain(ExteriorCell cell) => throw new NotSupportedException();
 
-    public float[]? ReadTerrainBelowTarget(ExteriorCell cell) => throw new NotSupportedException();
+    public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => throw new NotSupportedException();
 
     public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new NotSupportedException();
 

@@ -15,17 +15,14 @@ public readonly record struct PlacedVersionFact(
     PluginName Plugin, PlacementFacts Placement, float? Scale, BaseKey? Base, CellFact Cell, RecordKey SpaceKey, bool IsPersistent, ReferenceFacts Reference);
 
 /// <summary>
-/// What the target plugin last changed in a record of another plugin it overrides, part by part (<see cref="PartHistory"/>), over the
-/// versions from the one just below the target plugin's up to the winner, the patch included.
+/// How the parts of a placed record differ across its versions, from the one just below the named plugin's up to the winner, the
+/// patch included.
 /// </summary>
-/// <param name="Undo">The parts whose earlier value is written back (<see cref="PartOutcome.Undo"/>).</param>
-/// <param name="LeftToLaterPlugins">The parts the target plugin changed and a later plugin or the patch changed again, each with the last of them.</param>
-/// <param name="KeptForRecordFormat">
-/// The parts that would be undone, but whose earlier value holds bytes Mutagen does not read, stored in another record format than
-/// the winner's, so they cannot be written back and stay.
+/// <param name="LowestNotCopyable">
+/// The parts whose value in the lowest version cannot be written into the winner: it holds bytes Mutagen does not read, stored in
+/// another record format than the winner's.
 /// </param>
-public readonly record struct PlacedPartChanges(
-    PlacedParts Undo, ImmutableSortedDictionary<PlacedParts, PluginName> LeftToLaterPlugins, PlacedParts KeptForRecordFormat);
+public sealed record PlacedPartDifferences(ImmutableArray<VersionDifferences<PlacedParts>> Versions, PlacedParts LowestNotCopyable);
 
 /// <summary>What one version of a placed record says about the reference itself, apart from where it stands and its base object.</summary>
 /// <param name="ReferenceRadius">The reference's own radius (XRDS) as the version stores it; null when it has none.</param>

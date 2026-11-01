@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Mutagen.Bethesda.Plugins.Cache;
 using Mutagen.Bethesda.Plugins.Records;
 using Mutagen.Bethesda.Skyrim;
@@ -8,7 +9,7 @@ namespace AddedObjectRemover;
 internal static class ScriptPropertyReader
 {
     /// <summary>Resolved by these types only; <see cref="IMajorRecordGetter"/> would make the link cache enumerate every record of every mod.</summary>
-    private static readonly (Type Type, ScriptNamedKind Kind)[] NamedKinds =
+    private static readonly ImmutableArray<(Type Type, ScriptNamedKind Kind)> NamedKinds =
     [
         (typeof(IQuestGetter), ScriptNamedKind.Quest),
         (typeof(ISceneGetter), ScriptNamedKind.Scene),

@@ -2,7 +2,7 @@ using System.Numerics;
 
 namespace AddedObjectRemover;
 
-/// <summary>Cache C14: the winning navmesh triangles (world space) of each space, each bucket read and indexed once. Thread-safe.</summary>
+/// <summary>The winning navmesh triangles (world space) of each space, each bucket read and indexed once. Thread-safe.</summary>
 public interface INavmeshes
 {
     /// <summary>

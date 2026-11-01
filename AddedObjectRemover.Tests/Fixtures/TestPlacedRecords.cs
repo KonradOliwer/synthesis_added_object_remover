@@ -26,7 +26,7 @@ internal static class TestPlacedRecords
             ReferenceRadius: null,
             PrimitiveBounds: null,
             Versions: [Version(winningMod, placement, baseKey)],
-            CleanedModChanges: null);
+            PartDifferences: null);
     }
 
     /// <summary>A version in the test target space's cell, not persistent and without a stored scale.</summary>

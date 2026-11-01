@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
@@ -11,7 +12,7 @@ namespace AddedObjectRemover.Steps.MoveKeptMarkers;
 /// </summary>
 internal sealed class NavmeshSpotSearch(INavmeshes navmeshes, OtherObjectsAroundMarker objectsAroundMarker) : IFreeSpotSearch
 {
-    private static readonly Vector3[] ClearanceOffsets =
+    private static readonly ImmutableArray<Vector3> ClearanceOffsets =
     [
         Vector3.Zero,
         new(IFreeSpotSearch.Clearance, 0, 0),

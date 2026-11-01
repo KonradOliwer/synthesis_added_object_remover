@@ -1,5 +1,5 @@
 using System.Collections.Immutable;
-using AddedObjectRemover.Steps.WriteThePatch.Contracts;
+using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Tests.EndToEnd;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Plugins.Records;
@@ -142,7 +142,7 @@ public sealed class AreaRecordWriterTests
         repainted.Layers.Add(Layer(Quadrant.BottomLeft, 2));
         repainted.Layers.Add(Layer(Quadrant.TopRight, 3));
 
-        var written = WrittenLand(Write(LandHandles(repainted), new UndoLandParts(LandKey, PointSet.Of([5]), QuarterSet.Of([QuarterOf(Quadrant.BottomLeft)]), Rest: false)));
+        var written = WrittenLand(Write(LandHandles(repainted), new CopyEarlierLandParts(LandKey, PointSet.Of([5]), QuarterSet.Of([QuarterOf(Quadrant.BottomLeft)]), Rest: false)));
 
         Assert.Equal((default(P3UInt8), CleanedColour), (written.VertexColors![5, 0], written.VertexColors[6, 0]));
         Assert.Equal(
@@ -159,7 +159,7 @@ public sealed class AreaRecordWriterTests
         repainted.VertexColors![5, 0] = CleanedColour;
         CellCopyIn(_later.Mod).IsDeleted = true;
 
-        Assert.Throws<InvalidOperationException>(() => Write(LandHandles(repainted), new UndoLandParts(LandKey, PointSet.Of([5]), QuarterSet.Of([]), Rest: false)));
+        Assert.Throws<InvalidOperationException>(() => Write(LandHandles(repainted), new CopyEarlierLandParts(LandKey, PointSet.Of([5]), QuarterSet.Of([]), Rest: false)));
     }
 
     [Fact]
@@ -171,7 +171,7 @@ public sealed class AreaRecordWriterTests
         coloured.VertexColors = new Array2d<P3UInt8>(new P2Int(Side, Side), CleanedColour);
         coloured.Flags = Landscape.Flag.VertexNormalsHeightMap | Landscape.Flag.VertexColors;
 
-        var written = WrittenLand(Write(LandHandles(coloured), new UndoLandParts(LandKey, PointSet.Of([]), QuarterSet.Of([]), Rest: true)));
+        var written = WrittenLand(Write(LandHandles(coloured), new CopyEarlierLandParts(LandKey, PointSet.Of([]), QuarterSet.Of([]), Rest: true)));
 
         Assert.Null(written.VertexColors);
         Assert.Equal(Landscape.Flag.VertexNormalsHeightMap, written.Flags);
@@ -187,7 +187,7 @@ public sealed class AreaRecordWriterTests
         edited.Data.Parent = otherParent;
         edited.IsDeleted = true;
 
-        var written = WrittenNavmesh(Write(NavmeshHandles(_navmesh, edited), new CopyNavmeshGeometry(NavmeshKey)));
+        var written = WrittenNavmesh(Write(NavmeshHandles(_navmesh, edited), new CopyEarlierNavmeshGeometry(NavmeshKey)));
 
         Assert.Equal(_navmesh.Data!.Vertices.ToList(), written.Data!.Vertices.ToList());
         Assert.Equal(_navmesh.Data.Triangles.Select(triangle => triangle.Flags), written.Data.Triangles.Select(triangle => triangle.Flags));
@@ -204,7 +204,7 @@ public sealed class AreaRecordWriterTests
         edited.FormVersion = NewerFormVersion;
         edited.Data!.Vertices[2] = new P3Float(Size, Size, RaisedHeight);
 
-        Assert.Throws<InvalidOperationException>(() => Write(NavmeshHandles(_navmesh, edited), new CopyNavmeshGeometry(NavmeshKey)));
+        Assert.Throws<InvalidOperationException>(() => Write(NavmeshHandles(_navmesh, edited), new CopyEarlierNavmeshGeometry(NavmeshKey)));
     }
 
     [Fact]
@@ -216,7 +216,7 @@ public sealed class AreaRecordWriterTests
         edited.NNAM = null;
         edited.Data!.Vertices[2] = new P3Float(Size, Size, RaisedHeight);
 
-        var written = WrittenNavmesh(Write(NavmeshHandles(_navmesh, edited), new CopyNavmeshGeometry(NavmeshKey)));
+        var written = WrittenNavmesh(Write(NavmeshHandles(_navmesh, edited), new CopyEarlierNavmeshGeometry(NavmeshKey)));
 
         Assert.Equal(RawBytes, written.NNAM!.Value.ToArray());
         Assert.Equal(_navmesh.Data!.Vertices.ToList(), written.Data!.Vertices.ToList());
@@ -233,7 +233,7 @@ public sealed class AreaRecordWriterTests
         deleted.Data = null;
         deleted.NNAM = null;
 
-        var patch = Write(NavmeshHandles(_navmesh, deleted), new BringBackNavmesh(NavmeshKey));
+        var patch = Write(NavmeshHandles(_navmesh, deleted), new CopyEarlierNavmesh(NavmeshKey));
 
         var written = WrittenNavmesh(patch);
         Assert.True(_navmesh.Equals(written));
@@ -248,7 +248,7 @@ public sealed class AreaRecordWriterTests
     {
         var added = AddedNavmesh();
 
-        var written = WrittenNavmesh(Write(AddedNavmeshHandles(added), new SinkNavmesh(added.FormKey.ToRecordKey(), RemovalConvention.SunkNavmeshZ)), added.FormKey);
+        var written = WrittenNavmesh(Write(AddedNavmeshHandles(added), new SetNavmeshZ(added.FormKey.ToRecordKey(), RemovalConvention.SunkNavmeshZ)), added.FormKey);
 
         var data = written.Data!;
         const float z = RemovalConvention.SunkNavmeshZ;
@@ -281,7 +281,7 @@ public sealed class AreaRecordWriterTests
         laterMap.MapInfos.Add(Entry(_later.NextKey(), z: 0f));
         var order = new WriteNavmeshMapEntries(
             _map.FormKey.ToRecordKey(),
-            [new NavmeshEntryOrder(added.ToRecordKey(), Cleaned, RemovalConvention.SunkNavmeshZ), new NavmeshEntryOrder(NavmeshKey, BaseGame, SinkTo: null)]);
+            [new NavmeshEntryOrder(added.ToRecordKey(), Cleaned, RemovalConvention.SunkNavmeshZ), new NavmeshEntryOrder(NavmeshKey, BaseGame, SetZ: null)]);
 
         var map = Assert.Single(Write(MapHandles(cleanedMap, laterMap), order).EnumerateMajorRecords<INavigationMeshInfoMapGetter>());
 
@@ -321,8 +321,8 @@ public sealed class AreaRecordWriterTests
 
         var map = Assert.Single(Write(
             MapHandles(cleanedMap),
-            new WriteNavmeshMapEntries(mapKey, [new NavmeshEntryOrder(added.ToRecordKey(), Cleaned, SinkTo: null)]),
-            new WriteNavmeshMapEntries(mapKey, [new NavmeshEntryOrder(NavmeshKey, BaseGame, SinkTo: null)])).EnumerateMajorRecords<INavigationMeshInfoMapGetter>());
+            new WriteNavmeshMapEntries(mapKey, [new NavmeshEntryOrder(added.ToRecordKey(), Cleaned, SetZ: null)]),
+            new WriteNavmeshMapEntries(mapKey, [new NavmeshEntryOrder(NavmeshKey, BaseGame, SetZ: null)])).EnumerateMajorRecords<INavigationMeshInfoMapGetter>());
 
         Assert.Equal([_navmesh.FormKey, added], map.MapInfos.Select(entry => entry.NavigationMesh.FormKey));
     }
@@ -341,7 +341,7 @@ public sealed class AreaRecordWriterTests
             new PlacedRecordParts(new PlacedPartTolerances()),
             areaRecords: null);
 
-        var written = Assert.Single(Write(handles, new UndoPlacedParts(key, PlacedParts.NavDoorLink)).EnumerateMajorRecords<IPlacedObjectGetter>());
+        var written = Assert.Single(Write(handles, new CopyEarlierPlacedParts(key, PlacedParts.NavDoorLink)).EnumerateMajorRecords<IPlacedObjectGetter>());
 
         Assert.True(_door.NavigationDoorLink!.Equals(written.NavigationDoorLink));
         Assert.Equal(2f, written.Scale);
@@ -362,7 +362,7 @@ public sealed class AreaRecordWriterTests
             new PlacedRecordParts(new PlacedPartTolerances()),
             areaRecords: null);
 
-        Assert.Throws<InvalidOperationException>(() => Write(handles, new UndoPlacedParts(key, PlacedParts.Scale)));
+        Assert.Throws<InvalidOperationException>(() => Write(handles, new CopyEarlierPlacedParts(key, PlacedParts.Scale)));
     }
 
     /// <remarks>

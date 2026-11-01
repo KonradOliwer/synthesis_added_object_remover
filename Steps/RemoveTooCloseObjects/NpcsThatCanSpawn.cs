@@ -1,3 +1,4 @@
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
@@ -5,7 +6,7 @@ using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveTooCloseObjects;
 
-/// <summary>The placed NPCs of C10 without the replaced ones, which cannot spawn.</summary>
+/// <summary>The placed NPCs without the replaced ones, which cannot spawn.</summary>
 internal sealed class NpcsThatCanSpawn(IPlacedNpcsBySpace npcs, Replacements replaced) : INpcsThatCanSpawn
 {
     /// <remarks>Candidates come from the grid alone, not from <see cref="ItemsInSpace{T}"/>, whose bounds test could give a different set.</remarks>

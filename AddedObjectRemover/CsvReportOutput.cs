@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using AddedObjectRemover.Run.RunAllSteps.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 
@@ -7,7 +8,7 @@ namespace AddedObjectRemover;
 internal sealed class CsvReportOutput : IReportOutput
 {
     /// <summary>Not every run writes every file, so a file an earlier run left behind would look current.</summary>
-    private static readonly string[] KnownFileNames =
+    private static readonly ImmutableArray<string> KnownFileNames =
     [
         ReportFileNames.MeshOriginsFileName,
         ReportFileNames.SupportFileName,

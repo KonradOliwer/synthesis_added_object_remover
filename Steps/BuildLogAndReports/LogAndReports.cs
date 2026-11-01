@@ -12,6 +12,7 @@ using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
+using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
@@ -160,7 +161,7 @@ public sealed partial class LogAndReports
     }
 
     /// <param name="decisions">The decisions whose last round is the too-close round.</param>
-    /// <param name="visibleTargets">The visible target objects (C12), which the invisible other-mod objects are counted against.</param>
+    /// <param name="visibleTargets">The visible target objects, which the invisible other-mod objects are counted against.</param>
     public ImmutableArray<LogSection> BuildStepSections(
         TooCloseResult found, IRemovalDecisions decisions, CollectedObjects world, IVisibleTargetObjects visibleTargets, TimeSpan elapsed)
     {

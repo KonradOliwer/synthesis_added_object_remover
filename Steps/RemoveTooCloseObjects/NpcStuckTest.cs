@@ -1,4 +1,5 @@
 using System.Numerics;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveTooCloseObjects;

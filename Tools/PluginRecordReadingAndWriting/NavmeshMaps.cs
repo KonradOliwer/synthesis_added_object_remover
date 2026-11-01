@@ -14,18 +14,16 @@ internal sealed record NavmeshMapVersion(int LoadIndex, PluginName Plugin, INavi
 /// </summary>
 internal sealed class NavmeshMaps
 {
-    private readonly PluginName _target;
-    private readonly int _targetIndex;
     private readonly PluginNames _names;
+    private readonly IReadOnlyDictionary<PluginName, int> _loadIndexOf;
     private readonly ImmutableArray<NavmeshMapVersion> _maps;
     private readonly Dictionary<RecordKey, List<(NavmeshMapVersion Map, INavigationMapInfoGetter Entry)>> _entries = new();
 
-    private NavmeshMaps(ILoadOrderGetter<IModListingGetter<ISkyrimModGetter>> loadOrder, IReadOnlySet<RecordKey> navmeshes, PluginName target, PluginNames names)
+    private NavmeshMaps(ILoadOrderGetter<IModListingGetter<ISkyrimModGetter>> loadOrder, IReadOnlySet<RecordKey> navmeshes, PluginNames names)
     {
-        _target = target;
         _names = names;
         var listings = loadOrder.ListedOrder.ToList();
-        _targetIndex = listings.FindIndex(listing => names.Of(listing.ModKey) == target);
+        _loadIndexOf = listings.Select((listing, index) => (Plugin: names.Of(listing.ModKey), index)).DistinctBy(entry => entry.Plugin).ToDictionary(entry => entry.Plugin, entry => entry.index);
         _maps = [.. listings.SelectMany((listing, index) => MapsOf(listing, index))];
         KeepEntriesOf(navmeshes);
         WinningPreferredPaths = PreferredPathsOf(_maps.LastOrDefault());
@@ -35,31 +33,40 @@ internal sealed class NavmeshMaps
     public ImmutableArray<NavmeshMapVersion> Versions => _maps;
 
     /// <param name="navmeshes">The navmeshes whose entries are kept.</param>
-    public static NavmeshMaps Read(
-        ILoadOrderGetter<IModListingGetter<ISkyrimModGetter>> loadOrder, IReadOnlySet<RecordKey> navmeshes, PluginName target, PluginNames names) =>
-        new(loadOrder, navmeshes, target, names);
+    public static NavmeshMaps Read(ILoadOrderGetter<IModListingGetter<ISkyrimModGetter>> loadOrder, IReadOnlySet<RecordKey> navmeshes, PluginNames names) =>
+        new(loadOrder, navmeshes, names);
 
     /// <summary>
-    /// What the target plugin last changed in the navmesh's entry; <see cref="PartOutcome.Unchanged"/> when its map carries none. With
-    /// no entry below the target plugin's, the target plugin's entry counts as a change.
+    /// How the navmesh's entry differs across the entries of the plugins whose map carries one, from the last one below the given
+    /// plugin up to the last in load order; null when the given plugin's map carries none. With no entry below the given plugin's,
+    /// the lowest version holds none, under the given plugin's name.
     /// </summary>
-    public PartOutcome EntryOutcome(RecordKey navmesh, PluginName patch)
+    public PartDifferences? EntryDifferences(RecordKey navmesh, PluginName plugin)
     {
+        var pluginIndex = _loadIndexOf[plugin];
         var entries = EntriesOf(navmesh);
-        if (entries.FirstOrDefault(entry => entry.Map.LoadIndex == _targetIndex) is not { Entry: { } own }) return new PartOutcome.Unchanged();
-        var below = entries.LastOrDefault(entry => entry.Map.LoadIndex < _targetIndex);
-        var above = entries.Where(entry => entry.Map.LoadIndex > _targetIndex).ToList();
+        if (entries.FirstOrDefault(entry => entry.Map.LoadIndex == pluginIndex) is not { Entry: { } own }) return null;
+        var below = entries.LastOrDefault(entry => entry.Map.LoadIndex < pluginIndex);
+        var above = entries.Where(entry => entry.Map.LoadIndex > pluginIndex).ToList();
         INavigationMapInfoGetter?[] versions = [below.Entry, own, .. above.Select(entry => entry.Entry)];
-        // With no entry below, index 0 holds none; PartHistory names only the plugins above the target plugin's.
-        PluginName[] plugins = [below.Entry is null ? _target : below.Map.Plugin, _target, .. above.Select(entry => entry.Map.Plugin)];
-        return PartHistory.Of(plugins, PartHistory.TargetVersionIndex, patch, (lower, higher) => NavmeshRecordParts.MapEntry.DiffersOrMissing(versions[lower], versions[higher]));
+        PluginName[] plugins = [below.Entry is null ? plugin : below.Map.Plugin, plugin, .. above.Select(entry => entry.Map.Plugin)];
+        return VersionComparison.ComparePart(
+            plugins, (lower, higher) => NavmeshRecordParts.MapEntry.DiffersOrMissing(versions[lower], versions[higher]), lowestNotCopyable: false);
     }
 
-    /// <summary>The entry of the last plugin below the target plugin that carries one.</summary>
-    public NavmeshMapEntryFact? EntryBelowTarget(RecordKey navmesh) => LastEntry(navmesh, loadIndex => loadIndex < _targetIndex);
+    /// <summary>The entry of the last plugin below the given plugin that carries one.</summary>
+    public NavmeshMapEntryFact? EntryBelow(RecordKey navmesh, PluginName plugin)
+    {
+        var pluginIndex = _loadIndexOf[plugin];
+        return LastEntry(navmesh, loadIndex => loadIndex < pluginIndex);
+    }
 
-    /// <summary>The entry of the last plugin up to and including the target plugin that carries one.</summary>
-    public NavmeshMapEntryFact? EntryUpToTarget(RecordKey navmesh) => LastEntry(navmesh, loadIndex => loadIndex <= _targetIndex);
+    /// <summary>The entry of the last plugin up to and including the given plugin that carries one.</summary>
+    public NavmeshMapEntryFact? EntryUpTo(RecordKey navmesh, PluginName plugin)
+    {
+        var pluginIndex = _loadIndexOf[plugin];
+        return LastEntry(navmesh, loadIndex => loadIndex <= pluginIndex);
+    }
 
     public NavmeshMapEntryFact? WinningEntry(RecordKey navmesh) => LastEntry(navmesh, static _ => true);
 

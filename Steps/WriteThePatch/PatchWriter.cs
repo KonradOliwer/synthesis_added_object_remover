@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
-using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Steps.WriteThePatch.Contracts;
 
@@ -81,14 +81,14 @@ public static class PatchWriter
         whereRemoved.Objects.Where(judged => judged.IsRestored)
             .SelectMany(judged => PlacedUndoWrite.OrdersFor(judged.Change.Key, judged.Change.Cell, judged.Change.IsPersistent, judged.Change.Earlier))
             .Concat(whereRemoved.Cells.Where(judged => judged.IsRestored)
-                .Select(judged => new UndoCellParts(judged.Change.Cell, [.. judged.Undone.Select(part => part.Name)])))
+                .Select(judged => new CopyEarlierCellParts(judged.Change.Cell, [.. judged.Undone.Select(part => part.Name)])))
             .Concat(whereRemoved.Lands.Where(judged => judged.IsRestored).SelectMany(LandOrdersFor))
             .Concat(whereRemoved.NavmeshGroups.Where(group => group.IsRestored).SelectMany(group => group.Orders));
 
     /// <summary>The parts copied back first, then the heights, so the heights are written into the grids the rest brings back.</summary>
     private static IEnumerable<WriteOrder> LandOrdersFor(LandChangeJudged land)
     {
-        if (!land.Colours.IsEmpty || !land.Textures.IsEmpty || land.Rest) yield return new UndoLandParts(land.Change.LandKey, land.Colours, land.Textures, land.Rest);
+        if (!land.Colours.IsEmpty || !land.Textures.IsEmpty || land.Rest) yield return new CopyEarlierLandParts(land.Change.LandKey, land.Colours, land.Textures, land.Rest);
         if (land.FinalHeights is { } heights) yield return new SetLandHeights(land.Change.LandKey, heights, land.Heights, land.Beyond);
     }
 

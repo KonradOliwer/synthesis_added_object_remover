@@ -2,7 +2,7 @@ using System.Numerics;
 
 namespace AddedObjectRemover;
 
-/// <summary>Cache C13: the terrain height of exterior cells, each cell's height grid read once. Thread-safe.</summary>
+/// <summary>The terrain height of exterior cells, each cell's height grid read once. Thread-safe.</summary>
 public interface ITerrainHeights
 {
     /// <summary>False for interior cells and worldspaces whose land has no land data.</summary>

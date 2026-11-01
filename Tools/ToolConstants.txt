@@ -5,7 +5,6 @@
 BoxMesh.CornerCount | math | A box has 8 corners.
 BoxMesh.TriangleCount | math | A box surface is 12 triangles.
 BoxMesh.Limits | math | The tree limits for a mesh of exactly the box's 12 triangles.
-BoxMesh.SinglePart | math | A box mesh is one part starting at triangle 0.
 BoxMesh.FaceTriangles | math | The corner triples of the 12 triangles of a box.
 MeshClosedness.SharedEdgeParity | math | A closed surface uses every edge an even number of times.
 MeshPairTester.PairsPerRange | budget | Mesh pairs per parallel work range.
@@ -27,7 +26,6 @@ TriangleDistance.MinFaceSineSquared | math | Smallest face-angle sine (squared) 
 RayHit.MinHitSine | math | Smallest angle a ray may graze a triangle; float robustness.
 SurroundingRayTest.WorldDirections | game format | The up, east-west and north-south ray directions of the game's Z-up world axes.
 Percent.PerWhole | math | 100 percent make a whole.
-CsvFormat.CharactersNeedingQuotes | file format | Characters that make a CSV field need quoting.
 CompassDirections.SectorCount | math | Eight compass sectors.
 CompassDirections.NoHorizontalOffset | math | The sector reported for a zero offset (angle zero).
 CompassDirections.FullTurnDegrees | math | Degrees in a turn.
@@ -93,7 +91,7 @@ PlacedRecordParts.PersistentBit | game format | The record flag that marks a pla
 PlacedRecordParts.PresenceBits | game format | The Initially Disabled and Deleted record flags, which decide with the enable parent whether a placed reference shows.
 PlacedRecordParts.ExcludedFlagBits | game format | The record flags of a placed reference no part compares or writes: Persistent and Compressed.
 PlacedRecordParts.RestFlagBits | game format | The record flags of a placed reference the rest of the record holds.
-PartHistory.TargetVersionIndex | internal | The versions judged start just below the target plugin's, so its own version is the second.
+VersionComparison.NamedPluginIndex | internal | The versions compared start just below the named plugin's, so its own version is the second; only the comparison methods read it.
 PointSet.PointCount | game format | A LAND record's grids hold 33 by 33 points.
 PointSet.BitsPerWord | math | Bits in the 64-bit words of the point bitset.
 PointSet.WordCount | math | Words that hold one bit per grid point.

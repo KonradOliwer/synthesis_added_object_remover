@@ -3,8 +3,8 @@ using System.Text.RegularExpressions;
 namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
-/// Run state belongs to the run, so nothing static may hold changing data. Arrays are not counted: a
-/// static array of fixed content is a constant, not a cache.
+/// Run state belongs to the run, so nothing static may hold changing data. A static array counts: its elements stay writable
+/// by any caller, so fixed content is an <c>ImmutableArray</c> or a frozen set.
 /// </summary>
 public partial class StaticStateTests
 {
@@ -27,9 +27,16 @@ public partial class StaticStateTests
             private static readonly Dictionary<string, int> Cache = new();
             private static readonly System.Collections.Generic.HashSet<int> Seen = [];
             private static readonly Lazy<int> Value = new(() => 1);
+            public static readonly string[] Fields = ["a"];
+            private static readonly Vector3[] Directions =
+            [
+                Vector3.Zero,
+            ];
+            private static readonly (int Id, string Text)[] Pairs = [];
+            private static readonly Func<int, bool>[] Checks = [];
             """;
 
-        Assert.Equal(["_count", "Name", "Cache", "Seen", "Value"], MutableStatics(code));
+        Assert.Equal(["_count", "Name", "Cache", "Seen", "Value", "Fields", "Directions", "Pairs", "Checks"], MutableStatics(code));
     }
 
     [Fact]
@@ -38,6 +45,9 @@ public partial class StaticStateTests
         const string code = """
             private static readonly object Lock = new();
             private static readonly ImmutableHashSet<int> Kinds = [1];
+            public static readonly ImmutableArray<string> Fields = ["a"];
+            private static readonly ImmutableArray<(int Id, string Text)> Pairs = [];
+            private static readonly SearchValues<char> Quoted = SearchValues.Create(",");
             public static Foo None { get; } = new();
             public static int Next() => 1;
             public static class Holder { }
@@ -57,10 +67,15 @@ public partial class StaticStateTests
     private static bool IsMutable(Match member) =>
         member.Groups["end"].Value.StartsWith('{')
             ? SetterPattern().IsMatch(member.Groups["end"].Value)
-            : !member.Groups["readonly"].Success || GrowableTypePattern().IsMatch(member.Groups["type"].Value);
+            : !member.Groups["readonly"].Success
+              || GrowableTypePattern().IsMatch(member.Groups["type"].Value)
+              || ArrayTypePattern().IsMatch(member.Groups["type"].Value);
 
-    [GeneratedRegex(@"^\s*(?:\[[^\]]*\]\s*)?(?:(?:public|private|internal|protected|new|volatile)\s+)*static\s+(?<readonly>readonly\s+)?(?<type>[\w.]+(?:<[^=;{()]*>)?(?:\[\])*\??)\s+(?<name>\w+)\s*(?<end>;|=(?![>=])|\{[^}\n]*)", RegexOptions.Multiline)]
+    [GeneratedRegex(@"^\s*(?:\[[^\]]*\]\s*)?(?:(?:public|private|internal|protected|new|volatile)\s+)*static\s+(?<readonly>readonly\s+)?(?<type>(?:[\w.]+(?:<[^=;{()]*>)?|\([^()=;]*\))(?:\[\])*\??)\s+(?<name>\w+)\s*(?<end>;|=(?![>=])|\{[^}\n]*)", RegexOptions.Multiline)]
     private static partial Regex StaticMemberPattern();
+
+    [GeneratedRegex(@"\[\]\??$")]
+    private static partial Regex ArrayTypePattern();
 
     [GeneratedRegex(@"\bset\b")]
     private static partial Regex SetterPattern();

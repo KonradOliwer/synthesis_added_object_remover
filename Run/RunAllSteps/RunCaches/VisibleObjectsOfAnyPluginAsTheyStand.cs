@@ -6,10 +6,10 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
 
 /// <summary>
-/// The visible objects of any plugin with some of them moved or taken out, laid over C11 without changing it: an unchanged
-/// object is answered from C11, a moved one where it stands now, and a taken-out one not at all.
+/// The visible objects of any plugin with some of them moved or taken out, laid over the objects of any plugin without changing them: an unchanged
+/// object is answered from them, a moved one where it stands now, and a taken-out one not at all.
 /// </summary>
-/// <param name="changed">Visible objects of C11: each where it stands now, or null when taken out.</param>
+/// <param name="changed">Visible objects of any plugin: each where it stands now, or null when taken out.</param>
 internal sealed class VisibleObjectsOfAnyPluginAsTheyStand(
     IObjectsOfAnyPluginBySpace objectsOfAnyPlugin, IReadOnlyDictionary<OtherId, OtherObject?> changed, IBaseObjectShapes shapes, ObjectContainment containment)
     : IVisibleObjectsOfAnyPlugin

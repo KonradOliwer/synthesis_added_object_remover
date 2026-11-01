@@ -14,8 +14,8 @@ internal sealed class NavmeshWriter(CellOverrides cells, RecordHandles handles)
 
     private readonly Dictionary<FormKey, INavigationMesh> _navmeshes = [];
 
-    /// <summary>The winner's override takes the earlier version's geometry through the part table it was judged with; its parent stays.</summary>
-    public void CopyGeometry(RecordKey navmesh)
+    /// <summary>The winner's override takes the earlier version's geometry through the part table it was compared with; its parent stays.</summary>
+    public void CopyEarlierGeometry(RecordKey navmesh)
     {
         var versions = handles.NavmeshOf(navmesh);
         var earlier = Present(versions.Earlier, navmesh);
@@ -31,7 +31,7 @@ internal sealed class NavmeshWriter(CellOverrides cells, RecordHandles handles)
     /// The copy keeps the earlier version's FormVersion, so its raw bytes are written in the record format they follow, and its
     /// Deleted flag.
     /// </remarks>
-    public void BringBack(RecordKey navmesh)
+    public void CopyEarlier(RecordKey navmesh)
     {
         var earlier = Present(handles.NavmeshOf(navmesh).Earlier, navmesh);
         var copy = (NavigationMesh)earlier.Record.DeepCopy();
@@ -45,10 +45,10 @@ internal sealed class NavmeshWriter(CellOverrides cells, RecordHandles handles)
     /// The triangles keep their count, order and vertices, and the inner edges stay, so the grid, written unchanged, still lists
     /// valid triangles.
     /// </remarks>
-    public void Sink(RecordKey navmesh, float z)
+    public void SetZ(RecordKey navmesh, float z)
     {
         var target = GetOrAddOverride(Present(handles.NavmeshOf(navmesh).Winner, navmesh));
-        var data = target.Data ?? throw new InvalidOperationException($"Navmesh {navmesh} has no navmesh data to sink.");
+        var data = target.Data ?? throw new InvalidOperationException($"Navmesh {navmesh} has no navmesh data to set the height of.");
         LowerTo(data, z);
         CutOff(data);
     }

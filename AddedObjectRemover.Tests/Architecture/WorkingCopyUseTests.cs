@@ -3,17 +3,21 @@ using System.Text.RegularExpressions;
 namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
-/// The decision list's working copy is the way a step tries rounds without changing the shared list. Only the three steps
-/// that decide rounds (resting objects, and visible and invisible objects left behind) use it; the decision list's own projects define it.
+/// The decision list's working copy is the way a step tries rounds without changing the shared list. Only the four steps
+/// that decide rounds (resting objects, other mods' objects left without support, and visible and invisible objects left
+/// behind) use it; the decision list's own projects define it.
 /// </summary>
 public class WorkingCopyUseTests
 {
     private static readonly string[] DecisionListProjects = ["RemovalDecisionList", "RemovalDecisionList.Contracts"];
     private static readonly string[] RoundDecidingSteps =
-        ["Steps/RemoveObjectsRestingOnRemovedOnes", "Steps/RemoveVisibleObjectsLeftBehind", "Steps/RemoveInvisibleObjectsLeftBehind"];
+    [
+        "Steps/RemoveObjectsRestingOnRemovedOnes", "Steps/OtherModsObjectsLeftWithoutSupport", "Steps/RemoveVisibleObjectsLeftBehind",
+        "Steps/RemoveInvisibleObjectsLeftBehind",
+    ];
 
     [Fact]
-    public void OnlyTheRestingAndLeftBehindStepsUseTheWorkingCopyOrDecideRounds()
+    public void OnlyTheRoundDecidingStepsUseTheWorkingCopyOrDecideRounds()
     {
         var users = SourceFile.All()
             .Where(file => !file.IsIn(DecisionListProjects) && !file.IsIn(RoundDecidingSteps))
@@ -23,11 +27,11 @@ public class WorkingCopyUseTests
 
         Assert.True(
             users.Count == 0,
-            $"Only the resting-objects and left-behind steps may use the working copy or decide rounds:{Environment.NewLine}{string.Join(Environment.NewLine, users)}");
+            $"Only the round-deciding steps may use the working copy or decide rounds:{Environment.NewLine}{string.Join(Environment.NewLine, users)}");
     }
 
     [Fact]
-    public void TheScanFindsTheUsesInTheThreeStepsAndTheDecisionListItself()
+    public void TheScanFindsTheUsesInTheRoundDecidingStepsAndTheDecisionListItself()
     {
         var uses = SourceFile.All()
             .Where(file => FindUses(file.Code).Count > 0)
@@ -37,7 +41,10 @@ public class WorkingCopyUseTests
             .ToList();
 
         Assert.Equal(
-            ["RemovalDecisionList", "RemovalDecisionList.Contracts", "RemoveInvisibleObjectsLeftBehind", "RemoveObjectsRestingOnRemovedOnes", "RemoveVisibleObjectsLeftBehind"],
+            [
+                "OtherModsObjectsLeftWithoutSupport", "RemovalDecisionList", "RemovalDecisionList.Contracts", "RemoveInvisibleObjectsLeftBehind",
+                "RemoveObjectsRestingOnRemovedOnes", "RemoveVisibleObjectsLeftBehind",
+            ],
             uses);
     }
 

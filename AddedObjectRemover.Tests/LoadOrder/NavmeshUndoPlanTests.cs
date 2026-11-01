@@ -1,6 +1,6 @@
 using System.Numerics;
 using AddedObjectRemover.Steps.RestoreWhereRemoved;
-using AddedObjectRemover.Steps.WriteThePatch.Contracts;
+using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Tests.EndToEnd;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda.Plugins;
@@ -357,7 +357,7 @@ public sealed class NavmeshUndoPlanTests
         CellCopyIn(_later.Mod).Landscape = raised;
 
         var (plan, _) = Run(then: (plan, records, _) =>
-            plan.RefuseOnGround(records.FindLandWorldspace, cell => new LandHeights(records.ReadTerrainBelowTarget(cell), records.ReadTerrain(cell)), HeightTolerance));
+            plan.RefuseOnGround(records.FindLandWorldspace, cell => new LandHeights(records.ReadTerrainBelow(Cleaned, cell), records.ReadTerrain(cell)), HeightTolerance));
 
         Assert.Equal(refused ? new NavmeshRefusal(NavmeshGuard.Ground, WestKey, Fault: null) : null, Assert.Single(plan.Groups()).Refused);
     }

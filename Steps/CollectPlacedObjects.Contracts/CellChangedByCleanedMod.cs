@@ -29,3 +29,6 @@ public sealed record CellChangedByCleanedMod(
     CellWaterCopy EarlierWater,
     CellWaterCopy CurrentWater,
     float? DefaultWaterLevel);
+
+/// <summary>One part of a cell record and what happens to it.</summary>
+public sealed record PartChange(CellPartName Name, PartOutcome Outcome);

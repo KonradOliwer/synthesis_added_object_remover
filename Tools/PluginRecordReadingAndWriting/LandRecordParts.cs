@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Mutagen.Bethesda.Plugins.Records;
 using Mutagen.Bethesda.Skyrim;
 
@@ -16,13 +17,13 @@ internal sealed class LandRecordParts
     private const int PointCount = TerrainHeights.VerticesPerSide * TerrainHeights.VerticesPerSide;
 
     /// <summary>Never compared, never written: the writer derives the flags from what the record holds.</summary>
-    public static readonly string[] ExcludedFields = [.. RecordHeader.Fields, nameof(ILandscapeGetter.Flags)];
+    public static readonly ImmutableArray<string> ExcludedFields =[.. RecordHeader.Fields, nameof(ILandscapeGetter.Flags)];
 
     /// <summary>Never compared, never written.</summary>
     public const int ExcludedFlagBits = RecordHeader.CompressedBit;
 
     /// <summary>The grids whose values the point and colour parts hold.</summary>
-    private static readonly string[] GridFields =
+    private static readonly ImmutableArray<string> GridFields =
         [nameof(ILandscapeGetter.VertexHeightMap), nameof(ILandscapeGetter.VertexNormals), nameof(ILandscapeGetter.VertexColors)];
 
     private readonly Landscape.TranslationMask _restMask = TranslationMasks.AllBut<Landscape.TranslationMask>(

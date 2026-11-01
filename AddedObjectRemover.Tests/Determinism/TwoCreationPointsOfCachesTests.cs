@@ -1,4 +1,5 @@
 using System.Numerics;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Run.RunAllSteps.RunCaches;
 using AddedObjectRemover.Tests.Fixtures;
@@ -81,6 +82,6 @@ public class TwoCreationPointsOfCachesTests
             CollisionLayerReader.Read(linkCache),
             npcBodyRules,
             TooCloseObjects.PlacedNpcRules,
-            RestingObjects.SurfaceSamplesPerMesh);
+            WeightedSurfaceSamples.SamplesPerMesh);
     }
 }

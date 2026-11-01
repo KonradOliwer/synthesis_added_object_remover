@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
-using AddedObjectRemover.Steps.WriteThePatch.Contracts;
 
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 
@@ -38,9 +37,9 @@ internal sealed record NavmeshMember(NavmeshChangedByCleanedMod Change, NavmeshU
     /// <summary>The order that writes its navmesh record; null when only its map entry goes back.</summary>
     public WriteOrder? NavmeshOrder => Undo switch
     {
-        NavmeshUndo.Geometry => new CopyNavmeshGeometry(Key),
-        NavmeshUndo.BroughtBack => new BringBackNavmesh(Key),
-        NavmeshUndo.Sunk => new SinkNavmesh(Key, RemovalConvention.SunkNavmeshZ),
+        NavmeshUndo.Geometry => new CopyEarlierNavmeshGeometry(Key),
+        NavmeshUndo.BroughtBack => new CopyEarlierNavmesh(Key),
+        NavmeshUndo.Sunk => new SetNavmeshZ(Key, RemovalConvention.SunkNavmeshZ),
         _ => null,
     };
 
@@ -63,7 +62,7 @@ internal sealed record NavmeshMember(NavmeshChangedByCleanedMod Change, NavmeshU
 /// <param name="Doors">The doors linked to a member from either side, in key order.</param>
 /// <param name="Orders">The orders that put the group back; empty while it is refused.</param>
 /// <param name="Refused">The first guard that keeps the group; null when none does.</param>
-internal sealed record NavmeshGroup(ImmutableArray<NavmeshMember> Members, ImmutableArray<DoorLinkFact> Doors, ImmutableArray<WriteOrder> Orders, NavmeshRefusal? Refused)
+internal sealed record NavmeshGroup(ImmutableArray<NavmeshMember> Members, ImmutableArray<DoorLinkChange> Doors, ImmutableArray<WriteOrder> Orders, NavmeshRefusal? Refused)
 {
     public bool Holds(RecordKey navmesh) => Members.Any(member => member.Key == navmesh);
 
@@ -85,7 +84,7 @@ internal sealed record NavmeshGroup(ImmutableArray<NavmeshMember> Members, Immut
     /// </summary>
     /// <param name="linksToClear">The doors whose navmesh link is cleared, in key order.</param>
     /// <param name="writesLink">Whether the group writes the door's link before the cleaned mod.</param>
-    public ImmutableArray<WriteOrder> OrdersToPutBack(IEnumerable<RecordKey> linksToClear, Func<DoorLinkFact, bool> writesLink) =>
+    public ImmutableArray<WriteOrder> OrdersToPutBack(IEnumerable<RecordKey> linksToClear, Func<DoorLinkChange, bool> writesLink) =>
     [
         .. Members.Select(member => member.NavmeshOrder).OfType<WriteOrder>(),
         .. Members
@@ -93,7 +92,7 @@ internal sealed record NavmeshGroup(ImmutableArray<NavmeshMember> Members, Immut
             .GroupBy(member => member.EntryCopied!.Map)
             .OrderBy(map => map.Key, RecordKeyOrder.Comparer)
             .Select(map => new WriteNavmeshMapEntries(map.Key, [.. map.Select(member => member.EntryOrder!)])),
-        .. Doors.Where(writesLink).Select(door => new UndoPlacedParts(door.Door, PlacedParts.NavDoorLink)),
+        .. Doors.Where(writesLink).Select(door => new CopyEarlierPlacedParts(door.Door, PlacedParts.NavDoorLink)),
         .. linksToClear.Select(door => new ClearNavDoorLink(door)),
     ];
 }

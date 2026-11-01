@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Numerics;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda.Plugins;
 using AddedObjectRemover.Tests.EndToEnd;

@@ -46,7 +46,7 @@ internal sealed class PluginRecords(
 
     public float[]? ReadTerrain(ExteriorCell cell) => Scanned.Terrain.ReadHeights(cell);
 
-    public float[]? ReadTerrainBelowTarget(ExteriorCell cell) => Scanned.Terrain.ReadHeightsBelowTarget(cell);
+    public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => Scanned.Terrain.ReadHeightsBelow(plugin, cell);
 
     public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => Scanned.Terrain.ReadVersions(cell);
 

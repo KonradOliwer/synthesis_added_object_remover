@@ -3,7 +3,6 @@ using System.Diagnostics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 
@@ -12,14 +11,10 @@ namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 /// <summary>
 /// The also-remove step: seeded with the removals of the rounds the run names as its seed rounds, its rounds remove what
 /// goes with them, as the also-remove mode says, until a round removes nothing. It decides the rounds on its own copy
-/// of the decisions and proposes them as one proposal, which the runner applies to the run's decisions. It also judges the
-/// other mods' objects resting on target objects, and the target objects resting on those (<see cref="OtherModsObjects"/>).
+/// of the decisions and proposes them as one proposal, which the runner applies to the run's decisions.
 /// </summary>
 public static class RestingObjects
 {
-    /// <summary>How many points the surface samples (C15) spread over each mesh.</summary>
-    public static int SurfaceSamplesPerMesh => WeightedSurfaceSamples.SamplesPerMesh;
-
     /// <summary>
     /// The rounds, then the touch chains when they are shown, then the report-file details when report files are
     /// written, each stopped on its own by an unexpected failure.
@@ -63,123 +58,41 @@ public static class RestingObjects
         new AlsoRemoveFollowUp(targets, settings, execution, timeSinceStart, shapes, triangles, surfaces, terrain, objectsOfAnyPlugin);
 
     /// <summary>
-    /// The fit step's question asked before any removal: the objects other target objects rest on (see <see cref="RestingRule"/>), and
-    /// those judged objects of other mods rest on, whatever <paramref name="otherModsObjects"/> says (see <see cref="AnyObjectRestingRule"/>).
+    /// The fit step's question about target objects, asked before any removal: the objects other target objects rest on (see
+    /// <see cref="RestingRule"/>).
     /// </summary>
     /// <param name="targets">Where they stand before any object is shrunk or turned.</param>
-    /// <param name="visibleTargets">The index of <paramref name="targets"/>.</param>
-    /// <param name="trust">Decides whose objects are judged.</param>
     /// <param name="objectsOfAnyPlugin">Asked only when there is an object to check.</param>
-    /// <param name="heldUp">What <see cref="FindHeldUpTargets"/> found for the same targets.</param>
+    /// <param name="drops">Asks the drop test about the same targets where they stand.</param>
     public static IRestingRule CreateRestingRule(
         ImmutableArray<TargetObject> targets,
-        IVisibleTargetObjects visibleTargets,
         AlsoRemoveSettings settings,
-        ModTrustTable trust,
-        LoadOrderPlugins plugins,
-        OtherModsObjectsSettings otherModsObjects,
         IBaseObjectShapes shapes,
         ITriangleMeshes triangles,
         ISurfaceSamples surfaces,
         ITerrainHeights terrain,
         Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin,
-        HeldUpTargets heldUp,
+        ITargetObjectsDropTest drops,
         Execution execution) =>
-        OtherModsObjects.CreateRestingRule(
-            targets,
-            visibleTargets,
-            new RestingRule(targets, visibleTargets, settings, new OtherModsObjectRules(trust, plugins, shapes), shapes, triangles, surfaces, terrain, objectsOfAnyPlugin, execution),
-            heldUp,
-            new OtherModsObjectsContext(trust, plugins, otherModsObjects, shapes, triangles, surfaces, terrain, objectsOfAnyPlugin, execution));
+        new RestingRule(targets, settings, shapes, triangles, surfaces, terrain, objectsOfAnyPlugin, drops, execution);
 
     /// <summary>
-    /// KeepSupportingObject: the target objects other mods' objects rest on, directly or through other target objects, each where
-    /// it stands before any decision; switched off otherwise (see <see cref="OtherModsObjects"/>).
+    /// The also-remove rounds that spread, as the mode says, from removals made in <paramref name="decided"/>, for another step to
+    /// decide on its own working copy; asked only for a mode other than Nothing.
     /// </summary>
-    /// <param name="visibleTargets">The index of <paramref name="targets"/>.</param>
-    /// <param name="trust">Decides whose objects are judged.</param>
-    /// <param name="objectsOfAnyPlugin">Asked only with KeepSupportingObject.</param>
-    public static HeldUpTargets FindHeldUpTargets(
-        ImmutableArray<TargetObject> targets,
-        IVisibleTargetObjects visibleTargets,
-        ModTrustTable trust,
-        LoadOrderPlugins plugins,
-        OtherModsObjectsSettings settings,
-        IBaseObjectShapes shapes,
-        ITriangleMeshes triangles,
-        ISurfaceSamples surfaces,
-        ITerrainHeights terrain,
-        Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin,
-        Execution execution) =>
-        OtherModsObjects.FindHeldUpTargets(
-            targets, visibleTargets, new OtherModsObjectsContext(trust, plugins, settings, shapes, triangles, surfaces, terrain, objectsOfAnyPlugin, execution));
-
-    /// <summary>
-    /// The objects that move away from where they stand now and that an object that stays rests on there, by the test that finds the
-    /// other mods' objects left without support (see <see cref="OtherModsObjects"/>). Every object of <paramref name="staying"/> that
-    /// can rest counts, whichever plugin it belongs to.
-    /// </summary>
-    /// <param name="holders">Where they stand now; the id of each is its position.</param>
-    /// <param name="holderIndex">The index of <paramref name="holders"/>.</param>
-    /// <param name="movesAway">Which holders move away; the others stay, as their copies in <paramref name="staying"/>.</param>
-    /// <param name="staying">The visible objects of any plugin as they stand once the run is done, with a copy of each holder.</param>
-    /// <param name="copiesOfMoving">The copies in <paramref name="staying"/> of the holders that move away, which neither rest nor hold up.</param>
-    /// <returns>Each holder that moves away and holds up an object that stays, with the first such object in id order.</returns>
-    public static IReadOnlyDictionary<TargetId, OtherObject> FindHoldersOfObjectsThatStay(
-        IReadOnlyList<TargetObject> holders,
-        IVisibleTargetObjects holderIndex,
-        Func<TargetId, bool> movesAway,
-        IVisibleObjectsOfAnyPlugin staying,
-        IReadOnlySet<OtherId> copiesOfMoving,
-        ModTrustTable trust,
-        LoadOrderPlugins plugins,
-        OtherModsObjectsSettings settings,
-        IBaseObjectShapes shapes,
-        ITriangleMeshes triangles,
-        ISurfaceSamples surfaces,
-        ITerrainHeights terrain,
-        Execution execution) =>
-        OtherModsObjects.FindHoldersOfObjectsThatStay(
-            new SupportWorld(holders, holderIndex, movesAway, staying, copiesOfMoving.ToDictionary(id => id, _ => (PlacedTransform?)null), shapes),
-            holders.Where(holder => movesAway(holder.Id)),
-            copiesOfMoving,
-            new OtherModsObjectsContext(trust, plugins, settings, shapes, triangles, surfaces, terrain, () => staying, execution));
-
-    /// <summary>
-    /// RemoveFloatingObject and PullObjectToTheGround: what becomes of the other mods' objects left without support once the
-    /// also-remove rounds are decided, and the also-remove rounds for the target objects resting on or touching those taken away;
-    /// switched off with KeepSupportingObject (see <see cref="OtherModsObjects"/>). The rounds are decided on a working copy of
-    /// <paramref name="decided"/>, which never changes, and proposed for the runner to apply.
-    /// </summary>
-    /// <param name="targets">Where they stood before any decision.</param>
-    /// <param name="targetsAsMeasured">Each target object kept shrunk or turned at its new placement, as the rounds measure it.</param>
-    /// <param name="decided">The decisions of every removal round so far, the also-remove rounds included.</param>
-    /// <param name="visibleTargets">The index of <paramref name="targets"/>.</param>
-    /// <param name="visibleTargetsAsMeasured">The index of <paramref name="targetsAsMeasured"/>.</param>
-    /// <param name="indexTargets">The index of the given target objects.</param>
-    /// <param name="trust">Decides whose objects are judged.</param>
-    /// <param name="objectsOfAnyPlugin">Asked only when a target object was removed, shrunk or turned.</param>
-    public static OtherModsObjectsResult SettleOtherModsObjects(
-        ImmutableArray<TargetObject> targets,
-        ImmutableArray<TargetObject> targetsAsMeasured,
+    /// <param name="decided">The decisions the seeds were removed in; the objects they kept never take part in the touch rounds.</param>
+    /// <param name="targets">Where the rounds measure them.</param>
+    public static IRemovalRounds<RoundDetails> CreateRoundsAfter(
         IRemovalDecisions decided,
-        IVisibleTargetObjects visibleTargets,
-        IVisibleTargetObjects visibleTargetsAsMeasured,
-        Func<ImmutableArray<TargetObject>, IVisibleTargetObjects> indexTargets,
-        ModTrustTable trust,
-        LoadOrderPlugins plugins,
-        OtherModsObjectsSettings settings,
-        AlsoRemoveSettings alsoRemove,
+        ImmutableArray<TargetObject> targets,
+        IVisibleObjectsOfAnyPlugin objectsOfAnyPlugin,
+        AlsoRemoveSettings settings,
         IBaseObjectShapes shapes,
         ITriangleMeshes triangles,
         ISurfaceSamples surfaces,
         ITerrainHeights terrain,
-        Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin,
         Execution execution) =>
-        OtherModsObjects.SettleLeftWithoutSupport(
-            new DecidedTargets(targets, targetsAsMeasured, decided, visibleTargets, visibleTargetsAsMeasured, indexTargets),
-            alsoRemove,
-            new OtherModsObjectsContext(trust, plugins, settings, shapes, triangles, surfaces, terrain, objectsOfAnyPlugin, execution));
+        PrepareFrom(decided, new RoundsInput(targets, objectsOfAnyPlugin, shapes, triangles, surfaces, terrain, execution), settings).Rounds;
 
     private static RestingObjectsRun DecideRounds(
         RestingObjectsInput input,

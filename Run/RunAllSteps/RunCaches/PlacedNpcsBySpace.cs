@@ -1,5 +1,4 @@
 using AddedObjectRemover.Caches.RunCaches.Contracts;
-using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 
 namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
 

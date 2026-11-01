@@ -18,6 +18,8 @@ using AddedObjectRemover.Steps.JudgeChangedObjects;
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
+using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport;
+using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
@@ -49,9 +51,16 @@ public static class StepRunner
 {
     public static ImmutableArray<RunResult> PatchLoadOrder(ImmutableArray<RunRequest> requests, RunEnvironment environment)
     {
+        MarkPatchWhenARunWillWrite(requests, environment);
         var results = ImmutableArray.CreateBuilder<RunResult>(requests.Length);
         foreach (var request in requests) results.Add(PatchOneRun(request, environment));
         return results.MoveToImmutable();
+    }
+
+    /// <remarks>A batch of stop requests leaves the patch untouched, so it gets no marker.</remarks>
+    private static void MarkPatchWhenARunWillWrite(ImmutableArray<RunRequest> requests, RunEnvironment environment)
+    {
+        if (requests.Any(request => request is RunRequest.Ready)) environment.PatchWriting.WritePatchMarker();
     }
 
     /// <remarks>The start sections of a stop request already hold its stop line.</remarks>
@@ -86,7 +95,7 @@ public static class StepRunner
             environment.Bases.ReadCollisionLayers(records),
             TooCloseObjects.NpcBodyRules,
             TooCloseObjects.PlacedNpcRules,
-            RestingObjects.SurfaceSamplesPerMesh);
+            WeightedSurfaceSamples.SamplesPerMesh);
         var report = new LogAndReports(settings, reportFolder, loadOrderCaches, unexpectedErrors);
         return new RunScope(settings, source, environment, plugin, loadOrderCaches, unexpectedErrors, report, reportFolder);
     }
@@ -202,7 +211,7 @@ public static class StepRunner
         var visibleLeftBehind = RunVisibleLeftBehind(scope, runCaches, collected, alsoRemove.Decisions);
         var otherMods = RunOtherModsObjects(scope, runCaches, trust, collected, fitted.Decisions, visibleLeftBehind.Decisions);
         var otherModsObjectsTakenAway = otherMods.Result.TakenAway();
-        var visibleTargetsAsTheRoundsMeasureThem = ClashingObjectFitter.IndexAsTheRoundsMeasureThem(collected.Targets, otherMods.Decisions, runCaches);
+        var visibleTargetsAsTheRoundsMeasureThem = runCaches.IndexVisibleTargetsAsTheRoundsMeasureThem(collected.Targets, otherMods.Decisions);
         var leftBehind = RunLeftBehind(
             scope,
             runCaches,
@@ -214,7 +223,7 @@ public static class StepRunner
         var markerMoves = RunMarkerMoves(
             scope,
             runCaches,
-            ClashingObjectFitter.IndexAsTheyStand(collected.Targets, leftBehind.Decisions, runCaches),
+            runCaches.IndexVisibleTargetsAsTheyStand(collected.Targets, leftBehind.Decisions),
             collected,
             otherModsObjectsTakenAway,
             leftBehind);
@@ -238,7 +247,7 @@ public static class StepRunner
 
     private static HeldUpTargets RunHeldUpTargets(RunScope scope, IRunCaches runCaches, ModTrustTable trust, CollectedObjects collected) =>
         scope.Environment.Log.Timed(
-            () => RestingObjects.FindHeldUpTargets(
+            () => OtherModsObjects.FindHeldUpTargets(
                 collected.Targets,
                 runCaches.VisibleTargets,
                 trust,
@@ -273,17 +282,28 @@ public static class StepRunner
         RemovalDecisions afterFits,
         RemovalDecisions afterVisibleLeftBehind)
     {
-        var result = RestingObjects.SettleOtherModsObjects(
+        var targetsAsMeasured = afterFits.TargetsAsTheRoundsMeasureThem(collected.Targets);
+        var result = OtherModsObjects.SettleLeftWithoutSupport(
             collected.Targets,
-            afterFits.TargetsAsTheRoundsMeasureThem(collected.Targets),
+            targetsAsMeasured,
             afterVisibleLeftBehind,
             runCaches.VisibleTargets,
-            ClashingObjectFitter.IndexAsTheRoundsMeasureThem(collected.Targets, afterFits, runCaches),
+            runCaches.IndexVisibleTargetsAsTheRoundsMeasureThem(collected.Targets, afterFits),
             placed => runCaches.IndexVisibleTargets(placed),
             trust,
             scope.Environment.Plugins,
             scope.Settings.OtherModsObjects,
             scope.Settings.AlsoRemove,
+            decided => RestingObjects.CreateRoundsAfter(
+                decided,
+                targetsAsMeasured,
+                runCaches.VisibleObjectsOfAnyPlugin(),
+                scope.Settings.AlsoRemove,
+                runCaches.Shapes,
+                runCaches.Triangles,
+                runCaches.SurfaceSamples,
+                runCaches.Terrain,
+                scope.Settings.Execution),
             runCaches.Shapes,
             runCaches.Triangles,
             runCaches.SurfaceSamples,
@@ -401,10 +421,31 @@ public static class StepRunner
                 Unfittable: ChangedTerrainObjects.CreatePlacementRule(
                     trust.AcceptedWorld, scope.Environment.Plugins, scope.Plugin, runCaches.Shapes, group.ChangedTerrain.Settings))),
         ];
-        var resting = RestingObjects.CreateRestingRule(
+        var targetObjectsResting = RestingObjects.CreateRestingRule(
+            collected.Targets,
+            scope.Settings.AlsoRemove,
+            runCaches.Shapes,
+            runCaches.Triangles,
+            runCaches.SurfaceSamples,
+            runCaches.Terrain,
+            runCaches.VisibleObjectsOfAnyPlugin,
+            OtherModsObjects.CreateDropTest(
+                collected.Targets,
+                runCaches.VisibleTargets,
+                trust,
+                scope.Environment.Plugins,
+                scope.Settings.AlsoRemove,
+                runCaches.Shapes,
+                runCaches.Triangles,
+                runCaches.SurfaceSamples,
+                runCaches.Terrain,
+                runCaches.VisibleObjectsOfAnyPlugin,
+                scope.Settings.Execution),
+            scope.Settings.Execution);
+        var resting = OtherModsObjects.CreateRestingRule(
+            targetObjectsResting,
             collected.Targets,
             runCaches.VisibleTargets,
-            scope.Settings.AlsoRemove,
             trust,
             scope.Environment.Plugins,
             scope.Settings.OtherModsObjects,
@@ -534,7 +575,7 @@ public static class StepRunner
         var result = VisibleLeftBehindObjects.Find(
             collected.Targets,
             afterAlsoRemove,
-            ClashingObjectFitter.IndexAsTheRoundsMeasureThem(collected.Targets, afterAlsoRemove, runCaches),
+            runCaches.IndexVisibleTargetsAsTheRoundsMeasureThem(collected.Targets, afterAlsoRemove),
             runCaches.Bases,
             runCaches.Shapes,
             CreateAlsoRemoveFollowUp(scope, runCaches, afterAlsoRemove.TargetsAsTheRoundsMeasureThem(collected.Targets)),
@@ -662,7 +703,7 @@ public static class StepRunner
                 runCaches.Shapes,
                 runCaches.Triangles,
                 settings),
-            (holders, holderIndex, movesAway, staying, copiesOfMoving) => RestingObjects.FindHoldersOfObjectsThatStay(
+            (holders, holderIndex, movesAway, staying, copiesOfMoving) => OtherModsObjects.FindHoldersOfObjectsThatStay(
                 holders,
                 holderIndex,
                 movesAway,
@@ -680,7 +721,7 @@ public static class StepRunner
             runCaches.Shapes,
             runCaches.Navmeshes,
             scope.Plugin.FindLandWorldspace,
-            cell => new LandHeights(scope.Plugin.ReadTerrainBelowTarget(cell), scope.Plugin.ReadTerrain(cell)),
+            cell => new LandHeights(scope.Plugin.ReadTerrainBelow(trust.CleanedMod, cell), scope.Plugin.ReadTerrain(cell)),
             orders => scope.Environment.PatchWriting.FindNavmeshFaultIfWritten(scope.Plugin.ReadWritableRecords(), orders),
             scope.Environment.Plugins,
             trust.CleanedMod,

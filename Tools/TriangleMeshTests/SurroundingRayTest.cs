@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 
 namespace AddedObjectRemover;
@@ -10,7 +11,7 @@ namespace AddedObjectRemover;
 /// </summary>
 public static class SurroundingRayTest
 {
-    private static readonly Vector3[] WorldDirections = [Vector3.UnitZ, Vector3.UnitX, -Vector3.UnitX, Vector3.UnitY, -Vector3.UnitY];
+    private static readonly ImmutableArray<Vector3> WorldDirections = [Vector3.UnitZ, Vector3.UnitX, -Vector3.UnitX, Vector3.UnitY, -Vector3.UnitY];
 
     /// <param name="localPoint">The point in the mesh's local frame.</param>
     /// <param name="rotation">The placed object's rotation, turning local directions into world ones.</param>

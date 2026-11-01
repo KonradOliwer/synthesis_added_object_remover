@@ -2,12 +2,11 @@ using AddedObjectRemover.Caches.BaseObjectShapeAndKind;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 
 namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
 
 /// <summary>
-/// The load-order caches (C2 to C8 and C13 to C15), created at the start of the run: the first creation point of
+/// The load-order caches, created at the start of the run: the first creation point of
 /// the run's caches. It also holds the problems the mesh reads meet and the statistics counted from the contents.
 /// </summary>
 internal sealed class LoadOrderCaches : ILoadOrderCaches
@@ -59,9 +58,9 @@ internal sealed class LoadOrderCaches : ILoadOrderCaches
     /// <remarks>The terrain and navmesh caches read through <paramref name="plugin"/>, so they answer once its placed records are read.</remarks>
     /// <param name="unexpectedErrors">The run's unexpected-error channel, which the mesh files record into.</param>
     /// <param name="collisionLayers">The load order's collision layer records, by layer number.</param>
-    /// <param name="npcBodyRules">How C8 works out the bodies of the NPCs.</param>
-    /// <param name="placedNpcRules">How C10 picks, places and counts the placed NPCs.</param>
-    /// <param name="surfaceSamplesPerMesh">How many points C15 spreads over each mesh's surface.</param>
+    /// <param name="npcBodyRules">How the NPC body cache works out the bodies of the NPCs.</param>
+    /// <param name="placedNpcRules">How the placed-NPC index picks, places and counts the placed NPCs.</param>
+    /// <param name="surfaceSamplesPerMesh">How many points the surface sample spreads over each mesh's surface.</param>
     public static LoadOrderCaches Create(
         IMeshFilesFactory meshFilesFactory,
         IUnexpectedErrors unexpectedErrors,
@@ -88,8 +87,8 @@ internal sealed class LoadOrderCaches : ILoadOrderCaches
             placedNpcRules);
     }
 
-    /// <summary>Creates C9 to C12 over the collected placed objects, together with these caches, as a new object; these caches stay as they are. The second creation point of the run.</summary>
-    /// <param name="measurementRules">How C9 and C11 measure an object.</param>
+    /// <summary>Creates the object caches over the collected placed objects, together with these caches, as a new object; these caches stay as they are. The second creation point of the run.</summary>
+    /// <param name="measurementRules">How the other-mod and any-plugin object caches measure an object.</param>
     public CachesOfTheRun AddObjectCaches(CollectedObjects world, ObjectMeasurementRules measurementRules, Execution execution) =>
         new(this, ObjectCaches.Create(world, Shapes, Triangles, Bodies, measurementRules, _placedNpcRules, execution));
 

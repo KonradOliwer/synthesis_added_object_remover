@@ -1,6 +1,6 @@
 namespace AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 
-/// <summary>Cache C5: the shape, size and kind of each base object, measured once per base.</summary>
+/// <summary>The shape, size and kind of each base object, measured once per base.</summary>
 public interface IBaseObjectShapes
 {
     /// <summary>A null or unknown base yields <see cref="BaseShape.Missing"/>.</summary>

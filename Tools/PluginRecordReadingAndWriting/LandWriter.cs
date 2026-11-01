@@ -20,7 +20,7 @@ internal sealed class LandWriter(SynthesisWriteCache synthesis, CellOverrides ce
 
     private readonly Dictionary<FormKey, ILandscape> _lands = [];
 
-    public void UndoParts(RecordKey land, PointSet colours, QuarterSet quarters, bool rest)
+    public void CopyEarlierParts(RecordKey land, PointSet colours, QuarterSet quarters, bool rest)
     {
         var versions = handles.LandOf(land);
         var target = GetOrAddOverride(land, versions.Winner);

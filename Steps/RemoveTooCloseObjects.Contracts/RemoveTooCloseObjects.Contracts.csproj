@@ -4,10 +4,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The target objects found too close to another mod's object, the NPC bodies and the work counts of that search. It references Ids, CollectPlacedObjects.Contracts, SelectObjectsThatCanCauseRemovals.Contracts, RemovalDecisionList.Contracts, BoxAndTransformMath, OrderIndependentParallelWork and UnexpectedFailureHandling (for its part key) and holds no packages.</Description>
+    <Description>The target objects found too close to another mod's object and the work counts of that search. It references Ids, BaseObjectShapeAndKind.Contracts (for the NPC bodies), CollectPlacedObjects.Contracts, SelectObjectsThatCanCauseRemovals.Contracts, RemovalDecisionList.Contracts, BoxAndTransformMath, OrderIndependentParallelWork and UnexpectedFailureHandling (for its part key) and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
+    <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
     <ProjectReference Include="..\SelectObjectsThatCanCauseRemovals.Contracts\SelectObjectsThatCanCauseRemovals.Contracts.csproj" />
     <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />

@@ -1,4 +1,6 @@
+using System.Collections.Immutable;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
+using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
 namespace AddedObjectRemover.Tests.Fixtures;
 
@@ -38,6 +40,10 @@ internal sealed class TestRunCaches(
     public IVisibleTargetObjects VisibleTargets => throw NotRead();
 
     public IVisibleTargetObjects IndexVisibleTargets(IReadOnlyList<TargetObject> targets) => throw NotRead();
+
+    public IVisibleTargetObjects IndexVisibleTargetsAsTheRoundsMeasureThem(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions) => throw NotRead();
+
+    public IVisibleTargetObjects IndexVisibleTargetsAsTheyStand(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions) => throw NotRead();
 
     public IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPlugin() => objectsOfAnyPlugin();
 

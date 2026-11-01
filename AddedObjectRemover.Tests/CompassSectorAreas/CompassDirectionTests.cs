@@ -12,6 +12,32 @@ public class CompassDirectionTests
         OrientedBox.FromLocal(local, TestTargets.At(position, zRadians));
 
     [Theory]
+    [InlineData(1f, 0f, nameof(DirectionSector.East))]
+    [InlineData(1f, 1f, nameof(DirectionSector.NorthEast))]
+    [InlineData(0f, 1f, nameof(DirectionSector.North))]
+    [InlineData(-1f, 1f, nameof(DirectionSector.NorthWest))]
+    [InlineData(-1f, 0f, nameof(DirectionSector.West))]
+    [InlineData(-1f, -0.0001f, nameof(DirectionSector.West))]
+    [InlineData(-1f, -1f, nameof(DirectionSector.SouthWest))]
+    [InlineData(0f, -1f, nameof(DirectionSector.South))]
+    [InlineData(1f, -1f, nameof(DirectionSector.SouthEast))]
+    [InlineData(1f, -0.0001f, nameof(DirectionSector.East))]
+    [InlineData(0f, 0f, nameof(DirectionSector.East))]
+    public void OffsetFallsInItsCompassSector(float x, float y, string expected) =>
+        Assert.Equal(Enum.Parse<DirectionSector>(expected), CompassDirections.Of(new Vector2(x, y)));
+
+    [Theory]
+    [InlineData(22.4f, nameof(DirectionSector.East))]
+    [InlineData(22.6f, nameof(DirectionSector.NorthEast))]
+    [InlineData(337.4f, nameof(DirectionSector.SouthEast))]
+    [InlineData(337.6f, nameof(DirectionSector.East))]
+    public void SectorsSpanHalfASectorEachSide(float degrees, string expected)
+    {
+        var radians = float.DegreesToRadians(degrees);
+        Assert.Equal(Enum.Parse<DirectionSector>(expected), CompassDirections.Of(new Vector2(MathF.Cos(radians), MathF.Sin(radians))));
+    }
+
+    [Theory]
     [InlineData(0f, 0f, 20f)]
     [InlineData(49.9f, 29.9f, 0.1f)]
     [InlineData(49.99f, -29.99f, 39.99f)]

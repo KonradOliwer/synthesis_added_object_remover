@@ -21,12 +21,12 @@ public sealed class PatchWriting(SynthesisWriteCache synthesis, ISkyrimMod patch
         {
             switch (order)
             {
-                case UndoCellParts undo: cellParts.UndoParts(undo.Record, undo.Parts); break;
-                case UndoLandParts undo: lands.UndoParts(undo.Record, undo.Colours, undo.Quarters, undo.Rest); break;
+                case CopyEarlierCellParts copy: cellParts.CopyEarlierParts(copy.Record, copy.Parts); break;
+                case CopyEarlierLandParts copy: lands.CopyEarlierParts(copy.Record, copy.Colours, copy.Quarters, copy.Rest); break;
                 case SetLandHeights set: lands.SetHeights(set.Record, set.Heights, set.Restored, set.Beyond); break;
-                case CopyNavmeshGeometry copy: navmeshes.CopyGeometry(copy.Record); break;
-                case BringBackNavmesh bringBack: navmeshes.BringBack(bringBack.Record); break;
-                case SinkNavmesh sink: navmeshes.Sink(sink.Record, sink.Z); break;
+                case CopyEarlierNavmeshGeometry copy: navmeshes.CopyEarlierGeometry(copy.Record); break;
+                case CopyEarlierNavmesh copy: navmeshes.CopyEarlier(copy.Record); break;
+                case SetNavmeshZ set: navmeshes.SetZ(set.Record, set.Z); break;
                 case WriteNavmeshMapEntries entries: maps.WriteEntries(entries.Record, entries.Entries); break;
                 default: placed.Write(order); break;
             }
@@ -46,6 +46,5 @@ public sealed class PatchWriting(SynthesisWriteCache synthesis, ISkyrimMod patch
     private static RecordHandles HandlesOf(IWritableRecords records) =>
         records as RecordHandles ?? throw new ArgumentException(ForeignRecordsMessage, nameof(records));
 
-    /// <summary>Marks the patch as this patcher's output in its header description (<see cref="PatchMarker"/>).</summary>
     public void WritePatchMarker() => patchMod.ModHeader.Description = PatchMarker.AddTo(patchMod.ModHeader.Description);
 }

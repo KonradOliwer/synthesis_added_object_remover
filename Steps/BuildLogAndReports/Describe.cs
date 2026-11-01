@@ -1,4 +1,6 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
@@ -24,7 +26,7 @@ internal static class Describe
     /// <summary>Named for a change only the patch holds, which this run did not make.</summary>
     private const string EarlierPatcher = "an earlier patcher in this group";
 
-    private static readonly (TerrainChangeKind Kind, string Text)[] TerrainChangeTexts =
+    private static readonly ImmutableArray<(TerrainChangeKind Kind, string Text)> TerrainChangeTexts =
     [
         (TerrainChangeKind.Height, "height"),
         (TerrainChangeKind.TerrainType, "ground type"),

@@ -42,11 +42,11 @@ internal sealed class NavmeshMapWriter(ISkyrimMod patchMod, RecordHandles handle
         var navmesh = order.Navmesh.ToFormKey();
         var source = handles.NavmeshMaps.Single(version => version.Plugin == order.From && version.Map.FormKey == mapKey).Map;
         var entry = source.MapInfos.Last(info => info.NavigationMesh.FormKey == navmesh).DeepCopy();
-        if (order.SinkTo is { } z) Sink(entry, z);
+        if (order.SetZ is { } z) SetZ(entry, z);
         return entry;
     }
 
-    private static void Sink(NavigationMapInfo entry, float z)
+    private static void SetZ(NavigationMapInfo entry, float z)
     {
         entry.Point = entry.Point.WithZ(z);
         if (entry.Island is { } island)

@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Steps.WriteThePatch;
-using AddedObjectRemover.Steps.WriteThePatch.Contracts;
+using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Tests.EndToEnd;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Skyrim;
@@ -92,7 +92,7 @@ public sealed class NavmeshOutputCheckTests
         edited.Data.Max = new P3Float(Size, Size, Size / 2);
         Change(_west, [_west, edited], [BaseGame, Cleaned]);
 
-        var check = WriteAndCheck(new CopyNavmeshGeometry(WestKey), Entries((WestKey, BaseGame, null)));
+        var check = WriteAndCheck(new CopyEarlierNavmeshGeometry(WestKey), Entries((WestKey, BaseGame, null)));
 
         Assert.Null(Record.Exception(check));
     }
@@ -102,7 +102,7 @@ public sealed class NavmeshOutputCheckTests
     {
         Assert.Equal(new P2Int16(7, 6), StoredParentCoordinates);
         Change(_west, [_west, Deleted(CopyIn(_cleaned, _west))], [BaseGame, Cleaned]);
-        var orders = new WriteOrder[] { new BringBackNavmesh(WestKey), Entries((WestKey, BaseGame, null)) };
+        var orders = new WriteOrder[] { new CopyEarlierNavmesh(WestKey), Entries((WestKey, BaseGame, null)) };
         var (_, writing, handles) = Write(orders);
 
         var world = writing.ReadFinalNavmeshes(handles);
@@ -173,7 +173,7 @@ public sealed class NavmeshOutputCheckTests
         Change(_west, [_west, Deleted(CopyIn(_cleaned, _west))], [BaseGame, Cleaned]);
         DeleteCellInLaterPlugin();
 
-        var thrown = Record.Exception(() => Write([new BringBackNavmesh(WestKey)]));
+        var thrown = Record.Exception(() => Write([new CopyEarlierNavmesh(WestKey)]));
 
         Assert.Contains("deleted", Assert.IsType<InvalidOperationException>(thrown).Message);
     }
@@ -183,7 +183,7 @@ public sealed class NavmeshOutputCheckTests
     public void ABroughtBackNavmeshNamingADoorTheCleanedModLeavesRemovedThrows()
     {
         Change(_west, [_west, Deleted(CopyIn(_cleaned, _west))], [BaseGame, Cleaned]);
-        var orders = new WriteOrder[] { new BringBackNavmesh(WestKey), Entries((WestKey, BaseGame, null)) };
+        var orders = new WriteOrder[] { new CopyEarlierNavmesh(WestKey), Entries((WestKey, BaseGame, null)) };
         var (_, writing, handles) = Write(orders);
 
         var thrown = Record.Exception(() => NavmeshOutputCheck.ThrowOnFault(orders, new HashSet<RecordKey> { DoorKey }, () => writing.ReadFinalNavmeshes(handles)));
@@ -196,7 +196,7 @@ public sealed class NavmeshOutputCheckTests
     {
         Change(_west, [_west, Deleted(CopyIn(_cleaned, _west))], [BaseGame, Cleaned]);
 
-        var check = WriteAndCheck(new BringBackNavmesh(WestKey), Entries((WestKey, BaseGame, null)));
+        var check = WriteAndCheck(new CopyEarlierNavmesh(WestKey), Entries((WestKey, BaseGame, null)));
 
         Assert.Null(Record.Exception(check));
     }
@@ -233,7 +233,7 @@ public sealed class NavmeshOutputCheckTests
         _map.PreferredPathing = PreferredPathsThrough(_west.FormKey, _east.FormKey, far.FormKey);
         Change(_west, [_west, Deleted(CopyIn(_cleaned, _west))], [BaseGame, Cleaned]);
 
-        var check = WriteAndCheck(new BringBackNavmesh(WestKey), Entries((WestKey, BaseGame, null)));
+        var check = WriteAndCheck(new CopyEarlierNavmesh(WestKey), Entries((WestKey, BaseGame, null)));
 
         Assert.Null(Record.Exception(check));
     }
@@ -246,7 +246,7 @@ public sealed class NavmeshOutputCheckTests
         _map.PreferredPathing = PreferredPathsThrough(_west.FormKey, _east.FormKey, far.FormKey);
         Change(_west, [_west, Deleted(CopyIn(_cleaned, _west))], [BaseGame, Cleaned]);
 
-        var check = WriteAndCheck(new BringBackNavmesh(WestKey), Entries((WestKey, BaseGame, null)));
+        var check = WriteAndCheck(new CopyEarlierNavmesh(WestKey), Entries((WestKey, BaseGame, null)));
 
         Assert.Contains(nameof(NavmeshRule.PathData), Assert.IsType<InvalidOperationException>(Record.Exception(check)).Message);
     }
@@ -286,10 +286,10 @@ public sealed class NavmeshOutputCheckTests
 
     private WriteOrder[] ReplacementOrders(NavigationMesh replacement) =>
     [
-        new BringBackNavmesh(WestKey),
-        new SinkNavmesh(replacement.FormKey.ToRecordKey(), RemovalConvention.SunkNavmeshZ),
-        new CopyNavmeshGeometry(EastKey),
-        new UndoPlacedParts(DoorKey, PlacedParts.NavDoorLink),
+        new CopyEarlierNavmesh(WestKey),
+        new SetNavmeshZ(replacement.FormKey.ToRecordKey(), RemovalConvention.SunkNavmeshZ),
+        new CopyEarlierNavmeshGeometry(EastKey),
+        new CopyEarlierPlacedParts(DoorKey, PlacedParts.NavDoorLink),
         Entries((WestKey, BaseGame, null), (EastKey, BaseGame, null), (replacement.FormKey.ToRecordKey(), Cleaned, RemovalConvention.SunkNavmeshZ)),
     ];
 
@@ -352,8 +352,8 @@ public sealed class NavmeshOutputCheckTests
         return new Dictionary<RecordKey, NavDoorLinkFact> { [DoorKey] = new(link.NavMesh.FormKey.ToRecordKey(), link.TeleportMarkerTriangle) };
     }
 
-    private WriteNavmeshMapEntries Entries(params (RecordKey Navmesh, PluginName From, float? SinkTo)[] entries) =>
-        new(MapKey, [.. entries.Select(entry => new NavmeshEntryOrder(entry.Navmesh, entry.From, entry.SinkTo))]);
+    private WriteNavmeshMapEntries Entries(params (RecordKey Navmesh, PluginName From, float? SetZ)[] entries) =>
+        new(MapKey, [.. entries.Select(entry => new NavmeshEntryOrder(entry.Navmesh, entry.From, entry.SetZ))]);
 
     private void Change(NavigationMesh navmesh, NavigationMesh[] versions, PluginName[] plugins)
     {

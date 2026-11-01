@@ -176,7 +176,7 @@ internal sealed class NavmeshUndoPlan
         return Components.Of(members.Count, linked.Concat(byDoor)).Select(component =>
         {
             ImmutableArray<NavmeshMember> group = [.. component.Select(index => members[index])];
-            ImmutableArray<DoorLinkFact> doors = [.. group.SelectMany(member => member.Change.Doors).DistinctBy(door => door.Door).OrderBy(door => door.Door, RecordKeyOrder.Comparer)];
+            ImmutableArray<DoorLinkChange> doors = [.. group.SelectMany(member => member.Change.Doors).DistinctBy(door => door.Door).OrderBy(door => door.Door, RecordKeyOrder.Comparer)];
             return new NavmeshGroup(group, doors, Orders: [], Refused: null);
         });
     }

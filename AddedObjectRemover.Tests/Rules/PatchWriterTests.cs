@@ -138,7 +138,7 @@ public sealed class PatchWriterTests
 
         var (written, writing) = WriteOne(target, new WhenRemoved.Restore(earlier));
 
-        Assert.Equal<WriteOrder>([new UndoPlacedParts(target.Key, undo)], writing.Orders);
+        Assert.Equal<WriteOrder>([new CopyEarlierPlacedParts(target.Key, undo)], writing.Orders);
         Assert.Equal([0], written.Restored.Select(id => id.Index));
         Assert.Empty(written.Removed);
     }
@@ -153,7 +153,7 @@ public sealed class PatchWriterTests
         var (_, writing) = WriteOne(target, new WhenRemoved.Restore(earlier));
 
         Assert.Equal<WriteOrder>(
-            [new PlaceInCell(target.Key, earlierCell.Key, InPersistentList: false), new UndoPlacedParts(target.Key, earlier.Undo)], writing.Orders);
+            [new PlaceInCell(target.Key, earlierCell.Key, InPersistentList: false), new CopyEarlierPlacedParts(target.Key, earlier.Undo)], writing.Orders);
     }
 
     [Fact]
@@ -185,7 +185,7 @@ public sealed class PatchWriterTests
         var (_, writing) = WriteOne(target, new WhenRemoved.Restore(earlier));
 
         Assert.Equal<WriteOrder>(
-            [new PlaceInCell(target.Key, earlierCell.Key, persistentBefore), new UndoPlacedParts(target.Key, PlacedParts.Presence)], writing.Orders);
+            [new PlaceInCell(target.Key, earlierCell.Key, persistentBefore), new CopyEarlierPlacedParts(target.Key, PlacedParts.Presence)], writing.Orders);
     }
 
     /// <summary>A later plugin or an earlier patcher made the object persistent: its Persistent flag and list stay while its presence goes back.</summary>
@@ -197,7 +197,7 @@ public sealed class PatchWriterTests
 
         var (_, writing) = WriteOne(target, new WhenRemoved.Restore(earlier));
 
-        Assert.Equal<WriteOrder>([new UndoPlacedParts(target.Key, PlacedParts.Position | PlacedParts.Presence)], writing.Orders);
+        Assert.Equal<WriteOrder>([new CopyEarlierPlacedParts(target.Key, PlacedParts.Position | PlacedParts.Presence)], writing.Orders);
     }
 
     /// <summary>A later plugin moved the object, perhaps into another cell: it stays in its cell and list while its presence and persistence go back.</summary>
@@ -215,7 +215,7 @@ public sealed class PatchWriterTests
 
         var (_, writing) = WriteOne(target, new WhenRemoved.Restore(earlier));
 
-        Assert.Equal<WriteOrder>([new UndoPlacedParts(target.Key, PlacedParts.Presence)], writing.Orders);
+        Assert.Equal<WriteOrder>([new CopyEarlierPlacedParts(target.Key, PlacedParts.Presence)], writing.Orders);
     }
 
     [Fact]
@@ -233,7 +233,7 @@ public sealed class PatchWriterTests
         PatchWriter.Write(final, [.. targets], OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff, new ReadPlugin(), writing);
 
         Assert.Equal<Type>(
-            [typeof(SetInitiallyDisabled), typeof(SetPosition), typeof(SetPlacement), typeof(UndoPlacedParts), typeof(SetPosition)],
+            [typeof(SetInitiallyDisabled), typeof(SetPosition), typeof(SetPlacement), typeof(CopyEarlierPlacedParts), typeof(SetPosition)],
             writing.Orders.Select(order => order.GetType()));
         Assert.Equal([targets[0].Key, targets[0].Key, targets[1].Key, targets[2].Key, targets[3].Key], writing.Orders.Select(order => order.Record));
     }
@@ -270,12 +270,12 @@ public sealed class PatchWriterTests
         Assert.Equal((1, 2), (written.Restored.Length, written.WrittenWhereRemoved));
         Assert.Equal<WriteOrder>(
             [
-                new UndoPlacedParts(target.Key, PlacedParts.Position | PlacedParts.Rotation | PlacedParts.Scale),
+                new CopyEarlierPlacedParts(target.Key, PlacedParts.Position | PlacedParts.Rotation | PlacedParts.Scale),
                 new PlaceInCell(rock.Key, earlierCell.Key, InPersistentList: false),
-                new UndoPlacedParts(rock.Key, rock.Earlier.Undo),
+                new CopyEarlierPlacedParts(rock.Key, rock.Earlier.Undo),
             ],
             writing.Orders.Take(3));
-        var cellOrder = Assert.IsType<UndoCellParts>(Assert.Single(writing.Orders.Skip(3)));
+        var cellOrder = Assert.IsType<CopyEarlierCellParts>(Assert.Single(writing.Orders.Skip(3)));
         Assert.Equal(cell.Cell, cellOrder.Record);
         Assert.Equal([new CellPartName(CellPart.Music, null)], cellOrder.Parts.ToList());
     }
@@ -335,6 +335,8 @@ public sealed class PatchWriterTests
 
         public IWritableRecords? Records { get; private set; }
 
+        public void WritePatchMarker() => throw new NotSupportedException();
+
         public void Write(IWritableRecords records, IReadOnlyList<WriteOrder> orders)
         {
             Records = records;
@@ -367,7 +369,7 @@ public sealed class PatchWriterTests
 
         public float[]? ReadTerrain(ExteriorCell cell) => throw new NotSupportedException();
 
-        public float[]? ReadTerrainBelowTarget(ExteriorCell cell) => throw new NotSupportedException();
+        public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => throw new NotSupportedException();
 
         public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new NotSupportedException();
 

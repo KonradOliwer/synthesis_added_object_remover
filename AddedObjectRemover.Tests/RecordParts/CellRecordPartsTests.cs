@@ -138,7 +138,7 @@ public class CellRecordPartsTests
             ["FormKey", "EditorID", "VersionControl", "FormVersion", "Version2",
                 "Timestamp", "UnknownGroupData", "PersistentTimestamp", "PersistentUnknownGroupData", "TemporaryTimestamp", "TemporaryUnknownGroupData",
                 "Persistent", "Temporary", "NavigationMeshes", "Landscape", "Grid"],
-            CellRecordParts.ExcludedFields);
+            CellRecordParts.ExcludedFields.ToArray());
         Assert.Equal((int)Cell.Flag.IsInteriorCell, CellRecordParts.ExcludedFlagBits);
         Assert.Equal((int)Cell.MajorFlag.Persistent | (int)SkyrimMajorRecord.SkyrimMajorRecordFlag.Compressed, CellRecordParts.ExcludedMajorFlagBits);
     }

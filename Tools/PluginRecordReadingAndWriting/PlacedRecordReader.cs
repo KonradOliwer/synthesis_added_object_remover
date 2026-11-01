@@ -56,9 +56,9 @@ internal sealed record TargetFootprint(
 /// Mods are visited highest priority first, so the first sighting of a FormKey (record or cell)
 /// is its winner. The later sightings of a record that became a fact are its lower versions; they are kept down to and
 /// including the first one whose plugin stops the walk. For a record the target plugin overrides, no plugin stops the walk before
-/// the version just below the target plugin's is kept, and the parts of the versions from that one up are judged
+/// the version just below the target plugin's is kept, and the parts of the versions from that one up are compared
 /// (<see cref="PlacedPartHistory"/>). The cell and LAND records of other plugins the target plugin overrides are walked the same
-/// way when asked for, and judged (<see cref="CellPartHistory"/>, <see cref="LandPartHistory"/>), together with the navmeshes of the
+/// way when asked for, and compared (<see cref="CellPartHistory"/>, <see cref="LandPartHistory"/>), together with the navmeshes of the
 /// target spaces it overrides, deletes or adds (<see cref="NavmeshVersionCollector"/>).
 /// </summary>
 internal sealed class PlacedRecordReader
@@ -97,10 +97,10 @@ internal sealed class PlacedRecordReader
 
     /// <summary>
     /// The versions, highest first, of each record the target plugin overrides whose version just below the target plugin's is not
-    /// read yet. Memory stays bounded: each list is dropped once that version is read and the parts are judged.
+    /// read yet. Memory stays bounded: each list is dropped once that version is read and the parts are compared.
     /// </summary>
-    private readonly Dictionary<RecordKey, List<IPlacedGetter>> _versionsToJudge = new();
-    private readonly Dictionary<RecordKey, PlacedPartChanges> _cleanedModChanges = new();
+    private readonly Dictionary<RecordKey, List<IPlacedGetter>> _versionsToCompare = new();
+    private readonly Dictionary<RecordKey, PlacedPartDifferences> _partDifferences = new();
     private readonly List<LinkFact> _links = [];
     private readonly HashSet<RecordKey> _linkedFromPlacedRecords = [];
     private readonly Dictionary<RecordKey, RecordKey> _landWorldspaceOf = new();
@@ -423,7 +423,7 @@ internal sealed class PlacedRecordReader
     {
         var versions = new List<PlacedVersionFact> { winner };
         _versions.Add(key, versions);
-        if (_footprint.OverriddenRecords.Contains(key)) _versionsToJudge.Add(key, [record]);
+        if (_footprint.OverriddenRecords.Contains(key)) _versionsToCompare.Add(key, [record]);
         if (!StopsTheWalk(key, winner.Plugin)) _openVersions.Add(key, versions);
     }
 
@@ -434,28 +434,25 @@ internal sealed class PlacedRecordReader
         var isBelowTarget = versions[^1].Plugin == _scope.Target;
         if (isBelowTarget && _footprint.OverriddenRecords.Contains(key)) _earlierRecords.Add(key, record);
         versions.Add(ReadVersion(record, cell));
-        if (_versionsToJudge.TryGetValue(key, out var versionsToJudge)) KeepVersionToJudge(record, key, versionsToJudge, isBelowTarget, versions);
+        if (_versionsToCompare.TryGetValue(key, out var versionsToCompare)) KeepVersionToCompare(record, key, versionsToCompare, isBelowTarget, versions);
         if (StopsTheWalk(key, cell.Plugin)) _openVersions.Remove(key);
     }
 
-    /// <summary>Once the version just below the target plugin's is read, judges the parts of the record.</summary>
-    /// <param name="versions">The versions read so far, highest first; <paramref name="versionsToJudge"/> holds the same versions as stored.</param>
-    private void KeepVersionToJudge(
-        IPlacedGetter record, RecordKey key, List<IPlacedGetter> versionsToJudge, bool isBelowTarget, List<PlacedVersionFact> versions)
+    /// <summary>Once the version just below the target plugin's is read, compares the parts of the record's versions.</summary>
+    /// <param name="versions">The versions read so far, highest first; <paramref name="versionsToCompare"/> holds the same versions as stored.</param>
+    private void KeepVersionToCompare(
+        IPlacedGetter record, RecordKey key, List<IPlacedGetter> versionsToCompare, bool isBelowTarget, List<PlacedVersionFact> versions)
     {
-        versionsToJudge.Add(record);
+        versionsToCompare.Add(record);
         if (!isBelowTarget) return;
-        _versionsToJudge.Remove(key);
-        IPlacedGetter[] lowestFirst = [.. Enumerable.Reverse(versionsToJudge)];
+        _versionsToCompare.Remove(key);
+        IPlacedGetter[] lowestFirst = [.. Enumerable.Reverse(versionsToCompare)];
         PluginName[] plugins = [.. versions.Select(version => version.Plugin).Reverse()];
-        var patch = _names.Of(_patch);
-        _cleanedModChanges.Add(key, PlacedPartHistory.Of(_parts, lowestFirst, plugins, patch));
-        _navmeshVersions?.KeepDoorLinkOutcome(
-            key, PartHistory.Of(plugins, PartHistory.TargetVersionIndex, patch, (lower, higher) => _parts.NavDoorLink.Differs(lowestFirst[lower], lowestFirst[higher])));
+        _partDifferences.Add(key, PlacedPartHistory.Of(_parts, lowestFirst, plugins));
     }
 
     /// <summary>A record the target plugin overrides is walked on, whatever the plugin, until its version just below the target plugin's is read.</summary>
-    private bool StopsTheWalk(RecordKey key, PluginName plugin) => _stopsTheWalk(plugin) && !_versionsToJudge.ContainsKey(key);
+    private bool StopsTheWalk(RecordKey key, PluginName plugin) => _stopsTheWalk(plugin) && !_versionsToCompare.ContainsKey(key);
 
     /// <returns>True when a link was read; outside the target spaces only links into the target plugin are read.</returns>
     private bool ReadLinks(IPlacedGetter record, RecordKey key, ScannedCell cell)
@@ -491,7 +488,7 @@ internal sealed class PlacedRecordReader
         winner.Reference.ReferenceRadius,
         winner.Reference.PrimitiveBounds,
         Versions: [winner],
-        CleanedModChanges: null);
+        PartDifferences: null);
 
     private PlacedVersionFact ReadVersion(IPlacedGetter record, ScannedCell cell) => new(
         cell.Plugin,
@@ -513,10 +510,14 @@ internal sealed class PlacedRecordReader
     private ScannedRecords CreateScannedRecords(IReadOnlyDictionary<RecordKey, CellAreaFact> cellAreas)
     {
         var terrain = new LandscapeTerrain(
-            _landscapes, _landWorldspaceOf, _scope.TerrainVersions ? _landscapeVersions : null, _scope.TerrainLayers ? _names : null, ReadsLandVersions ? _landscapesBelowTarget : null);
-        var navmeshes = _navmeshVersions?.Judge(_loadOrder, _names.Of(_patch));
-        var changedCells = JudgeCells();
-        var changedLands = JudgeLands();
+            _landscapes,
+            _landWorldspaceOf,
+            _scope.TerrainVersions ? _landscapeVersions : null,
+            _scope.TerrainLayers ? _names : null,
+            ReadsLandVersions ? new LandscapesBelow(_scope.Target, _landscapesBelowTarget) : null);
+        var navmeshes = _navmeshVersions?.Compare(_loadOrder);
+        var changedCells = CompareCells();
+        var changedLands = CompareLands();
         var facts = new PlacedRecordFacts(
             [.. _records.Select(WithVersions)],
             _recordsScanned,
@@ -529,7 +530,7 @@ internal sealed class PlacedRecordReader
             changedLands,
             navmeshes?.Facts ?? ImmutableArray<NavmeshRecordFact>.Empty,
             _deletedCells,
-            navmeshes?.OverriddenDoorLinks ?? new Dictionary<RecordKey, DoorLinkFact>(),
+            navmeshes?.OverriddenDoorLinks ?? new Dictionary<RecordKey, NavDoorLinkVersions>(),
             _cellsDeletedInFinalWorld,
             _spaces);
         var water = new CellWater(_scope.Water ? _cellWaterCopies : null, CollectWorldspaceWater(), _waterWorldspaceOf);
@@ -538,11 +539,10 @@ internal sealed class PlacedRecordReader
         return new ScannedRecords(facts, new ScanLookups(handles, terrain, water, new NavmeshRecords(_navmeshes)));
     }
 
-    /// <returns>Only the cells with a part that goes back, was changed again or stays for its record format.</returns>
-    private ImmutableArray<CellRecordFact> JudgeCells()
+    /// <returns>Only the cells whose target plugin's version differs from the one below it in a part.</returns>
+    private ImmutableArray<CellRecordFact> CompareCells()
     {
         if (_areaTables is null) return [];
-        var patch = _names.Of(_patch);
         return
         [
             .. _cellWalk.Read
@@ -551,11 +551,12 @@ internal sealed class PlacedRecordReader
                     cell.Place.SpaceKey,
                     cell.Place.Grid,
                     cell.Versions.WinningMod,
-                    CellPartHistory.Of(_areaTables.Cells, cell.Versions, patch, _names),
+                    CellPartHistory.Of(_areaTables.Cells, cell.Versions, _names),
+                    cell.Versions.Versions.Any(version => version.IsDeleted),
                     WaterLevel.ReadCopy(cell.Versions.Plugins[0], cell.Versions.Earlier),
                     WaterLevel.ReadCopy(cell.Versions.WinningMod, cell.Versions.Winner),
                     DefaultWaterLevelOf(cell.Place)))
-                .Where(fact => !fact.Parts.IsEmpty),
+                .Where(fact => fact.Parts.Any(part => VersionComparison.NamedPluginVersionOf(part.Differences.Versions).FromBelow)),
         ];
     }
 
@@ -567,16 +568,15 @@ internal sealed class PlacedRecordReader
             ? worldspace.LandDefaults?.DefaultWaterHeight
             : null;
 
-    /// <returns>Only the LAND records with a part that goes back or was changed again.</returns>
-    private ImmutableArray<LandRecordFact> JudgeLands()
+    /// <returns>Only the LAND records whose target plugin's version differs from the one below it in a part.</returns>
+    private ImmutableArray<LandRecordFact> CompareLands()
     {
         if (_areaTables is null) return [];
-        var patch = _names.Of(_patch);
         return
         [
             .. _landWalk.Read
-                .Select(land => LandPartHistory.Of(_areaTables.Lands, land.Key, land.Place, land.Versions, patch, _deletedLandCells.Contains(land.Place)))
-                .Where(fact => !fact.Changes.IsEmpty),
+                .Select(land => LandPartHistory.Of(_areaTables.Lands, land.Key, land.Place, land.Versions, _deletedLandCells.Contains(land.Place)))
+                .Where(fact => !VersionComparison.NamedPluginVersionOf(fact.Versions).FromBelow.IsEmpty),
         ];
     }
 
@@ -590,14 +590,14 @@ internal sealed class PlacedRecordReader
     private PlacedRecordFact WithVersions(PlacedRecordFact fact) => fact with
     {
         Versions = [.. Enumerable.Reverse(_versions[fact.Key])],
-        CleanedModChanges = _cleanedModChanges.TryGetValue(fact.Key, out var changes) ? changes : null,
+        PartDifferences = _partDifferences.TryGetValue(fact.Key, out var differences) ? differences : null,
     };
 
     /// <summary>What every record of one cell shares.</summary>
     /// <param name="Plugin">The plugin whose copy of the cell is walked.</param>
     private sealed record ScannedCell(SpaceFact Space, CellFact Cell, bool InTargetSpace, PluginName Plugin, bool CollectReferences);
 
-    /// <summary>The part tables the cell and LAND records are judged with.</summary>
+    /// <summary>The part tables the cell and LAND records are compared with.</summary>
     private sealed record AreaRecordTables(CellRecordParts Cells, LandRecordParts Lands);
 
     /// <summary>Where a cell's winning version stands.</summary>

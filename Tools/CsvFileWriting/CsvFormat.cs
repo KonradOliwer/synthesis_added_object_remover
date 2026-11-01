@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Globalization;
 using System.Numerics;
 
@@ -6,7 +7,7 @@ namespace AddedObjectRemover;
 /// <summary>Formats CSV fields: invariant culture, RFC 4180-style quoting of fields that hold a comma, quote or newline.</summary>
 public static class CsvFormat
 {
-    private static readonly char[] CharactersNeedingQuotes = [',', '"', '\n', '\r'];
+    private static readonly SearchValues<char> CharactersNeedingQuotes = SearchValues.Create(",\"\n\r");
 
     public static string Number(float value) => value.ToString(CultureInfo.InvariantCulture);
 
@@ -21,7 +22,7 @@ public static class CsvFormat
 
     public static string Quote(string value)
     {
-        if (value.IndexOfAny(CharactersNeedingQuotes) < 0) return value;
+        if (value.AsSpan().IndexOfAny(CharactersNeedingQuotes) < 0) return value;
         return "\"" + value.Replace("\"", "\"\"") + "\"";
     }
 

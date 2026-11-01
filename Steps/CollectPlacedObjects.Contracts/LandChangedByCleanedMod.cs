@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
 /// <summary>
@@ -26,3 +28,7 @@ public sealed record LandChangedByCleanedMod(
     PluginName WinningMod,
     LandHeights? Heights,
     bool CellDeletedInAVersion = false);
+
+/// <summary>The parts of a LAND record the cleaned mod changed and a later plugin or the patch changed again.</summary>
+/// <param name="Plugins">The last plugin to change each of those parts, each plugin once, in load order.</param>
+public sealed record LandLeftToLater(PointSet Points, PointSet Colours, QuarterSet Quarters, bool Rest, ImmutableArray<PluginName> Plugins);

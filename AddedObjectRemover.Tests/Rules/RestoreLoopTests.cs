@@ -354,7 +354,7 @@ public sealed class RestoreLoopTests
         var navmesh = MovedNavmesh() with
         {
             Earlier = Square(BaseGame, HousePlace with { Z = 0 }) with { DoorTriangles = [new NavmeshDoorTriangleFact(0, door)] },
-            Doors = [new DoorLinkFact(door, new PartOutcome.Unchanged(), Earlier: null, Current: null, InDeletedCell: false)],
+            Doors = [new DoorLinkChange(door, new PartOutcome.Unchanged(), Earlier: null, Current: null, InDeletedCell: false)],
         };
 
         var result = Plan(new Scene { Navmeshes = [navmesh], Lands = [], Presence = Disabled(door) });
@@ -379,7 +379,7 @@ public sealed class RestoreLoopTests
         var navmesh = MovedNavmesh() with
         {
             Earlier = Square(BaseGame, HousePlace with { Z = 0 }) with { DoorTriangles = [new NavmeshDoorTriangleFact(0, door.Key)] },
-            Doors = [new DoorLinkFact(door.Key, new PartOutcome.Unchanged(), Earlier: null, Current: null, InDeletedCell: false)],
+            Doors = [new DoorLinkChange(door.Key, new PartOutcome.Unchanged(), Earlier: null, Current: null, InDeletedCell: false)],
         };
 
         var result = Plan(new Scene { Rocks = [door], Navmeshes = [navmesh], Lands = [], Presence = Disabled(door.Key) });
@@ -406,7 +406,7 @@ public sealed class RestoreLoopTests
         var navmesh = MovedNavmesh() with
         {
             Earlier = Square(BaseGame, HousePlace with { Z = 0 }) with { DoorTriangles = [new NavmeshDoorTriangleFact(link.Triangle, door)] },
-            Doors = [new DoorLinkFact(door, new PartOutcome.Unchanged(), link, link, InDeletedCell: false)],
+            Doors = [new DoorLinkChange(door, new PartOutcome.Unchanged(), link, link, InDeletedCell: false)],
         };
 
         var result = Plan(new Scene { Navmeshes = [navmesh], Lands = [], Presence = FollowingAParent(door, parentDisabled, doorOppositeOfParent) });
@@ -511,7 +511,7 @@ public sealed class RestoreLoopTests
         var navmesh = MovedNavmesh() with
         {
             Earlier = Square(BaseGame, HousePlace with { Z = 0 }) with { DoorTriangles = [new NavmeshDoorTriangleFact(link.Triangle, door)] },
-            Doors = [new DoorLinkFact(door, new PartOutcome.Unchanged(), link, link, InDeletedCell: false)],
+            Doors = [new DoorLinkChange(door, new PartOutcome.Unchanged(), link, link, InDeletedCell: false)],
         };
         var scene = new Scene
         {
@@ -720,7 +720,7 @@ public sealed class RestoreLoopTests
             Rocks = [door],
             Others = [RockNow(DoorIndex, DoorNow)],
             Lands = [],
-            FindFault = orders => fault && orders.OfType<UndoPlacedParts>().Any(order => order.Record == door.Key)
+            FindFault = orders => fault && orders.OfType<CopyEarlierPlacedParts>().Any(order => order.Record == door.Key)
                 ? new NavmeshFault(UnchangedNavmesh, NavmeshRule.Doors, NavmeshFaultKind.DoorLinkWithoutDoorTriangle, 0, door.Key)
                 : null,
         };
@@ -765,7 +765,7 @@ public sealed class RestoreLoopTests
         {
             Earlier = Square(BaseGame, HousePlace with { Z = 0 }) with { DoorTriangles = [new NavmeshDoorTriangleFact(earlier.Triangle, door.Key)] },
             Current = Square(TestTargets.TargetName, NavmeshNow) with { DoorTriangles = [new NavmeshDoorTriangleFact(current.Triangle, door.Key)] },
-            Doors = [new DoorLinkFact(door.Key, new PartOutcome.Undo(), earlier, current, InDeletedCell: false)],
+            Doors = [new DoorLinkChange(door.Key, new PartOutcome.Undo(), earlier, current, InDeletedCell: false)],
         };
         List<OtherObject> others =
         [
@@ -796,12 +796,12 @@ public sealed class RestoreLoopTests
         var deleted = Rock(DoorIndex, DoorOldPlace, DoorNow) with
         {
             Earlier = Rock(DoorIndex, DoorOldPlace, DoorNow).Earlier with { Undo = PlacedParts.Presence },
-            DoorLink = new DoorLinkFact(DoorKey, new PartOutcome.Undo(), link, Current: null, InDeletedCell: false),
+            DoorLink = new DoorLinkChange(DoorKey, new PartOutcome.Undo(), link, Current: null, InDeletedCell: false),
         };
         var navmesh = MovedNavmesh() with
         {
             Earlier = Square(BaseGame, HousePlace with { Z = 0 }) with { DoorTriangles = [new NavmeshDoorTriangleFact(link.Triangle, DoorKey)] },
-            Doors = [new DoorLinkFact(DoorKey, new PartOutcome.Undo(), link, Current: null, InDeletedCell: false)],
+            Doors = [new DoorLinkChange(DoorKey, new PartOutcome.Undo(), link, Current: null, InDeletedCell: false)],
         };
         var scene = new Scene
         {
@@ -809,7 +809,7 @@ public sealed class RestoreLoopTests
             Navmeshes = [navmesh],
             Lands = [],
             Presence = Disabled(DoorKey),
-            FindFault = orders => orders.Any(order => order is UndoPlacedParts { Parts: var parts } undo && undo.Record == DoorKey && parts.HasFlag(PlacedParts.Presence))
+            FindFault = orders => orders.Any(order => order is CopyEarlierPlacedParts { Parts: var parts } undo && undo.Record == DoorKey && parts.HasFlag(PlacedParts.Presence))
                 ? null
                 : new NavmeshFault(NavmeshKey, NavmeshRule.Doors, NavmeshFaultKind.DoorMissing, 0, DoorKey),
         };
@@ -839,7 +839,7 @@ public sealed class RestoreLoopTests
             Others = CrateBesideTheRock(DoorOldPlace, crateAtTheFirstDoor),
             Lands = [],
             Presence = Disabled(first.Key, second.Key),
-            FindFault = orders => new[] { first.Key, second.Key }.All(door => orders.Any(order => order is UndoPlacedParts { Parts: var parts } undo && undo.Record == door && parts.HasFlag(PlacedParts.Presence)))
+            FindFault = orders => new[] { first.Key, second.Key }.All(door => orders.Any(order => order is CopyEarlierPlacedParts { Parts: var parts } undo && undo.Record == door && parts.HasFlag(PlacedParts.Presence)))
                 ? null
                 : new NavmeshFault(UnchangedNavmesh, NavmeshRule.Doors, NavmeshFaultKind.DoorMissing, 0, first.Key),
         };
@@ -859,7 +859,7 @@ public sealed class RestoreLoopTests
         return door with
         {
             Earlier = door.Earlier with { Undo = PlacedParts.Presence },
-            DoorLink = new DoorLinkFact(door.Key, new PartOutcome.Undo(), link, Current: null, InDeletedCell: false),
+            DoorLink = new DoorLinkChange(door.Key, new PartOutcome.Undo(), link, Current: null, InDeletedCell: false),
         };
     }
 
@@ -1053,7 +1053,7 @@ public sealed class RestoreLoopTests
 
     /// <summary>A base game door the cleaned mod moved, whose navmesh link it changed as <paramref name="outcome"/> says.</summary>
     private static RecordChangedByCleanedMod MovedDoor(PartOutcome outcome, NavDoorLinkFact earlier, NavDoorLinkFact current) =>
-        Rock(DoorIndex, DoorOldPlace, DoorNow) with { DoorLink = new DoorLinkFact(DoorKey, outcome, earlier, current, InDeletedCell: false) };
+        Rock(DoorIndex, DoorOldPlace, DoorNow) with { DoorLink = new DoorLinkChange(DoorKey, outcome, earlier, current, InDeletedCell: false) };
 
     private static Scene RockInTheNavmeshTakenBack() => new()
     {

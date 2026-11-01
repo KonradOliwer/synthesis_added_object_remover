@@ -26,21 +26,15 @@ internal sealed class SupportRule(
     Execution execution)
     : IRemovalRounds<RoundDetails>
 {
-    /// <summary>Shares are sums of float fractions, so support that is fully removed can add up to slightly less than 1.</summary>
-    private const float ShareRoundingTolerance = 1e-5f;
-
     /// <summary>Contact points do not depend on what is removed, so each candidate's are found once.</summary>
     private readonly CandidateContacts?[] _contacts = new CandidateContacts?[targetCount];
 
     private int _contactsFound;
 
-    internal static bool ReachesThreshold(float removedShare, float threshold) =>
-        Tolerant.AtLeast(removedShare, threshold, ShareRoundingTolerance);
-
     /// <summary>The supporters each holding at least the threshold share of the support.</summary>
     /// <remarks>Only supporters with weight are listed, so a listed supporter means the total weight is above 0.</remarks>
     internal static IEnumerable<Supporter> FindSupportersHoldingEnough(CandidateContacts contacts, float threshold) =>
-        contacts.Supporters.Where(entry => ReachesThreshold(entry.Weight / contacts.TotalWeight, threshold)).Select(entry => entry.Supporter);
+        contacts.Supporters.Where(entry => SupportContactWeights.ReachesThreshold(entry.Weight / contacts.TotalWeight, threshold)).Select(entry => entry.Supporter);
 
     public RoundProposals<RoundDetails> Next(IRemovalDecisions decisions, ImmutableArray<TargetId> removedLastRound)
     {
@@ -87,7 +81,7 @@ internal sealed class SupportRule(
             .ThenBy(share => share.Supporter.Index)
             .ToList();
         var evaluation = new SupportEvaluation(candidate, contacts, shares, Proposed: false);
-        return evaluation with { Proposed = ReachesThreshold(evaluation.LeftItsPlaceShare, threshold) };
+        return evaluation with { Proposed = SupportContactWeights.ReachesThreshold(evaluation.LeftItsPlaceShare, threshold) };
     }
 
     private static SupportCategory Categorize(IRemovalDecisions decisions, Supporter supporter) => supporter.Type switch

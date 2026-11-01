@@ -9,6 +9,7 @@ public partial class BusinessTypeNamesTests
     {
         ["ModTrustTable"] = "vocabulary.md fixes the name: the per-plugin trust the classifier decides once, read by the collector, the terrain step and the log.",
         ["NpcBodySet"] = "The set of meshes that make up one NPC body; the log reports 'body mesh sets'.",
+        ["PartOutcome.KeptForRecordFormat"] = "README term: a part stored in an older or newer record format, which the patch cannot write back; the plugin record format, not a text format.",
         ["ObjectQueryScratch"] = "The per-worker scratch buffers for questions about the placed objects (the spatial tool's own buffers plus the caller's); reused buffers, not a cache.",
         ["NpcScratch"] = "The design's per-worker scratch buffers for the NPC search (see the tool catalog); reused buffers, not a cache.",
         ["RemovalDecisions.Store"] = "The decision list's own internal versioned store of decisions; the module's data structure.",

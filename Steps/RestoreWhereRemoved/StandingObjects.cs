@@ -4,7 +4,7 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 
 /// <summary>
 /// The objects that stay in the final world and block actors (<see cref="ObjectsThatBlockActors"/>), as boxes: the after-removal
-/// world's objects that are a change there (§6.1) but for the placed records that go back, and the placed records whose areas let
+/// world's objects that are a change there (another mod's object the game shows differently from its accepted values) but for the placed records that go back, and the placed records whose areas let
 /// them go back but a guard keeps, where they stand now. An object that ends removed in the final world (<see cref="FinalPresence"/>),
 /// such as a kept record the cleaned mod disabled or deleted, stands nowhere, so it is none of them.
 /// </summary>

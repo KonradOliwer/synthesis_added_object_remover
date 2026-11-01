@@ -1317,7 +1317,7 @@ public class ChangedTerrainObjectsTests
 
         public float[]? ReadTerrain(ExteriorCell cell) => throw new NotSupportedException();
 
-        public float[]? ReadTerrainBelowTarget(ExteriorCell cell) => throw new NotSupportedException();
+        public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => throw new NotSupportedException();
 
         public NavmeshWorldTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => throw new NotSupportedException();
 

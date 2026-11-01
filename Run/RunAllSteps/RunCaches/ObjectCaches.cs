@@ -1,12 +1,13 @@
+using System.Collections.Immutable;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
+using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
 namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
 
 /// <summary>
-/// The caches C9 to C12, indexed from the placed objects of one run, and the narrow views the steps read
+/// The object caches, indexed from the placed objects of one run, and the narrow views the steps read
 /// over them. Every answer depends only on the world. Thread-safe.
 /// </summary>
 internal sealed class ObjectCaches : IObjectCaches
@@ -36,8 +37,8 @@ internal sealed class ObjectCaches : IObjectCaches
         VisibleTargets = new VisibleTargetObjects(world.Targets, shapes, _containment, execution);
     }
 
-    /// <param name="measurementRules">How C9 and C11 measure an object; the rules belong to the select step.</param>
-    /// <param name="placedNpcRules">How C10 picks, places and counts the placed NPCs; the rules belong to the too-close step.</param>
+    /// <param name="measurementRules">How the other-mod and any-plugin object caches measure an object; the rules belong to the select step.</param>
+    /// <param name="placedNpcRules">How the placed-NPC index picks, places and counts the placed NPCs; the rules belong to the too-close step.</param>
     public static ObjectCaches Create(
         CollectedObjects world,
         IBaseObjectShapes shapes,
@@ -57,6 +58,16 @@ internal sealed class ObjectCaches : IObjectCaches
     public IVisibleTargetObjects VisibleTargets { get; }
 
     public IVisibleTargetObjects IndexVisibleTargets(IReadOnlyList<TargetObject> targets) => new VisibleTargetObjects(targets, _shapes, _containment, _execution);
+
+    public IVisibleTargetObjects IndexVisibleTargetsAsTheRoundsMeasureThem(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions) =>
+        IndexPlaced(decisions.AnyMeasuredElsewhere(), decisions.TargetsAsTheRoundsMeasureThem, targets);
+
+    public IVisibleTargetObjects IndexVisibleTargetsAsTheyStand(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions) =>
+        IndexPlaced(decisions.AnyStandsElsewhere(), decisions.TargetsAsTheyStand, targets);
+
+    private IVisibleTargetObjects IndexPlaced(
+        bool anyElsewhere, Func<ImmutableArray<TargetObject>, ImmutableArray<TargetObject>> placeTargets, ImmutableArray<TargetObject> targets) =>
+        anyElsewhere ? IndexVisibleTargets(placeTargets(targets)) : VisibleTargets;
 
     public IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPlugin() => new VisibleObjectsOfAnyPlugin(ObjectsOfAnyPlugin);
 

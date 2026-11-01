@@ -11,7 +11,7 @@ public interface IPluginRecordsFactory
 /// <summary>The winning records of the load order by key, as one run's plugin records resolve them.</summary>
 public interface IRecordIndex;
 
-/// <summary>Reads the load order's plugin records. Not thread-safe, except <see cref="ReadHomeCellGrid"/>, <see cref="ReadTerrain"/>, <see cref="ReadTerrainBelowTarget"/>, <see cref="ReadTerrainVersions"/>, <see cref="ReadWaterCopies"/>, <see cref="ReadTextureMaterialChain"/>, <see cref="FindLandWorldspace"/>, <see cref="ReadNavmeshes"/>, <see cref="NpcTraitsOf"/>, <see cref="TraitSupplierOf"/>, <see cref="LeveledEntriesOf"/> and <see cref="TryParsePluginName"/>.</summary>
+/// <summary>Reads the load order's plugin records. Not thread-safe, except <see cref="ReadHomeCellGrid"/>, <see cref="ReadTerrain"/>, <see cref="ReadTerrainBelow"/>, <see cref="ReadTerrainVersions"/>, <see cref="ReadWaterCopies"/>, <see cref="ReadTextureMaterialChain"/>, <see cref="FindLandWorldspace"/>, <see cref="ReadNavmeshes"/>, <see cref="NpcTraitsOf"/>, <see cref="TraitSupplierOf"/>, <see cref="LeveledEntriesOf"/> and <see cref="TryParsePluginName"/>.</summary>
 public interface IPluginRecords
 {
     /// <summary>Walks every plugin's cells once; the records the later reads and the patch writing need are remembered until the reader is dropped.</summary>
@@ -47,11 +47,12 @@ public interface IPluginRecords
     float[]? ReadTerrain(ExteriorCell cell);
 
     /// <summary>
-    /// The terrain heights of an exterior cell's LAND record at its version just below the target plugin's, row by row; the placed
-    /// records must have been read before, with the LAND area record versions asked for. Thread-safe.
+    /// The terrain heights of an exterior cell's LAND record at its version just below the given plugin's, row by row; the placed
+    /// records must have been read before around that plugin (<see cref="PlacedReadScope.Target"/>), with the LAND area record
+    /// versions asked for. Thread-safe.
     /// </summary>
-    /// <returns>Null where no plugin below the target plugin has a LAND record for the cell, or it is deleted or empty.</returns>
-    float[]? ReadTerrainBelowTarget(ExteriorCell cell);
+    /// <returns>Null where no plugin below the given plugin has a LAND record for the cell, or it is deleted or empty.</returns>
+    float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell);
 
     /// <summary>Every plugin's own land record of an exterior cell, decoded; the placed records must have been read before, with the terrain versions asked for. Thread-safe.</summary>
     /// <returns>In load order (lowest priority first); empty where no plugin has a land record for the cell.</returns>

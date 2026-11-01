@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Numerics;
 
@@ -13,11 +14,8 @@ public static class BoxMesh
 
     private static readonly MeshTreeLimits Limits = new(MaxIndexedTriangles: TriangleCount, MaxClosednessTriangles: TriangleCount);
 
-    /// <summary>The whole box is one part, starting at triangle 0.</summary>
-    private static readonly int[] SinglePart = [0];
-
     /// <summary>Two triangles per face: bottom, top, -Y, +Y, -X, +X.</summary>
-    private static readonly int[] FaceTriangles =
+    private static readonly ImmutableArray<int> FaceTriangles =
     [
         0, 2, 1, 1, 2, 3,
         4, 5, 6, 5, 7, 6,
@@ -40,6 +38,7 @@ public static class BoxMesh
                 (i & 2) != 0 ? box.Max.Y : box.Min.Y,
                 (i & 4) != 0 ? box.Max.Z : box.Min.Z);
         }
-        return new MeshTriangles(corners, FaceTriangles, SinglePart);
+        int[] wholeBoxAsOnePart = [0];
+        return new MeshTriangles(corners, [.. FaceTriangles], wholeBoxAsOnePart);
     }
 }

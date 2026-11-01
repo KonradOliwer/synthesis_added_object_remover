@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Skyrim;
 
@@ -19,7 +20,7 @@ internal sealed class CellRecordParts(float waterHeightTolerance)
     public const int ExcludedMajorFlagBits = (int)Cell.MajorFlag.Persistent | RecordHeader.CompressedBit;
 
     /// <summary>Never compared, never written: identity, header stamps, group data, child records judged as records of their own, and the grid.</summary>
-    public static readonly string[] ExcludedFields =
+    public static readonly ImmutableArray<string> ExcludedFields =
     [
         .. RecordHeader.Fields,
         nameof(ICellGetter.Timestamp),
@@ -36,7 +37,7 @@ internal sealed class CellRecordParts(float waterHeightTolerance)
     ];
 
     /// <summary>The parts that are whole fields, compared and copied through one translation mask each.</summary>
-    private static readonly (CellPart Part, string[] Fields)[] FieldParts =
+    private static readonly ImmutableArray<(CellPart Part, ImmutableArray<string> Fields)> FieldParts =
     [
         (CellPart.Lighting, [nameof(ICellGetter.Lighting), nameof(ICellGetter.LightingTemplate)]),
         (CellPart.ImageSpace, [nameof(ICellGetter.ImageSpace)]),
@@ -51,7 +52,7 @@ internal sealed class CellRecordParts(float waterHeightTolerance)
     ];
 
     /// <summary>The parts that are one bit of the cell flags.</summary>
-    private static readonly (CellPart Part, Cell.Flag Bit)[] FlagParts =
+    private static readonly ImmutableArray<(CellPart Part, Cell.Flag Bit)> FlagParts =
     [
         (CellPart.CantTravelFromHere, Cell.Flag.CantTravelFromHere),
         (CellPart.NoLodWater, Cell.Flag.NoLodWater),
@@ -62,7 +63,7 @@ internal sealed class CellRecordParts(float waterHeightTolerance)
     ];
 
     /// <summary>The parts that are one bit of the record flags.</summary>
-    private static readonly (CellPart Part, Cell.MajorFlag Bit)[] MajorFlagParts =
+    private static readonly ImmutableArray<(CellPart Part, Cell.MajorFlag Bit)> MajorFlagParts =
     [
         (CellPart.OffLimits, Cell.MajorFlag.OffLimits),
         (CellPart.CantWait, Cell.MajorFlag.CantWait),
@@ -95,7 +96,7 @@ internal sealed class CellRecordParts(float waterHeightTolerance)
 
     private static CellPartKey Key(CellPart part) => new(part, Region: null);
 
-    private static RecordPart<ICellGetter, ICell> FieldPart(string[] fields)
+    private static RecordPart<ICellGetter, ICell> FieldPart(ImmutableArray<string> fields)
     {
         var mask = TranslationMasks.Only<Cell.TranslationMask>(fields);
         return new(fields, (one, other) => !one.Equals(other, mask), (target, source) => ((ICellInternal)target).DeepCopyIn(source, errorMask: null, copyMask: mask.GetCrystal()), static _ => false);

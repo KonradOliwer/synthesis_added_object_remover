@@ -26,7 +26,7 @@ internal sealed class NpcRecordsPlugin(ILinkCache linkCache) : IPluginRecords
 
     public float[]? ReadTerrain(ExteriorCell cell) => throw new NotSupportedException();
 
-    public float[]? ReadTerrainBelowTarget(ExteriorCell cell) => throw new NotSupportedException();
+    public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => throw new NotSupportedException();
 
     public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new NotSupportedException();
 

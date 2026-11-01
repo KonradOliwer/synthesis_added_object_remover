@@ -7,9 +7,9 @@ internal sealed class CellPartWriter(CellOverrides cells, RecordHandles handles)
 {
     /// <summary>
     /// The patch's cell takes, in each of <paramref name="parts"/>, the values of the version just below the target plugin's, through
-    /// the part table the cell was judged with; every other part keeps the value of the cell the game shows now.
+    /// the part table the cell was compared with; every other part keeps the value of the cell the game shows now.
     /// </summary>
-    public void UndoParts(RecordKey cell, ImmutableArray<CellPartName> parts)
+    public void CopyEarlierParts(RecordKey cell, ImmutableArray<CellPartName> parts)
     {
         var versions = handles.CellOf(cell);
         var table = handles.CellParts.For(versions.Versions);

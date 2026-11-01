@@ -129,7 +129,7 @@ public class LandRecordPartsTests
         restamped.EditorID = "Other";
 
         Assert.False(Table.Rest.Differs(Original(), restamped));
-        Assert.Equal(["FormKey", "EditorID", "VersionControl", "FormVersion", "Version2", "Flags"], LandRecordParts.ExcludedFields);
+        Assert.Equal(["FormKey", "EditorID", "VersionControl", "FormVersion", "Version2", "Flags"], LandRecordParts.ExcludedFields.ToArray());
         Assert.Equal((int)SkyrimMajorRecord.SkyrimMajorRecordFlag.Compressed, LandRecordParts.ExcludedFlagBits);
     }
 

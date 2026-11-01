@@ -8,7 +8,7 @@ internal sealed record PlacedRecordHandle(IPlacedGetter Record, PlacedRecordLoca
 
 /// <summary>
 /// The cell and LAND records of other plugins the target plugin changed, each with its versions from the one just below the target
-/// plugin's up to the winner, the navmeshes it changed and every plugin's navmesh info map, and the part tables they were judged
+/// plugin's up to the winner, the navmeshes it changed and every plugin's navmesh info map, and the part tables they were compared
 /// with, so a part is written exactly as it was compared.
 /// </summary>
 internal sealed record AreaRecordHandles(
@@ -22,7 +22,7 @@ internal sealed record AreaRecordHandles(
 /// The plugin tool's record map: the winning load-order records of the target spaces, which can be written, by <see cref="RecordKey"/>.
 /// Only the plugin tool reads it.
 /// </summary>
-/// <param name="parts">The part table the reader judged the records' parts with, so a part is written exactly as it was compared.</param>
+/// <param name="parts">The part table the reader compared the records' parts with, so a part is written exactly as it was compared.</param>
 /// <param name="areaRecords">Null when the area record versions were not asked for.</param>
 internal sealed class RecordHandles(
     IReadOnlyDictionary<RecordKey, PlacedRecordHandle> handles,

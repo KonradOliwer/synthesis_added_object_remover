@@ -23,7 +23,7 @@ internal sealed class FailingTerrainVersionsPlugin(IPluginRecords inner) : IPlug
 
     public float[]? ReadTerrain(ExteriorCell cell) => inner.ReadTerrain(cell);
 
-    public float[]? ReadTerrainBelowTarget(ExteriorCell cell) => inner.ReadTerrainBelowTarget(cell);
+    public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => inner.ReadTerrainBelow(plugin, cell);
 
     public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new InvalidOperationException(FailureMessage);
 

@@ -104,7 +104,7 @@ public sealed class RestoredObjectPatchTests : IDisposable
             areaRecords: null);
 
         new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod).Write(
-            handles, [new PlaceInCell(key, _baseGame.Interior.Key.ToRecordKey(), InPersistentList: true), new UndoPlacedParts(key, PlacedParts.Position | PlacedParts.Presence)]);
+            handles, [new PlaceInCell(key, _baseGame.Interior.Key.ToRecordKey(), InPersistentList: true), new CopyEarlierPlacedParts(key, PlacedParts.Position | PlacedParts.Presence)]);
 
         var written = Assert.Single(state.PatchMod.EnumerateMajorRecords<IPlacedObjectGetter>());
         Assert.True(original.Equals(written));

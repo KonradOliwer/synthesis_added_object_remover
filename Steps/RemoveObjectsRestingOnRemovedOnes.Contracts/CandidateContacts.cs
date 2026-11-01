@@ -32,3 +32,6 @@ public readonly record struct SupporterWeight(Supporter Supporter, float Weight)
 public sealed record CandidateContacts(int ContactPoints, float TotalWeight, IReadOnlyList<SupporterWeight> Supporters);
 
 public readonly record struct MeshSupporter(Supporter Supporter, PlacedTransform Transform, string MeshPath);
+
+/// <param name="Hits">Per surface sample: whether it is in contact with the supporter.</param>
+public readonly record struct SupporterHits(Supporter Supporter, bool[] Hits);

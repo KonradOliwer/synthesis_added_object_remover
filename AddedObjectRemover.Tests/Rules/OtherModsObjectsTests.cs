@@ -843,7 +843,9 @@ public class OtherModsObjectsTests
         var decided = decide(RemovalDecisions.Start(protection, scene.CreateWhenRemoved()));
         var asMeasured = decided.TargetsAsTheRoundsMeasureThem([.. scene.Targets]);
         var triangles = new TriangleStore(Shapes.ReadTriangles);
-        var result = RestingObjects.SettleOtherModsObjects(
+        var surfaces = TestSurfaceSamples.Over(triangles);
+        var execution = new Execution(scene.Threads);
+        var result = OtherModsObjects.SettleLeftWithoutSupport(
             [.. scene.Targets],
             asMeasured,
             decided,
@@ -854,12 +856,14 @@ public class OtherModsObjectsTests
             Plugins,
             scene.OtherModsSettings,
             scene.AlsoRemoveSettings,
+            current => RestingObjects.CreateRoundsAfter(
+                current, asMeasured, caches.VisibleObjectsOfAnyPlugin(), scene.AlsoRemoveSettings, Shapes, triangles, surfaces, scene.Terrain, execution),
             Shapes,
             triangles,
-            TestSurfaceSamples.Over(triangles),
+            surfaces,
             scene.Terrain,
             caches.VisibleObjectsOfAnyPlugin,
-            new Execution(scene.Threads));
+            execution);
         return (result, decided.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds));
     }
 
@@ -871,7 +875,7 @@ public class OtherModsObjectsTests
     {
         var caches = TestScenes.CreateWithSupportOnlyObjects(scene.Targets, scene.Others, Shapes);
         var triangles = new TriangleStore(Shapes.ReadTriangles);
-        return RestingObjects.FindHeldUpTargets(
+        return OtherModsObjects.FindHeldUpTargets(
             [.. scene.Targets],
             caches.VisibleTargets,
             Trust,
@@ -894,20 +898,35 @@ public class OtherModsObjectsTests
     {
         var caches = TestScenes.CreateWithSupportOnlyObjects(scene.Targets, scene.Others, Shapes);
         var triangles = new TriangleStore(Shapes.ReadTriangles);
-        var rule = RestingObjects.CreateRestingRule(
+        var surfaces = TestSurfaceSamples.Over(triangles);
+        var execution = new Execution(scene.Threads);
+        var drops = OtherModsObjects.CreateDropTest(
             [.. scene.Targets],
             caches.VisibleTargets,
+            Trust,
+            Plugins,
             scene.AlsoRemoveSettings,
+            Shapes,
+            triangles,
+            surfaces,
+            scene.Terrain,
+            caches.VisibleObjectsOfAnyPlugin,
+            execution);
+        var rule = OtherModsObjects.CreateRestingRule(
+            RestingObjects.CreateRestingRule(
+                [.. scene.Targets], scene.AlsoRemoveSettings, Shapes, triangles, surfaces, scene.Terrain, caches.VisibleObjectsOfAnyPlugin, drops, execution),
+            [.. scene.Targets],
+            caches.VisibleTargets,
             Trust,
             Plugins,
             scene.OtherModsSettings,
             Shapes,
             triangles,
-            TestSurfaceSamples.Over(triangles),
+            surfaces,
             scene.Terrain,
             caches.VisibleObjectsOfAnyPlugin,
             heldUp,
-            new Execution(scene.Threads));
+            execution);
         return [.. rule.FindObjectsOthersRestOn([.. asked])];
     }
 

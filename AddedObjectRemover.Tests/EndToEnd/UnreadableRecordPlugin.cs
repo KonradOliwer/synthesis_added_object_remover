@@ -32,7 +32,7 @@ internal sealed class UnreadableRecordPlugin(IPluginRecords inner) : IPluginReco
 
     public float[]? ReadTerrain(ExteriorCell cell) => inner.ReadTerrain(cell);
 
-    public float[]? ReadTerrainBelowTarget(ExteriorCell cell) => inner.ReadTerrainBelowTarget(cell);
+    public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => inner.ReadTerrainBelow(plugin, cell);
 
     public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => inner.ReadTerrainVersions(cell);
 

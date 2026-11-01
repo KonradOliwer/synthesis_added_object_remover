@@ -1,4 +1,4 @@
-using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 
 namespace AddedObjectRemover.Caches.RunCaches.Contracts;
 
@@ -7,7 +7,7 @@ namespace AddedObjectRemover.Caches.RunCaches.Contracts;
 /// <param name="ListsResolved">Leveled lists resolved to the NPCs they can spawn.</param>
 public readonly record struct NpcBodyCacheStats(int BodiesBuilt, int BasesResolved, int ListsResolved);
 
-/// <summary>Cache C8: the bodies of NPCs, built once each and shared by all threads. Thread-safe.</summary>
+/// <summary>The bodies of NPCs, built once each and shared by all threads. Thread-safe.</summary>
 public interface INpcBodies
 {
     /// <summary>Every distinct body a placed NPC base can have; null when no NPC is found through the base's templates and leveled lists.</summary>

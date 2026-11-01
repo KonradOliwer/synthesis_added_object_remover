@@ -12,7 +12,7 @@ namespace AddedObjectRemover.Steps.IdentifyTheMods;
 public static class ModTrustClassifier
 {
     /// <summary>Creation Club plugins are deliberately not part of the base game.</summary>
-    private static readonly string[] BaseGameFileNames = ["Skyrim.esm", "Update.esm", "Dawnguard.esm", "HearthFires.esm", "Dragonborn.esm"];
+    private static readonly ImmutableArray<string> BaseGameFileNames = ["Skyrim.esm", "Update.esm", "Dawnguard.esm", "HearthFires.esm", "Dragonborn.esm"];
 
     public static ModTrustTable Classify(LoadOrderPlugins plugins, ModTrustSettings settings)
     {

@@ -7,6 +7,8 @@ internal sealed record RecordVersions<TVersion>(ImmutableArray<PluginName> Plugi
 {
     public TVersion Earlier => Versions[0];
 
+    public TVersion OfTarget => VersionComparison.NamedPluginVersionOf(Versions);
+
     public TVersion Winner => Versions[^1];
 
     public PluginName WinningMod => Plugins[^1];

@@ -53,7 +53,7 @@ internal sealed class PlacedOverrideWriter(CellOverrides cells, PlacedRecordPart
     /// its navmesh, so unless it is undone the copy keeps the deleted record's.
     /// </summary>
     /// <param name="cellKey">The cell the record was found in.</param>
-    public void UndoParts(IPlacedGetter record, IPlacedGetter earlier, PlacedParts undone, FormKey cellKey, bool inPersistentList)
+    public void CopyEarlierParts(IPlacedGetter record, IPlacedGetter earlier, PlacedParts undone, FormKey cellKey, bool inPersistentList)
     {
         if (record.IsDeleted && undone.HasFlag(PlacedParts.Presence))
         {

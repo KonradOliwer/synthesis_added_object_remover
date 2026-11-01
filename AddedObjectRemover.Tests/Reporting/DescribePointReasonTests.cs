@@ -1,5 +1,5 @@
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports;
-using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 
 namespace AddedObjectRemover.Tests.Reporting;
 

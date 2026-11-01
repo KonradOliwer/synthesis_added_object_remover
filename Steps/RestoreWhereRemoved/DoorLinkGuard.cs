@@ -81,7 +81,7 @@ internal sealed class DoorLinkGuard(
             .Where(written => written.Link is not null)
             .Select(written => (written.Candidate, written.Link!.Value.Navmesh));
 
-    private UndoPlacedParts RestoreOf(int candidate) => new(candidates[candidate].Key, candidates[candidate].Earlier.Undo);
+    private CopyEarlierPlacedParts RestoreOf(int candidate) => new(candidates[candidate].Key, candidates[candidate].Earlier.Undo);
 
     private static PlacedRefusal DoesNotMatch(RecordKey navmesh) => new(PlacedGuard.DoorLinkDoesNotMatch, navmesh, Failure: null);
 }

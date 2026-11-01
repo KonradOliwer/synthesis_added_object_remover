@@ -187,7 +187,7 @@ public class RestingObjectsRunTests
         Assert.DoesNotContain(probe.MeshesUsed, IsLampMesh);
     }
 
-    /// <summary>The details come after the rounds, read the lamp's mesh (which only they read) through the given C6 store and are part of the result.</summary>
+    /// <summary>The details come after the rounds, read the lamp's mesh (which only they read) through the given triangle-mesh store and are part of the result.</summary>
     [Fact]
     public void WithReportFilesTheDetailsAreComputedAfterTheRoundsThroughTheGivenTriangleStore()
     {

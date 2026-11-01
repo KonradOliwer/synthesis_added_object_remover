@@ -189,9 +189,13 @@ public class ChangedObjectJudgingTests
         var movedAgain = barrel with
         {
             Versions = barrel.Versions.Add(Version(Patch, FarFromB)),
-            CleanedModChanges = new PlacedPartChanges(
-                PlacedParts.None,
-                ImmutableSortedDictionary.CreateRange([KeyValuePair.Create(PlacedParts.Position, Mover), KeyValuePair.Create(PlacedParts.Rotation, Patch)]),
+            PartDifferences = new PlacedPartDifferences(
+                [
+                    new(City, PlacedParts.None, PlacedParts.None),
+                    new(Cleaned, PlacedParts.Position | PlacedParts.Rotation, PlacedParts.None),
+                    new(Mover, PlacedParts.Position, PlacedParts.Position),
+                    new(Patch, PlacedParts.Rotation, PlacedParts.Position | PlacedParts.Rotation),
+                ],
                 PlacedParts.None),
         };
 
@@ -208,7 +212,8 @@ public class ChangedObjectJudgingTests
         var restyled = barrel with
         {
             Versions = barrel.Versions.SetItem(2, barrel.Winner with { Base = OtherBase }),
-            CleanedModChanges = new PlacedPartChanges(PlacedParts.None, ImmutableSortedDictionary<PlacedParts, PluginName>.Empty, PlacedParts.BaseAndData),
+            PartDifferences = new PlacedPartDifferences(
+                [new(City, PlacedParts.None, PlacedParts.None), new(Cleaned, PlacedParts.BaseAndData, PlacedParts.None)], PlacedParts.BaseAndData),
         };
 
         var judged = Judge(new ChangedObjectSettings(Moved: RestoreMode.Remove, Replaced: RestoreMode.RestoreIfNoCollision), [restyled], Plan with { ProcessReplaced = true }, rules: Unused());
@@ -572,7 +577,7 @@ public class ChangedObjectJudgingTests
 
         public float[]? ReadTerrain(ExteriorCell cell) => throw new NotSupportedException();
 
-        public float[]? ReadTerrainBelowTarget(ExteriorCell cell) => throw new NotSupportedException();
+        public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => throw new NotSupportedException();
 
         public WaterCopies ReadWaterCopies(ExteriorCell cell) => throw new NotSupportedException();
 

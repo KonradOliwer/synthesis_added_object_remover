@@ -26,7 +26,7 @@ internal sealed record TestPlacedGuardRules(
                 shapes,
                 triangles,
                 settings),
-            (holders, holderIndex, movesAway, staying, copiesOfMoving) => RestingObjects.FindHoldersOfObjectsThatStay(
+            (holders, holderIndex, movesAway, staying, copiesOfMoving) => OtherModsObjects.FindHoldersOfObjectsThatStay(
                 holders, holderIndex, movesAway, staying, copiesOfMoving, trust, plugins, support, shapes, triangles, surfaces, terrain, new Execution(threads)),
             support);
     }

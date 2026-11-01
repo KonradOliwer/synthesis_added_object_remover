@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 
 namespace AddedObjectRemover;
@@ -19,7 +20,7 @@ public static class CompassDirections
     /// <summary>Half a sector, in sectors: each sector is centred on its direction.</summary>
     private const float CentredSectorShift = 0.5f;
 
-    private static readonly DirectionSector[] Sectors = Enum.GetValues<DirectionSector>();
+    private static readonly ImmutableArray<DirectionSector> Sectors = [.. Enum.GetValues<DirectionSector>()];
 
     public static IReadOnlyList<DirectionSector> All => Sectors;
 

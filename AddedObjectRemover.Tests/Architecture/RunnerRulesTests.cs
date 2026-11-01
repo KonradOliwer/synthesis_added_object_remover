@@ -40,6 +40,8 @@ public class RunnerRulesTests
     {
         ["StepRunner.cs: return request switch"] =
             "The settings validation may have ended the run before any step; the runner passes its stop on.",
+        ["StepRunner.cs: if (requests.Any(request => request is RunRequest.Ready)) environment.PatchWriting.WritePatchMarker();"] =
+            "Run policy: the patch gets its marker only when some run of the batch will write; the marker's text and merging belong to the plugin writer.",
         ["StepRunner.cs: if (collected.Stop is { } stop)"] =
             "Step 2 returns the stop for a run without target objects; the runner ends the run on any stop a step returns.",
     };

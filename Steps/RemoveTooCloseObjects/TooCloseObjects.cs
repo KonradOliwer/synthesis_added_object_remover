@@ -11,12 +11,12 @@ namespace AddedObjectRemover.Steps.RemoveTooCloseObjects;
 
 /// <summary>
 /// Finds the target objects too close to another mod's object, by a multiple of their size and/or by a distance in game units, and proposes their removal. It also holds the NPC
-/// body rules that the caches of NPC bodies (C8) and of placed NPCs (C10) apply, because the body of an NPC
+/// body rules that the caches of NPC bodies and of placed NPCs apply, because the body of an NPC
 /// is this step's rule.
 /// </summary>
 public static class TooCloseObjects
 {
-    /// <summary>The rules the NPC body cache (C8) applies.</summary>
+    /// <summary>The rules the NPC body cache applies.</summary>
     public static NpcBodyRules NpcBodyRules { get; } = new(NpcTemplateFlag.Traits, CreateOwnBodyResolver, DistinctBodies);
 
     private static Func<NpcTraits, NpcBody> CreateOwnBodyResolver(IMeshFiles meshFiles, IBodyMeshBounds bodyBounds) =>
@@ -29,7 +29,7 @@ public static class TooCloseObjects
         return new NpcBodySet(distinct, Box.UnionAll(distinct.Select(body => body.LocalBox)));
     }
 
-    /// <summary>The rules the placed-NPC index (C10) applies.</summary>
+    /// <summary>The rules the placed-NPC index applies.</summary>
     public static PlacedNpcRules PlacedNpcRules { get; } = new(IsPlacedNpc, BodyTransform, CountSizes);
 
     private static bool IsPlacedNpc(OtherObject other) => other.IsPlacedNpc;
@@ -50,7 +50,7 @@ public static class TooCloseObjects
     /// Runs once for each distinct set of settings over the objects judged with it, and proposes the removals of all of them in target order.
     /// </summary>
     /// <param name="selected">Each pass takes the objects that can cause removals for its own NPC handling.</param>
-    /// <param name="placedNpcs">C10; the step leaves out the NPCs the replacements in <paramref name="selected"/> replace.</param>
+    /// <param name="placedNpcs">The step leaves out the NPCs the replacements in <paramref name="selected"/> replace.</param>
     public static TooCloseResult Find(
         CollectedObjects world,
         IVisibleTargetObjects visibleTargets,
@@ -70,7 +70,7 @@ public static class TooCloseObjects
 
     /// <summary>The step's check of one target object at a given placement; it finds nothing when no removal zone is on.</summary>
     /// <param name="selected">The rule takes the objects that can cause removals for the NPC handling of <paramref name="settings"/>.</param>
-    /// <param name="placedNpcs">C10; the rule leaves out the NPCs the replacements in <paramref name="selected"/> replace.</param>
+    /// <param name="placedNpcs">The rule leaves out the NPCs the replacements in <paramref name="selected"/> replace.</param>
     public static IPlacementRule CreatePlacementRule(
         IReadOnlyList<TargetObject> targets,
         IVisibleTargetObjects visibleTargets,

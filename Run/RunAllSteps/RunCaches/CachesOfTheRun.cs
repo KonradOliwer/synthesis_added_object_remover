@@ -1,10 +1,12 @@
+using System.Collections.Immutable;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
 namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
 
-/// <summary>The caches of one run once the placed objects are collected: the load-order caches it was given and the object caches (C9 to C12). Neither changes after this is created.</summary>
+/// <summary>The caches of one run once the placed objects are collected: the load-order caches it was given and the object caches. Neither changes after this is created.</summary>
 internal sealed class CachesOfTheRun(ILoadOrderCaches loadOrder, ObjectCaches objects) : IRunCaches
 {
     public IBaseFacts Bases => loadOrder.Bases;
@@ -40,6 +42,12 @@ internal sealed class CachesOfTheRun(ILoadOrderCaches loadOrder, ObjectCaches ob
     public IVisibleTargetObjects VisibleTargets => objects.VisibleTargets;
 
     public IVisibleTargetObjects IndexVisibleTargets(IReadOnlyList<TargetObject> targets) => objects.IndexVisibleTargets(targets);
+
+    public IVisibleTargetObjects IndexVisibleTargetsAsTheRoundsMeasureThem(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions) =>
+        objects.IndexVisibleTargetsAsTheRoundsMeasureThem(targets, decisions);
+
+    public IVisibleTargetObjects IndexVisibleTargetsAsTheyStand(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions) =>
+        objects.IndexVisibleTargetsAsTheyStand(targets, decisions);
 
     public IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPlugin() => objects.VisibleObjectsOfAnyPlugin();
 

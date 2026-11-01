@@ -24,6 +24,7 @@ public class LogicPublicTypesTests
         ["RemoveObjectsOnChangedTerrain"] = "ChangedTerrainObjects",
         ["RemoveTooCloseObjects"] = "TooCloseObjects",
         ["RemoveObjectsRestingOnRemovedOnes"] = "RestingObjects",
+        ["OtherModsObjectsLeftWithoutSupport"] = "OtherModsObjects",
         ["RemoveVisibleObjectsLeftBehind"] = "VisibleLeftBehindObjects",
         ["RemoveInvisibleObjectsLeftBehind"] = "LeftBehindObjects",
         ["MoveKeptMarkers"] = "MarkerMovePlanner",
@@ -100,10 +101,7 @@ public class LogicPublicTypesTests
         ],
         ["FitClashingObjects"] =
         [
-            "static FitResult Fit(ImmutableArray<TargetObject>, IObjectsToKeep, IEnumerable<FitGroup>, IRestingRule, IBaseObjectShapes, WorkOrder, Execution)",
-            "static IVisibleTargetObjects IndexAsTheRoundsMeasureThem(ImmutableArray<TargetObject>, IRemovalDecisions, IObjectCaches)",
-            "static IVisibleTargetObjects IndexAsTheyStand(ImmutableArray<TargetObject>, IRemovalDecisions, IObjectCaches)",
-        ],
+            "static FitResult Fit(ImmutableArray<TargetObject>, IObjectsToKeep, IEnumerable<FitGroup>, IRestingRule, IBaseObjectShapes, WorkOrder, Execution)",        ],
         ["RemoveObjectsOnChangedTerrain"] =
         [
             "static IPlacementRule CreatePlacementRule(AcceptedWorld, LoadOrderPlugins, IPluginRecords, IBaseObjectShapes, ChangedTerrainSettings)",
@@ -118,13 +116,18 @@ public class LogicPublicTypesTests
         ],
         ["RemoveObjectsRestingOnRemovedOnes"] =
         [
-            "static Int32 SurfaceSamplesPerMesh { get; }",
             "static IAlsoRemoveFollowUp CreateFollowUp(ImmutableArray<TargetObject>, AlsoRemoveSettings, Execution, Func<TimeSpan>, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>)",
-            "static IRestingRule CreateRestingRule(ImmutableArray<TargetObject>, IVisibleTargetObjects, AlsoRemoveSettings, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, HeldUpTargets, Execution)",
+            "static IRestingRule CreateRestingRule(ImmutableArray<TargetObject>, AlsoRemoveSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, ITargetObjectsDropTest, Execution)",
+            "static IRemovalRounds<RoundDetails> CreateRoundsAfter(IRemovalDecisions, ImmutableArray<TargetObject>, IVisibleObjectsOfAnyPlugin, AlsoRemoveSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Execution)",
             "static RestingObjectsResult Find(RestingObjectsInput, IBaseFacts, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>)",
-            "static IReadOnlyDictionary<TargetId, OtherObject> FindHoldersOfObjectsThatStay(IReadOnlyList<TargetObject>, IVisibleTargetObjects, Func<TargetId, Boolean>, IVisibleObjectsOfAnyPlugin, IReadOnlySet<OtherId>, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Execution)",
+        ],
+        ["OtherModsObjectsLeftWithoutSupport"] =
+        [
             "static HeldUpTargets FindHeldUpTargets(ImmutableArray<TargetObject>, IVisibleTargetObjects, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
-            "static OtherModsObjectsResult SettleOtherModsObjects(ImmutableArray<TargetObject>, ImmutableArray<TargetObject>, IRemovalDecisions, IVisibleTargetObjects, IVisibleTargetObjects, Func<ImmutableArray<TargetObject>, IVisibleTargetObjects>, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, AlsoRemoveSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
+            "static IRestingRule CreateRestingRule(IRestingRule, ImmutableArray<TargetObject>, IVisibleTargetObjects, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, HeldUpTargets, Execution)",
+            "static ITargetObjectsDropTest CreateDropTest(ImmutableArray<TargetObject>, IVisibleTargetObjects, ModTrustTable, LoadOrderPlugins, AlsoRemoveSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
+            "static IReadOnlyDictionary<TargetId, OtherObject> FindHoldersOfObjectsThatStay(IReadOnlyList<TargetObject>, IVisibleTargetObjects, Func<TargetId, Boolean>, IVisibleObjectsOfAnyPlugin, IReadOnlySet<OtherId>, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Execution)",
+            "static OtherModsObjectsResult SettleLeftWithoutSupport(ImmutableArray<TargetObject>, ImmutableArray<TargetObject>, IRemovalDecisions, IVisibleTargetObjects, IVisibleTargetObjects, Func<ImmutableArray<TargetObject>, IVisibleTargetObjects>, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, AlsoRemoveSettings, Func<IRemovalDecisions, IRemovalRounds<RoundDetails>>, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
         ],
         ["RemoveVisibleObjectsLeftBehind"] =
         [

@@ -17,12 +17,10 @@ public class CopiedCodeTests
     private const string PartKeyLines = "One line per part key: Report's own keys and the wording table; each line names its own part, so there is no logic to share.";
     private const string ViewForwarders ="One-line members of a read-only view, each forwarding one question of the index to its caller; no logic to share.";
     private const string SettingChecks = "Setting-by-setting check lines; each reads another setting with its own default, limit and wording.";
-    private const string RecordFromFacts =
-        "Field-by-field construction of a record from the facts of another, with the same argument-list shape; each builds its own record type from its own facts.";
     private const string TableDeclarations = "Declaration of a report class with a constant or header list; the tables share only the shape of the declaration.";
 
     private const string NoSharedStepTypes =
-        "The generic parts live in CompassSectorAreas and the decision list; a tool may not reference step types, and a logic project may not reference another logic project.";
+        "The shared parts live in the decision list's contracts, the surroundings rule included; a tool may not reference step types, and a logic project may not reference another logic project.";
 
     private const string CheckRecords = "Check records of two steps (one object checked, its outcome and the rules over the outcome), each over its own outcome type. " + NoSharedStepTypes;
 
@@ -49,7 +47,7 @@ public class CopiedCodeTests
     private const string PlacementRules = "The placement rule of two steps: each places the object and runs its own step's check, which returns its own result type; they share only the shape.";
 
     private const string EntryForwarders =
-        "Public methods of a step's entry type that take the run's caches one by one and hand them to the internal code as one context; each forwards to its own method, so there is no logic to share.";
+        "Public methods of a step's entry type that take the run's caches one by one and hand them to the internal code; each builds its own part, so there is no logic to share.";
 
     private const string ParallelCalls ="One call of the order-independent parallel map over a list with per-worker buffers; each asks its own question, so there is no logic to share.";
 
@@ -75,6 +73,8 @@ public class CopiedCodeTests
     private const string StartSections = Report + "LogSections.Start.cs:LogSections.";
     private const string Resting = "Steps/RemoveObjectsRestingOnRemovedOnes/";
     private const string RestingContracts = "Steps/RemoveObjectsRestingOnRemovedOnes.Contracts/";
+    private const string OtherMods = "Steps/OtherModsObjectsLeftWithoutSupport/";
+    private const string OtherModsContracts = "Steps/OtherModsObjectsLeftWithoutSupport.Contracts/";
     private const string RestoreContracts = "Steps/RestoreWhereRemoved.Contracts/";
     private const string Restore = "Steps/RestoreWhereRemoved/";
 
@@ -99,8 +99,6 @@ public class CopiedCodeTests
     {
         [CopyFamily.KeyOf([Settings + "CreateLeftBehindSettings", Settings + "CreateVisibleLeftBehindSettings", Settings + "JudgesOldPlaces", Settings + "ValidateSurroundings"])] = SettingChecks,
         [CopyFamily.KeyOf([Report + "LogAndReports.cs:LogAndReports.BuildStepSections"])] = StepSections,
-        [CopyFamily.KeyOf([Collector + "NumberInKeyOrder", Collector + "ToChangedLand", Collector + "ToChangedNavmesh", Restore + "AfterRemovalWorld.cs:AfterRemovalWorld.AsItIsNow"])] =
-            RecordFromFacts,
         [CopyFamily.KeyOf([Restore + "WhereRemovedRestorer.cs:WhereRemovedRestorer.Plan", Restore + "WhereRemovedRestorer.cs:WhereRemovedRestorer.StepInputs"])] = EntryInputs,
         [CopyFamily.KeyOf([
             LeftBehindSections + "LeftBehindOutcomeLine", LeftBehindSections + "LeftBehindSummaryLine",
@@ -172,9 +170,9 @@ public class CopiedCodeTests
             "Steps/FitClashingObjects.Contracts/FitParts.cs", "Steps/FitClashingObjects.Contracts/FitParts.cs:FitParts",
             "Steps/FitClashingObjects.Contracts/FitParts.cs:FitParts.FitCheck", "Steps/FitClashingObjects.Contracts/FitParts.cs:FitParts.Owner",
             "Steps/FitClashingObjects.Contracts/FitParts.cs:FitParts.RestingCheck",
-            RestingContracts + "OtherModsObjectsParts.cs", RestingContracts + "OtherModsObjectsParts.cs:OtherModsObjectsParts",
-            RestingContracts + "OtherModsObjectsParts.cs:OtherModsObjectsParts.HeldUpTargets", RestingContracts + "OtherModsObjectsParts.cs:OtherModsObjectsParts.LeftWithoutSupport",
-            RestingContracts + "OtherModsObjectsParts.cs:OtherModsObjectsParts.Owner",
+            OtherModsContracts + "OtherModsObjectsParts.cs", OtherModsContracts + "OtherModsObjectsParts.cs:OtherModsObjectsParts",
+            OtherModsContracts + "OtherModsObjectsParts.cs:OtherModsObjectsParts.HeldUpTargets", OtherModsContracts + "OtherModsObjectsParts.cs:OtherModsObjectsParts.LeftWithoutSupport",
+            OtherModsContracts + "OtherModsObjectsParts.cs:OtherModsObjectsParts.Owner",
             RestingContracts + "RestingObjectsParts.cs", RestingContracts + "RestingObjectsParts.cs:RestingObjectsParts",
             RestingContracts + "RestingObjectsParts.cs:RestingObjectsParts.AlsoRemove", RestingContracts + "RestingObjectsParts.cs:RestingObjectsParts.FollowUp",
             RestingContracts + "RestingObjectsParts.cs:RestingObjectsParts.Owner", RestingContracts + "RestingObjectsParts.cs:RestingObjectsParts.ReportFileDetails",
@@ -206,14 +204,15 @@ public class CopiedCodeTests
             Report + "Tables.Removals.cs:Tables.BuildRemovalsTable", Report + "Tables.Removals.cs:Tables.RemovalsHeader",
             Report + "Tables.Support.cs:Tables.BuildSupportTable", Report + "Tables.Support.cs:Tables.SupportHeader"])] =
             TableDeclarations + " " + CsvColumnNames,
-        [CopyFamily.KeyOf(["Steps/MoveKeptMarkers/KeptMarkerMover.cs:KeptMarkerMover.Move", Resting + "TargetsHoldingUpOtherModsObjects.cs:TargetsHoldingUpOtherModsObjects.Find"])] =
+        [CopyFamily.KeyOf(["Steps/MoveKeptMarkers/KeptMarkerMover.cs:KeptMarkerMover.Move", OtherMods + "TargetsHoldingUpOtherModsObjects.cs:TargetsHoldingUpOtherModsObjects.Find"])] =
             ParallelCalls,
-        [CopyFamily.KeyOf([Resting + "SupportContactFinder.cs:SupportContactFinder.FindContactsOfAll", Resting + "TargetsHoldingUpOtherModsObjects.cs:TargetsHoldingUpOtherModsObjects.Find"])] =
+        [CopyFamily.KeyOf([Resting + "SupportContactFinder.cs:SupportContactFinder.FindContactsOfAll", OtherMods + "TargetsHoldingUpOtherModsObjects.cs:TargetsHoldingUpOtherModsObjects.Find"])] =
             ParallelCalls,
         [CopyFamily.KeyOf(["Steps/JudgeChangedObjects/ChangedObjectJudging.cs:ChangedObjectJudging.Prepare", "Steps/RemoveObjectsOnChangedTerrain/ChangedTerrainObjects.cs:ChangedTerrainObjects.FindPass"])] =
             ParallelCalls,
-        [CopyFamily.KeyOf([Resting + "LeftWithoutSupport.cs:LeftWithoutSupport.FindMissingWeightsBefore", Resting + "RestingRule.cs:RestingRule.FindResting"])] = ParallelCalls,
-        [CopyFamily.KeyOf([Resting + "RestingObjects.cs:RestingObjects.FindHeldUpTargets", Resting + "RestingObjects.cs:RestingObjects.SettleOtherModsObjects"])] =
+        [CopyFamily.KeyOf([OtherMods + "LeftWithoutSupport.cs:LeftWithoutSupport.FindMissingWeightsBefore", OtherMods + "TargetObjectsDropTest.cs:TargetObjectsDropTest.FindResting"])] =
+            ParallelCalls,
+        [CopyFamily.KeyOf([OtherMods + "OtherModsObjects.cs:OtherModsObjects.CreateDropTest", OtherMods + "OtherModsObjects.cs:OtherModsObjects.FindHeldUpTargets"])] =
             EntryForwarders,
         [CopyFamily.KeyOf([
             "Steps/RemoveObjectsOnChangedTerrain/ChangedTerrainPlacementRule.cs:ChangedTerrainPlacementRule.StartTries",

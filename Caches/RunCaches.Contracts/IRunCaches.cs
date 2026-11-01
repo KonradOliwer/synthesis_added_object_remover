@@ -10,7 +10,7 @@ namespace AddedObjectRemover.Caches.RunCaches.Contracts;
 /// <item>Statistics are neutral counts taken from the cache contents, so they do not depend on thread count or timing.</item>
 /// </list>
 /// The run creates them at two points: the load-order caches (<see cref="ILoadOrderCaches"/>) at the start, and
-/// these, which add the object caches (C9 to C12, <see cref="IObjectCaches"/>), once the placed objects are collected.
+/// these, which add the object caches (<see cref="IObjectCaches"/>), once the placed objects are collected.
 /// </summary>
 public interface IRunCaches : ILoadOrderCaches, IObjectCaches
 {

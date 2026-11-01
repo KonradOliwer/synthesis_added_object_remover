@@ -17,9 +17,9 @@ namespace AddedObjectRemover;
 /// <paramref name="TerrainVersions"/>, <paramref name="TerrainLayers"/> and <paramref name="Water"/> are asked for only to check records the
 /// target plugin overrides: they are skipped when it overrides no placed record of another plugin.
 /// </param>
-/// <param name="PartTolerances">The gaps that are no change when the parts of a record the target plugin overrides are compared (<see cref="PlacedRecordFact.CleanedModChanges"/>).</param>
+/// <param name="PartTolerances">The gaps that are no change when the parts of a record the target plugin overrides are compared (<see cref="PlacedRecordFact.PartDifferences"/>).</param>
 /// <param name="AreaRecordVersions">
-/// Also judge, part by part, the cell and LAND records of other plugins that the target plugin overrides, as far as asked for, and
+/// Also compare, part by part, the cell and LAND records of other plugins that the target plugin overrides, as far as asked for, and
 /// the navmeshes of the target spaces it overrides, deletes or adds (<see cref="PlacedRecordFacts.ChangedCells"/>,
 /// <see cref="PlacedRecordFacts.ChangedLands"/>, <see cref="PlacedRecordFacts.ChangedNavmeshes"/>); null when not asked for.
 /// </param>
@@ -56,9 +56,9 @@ public readonly record struct PlacedPartTolerances(float Position, float Rotatio
 /// Lowest first, the winner last: the record's versions from the winner down to and including the first one whose plugin stops the
 /// walk (<see cref="IPluginRecords.ReadPlacedRecords"/>), or all of them when none does. Each plugin gives one version.
 /// </param>
-/// <param name="CleanedModChanges">
+/// <param name="PartDifferences">
 /// Only for a record of another plugin that the target plugin overrides and that has a version below the target plugin's; null for
-/// every other record.
+/// every other record. It sets every part of each version from that one up to the winner against the others.
 /// </param>
 public sealed record PlacedRecordFact(
     RecordKey Key,
@@ -75,7 +75,7 @@ public sealed record PlacedRecordFact(
     float? ReferenceRadius,
     Vector3? PrimitiveBounds,
     ImmutableArray<PlacedVersionFact> Versions,
-    PlacedPartChanges? CleanedModChanges)
+    PlacedPartDifferences? PartDifferences)
 {
     /// <summary>The winning version, the last of <see cref="Versions"/>.</summary>
     public PlacedVersionFact Winner => Versions[^1];
@@ -137,6 +137,6 @@ public sealed record PlacedRecordFacts(
     ImmutableArray<LandRecordFact> ChangedLands,
     ImmutableArray<NavmeshRecordFact> ChangedNavmeshes,
     IReadOnlySet<RecordKey> DeletedCells,
-    IReadOnlyDictionary<RecordKey, DoorLinkFact> OverriddenDoorLinks,
+    IReadOnlyDictionary<RecordKey, NavDoorLinkVersions> OverriddenDoorLinks,
     IReadOnlyDictionary<RecordKey, PluginName> CellsDeletedInFinalWorld,
     IReadOnlyDictionary<RecordKey, SpaceFact> Spaces);

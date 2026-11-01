@@ -60,7 +60,6 @@ public static class Program
         var pluginRecords = new PluginRecordsFactory(world, workers);
         var requests = ValidateRequests(state, settings, configs, world, pluginRecords, workers);
         var patchWriting = new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod);
-        if (requests.Any(request => request is RunRequest.Ready)) patchWriting.WritePatchMarker();
         StepRunner.PatchLoadOrder(requests, CreateEnvironment(state, world, pluginRecords, patchWriting, totalTimer));
     }
 

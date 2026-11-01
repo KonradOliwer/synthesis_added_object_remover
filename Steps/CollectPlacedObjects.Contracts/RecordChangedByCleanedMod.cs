@@ -33,5 +33,5 @@ public sealed record RecordChangedByCleanedMod(
     TargetId? Target,
     bool LinkedFromCleanedMod,
     PlacedPresence PresenceBefore,
-    DoorLinkFact? DoorLink = null,
+    DoorLinkChange? DoorLink = null,
     bool InDeletedCell = false);

@@ -66,26 +66,6 @@ public static class ClashingObjectFitter
             ]);
     }
 
-    /// <summary>
-    /// The visible targets where the rounds measure them: a new index with each object kept shrunk or turned at its new placement
-    /// and every other object, a restored one too, where the cleaned mod put it, or the collected index when there is no fit. An
-    /// object kept shrunk or turned and removed later stands where it stood, as the patch leaves it.
-    /// </summary>
-    public static IVisibleTargetObjects IndexAsTheRoundsMeasureThem(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions, IObjectCaches caches) =>
-        IndexPlaced(decisions.AnyMeasuredElsewhere(), decisions.TargetsAsTheRoundsMeasureThem, targets, caches);
-
-    /// <summary>
-    /// The visible targets where they stand: a new index with each object kept shrunk or turned at its new placement and each
-    /// restored object at its earlier placement, or the collected index when none stands elsewhere. An object kept shrunk or turned
-    /// and removed later stands where it stood, as the patch leaves it.
-    /// </summary>
-    public static IVisibleTargetObjects IndexAsTheyStand(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions, IObjectCaches caches) =>
-        IndexPlaced(decisions.AnyStandsElsewhere(), decisions.TargetsAsTheyStand, targets, caches);
-
-    private static IVisibleTargetObjects IndexPlaced(
-        bool anyElsewhere, Func<ImmutableArray<TargetObject>, ImmutableArray<TargetObject>> placeTargets, ImmutableArray<TargetObject> targets, IObjectCaches caches) =>
-        anyElsewhere ? caches.IndexVisibleTargets(placeTargets(targets)) : caches.VisibleTargets;
-
     /// <summary>One object at a time per worker: an object's checks differ too much in cost to hand out several at once.</summary>
     /// <returns>One result per index, in the given order.</returns>
     private static T[] CheckEach<T>(

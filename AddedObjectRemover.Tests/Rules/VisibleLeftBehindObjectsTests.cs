@@ -797,7 +797,7 @@ public class VisibleLeftBehindObjectsTests
         VisibleLeftBehindObjects.Find(
             targets,
             decisions,
-            ClashingObjectFitter.IndexAsTheRoundsMeasureThem(targets, decisions, Scene(targets, [])),
+            Scene(targets, []).IndexVisibleTargetsAsTheRoundsMeasureThem(targets, decisions),
             UnresolvedBases,
             Shapes,
             new ScriptedFollowUp(),

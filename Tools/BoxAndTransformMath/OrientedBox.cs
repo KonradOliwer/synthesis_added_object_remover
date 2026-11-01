@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 
 namespace AddedObjectRemover;
@@ -11,7 +12,7 @@ public readonly record struct OrientedBox(Vector3 Center, Mat3 Rotation, Vector3
     /// <summary>Added to every |R| term so near-parallel axes do not produce a false separation from rounding.</summary>
     private const float ParallelAxisEpsilon = 1e-5f;
 
-    private static readonly float[] CornerSigns = [-1f, 1f];
+    private static readonly ImmutableArray<float> CornerSigns = [-1f, 1f];
 
     public static OrientedBox FromLocal(Box local, PlacedTransform transform)
     {

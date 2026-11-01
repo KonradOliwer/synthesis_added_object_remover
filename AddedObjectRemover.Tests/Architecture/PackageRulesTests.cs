@@ -9,7 +9,7 @@ public class PackageRulesTests
 
     private static readonly string[] ForbiddenPackagePrefixes = ["Mutagen", "Nifly", "Newtonsoft", "NetTopologySuite"];
 
-    /// <summary>The one project that may compile against NetTopologySuite among the package-free kinds (design 10.4).</summary>
+    /// <summary>The one project that may compile against NetTopologySuite among the package-free kinds.</summary>
     private const string NetTopologySuiteUser = "MoveKeptMarkers";
 
     [Fact]

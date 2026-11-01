@@ -71,11 +71,11 @@ public class SceneViewTests
         var turnedAQuarter = targets[0].Placement with { Rotation = new Vector3(0, 0, MathF.PI / 2) };
         var kept = started.ApplyFits([new ProposedFit(targets[0].Id, new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()), turnedAQuarter)]);
 
-        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(ClashingObjectFitter.IndexAsTheyStand(targets, kept, caches)));
-        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(ClashingObjectFitter.IndexAsTheRoundsMeasureThem(targets, kept, caches)));
+        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(caches.IndexVisibleTargetsAsTheyStand(targets, kept)));
+        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(caches.IndexVisibleTargetsAsTheRoundsMeasureThem(targets, kept)));
         Assert.Empty(NearEastOfTheSlab(caches.VisibleTargets));
-        Assert.Same(caches.VisibleTargets, ClashingObjectFitter.IndexAsTheyStand(targets, started, caches));
-        Assert.Same(caches.VisibleTargets, ClashingObjectFitter.IndexAsTheRoundsMeasureThem(targets, started, caches));
+        Assert.Same(caches.VisibleTargets, caches.IndexVisibleTargetsAsTheyStand(targets, started));
+        Assert.Same(caches.VisibleTargets, caches.IndexVisibleTargetsAsTheRoundsMeasureThem(targets, started));
     }
 
     /// <summary>
@@ -93,8 +93,8 @@ public class SceneViewTests
         var restored = started.Apply(
             RoundKind.TooClose, [new ProposedRemoval(targets[0].Id, new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()))]);
 
-        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(ClashingObjectFitter.IndexAsTheyStand(targets, restored, caches)));
-        Assert.Same(caches.VisibleTargets, ClashingObjectFitter.IndexAsTheRoundsMeasureThem(targets, restored, caches));
+        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(caches.IndexVisibleTargetsAsTheyStand(targets, restored)));
+        Assert.Same(caches.VisibleTargets, caches.IndexVisibleTargetsAsTheRoundsMeasureThem(targets, restored));
     }
 
     private static List<TargetId> NearEastOfTheSlab(IVisibleTargetObjects index)

@@ -6,3 +6,4 @@ ReferenceScale.Normalize | Rule over a plain number: a placed reference's scale,
 StartsDisabledRule.Of | Rule over a placed record's plugin facts (PlacementFacts, outside the domain list): is it shown in the game.
 StartsDisabledRule.HidesWinningTarget | Rule over a placed record's plugin facts (PresenceFacts, outside the domain list): does Initially Disabled hide it despite an enable parent.
 RemovedForm.IsRemoved | Rule over a placed record's plugin facts (PresenceFacts, outside the domain list): is it removed in the game.
+PartHistory.LastChangerAbove | Step of the rule of what the cleaned mod last changed, over version indices: which version above the cleaned mod's last changed a part.

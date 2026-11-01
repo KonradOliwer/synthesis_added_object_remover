@@ -17,8 +17,8 @@ internal sealed class PlacedRecordWriter(PlacedOverrideWriter overrides, RecordH
             case PlaceInCell place:
                 overrides.MoveToList(handles.RecordOf(order.Record), cellKey, location.InPersistentList, place.Cell.ToFormKey(), place.InPersistentList);
                 break;
-            case UndoPlacedParts undo:
-                overrides.UndoParts(handles.RecordOf(order.Record), handles.EarlierRecordOf(order.Record), undo.Parts, cellKey, location.InPersistentList);
+            case CopyEarlierPlacedParts copy:
+                overrides.CopyEarlierParts(handles.RecordOf(order.Record), handles.EarlierRecordOf(order.Record), copy.Parts, cellKey, location.InPersistentList);
                 break;
             default:
                 Apply(overrides.GetOrAddOverride(handles.RecordOf(order.Record), cellKey, location.InPersistentList), order);

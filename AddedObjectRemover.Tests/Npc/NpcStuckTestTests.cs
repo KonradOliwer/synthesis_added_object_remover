@@ -1,4 +1,5 @@
 using System.Numerics;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Tests.Fixtures;
 
 namespace AddedObjectRemover.Tests.Npc;

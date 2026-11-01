@@ -13,7 +13,7 @@ public static class RemovalCauseSelector
 {
     private static readonly ObjectMeasurement Invisible = new(IsVisible: false, Center: default);
 
-    /// <param name="otherModObjects">C9.</param>
+    /// <param name="otherModObjects">The objects added by other mods.</param>
     public static SelectedObjects Select(
         CollectedObjects world, IOtherModObjectsBySpace otherModObjects, IBaseObjectShapes shapes, SelectionSettings settings, Execution execution)
     {
@@ -26,7 +26,7 @@ public static class RemovalCauseSelector
     /// The views for earlier versions standing at their old places: every object of <paramref name="otherModObjects"/> can cause
     /// removals except <paramref name="excluded"/>, the versions of the records being checked that the earlier versions replace.
     /// </summary>
-    /// <param name="otherModObjects">The objects of the old-place world (C9).</param>
+    /// <param name="otherModObjects">The objects of the old-place world.</param>
     /// <param name="otherModObjectCount">The number of objects in <paramref name="otherModObjects"/>.</param>
     public static SelectedObjects SelectForOldPlace(
         IOtherModObjectsBySpace otherModObjects, int otherModObjectCount, IEnumerable<OtherId> excluded, NpcHandling npcs)

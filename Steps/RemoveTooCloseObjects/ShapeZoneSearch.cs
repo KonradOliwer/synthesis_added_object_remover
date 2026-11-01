@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 
@@ -275,8 +274,8 @@ internal sealed class ShapeZoneSearch : ITooCloseSearch
         public void Dispose() => _scratch.Meshes.Release();
 
         /// <remarks>
-        /// Only a mesh test that throws, which is a bug (an unreadable mesh gives no tree), makes a try's failure differ from the
-        /// whole search's: when the remembered object reaches, a lower object whose test would throw is not tested, so the try
+        /// Only a test of an object that throws (an unreadable mesh gives no tree, so it is a base that cannot be measured or a
+        /// bug) makes a try's failure differ from the whole search's: when the remembered object reaches, a lower object whose test would throw is not tested, so the try
         /// is a clash without a failure; when the remembered object's test throws, the try fails where the whole search would
         /// hit a lower object first. Either way the try does not fit, and the result does not depend on the thread count.
         /// </remarks>

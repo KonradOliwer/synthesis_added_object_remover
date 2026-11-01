@@ -21,7 +21,7 @@ internal static class SupportEvaluationRows
     private static SupportEvaluationRow Join(SupportEvaluation evaluation, Round round, int iteration, IRemovalDecisions decisions)
     {
         var decision = decisions.Of(new TargetId(evaluation.TargetIndex));
-        var effect = RoundEffects.Of(decision, round);
+        var effect = decision?.EffectIn(round) ?? RoundEffect.Untouched;
         var removedAsLinked = !evaluation.Proposed && effect is { Outcome: RoundOutcome.Removed, AsLinked: true };
         return new SupportEvaluationRow(
             evaluation.TargetIndex,
@@ -30,7 +30,7 @@ internal static class SupportEvaluationRows
             evaluation.Shares,
             Removed: evaluation.Proposed && effect.Outcome == RoundOutcome.Removed,
             RemovedAsLinked: removedAsLinked,
-            RemovedAsLinkedToRestored: removedAsLinked && RoundEffects.FollowedARestoredMember(decision, decisions.Of),
+            RemovedAsLinkedToRestored: removedAsLinked && decision!.FollowedARestoredMember(decisions.Of),
             Restored: evaluation.Proposed && effect.Outcome == RoundOutcome.Restored,
             RestoredAsLinked: !evaluation.Proposed && effect is { Outcome: RoundOutcome.Restored, AsLinked: true },
             Held: evaluation.Proposed && effect.Outcome == RoundOutcome.KeptAsReferenced);

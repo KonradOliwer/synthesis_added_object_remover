@@ -1,7 +1,7 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
-using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
+using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 
@@ -16,9 +16,4 @@ public sealed record LeftBehindCheck(
     OtherObject? ContainingObject,
     SectorAreas Surroundings,
     LeftBehindOutcome Decision,
-    KeepReason? KeepReason)
-{
-    public bool IsRemoved => LeftBehindOutcomes.IsRemoval(Decision);
-
-    public bool IsRestored => LeftBehindOutcomes.IsRestoration(Decision);
-}
+    KeepReason? KeepReason) : LeftBehindVerdict(TargetIndex, Surroundings, Decision, KeepReason);

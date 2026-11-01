@@ -27,7 +27,7 @@ public class VisibleLeftBehindFollowUpRunTests
         var removal = Assert.Single(outcome.Removals.OfType<ObjectWithReason.VisibleLeftBehind>());
         Assert.Equal(MiddleCrate, outcome.Collected.Targets[removal.TargetIndex].EditorId);
         var door = Assert.Single(outcome.VisibleLeftBehind.Evaluations, check => outcome.Collected.Targets[check.TargetIndex].EditorId == DoorEditorId);
-        Assert.Equal(VisibleLeftBehindOutcome.KeptSurroundingsMostlyKept, door.Decision);
+        Assert.Equal(LeftBehindOutcome.KeptSurroundingsMostlyKept, door.Decision);
     }
 
     [Theory]
@@ -44,8 +44,8 @@ public class VisibleLeftBehindFollowUpRunTests
         var removed = Assert.IsType<Decision.Removed>(outcome.Final.Of(doorId));
         Assert.Contains(removed.Round, followUp.Rounds);
         Assert.True(removed.Round.Number > visibleRound.Number);
-        Assert.Equal(mode == FollowUpRemovalMode.EverythingTouchingIt, removed.Reason is RemovalReason.Touching);
-        Assert.Equal(mode == FollowUpRemovalMode.OnlyWhatLosesItsSupport, removed.Reason is RemovalReason.LostSupport);
+        Assert.Equal(mode == FollowUpRemovalMode.EverythingTouchingIt, removed.Reason is TouchingTargetThatLeft);
+        Assert.Equal(mode == FollowUpRemovalMode.OnlyWhatLosesItsSupport, removed.Reason is LostSupport);
     }
 
     [Theory]

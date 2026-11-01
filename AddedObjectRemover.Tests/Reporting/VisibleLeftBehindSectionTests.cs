@@ -120,7 +120,7 @@ public sealed class VisibleLeftBehindSectionTests
     {
         var (world, scene, decisions) = Scene();
         var linkedMember = new VisibleLeftBehindCheck(
-            LinkedPartner, null, Areas(northCleared: false), VisibleLeftBehindOutcome.RemovedLinkedToRemoval, null);
+            LinkedPartner, null, Areas(northCleared: false), LeftBehindOutcome.RemovedLinkedToRemoval, null);
         var result = scene with { Evaluations = [.. scene.Evaluations, linkedMember] };
 
         var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Detailed).Lines.ToList();
@@ -138,7 +138,7 @@ public sealed class VisibleLeftBehindSectionTests
     {
         var (world, scene, decisions) = Scene();
         var linkedMember = new VisibleLeftBehindCheck(
-            LinkedPartner, null, Areas(northCleared: false), VisibleLeftBehindOutcome.RemovedLinkedToRestoration, null);
+            LinkedPartner, null, Areas(northCleared: false), LeftBehindOutcome.RemovedLinkedToRestoration, null);
         var result = scene with { Evaluations = [.. scene.Evaluations, linkedMember] };
 
         var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Detailed).Lines.ToList();
@@ -153,7 +153,7 @@ public sealed class VisibleLeftBehindSectionTests
     {
         var (world, scene, decisions) = Scene();
         var restored = new VisibleLeftBehindCheck(
-            LinkedPartner, VisibleObjectKind.Furniture, Areas(northCleared: true), VisibleLeftBehindOutcome.RestoredSurroundingsRemoved, null);
+            LinkedPartner, VisibleObjectKind.Furniture, Areas(northCleared: true), LeftBehindOutcome.RestoredSurroundingsRemoved, null);
         var result = scene with { Evaluations = [.. scene.Evaluations, restored] };
 
         var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Detailed).Lines.ToList();
@@ -171,8 +171,8 @@ public sealed class VisibleLeftBehindSectionTests
     {
         var (world, scene, decisions) = Scene();
         var removedWithRestored = new VisibleLeftBehindCheck(
-            LinkedPartner, null, Areas(northCleared: true), VisibleLeftBehindOutcome.RemovedSurroundingsRemovedAndRestored, null);
-        var restoredWithRestored = removedWithRestored with { TargetIndex = NoClearedDirection, Decision = VisibleLeftBehindOutcome.RestoredSurroundingsRemovedAndRestored };
+            LinkedPartner, null, Areas(northCleared: true), LeftBehindOutcome.RemovedSurroundingsRemovedAndRestored, null);
+        var restoredWithRestored = removedWithRestored with { TargetIndex = NoClearedDirection, Decision = LeftBehindOutcome.RestoredSurroundingsRemovedAndRestored };
 
         var plain = LogSections.BuildVisibleLeftBehindSection(world, scene, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Detailed).Lines.ToList();
         var counted = LogSections.BuildVisibleLeftBehindSection(
@@ -252,12 +252,12 @@ public sealed class VisibleLeftBehindSectionTests
             null);
         VisibleLeftBehindCheck[] evaluations =
         [
-            new(Removed, VisibleObjectKind.NpcsAndCreatures, Areas(northCleared: true), VisibleLeftBehindOutcome.RemovedSurroundingsRemoved, null),
-            new(Referenced, VisibleObjectKind.Containers, Areas(northCleared: true), VisibleLeftBehindOutcome.KeptReferenced, TestKeepReasons.Quest),
-            new(ProtectedKind, VisibleObjectKind.Containers, Areas(northCleared: true), VisibleLeftBehindOutcome.KeptProtectedType, null),
-            new(NearMiss, null, Areas(northCleared: false), VisibleLeftBehindOutcome.KeptSurroundingsMostlyKept, null),
-            new(NoClearedDirection, null, new SectorAreaTally(50).Build(), VisibleLeftBehindOutcome.KeptSurroundingsMostlyKept, null),
-            new(TooFewObjects, null, new SectorAreaTally(50).Build(), VisibleLeftBehindOutcome.KeptTooFewSurroundingObjects, null),
+            new(Removed, VisibleObjectKind.NpcsAndCreatures, Areas(northCleared: true), LeftBehindOutcome.RemovedSurroundingsRemoved, null),
+            new(Referenced, VisibleObjectKind.Containers, Areas(northCleared: true), LeftBehindOutcome.KeptReferenced, TestKeepReasons.Quest),
+            new(ProtectedKind, VisibleObjectKind.Containers, Areas(northCleared: true), LeftBehindOutcome.KeptProtectedType, null),
+            new(NearMiss, null, Areas(northCleared: false), LeftBehindOutcome.KeptSurroundingsMostlyKept, null),
+            new(NoClearedDirection, null, new SectorAreaTally(50).Build(), LeftBehindOutcome.KeptSurroundingsMostlyKept, null),
+            new(TooFewObjects, null, new SectorAreaTally(50).Build(), LeftBehindOutcome.KeptTooFewSurroundingObjects, null),
         ];
         var protection = ObjectsToKeep.Build(
             [.. targets],
@@ -267,8 +267,8 @@ public sealed class VisibleLeftBehindSectionTests
         var decisions = TestSeededDecisions.StartDisablingAll(protection, TargetCount).Apply(
             RoundKind.VisibleLeftBehind,
             [
-                new ProposedRemoval(new TargetId(Removed), new RemovalReason.VisibleObjectSurroundingsRemoved()),
-                new ProposedRemoval(new TargetId(Referenced), new RemovalReason.VisibleObjectSurroundingsRemoved()),
+                new ProposedRemoval(new TargetId(Removed), new VisibleObjectSurroundingsRemoved()),
+                new ProposedRemoval(new TargetId(Referenced), new VisibleObjectSurroundingsRemoved()),
             ]);
         return (world, new VisibleLeftBehindResult(StepOutcome.Performed, evaluations, [], [decisions.Rounds[^1]], RoundsTime, TestRestingObjects.SwitchedOff, Failure: null), decisions);
     }

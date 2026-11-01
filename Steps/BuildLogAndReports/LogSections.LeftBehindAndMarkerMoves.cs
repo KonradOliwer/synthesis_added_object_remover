@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
+using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 
@@ -26,7 +27,8 @@ internal static partial class LogSections
 
         List<string> lines =
         [
-            BuildPerformedOrNotPerformedLine(leftBehind.Outcome, LeftBehindStepName, () => LeftBehindSummaryLine(leftBehind, elapsed, context)),
+            BuildPerformedOrNotPerformedLine(
+                leftBehind.Outcome, LeftBehindStepName, () => LeftBehindSummaryLine(LeftBehindStepName, leftBehind.Evaluations, judgesInsideOtherObjects: true, elapsed, context)),
         ];
         if (context.Detailed) lines.AddRange(leftBehind.Evaluations.Select(evaluation => LeftBehindOutcomeLine(world, evaluation)));
         lines.AddRange(BuildKeptLines(world, kept));
@@ -94,14 +96,21 @@ internal static partial class LogSections
             + $"removed/total ground area {SectorAreasText.Describe(evaluation.Surroundings)}.";
     }
 
-    private static string LeftBehindSummaryLine(LeftBehindResult leftBehind, TimeSpan elapsed, ReportContext context) =>
+    /// <summary>The summary line of either left-behind step.</summary>
+    /// <param name="judgesInsideOtherObjects">
+    /// Whether the step removes objects inside another mod's object: only then is that outcome listed when no object has it. The visible
+    /// step never gives it.
+    /// </param>
+    private static string LeftBehindSummaryLine(
+        string stepName, IEnumerable<LeftBehindVerdict> evaluations, bool judgesInsideOtherObjects, TimeSpan elapsed, ReportContext context) =>
         BuildOutcomeSummaryLine(
-            LeftBehindStepName,
-            [.. leftBehind.Evaluations.Select(evaluation => evaluation.Decision)],
+            stepName,
+            [.. evaluations.Select(evaluation => evaluation.Decision)],
             LeftBehindOutcomes.IsRemoval,
             LeftBehindOutcomes.IsRestoration,
             outcome => LeftBehindOutcomes.IsRemovedAsLinked(outcome) || LeftBehindOutcomes.IsRestoration(outcome)
-                || outcome is LeftBehindOutcome.RemovedSurroundingsRemovedAndRestored or LeftBehindOutcome.KeptInDeletedCell,
+                || outcome is LeftBehindOutcome.RemovedSurroundingsRemovedAndRestored or LeftBehindOutcome.KeptInDeletedCell
+                || (outcome is LeftBehindOutcome.RemovedInsideOtherObject && !judgesInsideOtherObjects),
             LeftBehindOutcomeText.Describe,
             elapsed,
             context);

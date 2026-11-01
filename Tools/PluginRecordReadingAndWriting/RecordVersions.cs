@@ -2,12 +2,12 @@ using System.Collections.Immutable;
 
 namespace AddedObjectRemover;
 
-/// <summary>A record's versions as their plugins store them, lowest first: the one just below the target plugin's, the target plugin's, then each later one up to the winner.</summary>
+/// <summary>A record's versions as their plugins store them, lowest first: the one just below the named plugin's, the named plugin's, then each later one up to the winner.</summary>
 internal sealed record RecordVersions<TVersion>(ImmutableArray<PluginName> Plugins, ImmutableArray<TVersion> Versions)
 {
     public TVersion Earlier => Versions[0];
 
-    public TVersion OfTarget => VersionComparison.NamedPluginVersionOf(Versions);
+    public TVersion OfNamedPlugin => VersionComparison.NamedPluginVersionOf(Versions);
 
     public TVersion Winner => Versions[^1];
 
@@ -15,8 +15,8 @@ internal sealed record RecordVersions<TVersion>(ImmutableArray<PluginName> Plugi
 }
 
 /// <summary>
-/// Keeps the versions of records the target plugin overrides while the load order is walked highest priority first, until the version
-/// just below the target plugin's is read; no plugin stops the walk before. Memory stays bounded: only the records asked for keep
+/// Keeps the versions of records the named plugin overrides while the load order is walked highest priority first, until the version
+/// just below the named plugin's is read; no plugin stops the walk before. Memory stays bounded: only the records asked for keep
 /// versions.
 /// </summary>
 /// <typeparam name="TVersion">One version of the record as read.</typeparam>
@@ -50,11 +50,11 @@ internal sealed class TargetOverrideWalk<TVersion, TPlace>(PluginName target)
         _readOrder.Add(key);
     }
 
-    /// <summary>The records whose version just below the target plugin's was read, in the order their walk ended.</summary>
+    /// <summary>The records whose version just below the named plugin's was read, in the order their walk ended.</summary>
     public IEnumerable<(RecordKey Key, TPlace Place, RecordVersions<TVersion> Versions)> Read =>
         _readOrder.Select(key => (key, _read[key].Place, _read[key].Versions));
 
-    /// <summary>The records the target plugin itself defines, walked down to its own version, which is their lowest; lowest first.</summary>
+    /// <summary>The records the named plugin itself defines, walked down to its own version, which is their lowest; lowest first.</summary>
     public IEnumerable<(RecordKey Key, TPlace Place, ImmutableArray<PluginName> Plugins, ImmutableArray<TVersion> Versions)> DefinedByTarget =>
         _open
             .Where(entry => entry.Key.Plugin == target)
@@ -64,7 +64,7 @@ internal sealed class TargetOverrideWalk<TVersion, TPlace>(PluginName target)
                 ImmutableArray.CreateRange(Enumerable.Reverse(entry.Value.Versions).Select(version => version.Plugin)),
                 ImmutableArray.CreateRange(Enumerable.Reverse(entry.Value.Versions).Select(version => version.Version))));
 
-    /// <param name="keys">Records whose version just below the target plugin's was read.</param>
+    /// <param name="keys">Records whose version just below the named plugin's was read.</param>
     public IReadOnlyDictionary<RecordKey, RecordVersions<TVersion>> VersionsOf(IEnumerable<RecordKey> keys) =>
         keys.ToDictionary(key => key, key => _read[key].Versions);
 }

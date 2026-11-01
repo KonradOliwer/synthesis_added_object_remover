@@ -60,10 +60,10 @@ public sealed record CopyEarlierNavmeshGeometry(RecordKey Record) : WriteOrder(R
 public sealed record CopyEarlierNavmesh(RecordKey Record) : WriteOrder(Record);
 
 /// <summary>
-/// Sets every vertex of the navmesh to the height <paramref name="Z"/> and cuts it off: no edge link, door, cover or preferred
-/// triangle stays. X and Y, the triangles in their order, the inner edges and the grid stay; it is not deleted.
+/// Sets every vertex of the navmesh to the height <paramref name="Z"/> and removes every edge link, door, cover and preferred
+/// triangle. X and Y, the triangles in their order, the inner edges and the grid stay; it is not deleted.
 /// </summary>
-public sealed record SetNavmeshZ(RecordKey Record, float Z) : WriteOrder(Record);
+public sealed record FlattenAndDetachNavmesh(RecordKey Record, float Z) : WriteOrder(Record);
 
 /// <summary>
 /// The patch's navmesh info map holds the given entries besides those it already holds, in navmesh key order, with the winning

@@ -104,15 +104,10 @@ internal static partial class LogSections
     public static LogSection BuildUnexpectedErrorsSection(IEnumerable<UnexpectedError> errors, ReportContext context) =>
         new("unexpectedErrors", UnexpectedErrorLines.Of(errors, context));
 
-    /// <summary>Every broken mesh of the run, once, whichever step read it first: the detailed log lists the per-mesh problems, both logs list the grouped unexpected errors.</summary>
+    /// <summary>Every broken mesh of the run, once, whichever step read it first; only the detailed log lists them.</summary>
     /// <param name="problems">All mesh problems of the run; they are listed by mesh (ignoring case), then by the worded line.</param>
-    /// <param name="errors">The unexpected errors whose subject is a mesh.</param>
-    public static LogSection BuildMeshProblemsSection(ImmutableArray<AssetProblem> problems, IEnumerable<UnexpectedError> errors, ReportContext context) =>
-        new("meshProblems",
-        [
-            .. context.Detailed ? MeshProblemLinesInOrder(problems) : [],
-            .. UnexpectedErrorLines.Of(errors, context),
-        ]);
+    public static LogSection BuildMeshProblemsSection(ImmutableArray<AssetProblem> problems, ReportContext context) =>
+        new("meshProblems", [.. context.Detailed ? MeshProblemLinesInOrder(problems) : []]);
 
     private static IEnumerable<string> MeshProblemLinesInOrder(ImmutableArray<AssetProblem> problems) =>
         problems

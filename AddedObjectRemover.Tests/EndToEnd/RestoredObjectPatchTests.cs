@@ -31,7 +31,7 @@ public sealed class RestoredObjectPatchTests : IDisposable
 
     private static readonly WhatToCollect Plan = new(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false);
 
-    private static readonly RemovalReason Reason = new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize());
+    private static readonly RemovalReason Reason = new TooClose(new OtherId(0), new TooCloseCause.ObjectSize());
 
     private readonly FixtureMod _baseGame = new("Skyrim.esm");
     private readonly FixtureMod _cleaned;
@@ -327,7 +327,7 @@ public sealed class RestoredObjectPatchTests : IDisposable
         var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved);
         var final = RemovalDecisions.Start(protection, [new WhenRemoved.Restore(moved.EarlierVersion!)]).Apply(RoundKind.TooClose, [new ProposedRemoval(moved.Id, Reason)]);
 
-        PatchWriter.Write(final, targets, OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff, reader, writing);
+        PatchWriter.Write(new(final, targets, OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff, reader, writing));
 
         return state.PatchMod;
     }

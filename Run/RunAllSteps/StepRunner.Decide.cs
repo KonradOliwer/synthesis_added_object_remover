@@ -44,33 +44,31 @@ public static partial class StepRunner
     /// </summary>
     /// <remarks>
     /// The runner holds no error boundary: each step catches only user-data failures inside the step, and any other error ends
-    /// the run. A step adds its rounds to the run's decisions outside that boundary, so any error there ends the run. Each step's
-    /// call is one timed section, so the printed times include adding the rounds.
+    /// the run. A step adds its rounds to the run's decisions outside that boundary, so any error there ends the run. Each deciding
+    /// step's call is one timed section, so the printed times include adding the rounds.
     /// </remarks>
     private static StepResults Decide(RunScope scope, IRunCaches runCaches, ModTrustTable trust, CollectedObjects collected)
     {
         var selected = RunSelection(scope, runCaches, collected);
-        var heldUp = RunHeldUpTargets(scope, runCaches, trust, collected);
-        var kept = RunKeepCheck(scope, runCaches, collected, heldUp);
+        var kept = RunKeepCheck(scope, runCaches, trust, collected);
         var judged = RunChangedObjectJudging(scope, runCaches, trust, collected);
-        var started = RemovalDecisions.Start(kept.ObjectsToKeep, judged.Result.WhenRemoved);
         var groups = scope.Settings.CollisionGroupsOf(collected.Targets);
-        var fitted = RunFit(scope, runCaches, trust, collected, selected, groups, heldUp, kept.ObjectsToKeep, started);
-        var changedTerrain = RunChangedTerrain(scope, runCaches, trust, collected, groups, fitted.Decisions);
-        var tooClose = RunTooClose(scope, runCaches, collected, selected, groups, changedTerrain.Decisions);
-        var alsoRemove = RunAlsoRemove(scope, runCaches, collected, tooClose.Decisions);
-        var visibleLeftBehind = RunVisibleLeftBehind(scope, runCaches, collected, alsoRemove.Decisions);
-        var otherMods = RunOtherModsObjects(scope, runCaches, trust, collected, fitted.Decisions, visibleLeftBehind.Decisions);
+        var fitted = RunFit(scope, runCaches, trust, collected, selected, groups, kept, judged);
+        var changedTerrain = RunChangedTerrain(scope, runCaches, trust, collected, groups, fitted);
+        var tooClose = RunTooClose(scope, runCaches, collected, selected, groups, changedTerrain);
+        var alsoRemove = RunAlsoRemove(scope, runCaches, collected, tooClose);
+        var visibleLeftBehind = RunVisibleLeftBehind(scope, runCaches, collected, alsoRemove);
+        var otherMods = RunOtherModsObjects(scope, runCaches, trust, collected, fitted.Decisions, visibleLeftBehind);
         var otherModsObjectsTakenAway = otherMods.Result.TakenAway();
-        var visibleTargetsAsTheRoundsMeasureThem = runCaches.IndexVisibleTargetsAsTheRoundsMeasureThem(collected.Targets, otherMods.Decisions);
+        var visibleTargetsAsTheRoundsMeasureThem = runCaches.IndexVisibleTargetsAsTheRoundsMeasureThem(otherMods.Decisions);
         var leftBehind = RunLeftBehind(
-            scope, runCaches, visibleTargetsAsTheRoundsMeasureThem, collected, selected.ObjectsThatCanCauseRemovals, otherModsObjectsTakenAway, otherMods.Decisions);
+            scope, runCaches, visibleTargetsAsTheRoundsMeasureThem, collected, selected.ObjectsThatCanCauseRemovals, otherModsObjectsTakenAway, otherMods);
         var markerMoves = RunMarkerMoves(scope, runCaches, collected, otherModsObjectsTakenAway, leftBehind);
         var whereRemoved = RunRestoreWhereRemoved(scope, runCaches, trust, visibleTargetsAsTheRoundsMeasureThem, collected, otherMods.Result, markerMoves.Decisions);
         return new StepResults(
             Collected: collected,
-            ObjectsToKeep: kept.ObjectsToKeep,
-            RemovalRisks: kept.Risks,
+            ObjectsToKeep: kept.Kept.ObjectsToKeep,
+            RemovalRisks: kept.Kept.Risks,
             ChangedObjects: judged.Result,
             OldPlaceWorld: judged.OldPlaceWorld,
             ChangedTerrain: changedTerrain.Result,
@@ -88,26 +86,18 @@ public static partial class StepRunner
             () => RemovalCauseSelector.Select(new(collected, runCaches.OtherModObjects, runCaches.Shapes, scope.Settings.Selection, scope.Settings.Execution)),
             (selected, elapsed) => scope.Report.BuildStepSections(selected.Replacements, collected, elapsed));
 
-    private static HeldUpTargets RunHeldUpTargets(RunScope scope, IRunCaches runCaches, ModTrustTable trust, CollectedObjects collected) =>
-        scope.Environment.Log.Timed(
-            () => OtherModsObjects.FindHeldUpTargets(
-                collected.Targets,
-                runCaches.VisibleTargets,
-                trust,
-                scope.Environment.Plugins,
-                scope.Settings.OtherModsObjects,
-                runCaches.Shapes,
-                runCaches.Triangles,
-                runCaches.SurfaceSamples,
-                runCaches.Terrain,
-                runCaches.VisibleObjectsOfAnyPlugin,
-                scope.Settings.Execution),
-            (heldUp, elapsed) => scope.Report.BuildStepSections(heldUp, elapsed));
-
-    private static ObjectsToKeepResult RunKeepCheck(RunScope scope, IRunCaches runCaches, CollectedObjects collected, HeldUpTargets heldUp) =>
-        scope.Environment.Log.Timed(
-            () => ObjectsToKeepFinder.Find(new(collected.Targets, collected.Links, runCaches.Bases, heldUp.Targets)),
-            scope.Report.BuildStepSections);
+    /// <remarks>
+    /// The step times its two parts through the run's clock, since each prints its own sections: what other mods' objects rest on,
+    /// then the objects to keep.
+    /// </remarks>
+    private static ObjectsToKeepFound RunKeepCheck(RunScope scope, IRunCaches runCaches, ModTrustTable trust, CollectedObjects collected)
+    {
+        var found = ObjectsToKeepFinder.Find(
+            new(collected.Targets, collected.Links, runCaches.Bases, CreateHeldUpTargetsSearch(scope, runCaches, trust, collected), scope.Environment.TimeSinceStart));
+        Print(scope.Environment.Log, scope.Report.BuildStepSections(found.HeldUp, found.HeldUpTime));
+        Print(scope.Environment.Log, scope.Report.BuildStepSections(found.Kept, found.KeepTime));
+        return found;
+    }
 
     private static ChangedObjectsJudged RunChangedObjectJudging(RunScope scope, IRunCaches runCaches, ModTrustTable trust, CollectedObjects collected) =>
         scope.Environment.Log.Timed(
@@ -129,20 +119,19 @@ public static partial class StepRunner
         CollectedObjects collected,
         SelectedObjects selected,
         ImmutableArray<CollisionGroup> groups,
-        HeldUpTargets heldUp,
-        IObjectsToKeep objectsToKeep,
-        IRunDecisions started) =>
+        ObjectsToKeepFound kept,
+        ChangedObjectsJudged judged) =>
         scope.Environment.Log.Timed(
             () => ClashingObjectFitter.Fit(
                 new(
                     collected.Targets,
-                    objectsToKeep,
+                    kept.Kept.ObjectsToKeep,
                     CreateFitGroups(scope, runCaches, trust, collected, selected, groups),
-                    CreateFitRestingRule(scope, runCaches, trust, collected, heldUp),
+                    CreateFitRestingRule(scope, runCaches, trust, collected, kept.HeldUp),
                     runCaches.Shapes,
                     collected.Order,
                     scope.Settings.Execution,
-                    started)),
+                    RemovalDecisions.Start(kept.Kept.ObjectsToKeep, judged.Result.WhenRemoved))),
             (fitted, elapsed) => scope.Report.BuildStepSections(fitted.Result, elapsed));
 
     private static Decided<ChangedTerrainResult> RunChangedTerrain(
@@ -151,12 +140,12 @@ public static partial class StepRunner
         ModTrustTable trust,
         CollectedObjects collected,
         ImmutableArray<CollisionGroup> groups,
-        IRunDecisions afterFits) =>
+        Decided<FitResult> fitted) =>
         scope.Environment.Log.Timed(
             () => ChangedTerrainObjects.Find(
                 new(
                     collected,
-                    afterFits,
+                    fitted.Decisions,
                     trust.AcceptedWorld,
                     scope.Environment.Plugins,
                     scope.Plugin,
@@ -171,7 +160,7 @@ public static partial class StepRunner
         CollectedObjects collected,
         SelectedObjects selected,
         ImmutableArray<CollisionGroup> groups,
-        IRunDecisions afterChangedTerrain) =>
+        Decided<ChangedTerrainResult> changedTerrain) =>
         scope.Environment.Log.Timed(
             () => TooCloseObjects.Find(
                 new(
@@ -183,16 +172,16 @@ public static partial class StepRunner
                     runCaches.Triangles,
                     scope.Settings.Execution,
                     groups.Select(group => group.TooClose),
-                    afterChangedTerrain)),
+                    changedTerrain.Decisions)),
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, runCaches.VisibleTargets, elapsed));
 
     /// <remarks>The step also times its rounds alone, through the run's clock.</remarks>
-    private static Decided<RestingObjectsResult> RunAlsoRemove(RunScope scope, IRunCaches runCaches, CollectedObjects collected, IRunDecisions afterTooClose) =>
+    private static Decided<RestingObjectsResult> RunAlsoRemove(RunScope scope, IRunCaches runCaches, CollectedObjects collected, Decided<TooCloseResult> tooClose) =>
         scope.Environment.Log.Timed(
             () => RestingObjects.Find(
                 new(
                     collected.Targets,
-                    afterTooClose,
+                    tooClose.Decisions,
                     scope.Settings.AlsoRemove,
                     scope.Settings.Execution,
                     scope.Environment.TimeSinceStart,
@@ -201,14 +190,14 @@ public static partial class StepRunner
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
 
     private static Decided<VisibleLeftBehindResult> RunVisibleLeftBehind(
-        RunScope scope, IRunCaches runCaches, CollectedObjects collected, IRunDecisions afterAlsoRemove) =>
+        RunScope scope, IRunCaches runCaches, CollectedObjects collected, Decided<RestingObjectsResult> alsoRemove) =>
         scope.Environment.Log.Timed(
             () => VisibleLeftBehindObjects.Find(
                 new(
                     collected.Targets,
-                    afterAlsoRemove,
+                    alsoRemove.Decisions,
                     runCaches,
-                    CreateAlsoRemoveFollowUp(scope, runCaches, collected, afterAlsoRemove),
+                    CreateAlsoRemoveFollowUp(scope, runCaches, collected, alsoRemove.Decisions),
                     scope.Environment.TimeSinceStart,
                     collected.Order,
                     scope.Settings.Execution,
@@ -222,20 +211,15 @@ public static partial class StepRunner
         ModTrustTable trust,
         CollectedObjects collected,
         IRemovalDecisions afterFits,
-        IRunDecisions afterVisibleLeftBehind) =>
+        Decided<VisibleLeftBehindResult> visibleLeftBehind) =>
         scope.Environment.Log.Timed(
             () => OtherModsObjects.Settle(
                 new(
-                    collected.Targets,
+                    CreateSupportJudging(scope, runCaches, trust, collected),
                     afterFits,
-                    afterVisibleLeftBehind,
-                    runCaches,
-                    trust,
-                    scope.Environment.Plugins,
-                    scope.Settings.OtherModsObjects,
+                    visibleLeftBehind.Decisions,
                     scope.Settings.AlsoRemove,
-                    CreateAlsoRemoveRoundsAfter(scope, runCaches),
-                    scope.Settings.Execution)),
+                    CreateAlsoRemoveRoundsAfter(scope, runCaches))),
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
 
     /// <param name="visibleTargets">The visible targets where the rounds measure them.</param>
@@ -247,14 +231,14 @@ public static partial class StepRunner
         CollectedObjects collected,
         IObjectsThatCanCauseRemovals objectsThatCanCauseRemovals,
         IReadOnlyDictionary<OtherId, OtherObject?> otherModsObjectsTakenAway,
-        IRunDecisions afterOtherModsObjects) =>
+        Decided<OtherModsObjectsResult> otherMods) =>
         scope.Environment.Log.Timed(
             () => LeftBehindObjects.Find(
                 new(
                     collected.Targets,
                     objectsThatCanCauseRemovals,
                     otherModsObjectsTakenAway,
-                    afterOtherModsObjects,
+                    otherMods.Decisions,
                     visibleTargets,
                     runCaches,
                     collected.Order,

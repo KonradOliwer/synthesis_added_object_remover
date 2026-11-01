@@ -4,7 +4,7 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 /// <param name="Part">What failed, as a phrase ("the also-remove step" for a whole part; "checking objects for being too close" when objects are handled one by one).</param>
 /// <param name="Failure">The exception's type and message.</param>
 /// <param name="Consequence">A full sentence saying what is missing or incomplete in the results because of it.</param>
-/// <param name="Subject">The one object or mesh it happened for; null when it stopped a whole part.</param>
+/// <param name="Subject">The one object it happened for; null when it stopped a whole part.</param>
 internal sealed record UnexpectedError(string Part, string Failure, string Consequence, ErrorSubject? Subject)
 {
     /// <summary>The exception's full text with its stack trace, which only the detailed log prints; null when the part failed without an exception.</summary>
@@ -18,7 +18,6 @@ internal sealed record UnexpectedError(string Part, string Failure, string Conse
 internal sealed record SubjectKind(string Singular, string Plural)
 {
     public static readonly SubjectKind Object = new("object", "objects");
-    public static readonly SubjectKind Mesh = new("mesh", "meshes");
     public static readonly SubjectKind OldPlaceObject = new("old-place object", "old-place objects");
 }
 

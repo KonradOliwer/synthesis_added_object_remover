@@ -16,8 +16,8 @@ public enum MeshReadStatus
     EffectOnly,
 }
 
-/// <summary>Where a mesh file was found; Unknown where reading it failed before that was settled.</summary>
-public enum MeshSource { NotFound, LooseFile, Archive, Unknown }
+/// <summary>Where a mesh file was found.</summary>
+public enum MeshSource { NotFound, LooseFile, Archive }
 
 /// <summary>What reading one mesh for its bounds gave.</summary>
 /// <param name="Box">The render geometry's bounds in mesh-local space; null when the mesh is unreadable or has no render geometry.</param>

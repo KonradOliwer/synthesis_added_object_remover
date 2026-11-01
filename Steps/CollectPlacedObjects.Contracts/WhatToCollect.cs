@@ -47,4 +47,19 @@ public sealed record WhatToCollect(
     bool JudgeOldPlaces,
     bool TerrainForChangedObjectsOnly,
     AreaRecordReads? AreaRecordVersions = null,
-    bool DecideEveryObjectWithoutCleanedMod = false);
+    bool DecideEveryObjectWithoutCleanedMod = false)
+{
+    /// <summary>What the steps need read, with the moved distance and the replaced setting of the changed-object judging.</summary>
+    public static WhatToCollect Of(ScanNeeds needs, float movedDistance, bool processReplaced) => new(
+        needs.Navmesh,
+        needs.OtherModDetails,
+        needs.TerrainVersions,
+        needs.TerrainLayers,
+        needs.Water,
+        movedDistance,
+        processReplaced,
+        needs.JudgeOldPlaces,
+        needs.TerrainForChangedObjectsOnly,
+        needs.AreaRecordVersions,
+        needs.DecideEveryObjectWithoutCleanedMod);
+}

@@ -19,7 +19,6 @@ public class RunPartTextTests
     private static readonly ReportContext Normal = new(Bases: null!, Shapes: null!, Detailed: false);
     private static readonly ReportContext Detailed = new(Bases: null!, Shapes: null!, Detailed: true);
     private static readonly FailureSubject Object = new("000801:Other.esp", "Crate", Position: 1);
-    private static readonly FailureSubject Mesh = new(@"meshes\crate.nif", Name: null, Position: 0);
 
     public static TheoryData<string, string> WholeParts { get; } = new()
     {
@@ -30,7 +29,6 @@ public class RunPartTextTests
         { "LeftBehind", "  Unexpected error in the step for invisible objects left behind (InvalidOperationException: broke). That step did not run, so invisible objects whose surroundings were removed were not removed." },
         { "MarkerMoves", "  Unexpected error in the marker moves (InvalidOperationException: broke). No kept marker was moved, so markers inside other mods' objects stay where they are." },
         { "ReportFileDetails", "  Unexpected error in the report-file details (InvalidOperationException: broke). The touching pairs or mesh origins that the report files list are missing from them." },
-        { "LoaderStartUp", "  Unexpected error in the NIF loader start-up (InvalidOperationException: broke). Meshes are read one at a time, which is slower; the results are not affected." },
         { "Step", "  Unexpected error in the step that restores what the cleaned mod changed where it was removed (InvalidOperationException: broke). Nothing was restored by area; the objects restored because they themselves were removed are written as decided." },
     };
 
@@ -42,8 +40,6 @@ public class RunPartTextTests
         { "ObjectCheck", "  Unexpected error while checking objects the cleaned mod changed against what stays (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They stay as the cleaned mod changed them." },
         { "ObjectThatStays", "  Unexpected error while measuring objects that stay, which objects restored where the cleaned mod was removed are checked against (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were treated as invisible, so an object restored next to them was not checked against them for coming too close." },
         { "RemovalCauseSelection", "  Unexpected error while selecting the objects that can cause removals (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were not used to remove the cleaned mod's objects." },
-        { "MeshShapes", @"  Unexpected error while reading mesh shapes (InvalidOperationException: broke): 1 mesh, e.g. meshes\crate.nif. Objects using the mesh are treated as having no mesh shape." },
-        { "MeshTriangles", @"  Unexpected error while reading mesh triangles (InvalidOperationException: broke): 1 mesh, e.g. meshes\crate.nif. Objects using the mesh are treated as having no mesh triangles." },
     };
 
     [Theory]
@@ -55,12 +51,9 @@ public class RunPartTextTests
 
     [Theory]
     [MemberData(nameof(PerSubjectParts))]
-    public void AFailureForOneObjectOrMeshIsWordedAsToday(string part, string line)
+    public void AFailureForOneObjectIsWordedAsToday(string part, string line)
     {
-        var key = KeyNamed(part);
-        var subject = key.Owner == MeshReadingParts.MeshShapes.Owner ? Mesh : Object;
-
-        Assert.Equal(line, Assert.Single(LinesOf(new PartFailure(key, Failure, subject))));
+        Assert.Equal(line, Assert.Single(LinesOf(new PartFailure(KeyNamed(part), Failure, Object))));
     }
 
     [Fact]
@@ -118,7 +111,6 @@ public class RunPartTextTests
         {
             ReportFileParts.ReportFiles, RestingObjectsParts.AlsoRemove, RestingObjectsParts.FollowUp, RestingObjectsParts.TouchChains, LeftBehindParts.LeftBehind, MarkerMoveParts.MarkerMoves,
             RestingObjectsParts.ReportFileDetails, ChangedTerrainParts.TerrainCheck, TooCloseParts.TooCloseCheck, KeepParts.KeepCheck, SelectionParts.RemovalCauseSelection,
-            MeshReadingParts.MeshShapes, MeshReadingParts.MeshTriangles, MeshReadingParts.LoaderStartUp,
             RestoreWhereRemovedParts.Step, RestoreWhereRemovedParts.ObjectCheck, RestoreWhereRemovedParts.ObjectThatStays,
         }.Single(key => key.Name == name);
 }

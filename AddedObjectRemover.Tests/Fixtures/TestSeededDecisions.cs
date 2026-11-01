@@ -3,9 +3,9 @@ namespace AddedObjectRemover.Tests.Fixtures;
 /// <summary>Removal decisions seeded by a too-close round like the pipeline does, after a changed-terrain round when terrain seeds are given.</summary>
 internal static class TestSeededDecisions
 {
-    private static readonly RemovalReason SeedReason = new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize());
+    private static readonly RemovalReason SeedReason = new TooClose(new OtherId(0), new TooCloseCause.ObjectSize());
 
-    private static readonly RemovalReason TerrainSeedReason = new RemovalReason.TerrainChanged(new PluginName("Other.esp"), TerrainChangeKind.Height);
+    private static readonly RemovalReason TerrainSeedReason = new TerrainChanged(new PluginName("Other.esp"), TerrainChangeKind.Height);
 
     private static readonly PluginName EarlierPlugin = new("Earlier.esp");
 

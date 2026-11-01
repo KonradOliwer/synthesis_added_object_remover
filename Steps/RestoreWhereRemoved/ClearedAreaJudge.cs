@@ -33,6 +33,10 @@ internal sealed class ClearedAreaJudge(
         return _shares.Get((space, center), () => Measure(space, center, radius));
     }
 
+    /// <summary>The areas of the spaces one terrain quarter is judged in, added up under the verdict they give together.</summary>
+    public AreaShare Sum(IReadOnlyCollection<AreaShare> areas, AreaVerdict verdict) =>
+        ShareOf(areas.Sum(area => area.Objects), areas.Sum(area => area.Standing), areas.Sum(area => area.Size), areas.Sum(area => area.StandingSize), verdict);
+
     private bool IsInterior(RecordKey space) => spaces.TryGetValue(space, out var fact) && fact.Kind == SpaceKind.Interior;
 
     /// <remarks>The sums are added in ascending id, so they do not depend on which thread measures.</remarks>
@@ -50,22 +54,32 @@ internal sealed class ClearedAreaJudge(
             standing++;
             standingSize += volume;
         }
-        return new AreaShare(objects, standing, size, standingSize, VerdictOf(objects, standing, size, standingSize));
+        return ShareOf(objects, standing, size, standingSize, VerdictOf(objects, standing, size, standingSize));
     }
 
-    private bool Stands(TargetId target) => NeighbourFates.Of(final, target) switch
+    private AreaShare ShareOf(int objects, int standing, double size, double standingSize, AreaVerdict verdict)
+    {
+        var measure = MeasureFor(size);
+        var (standingWeight, weight) = measure == ClearedAreaMeasure.ObjectSize ? (standingSize, size) : (standing, (double)objects);
+        var percent = weight > 0 ? standingWeight / weight * Percent.PerWhole : 0;
+        return new AreaShare(objects, standing, size, standingSize, verdict, measure, percent);
+    }
+
+    /// <remarks>When no object counted has a volume, the share is taken by count.</remarks>
+    private ClearedAreaMeasure MeasureFor(double size) =>
+        settings.Measure == ClearedAreaMeasure.ObjectSize && size > 0 ? ClearedAreaMeasure.ObjectSize : ClearedAreaMeasure.ObjectCount;
+
+    private bool Stands(TargetId target) => final.FateOf(target) switch
     {
         BoxFate.Removed => false,
         BoxFate.Stands => true,
         var fate => throw new UnreachableException($"The cleaned mod's own object {target} has the fate {fate}; only another plugin's object goes back."),
     };
 
-    /// <remarks>When every object counted has no volume, the share is taken by count.</remarks>
     private AreaVerdict VerdictOf(int objects, int standing, double size, double standingSize)
     {
         if (objects == 0) return AreaVerdict.NoObjectsAround;
-        var bySize = settings.Measure == ClearedAreaMeasure.ObjectSize && size > 0;
-        var cleared = bySize
+        var cleared = MeasureFor(size) == ClearedAreaMeasure.ObjectSize
             ? SharePercent.AtMost(standingSize, size, settings.MaxStandingPercent)
             : SharePercent.AtMost(standing, objects, settings.MaxStandingPercent);
         return cleared ? AreaVerdict.Cleared : AreaVerdict.StillStanding;

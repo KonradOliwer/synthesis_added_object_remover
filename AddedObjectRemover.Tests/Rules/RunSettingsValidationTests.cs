@@ -303,7 +303,7 @@ public class RunSettingsValidationTests
 
         var ready = BuildReady(settings);
 
-        Assert.Equal(expected, ready.Settings.LeftBehind!.MinOccupiedDirections);
+        Assert.Equal(expected, ready.Settings.LeftBehind!.Surroundings.MinOccupiedDirections);
         Assert.Equal(configured != expected, ready.Warnings.Any(warning => warning.Message.Contains("directions have objects")));
     }
 
@@ -323,7 +323,7 @@ public class RunSettingsValidationTests
 
         var ready = BuildReady(settings);
 
-        Assert.Equal(expected, ready.Settings.VisibleLeftBehind!.MinOccupiedDirections);
+        Assert.Equal(expected, ready.Settings.VisibleLeftBehind!.Surroundings.MinOccupiedDirections);
         Assert.Equal(
             configured != expected,
             ready.Warnings.Any(warning => warning.Message.StartsWith("Warning: Visible objects left behind > ", StringComparison.Ordinal) && warning.Message.Contains("directions have objects")));
@@ -340,7 +340,7 @@ public class RunSettingsValidationTests
 
         Assert.Null(off.Settings.VisibleLeftBehind);
         var visible = on.Settings.VisibleLeftBehind!;
-        Assert.Equal((1024f, 6, 80, 80), (visible.LookAround, visible.MinOccupiedDirections, visible.DirectionClearedPercent, visible.ClearedDirectionsPercent));
+        Assert.Equal(new LeftBehindSurroundings(1024f, 6, 80, 80), visible.Surroundings);
         Assert.Empty(visible.NeverRemove);
         Assert.Empty(on.Warnings);
     }

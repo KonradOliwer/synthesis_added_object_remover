@@ -28,15 +28,15 @@ public class ChangedTerrainRunTests
         Assert.Equal(
             new Dictionary<string, RemovalReason?>
             {
-                [TerrainWorld.CrateOnRaisedTerrain] = new RemovalReason.TerrainChanged(Other, TerrainChangeKind.Height),
-                [TerrainWorld.CrateOnRoad] = new RemovalReason.TerrainChanged(Other, TerrainChangeKind.TerrainType),
+                [TerrainWorld.CrateOnRaisedTerrain] = new TerrainChanged(Other, TerrainChangeKind.Height),
+                [TerrainWorld.CrateOnRoad] = new TerrainChanged(Other, TerrainChangeKind.TerrainType),
                 [TerrainWorld.CrateOnOtherGrass] = null,
                 [TerrainWorld.CrateOnTerrainRaisedByARequiringMod] = null,
-                [TerrainWorld.CrateUnderRaisedWater] = new RemovalReason.TerrainChanged(Other, TerrainChangeKind.WaterHeight),
-                [TerrainWorld.CrateInAddedWater] = new RemovalReason.TerrainChanged(Other, TerrainChangeKind.WaterAdded),
-                [TerrainWorld.CrateOnResavedTerrain] = new RemovalReason.TerrainChanged(Other, TerrainChangeKind.Height),
+                [TerrainWorld.CrateUnderRaisedWater] = new TerrainChanged(Other, TerrainChangeKind.WaterHeight),
+                [TerrainWorld.CrateInAddedWater] = new TerrainChanged(Other, TerrainChangeKind.WaterAdded),
+                [TerrainWorld.CrateOnResavedTerrain] = new TerrainChanged(Other, TerrainChangeKind.Height),
                 [TerrainWorld.CrateOnCarriedTerrain] = null,
-                [TerrainWorld.CrateInDroppedDefaultWater] = new RemovalReason.TerrainChanged(NoDefaultWater, TerrainChangeKind.WaterRemoved),
+                [TerrainWorld.CrateInDroppedDefaultWater] = new TerrainChanged(NoDefaultWater, TerrainChangeKind.WaterRemoved),
             },
             ReasonsByEditorId(outcome));
     }

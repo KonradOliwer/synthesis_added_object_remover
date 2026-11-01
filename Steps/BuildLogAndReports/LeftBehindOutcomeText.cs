@@ -1,6 +1,5 @@
 using System.Diagnostics;
-using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
-using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
@@ -26,11 +25,11 @@ internal static class LeftBehindOutcomeText
     };
 
     /// <summary>What the step did with the object.</summary>
-    public static string Verdict(LeftBehindCheck evaluation) =>
+    public static string Verdict(LeftBehindVerdict evaluation) =>
         evaluation.IsRemoved ? "removed" : evaluation.IsRestored ? "restored" : "kept";
 
     /// <summary>The outcome's reason, with the linking record for a referenced object.</summary>
-    public static string DescribeReason(LeftBehindCheck evaluation) =>
+    public static string DescribeReason(LeftBehindVerdict evaluation) =>
         evaluation.KeepReason is { } keepReason
             ? $"{Describe(evaluation.Decision)}: {KeepReasonText.Detail(keepReason)}"
             : Describe(evaluation.Decision);

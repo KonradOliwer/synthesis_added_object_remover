@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 
@@ -11,7 +12,7 @@ internal static class VisibleObjectKinds
         [BaseRecordKind.Container] = VisibleObjectKind.Containers,
         [BaseRecordKind.Furniture] = VisibleObjectKind.Furniture,
         [BaseRecordKind.Activator] = VisibleObjectKind.Activators,
-    };
+    }.ToFrozenDictionary();
 
     /// <summary>By the record type of the object's base, which a visible object always has; null for an object of no listed kind.</summary>
     public static VisibleObjectKind? Of(TargetObject target, IBaseFacts bases) =>

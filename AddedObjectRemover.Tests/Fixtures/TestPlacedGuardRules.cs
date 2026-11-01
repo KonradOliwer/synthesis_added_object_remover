@@ -15,19 +15,27 @@ internal sealed record TestPlacedGuardRules(
         IBaseObjectShapes shapes, ModTrustTable trust, LoadOrderPlugins plugins, OtherModsObjectsSettings support, ITerrainHeights terrain, int threads)
     {
         var triangles = new TriangleStore(shapes.ReadTriangles);
-        var surfaces = TestSurfaceSamples.Over(triangles);
         var worldCaches = new TestObjectCachesOfWorlds(world => TestScenes.Index(world, shapes, threads));
+        var causes = RemovalCauseSelector.CreateCausesOfWorlds(worldCaches);
+        var noWorld = TestScenes.Index(TestScenes.CreateWorld([], []), shapes, threads);
         return new TestPlacedGuardRules(
             worldCaches,
             (world, caches, excluded, settings) => TooCloseObjects.CreatePlacementRule(
-                world.Targets,
-                caches.VisibleTargets,
-                RemovalCauseSelector.SelectForOldPlace(caches.OtherModObjects, world.OtherModObjects.Length, excluded, settings.Npcs),
-                caches.PlacedNpcs,
-                shapes,
-                triangles,
-                settings),
-            OtherModsObjects.CreateHoldersOfObjectsThatStay(worldCaches, trust, plugins, support, shapes, triangles, surfaces, terrain, new Execution(threads)),
+                new(world.Targets, caches.VisibleTargets, causes.Of(world, excluded, settings.Npcs), caches.PlacedNpcs, shapes, triangles, settings)),
+            OtherModsObjects.CreateHoldersOfObjectsThatStay(
+                new(
+                    new(
+                        [],
+                        noWorld,
+                        trust,
+                        plugins,
+                        support,
+                        shapes,
+                        triangles,
+                        RestingObjects.CreateSupportContacts(new TestRunCaches(shapes, triangles, terrain, TestBaseFacts.Unresolved, noWorld.VisibleObjectsOfAnyPlugin)),
+                        terrain,
+                        new Execution(threads)),
+                    worldCaches)),
             support);
     }
 

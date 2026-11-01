@@ -90,7 +90,7 @@ internal static partial class LogSections
         var stats = (alsoRemove.TouchChains ?? throw new InvalidOperationException("The touch rounds had seeds and their chain search did not fail, yet no touch chains were given.")).Stats;
         return
         [
-            $"Touching objects: {TextFormat.Count(CountRemovedBy<RemovalReason.Touching>(alsoRemove, decisions))} removed in {TextFormat.Count(stats.Components)} components "
+            $"Touching objects: {TextFormat.Count(CountRemovedBy<TouchingTargetThatLeft>(alsoRemove, decisions))} removed in {TextFormat.Count(stats.Components)} components "
             + $"({TextFormat.Count(stats.ComponentsWithFollowUpRemovals)} with follow-up removals, largest {TextFormat.Count(stats.LargestComponent)} removed objects, "
             + $"longest chain {TextFormat.Count(stats.MaxDepth)} steps); {TextFormat.Count(CountKept(alsoRemove, decisions))} kept as referenced.",
             AlsoRemovePairs(stats.Pairs, stats.Levels, "levels"),
@@ -102,7 +102,7 @@ internal static partial class LogSections
         var work = alsoRemove.Work;
         return
         [
-            $"Anchoring: {TextFormat.Count(CountRemovedBy<RemovalReason.LostSupport>(alsoRemove, decisions))} removed over {TextFormat.Count(work.Rounds)} iterations; "
+            $"Anchoring: {TextFormat.Count(CountRemovedBy<LostSupport>(alsoRemove, decisions))} removed over {TextFormat.Count(work.Rounds)} iterations; "
             + $"{TextFormat.Count(work.Candidates)} touching objects evaluated ({TextFormat.Count(work.Evaluations)} evaluations), "
             + $"{TextFormat.Count(work.KeptWithoutContacts)} kept without any contact points, {TextFormat.Count(CountKept(alsoRemove, decisions))} kept as referenced.",
             AlsoRemovePairs(work.Pairs, work.Rounds, "iterations"),

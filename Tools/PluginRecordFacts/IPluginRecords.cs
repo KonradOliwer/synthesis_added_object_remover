@@ -17,19 +17,20 @@ public interface IPluginRecords
     /// <summary>Walks every plugin's cells once; the records the later reads and the patch writing need are remembered until the reader is dropped.</summary>
     /// <param name="stopsTheWalk">
     /// Whether a plugin's version is the lowest one kept of a record: each record's versions are kept from the winner down to and
-    /// including the first version whose plugin stops the walk, or all of them when none does. For a record the target plugin
-    /// overrides, no plugin from the winner down to the target plugin stops it, so the version just below the target plugin's is kept.
+    /// including the first version whose plugin stops the walk, or all of them when none does. For a record the scope's plugin
+    /// (<see cref="PlacedReadScope.Plugin"/>) overrides, no plugin from the winner down to it stops the walk, so the version just below
+    /// its own is kept.
     /// </param>
     PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk);
 
     /// <summary>
     /// The links into the given records from every version of every record that is not a placed record, in the plugins that can
-    /// link to the given plugins or the target plugin (the patch, and the plugins that are one of them or have one as a master), and
-    /// the quest aliases that fill with a target-plugin NPC as their Unique Actor (<see cref="RelationKind.UniqueActor"/>, linking
+    /// link to the given plugins or <paramref name="target"/> (the patch, and the plugins that are one of them or have one as a master),
+    /// and the quest aliases that fill with an NPC of <paramref name="target"/> as their Unique Actor (<see cref="RelationKind.UniqueActor"/>, linking
     /// the NPC base). A record that cannot be parsed is not read further and is listed in <see cref="NonPlacedLinks.Unreadable"/>.
     /// The links of placed records are in <see cref="PlacedRecordFacts.Links"/>.
     /// </summary>
-    /// <param name="linkedPlugins">The plugins whose dependents are read, besides the target plugin.</param>
+    /// <param name="linkedPlugins">The plugins whose dependents are read, besides <paramref name="target"/>.</param>
     NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> records, IReadOnlySet<PluginName> linkedPlugins);
 
     /// <summary>The records <see cref="IPatchWriting"/> copies from; the placed records must have been read before.</summary>
@@ -48,7 +49,7 @@ public interface IPluginRecords
 
     /// <summary>
     /// The terrain heights of an exterior cell's LAND record at its version just below the given plugin's, row by row; the placed
-    /// records must have been read before around that plugin (<see cref="PlacedReadScope.Target"/>), with the LAND area record
+    /// records must have been read before around that plugin (<see cref="PlacedReadScope.Plugin"/>), with the LAND area record
     /// versions asked for. Thread-safe.
     /// </summary>
     /// <returns>Null where no plugin below the given plugin has a LAND record for the cell, or it is deleted or empty.</returns>

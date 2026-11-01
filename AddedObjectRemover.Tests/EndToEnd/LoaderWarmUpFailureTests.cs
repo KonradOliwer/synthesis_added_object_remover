@@ -3,10 +3,10 @@ using Mutagen.Bethesda.Plugins;
 
 namespace AddedObjectRemover.Tests.EndToEnd;
 
-/// <summary>A mesh-loader start-up failure is an unexpected error: it prints before the first mesh is read, and the run carries on.</summary>
+/// <summary>A mesh-loader start-up that held no blocks is an unexpected error: it prints before the first mesh is read, and the run carries on.</summary>
 public class LoaderWarmUpFailureTests
 {
-    private const string LoaderFailure = "InvalidOperationException: warm-up broke";
+    private const string LoaderFailure = "the minimal NIF it saved and loaded again held no blocks";
 
     [Fact]
     public void AFailedWarmUpIsReportedOnceBeforeTheModToCleanUpLineAndTheRunCompletes()
@@ -51,7 +51,7 @@ public class LoaderWarmUpFailureTests
             var problems = new AssetProblemLog();
             return new MeshFiles(
                 new MeshFileSource(dataFolder, release, listedPlugins, problems),
-                new NifGeometryReader(() => LoaderStartUp.Threw(LoaderFailure)),
+                new NifGeometryReader(LoaderStartUp.HeldNoBlocks),
                 problems,
                 unexpectedErrors,
                 inclusion);

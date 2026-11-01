@@ -3,8 +3,11 @@ using System.Diagnostics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
+using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveTooCloseObjects;
@@ -66,48 +69,65 @@ public static class TooCloseObjects
     public static Decided<TooCloseResult> Find(Input input)
     {
         var selected = input.Selected;
-        var result = Find(
-            new TooCloseInput(
-                input.World.Targets,
-                input.VisibleTargets,
-                input.World.Order,
-                selected,
-                new NpcsThatCanSpawn(input.PlacedNpcs, selected.Replacements),
-                input.Shapes,
-                input.Triangles,
-                input.Execution),
-            input.Groups);
+        var passInput = new TooCloseInput(
+            input.World.Targets,
+            input.VisibleTargets,
+            input.World.Order,
+            selected,
+            new NpcsThatCanSpawn(input.PlacedNpcs, selected.Replacements),
+            input.Shapes,
+            input.Triangles,
+            input.Execution);
+        TooCloseResult result = new([.. ObjectsJudgedWith<TooCloseSettings>.MergeEqualSettings(input.Groups).Select(group => FindPass(passInput, group))]);
         return new Decided<TooCloseResult>(result, input.Decisions.Apply(RoundKind.TooClose, result.Proposals));
     }
 
-    internal static TooCloseResult Find(TooCloseInput input, IEnumerable<ObjectsJudgedWith<TooCloseSettings>> groups) =>
-        new([.. JudgedGroups.MergeEqualSettings(groups).Select(group => FindPass(input, group))]);
+    /// <param name="Selected">The rule takes the objects that can cause removals for the NPC handling of <paramref name="Settings"/>.</param>
+    /// <param name="PlacedNpcs">The rule leaves out the NPCs the replacements in <paramref name="Selected"/> replace.</param>
+    public sealed record PlacementRuleInput(
+        IReadOnlyList<TargetObject> Targets,
+        IVisibleTargetObjects VisibleTargets,
+        SelectedObjects Selected,
+        IPlacedNpcsBySpace PlacedNpcs,
+        IBaseObjectShapes Shapes,
+        ITriangleMeshes Triangles,
+        TooCloseSettings Settings);
+
+    /// <param name="Targets">The run's target objects, measured where the cleaned mod put them.</param>
+    /// <param name="Caches">The run's caches: the index of <paramref name="Targets"/>, the shapes and the triangles.</param>
+    /// <param name="WorldCaches">The object caches of the old-place world, built when the first earlier version is checked.</param>
+    /// <param name="Causes">The objects that can cause removals in the old-place world, selected among <paramref name="WorldCaches"/>.</param>
+    public sealed record OldPlaceRuleInput(
+        IReadOnlyList<TargetObject> Targets, IRunCaches Caches, IObjectCachesOfWorlds WorldCaches, ICausesOfWorlds Causes, TooCloseSettings Settings);
+
+    /// <param name="Caches">The run's caches: the shapes and the triangles.</param>
+    /// <param name="WorldCaches">The object caches of the worlds of what stays.</param>
+    /// <param name="Causes">The objects that can cause removals in those worlds, selected among <paramref name="WorldCaches"/>.</param>
+    public sealed record WhatStaysRuleInput(IRunCaches Caches, IObjectCachesOfWorlds WorldCaches, ICausesOfWorlds Causes);
 
     /// <summary>The step's check of one target object at a given placement; it finds nothing when no removal zone is on.</summary>
-    /// <param name="selected">The rule takes the objects that can cause removals for the NPC handling of <paramref name="settings"/>.</param>
-    /// <param name="placedNpcs">The rule leaves out the NPCs the replacements in <paramref name="selected"/> replace.</param>
-    public static IPlacementRule CreatePlacementRule(
-        IReadOnlyList<TargetObject> targets,
-        IVisibleTargetObjects visibleTargets,
-        SelectedObjects selected,
-        IPlacedNpcsBySpace placedNpcs,
-        IBaseObjectShapes shapes,
-        ITriangleMeshes triangles,
-        TooCloseSettings settings)
+    public static IPlacementRule CreatePlacementRule(PlacementRuleInput input)
     {
-        var zones = ZoneGrowth.Active(settings);
-        return new TooClosePlacementRule(
-            zones.IsEmpty
-                ? null
-                : new ComputedOnce<ITooCloseSearch>(() =>
-                {
-                    var npcRule = CreateNpcRule(visibleTargets, new NpcsThatCanSpawn(placedNpcs, selected.Replacements), shapes, triangles, settings.Npcs);
-                    return CreateSearch(targets, visibleTargets, selected.ViewFor(settings.Npcs), shapes, triangles, zones, npcRule, settings.Zone);
-                }));
+        var zones = ZoneGrowth.Active(input.Settings);
+        return new TooClosePlacementRule(zones.IsEmpty ? null : new ComputedOnce<ITooCloseSearch>(() => CreateSearch(input, zones)));
     }
 
+    /// <summary>The search of <see cref="CreatePlacementRule"/>, built when the rule first checks a placement.</summary>
+    private static ITooCloseSearch CreateSearch(PlacementRuleInput input, ImmutableArray<ZoneGrowth> zones)
+    {
+        var (settings, selected) = (input.Settings, input.Selected);
+        var npcRule = CreateNpcRule(input.VisibleTargets, new NpcsThatCanSpawn(input.PlacedNpcs, selected.Replacements), input.Shapes, input.Triangles, settings.Npcs);
+        return CreateSearch(input.Targets, input.VisibleTargets, selected.ViewFor(settings.Npcs), input.Shapes, input.Triangles, zones, npcRule, settings.Zone);
+    }
+
+    /// <summary>The judge step's check of an earlier version at its old place (see <see cref="OldPlaceTooCloseRule"/>).</summary>
+    public static IOldPlaceTooCloseRule CreateOldPlaceTooCloseRule(OldPlaceRuleInput input) => new OldPlaceTooCloseRule(input);
+
+    /// <summary>The restore step's check of a placed record going back, among what stays (see <see cref="TooCloseToWhatStaysRule"/>).</summary>
+    public static ITooCloseToWhatStaysRule CreateTooCloseToWhatStaysRule(WhatStaysRuleInput input) => new TooCloseToWhatStaysRule(input);
+
     /// <summary>How the step words a too-close finding as the reason of a removal.</summary>
-    internal static RemovalReason ReasonOf(ZoneHit hit) => new RemovalReason.TooClose(hit.Other, hit.Cause);
+    internal static RemovalReason ReasonOf(ZoneHit hit) => new TooClose(hit.Other, hit.Cause);
 
     /// <remarks>When no removal zone is on, the pass looks at nothing, not even for stuck NPCs, and its outcome is <see cref="StepOutcome.SwitchedOff"/>.</remarks>
     private static TooClosePass FindPass(TooCloseInput input, ObjectsJudgedWith<TooCloseSettings> group)

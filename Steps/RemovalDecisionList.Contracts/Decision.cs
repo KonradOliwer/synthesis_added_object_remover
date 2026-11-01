@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 
@@ -13,6 +14,23 @@ public readonly record struct Round(int Number, RoundKind Kind);
 /// <param name="Reason">Why a step proposed to remove it; for a fitted object, why it did not fit where it stood.</param>
 public abstract record Decision(Round Round, RemovalReason Reason)
 {
+    /// <summary>What the decision's round did to the object.</summary>
+    public RoundEffect Effect => this switch
+    {
+        Removed => new RoundEffect(RoundOutcome.Removed, Reason is LinkedTo, KeepReason: null),
+        Restored => new RoundEffect(RoundOutcome.Restored, Reason is LinkedTo, KeepReason: null),
+        Kept kept => new RoundEffect(RoundOutcome.KeptAsReferenced, AsLinked: false, kept.KeepReason),
+        Fitted => new RoundEffect(RoundOutcome.KeptShrunkOrTurned, AsLinked: false, KeepReason: null),
+        _ => throw new UnreachableException($"Unknown decision {GetType().Name}."),
+    };
+
+    /// <summary>What <paramref name="round"/> did to the object; <see cref="RoundEffect.Untouched"/> when the decision is another round's.</summary>
+    public RoundEffect EffectIn(Round round) => Round == round ? Effect : RoundEffect.Untouched;
+
+    /// <summary>Whether the object was taken along as a member of a linked group by a member of its group that the same round restored.</summary>
+    /// <param name="decisionOf">What was decided for a target; null for none.</param>
+    public bool FollowedARestoredMember(Func<TargetId, Decision?> decisionOf) => Reason is LinkedTo linked && decisionOf(linked.To) is Restored;
+
     /// <summary>The object is disabled in the patch, so it stands nowhere.</summary>
     public sealed record Removed(Round Round, RemovalReason Reason) : Decision(Round, Reason);
 

@@ -462,8 +462,9 @@ public class PlacedRecordFactReadingTests
     {
         using var world = CreateWorldWithOverridesAroundThePatch().World;
         var table = ModTrustClassifier.Classify(
-            world.Plugins,
-            new ModTrustSettings(_target.Key.ToPluginName(), [], [], [], TrustRequiringMods: false, MaxOtherMastersOfRequiringMod: 0, TrustLoadingBefore: false));
+            new(
+                world.Plugins,
+                new ModTrustSettings(_target.Key.ToPluginName(), [], [], [], TrustRequiringMods: false, MaxOtherMastersOfRequiringMod: 0, TrustLoadingBefore: false)));
         var plugins = world.Order.ListedOrder.Select(listing => listing.ModKey.ToPluginName()).Where(plugin => !table.IsPatch(plugin));
 
         var collected = PlacedObjects.Collect(

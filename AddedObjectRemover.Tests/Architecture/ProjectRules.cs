@@ -26,9 +26,16 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
     private const string CacheCatalogKind = "Q";
     private const string StepsFolderPrefix = "Steps/";
     private const string CachesFolderPrefix = "Caches/";
+    private const string RunFolderPrefix = "Run/";
     private const string RunCachesContractsName = "RunCaches.Contracts";
 
     public static readonly IReadOnlyList<string> LogicKinds = ["L", "B"];
+
+    /// <summary>The logic projects that may reference the run's contracts, with the reason.</summary>
+    public static readonly IReadOnlyDictionary<string, string> LogicReferencesToRunContracts = new Dictionary<string, string>
+    {
+        ["BuildLogAndReports -> RunSettingsValidation.Contracts"] = "the log prints the run's settings and the batch request, which these contracts define",
+    };
 
     public static readonly IReadOnlyList<string> ToolKinds = ["A", "T"];
 
@@ -54,6 +61,8 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
 
     private bool IsCacheContracts(ProjectRule project) => IsContracts(project) && InFolder(project, CachesFolderPrefix);
 
+    private bool IsRunContracts(ProjectRule project) => IsContracts(project) && InFolder(project, RunFolderPrefix);
+
     private static bool InFolder(ProjectRule project, string folderPrefix) =>
         project.Folder.StartsWith(folderPrefix, StringComparison.Ordinal);
 
@@ -71,6 +80,15 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
     public IReadOnlyList<string> FindStepContractsReferencingRunCachesContracts() =>
         FindReferences(IsStepContracts, project => project.Name == RunCachesContractsName);
 
+    public IReadOnlyList<string> FindStepContractsReferencingRunContracts() =>
+        FindReferences(IsStepContracts, IsRunContracts);
+
+    public IReadOnlyList<string> FindLogicReferencingRunContractsWithoutReason() =>
+        FindReferences(IsLogic, IsRunContracts).Except(LogicReferencesToRunContracts.Keys).ToList();
+
+    public IReadOnlyList<string> FindListedLogicReferencesToRunContractsThatDoNotExist() =>
+        LogicReferencesToRunContracts.Keys.Except(FindReferences(IsLogic, IsRunContracts)).ToList();
+
     public IReadOnlyList<string> FindToolsReferencingNonTools() =>
         FindReferences(IsTool, project => !IsTool(project) && !IsIds(project));
 
@@ -79,7 +97,7 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
 
     /// <summary>Cache contracts sit between the steps and the caches: they may see step contracts and other cache contracts, but not the run's own contracts.</summary>
     public IReadOnlyList<string> FindCacheContractsReferencingRunContracts() =>
-        FindReferences(IsCacheContracts, project => IsContracts(project) && !InFolder(project, StepsFolderPrefix) && !InFolder(project, CachesFolderPrefix));
+        FindReferences(IsCacheContracts, IsRunContracts);
 
     /// <summary>One line per reference that closes a loop, written as the loop's path, e.g. "A -> B -> A".</summary>
     public IReadOnlyList<string> FindCycles()

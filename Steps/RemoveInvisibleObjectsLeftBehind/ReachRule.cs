@@ -14,19 +14,13 @@ internal sealed class ReachRule(IBaseFacts bases)
     public float? GetReach(TargetObject target) =>
         GetReferenceReach(target.ReferenceRadius, target.PrimitiveBounds) ?? GetBaseReach(target.Base);
 
+    /// <remarks>The primitive bounds are full sizes (the record stores half-sizes).</remarks>
     private static float? GetReferenceReach(float? referenceRadius, Vector3? primitiveBounds) => (referenceRadius, primitiveBounds) switch
     {
         ({ } radius, _) when radius > 0 => radius,
-        (_, { } bounds) => GetPositiveHalfSize(bounds),
+        (_, { } bounds) when Boxes.HorizontalHalfSize(bounds) is var halfSize && halfSize > 0 => halfSize,
         _ => null,
     };
-
-    /// <summary>The primitive bounds are full sizes (the record stores half-sizes).</summary>
-    private static float? GetPositiveHalfSize(Vector3 bounds)
-    {
-        var halfSize = Boxes.HorizontalHalfSize(bounds);
-        return halfSize > 0 ? halfSize : null;
-    }
 
     private float? GetBaseReach(BaseKey? baseKey)
     {

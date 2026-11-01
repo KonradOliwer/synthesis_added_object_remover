@@ -9,7 +9,7 @@ namespace AddedObjectRemover.Tests.Reporting;
 public sealed class OldPlaceChecksSectionTests
 {
     private static readonly ModKey OtherMod = ModKey.FromNameAndExtension("Other.esp");
-    private static readonly RemovalReason Collision = new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize());
+    private static readonly RemovalReason Collision = new TooClose(new OtherId(0), new TooCloseCause.ObjectSize());
 
     [Fact]
     public void TheLineCountsTheFreeAndTheCollidingOldPlacesAndTheDetailedLogNamesEachCollision()

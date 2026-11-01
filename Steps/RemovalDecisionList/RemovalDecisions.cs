@@ -94,6 +94,13 @@ public sealed class RemovalDecisions : IRunDecisions
 
     public bool HasLeftItsPlace(TargetId id) => Of(id) is Decision.Removed or Decision.Restored;
 
+    public BoxFate FateOf(TargetId id) => Of(id) switch
+    {
+        Decision.Removed => BoxFate.Removed,
+        Decision.Restored => BoxFate.Restored,
+        _ => BoxFate.Stands,
+    };
+
     public bool IsProtected(TargetId id) => _store.Protection.IsProtected(id.Index);
 
     public ImmutableArray<TargetId> RemovedIn(Round round) => LeftInDecidedAs<Decision.Removed>(round);
@@ -300,7 +307,7 @@ public sealed class RemovalDecisions : IRunDecisions
             {
                 var memberId = new TargetId(member);
                 if (IsDecided(memberId)) continue;
-                _store.Decisions[member] = DecideRemoval(memberId, round, new RemovalReason.LinkedTo(removed));
+                _store.Decisions[member] = DecideRemoval(memberId, round, new LinkedTo(removed));
                 linked.Add(memberId);
             }
         }

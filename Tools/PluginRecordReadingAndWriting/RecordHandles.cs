@@ -7,7 +7,7 @@ namespace AddedObjectRemover;
 internal sealed record PlacedRecordHandle(IPlacedGetter Record, PlacedRecordLocation Location);
 
 /// <summary>
-/// The cell and LAND records of other plugins the target plugin changed, each with its versions from the one just below the target
+/// The cell and LAND records of other plugins the read's plugin changed, each with its versions from the one just below the read's
 /// plugin's up to the winner, the navmeshes it changed and every plugin's navmesh info map, and the part tables they were compared
 /// with, so a part is written exactly as it was compared.
 /// </summary>
@@ -40,18 +40,18 @@ internal sealed class RecordHandles(
     /// <returns>Null when the record is no winning placed record of the target spaces.</returns>
     public IPlacedGetter? FindRecord(RecordKey key) => handles.TryGetValue(key, out var handle) ? handle.Record : null;
 
-    /// <summary>The version of the record just below the target plugin's, for a record the target plugin overrides. A writer copies it; it never changes it.</summary>
+    /// <summary>The version of the record just below the read's plugin's, for a record the read's plugin overrides. A writer copies it; it never changes it.</summary>
     public IPlacedGetter EarlierRecordOf(RecordKey key) => earlierRecords[key];
 
     public PlacedRecordLocation LocationOf(RecordKey key) => handles[key].Location;
 
-    /// <summary>A cell record of another plugin the target plugin overrides. A writer copies its versions; it never changes them.</summary>
+    /// <summary>A cell record of another plugin the read's plugin overrides. A writer copies its versions; it never changes them.</summary>
     public RecordVersions<ICellGetter> CellOf(RecordKey key) => AreaRecords.Cells[key];
 
-    /// <summary>A LAND record of another plugin the target plugin overrides. A writer copies its versions; it never changes them.</summary>
+    /// <summary>A LAND record of another plugin the read's plugin overrides. A writer copies its versions; it never changes them.</summary>
     public RecordVersions<ILandscapeGetter> LandOf(RecordKey key) => AreaRecords.Lands[key];
 
-    /// <summary>A navmesh the target plugin overrides, deletes or adds. A writer copies its versions; it never changes them.</summary>
+    /// <summary>A navmesh the read's plugin overrides, deletes or adds. A writer copies its versions; it never changes them.</summary>
     public RecordVersions<NavmeshVersion?> NavmeshOf(RecordKey key) => AreaRecords.Navmeshes.Navmeshes[key];
 
     /// <summary>Every plugin's navmesh info map, in load order. A writer copies them; it never changes them.</summary>

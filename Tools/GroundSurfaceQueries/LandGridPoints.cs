@@ -4,7 +4,13 @@ using System.Collections.Immutable;
 namespace AddedObjectRemover;
 
 /// <summary>A grid point of one land record: the record's cell and the point's index in the cell's grid (row by row from the bottom, x fastest).</summary>
-public readonly record struct LandGridPoint(ExteriorCell Cell, int Point);
+public readonly record struct LandGridPoint(ExteriorCell Cell, int Point)
+{
+    /// <summary>The lowest height at the points; a point of a cell whose heights are not known does not count, and at least one must be known.</summary>
+    /// <param name="heightsOf">A cell's heights by grid point index; null when not known.</param>
+    public static float LowestHeight(IEnumerable<LandGridPoint> points, Func<ExteriorCell, float[]?> heightsOf) =>
+        points.Select(point => heightsOf(point.Cell)?[point.Point]).OfType<float>().Min();
+}
 
 /// <summary>A grid point of a worldspace's land, counted in grid steps from the world origin.</summary>
 public readonly record struct WorldGridPoint(RecordKey Worldspace, int X, int Y)

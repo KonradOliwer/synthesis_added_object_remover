@@ -5,6 +5,7 @@ using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
+using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
@@ -155,21 +156,20 @@ internal static partial class LogSections
         + $"Remove when this much support is gone: {TextFormat.Percent(settings.SupportLostFraction)}; "
         + $"Other mods' objects left without support: {otherModsObjects.Handling}.";
 
-    private static string DescribeVisibleLeftBehind(VisibleLeftBehindSettings? visible)
-    {
-        if (visible is null) return $"{VisibleLeftBehindStepName}: off.";
-        var protectedKinds = TextLists.JoinOr(
-            visible.NeverRemove.Order().Select(VisibleLeftBehindOutcomeText.KindName), Describe.ListSeparator, Describe.NoEntries);
-        return $"{VisibleLeftBehindStepName}: on; "
-            + $"{DescribeSurroundings(visible.LookAround, visible.MinOccupiedDirections, visible.DirectionClearedPercent, visible.ClearedDirectionsPercent)}; "
-            + $"Never remove these as visible objects left behind: {protectedKinds}.";
-    }
+    private static string DescribeVisibleLeftBehind(VisibleLeftBehindSettings? visible) =>
+        visible is null
+            ? $"{VisibleLeftBehindStepName}: off."
+            : $"{DescribeLeftBehindStep(VisibleLeftBehindStepName, visible.Surroundings, "visible", visible.NeverRemove.Order().Select(VisibleObjectKindText.KindName))}.";
 
-    private static string DescribeSurroundings(float lookAround, int minOccupiedDirections, int directionClearedPercent, int clearedDirectionsPercent) =>
-        $"Look this far around it: {lookAround} units; "
-        + $"Decide only if at least this many of the 8 directions have objects: {minOccupiedDirections}; "
-        + $"A direction is cleared when this much of it was removed: {directionClearedPercent}%; "
-        + $"Remove when this share of the directions with objects is cleared: {clearedDirectionsPercent}%";
+    /// <summary>The settings line of a left-behind step that is on, up to its own settings.</summary>
+    /// <param name="objectsKind">"visible" or "invisible", as the never-remove setting names the objects.</param>
+    private static string DescribeLeftBehindStep(string stepName, LeftBehindSurroundings surroundings, string objectsKind, IEnumerable<string> protectedKindNames) =>
+        $"{stepName}: on; "
+        + $"Look this far around it: {surroundings.LookAround} units; "
+        + $"Decide only if at least this many of the 8 directions have objects: {surroundings.MinOccupiedDirections}; "
+        + $"A direction is cleared when this much of it was removed: {surroundings.DirectionClearedPercent}%; "
+        + $"Remove when this share of the directions with objects is cleared: {surroundings.ClearedDirectionsPercent}%; "
+        + $"Never remove these as {objectsKind} objects left behind: {TextLists.JoinOr(protectedKindNames, Describe.ListSeparator, Describe.NoEntries)}";
 
     private static string DescribeRestoreWhereRemoved(WhereRemovedRestoreSettings? restore)
     {
@@ -191,13 +191,9 @@ internal static partial class LogSections
         if (restore.Navmeshes) yield return "navmeshes";
     }
 
-    private static string DescribeLeftBehind(RunSettings settings)
-    {
-        if (settings.LeftBehind is not { } leftovers) return $"{LeftBehindStepName}: off.";
-        var protectedKinds = TextLists.JoinOr(leftovers.NeverRemove.Order().Select(ObjectVisibilityText.KindName), Describe.ListSeparator, Describe.NoEntries);
-        return $"{LeftBehindStepName}: on; "
-            + $"{DescribeSurroundings(leftovers.LookAround, leftovers.MinOccupiedDirections, leftovers.DirectionClearedPercent, leftovers.ClearedDirectionsPercent)}; "
-            + $"Never remove these as invisible objects left behind: {protectedKinds}; "
-            + $"Move kept markers out of other mods' objects: {OnOff(settings.MarkerMoves != null)}.";
-    }
+    private static string DescribeLeftBehind(RunSettings settings) =>
+        settings.LeftBehind is not { } leftovers
+            ? $"{LeftBehindStepName}: off."
+            : $"{DescribeLeftBehindStep(LeftBehindStepName, leftovers.Surroundings, "invisible", leftovers.NeverRemove.Order().Select(ObjectVisibilityText.KindName))}; "
+                + $"Move kept markers out of other mods' objects: {OnOff(settings.MarkerMoves != null)}.";
 }

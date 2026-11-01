@@ -146,8 +146,12 @@ internal sealed class NavmeshUndoPlan
         new(_judged, _guards, [.. _groups.Select(group => group.Refused is null && refusalOf(group) is { } refusal ? group.RefusedFor(refusal) : group)]);
 
     /// <summary>A navmesh whose area is cleared gets what the patch writes for its case; nothing when nothing in it goes back.</summary>
-    private static NavmeshChangeJudged WithUndo(NavmeshChangeJudged navmesh) =>
-        navmesh.Area?.Verdict == AreaVerdict.Cleared ? navmesh with { Undo = UndoOf(navmesh.Change) } : navmesh;
+    private static NavmeshChangeJudged WithUndo(NavmeshChangeJudged navmesh)
+    {
+        if (navmesh.Area?.Verdict != AreaVerdict.Cleared) return navmesh;
+        var undo = UndoOf(navmesh.Change);
+        return navmesh with { Undo = undo, NothingGoesBack = undo is null };
+    }
 
     /// <remarks>A part a later plugin changed again still makes a candidate, so its group is refused (N0) rather than split.</remarks>
     private static NavmeshUndo? UndoOf(NavmeshChangedByCleanedMod change) => change.Case switch

@@ -38,7 +38,7 @@ public class SupportProtectionTests
         var run = Execute(itemPosition: new Vector3(5, 5, 10), otherSupporters: []);
 
         var held = Assert.IsType<Decision.Kept>(run.RemovalDecisions.Of(new TargetId(Protected)));
-        var lost = Assert.IsType<RemovalReason.LostSupport>(held.Reason);
+        var lost = Assert.IsType<LostSupport>(held.Reason);
         Assert.Equal(new TargetId(SeedTable), lost.MainSupporter);
         var kept = Assert.Single(run.Kept);
         Assert.Equal(Protected, kept.TargetIndex);

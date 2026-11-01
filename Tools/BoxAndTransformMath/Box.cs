@@ -13,6 +13,9 @@ public readonly record struct Box(Vector3 Min, Vector3 Max)
 
     public Vector3 HalfExtents => Size * 0.5f;
 
+    /// <summary>Every side is longer than zero.</summary>
+    public bool HasVolume => Size is { X: > 0, Y: > 0, Z: > 0 };
+
     /// <summary>Builds a box from two arbitrary corners (order per axis does not matter).</summary>
     public static Box FromCorners(Vector3 a, Vector3 b) => new(Vector3.Min(a, b), Vector3.Max(a, b));
 

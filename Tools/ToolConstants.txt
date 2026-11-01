@@ -6,6 +6,7 @@ BoxMesh.CornerCount | math | A box has 8 corners.
 BoxMesh.TriangleCount | math | A box surface is 12 triangles.
 BoxMesh.Limits | math | The tree limits for a mesh of exactly the box's 12 triangles.
 BoxMesh.FaceTriangles | math | The corner triples of the 12 triangles of a box.
+Boxes.SidesPerAxis | math | A box is padded on both of its sides along an axis.
 MeshClosedness.SharedEdgeParity | math | A closed surface uses every edge an even number of times.
 MeshPairTester.PairsPerRange | budget | Mesh pairs per parallel work range.
 MeshPairTester.GroupsPerRange | budget | One group per parallel range (ParallelMap.OneItemPerRange).
@@ -61,12 +62,11 @@ PatchWriting.ForeignRecordsMessage | internal | Error text for handing the patch
 PatchMarker.Text | file format | Text of a plugin's header description that marks the output of this patcher.
 PatchMarker.DescriptionLineBreak | file format | Line break that plugin editors write into a header description; the marker goes on a new line after an existing description.
 RunLinkCache.ForeignIndexMessage | internal | Error text for reading through a record index another reader opened.
+MutagenCalls.Parsers | internal | The library assemblies whose throws of general exception types count as malformed plugin data.
 MeshFileSource.MeshesPrefix | game format | Mesh paths in the game's data start with "meshes\".
 MeshFileSource.DataPrefix | game format | A model path may carry a leading "data\" folder name, which is not part of the archive path.
 MeshFileSource.ArchiveSuffixDelimiter | game format | An archive named "<Plugin> - <Suffix>" belongs to the plugin before the delimiter.
 MeshReadingParts.Owner | internal | The owner name of the mesh reader's part keys; the keys are only compared.
-MeshReadingParts.MeshShapes | internal | Part key the mesh reader records a failed shape read under; the log words it.
-MeshReadingParts.MeshTriangles | internal | Part key the mesh reader records a failed triangle read under; the log words it.
 MeshReadingParts.LoaderStartUp | internal | Part key the mesh reader records a failed loader start-up under; the log words it.
 NifShapes.StripFieldFlags | internal | Binding flags for reading the library's private strip fields.
 BoundsAccumulator.MaxCoordinate | budget | Largest accepted absolute mesh coordinate; larger values come from broken exports and would blow up spatial grids and triangle indexes.
@@ -90,7 +90,7 @@ PlacedRecordParts.PersistentBit | game format | The record flag that marks a pla
 PlacedRecordParts.PresenceBits | game format | The Initially Disabled and Deleted record flags, which decide with the enable parent whether a placed reference shows.
 PlacedRecordParts.ExcludedFlagBits | game format | The record flags of a placed reference no part compares or writes: Persistent and Compressed.
 PlacedRecordParts.RestFlagBits | game format | The record flags of a placed reference the rest of the record holds.
-VersionComparison.NamedPluginIndex | internal | The versions compared start just below the named plugin's, so its own version is the second; only the comparison methods read it.
+VersionComparison.NamedPluginIndex | math | The versions compared start just below the named plugin's, so its own version is the second; callers address that version by this index.
 PointSet.BitsPerWord | math | Bits in the 64-bit words of the point bitset.
 PointSet.WordCount | math | Words that hold one bit per grid point.
 QuarterSet.QuarterCount | game format | A cell's terrain has 2 by 2 quarters.

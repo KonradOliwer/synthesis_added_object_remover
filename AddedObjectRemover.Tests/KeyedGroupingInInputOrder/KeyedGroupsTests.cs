@@ -3,6 +3,29 @@ namespace AddedObjectRemover.Tests.Grouping;
 public class KeyedGroupsTests
 {
     [Fact]
+    public void GroupsWithEqualKeysBecomeOneGroupInTheOrderTheirKeysFirstAppearWithAscendingItems()
+    {
+        (int Key, int[] Items)[] groups = [(2, [3]), (1, [2, 0]), (2, [1])];
+
+        var merged = KeyedGroups.MergeGroupsWithEqualKeys(groups, group => group.Items, group => group.Key, EqualityComparer<int>.Default);
+
+        Assert.Equal([(2, "1,3"), (1, "0,2")], merged.Select(group => (group.Key, string.Join(",", group.Value))));
+    }
+
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(1, 2)]
+    public void AnItemInTwoGroupsIsRefusedWhateverTheirKeys(int firstKey, int secondKey)
+    {
+        (int Key, int[] Items)[] groups = [(firstKey, [0, 4]), (secondKey, [4])];
+
+        var exception = Assert.Throws<System.Diagnostics.UnreachableException>(
+            () => KeyedGroups.MergeGroupsWithEqualKeys(groups, group => group.Items, group => group.Key, EqualityComparer<int>.Default));
+
+        Assert.Contains("4", exception.Message);
+    }
+
+    [Fact]
     public void IndicesByKeyListsGroupsInFirstSeenOrderWithAscendingIndices()
     {
         string[] items = ["b1", "a1", "b2", "c1", "a2", "b3"];

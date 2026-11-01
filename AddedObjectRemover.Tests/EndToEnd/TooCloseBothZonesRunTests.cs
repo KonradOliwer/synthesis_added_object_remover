@@ -31,7 +31,7 @@ public class TooCloseBothZonesRunTests
             },
             outcome.Collected.Targets.ToDictionary(
                 target => target.EditorId!,
-                target => outcome.Final.Of(target.Id) is Decision.Removed { Reason: RemovalReason.TooClose tooClose } ? tooClose.Cause : null));
+                target => outcome.Final.Of(target.Id) is Decision.Removed { Reason: TooClose tooClose } ? tooClose.Cause : null));
     }
 
     [Fact]

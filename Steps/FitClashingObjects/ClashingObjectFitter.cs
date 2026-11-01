@@ -42,23 +42,15 @@ public static class ClashingObjectFitter
 
     public static Decided<FitResult> Fit(Input input)
     {
-        var result = Fit(input.Targets, input.ObjectsToKeep, input.Groups, input.Resting, input.Shapes, input.Order, input.Execution);
+        var result = FindFits(input);
         return new Decided<FitResult>(result, input.Decisions.ApplyFits(result.Fits));
     }
 
-    /// <param name="groups">The objects of each group are tried with its own settings and rules; an object is in one group.</param>
-    /// <param name="resting">Names the objects others rest on, which are left to the removal rounds.</param>
-    internal static FitResult Fit(
-        ImmutableArray<TargetObject> targets,
-        IObjectsToKeep objectsToKeep,
-        IEnumerable<FitGroup> groups,
-        IRestingRule resting,
-        IBaseObjectShapes shapes,
-        WorkOrder order,
-        Execution execution)
+    private static FitResult FindFits(Input input)
     {
-        var fitGroups = groups.ToList();
-        JudgedGroups.RequireEachObjectInOneGroup(fitGroups.Select(group => group.Judged));
+        var (targets, objectsToKeep, shapes, order, execution) = (input.Targets, input.ObjectsToKeep, input.Shapes, input.Order, input.Execution);
+        var fitGroups = input.Groups.ToList();
+        KeyedGroups.RequireEachItemInOneGroup(fitGroups.Select(group => group.Judged.Objects.AsEnumerable()));
         var trialOf = fitGroups
             .SelectMany(group => TrialsOf(group, targets, objectsToKeep, shapes))
             .ToDictionary(trial => trial.Target);
@@ -66,7 +58,7 @@ public static class ClashingObjectFitter
         var clashes = CheckEach(targets, candidates, target => ClashWhereItStands(target, trialOf[target.Id.Index].Group), order, execution);
         var clashOf = candidates.Zip(clashes).Where(pair => pair.Second is not null).ToDictionary(pair => pair.First, pair => pair.Second!);
         List<int> clashing = [.. clashOf.Keys.Order()];
-        var (restedOn, restingFailure) = FindRestedOn(clashing, resting);
+        var (restedOn, restingFailure) = FindRestedOn(clashing, input.Resting);
         List<int> tried = restingFailure is null ? [.. clashing.Where(index => !restedOn.Contains(index))] : [];
         var fits = CheckEach(
             targets,

@@ -19,7 +19,7 @@ internal readonly record struct FitChange(float SizeShare, float TurnDegrees);
 /// <summary>The outcomes of the changed objects and the fitted objects, read from the final decisions.</summary>
 internal static class FitOutcomes
 {
-    public static ChangedObjectOutcome OutcomeOf(IRemovalDecisions final, TargetId target) => RoundEffects.Of(final.Of(target)).Outcome switch
+    public static ChangedObjectOutcome OutcomeOf(IRemovalDecisions final, TargetId target) => (final.Of(target)?.Effect ?? RoundEffect.Untouched).Outcome switch
     {
         RoundOutcome.Removed => ChangedObjectOutcome.Removed,
         RoundOutcome.Restored => ChangedObjectOutcome.Restored,

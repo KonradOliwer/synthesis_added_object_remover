@@ -69,6 +69,27 @@ public class UnreadableRecordTests : IDisposable
     }
 
     [Fact]
+    public void ARecordWhoseScriptDataTheLibraryCannotParseIsReportedAndTheRecordsAfterItAreStillRead()
+    {
+        var broken = new FixtureMod("Broken.esp", _base, _target);
+        broken.Mod.Activators.Add(new Mutagen.Bethesda.Skyrim.Activator(broken.NextKey(), FixtureMod.Release)
+        {
+            EditorID = "BrokenActivator",
+            VirtualMachineAdapter = TestScripts.Naming(TestTargets.FormKeyOf(0)),
+        });
+        broken.Mod.FormLists.Add(CreateListLinkingTo(broken, 0));
+        using var overlay = BrokenScriptData.WriteAndOpen(broken.Mod, _folder, BrokenScriptData.Fault.EndsInsideTheLastPropertyValue);
+
+        var read = LinkReader.ReadFromNonPlaced(
+            [overlay], new HashSet<RecordKey> { TestTargets.Key(0) }, TestTargets.TargetName, CreateNames(broken), new Execution(1));
+
+        var record = Assert.Single(read.Unreadable);
+        Assert.Equal("Activator", record.RecordType);
+        Assert.Equal("BrokenActivator", record.EditorId);
+        Assert.Equal("FormList", Assert.Single(read.Links).SourceRecordType);
+    }
+
+    [Fact]
     public void ThePluginsLinksAndUnreadableRecordsComeInTheGivenPluginOrderWithOneOrManyWorkers()
     {
         var linking = Enumerable.Range(0, LinkingPluginCount).Select(CreateLinkingPlugin).ToArray();

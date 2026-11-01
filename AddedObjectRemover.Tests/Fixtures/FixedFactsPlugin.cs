@@ -38,7 +38,7 @@ internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records,
     public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk)
     {
         StopsTheWalk = stopsTheWalk;
-        var walked = records.Select(record => Walk(record, scope.Target, stopsTheWalk)).ToImmutableArray();
+        var walked = records.Select(record => Walk(record, scope.Plugin, stopsTheWalk)).ToImmutableArray();
         return new(
             walked,
             walked.Length,

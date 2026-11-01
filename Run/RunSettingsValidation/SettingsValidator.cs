@@ -7,6 +7,7 @@ using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
+using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
@@ -141,9 +142,13 @@ public static class SettingsValidator
         var collision = CreateCollisionSettings(settings.Collision, CleanedModCollisionTexts, warnings);
         var alsoRemove = CreateAlsoRemoveSettings(settings.FollowUpRemoval, touchChainsShown: detailedLogAndReports, warnings);
         var otherModsObjects = CreateOtherModsObjectsSettings(settings.FollowUpRemoval, alsoRemove, warnings);
-        var visibleLeftBehind = CreateVisibleLeftBehindSettings(settings.LeftoverVisibleObjects, warnings);
+        // Built (and their settings validated) even when the steps are off, so invalid values are always reported.
+        var visibleLeftovers = settings.LeftoverVisibleObjects;
+        var visibleLeftBehind = new VisibleLeftBehindSettings(
+            ValidateSurroundings(VisibleSurroundingObjectsGroup, visibleLeftovers.SurroundingObjects, warnings), visibleLeftovers.NeverRemove.ToHashSet());
         var leftoverSettings = settings.LeftoverInvisibleObjects;
-        var leftBehind = CreateLeftBehindSettings(leftoverSettings, warnings);
+        var leftBehind = new LeftBehindSettings(
+            ValidateSurroundings(InvisibleSurroundingObjectsGroup, leftoverSettings.SurroundingObjects, warnings), leftoverSettings.NeverRemove.ToHashSet());
         var markerMoves = CreateMarkerMoveSettings(leftoverSettings);
         var restoreWhereRemoved = CreateRestoreWhereRemovedSettings(settings.RestoreWhereRemoved, collision, changedCollision, warnings);
         var reports = detailedLogAndReports ? CreateReportFileSettings(reportsFolder, config.Source) : null;
@@ -153,7 +158,7 @@ public static class SettingsValidator
             targetAsTyped,
             modTrust,
             CreateWhatToCollect(
-                markerMoves, collision.ChangedTerrain, changedCollision.ChangedTerrain, changedObjects, changed.Replaced.Process, detailedLogAndReports, movedDistance, restoreWhereRemoved),
+                markerMoves, reports, collision.ChangedTerrain, changedCollision.ChangedTerrain, changedObjects, changed.Replaced.Process, movedDistance, restoreWhereRemoved),
             new SelectionSettings(collision.TooClose.Npcs),
             collision,
             changedObjects,
@@ -447,55 +452,27 @@ public static class SettingsValidator
     internal static string ResolveReportFolder(string reportsFolder, SettingsSource source) =>
         source is SettingsSource.ConfigFile file ? Path.Combine(reportsFolder, file.Name) : reportsFolder;
 
-    /// <summary>
-    /// The navmeshes are read only when relocation or the restore group needs them; the Editor ID lists only when the detailed log
-    /// prints them; every plugin's terrain only when a changed-terrain step runs, its texture layers only when one counts terrain
-    /// types, and its water only when one counts a water change; the old places only when a mode checks them or restored objects of
-    /// other mods are checked against what stays, which is told from the world without the cleaned mod.
-    /// When only the changed objects' terrain check is on, the scan reads terrain only if the cleaned mod overrides a record of
-    /// another plugin; whether an override is a changed object is known only after the scan, and every changed object, in any
-    /// mode, is checked where the cleaned mod put it. The restore group reads the cell, LAND and navmesh records itself, so it
-    /// does not need those terrain reads.
-    /// </summary>
-    /// <param name="cleanedModTerrain">The changed-terrain settings of the cleaned mod's own objects.</param>
-    /// <param name="changedObjectsTerrain">The changed-terrain settings of the objects the cleaned mod changed.</param>
-    /// <param name="movedDistance">The validated moved distance.</param>
+    /// <summary>What the scan collects is what the steps that are on need read; each step's settings state their own need.</summary>
+    /// <param name="reports">Null unless the detailed log and the report files are on.</param>
     /// <param name="restoreWhereRemoved">Null when the restore group is off.</param>
     private static WhatToCollect CreateWhatToCollect(
         MarkerMoveSettings? markerMoves,
+        ReportFileSettings? reports,
         ChangedTerrainSettings cleanedModTerrain,
         ChangedTerrainSettings changedObjectsTerrain,
         ChangedObjectSettings changedObjects,
         bool processReplaced,
-        bool detailedLog,
         float movedDistance,
-        WhereRemovedRestoreSettings? restoreWhereRemoved)
-    {
-        ChangedTerrainSettings[] changedTerrains = [cleanedModTerrain, changedObjectsTerrain];
-        return new WhatToCollect(
-            markerMoves != null || restoreWhereRemoved != null,
-            detailedLog,
-            changedTerrains.Any(terrain => terrain.On),
-            changedTerrains.Any(terrain => terrain.On && terrain.CountTerrainTypeChanges),
-            changedTerrains.Any(terrain => terrain.On && terrain.CountsWaterChanges),
+        WhereRemovedRestoreSettings? restoreWhereRemoved) =>
+        WhatToCollect.Of(
+            ScanNeeds.UnionOf(
+                markerMoves?.Needs,
+                reports?.Needs,
+                ChangedTerrainSettings.NeedsOfBoth(cleanedModTerrain, changedObjectsTerrain),
+                changedObjects.NeedsWhenReplacedObjectsAre(processReplaced),
+                restoreWhereRemoved?.Needs),
             movedDistance,
-            processReplaced,
-            JudgeOldPlaces: JudgesOldPlaces(changedObjects, processReplaced) || restoreWhereRemoved is { OtherModsObjects: true },
-            TerrainForChangedObjectsOnly: !cleanedModTerrain.On && changedObjectsTerrain.On,
-            AreaRecordVersions: restoreWhereRemoved is { } restore ? AreaRecordReadsFor(restore) : null,
-            DecideEveryObjectWithoutCleanedMod: restoreWhereRemoved is { OtherModsObjects: true });
-    }
-
-    /// <summary>
-    /// A kind whose switch is off stays as the cleaned mod made it, so it is still read when the guards of a kind that is on look at
-    /// it: restored objects and navmeshes are kept off ground and out of water lines that stay changed, while the terrain guards look
-    /// at no cell and the cell guards at no ground. Every kind's guards look at the navmeshes that stay changed, so those are always
-    /// read.
-    /// </summary>
-    private static AreaRecordReads AreaRecordReadsFor(WhereRemovedRestoreSettings restore) => new(
-        new AreaPartTolerances(restore.HeightChangeTolerance, restore.WaterHeightChangeTolerance),
-        Cells: restore.Cells || restore.OtherModsObjects || restore.Navmeshes,
-        Lands: restore.Terrain || restore.OtherModsObjects || restore.Navmeshes);
+            processReplaced);
 
     /// <summary>
     /// Built (and its settings validated) even when the group is off, so invalid values are always reported; null when all four switches are off.
@@ -532,46 +509,12 @@ public static class SettingsValidator
             changedCollision.ChangedTerrain);
     }
 
-    /// <summary>A replaced object is judged only when replaced objects are processed, so its mode counts only then.</summary>
-    private static bool JudgesOldPlaces(ChangedObjectSettings changedObjects, bool processReplaced) =>
-        changedObjects.Moved == RestoreMode.RestoreIfNoCollision || (processReplaced && changedObjects.Replaced == RestoreMode.RestoreIfNoCollision);
-
-    /// <summary>Built (and its settings validated) even when the step is off, so invalid values are always reported.</summary>
-    private static LeftBehindSettings CreateLeftBehindSettings(ILeftoverSettingsValues leftovers, ICollection<SettingWarning> warnings) =>
-        ValidateSurroundings(
-            InvisibleSurroundingObjectsGroup,
-            leftovers.SurroundingObjects,
-            warnings,
-            (lookAround, minOccupied, directionCleared, clearedDirections) =>
-                new LeftBehindSettings(
-                    LookAround: lookAround,
-                    MinOccupiedDirections: minOccupied,
-                    DirectionClearedPercent: directionCleared,
-                    ClearedDirectionsPercent: clearedDirections,
-                    NeverRemove: leftovers.NeverRemove.ToHashSet()));
-
-    /// <summary>Built (and its settings validated) even when the step is off, so invalid values are always reported.</summary>
-    private static VisibleLeftBehindSettings CreateVisibleLeftBehindSettings(IVisibleLeftoverSettingsValues leftovers, ICollection<SettingWarning> warnings) =>
-        ValidateSurroundings(
-            VisibleSurroundingObjectsGroup,
-            leftovers.SurroundingObjects,
-            warnings,
-            (lookAround, minOccupied, directionCleared, clearedDirections) =>
-                new VisibleLeftBehindSettings(
-                    LookAround: lookAround,
-                    MinOccupiedDirections: minOccupied,
-                    DirectionClearedPercent: directionCleared,
-                    ClearedDirectionsPercent: clearedDirections,
-                    NeverRemove: leftovers.NeverRemove.ToHashSet()));
-
-    /// <param name="create">Builds the step's settings from the validated radius, occupied-directions count, direction share and cleared-directions share.</param>
-    private static TSettings ValidateSurroundings<TSettings>(
-        string group, ISurroundingObjectsSettingsValues values, ICollection<SettingWarning> warnings, Func<float, int, int, int, TSettings> create) =>
-        create(
-            Clamp(values.SearchRadius, MinSearchRadius, MaxSearchRadius, SettingDefaults.SearchRadius, group + SearchRadiusName, warnings),
-            Clamp(values.MinOccupiedDirections, MinOccupiedDirectionsLowest, CompassDirections.SectorCount, group + MinOccupiedDirectionsName, warnings),
-            WholeTens(values.DirectionThresholdPercent, group + DirectionThresholdName, warnings),
-            WholeTens(values.ClearedDirectionsPercent, group + ClearedDirectionsName, warnings));
+    private static LeftBehindSurroundings ValidateSurroundings(string group, ISurroundingObjectsSettingsValues values, ICollection<SettingWarning> warnings) =>
+        new(
+            LookAround: Clamp(values.SearchRadius, MinSearchRadius, MaxSearchRadius, SettingDefaults.SearchRadius, group + SearchRadiusName, warnings),
+            MinOccupiedDirections: Clamp(values.MinOccupiedDirections, MinOccupiedDirectionsLowest, CompassDirections.SectorCount, group + MinOccupiedDirectionsName, warnings),
+            DirectionClearedPercent: WholeTens(values.DirectionThresholdPercent, group + DirectionThresholdName, warnings),
+            ClearedDirectionsPercent: WholeTens(values.ClearedDirectionsPercent, group + ClearedDirectionsName, warnings));
 
     private static StopReason? FindTarget(IPluginRecords records, LoadOrderPlugins mods, string? targetPlugin, out PluginName target, out PluginListing targetListing)
     {

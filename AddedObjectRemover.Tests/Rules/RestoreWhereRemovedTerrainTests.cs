@@ -396,8 +396,8 @@ public sealed class RestoreWhereRemovedTerrainTests
     [Fact]
     public void APlanProtectingMorePointsEndsAsOneProtectingThemFromTheStart()
     {
-        var standing = new LandQuarterJudged(AreaVerdict.StillStanding, []);
-        var cleared = new LandQuarterJudged(AreaVerdict.Cleared, []);
+        var standing = TestAreaShares.Quarter(AreaVerdict.StillStanding);
+        var cleared = TestAreaShares.Quarter(AreaVerdict.Cleared);
         LandAreasJudged[] lands =
         [
             new(LandAt(0, 0, RaisedEverywhere(by: 4000f)), Never: null, [cleared, standing, standing, standing]),
@@ -465,8 +465,8 @@ public sealed class RestoreWhereRemovedTerrainTests
     [Fact]
     public void APlanThatDoesNotProtectAnEarlierTooSteepCellEndsAsOneComputedAfresh()
     {
-        var standing = new LandQuarterJudged(AreaVerdict.StillStanding, []);
-        var cleared = new LandQuarterJudged(AreaVerdict.Cleared, []);
+        var standing = TestAreaShares.Quarter(AreaVerdict.StillStanding);
+        var cleared = TestAreaShares.Quarter(AreaVerdict.Cleared);
         LandAreasJudged[] lands =
         [
             new(LandAt(0, 0, RaisedEverywhere(by: 4000f)), Never: null, [cleared, standing, standing, standing]),
@@ -547,7 +547,7 @@ public sealed class RestoreWhereRemovedTerrainTests
 
     private static LandAreasJudged AllCleared(LandChangedByCleanedMod land)
     {
-        var cleared = new LandQuarterJudged(AreaVerdict.Cleared, []);
+        var cleared = TestAreaShares.Quarter(AreaVerdict.Cleared);
         return new LandAreasJudged(land, Never: null, [cleared, cleared, cleared, cleared]);
     }
 
@@ -602,7 +602,7 @@ public sealed class RestoreWhereRemovedTerrainTests
             TestGround.NoTerrain(),
             workers);
         var final = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved), targets.Length)
-            .Apply(RoundKind.TooClose, [.. scene.Removals.Select(index => new ProposedRemoval(new TargetId(index), new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);
+            .Apply(RoundKind.TooClose, [.. scene.Removals.Select(index => new ProposedRemoval(new TargetId(index), new TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);
         return WhereRemovedRestorer.Plan(
             new(
                 collected,

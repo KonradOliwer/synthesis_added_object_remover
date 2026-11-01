@@ -25,23 +25,21 @@ internal static class ZeroWeightDiagnosis
             meshPath,
             contacts.ContactPoints,
             samples.Falloff,
-            samples.MeshSize,
+            SampleWeights.FalloffOf(samples.Bounds, SurfaceContacts.OriginFalloffFraction),
             samples.Bounds,
             samples.Weights.Length,
             CountWeights(samples.Weights),
-            SumOf(samples.Weights),
-            SumOf(touching),
+            DoubleSum.Of(samples.Weights),
+            DoubleSum.Of(touching),
             [.. hitsBySupporter.Select(entry => DescribeSupporter(entry, samples.Weights, supportersPerPoint))]);
     }
 
     private static SupporterSamples DescribeSupporter(SupporterHits entry, float[] weights, int[] supportersPerPoint) =>
-        new(entry.Supporter, entry.Hits.Count(hit => hit), SupportContactWeights.WeightHeldBy(entry.Hits, weights, supportersPerPoint));
+        new(entry.Supporter, entry.Hits.Count(hit => hit), SampleWeights.WeightHeldBy(entry.Hits, weights, supportersPerPoint));
 
     private static SampleWeightCounts CountWeights(float[] weights) =>
         new(
             weights.Count(weight => float.IsFinite(weight) && weight > 0),
             weights.Count(weight => float.IsFinite(weight) && !(weight > 0)),
             weights.Count(weight => !float.IsFinite(weight)));
-
-    private static double SumOf(IEnumerable<float> weights) => weights.Sum(weight => (double)weight);
 }

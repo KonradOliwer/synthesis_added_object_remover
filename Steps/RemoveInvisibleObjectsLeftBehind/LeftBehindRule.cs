@@ -2,7 +2,7 @@ using System.Numerics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
+using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 
@@ -29,8 +29,13 @@ internal sealed class LeftBehindRule(
     public LeftBehindResult SelectRemovals(IRemovalDecisions decisions, Execution execution)
     {
         var evaluations = EvaluateAll(decisions, execution);
-        return new LeftBehindResult(StepOutcome.Performed, evaluations, LeftBehindRound.ProposalsOf(evaluations), Failure: null);
+        return new LeftBehindResult(StepOutcome.Performed, evaluations, LeftBehindVerdicts.ProposalsOf(evaluations, ReasonOf), Failure: null);
     }
+
+    private static RemovalReason ReasonOf(LeftBehindCheck evaluation) =>
+        evaluation.ContainingObject is { } container
+            ? new InsideAnotherModsObject(container.Id)
+            : new SurroundingsRemoved();
 
     private LeftBehindCheck[] EvaluateAll(IRemovalDecisions decisions, Execution execution)
     {
@@ -55,12 +60,16 @@ internal sealed class LeftBehindRule(
         var radius = GetEffectiveRadius(target);
         var containingObject = containingObjects.Of(targetIndex);
         var areas = MeasureSurroundings(target, radius, decisions, neighbours);
-        var ruleDecision = containingObject != null ? LeftBehindOutcome.RemovedInsideOtherObject : DecideByDirections(areas, config);
-        return new LeftBehindCheck(targetIndex, kind, radius, containingObject, areas, ApplyProtectedTypes(kind, ruleDecision), KeepReason: null);
+        var ruleDecision = containingObject != null ? LeftBehindOutcome.RemovedInsideOtherObject : LeftBehindVerdicts.BySurroundings(areas, config.Surroundings);
+        var decision = LeftBehindVerdicts.KeptWhenProtected(ruleDecision, config.NeverRemove.Contains(kind));
+        return new LeftBehindCheck(targetIndex, kind, radius, containingObject, areas, decision, KeepReason: null);
     }
 
-    private float GetEffectiveRadius(TargetObject target) =>
-        reach.GetReach(target) is { } ownReach ? MathF.Min(config.LookAround, ownReach) : config.LookAround;
+    private float GetEffectiveRadius(TargetObject target)
+    {
+        var lookAround = config.Surroundings.LookAround;
+        return reach.GetReach(target) is { } ownReach ? MathF.Min(lookAround, ownReach) : lookAround;
+    }
 
     private SectorAreas MeasureSurroundings(
         TargetObject target,
@@ -70,20 +79,7 @@ internal sealed class LeftBehindRule(
     {
         surroundings.Around(target.SpaceKey, target.Transform.Position, radius, neighbours);
         // The neighbours come in ascending target id, which fixes the order of the float sums.
-        var boxes = neighbours.Select(neighbour => (neighbour.Box, NeighbourFates.Of(decisions, neighbour.Target)));
-        return SectorAreaTally.Measure(boxes, target.Transform.Position, config.DirectionClearedPercent);
+        var boxes = neighbours.Select(neighbour => (neighbour.Box, decisions.FateOf(neighbour.Target)));
+        return SectorAreaTally.Measure(boxes, target.Transform.Position, config.Surroundings.DirectionClearedPercent);
     }
-
-    internal static LeftBehindOutcome DecideByDirections(SectorAreas areas, LeftBehindSettings config) =>
-        SectorRule.Decide(areas, config.MinOccupiedDirections, config.ClearedDirectionsPercent) switch
-        {
-            SectorVerdict.TooFewOccupiedDirections => LeftBehindOutcome.KeptTooFewSurroundingObjects,
-            SectorVerdict.TooFewClearedDirections => LeftBehindOutcome.KeptSurroundingsMostlyKept,
-            _ when areas.RestoredCount > 0 => LeftBehindOutcome.RemovedSurroundingsRemovedAndRestored,
-            _ => LeftBehindOutcome.RemovedSurroundingsRemoved,
-        };
-
-    /// <summary>Protected types stay whatever the rules decided; referenced objects are kept by the removal decisions.</summary>
-    private LeftBehindOutcome ApplyProtectedTypes(InvisibleObjectKind kind, LeftBehindOutcome ruleDecision) =>
-        LeftBehindOutcomes.IsRemoval(ruleDecision) && config.NeverRemove.Contains(kind) ? LeftBehindOutcome.KeptProtectedType : ruleDecision;
 }

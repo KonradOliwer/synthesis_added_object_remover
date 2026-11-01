@@ -4,9 +4,10 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The visible target objects checked for being left behind, the ground area around each, and the settings of that check. It references RemovalDecisionList.Contracts, FindTargetObjectsToKeep.Contracts, RemoveObjectsRestingOnRemovedOnes.Contracts (for the follow-up result) and UnexpectedFailureHandling (for its part key) and holds no packages.</Description>
+    <Description>The visible target objects checked for being left behind, with the kind only this step names, the settings of that check, the step's removal reason, and the also-remove follow-up the step asks. It references ObjectsLeftBehind.Contracts (for the verdict and outcome both left-behind steps share), RemovalDecisionList.Contracts, FindTargetObjectsToKeep.Contracts, RemoveObjectsRestingOnRemovedOnes.Contracts (for the follow-up result) and UnexpectedFailureHandling (for its part key) and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\ObjectsLeftBehind.Contracts\ObjectsLeftBehind.Contracts.csproj" />
     <ProjectReference Include="..\FindTargetObjectsToKeep.Contracts\FindTargetObjectsToKeep.Contracts.csproj" />
     <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
     <ProjectReference Include="..\RemoveObjectsRestingOnRemovedOnes.Contracts\RemoveObjectsRestingOnRemovedOnes.Contracts.csproj" />

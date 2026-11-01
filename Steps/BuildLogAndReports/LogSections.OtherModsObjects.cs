@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 
@@ -50,7 +51,7 @@ internal static partial class LogSections
     /// <summary>The removals of the step's rounds the rule itself decided; the linked group members removed with them are not counted.</summary>
     private static string RemovedWithThem(OtherModsObjectsResult settled, IRemovalDecisions decisions, PluginName target)
     {
-        var removed = settled.Rounds.Sum(round => decisions.RemovedIn(round).Count(removal => !RoundEffects.Of(decisions.Of(removal)).AsLinked));
+        var removed = settled.Rounds.Sum(round => decisions.RemovedIn(round).Count(removal => !decisions.Of(removal)!.Effect.AsLinked));
         return removed > 0 ? $"; objects of {target} removed with them: {TextFormat.Count(removed)}" : string.Empty;
     }
 

@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 namespace AddedObjectRemover;
 
 /// <summary>Why reading a mesh gave no usable geometry.</summary>
-public enum MeshReadError { NotFound, NotLoadable, NoRootNode, InvalidCoordinates, NoRenderGeometry, EffectOnly, Malformed, UnexpectedException }
+public enum MeshReadError { NotFound, NotLoadable, NoRootNode, InvalidCoordinates, NoRenderGeometry, EffectOnly, Malformed }
 
 /// <summary>The first vertex that made a mesh's coordinates invalid.</summary>
 /// <param name="NonFinite">The vertex was not finite; otherwise it was beyond the limit.</param>

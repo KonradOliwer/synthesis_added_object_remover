@@ -1,5 +1,6 @@
 using ICSharpCode.SharpZipLib;
 using IniParser.Exceptions;
+using Mutagen.Bethesda.Archives.Exceptions;
 
 namespace AddedObjectRemover;
 
@@ -34,7 +35,8 @@ internal static class KnownProblems
             or NotSupportedException
             or NotImplementedException
             or ArithmeticException
-            or SharpZipBaseException;
+            or SharpZipBaseException
+            or ArchiveException;
 
     /// <summary>What reading the game INI's archive list raises (missing or unreadable INI, unknown game).</summary>
     public static bool IsUnreadableIni(Exception ex) =>

@@ -22,7 +22,7 @@ public class RemovalDecisionsTests
         TestTargets.Link(6, 7),
     ];
 
-    private static readonly RemovalReason TooClose = new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize());
+    private static readonly RemovalReason TooClose = new TooClose(new OtherId(0), new TooCloseCause.ObjectSize());
 
     private static readonly EulerPlacement FitPlacement = new(Vector3.One, Vector3.Zero, 1f);
 
@@ -61,7 +61,7 @@ public class RemovalDecisionsTests
     [Fact]
     public void ApplyingTheRoundsOfAWorkingCopyGivesTheSameDecisionsAsTheCopy()
     {
-        var touching = new RemovalReason.Touching(Id(0));
+        var touching = new TouchingTargetThatLeft(Id(0));
         var afterTooClose = Start(new Dictionary<int, KeepReason> { [4] = QuestReason }).Apply(RoundKind.TooClose, [Propose(0, TooClose)]);
         var rule = new ScriptedRounds([Propose(3, touching), Propose(5, touching)], [Propose(8, touching), Propose(6, touching)], []);
 
@@ -76,7 +76,7 @@ public class RemovalDecisionsTests
             Assert.Equal(copy.KeptIn(round).ToArray(), applied.KeptIn(round).ToArray());
         });
         Assert.IsType<Decision.Kept>(applied.Of(Id(3)));
-        Assert.Equal(new RemovalReason.LinkedTo(Id(5)), Removed(applied, 7).Reason);
+        Assert.Equal(new LinkedTo(Id(5)), Removed(applied, 7).Reason);
     }
 
     /// <summary>Object 9 is kept shrunk or turned: the visible left-behind round leaves it as it is, the also-remove round removes it.</summary>
@@ -121,7 +121,7 @@ public class RemovalDecisionsTests
         Assert.Equal(applied.RemovedIn(applied.Rounds[^1]).ToArray(), copy.RemovedIn(copy.Rounds[^1]).ToArray());
         Assert.Equal(applied.KeptIn(applied.Rounds[^1]).ToArray(), copy.KeptIn(copy.Rounds[^1]).ToArray());
         Assert.IsType<Decision.Kept>(copy.Of(Id(3)));
-        Assert.Equal(new RemovalReason.LinkedTo(Id(5)), Removed(copy, 7).Reason);
+        Assert.Equal(new LinkedTo(Id(5)), Removed(copy, 7).Reason);
     }
 
     [Fact]
@@ -140,8 +140,8 @@ public class RemovalDecisionsTests
     {
         var decisions = Start().Apply(RoundKind.TooClose, [Propose(1, TooClose)]);
 
-        Assert.Equal(new RemovalReason.LinkedTo(Id(1)), Removed(decisions, 0).Reason);
-        Assert.Equal(new RemovalReason.LinkedTo(Id(1)), Removed(decisions, 2).Reason);
+        Assert.Equal(new LinkedTo(Id(1)), Removed(decisions, 0).Reason);
+        Assert.Equal(new LinkedTo(Id(1)), Removed(decisions, 2).Reason);
         Assert.Equal(TooClose, Removed(decisions, 1).Reason);
         Assert.False(decisions.IsDecided(Id(3)));
     }
@@ -149,24 +149,24 @@ public class RemovalDecisionsTests
     [Fact]
     public void LinkedMembersFollowTheLowestDirectlyRemovedMemberOfTheirGroup()
     {
-        var touching = new RemovalReason.Touching(Id(0));
+        var touching = new TouchingTargetThatLeft(Id(0));
 
         var decisions = Start().Apply(RoundKind.AlsoRemove, [Propose(4, touching), Propose(2, touching), Propose(0, TooClose)]);
 
-        Assert.Equal(new RemovalReason.LinkedTo(Id(0)), Removed(decisions, 1).Reason);
-        Assert.Equal(new RemovalReason.LinkedTo(Id(4)), Removed(decisions, 3).Reason);
+        Assert.Equal(new LinkedTo(Id(0)), Removed(decisions, 1).Reason);
+        Assert.Equal(new LinkedTo(Id(4)), Removed(decisions, 3).Reason);
     }
 
     [Fact]
     public void DirectlyRemovedMembersKeepTheirOwnReasonInsteadOfLinked()
     {
-        var touching = new RemovalReason.Touching(Id(8));
+        var touching = new TouchingTargetThatLeft(Id(8));
 
         var decisions = Start().Apply(RoundKind.TooClose, [Propose(0, TooClose), Propose(1, touching)]);
 
         Assert.Equal(TooClose, Removed(decisions, 0).Reason);
         Assert.Equal(touching, Removed(decisions, 1).Reason);
-        Assert.Equal(new RemovalReason.LinkedTo(Id(0)), Removed(decisions, 2).Reason);
+        Assert.Equal(new LinkedTo(Id(0)), Removed(decisions, 2).Reason);
     }
 
     [Fact]
@@ -214,7 +214,7 @@ public class RemovalDecisionsTests
         var first = Start().Apply(RoundKind.TooClose, [Propose(0, TooClose)]);
         var firstRound = first.Rounds[0];
 
-        var second = first.Apply(RoundKind.AlsoRemove, [Propose(0, new RemovalReason.Touching(Id(8))), Propose(8, TooClose)]);
+        var second = first.Apply(RoundKind.AlsoRemove, [Propose(0, new TouchingTargetThatLeft(Id(8))), Propose(8, TooClose)]);
 
         Assert.Equal(firstRound, Removed(second, 0).Round);
         Assert.Equal(TooClose, Removed(second, 0).Reason);
@@ -269,7 +269,7 @@ public class RemovalDecisionsTests
     public void DecisionsDoNotDependOnProposalOrder()
     {
         var references = new Dictionary<int, KeepReason> { [7] = QuestReason, [10] = QuestReason };
-        var proposals = new[] { 0, 2, 3, 5, 8, 9, 10 }.Select(index => Propose(index, new RemovalReason.Touching(Id(index)))).ToList();
+        var proposals = new[] { 0, 2, 3, 5, 8, 9, 10 }.Select(index => Propose(index, new TouchingTargetThatLeft(Id(index)))).ToList();
         var expected = Start(references).Apply(RoundKind.AlsoRemove, proposals);
         var random = new Random(ShuffleSeed);
 
@@ -288,7 +288,7 @@ public class RemovalDecisionsTests
     [Fact]
     public void FirstProposalWinsForATargetProposedTwice()
     {
-        var touching = new RemovalReason.Touching(Id(9));
+        var touching = new TouchingTargetThatLeft(Id(9));
 
         var decisions = Start().Apply(RoundKind.TooClose, [Propose(8, TooClose), Propose(8, touching)]);
 
@@ -307,9 +307,9 @@ public class RemovalDecisionsTests
         Assert.Equal(RoundKind.TooClose, Removed(decisions, 1).Round.Kind);
         Assert.Equal(RoundKind.AlsoRemove, Removed(decisions, 4).Round.Kind);
         Assert.Equal(RoundKind.LeftBehind, Removed(decisions, 6).Round.Kind);
-        Assert.Equal(new RemovalReason.LinkedTo(Id(0)), Removed(decisions, 2).Reason);
-        Assert.Equal(new RemovalReason.LinkedTo(Id(3)), Removed(decisions, 4).Reason);
-        Assert.Equal(new RemovalReason.LinkedTo(Id(5)), Removed(decisions, 7).Reason);
+        Assert.Equal(new LinkedTo(Id(0)), Removed(decisions, 2).Reason);
+        Assert.Equal(new LinkedTo(Id(3)), Removed(decisions, 4).Reason);
+        Assert.Equal(new LinkedTo(Id(5)), Removed(decisions, 7).Reason);
     }
 
     [Fact]
@@ -533,8 +533,8 @@ public class RemovalDecisionsTests
         var round = decisions.Rounds[0];
 
         Assert.Equal(TooClose, Assert.IsType<Decision.Restored>(decisions.Of(Id(1))).Reason);
-        Assert.Equal(new RemovalReason.LinkedTo(Id(1)), Assert.IsType<Decision.Restored>(decisions.Of(Id(0))).Reason);
-        Assert.Equal(new RemovalReason.LinkedTo(Id(1)), Removed(decisions, 2).Reason);
+        Assert.Equal(new LinkedTo(Id(1)), Assert.IsType<Decision.Restored>(decisions.Of(Id(0))).Reason);
+        Assert.Equal(new LinkedTo(Id(1)), Removed(decisions, 2).Reason);
         Assert.Equal(Ids(1, 0, 2), decisions.LeftIn(round).ToArray());
         Assert.Equal(Ids(2), decisions.RemovedIn(round).ToArray());
         Assert.Equal(
@@ -544,7 +544,7 @@ public class RemovalDecisionsTests
                 new RoundEffect(RoundOutcome.Restored, AsLinked: true, KeepReason: null),
                 new RoundEffect(RoundOutcome.Removed, AsLinked: true, KeepReason: null),
             },
-            Ids(1, 0, 2).Select(target => RoundEffects.Of(decisions.Of(target), round)).ToArray());
+            Ids(1, 0, 2).Select(target => decisions.Of(target)!.EffectIn(round)).ToArray());
     }
 
     [Fact]

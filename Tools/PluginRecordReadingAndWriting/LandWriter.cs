@@ -6,7 +6,7 @@ using static AddedObjectRemover.TerrainGrid;
 namespace AddedObjectRemover;
 
 /// <summary>
-/// Writes parts of LAND records the target plugin changed into the patch: each into a copy of the winning record in the patch's
+/// Writes parts of LAND records the read's plugin changed into the patch: each into a copy of the winning record in the patch's
 /// override of its cell, made on first use. Not thread-safe.
 /// </summary>
 internal sealed class LandWriter(SynthesisWriteCache synthesis, CellOverrides cells, RecordHandles handles)

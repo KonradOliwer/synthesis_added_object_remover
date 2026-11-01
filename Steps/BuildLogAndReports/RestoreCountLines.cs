@@ -16,13 +16,13 @@ internal static class RestoreCountLines
         if (objects.Count > 0)
         {
             yield return $"{TextFormat.Count(objects.Count, "object", "objects")} of other mods "
-                + $"({Breakdown(objects.GroupBy(change => RestoreOutcomes.KindOf(change.Change)).OrderBy(group => group.Key).Select(group => Item(RestoreWhereRemovedText.Kind(group.Key), group.Count())))})";
+                + $"({Breakdown(objects.GroupBy(change => change.Kind).OrderBy(group => group.Key).Select(group => Item(RestoreWhereRemovedText.Kind(group.Key), group.Count())))})";
         }
 
-        var lands = judged.Lands.Where(land => land.Land.IsRestored).ToList();
+        var lands = judged.Result.Lands.Where(land => land.IsRestored).ToList();
         if (lands.Count > 0)
         {
-            var quarters = lands.Sum(land => land.Quarters.Count(quarter => quarter.Restores));
+            var quarters = lands.Sum(land => land.ChangedQuarters.Count(quarter => quarter.Restored.Any));
             var landCells = TextFormat.Count(lands.Count, "cell", "cells");
             yield return quarters > 0 ? $"terrain in {TextFormat.Count(quarters, "cell quarter", "cell quarters")} of {landCells}" : $"terrain of {landCells}";
         }
@@ -49,7 +49,7 @@ internal static class RestoreCountLines
         var objects = judged.Result.Objects.Count(change => change.IsRestored);
         if (objects > 0) yield return TextFormat.Count(objects, "object", "objects");
 
-        var lands = judged.Lands.Count(land => land.Land.IsRestored);
+        var lands = judged.Result.Lands.Count(land => land.IsRestored);
         if (lands > 0) yield return $"terrain in {TextFormat.Count(lands, "cell", "cells")}";
 
         var cells = judged.Result.Cells.Count(cell => cell.IsRestored);
@@ -69,7 +69,7 @@ internal static class RestoreCountLines
             yield return $"{TextFormat.Count(refusals.Count, "object", "objects")} ({Breakdown(kinds.Select(group => Item(group.Key, group.Count())))})";
         }
 
-        var kept = judged.Lands.SelectMany(land => land.Land.Kept).ToList();
+        var kept = judged.Result.Lands.SelectMany(land => land.Kept).ToList();
         var points = kept.Sum(entry => entry.Points.Count);
         if (points > 0)
         {
@@ -133,21 +133,19 @@ internal static class RestoreCountLines
     /// </summary>
     public static IEnumerable<string> KeptForArea(RestoreJudgements judged, AreaVerdict verdict)
     {
-        var objects = judged.Result.Objects.Count(change => RestoreOutcomes.IsKeptForArea(change) && RestoreOutcomes.AreaKeeping(change) == verdict);
+        var objects = judged.Result.Objects.Count(change => change.KeptForArea == verdict);
         if (objects > 0) yield return TextFormat.Count(objects, "object", "objects");
 
-        var cells = judged.Result.Cells.Count(cell => RestoreOutcomes.IsKeptForArea(cell) && cell.Area?.Verdict == verdict);
+        var cells = judged.Result.Cells.Count(cell => cell.KeptForArea == verdict);
         if (cells > 0) yield return TextFormat.Count(cells, "cell", "cells");
 
-        var quarters = judged.Lands
-            .Where(land => land.Land.Never is null)
-            .Sum(land => land.Quarters.Count(quarter => quarter.HoldsChange && !quarter.Restores && quarter.Judged?.Verdict == verdict));
+        var quarters = judged.Result.Lands.Sum(land => land.ChangedQuarters.Count(quarter => quarter.KeptForArea == verdict));
         if (quarters > 0) yield return $"terrain in {TextFormat.Count(quarters, "cell quarter", "cell quarters")}";
 
-        var rests = judged.Lands.Count(land => RestoreOutcomes.HoldsOnlyTheRest(land) && RestoreOutcomes.IsRestKeptForArea(land.Land) && RestoreOutcomes.RestAreaKeeping(land.Land) == verdict);
+        var rests = judged.Result.Lands.Count(land => RestoreOutcomes.HoldsOnlyTheRest(land) && land.RestKeptForArea == verdict);
         if (rests > 0) yield return $"the rest of {TextFormat.Count(rests, "land record", "land records")}";
 
-        var navmeshes = judged.Navmeshes.Count(navmesh => RestoreOutcomes.IsKeptForArea(navmesh) && navmesh.Judged.Area?.Verdict == verdict);
+        var navmeshes = judged.Navmeshes.Count(navmesh => navmesh.Judged.KeptForArea == verdict);
         if (navmeshes > 0) yield return TextFormat.Count(navmeshes, "navmesh", "navmeshes");
     }
 
@@ -169,7 +167,7 @@ internal static class RestoreCountLines
 
     private static IEnumerable<string> TerrainLeftToLater(RestoreJudgements judged)
     {
-        var later = judged.Lands.Select(land => land.Land.Change.LeftToLater).ToList();
+        var later = judged.Result.Lands.Select(land => land.Change.LeftToLater).ToList();
         var heights = later.Sum(entry => entry.Points.Count);
         if (heights > 0) yield return TextFormat.Count(heights, "height", "heights");
 

@@ -30,7 +30,7 @@ internal sealed class PlacedNpcIndex : IPlacedNpcIndex
 
         _pointFallbacks = Enumerable.Range(0, npcs.Length)
             .Where(slot => bodies[slot].FirstPoint != null)
-            .Select(slot => new PointNpc(npcs[slot], bodies[slot].FirstPoint!.PointReason!.Value))
+            .Select(slot => new PointNpc(npcs[slot].Id, bodies[slot].FirstPoint!.PointReason!.Value))
             .ToArray();
         Counts = counts;
     }

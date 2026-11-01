@@ -8,16 +8,13 @@ public enum AssetProblemKind { NotFound, LooseFileUnreadable, ArchiveExtractFail
 public readonly record struct FooterRootBlocks(int Used, int FirstNodeRoot);
 
 /// <summary>A problem with one mesh file, as facts only; the wording is the reader's.</summary>
-/// <param name="Detail">
-/// The exception message; only for <see cref="AssetProblemKind.LooseFileUnreadable"/>, <see cref="AssetProblemKind.ArchiveExtractFailed"/>
-/// and an unexpected <see cref="AssetProblemKind.TrianglesUnreadableAfterGoodRead"/>.
-/// </param>
+/// <param name="Detail">The exception message; only for <see cref="AssetProblemKind.LooseFileUnreadable"/> and <see cref="AssetProblemKind.ArchiveExtractFailed"/>.</param>
 /// <param name="LoosePath">The loose file that could not be read; only for <see cref="AssetProblemKind.LooseFileUnreadable"/>.</param>
 /// <param name="ExceptionType">The type name of the archive extract's exception; only for <see cref="AssetProblemKind.ArchiveExtractFailed"/>.</param>
 /// <param name="FooterRoot">Only for <see cref="AssetProblemKind.FooterRoot"/>.</param>
 /// <param name="ReadFailure">
 /// Only for <see cref="AssetProblemKind.Unreadable"/>, <see cref="AssetProblemKind.TrianglesUnreadable"/>
-/// and a <see cref="AssetProblemKind.TrianglesUnreadableAfterGoodRead"/> that is not unexpected.
+/// and <see cref="AssetProblemKind.TrianglesUnreadableAfterGoodRead"/>.
 /// </param>
 /// <param name="MismatchedStrips">The NiTriStrips shapes whose strip lengths do not match their points; only for <see cref="AssetProblemKind.ReadWarning"/>.</param>
 public sealed record AssetProblem(
@@ -40,9 +37,6 @@ public sealed record AssetProblem(
 
     public static AssetProblem TrianglesUnreadableAfterGoodRead(string mesh, MeshReadFailure failure) =>
         new(mesh, AssetProblemKind.TrianglesUnreadableAfterGoodRead, null, null, null, null, failure, null);
-
-    public static AssetProblem TrianglesUnreadableAfterGoodRead(string mesh, string unexpectedFailure) =>
-        new(mesh, AssetProblemKind.TrianglesUnreadableAfterGoodRead, unexpectedFailure, null, null, null, null, null);
 
     public static AssetProblem ReadWarning(string mesh, int mismatchedStrips) =>
         new(mesh, AssetProblemKind.ReadWarning, null, null, null, null, null, mismatchedStrips);
@@ -81,7 +75,4 @@ public interface IMeshProblems
 
     /// <summary>The archive and loader problems first recorded after the mark, in the order recorded.</summary>
     ImmutableArray<ArchiveProblem> ArchiveProblemsSince(ProblemMark mark);
-
-    /// <summary>The spelling of a mesh path to print: of all the spellings the mesh was asked for, the one that sorts first (ordinal). Throws for a mesh nobody asked for.</summary>
-    string PrintedSpelling(string mesh);
 }

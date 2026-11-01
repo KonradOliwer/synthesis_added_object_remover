@@ -18,7 +18,7 @@ internal sealed class BaseFactsReader(ILinkCache linkCache, KnownPluginNames kno
     private readonly ComputedOncePerKey<RecordKey, BaseFacts> _byBase = new(Publication.FirstWriteWins, EqualityComparer<RecordKey>.Default);
     private readonly PluginNames _names = new(knownPlugins);
 
-    public BaseFacts Of(BaseKey baseKey) => _byBase.Get(baseKey.Record, () => Read(baseKey));
+    public BaseFacts Of(BaseKey baseKey) => MutagenCalls.Read(() => _byBase.Get(baseKey.Record, () => Read(baseKey)));
 
     public static Box ToBox(IObjectBoundsGetter bounds) => Box.FromCorners(
         new Vector3(bounds.First.X, bounds.First.Y, bounds.First.Z),

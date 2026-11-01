@@ -6,9 +6,6 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 /// <summary>What the cleaned mod last changed in a part of a record, over the record's versions from the one just below the cleaned mod's up to the winner, the patch included.</summary>
 internal static class PartHistory
 {
-    /// <summary>The versions read start just below the cleaned mod's, so its own version is the second.</summary>
-    private const int CleanedModVersionIndex = 1;
-
     /// <param name="plugins">The plugin of each version of the record, lowest first; the version just below the cleaned mod's lies at <paramref name="cleanedModIndex"/> - 1.</param>
     /// <param name="cleanedModIndex">The index of the cleaned mod's version, at least 1.</param>
     /// <param name="patch">The patch, whose version holds what earlier patchers of the group wrote.</param>
@@ -30,7 +27,7 @@ internal static class PartHistory
     /// <param name="includes">Whether a set of parts includes the part.</param>
     public static PartOutcome Of<TParts>(
         ImmutableArray<VersionDifferences<TParts>> versions, IReadOnlyList<PluginName> plugins, PluginName patch, Func<TParts, bool> includes) =>
-        Of(plugins, CleanedModVersionIndex, patch, VersionComparison.Differs(versions, includes));
+        Of(plugins, VersionComparison.NamedPluginIndex, patch, VersionComparison.Differs(versions, includes));
 
     /// <summary>
     /// As <see cref="Of{TParts}"/>; a part that would be undone but whose earlier value cannot be written into the winner is

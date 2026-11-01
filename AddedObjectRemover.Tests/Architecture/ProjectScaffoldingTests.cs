@@ -34,17 +34,21 @@ public class ProjectScaffoldingTests
     private static ProjectRules RulesWithActualReferences(IReadOnlyList<(string Name, string Folder, IReadOnlyList<string> References)> projects)
     {
         var rows = projects
-            .Where(project => Rules.Projects.Any(rule => rule.Name == project.Name))
-            .Select(project => Rules.Find(project.Name) with { References = project.References })
+            .Where(project => HasRow(project.Name))
+            .Select(project => Rules.Find(project.Name) with { References = project.References.Where(HasRow).ToList() })
             .ToList();
         return new ProjectRules(Rules.EntryOnlyProjects, rows);
     }
+
+    private static bool HasRow(string name) => Rules.Projects.Any(rule => rule.Name == name);
 
     private static IEnumerable<string> FindKindBreaches(ProjectRules actual) =>
         actual.FindLogicReferencingLogic().Select(reference => $"{reference}: logic references logic")
             .Concat(actual.FindLogicReferencedByNonRunners().Select(reference => $"{reference}: logic referenced by a non-runner"))
             .Concat(actual.FindEntryOnlyReferencedByOthers().Select(reference => $"{reference}: entry-only project referenced by another project"))
             .Concat(actual.FindStepContractsReferencingRunCachesContracts().Select(reference => $"{reference}: step contracts reference the run caches"))
+            .Concat(actual.FindStepContractsReferencingRunContracts().Select(reference => $"{reference}: step contracts reference the run's contracts"))
+            .Concat(actual.FindLogicReferencingRunContractsWithoutReason().Select(reference => $"{reference}: logic references the run's contracts without a listed reason"))
             .Concat(actual.FindToolsReferencingNonTools().Select(reference => $"{reference}: tool references something other than tools and ids"))
             .Concat(actual.FindContractsReferencingNonContractsAndNonTools().Select(reference => $"{reference}: contracts reference something other than contracts, tools and ids"))
             .Concat(actual.FindCacheContractsReferencingRunContracts().Select(reference => $"{reference}: cache contracts reference the run's contracts"))

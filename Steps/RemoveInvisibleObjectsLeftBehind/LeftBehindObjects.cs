@@ -1,9 +1,7 @@
 using System.Collections.Immutable;
-using System.Diagnostics;
-using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
+using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
@@ -31,59 +29,35 @@ public static class LeftBehindObjects
 
     public static Decided<LeftBehindResult> Find(Input input)
     {
-        var decisions = input.Decisions;
-        var result = Find(
-            input.Targets,
-            input.OtherModObjects,
-            input.OtherModObjectsTakenAway.Keys.ToHashSet(),
-            decisions,
-            input.Surroundings,
-            input.Caches.Bases,
-            input.Caches.Shapes,
-            input.Order,
-            input.Execution,
-            input.Settings);
-        return new Decided<LeftBehindResult>(result, decisions.Apply(RoundKind.LeftBehind, result.Proposals));
+        var result = Evaluate(input);
+        return new Decided<LeftBehindResult>(result, input.Decisions.Apply(RoundKind.LeftBehind, result.Proposals));
     }
 
-    /// <param name="otherModObjects">The other-mod objects that can cause removals (the selection step's view).</param>
-    /// <param name="otherModObjectsTakenAway">Those of any plugin this run removes or pulls down: no object sits inside them any more.</param>
-    /// <param name="decisions">The newest decisions; only the removals already in them count as cleared.</param>
-    /// <param name="surroundings">The visible target objects, removed or not, where the rounds measure them: a restored one where the cleaned mod put it.</param>
-    /// <param name="settings">Null when the step is switched off.</param>
     /// <returns>
-    /// The evaluations, and the proposals. An object the round keeps as referenced is already <see cref="LeftBehindOutcome.KeptReferenced"/>
-    /// with its keep reason (<see cref="LeftBehindOutcome.KeptInDeletedCell"/> when the reason is a deleted cell), and one the round removes as a linked member is <see cref="LeftBehindOutcome.RemovedLinkedToRemoval"/> or <see cref="LeftBehindOutcome.RemovedLinkedToRestoration"/>: the step decides its round on a working copy of <paramref name="decisions"/> and joins the verdicts itself.
-    /// When <paramref name="settings"/> is null the step does not look for containing objects, makes no copy, and the result is
+    /// The evaluations, and the proposals; only the removals already in the decisions count as cleared. An object the round keeps as referenced is already <see cref="LeftBehindOutcome.KeptReferenced"/>
+    /// with its keep reason (<see cref="LeftBehindOutcome.KeptInDeletedCell"/> when the reason is a deleted cell), and one the round removes as a linked member is <see cref="LeftBehindOutcome.RemovedLinkedToRemoval"/> or <see cref="LeftBehindOutcome.RemovedLinkedToRestoration"/>: the step decides its round on a working copy of the decisions and joins the verdicts itself.
+    /// When the settings are null the step does not look for containing objects, makes no copy, and the result is
     /// <see cref="StepOutcome.SwitchedOff"/>. An unexpected failure stops the step: <see cref="StepOutcome.StoppedByUnexpectedError"/>,
     /// with the failure and no proposals.
     /// </returns>
-    internal static LeftBehindResult Find(
-        ImmutableArray<TargetObject> targets,
-        IObjectsThatCanCauseRemovals otherModObjects,
-        IReadOnlySet<OtherId> otherModObjectsTakenAway,
-        IRemovalDecisions decisions,
-        IVisibleTargetObjects surroundings,
-        IBaseFacts bases,
-        IBaseObjectShapes shapes,
-        WorkOrder order,
-        Execution execution,
-        LeftBehindSettings? settings)
+    private static LeftBehindResult Evaluate(Input input)
     {
-        if (settings is null) return LeftBehindResult.SwitchedOff;
+        if (input.Settings is not { } settings) return LeftBehindResult.SwitchedOff;
 
+        var (targets, shapes, order, execution) = (input.Targets, input.Caches.Shapes, input.Order, input.Execution);
+        var takenAway = input.OtherModObjectsTakenAway.Keys.ToHashSet();
         return Failures.Attempt(
             () => JoinVerdicts(
                 new LeftBehindRule(
                         targets,
                         shapes,
-                        surroundings,
-                        ContainingObjectFinder.Find(targets, shapes, otherModObjects, otherModObjectsTakenAway, order, execution),
-                        new ReachRule(bases),
+                        input.Surroundings,
+                        ContainingObjectFinder.Find(targets, shapes, input.OtherModObjects, takenAway, order, execution),
+                        new ReachRule(input.Caches.Bases),
                         settings,
                         order)
-                    .SelectRemovals(decisions, execution),
-                decisions),
+                    .SelectRemovals(input.Decisions, execution),
+                input.Decisions),
             failure => new LeftBehindResult(StepOutcome.StoppedByUnexpectedError, [], [], PartFailure.OfWholePart(LeftBehindParts.LeftBehind, failure)));
     }
 
@@ -94,30 +68,14 @@ public static class LeftBehindObjects
     private static LeftBehindResult JoinVerdicts(LeftBehindResult evaluated, IRemovalDecisions decisions)
     {
         var decided = decisions.DecideRoundOnCopy(RoundKind.LeftBehind, [.. evaluated.Proposals]);
+        Func<TargetId, Decision?> decisionOf = target => decided.GetValueOrDefault(target);
         return evaluated with
         {
             Evaluations =
             [
-                .. evaluated.Evaluations.Select(evaluation => Join(evaluation, decided.GetValueOrDefault(new TargetId(evaluation.TargetIndex)), decided)),
+                .. evaluated.Evaluations.Select(evaluation =>
+                    LeftBehindVerdicts.JoinRoundDecision(evaluation, decisionOf(new TargetId(evaluation.TargetIndex)), decisionOf)),
             ],
         };
     }
-
-    private static LeftBehindCheck Join(LeftBehindCheck evaluation, Decision? decision, IReadOnlyDictionary<TargetId, Decision> decided)
-    {
-        var effect = RoundEffects.Of(decision);
-        return effect switch
-        {
-            { Outcome: RoundOutcome.KeptAsReferenced, KeepReason.Kind: KeepKind.CellDeleted } => evaluation with { Decision = LeftBehindOutcome.KeptInDeletedCell, KeepReason = effect.KeepReason },
-            { Outcome: RoundOutcome.KeptAsReferenced } => evaluation with { Decision = LeftBehindOutcome.KeptReferenced, KeepReason = effect.KeepReason },
-            { Outcome: RoundOutcome.Removed, AsLinked: true } => evaluation with { Decision = RemovedAsLinked(decision, decided) },
-            { Outcome: RoundOutcome.Untouched or RoundOutcome.Removed } => evaluation,
-            { Outcome: RoundOutcome.Restored, AsLinked: true } => evaluation with { Decision = LeftBehindOutcome.RestoredAsLinked },
-            { Outcome: RoundOutcome.Restored } => evaluation with { Decision = LeftBehindOutcomes.AsRestored(evaluation.Decision) },
-            _ => throw new UnreachableException($"Unexpected round effect {effect} in a left-behind round."),
-        };
-    }
-
-    private static LeftBehindOutcome RemovedAsLinked(Decision? decision, IReadOnlyDictionary<TargetId, Decision> decided) =>
-        RoundEffects.FollowedARestoredMember(decision, target => decided.GetValueOrDefault(target)) ? LeftBehindOutcome.RemovedLinkedToRestoration : LeftBehindOutcome.RemovedLinkedToRemoval;
 }

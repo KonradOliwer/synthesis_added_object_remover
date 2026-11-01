@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using Mutagen.Bethesda.Plugins;
-using Mutagen.Bethesda.Plugins.Exceptions;
 using Mutagen.Bethesda.Plugins.Records;
 using Mutagen.Bethesda.Skyrim;
 
@@ -43,7 +42,7 @@ internal static class LinkReader
     /// Every version of every non-placed record of the given plugins is checked. Overridden versions,
     /// which the game does not use, are included as well; this is conservative. Placed records are
     /// left out because <see cref="ReadFromPlaced"/> covers their winning versions. Besides the links to
-    /// the given records, each quest alias that fills with a target-plugin NPC as its Unique Actor is read.
+    /// the given records, each quest alias that fills with an NPC of the given plugin as its Unique Actor is read.
     /// </summary>
     /// <returns>The links and the records that could not be parsed, both in the order of the given plugins and of their records.</returns>
     /// <param name="mods">In priority order, highest first.</param>
@@ -60,14 +59,14 @@ internal static class LinkReader
     {
         var lowestPriorityFirst = new WorkOrder([.. Enumerable.Range(0, mods.Count).Reverse()]);
         var perMod = ParallelMap.Run(
-            execution, lowestPriorityFirst, mods.Count, index => ReadPluginLinks(mods[index], records, target, names), ParallelMap.OneItemPerRange);
+            execution, lowestPriorityFirst, mods.Count, index => MutagenCalls.Read(() => ReadPluginLinks(mods[index], records, target, names)), ParallelMap.OneItemPerRange);
         return new NonPlacedLinks(
             [.. perMod.SelectMany(read => read.Links)], [.. perMod.SelectMany(read => read.Unreadable)]);
     }
 
     /// <remarks>
     /// Mutagen reads a record's subrecords lazily, so a malformed one throws while its links are enumerated, not while the mod's
-    /// records are enumerated. Only that exception is caught, per record: the links read before it stay, and the rest of the mod is read.
+    /// records are enumerated. Only malformed data is caught, per record: the links read before it stay, and the rest of the mod is read.
     /// </remarks>
     private static NonPlacedLinks ReadPluginLinks(
         ISkyrimModGetter mod, IReadOnlySet<RecordKey> records, PluginName target, PluginNames names)
@@ -82,7 +81,7 @@ internal static class LinkReader
                 ReadLinksToRecords(record, records, names, facts);
                 if (record is IQuestGetter quest) ReadUniqueActors(quest, target, names, facts);
             }
-            catch (MalformedDataException ex)
+            catch (Exception ex) when (MutagenCalls.IsMalformedData(ex))
             {
                 unreadable.Add(new UnreadableRecord(
                     names.KeyOf(record.FormKey), record.EditorID, record.Registration.Name, ex.Message));

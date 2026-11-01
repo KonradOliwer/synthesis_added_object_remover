@@ -11,7 +11,6 @@ public class MeshProblemsSectionRunTests
     private const string MeshSection = "meshProblems";
     private const string Mesh = @"meshes\planted.nif";
     private const string MeshLine = @"  [mesh] not found: meshes\planted.nif";
-    private const string MeshErrorLinePrefix = "  Unexpected error while reading mesh triangles";
     private const string ArchiveLine = "  Warning: could not read archive a.bsa: unreadable";
 
     private static readonly AssetProblem MeshProblem = AssetProblem.NotFound(Mesh);
@@ -23,36 +22,18 @@ public class MeshProblemsSectionRunTests
     [MemberData(nameof(StepSections))]
     public void AMeshProblemPrintsOnceInTheMeshProblemsSectionWhicheverStepMetItFirst(string stepSection)
     {
-        var log = RunPlanting(SettingsVariants.TouchWithLeftBehindAndMarkerMoves, stepSection, (problems, _) => problems.Add(MeshProblem));
+        var log = RunPlanting(SettingsVariants.TouchWithLeftBehindAndMarkerMoves, stepSection, problems => problems.Add(MeshProblem));
 
         Assert.Equal([MeshSection], SectionsWithLine(log, line => line == MeshLine));
         Assert.Single(log.Sections.SelectMany(section => section.Lines), MeshLine);
     }
 
-    [Theory]
-    [MemberData(nameof(StepSections))]
-    public void AMeshWhoseReadingThrowsGivesOneGroupedLineInTheMeshProblemsSectionAndNoneInTheErrorSections(string stepSection)
-    {
-        var log = RunPlanting(SettingsVariants.TouchWithLeftBehindAndMarkerMoves, stepSection, PlantMeshError);
-
-        Assert.Equal([MeshSection], SectionsWithLine(log, line => line.StartsWith(MeshErrorLinePrefix, StringComparison.Ordinal)));
-        Assert.Single(log.Sections.SelectMany(section => section.Lines), line => line.StartsWith(MeshErrorLinePrefix, StringComparison.Ordinal));
-    }
-
     [Fact]
-    public void TheNormalLogShowsTheMeshErrorButNotTheMeshProblem()
+    public void TheNormalLogShowsNoMeshProblem()
     {
-        var log = RunPlanting(
-            SettingsVariants.TouchWithLeftBehindAndMarkerMovesNormalLog,
-            "tooClose",
-            (problems, errors) =>
-            {
-                problems.Add(MeshProblem);
-                PlantMeshError(problems, errors);
-            });
+        var log = RunPlanting(SettingsVariants.TouchWithLeftBehindAndMarkerMovesNormalLog, "tooClose", problems => problems.Add(MeshProblem));
 
         Assert.Empty(SectionsWithLine(log, line => line == MeshLine));
-        Assert.Equal([MeshSection], SectionsWithLine(log, line => line.StartsWith(MeshErrorLinePrefix, StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -61,7 +42,7 @@ public class MeshProblemsSectionRunTests
         var log = RunPlanting(
             SettingsVariants.TouchWithLeftBehindAndMarkerMoves,
             "write",
-            (problems, _) =>
+            problems =>
             {
                 problems.Add(ArchiveProblem);
                 problems.Add(MeshProblem);
@@ -71,19 +52,13 @@ public class MeshProblemsSectionRunTests
         Assert.Equal([MeshSection], SectionsWithLine(log, line => line == MeshLine));
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void AMeshProblemOrMeshErrorRecordedAfterTheMeshProblemsAreTakenIsABugThatEndsTheRun(bool recordAnError)
+    [Fact]
+    public void AMeshProblemRecordedAfterTheMeshProblemsAreTakenIsABugThatEndsTheRun()
     {
         Assert.Throws<UnreachableException>(() => RunPlanting(
             SettingsVariants.TouchWithLeftBehindAndMarkerMoves,
             MeshSection,
-            (problems, errors) =>
-            {
-                if (recordAnError) PlantMeshError(problems, errors);
-                else problems.Add(MeshProblem);
-            }));
+            problems => problems.Add(MeshProblem)));
     }
 
     [Fact]
@@ -92,7 +67,7 @@ public class MeshProblemsSectionRunTests
         Assert.Throws<UnreachableException>(() => RunPlanting(
             SettingsVariants.TouchWithLeftBehindAndMarkerMoves,
             MeshSection,
-            (problems, _) => problems.Add(ArchiveProblem)));
+            problems => problems.Add(ArchiveProblem)));
     }
 
     [Fact]
@@ -110,28 +85,18 @@ public class MeshProblemsSectionRunTests
         Assert.Equal(["archiveWarnings"], SectionsWithLine(log, line => line == ArchiveLine));
     }
 
-    /// <summary>The reader notes a mesh's spelling before it can fail on it, so the plant does too.</summary>
-    private static void PlantMeshError(AssetProblemLog problems, IUnexpectedErrors errors)
-    {
-        problems.NoteSpelling(Mesh);
-        errors.Add(MeshReadingError());
-    }
-
-    private static PartFailure MeshReadingError() =>
-        new(MeshReadingParts.MeshTriangles, Failures.DescribeFailure(new InvalidOperationException("planted")), new FailureSubject(Mesh, Name: null, Position: 0));
-
     private static List<string> SectionsWithLine(RecordingLogSink log, Func<string, bool> isLine) =>
         [.. log.Sections.Where(section => section.Lines.Any(isLine)).Select(section => section.Id)];
 
-    /// <param name="plant">Records a problem or an error into the run's problem log or error channel; called when the sections of <paramref name="afterSection"/> print.</param>
-    private static RecordingLogSink RunPlanting(string variant, string afterSection, Action<AssetProblemLog, IUnexpectedErrors> plant)
+    /// <param name="plant">Records problems into the run's problem log; called when the sections of <paramref name="afterSection"/> print.</param>
+    private static RecordingLogSink RunPlanting(string variant, string afterSection, Action<AssetProblemLog> plant)
     {
         PlantingMeshFilesFactory? factory = null;
         var log = new RecordingLogSink
         {
             OnPrint = section =>
             {
-                if (section.Id == afterSection) plant((AssetProblemLog)factory!.Files!.Problems, factory.Errors!);
+                if (section.Id == afterSection) plant((AssetProblemLog)factory!.Files!.Problems);
             },
         };
 
@@ -181,16 +146,13 @@ public class MeshProblemsSectionRunTests
         public TriangleFailureCounts CountTriangleFailures() => inner.CountTriangleFailures();
     }
 
-    /// <summary>Opens the run's mesh reader and keeps the reader and the error channel it was given, so a test can record into the run's own channels.</summary>
+    /// <summary>Opens the run's mesh reader and keeps it, so a test can record into the run's own problem log.</summary>
     private sealed class PlantingMeshFilesFactory(IMeshFilesFactory inner) : IMeshFilesFactory
     {
         public IMeshFiles? Files { get; private set; }
 
-        public IUnexpectedErrors? Errors { get; private set; }
-
         public IMeshFiles Open(ShapeInclusion inclusion, IUnexpectedErrors unexpectedErrors)
         {
-            Errors = unexpectedErrors;
             Files = inner.Open(inclusion, unexpectedErrors);
             return Files;
         }

@@ -99,7 +99,7 @@ internal sealed class AreaRecordChanges(PluginName patch, IReadOnlyDictionary<Re
         door.InDeletedCell);
 
     private static PartOutcome WhatGoesBack(NavmeshRecordFact navmesh, PartOutcome outcome) =>
-        navmesh.DeletedAboveTarget && outcome is PartOutcome.Undo or PartOutcome.KeptForRecordFormat ? new PartOutcome.Unchanged() : outcome;
+        navmesh.DeletedAboveNamedPlugin && outcome is PartOutcome.Undo or PartOutcome.KeptForRecordFormat ? new PartOutcome.Unchanged() : outcome;
 
     /// <param name="includes">For each index, whether a set of parts includes the part at that index.</param>
     private List<(int Index, PartOutcome Outcome)> OutcomesOf(

@@ -11,7 +11,7 @@ namespace AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport;
 /// mesh below that passes between them may sink in slightly. An object rests on what is below it when it cannot move down by
 /// more than the touch gap. Thread-safe; results depend only on the inputs.
 /// </summary>
-internal sealed class DropFinder(SurfaceContacts surfaces, ITriangleMeshes cache, ITerrainHeights terrain, float touchGap)
+internal sealed class DropFinder(ISupportContacts surfaces, ITriangleMeshes cache, ITerrainHeights terrain, float touchGap)
 {
     private static readonly Vector3 Down = -Vector3.UnitZ;
 

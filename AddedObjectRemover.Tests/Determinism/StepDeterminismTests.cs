@@ -75,7 +75,7 @@ public class StepDeterminismTests
         Assert.NotEqual(0, RestingObjectsRemovals.CountByRule(sequential.Result, sequential.RemovalDecisions));
         Assert.Contains(
             sequential.AlsoRemoveRounds.SelectMany(round => sequential.RemovalDecisions.RemovedIn(round)),
-            target => sequential.RemovalDecisions.Of(target)!.Reason is RemovalReason.LinkedTo);
+            target => sequential.RemovalDecisions.Of(target)!.Reason is LinkedTo);
         Assert.Equal(DescribeRounds(sequential.RemovalDecisions), DescribeRounds(parallel.RemovalDecisions));
         Assert.Equal(sequential.RemovalDecisions.All().ToList(), parallel.RemovalDecisions.All().ToList());
         Assert.Equal(sequential.Result.Work, parallel.Result.Work);
@@ -334,10 +334,7 @@ public class StepDeterminismTests
             .ToList();
 
     private static LeftBehindSettings CreateLeftBehindConfig() => new(
-        LookAround: 100,
-        DirectionClearedPercent: 50,
-        ClearedDirectionsPercent: 60,
-        MinOccupiedDirections: 4,
+        new LeftBehindSurroundings(LookAround: 100, MinOccupiedDirections: 4, DirectionClearedPercent: 50, ClearedDirectionsPercent: 60),
         NeverRemove: new HashSet<InvisibleObjectKind>());
 
     private static TriangleStore NewCache() => new(Shapes.ReadTriangles);

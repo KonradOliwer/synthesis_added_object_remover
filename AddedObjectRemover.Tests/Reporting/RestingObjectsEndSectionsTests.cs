@@ -572,17 +572,17 @@ public sealed class RestingObjectsEndSectionsTests
     public void Bounds_BothLogsShowTheMeshTriangleFailuresAndThoseAfterAGoodReadNextToTheMeshFailures()
     {
         var failures = Statistics([new(Category(MeshReadError.NotFound), 2)]);
-        var triangles = new TriangleFailureCounts([new(Category(MeshReadError.UnexpectedException), 1), new(Category(MeshReadError.NotFound), 3)], AfterGoodRead: 1);
+        var triangles = new TriangleFailureCounts([new(Category(MeshReadError.NoRootNode), 1), new(Category(MeshReadError.NotFound), 3)], AfterGoodRead: 1);
 
         Assert.Equal(
             [
                 "Mesh failures: 2 not found.",
-                "Mesh triangle failures: 3 not found, 1 unexpected error.",
+                "Mesh triangle failures: 3 not found, 1 no root node.",
                 "Meshes whose triangles failed after reading fine earlier in the run: 1.",
             ],
             LogSections.BuildBoundsSection(failures, triangles, Normal).Lines.ToList());
         Assert.Equal(
-            ["  Mesh triangle failures: 3 not found, 1 unexpected error.", "  Meshes whose triangles failed after reading fine earlier in the run: 1."],
+            ["  Mesh triangle failures: 3 not found, 1 no root node.", "  Meshes whose triangles failed after reading fine earlier in the run: 1."],
             LogSections.BuildBoundsSection(Statistics([]), triangles, Detailed).Lines.Skip(1).ToList());
     }
 
@@ -591,14 +591,14 @@ public sealed class RestingObjectsEndSectionsTests
     {
         var failures = Statistics(
         [
-            new(Category(MeshReadError.UnexpectedException), 2),
+            new(Category(MeshReadError.NotLoadable), 2),
             new(new MeshFailureCategory(MeshReadError.Malformed, "EndOfStreamException"), 2),
             new(Category(MeshReadError.NotFound), 2),
             new(Category(MeshReadError.NoRootNode), 3),
         ]);
 
         Assert.Equal(
-            ["Mesh failures: 3 no root node, 2 EndOfStreamException, 2 not found, 2 unexpected error."],
+            ["Mesh failures: 3 no root node, 2 EndOfStreamException, 2 not found, 2 not loadable."],
             LogSections.BuildBoundsSection(failures, TriangleFailureCounts.None, Normal).Lines.ToList());
     }
 
@@ -781,13 +781,13 @@ public sealed class RestingObjectsEndSectionsTests
 
     private static (CollectedObjects World, RestingObjectsResult AlsoRemove, RemovalDecisions Decisions) TouchScene()
     {
-        var (world, decisions) = RunRounds(alsoRemoveReason: index => new RemovalReason.Touching(new TargetId(0)));
+        var (world, decisions) = RunRounds(alsoRemoveReason: index => new TouchingTargetThatLeft(new TargetId(0)));
         return (world, AlsoRemoveOf(FollowUpRemovalMode.EverythingTouchingIt, decisions), decisions);
     }
 
     private static (CollectedObjects World, RestingObjectsResult AlsoRemove, RemovalDecisions Decisions) SupportScene()
     {
-        var (world, decisions) = RunRounds(alsoRemoveReason: index => new RemovalReason.LostSupport(0.6f, 0f, new TargetId(0)));
+        var (world, decisions) = RunRounds(alsoRemoveReason: index => new LostSupport(0.6f, 0f, new TargetId(0)));
         return (world, AlsoRemoveOf(FollowUpRemovalMode.OnlyWhatLosesItsSupport, decisions), decisions);
     }
 
@@ -847,7 +847,7 @@ public sealed class RestingObjectsEndSectionsTests
     /// <summary>Round 1: target 0 too close, protected target 3 held. Round 2: 1 follows from 0 (its linked partner 2 goes along), protected 4 held.</summary>
     private static (CollectedObjects World,RemovalDecisions Decisions) RunRounds(Func<int, RemovalReason>? alsoRemoveReason = null)
     {
-        var reasonOf = alsoRemoveReason ?? (_ => new RemovalReason.Touching(new TargetId(0)));
+        var reasonOf = alsoRemoveReason ?? (_ => new TouchingTargetThatLeft(new TargetId(0)));
         var targets = TestTargets.CreateMany(TargetCount);
         var protection = ObjectsToKeep.Build(
             [.. targets],
@@ -871,7 +871,7 @@ public sealed class RestingObjectsEndSectionsTests
             TargetWorkOrder.Of(targets),
             null);
         var decisions = TestSeededDecisions.StartDisablingAll(protection, TargetCount)
-            .Apply(RoundKind.TooClose, [Propose(0, new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize())), Propose(Protected, new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()))])
+            .Apply(RoundKind.TooClose, [Propose(0, new TooClose(new OtherId(0), new TooCloseCause.ObjectSize())), Propose(Protected, new TooClose(new OtherId(0), new TooCloseCause.ObjectSize()))])
             .Apply(RoundKind.AlsoRemove, [Propose(1, reasonOf(1)), Propose(ProtectedAlsoRemove, reasonOf(ProtectedAlsoRemove))]);
         return (world, decisions);
     }

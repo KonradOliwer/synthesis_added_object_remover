@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Numerics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
@@ -79,14 +78,14 @@ public interface IObjectCaches
     /// and every other object, a restored one too, where the cleaned mod put it, or <see cref="VisibleTargets"/> when there is no
     /// fit. An object kept shrunk or turned and removed later stands where it stood, as the patch leaves it.
     /// </summary>
-    IVisibleTargetObjects IndexVisibleTargetsAsTheRoundsMeasureThem(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions);
+    IVisibleTargetObjects IndexVisibleTargetsAsTheRoundsMeasureThem(IRemovalDecisions decisions);
 
     /// <summary>
     /// The visible targets where they stand: a new index with each object kept shrunk or turned at its new placement and each
     /// restored object at its earlier placement, or <see cref="VisibleTargets"/> when none stands elsewhere. An object kept shrunk
     /// or turned and removed later stands where it stood, as the patch leaves it.
     /// </summary>
-    IVisibleTargetObjects IndexVisibleTargetsAsTheyStand(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions);
+    IVisibleTargetObjects IndexVisibleTargetsAsTheyStand(IRemovalDecisions decisions);
 
     /// <summary>The visible objects of <see cref="ObjectsOfAnyPlugin"/>; asking builds it.</summary>
     IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPlugin();

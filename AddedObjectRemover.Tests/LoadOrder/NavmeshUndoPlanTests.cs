@@ -30,7 +30,6 @@ public sealed class NavmeshUndoPlanTests
 
     private static readonly WhatToCollect Plan = new(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false, AreaRecordVersions: new AreaRecordReads(new AreaPartTolerances(HeightTolerance, HeightTolerance), Cells: true, Lands: true));
     private static readonly PluginName Patch = FixturePatcherState.PatchModKey.ToPluginName();
-    private static readonly AreaShare Cleared = new(Objects: 1, Standing: 0, Size: 1, StandingSize: 0, AreaVerdict.Cleared);
     private static readonly Vector3 Origin = new(CellX * ExteriorGrid.CellSize, CellY * ExteriorGrid.CellSize, 0f);
 
     private readonly FixtureMod _base = new("Base.esm");
@@ -513,7 +512,9 @@ public sealed class NavmeshUndoPlanTests
         PluginName[] list = pluginList ?? [BaseGame, Cleaned, Later, Patch];
         var plugins = TestLoadOrderPlugins.Of(new KnownPluginNames(list), Patch, [.. list.Select(plugin => new PluginListing(plugin, Loaded: true, []))], list, []);
         var judged = collected.ChangedNavmeshes
-            .Select(navmesh => new NavmeshChangeJudged(navmesh, Never: null, Cleared with { Verdict = verdictOf?.Invoke(navmesh.Navmesh) ?? AreaVerdict.Cleared }, Undo: null))
+            .Select(navmesh => (Navmesh: navmesh, Verdict: verdictOf?.Invoke(navmesh.Navmesh) ?? AreaVerdict.Cleared))
+            .Select(entry => new NavmeshChangeJudged(
+                entry.Navmesh, Never: null, TestAreaShares.Of(entry.Verdict), Undo: null, ChangeJudge.VerdictKeeping([entry.Verdict]), NothingGoesBack: false))
             .ToList();
         var changed = collected.ChangedNavmeshes.ToDictionary(navmesh => navmesh.Navmesh);
         var changedRecords = collected.ChangedRecords.ToDictionary(record => record.Key);
@@ -534,7 +535,7 @@ public sealed class NavmeshUndoPlanTests
             ? TestSeededDecisions.StartDisablingAll(protection, collected.Targets.Length)
             : TestSeededDecisions.Seed(protection, collected.Targets.Length, removed);
         var result = new RestoreWhereRemovedResult(StepOutcome.Performed, [], [], [], plan.Navmeshes(), plan.Groups(), Passes: 1, DoorsLeftRemoved: [], Failures: []);
-        PatchWriter.Write(final, collected.Targets, OtherModsObjectsResult.SwitchedOff, result, records, writing);
+        PatchWriter.Write(new(final, collected.Targets, OtherModsObjectsResult.SwitchedOff, result, records, writing));
         return (plan, state.PatchMod);
     }
 

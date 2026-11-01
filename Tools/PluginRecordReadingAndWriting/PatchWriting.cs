@@ -26,7 +26,7 @@ public sealed class PatchWriting(SynthesisWriteCache synthesis, ISkyrimMod patch
                 case SetLandHeights set: lands.SetHeights(set.Record, set.Heights, set.Restored, set.Beyond); break;
                 case CopyEarlierNavmeshGeometry copy: navmeshes.CopyEarlierGeometry(copy.Record); break;
                 case CopyEarlierNavmesh copy: navmeshes.CopyEarlier(copy.Record); break;
-                case SetNavmeshZ set: navmeshes.SetZ(set.Record, set.Z); break;
+                case FlattenAndDetachNavmesh flatten: navmeshes.FlattenAndDetach(flatten.Record, flatten.Z); break;
                 case WriteNavmeshMapEntries entries: maps.WriteEntries(entries.Record, entries.Entries); break;
                 default: placed.Write(order); break;
             }
@@ -36,7 +36,10 @@ public sealed class PatchWriting(SynthesisWriteCache synthesis, ISkyrimMod patch
     public INavmeshWorldView ReadFinalNavmeshes(IWritableRecords records) => new FinalNavmeshWorld(patchMod, HandlesOf(records), synthesis);
 
     /// <remarks>The trial plugin has the patch's name, so the overrides it gets match those the patch would get.</remarks>
-    public NavmeshFault? FindNavmeshFaultIfWritten(IWritableRecords records, IReadOnlyList<WriteOrder> orders)
+    public NavmeshFault? FindNavmeshFaultIfWritten(IWritableRecords records, IReadOnlyList<WriteOrder> orders) =>
+        MutagenCalls.Read(() => FindNavmeshFaultInTrialPlugin(records, orders));
+
+    private NavmeshFault? FindNavmeshFaultInTrialPlugin(IWritableRecords records, IReadOnlyList<WriteOrder> orders)
     {
         var trial = new SkyrimMod(patchMod.ModKey, patchMod.SkyrimRelease);
         new PatchWriting(synthesis, trial).Write(records, orders);

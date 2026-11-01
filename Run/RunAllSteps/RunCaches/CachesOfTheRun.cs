@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
@@ -43,11 +42,9 @@ internal sealed class CachesOfTheRun(ILoadOrderCaches loadOrder, ObjectCaches ob
 
     public IVisibleTargetObjects IndexVisibleTargets(IReadOnlyList<TargetObject> targets) => objects.IndexVisibleTargets(targets);
 
-    public IVisibleTargetObjects IndexVisibleTargetsAsTheRoundsMeasureThem(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions) =>
-        objects.IndexVisibleTargetsAsTheRoundsMeasureThem(targets, decisions);
+    public IVisibleTargetObjects IndexVisibleTargetsAsTheRoundsMeasureThem(IRemovalDecisions decisions) => objects.IndexVisibleTargetsAsTheRoundsMeasureThem(decisions);
 
-    public IVisibleTargetObjects IndexVisibleTargetsAsTheyStand(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions) =>
-        objects.IndexVisibleTargetsAsTheyStand(targets, decisions);
+    public IVisibleTargetObjects IndexVisibleTargetsAsTheyStand(IRemovalDecisions decisions) => objects.IndexVisibleTargetsAsTheyStand(decisions);
 
     public IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPlugin() => objects.VisibleObjectsOfAnyPlugin();
 

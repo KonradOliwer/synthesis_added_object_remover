@@ -21,7 +21,7 @@ internal sealed class SupportLoss(OtherObjectSupport support, DropFinder drops, 
     {
         if (!(weightBefore > 0f)) return null;
         var lost = FindLost(weightBefore, support.FindContacts(standing, after, queries));
-        return SupportContactWeights.ReachesThreshold(lost, threshold) && drops.Rests(standing, before, queries) && !drops.Rests(standing, after, queries) ? lost : null;
+        return support.ReachesThreshold(lost, threshold) && drops.Rests(standing, before, queries) && !drops.Rests(standing, after, queries) ? lost : null;
     }
 
     /// <summary>The target objects in <paramref name="world"/> that the object loses its support without.</summary>
@@ -32,12 +32,12 @@ internal sealed class SupportLoss(OtherObjectSupport support, DropFinder drops, 
     public List<TargetId> FindTargetsHoldingUp(StandingObject standing, SupportWorld world, OtherObjectQueries queries)
     {
         var hits = support.FindHits(standing, world, queries);
-        var contacts = hits.Contacts();
+        var contacts = support.ContactsOf(hits);
         List<TargetId> touched = [.. contacts.Supporters.Where(entry => entry.Supporter.Type == SupporterType.Target).Select(entry => new TargetId(entry.Supporter.Index))];
         if (touched.Count == 0) return [];
 
-        List<TargetId> reachingAlone = [.. touched.Where(target => ReachesThreshold(contacts.TotalWeight, hits.ContactsWithout([target])))];
-        var reachingTogether = ReachesThreshold(contacts.TotalWeight, hits.ContactsWithout(touched));
+        List<TargetId> reachingAlone = [.. touched.Where(target => ReachesThreshold(contacts.TotalWeight, support.ContactsWithout(hits, [target])))];
+        var reachingTogether = ReachesThreshold(contacts.TotalWeight, support.ContactsWithout(hits, touched));
         if ((reachingAlone.Count == 0 && !reachingTogether) || !drops.Rests(standing, world, queries)) return [];
 
         List<TargetId> alone = [.. reachingAlone.Where(target => !drops.Rests(standing, world.Without([target]), queries))];
@@ -45,7 +45,7 @@ internal sealed class SupportLoss(OtherObjectSupport support, DropFinder drops, 
         return reachingTogether && !drops.Rests(standing, world.Without(touched), queries) ? touched : [];
     }
 
-    private bool ReachesThreshold(float weightBefore, CandidateContacts after) => SupportContactWeights.ReachesThreshold(FindLost(weightBefore, after), threshold);
+    private bool ReachesThreshold(float weightBefore, CandidateContacts after) => support.ReachesThreshold(FindLost(weightBefore, after), threshold);
 
     private static float FindLost(float weightBefore, CandidateContacts after) => 1f - after.TotalWeight / weightBefore;
 }

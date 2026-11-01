@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 
 namespace AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
@@ -22,28 +21,11 @@ public enum RoundOutcome
     KeptShrunkOrTurned,
 }
 
+/// <summary>What a round did to one object; each <see cref="Decision"/> gives its own.</summary>
 /// <param name="AsLinked">The round removed or restored the object as a member of a linked group, not for its own reason; false for any other outcome.</param>
 /// <param name="KeepReason">Why a referenced object is kept; null for any other outcome.</param>
-public readonly record struct RoundEffect(RoundOutcome Outcome, bool AsLinked, KeepReason? KeepReason);
-
-/// <summary>The one reader of what a round did to an object.</summary>
-public static class RoundEffects
+public readonly record struct RoundEffect(RoundOutcome Outcome, bool AsLinked, KeepReason? KeepReason)
 {
-    public static RoundEffect Of(Decision? decision) => decision switch
-    {
-        Decision.Removed removed => new RoundEffect(RoundOutcome.Removed, removed.Reason is RemovalReason.LinkedTo, null),
-        Decision.Restored restored => new RoundEffect(RoundOutcome.Restored, restored.Reason is RemovalReason.LinkedTo, null),
-        Decision.Kept kept => new RoundEffect(RoundOutcome.KeptAsReferenced, false, kept.KeepReason),
-        Decision.Fitted => new RoundEffect(RoundOutcome.KeptShrunkOrTurned, false, null),
-        null => new RoundEffect(RoundOutcome.Untouched, false, null),
-        _ => throw new UnreachableException($"Unknown decision {decision}."),
-    };
-
-    /// <summary>Whether the object was taken along as a member of a linked group by a member of its group that the same round restored.</summary>
-    /// <param name="decisionOf">What was decided for a target; null for none.</param>
-    public static bool FollowedARestoredMember(Decision? decision, Func<TargetId, Decision?> decisionOf) =>
-        decision is { Reason: RemovalReason.LinkedTo linked } && decisionOf(linked.To) is Decision.Restored;
-
-    /// <summary>What <paramref name="round"/> did to the object; <see cref="RoundOutcome.Untouched"/> when the decision is another round's.</summary>
-    public static RoundEffect Of(Decision? decision, Round round) => Of(decision?.Round == round ? decision : null);
+    /// <summary>What a round did to an object it decided nothing for.</summary>
+    public static readonly RoundEffect Untouched = new(RoundOutcome.Untouched, AsLinked: false, KeepReason: null);
 }

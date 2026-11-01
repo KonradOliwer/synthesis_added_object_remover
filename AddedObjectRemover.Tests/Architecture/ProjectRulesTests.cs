@@ -41,6 +41,51 @@ public class ProjectRulesTests
     }
 
     [Fact]
+    public void NoStepContractsReferenceTheRunsContracts() =>
+        Assert.Empty(Rules.FindStepContractsReferencingRunContracts());
+
+    [Fact]
+    public void StepContractsReferencingTheRunsContractsAreReported()
+    {
+        var bad = Table(
+            new ProjectRule("Step.Contracts", "C", "Steps/Step.Contracts", ["Run.Contracts", "Other.Step.Contracts"], []),
+            new ProjectRule("Other.Step.Contracts", "C", "Steps/Other.Step.Contracts", [], []),
+            new ProjectRule("Cache.Contracts", "C", "Caches/Cache.Contracts", ["Run.Contracts"], []),
+            new ProjectRule("Run.Contracts", "C", "Run/Run.Contracts", [], []));
+
+        Assert.Equal(["Step.Contracts -> Run.Contracts"], bad.FindStepContractsReferencingRunContracts());
+    }
+
+    [Fact]
+    public void LogicReferencesTheRunsContractsOnlyWhereARealReasonIsListed()
+    {
+        Assert.Empty(Rules.FindLogicReferencingRunContractsWithoutReason());
+        Assert.Empty(Rules.FindListedLogicReferencesToRunContractsThatDoNotExist());
+    }
+
+    [Fact]
+    public void ALogicReferenceToTheRunsContractsWithoutAListedReasonIsReported()
+    {
+        var bad = Table(
+            new ProjectRule("BuildLogAndReports", "L", "Steps/BuildLogAndReports", ["RunSettingsValidation.Contracts", "RunAllSteps.Contracts"], []),
+            new ProjectRule("Cache", "B", "Caches/Cache", ["RunSettingsValidation.Contracts"], []),
+            new ProjectRule("RunSettingsValidation.Contracts", "C", "Run/RunSettingsValidation.Contracts", [], []),
+            new ProjectRule("RunAllSteps.Contracts", "C", "Run/RunAllSteps.Contracts", [], []));
+
+        Assert.Equal(["BuildLogAndReports -> RunAllSteps.Contracts", "Cache -> RunSettingsValidation.Contracts"], bad.FindLogicReferencingRunContractsWithoutReason());
+    }
+
+    [Fact]
+    public void AListedLogicReferenceToTheRunsContractsThatIsGoneIsReported()
+    {
+        var bad = Table(
+            new ProjectRule("BuildLogAndReports", "L", "Steps/BuildLogAndReports", [], []),
+            new ProjectRule("RunSettingsValidation.Contracts", "C", "Run/RunSettingsValidation.Contracts", [], []));
+
+        Assert.Equal(["BuildLogAndReports -> RunSettingsValidation.Contracts"], bad.FindListedLogicReferencesToRunContractsThatDoNotExist());
+    }
+
+    [Fact]
     public void ToolsReferenceOnlyToolsAndIds() =>
         Assert.Empty(Rules.FindToolsReferencingNonTools());
 

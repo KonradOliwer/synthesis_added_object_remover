@@ -92,7 +92,7 @@ internal sealed class SupportRule(
         _ => throw new UnreachableException($"Unknown supporter type {supporter.Type}."),
     };
 
-    private static SupportCategory CategorizeTarget(IRemovalDecisions decisions, TargetId target) => NeighbourFates.Of(decisions, target) switch
+    private static SupportCategory CategorizeTarget(IRemovalDecisions decisions, TargetId target) => decisions.FateOf(target) switch
     {
         BoxFate.Removed => SupportCategory.RemovedTarget,
         BoxFate.Restored => SupportCategory.RestoredTarget,
@@ -101,5 +101,5 @@ internal sealed class SupportRule(
 
     private static ProposedRemoval ToProposal(SupportEvaluation evaluation) => new(
         new TargetId(evaluation.TargetIndex),
-        new RemovalReason.LostSupport(evaluation.LeftItsPlaceShare, evaluation.RestoredShare, new TargetId(evaluation.MainLeftItsPlaceSupporter)));
+        new LostSupport(evaluation.LeftItsPlaceShare, evaluation.RestoredShare, new TargetId(evaluation.MainLeftItsPlaceSupporter)));
 }

@@ -65,7 +65,19 @@ public partial class GenericCodeTests
     {
         var keys = Flagged([typeof(SampleStatics)]).Select(member => member.Key).Order(StringComparer.Ordinal);
 
-        Assert.Equal(["SampleStatics.Add", "SampleStatics.Lambda", "SampleStatics.WithLocal.Twice"], keys);
+        Assert.Equal(["SampleStatics.Add", "SampleStatics.Lambda", "SampleStatics.OfClass", "SampleStatics.WithLocal.Twice"], keys);
+    }
+
+    [Fact]
+    public void OnlyRecordsOfTheMethodsOwnModuleCountAsDomainTypes()
+    {
+        const string module = "AddedObjectRemover.Tests";
+
+        Assert.True(BusinessCode.IsRecordOfModule(typeof(SampleInput), module));
+        Assert.True(BusinessCode.IsRecordOfModule(typeof(SamplePoint), module));
+        Assert.False(BusinessCode.IsRecordOfModule(typeof(SampleClass), module));
+        Assert.False(BusinessCode.IsRecordOfModule(typeof(SampleInput), "Steps/WriteThePatch"));
+        Assert.False(BusinessCode.IsRecordOfModule(typeof(PartFailure), module));
     }
 
     [Fact]
@@ -100,13 +112,18 @@ public partial class GenericCodeTests
 
     private static string Describe((string Module, string Key) member) => $"{member.Module}: {member.Key}";
 
+    /// <summary>A record the method's own module declares (such as a step's input or plans record) counts as a domain type: it carries the module's domain types.</summary>
     private static IEnumerable<(string Module, string Key)> Flagged(IEnumerable<Type> types) =>
-        types.SelectMany(type => CheckedMethods(type)
-            .Where(checkedMethod => !checkedMethod.Method.GetParameters().Select(parameter => parameter.ParameterType)
-                .Append(checkedMethod.Method.ReturnType)
-                .Where(signatureType => !BusinessCode.Mentions(signatureType, BusinessCode.IsCompilerGenerated))
-                .Any(signatureType => BusinessCode.Mentions(signatureType, BusinessCode.IsDomainType)))
-            .Select(checkedMethod => (BusinessCode.ModuleFolder(type), checkedMethod.Key)));
+        types.SelectMany(type =>
+        {
+            var module = BusinessCode.ModuleFolder(type);
+            return CheckedMethods(type)
+                .Where(checkedMethod => !checkedMethod.Method.GetParameters().Select(parameter => parameter.ParameterType)
+                    .Append(checkedMethod.Method.ReturnType)
+                    .Where(signatureType => !BusinessCode.Mentions(signatureType, BusinessCode.IsCompilerGenerated))
+                    .Any(signatureType => BusinessCode.Mentions(signatureType, mentioned => BusinessCode.IsDomainType(mentioned) || BusinessCode.IsRecordOfModule(mentioned, module))))
+                .Select(checkedMethod => (module, checkedMethod.Key));
+        });
 
     /// <summary>
     /// The static methods the author wrote and every local function (even those the compiler moved into closure types).
@@ -168,7 +185,22 @@ internal sealed class SampleStatics
 
     public static Func<int, int> Lambda() => value => value + 1;
 
+    public static int OfRecord(SampleInput input) => input.Value;
+
+    public static int OfRecordStruct(SamplePoint point) => point.X;
+
+    public static int OfClass(SampleClass sample) => sample.Value;
+
     public static int Property { get; } = 1;
 
     public int Instance(int value) => value;
+}
+
+internal sealed record SampleInput(int Value);
+
+internal readonly record struct SamplePoint(int X);
+
+internal sealed class SampleClass(int value)
+{
+    public int Value => value;
 }

@@ -20,7 +20,8 @@ public sealed record PartDifferences(ImmutableArray<VersionDifferences<bool>> Ve
 /// <summary>Compares the versions of a record read from the one just below a named plugin up to the winner.</summary>
 public static class VersionComparison
 {
-    private const int NamedPluginIndex = 1;
+    /// <summary>The index of the named plugin's version: the versions start just below it, so its own is the second.</summary>
+    public const int NamedPluginIndex = 1;
 
     /// <param name="plugins">The plugin of each version, lowest first.</param>
     /// <param name="differing">The parts whose values differ between two versions, given the lower index first.</param>

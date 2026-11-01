@@ -130,7 +130,7 @@ public sealed class ChangedTerrainSectionTests
     private static ImmutableArray<TargetId> AllTargets() => [.. Enumerable.Range(0, TargetCount).Select(index => new TargetId(index))];
 
     private static ChangedTerrainPass Pass(ImmutableArray<TargetId> objects, ImmutableArray<ObjectOnChangedTerrain> hits, int cellsCompared, int objectsWithoutTerrain) =>
-        new(objects, StepOutcome.Performed, hits, [.. hits.Select(hit => new ProposedRemoval(hit.Target, new RemovalReason.TerrainChanged(hit.ChangedBy, hit.Kind)))], [], cellsCompared, objectsWithoutTerrain);
+        new(objects, StepOutcome.Performed, hits, [.. hits.Select(hit => new ProposedRemoval(hit.Target, new TerrainChanged(hit.ChangedBy, hit.Kind)))], [], cellsCompared, objectsWithoutTerrain);
 
     private static ImmutableArray<KeptObject> Kept() => [new KeptObject(4, TestKeepReasons.Quest, null)];
 

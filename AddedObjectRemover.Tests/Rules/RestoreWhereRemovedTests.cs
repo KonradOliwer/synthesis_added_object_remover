@@ -21,7 +21,8 @@ public sealed class RestoreWhereRemovedTests
     private static readonly ModKey ShapeMod = ModKey.FromNameAndExtension("RestoreAreaShapes.esp");
     private static readonly TestStatic Block = new(new FormKey(ShapeMod, 0x801), @"test\restorearea\block.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20), new Vector3(20))));
     private static readonly TestStatic BigBlock = new(new FormKey(ShapeMod, 0x802), @"test\restorearea\bigblock.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-100), new Vector3(100))));
-    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(ShapeMod, "RestoreWhereRemovedData", Block, BigBlock));
+    private static readonly TestStatic Flat = new(new FormKey(ShapeMod, 0x803), @"test\restorearea\flat.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20, -20, 0), new Vector3(20, 20, 0))));
+    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(ShapeMod, "RestoreWhereRemovedData", Block, BigBlock, Flat));
 
     private static readonly ModKey BaseGameMod = ModKey.FromNameAndExtension("Base.esm");
     private static readonly PluginName BaseGame = BaseGameMod.ToPluginName();
@@ -134,6 +135,17 @@ public sealed class RestoreWhereRemovedTests
 
         Assert.Equal(expected, judged.OldPlace!.Verdict);
         Assert.Equal((BigBlockVolume, BigBlockVolume + 3 * BlockVolume), (judged.OldPlace.StandingSize, judged.OldPlace.Size));
+    }
+
+    /// <summary>Weighed by size, objects without a volume leave nothing to weigh, so the share is taken by count and says so.</summary>
+    [Fact]
+    public void AnAreaWhoseObjectsHaveNoVolumeIsWeighedByCount()
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(0, 100, 0), Flat), Own(1, new Vector3(0, -100, 0), Flat)];
+
+        var judged = Assert.Single(Plan(targets, removed: [1], [ChangedRock(0x900, Vector3.Zero)]).Objects);
+
+        Assert.Equal((2, 0d, ClearedAreaMeasure.ObjectCount, 50d), (judged.OldPlace!.Objects, judged.OldPlace.Size, judged.OldPlace.Measure, judged.OldPlace.StandingPercent));
     }
 
     [Fact]
@@ -273,7 +285,7 @@ public sealed class RestoreWhereRemovedTests
     {
         ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0), BigBlock), Own(1, new Vector3(-100, 0, 0))];
         var shrunk = DecisionsRemoving(targets, 1).ApplyFits([new ProposedFit(targets[0].Id, TooClose(0).Reason, targets[0].Placement with { Scale = 0.5f })]);
-        var asTheRoundsMeasureThem = TestScenes.Create(targets, [], Shapes).IndexVisibleTargetsAsTheRoundsMeasureThem(targets, shrunk);
+        var asTheRoundsMeasureThem = TestScenes.Create(targets, [], Shapes).IndexVisibleTargetsAsTheRoundsMeasureThem(shrunk);
 
         var judged = Assert.Single(Plan(targets, shrunk, [ChangedRock(0x900, Vector3.Zero)], visibleTargets: asTheRoundsMeasureThem).Objects);
 
@@ -493,7 +505,7 @@ public sealed class RestoreWhereRemovedTests
         TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved), targets.Length)
             .Apply(RoundKind.TooClose, [.. removed.Select(TooClose)]);
 
-    private static ProposedRemoval TooClose(int index) => new(new TargetId(index), new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()));
+    private static ProposedRemoval TooClose(int index) => new(new TargetId(index), new TooClose(new OtherId(0), new TooCloseCause.ObjectSize()));
 
     private static RestoreWhereRemovedResult Plan(
         ImmutableArray<TargetObject> targets,

@@ -48,15 +48,15 @@ internal static class TestLeftBehind
     {
         var scene = TestScenes.Create(targets, others, shapes);
         return LeftBehindObjects.Find(
-            [.. targets],
-            scene.ObjectsThatCanCauseRemovals(Replacements.None(others.Count), NpcHandling.OnlyWhenStuckInsideTheObject),
-            new HashSet<OtherId>(),
-            TestSeededDecisions.StartDisablingAll(protection, targets.Count),
-            scene.VisibleTargets,
-            TestBaseFacts.Reader(new SkyrimMod(ReachRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
-            shapes,
-            TargetWorkOrder.Of(targets),
-            new Execution(Environment.ProcessorCount),
-            config);
+            new(
+                [.. targets],
+                scene.ObjectsThatCanCauseRemovals(Replacements.None(others.Count), NpcHandling.OnlyWhenStuckInsideTheObject),
+                new Dictionary<OtherId, OtherObject?>(),
+                TestSeededDecisions.StartDisablingAll(protection, targets.Count),
+                scene.VisibleTargets,
+                new TestRunCaches(shapes, bases: TestBaseFacts.Reader(new SkyrimMod(ReachRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache())),
+                TargetWorkOrder.Of(targets),
+                new Execution(Environment.ProcessorCount),
+                config)).Result;
     }
 }

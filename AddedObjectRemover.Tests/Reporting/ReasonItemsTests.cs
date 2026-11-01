@@ -22,7 +22,7 @@ public sealed class ReasonItemsTests
             new ObjectWithReason.LostSupport(4, 0.5f, 0f, 0),
             new ObjectWithReason.TouchingAnotherModsObject(5, default),
             new ObjectWithReason.LostSupportWithAnotherModsObject(6, 0.5f, 0f, default),
-            new ObjectWithReason.VisibleLeftBehind(7, new VisibleLeftBehindCheck(7, null, surroundings, VisibleLeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null)),
+            new ObjectWithReason.VisibleLeftBehind(7, new VisibleLeftBehindCheck(7, null, surroundings, LeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null)),
             new ObjectWithReason.LeftBehind(8, new LeftBehindCheck(8, InvisibleObjectKind.XMarkers, 100f, null, surroundings, LeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null)),
             new ObjectWithReason.LinkedTo(9, 0),
             new ObjectWithReason.LinkedTo(10, 0),
@@ -51,7 +51,7 @@ public sealed class ReasonItemsTests
         var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(TargetCount), TestBaseFacts.Unresolved);
         var restore = new WhenRemoved.Restore(TestTargets.EarlierVersionAt(new PluginName("Earlier.esp"), targets[0].Placement));
         var decisions = RemovalDecisions.Start(protection, [restore, new WhenRemoved.Disable(), new WhenRemoved.Disable(), new WhenRemoved.Disable()])
-            .Apply(RoundKind.TooClose, [Propose(0, new RemovalReason.TooClose(new OtherId(0), BySize)), Propose(3, new RemovalReason.TooClose(new OtherId(0), BySize))]);
+            .Apply(RoundKind.TooClose, [Propose(0, new TooClose(new OtherId(0), BySize)), Propose(3, new TooClose(new OtherId(0), BySize))]);
         ObjectWithReason[] objects = [new ObjectWithReason.LinkedTo(1, 0), new ObjectWithReason.LinkedTo(2, 3)];
 
         Assert.Equal(
@@ -68,7 +68,7 @@ public sealed class ReasonItemsTests
         ObjectWithReason[] objects =
         [
             new ObjectWithReason.TerrainChanged(0, new PluginName("Other.esp"), TerrainChangeKind.Height),
-            new ObjectWithReason.VisibleLeftBehind(1, new VisibleLeftBehindCheck(1, null, surroundings, VisibleLeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null)),
+            new ObjectWithReason.VisibleLeftBehind(1, new VisibleLeftBehindCheck(1, null, surroundings, LeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null)),
         ];
 
         Assert.Equal(
@@ -88,9 +88,9 @@ public sealed class ReasonItemsTests
     public void AFollowUpFirstShrunkOrTurnedIsCountedAmongTheFollowUps()
     {
         var decisions = StartDecisions()
-            .ApplyFits([new ProposedFit(new TargetId(1), new RemovalReason.TooClose(new OtherId(0), BySize), new EulerPlacement(Vector3.Zero, Vector3.Zero, 0.8f))])
-            .Apply(RoundKind.TooClose, [Propose(0, new RemovalReason.TooClose(new OtherId(0), BySize))])
-            .Apply(RoundKind.AlsoRemove, [Propose(1, new RemovalReason.Touching(new TargetId(0)))]);
+            .ApplyFits([new ProposedFit(new TargetId(1), new TooClose(new OtherId(0), BySize), new EulerPlacement(Vector3.Zero, Vector3.Zero, 0.8f))])
+            .Apply(RoundKind.TooClose, [Propose(0, new TooClose(new OtherId(0), BySize))])
+            .Apply(RoundKind.AlsoRemove, [Propose(1, new TouchingTargetThatLeft(new TargetId(0)))]);
         ObjectWithReason[] objects = [new ObjectWithReason.Touching(1, 0), new ObjectWithReason.LostSupport(2, 0.5f, 0f, 0)];
 
         Assert.Equal(

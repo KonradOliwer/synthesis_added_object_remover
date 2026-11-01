@@ -45,7 +45,7 @@ internal sealed class NpcBodyResolver(IMeshFiles meshFiles, IBodyMeshBounds body
         {
             return NpcBody.FromBox(NpcSizeSource.BodyMesh, race.Playable ? WithHumanoidHeight(measured) : measured, heightScale);
         }
-        if (HasVolume(npc.ObjectBounds)) return NpcBody.FromBox(NpcSizeSource.ObjectBounds, npc.ObjectBounds, heightScale);
+        if (npc.ObjectBounds.HasVolume) return NpcBody.FromBox(NpcSizeSource.ObjectBounds, npc.ObjectBounds, heightScale);
         if (race.Playable) return NpcBody.FromBox(NpcSizeSource.HumanoidApproximation, HumanoidBox, heightScale);
         return NpcBody.Point(new PointReason(PointReasonKind.NoBodyMeshNoBoundsNotPlayable, npc.RaceKey, race.EditorId));
     }
@@ -91,6 +91,4 @@ internal sealed class NpcBodyResolver(IMeshFiles meshFiles, IBodyMeshBounds body
 
     private static Box WithHumanoidHeight(Box body) =>
         body with { Max = body.Max with { Z = MathF.Max(body.Max.Z, body.Min.Z + HumanoidHeight) } };
-
-    private static bool HasVolume(Box box) => box.Size is { X: > 0, Y: > 0, Z: > 0 };
 }

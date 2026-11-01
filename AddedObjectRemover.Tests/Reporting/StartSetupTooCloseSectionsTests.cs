@@ -166,7 +166,7 @@ public sealed class StartSetupTooCloseSectionsTests
         };
         var mods = Facts();
         var runSettings = Assert.IsType<RunRequest.Ready>(Build(settings, mods, detailedLogAndReports: everythingOn)).Settings;
-        var trust = ModTrustClassifier.Classify(mods, runSettings.ModTrust);
+        var trust = ModTrustClassifier.Classify(new(mods, runSettings.ModTrust));
 
         var lines = LogSections.BuildConfigSection(runSettings, trust, mods).Lines.Select(line => line.Replace('\\', '/')).ToArray();
 
@@ -182,7 +182,7 @@ public sealed class StartSetupTooCloseSectionsTests
         string VisibleLine()
         {
             var runSettings = Assert.IsType<RunRequest.Ready>(Build(settings, mods)).Settings;
-            return LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(mods, runSettings.ModTrust), mods).Lines
+            return LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(new(mods, runSettings.ModTrust)), mods).Lines
                 .Single(line => line.StartsWith("Visible objects left behind: ", StringComparison.Ordinal));
         }
 
@@ -208,7 +208,7 @@ public sealed class StartSetupTooCloseSectionsTests
         string RestoreLine()
         {
             var runSettings = Assert.IsType<RunRequest.Ready>(Build(settings, mods)).Settings;
-            return LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(mods, runSettings.ModTrust), mods).Lines
+            return LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(new(mods, runSettings.ModTrust)), mods).Lines
                 .Single(line => line.StartsWith("Restore where the cleaned mod was removed: ", StringComparison.Ordinal));
         }
 
@@ -250,7 +250,7 @@ public sealed class StartSetupTooCloseSectionsTests
         var mods = Facts();
         var runSettings = Assert.IsType<RunRequest.Ready>(Build(settings, mods)).Settings;
 
-        var line = LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(mods, runSettings.ModTrust), mods).Lines
+        var line = LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(new(mods, runSettings.ModTrust)), mods).Lines
             .Single(line => line.StartsWith("Shrink or turn objects to make them fit", StringComparison.Ordinal));
 
         Assert.Equal(expected, line);
@@ -264,7 +264,7 @@ public sealed class StartSetupTooCloseSectionsTests
         var mods = TrustFacts();
         var runSettings = Assert.IsType<RunRequest.Ready>(Build(settings, mods)).Settings;
 
-        var lines = LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(mods, runSettings.ModTrust), mods).Lines;
+        var lines = LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(new(mods, runSettings.ModTrust)), mods).Lines;
 
         Assert.Equal(
             [
@@ -306,7 +306,7 @@ public sealed class StartSetupTooCloseSectionsTests
             new KnownPluginNames(listed.SelectMany(listing => listing.Masters.Prepend(listing.Mod))), Patch.ToPluginName(), [.. listed]);
         var runSettings = Assert.IsType<RunRequest.Ready>(Build(SettingsFor(), mods)).Settings;
 
-        var lines = LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(mods, runSettings.ModTrust), mods).Lines;
+        var lines = LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(new(mods, runSettings.ModTrust)), mods).Lines;
 
         Assert.Equal(
             [
@@ -337,7 +337,7 @@ public sealed class StartSetupTooCloseSectionsTests
             new KnownPluginNames(listed.SelectMany(listing => listing.Masters.Prepend(listing.Mod))), Patch.ToPluginName(), [.. listed]);
         var runSettings = Assert.IsType<RunRequest.Ready>(Build(SettingsFor(), mods)).Settings;
 
-        var lines = LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(mods, runSettings.ModTrust), mods).Lines;
+        var lines = LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(new(mods, runSettings.ModTrust)), mods).Lines;
 
         Assert.Contains("Requires Target.esp but not trusted, Added Object Remover patch of another group: Other Group Patch.esp", lines);
         Assert.DoesNotContain(lines, line => line.Contains("other masters (limit", StringComparison.Ordinal));
@@ -363,7 +363,7 @@ public sealed class StartSetupTooCloseSectionsTests
             new KnownPluginNames(listed.SelectMany(listing => listing.Masters.Prepend(listing.Mod))), Patch.ToPluginName(), [.. listed]);
         var runSettings = Assert.IsType<RunRequest.Ready>(Build(SettingsFor(), mods)).Settings;
 
-        var lines = LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(mods, runSettings.ModTrust), mods).Lines;
+        var lines = LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(new(mods, runSettings.ModTrust)), mods).Lines;
 
         Assert.Equal(
             [
@@ -380,7 +380,7 @@ public sealed class StartSetupTooCloseSectionsTests
         var mods = TrustFacts();
         var runSettings = Assert.IsType<RunRequest.Ready>(Build(SettingsFor(), mods)).Settings;
 
-        var lines = LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(mods, runSettings.ModTrust), mods).Lines;
+        var lines = LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(new(mods, runSettings.ModTrust)), mods).Lines;
 
         Assert.DoesNotContain(lines, line => line.Contains("another group", StringComparison.Ordinal));
     }
@@ -898,7 +898,7 @@ public sealed class StartSetupTooCloseSectionsTests
         change(settings);
         var mods = Facts();
         var runSettings = Assert.IsType<RunRequest.Ready>(Build(settings, mods)).Settings;
-        return LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(mods, runSettings.ModTrust), mods).Lines;
+        return LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(new(mods, runSettings.ModTrust)), mods).Lines;
     }
 
     private static RunRequest Build(StandardSettings settings, LoadOrderPlugins mods, bool detailedLogAndReports = false) =>
@@ -928,7 +928,7 @@ public sealed class StartSetupTooCloseSectionsTests
         var world = CreateWorld();
         var zoneWork = zone == ZoneShape.ObjectShape ? new ShapeZoneWork(10, 8, 6, 3, 2, 1, 40) : default;
         var stuck = npcs is NpcHandling.OnlyWhenStuckInsideTheObject or NpcHandling.OnlyWhenStuckInsideTheObjectWithCollision
-            ? new NpcStuckSummary(new NpcSizeCounts(5, 2, 1, 1, 1, 3), 12, 30, 4, 1, [new PointNpc(world.OtherModObjects[1], new PointReason(PointReasonKind.NoBodyMeshNoBoundsNotPlayable, TestTargets.SpaceKey(0x7000), "TestRace"))])
+            ? new NpcStuckSummary(new NpcSizeCounts(5, 2, 1, 1, 1, 3), 12, 30, 4, 1, [new PointNpc(world.OtherModObjects[1].Id, new PointReason(PointReasonKind.NoBodyMeshNoBoundsNotPlayable, TestTargets.SpaceKey(0x7000), "TestRace"))])
             : null;
         var pass = new TooClosePass(
             [.. world.Targets.Select(target => target.Id)],

@@ -559,5 +559,5 @@ public sealed class RestoreWhereRemovedGuardTests
 
     private static RemovalDecisions DecisionsRemoving(ImmutableArray<TargetObject> targets, int[] removed) =>
         TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved), targets.Length)
-            .Apply(RoundKind.TooClose, [.. removed.Select(index => new ProposedRemoval(new TargetId(index), new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);
+            .Apply(RoundKind.TooClose, [.. removed.Select(index => new ProposedRemoval(new TargetId(index), new TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);
 }

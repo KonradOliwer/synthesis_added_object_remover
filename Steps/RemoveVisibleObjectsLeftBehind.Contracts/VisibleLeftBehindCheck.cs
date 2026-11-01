@@ -1,5 +1,5 @@
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
-using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
+using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 
@@ -10,10 +10,5 @@ public sealed record VisibleLeftBehindCheck(
     int TargetIndex,
     VisibleObjectKind? Kind,
     SectorAreas Surroundings,
-    VisibleLeftBehindOutcome Decision,
-    KeepReason? KeepReason)
-{
-    public bool IsRemoved => VisibleLeftBehindOutcomes.IsRemoval(Decision);
-
-    public bool IsRestored => VisibleLeftBehindOutcomes.IsRestoration(Decision);
-}
+    LeftBehindOutcome Decision,
+    KeepReason? KeepReason) : LeftBehindVerdict(TargetIndex, Surroundings, Decision, KeepReason);

@@ -81,21 +81,14 @@ internal sealed class NifGeometryReader
     {
         lock (LoadLock)
         {
-            try
-            {
-                var template = new NifFile(NiVersion.GetSSE(), withRootNode: true);
-                using var stream = new MemoryStream();
-                var saved = template.Save(stream) == 0;
-                stream.Position = 0;
-                var nif = new NifFile();
-                return saved && nif.Load(stream) == 0 && nif.Valid && nif.Blocks.Count > 0
-                    ? LoaderStartUp.Success()
-                    : LoaderStartUp.HeldNoBlocks();
-            }
-            catch (Exception ex) when (Failures.IsRecoverable(ex))
-            {
-                return LoaderStartUp.Threw(Failures.DescribeFailure(ex));
-            }
+            var template = new NifFile(NiVersion.GetSSE(), withRootNode: true);
+            using var stream = new MemoryStream();
+            var saved = template.Save(stream) == 0;
+            stream.Position = 0;
+            var nif = new NifFile();
+            return saved && nif.Load(stream) == 0 && nif.Valid && nif.Blocks.Count > 0
+                ? LoaderStartUp.Success()
+                : LoaderStartUp.HeldNoBlocks();
         }
     }
 

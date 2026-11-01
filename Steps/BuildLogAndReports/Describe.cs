@@ -4,9 +4,9 @@ using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
-using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
@@ -125,7 +125,7 @@ internal static class Describe
         ObjectWithReason.LostSupportWithAnotherModsObject support =>
             $"{TextFormat.Percent(support.LeftItsPlaceShare)} of its support {(support.RestoredShare > 0 ? "left its place or was pulled down" : "was removed or pulled down")} "
             + $"(mostly {OtherObject(support.MainSupporter)}, another mod's object left without support)",
-        ObjectWithReason.VisibleLeftBehind { Evaluation: var evaluation } => $"visible, {VisibleLeftBehindOutcomeText.DescribeReason(evaluation)}",
+        ObjectWithReason.VisibleLeftBehind { Evaluation: var evaluation } => $"visible, {LeftBehindOutcomeText.DescribeReason(evaluation)}",
         ObjectWithReason.LeftBehind { Evaluation: var evaluation } => $"invisible, {LeftBehindReason(evaluation)}",
         ObjectWithReason.LinkedTo linked => $"linked to {FateOf(final, linked.LinkedToTargetIndex)} {RecordNames.Describe(world.Targets[linked.LinkedToTargetIndex])}",
         _ => throw new UnreachableException($"Unknown removal type {removal.GetType().Name}."),

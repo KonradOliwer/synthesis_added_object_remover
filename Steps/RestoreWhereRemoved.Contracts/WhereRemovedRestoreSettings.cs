@@ -1,3 +1,4 @@
+using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 
@@ -27,4 +28,26 @@ public sealed record WhereRemovedRestoreSettings(
     float HeightChangeTolerance,
     float WaterHeightChangeTolerance,
     TooCloseSettings TooClose,
-    ChangedTerrainSettings ChangedTerrain);
+    ChangedTerrainSettings ChangedTerrain)
+{
+    /// <summary>
+    /// The navmeshes are always read. Other mods' objects that go back are judged at their old places and against every object that
+    /// exists because of the cleaned mod, which is told from the world without the cleaned mod.
+    /// </summary>
+    public ScanNeeds Needs => new(
+        Navmesh: true,
+        JudgeOldPlaces: OtherModsObjects,
+        DecideEveryObjectWithoutCleanedMod: OtherModsObjects,
+        AreaRecordVersions: ReadAreaRecords());
+
+    /// <summary>
+    /// A kind whose switch is off stays as the cleaned mod made it, so it is still read when the guards of a kind that is on look at
+    /// it: restored objects and navmeshes are kept off ground and out of water lines that stay changed, while the terrain guards look
+    /// at no cell and the cell guards at no ground. Every kind's guards look at the navmeshes that stay changed, so those are always
+    /// read.
+    /// </summary>
+    private AreaRecordReads ReadAreaRecords() => new(
+        new AreaPartTolerances(HeightChangeTolerance, WaterHeightChangeTolerance),
+        Cells: Cells || OtherModsObjects || Navmeshes,
+        Lands: Terrain || OtherModsObjects || Navmeshes);
+}

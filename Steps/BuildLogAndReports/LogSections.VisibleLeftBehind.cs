@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 
@@ -29,7 +30,10 @@ internal static partial class LogSections
         return new LogSection(
             "visible-leftovers",
             [
-                BuildPerformedOrNotPerformedLine(visibleLeftBehind.Outcome, VisibleLeftBehindStepName, () => VisibleLeftBehindSummaryLine(visibleLeftBehind, elapsed, context)),
+                BuildPerformedOrNotPerformedLine(
+                    visibleLeftBehind.Outcome,
+                    VisibleLeftBehindStepName,
+                    () => LeftBehindSummaryLine(VisibleLeftBehindStepName, visibleLeftBehind.Evaluations, judgesInsideOtherObjects: false, elapsed, context)),
                 .. VisibleRoundsLines(visibleLeftBehind, context),
                 .. evaluationLines,
                 .. BuildKeptLines(world, kept),
@@ -48,28 +52,16 @@ internal static partial class LogSections
     /// </summary>
     private static bool HasDetailedLine(VisibleLeftBehindCheck evaluation) => evaluation.Decision switch
     {
-        VisibleLeftBehindOutcome.KeptSurroundingsMostlyKept => evaluation.Surroundings.ClearedCount > 0,
-        VisibleLeftBehindOutcome.KeptTooFewSurroundingObjects => false,
+        LeftBehindOutcome.KeptSurroundingsMostlyKept => evaluation.Surroundings.ClearedCount > 0,
+        LeftBehindOutcome.KeptTooFewSurroundingObjects => false,
         _ => true,
     };
 
     private static string VisibleLeftBehindOutcomeLine(CollectedObjects world, VisibleLeftBehindCheck evaluation)
     {
         var target = world.Targets[evaluation.TargetIndex];
-        return $"  Visible left behind: {RecordNames.Describe(target)}{(evaluation.Kind is { } kind ? $" ({VisibleLeftBehindOutcomeText.KindName(kind)})" : string.Empty)} in {Describe.Space(world, target.SpaceKey)}: "
-            + $"{VisibleLeftBehindOutcomeText.Verdict(evaluation)}, {VisibleLeftBehindOutcomeText.DescribeReason(evaluation)}; "
+        return $"  Visible left behind: {RecordNames.Describe(target)}{(evaluation.Kind is { } kind ? $" ({VisibleObjectKindText.KindName(kind)})" : string.Empty)} in {Describe.Space(world, target.SpaceKey)}: "
+            + $"{LeftBehindOutcomeText.Verdict(evaluation)}, {LeftBehindOutcomeText.DescribeReason(evaluation)}; "
             + $"removed/total ground area {SectorAreasText.Describe(evaluation.Surroundings)}.";
     }
-
-    private static string VisibleLeftBehindSummaryLine(VisibleLeftBehindResult visibleLeftBehind, TimeSpan elapsed, ReportContext context) =>
-        BuildOutcomeSummaryLine(
-            VisibleLeftBehindStepName,
-            [.. visibleLeftBehind.Evaluations.Select(evaluation => evaluation.Decision)],
-            VisibleLeftBehindOutcomes.IsRemoval,
-            VisibleLeftBehindOutcomes.IsRestoration,
-            outcome => VisibleLeftBehindOutcomes.IsRemovedAsLinked(outcome) || VisibleLeftBehindOutcomes.IsRestoration(outcome)
-                || outcome is VisibleLeftBehindOutcome.RemovedSurroundingsRemovedAndRestored or VisibleLeftBehindOutcome.KeptInDeletedCell,
-            VisibleLeftBehindOutcomeText.Describe,
-            elapsed,
-            context);
 }

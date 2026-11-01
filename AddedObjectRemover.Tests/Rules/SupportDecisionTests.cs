@@ -69,10 +69,10 @@ public class SupportDecisionTests
     {
         var tree = MeshTriangleTree.Build(BoxMesh.CreateTriangles(TestMeshes.UnitCube), MeshLimits.Tree)!;
 
-        var samples = WeightedSurfaceSamples.Create(new SampledSurface([.. SurfaceSampler.Sample(tree, WeightedSurfaceSamples.SamplesPerMesh)], tree.Bounds));
+        var samples = SurfaceContacts.Weigh(new SampledSurface([.. SurfaceSampler.Sample(tree, RestingObjects.SurfaceSamplesPerMesh)], tree.Bounds));
 
         Assert.True(samples.Falloff > 0);
-        Assert.Equal(samples.MeshSize, samples.Falloff);
+        Assert.Equal(SampleWeights.FalloffOf(samples.Bounds, SurfaceContacts.OriginFalloffFraction), samples.Falloff);
         Assert.All(
             samples.Points.Zip(samples.Weights),
             sample => Assert.Equal(1f / (1f + MathF.Pow(sample.First.Length() / samples.Falloff, 2)), sample.Second, 1e-6f));

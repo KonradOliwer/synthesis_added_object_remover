@@ -72,7 +72,7 @@ public class MovedReplacementRunTests
     {
         var outcome = FixtureRun.Execute(CrateSettings(), Workers, CreateCrateWorldWithAnOwnCrateAtTheOldPlace);
 
-        Assert.IsType<RemovalReason.TooClose>(Assert.IsType<Decision.Removed>(outcome.Final.Of(ReplacementOf(outcome).Id)).Reason);
+        Assert.IsType<TooClose>(Assert.IsType<Decision.Removed>(outcome.Final.Of(ReplacementOf(outcome).Id)).Reason);
         Assert.Empty(outcome.Restorations);
     }
 
@@ -460,7 +460,7 @@ public class MovedReplacementRunTests
         var outcome = RunStackWorld(SupportSettings(), [BesideTheTop, Original], patch => writtenTop = FindTarget(patch, "T_Top"));
 
         var (top, bottom) = StackOf(outcome);
-        Assert.Equal(bottom.Id, Assert.IsType<RemovalReason.LostSupport>(Assert.IsType<Decision.Removed>(outcome.Final.Of(top.Id)).Reason).MainSupporter);
+        Assert.Equal(bottom.Id, Assert.IsType<LostSupport>(Assert.IsType<Decision.Removed>(outcome.Final.Of(top.Id)).Reason).MainSupporter);
         Assert.True(IsInitiallyDisabled(writtenTop!));
         Assert.Equal(1f, writtenTop!.Scale ?? 1f);
     }
@@ -483,8 +483,8 @@ public class MovedReplacementRunTests
         var outcome = RunStackWorld(SupportSettings(), [BesideTheBottom]);
 
         var (top, bottom) = StackOf(outcome);
-        Assert.IsType<RemovalReason.TooClose>(Assert.IsType<Decision.Removed>(outcome.Final.Of(bottom.Id)).Reason);
-        Assert.Equal(bottom.Id, Assert.IsType<RemovalReason.LostSupport>(Assert.IsType<Decision.Removed>(outcome.Final.Of(top.Id)).Reason).MainSupporter);
+        Assert.IsType<TooClose>(Assert.IsType<Decision.Removed>(outcome.Final.Of(bottom.Id)).Reason);
+        Assert.Equal(bottom.Id, Assert.IsType<LostSupport>(Assert.IsType<Decision.Removed>(outcome.Final.Of(top.Id)).Reason).MainSupporter);
     }
 
     /// <summary>
@@ -508,8 +508,8 @@ public class MovedReplacementRunTests
         var outcome = RunStackWorld(ShrinkSettings(), [BesideTheBottom]);
 
         var (top, bottom) = StackOf(outcome);
-        Assert.IsType<RemovalReason.TooClose>(Assert.IsType<Decision.Removed>(outcome.Final.Of(bottom.Id)).Reason);
-        Assert.Equal(new RemovalReason.Touching(bottom.Id), Assert.IsType<Decision.Removed>(outcome.Final.Of(top.Id)).Reason);
+        Assert.IsType<TooClose>(Assert.IsType<Decision.Removed>(outcome.Final.Of(bottom.Id)).Reason);
+        Assert.Equal(new TouchingTargetThatLeft(bottom.Id), Assert.IsType<Decision.Removed>(outcome.Final.Of(top.Id)).Reason);
     }
 
     [Fact]
@@ -552,7 +552,7 @@ public class MovedReplacementRunTests
         var outcome = FixtureRun.Execute(CrateSettings().WithMovedObjects(RestoreMode.Remove), Workers, CreateSoundWorld);
 
         var removal = Assert.IsType<Decision.Removed>(outcome.Final.Of(ReplacementOf(outcome).Id));
-        Assert.IsType<RemovalReason.InsideAnotherModsObject>(removal.Reason);
+        Assert.IsType<InsideAnotherModsObject>(removal.Reason);
     }
 
     [Fact]
@@ -604,7 +604,7 @@ public class MovedReplacementRunTests
         var (outcome, run) = RunRestoring(RestoreMode.Restore, CreateCrateWorldWithAnOwnCrateOnTheMovedOne);
 
         var top = Assert.Single(outcome.Collected.Targets, target => target.EditorId == "T_OnTheMovedCrate");
-        Assert.IsType<RemovalReason.LostSupport>(Assert.IsType<Decision.Removed>(outcome.Final.Of(top.Id)).Reason);
+        Assert.IsType<LostSupport>(Assert.IsType<Decision.Removed>(outcome.Final.Of(top.Id)).Reason);
         Assert.Contains(run.Log, line => line.Contains("of its support left its place (mostly B_Crate [000805:Skyrim.esm], restored)", StringComparison.Ordinal));
         Assert.DoesNotContain(run.Log, line => line.Contains("support was removed (mostly B_Crate", StringComparison.Ordinal));
         ExpectedOutputFiles.AssertMatches("restored-objects/RestoredSupportLost", run.ToExpectedOutputLines());

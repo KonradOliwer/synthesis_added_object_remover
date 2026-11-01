@@ -85,8 +85,8 @@ internal sealed class TouchChains
     {
         var parent = _decisions.Of(node)!.Reason switch
         {
-            RemovalReason.Touching touching => touching.Touched.Index,
-            RemovalReason.LinkedTo linked => linked.To.Index,
+            TouchingTargetThatLeft touching => touching.Touched.Index,
+            LinkedTo linked => linked.To.Index,
             var reason => throw new InvalidOperationException($"A touch round has no cause {reason}."),
         };
         _parentOf[node.Index] = parent;
@@ -150,7 +150,7 @@ internal sealed class TouchChains
     private bool IsRemovedForTouching(int node)
     {
         var id = new TargetId(node);
-        return _decisions.IsRemoved(id) && _decisions.Of(id)!.Reason is RemovalReason.Touching;
+        return _decisions.IsRemoved(id) && _decisions.Of(id)!.Reason is TouchingTargetThatLeft;
     }
 }
 

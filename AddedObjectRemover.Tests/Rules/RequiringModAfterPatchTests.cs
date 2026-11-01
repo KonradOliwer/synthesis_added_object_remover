@@ -111,7 +111,7 @@ public class RequiringModAfterPatchTests
         var facts = Facts(PluginList, Early);
         var settings = Assert.IsType<RunRequest.Ready>(Build(facts, onlyWarn)).Settings;
 
-        var lines = LogSections.BuildConfigSection(settings, ModTrustClassifier.Classify(facts, settings.ModTrust), facts).Lines;
+        var lines = LogSections.BuildConfigSection(settings, ModTrustClassifier.Classify(new(facts, settings.ModTrust)), facts).Lines;
 
         Assert.Contains($"{SwitchName}: {shown}.", lines);
     }

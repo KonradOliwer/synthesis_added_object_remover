@@ -1,7 +1,9 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using Mutagen.Bethesda.Plugins;
+using AddedObjectRemover.Tests.Architecture;
 using AddedObjectRemover.Tests.Fixtures;
 
 namespace AddedObjectRemover.Tests.Reporting;
@@ -53,8 +55,8 @@ public sealed class SharedReportingTests
         var world = CreateWorld();
         var changedBy = new PluginName("Other.esp");
         var decisions = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(world.Targets, [], TestTargets.References(TargetCount), TestBaseFacts.Unresolved), TargetCount)
-            .Apply(RoundKind.ChangedTerrain, [Propose(0, new RemovalReason.TerrainChanged(changedBy, TerrainChangeKind.Height | TerrainChangeKind.TerrainType))])
-            .Apply(RoundKind.TooClose, [Propose(1, new RemovalReason.TooClose(new OtherId(0), BySize)), Propose(2, new RemovalReason.TooClose(new OtherId(0), WithinDistance))]);
+            .Apply(RoundKind.ChangedTerrain, [Propose(0, new TerrainChanged(changedBy, TerrainChangeKind.Height | TerrainChangeKind.TerrainType))])
+            .Apply(RoundKind.TooClose, [Propose(1, new TooClose(new OtherId(0), BySize)), Propose(2, new TooClose(new OtherId(0), WithinDistance))]);
 
         var removals = RemovalList.WithReasons(PatchWriter.ListRemovalsInWriteOrder(decisions), decisions, world, TestVisibleLeftBehind.SwitchedOff, TestLeftBehind.PerformedWithoutFindings);
 
@@ -82,9 +84,9 @@ public sealed class SharedReportingTests
     {
         var world = CreateWorld();
         var decisions = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(world.Targets, [], TestTargets.References(TargetCount), TestBaseFacts.Unresolved), TargetCount)
-            .ApplyFits([new ProposedFit(new TargetId(1), new RemovalReason.TooClose(new OtherId(0), BySize), new EulerPlacement(Vector3.Zero, Vector3.Zero, 0.8f))])
-            .Apply(RoundKind.TooClose, [Propose(0, new RemovalReason.TooClose(new OtherId(0), BySize))])
-            .Apply(RoundKind.AlsoRemove, [Propose(1, new RemovalReason.Touching(new TargetId(0)))]);
+            .ApplyFits([new ProposedFit(new TargetId(1), new TooClose(new OtherId(0), BySize), new EulerPlacement(Vector3.Zero, Vector3.Zero, 0.8f))])
+            .Apply(RoundKind.TooClose, [Propose(0, new TooClose(new OtherId(0), BySize))])
+            .Apply(RoundKind.AlsoRemove, [Propose(1, new TouchingTargetThatLeft(new TargetId(0)))]);
         var removals = RemovalList.WithReasons(PatchWriter.ListRemovalsInWriteOrder(decisions), decisions, world, TestVisibleLeftBehind.SwitchedOff, TestLeftBehind.PerformedWithoutFindings);
 
         var summary = LogSections.BuildRemovalSummarySection(world, removals, decisions, TestTargets.TargetName, StepOutcome.SwitchedOff, StepOutcome.SwitchedOff);
@@ -149,7 +151,7 @@ public sealed class SharedReportingTests
         ];
         if (visibleLeftBehind == StepOutcome.Performed)
         {
-            removals.Add(new ObjectWithReason.VisibleLeftBehind(1, new VisibleLeftBehindCheck(1, null, surroundings, VisibleLeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null)));
+            removals.Add(new ObjectWithReason.VisibleLeftBehind(1, new VisibleLeftBehindCheck(1, null, surroundings, LeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null)));
         }
 
         var world = CreateWorld();
@@ -161,7 +163,7 @@ public sealed class SharedReportingTests
     [Fact]
     public void AVisibleLeftBehindRemovalIsDescribedAsVisibleWithItsSurroundingsRemoved()
     {
-        var check = new VisibleLeftBehindCheck(1, VisibleObjectKind.Containers, new SectorAreaTally(50).Build(), VisibleLeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null);
+        var check = new VisibleLeftBehindCheck(1, VisibleObjectKind.Containers, new SectorAreaTally(50).Build(), LeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null);
 
         Assert.Equal("visible, surroundings removed", Describe.RemovalReason(null!, new ObjectWithReason.VisibleLeftBehind(1, check), null!));
     }
@@ -239,7 +241,7 @@ public sealed class SharedReportingTests
         var decisions = RemovalDecisions.Start(
                 CreateProtection(world.Targets),
                 [.. world.Targets.Select((_, index) => index == 0 ? (WhenRemoved)new WhenRemoved.DisableInsteadOfRestore(new PluginName("Later.esp"), CellDeleted: null) : new WhenRemoved.Disable())])
-            .Apply(RoundKind.TooClose, [Propose(0, new RemovalReason.TooClose(new OtherId(0), BySize)), Propose(1, new RemovalReason.TooClose(new OtherId(0), BySize))]);
+            .Apply(RoundKind.TooClose, [Propose(0, new TooClose(new OtherId(0), BySize)), Propose(1, new TooClose(new OtherId(0), BySize))]);
         var notRestored = new ObjectWithReason.TooClose(0, world.OtherModObjects[0], BySize);
         var removed = new ObjectWithReason.TooClose(1, world.OtherModObjects[0], BySize);
 
@@ -375,7 +377,7 @@ public sealed class SharedReportingTests
         var (world, decisions) = RunRounds();
         var restored = new Decision.Restored(
             new Round(1, RoundKind.TooClose),
-            new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()),
+            new TooClose(new OtherId(0), new TooCloseCause.ObjectSize()),
             TestTargets.EarlierVersionAt(new PluginName("Earlier.esp"), world.Targets[0].Placement));
         var kept = RemovalList.Kept(decisions).Single(entry => entry.TouchedTargetIndex is not null) with { TouchedDecision = restored };
 
@@ -439,7 +441,7 @@ public sealed class SharedReportingTests
         var decisions = RemovalDecisions.Start(
                 CreateProtection(targets),
                 [.. targets.Select((_, index) => index == 1 ? (WhenRemoved)restoring : new WhenRemoved.Disable())])
-            .Apply(RoundKind.TooClose, [Propose(1, new RemovalReason.TooClose(new OtherId(0), BySize))]);
+            .Apply(RoundKind.TooClose, [Propose(1, new TooClose(new OtherId(0), BySize))]);
 
         var round = Assert.Single(decisions.Rounds);
 
@@ -448,19 +450,36 @@ public sealed class SharedReportingTests
     }
 
     [Fact]
-    public void MeshProblems_ShowTheMeshProblemsOnlyInTheDetailedLogAndTheMeshErrorsInBoth()
+    public void MeshProblems_ShowTheMeshProblemsOnlyInTheDetailedLog()
     {
         ImmutableArray<AssetProblem> problems = [AssetProblem.NotFound("m.nif")];
-        var error = new UnexpectedError(
-            "reading mesh triangles", "InvalidDataException: broke", "Objects using the mesh are treated as having no mesh triangles.", new ErrorSubject(SubjectKind.Mesh, "m.nif", Position: 0));
 
-        var normal = LogSections.BuildMeshProblemsSection(problems, [error], Normal);
-        var detailed = LogSections.BuildMeshProblemsSection(problems, [error], Detailed);
+        var normal = LogSections.BuildMeshProblemsSection(problems, Normal);
+        var detailed = LogSections.BuildMeshProblemsSection(problems, Detailed);
 
         Assert.Equal("meshProblems", normal.Id);
-        Assert.Equal(UnexpectedErrorLines.Of([error], Normal).ToArray(), normal.Lines.ToArray());
-        Assert.Equal(["  [mesh] not found: m.nif", ..UnexpectedErrorLines.Of([error], Detailed)], detailed.Lines.ToArray());
-        Assert.Empty(LogSections.BuildMeshProblemsSection([], [], Detailed).Lines);
+        Assert.Empty(normal.Lines);
+        Assert.Equal(["  [mesh] not found: m.nif"], detailed.Lines.ToArray());
+        Assert.Empty(LogSections.BuildMeshProblemsSection([], Detailed).Lines);
+    }
+
+    [Fact]
+    public void TheLogTurnsEveryRemovalReasonAStepDeclaresIntoItsRecord()
+    {
+        var world = CreateWorld();
+        var reasons = ProductionSources.Assemblies()
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => type.IsSubclassOf(typeof(RemovalReason)) && !type.IsAbstract)
+            .ToList();
+
+        // A left-behind reason reaches its step's check, which a collision does not carry.
+        var notTurned = reasons
+            .Where(type => Record.Exception(() => RemovalList.Collision(new TargetId(0), (RemovalReason)RuntimeHelpers.GetUninitializedObject(type), world))
+                is not (null or KeyNotFoundException))
+            .Select(type => type.Name);
+
+        Assert.NotEmpty(reasons);
+        Assert.Empty(notTurned);
     }
 
     /// <summary>Round 1: target 0 too close, protected target 3 held. Round 2: 1 touches 0 (its linked partner 2 goes along), protected 4 held.</summary>
@@ -468,8 +487,8 @@ public sealed class SharedReportingTests
     {
         var world = CreateWorld();
         var decisions = TestSeededDecisions.StartDisablingAll(CreateProtection(world.Targets), TargetCount)
-            .Apply(RoundKind.TooClose, [Propose(0, new RemovalReason.TooClose(new OtherId(0), BySize)), Propose(Protected, new RemovalReason.TooClose(new OtherId(0), BySize))])
-            .Apply(RoundKind.AlsoRemove, [Propose(1, new RemovalReason.Touching(new TargetId(0))), Propose(ProtectedTouching, new RemovalReason.Touching(new TargetId(0)))]);
+            .Apply(RoundKind.TooClose, [Propose(0, new TooClose(new OtherId(0), BySize)), Propose(Protected, new TooClose(new OtherId(0), BySize))])
+            .Apply(RoundKind.AlsoRemove, [Propose(1, new TouchingTargetThatLeft(new TargetId(0))), Propose(ProtectedTouching, new TouchingTargetThatLeft(new TargetId(0)))]);
         return (world, decisions);
     }
 

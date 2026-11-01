@@ -56,9 +56,9 @@ public class RestingObjectsLinkedGroupTests
         Assert.Equal(
             new (int, RemovalReason)[]
             {
-                (ItemOnTable, new RemovalReason.Touching(new TargetId(Table))),
-                (Shelf, new RemovalReason.LinkedTo(new TargetId(ItemOnTable))),
-                (ItemOnShelf, new RemovalReason.Touching(new TargetId(Shelf))),
+                (ItemOnTable, new TouchingTargetThatLeft(new TargetId(Table))),
+                (Shelf, new LinkedTo(new TargetId(ItemOnTable))),
+                (ItemOnShelf, new TouchingTargetThatLeft(new TargetId(Shelf))),
             },
             alsoRemoveRounds.SelectMany(round => decisions.RemovedIn(round)).Select(target => (target.Index, decisions.Of(target)!.Reason)));
         Assert.Equal(1, stats.Components);
@@ -96,7 +96,7 @@ public class RestingObjectsLinkedGroupTests
             threads: 4);
 
         Assert.Equal(
-            new[] { (ItemOnTable, typeof(RemovalReason.LostSupport)), (Shelf, typeof(RemovalReason.LinkedTo)), (ItemOnShelf, typeof(RemovalReason.LostSupport)) },
+            new[] { (ItemOnTable, typeof(LostSupport)), (Shelf, typeof(LinkedTo)), (ItemOnShelf, typeof(LostSupport)) },
             DescribeRemovals(run));
         Assert.Equal(
             new[] { (ItemOnTable, 1), (ItemOnShelf, 2) },
@@ -133,9 +133,9 @@ public class RestingObjectsLinkedGroupTests
             restoredTargets: partnerRestored ? [itemOnTable] : null);
 
         var item = run.RemovalDecisions.Of(new TargetId(itemOnTable))!;
-        Assert.IsType<RemovalReason.LostSupport>(item.Reason);
+        Assert.IsType<LostSupport>(item.Reason);
         Assert.Equal(partnerRestored ? typeof(Decision.Restored) : typeof(Decision.Removed), item.GetType());
-        Assert.IsType<RemovalReason.LinkedTo>(Assert.IsType<Decision.Removed>(run.RemovalDecisions.Of(new TargetId(crateBesideTable))).Reason);
+        Assert.IsType<LinkedTo>(Assert.IsType<Decision.Removed>(run.RemovalDecisions.Of(new TargetId(crateBesideTable))).Reason);
         var evaluations = run.Evaluations;
         var crate = Assert.Single(evaluations, evaluation => evaluation.TargetIndex == crateBesideTable);
         Assert.False(crate.Removed);

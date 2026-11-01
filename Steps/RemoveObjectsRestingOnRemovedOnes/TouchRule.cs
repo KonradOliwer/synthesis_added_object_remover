@@ -17,7 +17,7 @@ internal sealed class TouchRule(TouchSearch search) : IRemovalRounds<RoundDetail
     {
         var (reached, work) = search.FindUndecidedTouchingRemoved(decisions, removedLastRound, alsoWhenCentreEnclosed: false);
         return new RoundProposals<RoundDetails>(
-            [.. reached.Select(pair => new ProposedRemoval(new TargetId(pair.Second), new RemovalReason.Touching(new TargetId(pair.First))))],
+            [.. reached.Select(pair => new ProposedRemoval(new TargetId(pair.Second), new TouchingTargetThatLeft(new TargetId(pair.First))))],
             new TouchRoundDetails([.. reached], work));
     }
 }

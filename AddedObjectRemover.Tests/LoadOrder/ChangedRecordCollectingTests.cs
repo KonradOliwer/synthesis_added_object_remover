@@ -524,12 +524,14 @@ public sealed class ChangedRecordCollectingTests
         using var world = FixturePatcherState.CreateFinalWorld(state);
         var records = new PluginRecordsFactory(world, Environment.ProcessorCount).Open();
         var collected = PlacedObjects.Collect(records, Trust(laterTrusted: false), Plan);
-        var cleared = new AreaShare(Objects: 1, Standing: 0, Size: 1, StandingSize: 0, AreaVerdict.Cleared);
+        var cleared = TestAreaShares.Of(AreaVerdict.Cleared);
         var whereRemoved = new RestoreWhereRemovedResult(
-            StepOutcome.Performed, [.. collected.ChangedRecords.Select(changed => new PlacedChangeJudged(changed, null, cleared, null, Refused: null, IsRestored: true))], [], [], [], [], Passes: 1, DoorsLeftRemoved: [], Failures: []);
+            StepOutcome.Performed,
+            [.. collected.ChangedRecords.Select(changed => new PlacedChangeJudged(changed, null, cleared, null, Refused: null, IsRestored: true, ChangeJudge.KindOf(changed), KeptForArea: null))],
+            [], [], [], [], Passes: 1, DoorsLeftRemoved: [], Failures: []);
         var protection = ObjectsToKeep.Build(collected.Targets, [], TestTargets.References(collected.Targets.Length), TestBaseFacts.Unresolved);
         var final = RemovalDecisions.Start(protection, [.. collected.Targets.Select(_ => (WhenRemoved)new WhenRemoved.Disable())]);
-        PatchWriter.Write(final, collected.Targets, OtherModsObjectsResult.SwitchedOff, whereRemoved, records, new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod));
+        PatchWriter.Write(new(final, collected.Targets, OtherModsObjectsResult.SwitchedOff, whereRemoved, records, new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod)));
         return (collected, state.PatchMod);
     }
 

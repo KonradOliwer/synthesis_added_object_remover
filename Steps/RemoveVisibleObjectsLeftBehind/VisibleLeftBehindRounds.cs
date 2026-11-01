@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
@@ -95,9 +96,13 @@ internal sealed class VisibleLeftBehindRounds
         if (checks.Length == 0) return false;
 
         RecordLatestChecks(checks);
-        DecideRound(new ProposedRound(RoundKind.VisibleLeftBehind, VisibleLeftBehindProposals.ProposalsOf(checks)));
+        DecideRound(new ProposedRound(RoundKind.VisibleLeftBehind, ProposalsOf(checks)));
         return !LeftInNewestRound().IsEmpty;
     }
+
+    /// <summary>A removal proposal for each object the rule would remove.</summary>
+    internal static IReadOnlyList<ProposedRemoval> ProposalsOf(IEnumerable<VisibleLeftBehindCheck> checks) =>
+        LeftBehindVerdicts.ProposalsOf(checks, _ => new VisibleObjectSurroundingsRemoved());
 
     /// <remarks>A failed follow-up proposes nothing, so the visible rounds go on alone.</remarks>
     private void FollowUpNewestRound()

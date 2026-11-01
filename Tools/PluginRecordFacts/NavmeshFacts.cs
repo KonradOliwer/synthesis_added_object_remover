@@ -3,7 +3,7 @@ using System.Numerics;
 
 namespace AddedObjectRemover;
 
-/// <summary>How the target plugin changed a navmesh of a target space.</summary>
+/// <summary>How the read's plugin changed a navmesh of a target space.</summary>
 public enum NavmeshCase
 {
     /// <summary>It overrides another plugin's navmesh and does not delete it.</summary>
@@ -67,43 +67,47 @@ public sealed record NavmeshShape(
     /// <summary>The triangles in world space, in triangle order, but those naming a missing vertex.</summary>
     public IEnumerable<MeshTriangle> WorldTriangles() => Enumerable.Range(0, Triangles.Length).Select(CornersOf).OfType<MeshTriangle>();
 
+    /// <summary>The indexes of the triangles flagged Preferred.</summary>
+    public ImmutableHashSet<int> PreferredTriangles() => [.. Enumerable.Range(0, Triangles.Length).Where(triangle => Triangles[triangle].Preferred)];
+
     private bool IsVertex(int index) => index >= 0 && index < Vertices.Length;
 }
 
-/// <summary>A navmesh edge-linked to a navmesh the target plugin changed, in either direction and in any version read.</summary>
-/// <param name="Earlier">Its version just below the target plugin's; null when it has none.</param>
+/// <summary>A navmesh edge-linked to a navmesh the read's plugin changed, in either direction and in any version read.</summary>
+/// <param name="Earlier">Its version just below the read's plugin's; null when it has none.</param>
 public sealed record NeighbourNavmesh(RecordKey Navmesh, NavmeshShape Winner, NavmeshShape? Earlier);
 
 /// <summary>Where a door's navmesh link (XNDP) points.</summary>
 public readonly record struct NavDoorLinkFact(RecordKey Navmesh, int Triangle);
 
 /// <summary>A door whose navmesh link names a navmesh, or that a navmesh's door triangles or map entry name, in any version read.</summary>
-/// <param name="Earlier">The link of the door's version just below the target plugin's; null when it has none or that version has no link.</param>
+/// <param name="Earlier">The link of the door's version just below the read's plugin's; null when it has none or that version has no link.</param>
 /// <param name="Current">The link of the door's winning version; null when it has none.</param>
 /// <param name="InDeletedCell">A version read deletes the cell whose child list holds the door's winning version.</param>
 public sealed record NavDoorLinkVersions(RecordKey Door, NavDoorLinkFact? Earlier, NavDoorLinkFact? Current, bool InDeletedCell);
 
 /// <summary>
-/// A navmesh of a target space that the target plugin overrides, deletes or adds and changed, with how its parts differ across the
-/// versions from the one just below the target plugin's up to the winner, the patch included.
+/// A navmesh of a target space that the read's plugin overrides, deletes or adds and changed, with how its parts differ across the
+/// versions from the one just below the read's plugin's up to the winner, the patch included; the read's plugin is the named plugin
+/// of the comparison (<see cref="VersionComparison"/>).
 /// </summary>
 /// <param name="Cell">The cell record whose navmesh list holds the winning version.</param>
 /// <param name="Geometry">The navmesh's data and raw navmesh bytes; every record flag but Deleted.</param>
 /// <param name="Presence">The Deleted flag; an added navmesh has no version below, which counts as a difference.</param>
 /// <param name="MapEntry">
 /// Its entry in the navmesh info map, over the entries of the plugins whose map carries one, in load order; with no entry below the
-/// target plugin's, the lowest version holds none. Null when the target plugin's map carries none.
+/// read's plugin's, the lowest version holds none. Null when the read's plugin's map carries none.
 /// </param>
-/// <param name="DeletedAboveTarget">The target plugin's version is not deleted, and a version above it is.</param>
-/// <param name="Earlier">The version just below the target plugin's; null for <see cref="NavmeshCase.Added"/>.</param>
-/// <param name="Current">The target plugin's version; for a deletion, the earlier version with the deleted state.</param>
+/// <param name="DeletedAboveNamedPlugin">The read's plugin's version is not deleted, and a version above it is.</param>
+/// <param name="Earlier">The version just below the read's plugin's; null for <see cref="NavmeshCase.Added"/>.</param>
+/// <param name="Current">The read's plugin's version; for a deletion, the earlier version with the deleted state.</param>
 /// <param name="ReplacedBy">For <see cref="NavmeshCase.DeletedAndReplaced"/>: the added navmeshes that overlap it, in key order.</param>
 /// <param name="Neighbours">In key order.</param>
 /// <param name="Doors">In key order.</param>
 /// <param name="NamedInPreferredPaths">The winning navmesh info map's preferred paths name it.</param>
 /// <param name="WinningMapMod">The plugin of the last navmesh info map in load order; null when no plugin has one.</param>
 /// <param name="CellDeletedInAVersion">A version read of <paramref name="Cell"/> deletes the cell.</param>
-/// <param name="LaterWinner">The winning version when a plugin after the target plugin wins the navmesh; null when the target plugin's version wins.</param>
+/// <param name="LaterWinner">The winning version when a plugin after the read's plugin wins the navmesh; null when the read's plugin's version wins.</param>
 /// <param name="WinningMapEntry">The entry of the last plugin whose navmesh info map carries one, whoever wins the navmesh record; null when none does.</param>
 public sealed record NavmeshRecordFact(
     RecordKey Key,
@@ -114,7 +118,7 @@ public sealed record NavmeshRecordFact(
     PartDifferences Geometry,
     PartDifferences Presence,
     PartDifferences? MapEntry,
-    bool DeletedAboveTarget,
+    bool DeletedAboveNamedPlugin,
     NavmeshShape? Earlier,
     NavmeshShape Current,
     ImmutableArray<RecordKey> ReplacedBy,

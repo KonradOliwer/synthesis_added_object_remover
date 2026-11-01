@@ -6,7 +6,8 @@ namespace AddedObjectRemover.Tests.Architecture;
 /// The public surface of each logic project (a step, the removal decision list and the base-object shapes) is its one
 /// entry type. Everything else in the project is internal; the data it passes lives in the contracts projects. A step's entry
 /// type also declares the record its entry takes, <c>Input</c>, since that record holds the run caches, which no step contract
-/// may name. A step has one entry, which takes that record; its other public members provide the rules other modules ask of it.
+/// may name. A step has one entry, which takes that record; its other public methods are the listed rule providers, which
+/// provide the rules other modules ask of it, and each takes one record the entry type declares too, or one cache.
 /// </summary>
 public class LogicPublicTypesTests
 {
@@ -61,9 +62,9 @@ public class LogicPublicTypesTests
             "static ObjectMeasurementRules MeasurementRules(IUnexpectedErrors)",
             "static ObjectMeasurementRules MeasurementRules(IUnexpectedErrors, PartKey)",
             "static SelectedObjects Select(Input)",
-            "static SelectedObjects SelectForOldPlace(IOtherModObjectsBySpace, Int32, IEnumerable<OtherId>, NpcHandling)",
+            "static ICausesOfWorlds CreateCausesOfWorlds(IObjectCachesOfWorlds)",
         ],
-        ["FindTargetObjectsToKeep"] = ["static ObjectsToKeepResult Find(Input)"],
+        ["FindTargetObjectsToKeep"] = ["static ObjectsToKeepFound Find(Input)"],
         ["RemovalDecisionList"] =
         [
             "IEnumerable<ValueTuple<TargetId, Decision>> All()",
@@ -87,6 +88,7 @@ public class LogicPublicTypesTests
             "Boolean IsProtected(TargetId)",
             "Boolean IsRemoved(TargetId)",
             "Boolean HasLeftItsPlace(TargetId)",
+            "BoxFate FateOf(TargetId)",
             "Decision Of(TargetId)",
             "IRemovalDecisionsCopy WorkingCopy()",
             "IReadOnlyDictionary<TargetId, Decision> DecideRoundOnCopy(RoundKind, IReadOnlyList<ProposedRemoval>)",
@@ -101,29 +103,33 @@ public class LogicPublicTypesTests
         ["FitClashingObjects"] = ["static Decided<FitResult> Fit(Input)"],
         ["RemoveObjectsOnChangedTerrain"] =
         [
-            "static IPlacementRule CreatePlacementRule(AcceptedWorld, LoadOrderPlugins, IPluginRecords, IBaseObjectShapes, ChangedTerrainSettings)",
+            "static IPlacementRule CreatePlacementRule(PlacementRuleInput)",
             "static Decided<ChangedTerrainResult> Find(Input)",
         ],
         ["RemoveTooCloseObjects"] =
         [
             "static NpcBodyRules NpcBodyRules { get; }",
             "static PlacedNpcRules PlacedNpcRules { get; }",
-            "static IPlacementRule CreatePlacementRule(IReadOnlyList<TargetObject>, IVisibleTargetObjects, SelectedObjects, IPlacedNpcsBySpace, IBaseObjectShapes, ITriangleMeshes, TooCloseSettings)",
+            "static IPlacementRule CreatePlacementRule(PlacementRuleInput)",
+            "static IOldPlaceTooCloseRule CreateOldPlaceTooCloseRule(OldPlaceRuleInput)",
+            "static ITooCloseToWhatStaysRule CreateTooCloseToWhatStaysRule(WhatStaysRuleInput)",
             "static Decided<TooCloseResult> Find(Input)",
         ],
         ["RemoveObjectsRestingOnRemovedOnes"] =
         [
-            "static IAlsoRemoveFollowUp CreateFollowUp(ImmutableArray<TargetObject>, AlsoRemoveSettings, Execution, Func<TimeSpan>, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>)",
-            "static IRestingRule CreateRestingRule(ImmutableArray<TargetObject>, AlsoRemoveSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, ITargetObjectsDropTest, Execution)",
-            "static IAlsoRemoveRoundsAfter CreateAlsoRemoveRoundsAfter(AlsoRemoveSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
+            "static IAlsoRemoveFollowUp CreateFollowUp(FollowUpInput)",
+            "static IRestingRule CreateRestingRule(RestingRuleInput)",
+            "static IAlsoRemoveRoundsAfter CreateAlsoRemoveRoundsAfter(RoundsAfterInput)",
+            "static ISupportContacts CreateSupportContacts(ILoadOrderCaches)",
+            "static Int32 SurfaceSamplesPerMesh",
             "static Decided<RestingObjectsResult> Find(Input)",
         ],
         ["OtherModsObjectsLeftWithoutSupport"] =
         [
-            "static HeldUpTargets FindHeldUpTargets(ImmutableArray<TargetObject>, IVisibleTargetObjects, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
-            "static IRestingRule CreateRestingRule(IRestingRule, ImmutableArray<TargetObject>, IVisibleTargetObjects, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, HeldUpTargets, Execution)",
-            "static ITargetObjectsDropTest CreateDropTest(ImmutableArray<TargetObject>, IVisibleTargetObjects, ModTrustTable, LoadOrderPlugins, AlsoRemoveSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Func<IVisibleObjectsOfAnyPlugin>, Execution)",
-            "static IHoldersOfObjectsThatStay CreateHoldersOfObjectsThatStay(IObjectCachesOfWorlds, ModTrustTable, LoadOrderPlugins, OtherModsObjectsSettings, IBaseObjectShapes, ITriangleMeshes, ISurfaceSamples, ITerrainHeights, Execution)",
+            "static IHeldUpTargetsSearch CreateHeldUpTargetsSearch(SupportJudging)",
+            "static IRestingRule CreateRestingRule(RestingRuleInput)",
+            "static ITargetObjectsDropTest CreateDropTest(DropTestInput)",
+            "static IHoldersOfObjectsThatStay CreateHoldersOfObjectsThatStay(HoldersInput)",
             "static Decided<OtherModsObjectsResult> Settle(Input)",
         ],
         ["RemoveVisibleObjectsLeftBehind"] = ["static Decided<VisibleLeftBehindResult> Find(Input)"],
@@ -164,6 +170,29 @@ public class LogicPublicTypesTests
         ],
     };
 
+    /// <summary>
+    /// "EntryType.Method" of each public method of a step's entry type besides its entry, with the rule it provides and who asks
+    /// it. The runner binds each into the input of the step that asks; it calls no other method of a step.
+    /// </summary>
+    internal static readonly Dictionary<string, string> RuleProviders = new()
+    {
+        ["RemovalCauseSelector.MeasurementRules"] = "How the object caches measure other mods' objects; the caches take it when they are built.",
+        ["RemovalCauseSelector.CreateCausesOfWorlds"] = "The objects that can cause removals in worlds other than the run's, which the too-close step's rules for those worlds ask.",
+        ["ChangedTerrainObjects.CreatePlacementRule"] = "The changed-terrain check of one placement, which the fit step and the judge step's old-place check ask.",
+        ["TooCloseObjects.CreatePlacementRule"] = "The too-close check of one placement, which the fit step asks.",
+        ["TooCloseObjects.CreateOldPlaceTooCloseRule"] = "The too-close check of an earlier version at its old place, which the judge step asks.",
+        ["TooCloseObjects.CreateTooCloseToWhatStaysRule"] = "The too-close check of a placed record going back among what stays, which the restore step asks.",
+        ["RestingObjects.CreateFollowUp"] = "The also-remove rounds that follow up each round of the visible step, which that step asks.",
+        ["RestingObjects.CreateRestingRule"] = "The target objects other target objects rest on, which the fit step asks through the other-mods rule.",
+        ["RestingObjects.CreateAlsoRemoveRoundsAfter"] = "The also-remove rounds the step for other mods' objects asks after its own rounds.",
+        ["RestingObjects.CreateSupportContacts"] = "The support rule the step for other mods' objects measures with.",
+        ["OtherModsObjects.CreateHeldUpTargetsSearch"] = "The target objects other mods' objects rest on, which the keep step asks.",
+        ["OtherModsObjects.CreateRestingRule"] = "The objects others rest on, other mods' objects included, which the fit step asks.",
+        ["OtherModsObjects.CreateDropTest"] = "Whether a target object holds up another, which the also-remove step's resting rule asks.",
+        ["OtherModsObjects.CreateHoldersOfObjectsThatStay"] = "The objects that move away and hold up an object that stays, which the restore step asks.",
+        ["PatchWriter.CreateNavmeshCheck"] = "The navmesh check of a trial write, which the restore step asks.",
+    };
+
     [Fact]
     public void EveryLogicProjectHasAListedEntryType()
     {
@@ -173,7 +202,7 @@ public class LogicPublicTypesTests
     }
 
     [Fact]
-    public void EveryLogicProjectPublishesOnlyItsEntryTypeAndAStepItsInputRecord()
+    public void EveryLogicProjectPublishesOnlyItsEntryTypeAndAStepTheRecordsItsMethodsTake()
     {
         var wrong = LogicProjectNames()
             .SelectMany(project => PublicTypeNames(project).Except(AllowedPublicTypeNames(project)).Select(name => $"{project}: {name}"))
@@ -201,6 +230,24 @@ public class LogicPublicTypesTests
         Assert.Empty(wrong);
     }
 
+    [Fact]
+    public void EveryOtherPublicMethodOfAStepsEntryTypeIsAListedRuleProvider()
+    {
+        var providers = StepProjectNames().SelectMany(RuleProviderNamesOf).ToHashSet();
+
+        var notListed = providers.Except(RuleProviders.Keys).Order(StringComparer.Ordinal).ToList();
+        var stale = RuleProviders.Keys.Except(providers).Order(StringComparer.Ordinal).ToList();
+
+        Assert.True(notListed.Count == 0, $"Public methods of a step's entry type besides its entry, not listed in {nameof(RuleProviders)}:{Environment.NewLine}{string.Join(Environment.NewLine, notListed)}");
+        AllowListAssert.NoneStale(stale, $"Listed in {nameof(RuleProviders)} but no longer found (remove)");
+    }
+
+    /// <summary>"EntryType.Method" of each public method of the step's entry type besides its entry.</summary>
+    private static IEnumerable<string> RuleProviderNamesOf(string project) =>
+        EntryTypeOf(project).GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+            .Where(method => !method.IsSpecialName && !EntryMethodsOf(project).Contains(method))
+            .Select(method => $"{EntryTypes[project]}.{method.Name}");
+
     /// <summary>
     /// The method of each step that takes its <c>Input</c> record, the step's one entry, by step project; the runner calls it once
     /// (see <see cref="RunnerRulesTests"/>).
@@ -210,7 +257,16 @@ public class LogicPublicTypesTests
     private static IEnumerable<string> StepProjectNames() => LogicProjectNames().Except(NotSteps);
 
     private static IEnumerable<string> AllowedPublicTypeNames(string project) =>
-        NotSteps.Contains(project) ? [EntryTypes[project]] : [EntryTypes[project], $"{EntryTypes[project]}.{InputRecordName}"];
+        NotSteps.Contains(project) ? [EntryTypes[project]] : [EntryTypes[project], $"{EntryTypes[project]}.{InputRecordName}", .. ProviderRecordNamesOf(project)];
+
+    /// <summary>The records the entry type declares that one of its rule providers takes as its one parameter.</summary>
+    private static IEnumerable<string> ProviderRecordNamesOf(string project) =>
+        EntryTypeOf(project).GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+            .Select(method => method.GetParameters() is [var only] ? only.ParameterType : null)
+            .OfType<Type>()
+            .Where(type => type.DeclaringType == EntryTypeOf(project) && IsRecord(type))
+            .Select(BusinessCode.PathName)
+            .Distinct();
 
     private static Type EntryTypeOf(string project) =>
         Assembly.Load(project).GetTypes().Single(type => type.IsVisible && BusinessCode.PathName(type) == EntryTypes[project]);

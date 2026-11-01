@@ -19,9 +19,9 @@ internal static class OtherRecordChange
     /// <summary>The object properties, each as "the two versions differ": position, rotation, scale, base and presence.</summary>
     private static readonly ImmutableArray<Func<PlacedVersionFact, PlacedVersionFact, bool>> ObjectProperties =
     [
-        static (first, second) => DiffersBeyond(
+        static (first, second) => Vectors.DiffersBeyond(
             first.Placement.Position, second.Placement.Position, static (one, other) => Vector3.Abs(one - other), Tolerances.Position),
-        static (first, second) => DiffersBeyond(first.Placement.EulerRotation, second.Placement.EulerRotation, Vectors.ShortestAngles, Tolerances.Rotation),
+        static (first, second) => Vectors.DiffersBeyond(first.Placement.EulerRotation, second.Placement.EulerRotation, Vectors.ShortestAngles, Tolerances.Rotation),
         static (first, second) => MathF.Abs(ReferenceScale.Normalize(first.Scale) - ReferenceScale.Normalize(second.Scale)) > Tolerances.Scale,
         static (first, second) => first.Base != second.Base,
         static (first, second) => first.Placement.Presence != second.Placement.Presence,
@@ -37,14 +37,6 @@ internal static class OtherRecordChange
         var acceptances = AcceptedVersions.Decide(trusts, differs);
         return acceptances.Any(acceptance => acceptance.Changed) ? NameTheChange(versions, acceptances) : null;
     }
-
-    /// <param name="gapOf">Per axis, how far apart two values are.</param>
-    private static bool DiffersBeyond(Vector3? first, Vector3? second, Func<Vector3, Vector3, Vector3> gapOf, float tolerance) =>
-        (first, second) switch
-        {
-            ({ } one, { } other) => gapOf(one, other) is var gap && (gap.X > tolerance || gap.Y > tolerance || gap.Z > tolerance),
-            _ => first.HasValue != second.HasValue,
-        };
 
     /// <summary>
     /// Of the changed properties, the one whose changing version loads last names the change; on a tie, the first in property

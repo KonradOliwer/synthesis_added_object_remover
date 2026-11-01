@@ -68,7 +68,7 @@ internal sealed class ReplacementMatcher
             var distance = Vector3.Distance(other.Position, position);
             if (ScaledSortedDims(_shapes.Of(other.Base).Box, other.Scale) is not { } otherDims) continue;
 
-            var ratio = SizeRatio(targetDims, otherDims);
+            var ratio = targetDims.RatioTo(otherDims);
             if (ratio < SizeSimilarity) continue;
 
             (matches ??= []).Add(new Match(other.Id, distance, ratio));
@@ -91,16 +91,4 @@ internal sealed class ReplacementMatcher
     /// </summary>
     private static SortedDimensions? ScaledSortedDims(Box local, float scale) =>
         local.Size == Vector3.Zero ? null : Boxes.SortedScaledDimensions(local, scale);
-
-    /// <summary>Smallest, across the three matching sorted-dimension pairs, of min(a,b)/max(a,b).</summary>
-    private static float SizeRatio(SortedDimensions x, SortedDimensions y) =>
-        MathF.Min(
-            MathF.Min(DimensionRatio(x.Largest, y.Largest), DimensionRatio(x.Middle, y.Middle)),
-            DimensionRatio(x.Smallest, y.Smallest));
-
-    private static float DimensionRatio(float a, float b)
-    {
-        if (a == 0 || b == 0) return a == b ? 1f : 0f;
-        return MathF.Min(a, b) / MathF.Max(a, b);
-    }
 }

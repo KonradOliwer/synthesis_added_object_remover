@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Numerics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
@@ -24,15 +25,28 @@ internal sealed class ChangeJudge(
     /// <remarks>A target the removal steps left undecided is judged both at its old place and where it stands, so a moved object is never taken out of a village that stays.</remarks>
     public PlacedChangeJudged Placed(RecordChangedByCleanedMod change)
     {
+        var kind = KindOf(change);
         if (NeverRestored(change.WinningMod, change.LinkedFromCleanedMod, change.InDeletedCell) is { } never)
         {
-            return new PlacedChangeJudged(change, never, OldPlace: null, WhereItIsNow: null, Refused: null, IsRestored: false);
+            return new PlacedChangeJudged(change, never, OldPlace: null, WhereItIsNow: null, Refused: null, IsRestored: false, kind, KeptForArea: null);
         }
 
         var oldPlace = areas.Judge(change.SpaceKey, change.Earlier.Placement.Position);
         var whereItIsNow = change.Target is { } target ? areas.Judge(change.SpaceKey, targets[target.Index].Transform.Position) : null;
-        var isRestored = oldPlace.Verdict == AreaVerdict.Cleared && whereItIsNow?.Verdict is null or AreaVerdict.Cleared;
-        return new PlacedChangeJudged(change, Never: null, oldPlace, whereItIsNow, Refused: null, isRestored);
+        var keptForArea = VerdictKeeping(whereItIsNow is null ? [oldPlace.Verdict] : [oldPlace.Verdict, whereItIsNow.Verdict]);
+        return new PlacedChangeJudged(change, Never: null, oldPlace, whereItIsNow, Refused: null, IsRestored: keptForArea is null, kind, keptForArea);
+    }
+
+    /// <summary>What a placed record's restore puts back, by the first of its undone parts in the order of <see cref="PlacedRestoreKind"/>.</summary>
+    /// <remarks>Every candidate has an undone part of one of these kinds; its navmesh door link goes back only with one of them.</remarks>
+    public static PlacedRestoreKind KindOf(RecordChangedByCleanedMod change)
+    {
+        var undo = change.Earlier.Undo;
+        if (undo.HasFlag(PlacedParts.BaseAndData)) return PlacedRestoreKind.OwnModel;
+        if (undo.HasFlag(PlacedParts.Presence)) return change.PresenceBefore.Removed ? PlacedRestoreKind.HiddenAgain : PlacedRestoreKind.ShownAgain;
+        if (undo.HasFlag(PlacedParts.Position)) return PlacedRestoreKind.MovedBack;
+        if (undo.HasFlag(PlacedParts.Rotation) || undo.HasFlag(PlacedParts.Scale)) return PlacedRestoreKind.TurnedOrRescaledBack;
+        throw new UnreachableException($"The placed record {change.Key} goes back with {undo}, which is no restored kind.");
     }
 
     public CellChangeJudged Cell(CellCandidate cell)
@@ -40,12 +54,22 @@ internal sealed class ChangeJudge(
         var change = cell.Change;
         if (NeverRestored(change.WinningMod, change.LinkedFromCleanedMod, inDeletedCell: false) is { } never)
         {
-            return new CellChangeJudged(change, cell.Undone, never, Area: null, WaterKeptBy: null, IsRestored: false);
+            return new CellChangeJudged(change, cell.Undone, never, Area: null, WaterKeptBy: null, IsRestored: false, KeptForArea: null);
         }
 
         var area = areas.Judge(change.SpaceKey, CentreOf(change));
-        return new CellChangeJudged(change, cell.Undone, Never: null, area, WaterKeptBy: null, area.Verdict == AreaVerdict.Cleared);
+        var keptForArea = VerdictKeeping([area.Verdict]);
+        return new CellChangeJudged(change, cell.Undone, Never: null, area, WaterKeptBy: null, IsRestored: keptForArea is null, keptForArea);
     }
+
+    /// <summary>
+    /// Of the verdicts of the areas a change is judged in, the one that keeps it: a share that still stands before no objects around;
+    /// null when every area is cleared.
+    /// </summary>
+    public static AreaVerdict? VerdictKeeping(IReadOnlyCollection<AreaVerdict> verdicts) =>
+        verdicts.Contains(AreaVerdict.StillStanding) ? AreaVerdict.StillStanding
+        : verdicts.Contains(AreaVerdict.NoObjectsAround) ? AreaVerdict.NoObjectsAround
+        : null;
 
     public LandAreasJudged Land(LandChangedByCleanedMod land)
     {
@@ -66,24 +90,29 @@ internal sealed class ChangeJudge(
     /// A navmesh is judged at the centre of its bounds seen from above: its version before the cleaned mod's for a deletion, the
     /// cleaned mod's otherwise. What goes back is left to the navmesh plan.
     /// </summary>
+    /// <remarks>Its undo is left to the navmesh plan, which also says when nothing in a navmesh whose area is cleared goes back.</remarks>
     public NavmeshChangeJudged Navmesh(NavmeshChangedByCleanedMod navmesh)
     {
-        if (NeverRestored(navmesh.WinningMod, linkedFromCleanedMod: false, inDeletedCell: false) is { } never) return new NavmeshChangeJudged(navmesh, never, Area: null, Undo: null);
+        if (NeverRestored(navmesh.WinningMod, linkedFromCleanedMod: false, inDeletedCell: false) is { } never)
+        {
+            return new NavmeshChangeJudged(navmesh, never, Area: null, Undo: null, KeptForArea: null, NothingGoesBack: false);
+        }
 
         var shape = navmesh.Case is NavmeshCase.DeletedWithoutReplacement or NavmeshCase.DeletedAndReplaced ? navmesh.Earlier : navmesh.Current;
-        if (shape is not { Vertices.IsEmpty: false } judged) return new NavmeshChangeJudged(navmesh, Never: null, Area: null, Undo: null);
+        if (shape is not { Vertices.IsEmpty: false } judged) return new NavmeshChangeJudged(navmesh, Never: null, Area: null, Undo: null, KeptForArea: null, NothingGoesBack: true);
         var (min, max) = (judged.Vertices.Aggregate(Vector3.Min), judged.Vertices.Aggregate(Vector3.Max));
-        return new NavmeshChangeJudged(navmesh, Never: null, areas.Judge(navmesh.SpaceKey, Vector3.Lerp(min, max, Halfway)), Undo: null);
+        var area = areas.Judge(navmesh.SpaceKey, Vector3.Lerp(min, max, Halfway));
+        return new NavmeshChangeJudged(navmesh, Never: null, area, Undo: null, VerdictKeeping([area.Verdict]), NothingGoesBack: false);
     }
 
     /// <summary>Cleared when no space says the cleaned mod's objects still stand and at least one says cleared.</summary>
-    private static LandQuarterJudged Quarter(ImmutableArray<AreaShare> areas)
+    private LandQuarterJudged Quarter(ImmutableArray<AreaShare> spaces)
     {
-        var verdicts = areas.Select(area => area.Verdict).ToList();
+        var verdicts = spaces.Select(area => area.Verdict).ToList();
         var verdict = verdicts.Contains(AreaVerdict.StillStanding) ? AreaVerdict.StillStanding
             : verdicts.Contains(AreaVerdict.Cleared) ? AreaVerdict.Cleared
             : AreaVerdict.NoObjectsAround;
-        return new LandQuarterJudged(verdict, areas);
+        return new LandQuarterJudged(areas.Sum(spaces, verdict));
     }
 
     /// <param name="inDeletedCell">A version read deletes a cell the record would be written into.</param>

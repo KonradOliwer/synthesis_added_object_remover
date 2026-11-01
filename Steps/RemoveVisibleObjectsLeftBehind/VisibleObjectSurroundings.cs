@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
@@ -96,7 +97,7 @@ internal sealed class VisibleObjectSurroundings
         var changed = new SortedSet<int>();
         foreach (var gone in rounds.SelectMany(round => decisions.LeftIn(round)))
         {
-            RecordFate(gone, NeighbourFates.Of(decisions, gone));
+            RecordFate(gone, decisions.FateOf(gone));
             foreach (var position in _candidatesAround.NodesListing(gone.Index))
             {
                 var candidate = _candidates[position];

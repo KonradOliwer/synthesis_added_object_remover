@@ -34,16 +34,16 @@ public class TooCloseByDistanceTests
         var world = TestScenes.Create(targets, others, Shapes);
         var replacements = Replacements.None(others.Count);
         return TooCloseObjects.Find(
-            new TooCloseInput(
-                [.. targets],
+            new(
+                TestScenes.CreateWorld(targets, others),
                 world.VisibleTargets,
-                TargetWorkOrder.Of(targets),
                 world.Selected(replacements, NpcHandling.Never),
-                world.NpcsThatCanSpawn(replacements),
+                world.PlacedNpcs,
                 Shapes,
                 new TriangleStore(Shapes.ReadTriangles),
-                new Execution(1)),
-            [TestJudgedGroups.OfAll(targets, settings)]).Passes.Single();
+                new Execution(1),
+                [TestJudgedGroups.OfAll(targets, settings)],
+                TestSeededDecisions.StartUnprotected(targets))).Result.Passes.Single();
     }
 
     private static TooCloseSettings DistanceOnly(ZoneShape zone, float units) =>
@@ -68,7 +68,7 @@ public class TooCloseByDistanceTests
         Assert.Equal(new TooCloseCause.Distance(Distance), hit.Cause);
         var proposal = Assert.Single(result.Proposals);
         Assert.Equal(new TargetId(0), proposal.Target);
-        Assert.Equal(new RemovalReason.TooClose(hit.TooCloseTo.Id, new TooCloseCause.Distance(Distance)), proposal.Reason);
+        Assert.Equal(new TooClose(hit.TooCloseTo.Id, new TooCloseCause.Distance(Distance)), proposal.Reason);
     }
 
     [Theory]
@@ -106,7 +106,7 @@ public class TooCloseByDistanceTests
         var hit = Assert.Single(result.Hits);
         Assert.Equal(new TooCloseCause.ObjectSize(), hit.Cause);
         var proposal = Assert.Single(result.Proposals);
-        Assert.Equal(new RemovalReason.TooClose(hit.TooCloseTo.Id, new TooCloseCause.ObjectSize()), proposal.Reason);
+        Assert.Equal(new TooClose(hit.TooCloseTo.Id, new TooCloseCause.ObjectSize()), proposal.Reason);
     }
 
     [Theory]
@@ -119,7 +119,7 @@ public class TooCloseByDistanceTests
         Assert.Equal([0, 1], result.Hits.Select(hit => hit.TargetIndex));
         TooCloseCause[] causes = [new TooCloseCause.ObjectSize(), new TooCloseCause.Distance(Distance)];
         Assert.Equal(causes, result.Hits.Select(hit => hit.Cause));
-        Assert.Equal(causes, result.Proposals.Select(proposal => Assert.IsType<RemovalReason.TooClose>(proposal.Reason).Cause));
+        Assert.Equal(causes, result.Proposals.Select(proposal => Assert.IsType<TooClose>(proposal.Reason).Cause));
     }
 
     [Theory]

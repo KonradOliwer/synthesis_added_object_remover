@@ -121,6 +121,31 @@ public class RunnerRulesTests
         Assert.True(wrong.Count == 0, $"Step entries the runner does not call exactly once:{Environment.NewLine}{string.Join(Environment.NewLine, wrong)}");
     }
 
+    /// <summary>
+    /// Besides each step's entry, the runner calls on a step's entry type only the listed rule providers, whichever parameters they
+    /// take, so a phase of a step cannot pass as a second call.
+    /// </summary>
+    [Fact]
+    public void TheRunnerCallsOnAStepsEntryTypeOnlyItsEntryAndListedRuleProviders()
+    {
+        var code = string.Concat(RunnerFiles().Select(file => file.Code));
+
+        var wrong = LogicPublicTypesTests.StepEntries()
+            .SelectMany(entry => FindMethodCalls(code, entry.DeclaringType!).Where(method => method != entry.Name).Select(method => $"{entry.DeclaringType!.Name}.{method}"))
+            .Where(call => !LogicPublicTypesTests.RuleProviders.ContainsKey(call))
+            .Distinct()
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(wrong.Count == 0, $"Methods of a step's entry type the runner calls that are neither its entry nor a listed rule provider:{Environment.NewLine}{string.Join(Environment.NewLine, wrong)}");
+    }
+
+    /// <summary>The names of the methods of <paramref name="entryType"/> called in <paramref name="code"/>; constructing a record it declares is no method call.</summary>
+    private static IEnumerable<string> FindMethodCalls(string code, Type entryType) =>
+        Regex.Matches(code, $@"\b{entryType.Name}\.(?<method>\w+)\(")
+            .Select(match => match.Groups["method"].Value)
+            .Where(name => entryType.GetNestedType(name) is null);
+
     [Fact]
     public void TheRunnerHoldsNoErrorBoundary()
     {

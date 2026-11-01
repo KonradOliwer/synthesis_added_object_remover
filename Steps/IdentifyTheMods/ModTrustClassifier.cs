@@ -16,10 +16,9 @@ public static class ModTrustClassifier
 
     public sealed record Input(LoadOrderPlugins Plugins, ModTrustSettings Settings);
 
-    public static ModTrustTable Classify(Input input) => Classify(input.Plugins, input.Settings);
-
-    internal static ModTrustTable Classify(LoadOrderPlugins plugins, ModTrustSettings settings)
+    public static ModTrustTable Classify(Input input)
     {
+        var (plugins, settings) = (input.Plugins, input.Settings);
         var listings = ListingsByPlugin(plugins);
         var known = KnownPlugins(plugins);
         var alwaysTrusted = AlwaysTrusted.Of(settings.Target, listings);

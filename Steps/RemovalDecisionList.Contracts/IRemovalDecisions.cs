@@ -29,6 +29,9 @@ public interface IRemovalDecisions
     /// </summary>
     bool HasLeftItsPlace(TargetId id);
 
+    /// <summary>What became of the object, as the steps that judge the surroundings of an object tell it.</summary>
+    BoxFate FateOf(TargetId id);
+
     /// <summary>Whether the target is among the objects to keep, whether or not a step has proposed it yet.</summary>
     bool IsProtected(TargetId id);
 

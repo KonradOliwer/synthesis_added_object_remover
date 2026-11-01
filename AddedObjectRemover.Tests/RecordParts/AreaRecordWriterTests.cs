@@ -248,7 +248,7 @@ public sealed class AreaRecordWriterTests
     {
         var added = AddedNavmesh();
 
-        var written = WrittenNavmesh(Write(AddedNavmeshHandles(added), new SetNavmeshZ(added.FormKey.ToRecordKey(), RemovalConvention.SunkNavmeshZ)), added.FormKey);
+        var written = WrittenNavmesh(Write(AddedNavmeshHandles(added), new FlattenAndDetachNavmesh(added.FormKey.ToRecordKey(), RemovalConvention.SunkNavmeshZ)), added.FormKey);
 
         var data = written.Data!;
         const float z = RemovalConvention.SunkNavmeshZ;

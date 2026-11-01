@@ -4,10 +4,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>Finds the other mods' objects that a target object replaces. It references its contracts, BaseObjectShapeAndKind.Contracts, RunCaches.Contracts, CollectPlacedObjects.Contracts, Ids and the package-free tools it uses, and holds no packages.</Description>
+    <Description>Finds the other mods' objects that a target object replaces. It references its contracts, RemoveTooCloseObjects.Contracts (for the causes of other worlds it provides), BaseObjectShapeAndKind.Contracts, RunCaches.Contracts, CollectPlacedObjects.Contracts, Ids and the package-free tools it uses, and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\SelectObjectsThatCanCauseRemovals.Contracts\SelectObjectsThatCanCauseRemovals.Contracts.csproj" />
+    <ProjectReference Include="..\RemoveTooCloseObjects.Contracts\RemoveTooCloseObjects.Contracts.csproj" />
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
     <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
     <ProjectReference Include="..\..\Caches\RunCaches.Contracts\RunCaches.Contracts.csproj" />

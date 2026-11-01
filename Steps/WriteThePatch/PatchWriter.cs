@@ -21,20 +21,9 @@ public static class PatchWriter
         IPluginRecords Plugin,
         IPatchWriting Writing);
 
-    public static WriteSummary Write(Input input) =>
-        Write(input.Final, input.Targets, input.OtherModsObjects, input.WhereRemoved, input.Plugin, input.Writing);
-
-    /// <summary>The restore step's navmesh check, which has the patch writing try the write orders without writing them.</summary>
-    public static INavmeshCheckIfWritten CreateNavmeshCheck(IPluginRecords plugin, IPatchWriting writing) => new NavmeshCheckIfWritten(plugin, writing);
-
-    internal static WriteSummary Write(
-        IRemovalDecisions final,
-        ImmutableArray<TargetObject> targets,
-        OtherModsObjectsResult otherModsObjects,
-        RestoreWhereRemovedResult whereRemoved,
-        IPluginRecords plugin,
-        IPatchWriting writing)
+    public static WriteSummary Write(Input input)
     {
+        var (final, targets, otherModsObjects, whereRemoved) = (input.Final, input.Targets, input.OtherModsObjects, input.WhereRemoved);
         var removed = ListRemovalsInWriteOrder(final);
         var orders = new List<WriteOrder>();
         var enableParentsReplaced = 0;
@@ -61,12 +50,15 @@ public static class PatchWriter
         var pulled = otherModsObjects.Objects.Where(outcome => outcome.Fate == OtherModsObjectFate.PulledDown).Select(outcome => new SetPosition(outcome.Object.Key, outcome.NewPosition)).ToList();
         orders.AddRange(pulled);
 
-        var records = plugin.ReadWritableRecords();
-        writing.Write(records, orders);
-        NavmeshOutputCheck.ThrowOnFault(orders, whereRemoved.DoorsLeftRemoved.ToHashSet(), () => writing.ReadFinalNavmeshes(records));
+        var records = input.Plugin.ReadWritableRecords();
+        input.Writing.Write(records, orders);
+        NavmeshOutputCheck.ThrowOnFault(orders, whereRemoved.DoorsLeftRemoved.ToHashSet(), () => input.Writing.ReadFinalNavmeshes(records));
         return new WriteSummary(
             removed, restored, moves.Count, enableParentsReplaced, fitted.Count, otherRemovals.Count, pulled.Count, whereRemovedOrders.Select(order => order.Record).Distinct().Count());
     }
+
+    /// <summary>The restore step's navmesh check, which has the patch writing try the write orders without writing them.</summary>
+    public static INavmeshCheckIfWritten CreateNavmeshCheck(IPluginRecords plugin, IPatchWriting writing) => new NavmeshCheckIfWritten(plugin, writing);
 
     /// <summary>Round by round, each round's direct removals in target order, then the linked ones.</summary>
     internal static ImmutableArray<TargetId> ListRemovalsInWriteOrder(IRemovalDecisions final) =>

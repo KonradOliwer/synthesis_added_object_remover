@@ -39,7 +39,7 @@ public sealed record UnreadableRecord(RecordKey Key, string? EditorId, string Re
 /// <param name="Unreadable">The records that could not be read, in the order found.</param>
 public sealed record NonPlacedLinks(ImmutableArray<LinkFact> Links, ImmutableArray<UnreadableRecord> Unreadable);
 
-/// <summary>One form link from a record into a target-plugin record, as read; it is not judged here.</summary>
+/// <summary>One form link from a record into a record the read asked about, as read; it is not judged here.</summary>
 /// <param name="SourceRecordType">The record type name of the linking record, e.g. "Quest".</param>
 /// <param name="SourceIsWorldspace">Whether the linking record is a worldspace.</param>
 /// <param name="AliasFlags">For a <see cref="RelationKind.UniqueActor"/> link, the flags of that alias; otherwise none.</param>

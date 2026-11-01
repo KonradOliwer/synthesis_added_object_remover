@@ -4,8 +4,8 @@ using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
 /// <summary>
-/// The log lines of the unexpected errors. Errors for single objects or meshes with the same part and the same failure
-/// are one group, so a faulty mesh gives one line, not one per object. Groups come ordered by part, then failure,
+/// The log lines of the unexpected errors. Errors for single objects with the same part and the same failure
+/// are one group, so one line stands for many objects. Groups come ordered by part, then failure,
 /// and a group's subjects by their position in the record key order, so the text does not depend on timing.
 /// </summary>
 internal static class UnexpectedErrorLines

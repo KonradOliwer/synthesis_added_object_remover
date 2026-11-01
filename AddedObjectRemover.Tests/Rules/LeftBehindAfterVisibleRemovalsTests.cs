@@ -16,10 +16,7 @@ public class LeftBehindAfterVisibleRemovalsTests
     private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(OtherMod, "LeftBehindAfterVisibleRemovalsData", Block));
 
     private static readonly LeftBehindSettings Settings = new(
-        LookAround: 1024,
-        DirectionClearedPercent: 50,
-        ClearedDirectionsPercent: 60,
-        MinOccupiedDirections: 4,
+        new LeftBehindSurroundings(LookAround: 1024, MinOccupiedDirections: 4, DirectionClearedPercent: 50, ClearedDirectionsPercent: 60),
         NeverRemove: new HashSet<InvisibleObjectKind>());
 
     private static readonly BaseKey XMarker = TestVisibility.TaggedBase(ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers));
@@ -55,24 +52,24 @@ public class LeftBehindAfterVisibleRemovalsTests
         Assert.Equal(LeftBehindOutcome.KeptSurroundingsMostlyKept, marker.Decision);
     }
 
-    private static ProposedRemoval Removed(int index) => new(new TargetId(index), new RemovalReason.VisibleObjectSurroundingsRemoved());
+    private static ProposedRemoval Removed(int index) => new(new TargetId(index), new VisibleObjectSurroundingsRemoved());
 
     private static RemovalDecisions StartDecisions() =>
         TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Length), TestBaseFacts.Unresolved), Targets.Length);
 
-    private static LeftBehindResult Find(IRemovalDecisions decisions)
+    private static LeftBehindResult Find(IRunDecisions decisions)
     {
         var scene = TestScenes.Create(Targets, [], Shapes, supportOnlyObjects: []);
         return LeftBehindObjects.Find(
-            Targets,
-            scene.ObjectsThatCanCauseRemovals(Replacements.None(0), NpcHandling.OnlyWhenStuckInsideTheObject),
-            new HashSet<OtherId>(),
-            decisions,
-            scene.VisibleTargets,
-            TestBaseFacts.Unresolved,
-            Shapes,
-            TargetWorkOrder.Of(Targets),
-            new Execution(Environment.ProcessorCount),
-            Settings);
+            new(
+                Targets,
+                scene.ObjectsThatCanCauseRemovals(Replacements.None(0), NpcHandling.OnlyWhenStuckInsideTheObject),
+                new Dictionary<OtherId, OtherObject?>(),
+                decisions,
+                scene.VisibleTargets,
+                new TestRunCaches(Shapes, bases: TestBaseFacts.Unresolved),
+                TargetWorkOrder.Of(Targets),
+                new Execution(Environment.ProcessorCount),
+                Settings)).Result;
     }
 }

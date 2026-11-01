@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 
@@ -37,25 +38,22 @@ public static class ChangedTerrainObjects
     {
         ChangedTerrainResult result = new(
             [
-                .. JudgedGroups.MergeEqualSettings(input.Groups)
+                .. ObjectsJudgedWith<ChangedTerrainSettings>.MergeEqualSettings(input.Groups)
                     .Select(group => FindPass(input.World, input.Accepted, input.LoadOrder, input.Records, input.Shapes, input.Execution, group)),
             ]);
         return new Decided<ChangedTerrainResult>(result, input.Decisions.Apply(RoundKind.ChangedTerrain, result.Proposals));
     }
 
+    /// <param name="LoadOrder">Decides which of several changing plugins loads last.</param>
+    /// <param name="Records">Its terrain and water versions must have been read.</param>
+    public sealed record PlacementRuleInput(AcceptedWorld Accepted, LoadOrderPlugins LoadOrder, IPluginRecords Records, IBaseObjectShapes Shapes, ChangedTerrainSettings Settings);
+
     /// <summary>The step's check of one target object at a given placement; it finds nothing when the step is off.</summary>
-    /// <param name="loadOrder">Decides which of several changing plugins loads last.</param>
-    /// <param name="records">Its terrain and water versions must have been read.</param>
-    public static IPlacementRule CreatePlacementRule(
-        AcceptedWorld accepted,
-        LoadOrderPlugins loadOrder,
-        IPluginRecords records,
-        IBaseObjectShapes shapes,
-        ChangedTerrainSettings settings) =>
-        new ChangedTerrainPlacementRule(settings.On ? CreateCheck(accepted, loadOrder, records, shapes, settings) : null);
+    public static IPlacementRule CreatePlacementRule(PlacementRuleInput input) =>
+        new ChangedTerrainPlacementRule(input.Settings.On ? CreateCheck(input.Accepted, input.LoadOrder, input.Records, input.Shapes, input.Settings) : null);
 
     /// <summary>How the step words a finding as the reason of a removal.</summary>
-    internal static RemovalReason ReasonOf(ObjectOnChangedTerrain hit) => new RemovalReason.TerrainChanged(hit.ChangedBy, hit.Kind);
+    internal static RemovalReason ReasonOf(ObjectOnChangedTerrain hit) => new TerrainChanged(hit.ChangedBy, hit.Kind);
 
     private static ChangedTerrainPass FindPass(
         CollectedObjects world,

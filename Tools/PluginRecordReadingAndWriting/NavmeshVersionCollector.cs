@@ -5,10 +5,10 @@ using Mutagen.Bethesda.Skyrim;
 namespace AddedObjectRemover;
 
 /// <summary>
-/// The navmeshes of the target spaces the target plugin overrides, deletes or adds, each with its versions from the one just below
-/// the target plugin's up to the winner, and every plugin's navmesh info map, so a part is written from the versions it was compared on.
+/// The navmeshes of the target spaces the read's plugin overrides, deletes or adds, each with its versions from the one just below
+/// the read's plugin's up to the winner, and every plugin's navmesh info map, so a part is written from the versions it was compared on.
 /// </summary>
-/// <param name="navmeshes">Only those with a fact. For a navmesh the target plugin defines, the version below its own holds no record.</param>
+/// <param name="navmeshes">Only those with a fact. For a navmesh the read's plugin defines, the version below its own holds no record.</param>
 /// <param name="winners">Every navmesh of the target spaces at its winning version, so the written navmeshes can be checked among them.</param>
 /// <param name="winningDoorLinks">The navmesh link of every placed record of the target spaces whose winning version has one.</param>
 internal sealed class NavmeshRecordHandles(
@@ -28,16 +28,19 @@ internal sealed class NavmeshRecordHandles(
     /// <summary>The reverse links among <see cref="Winners"/> and <see cref="WinningDoorLinks"/>, built once for every final world over this read.</summary>
     public WinningNavmeshLinks Links { get; } = new(winners, winningDoorLinks);
 
-    /// <summary>The target plugin changes no navmesh, so no map is read.</summary>
+    /// <summary>The read's plugin changes no navmesh, so no map is read.</summary>
     public static NavmeshRecordHandles Empty { get; } = new(
-        new Dictionary<RecordKey, RecordVersions<NavmeshVersion?>>(), [], new Dictionary<RecordKey, NavmeshVersion>(), new Dictionary<RecordKey, NavDoorLinkFact>());
+        ImmutableDictionary<RecordKey, RecordVersions<NavmeshVersion?>>.Empty,
+        [],
+        ImmutableDictionary<RecordKey, NavmeshVersion>.Empty,
+        ImmutableDictionary<RecordKey, NavDoorLinkFact>.Empty);
 }
 
 /// <summary>
 /// Collects, while the load order is walked highest priority first, the navmesh versions of the target spaces and the navmesh links
-/// of their doors, then compares the versions of the navmeshes the target plugin overrides, deletes or adds (<see cref="NavmeshRecordFact"/>).
-/// Memory stays bounded: every navmesh keeps only its winner and its version just below the target plugin's, and only the
-/// navmeshes the target plugin changed keep the versions in between.
+/// of their doors, then compares the versions of the navmeshes the read's plugin overrides, deletes or adds (<see cref="NavmeshRecordFact"/>).
+/// Memory stays bounded: every navmesh keeps only its winner and its version just below the read's plugin's, and only the
+/// navmeshes the read's plugin changed keep the versions in between.
 /// </summary>
 internal sealed class NavmeshVersionCollector(PluginName target, TargetFootprint footprint, PluginNames names)
 {
@@ -47,16 +50,16 @@ internal sealed class NavmeshVersionCollector(PluginName target, TargetFootprint
     private readonly Dictionary<RecordKey, NavDoorLinkFact> _winningDoorLinks = new();
     private readonly Dictionary<RecordKey, NavDoorLinkFact> _earlierDoorLinks = new();
 
-    /// <summary>The cell whose child list holds the winning version of each placed record the target plugin overrides.</summary>
+    /// <summary>The cell whose child list holds the winning version of each placed record the read's plugin overrides.</summary>
     private readonly Dictionary<RecordKey, RecordKey> _winningDoorCells = new();
 
-    /// <summary>Doors whose winner loads at or after the target plugin and whose version below it is not read yet.</summary>
+    /// <summary>Doors whose winner loads at or after the read's plugin and whose version below it is not read yet.</summary>
     private readonly HashSet<RecordKey> _doorsAwaitingEarlierVersion = new();
 
     /// <summary>The cells of the target spaces that some plugin's version deletes.</summary>
     private readonly HashSet<RecordKey> _deletedCells = new();
 
-    /// <param name="belowTarget">The plugin loads before the target plugin.</param>
+    /// <param name="belowTarget">The plugin loads before the read's plugin.</param>
     /// <remarks>Like placed records, a plugin's first copy of a navmesh found is the one kept.</remarks>
     public void SeeNavmeshes(ICellGetter cell, RecordKey cellKey, RecordKey spaceKey, PluginName plugin, bool belowTarget)
     {
@@ -74,7 +77,7 @@ internal sealed class NavmeshVersionCollector(PluginName target, TargetFootprint
 
     /// <param name="cell">The cell whose child list holds the version.</param>
     /// <param name="isWinner">The first version of the record found.</param>
-    /// <param name="belowTarget">The version's plugin loads before the target plugin.</param>
+    /// <param name="belowTarget">The version's plugin loads before the read's plugin.</param>
     public void SeeDoorVersion(RecordKey key, IPlacedGetter record, RecordKey cell, bool isWinner, bool belowTarget)
     {
         if (record is not IPlacedObjectGetter placed) return;
@@ -94,8 +97,8 @@ internal sealed class NavmeshVersionCollector(PluginName target, TargetFootprint
     }
 
     /// <returns>
-    /// The navmeshes whose target plugin's version differs from the one below it in a part, in key order; and the navmesh link of
-    /// each placed record the target plugin overrides that has one in its version below the target plugin's or its winning version, by key.
+    /// The navmeshes whose read's plugin's version differs from the one below it in a part, in key order; and the navmesh link of
+    /// each placed record the read's plugin overrides that has one in its version below the read's plugin's or its winning version, by key.
     /// </returns>
     public (ImmutableArray<NavmeshRecordFact> Facts, NavmeshRecordHandles Handles, IReadOnlyDictionary<RecordKey, NavDoorLinkVersions> OverriddenDoorLinks) Compare(
         ILoadOrderGetter<IModListingGetter<ISkyrimModGetter>> loadOrder)
@@ -109,7 +112,7 @@ internal sealed class NavmeshVersionCollector(PluginName target, TargetFootprint
             .OrderBy(entry => entry.Key, RecordKeyOrder.Comparer)
             .Select(entry => CompareNavmesh(entry.Key, entry.Value.SpaceKey, entry.Value.Versions, neighbours[entry.Key], comparing))
             .ToList();
-        ImmutableArray<NavmeshRecordFact> facts = [.. WithReplacements(compared).Where(TargetChangedAPart)];
+        ImmutableArray<NavmeshRecordFact> facts = [.. WithReplacements(compared).Where(NamedPluginChangedAPart)];
         var handles = new NavmeshRecordHandles(
             facts.ToDictionary(fact => fact.Key, fact => changed[fact.Key].Versions),
             maps.Versions,
@@ -135,7 +138,7 @@ internal sealed class NavmeshVersionCollector(PluginName target, TargetFootprint
         var changed = _walk.Read.ToDictionary(entry => entry.Key, entry => (entry.Place, entry.Versions));
         foreach (var (key, spaceKey, plugins, versions) in _walk.DefinedByTarget)
         {
-            // No record below the target plugin's version, which stands under the target plugin's name.
+            // No record below the read's plugin's version, which stands under the read's plugin's name.
             changed.Add(key, (spaceKey, new RecordVersions<NavmeshVersion?>([target, .. plugins], [null, .. versions])));
         }
         return changed;
@@ -157,11 +160,11 @@ internal sealed class NavmeshVersionCollector(PluginName target, TargetFootprint
         return linkingInto;
     }
 
-    /// <summary>The navmeshes of the target spaces linked to the navmesh by its version below the target plugin's, by the target plugin's, or by their winner.</summary>
+    /// <summary>The navmeshes of the target spaces linked to the navmesh by its version below the read's plugin's, by the read's plugin's, or by their winner.</summary>
     private ImmutableArray<RecordKey> NeighboursOf(RecordKey key, RecordVersions<NavmeshVersion?> read, Dictionary<RecordKey, List<RecordKey>> linkingInto)
     {
         var linked = new HashSet<RecordKey>(linkingInto.GetValueOrDefault(key) ?? []);
-        foreach (var version in new[] { read.Earlier, read.OfTarget })
+        foreach (var version in new[] { read.Earlier, read.OfNamedPlugin })
         {
             if (version is not null) linked.UnionWith(NavmeshShapes.LinkedNavmeshes(version.Record, names));
         }
@@ -169,7 +172,7 @@ internal sealed class NavmeshVersionCollector(PluginName target, TargetFootprint
         return [.. linked.Where(_winners.ContainsKey).Order(RecordKeyOrder.Comparer)];
     }
 
-    /// <summary>For each navmesh, the doors whose winning link or link below the target plugin names it.</summary>
+    /// <summary>For each navmesh, the doors whose winning link or link below the read's plugin names it.</summary>
     private Dictionary<RecordKey, List<RecordKey>> DoorsNamingEachNavmesh()
     {
         var doors = new Dictionary<RecordKey, List<RecordKey>>();
@@ -179,8 +182,8 @@ internal sealed class NavmeshVersionCollector(PluginName target, TargetFootprint
 
     private NavmeshRecordFact CompareNavmesh(RecordKey key, RecordKey spaceKey, RecordVersions<NavmeshVersion?> read, ImmutableArray<RecordKey> neighbours, Comparing comparing)
     {
-        var own = read.OfTarget!;
-        var (geometry, presence) = NavmeshPartHistory.Of(read);
+        var own = read.OfNamedPlugin!;
+        var (geometry, presence) = NavmeshPartComparison.Of(read);
         var earlier = read.Earlier is { } below ? NavmeshShapes.Read(below, read.Plugins[0], comparing.Maps.EntryBelow(key, target), names) : null;
         var ownEntry = comparing.Maps.EntryUpTo(key, target);
         var current = own.Record.IsDeleted && earlier is not null
@@ -195,7 +198,7 @@ internal sealed class NavmeshVersionCollector(PluginName target, TargetFootprint
             geometry,
             presence,
             comparing.Maps.EntryDifferences(key, target),
-            IsDeletedAboveTarget(read, own),
+            IsDeletedAboveNamedPlugin(read, own),
             earlier,
             current,
             [],
@@ -213,7 +216,7 @@ internal sealed class NavmeshVersionCollector(PluginName target, TargetFootprint
         : footprint.DeletedNavmeshes.Contains(key) ? NavmeshCase.DeletedWithoutReplacement
         : NavmeshCase.Edited;
 
-    private static bool IsDeletedAboveTarget(RecordVersions<NavmeshVersion?> read, NavmeshVersion own) =>
+    private static bool IsDeletedAboveNamedPlugin(RecordVersions<NavmeshVersion?> read, NavmeshVersion own) =>
         !own.Record.IsDeleted && VersionComparison.AboveNamedPlugin(read.Versions).Any(version => version!.Record.IsDeleted);
 
     private NeighbourNavmesh NeighbourOf(RecordKey neighbour, Comparing comparing)
@@ -241,7 +244,7 @@ internal sealed class NavmeshVersionCollector(PluginName target, TargetFootprint
         return [.. doors.Order(RecordKeyOrder.Comparer).Select(DoorLinkOf)];
     }
 
-    /// <summary>A deleted navmesh is replaced by the navmeshes the target plugin adds in its cell that overlap its earlier triangles from above.</summary>
+    /// <summary>A deleted navmesh is replaced by the navmeshes the read's plugin adds in its cell that overlap its earlier triangles from above.</summary>
     private static IEnumerable<NavmeshRecordFact> WithReplacements(List<NavmeshRecordFact> facts)
     {
         var added = facts.Where(fact => fact.Case == NavmeshCase.Added).ToList();
@@ -263,10 +266,10 @@ internal sealed class NavmeshVersionCollector(PluginName target, TargetFootprint
         return one.WorldTriangles().Any(triangle => others.Any(otherTriangle => TriangleFootprints.Overlap(triangle, otherTriangle)));
     }
 
-    private static bool TargetChangedAPart(NavmeshRecordFact fact) =>
-        TargetChanged(fact.Geometry) || TargetChanged(fact.Presence) || (fact.MapEntry is { } mapEntry && TargetChanged(mapEntry));
+    private static bool NamedPluginChangedAPart(NavmeshRecordFact fact) =>
+        NamedPluginChanged(fact.Geometry) || NamedPluginChanged(fact.Presence) || (fact.MapEntry is { } mapEntry && NamedPluginChanged(mapEntry));
 
-    private static bool TargetChanged(PartDifferences part) => VersionComparison.NamedPluginVersionOf(part.Versions).FromBelow;
+    private static bool NamedPluginChanged(PartDifferences part) => VersionComparison.NamedPluginVersionOf(part.Versions).FromBelow;
 
     /// <summary>What comparing every changed navmesh shares.</summary>
     /// <param name="Neighbours">The neighbours read so far, so each is read once.</param>

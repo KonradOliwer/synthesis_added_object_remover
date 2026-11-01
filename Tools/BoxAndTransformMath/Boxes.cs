@@ -4,10 +4,24 @@ using System.Numerics;
 namespace AddedObjectRemover;
 
 /// <summary>A box's three sizes, ordered from the largest to the smallest.</summary>
-public readonly record struct SortedDimensions(float Largest, float Middle, float Smallest);
+public readonly record struct SortedDimensions(float Largest, float Middle, float Smallest)
+{
+    /// <summary>How alike two boxes are in size: the smallest, across the three matching sizes, of min(a,b)/max(a,b); two zero sizes are alike.</summary>
+    public float RatioTo(SortedDimensions other) =>
+        MathF.Min(MathF.Min(Ratio(Largest, other.Largest), Ratio(Middle, other.Middle)), Ratio(Smallest, other.Smallest));
+
+    private static float Ratio(float a, float b)
+    {
+        if (a == 0 || b == 0) return a == b ? 1f : 0f;
+        return MathF.Min(a, b) / MathF.Max(a, b);
+    }
+}
 
 public static class Boxes
 {
+    /// <summary>A box grown by padding is padded on both sides of each axis.</summary>
+    private const float SidesPerAxis = 2f;
+
     /// <summary>AABB enclosing the box of the given half extents, rotated by <paramref name="rotation"/> and centered at <paramref name="center"/>.</summary>
     public static Box RotatedAabb(Vector3 center, Mat3 rotation, Vector3 halfExtents)
     {
@@ -28,6 +42,12 @@ public static class Boxes
         var padding = scaled.Size * multiplier;
         return new Box(scaled.Min - padding, scaled.Max + padding);
     }
+
+    /// <summary>
+    /// How many times its size <see cref="ExpandedLocalBox"/> makes a box along each axis. That method pads minimum and maximum
+    /// itself, because computing the grown size from this factor would round differently; both describe the same growth.
+    /// </summary>
+    public static float SizeGrowthFactor(float multiplier) => 1f + SidesPerAxis * multiplier;
 
     /// <summary>
     /// The axis-aligned world boxes around a local box placed by <paramref name="transform"/>, grown on every side: the first by its

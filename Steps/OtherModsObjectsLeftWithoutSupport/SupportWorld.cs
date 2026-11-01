@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
@@ -28,7 +29,7 @@ internal sealed class SupportWorld(
     IBaseObjectShapes shapes)
 {
     /// <summary>No object of any plugin moved or taken away.</summary>
-    public static readonly IReadOnlyDictionary<OtherId, PlacedTransform?> NoChanges = new Dictionary<OtherId, PlacedTransform?>();
+    public static readonly IReadOnlyDictionary<OtherId, PlacedTransform?> NoChanges = ImmutableDictionary<OtherId, PlacedTransform?>.Empty;
 
     /// <summary>The world with the objects of any plugin as <paramref name="changes"/> leaves them.</summary>
     public SupportWorld With(IReadOnlyDictionary<OtherId, PlacedTransform?> changes) => new(targets, targetIndex, stands, others, changes, shapes);

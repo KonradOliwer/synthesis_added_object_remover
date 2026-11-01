@@ -81,14 +81,11 @@ internal sealed class TerrainGuards(
         var points = ground.Under(placed).ToList();
         if (!points.Any(plan.Restores)) return [];
         var bottom = ground.BottomOf(placed);
-        var lowestNow = LowestOf(points, winningHeightsOf);
-        var lowestAfter = LowestOf(points, cell => plan.PlannedHeightsOf(cell) ?? winningHeightsOf(cell));
+        // Points under the object always include one that goes back, so some height is known.
+        var lowestNow = LandGridPoint.LowestHeight(points, winningHeightsOf);
+        var lowestAfter = LandGridPoint.LowestHeight(points, cell => plan.PlannedHeightsOf(cell) ?? winningHeightsOf(cell));
         return MathF.Abs(bottom - lowestNow) <= MathF.Abs(bottom - lowestAfter) ? points : [];
     }
-
-    /// <remarks>Only cells with known heights count; points under the object always include one that goes back, so some height is known.</remarks>
-    private static float LowestOf(List<LandGridPoint> points, Func<ExteriorCell, float[]?> heightsOf) =>
-        points.Select(point => heightsOf(point.Cell)?[point.Point]).OfType<float>().Min();
 
     private bool LiesOnTheGroundAsItIs(RestoredGridPoint point, NavmeshesAsTheyWillStand navmeshes) =>
         spacesOnLand.GetValueOrDefault(point.Point.Worldspace, []).Any(space =>

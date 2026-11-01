@@ -109,12 +109,12 @@ public class SupportShortcutTests
 
         Assert.Equal(
             [Supporter.Target(0), Supporter.Target(1), Supporter.Placed(new OtherId(1)), Supporter.Terrain],
-            hits.Contacts().Supporters.Select(entry => entry.Supporter));
+            support.ContactsOf(hits).Supporters.Select(entry => entry.Supporter));
         List<TargetId>[] takenOutSets = [[new TargetId(0)], [new TargetId(1)], [new TargetId(0), new TargetId(1)]];
         foreach (var takenOut in takenOutSets)
         {
             var searched = support.FindContacts(standing, scene.World.Without(takenOut), queries);
-            var shortcut = hits.ContactsWithout(takenOut);
+            var shortcut = support.ContactsWithout(hits, takenOut);
 
             Assert.Equal(searched.ContactPoints, shortcut.ContactPoints);
             Assert.Equal(BitConverter.SingleToInt32Bits(searched.TotalWeight), BitConverter.SingleToInt32Bits(shortcut.TotalWeight));
@@ -168,7 +168,9 @@ public class SupportShortcutTests
         return new Scene([], [Lantern(Up(HighAbove)), Block(1), TestShapes.Placed(OtherMod, 2, BoardModel.Base, Up(boardBottom))], TestGround.NoTerrain());
     }
 
-    private static SurfaceContacts CreateSurfaceContacts(Scene scene) => new(scene.Terrain, scene.Triangles, TestSurfaceSamples.Over(scene.Triangles), TouchGap);
+    private static ISupportContacts CreateSurfaceContacts(Scene scene) =>
+        RestingObjects.CreateSupportContacts(
+            new TestRunCaches(Shapes, scene.Triangles, scene.Terrain, TestBaseFacts.Unresolved, () => throw new InvalidOperationException("The support rule reads no objects of any plugin.")));
 
     private static StandingObject StandingOf(OtherObject other)
     {

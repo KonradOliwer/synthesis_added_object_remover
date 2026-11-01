@@ -7,33 +7,33 @@ public class RoundEffectsTests
 {
     private static readonly Round ThisRound = new(2, RoundKind.AlsoRemove);
     private static readonly Round OtherRound = new(1, RoundKind.TooClose);
-    private static readonly RemovalReason Cause = new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize());
+    private static readonly RemovalReason Cause = new TooClose(new OtherId(0), new TooCloseCause.ObjectSize());
     private static readonly KeepReason Referenced = TestKeepReasons.Quest;
 
     [Fact]
-    public void NoDecisionIsUntouched()
+    public void UntouchedHasNoOutcomeAndNoKeepReason()
     {
-        Assert.Equal(new RoundEffect(RoundOutcome.Untouched, false, null), RoundEffects.Of(null));
+        Assert.Equal(new RoundEffect(RoundOutcome.Untouched, false, null), RoundEffect.Untouched);
     }
 
     [Fact]
     public void ARemovalForItsOwnReasonIsRemoved()
     {
-        Assert.Equal(new RoundEffect(RoundOutcome.Removed, false, null), RoundEffects.Of(new Decision.Removed(ThisRound, Cause)));
+        Assert.Equal(new RoundEffect(RoundOutcome.Removed, false, null), new Decision.Removed(ThisRound, Cause).Effect);
     }
 
     [Fact]
     public void ARemovalAsAGroupMemberIsRemovedAsLinked()
     {
-        var linked = new RemovalReason.LinkedTo(new TargetId(3));
+        var linked = new LinkedTo(new TargetId(3));
 
-        Assert.Equal(new RoundEffect(RoundOutcome.Removed, true, null), RoundEffects.Of(new Decision.Removed(ThisRound, linked)));
+        Assert.Equal(new RoundEffect(RoundOutcome.Removed, true, null), new Decision.Removed(ThisRound, linked).Effect);
     }
 
     [Fact]
     public void AKeptProposalIsKeptAsReferencedWithItsKeepReason()
     {
-        Assert.Equal(new RoundEffect(RoundOutcome.KeptAsReferenced, false, Referenced), RoundEffects.Of(new Decision.Kept(ThisRound, Cause, Referenced)));
+        Assert.Equal(new RoundEffect(RoundOutcome.KeptAsReferenced, false, Referenced), new Decision.Kept(ThisRound, Cause, Referenced).Effect);
     }
 
     [Fact]
@@ -41,14 +41,13 @@ public class RoundEffectsTests
     {
         var fitted = new Decision.Fitted(ThisRound, Cause, new EulerPlacement(Vector3.One, Vector3.Zero, 0.5f));
 
-        Assert.Equal(new RoundEffect(RoundOutcome.KeptShrunkOrTurned, false, null), RoundEffects.Of(fitted));
+        Assert.Equal(new RoundEffect(RoundOutcome.KeptShrunkOrTurned, false, null), fitted.Effect);
     }
 
     [Fact]
     public void ADecisionOfAnotherRoundIsUntouchedForThisRound()
     {
-        Assert.Equal(RoundOutcome.Untouched, RoundEffects.Of(new Decision.Removed(OtherRound, Cause), ThisRound).Outcome);
-        Assert.Equal(RoundOutcome.Untouched, RoundEffects.Of(null, ThisRound).Outcome);
+        Assert.Equal(RoundEffect.Untouched, new Decision.Removed(OtherRound, Cause).EffectIn(ThisRound));
     }
 
     [Fact]
@@ -56,6 +55,6 @@ public class RoundEffectsTests
     {
         var decision = new Decision.Kept(ThisRound, Cause, Referenced);
 
-        Assert.Equal(RoundEffects.Of(decision), RoundEffects.Of(decision, ThisRound));
+        Assert.Equal(decision.Effect, decision.EffectIn(ThisRound));
     }
 }

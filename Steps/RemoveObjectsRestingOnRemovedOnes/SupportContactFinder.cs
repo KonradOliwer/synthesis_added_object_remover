@@ -5,14 +5,15 @@ namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
 /// <summary>
 /// Contact points of a target object with everything that may hold it up (<see cref="SupporterFinder"/>, and terrain), found
-/// by <see cref="SurfaceContacts"/>, their weights split among the supporters (<see cref="SupportContactWeights"/>).
+/// by <see cref="SurfaceContacts"/> within the touch gap, their weights split among the supporters (<see cref="SupportContactWeights"/>).
 /// Thread-safe; results depend only on the inputs.
 /// </summary>
 internal sealed class SupportContactFinder(
     IReadOnlyList<TargetObject> targets,
     TargetMeshPaths meshPaths,
     SupporterFinder supporterFinder,
-    SurfaceContacts surfaces)
+    SurfaceContacts surfaces,
+    float touchGap)
 {
     /// <param name="ZeroWeight">Set when the contacts have contact points but no support weight.</param>
     internal readonly record struct FoundContacts(CandidateContacts Contacts, ZeroWeightDiagnostic? ZeroWeight);
@@ -33,7 +34,7 @@ internal sealed class SupportContactFinder(
     {
         var target = targets[candidate];
         var samples = surfaces.SampleSurface(meshPaths.Get(candidate));
-        var hits = surfaces.FindHits(samples.Points, target.SpaceKey, target.Transform, supporterFinder.FindMeshSupporters(candidate, scratch), scratch.Triangles);
+        var hits = surfaces.FindHits(samples.Points, target.SpaceKey, target.Transform, supporterFinder.FindMeshSupporters(candidate, scratch), touchGap, scratch.Triangles);
         var contacts = SupportContactWeights.SplitWeightsAmongSupporters(hits, samples.Weights);
         return new FoundContacts(contacts, ZeroWeightDiagnosis.Of(candidate, meshPaths.Get(candidate), samples, hits, contacts));
     }

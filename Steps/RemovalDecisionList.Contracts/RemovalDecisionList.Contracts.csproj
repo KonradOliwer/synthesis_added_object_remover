@@ -4,13 +4,12 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The decisions about which target objects are removed, kept or kept shrunk or turned where they stand, round by round, the proposals steps make, and the rules steps share to judge an object shrunk or turned and to find the objects others rest on, and the surroundings rule both left-behind steps judge by: what became of each neighbour and when the directions around an object are cleared. It references Ids, BoxAndTransformMath (for the placement), CompassSectorAreas and NumericRanges (for the areas and shares per direction), CollectPlacedObjects.Contracts (for the target object a rule checks), FindTargetObjectsToKeep.Contracts and UnexpectedFailureHandling (for the failures of a pass) and holds no packages.</Description>
+    <Description>The decisions about which target objects are removed, kept or kept shrunk or turned where they stand, round by round, their read view, the open base of the removal reasons each step declares in its own contracts, the proposals steps make, and what became of each object as the steps that judge the surroundings of an object tell it. It references Ids, BoxAndTransformMath (for the placement), CollectPlacedObjects.Contracts (for the target objects and earlier versions), FindTargetObjectsToKeep.Contracts, KeyedGroupingInInputOrder (for merging groups with equal settings) and UnexpectedFailureHandling (for the failures of a pass) and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
     <ProjectReference Include="..\..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
-    <ProjectReference Include="..\..\Tools\CompassSectorAreas\CompassSectorAreas.csproj" />
-    <ProjectReference Include="..\..\Tools\NumericRanges\NumericRanges.csproj" />
+    <ProjectReference Include="..\..\Tools\KeyedGroupingInInputOrder\KeyedGroupingInInputOrder.csproj" />
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
     <ProjectReference Include="..\FindTargetObjectsToKeep.Contracts\FindTargetObjectsToKeep.Contracts.csproj" />
     <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />

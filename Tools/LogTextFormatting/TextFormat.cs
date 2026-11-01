@@ -15,6 +15,9 @@ public static class TextFormat
     public static string Count<T>(T value, string singular, string plural) where T : IBinaryInteger<T> =>
         $"{Count(value)} {(value == T.One ? singular : plural)}";
 
+    /// <summary>A number with every digit that matters: it reads back as the same value.</summary>
+    public static string Exact<T>(T value) where T : IFormattable => value.ToString("R", CultureInfo.InvariantCulture);
+
     /// <summary>A number with exactly <paramref name="decimals"/> decimals.</summary>
     public static string Fixed<T>(T value, int decimals) where T : IFormattable => value.ToString($"F{decimals}", null);
 

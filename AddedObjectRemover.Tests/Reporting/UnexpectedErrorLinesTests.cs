@@ -97,15 +97,15 @@ public class UnexpectedErrorLinesTests
     }
 
     [Fact]
-    public void MeshesAreCountedAsMeshes()
+    public void OldPlaceObjectsAreCountedAsOldPlaceObjects()
     {
-        var errors = new[] { @"meshes\b.nif", @"meshes\a.nif" }.Select(
-            mesh => new UnexpectedError("reading mesh shapes", "InvalidDataException: broke", "Objects using the mesh have no shape.", new ErrorSubject(SubjectKind.Mesh, mesh, Position: 0)));
+        var errors = new[] { "Crate B", "Crate A" }.Select(
+            label => new UnexpectedError("checking old places", "InvalidDataException: broke", "Each was treated as colliding.", new ErrorSubject(SubjectKind.OldPlaceObject, label, Position: 0)));
 
         var lines = UnexpectedErrorLines.Of(errors, Context(detailed: false));
 
         Assert.Equal(
-            @"  Unexpected error while reading mesh shapes (InvalidDataException: broke): 2 meshes, e.g. meshes\a.nif, meshes\b.nif. Objects using the mesh have no shape.",
+            "  Unexpected error while checking old places (InvalidDataException: broke): 2 old-place objects, e.g. Crate A, Crate B. Each was treated as colliding.",
             Assert.Single(lines));
     }
 
@@ -128,13 +128,13 @@ public class UnexpectedErrorLinesTests
     public void ErrorsEqualOnTheFirstKeysButOfDifferentSubjectKindsComeOutInOneOrder()
     {
         var asObject = new UnexpectedError("checking", "InvalidOperationException: boom", "Missing.", new ErrorSubject(SubjectKind.Object, "same", 1));
-        var asMesh = asObject with { Subject = new ErrorSubject(SubjectKind.Mesh, "same", 1) };
+        var asOldPlaceObject = asObject with { Subject = new ErrorSubject(SubjectKind.OldPlaceObject, "same", 1) };
 
-        var oneWay = UnexpectedErrorLines.Of([asObject, asMesh], Context(detailed: false));
-        var otherWay = UnexpectedErrorLines.Of([asMesh, asObject], Context(detailed: false));
+        var oneWay = UnexpectedErrorLines.Of([asObject, asOldPlaceObject], Context(detailed: false));
+        var otherWay = UnexpectedErrorLines.Of([asOldPlaceObject, asObject], Context(detailed: false));
 
         Assert.Equal(oneWay.AsEnumerable(), otherWay.AsEnumerable());
-        Assert.Contains("1 mesh", oneWay[0], StringComparison.Ordinal);
+        Assert.Contains("1 object", oneWay[0], StringComparison.Ordinal);
     }
 
     [Fact]

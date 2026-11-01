@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using AddedObjectRemover.Tests.Fixtures;
 
 namespace AddedObjectRemover.Tests.Determinism;
 
@@ -6,6 +7,9 @@ public class ParallelMapTests
 {
     private const int ItemCount = 1000;
     private const int ShuffleSeed = 7;
+    private const int OtherShuffleSeed = 11;
+    private const int LowerFailingItem = 3;
+    private const int HigherFailingItem = 7;
 
     private sealed class CountingScratch
     {
@@ -106,6 +110,32 @@ public class ParallelMapTests
             ParallelMap.OneItemPerRange));
 
         Assert.IsType<OutOfMemoryException>(Assert.Single(failure.InnerExceptions));
+    }
+
+    [Theory]
+    [InlineData(1, ShuffleSeed)]
+    [InlineData(1, OtherShuffleSeed)]
+    [InlineData(8, ShuffleSeed)]
+    [InlineData(8, OtherShuffleSeed)]
+    public void ABugIsReportedBeforeALowerItemsUserDataFailureWhateverTheWorkersAndOrder(int workers, int seed)
+    {
+        var failure = Assert.Throws<AggregateException>(() => RunFailing(workers, seed, () => new IOException(), () => new NullReferenceException()));
+
+        Assert.IsType<NullReferenceException>(Assert.Single(failure.InnerExceptions));
+        Assert.False(Failures.IsRecoverable(failure));
+    }
+
+    [Theory]
+    [InlineData(1, ShuffleSeed)]
+    [InlineData(1, OtherShuffleSeed)]
+    [InlineData(8, ShuffleSeed)]
+    [InlineData(8, OtherShuffleSeed)]
+    public void OnlyUserDataFailuresReportTheLowestItemsWhateverTheWorkersAndOrder(int workers, int seed)
+    {
+        var failure = Assert.Throws<AggregateException>(() => RunFailing(workers, seed, () => new IOException(), () => new PlantedUserDataException()));
+
+        Assert.IsType<IOException>(Assert.Single(failure.InnerExceptions));
+        Assert.True(Failures.IsRecoverable(failure));
     }
 
     [Fact]
@@ -217,12 +247,26 @@ public class ParallelMapTests
             scratch => new Work(scratch.ItemsSeen, scratch.IndexSum),
             ParallelMap.AutomaticRangeSize);
 
+    /// <summary>Every item runs in a shuffled order; the lower failing item throws the first failure, the higher one the second.</summary>
+    private static int[] RunFailing(int workers, int seed, Func<Exception> lowerFailure, Func<Exception> higherFailure) =>
+        ParallelMap.Run(
+            Workers(workers),
+            Shuffled(ItemCount, seed),
+            () => 0,
+            (item, _) => item switch
+            {
+                LowerFailingItem => throw lowerFailure(),
+                HigherFailingItem => throw higherFailure(),
+                _ => item,
+            },
+            ParallelMap.OneItemPerRange);
+
     private static long Square(int item) => (long)item * item;
 
-    private static ImmutableArray<int> Shuffled(int count)
+    private static ImmutableArray<int> Shuffled(int count, int seed = ShuffleSeed)
     {
         var order = Enumerable.Range(0, count).ToArray();
-        new Random(ShuffleSeed).Shuffle(order);
+        new Random(seed).Shuffle(order);
         return [.. order];
     }
 

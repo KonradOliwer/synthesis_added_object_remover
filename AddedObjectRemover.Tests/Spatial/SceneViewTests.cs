@@ -69,13 +69,13 @@ public class SceneViewTests
         var caches = TestScenes.Create(targets, [], Shapes);
         var started = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(1), TestBaseFacts.Unresolved), targets.Length);
         var turnedAQuarter = targets[0].Placement with { Rotation = new Vector3(0, 0, MathF.PI / 2) };
-        var kept = started.ApplyFits([new ProposedFit(targets[0].Id, new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()), turnedAQuarter)]);
+        var kept = started.ApplyFits([new ProposedFit(targets[0].Id, new TooClose(new OtherId(0), new TooCloseCause.ObjectSize()), turnedAQuarter)]);
 
-        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(caches.IndexVisibleTargetsAsTheyStand(targets, kept)));
-        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(caches.IndexVisibleTargetsAsTheRoundsMeasureThem(targets, kept)));
+        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(caches.IndexVisibleTargetsAsTheyStand(kept)));
+        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(caches.IndexVisibleTargetsAsTheRoundsMeasureThem(kept)));
         Assert.Empty(NearEastOfTheSlab(caches.VisibleTargets));
-        Assert.Same(caches.VisibleTargets, caches.IndexVisibleTargetsAsTheyStand(targets, started));
-        Assert.Same(caches.VisibleTargets, caches.IndexVisibleTargetsAsTheRoundsMeasureThem(targets, started));
+        Assert.Same(caches.VisibleTargets, caches.IndexVisibleTargetsAsTheyStand(started));
+        Assert.Same(caches.VisibleTargets, caches.IndexVisibleTargetsAsTheRoundsMeasureThem(started));
     }
 
     /// <summary>
@@ -91,10 +91,10 @@ public class SceneViewTests
         var started = RemovalDecisions.Start(
             ObjectsToKeep.Build(targets, [], TestTargets.References(1), TestBaseFacts.Unresolved), [new WhenRemoved.Restore(earlierVersion)]);
         var restored = started.Apply(
-            RoundKind.TooClose, [new ProposedRemoval(targets[0].Id, new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()))]);
+            RoundKind.TooClose, [new ProposedRemoval(targets[0].Id, new TooClose(new OtherId(0), new TooCloseCause.ObjectSize()))]);
 
-        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(caches.IndexVisibleTargetsAsTheyStand(targets, restored)));
-        Assert.Same(caches.VisibleTargets, caches.IndexVisibleTargetsAsTheRoundsMeasureThem(targets, restored));
+        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(caches.IndexVisibleTargetsAsTheyStand(restored)));
+        Assert.Same(caches.VisibleTargets, caches.IndexVisibleTargetsAsTheRoundsMeasureThem(restored));
     }
 
     private static List<TargetId> NearEastOfTheSlab(IVisibleTargetObjects index)

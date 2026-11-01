@@ -63,8 +63,7 @@ public class RestingObjectsRunTests
     {
         var afterTooClose = AfterTooClose();
 
-        var result = Run(new Probe(), mode, afterTooClose);
-        var applied = afterTooClose.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds);
+        var (result, applied) = Decide(new Probe(), mode, afterTooClose);
 
         Assert.Equal(StepOutcome.Performed, result.Outcome);
         Assert.True(result.HadSeeds);
@@ -72,6 +71,7 @@ public class RestingObjectsRunTests
         Assert.Single(afterTooClose.Rounds);
         Assert.True(applied.IsRemoved(new TargetId(ItemOnTable)));
         Assert.Equal(result.Rounds.ToArray(), applied.RoundsAfter(afterTooClose).ToArray());
+        Assert.All(applied.RoundsAfter(afterTooClose), round => Assert.Equal(RoundKind.AlsoRemove, round.Kind));
         Assert.Equal(new[] { new Round(1, RoundKind.TooClose) }, result.SeedRounds.ToArray());
     }
 
@@ -84,8 +84,7 @@ public class RestingObjectsRunTests
         var afterTooClose = TestSeededDecisions.Seed(
             ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Count), TestBaseFacts.Unresolved), Targets.Count, seeds: [], terrainSeeds: [Table]);
 
-        var result = Run(new Probe(), mode, afterTooClose);
-        var applied = afterTooClose.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds);
+        var (result, applied) = Decide(new Probe(), mode, afterTooClose);
 
         Assert.True(result.HadSeeds);
         Assert.Equal(new[] { new Round(1, RoundKind.ChangedTerrain), new Round(2, RoundKind.TooClose) }, result.SeedRounds.ToArray());
@@ -98,10 +97,10 @@ public class RestingObjectsRunTests
     [InlineData(FollowUpRemovalMode.OnlyWhatLosesItsSupport)]
     public void TheRoundsAreSeededByTheGivenSeedRoundsAloneAndRemoveWhatRestsOnTheirRemovals(FollowUpRemovalMode mode)
     {
-        var earlier = Decisions().Apply(RoundKind.TooClose, [Removal(2, new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()))]);
-        var afterVisible = earlier.Apply(RoundKind.VisibleLeftBehind, [Removal(Table, new RemovalReason.VisibleObjectSurroundingsRemoved())]);
+        var earlier = Decisions().Apply(RoundKind.TooClose, [Removal(2, new TooClose(new OtherId(0), new TooCloseCause.ObjectSize()))]);
+        var afterVisible = earlier.Apply(RoundKind.VisibleLeftBehind, [Removal(Table, new VisibleObjectSurroundingsRemoved())]);
 
-        var result = Run(new Probe(), mode, afterVisible, reportFiles: StepOutcome.SwitchedOff, seedRounds: afterVisible.RoundsAfter(earlier));
+        var result = RunSeededBy(new Probe(), mode, afterVisible, afterVisible.RoundsAfter(earlier), StepOutcome.SwitchedOff);
         var applied = afterVisible.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds);
 
         Assert.Equal(new[] { new Round(2, RoundKind.VisibleLeftBehind) }, result.SeedRounds.ToArray());
@@ -114,10 +113,10 @@ public class RestingObjectsRunTests
     [InlineData(FollowUpRemovalMode.OnlyWhatLosesItsSupport)]
     public void ARemovalOfARoundOutsideTheSeedRoundsDoesNotSeedTheRounds(FollowUpRemovalMode mode)
     {
-        var earlier = Decisions().Apply(RoundKind.TooClose, [Removal(Table, new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()))]);
-        var afterVisible = earlier.Apply(RoundKind.VisibleLeftBehind, [Removal(2, new RemovalReason.VisibleObjectSurroundingsRemoved())]);
+        var earlier = Decisions().Apply(RoundKind.TooClose, [Removal(Table, new TooClose(new OtherId(0), new TooCloseCause.ObjectSize()))]);
+        var afterVisible = earlier.Apply(RoundKind.VisibleLeftBehind, [Removal(2, new VisibleObjectSurroundingsRemoved())]);
 
-        var result = Run(new Probe(), mode, afterVisible, reportFiles: StepOutcome.SwitchedOff, seedRounds: afterVisible.RoundsAfter(earlier));
+        var result = RunSeededBy(new Probe(), mode, afterVisible, afterVisible.RoundsAfter(earlier), StepOutcome.SwitchedOff);
         var applied = afterVisible.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds);
 
         Assert.True(result.HadSeeds);
@@ -127,7 +126,7 @@ public class RestingObjectsRunTests
     [Fact]
     public void WithoutSeedRoundsThereAreNoSeedsWhateverTheEarlierRoundsRemoved()
     {
-        var result = Run(new Probe(), FollowUpRemovalMode.EverythingTouchingIt, AfterTooClose(), seedRounds: []);
+        var result = RunSeededBy(new Probe(), FollowUpRemovalMode.EverythingTouchingIt, AfterTooClose(), seedRounds: [], StepOutcome.Performed);
 
         Assert.False(result.HadSeeds);
         Assert.Empty(result.ProposedRounds);
@@ -288,16 +287,32 @@ public class RestingObjectsRunTests
 
     /// <param name="touchChainsShown">Report files show the touch chains too, as the settings check sets it.</param>
     private static RestingObjectsResult Run(
-        Probe probe,
-        FollowUpRemovalMode mode,
-        RemovalDecisions? afterTooClose = null,
-        bool touchChainsShown = false,
-        StepOutcome reportFiles = StepOutcome.Performed,
-        ImmutableArray<Round>? seedRounds = null)
+        Probe probe, FollowUpRemovalMode mode, RemovalDecisions? afterTooClose = null, bool touchChainsShown = false, StepOutcome reportFiles = StepOutcome.Performed) =>
+        Decide(probe, mode, afterTooClose ?? AfterTooClose(), touchChainsShown, reportFiles).Result;
+
+    /// <summary>The step seeded by every round of <paramref name="afterTooClose"/>.</summary>
+    /// <param name="touchChainsShown">Report files show the touch chains too, as the settings check sets it.</param>
+    /// <returns>The step's result, with its rounds added to <paramref name="afterTooClose"/>.</returns>
+    private static Decided<RestingObjectsResult> Decide(
+        Probe probe, FollowUpRemovalMode mode, RemovalDecisions afterTooClose, bool touchChainsShown = false, StepOutcome reportFiles = StepOutcome.Performed) =>
+        RestingObjects.Find(
+            new([.. Targets], afterTooClose, Settings(mode, touchChainsShown, reportFiles), new Execution(1), probe.ReadClock, reportFiles, CreateCaches(probe)));
+
+    /// <summary>The step's rounds and details seeded by the removals of <paramref name="seedRounds"/> alone; nothing is added to <paramref name="decisions"/>.</summary>
+    private static RestingObjectsResult RunSeededBy(
+        Probe probe, FollowUpRemovalMode mode, RemovalDecisions decisions, ImmutableArray<Round> seedRounds, StepOutcome reportFiles) =>
+        RestingObjects.Find(
+            new RestingObjectsInput([.. Targets], decisions, seedRounds, Settings(mode, touchChainsShown: false, reportFiles), new Execution(1), probe.ReadClock, reportFiles),
+            CreateCaches(probe));
+
+    private static AlsoRemoveSettings Settings(FollowUpRemovalMode mode, bool touchChainsShown, StepOutcome reportFiles) =>
+        new(mode, TouchDistance, Threshold, touchChainsShown || reportFiles == StepOutcome.Performed);
+
+    /// <summary>The caches over the targets, whose triangle uses and asks for the objects of any plugin <paramref name="probe"/> records.</summary>
+    private static TestRunCaches CreateCaches(Probe probe)
     {
-        var decisions = afterTooClose ?? AfterTooClose();
         var objectsOfAnyPlugin = TestScenes.CreateWithSupportOnlyObjects(Targets, [], Shapes);
-        var caches = new TestRunCaches(
+        return new TestRunCaches(
             Shapes,
             probe.Watch(new TriangleStore(TestShapes.MeshFilesOf(Shapes).ReadTriangles)),
             TestGround.NoTerrain(),
@@ -307,16 +322,6 @@ public class RestingObjectsRunTests
                 probe.Record(ObjectsOfAnyPluginAsk);
                 return objectsOfAnyPlugin.VisibleObjectsOfAnyPlugin();
             });
-        var input = new RestingObjectsInput(
-            [.. Targets],
-            decisions,
-            seedRounds ?? decisions.Rounds,
-            new AlsoRemoveSettings(mode, TouchDistance, Threshold, touchChainsShown || reportFiles == StepOutcome.Performed),
-            new Execution(1),
-            probe.ReadClock,
-            reportFiles);
-        return RestingObjects.Find(
-            input, caches.Bases, caches.Shapes, caches.Triangles, caches.SurfaceSamples, caches.Terrain, caches.VisibleObjectsOfAnyPlugin);
     }
 
     private static bool IsLampMesh(string meshPath) => meshPath.EndsWith(LampModel.Model, StringComparison.OrdinalIgnoreCase);

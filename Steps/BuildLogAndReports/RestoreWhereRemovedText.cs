@@ -67,16 +67,14 @@ internal static class RestoreWhereRemovedText
     /// <param name="label">Names a record.</param>
     public static string WaterKept(RecordKey by, Func<RecordKey, string> label) => $"{label(by)} lies across the water line between the level before the cleaned mod and the one that stays";
 
-    /// <summary>
-    /// Why a cleared quarter keeps what no kept height explains: only vertex colours, each on a line shared with a quarter or a
-    /// neighbouring cell whose colour stays there.
-    /// </summary>
+    /// <summary>The words for <see cref="LandQuarterOutcome.ColoursSharedWithGroundThatStays"/>.</summary>
     public const string ColoursSharedWithGroundThatStays = "its vertex colours lie on a line shared with ground that stays";
 
     /// <summary>The part of a LAND record that belongs to no terrain quarter.</summary>
     public const string RestOfLandRecord = "the rest of the record";
 
-    public const string NothingGoesBack = "nothing of what the cleaned mod changed in it goes back";
+    /// <summary>The words for <see cref="NavmeshChangeJudged.NothingGoesBack"/>.</summary>
+    public const string NothingGoesBack ="nothing of what the cleaned mod changed in it goes back";
 
     /// <summary>Why a placed record stays although its area is cleared: the guard, with the record it found or the failure that stopped the check.</summary>
     /// <param name="label">Names a record.</param>

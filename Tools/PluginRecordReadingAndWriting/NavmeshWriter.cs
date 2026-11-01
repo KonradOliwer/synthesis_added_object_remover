@@ -5,7 +5,7 @@ using Noggog;
 namespace AddedObjectRemover;
 
 /// <summary>
-/// Writes navmeshes the target plugin edited, deleted or added into the patch, in the patch's overrides of the cells that hold them.
+/// Writes navmeshes the read's plugin edited, deleted or added into the patch, in the patch's overrides of the cells that hold them.
 /// Not thread-safe.
 /// </summary>
 internal sealed class NavmeshWriter(CellOverrides cells, RecordHandles handles)
@@ -41,11 +41,12 @@ internal sealed class NavmeshWriter(CellOverrides cells, RecordHandles handles)
         _navmeshes[copy.FormKey] = copy;
     }
 
+    /// <summary>Sets every vertex of the navmesh to the height and removes every edge link, door, cover and preferred triangle.</summary>
     /// <remarks>
     /// The triangles keep their count, order and vertices, and the inner edges stay, so the grid, written unchanged, still lists
     /// valid triangles.
     /// </remarks>
-    public void SetZ(RecordKey navmesh, float z)
+    public void FlattenAndDetach(RecordKey navmesh, float z)
     {
         var target = GetOrAddOverride(Present(handles.NavmeshOf(navmesh).Winner, navmesh));
         var data = target.Data ?? throw new InvalidOperationException($"Navmesh {navmesh} has no navmesh data to set the height of.");

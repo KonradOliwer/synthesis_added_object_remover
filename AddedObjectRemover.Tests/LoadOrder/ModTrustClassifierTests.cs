@@ -454,7 +454,7 @@ public class ModTrustClassifierTests
     {
         PluginListing[] withPatch = listed.Any(listing => listing.Mod == Patch) ? listed : [.. listed, Listing(Patch)];
         var names = new KnownPluginNames(withPatch.SelectMany(listing => listing.Masters.Prepend(listing.Mod)));
-        return ModTrustClassifier.Classify(TestLoadOrderPlugins.Of(names, Patch, [.. withPatch]), settings);
+        return ModTrustClassifier.Classify(new(TestLoadOrderPlugins.Of(names, Patch, [.. withPatch]), settings));
     }
 
     private static void AssertTrust(ModTrustTable table, PluginName plugin, ModTrust trust, TrustReason? reason)

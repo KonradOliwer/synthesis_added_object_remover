@@ -13,7 +13,7 @@ internal static class MeshProblemText
         AssetProblemKind.Unreadable => $"  [mesh] unreadable: {problem.Mesh} ({ReadFailure(Required(problem.ReadFailure))})",
         AssetProblemKind.TrianglesUnreadable => $"  [mesh] triangles unreadable: {problem.Mesh} ({ReadFailure(Required(problem.ReadFailure))})",
         AssetProblemKind.TrianglesUnreadableAfterGoodRead =>
-            $"  [mesh] triangles unreadable after reading fine earlier in the run: {problem.Mesh} ({(problem.ReadFailure is { } failure ? ReadFailure(failure) : Required(problem.Detail))})",
+            $"  [mesh] triangles unreadable after reading fine earlier in the run: {problem.Mesh} ({ReadFailure(Required(problem.ReadFailure))})",
         AssetProblemKind.ReadWarning =>
             $"  [mesh] {problem.Mesh}: {Required(problem.MismatchedStrips)} NiTriStrips shape(s) whose strip lengths do not match their points are used as points.",
         AssetProblemKind.LooseFileUnreadable => $"  [mesh] could not read loose file {problem.LoosePath}: {problem.Detail}",
@@ -56,7 +56,6 @@ internal static class MeshProblemText
         MeshReadError.InvalidCoordinates => "invalid vertex coordinates",
         MeshReadError.NoRenderGeometry => "no visible geometry (normal for markers and dummy items)",
         MeshReadError.Malformed => Required(category.ExceptionType),
-        MeshReadError.UnexpectedException => "unexpected error",
         _ => throw new UnreachableException($"A mesh read of kind {category.Kind} is not counted as a mesh failure."),
     };
 

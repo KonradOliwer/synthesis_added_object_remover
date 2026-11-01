@@ -1,3 +1,6 @@
+using System.Collections.Immutable;
+using System.Diagnostics;
+
 namespace AddedObjectRemover;
 
 /// <param name="Indices">Positions in the grouped list, ascending.</param>
@@ -25,6 +28,33 @@ public static class KeyedGroups
             groups[group].Indices.Add(i);
         }
         return groups;
+    }
+
+    /// <returns>
+    /// One group per distinct key, in the order the keys first appear, holding the items of every group with that key in ascending
+    /// order; the group's key is the first one seen.
+    /// </returns>
+    /// <remarks>Throws when an item is in more than one group.</remarks>
+    public static List<KeyValuePair<TKey, ImmutableArray<T>>> MergeGroupsWithEqualKeys<TGroup, T, TKey>(
+        IEnumerable<TGroup> groups, Func<TGroup, IEnumerable<T>> itemsOf, Func<TGroup, TKey> keyOf, IEqualityComparer<TKey> comparer)
+        where TKey : notnull
+    {
+        var all = groups.ToList();
+        RequireEachItemInOneGroup(all.Select(itemsOf));
+        return
+        [
+            .. IndicesByKey(all, keyOf, comparer)
+                .Select(merged => KeyValuePair.Create(merged.Key, merged.Indices.SelectMany(index => itemsOf(all[index])).Order().ToImmutableArray())),
+        ];
+    }
+
+    public static void RequireEachItemInOneGroup<T>(IEnumerable<IEnumerable<T>> groups)
+    {
+        HashSet<T> seen = [];
+        foreach (var item in groups.SelectMany(group => group))
+        {
+            if (!seen.Add(item)) throw new UnreachableException($"Item {item} is in more than one group.");
+        }
     }
 
     /// <returns>One entry per distinct key with its number of items, in the order the keys first appear; the entry's key is the first one seen.</returns>

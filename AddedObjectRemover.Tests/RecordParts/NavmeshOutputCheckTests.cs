@@ -287,7 +287,7 @@ public sealed class NavmeshOutputCheckTests
     private WriteOrder[] ReplacementOrders(NavigationMesh replacement) =>
     [
         new CopyEarlierNavmesh(WestKey),
-        new SetNavmeshZ(replacement.FormKey.ToRecordKey(), RemovalConvention.SunkNavmeshZ),
+        new FlattenAndDetachNavmesh(replacement.FormKey.ToRecordKey(), RemovalConvention.SunkNavmeshZ),
         new CopyEarlierNavmeshGeometry(EastKey),
         new CopyEarlierPlacedParts(DoorKey, PlacedParts.NavDoorLink),
         Entries((WestKey, BaseGame, null), (EastKey, BaseGame, null), (replacement.FormKey.ToRecordKey(), Cleaned, RemovalConvention.SunkNavmeshZ)),

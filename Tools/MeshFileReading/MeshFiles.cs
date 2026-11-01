@@ -40,61 +40,29 @@ internal sealed class MeshFiles(
     public MeshTriangles? ReadTriangles(string meshPath)
     {
         problems.NoteSpelling(meshPath);
-        try
-        {
-            return ReadTrianglesOfMesh(meshPath);
-        }
-        catch (Exception ex) when (Failures.IsRecoverable(ex))
-        {
-            var failure = Failures.DescribeFailure(ex);
-            unexpectedErrors.Add(new PartFailure(MeshReadingParts.MeshTriangles, failure, MeshSubject(meshPath)));
-            RecordTriangleFailure(
-                meshPath,
-                new MeshFailureCategory(MeshReadError.UnexpectedException, ExceptionType: null),
-                AssetProblem.TrianglesUnreadableAfterGoodRead(meshPath, failure));
-            return null;
-        }
-    }
-
-    public TriangleFailureCounts CountTriangleFailures() => _triangleReads.Count();
-
-    private MeshTriangles? ReadTrianglesOfMesh(string meshPath)
-    {
         var (result, _) = LoadAndParse(meshPath, includeTriangles: true);
         if (result.Failure is { } failure)
         {
             problems.Add(AssetProblem.TrianglesUnreadable(meshPath, failure));
-            if (failure.Kind != MeshReadError.EffectOnly)
-            {
-                RecordTriangleFailure(meshPath, new MeshFailureCategory(failure.Kind, failure.ExceptionType), AssetProblem.TrianglesUnreadableAfterGoodRead(meshPath, failure));
-            }
+            if (failure.Kind != MeshReadError.EffectOnly) RecordTriangleFailure(meshPath, failure);
             return null;
         }
         _triangleReads.NoteGoodRead(meshPath);
         return result.Geometry is { Triangles.TriangleCount: > 0 } geometry ? geometry.Triangles : null;
     }
 
-    /// <param name="afterGoodRead">The problem recorded when the mesh's triangles were read fine earlier in the run.</param>
-    private void RecordTriangleFailure(string meshPath, MeshFailureCategory failure, AssetProblem afterGoodRead)
+    public TriangleFailureCounts CountTriangleFailures() => _triangleReads.Count();
+
+    /// <remarks>A mesh whose triangles were read fine earlier in the run is also recorded as a problem of its own.</remarks>
+    private void RecordTriangleFailure(string meshPath, MeshReadFailure failure)
     {
-        if (_triangleReads.NoteFailure(meshPath, failure)) problems.Add(afterGoodRead);
+        if (_triangleReads.NoteFailure(meshPath, new MeshFailureCategory(failure.Kind, failure.ExceptionType)))
+        {
+            problems.Add(AssetProblem.TrianglesUnreadableAfterGoodRead(meshPath, failure));
+        }
     }
 
     private MeshBounds ReadBounds(string meshPath)
-    {
-        try
-        {
-            return ReadBoundsOfMesh(meshPath);
-        }
-        catch (Exception ex) when (Failures.IsRecoverable(ex))
-        {
-            unexpectedErrors.Add(new PartFailure(MeshReadingParts.MeshShapes, Failures.DescribeFailure(ex), MeshSubject(meshPath)));
-            return new MeshBounds(
-                null, MeshReadStatus.Failed, MeshSource.Unknown, HasFooterRoot: false, MeshReadError.UnexpectedException, FailureExceptionType: null, CollisionLayers: null);
-        }
-    }
-
-    private MeshBounds ReadBoundsOfMesh(string meshPath)
     {
         var (result, meshSource) = LoadAndParse(meshPath, includeTriangles: false);
         var hasFooterRoot = RecordFooterRoot(meshPath, result.FooterRoot);
@@ -132,12 +100,9 @@ internal sealed class MeshFiles(
 
     private void ReportLoaderWarmUpFailure()
     {
-        if (reader.LoaderWarmUp is not { Succeeded: false } startUp) return;
-        unexpectedErrors.Add(new PartFailure(MeshReadingParts.LoaderStartUp, startUp.Failure, Subject: null));
+        if (reader.LoaderWarmUp is not { Succeeded: false }) return;
+        unexpectedErrors.Add(new PartFailure(MeshReadingParts.LoaderStartUp, Failure: null, Subject: null));
     }
-
-    /// <remarks>Meshes have no record key order; they are listed by path.</remarks>
-    private static FailureSubject MeshSubject(string meshPath) => new(meshPath, Name: null, Position: 0);
 
     private bool RecordFooterRoot(string meshPath, NifRoot? footerRoot)
     {

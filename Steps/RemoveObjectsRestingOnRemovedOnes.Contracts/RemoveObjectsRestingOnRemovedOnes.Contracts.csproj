@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The input of the step that removes objects resting on removed ones, the objects it removed, the chains and support shares behind each removal, its settings, and the contact points and support shares it shares with the step for other mods' objects. It holds no packages.</Description>
+    <Description>The input of the step that removes objects resting on removed ones, the objects it removed, its removal reasons, the chains and support shares behind each removal, its settings, and the contact points and weighted surface samples of its support rule. It holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
@@ -13,9 +13,6 @@
     <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
     <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
     <ProjectReference Include="..\..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
-    <ProjectReference Include="..\..\Tools\TriangleMeshTests\TriangleMeshTests.csproj" />
-    <ProjectReference Include="..\..\Tools\GroundSurfaceQueries\GroundSurfaceQueries.csproj" />
-    <ProjectReference Include="..\..\Tools\NumericRanges\NumericRanges.csproj" />
     <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
   </ItemGroup>
   <ItemGroup>

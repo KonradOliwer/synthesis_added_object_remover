@@ -10,7 +10,7 @@ using AddedObjectRemover.Steps.CollectPlacedObjects;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
-using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals;
 using AddedObjectRemover.Steps.WriteThePatch;
@@ -72,7 +72,7 @@ public static partial class StepRunner
             environment.Bases.ReadCollisionLayers(records),
             TooCloseObjects.NpcBodyRules,
             TooCloseObjects.PlacedNpcRules,
-            WeightedSurfaceSamples.SamplesPerMesh);
+            RestingObjects.SurfaceSamplesPerMesh);
         var report = new LogAndReports(settings, reportFolder, loadOrderCaches, unexpectedErrors);
         return new RunScope(settings, source, environment, plugin, loadOrderCaches, unexpectedErrors, report, reportFolder);
     }

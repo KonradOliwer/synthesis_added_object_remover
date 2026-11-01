@@ -3,9 +3,11 @@ using System.Diagnostics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
@@ -16,6 +18,9 @@ namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 /// </summary>
 public static class RestingObjects
 {
+    /// <summary>The number of points sampled on a mesh's surface for the support rule (<see cref="ISurfaceSamples"/>).</summary>
+    public const int SurfaceSamplesPerMesh = 4096;
+
     /// <param name="Targets">Where they stood before any decision.</param>
     /// <param name="Decisions">The decisions with the rounds of the steps before, whose removals the rounds follow up; the step's rounds are added to them.</param>
     /// <param name="TimeSinceStart">The run's clock, which times the rounds alone.</param>
@@ -36,7 +41,7 @@ public static class RestingObjects
     /// <remarks>Seeded with the removals of every round so far, measuring the target objects where those rounds measure them.</remarks>
     public static Decided<RestingObjectsResult> Find(Input input)
     {
-        var (earlierRounds, caches) = (input.Decisions, input.Caches);
+        var earlierRounds = input.Decisions;
         var result = Find(
             new RestingObjectsInput(
                 earlierRounds.TargetsAsTheRoundsMeasureThem(input.Targets),
@@ -46,12 +51,7 @@ public static class RestingObjects
                 input.Execution,
                 input.TimeSinceStart,
                 input.ReportFiles),
-            caches.Bases,
-            caches.Shapes,
-            caches.Triangles,
-            caches.SurfaceSamples,
-            caches.Terrain,
-            caches.VisibleObjectsOfAnyPlugin);
+            input.Caches);
         return new Decided<RestingObjectsResult>(result, earlierRounds.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds));
     }
 
@@ -59,74 +59,57 @@ public static class RestingObjects
     /// The rounds, then the touch chains when they are shown, then the report-file details when report files are
     /// written, each stopped on its own by an unexpected failure.
     /// </summary>
-    /// <param name="objectsOfAnyPlugin">Asked only when the support rounds have seeds: the first ask builds the supporters' bounds index.</param>
-    internal static RestingObjectsResult Find(
-        RestingObjectsInput input,
-        IBaseFacts bases,
-        IBaseObjectShapes shapes,
-        ITriangleMeshes triangles,
-        ISurfaceSamples surfaces,
-        ITerrainHeights terrain,
-        Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin)
+    /// <param name="caches">
+    /// Its base facts, shapes, triangles, surface samples and terrain are read; its objects of any plugin are asked only when the
+    /// support rounds have seeds: the first ask builds the supporters' bounds index.
+    /// </param>
+    internal static RestingObjectsResult Find(RestingObjectsInput input, IRunCaches caches)
     {
         if (input.Settings.Mode == FollowUpRemovalMode.Nothing) return NotPerformed(input, StepOutcome.SwitchedOff, failure: null).Result;
 
         var rounds = Failures.Attempt(
-            () => DecideRounds(input, shapes, triangles, surfaces, terrain, objectsOfAnyPlugin),
+            () => DecideRounds(input, caches),
             failure => NotPerformed(input, StepOutcome.StoppedByUnexpectedError, PartFailure.OfWholePart(RestingObjectsParts.AlsoRemove, failure)));
         var run = rounds with { Result = WithTouchChains(rounds, input) };
-        return run.Result with { ReportFileDetails = FindReportFileDetails(run, input, bases, shapes, triangles) };
+        return run.Result with { ReportFileDetails = FindReportFileDetails(run, input, caches.Bases, caches.Shapes, caches.Triangles) };
     }
+
+    /// <param name="Targets">Where the rounds measure them, from the decisions the first pass starts from.</param>
+    /// <param name="TimeSinceStart">The run's clock, which measures the rounds.</param>
+    /// <param name="Caches">
+    /// Its shapes, triangles, surface samples and terrain are read; its objects of any plugin are asked only when the support rounds
+    /// have seeds: the first ask builds the supporters' bounds index.
+    /// </param>
+    public sealed record FollowUpInput(
+        ImmutableArray<TargetObject> Targets, AlsoRemoveSettings Settings, Execution Execution, Func<TimeSpan> TimeSinceStart, IRunCaches Caches);
+
+    /// <param name="Targets">Where they stand before any object is shrunk or turned.</param>
+    /// <param name="Drops">Asks the drop test about the same targets where they stand.</param>
+    /// <param name="Caches">Its shapes, triangles, surface samples and terrain are read; its objects of any plugin are asked only when there is an object to check.</param>
+    public sealed record RestingRuleInput(
+        ImmutableArray<TargetObject> Targets, AlsoRemoveSettings Settings, ITargetObjectsDropTest Drops, Execution Execution, IRunCaches Caches);
+
+    /// <param name="Caches">Its shapes, triangles, surface samples and terrain are read; its objects of any plugin are asked each time the rounds are created.</param>
+    public sealed record RoundsAfterInput(AlsoRemoveSettings Settings, Execution Execution, IRunCaches Caches);
 
     /// <summary>
     /// The also-remove rounds that follow up a later step's removals pass by pass (see <see cref="IAlsoRemoveFollowUp"/>); its result
     /// computes no report-file details.
     /// </summary>
-    /// <param name="targets">Where the rounds measure them, from the decisions the first pass starts from.</param>
-    /// <param name="timeSinceStart">The run's clock, which measures the rounds.</param>
-    /// <param name="objectsOfAnyPlugin">Asked only when the support rounds have seeds: the first ask builds the supporters' bounds index.</param>
-    public static IAlsoRemoveFollowUp CreateFollowUp(
-        ImmutableArray<TargetObject> targets,
-        AlsoRemoveSettings settings,
-        Execution execution,
-        Func<TimeSpan> timeSinceStart,
-        IBaseObjectShapes shapes,
-        ITriangleMeshes triangles,
-        ISurfaceSamples surfaces,
-        ITerrainHeights terrain,
-        Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin) =>
-        new AlsoRemoveFollowUp(targets, settings, execution, timeSinceStart, shapes, triangles, surfaces, terrain, objectsOfAnyPlugin);
+    public static IAlsoRemoveFollowUp CreateFollowUp(FollowUpInput input) => new AlsoRemoveFollowUp(input);
 
     /// <summary>
     /// The fit step's question about target objects, asked before any removal: the objects other target objects rest on (see
     /// <see cref="RestingRule"/>).
     /// </summary>
-    /// <param name="targets">Where they stand before any object is shrunk or turned.</param>
-    /// <param name="objectsOfAnyPlugin">Asked only when there is an object to check.</param>
-    /// <param name="drops">Asks the drop test about the same targets where they stand.</param>
-    public static IRestingRule CreateRestingRule(
-        ImmutableArray<TargetObject> targets,
-        AlsoRemoveSettings settings,
-        IBaseObjectShapes shapes,
-        ITriangleMeshes triangles,
-        ISurfaceSamples surfaces,
-        ITerrainHeights terrain,
-        Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin,
-        ITargetObjectsDropTest drops,
-        Execution execution) =>
-        new RestingRule(targets, settings, shapes, triangles, surfaces, terrain, objectsOfAnyPlugin, drops, execution);
+    public static IRestingRule CreateRestingRule(RestingRuleInput input) => new RestingRule(input);
 
     /// <summary>The also-remove rounds the step for other mods' objects decides on its own working copy (see <see cref="CreateRoundsAfter"/>).</summary>
-    /// <param name="objectsOfAnyPlugin">Asked each time the rounds are created.</param>
-    public static IAlsoRemoveRoundsAfter CreateAlsoRemoveRoundsAfter(
-        AlsoRemoveSettings settings,
-        IBaseObjectShapes shapes,
-        ITriangleMeshes triangles,
-        ISurfaceSamples surfaces,
-        ITerrainHeights terrain,
-        Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin,
-        Execution execution) =>
-        new AlsoRemoveRoundsAfter(settings, shapes, triangles, surfaces, terrain, objectsOfAnyPlugin, execution);
+    public static IAlsoRemoveRoundsAfter CreateAlsoRemoveRoundsAfter(RoundsAfterInput input) => new AlsoRemoveRoundsAfter(input);
+
+    /// <summary>The support rule the step for other mods' objects measures with (see <see cref="SurfaceContacts"/>).</summary>
+    /// <param name="caches">Its triangles, surface samples and terrain are read.</param>
+    public static ISupportContacts CreateSupportContacts(ILoadOrderCaches caches) => new SurfaceContacts(caches.Terrain, caches.Triangles, caches.SurfaceSamples);
 
     /// <summary>
     /// The also-remove rounds that spread, as the mode says, from removals made in <paramref name="decided"/>, for another step to
@@ -146,24 +129,18 @@ public static class RestingObjects
         Execution execution) =>
         PrepareFrom(decided, new RoundsInput(targets, objectsOfAnyPlugin, shapes, triangles, surfaces, terrain, execution), settings).Rounds;
 
-    private static RestingObjectsRun DecideRounds(
-        RestingObjectsInput input,
-        IBaseObjectShapes shapes,
-        ITriangleMeshes triangles,
-        ISurfaceSamples surfaces,
-        ITerrainHeights terrain,
-        Func<IVisibleObjectsOfAnyPlugin> askObjectsOfAnyPlugin)
+    private static RestingObjectsRun DecideRounds(RestingObjectsInput input, IRunCaches caches)
     {
         var (earlierRounds, seedRounds, settings) = (input.EarlierRounds, input.SeedRounds, input.Settings);
         var (run, roundsTime) = TimeRounds(
             NeedsObjectsOfAnyPlugin(earlierRounds, seedRounds, settings),
-            askObjectsOfAnyPlugin,
+            caches.VisibleObjectsOfAnyPlugin,
             input.TimeSinceStart,
             objectsOfAnyPlugin => DecideOnWorkingCopy(
                 Prepare(
                     earlierRounds,
                     seedRounds,
-                    new RoundsInput(input.Targets, objectsOfAnyPlugin, shapes, triangles, surfaces, terrain, input.Execution),
+                    new RoundsInput(input.Targets, objectsOfAnyPlugin, caches.Shapes, caches.Triangles, caches.SurfaceSamples, caches.Terrain, input.Execution),
                     settings),
                 earlierRounds,
                 seedRounds));
@@ -381,7 +358,7 @@ public static class RestingObjects
         float touchGap)
     {
         var supporterFinder = new SupporterFinder(targets, search, objectsOfAnyPlugin, shapes, touchGap);
-        return new SupportContactFinder(targets, search.MeshPaths, supporterFinder, new SurfaceContacts(terrain, search.Cache, surfaces, touchGap));
+        return new SupportContactFinder(targets, search.MeshPaths, supporterFinder, new SurfaceContacts(terrain, search.Cache, surfaces), touchGap);
     }
 
     private static RestingObjectsWork CountSupportWork(ImmutableArray<RoundDetails> evidence, IRemovalDecisions decisions)

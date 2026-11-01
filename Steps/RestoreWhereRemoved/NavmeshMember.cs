@@ -39,7 +39,7 @@ internal sealed record NavmeshMember(NavmeshChangedByCleanedMod Change, NavmeshU
     {
         NavmeshUndo.Geometry => new CopyEarlierNavmeshGeometry(Key),
         NavmeshUndo.BroughtBack => new CopyEarlierNavmesh(Key),
-        NavmeshUndo.Sunk => new SetNavmeshZ(Key, RemovalConvention.SunkNavmeshZ),
+        NavmeshUndo.Sunk => new FlattenAndDetachNavmesh(Key, RemovalConvention.SunkNavmeshZ),
         _ => null,
     };
 
@@ -48,13 +48,10 @@ internal sealed record NavmeshMember(NavmeshChangedByCleanedMod Change, NavmeshU
         EntryCopied is { } entry ? new NavmeshEntryOrder(Key, entry.Plugin, Undo == NavmeshUndo.Sunk ? RemovalConvention.SunkNavmeshZ : null) : null;
 
     /// <summary>The triangles flagged Preferred as the game shows them now; none while the navmesh is deleted.</summary>
-    public ImmutableHashSet<int> PreferredNow => PreferredOf(Change.Current.IsDeleted ? null : Change.Current);
+    public ImmutableHashSet<int> PreferredNow => Change.Current.IsDeleted ? [] : Change.Current.PreferredTriangles();
 
     /// <summary>The triangles flagged Preferred once written.</summary>
-    public ImmutableHashSet<int> PreferredPlanned => PreferredOf(Planned);
-
-    private static ImmutableHashSet<int> PreferredOf(NavmeshShape? shape) =>
-        shape is null ? [] : [.. Enumerable.Range(0, shape.Triangles.Length).Where(triangle => shape.Triangles[triangle].Preferred)];
+    public ImmutableHashSet<int> PreferredPlanned => Planned?.PreferredTriangles() ?? [];
 }
 
 /// <summary>Navmeshes that go back together or not at all.</summary>

@@ -23,10 +23,6 @@ public class MeshProblemTextTests
             @"  [mesh] triangles unreadable after reading fine earlier in the run: meshes\a.nif (mesh file not found)"
         },
         {
-            AssetProblem.TrianglesUnreadableAfterGoodRead(Mesh, "IOException: broke"),
-            @"  [mesh] triangles unreadable after reading fine earlier in the run: meshes\a.nif (IOException: broke)"
-        },
-        {
             AssetProblem.Unreadable(Mesh, MeshReadFailure.NoRenderGeometry(Shapes([], hiddenIgnored: false))),
             @"  [mesh] no visible geometry (normal for markers and dummy items): meshes\a.nif (20 shapes: counted=1, hidden=2, editorMarker=3, effectShader=4, "
             + "unsupported=0, noVertices=5, unreachable=6, hiddenAncestor=7, markerAncestor=8, mismatchedStrips=9)"
@@ -100,7 +96,6 @@ public class MeshProblemTextTests
         { new MeshFailureCategory(MeshReadError.InvalidCoordinates, null), "invalid vertex coordinates" },
         { new MeshFailureCategory(MeshReadError.NoRenderGeometry, null), "no visible geometry (normal for markers and dummy items)" },
         { new MeshFailureCategory(MeshReadError.Malformed, "EndOfStreamException"), "EndOfStreamException" },
-        { new MeshFailureCategory(MeshReadError.UnexpectedException, null), "unexpected error" },
     };
 
     [Theory]
@@ -130,8 +125,8 @@ public class MeshProblemTextTests
         var warning = AssetProblem.ReadWarning(Mesh, 1);
         var other = AssetProblem.NotFound(@"meshes\B.nif");
 
-        var forward = LogSections.BuildMeshProblemsSection([notFound, warning, other], [], Detailed).Lines.ToArray();
-        var backward = LogSections.BuildMeshProblemsSection([other, warning, notFound], [], Detailed).Lines.ToArray();
+        var forward = LogSections.BuildMeshProblemsSection([notFound, warning, other], Detailed).Lines.ToArray();
+        var backward = LogSections.BuildMeshProblemsSection([other, warning, notFound], Detailed).Lines.ToArray();
 
         Assert.Equal(forward, backward);
         Assert.Equal(

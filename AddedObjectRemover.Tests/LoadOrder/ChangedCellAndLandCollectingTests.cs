@@ -428,7 +428,7 @@ public sealed class ChangedCellAndLandCollectingTests
 
         var patch = RestoreInPatch(collected =>
         {
-            var cleared = new LandQuarterJudged(AreaVerdict.Cleared, []);
+            var cleared = TestAreaShares.Quarter(AreaVerdict.Cleared);
             var land = new LandAreasJudged(ChangedLandOf(collected), Never: null, [cleared, cleared, cleared, cleared]);
             var judged = new TerrainUndoPlan([land], _ => new LandHeights(null, null), HeightTolerance, blendDistance: 0f).Judged();
             return new RestoreWhereRemovedResult(StepOutcome.Performed, [], [], judged, [], [], Passes: 1, DoorsLeftRemoved: [], Failures: []);
@@ -583,9 +583,12 @@ public sealed class ChangedCellAndLandCollectingTests
     private ISkyrimModGetter RestoreTheChangedCell() => RestoreInPatch(collected =>
     {
         var changed = ChangedCellOf(collected);
-        var cleared = new AreaShare(Objects: 1, Standing: 0, Size: 1, StandingSize: 0, AreaVerdict.Cleared);
+        var cleared = TestAreaShares.Of(AreaVerdict.Cleared);
         return new RestoreWhereRemovedResult(
-            StepOutcome.Performed, [], [new CellChangeJudged(changed, [.. changed.Parts.Where(part => part.Outcome is PartOutcome.Undo)], null, cleared, WaterKeptBy: null, IsRestored: true)], [], [], [], Passes: 1, DoorsLeftRemoved: [], Failures: []);
+            StepOutcome.Performed,
+            [],
+            [new CellChangeJudged(changed, [.. changed.Parts.Where(part => part.Outcome is PartOutcome.Undo)], null, cleared, WaterKeptBy: null, IsRestored: true, KeptForArea: null)],
+            [], [], [], Passes: 1, DoorsLeftRemoved: [], Failures: []);
     });
 
     /// <summary>Collects, judges what goes back with the given judging and writes the patch.</summary>
@@ -597,7 +600,7 @@ public sealed class ChangedCellAndLandCollectingTests
         var collected = PlacedObjects.Collect(records, TestModTrust.Of(Cleaned, Patch, trusted: [BaseGame, Later], untrusted: []), Plan);
         var protection = ObjectsToKeep.Build(collected.Targets, [], TestTargets.References(collected.Targets.Length), TestBaseFacts.Unresolved);
         var final = RemovalDecisions.Start(protection, [.. collected.Targets.Select(_ => (WhenRemoved)new WhenRemoved.Disable())]);
-        PatchWriter.Write(final, collected.Targets, OtherModsObjectsResult.SwitchedOff, judge(collected), records, new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod));
+        PatchWriter.Write(new(final, collected.Targets, OtherModsObjectsResult.SwitchedOff, judge(collected), records, new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod)));
         return state.PatchMod;
     }
 

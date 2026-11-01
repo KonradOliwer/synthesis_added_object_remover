@@ -204,20 +204,24 @@ public static class ParallelMap
                 return scratch;
             },
             finish);
-        ThrowFailureOfLowestItem(failures);
+        ThrowReportedFailure(failures);
         return results;
     }
 
     /// <remarks>
-    /// Every item runs even after another failed, so that the reported failure is the lowest item's and never
-    /// depends on which worker failed first. It is wrapped like the failures of a parallel loop are; an
-    /// <see cref="OutOfMemoryException"/> is reported before any other failure.
+    /// Every item runs even after another failed, so the reported failure never depends on which worker failed first. It is
+    /// wrapped like the failures of a parallel loop are. An <see cref="OutOfMemoryException"/> is reported first, then the lowest
+    /// item's failure that is not the user's data, so a bug is never taken for a user-data failure of a lower item; only when every
+    /// failure is the user's data is the lowest item's reported.
     /// </remarks>
-    private static void ThrowFailureOfLowestItem(ConcurrentDictionary<int, Exception> failures)
+    private static void ThrowReportedFailure(ConcurrentDictionary<int, Exception> failures)
     {
         if (failures.IsEmpty) return;
         var inItemOrder = failures.OrderBy(failure => failure.Key).Select(failure => failure.Value).ToList();
-        throw new AggregateException(inItemOrder.FirstOrDefault(failure => failure is OutOfMemoryException) ?? inItemOrder[0]);
+        throw new AggregateException(
+            inItemOrder.FirstOrDefault(failure => failure is OutOfMemoryException)
+            ?? inItemOrder.FirstOrDefault(failure => !Failures.IsRecoverable(failure))
+            ?? inItemOrder[0]);
     }
 
     private static int ChooseRangeSize(Execution execution, int count, int rangeSize)

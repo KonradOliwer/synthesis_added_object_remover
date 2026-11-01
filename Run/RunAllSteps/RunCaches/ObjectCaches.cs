@@ -12,6 +12,7 @@ namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
 /// </summary>
 internal sealed class ObjectCaches : IObjectCaches
 {
+    private readonly ImmutableArray<TargetObject> _targets;
     private readonly ComputedOnce<PlacedSpaces> _objectsOfAnyPlugin;
     private readonly ObjectContainment _containment;
     private readonly IBaseObjectShapes _shapes;
@@ -26,6 +27,7 @@ internal sealed class ObjectCaches : IObjectCaches
         PlacedNpcRules placedNpcRules,
         Execution execution)
     {
+        _targets = world.Targets;
         _shapes = shapes;
         _execution = execution;
         _containment = new ObjectContainment(shapes, triangles);
@@ -59,15 +61,14 @@ internal sealed class ObjectCaches : IObjectCaches
 
     public IVisibleTargetObjects IndexVisibleTargets(IReadOnlyList<TargetObject> targets) => new VisibleTargetObjects(targets, _shapes, _containment, _execution);
 
-    public IVisibleTargetObjects IndexVisibleTargetsAsTheRoundsMeasureThem(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions) =>
-        IndexPlaced(decisions.AnyMeasuredElsewhere(), decisions.TargetsAsTheRoundsMeasureThem, targets);
+    public IVisibleTargetObjects IndexVisibleTargetsAsTheRoundsMeasureThem(IRemovalDecisions decisions) =>
+        IndexPlaced(decisions.AnyMeasuredElsewhere(), decisions.TargetsAsTheRoundsMeasureThem);
 
-    public IVisibleTargetObjects IndexVisibleTargetsAsTheyStand(ImmutableArray<TargetObject> targets, IRemovalDecisions decisions) =>
-        IndexPlaced(decisions.AnyStandsElsewhere(), decisions.TargetsAsTheyStand, targets);
+    public IVisibleTargetObjects IndexVisibleTargetsAsTheyStand(IRemovalDecisions decisions) =>
+        IndexPlaced(decisions.AnyStandsElsewhere(), decisions.TargetsAsTheyStand);
 
-    private IVisibleTargetObjects IndexPlaced(
-        bool anyElsewhere, Func<ImmutableArray<TargetObject>, ImmutableArray<TargetObject>> placeTargets, ImmutableArray<TargetObject> targets) =>
-        anyElsewhere ? IndexVisibleTargets(placeTargets(targets)) : VisibleTargets;
+    private IVisibleTargetObjects IndexPlaced(bool anyElsewhere, Func<ImmutableArray<TargetObject>, ImmutableArray<TargetObject>> placeTargets) =>
+        anyElsewhere ? IndexVisibleTargets(placeTargets(_targets)) : VisibleTargets;
 
     public IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPlugin() => new VisibleObjectsOfAnyPlugin(ObjectsOfAnyPlugin);
 

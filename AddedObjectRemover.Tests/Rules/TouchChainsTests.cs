@@ -45,7 +45,7 @@ public class TouchChainsTests
             TouchDistance,
             threads: 4,
             collectDiagnostics: true,
-            (_, _) => new ScriptedRule([new ProposedRemoval(new TargetId(reached), new RemovalReason.Touching(new TargetId(seed)))])).TouchChains;
+            (_, _) => new ScriptedRule([new ProposedRemoval(new TargetId(reached), new TouchingTargetThatLeft(new TargetId(seed)))])).TouchChains;
 
         Assert.Equal(1, components.Stats.Components);
         Assert.Equal(2, components.Stats.LargestComponent);
@@ -69,7 +69,7 @@ public class TouchChainsTests
         var run = TestTouchCascade.Execute(targets, Shapes, protection, [seedTable], TouchDistance, threads: 4, collectDiagnostics: true);
         var (decisions, components) = (run.RemovalDecisions, run.TouchChains);
 
-        Assert.Equal(new RemovalReason.LinkedTo(new TargetId(itemOnTable)), decisions.Of(new TargetId(partner))!.Reason);
+        Assert.Equal(new LinkedTo(new TargetId(itemOnTable)), decisions.Of(new TargetId(partner))!.Reason);
         Assert.Equal(1, components.DepthOf[itemOnTable]);
         Assert.Equal(2, components.DepthOf[partner]);
         Assert.Equal(2, components.Stats.MaxDepth);
@@ -110,7 +110,7 @@ public class TouchChainsTests
         {
             var proposals = _proposed ? [] : firstRound;
             _proposed = true;
-            return new RoundProposals<RoundDetails>(proposals, new TouchRoundDetails([.. proposals.Select(proposal => new IndexPair(((RemovalReason.Touching)proposal.Reason).Touched.Index, proposal.Target.Index))], PairTestStats.Zero));
+            return new RoundProposals<RoundDetails>(proposals, new TouchRoundDetails([.. proposals.Select(proposal => new IndexPair(((TouchingTargetThatLeft)proposal.Reason).Touched.Index, proposal.Target.Index))], PairTestStats.Zero));
         }
     }
 }

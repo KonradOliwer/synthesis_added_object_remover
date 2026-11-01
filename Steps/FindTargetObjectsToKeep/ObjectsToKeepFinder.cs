@@ -10,10 +10,21 @@ namespace AddedObjectRemover.Steps.FindTargetObjectsToKeep;
 /// </summary>
 public static class ObjectsToKeepFinder
 {
-    /// <param name="RestingOn">The target objects other mods' objects rest on, with what rests on each; empty unless they are kept.</param>
-    public sealed record Input(IReadOnlyList<TargetObject> Targets, IReadOnlyList<LinkFact> Links, IBaseFacts Bases, IReadOnlyDictionary<TargetId, RestingObject> RestingOn);
+    /// <param name="HeldUp">Finds the target objects other mods' objects rest on, which are kept.</param>
+    /// <param name="TimeSinceStart">The run's clock, which times the two parts of the step.</param>
+    public sealed record Input(
+        IReadOnlyList<TargetObject> Targets, IReadOnlyList<LinkFact> Links, IBaseFacts Bases, IHeldUpTargetsSearch HeldUp, Func<TimeSpan> TimeSinceStart);
 
-    public static ObjectsToKeepResult Find(Input input) => Find(input.Targets, input.Links, input.Bases, input.RestingOn);
+    /// <summary>Finds what other mods' objects rest on first, since what rests on a target object keeps it.</summary>
+    public static ObjectsToKeepFound Find(Input input)
+    {
+        var clock = input.TimeSinceStart;
+        var start = clock();
+        var heldUp = input.HeldUp.Find();
+        var heldUpEnd = clock();
+        var kept = Find(input.Targets, input.Links, input.Bases, heldUp.Targets);
+        return new ObjectsToKeepFound(heldUp, heldUpEnd - start, kept, clock() - heldUpEnd);
+    }
 
     /// <param name="restingOn">The target objects other mods' objects rest on, with what rests on each; empty unless they are kept.</param>
     internal static ObjectsToKeepResult Find(

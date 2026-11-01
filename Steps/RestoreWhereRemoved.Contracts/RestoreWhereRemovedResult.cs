@@ -21,7 +21,9 @@ public enum AreaVerdict
 /// <param name="Standing">Those not removed.</param>
 /// <param name="Size">The box volume of the objects counted, in cubic game units.</param>
 /// <param name="StandingSize">The box volume of those not removed.</param>
-public sealed record AreaShare(int Objects, int Standing, double Size, double StandingSize, AreaVerdict Verdict);
+/// <param name="Measure">What the share is weighed by: the setting's measure, or the count when the setting weighs by size and no object counted has a volume.</param>
+/// <param name="StandingPercent">The percent of the weight that still stands; 0 when the area holds no object.</param>
+public sealed record AreaShare(int Objects, int Standing, double Size, double StandingSize, AreaVerdict Verdict, ClearedAreaMeasure Measure, double StandingPercent);
 
 /// <summary>Why a change never goes back, whatever its area.</summary>
 public enum NeverRestoredReason
@@ -78,14 +80,46 @@ public enum PlacedGuard
 /// <param name="Failure">Why the check stopped unexpectedly, which keeps the record too; null when it did not.</param>
 public sealed record PlacedRefusal(PlacedGuard Guard, RecordKey? By, string? Failure);
 
+/// <summary>What a placed record's restore puts back, by the first of these its undone parts hold.</summary>
+public enum PlacedRestoreKind
+{
+    /// <summary>Its base object with every field no other part holds.</summary>
+    OwnModel,
+
+    /// <summary>Its presence, which makes a record removed now present again.</summary>
+    ShownAgain,
+
+    /// <summary>Its presence, which makes a record present now removed again.</summary>
+    HiddenAgain,
+
+    /// <summary>Its position.</summary>
+    MovedBack,
+
+    /// <summary>Its rotation or scale.</summary>
+    TurnedOrRescaledBack,
+}
+
 /// <summary>A placed record of another plugin with parts that go back where the cleaned mod's objects are removed, and what became of it.</summary>
 /// <param name="Never">Why it never goes back; null when it can.</param>
 /// <param name="OldPlace">The area around the earlier version's place; null when <paramref name="Never"/> is set.</param>
 /// <param name="WhereItIsNow">For a target the removal steps left undecided, the area where it stands now; null otherwise.</param>
 /// <param name="Refused">The first guard that keeps it, once every area judged is cleared; null when none does.</param>
 /// <param name="IsRestored">Its undone parts go back: no never-rule holds, every area judged is cleared and no guard keeps it.</param>
+/// <param name="Kind">What its restore puts back.</param>
+/// <param name="KeptForArea">
+/// When no never-rule holds and an area judged is not cleared, the verdict of the area that keeps it: one where the cleaned mod's
+/// objects still stand before one with none of them around; null otherwise.
+/// </param>
+/// <remarks>When it stays, exactly one of <paramref name="Never"/>, <paramref name="Refused"/> and <paramref name="KeptForArea"/> says why.</remarks>
 public sealed record PlacedChangeJudged(
-    RecordChangedByCleanedMod Change, NeverRestoredReason? Never, AreaShare? OldPlace, AreaShare? WhereItIsNow, PlacedRefusal? Refused, bool IsRestored);
+    RecordChangedByCleanedMod Change,
+    NeverRestoredReason? Never,
+    AreaShare? OldPlace,
+    AreaShare? WhereItIsNow,
+    PlacedRefusal? Refused,
+    bool IsRestored,
+    PlacedRestoreKind Kind,
+    AreaVerdict? KeptForArea);
 
 /// <summary>A cell record of another plugin with parts that go back where the cleaned mod's objects are removed, and what became of it.</summary>
 /// <param name="Undone">
@@ -98,13 +132,70 @@ public sealed record PlacedChangeJudged(
 /// the cleaned mod's water level; null when the water level goes back or the cleaned mod is not the last to change it.
 /// </param>
 /// <param name="IsRestored">Its undone parts go back: no never-rule holds, its area is cleared and some part is undone.</param>
+/// <param name="KeptForArea">When no never-rule holds and its area is not cleared, the area's verdict; null otherwise.</param>
+/// <remarks>
+/// When it stays, exactly one of <paramref name="Never"/>, <paramref name="KeptForArea"/> and <paramref name="WaterKeptBy"/> says
+/// why: a cell whose area is cleared stays only when its water level was all that would go back.
+/// </remarks>
 public sealed record CellChangeJudged(
-    CellChangedByCleanedMod Change, ImmutableArray<PartChange> Undone, NeverRestoredReason? Never, AreaShare? Area, RecordKey? WaterKeptBy, bool IsRestored);
+    CellChangedByCleanedMod Change,
+    ImmutableArray<PartChange> Undone,
+    NeverRestoredReason? Never,
+    AreaShare? Area,
+    RecordKey? WaterKeptBy,
+    bool IsRestored,
+    AreaVerdict? KeptForArea);
 
 /// <summary>One quarter of a cell's terrain, judged at its centre in every space whose ground the cell is.</summary>
-/// <param name="Verdict">Cleared when no space says the cleaned mod's objects still stand and at least one says cleared.</param>
-/// <param name="Areas">The area of each such space that holds a target, in space key order.</param>
-public sealed record LandQuarterJudged(AreaVerdict Verdict, ImmutableArray<AreaShare> Areas);
+/// <param name="Area">
+/// The areas of every such space that holds a target added up, under the quarter's verdict: cleared when no space says the cleaned
+/// mod's objects still stand and at least one says cleared.
+/// </param>
+public sealed record LandQuarterJudged(AreaShare Area)
+{
+    public AreaVerdict Verdict => Area.Verdict;
+}
+
+/// <summary>Heights, vertex colours and texture layers of a terrain quarter.</summary>
+/// <param name="Heights">Grid points by their height.</param>
+/// <param name="Colours">Grid points by their vertex colour.</param>
+/// <param name="Textures">The quarter's texture layers.</param>
+public readonly record struct TerrainPieces(int Heights, int Colours, bool Textures)
+{
+    public bool Any => Heights > 0 || Colours > 0 || Textures;
+}
+
+/// <param name="Points">How many of the quarter's points keep their height for <paramref name="Reason"/>.</param>
+public sealed record QuarterPointsKept(TerrainKeptReason Reason, int Points);
+
+/// <summary>
+/// One quarter of a cell's terrain that holds something the cleaned mod last changed that could go back, and what became of it. A
+/// point on the line between quarters counts in each of them; the rest of the LAND record belongs to no quarter.
+/// </summary>
+/// <param name="Quarter">By <see cref="TerrainQuadrants.IndexOf"/>.</param>
+/// <param name="Area">The quarter's area; null when a never-rule keeps the land.</param>
+/// <param name="Changed">What the cleaned mod last changed in it that could go back.</param>
+/// <param name="Restored">What of that goes back.</param>
+/// <param name="Later">What a later plugin changed again in it.</param>
+/// <param name="Kept">In a cleared quarter, the points whose height stays per reason, in reason order; empty otherwise.</param>
+/// <param name="KeptForArea">When nothing of it goes back and no never-rule holds, the verdict of its area that is not cleared; null otherwise.</param>
+/// <param name="ColoursSharedWithGroundThatStays">
+/// Nothing of the cleared quarter goes back and it keeps no height: its only change, vertex colours, each lies on a line shared with
+/// a quarter or a neighbouring cell whose colour stays there.
+/// </param>
+/// <remarks>
+/// When nothing of it goes back, exactly one of the land's never-rule, <paramref name="KeptForArea"/>, <paramref name="Kept"/> and
+/// <paramref name="ColoursSharedWithGroundThatStays"/> says why.
+/// </remarks>
+public sealed record LandQuarterOutcome(
+    int Quarter,
+    AreaShare? Area,
+    TerrainPieces Changed,
+    TerrainPieces Restored,
+    TerrainPieces Later,
+    ImmutableArray<QuarterPointsKept> Kept,
+    AreaVerdict? KeptForArea,
+    bool ColoursSharedWithGroundThatStays);
 
 /// <summary>Why a grid point whose height the cleaned mod last changed keeps that height although a quarter holding it is cleared.</summary>
 public enum TerrainKeptReason
@@ -149,11 +240,16 @@ public sealed record LandPointsKept(TerrainKeptReason Reason, PointSet Points);
 /// <param name="Heights">The points whose height and normal go back, wholly or blended into the ground that stays.</param>
 /// <param name="Colours">The points whose vertex colour goes back.</param>
 /// <param name="Textures">The quarters whose texture layers go back.</param>
-/// <param name="Rest">Whether the rest of the record goes back.</param>
+/// <param name="Rest">Whether the rest of the record goes back: the cleaned mod last changed it and every quarter is cleared.</param>
 /// <param name="Kept">The points the cleaned mod last changed that a cleared quarter holds and whose height stays, by first reason in reason order.</param>
 /// <param name="FinalHeights">Every point's height once written, in game units, row by row from the bottom; null when no height goes back.</param>
 /// <param name="Beyond">The final heights just outside the cell, for the normals at its edges.</param>
 /// <param name="IsRestored">Some height, colour, texture or the rest goes back.</param>
+/// <param name="ChangedQuarters">The quarters that hold something the cleaned mod last changed that could go back, in quarter order.</param>
+/// <param name="RestKeptForArea">
+/// When the rest of the record the cleaned mod last changed stays and no never-rule holds, the verdict of a quarter that is not
+/// cleared: one where the cleaned mod's objects still stand before one with none of them around; null otherwise.
+/// </param>
 public sealed record LandChangeJudged(
     LandChangedByCleanedMod Change,
     NeverRestoredReason? Never,
@@ -165,7 +261,9 @@ public sealed record LandChangeJudged(
     ImmutableArray<LandPointsKept> Kept,
     float[]? FinalHeights,
     CellEdgeHeights Beyond,
-    bool IsRestored);
+    bool IsRestored,
+    ImmutableArray<LandQuarterOutcome> ChangedQuarters,
+    AreaVerdict? RestKeptForArea);
 
 /// <summary>What the patch writes for a navmesh of a group that goes back.</summary>
 public enum NavmeshUndo
@@ -187,7 +285,14 @@ public enum NavmeshUndo
 /// <param name="Never">Why it never goes back; null when it can.</param>
 /// <param name="Area">The area around the centre of its bounds, or the whole interior; null when <paramref name="Never"/> is set or it has no vertices.</param>
 /// <param name="Undo">What the patch writes when its group goes back; null when it is no candidate: a never-rule holds, its area is not cleared or nothing in it goes back.</param>
-public sealed record NavmeshChangeJudged(NavmeshChangedByCleanedMod Change, NeverRestoredReason? Never, AreaShare? Area, NavmeshUndo? Undo);
+/// <param name="KeptForArea">When no never-rule holds and its area is not cleared, the area's verdict; null otherwise.</param>
+/// <param name="NothingGoesBack">No never-rule holds and its area is cleared or it has no vertices to judge it at, but nothing in it goes back.</param>
+/// <remarks>
+/// When it is no candidate, exactly one of <paramref name="Never"/>, <paramref name="KeptForArea"/> and
+/// <paramref name="NothingGoesBack"/> says why; a candidate goes back or stays with its group.
+/// </remarks>
+public sealed record NavmeshChangeJudged(
+    NavmeshChangedByCleanedMod Change, NeverRestoredReason? Never, AreaShare? Area, NavmeshUndo? Undo, AreaVerdict? KeptForArea, bool NothingGoesBack);
 
 /// <summary>What keeps a group of navmeshes as the cleaned mod made them (rules N0–N9).</summary>
 public enum NavmeshGuard

@@ -123,7 +123,7 @@ public class UnexpectedErrorRunTests
         Assert.DoesNotContain(outcome.LeftBehind.Evaluations, evaluation => evaluation.IsRemoved);
         Assert.Equal(outcome.Removals.Select(removal => removal.TargetIndex), outcome.Written.Removed.Select(id => id.Index));
         Assert.Equal(
-            $"  Unexpected error in the step for invisible objects left behind (PlantedUserDataException: {FailingBaseFacts.FailureMessage}). "
+            $"  Unexpected error in the step for invisible objects left behind (MalformedRecordException: {FailingBaseFacts.FailureMessage}). "
             + "That step did not run, so invisible objects whose surroundings were removed were not removed.",
             Assert.Single(UnexpectedErrorLines(log)));
         Assert.Contains("Invisible objects left behind: not performed because of an unexpected error.", SectionLines(log, "leftovers"));
@@ -146,7 +146,7 @@ public class UnexpectedErrorRunTests
 
         Assert.IsType<RunResult.Done>(result);
         Assert.Equal(
-            $"  Unexpected error in the report files (PlantedUserDataException: {BaseFactsFailingInReportTables.FailureMessage}). "
+            $"  Unexpected error in the report files (MalformedRecordException: {BaseFactsFailingInReportTables.FailureMessage}). "
             + "Some or all of the report files are missing; the patch is not affected.",
             Assert.Single(UnexpectedErrorLines(log)));
         Assert.Equal("Report files: not performed because of an unexpected error.", Assert.Single(SectionLines(log, "written")));
@@ -176,7 +176,7 @@ public class UnexpectedErrorRunTests
         var done = Assert.IsType<RunResult.Done>(result);
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, done.Outcome.RestingObjects.ReportFileDetails.Outcome);
         var errorLine =
-            $"  Unexpected error in the report-file details (PlantedUserDataException: {FailingBaseFacts.FailureMessage}). "
+            $"  Unexpected error in the report-file details (MalformedRecordException: {FailingBaseFacts.FailureMessage}). "
             + "The touching pairs or mesh origins that the report files list are missing from them.";
         Assert.Equal(errorLine, Assert.Single(UnexpectedErrorLines(log)));
         var write = log.Sections.FindIndex(section => section.Id == "write");

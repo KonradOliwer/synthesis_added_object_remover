@@ -200,8 +200,8 @@ public sealed class TablesTests : IDisposable
         tally.Add(DirectionSector.West, 40.5f, removed: false);
         VisibleLeftBehindCheck[] evaluations =
         [
-            new(3, VisibleObjectKind.Containers, tally.Build(), VisibleLeftBehindOutcome.KeptProtectedType, KeepReason: null),
-            new(1, null, new SectorAreaTally(80).Build(), VisibleLeftBehindOutcome.KeptReferenced, QuestReason),
+            new(3, VisibleObjectKind.Containers, tally.Build(), LeftBehindOutcome.KeptProtectedType, KeepReason: null),
+            new(1, null, new SectorAreaTally(80).Build(), LeftBehindOutcome.KeptReferenced, QuestReason),
         ];
 
         var table = Tables.BuildVisibleLeftBehindTable(world, evaluations, Context);
@@ -393,7 +393,7 @@ public sealed class TablesTests : IDisposable
         tables.Single(table => table.FileName == ReportFileNames.ComponentsFileName).Rows.Single();
 
     private static ImmutableArray<CsvTable> BuildTables(RunOutcome outcome, AlsoRemoveSettings settings) =>
-        Tables.BuildTables(outcome, settings, whereRemoved: null, Context);
+        Tables.BuildTables(outcome, settings, Context);
 
     private static RunOutcome WithDetails(RunOutcome outcome, ReportFileDetails details) =>
         outcome with { RestingObjects = outcome.RestingObjects with { ReportFileDetails = details } };

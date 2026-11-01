@@ -24,9 +24,10 @@ public sealed class RestoreWhereRemovedReportTests
     private static readonly PluginName Patch = new("Patch.esp");
     private static readonly RecordKey WaterObject = new(Later, 0x777);
 
-    private static readonly AreaShare Cleared = new(Objects: 214, Standing: 0, Size: 8_000_000, StandingSize: 0, AreaVerdict.Cleared);
-    private static readonly AreaShare StillStanding = new(Objects: 10, Standing: 4, Size: 1000, StandingSize: 250, AreaVerdict.StillStanding);
-    private static readonly AreaShare NoObjects = new(Objects: 0, Standing: 0, Size: 0, StandingSize: 0, AreaVerdict.NoObjectsAround);
+    private static readonly AreaShare Cleared = new(Objects: 214, Standing: 0, Size: 8_000_000, StandingSize: 0, AreaVerdict.Cleared, ClearedAreaMeasure.ObjectSize, StandingPercent: 0);
+    private static readonly AreaShare StillStanding = new(Objects: 10, Standing: 4, Size: 1000, StandingSize: 250, AreaVerdict.StillStanding, ClearedAreaMeasure.ObjectSize, StandingPercent: 25);
+    private static readonly AreaShare StillStandingByCount = StillStanding with { Measure = ClearedAreaMeasure.ObjectCount, StandingPercent = 40 };
+    private static readonly AreaShare NoObjects = new(Objects: 0, Standing: 0, Size: 0, StandingSize: 0, AreaVerdict.NoObjectsAround, ClearedAreaMeasure.ObjectCount, StandingPercent: 0);
 
     private static string Space => $"worldspace {RecordLabels.Of(TestTargets.Space, "Tamriel")}";
 
@@ -59,7 +60,7 @@ public sealed class RestoreWhereRemovedReportTests
     [Fact]
     public void ACountOfZeroIsLeftOutAndALineWithNoFactIsNotPrinted()
     {
-        var lines = Section(ObjectsOnly(Judged(Rock(0x912, PlacedParts.Position), Cleared, restored: true)), Normal).Lines;
+        var lines = Section(ObjectsOnly(Restored(Rock(0x912, PlacedParts.Position), Cleared)), Normal).Lines;
 
         Assert.Equal($"{Heading}: 1 object of other mods (1 moved back).", Assert.Single(lines));
     }
@@ -72,7 +73,7 @@ public sealed class RestoreWhereRemovedReportTests
         Assert.Empty(Section(nothing, Normal).Lines);
         Assert.Empty(Section(nothing, Detailed).Lines);
         Assert.Empty(LogSections.BuildRestoreWhereRemovedSummarySection(nothing).Lines);
-        Assert.Empty(Tables.BuildRestoredWhereRemovedTables(World(), nothing, ClearedAreaMeasure.ObjectSize, Normal));
+        Assert.Empty(Tables.BuildRestoredWhereRemovedTables(World(), nothing, Normal));
     }
 
     [Fact]
@@ -157,7 +158,7 @@ public sealed class RestoreWhereRemovedReportTests
     [Fact]
     public void ATargetJudgedAtBothPlacesShowsBothAreas()
     {
-        var both = ObjectsOnly(Judged(Rock(0x910, PlacedParts.Position), Cleared, now: StillStanding));
+        var both = ObjectsOnly(KeptForArea(Rock(0x910, PlacedParts.Position), Cleared, AreaVerdict.StillStanding, now: StillStanding));
 
         var line = Assert.Single(Section(both, Detailed).Lines, text => text.StartsWith("  Kept as changed", StringComparison.Ordinal));
 
@@ -168,7 +169,7 @@ public sealed class RestoreWhereRemovedReportTests
     public void TheMeasureNamesThePercentOfTheCountWhenTheAreaIsWeighedByCount()
     {
         var line = Assert.Single(
-            LogSections.BuildRestoreWhereRemovedSection(World(), ObjectsOnly(Judged(Rock(0x911, PlacedParts.Position), StillStanding)), ClearedAreaMeasure.ObjectCount, Elapsed, Detailed).Lines,
+            Section(ObjectsOnly(KeptForArea(Rock(0x911, PlacedParts.Position), StillStandingByCount, AreaVerdict.StillStanding)), Detailed).Lines,
             text => text.StartsWith("  Kept as changed", StringComparison.Ordinal));
 
         Assert.EndsWith("4 of 10 objects still stand (40.0% by count)", line);
@@ -284,7 +285,7 @@ public sealed class RestoreWhereRemovedReportTests
     [Fact]
     public void TheObjectsFileHasARowPerJudgedPlacedChangeWithTheAreaAndTheResult()
     {
-        var table = Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), Scene(), ClearedAreaMeasure.ObjectSize, Normal), file => file.FileName == ReportFileNames.RestoredWhereRemovedObjectsFileName);
+        var table = ObjectsTable();
 
         Assert.Equal(Scene().Objects.Length, table.Rows.Length);
         Assert.All(table.Rows, row => Assert.Equal(table.Header.Length, row.Length));
@@ -303,7 +304,7 @@ public sealed class RestoreWhereRemovedReportTests
     {
         var never = Row(ObjectsTable(), "formKey", Key(0x909).ToString());
         var byCount = Assert.Single(
-            Tables.BuildRestoredWhereRemovedTables(World(), ObjectsOnly(Judged(Rock(0x911, PlacedParts.Position), StillStanding)), ClearedAreaMeasure.ObjectCount, Normal),
+            Tables.BuildRestoredWhereRemovedTables(World(), ObjectsOnly(KeptForArea(Rock(0x911, PlacedParts.Position), StillStandingByCount, AreaVerdict.StillStanding)), Normal),
             file => file.FileName == ReportFileNames.RestoredWhereRemovedObjectsFileName);
         var objects = ObjectsTable();
 
@@ -358,7 +359,7 @@ public sealed class RestoreWhereRemovedReportTests
     {
         var scene = Scene() with { Objects = [], Cells = [], Navmeshes = [], NavmeshGroups = [], Lands = [RestOnlyLand(aQuarterStillStands)] };
 
-        var table = Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), scene, ClearedAreaMeasure.ObjectSize, Normal));
+        var table = Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), scene, Normal));
 
         var row = Assert.Single(table.Rows);
         Assert.Equal(
@@ -391,7 +392,7 @@ public sealed class RestoreWhereRemovedReportTests
         var scene = Scene() with { Objects = [], Cells = [], Navmeshes = [], NavmeshGroups = [], Lands = [LandNextToAQuarterThatStays()] };
 
         var lines = Section(scene, Detailed).Lines;
-        var table = Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), scene, ClearedAreaMeasure.ObjectSize, Normal));
+        var table = Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), scene, Normal));
 
         Assert.Contains(
             $"  Terrain {Space}, cell (2, 0), south-west quarter: 1 height; 1 height kept on the line to a quarter of the cell whose area is not cleared; 0 of 214 objects still stand (0.0% by size)",
@@ -407,16 +408,19 @@ public sealed class RestoreWhereRemovedReportTests
     public void AClearedQuarterKeepingOnlyVertexColoursSaysTheyLieOnALineSharedWithGroundThatStays()
     {
         var land = LandNextToAQuarterThatStays();
-        var coloursOnly = land with
-        {
-            Change = land.Change with { UndoPoints = PointSet.Of([]), UndoColours = PointSet.Of([16]) },
-            Heights = PointSet.Of([]),
-            Kept = [],
-            IsRestored = false,
-        };
+        var coloursOnly = LandOutcomes.Judged(
+            land.Change with { UndoPoints = PointSet.Of([]), UndoColours = PointSet.Of([16]) },
+            land.Quarters,
+            heights: PointSet.Of([]),
+            land.Colours,
+            land.Textures,
+            rest: false,
+            kept: [],
+            finalHeights: null,
+            CellEdgeHeights.Unknown);
         var scene = Scene() with { Objects = [], Cells = [], Navmeshes = [], NavmeshGroups = [], Lands = [coloursOnly] };
 
-        var table = Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), scene, ClearedAreaMeasure.ObjectSize, Normal));
+        var table = Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), scene, Normal));
 
         Assert.Equal("kept: its vertex colours lie on a line shared with ground that stays", Field(table, Row(table, "quarter", "south-west"), "result"));
     }
@@ -427,9 +431,9 @@ public sealed class RestoreWhereRemovedReportTests
     {
         var lantern = TestShapes.Placed(Mutagen.Bethesda.Plugins.ModKey.FromNameAndExtension("Later.esp"), 7, new BaseKey(Key(0x300), BaseLinkKind.PlaceableObject), Vector3.Zero) with { EditorId = "Lantern" };
         var world = World() with { OtherModObjects = [lantern] };
-        var refused = ObjectsOnly(Judged(Rock(0x913, PlacedParts.Scale), Cleared, refused: new PlacedRefusal(PlacedGuard.CarriesObjectThatStays, lantern.Key, Failure: null)));
+        var refused = ObjectsOnly(Refused(Rock(0x913, PlacedParts.Scale), Cleared, new PlacedRefusal(PlacedGuard.CarriesObjectThatStays, lantern.Key, Failure: null)));
 
-        var lines = LogSections.BuildRestoreWhereRemovedSection(world, refused, ClearedAreaMeasure.ObjectSize, Elapsed, Detailed).Lines;
+        var lines = LogSections.BuildRestoreWhereRemovedSection(world, refused, Elapsed, Detailed).Lines;
 
         Assert.Contains(lines, line => line.Contains($": carrying an object that stays (Lantern [{lantern.Key}]);", StringComparison.Ordinal));
     }
@@ -440,7 +444,7 @@ public sealed class RestoreWhereRemovedReportTests
     {
         var large = Cleared with { Size = 123_456_789d, StandingSize = 12_345_678d };
 
-        var table = Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), ObjectsOnly(Judged(Rock(0x914, PlacedParts.Position), large, restored: true)), ClearedAreaMeasure.ObjectSize, Normal));
+        var table = Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), ObjectsOnly(Restored(Rock(0x914, PlacedParts.Position), large)), Normal));
 
         Assert.Equal(("123456789", "12345678"), (Field(table, table.Rows[0], "size"), Field(table, table.Rows[0], "standingSize")));
     }
@@ -464,7 +468,7 @@ public sealed class RestoreWhereRemovedReportTests
     {
         var onlyCells = Scene() with { Objects = [], Lands = [], Navmeshes = [], NavmeshGroups = [] };
 
-        var tables = Tables.BuildRestoredWhereRemovedTables(World(), onlyCells, ClearedAreaMeasure.ObjectSize, Normal);
+        var tables = Tables.BuildRestoredWhereRemovedTables(World(), onlyCells, Normal);
 
         Assert.Equal([ReportFileNames.RestoredWhereRemovedCellsFileName], tables.Select(table => table.FileName));
     }
@@ -472,13 +476,13 @@ public sealed class RestoreWhereRemovedReportTests
     // ---- the scene
 
     private static LogSection Section(RestoreWhereRemovedResult result, ReportContext context) =>
-        LogSections.BuildRestoreWhereRemovedSection(World(), result, ClearedAreaMeasure.ObjectSize, Elapsed, context);
+        LogSections.BuildRestoreWhereRemovedSection(World(), result, Elapsed, context);
 
     private static CsvTable ObjectsTable() =>
-        Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), Scene(), ClearedAreaMeasure.ObjectSize, Normal), file => file.FileName == ReportFileNames.RestoredWhereRemovedObjectsFileName);
+        Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), Scene(), Normal), file => file.FileName == ReportFileNames.RestoredWhereRemovedObjectsFileName);
 
     private static CsvTable CellsTable() =>
-        Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), Scene(), ClearedAreaMeasure.ObjectSize, Normal), file => file.FileName == ReportFileNames.RestoredWhereRemovedCellsFileName);
+        Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), Scene(), Normal), file => file.FileName == ReportFileNames.RestoredWhereRemovedCellsFileName);
 
     private static ImmutableArray<string> Row(CsvTable table, string column, string value) =>
         table.Rows.Single(row => Field(table, row, column) == value);
@@ -511,20 +515,20 @@ public sealed class RestoreWhereRemovedReportTests
         new(
             StepOutcome.Performed,
             [
-                Judged(Rock(0x901, PlacedParts.Position | PlacedParts.Rotation, later: new Dictionary<PlacedParts, PluginName> { [PlacedParts.Rotation] = Later }), Cleared, restored: true),
-                Judged(Rock(0x902, PlacedParts.Presence, removedBefore: false, later: new Dictionary<PlacedParts, PluginName> { [PlacedParts.Scale] = Patch }), Cleared, restored: true),
-                Judged(Rock(0x903, PlacedParts.Presence, removedBefore: true), Cleared, restored: true),
-                Judged(Rock(0x904, PlacedParts.BaseAndData | PlacedParts.Position), Cleared, restored: true),
-                Judged(Rock(0x905, PlacedParts.Position), Cleared, refused: new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, Key(0x500), Failure: null)),
-                Judged(Rock(0x906, PlacedParts.Position), Cleared, refused: new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, By: null, "InvalidOperationException: broke")),
-                Judged(Rock(0x907, PlacedParts.Position), StillStanding),
-                Judged(Rock(0x908, PlacedParts.Position), NoObjects),
-                Judged(Rock(0x909, PlacedParts.Position), area: null, never: NeverRestoredReason.WinnerLoadsAfterPatch),
+                Restored(Rock(0x901, PlacedParts.Position | PlacedParts.Rotation, later: new Dictionary<PlacedParts, PluginName> { [PlacedParts.Rotation] = Later }), Cleared),
+                Restored(Rock(0x902, PlacedParts.Presence, removedBefore: false, later: new Dictionary<PlacedParts, PluginName> { [PlacedParts.Scale] = Patch }), Cleared),
+                Restored(Rock(0x903, PlacedParts.Presence, removedBefore: true), Cleared),
+                Restored(Rock(0x904, PlacedParts.BaseAndData | PlacedParts.Position), Cleared),
+                Refused(Rock(0x905, PlacedParts.Position), Cleared, new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, Key(0x500), Failure: null)),
+                Refused(Rock(0x906, PlacedParts.Position), Cleared, new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, By: null, "InvalidOperationException: broke")),
+                KeptForArea(Rock(0x907, PlacedParts.Position), StillStanding, AreaVerdict.StillStanding),
+                KeptForArea(Rock(0x908, PlacedParts.Position), NoObjects, AreaVerdict.NoObjectsAround),
+                NeverRestored(Rock(0x909, PlacedParts.Position), NeverRestoredReason.WinnerLoadsAfterPatch),
             ],
             [
                 Cell(1, 2, [CellPart.Lighting, CellPart.Music], Cleared, restored: true),
                 Cell(3, 4, [CellPart.Music], Cleared, restored: true, waterKeptBy: WaterObject),
-                Cell(5, 6, [CellPart.Music], StillStanding, later: Later),
+                Cell(5, 6, [CellPart.Music], StillStanding, keptForArea: AreaVerdict.StillStanding, later: Later),
                 Cell(7, 8, [CellPart.Lighting], area: null, never: NeverRestoredReason.LinkedFromCleanedMod),
             ],
             [Land()],
@@ -533,7 +537,7 @@ public sealed class RestoreWhereRemovedReportTests
                 Navmesh(0xA02, NavmeshCase.DeletedWithoutReplacement, NavmeshUndo.BroughtBack, Cleared),
                 Navmesh(0xA03, NavmeshCase.Added, NavmeshUndo.Sunk, Cleared),
                 Navmesh(0xA04, NavmeshCase.Edited, NavmeshUndo.Geometry, Cleared),
-                Navmesh(0xA05, NavmeshCase.Edited, undo: null, StillStanding),
+                Navmesh(0xA05, NavmeshCase.Edited, undo: null, StillStanding, keptForArea: AreaVerdict.StillStanding),
             ],
             [
                 new NavmeshGroupJudged([Key(0xA01), Key(0xA02)], [], Refused: null, IsRestored: true),
@@ -544,14 +548,17 @@ public sealed class RestoreWhereRemovedReportTests
             DoorsLeftRemoved: [],
             Failures: []);
 
-    private static PlacedChangeJudged Judged(
-        RecordChangedByCleanedMod change,
-        AreaShare? area,
-        bool restored = false,
-        PlacedRefusal? refused = null,
-        NeverRestoredReason? never = null,
-        AreaShare? now = null) =>
-        new(change, never, area, now, refused, restored);
+    private static PlacedChangeJudged Restored(RecordChangedByCleanedMod change, AreaShare area) =>
+        new(change, Never: null, area, WhereItIsNow: null, Refused: null, IsRestored: true, ChangeJudge.KindOf(change), KeptForArea: null);
+
+    private static PlacedChangeJudged Refused(RecordChangedByCleanedMod change, AreaShare area, PlacedRefusal refusal) =>
+        new(change, Never: null, area, WhereItIsNow: null, refusal, IsRestored: false, ChangeJudge.KindOf(change), KeptForArea: null);
+
+    private static PlacedChangeJudged KeptForArea(RecordChangedByCleanedMod change, AreaShare area, AreaVerdict keeping, AreaShare? now = null) =>
+        new(change, Never: null, area, now, Refused: null, IsRestored: false, ChangeJudge.KindOf(change), keeping);
+
+    private static PlacedChangeJudged NeverRestored(RecordChangedByCleanedMod change, NeverRestoredReason never) =>
+        new(change, never, OldPlace: null, WhereItIsNow: null, Refused: null, IsRestored: false, ChangeJudge.KindOf(change), KeptForArea: null);
 
     private static RecordChangedByCleanedMod Rock(uint id, PlacedParts undo, bool removedBefore = false, IReadOnlyDictionary<PlacedParts, PluginName>? later = null)
     {
@@ -577,7 +584,15 @@ public sealed class RestoreWhereRemovedReportTests
     }
 
     private static CellChangeJudged Cell(
-        int x, int y, CellPart[] undone, AreaShare? area, bool restored = false, RecordKey? waterKeptBy = null, PluginName? later = null, NeverRestoredReason? never = null)
+        int x,
+        int y,
+        CellPart[] undone,
+        AreaShare? area,
+        bool restored = false,
+        RecordKey? waterKeptBy = null,
+        AreaVerdict? keptForArea = null,
+        PluginName? later = null,
+        NeverRestoredReason? never = null)
     {
         var water = new CellWaterCopy(BaseGame, HasWater: false, OwnLevel: null);
         ImmutableArray<PartChange> parts =
@@ -587,7 +602,7 @@ public sealed class RestoreWhereRemovedReportTests
         ];
         var change = new CellChangedByCleanedMod(
             new RecordKey(BaseGame, (uint)(0x500 + x)), TestTargets.Space, (x, y), parts, LinkedFromCleanedMod: false, TestTargets.TargetName, water, water, DefaultWaterLevel: null);
-        return new CellChangeJudged(change, [.. parts.Where(part => part.Outcome is PartOutcome.Undo)], never, area, waterKeptBy, restored);
+        return new CellChangeJudged(change, [.. parts.Where(part => part.Outcome is PartOutcome.Undo)], never, area, waterKeptBy, restored, keptForArea);
     }
 
     /// <summary>
@@ -609,25 +624,16 @@ public sealed class RestoreWhereRemovedReportTests
             new LandLeftToLater(PointSet.Of([]), PointSet.Of([]), default, Rest: false, []),
             TestTargets.TargetName,
             Heights: null);
-        LandQuarterJudged[] quarters =
-        [
-            new(AreaVerdict.Cleared, [Cleared]),
-            new(AreaVerdict.Cleared, [Cleared]),
-            new(AreaVerdict.Cleared, [Cleared]),
-            new(AreaVerdict.StillStanding, [StillStanding]),
-        ];
-        return new LandChangeJudged(
+        return LandOutcomes.Judged(
             change,
-            Never: null,
-            [.. quarters],
+            [new(Cleared), new(Cleared), new(Cleared), new(StillStanding)],
             PointSet.Of([0, HeightRowLength]),
             PointSet.Of([0]),
             QuarterSet.Of([0]),
-            Rest: false,
+            rest: false,
             [new LandPointsKept(TerrainKeptReason.UnderObjectThatStays, PointSet.Of([1]))],
-            FinalHeights: null,
-            CellEdgeHeights.Unknown,
-            IsRestored: true);
+            finalHeights: null,
+            CellEdgeHeights.Unknown);
     }
 
     /// <summary>
@@ -648,25 +654,16 @@ public sealed class RestoreWhereRemovedReportTests
             new LandLeftToLater(PointSet.Of([]), PointSet.Of([]), default, Rest: false, []),
             TestTargets.TargetName,
             Heights: null);
-        LandQuarterJudged[] quarters =
-        [
-            new(AreaVerdict.Cleared, [Cleared]),
-            new(AreaVerdict.StillStanding, [StillStanding]),
-            new(AreaVerdict.Cleared, [Cleared]),
-            new(AreaVerdict.Cleared, [Cleared]),
-        ];
-        return new LandChangeJudged(
+        return LandOutcomes.Judged(
             change,
-            Never: null,
-            [.. quarters],
+            [new(Cleared), new(StillStanding), new(Cleared), new(Cleared)],
             PointSet.Of([inside]),
             PointSet.Of([]),
             QuarterSet.Of([]),
-            Rest: false,
+            rest: false,
             [new LandPointsKept(TerrainKeptReason.NextToQuarterThatStays, PointSet.Of([onTheLine]))],
-            FinalHeights: null,
-            CellEdgeHeights.Unknown,
-            IsRestored: true);
+            finalHeights: null,
+            CellEdgeHeights.Unknown);
     }
 
     /// <summary>Cell (1, 0): the cleaned mod changed only the rest of the record, which goes back unless the last quarter's area still stands.</summary>
@@ -682,28 +679,19 @@ public sealed class RestoreWhereRemovedReportTests
             new LandLeftToLater(PointSet.Of([]), PointSet.Of([]), default, Rest: false, []),
             TestTargets.TargetName,
             Heights: null);
-        LandQuarterJudged[] quarters =
-        [
-            new(AreaVerdict.Cleared, [Cleared]),
-            new(AreaVerdict.Cleared, [Cleared]),
-            new(AreaVerdict.Cleared, [Cleared]),
-            lastQuarterStillStands ? new(AreaVerdict.StillStanding, [StillStanding]) : new(AreaVerdict.Cleared, [Cleared]),
-        ];
-        return new LandChangeJudged(
+        return LandOutcomes.Judged(
             change,
-            Never: null,
-            [.. quarters],
+            [new(Cleared), new(Cleared), new(Cleared), new(lastQuarterStillStands ? StillStanding : Cleared)],
             PointSet.Of([]),
             PointSet.Of([]),
             QuarterSet.Of([]),
-            Rest: !lastQuarterStillStands,
+            rest: !lastQuarterStillStands,
             [],
-            FinalHeights: null,
-            CellEdgeHeights.Unknown,
-            IsRestored: !lastQuarterStillStands);
+            finalHeights: null,
+            CellEdgeHeights.Unknown);
     }
 
-    private static NavmeshChangeJudged Navmesh(uint id, NavmeshCase navmeshCase, NavmeshUndo? undo, AreaShare area)
+    private static NavmeshChangeJudged Navmesh(uint id, NavmeshCase navmeshCase, NavmeshUndo? undo, AreaShare area, AreaVerdict? keptForArea = null)
     {
         var cell = Key(0x600);
         var change = new NavmeshChangedByCleanedMod(
@@ -725,6 +713,6 @@ public sealed class RestoreWhereRemovedReportTests
             CellDeletedInAVersion: false,
             LaterWinner: null,
             WinningMapEntry: null);
-        return new NavmeshChangeJudged(change, Never: null, area, undo);
+        return new NavmeshChangeJudged(change, Never: null, area, undo, keptForArea, NothingGoesBack: false);
     }
 }

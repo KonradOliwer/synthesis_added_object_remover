@@ -134,7 +134,7 @@ public class ChangedTerrainObjectsTests
 
     /// <param name="changedBy">Null for a change only the patch holds.</param>
     private static ProposedRemoval Removal(int index, PluginName? changedBy, TerrainChangeKind kind = TerrainChangeKind.Height) =>
-        new(new TargetId(index), new RemovalReason.TerrainChanged(changedBy, kind));
+        new(new TargetId(index), new TerrainChanged(changedBy, kind));
 
     [Fact]
     public void ASwitchedOffStepReadsNoTerrainAndProposesNothing()
@@ -166,11 +166,17 @@ public class ChangedTerrainObjectsTests
     [Fact]
     public void AnotherModRaisingTheTerrainUnderTheObjectRemovesIt()
     {
-        var result = FindInCell(Flat(Target), RaisedAt(Other, Near));
+        var world = TestScenes.CreateWorld([Placed(0, Rock)], []);
+        var terrain = new TerrainPlugin(new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(Target), RaisedAt(Other, Near)] });
+
+        var decided = Decide(world, Mods.AcceptedWorld, terrain, threads: 1, TestJudgedGroups.OfAll(world.Targets, Settings()));
+        var result = decided.Result.Passes.Single();
 
         Assert.Equal(StepOutcome.Performed, result.Outcome);
         Assert.Equal([Removal(0, Other)], result.Proposals.AsEnumerable());
         Assert.Equal(1, result.CellsCompared);
+        Assert.Equal(new Round(1, RoundKind.ChangedTerrain), Assert.Single(decided.Decisions.Rounds));
+        Assert.True(decided.Decisions.IsRemoved(new TargetId(0)));
     }
 
     /// <summary>Every object stands at <see cref="Spot"/>, over terrain that Other.esp raised by <see cref="Raised"/>.</summary>
@@ -181,11 +187,15 @@ public class ChangedTerrainObjectsTests
         return Find(world, Mods.AcceptedWorld, plugin, threads, groups);
     }
 
-    /// <summary>The step over the world's targets, none of them kept, decided before.</summary>
     private static ChangedTerrainResult Find(
         CollectedObjects world, AcceptedWorld accepted, IPluginRecords plugin, int threads, params ObjectsJudgedWith<ChangedTerrainSettings>[] groups) =>
+        Decide(world, accepted, plugin, threads, groups).Result;
+
+    /// <summary>The step over the world's targets, none of them kept, decided before.</summary>
+    private static Decided<ChangedTerrainResult> Decide(
+        CollectedObjects world, AcceptedWorld accepted, IPluginRecords plugin, int threads, params ObjectsJudgedWith<ChangedTerrainSettings>[] groups) =>
         ChangedTerrainObjects.Find(
-            new(world, TestSeededDecisions.StartUnprotected(world.Targets), accepted, LoadOrder, plugin, new BoxShapes(), new Execution(threads), groups)).Result;
+            new(world, TestSeededDecisions.StartUnprotected(world.Targets), accepted, LoadOrder, plugin, new BoxShapes(), new Execution(threads), groups));
 
     [Fact]
     public void GroupsWithDifferentSettingsRunOnceEachOverTheirOwnObjects()

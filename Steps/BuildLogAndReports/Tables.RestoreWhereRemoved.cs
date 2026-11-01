@@ -38,16 +38,16 @@ internal static partial class Tables
     /// rest of the record when that is all of the land that could go back, then the navmeshes in record key order; a row for a terrain
     /// quarter or for the rest of a land's record gives the cell's grid, one for a cell or a navmesh its record.
     /// </remarks>
-    public static ImmutableArray<CsvTable> BuildRestoredWhereRemovedTables(CollectedObjects world, RestoreWhereRemovedResult result, ClearedAreaMeasure measure, ReportContext context)
+    public static ImmutableArray<CsvTable> BuildRestoredWhereRemovedTables(CollectedObjects world, RestoreWhereRemovedResult result, ReportContext context)
     {
         var judged = new RestoreJudgements(result);
         var label = RestoreOutcomes.LabelsIn(world);
-        ImmutableArray<ImmutableArray<string>> objects = [.. result.Objects.Select(change => RestoredWhereRemovedObjectRow(world, change, measure, label, context))];
+        ImmutableArray<ImmutableArray<string>> objects = [.. result.Objects.Select(change => RestoredWhereRemovedObjectRow(world, change, label, context))];
         ImmutableArray<ImmutableArray<string>> cells =
         [
-            .. result.Cells.Select(cell => RestoredWhereRemovedCellRow(world, cell, measure, label)),
-            .. RestoredWhereRemovedLandRows(world, judged.Lands, measure),
-            .. judged.Navmeshes.Select(navmesh => RestoredWhereRemovedNavmeshRow(world, navmesh, measure, label)),
+            .. result.Cells.Select(cell => RestoredWhereRemovedCellRow(world, cell, label)),
+            .. RestoredWhereRemovedLandRows(world, result.Lands),
+            .. judged.Navmeshes.Select(navmesh => RestoredWhereRemovedNavmeshRow(world, navmesh, label)),
         ];
         return
         [
@@ -64,7 +64,7 @@ internal static partial class Tables
 
     /// <param name="label">Names a record a guard found.</param>
     private static ImmutableArray<string> RestoredWhereRemovedObjectRow(
-        CollectedObjects world, PlacedChangeJudged judged, ClearedAreaMeasure measure, Func<RecordKey, string> label, ReportContext context)
+        CollectedObjects world, PlacedChangeJudged judged, Func<RecordKey, string> label, ReportContext context)
     {
         var change = judged.Change;
         return CsvRow.Of(
@@ -79,14 +79,14 @@ internal static partial class Tables
             .. Numbers(change.Earlier.Placement.Position),
             Quote(PartNames(change.Earlier.Undo)),
             OptionalText(LeftToLaterPlugins(change.Earlier)),
-            .. AreaColumns(judged.OldPlace, measure),
-            .. AreaColumns(judged.WhereItIsNow, measure),
+            .. AreaColumns(judged.OldPlace),
+            .. AreaColumns(judged.WhereItIsNow),
             Quote(RestoreWhereRemovedText.Result(RestoreOutcomes.KeptBecause(judged, label))),
         ]);
     }
 
     /// <param name="label">Names the record that keeps the water level.</param>
-    private static ImmutableArray<string> RestoredWhereRemovedCellRow(CollectedObjects world, CellChangeJudged judged, ClearedAreaMeasure measure, Func<RecordKey, string> label)
+    private static ImmutableArray<string> RestoredWhereRemovedCellRow(CollectedObjects world, CellChangeJudged judged, Func<RecordKey, string> label)
     {
         var change = judged.Change;
         return RestoredWhereRemovedRow(
@@ -99,21 +99,20 @@ internal static partial class Tables
             string.Join(Describe.ListSeparator, judged.Undone.Select(part => RestoreWhereRemovedText.PartOfCell(part.Name.Part)).Distinct()),
             Describe.PartsByPlugin(RestoreOutcomes.LeftToLaterPlugins(change)),
             judged.Area,
-            measure,
             RestoreWhereRemovedText.Result(RestoreOutcomes.KeptBecause(judged, label)),
             keptPoints: null);
     }
 
-    private static IEnumerable<ImmutableArray<string>> RestoredWhereRemovedLandRows(CollectedObjects world, IEnumerable<LandJudgement> lands, ClearedAreaMeasure measure)
+    private static IEnumerable<ImmutableArray<string>> RestoredWhereRemovedLandRows(CollectedObjects world, IEnumerable<LandChangeJudged> lands)
     {
         foreach (var land in lands)
         {
-            foreach (var quarter in land.Quarters.Where(facts => facts.HoldsChange)) yield return RestoredWhereRemovedQuarterRow(world, land.Land, quarter, measure);
-            if (RestoreOutcomes.HoldsOnlyTheRest(land)) yield return RestoredWhereRemovedRestRow(world, land.Land, measure);
+            foreach (var quarter in land.ChangedQuarters) yield return RestoredWhereRemovedQuarterRow(world, land, quarter);
+            if (RestoreOutcomes.HoldsOnlyTheRest(land)) yield return RestoredWhereRemovedRestRow(world, land);
         }
     }
 
-    private static ImmutableArray<string> RestoredWhereRemovedRestRow(CollectedObjects world, LandChangeJudged land, ClearedAreaMeasure measure) =>
+    private static ImmutableArray<string> RestoredWhereRemovedRestRow(CollectedObjects world, LandChangeJudged land) =>
         RestoredWhereRemovedLandRow(
             "rest",
             world,
@@ -122,20 +121,18 @@ internal static partial class Tables
             RestoreWhereRemovedText.RestOfLandRecord,
             leftToLaterPlugins: null,
             area: null,
-            measure,
             RestoreWhereRemovedText.Result(RestoreOutcomes.KeptBecauseOfRest(land)),
             keptPoints: null);
 
-    private static ImmutableArray<string> RestoredWhereRemovedQuarterRow(CollectedObjects world, LandChangeJudged land, LandQuarterFacts quarter, ClearedAreaMeasure measure) =>
+    private static ImmutableArray<string> RestoredWhereRemovedQuarterRow(CollectedObjects world, LandChangeJudged land, LandQuarterOutcome quarter) =>
         RestoredWhereRemovedLandRow(
             "quarter",
             world,
             land,
             RestoreWhereRemovedText.Quarter(quarter.Quarter),
-            TerrainPieces(quarter.Heights, quarter.Colours, quarter.Textures),
+            PiecesText(quarter.Changed),
             LaterTerrain(land.Change.LeftToLater, quarter),
-            RestoreOutcomes.AreaOf(quarter),
-            measure,
+            quarter.Area,
             RestoreWhereRemovedText.Result(RestoreOutcomes.KeptBecause(land, quarter)),
             keptPoints: TerrainKeptReasons.Select(reason => quarter.Kept.Where(entry => entry.Reason == reason).Sum(entry => entry.Points)).ToImmutableArray());
 
@@ -148,17 +145,16 @@ internal static partial class Tables
         string undone,
         string? leftToLaterPlugins,
         AreaShare? area,
-        ClearedAreaMeasure measure,
         string result,
         ImmutableArray<int>? keptPoints)
     {
         var cell = land.Change.Cell;
         return RestoredWhereRemovedRow(
-            kind, Describe.Space(world, cell.WorldspaceKey), (cell.X, cell.Y), cell: null, quarter, navmesh: null, undone, leftToLaterPlugins, area, measure, result, keptPoints);
+            kind, Describe.Space(world, cell.WorldspaceKey), (cell.X, cell.Y), cell: null, quarter, navmesh: null, undone, leftToLaterPlugins, area, result, keptPoints);
     }
 
     /// <param name="label">Names a record a guard found.</param>
-    private static ImmutableArray<string> RestoredWhereRemovedNavmeshRow(CollectedObjects world, NavmeshOutcome outcome, ClearedAreaMeasure measure, Func<RecordKey, string> label)
+    private static ImmutableArray<string> RestoredWhereRemovedNavmeshRow(CollectedObjects world, NavmeshOutcome outcome, Func<RecordKey, string> label)
     {
         var change = outcome.Judged.Change;
         return RestoredWhereRemovedRow(
@@ -171,7 +167,6 @@ internal static partial class Tables
             string.Join(Describe.ListSeparator, RestoreOutcomes.UndoneParts(change)),
             Describe.PartsByPlugin(RestoreOutcomes.LeftToLaterPlugins(change)),
             outcome.Judged.Area,
-            measure,
             RestoreWhereRemovedText.Result(RestoreOutcomes.KeptBecause(outcome, label)),
             keptPoints: null);
     }
@@ -188,7 +183,6 @@ internal static partial class Tables
         string undone,
         string? leftToLaterPlugins,
         AreaShare? area,
-        ClearedAreaMeasure measure,
         string result,
         ImmutableArray<int>? keptPoints) =>
         CsvRow.Of(
@@ -202,13 +196,13 @@ internal static partial class Tables
             OptionalText(navmesh),
             Quote(undone),
             OptionalText(leftToLaterPlugins is { Length: > 0 } ? leftToLaterPlugins : null),
-            .. AreaColumns(area, measure),
+            .. AreaColumns(area),
             Quote(result),
             .. keptPoints is { } points ? points.Select(Int) : Enumerable.Repeat(string.Empty, TerrainKeptReasons.Length),
         ]);
 
     /// <summary>The columns of <see cref="AreaHeader"/>; empty for an area that was not judged.</summary>
-    private static IEnumerable<string> AreaColumns(AreaShare? area, ClearedAreaMeasure measure) =>
+    private static IEnumerable<string> AreaColumns(AreaShare? area) =>
         CsvRow.EmptyOrValues(
             area,
             AreaColumnCount,
@@ -218,25 +212,25 @@ internal static partial class Tables
                 Int(share.Standing),
                 Number(share.Size),
                 Number(share.StandingSize),
-                Number((float)ClearedAreaText.StandingPercent(share, measure)),
+                Number((float)share.StandingPercent),
                 Quote(share.Verdict.ToString()),
             ]);
 
     /// <summary>E.g. "210 heights, 3 vertex colours, ground textures".</summary>
-    private static string TerrainPieces(int heights, int colours, bool textures) =>
+    private static string PiecesText(TerrainPieces pieces) =>
         string.Join(
             Describe.ListSeparator,
             new[]
             {
-                heights > 0 ? TextFormat.Count(heights, "height", "heights") : null,
-                colours > 0 ? TextFormat.Count(colours, "vertex colour", "vertex colours") : null,
-                textures ? "ground textures" : null,
+                pieces.Heights > 0 ? TextFormat.Count(pieces.Heights, "height", "heights") : null,
+                pieces.Colours > 0 ? TextFormat.Count(pieces.Colours, "vertex colour", "vertex colours") : null,
+                pieces.Textures ? "ground textures" : null,
             }.OfType<string>());
 
     /// <summary>E.g. "12 heights (Later.esp, Other.esp)": what a later plugin changed again in the quarter, with the plugins that did so in the land.</summary>
-    private static string? LaterTerrain(LandLeftToLater later, LandQuarterFacts quarter)
+    private static string? LaterTerrain(LandLeftToLater later, LandQuarterOutcome quarter)
     {
-        var pieces = TerrainPieces(quarter.LaterHeights, quarter.LaterColours, quarter.LaterTextures);
+        var pieces = PiecesText(quarter.Later);
         return pieces.Length == 0 ? null : $"{pieces} ({string.Join(Describe.ListSeparator, later.Plugins)})";
     }
 }

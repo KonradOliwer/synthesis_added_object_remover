@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 
 namespace AddedObjectRemover.Caches.BaseObjectShapeAndKind;
@@ -19,8 +20,8 @@ public sealed class BaseObjectShapes : IBaseObjectShapes
     /// leaves nothing but some shapes were hidden, hidden shapes count as well.
     /// </summary>
     public static readonly ShapeInclusion SolidShapes = new(
-        CountedKinds: new HashSet<MeshShapeKind> { MeshShapeKind.Solid },
-        SkippedAncestorKinds: new HashSet<MeshShapeKind> { MeshShapeKind.EditorMarker },
+        CountedKinds: ImmutableHashSet.Create(MeshShapeKind.Solid),
+        SkippedAncestorKinds: ImmutableHashSet.Create(MeshShapeKind.EditorMarker),
         IncludeHidden: false,
         RetryIncludingHiddenWhenEmpty: true,
         EditorMarkerNamePart: EditorMarkerNamePart);

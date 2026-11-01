@@ -31,55 +31,30 @@ public static class MarkerMovePlanner
 
     public static Decided<MarkerMoves> Plan(Input input)
     {
-        var (decisions, caches) = (input.Decisions, input.Caches);
-        var moves = Plan(
-            input.Targets,
-            input.LeftBehind,
-            decisions,
-            () => caches.VisibleObjectsOfAnyPluginAsTheyStand(input.OtherModsObjectsTakenAway),
-            caches.IndexVisibleTargetsAsTheyStand(input.Targets, decisions),
-            input.Plugin,
-            caches.Navmeshes,
-            caches.Terrain,
-            caches.Shapes,
-            input.Execution,
-            input.Settings);
-        return new Decided<MarkerMoves>(moves, decisions.AddMoves(moves.Moves));
+        var moves = PlanMoves(input);
+        return new Decided<MarkerMoves>(moves, input.Decisions.AddMoves(moves.Moves));
     }
 
-    /// <param name="leftBehind">Its evaluations the decisions kept, inside another mod's object, are the candidates.</param>
-    /// <param name="final">The decisions with the left-behind round.</param>
-    /// <param name="objectsOfAnyPlugin">
-    /// As the run leaves them: those pulled down where they stand now, those removed left out. Asked only when the step is
-    /// performed: the first ask builds the supporters' bounds index, which the closing statistics count.
-    /// </param>
-    /// <param name="plugin">For the exterior cell each marker belongs to.</param>
-    /// <param name="navmeshes">The winning navmeshes of each target space.</param>
-    /// <param name="settings">Null when kept markers stay where they are: the step is switched off.</param>
+    /// <remarks>
+    /// The objects of any plugin are asked only when the step is performed: the first ask builds the supporters' bounds index, which
+    /// the closing statistics count.
+    /// </remarks>
     /// <returns>An unexpected failure stops the step: <see cref="StepOutcome.StoppedByUnexpectedError"/>, with the failure and no moves.</returns>
-    internal static MarkerMoves Plan(
-        ImmutableArray<TargetObject> targets,
-        LeftBehindResult leftBehind,
-        IRemovalDecisions final,
-        Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin,
-        IVisibleTargetObjects visibleTargets,
-        IPluginRecords plugin,
-        INavmeshes navmeshes,
-        ITerrainHeights terrain,
-        IBaseObjectShapes shapes,
-        Execution execution,
-        MarkerMoveSettings? settings)
+    private static MarkerMoves PlanMoves(Input input)
     {
-        if (settings == null) return MarkerMoves.SwitchedOff;
-        if (leftBehind.Outcome == StepOutcome.StoppedByUnexpectedError) return MarkerMoves.NotPerformedAfterLeftBehindStopped;
+        var (targets, final, caches) = (input.Targets, input.Decisions, input.Caches);
+        var visibleTargets = caches.IndexVisibleTargetsAsTheyStand(final);
+        if (input.Settings is not { } settings) return MarkerMoves.SwitchedOff;
+        if (input.LeftBehind.Outcome == StepOutcome.StoppedByUnexpectedError) return MarkerMoves.NotPerformedAfterLeftBehindStopped;
 
         return Failures.Attempt(
             () => new KeptMarkerMover(
                     targets,
-                    index => HomeCells.Find(targets[index], plugin),
-                    SpotSearches(objectsOfAnyPlugin(), visibleTargets, final, shapes, navmeshes, terrain),
+                    index => HomeCells.Find(targets[index], input.Plugin),
+                    SpotSearches(
+                        caches.VisibleObjectsOfAnyPluginAsTheyStand(input.OtherModsObjectsTakenAway), visibleTargets, final, caches.Shapes, caches.Navmeshes, caches.Terrain),
                     settings.MaxDistance)
-                .Move(Candidates(leftBehind, final), execution),
+                .Move(Candidates(input.LeftBehind, final), input.Execution),
             failure => new MarkerMoves(
                 StepOutcome.StoppedByUnexpectedError, [], [], [], [], settings.MaxDistance, PartFailure.OfWholePart(MarkerMoveParts.MarkerMoves, failure)));
     }

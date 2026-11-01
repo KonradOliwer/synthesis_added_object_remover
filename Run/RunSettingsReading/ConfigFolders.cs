@@ -12,16 +12,8 @@ internal static class ConfigFolders
 
     public static string ConfigsFolder(string dataFolder) => Path.Combine(dataFolder, Root, Configs);
 
-    public static bool IsFileName(string name) =>
-        name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0 && IsUsableStem(WithoutExtension(name));
+    /// <remarks>The config's report folder is named after the name without its extension, so Windows must keep that as written.</remarks>
+    public static bool IsFileName(string name) => FileNames.IsKeptAsWritten(name, Extension);
 
-    public static string FileNameOf(string name) =>
-        HasExtension(name) ? name : name + Extension;
-
-    /// <summary>Windows drops a trailing space or dot from a folder name, and a name of only dots is a folder reference; the config's report folder is named after it.</summary>
-    private static bool IsUsableStem(string stem) => stem.Length > 0 && !stem.EndsWith(' ') && !stem.EndsWith('.');
-
-    private static string WithoutExtension(string name) => HasExtension(name) ? name[..^Extension.Length] : name;
-
-    private static bool HasExtension(string name) => name.EndsWith(Extension, StringComparison.OrdinalIgnoreCase);
+    public static string FileNameOf(string name) => FileNames.WithExtension(name, Extension);
 }

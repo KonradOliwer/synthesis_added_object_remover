@@ -24,9 +24,9 @@ public class DeletedCellWordingTests
     public void AVisibleObjectKeptInADeletedCellNamesTheCellAndThePlugin()
     {
         var evaluation = new VisibleLeftBehindCheck(
-            0, null, new SectorAreaTally(50).Build(), VisibleLeftBehindOutcome.KeptInDeletedCell, TestKeepReasons.InDeletedCell);
+            0, null, new SectorAreaTally(50).Build(), LeftBehindOutcome.KeptInDeletedCell, TestKeepReasons.InDeletedCell);
 
-        Assert.Equal(Expected, VisibleLeftBehindOutcomeText.DescribeReason(evaluation));
-        Assert.Equal("kept", VisibleLeftBehindOutcomeText.Verdict(evaluation));
+        Assert.Equal(Expected, LeftBehindOutcomeText.DescribeReason(evaluation));
+        Assert.Equal("kept", LeftBehindOutcomeText.Verdict(evaluation));
     }
 }

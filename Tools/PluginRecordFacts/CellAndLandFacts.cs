@@ -8,7 +8,7 @@ namespace AddedObjectRemover;
 public readonly record struct AreaPartTolerances(float LandHeight, float WaterHeight);
 
 /// <summary>
-/// Which records of other plugins the target plugin changed in the target spaces are read with their versions and compared part
+/// Which records of other plugins the read's plugin changed in the target spaces are read with their versions and compared part
 /// by part, and with which tolerances. The navmeshes it overrides, deletes or adds are always read.
 /// </summary>
 /// <param name="Cells">The cell records it overrides.</param>
@@ -19,14 +19,14 @@ public sealed record AreaRecordReads(AreaPartTolerances Tolerances, bool Cells, 
 public sealed record CellPartDifferences(CellPartName Name, PartDifferences Differences);
 
 /// <summary>
-/// A cell record of another plugin that the target plugin overrides in a target space and changed, with how each of its parts
-/// differs across the versions from the one just below the target plugin's up to the winner, the patch included.
+/// A cell record of another plugin that the read's plugin overrides in a target space and changed, with how each of its parts
+/// differs across the versions from the one just below the read's plugin's up to the winner, the patch included.
 /// </summary>
 /// <param name="SpaceKey">The worldspace, or for an interior the cell itself.</param>
 /// <param name="Grid">Null for an interior.</param>
 /// <param name="Parts">In the order of the cell's part table.</param>
 /// <param name="DeletedInAVersion">A version read deletes the cell.</param>
-/// <param name="EarlierWater">The water fields of the version just below the target plugin's.</param>
+/// <param name="EarlierWater">The water fields of the version just below the read's plugin's.</param>
 /// <param name="CurrentWater">The water fields of the winning version.</param>
 /// <param name="DefaultWaterLevel">
 /// The winning default water height of the worldspace whose water the cell uses, which a cell storing no height of its own has; null
@@ -44,7 +44,7 @@ public sealed record CellRecordFact(
     float? DefaultWaterLevel);
 
 /// <summary>
-/// A LAND record of another plugin that the target plugin overrides in a worldspace whose land a target space uses and changed,
+/// A LAND record of another plugin that the read's plugin overrides in a worldspace whose land a target space uses and changed,
 /// with how its parts differ across its versions, read like a cell (<see cref="CellRecordFact"/>). No LAND part holds bytes Mutagen
 /// does not read, so every earlier value can be written back.
 /// </summary>
@@ -75,6 +75,6 @@ public sealed record LandParts(PointSet Points, PointSet Colours, QuarterSet Qua
 }
 
 /// <summary>The heights at a LAND record's grid points in game units, row by row from the bottom, x fastest; each is null when its version has no height map.</summary>
-/// <param name="Earlier">Of the version just below the target plugin's.</param>
+/// <param name="Earlier">Of the version just below the read's plugin's.</param>
 /// <param name="Current">Of the winning version.</param>
 public sealed record LandHeights(float[]? Earlier, float[]? Current);

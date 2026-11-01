@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Runtime.CompilerServices;
 
 namespace AddedObjectRemover.Tests.Architecture;
@@ -12,6 +13,7 @@ internal static class BusinessCode
     private const string RootNamespace = "AddedObjectRemover";
     private const string IdsProject = "AddedObjectRemover.Ids";
     private const string ReportProject = "BuildLogAndReports";
+    private const string RecordPrintMembers = "PrintMembers";
 
     private static readonly ProjectRules Rules = ProjectRules.Load();
 
@@ -57,6 +59,12 @@ internal static class BusinessCode
             && DomainFolderRoots.Any(root => row.Folder.StartsWith(root, StringComparison.Ordinal));
     }
 
+    /// <summary>A record or record struct declared in a project of the given module folder (see <see cref="ModuleFolder"/>).</summary>
+    public static bool IsRecordOfModule(Type type, string moduleFolder) =>
+        IsRecord(type)
+            && Rules.Projects.Any(rule => rule.Name == AssemblyName(type))
+            && ModuleFolder(type) == moduleFolder;
+
     /// <summary>The type itself, its generic arguments, or its element type, anywhere in the signature type.</summary>
     public static bool Mentions(Type type, Func<Type, bool> test)
     {
@@ -85,6 +93,11 @@ internal static class BusinessCode
         AssemblyName(type) == ReportProject && !type.IsVisible && !IsCompilerGenerated(type);
 
     private static string AssemblyName(Type type) => type.Assembly.GetName().Name!;
+
+    /// <summary>The compiler writes PrintMembers into every record and record struct.</summary>
+    private static bool IsRecord(Type type) =>
+        type.GetMethod(RecordPrintMembers, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly) is { } printMembers
+            && printMembers.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false);
 
     private static string ModuleFolderOf(string projectFolder) =>
         projectFolder.EndsWith(ContractsSuffix, StringComparison.Ordinal) ? projectFolder[..^ContractsSuffix.Length] : projectFolder;

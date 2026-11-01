@@ -21,6 +21,14 @@ public static class TerrainQuadrants
         from quadrantX in Along(vertex % TerrainGrid.VerticesPerSide)
         select IndexOf(quadrantX, quadrantY);
 
+    /// <summary>Per quadrant, in the order of <see cref="IndexOf"/>, how many of the vertices it holds; a vertex on a common edge counts in each.</summary>
+    public static int[] CountPerQuadrant(IEnumerable<int> vertices)
+    {
+        var counts = new int[PerSide * PerSide];
+        foreach (var quadrant in vertices.SelectMany(Holding)) counts[quadrant]++;
+        return counts;
+    }
+
     /// <summary>The world position, seen from above, of the centre of a quadrant of an exterior cell.</summary>
     public static Vector2 CentreOf(int cellX, int cellY, int quadrant) =>
         new Vector2(cellX, cellY) * ExteriorGrid.CellSize + new Vector2(quadrant % PerSide + HalfWay, quadrant / PerSide + HalfWay) * Size;

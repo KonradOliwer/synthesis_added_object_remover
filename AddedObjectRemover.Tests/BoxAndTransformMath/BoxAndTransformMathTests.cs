@@ -76,6 +76,16 @@ public class BoxAndTransformMathTests
         Assert.Equal(new Box(new Vector3(-2, -4, -6), new Vector3(6, 12, 18)), grown);
     }
 
+    [Fact]
+    public void SizeGrowthFactorIsHowManyTimesItsSizeExpandedLocalBoxMakesABox()
+    {
+        var local = new Box(Vector3.Zero, new Vector3(2, 4, 6));
+
+        var grown = Boxes.ExpandedLocalBox(local, scale: 1, multiplier: 0.5f);
+
+        Assert.Equal(local.Size * Boxes.SizeGrowthFactor(0.5f), grown.Size);
+    }
+
     [Theory]
     [InlineData(15f, 6f, 7f, true)]
     [InlineData(11f, 2f, 3f, true)]

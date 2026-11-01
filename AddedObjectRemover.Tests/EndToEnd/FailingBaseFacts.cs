@@ -3,7 +3,7 @@ using AddedObjectRemover.Tests.Fixtures;
 namespace AddedObjectRemover.Tests.EndToEnd;
 
 /// <summary>
-/// The base facts of a run, except that reading one throws while <see cref="Armed"/>, or once after
+/// The base facts of a run, except that reading one fails as a malformed record while <see cref="Armed"/>, or once after
 /// <see cref="FailNextRead"/>, so a test can break one part of the run only.
 /// </summary>
 internal sealed class FailingBaseFacts(IBaseFacts inner) : IBaseFacts
@@ -17,5 +17,5 @@ internal sealed class FailingBaseFacts(IBaseFacts inner) : IBaseFacts
     public void FailNextRead() => Interlocked.Exchange(ref _failNextRead, 1);
 
     public BaseFacts Of(BaseKey baseKey) =>
-        Armed || Interlocked.Exchange(ref _failNextRead, 0) == 1 ? throw new PlantedUserDataException(FailureMessage) : inner.Of(baseKey);
+        Armed || Interlocked.Exchange(ref _failNextRead, 0) == 1 ? PlantedMalformedRecord.Throw<BaseFacts>(FailureMessage) : inner.Of(baseKey);
 }

@@ -1,3 +1,5 @@
+using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+
 namespace AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 
 /// <summary>What happens to another mod's object the cleaned mod changed when a removal step would remove it.</summary>
@@ -15,4 +17,9 @@ public enum RestoreMode
 
 /// <param name="Moved">For an object the cleaned mod moved.</param>
 /// <param name="Replaced">For an object the cleaned mod gave another model; used only for replaced objects the run collects.</param>
-public sealed record ChangedObjectSettings(RestoreMode Moved, RestoreMode Replaced);
+public sealed record ChangedObjectSettings(RestoreMode Moved, RestoreMode Replaced)
+{
+    /// <summary>A replaced object is judged only when replaced objects are processed, so its mode counts only then.</summary>
+    public ScanNeeds NeedsWhenReplacedObjectsAre(bool processed) => new(
+        JudgeOldPlaces: Moved == RestoreMode.RestoreIfNoCollision || (processed && Replaced == RestoreMode.RestoreIfNoCollision));
+}

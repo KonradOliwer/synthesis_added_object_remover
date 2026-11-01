@@ -1,6 +1,7 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 
@@ -24,17 +25,8 @@ internal sealed class VisibleLeftBehindRule(
     public VisibleLeftBehindCheck Judge(MeasuredSurroundings measured)
     {
         var kind = VisibleObjectKinds.Of(targets[measured.TargetIndex], bases);
-        return new VisibleLeftBehindCheck(measured.TargetIndex, kind, measured.Surroundings, Decide(measured.Surroundings, kind), KeepReason: null);
+        var decision = LeftBehindVerdicts.KeptWhenProtected(
+            LeftBehindVerdicts.BySurroundings(measured.Surroundings, config.Surroundings), kind is { } listed && config.NeverRemove.Contains(listed));
+        return new VisibleLeftBehindCheck(measured.TargetIndex, kind, measured.Surroundings, decision, KeepReason: null);
     }
-
-    /// <summary>Protected kinds stay whatever the surroundings say; referenced objects are kept by the removal decisions.</summary>
-    private VisibleLeftBehindOutcome Decide(SectorAreas areas, VisibleObjectKind? kind) =>
-        SectorRule.Decide(areas, config.MinOccupiedDirections, config.ClearedDirectionsPercent) switch
-        {
-            SectorVerdict.TooFewOccupiedDirections => VisibleLeftBehindOutcome.KeptTooFewSurroundingObjects,
-            SectorVerdict.TooFewClearedDirections => VisibleLeftBehindOutcome.KeptSurroundingsMostlyKept,
-            _ when kind is { } listed && config.NeverRemove.Contains(listed) => VisibleLeftBehindOutcome.KeptProtectedType,
-            _ when areas.RestoredCount > 0 => VisibleLeftBehindOutcome.RemovedSurroundingsRemovedAndRestored,
-            _ => VisibleLeftBehindOutcome.RemovedSurroundingsRemoved,
-        };
 }

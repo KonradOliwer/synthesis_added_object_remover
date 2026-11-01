@@ -20,6 +20,7 @@ public partial class ToolWordingTests
         [("Tools/MeshFileReading/AssetProblemLog.cs", "No spelling of {mesh} was noted.")] = BugMessage,
         [("Tools/MeshFileReading/NifShapeCollector.cs", "Shapes of kind {kind} cannot be left out of the geometry.")] = BugMessage,
         [("Tools/DenseIdTables/PerIndexTable.cs", "Index {index} has more than one item.")] = BugMessage,
+        [("Tools/KeyedGroupingInInputOrder/KeyedGroups.cs", "Item {item} is in more than one group.")] = BugMessage,
         [("Tools/DenseIdTables/PerIndexTable.cs", "No item has index {index}.")] = BugMessage,
         [("Tools/CompassSectorAreas/DirectionAreaTally.cs", "The tally holds boxes in a category, so it has no totals with every box in none.")] = BugMessage,
         [("Tools/OrderIndependentParallelWork/WorkOrder.cs", "The work order covers {ItemsInOrder.Length} items, not {itemCount}.")] = BugMessage,

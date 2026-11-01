@@ -30,10 +30,7 @@ public class LeftBehindOrderDeterminismTests
     private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(Mod, "LeftoverOrderData", Table, Room));
 
     private static readonly LeftBehindSettings Settings = new(
-        LookAround: 100,
-        DirectionClearedPercent: 50,
-        ClearedDirectionsPercent: 60,
-        MinOccupiedDirections: 4,
+        new LeftBehindSurroundings(LookAround: 100, MinOccupiedDirections: 4, DirectionClearedPercent: 50, ClearedDirectionsPercent: 60),
         NeverRemove: new HashSet<InvisibleObjectKind>());
 
     [Fact]
@@ -73,16 +70,16 @@ public class LeftBehindOrderDeterminismTests
         var decisions = TestSeededDecisions.Seed(protection, targets.Count, removedTables);
         var otherModObjects = scene.ObjectsThatCanCauseRemovals(Replacements.None(rooms.Count), NpcHandling.OnlyWhenStuckInsideTheObject);
         return LeftBehindObjects.Find(
-            immutableTargets,
-            otherModObjects,
-            new HashSet<OtherId>(),
-            decisions,
-            scene.VisibleTargets,
-            TestBaseFacts.Reader(new SkyrimMod(ModKey.FromNameAndExtension("Facts.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
-            Shapes,
-            order,
-            execution,
-            Settings);
+            new(
+                immutableTargets,
+                otherModObjects,
+                new Dictionary<OtherId, OtherObject?>(),
+                decisions,
+                scene.VisibleTargets,
+                new TestRunCaches(Shapes, bases: TestBaseFacts.Reader(new SkyrimMod(ModKey.FromNameAndExtension("Facts.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache())),
+                order,
+                execution,
+                Settings)).Result;
     }
 
     private static Vector3 RandomPoint(Random random) =>

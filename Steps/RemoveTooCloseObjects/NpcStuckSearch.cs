@@ -71,10 +71,7 @@ internal sealed class NpcStuckSearch
             work.CoreTests,
             work.Conflicts,
             work.ConflictsWithoutBlockingCollision,
-            _spaces
-                .SelectMany(_npcs.PointFallbacksIn)
-                .OrderBy(fallback => fallback.Npc.Key, RecordKeyTextOrder.Comparer)
-                .ToList());
+            [.. _spaces.SelectMany(_npcs.PointFallbacksIn)]);
 
     /// <summary>The first other-mod NPC stuck in the visible target, or null.</summary>
     public OtherId? FindFirstStuckNpc(TargetObject target, NpcScratch scratch)

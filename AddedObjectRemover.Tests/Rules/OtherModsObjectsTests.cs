@@ -83,7 +83,7 @@ public class OtherModsObjectsTests
     private static readonly IBaseObjectShapes Shapes = TestShapes.Create(
         TestTargets.TargetMod, "OtherModsObjectsData", TableModel, BookModel, LanternModel, FloorModel, SlabModel, BlockModel, OpenShellModel, ThinBoardModel, PlateModel);
 
-    private static readonly RemovalReason Clash = new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize());
+    private static readonly RemovalReason Clash = new TooClose(new OtherId(0), new TooCloseCause.ObjectSize());
 
     /// <summary>A held-up step that stopped, so the fit step searches on its own.</summary>
     private static readonly HeldUpTargets OwnSearch = HeldUpTargets.SwitchedOff with { Outcome = StepOutcome.StoppedByUnexpectedError };
@@ -440,14 +440,14 @@ public class OtherModsObjectsTests
         }
 
         RemovalReason expected = mode == FollowUpRemovalMode.EverythingTouchingIt
-            ? new RemovalReason.TouchingAnotherModsObject(new OtherId(1))
-            : new RemovalReason.LostSupportWithAnotherModsObject(1f, 0f, new OtherId(1));
+            ? new TouchingAnotherModsObject(new OtherId(1))
+            : new LostSupportWithAnotherModsObject(1f, 0f, new OtherId(1));
         var removed = Assert.IsType<Decision.Removed>(lantern);
         Assert.Equal(expected.GetType(), removed.Reason.GetType());
         Assert.Equal(new OtherId(1), removed.Reason switch
         {
-            RemovalReason.TouchingAnotherModsObject touching => touching.Touched,
-            RemovalReason.LostSupportWithAnotherModsObject lost => lost.MainSupporter,
+            TouchingAnotherModsObject touching => touching.Touched,
+            LostSupportWithAnotherModsObject lost => lost.MainSupporter,
             _ => default,
         });
         Assert.Equal([1, 2], result.Objects.Select(outcome => outcome.Object.Id.Index));
@@ -505,7 +505,7 @@ public class OtherModsObjectsTests
         var (_, decisions) = Settle(scene, RemoveTable);
 
         Assert.IsType<Decision.Removed>(decisions.Of(new TargetId(LanternOnTheBook)));
-        Assert.Equal(new RemovalReason.LinkedTo(new TargetId(LanternOnTheBook)), Assert.IsType<Decision.Removed>(decisions.Of(new TargetId(linked))).Reason);
+        Assert.Equal(new LinkedTo(new TargetId(LanternOnTheBook)), Assert.IsType<Decision.Removed>(decisions.Of(new TargetId(linked))).Reason);
     }
 
     [Fact]
@@ -515,7 +515,7 @@ public class OtherModsObjectsTests
 
         var (result, decisions) = Settle(scene, RemoveTable);
 
-        Assert.Equal(new RemovalReason.TouchingAnotherModsObject(new OtherId(1)), Assert.IsType<Decision.Removed>(decisions.Of(new TargetId(LanternOnTheBook))).Reason);
+        Assert.Equal(new TouchingAnotherModsObject(new OtherId(1)), Assert.IsType<Decision.Removed>(decisions.Of(new TargetId(LanternOnTheBook))).Reason);
         Assert.Equal([(1, OtherModsObjectFate.Removed), (2, OtherModsObjectFate.Removed)], result.Objects.Select(outcome => (outcome.Object.Id.Index, outcome.Fate)));
     }
 
@@ -530,7 +530,7 @@ public class OtherModsObjectsTests
             scene,
             decisions => RemoveTable(decisions.ApplyFits([new ProposedFit(new TargetId(LanternOnTheBook), Clash, new EulerPlacement(onTheBook, Vector3.Zero, ShrunkScale))])));
 
-        Assert.Equal(new RemovalReason.TouchingAnotherModsObject(new OtherId(1)), Assert.IsType<Decision.Removed>(decisions.Of(new TargetId(LanternOnTheBook))).Reason);
+        Assert.Equal(new TouchingAnotherModsObject(new OtherId(1)), Assert.IsType<Decision.Removed>(decisions.Of(new TargetId(LanternOnTheBook))).Reason);
     }
 
     /// <summary>The restored table stands at its earlier placement, a shrunk one, so the lantern that rested on it where the cleaned mod put it lands on that top.</summary>
@@ -610,7 +610,7 @@ public class OtherModsObjectsTests
             Assert.Null(decisions.Of(new TargetId(slab)));
             return;
         }
-        var reason = Assert.IsType<RemovalReason.LostSupportWithAnotherModsObject>(Assert.IsType<Decision.Removed>(decisions.Of(new TargetId(slab))).Reason);
+        var reason = Assert.IsType<LostSupportWithAnotherModsObject>(Assert.IsType<Decision.Removed>(decisions.Of(new TargetId(slab))).Reason);
         Assert.Equal(new OtherId(2), reason.MainSupporter);
         Assert.InRange(reason.LeftItsPlaceShare, 0.5f, 0.6f);
         Assert.Equal(bookRestored, reason.RestoredShare > 0f);
@@ -835,36 +835,15 @@ public class OtherModsObjectsTests
         int threads = 1) =>
         Settle(new Scene([CreateTable()], others, handling) { Threshold = threshold, Threads = threads }, decide).Result;
 
-    /// <returns>The step's result, and the decisions with its rounds applied.</returns>
-    private static (OtherModsObjectsResult Result, RemovalDecisions Decisions) Settle(Scene scene, Func<RemovalDecisions, RemovalDecisions> decide)
+    /// <summary>The step after the rounds <paramref name="decide"/> adds, which also stand for the fits.</summary>
+    /// <returns>The step's result, and the decisions with its rounds added.</returns>
+    private static Decided<OtherModsObjectsResult> Settle(Scene scene, Func<RemovalDecisions, RemovalDecisions> decide)
     {
         var caches = TestScenes.CreateWithSupportOnlyObjects(scene.Targets, scene.Others, Shapes, scene.Threads);
-        var protection = scene.CreateProtection();
-        var decided = decide(RemovalDecisions.Start(protection, scene.CreateWhenRemoved()));
-        var asMeasured = decided.TargetsAsTheRoundsMeasureThem([.. scene.Targets]);
+        var decided = decide(RemovalDecisions.Start(scene.CreateProtection(), scene.CreateWhenRemoved()));
         var triangles = new TriangleStore(Shapes.ReadTriangles);
-        var surfaces = TestSurfaceSamples.Over(triangles);
-        var execution = new Execution(scene.Threads);
-        var result = OtherModsObjects.SettleLeftWithoutSupport(
-            [.. scene.Targets],
-            asMeasured,
-            decided,
-            caches.VisibleTargets,
-            caches.IndexVisibleTargets(asMeasured),
-            placed => caches.IndexVisibleTargets(placed),
-            Trust,
-            Plugins,
-            scene.OtherModsSettings,
-            scene.AlsoRemoveSettings,
-            current => RestingObjects.CreateRoundsAfter(
-                current, asMeasured, caches.VisibleObjectsOfAnyPlugin(), scene.AlsoRemoveSettings, Shapes, triangles, surfaces, scene.Terrain, execution),
-            Shapes,
-            triangles,
-            surfaces,
-            scene.Terrain,
-            caches.VisibleObjectsOfAnyPlugin,
-            execution);
-        return (result, decided.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds));
+        var alsoRemoveRounds = RestingObjects.CreateAlsoRemoveRoundsAfter(new(scene.AlsoRemoveSettings, new Execution(scene.Threads), CreateRunCaches(scene, caches, triangles)));
+        return OtherModsObjects.Settle(new(CreateInput(scene, caches, triangles), decided, decided, scene.AlsoRemoveSettings, alsoRemoveRounds));
     }
 
     private static HeldUpTargets FindHeldUp(
@@ -875,19 +854,25 @@ public class OtherModsObjectsTests
     {
         var caches = TestScenes.CreateWithSupportOnlyObjects(scene.Targets, scene.Others, Shapes);
         var triangles = new TriangleStore(Shapes.ReadTriangles);
-        return OtherModsObjects.FindHeldUpTargets(
+        return OtherModsObjects.CreateHeldUpTargetsSearch(CreateInput(scene, caches, triangles)).Find();
+    }
+
+    private static OtherModsObjects.SupportJudging CreateInput(Scene scene, IObjectCaches caches, TriangleStore triangles) =>
+        new(
             [.. scene.Targets],
-            caches.VisibleTargets,
+            caches,
             Trust,
             Plugins,
             scene.OtherModsSettings,
             Shapes,
             triangles,
-            TestSurfaceSamples.Over(triangles),
+            RestingObjects.CreateSupportContacts(CreateRunCaches(scene, caches, triangles)),
             scene.Terrain,
-            caches.VisibleObjectsOfAnyPlugin,
             new Execution(scene.Threads));
-    }
+
+    /// <summary>The load-order caches of the scene, with the objects of any plugin of <paramref name="caches"/>.</summary>
+    private static TestRunCaches CreateRunCaches(Scene scene, IObjectCaches caches, TriangleStore triangles) =>
+        new(Shapes, triangles, scene.Terrain, TestBaseFacts.Unresolved, caches.VisibleObjectsOfAnyPlugin);
 
     /// <summary>The fit step's answer after the held-up step: which of the scene's target objects others rest on.</summary>
     private static List<TargetId> FindRestedOn(Scene scene) => FindRestedOn(scene, FindHeldUp(scene), scene.Targets.Select(target => target.Id));
@@ -898,35 +883,14 @@ public class OtherModsObjectsTests
     {
         var caches = TestScenes.CreateWithSupportOnlyObjects(scene.Targets, scene.Others, Shapes);
         var triangles = new TriangleStore(Shapes.ReadTriangles);
-        var surfaces = TestSurfaceSamples.Over(triangles);
         var execution = new Execution(scene.Threads);
-        var drops = OtherModsObjects.CreateDropTest(
-            [.. scene.Targets],
-            caches.VisibleTargets,
-            Trust,
-            Plugins,
-            scene.AlsoRemoveSettings,
-            Shapes,
-            triangles,
-            surfaces,
-            scene.Terrain,
-            caches.VisibleObjectsOfAnyPlugin,
-            execution);
+        var input = CreateInput(scene, caches, triangles);
+        var drops = OtherModsObjects.CreateDropTest(new(input, scene.AlsoRemoveSettings));
         var rule = OtherModsObjects.CreateRestingRule(
-            RestingObjects.CreateRestingRule(
-                [.. scene.Targets], scene.AlsoRemoveSettings, Shapes, triangles, surfaces, scene.Terrain, caches.VisibleObjectsOfAnyPlugin, drops, execution),
-            [.. scene.Targets],
-            caches.VisibleTargets,
-            Trust,
-            Plugins,
-            scene.OtherModsSettings,
-            Shapes,
-            triangles,
-            surfaces,
-            scene.Terrain,
-            caches.VisibleObjectsOfAnyPlugin,
-            heldUp,
-            execution);
+            new(
+                input,
+                RestingObjects.CreateRestingRule(new([.. scene.Targets], scene.AlsoRemoveSettings, drops, execution, CreateRunCaches(scene, caches, triangles))),
+                heldUp));
         return [.. rule.FindObjectsOthersRestOn([.. asked])];
     }
 

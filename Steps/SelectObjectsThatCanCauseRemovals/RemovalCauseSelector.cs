@@ -1,6 +1,7 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals;
@@ -25,13 +26,17 @@ public static class RemovalCauseSelector
         return new SelectedObjects(replacements, ViewsOf(otherModObjects, replacements), input.Settings.Npcs);
     }
 
+    /// <summary>The too-close step's question about worlds other than the run's (see <see cref="SelectForOldPlace"/>).</summary>
+    /// <param name="worldCaches">The object caches of the worlds asked about.</param>
+    public static ICausesOfWorlds CreateCausesOfWorlds(IObjectCachesOfWorlds worldCaches) => new CausesOfWorlds(worldCaches);
+
     /// <summary>
-    /// The views for earlier versions standing at their old places: every object of <paramref name="otherModObjects"/> can cause
-    /// removals except <paramref name="excluded"/>, the versions of the records being checked that the earlier versions replace.
+    /// The views for objects standing in another world than the run's: every object of <paramref name="otherModObjects"/> can cause
+    /// removals except <paramref name="excluded"/>, such as the versions of the records being checked that those objects replace.
     /// </summary>
-    /// <param name="otherModObjects">The objects of the old-place world.</param>
+    /// <param name="otherModObjects">The objects of the other world.</param>
     /// <param name="otherModObjectCount">The number of objects in <paramref name="otherModObjects"/>.</param>
-    public static SelectedObjects SelectForOldPlace(
+    internal static SelectedObjects SelectForOldPlace(
         IOtherModObjectsBySpace otherModObjects, int otherModObjectCount, IEnumerable<OtherId> excluded, NpcHandling npcs)
     {
         var replacements = Replacements.Excluding(otherModObjectCount, excluded);

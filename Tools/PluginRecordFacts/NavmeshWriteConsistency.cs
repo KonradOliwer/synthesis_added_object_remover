@@ -26,7 +26,7 @@ public static class NavmeshWriteConsistency
     private static IEnumerable<RecordKey> WrittenNavmeshes(IReadOnlyList<WriteOrder> orders) =>
         orders.SelectMany(order => order switch
         {
-            CopyEarlierNavmeshGeometry or CopyEarlierNavmesh or SetNavmeshZ => [order.Record],
+            CopyEarlierNavmeshGeometry or CopyEarlierNavmesh or FlattenAndDetachNavmesh => [order.Record],
             WriteNavmeshMapEntries entries => entries.Entries.Select(entry => entry.Navmesh),
             _ => [],
         });

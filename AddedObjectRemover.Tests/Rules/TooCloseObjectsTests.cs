@@ -177,8 +177,9 @@ public class TooCloseObjectsTests
         Func<int, bool> isEven = index => index % 2 == 0;
         Func<int, bool> isOdd = index => index % 2 == 1;
 
-        var result = FindGroupsWithFacade(
+        var decided = DecideGroupsWithFacade(
             scene, NewTriangles(), Threads, TestJudgedGroups.Of(TargetsWhere(scene, isEven), wide), TestJudgedGroups.Of(TargetsWhere(scene, isOdd), narrow));
+        var result = decided.Result;
 
         var (wideAlone, narrowAlone) = (FindWithFacade(scene, wide), FindWithFacade(scene, narrow));
         Assert.Equal(2, result.Passes.Length);
@@ -191,6 +192,9 @@ public class TooCloseObjectsTests
         Assert.Equal(
             result.Passes.SelectMany(pass => pass.Hits).Select(hit => hit.TargetIndex).Order(),
             result.Proposals.Select(proposal => proposal.Target.Index));
+        var round = Assert.Single(decided.Decisions.Rounds);
+        Assert.Equal(RoundKind.TooClose, round.Kind);
+        Assert.Equal(result.Proposals.Select(proposal => proposal.Target), decided.Decisions.LeftIn(round));
     }
 
     [Theory]
@@ -384,6 +388,25 @@ public class TooCloseObjectsTests
     }
 
     /// <summary>
+    /// The other case where a try records a different failure than its own check: B, hit by the last try, is tested first and
+    /// can no longer be measured. The own check hits A before it would test B; the try records B's failure and no clash.
+    /// </summary>
+    [Fact]
+    public void ATryWhoseFirstTestedObjectThrowsRecordsAFailureWhereItsOwnCheckHitsALowerObject()
+    {
+        var scene = CreateSideBySideScene(Table.Base, Unreadable.Base);
+        var shapes = new ShapesFailingOnceArmed(Shapes, Unreadable.Base);
+        var rule = CreatePlacementRule(scene, SizeOnlyMeshZone, NewTriangles(), shapes);
+        var target = scene.Targets[0];
+        using var tries = rule.StartTries(target);
+
+        Assert.Equal(ReasonOf(TableB), tries.Check(Beside(OnlyB)).Clash);
+        shapes.Armed = true;
+        Assert.Equal(new PlacementCheck(ReasonOf(TableA), null), CheckOnce(rule, target, Beside(OnBoth)));
+        Assert.Equal(new PlacementCheck(null, $"PlantedUserDataException: {ShapesFailingOnceArmed.FailureMessage}"), tries.Check(Beside(OnBoth)));
+    }
+
+    /// <summary>
     /// With both zones on, a try the size zone misses tests the object the last hit found in the distance zone first: B, hit
     /// there by the last try, names the try where the own check names A.
     /// </summary>
@@ -457,6 +480,11 @@ public class TooCloseObjectsTests
         Assert.Single(FindGroupsWithFacade(scene, triangles, Threads, TestJudgedGroups.OfAll(scene.Targets, settings)).Passes);
 
     private static TooCloseResult FindGroupsWithFacade(
+        TooCloseScene scene, ITriangleMeshes triangles, int threads, params ObjectsJudgedWith<TooCloseSettings>[] groups) =>
+        DecideGroupsWithFacade(scene, triangles, threads, groups).Result;
+
+    /// <returns>The step's result, with its round added to decisions where no round has run.</returns>
+    private static Decided<TooCloseResult> DecideGroupsWithFacade(
         TooCloseScene scene, ITriangleMeshes triangles, int threads, params ObjectsJudgedWith<TooCloseSettings>[] groups)
     {
         var replacements = Replacements.None(scene.OtherModObjects.Count);
@@ -471,7 +499,7 @@ public class TooCloseObjectsTests
                 triangles,
                 new Execution(threads),
                 groups,
-                TestSeededDecisions.StartUnprotected(scene.Targets))).Result;
+                TestSeededDecisions.StartUnprotected(scene.Targets)));
     }
 
     private static IEnumerable<int> TargetsWhere(TooCloseScene scene, Func<int, bool> includes) =>
@@ -499,18 +527,16 @@ public class TooCloseObjectsTests
     private static IPlacementRule CreatePlacementRule(TooCloseScene scene, TooCloseSettings settings) =>
         CreatePlacementRule(scene, settings, NewTriangles());
 
-    private static IPlacementRule CreatePlacementRule(TooCloseScene scene, TooCloseSettings settings, ITriangleMeshes triangles)
+    private static IPlacementRule CreatePlacementRule(TooCloseScene scene, TooCloseSettings settings, ITriangleMeshes triangles) =>
+        CreatePlacementRule(scene, settings, triangles, Shapes);
+
+    /// <param name="shapes">The shapes the rule measures with; the scene's caches are built with the real ones.</param>
+    private static IPlacementRule CreatePlacementRule(TooCloseScene scene, TooCloseSettings settings, ITriangleMeshes triangles, IBaseObjectShapes shapes)
     {
         var replacements = Replacements.None(scene.OtherModObjects.Count);
         var caches = CreateWorld(scene);
         return TooCloseObjects.CreatePlacementRule(
-            scene.Targets,
-            caches.VisibleTargets,
-            caches.Selected(replacements, settings.Npcs),
-            caches.PlacedNpcs,
-            Shapes,
-            triangles,
-            settings);
+            new(scene.Targets, caches.VisibleTargets, caches.Selected(replacements, settings.Npcs), caches.PlacedNpcs, shapes, triangles, settings));
     }
 
     private static PlacementCheck CheckOnce(IPlacementRule rule, TargetObject target, EulerPlacement placement)
@@ -535,9 +561,9 @@ public class TooCloseObjectsTests
 
     private static EulerPlacement At(float x, float y) => new(new Vector3(x, y, 0), Vector3.Zero, 1f);
 
-    private static RemovalReason ReasonOf(OtherId other) => new RemovalReason.TooClose(other, new TooCloseCause.ObjectSize());
+    private static RemovalReason ReasonOf(OtherId other) => new TooClose(other, new TooCloseCause.ObjectSize());
 
-    private static RemovalReason DistanceReasonOf(OtherId other) => new RemovalReason.TooClose(other, new TooCloseCause.Distance(NearDistance));
+    private static RemovalReason DistanceReasonOf(OtherId other) => new TooClose(other, new TooCloseCause.Distance(NearDistance));
 
     /// <summary>Visible targets with and without meshes, every few of them invisible, among other mods' objects and placed NPCs.</summary>
     private static TooCloseScene CreateScene()
@@ -602,5 +628,21 @@ public class TooCloseObjectsTests
             ObjectBounds = new ObjectBounds { First = new P3Int16(-50, -50, -20), Second = new P3Int16(50, 50, 40) },
         });
         return mod;
+    }
+
+    /// <summary>The scene's shapes, except that measuring one base fails as user data while <see cref="Armed"/>.</summary>
+    private sealed class ShapesFailingOnceArmed(IBaseObjectShapes inner, BaseKey failing) : IBaseObjectShapes
+    {
+        public const string FailureMessage = "shape broke";
+
+        public bool Armed;
+
+        public BaseShape Of(BaseKey? baseKey) => Armed && baseKey == failing ? throw new PlantedUserDataException(FailureMessage) : inner.Of(baseKey);
+
+        public ObjectVisibility VisibilityOf(BaseKey? baseKey, bool isPrimitive, bool hasMapMarker) => inner.VisibilityOf(baseKey, isPrimitive, hasMapMarker);
+
+        public bool LayerBlocksActors(uint collisionLayer) => inner.LayerBlocksActors(collisionLayer);
+
+        public IReadOnlyList<MeasuredBase> Computed() => inner.Computed();
     }
 }

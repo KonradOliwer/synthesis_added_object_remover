@@ -4,8 +4,9 @@ using System.Numerics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
+using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
+using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
@@ -158,7 +159,7 @@ internal sealed class PlacedGuards(
         return check.Clash switch
         {
             null => null,
-            RemovalReason.TooClose clash => new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, world.World.Other(clash.Other).Key, Failure: null),
+            TooClose clash => new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, world.World.Other(clash.Other).Key, Failure: null),
             var other => throw new UnreachableException($"The too-close rule gave the reason {other}."),
         };
     }

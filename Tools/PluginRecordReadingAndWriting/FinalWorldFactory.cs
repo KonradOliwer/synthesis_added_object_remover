@@ -33,6 +33,10 @@ public sealed class FinalWorldFactory(PluginOpener openPlugins)
     /// </param>
     /// <param name="patch">The patch being written; it replaces any old copy of itself on disk.</param>
     public FinalWorld Create(
+        IEnumerable<IModListing<ISkyrimModGetter>> stateListings, ISkyrimModGetter patch, PluginListRead.Found pluginList, DirectoryPath dataFolder) =>
+        MutagenCalls.Read(() => OpenAndReadPlugins(stateListings, patch, pluginList, dataFolder));
+
+    private FinalWorld OpenAndReadPlugins(
         IEnumerable<IModListing<ISkyrimModGetter>> stateListings, ISkyrimModGetter patch, PluginListRead.Found pluginList, DirectoryPath dataFolder)
     {
         var opened = openPlugins(dataFolder, EnabledEntriesBelow(patch.ModKey, pluginList));

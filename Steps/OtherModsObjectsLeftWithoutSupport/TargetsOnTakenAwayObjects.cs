@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 
@@ -39,7 +40,7 @@ internal sealed class TargetsOnTakenAwayObjects(
         return settings.Mode switch
         {
             FollowUpRemovalMode.EverythingTouchingIt =>
-                [.. touching.Select(entry => new ProposedRemoval(entry.Target, new RemovalReason.TouchingAnotherModsObject(entry.FirstTouched)))],
+                [.. touching.Select(entry => new ProposedRemoval(entry.Target, new TouchingAnotherModsObject(entry.FirstTouched)))],
             FollowUpRemovalMode.OnlyWhatLosesItsSupport => ProposeLosingSupport(decisions, touching, [.. takenAway.Select(other => other.Id)]),
             _ => throw new UnreachableException($"Unknown follow-up removal mode {settings.Mode}."),
         };
@@ -120,10 +121,10 @@ internal sealed class TargetsOnTakenAwayObjects(
         if (heldByTakenAway.Count == 0) return null;
 
         var share = ShareOf(contacts, supporter => IsGone(supporter, decisions, takenAway));
-        return SupportContactWeights.ReachesThreshold(share, settings.SupportLostFraction)
+        return support.ReachesThreshold(share, settings.SupportLostFraction)
             ? new ProposedRemoval(
                 target,
-                new RemovalReason.LostSupportWithAnotherModsObject(
+                new LostSupportWithAnotherModsObject(
                     share, ShareOf(contacts, supporter => IsRestoredTarget(supporter, decisions)), new OtherId(heldByTakenAway[0].Supporter.Index)))
             : null;
     }

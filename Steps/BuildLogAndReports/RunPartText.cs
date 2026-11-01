@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Diagnostics;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
@@ -60,16 +61,14 @@ internal static class RunPartText
             "measuring objects that stay, which objects restored where the cleaned mod was removed are checked against",
             "They were treated as invisible, so an object restored next to them was not checked against them for coming too close.",
             SubjectKind.Object),
-        [MeshReadingParts.MeshShapes] = new("reading mesh shapes", "Objects using the mesh are treated as having no mesh shape.", SubjectKind.Mesh),
-        [MeshReadingParts.MeshTriangles] = new("reading mesh triangles", "Objects using the mesh are treated as having no mesh triangles.", SubjectKind.Mesh),
         [MeshReadingParts.LoaderStartUp] = new("the NIF loader start-up", "Meshes are read one at a time, which is slower; the results are not affected.", Subjects: null),
-    };
+    }.ToFrozenDictionary();
 
     /// <summary>How the log names a part that failed without an exception.</summary>
     private static readonly IReadOnlyDictionary<PartKey, string> FailuresWithoutException = new Dictionary<PartKey, string>
     {
         [MeshReadingParts.LoaderStartUp] = "the minimal NIF it saved and loaded again held no blocks",
-    };
+    }.ToFrozenDictionary();
 
     /// <summary>The failure in the log's words: its part's phrase and consequence, and its subject's label.</summary>
     public static UnexpectedError Word(PartFailure failure)

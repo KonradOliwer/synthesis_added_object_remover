@@ -82,6 +82,6 @@ public class TwoCreationPointsOfCachesTests
             CollisionLayerReader.Read(linkCache),
             npcBodyRules,
             TooCloseObjects.PlacedNpcRules,
-            WeightedSurfaceSamples.SamplesPerMesh);
+            RestingObjects.SurfaceSamplesPerMesh);
     }
 }

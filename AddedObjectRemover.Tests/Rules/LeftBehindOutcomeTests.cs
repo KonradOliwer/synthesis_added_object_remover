@@ -16,11 +16,11 @@ public class LeftBehindOutcomeTests
     private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(OtherMod, "LeftBehindOutcomeData", Room));
 
     private static LeftBehindSettings Config(int minOccupied = 4, int removedPercent = 60, params InvisibleObjectKind[] protectedKinds) => new(
-        LookAround: 1024,
-        DirectionClearedPercent: 50,
-        ClearedDirectionsPercent: removedPercent,
-        MinOccupiedDirections: minOccupied,
+        Rule(minOccupied, removedPercent),
         NeverRemove: protectedKinds.ToHashSet());
+
+    private static LeftBehindSurroundings Rule(int minOccupied = 4, int removedPercent = 60) =>
+        new(LookAround: 1024, MinOccupiedDirections: minOccupied, DirectionClearedPercent: 50, ClearedDirectionsPercent: removedPercent);
 
     [Theory]
     [InlineData(3, 3, nameof(LeftBehindOutcome.KeptTooFewSurroundingObjects))]
@@ -31,7 +31,7 @@ public class LeftBehindOutcomeTests
     public void DirectionRuleNeedsEnoughOccupiedAndRemovedDirections(int occupied, int removed, string expected) =>
         Assert.Equal(
             Enum.Parse<LeftBehindOutcome>(expected),
-            LeftBehindRule.DecideByDirections(Areas(occupied, removed), Config()));
+            LeftBehindVerdicts.BySurroundings(Areas(occupied, removed), Rule()));
 
     [Fact]
     public void ARestoredObjectInAClearedDirectionGivesTheReasonSurroundingsRemovedAndRestored()
@@ -39,24 +39,24 @@ public class LeftBehindOutcomeTests
         var tally = new SectorAreaTally(50);
         for (var i = 0; i < 4; i++) tally.Add(Sectors[i], 100, i == 0 ? BoxFate.Restored : BoxFate.Removed);
 
-        Assert.Equal(LeftBehindOutcome.RemovedSurroundingsRemovedAndRestored, LeftBehindRule.DecideByDirections(tally.Build(), Config()));
+        Assert.Equal(LeftBehindOutcome.RemovedSurroundingsRemovedAndRestored, LeftBehindVerdicts.BySurroundings(tally.Build(), Rule()));
     }
 
     [Fact]
     public void NoSurroundingsKeepsTheObject() =>
         Assert.Equal(
             LeftBehindOutcome.KeptTooFewSurroundingObjects,
-            LeftBehindRule.DecideByDirections(new SectorAreaTally(50).Build(),Config(minOccupied: 1)));
+            LeftBehindVerdicts.BySurroundings(new SectorAreaTally(50).Build(), Rule(minOccupied: 1)));
 
     [Fact]
     public void FullRemovalRequirementNeedsEveryOccupiedDirection()
     {
         Assert.Equal(
             LeftBehindOutcome.KeptSurroundingsMostlyKept,
-            LeftBehindRule.DecideByDirections(Areas(8, 7), Config(removedPercent: 100)));
+            LeftBehindVerdicts.BySurroundings(Areas(8, 7), Rule(removedPercent: 100)));
         Assert.Equal(
             LeftBehindOutcome.RemovedSurroundingsRemoved,
-            LeftBehindRule.DecideByDirections(Areas(8, 8), Config(removedPercent: 100)));
+            LeftBehindVerdicts.BySurroundings(Areas(8, 8), Rule(removedPercent: 100)));
     }
 
     [Fact]

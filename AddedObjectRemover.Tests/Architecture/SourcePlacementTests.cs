@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
 namespace AddedObjectRemover.Tests.Architecture;
@@ -24,12 +26,27 @@ public class SourcePlacementTests
 
     private static readonly Dictionary<string, string> MutagenExceptions = new()
     {
-        ["Settings.cs"] = "The settings class carries the Synthesis setting-name attributes.",
+        ["Settings.cs"] = SettingsAttributes,
+        ["Settings.ChangedObjects.cs"] = SettingsAttributes,
+        ["Settings.FollowUpRemoval.cs"] = SettingsAttributes,
+        ["Settings.LeftoverInvisibleObjects.cs"] = SettingsAttributes,
+        ["Settings.LeftoverVisibleObjects.cs"] = SettingsAttributes,
+        ["Settings.Margins.cs"] = SettingsAttributes,
+        ["Settings.RestoreWhereRemoved.cs"] = SettingsAttributes,
+        ["Settings.ShrinkOrTurn.cs"] = SettingsAttributes,
+        ["Settings.TerrainChange.cs"] = SettingsAttributes,
+        ["Settings.TooClose.cs"] = SettingsAttributes,
+        ["Settings.Trust.cs"] = SettingsAttributes,
     };
+
+    private const string SettingsAttributes = "The settings classes carry the Synthesis setting-name attributes.";
+
+    private const string SettingsConverter = "The settings class names the converter Synthesis' settings.json reader must use for an unset plugin picker.";
 
     private static readonly Dictionary<string, string> NewtonsoftExceptions = new()
     {
-        ["Settings.cs"] = "The settings class names the converter Synthesis' settings.json reader must use for an unset plugin picker.",
+        ["Settings.cs"] = SettingsConverter,
+        ["Settings.Trust.cs"] = SettingsConverter,
     };
 
     /// <summary>Tools that touch a placed record's enable parent for another purpose than deciding whether the game has the record.</summary>
@@ -40,9 +57,10 @@ public class SourcePlacementTests
         ["Tools/PluginRecordReadingAndWriting/PlacedRecordParts.cs"] = "Compares and copies the presence flags with the enable parent as one part of the record; it decides nothing about whether the game has it.",
         ["Tools/PluginRecordReadingAndWriting/PlacedOverrideWriter.cs"] = "Writes a deleted record back whole when its presence part goes back; it decides nothing about whether the game has it.",
         ["Steps/BuildLogAndReports/Tables.Restored.cs"] = "Names the presence part in the report; it decides nothing about whether the game has the record.",
-        ["Steps/BuildLogAndReports/RestoreOutcomes.cs"] = "Words a restored record as shown or hidden again when its presence part goes back; it decides nothing about whether the game has the record.",
-        ["Tools/PluginRecordReadingAndWriting/NavmeshPartHistory.cs"] = "Judges a navmesh's Deleted flag, not a placed record's presence.",
-        ["Tools/PluginRecordReadingAndWriting/NavmeshVersionCollector.cs"] = "Reads the judged Deleted flag of a navmesh, not a placed record's presence.",
+        ["Steps/BuildLogAndReports/RestoreOutcomes.cs"] = "Names a navmesh's existence part in the report, not a placed record's presence.",
+        ["Steps/RestoreWhereRemoved/ChangeJudge.cs"] = "Names a restored record shown or hidden again when its presence part goes back; it decides nothing about whether the game has the record.",
+        ["Tools/PluginRecordReadingAndWriting/NavmeshPartComparison.cs"] = "Compares a navmesh's Deleted flag across its versions, not a placed record's presence.",
+        ["Tools/PluginRecordReadingAndWriting/NavmeshVersionCollector.cs"] = "Compares the Deleted flag of a navmesh's versions, not a placed record's presence.",
         ["Steps/RestoreWhereRemoved/NavmeshUndoPlan.cs"] = "Reads the judged Deleted flag of a navmesh, not a placed record's presence.",
         ["Steps/RestoreWhereRemoved/NavmeshGroupGuards.cs"] = "Reads the judged Deleted flag of a navmesh, and whether a later plugin changed a linked door's presence part; it decides nothing about whether the game has the door.",
         ["Steps/RestoreWhereRemoved/FinalPresence.cs"] = "Reads whether a restore brings back a record's presence part; whether the game has a version comes from the collector's presence rule, which it follows along the enable parents.",
@@ -54,6 +72,20 @@ public class SourcePlacementTests
 
     /// <summary>Atomic operations; the lookups tool also needs them for its lock-free memos.</summary>
     private static readonly string[] AtomicApis = ["Interlocked.", "Volatile."];
+
+    private static readonly string[] DecisionListProjects = ["RemovalDecisionList", "RemovalDecisionList.Contracts"];
+
+    private static readonly string[] DecidingStepInputs =
+    [
+        "ChangedTerrainObjects.Input", "ClashingObjectFitter.Input", "LeftBehindObjects.Input", "MarkerMovePlanner.Input", "OtherModsObjects.Input",
+        "RestingObjects.Input", "TooCloseObjects.Input", "VisibleLeftBehindObjects.Input",
+    ];
+
+    private const BindingFlags DeclaredMembers = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+    private const string StepsNamespace = "AddedObjectRemover.Steps.";
+    private const string InputRecordName = "Input";
+    private const string RecordCloneMethod = "<Clone>$";
+    private const string DeconstructMethod = "Deconstruct";
 
     [Fact]
     public void MutagenAndNoggogAreUsedOnlyWhereRecordsAreReadOrWritten() =>
@@ -137,26 +169,30 @@ public class SourcePlacementTests
         PlacementCheck.AssertUsedOnlyIn(file => ContainsAny(file, AtomicApis), [ParallelTool, LookupTool]);
 
     /// <summary>
-    /// Each step that decides rounds or moves adds them to the run's decisions in its entry, outside the step's error boundary. The tools
-    /// are allowed as a whole: they cannot name the decision list (see ToolsNameNoBusinessTypeTests), so their Apply is the geometry transform.
+    /// Only what holds an <see cref="IRunDecisions"/> can add rounds or moves to the run's decisions. Outside the decision list and its
+    /// contracts, neither it nor a type that implements it is the type, or part of the type, of a field, a property or a method or
+    /// constructor parameter, except a property of a step's nested Input record, with the constructor, Deconstruct and accessor
+    /// parameters and the backing field the compiler writes for it. Locals, lambdas, local functions and return types are not checked. The
+    /// step Input records that hold the decisions are listed, so the check cannot pass by finding none.
     /// </summary>
     [Fact]
-    public void OnlyTheDecisionListAndTheEntriesOfTheDecidingStepsAddToTheDecisions() =>
-        PlacementCheck.AssertUsedOnlyIn(
-            file => Regex.IsMatch(file.Code, @"\b(Apply|ApplyFits|ApplyRounds|AddMoves)\("),
-            [
-                "Steps/RemovalDecisionList",
-                "Steps/RemovalDecisionList.Contracts",
-                "Steps/FitClashingObjects/ClashingObjectFitter.cs",
-                "Steps/RemoveObjectsOnChangedTerrain/ChangedTerrainObjects.cs",
-                "Steps/RemoveTooCloseObjects/TooCloseObjects.cs",
-                "Steps/RemoveObjectsRestingOnRemovedOnes/RestingObjects.cs",
-                "Steps/RemoveVisibleObjectsLeftBehind/VisibleLeftBehindObjects.cs",
-                "Steps/OtherModsObjectsLeftWithoutSupport/OtherModsObjects.cs",
-                "Steps/RemoveInvisibleObjectsLeftBehind/LeftBehindObjects.cs",
-                "Steps/MoveKeptMarkers/MarkerMovePlanner.cs",
-                "Tools",
-            ]);
+    public void OnlyTheInputRecordsOfTheDecidingStepsHoldTheRunsDecisions()
+    {
+        var types = ProductionSources.Assemblies()
+            .Where(assembly => !DecisionListProjects.Contains(assembly.GetName().Name!))
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => !BusinessCode.IsCompilerGenerated(type))
+            .ToList();
+
+        var holders = types.SelectMany(type => FindDecisionHolders(type).Select(member => $"{type.FullName}: {member}")).Order(StringComparer.Ordinal).ToList();
+        var inputs = types
+            .Where(type => IsStepInputRecord(type) && type.GetProperties().Any(property => HoldsDecisions(property.PropertyType)))
+            .Select(BusinessCode.PathName)
+            .Order(StringComparer.Ordinal);
+
+        Assert.True(holders.Count == 0, $"Only a step's nested Input record may hold the run's decisions:{Environment.NewLine}{string.Join(Environment.NewLine, holders)}");
+        Assert.Equal(DecidingStepInputs, inputs);
+    }
 
     [Fact]
     public void CommentsAndTextInQuotesDoNotCountAsCode()
@@ -171,4 +207,34 @@ public class SourcePlacementTests
 
     private static bool ContainsAny(SourceFile file, string[] apis) =>
         apis.Any(api => file.Code.Contains(api, StringComparison.Ordinal));
+
+    /// <returns>Each field, property and parameter of <paramref name="type"/> that holds the run's decisions and is not allowed to.</returns>
+    private static IEnumerable<string> FindDecisionHolders(Type type)
+    {
+        var isInput = IsStepInputRecord(type);
+        var fields = type.GetFields(DeclaredMembers)
+            .Where(field => HoldsDecisions(field.FieldType) && !(isInput && field.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false)))
+            .Select(field => $"field {field.Name}");
+        var properties = type.GetProperties(DeclaredMembers)
+            .Where(property => HoldsDecisions(property.PropertyType) && !isInput)
+            .Select(property => $"property {property.Name}");
+        var parameters = type.GetMethods(DeclaredMembers).Where(method => !IsNamedByTheCompiler(method)).Cast<MethodBase>().Concat(type.GetConstructors(DeclaredMembers))
+            .Where(method => !(isInput && IsWrittenForPositionalProperties(method)))
+            .SelectMany(method => method.GetParameters().Where(parameter => HoldsDecisions(parameter.ParameterType)).Select(parameter => $"parameter {parameter.Name} of {method.Name}"));
+        return [.. fields, .. properties, .. parameters];
+    }
+
+    private static bool HoldsDecisions(Type type) => BusinessCode.Mentions(type, typeof(IRunDecisions).IsAssignableFrom);
+
+    private static bool IsStepInputRecord(Type type) =>
+        type.Name == InputRecordName
+            && type.DeclaringType is not null
+            && type.Namespace?.StartsWith(StepsNamespace, StringComparison.Ordinal) == true
+            && type.GetMethod(RecordCloneMethod, DeclaredMembers) is not null;
+
+    /// <summary>Lambdas, local functions and a record's clone method: the compiler names the methods it writes for them with a leading '&lt;'.</summary>
+    private static bool IsNamedByTheCompiler(MethodInfo method) => method.Name.StartsWith('<');
+
+    private static bool IsWrittenForPositionalProperties(MethodBase method) =>
+        method.IsConstructor || method.IsSpecialName || method.Name == DeconstructMethod;
 }

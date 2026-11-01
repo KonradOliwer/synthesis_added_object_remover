@@ -8,14 +8,12 @@ namespace AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 /// </summary>
 public static class TooCloseZoneReach
 {
-    private const float SidesPerAxis = 2f;
-
     /// <summary>A box grown by a distance on each axis reaches this many times the distance from its centre at a corner.</summary>
     private static readonly float CornerReach = MathF.Sqrt(3f);
 
     /// <summary>The placement of the target's mesh enlarged uniformly around the centre of its local box by the size zone: its size plus the multiplier of it on both sides of each axis.</summary>
     public static PlacedTransform EnlargeBySize(PlacedTransform transform, Vector3 localCentre, float multiplier) =>
-        Boxes.EnlargeAroundCentre(transform, localCentre, SizeEnlargement(multiplier));
+        Boxes.EnlargeAroundCentre(transform, localCentre, Boxes.SizeGrowthFactor(multiplier));
 
     /// <summary>
     /// The distance from the centre of a box of the given half extents, at any angle, within which every zone that is on lies: the
@@ -24,10 +22,8 @@ public static class TooCloseZoneReach
     public static float ReachRadius(TooCloseSettings settings, Vector3 halfExtents)
     {
         var corner = halfExtents.Length();
-        var bySize = settings.BySize ? corner * SizeEnlargement(settings.Multiplier) : 0f;
+        var bySize = settings.BySize ? corner * Boxes.SizeGrowthFactor(settings.Multiplier) : 0f;
         var byDistance = settings.ByDistance ? corner + settings.DistanceInUnits * CornerReach : 0f;
         return MathF.Max(bySize, byDistance);
     }
-
-    private static float SizeEnlargement(float multiplier) => 1f + SidesPerAxis * multiplier;
 }

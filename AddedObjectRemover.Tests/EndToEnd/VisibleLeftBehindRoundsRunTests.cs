@@ -35,8 +35,8 @@ public class VisibleLeftBehindRoundsRunTests
 
         var middle = Assert.IsType<Decision.Removed>(outcome.Final.Of(IdOf(outcome, MiddleCrate)));
         var outer = Assert.IsType<Decision.Removed>(outcome.Final.Of(IdOf(outcome, OuterCrate)));
-        Assert.IsType<RemovalReason.VisibleObjectSurroundingsRemoved>(middle.Reason);
-        Assert.IsType<RemovalReason.VisibleObjectSurroundingsRemoved>(outer.Reason);
+        Assert.IsType<VisibleObjectSurroundingsRemoved>(middle.Reason);
+        Assert.IsType<VisibleObjectSurroundingsRemoved>(outer.Reason);
         Assert.Equal(new[] { middle.Round, outer.Round }, outcome.VisibleLeftBehind.Rounds.ToArray());
         Assert.Equal(RingCrates + 2, outcome.Removals.Length);
         Assert.Contains(
@@ -58,7 +58,7 @@ public class VisibleLeftBehindRoundsRunTests
         Assert.Equal(RoundKind.VisibleLeftBehind, outer.Round.Kind);
         Assert.True(middle.Round.Number < door.Round.Number);
         Assert.True(door.Round.Number < outer.Round.Number);
-        Assert.IsType<RemovalReason.VisibleObjectSurroundingsRemoved>(outer.Reason);
+        Assert.IsType<VisibleObjectSurroundingsRemoved>(outer.Reason);
         Assert.Equal(new[] { middle.Round, outer.Round }, outcome.VisibleLeftBehind.Rounds.ToArray());
     }
 

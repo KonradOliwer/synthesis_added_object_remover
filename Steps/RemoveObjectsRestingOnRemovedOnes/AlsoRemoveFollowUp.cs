@@ -1,9 +1,9 @@
 using System.Collections.Immutable;
-using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
@@ -18,28 +18,17 @@ namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 /// search, as in the also-remove step; objects kept later stay in the search but are never candidates, because the rounds skip
 /// decided objects.
 /// </remarks>
-/// <param name="targets">Where the rounds measure them, from the decisions the first pass starts from.</param>
-/// <param name="timeSinceStart">The run's clock, which measures the rounds.</param>
-/// <param name="objectsOfAnyPlugin">Asked only when the support rounds have seeds.</param>
-internal sealed class AlsoRemoveFollowUp(
-    ImmutableArray<TargetObject> targets,
-    AlsoRemoveSettings settings,
-    Execution execution,
-    Func<TimeSpan> timeSinceStart,
-    IBaseObjectShapes shapes,
-    ITriangleMeshes triangles,
-    ISurfaceSamples surfaces,
-    ITerrainHeights terrain,
-    Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin)
-    : IAlsoRemoveFollowUp
+internal sealed class AlsoRemoveFollowUp(RestingObjects.FollowUpInput input) : IAlsoRemoveFollowUp
 {
     private readonly List<DecidedPass> _passes = [];
     private SpreadRule? _rule;
     private PartFailure? _failure;
 
+    private AlsoRemoveSettings Settings => input.Settings;
+
     public FollowUpPass FollowUp(IRemovalDecisions decided, ImmutableArray<TargetId> seeds)
     {
-        if (settings.Mode == FollowUpRemovalMode.Nothing || seeds.IsEmpty || _failure is not null) return new FollowUpPass([], _failure);
+        if (Settings.Mode == FollowUpRemovalMode.Nothing || seeds.IsEmpty || _failure is not null) return new FollowUpPass([], _failure);
 
         return Failures.Attempt(() => RecordPass(DecidePass(decided, seeds)), StopFollowUps);
     }
@@ -47,15 +36,15 @@ internal sealed class AlsoRemoveFollowUp(
     /// <remarks>Stopped by its first pass, the follow-ups count as stopped; stopped later, they keep the passes before.</remarks>
     public RestingObjectsResult Summarize(IRemovalDecisions final)
     {
-        if (settings.Mode == FollowUpRemovalMode.Nothing) return RestingObjects.WithoutRounds(StepOutcome.SwitchedOff, settings.Mode, hadSeeds: false, failure: null);
+        if (Settings.Mode == FollowUpRemovalMode.Nothing) return RestingObjects.WithoutRounds(StepOutcome.SwitchedOff, Settings.Mode, hadSeeds: false, failure: null);
         if (_passes.Count == 0)
         {
             var outcome = _failure is null ? StepOutcome.Performed : StepOutcome.StoppedByUnexpectedError;
-            return RestingObjects.WithoutRounds(outcome, settings.Mode, hadSeeds: false, _failure);
+            return RestingObjects.WithoutRounds(outcome, Settings.Mode, hadSeeds: false, _failure);
         }
 
         var result = RestingObjects.SummarizeSeededRounds(
-            settings.Mode,
+            Settings.Mode,
             [.. _passes.SelectMany(pass => pass.SeedRounds)],
             [.. _passes.SelectMany(pass => pass.Rounds)],
             [.. _passes.SelectMany(pass => pass.RoundProposals)],
@@ -64,21 +53,26 @@ internal sealed class AlsoRemoveFollowUp(
             RoundsTime = _passes.Aggregate(TimeSpan.Zero, (sum, pass) => sum + pass.Time),
             Failure = _failure,
         };
-        return RestingObjects.WithTouchChains(result, settings, () => FindTouchChains(final, result.Evidence));
+        return RestingObjects.WithTouchChains(result, Settings, () => FindTouchChains(final, result.Evidence));
     }
 
+    /// <remarks>The objects of any plugin are asked only when the support rounds have seeds.</remarks>
     private DecidedPass DecidePass(IRemovalDecisions decided, ImmutableArray<TargetId> seeds)
     {
         var ((decisions, roundProposals), time) = RestingObjects.TimeRounds(
-            _rule is null && RestingObjects.ReadsObjectsOfAnyPlugin(settings.Mode),
-            objectsOfAnyPlugin,
-            timeSinceStart,
+            _rule is null && RestingObjects.ReadsObjectsOfAnyPlugin(Settings.Mode),
+            input.Caches.VisibleObjectsOfAnyPlugin,
+            input.TimeSinceStart,
             objects => decided.WorkingCopy().DecideRoundsUntilNothingRemoved(RuleFor(decided, objects).Rounds, seeds));
         return new DecidedPass(seeds, SeedRoundsOf(decided, seeds), decisions.RoundsAfter(decided), roundProposals, time);
     }
 
-    private SpreadRule RuleFor(IRemovalDecisions decided, IVisibleObjectsOfAnyPlugin? objects) =>
-        _rule ??= RestingObjects.PrepareFrom(decided, new RoundsInput(targets, objects, shapes, triangles, surfaces, terrain, execution), settings);
+    private SpreadRule RuleFor(IRemovalDecisions decided, IVisibleObjectsOfAnyPlugin? objects)
+    {
+        var caches = input.Caches;
+        return _rule ??= RestingObjects.PrepareFrom(
+            decided, new RoundsInput(input.Targets, objects, caches.Shapes, caches.Triangles, caches.SurfaceSamples, caches.Terrain, input.Execution), Settings);
+    }
 
     /// <returns>The pass's proposals.</returns>
     private FollowUpPass RecordPass(DecidedPass pass)
@@ -94,7 +88,7 @@ internal sealed class AlsoRemoveFollowUp(
     }
 
     private TouchChainSet FindTouchChains(IRemovalDecisions final, ImmutableArray<RoundDetails> evidence) =>
-        TouchChains.Find([.. _passes.Select(pass => new TouchPass(pass.Seeds, pass.Rounds))], final, _rule?.Search, evidence, targets.Length, execution);
+        TouchChains.Find([.. _passes.Select(pass => new TouchPass(pass.Seeds, pass.Rounds))], final, _rule?.Search, evidence, input.Targets.Length, input.Execution);
 
     /// <returns>The rounds of <paramref name="decided"/> that took a seed from its place, in round order.</returns>
     private static ImmutableArray<Round> SeedRoundsOf(IRemovalDecisions decided, ImmutableArray<TargetId> seeds)

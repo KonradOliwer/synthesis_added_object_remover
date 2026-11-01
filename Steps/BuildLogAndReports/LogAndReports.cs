@@ -37,7 +37,6 @@ public sealed partial class LogAndReports
     private ErrorMark _errorsTakenUpTo;
     private ProblemMark _archiveProblemsTakenUpTo;
     private ProblemMark _meshProblemsAtMeshSection;
-    private ErrorMark _errorsAtMeshSection;
 
     /// <param name="reportFolder">What the report writer decided; the tables are built only when it is performed.</param>
     /// <param name="unexpectedErrors">The run's unexpected errors: the steps record into it, and the log only reads what is new where it shows errors; it never adds to it.</param>
@@ -221,13 +220,9 @@ public sealed partial class LogAndReports
             ? []
             :
             [
-                .. WhenItHasLines(LogSections.BuildRestoreWhereRemovedSection(world, found, AreaMeasure, elapsed, _context)),
+                .. WhenItHasLines(LogSections.BuildRestoreWhereRemovedSection(world, found, elapsed, _context)),
                 .. WhenItHasLines(TakeUnexpectedErrors(found.Failures)),
             ];
-
-    /// <remarks>Only asked for a run whose restore step is on, since a switched-off step prints and writes nothing.</remarks>
-    private ClearedAreaMeasure AreaMeasure =>
-        _settings.RestoreWhereRemoved?.ClearedArea.Measure ?? throw new UnreachableException("The restore step ran with its settings switched off.");
 
     public ImmutableArray<LogSection> BuildStepSections(WriteSummary written, TimeSpan elapsed) => [LogSections.BuildWriteSection(written, elapsed, _context)];
 
@@ -279,48 +274,38 @@ public sealed partial class LogAndReports
         if (!_reportFilesWritten) return ReportTables.SwitchedOff;
 
         return Failures.Attempt(
-            () => new ReportTables(StepOutcome.Performed, Tables.BuildTables(outcome, _settings.AlsoRemove, _settings.RestoreWhereRemoved, _context), Failure: null),
+            () => new ReportTables(StepOutcome.Performed, Tables.BuildTables(outcome, _settings.AlsoRemove, _context), Failure: null),
             failure => new ReportTables(StepOutcome.StoppedByUnexpectedError, [], PartFailure.OfWholePart(ReportFileParts.ReportFiles, failure)));
     }
 
-    /// <summary>The errors recorded since the last take, worded, except the mesh errors, which print in the mesh problems section.</summary>
+    /// <summary>The errors recorded since the last take, worded.</summary>
     private LogSection TakeUnexpectedErrors() => TakeUnexpectedErrors([]);
 
     /// <param name="resultFailures">The failures the step result just handed over; they are worded together with the channel's, as one set.</param>
     private LogSection TakeUnexpectedErrors(IEnumerable<PartFailure> resultFailures)
     {
-        var channelFailures = _unexpectedErrors.Since(_errorsTakenUpTo).Where(failure => !IsAboutMesh(failure));
+        var channelFailures = _unexpectedErrors.Since(_errorsTakenUpTo);
         _errorsTakenUpTo = _unexpectedErrors.Mark();
         return LogSections.BuildUnexpectedErrorsSection(resultFailures.Concat(channelFailures).Select(RunPartText.Word), _context);
     }
 
-    /// <summary>Every mesh problem and mesh error of the run.</summary>
+    /// <summary>Every mesh problem of the run.</summary>
     private LogSection TakeMeshProblems()
     {
         var problems = _caches.MeshFiles.Problems;
         _meshProblemsAtMeshSection = problems.Mark();
-        _errorsAtMeshSection = _unexpectedErrors.Mark();
-        var meshErrors = _unexpectedErrors.Since(default).Where(IsAboutMesh).Select(failure => WithPrintedMesh(failure, problems));
-        return LogSections.BuildMeshProblemsSection(problems.Since(default), meshErrors.Select(RunPartText.Word), _context);
+        return LogSections.BuildMeshProblemsSection(problems.Since(default), _context);
     }
-
-    private static PartFailure WithPrintedMesh(PartFailure failure, IMeshProblems problems) =>
-        failure with { Subject = failure.Subject! with { Key = problems.PrintedSpelling(failure.Subject!.Key) } };
 
     /// <remarks>Nothing reads meshes after the report tables are built, so a mesh or archive problem recorded since the end takes is a bug in the run.</remarks>
     private void RequireNoProblemRecordedSinceEndOfRunTakes()
     {
         var problems = _caches.MeshFiles.Problems;
-        var lateProblems = problems.Since(_meshProblemsAtMeshSection);
-        var lateErrors = _unexpectedErrors.Since(_errorsAtMeshSection).Where(IsAboutMesh);
-        if (lateProblems.Length > 0 || lateErrors.Any() || problems.ArchiveProblemsSince(_archiveProblemsTakenUpTo).Length > 0)
+        if (problems.Since(_meshProblemsAtMeshSection).Length > 0 || problems.ArchiveProblemsSince(_archiveProblemsTakenUpTo).Length > 0)
         {
-            throw new UnreachableException("A mesh problem, a mesh error or an archive problem was recorded after the end of the run took them.");
+            throw new UnreachableException("A mesh problem or an archive problem was recorded after the end of the run took them.");
         }
     }
-
-    /// <remarks>The loader start-up is a mesh-reading part too, but it is about no mesh, so it prints with the other errors.</remarks>
-    private static bool IsAboutMesh(PartFailure failure) => failure.Part == MeshReadingParts.MeshShapes || failure.Part == MeshReadingParts.MeshTriangles;
 
     /// <summary>The archive and data-folder problems met since the last take; each is handed out once.</summary>
     private ImmutableArray<ArchiveProblem> TakeArchiveProblems()

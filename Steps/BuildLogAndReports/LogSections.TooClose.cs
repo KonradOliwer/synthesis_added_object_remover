@@ -109,9 +109,9 @@ internal static partial class LogSections
             + $"{TextFormat.Count(report.NpcBasesResolved)} NPC bases resolved; "
             + $"{TextFormat.Count(report.LeveledListsResolved)} leveled lists resolved; "
             + $"{TextFormat.Count(report.BodyMeshSetsMeasured)} body mesh sets measured.";
-        foreach (var fallback in summary.PointFallbacks)
+        foreach (var (npc, reason) in summary.PointFallbacks.Select(fallback => (Npc: report.World.Other(fallback.Npc), fallback.Reason)).OrderBy(fallback => fallback.Npc.Key, RecordKeyTextOrder.Comparer))
         {
-            yield return $"  Sized as a point {Describe.OtherObject(fallback.Npc)}: {Describe.PointReason(fallback.Reason)}.";
+            yield return $"  Sized as a point {Describe.OtherObject(npc)}: {Describe.PointReason(reason)}.";
         }
     }
 }

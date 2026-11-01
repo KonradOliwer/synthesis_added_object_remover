@@ -2,11 +2,11 @@ using System.Collections.Immutable;
 
 namespace AddedObjectRemover;
 
-/// <summary>Puts parts of cell records back to the version just below the target plugin's, in the patch's cell overrides. Not thread-safe.</summary>
+/// <summary>Puts parts of cell records back to the version just below the read's plugin's, in the patch's cell overrides. Not thread-safe.</summary>
 internal sealed class CellPartWriter(CellOverrides cells, RecordHandles handles)
 {
     /// <summary>
-    /// The patch's cell takes, in each of <paramref name="parts"/>, the values of the version just below the target plugin's, through
+    /// The patch's cell takes, in each of <paramref name="parts"/>, the values of the version just below the read's plugin's, through
     /// the part table the cell was compared with; every other part keeps the value of the cell the game shows now.
     /// </summary>
     public void CopyEarlierParts(RecordKey cell, ImmutableArray<CellPartName> parts)

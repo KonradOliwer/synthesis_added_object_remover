@@ -33,7 +33,7 @@ public class VisibleObjectSurroundingsTests
     private static readonly ModKey OtherMod = ModKey.FromNameAndExtension("Other.esp");
     private static readonly TestStatic Block = new(new FormKey(OtherMod, 0x801), @"test\block.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20), new Vector3(20))));
     private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(OtherMod, "VisibleObjectSurroundingsData", Block));
-    private static readonly RemovalReason AnyReason = new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize());
+    private static readonly RemovalReason AnyReason = new TooClose(new OtherId(0), new TooCloseCause.ObjectSize());
 
     [Fact]
     public void InitiallyEveryCandidateIsMeasuredWithEveryOtherObjectStanding()
@@ -229,7 +229,7 @@ public class VisibleObjectSurroundingsTests
     {
         var target = world.Targets[candidate];
         return SectorAreaTally.Measure(
-            AroundOf(world, target).Select(neighbour => (neighbour.Box, NeighbourFates.Of(decisions, neighbour.Target))),
+            AroundOf(world, target).Select(neighbour => (neighbour.Box, decisions.FateOf(neighbour.Target))),
             target.Transform.Position,
             DirectionClearedPercent);
     }

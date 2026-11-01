@@ -1,7 +1,11 @@
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
+using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 
@@ -40,10 +44,10 @@ internal static class RemovalList
 
     /// <summary>How many objects the round disabled as members of a linked group because a member of it was restored.</summary>
     public static int CountLinkedToRestoredIn(IRemovalDecisions decisions, Round round) =>
-        decisions.RemovedIn(round).Count(target => RoundEffects.FollowedARestoredMember(decisions.Of(target), decisions.Of));
+        decisions.RemovedIn(round).Count(target => decisions.Of(target)!.FollowedARestoredMember(decisions.Of));
 
     private static int CountAsLinked(IRemovalDecisions decisions, IEnumerable<TargetId> targets) =>
-        targets.Count(target => RoundEffects.Of(decisions.Of(target)).AsLinked);
+        targets.Count(target => decisions.Of(target)!.Effect.AsLinked);
 
     private static List<ObjectWithReason> WithReasons(IEnumerable<TargetId> targets, IRemovalDecisions decisions, CollectedObjects world, LeftBehindChecks checks) =>
         [.. targets.Select(target => ToObjectWithReason(target, decisions.Of(target)!.Reason, world, checks))];
@@ -61,16 +65,17 @@ internal static class RemovalList
 
     private static ObjectWithReason ToObjectWithReason(TargetId target, RemovalReason reason, CollectedObjects world, LeftBehindChecks checks) => reason switch
     {
-        RemovalReason.TerrainChanged changed => new ObjectWithReason.TerrainChanged(target.Index, changed.ChangedBy, changed.Kind),
-        RemovalReason.TooClose tooClose => new ObjectWithReason.TooClose(target.Index, world.OtherModObjects[tooClose.Other.Index], tooClose.Cause),
-        RemovalReason.Touching touching => new ObjectWithReason.Touching(target.Index, touching.Touched.Index),
-        RemovalReason.LostSupport lost => new ObjectWithReason.LostSupport(target.Index, lost.LeftItsPlaceShare, lost.RestoredShare, lost.MainSupporter.Index),
-        RemovalReason.TouchingAnotherModsObject touching => new ObjectWithReason.TouchingAnotherModsObject(target.Index, world.Other(touching.Touched)),
-        RemovalReason.LostSupportWithAnotherModsObject lost =>
+        TerrainChanged changed => new ObjectWithReason.TerrainChanged(target.Index, changed.ChangedBy, changed.Kind),
+        TooClose tooClose => new ObjectWithReason.TooClose(target.Index, world.OtherModObjects[tooClose.Other.Index], tooClose.Cause),
+        TouchingTargetThatLeft touching => new ObjectWithReason.Touching(target.Index, touching.Touched.Index),
+        LostSupport lost => new ObjectWithReason.LostSupport(target.Index, lost.LeftItsPlaceShare, lost.RestoredShare, lost.MainSupporter.Index),
+        TouchingAnotherModsObject touching => new ObjectWithReason.TouchingAnotherModsObject(target.Index, world.Other(touching.Touched)),
+        LostSupportWithAnotherModsObject lost =>
             new ObjectWithReason.LostSupportWithAnotherModsObject(target.Index, lost.LeftItsPlaceShare, lost.RestoredShare, world.Other(lost.MainSupporter)),
-        RemovalReason.VisibleObjectSurroundingsRemoved => new ObjectWithReason.VisibleLeftBehind(target.Index, checks.Visible.Get(target.Index)),
-        RemovalReason.InsideAnotherModsObject or RemovalReason.SurroundingsRemoved => new ObjectWithReason.LeftBehind(target.Index, checks.Invisible.Get(target.Index)),
-        RemovalReason.LinkedTo linked => new ObjectWithReason.LinkedTo(target.Index, linked.To.Index),
+        VisibleObjectSurroundingsRemoved => new ObjectWithReason.VisibleLeftBehind(target.Index, checks.Visible.Get(target.Index)),
+        InsideAnotherModsObject or SurroundingsRemoved => new ObjectWithReason.LeftBehind(target.Index, checks.Invisible.Get(target.Index)),
+        LinkedTo linked => new ObjectWithReason.LinkedTo(target.Index, linked.To.Index),
+        // Each step declares its own reasons, so the compiler cannot see that one is missing here.
         _ => throw new InvalidOperationException($"Unknown removal reason {reason}."),
     };
 
@@ -85,8 +90,8 @@ internal static class RemovalList
 
     private static int? TouchedTargetThatLeftItsPlace(RemovalReason reason) => reason switch
     {
-        RemovalReason.Touching touching => touching.Touched.Index,
-        RemovalReason.LostSupport lost => lost.MainSupporter.Index,
+        TouchingTargetThatLeft touching => touching.Touched.Index,
+        LostSupport lost => lost.MainSupporter.Index,
         _ => null,
     };
 }

@@ -79,7 +79,7 @@ public class ChangedObjectJudgingTests
 
         var judged = JudgeBarrel(RestoreMode.RestoreIfNoCollision, neighbour);
 
-        var collision = Assert.IsType<RemovalReason.TooClose>(Assert.Single(judged.Result.OldPlaceChecks).Collision);
+        var collision = Assert.IsType<TooClose>(Assert.Single(judged.Result.OldPlaceChecks).Collision);
         Assert.Equal(ChangedObjectJudging.OldPlaceIdOf(judged.Collected.Targets.Single(target => target.Key == neighbour.Key)), collision.Other);
         Assert.IsType<WhenRemoved.Disable>(judged.WhenRemovedOf(Barrel));
     }
@@ -139,7 +139,7 @@ public class ChangedObjectJudgingTests
 
         var judged = JudgeBarrel(RestoreMode.RestoreIfNoCollision, terrain);
 
-        var collision = Assert.IsType<RemovalReason.TerrainChanged>(Assert.Single(judged.Result.OldPlaceChecks).Collision);
+        var collision = Assert.IsType<TerrainChanged>(Assert.Single(judged.Result.OldPlaceChecks).Collision);
         Assert.Equal(Cleaned, collision.ChangedBy);
         Assert.IsType<WhenRemoved.Disable>(judged.WhenRemovedOf(Barrel));
     }
@@ -379,7 +379,7 @@ public class ChangedObjectJudgingTests
     {
         var judged = JudgeReplacedBarrel(earlierModel: Slab.Base, cleanedModsModel: Table.Base);
 
-        Assert.IsType<RemovalReason.TooClose>(Assert.Single(judged.Result.OldPlaceChecks).Collision);
+        Assert.IsType<TooClose>(Assert.Single(judged.Result.OldPlaceChecks).Collision);
         Assert.IsType<WhenRemoved.Disable>(judged.WhenRemovedOf(Barrel));
     }
 
@@ -389,7 +389,7 @@ public class ChangedObjectJudgingTests
     {
         var judged = JudgeBarrel(RestoreMode.RestoreIfNoCollision, Crate(Patch, NextToB));
 
-        Assert.IsType<RemovalReason.TooClose>(Assert.Single(judged.Result.OldPlaceChecks).Collision);
+        Assert.IsType<TooClose>(Assert.Single(judged.Result.OldPlaceChecks).Collision);
         Assert.IsType<WhenRemoved.Disable>(judged.WhenRemovedOf(Barrel));
     }
 
@@ -411,7 +411,7 @@ public class ChangedObjectJudgingTests
 
         var judged = JudgeBarrel(RestoreMode.RestoreIfNoCollision, movedByThePatch);
 
-        Assert.IsType<RemovalReason.TooClose>(Assert.Single(judged.Result.OldPlaceChecks).Collision);
+        Assert.IsType<TooClose>(Assert.Single(judged.Result.OldPlaceChecks).Collision);
     }
 
     private sealed record Judged(CollectedObjects Collected, ChangedObjectJudgingResult Result)
@@ -469,15 +469,16 @@ public class ChangedObjectJudgingTests
         var triangles = new TriangleStore(Shapes.ReadTriangles);
         return new OldPlaceRules(
             target => TooCloseObjects.CreatePlacementRule(
-                collected.Targets,
-                visibleTargets,
-                RemovalCauseSelector.SelectForOldPlace(oldPlace.OtherModObjects, world.OtherModObjects.Length, [ChangedObjectJudging.OldPlaceIdOf(target)], Zone.Npcs),
-                oldPlace.PlacedNpcs,
-                Shapes,
-                triangles,
-                Zone),
+                new(
+                    collected.Targets,
+                    visibleTargets,
+                    RemovalCauseSelector.SelectForOldPlace(oldPlace.OtherModObjects, world.OtherModObjects.Length, [ChangedObjectJudging.OldPlaceIdOf(target)], Zone.Npcs),
+                    oldPlace.PlacedNpcs,
+                    Shapes,
+                    triangles,
+                    Zone)),
             ChangedTerrainObjects.CreatePlacementRule(
-                Mods.AcceptedWorldWithoutCleanedMod, LoadOrder, terrain ?? new TerrainRecords(), Shapes, terrain is null ? TerrainOff : Terrain()));
+                new(Mods.AcceptedWorldWithoutCleanedMod, LoadOrder, terrain ?? new TerrainRecords(), Shapes, terrain is null ? TerrainOff : Terrain())));
     }
 
     /// <summary>Rules that fail the test when asked: the mode decides without a check.</summary>

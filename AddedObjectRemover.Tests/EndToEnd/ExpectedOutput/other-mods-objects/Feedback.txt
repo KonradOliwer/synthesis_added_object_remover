@@ -15,6 +15,7 @@ Shrink or turn objects to make them fit: Shrink down to: 80% of its size; Turn b
 Also remove what rests on removed objects: OnlyWhatLosesItsSupport; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
 Visible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 6; A direction is cleared when this much of it was removed: 80%; Remove when this share of the directions with objects is cleared: 80%; Never remove these as visible objects left behind: none.
 Invisible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 4; A direction is cleared when this much of it was removed: 50%; Remove when this share of the directions with objects is cleared: 60%; Never remove these as invisible objects left behind: none; Move kept markers out of other mods' objects: on.
+Restore where the cleaned mod was removed: other mods' objects, terrain, cell settings, navmeshes; an area 10000 units wide counts as cleared when at most 0.1% of the cleaned mod's objects there still stand, by size; terrain edges blended over 256 units.
 Detailed log and reports: on, report files go to <root>/Output/Reports.
 Only warn (don't stop) when a mod that requires the cleaned mod loads after the patch: off.
 Scanned 6 placed records in <time>: 2 Target.esp objects to check, 1 objects from other mods.
@@ -43,7 +44,7 @@ Linked groups: 0 more objects removed with the left-behind removals they are lin
 Moved 0 kept markers out of other mods' objects; 0 left in place.
 Wrote 4 overrides (2 removed; other mods' objects: 2 pulled down) in <time>.
   Removed T_Crate [000801:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; too close to U_Cause [000801:Untrusted.esp], changed by Untrusted.esp (new object)
-  Removed T_Pad [000803:Target.esp] (base T_PadBase [000802:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; 63 % of its support was removed or pulled down (mostly 000801:Trusted.esp, another mod's object left without support)
+  Removed T_Pad [000803:Target.esp] (base T_PadBase [000802:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold unnamed area; 63 % of its support was removed or pulled down (mostly Trusted_LowerPad [000801:Trusted.esp], another mod's object left without support)
 Bounds: 5 bases from NIF, 0 NIF misses, 0 from OBND, 0 without bounds. Meshes: 3 read, 0 effect-only, 0 failed (3 loose, 0 from 0 archives), 0 with a footer root other than their first node.
 Per cell/worldspace (objects of Target.esp / other objects / Target.esp objects removed):
   interior AorInterior [000800:Skyrim.esm]: 2 / 1 / 2
@@ -51,8 +52,8 @@ Target.esp objects: 2 visible, 0 invisible (by kind: none), 0 deleted, start dis
 Objects of Target.esp: 2; already removed by earlier patchers in this group: 0; not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 0; judged in this run: 2; removed in this run: 2.
 Removed 2 objects (1 too close, 1 follow-up removals, 0 visible objects left behind, 0 invisible objects left behind, 0 linked to removed objects).
 Other mods' objects left without support: 2; pulled down: 2.
-  000801:Trusted.esp (base Trusted_PadBase [000800:Trusted.esp]) in interior AorInterior [000800:Skyrim.esm] at (0, 0, 100): pulled down by 100.0 units; 100 % of its support gone.
-  000802:Trusted.esp (base Trusted_PadBase [000800:Trusted.esp]) in interior AorInterior [000800:Skyrim.esm] at (0, 0, 140): pulled down by 120.0 units; 100 % of its support gone.
+  Trusted_LowerPad [000801:Trusted.esp] (base Trusted_PadBase [000800:Trusted.esp]) in interior AorInterior [000800:Skyrim.esm] at (0, 0, 100): pulled down by 100.0 units; 100 % of its support gone.
+  Trusted_UpperPad [000802:Trusted.esp] (base Trusted_PadBase [000800:Trusted.esp]) in interior AorInterior [000800:Skyrim.esm] at (0, 0, 140): pulled down by 120.0 units; 100 % of its support gone.
 Removed 2/2 (removed/all checked objects):
   AorInterior › unnamed area 2/2
 Anchoring diagnostics: wrote 0 evaluations to <root>/Output/Reports/anchoring.csv.
@@ -81,11 +82,11 @@ meshes\aor\crate.nif,T_CrateBase,1,-50,-50,0,50,50,100,0.5,0.5,-0,origin near bo
 meshes\aor\pad.nif,T_PadBase,1,-20,-20,0,20,20,20,0.5,0.5,-0,origin near bottom
 ## report other-mods-objects-left-without-support.csv
 outcome,formKey,editorId,base,winningMod,worldspace,x,y,z,newZ,supportGoneShare,notRemovableBecause
-pulled down,000801:Trusted.esp,,Trusted_PadBase [000800:Trusted.esp],Trusted.esp,AorInterior,0,0,100,0,1,
-pulled down,000802:Trusted.esp,,Trusted_PadBase [000800:Trusted.esp],Trusted.esp,AorInterior,0,0,140,20,1,
+pulled down,000801:Trusted.esp,Trusted_LowerPad,Trusted_PadBase [000800:Trusted.esp],Trusted.esp,AorInterior,0,0,100,0,1,
+pulled down,000802:Trusted.esp,Trusted_UpperPad,Trusted_PadBase [000800:Trusted.esp],Trusted.esp,AorInterior,0,0,140,20,1,
 ## report removals.csv
 formKey,editorId,base,reason,worldspace,hold,place,cellFormKey,cellEditorId,gridX,gridY,x,y,z
 000801:Target.esp,T_Crate,T_CrateBase [000800:Target.esp],"too close to U_Cause [000801:Untrusted.esp], changed by Untrusted.esp (new object)",AorInterior,unnamed area,AorInterior,000800:Skyrim.esm,AorInterior,,,0,0,0
-000803:Target.esp,T_Pad,T_PadBase [000802:Target.esp],"63 % of its support was removed or pulled down (mostly 000801:Trusted.esp, another mod's object left without support)",AorInterior,unnamed area,AorInterior,000800:Skyrim.esm,AorInterior,,,0,0,120
+000803:Target.esp,T_Pad,T_PadBase [000802:Target.esp],"63 % of its support was removed or pulled down (mostly Trusted_LowerPad [000801:Trusted.esp], another mod's object left without support)",AorInterior,unnamed area,AorInterior,000800:Skyrim.esm,AorInterior,,,0,0,120
 ## report removed-markers-and-kept-objects.csv
 kind,formKey,editorId,space,cell,detail

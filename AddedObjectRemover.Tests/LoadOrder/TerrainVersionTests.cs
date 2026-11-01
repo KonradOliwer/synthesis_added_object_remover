@@ -24,7 +24,8 @@ public class TerrainVersionTests
         new Dictionary<ExteriorCell, ILandscapeGetter>(),
         new Dictionary<RecordKey, RecordKey>(),
         versionsRead ? new Dictionary<ExteriorCell, List<LandscapeVersion>> { [Cell] = [.. highestPriorityFirst] } : null,
-        layerNames: null);
+        layerNames: null,
+        landscapesBelowTarget: null);
 
     [Fact]
     public void VersionsComeInLoadOrderWithEachPluginsOwnHeights()

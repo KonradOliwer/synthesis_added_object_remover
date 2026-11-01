@@ -98,6 +98,18 @@ public class OrientedBoxTests
     }
 
     [Fact]
+    public void VolumeIsTheProductOfTheFullExtentsWhateverTheRotation()
+    {
+        var box = new OrientedBox(Vector3.Zero, Mat3.Identity, new Vector3(1, 2, 3));
+        Assert.Equal(48f, box.Volume, 1e-4f);
+
+        var turned = box with { Rotation = Mat3.FromEuler(new Vector3(0.5f, 0.2f, 1.1f)) };
+        Assert.Equal(48f, turned.Volume, 1e-4f);
+
+        Assert.Equal(0f, (box with { HalfExtents = new Vector3(1, 0, 3) }).Volume);
+    }
+
+    [Fact]
     public void FromLocalScalesAboutTheOrigin()
     {
         var local = new Box(new Vector3(1, 1, 1), new Vector3(3, 3, 3));

@@ -6,4 +6,6 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 /// <param name="Objects">The objects with the placed records' links only and no unreadable record.</param>
 /// <param name="CleanedMod">The plugin whose objects are judged; the links into it are kept.</param>
 /// <param name="RemovedRecords">The records whose final version is removed; a link from one keeps nothing.</param>
-public sealed record ScannedPlacedRecords(CollectedObjects Objects, PluginName CleanedMod, ImmutableHashSet<RecordKey> RemovedRecords);
+/// <param name="MarksLinksIntoChangedRecords">Whether the links into the changed records are read and mark which of them the cleaned mod's records link to.</param>
+public sealed record ScannedPlacedRecords(
+    CollectedObjects Objects, PluginName CleanedMod, ImmutableHashSet<RecordKey> RemovedRecords, bool MarksLinksIntoChangedRecords);

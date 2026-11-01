@@ -2,6 +2,7 @@ using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Skyrim;
+using Mutagen.Bethesda.Synthesis;
 
 namespace AddedObjectRemover.Tests.EndToEnd;
 
@@ -20,6 +21,7 @@ internal static class FixtureRun
     /// <param name="patchPosition">How many of the listed mods load above the patch; the others load below it. None puts the patch last.</param>
     /// <param name="inspectPatch">Reads the patch once the run is over.</param>
     /// <param name="inspectRunFolder">Reads the folder the run's output and reports folder are in once the run is over; the report folder is in it.</param>
+    /// <param name="earlierPatcherWrites">What an earlier patcher of the group wrote into the patch before the run starts; none when the patch starts empty.</param>
     public static RunResult Run(
         Settings settings,
         int workers,
@@ -31,7 +33,8 @@ internal static class FixtureRun
         Func<string, IReadOnlyList<ISkyrimMod>>? createLoadOrder = null,
         int? patchPosition = null,
         Action<ISkyrimModGetter>? inspectPatch = null,
-        Action<string>? inspectRunFolder = null)
+        Action<string>? inspectRunFolder = null,
+        Action<IPatcherState<ISkyrimMod, ISkyrimModGetter>>? earlierPatcherWrites = null)
     {
         var root = Directory.CreateTempSubdirectory("aor-run-");
         try
@@ -41,6 +44,7 @@ internal static class FixtureRun
             var abovePatch = patchPosition ?? listedMods.Count;
             var state = FixturePatcherState.Create(
                 [.. listedMods.Take(abovePatch)], dataFolder, Path.Combine(root.FullName, FixturePatcherState.PatchModKey.FileName));
+            earlierPatcherWrites?.Invoke(state);
             using var world = FixturePatcherState.CreateFinalWorld(state, [.. listedMods.Skip(abovePatch)]);
             var pluginRecords = new PluginRecordsFactory(world, workers);
             var request = SettingsValidator.Build(
@@ -72,7 +76,14 @@ internal static class FixtureRun
     }
 
     /// <summary>Runs with the log recorded and the reports read, and returns what the run printed, patched and reported, masked like the output of a whole run through the entry.</summary>
-    public static (RunOutcome Outcome, RunOutput Output) Capture(Settings settings, int workers, Func<string, IReadOnlyList<ISkyrimMod>> createLoadOrder)
+    /// <param name="earlierPatcherWrites">What an earlier patcher of the group wrote into the patch before the run starts; none when the patch starts empty.</param>
+    /// <param name="describeMore">More lines about the patch than its placed records, such as its cells, land and navmeshes; none for the placed records only.</param>
+    public static (RunOutcome Outcome, RunOutput Output) Capture(
+        Settings settings,
+        int workers,
+        Func<string, IReadOnlyList<ISkyrimMod>> createLoadOrder,
+        Action<IPatcherState<ISkyrimMod, ISkyrimModGetter>>? earlierPatcherWrites = null,
+        Func<ISkyrimModGetter, IReadOnlyList<string>>? describeMore = null)
     {
         var log = new RecordingLogSink();
         IReadOnlyList<string> patch = [];
@@ -84,12 +95,13 @@ internal static class FixtureRun
             log,
             DefaultMeshFiles,
             createLoadOrder: createLoadOrder,
-            inspectPatch: mod => patch = PatchDump.Describe(mod),
+            inspectPatch: mod => patch = [.. PatchDump.Describe(mod), .. describeMore?.Invoke(mod) ?? []],
             inspectRunFolder: folder =>
             {
                 runFolder = folder;
                 reports = PipelineRun.ReadReports(Path.Combine(folder, Program.ReportsFolderName), folder);
-            });
+            },
+            earlierPatcherWrites: earlierPatcherWrites);
         var printed = log.Sections.SelectMany(section => section.Lines).ToList();
         return (((RunResult.Done)result).Outcome, new RunOutput(OutputMasks.MaskLog(printed, runFolder), patch, reports, printed));
     }
@@ -114,6 +126,8 @@ internal static class FixtureRun
             var opened = inner.Open(records);
             return wrap is null ? opened : wrap(opened);
         }
+
+        public IReadOnlyDictionary<uint, CollisionLayerFact> ReadCollisionLayers(IRecordIndex records) => inner.ReadCollisionLayers(records);
     }
 
     /// <remarks>Builds the sections it does not print, because building them takes the problems and counts what the log shows, as a printing run does.</remarks>

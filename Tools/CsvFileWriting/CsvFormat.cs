@@ -10,6 +10,8 @@ public static class CsvFormat
 
     public static string Number(float value) => value.ToString(CultureInfo.InvariantCulture);
 
+    public static string Number(double value) => value.ToString(CultureInfo.InvariantCulture);
+
     /// <summary>The three components as three fields: x, y, z.</summary>
     public static IEnumerable<string> Numbers(Vector3 value) => [Number(value.X), Number(value.Y), Number(value.Z)];
 

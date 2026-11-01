@@ -15,13 +15,15 @@ internal static partial class Tables
     ];
 
     /// <summary>One row per changed object, then one per object of the target plugin kept shrunk or turned, each in target order.</summary>
+    /// <param name="restoredWhereRemoved">The earlier version of each target that went back where the cleaned mod was removed.</param>
     /// <returns>Null when there is no row.</returns>
-    public static CsvTable? BuildFitsTable(CollectedObjects world, IRemovalDecisions final, ReportContext context)
+    public static CsvTable? BuildFitsTable(CollectedObjects world, IRemovalDecisions final, IReadOnlyDictionary<TargetId, EarlierVersion> restoredWhereRemoved, ReportContext context)
     {
         ImmutableArray<ImmutableArray<string>> rows =
         [
-            .. FitOutcomes.ChangedObjects(world).Select(changedObject => FitRow(world, final, changedObject, ChangedObjectOutcomeName(FitOutcomes.OutcomeOf(final, changedObject.Id)), context)),
-            .. FitOutcomes.OwnObjectsShrunkOrTurned(world, final).Select(own => FitRow(world, final, own, OwnShrunkOrTurned, context)),
+            .. FitOutcomes.ChangedObjects(world).Select(changedObject => FitRow(
+                world, final, restoredWhereRemoved, changedObject, ChangedObjectOutcomeName(FitOutcomes.ChangedObjectOutcomeOf(final, restoredWhereRemoved, changedObject.Id)), context)),
+            .. FitOutcomes.OwnObjectsShrunkOrTurned(world, final).Select(own => FitRow(world, final, restoredWhereRemoved, own, OwnShrunkOrTurned, context)),
         ];
         return rows.IsEmpty ? null : new CsvTable(ReportFileNames.FitsFileName, FitsHeader, rows);
     }
@@ -31,16 +33,21 @@ internal static partial class Tables
     private static string ChangedObjectOutcomeName(ChangedObjectOutcome outcome) => outcome switch
     {
         ChangedObjectOutcome.KeptWherePut => "changed object kept where moved",
+        ChangedObjectOutcome.KeptThenRestoredWhereRemoved => "changed object kept where moved, then restored where the cleaned mod was removed",
         ChangedObjectOutcome.KeptShrunkOrTurned => "changed object kept shrunk or turned",
         ChangedObjectOutcome.Restored => "changed object restored",
         ChangedObjectOutcome.Removed => "changed object removed",
         _ => throw new UnreachableException($"Unknown changed object outcome {outcome}."),
     };
 
-    /// <remarks>The new placement is empty for an object that kept its placement; for a restored object it is the earlier version's, with its base when that differs.</remarks>
-    private static ImmutableArray<string> FitRow(CollectedObjects world, IRemovalDecisions final, TargetObject target, string outcome, ReportContext context)
+    /// <remarks>
+    /// The new placement is empty for an object that kept its placement; for an object restored by either restore it is the one the
+    /// restore writes, with the earlier base when that goes back.
+    /// </remarks>
+    private static ImmutableArray<string> FitRow(
+        CollectedObjects world, IRemovalDecisions final, IReadOnlyDictionary<TargetId, EarlierVersion> restoredWhereRemoved, TargetObject target, string outcome, ReportContext context)
     {
-        var newPlacement = FitOutcomes.NewPlacementOf(final, target.Id);
+        var newPlacement = FitOutcomes.NewPlacementOf(final, restoredWhereRemoved, target);
         return CsvRow.Of(
         [
             Quote(TargetOrigins.KindName(target.Origin)),
@@ -49,7 +56,7 @@ internal static partial class Tables
             Quote(AreaText.Worldspace(world.Spaces[target.SpaceKey])),
             .. PlacementColumns(target.Placement),
             .. newPlacement is { } placed ? PlacementColumns(placed) : Enumerable.Repeat(OptionalText(null), PlacementColumnCount),
-            NewBaseColumn((final.Of(target.Id) as Decision.Restored)?.EarlierVersion, context),
+            NewBaseColumn(target, FitOutcomes.EarlierVersionWritten(final, restoredWhereRemoved, target.Id), context),
         ]);
     }
 
@@ -62,7 +69,10 @@ internal static partial class Tables
         Number(placement.Scale),
     ];
 
-    /// <summary>The earlier version's base, written like the base column; empty when there is no earlier version or its base is the winning version's.</summary>
-    private static string NewBaseColumn(EarlierVersion? earlier, ReportContext context) =>
-        OptionalText(earlier is { RestoresWholeRecord: true } ? RecordNames.DescribeBase(context.Bases, earlier.Base) : null);
+    /// <summary>The earlier version's base, written like the base column; empty when there is no earlier version, its base and data do not go back, or its base is the object's own.</summary>
+    private static string NewBaseColumn(TargetObject target, EarlierVersion? earlier, ReportContext context) =>
+        OptionalText(
+            earlier is not null && earlier.Undo.HasFlag(PlacedParts.BaseAndData) && earlier.Base != target.Base
+                ? RecordNames.DescribeBase(context.Bases, earlier.Base)
+                : null);
 }

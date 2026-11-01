@@ -125,7 +125,7 @@ public class SceneViewTests
     public void AnExcludedOtherModObjectCausesNoRemovalsAndListsNoReplacement()
     {
         List<OtherObject> otherModObjects = [TestShapes.Placed(Mod, 0, Crate.Base, Vector3.Zero), TestShapes.Placed(Mod, 1, Crate.Base, Vector3.Zero)];
-        var excluding = Replacements.Excluding(otherModObjects.Count, new OtherId(0));
+        var excluding = Replacements.Excluding(otherModObjects.Count, [new OtherId(0)]);
         var active = TestScenes.Create([], otherModObjects, Shapes).ObjectsThatCanCauseRemovals(excluding, NpcHandling.Never);
         List<OtherId> found = [];
 
@@ -134,6 +134,11 @@ public class SceneViewTests
         Assert.Equal(new[] { new OtherId(1) }, found);
         Assert.Empty(excluding.List);
     }
+
+    /// <summary>An id beyond the other-mod objects comes from another numbering, which is a bug.</summary>
+    [Fact]
+    public void ExcludingAnObjectBeyondTheOtherModObjectsThrows() =>
+        Assert.Throws<IndexOutOfRangeException>(() => Replacements.Excluding(otherModObjectCount: 2, [new OtherId(0), new OtherId(2)]));
 
     [Fact]
     public void NpcsSkipReplacedNpcsButCountTheirSizes()

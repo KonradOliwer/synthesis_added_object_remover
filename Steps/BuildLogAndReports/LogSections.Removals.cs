@@ -21,7 +21,7 @@ internal static partial class LogSections
     {
         var target = world.Targets[entry.TargetIndex];
         return $"{RecordNames.Describe(target)} (base {RecordNames.DescribeBase(context.Bases, target.Base)}) "
-            + $"in {Describe.Location(world, target)}, {AreaText.Detail(target.Area, world.Spaces[target.SpaceKey])}; {Describe.RemovalReason(world, entry, final)}";
+            + $"in {Describe.Location(world, target)}, {AreaText.Detail(target.Area, world.Spaces[target.SpaceKey])}; {Describe.LeftItsPlaceReason(world, entry, final)}";
     }
 
     /// <remarks>Counts the target's own objects only, like <see cref="BuildRunSummarySection"/>.</remarks>
@@ -102,25 +102,31 @@ internal static partial class LogSections
             KeyedGroups.CountBy(keptOnce, entry => KeepReasonText.Category(entry.Reason), StringComparer.Ordinal),
             StringComparer.Ordinal);
         if (byCategory.Count == 0) return new LogSection("kept-summary", []);
-        var because = keptOnce.Any(entry => IsKeptForAnotherModsObject(entry.Reason))
-            ? "because other records depend on them, because of their own script or location ref type, or because other mods' objects rest on them."
-            : "because other records depend on them or because of their own script or location ref type.";
         return new LogSection(
             "kept-summary",
             [
-                $"Kept {TextFormat.Count(byCategory.Sum(group => group.Value))} objects that would have been removed, {because}",
+                $"Kept {TextFormat.Count(byCategory.Sum(group => group.Value))} objects that would have been removed, {KeptBecause(keptOnce)}.",
                 .. byCategory.Select(group => $"  {group.Key}: {TextFormat.Count(group.Value)}"),
             ]);
     }
 
-    private static bool IsKeptForAnotherModsObject(KeepReason reason) =>
-        reason.Kind == KeepKind.OtherModsObjectRestsOnIt || reason.Keeper?.Reason.Kind == KeepKind.OtherModsObjectRestsOnIt;
+    /// <summary>E.g. "because other records depend on them, because of their own script or location ref type, or because their cell is deleted".</summary>
+    private static string KeptBecause(IReadOnlyList<KeptObject> keptOnce)
+    {
+        List<string> reasons = ["because other records depend on them", "because of their own script or location ref type"];
+        if (keptOnce.Any(entry => IsKeptFor(entry.Reason, KeepKind.OtherModsObjectRestsOnIt))) reasons.Add("because other mods' objects rest on them");
+        if (keptOnce.Any(entry => IsKeptFor(entry.Reason, KeepKind.CellDeleted))) reasons.Add("because their cell is deleted");
+        return reasons.Count == 2 ? $"{reasons[0]} or {reasons[1]}" : $"{string.Join(Describe.ListSeparator, reasons[..^1])}, or {reasons[^1]}";
+    }
+
+    /// <summary>Kept for the reason of that kind, its own or that of the member of its linked group that must stay.</summary>
+    private static bool IsKeptFor(KeepReason reason, KeepKind kind) => reason.Kind == kind || reason.Keeper?.Reason.Kind == kind;
 
     /// <summary>
     /// The objects kept for a reason of their own: a script on them, or on their base the target plugin defines, names
-    /// a quest or scene, they have a location ref type themselves, or another mod's object rests on them. They are kept on
-    /// purpose and need no manual patch; objects that another record links to are in the hints instead. Each kept object
-    /// once; no lines when there are none.
+    /// a quest or scene, they have a location ref type themselves, another mod's object rests on them, or the final world deletes
+    /// their cell. They are kept on purpose and need no manual patch; objects that another record links to are in the hints instead.
+    /// Each kept object once; no lines when there are none.
     /// </summary>
     public static LogSection BuildKeptOnPurposeSection(CollectedObjects world, IEnumerable<KeptObject> kept)
     {
@@ -131,6 +137,7 @@ internal static partial class LogSections
                 .. KeptOnPurposeLines(world, keptOnce, KeepKind.ScriptNamesQuestOrScene, "Kept, script names a quest or scene:", KeepReasonText.Detail),
                 .. KeptOnPurposeLines(world, keptOnce, KeepKind.LocationRole, "Kept, location role:", KeepReasonText.Detail),
                 .. KeptOnPurposeLines(world, keptOnce, KeepKind.OtherModsObjectRestsOnIt, "Kept, another mod's object rests on it:", KeepReasonText.RestingObjects),
+                .. KeptOnPurposeLines(world, keptOnce, KeepKind.CellDeleted, "Kept, in a deleted cell:", KeepReasonText.DeletingPlugin),
             ]);
     }
 

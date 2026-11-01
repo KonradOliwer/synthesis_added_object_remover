@@ -30,6 +30,18 @@ public class NumericRangesTests
     }
 
     [Theory]
+    [InlineData(0.1, 100.0, 0.1, true)]
+    [InlineData(0.11, 100.0, 0.1, false)]
+    [InlineData(0.0, 100.0, 0.0, true)]
+    [InlineData(0.01, 100.0, 0.0, false)]
+    [InlineData(0.0, 0.0, 0.1, true)]
+    [InlineData(5.0, 10.0, 50.0, true)]
+    [InlineData(5.1, 10.0, 50.0, false)]
+    [InlineData(10.0, 10.0, 100.0, true)]
+    public void FractionalShareStaysWithinThePercentExactlyAtTheBoundary(double part, double whole, double percent, bool expected) =>
+        Assert.Equal(expected, SharePercent.AtMost(part, whole, percent));
+
+    [Theory]
     [InlineData(0.5f, 0.5f, 0f, true)]
     [InlineData(0.4999f, 0.5f, 0f, false)]
     [InlineData(0.499995f, 0.5f, 0.00001f, true)]

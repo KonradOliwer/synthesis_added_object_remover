@@ -10,10 +10,8 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 /// </summary>
 internal static class OtherRecordChange
 {
-    // Plugins that re-save a record round its floats, so a difference this small is no change. Base and presence are exact.
-    private const float PositionTolerance = 0.01f;
-    private const float RotationTolerance = 0.0001f;
-    private const float ScaleTolerance = 0.0001f;
+    /// <summary>Plugins that re-save a record round its floats, so a difference this small is no change. Base and presence are exact.</summary>
+    public static readonly PlacedPartTolerances Tolerances = new(Position: PlacedPartTolerances.ResavedPosition, Rotation: 0.0001f, Scale: 0.0001f);
 
     /// <summary>Ranks a change only the patch holds below every version index, so any real mod's change is named first.</summary>
     private const int PatchOnlyRank = -1;
@@ -22,9 +20,9 @@ internal static class OtherRecordChange
     private static readonly Func<PlacedVersionFact, PlacedVersionFact, bool>[] ObjectProperties =
     [
         static (first, second) => DiffersBeyond(
-            first.Placement.Position, second.Placement.Position, static (one, other) => Vector3.Abs(one - other), PositionTolerance),
-        static (first, second) => DiffersBeyond(first.Placement.EulerRotation, second.Placement.EulerRotation, Vectors.ShortestAngles, RotationTolerance),
-        static (first, second) => MathF.Abs(ReferenceScale.Normalize(first.Scale) - ReferenceScale.Normalize(second.Scale)) > ScaleTolerance,
+            first.Placement.Position, second.Placement.Position, static (one, other) => Vector3.Abs(one - other), Tolerances.Position),
+        static (first, second) => DiffersBeyond(first.Placement.EulerRotation, second.Placement.EulerRotation, Vectors.ShortestAngles, Tolerances.Rotation),
+        static (first, second) => MathF.Abs(ReferenceScale.Normalize(first.Scale) - ReferenceScale.Normalize(second.Scale)) > Tolerances.Scale,
         static (first, second) => first.Base != second.Base,
         static (first, second) => first.Placement.Presence != second.Placement.Presence,
     ];

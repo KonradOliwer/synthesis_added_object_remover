@@ -10,6 +10,7 @@ namespace AddedObjectRemover.Steps.FindTargetObjectsToKeep;
 /// target objects links to are never removed, because the game may crash or break on them. Nor are
 /// targets whose script names a quest or scene, see <see cref="FindScriptReason"/>.
 /// Nor are targets with a location role, which a quest alias can pick them by.
+/// Nor are targets in a cell the final world deletes, since the patch writes nothing into such a cell.
 /// Links between target objects do not keep them: they form linked groups, which stay together, so
 /// a group stays whole as soon as one member must stay.
 /// </summary>
@@ -58,7 +59,8 @@ internal sealed class ObjectsToKeep : IObjectsToKeep
     {
         try
         {
-            return target.IsTeleportDoor ? TeleportDoor : references[index] ?? FindScriptReason(target, bases) ?? FindLocationRoleReason(target);
+            return FindCellDeletedReason(target)
+                ?? (target.IsTeleportDoor ? TeleportDoor : references[index] ?? FindScriptReason(target, bases) ?? FindLocationRoleReason(target));
         }
         catch (Exception ex) when (Failures.IsRecoverable(ex))
         {
@@ -66,6 +68,9 @@ internal sealed class ObjectsToKeep : IObjectsToKeep
             return CheckFailed;
         }
     }
+
+    private static KeepReason? FindCellDeletedReason(TargetObject target) =>
+        target.CellDeleted is { } deleted ? new KeepReason(KeepKind.CellDeleted, CellDeleted: deleted) : null;
 
     /// <remarks>
     /// Only what depends on the object counts, and what the object's script merely reads cannot depend on it. A disabled

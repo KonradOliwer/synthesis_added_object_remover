@@ -16,10 +16,11 @@ internal sealed class TargetsHoldingUpOtherModsObjects(
     Execution execution)
 {
     /// <param name="nearTargets">The judged objects whose box comes within the gap of one of theirs are checked.</param>
+    /// <param name="isLeftOut">Whether an object is never checked, whatever it touches.</param>
     /// <returns>Each target object that holds up a checked object, with the first such object in id order.</returns>
-    public Dictionary<TargetId, OtherObject> Find(IEnumerable<TargetObject> nearTargets)
+    public Dictionary<TargetId, OtherObject> Find(IEnumerable<TargetObject> nearTargets, Func<OtherId, bool> isLeftOut)
     {
-        var resting = near.FindTouchingAny([.. nearTargets.Select(rules.SupportingBoxOf).OfType<BoxInSpace>()], isLeftOut: _ => false);
+        var resting = near.FindTouchingAny([.. nearTargets.Select(rules.SupportingBoxOf).OfType<BoxInSpace>()], isLeftOut);
         var holders = ParallelMap.Run(execution, resting.Count, () => new OtherObjectQueries(), (k, queries) => FindTargetsHoldingUp(resting[k], queries), ParallelMap.AutomaticRangeSize);
         var found = new Dictionary<TargetId, OtherObject>();
         foreach (var (other, holdersOfOther) in resting.Zip(holders))

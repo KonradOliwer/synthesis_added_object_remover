@@ -12,6 +12,7 @@ using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 using static AddedObjectRemover.SettingCorrections;
 
@@ -36,6 +37,9 @@ public static class SettingsValidator
     private const int MaxOtherMastersLimit = 100;
     private const float MinPercent = 1f;
     private const int MinShrinkLimitPercent = 1;
+    private const float MinClearedAreaRadius = 1024f;
+    private const float MaxClearedAreaRadius = 16384f;
+    private const float MaxEdgeBlendDistance = 1024f;
 
     /// <summary>The names the settings screen shows, group first, so a warning leads to the setting.</summary>
     private const string CleanedModName = "Mod to clean up";
@@ -69,6 +73,12 @@ public static class SettingsValidator
     private const string DirectionThresholdName = "A direction is cleared when this much of it was removed";
     private const string ClearedDirectionsName = "Remove when this share of the directions with objects is cleared";
     private const string MinOccupiedDirectionsName = "Decide only if at least this many of the 8 directions have objects";
+    private const string RestoreWhereRemovedGroup = "Restore what the cleaned mod changed where it was removed > ";
+    private const string ClearedAreaGroup = RestoreWhereRemovedGroup + "When an area counts as cleared > ";
+    private const string ClearedAreaRadiusName = "Look this far around the place";
+    private const string MaxStandingPercentName = "Cleared when at most this share still stands";
+    private const string MeasureName = "Measure the share by";
+    private const string EdgeBlendDistanceName = "Blend terrain edges over";
     private const string TrustedModsName = "Which other mods can cause removals > Trusted mods, and their masters";
     private const string OwnChangesModsName = "Which other mods can cause removals > Mods trusted for their own changes only";
     private const string NeverTrustedModsName = "Which other mods can cause removals > Never trusted mods";
@@ -134,6 +144,7 @@ public static class SettingsValidator
         var leftoverSettings = settings.LeftoverInvisibleObjects;
         var leftBehind = CreateLeftBehindSettings(leftoverSettings, warnings);
         var markerMoves = CreateMarkerMoveSettings(leftoverSettings);
+        var restoreWhereRemoved = CreateRestoreWhereRemovedSettings(settings.RestoreWhereRemoved, collision, changedCollision, warnings);
         var reports = detailedLogAndReports ? CreateReportFileSettings(reportsFolder, config.Source) : null;
 
         var runSettings = new RunSettings(
@@ -141,7 +152,7 @@ public static class SettingsValidator
             targetAsTyped,
             modTrust,
             CreateWhatToCollect(
-                markerMoves, collision.ChangedTerrain, changedCollision.ChangedTerrain, changedObjects, changed.Replaced.Process, detailedLogAndReports, movedDistance),
+                markerMoves, collision.ChangedTerrain, changedCollision.ChangedTerrain, changedObjects, changed.Replaced.Process, detailedLogAndReports, movedDistance, restoreWhereRemoved),
             new SelectionSettings(collision.TooClose.Npcs),
             collision,
             changedObjects,
@@ -150,6 +161,7 @@ public static class SettingsValidator
             otherModsObjects,
             settings.LeftoverVisibleObjects.RemoveLeftoverVisibleObjects ? visibleLeftBehind : null,
             leftoverSettings.RemoveLeftoverInvisibleObjects ? leftBehind : null,
+            restoreWhereRemoved,
             markerMoves,
             reports,
             onlyWarnWhenRequiringModLoadsAfterPatch,
@@ -435,16 +447,19 @@ public static class SettingsValidator
         source is SettingsSource.ConfigFile file ? Path.Combine(reportsFolder, file.Name) : reportsFolder;
 
     /// <summary>
-    /// The navmeshes are read only when relocation needs them; the Editor ID lists only when the detailed log prints them; every
-    /// plugin's terrain only when a changed-terrain step runs, its texture layers only when one counts terrain types, and its water
-    /// only when one counts a water change; the old places only when a mode checks them.
+    /// The navmeshes are read only when relocation or the restore group needs them; the Editor ID lists only when the detailed log
+    /// prints them; every plugin's terrain only when a changed-terrain step runs, its texture layers only when one counts terrain
+    /// types, and its water only when one counts a water change; the old places only when a mode checks them or restored objects of
+    /// other mods are checked against what stays, which is told from the world without the cleaned mod.
     /// When only the changed objects' terrain check is on, the scan reads terrain only if the cleaned mod overrides a record of
     /// another plugin; whether an override is a changed object is known only after the scan, and every changed object, in any
-    /// mode, is checked where the cleaned mod put it.
+    /// mode, is checked where the cleaned mod put it. The restore group reads the cell, LAND and navmesh records itself, so it
+    /// does not need those terrain reads.
     /// </summary>
     /// <param name="cleanedModTerrain">The changed-terrain settings of the cleaned mod's own objects.</param>
     /// <param name="changedObjectsTerrain">The changed-terrain settings of the objects the cleaned mod changed.</param>
     /// <param name="movedDistance">The validated moved distance.</param>
+    /// <param name="restoreWhereRemoved">Null when the restore group is off.</param>
     private static WhatToCollect CreateWhatToCollect(
         MarkerMoveSettings? markerMoves,
         ChangedTerrainSettings cleanedModTerrain,
@@ -452,19 +467,68 @@ public static class SettingsValidator
         ChangedObjectSettings changedObjects,
         bool processReplaced,
         bool detailedLog,
-        float movedDistance)
+        float movedDistance,
+        WhereRemovedRestoreSettings? restoreWhereRemoved)
     {
         ChangedTerrainSettings[] changedTerrains = [cleanedModTerrain, changedObjectsTerrain];
         return new WhatToCollect(
-            markerMoves != null,
+            markerMoves != null || restoreWhereRemoved != null,
             detailedLog,
             changedTerrains.Any(terrain => terrain.On),
             changedTerrains.Any(terrain => terrain.On && terrain.CountTerrainTypeChanges),
             changedTerrains.Any(terrain => terrain.On && terrain.CountsWaterChanges),
             movedDistance,
             processReplaced,
-            JudgeOldPlaces: JudgesOldPlaces(changedObjects, processReplaced),
-            TerrainForChangedObjectsOnly: !cleanedModTerrain.On && changedObjectsTerrain.On);
+            JudgeOldPlaces: JudgesOldPlaces(changedObjects, processReplaced) || restoreWhereRemoved is { OtherModsObjects: true },
+            TerrainForChangedObjectsOnly: !cleanedModTerrain.On && changedObjectsTerrain.On,
+            AreaRecordVersions: restoreWhereRemoved is { } restore ? AreaRecordReadsFor(restore) : null,
+            DecideEveryObjectWithoutCleanedMod: restoreWhereRemoved is { OtherModsObjects: true });
+    }
+
+    /// <summary>
+    /// A kind whose switch is off stays as the cleaned mod made it, so it is still read when the guards of a kind that is on look at
+    /// it: restored objects and navmeshes are kept off ground and out of water lines that stay changed, while the terrain guards look
+    /// at no cell and the cell guards at no ground. Every kind's guards look at the navmeshes that stay changed, so those are always
+    /// read.
+    /// </summary>
+    private static AreaRecordReads AreaRecordReadsFor(WhereRemovedRestoreSettings restore) => new(
+        new AreaPartTolerances(restore.HeightChangeTolerance, restore.WaterHeightChangeTolerance),
+        Cells: restore.Cells || restore.OtherModsObjects || restore.Navmeshes,
+        Lands: restore.Terrain || restore.OtherModsObjects || restore.Navmeshes);
+
+    /// <summary>
+    /// Built (and its settings validated) even when the group is off, so invalid values are always reported; null when all four switches are off.
+    /// The percent is the decimal the user typed: the float setting 0.7 would otherwise widen to 0.69999998.
+    /// </summary>
+    /// <param name="cleanedModCollision">The collision settings of the cleaned mod's own objects, whose terrain tolerances the restore reuses.</param>
+    /// <param name="changedCollision">The collision settings of the objects the cleaned mod changed, which judge a restored object against what stays.</param>
+    private static WhereRemovedRestoreSettings? CreateRestoreWhereRemovedSettings(
+        IRestoreWhereRemovedSettingsValues values,
+        CollisionSettings cleanedModCollision,
+        ChangedObjectCollision changedCollision,
+        ICollection<SettingWarning> warnings)
+    {
+        var area = values.ClearedArea;
+        var searchRadius = Clamp(
+            area.SearchRadius, MinClearedAreaRadius, MaxClearedAreaRadius, SettingDefaults.ClearedAreaSearchRadius, ClearedAreaGroup + ClearedAreaRadiusName, warnings);
+        var maxStandingPercent = Clamp(
+            area.MaxStandingPercent, 0, Percent.PerWhole, SettingDefaults.ClearedAreaMaxStandingPercent, ClearedAreaGroup + MaxStandingPercentName, warnings);
+        var measure = ValidateDefined(area.Measure, SettingDefaults.AreaMeasure, ClearedAreaGroup + MeasureName, warnings);
+        var edgeBlendDistance = Clamp(
+            values.TerrainEdgeBlendDistanceInUnits, 0, MaxEdgeBlendDistance, SettingDefaults.TerrainEdgeBlendDistanceInUnits, RestoreWhereRemovedGroup + EdgeBlendDistanceName, warnings);
+        if (!values.RestoreOtherModsObjects && !values.RestoreTerrain && !values.RestoreCells && !values.RestoreNavmeshes) return null;
+
+        return new WhereRemovedRestoreSettings(
+            values.RestoreOtherModsObjects,
+            values.RestoreTerrain,
+            values.RestoreCells,
+            values.RestoreNavmeshes,
+            new ClearedArea(searchRadius, (double)(decimal)maxStandingPercent, measure),
+            edgeBlendDistance,
+            cleanedModCollision.ChangedTerrain.HeightTolerance,
+            cleanedModCollision.ChangedTerrain.WaterHeightTolerance,
+            changedCollision.TooClose,
+            changedCollision.ChangedTerrain);
     }
 
     /// <summary>A replaced object is judged only when replaced objects are processed, so its mode counts only then.</summary>

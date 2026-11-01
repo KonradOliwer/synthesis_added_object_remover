@@ -11,24 +11,26 @@ public interface IPluginRecordsFactory
 /// <summary>The winning records of the load order by key, as one run's plugin records resolve them.</summary>
 public interface IRecordIndex;
 
-/// <summary>Reads the load order's plugin records. Not thread-safe, except <see cref="ReadHomeCellGrid"/>, <see cref="ReadTerrain"/>, <see cref="ReadTerrainVersions"/>, <see cref="ReadWaterCopies"/>, <see cref="ReadTextureMaterialChain"/>, <see cref="FindLandWorldspace"/>, <see cref="ReadNavmeshes"/>, <see cref="NpcTraitsOf"/>, <see cref="TraitSupplierOf"/>, <see cref="LeveledEntriesOf"/> and <see cref="TryParsePluginName"/>.</summary>
+/// <summary>Reads the load order's plugin records. Not thread-safe, except <see cref="ReadHomeCellGrid"/>, <see cref="ReadTerrain"/>, <see cref="ReadTerrainBelowTarget"/>, <see cref="ReadTerrainVersions"/>, <see cref="ReadWaterCopies"/>, <see cref="ReadTextureMaterialChain"/>, <see cref="FindLandWorldspace"/>, <see cref="ReadNavmeshes"/>, <see cref="NpcTraitsOf"/>, <see cref="TraitSupplierOf"/>, <see cref="LeveledEntriesOf"/> and <see cref="TryParsePluginName"/>.</summary>
 public interface IPluginRecords
 {
     /// <summary>Walks every plugin's cells once; the records the later reads and the patch writing need are remembered until the reader is dropped.</summary>
     /// <param name="stopsTheWalk">
     /// Whether a plugin's version is the lowest one kept of a record: each record's versions are kept from the winner down to and
-    /// including the first version whose plugin stops the walk, or all of them when none does.
+    /// including the first version whose plugin stops the walk, or all of them when none does. For a record the target plugin
+    /// overrides, no plugin from the winner down to the target plugin stops it, so the version just below the target plugin's is kept.
     /// </param>
     PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk);
 
     /// <summary>
     /// The links into the given records from every version of every record that is not a placed record, in the plugins that can
-    /// link to them (the patch, and the plugins that are one of the records' plugins or have one as a master), and the quest aliases
-    /// that fill with a target-plugin NPC as their Unique Actor (<see cref="RelationKind.UniqueActor"/>, linking the NPC base).
-    /// A record that cannot be parsed is not read further and is listed in <see cref="NonPlacedLinks.Unreadable"/>.
+    /// link to the given plugins or the target plugin (the patch, and the plugins that are one of them or have one as a master), and
+    /// the quest aliases that fill with a target-plugin NPC as their Unique Actor (<see cref="RelationKind.UniqueActor"/>, linking
+    /// the NPC base). A record that cannot be parsed is not read further and is listed in <see cref="NonPlacedLinks.Unreadable"/>.
     /// The links of placed records are in <see cref="PlacedRecordFacts.Links"/>.
     /// </summary>
-    NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> records);
+    /// <param name="linkedPlugins">The plugins whose dependents are read, besides the target plugin.</param>
+    NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> records, IReadOnlySet<PluginName> linkedPlugins);
 
     /// <summary>The records <see cref="IPatchWriting"/> copies from; the placed records must have been read before.</summary>
     IWritableRecords ReadWritableRecords();
@@ -43,6 +45,13 @@ public interface IPluginRecords
     /// <summary>The terrain heights of an exterior cell, row by row (<see cref="TerrainHeights.VerticesPerSide"/> per row); the placed records must have been read before.</summary>
     /// <returns>Null where the cell has no terrain (no, a deleted, or an empty land record).</returns>
     float[]? ReadTerrain(ExteriorCell cell);
+
+    /// <summary>
+    /// The terrain heights of an exterior cell's LAND record at its version just below the target plugin's, row by row; the placed
+    /// records must have been read before, with the LAND area record versions asked for. Thread-safe.
+    /// </summary>
+    /// <returns>Null where no plugin below the target plugin has a LAND record for the cell, or it is deleted or empty.</returns>
+    float[]? ReadTerrainBelowTarget(ExteriorCell cell);
 
     /// <summary>Every plugin's own land record of an exterior cell, decoded; the placed records must have been read before, with the terrain versions asked for. Thread-safe.</summary>
     /// <returns>In load order (lowest priority first); empty where no plugin has a land record for the cell.</returns>
@@ -66,9 +75,9 @@ public interface IPluginRecords
     /// <returns>Null where the space is not such a worldspace or the worldspace holds no land data of its own.</returns>
     RecordKey? FindLandWorldspace(RecordKey space);
 
-    /// <summary>The winning navmesh triangles (world space) of the bucket; the placed records must have been read before.</summary>
+    /// <summary>The winning navmesh triangles (world space) of the bucket, each with its navmesh; the placed records must have been read before.</summary>
     /// <returns>Null where the bucket has no navmesh.</returns>
-    MeshTriangle[]? ReadNavmeshes(NavmeshBucket bucket);
+    NavmeshWorldTriangle[]? ReadNavmeshes(NavmeshBucket bucket);
 
     /// <summary>An NPC's raw record facts. Thread-safe.</summary>
     /// <returns>Null when the base is not found as an NPC.</returns>

@@ -1,6 +1,7 @@
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover;
@@ -49,4 +50,12 @@ public static class SettingDefaults
     public const int VisibleMinOccupiedDirections = 6;
     public const int VisibleDirectionThresholdPercent = 80;
     public const int VisibleClearedDirectionsPercent = 80;
+    public const bool RestoreOtherModsObjects = true;
+    public const bool RestoreTerrain = true;
+    public const bool RestoreCells = true;
+    public const bool RestoreNavmeshes = true;
+    public const float ClearedAreaSearchRadius = 5000f;
+    public const float ClearedAreaMaxStandingPercent = 0.1f;
+    public const ClearedAreaMeasure AreaMeasure = ClearedAreaMeasure.ObjectSize;
+    public const float TerrainEdgeBlendDistanceInUnits = 256f;
 }

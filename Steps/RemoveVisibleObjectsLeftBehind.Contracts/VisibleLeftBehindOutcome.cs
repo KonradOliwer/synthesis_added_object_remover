@@ -23,6 +23,9 @@ public enum VisibleLeftBehindOutcome
     KeptSurroundingsMostlyKept,
     KeptProtectedType,
     KeptReferenced,
+
+    /// <summary>Not removed, because the cell it stands in is deleted by a later plugin and the patch writes nothing into a deleted cell.</summary>
+    KeptInDeletedCell,
 }
 
 public static class VisibleLeftBehindOutcomes

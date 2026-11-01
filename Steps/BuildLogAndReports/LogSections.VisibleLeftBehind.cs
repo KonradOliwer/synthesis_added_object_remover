@@ -68,7 +68,7 @@ internal static partial class LogSections
             VisibleLeftBehindOutcomes.IsRemoval,
             VisibleLeftBehindOutcomes.IsRestoration,
             outcome => VisibleLeftBehindOutcomes.IsRemovedAsLinked(outcome) || VisibleLeftBehindOutcomes.IsRestoration(outcome)
-                || outcome == VisibleLeftBehindOutcome.RemovedSurroundingsRemovedAndRestored,
+                || outcome is VisibleLeftBehindOutcome.RemovedSurroundingsRemovedAndRestored or VisibleLeftBehindOutcome.KeptInDeletedCell,
             VisibleLeftBehindOutcomeText.Describe,
             elapsed,
             context);

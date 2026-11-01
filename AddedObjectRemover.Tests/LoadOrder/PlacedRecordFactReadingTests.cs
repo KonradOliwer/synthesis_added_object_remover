@@ -586,7 +586,7 @@ public class PlacedRecordFactReadingTests
 
     private PlacedRecordFacts ReadWith(IPluginRecords plugin, Func<PluginName, bool> stopsTheWalk) =>
         plugin.ReadPlacedRecords(
-            new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: false, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword, TerrainReadsNeedAnOverride: false),
+            new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: false, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword, TerrainReadsNeedAnOverride: false, OtherRecordChange.Tolerances, AreaRecordVersions: null),
             stopsTheWalk);
 
     /// <param name="abovePatch">Plugins loading after the target plugin and above the patch.</param>

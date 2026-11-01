@@ -2,6 +2,7 @@ using System.Numerics;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Plugins.Records;
 using Mutagen.Bethesda.Skyrim;
+using Mutagen.Bethesda.Synthesis;
 using Noggog;
 
 namespace AddedObjectRemover.Tests.EndToEnd;
@@ -29,6 +30,12 @@ public class MovedReplacementRunTests
     /// <summary>A point inside the grid square of the home cell, and one inside the square of the cell east of it.</summary>
     private static readonly Vector3 InTheHomeCell = new(HomeGridX * ExteriorGrid.CellSize + 1000, 1000, 0);
     private static readonly Vector3 InTheEastCell = new(EastGridX * ExteriorGrid.CellSize + 1000, 1000, 0);
+
+    /// <summary>A point on the border between the home cell and the east cell, far from the crate.</summary>
+    private static readonly Vector3 AtTheBorder = new(EastGridX * ExteriorGrid.CellSize, 3000, 0);
+
+    private const string BorderCrateEditorId = "T_BorderCrate";
+    private const string BorderWallEditorId = "C_BorderWall";
 
     [Fact]
     public void AReplacementLeftWhereItStoodIsNotCheckedEvenNextToAWall()
@@ -250,6 +257,42 @@ public class MovedReplacementRunTests
         Assert.EndsWith(",1,0,0,0,0,1,", row);
     }
 
+    /// <summary>The crate stays where the cleaned mod put it; the step judged it and keeps it, and says so in the log and in its file.</summary>
+    [Fact]
+    public void AMovedReplacementKeptWhereTheCleanedModPutItIsJudgedForRestoringWhereItWasRemovedAndSaidSoInTheLogAndTheFile()
+    {
+        var settings = CrateSettings();
+        settings.DetailedLogAndReports = true;
+
+        var (_, run) = FixtureRun.Capture(settings, Workers, dataFolder => CreateCrateWorld(dataFolder, MovedTo, []));
+
+        Assert.Contains(run.Log, line => line.StartsWith("  Kept as changed: B_Crate [000805:Skyrim.esm]", StringComparison.Ordinal));
+        Assert.DoesNotContain(run.Log, line => line.StartsWith("Restored where the cleaned mod was removed", StringComparison.Ordinal));
+        Assert.Matches(@"^Restore where removed: \d+ pass(es)? in ", run.Log.Single(line => line.StartsWith("Restore where removed: ", StringComparison.Ordinal)));
+        var objects = Assert.Single(run.Reports, report => report.Name == ReportFileNames.RestoredWhereRemovedObjectsFileName);
+        Assert.StartsWith("formKey,editorId,base,space,cellFormKey,cellEditorId,winningMod,oldX,oldY,oldZ,undone,leftToLaterPlugins,objects,", objects.Lines[0]);
+        Assert.StartsWith("000805:Skyrim.esm,B_Crate,", Assert.Single(objects.Lines.Skip(1)));
+        Assert.Contains(",kept: ", objects.Lines[1], StringComparison.Ordinal);
+        Assert.Contains(run.Log, line => line.StartsWith("Objects judged for restoring where the cleaned mod was removed: wrote 1 rows to ", StringComparison.Ordinal));
+        Assert.DoesNotContain(run.Reports, report => report.Name == ReportFileNames.RestoredWhereRemovedCellsFileName);
+    }
+
+    [Fact]
+    public void WithTheRestoreStepSwitchedOffItPrintsAndWritesNothing()
+    {
+        var settings = CrateSettings();
+        settings.DetailedLogAndReports = true;
+        settings.Standard.RestoreWhereRemoved = new RestoreWhereRemovedSettings
+        {
+            RestoreOtherModsObjects = false, RestoreTerrain = false, RestoreCells = false, RestoreNavmeshes = false,
+        };
+
+        var (_, run) = FixtureRun.Capture(settings, Workers, dataFolder => CreateCrateWorld(dataFolder, MovedTo, []));
+
+        Assert.DoesNotContain(run.Log, line => line.Contains("Restore where removed", StringComparison.Ordinal) || line.Contains("restoring where", StringComparison.Ordinal));
+        Assert.DoesNotContain(run.Reports, report => report.Name.StartsWith("restored-where-removed", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void TheChangedAndFittedObjectsFileHasAnOwnRowForAnObjectOfTheCleanedModKeptShrunk()
     {
@@ -342,6 +385,58 @@ public class MovedReplacementRunTests
 
         Assert.IsType<Decision.Fitted>(outcome.Final.Of(ReplacementOf(outcome).Id));
         Assert.Equal(EastCellEditorId, cellOfTheWrittenCrate);
+    }
+
+    /// <summary>
+    /// The cleaned mod moved the crate into the next exterior cell, and the city mod deletes the crate's home cell, which the restore
+    /// would move it back into. With the restore where the cleaned mod was removed on or off, and with either restoring mode, the
+    /// crate is disabled in the cell it stands in instead, and the log names the deleted cell.
+    /// </summary>
+    [Theory]
+    [InlineData(false, RestoreMode.Restore)]
+    [InlineData(true, RestoreMode.Restore)]
+    [InlineData(false, RestoreMode.RestoreIfNoCollision)]
+    [InlineData(true, RestoreMode.RestoreIfNoCollision)]
+    public void AMovedObjectWhoseRestoreWouldGoIntoADeletedCellIsDisabledWhereItStands(bool restoreWhereRemoved, RestoreMode mode)
+    {
+        var (outcome, run) = RunTwoCellWorldRestoring(HomeCellEditorId, restoreWhereRemoved, mode);
+
+        var crate = ReplacementOf(outcome);
+        Assert.IsType<Decision.Removed>(outcome.Final.Of(crate.Id));
+        var cellDeleted = Assert.IsType<WhenRemoved.DisableInsteadOfRestore>(outcome.Final.WhenRemovedOf(crate.Id)).CellDeleted;
+        Assert.Equal((HomeCellEditorId, new PluginName(CityPlugin)), (cellDeleted?.Cell.EditorId, cellDeleted?.DeletedBy));
+        Assert.Contains(
+            run.Log,
+            line => line.Contains($"; not restored: the cell it would go back into, {HomeCellEditorId} [", StringComparison.Ordinal)
+                && line.Contains($"is deleted by {CityPlugin}", StringComparison.Ordinal));
+        Assert.StartsWith($"{crate.Key.ToFormKey()} in {crate.Cell!.Key.ToFormKey()} (temporary): disabled True", Assert.Single(run.Patch), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The city mod deletes the cell the cleaned mod moved the crate into. The crate is still judged and the city wall beside it in
+    /// that cell still makes it too close, but it is kept, since the patch writes nothing into a deleted cell; the log names the cell
+    /// and the plugin. The cleaned mod's own crate across the border, in the home cell, is removed for the city wall standing in the
+    /// deleted cell, and its disable is the patch's only record. With the restore where the cleaned mod was removed on or off, and
+    /// with either restoring mode.
+    /// </summary>
+    [Theory]
+    [InlineData(false, RestoreMode.Restore)]
+    [InlineData(true, RestoreMode.Restore)]
+    [InlineData(false, RestoreMode.RestoreIfNoCollision)]
+    [InlineData(true, RestoreMode.RestoreIfNoCollision)]
+    public void AMovedObjectInACellALaterPluginDeletesIsKeptAndObjectsInThatCellStillCauseRemovals(bool restoreWhereRemoved, RestoreMode mode)
+    {
+        var (outcome, run) = RunTwoCellWorldRestoring(EastCellEditorId, restoreWhereRemoved, mode, withAnOwnCrateAcrossTheBorder: true);
+
+        var crate = ReplacementOf(outcome);
+        var kept = Assert.IsType<Decision.Kept>(outcome.Final.Of(crate.Id));
+        Assert.Equal(KeepKind.CellDeleted, kept.KeepReason.Kind);
+        Assert.Equal((EastCellEditorId, new PluginName(CityPlugin)), (kept.KeepReason.CellDeleted?.Cell.EditorId, kept.KeepReason.CellDeleted?.DeletedBy));
+        Assert.Contains(run.Log, line => line.StartsWith("  Kept, in a deleted cell: B_Crate ", StringComparison.Ordinal) && line.EndsWith($": deleted by {CityPlugin}.", StringComparison.Ordinal));
+        var borderCrate = Assert.Single(outcome.Collected.Targets, target => target.EditorId == BorderCrateEditorId);
+        Assert.IsType<Decision.Removed>(outcome.Final.Of(borderCrate.Id));
+        Assert.Contains(run.Log, line => line.StartsWith($"  Removed {BorderCrateEditorId} ", StringComparison.Ordinal) && line.Contains(BorderWallEditorId, StringComparison.Ordinal));
+        Assert.StartsWith($"{borderCrate.Key.ToFormKey()} in {borderCrate.Cell!.Key.ToFormKey()} (temporary): disabled True", Assert.Single(run.Patch), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -538,11 +633,113 @@ public class MovedReplacementRunTests
         Assert.Equal(one, many);
     }
 
-    private static (RunOutcome Outcome, RunOutput Run) RunRestoring(RestoreMode mode, Func<string, IReadOnlyList<ISkyrimMod>> createLoadOrder, int workers = Workers)
+    /// <summary>
+    /// The cleaned mod sizes the crate to 1.5 as it moves it; an earlier patcher of the group carries the move and sizes it to 2. The
+    /// position goes back and the size stays the patch's, and the report names the size as left to the patch and shows it.
+    /// </summary>
+    [Fact]
+    public void ARestoreWhoseSizeAnEarlierPatcherChangedAgainReportsThatSizeAsTheNewOneAndNamesThePatch()
+    {
+        var crate = default(FormKey);
+        var (outcome, run) = RunRestoring(
+            RestoreMode.Restore,
+            dataFolder => CreateCrateWorldMovedAndSized(dataFolder, found => crate = found),
+            state => OverrideInPatch(state, crate).Scale = PatchScale);
+
+        var restored = Assert.IsType<Decision.Restored>(outcome.Final.Of(ReplacementOf(outcome).Id));
+        Assert.Equal([KeyValuePair.Create(PlacedParts.Scale, PatchName)], restored.EarlierVersion.LeftToLaterPlugins);
+        var row = Assert.Single(run.Reports, report => report.Name == ReportFileNames.RestoredFileName).Lines[1];
+        Assert.EndsWith($",{BaseGamePlugin},0,0,0,0,2,,not checked,scale ({PatchName})", row);
+    }
+
+    /// <summary>An earlier patcher of the group moved the crate again after the cleaned mod, so its position does not go back and it is removed instead.</summary>
+    [Fact]
+    public void AnObjectWhosePositionAnEarlierPatcherChangedAgainIsRemovedAndTheReasonNamesThePatch()
+    {
+        var crate = default(FormKey);
+        var (outcome, run) = RunRestoring(
+            RestoreMode.Restore,
+            dataFolder => CreateCrateWorldMovedAndSized(dataFolder, found => crate = found),
+            state => OverrideInPatch(state, crate).Placement!.Position = new P3Float(MovedTo.X, MovedTo.Y + 5, MovedTo.Z));
+
+        Assert.IsType<Decision.Removed>(outcome.Final.Of(ReplacementOf(outcome).Id));
+        var notRestored = $"; not restored: changed again by {PatchName}";
+        Assert.Contains(Assert.Single(run.Reports, report => report.Name == ReportFileNames.RemovalsFileName).Lines, line => line.Contains(notRestored, StringComparison.Ordinal));
+        Assert.Contains(run.Log, line => line.Contains(notRestored, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// The cleaned mod gives the crate another base and moves it 5 units; an earlier patcher of the group carries both and moves it
+    /// to 8 units. The base goes back and the position stays, so the log must not say the object stands where it stood before.
+    /// </summary>
+    [Fact]
+    public void AReplacedObjectWhosePositionAnEarlierPatcherMovedAgainIsLoggedAsRestoredExceptItsPosition()
+    {
+        var crate = default(FormKey);
+        var settings = CrateSettings().WithReplacedObjects(process: true, SettingDefaults.ReplacedObjectsWhenRemoved);
+        settings.DetailedLogAndReports = true;
+
+        var (outcome, run) = FixtureRun.Capture(
+            settings,
+            Workers,
+            dataFolder => CreateReplacedWorld(dataFolder, new Vector3(5, 0, 0), found => crate = found),
+            state => OverrideInPatch(state, crate).Placement!.Position = new P3Float(8, 0, 0));
+
+        var replaced = Assert.Single(outcome.Collected.Targets, target => target.Origin == TargetOrigin.Replaced);
+        var restored = Assert.IsType<Decision.Restored>(outcome.Final.Of(replaced.Id));
+        Assert.Equal([KeyValuePair.Create(PlacedParts.Position, PatchName)], restored.EarlierVersion.LeftToLaterPlugins);
+        Assert.Contains(run.Log, line => line.StartsWith("  Restored except its position, which stays as changed after Target.esp: ", StringComparison.Ordinal));
+        Assert.DoesNotContain(run.Log, line => line.Contains("Restored where it stood", StringComparison.Ordinal));
+    }
+
+    /// <summary>The cleaned mod moves the crate and sets its radius: the data goes back with the position, but the base is the same.</summary>
+    [Fact]
+    public void TheNewBaseIsEmptyWhenTheDataWentBackButTheBaseDidNotChange()
+    {
+        var (outcome, run) = RunRestoring(RestoreMode.Restore, dataFolder => CreateCrateWorldMovedAnd(dataFolder, moved => moved.Radius = CleanedModRadius));
+
+        var restored = Assert.IsType<Decision.Restored>(outcome.Final.Of(ReplacementOf(outcome).Id));
+        Assert.True(restored.EarlierVersion.Undo.HasFlag(PlacedParts.BaseAndData));
+        Assert.EndsWith(",0,0,0,0,1,,not checked,", Assert.Single(run.Reports, report => report.Name == ReportFileNames.RestoredFileName).Lines[1]);
+        Assert.EndsWith(",0,0,0,0,1,", Assert.Single(run.Reports, report => report.Name == "changed-and-fitted-objects.csv").Lines[1]);
+    }
+
+    private const float CleanedModRadius = 50f;
+    private const float CleanedModScale = 1.5f;
+    private const float PatchScale = 2f;
+    private static readonly PluginName PatchName = FixturePatcherState.PatchModKey.ToPluginName();
+
+    /// <summary>The crate world with the wall beside the new place, where the cleaned mod also sizes the crate.</summary>
+    /// <param name="crateFound">Receives the crate's key.</param>
+    private static IReadOnlyList<ISkyrimMod> CreateCrateWorldMovedAndSized(string dataFolder, Action<FormKey> crateFound) =>
+        CreateCrateWorldMovedAnd(dataFolder, moved =>
+        {
+            moved.Scale = CleanedModScale;
+            crateFound(moved.FormKey);
+        });
+
+    /// <summary>The crate world with the wall beside the new place, where the cleaned mod also changes the moved crate as given.</summary>
+    private static IReadOnlyList<ISkyrimMod> CreateCrateWorldMovedAnd(string dataFolder, Action<IPlacedObject> change)
+    {
+        var world = FillCrateWorld(CreateWorld(dataFolder), MovedTo, [NearMovedTo]);
+        change(world.Target.Mod.EnumerateMajorRecords<IPlacedObject>().Single(placed => placed.FormKey.ModKey == ModKey.FromNameAndExtension(BaseGamePlugin)));
+        return world.LoadOrder;
+    }
+
+    /// <summary>The patch's override of the record, a copy of its winning version.</summary>
+    private static IPlacedObject OverrideInPatch(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, FormKey record) =>
+        state.LinkCache.ResolveContext<IPlacedObject, IPlacedObjectGetter>(record).GetOrAddAsOverride(state.PatchMod);
+
+    /// <param name="earlierPatcherWrites">What an earlier patcher of the group wrote into the patch before the run starts; none when the patch starts empty.</param>
+    private static (RunOutcome Outcome, RunOutput Run) RunRestoring(
+        RestoreMode mode,
+        Func<string, IReadOnlyList<ISkyrimMod>> createLoadOrder,
+        Action<IPatcherState<ISkyrimMod, ISkyrimModGetter>>? earlierPatcherWrites = null,
+        int workers = Workers)
     {
         var settings = CrateSettings().WithMovedObjects(mode);
         settings.DetailedLogAndReports = true;
-        return FixtureRun.Capture(settings, workers, createLoadOrder);
+        return FixtureRun.Capture(settings, workers, createLoadOrder, earlierPatcherWrites);
     }
 
     /// <summary>A moved object that would be removed is tried shrunk or turned where the cleaned mod put it first and is then removed.</summary>
@@ -578,6 +775,20 @@ public class MovedReplacementRunTests
         var result = FixtureRun.Run(
             settings, Workers, new RecordingLogSink(), OpenMeshFiles, createLoadOrder: dataFolder => CreateCrateWorld(dataFolder, movedTo, walls), inspectPatch: inspectPatch);
         return Assert.IsType<RunResult.Done>(result).Outcome;
+    }
+
+    /// <param name="deletedByTheCityMod">The Editor ID of the cell the city mod's copy deletes.</param>
+    /// <param name="restoreWhereRemoved">Whether the restore where the cleaned mod was removed is on; off, its four switches are off.</param>
+    /// <param name="mode">How the moved crate is restored when it would be removed.</param>
+    private static (RunOutcome Outcome, RunOutput Run) RunTwoCellWorldRestoring(
+        string deletedByTheCityMod, bool restoreWhereRemoved, RestoreMode mode, bool withAnOwnCrateAcrossTheBorder = false)
+    {
+        var settings = CrateSettings().WithMovedObjects(mode);
+        settings.DetailedLogAndReports = true;
+        var restore = settings.Standard.RestoreWhereRemoved;
+        (restore.RestoreOtherModsObjects, restore.RestoreTerrain, restore.RestoreCells, restore.RestoreNavmeshes) =
+            (restoreWhereRemoved, restoreWhereRemoved, restoreWhereRemoved, restoreWhereRemoved);
+        return FixtureRun.Capture(settings, Workers, dataFolder => CreateTwoCellWorld(dataFolder, deletedByTheCityMod, withAnOwnCrateAcrossTheBorder));
     }
 
     private static void RunTwoCellWorld(Action<ISkyrimModGetter> inspectPatch) =>
@@ -675,11 +886,18 @@ public class MovedReplacementRunTests
     }
 
     /// <summary>The base game's crate in the interior, which the cleaned mod gives a building's model without moving it, and a city wall beside the building's edge.</summary>
-    private static IReadOnlyList<ISkyrimMod> CreateReplacedWorld(string dataFolder)
+    private static IReadOnlyList<ISkyrimMod> CreateReplacedWorld(string dataFolder) => CreateReplacedWorld(dataFolder, Original, _ => { });
+
+    /// <param name="replacedAt">Where the cleaned mod puts the replaced crate; within the moved distance of the original place it still counts as replaced.</param>
+    /// <param name="crateFound">Receives the crate's key.</param>
+    private static IReadOnlyList<ISkyrimMod> CreateReplacedWorld(string dataFolder, Vector3 replacedAt, Action<FormKey> crateFound)
     {
         var world = CreateWorld(dataFolder);
         var crate = world.BaseGame.Interior.Place("B_Crate", world.BaseGame.AddModeledStatic("B_CrateBase", FixtureMeshes.CrateModel), Original);
-        world.Target.Interior.PlaceCopyOf(crate).Base.SetTo(world.Target.AddModeledStatic("T_BuildingBase", FixtureMeshes.BuildingModel));
+        var replaced = world.Target.Interior.PlaceCopyOf(crate);
+        replaced.Base.SetTo(world.Target.AddModeledStatic("T_BuildingBase", FixtureMeshes.BuildingModel));
+        MoveCopy(replaced, replacedAt);
+        crateFound(replaced.FormKey);
         PlaceWalls(world.City, world.City.Interior, [Original + new Vector3(250, 0, 0)]);
         return world.LoadOrder;
     }
@@ -708,7 +926,14 @@ public class MovedReplacementRunTests
     /// The base game's crate in its own exterior cell; the cleaned mod moves it into the cell east of it, next to a city wall. The
     /// cleaned mod's own crate is in the interior, so the worldspace holds no object of its own. Each plugin holds both cells.
     /// </summary>
-    private static IReadOnlyList<ISkyrimMod> CreateTwoCellWorld(string dataFolder)
+    private static IReadOnlyList<ISkyrimMod> CreateTwoCellWorld(string dataFolder) => CreateTwoCellWorld(dataFolder, deletedByTheCityMod: null, withAnOwnCrateAcrossTheBorder: false);
+
+    /// <param name="deletedByTheCityMod">The Editor ID of the cell the city mod's copy deletes; none when it deletes none.</param>
+    /// <param name="withAnOwnCrateAcrossTheBorder">
+    /// Whether the cleaned mod also places a crate of its own in the home cell, at the border to the east cell, too close to a city
+    /// wall just across the border in the east cell.
+    /// </param>
+    private static IReadOnlyList<ISkyrimMod> CreateTwoCellWorld(string dataFolder, string? deletedByTheCityMod, bool withAnOwnCrateAcrossTheBorder)
     {
         var world = CreateWorld(dataFolder);
         var (homeKey, eastKey) = (world.BaseGame.NextKey(), world.BaseGame.NextKey());
@@ -717,6 +942,12 @@ public class MovedReplacementRunTests
         var crate = cells[world.BaseGame].Home.Place("B_Crate", world.BaseGame.AddModeledStatic("B_CrateBase", FixtureMeshes.CrateModel), InTheHomeCell);
         MoveCopy(cells[world.Target].East.PlaceCopyOf(crate), InTheEastCell);
         PlaceWalls(world.City, cells[world.City].East, [InTheEastCell + new Vector3(75, 0, 0)]);
+        if (withAnOwnCrateAcrossTheBorder)
+        {
+            cells[world.Target].Home.Place(BorderCrateEditorId, world.Target.AddModeledStatic("T_BorderCrateBase", FixtureMeshes.CrateModel), AtTheBorder - new Vector3(38, 0, 0));
+            cells[world.City].East.Place(BorderWallEditorId, world.City.AddModeledStatic("C_BorderWallBase", FixtureMeshes.PadModel), AtTheBorder + new Vector3(37, 0, 0));
+        }
+        foreach (var cell in new[] { cells[world.City].Home, cells[world.City].East }.Where(cell => cell.Record.EditorID == deletedByTheCityMod)) cell.Record.IsDeleted = true;
         return world.LoadOrder;
     }
 

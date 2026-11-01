@@ -385,6 +385,21 @@ public class OtherModsObjectsTests
         Assert.Equal(OtherModsObjectFate.LeftWonAfterPatch, outcome.Fate);
     }
 
+    /// <summary>The patch writes nothing into a deleted cell, so an object standing in one is neither pulled down nor removed.</summary>
+    [Theory]
+    [InlineData(OtherModsObjectsHandling.RemoveFloatingObject)]
+    [InlineData(OtherModsObjectsHandling.PullObjectToTheGround)]
+    public void AnObjectInACellALaterPluginDeletesIsLeftAsItIs(OtherModsObjectsHandling handling)
+    {
+        var deleted = new DeletedCell(new CellFact(new RecordKey(new PluginName("Skyrim.esm"), 0x000D00), "DeletedCell"), new PluginName("CityMod.esp"));
+        var lantern = Lantern(OtherMod, 1, OnTheTable) with { CellDeleted = deleted };
+
+        var outcome = Assert.Single(Settle(WithFloor(lantern), RemoveTable, handling).Objects);
+
+        Assert.Equal(OtherModsObjectFate.LeftInDeletedCell, outcome.Fate);
+        Assert.Equal(deleted, outcome.Object.CellDeleted);
+    }
+
     [Fact]
     public void AnObjectOnlyBesideTheTableWithNothingBelowItIsNotRestingAndIsLeftAlone()
     {

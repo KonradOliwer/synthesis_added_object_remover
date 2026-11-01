@@ -16,6 +16,7 @@ Shrink or turn objects to make them fit: Shrink down to: 80% of its size; Turn b
 Also remove what rests on removed objects: Nothing; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: KeepSupportingObject.
 Visible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 6; A direction is cleared when this much of it was removed: 80%; Remove when this share of the directions with objects is cleared: 80%; Never remove these as visible objects left behind: none.
 Invisible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 4; A direction is cleared when this much of it was removed: 50%; Remove when this share of the directions with objects is cleared: 60%; Never remove these as invisible objects left behind: none; Move kept markers out of other mods' objects: on.
+Restore where the cleaned mod was removed: other mods' objects, terrain, cell settings, navmeshes; an area 10000 units wide counts as cleared when at most 0.1% of the cleaned mod's objects there still stand, by size; terrain edges blended over 256 units.
 Detailed log and reports: on, report files go to <root>/Output/Reports.
 Only warn (don't stop) when a mod that requires the cleaned mod loads after the patch: off.
 Scanned 26 placed records in <time>: 7 Target.esp objects to check, 8 objects from other mods.
@@ -30,10 +31,10 @@ Object-shape zones: 8 candidate pairs, 8 passed the box filter, 7 mesh tests, 7 
   0 large other objects tested against every Target.esp object of their space; 0 effect-only meshes (fog, light rays, water spray) ignored.
 Found 7 of 7 Target.esp objects too close to other mods' objects in <time>, not counting the shrink or turn check before it.
 NPCs and creatures (only when stuck in the object and the object's collision stops characters): 0 placed NPCs evaluated: 0 sized by body mesh, 0 by Object Bounds, 0 by humanoid approximation, 0 sized as a point; 0 skipped because their base is no NPC; 0 NPC-object pairs tested (0 body boxes), 0 objects with an NPC stuck in them, 0 of them not counted because their collision does not stop characters.
-  Kept T_Crate_Removed [000801:Target.esp] in interior AorInterior [000800:Skyrim.esm]: 000801:Trusted.esp rests on it.
-  Kept T_Crate_NotShrunkPadOnIt [000802:Target.esp] in interior AorInterior [000800:Skyrim.esm]: 000803:Trusted.esp rests on it.
-  Kept T_Crate_NothingBelow [000803:Target.esp] in interior AorInterior [000800:Skyrim.esm]: 000805:Trusted.esp rests on it.
-  Kept T_Crate_CleanedModMaster [000806:Target.esp] in interior AorInterior [000800:Skyrim.esm]: 000801:TargetMaster.esm rests on it.
+  Kept T_Crate_Removed [000801:Target.esp] in interior AorInterior [000800:Skyrim.esm]: Removed_Pad [000801:Trusted.esp] rests on it.
+  Kept T_Crate_NotShrunkPadOnIt [000802:Target.esp] in interior AorInterior [000800:Skyrim.esm]: NotShrunkPadOnIt_Pad [000803:Trusted.esp] rests on it.
+  Kept T_Crate_NothingBelow [000803:Target.esp] in interior AorInterior [000800:Skyrim.esm]: NothingBelow_Pad [000805:Trusted.esp] rests on it.
+  Kept T_Crate_CleanedModMaster [000806:Target.esp] in interior AorInterior [000800:Skyrim.esm]: CleanedModMaster_Pad [000801:TargetMaster.esm] rests on it.
 Linked groups: 0 more objects removed with the too-close removals they are linked to.
 Linked groups: 0 more objects removed with the follow-up removals they are linked to.
 Visible objects left behind: 0 evaluated in <time>; removed 0 (0 surroundings removed); kept 0 (0 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 0 referenced).
@@ -54,10 +55,10 @@ Target.esp objects kept shrunk or turned: 1.
   Kept shrunk or turned: T_Crate_ShrunkNothingOnIt [000807:Target.esp] in interior AorInterior [000800:Skyrim.esm]; size 90 %, turned 0 degrees.
 Kept 4 objects that would have been removed, because other records depend on them, because of their own script or location ref type, or because other mods' objects rest on them.
   another mod's object rests on it: 4
-  Kept, another mod's object rests on it: T_Crate_Removed [000801:Target.esp] in interior AorInterior [000800:Skyrim.esm]: 000801:Trusted.esp.
-  Kept, another mod's object rests on it: T_Crate_NotShrunkPadOnIt [000802:Target.esp] in interior AorInterior [000800:Skyrim.esm]: 000803:Trusted.esp.
-  Kept, another mod's object rests on it: T_Crate_NothingBelow [000803:Target.esp] in interior AorInterior [000800:Skyrim.esm]: 000805:Trusted.esp.
-  Kept, another mod's object rests on it: T_Crate_CleanedModMaster [000806:Target.esp] in interior AorInterior [000800:Skyrim.esm]: 000801:TargetMaster.esm.
+  Kept, another mod's object rests on it: T_Crate_Removed [000801:Target.esp] in interior AorInterior [000800:Skyrim.esm]: Removed_Pad [000801:Trusted.esp].
+  Kept, another mod's object rests on it: T_Crate_NotShrunkPadOnIt [000802:Target.esp] in interior AorInterior [000800:Skyrim.esm]: NotShrunkPadOnIt_Pad [000803:Trusted.esp].
+  Kept, another mod's object rests on it: T_Crate_NothingBelow [000803:Target.esp] in interior AorInterior [000800:Skyrim.esm]: NothingBelow_Pad [000805:Trusted.esp].
+  Kept, another mod's object rests on it: T_Crate_CleanedModMaster [000806:Target.esp] in interior AorInterior [000800:Skyrim.esm]: CleanedModMaster_Pad [000801:TargetMaster.esm].
 Removed 2/7 (removed/all checked objects):
   AorInterior › unnamed area 2/7
 Kept 4/7 (kept/all checked objects), another mod's object rests on it:

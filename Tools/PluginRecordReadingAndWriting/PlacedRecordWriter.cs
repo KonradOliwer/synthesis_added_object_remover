@@ -5,27 +5,24 @@ using Noggog;
 
 namespace AddedObjectRemover;
 
-/// <summary>Runs write orders as overrides in the patch; records are addressed by key. Not thread-safe.</summary>
+/// <summary>Runs write orders of placed records as overrides in the patch; records are addressed by key. Not thread-safe.</summary>
 internal sealed class PlacedRecordWriter(PlacedOverrideWriter overrides, RecordHandles handles)
 {
-    public void Write(IReadOnlyList<WriteOrder> orders)
+    public void Write(WriteOrder order)
     {
-        foreach (var order in orders)
+        var location = handles.LocationOf(order.Record);
+        var cellKey = location.WinningCell.FormKey;
+        switch (order)
         {
-            var location = handles.LocationOf(order.Record);
-            var cellKey = location.WinningCell.FormKey;
-            switch (order)
-            {
-                case PlaceInCell place:
-                    overrides.MoveToCell(handles.RecordOf(order.Record), cellKey, location.InPersistentList, place.Cell.ToFormKey());
-                    break;
-                case CopyVersion:
-                    overrides.ReplaceWithCopyOf(handles.EarlierRecordOf(order.Record), cellKey, location.InPersistentList);
-                    break;
-                default:
-                    Apply(overrides.GetOrAddOverride(handles.RecordOf(order.Record), cellKey, location.InPersistentList), order);
-                    break;
-            }
+            case PlaceInCell place:
+                overrides.MoveToList(handles.RecordOf(order.Record), cellKey, location.InPersistentList, place.Cell.ToFormKey(), place.InPersistentList);
+                break;
+            case UndoPlacedParts undo:
+                overrides.UndoParts(handles.RecordOf(order.Record), handles.EarlierRecordOf(order.Record), undo.Parts, cellKey, location.InPersistentList);
+                break;
+            default:
+                Apply(overrides.GetOrAddOverride(handles.RecordOf(order.Record), cellKey, location.InPersistentList), order);
+                break;
         }
     }
 
@@ -43,6 +40,9 @@ internal sealed class PlacedRecordWriter(PlacedOverrideWriter overrides, RecordH
                 placed.Placement!.Position = ToP3Float(set.Position);
                 placed.Placement.Rotation = ToP3Float(set.Rotation);
                 placed.Scale = set.Scale;
+                break;
+            case ClearNavDoorLink:
+                ((IPlacedObject)placed).NavigationDoorLink = null;
                 break;
             case SetEnableParent set:
                 placed.EnableParent = new EnableParent

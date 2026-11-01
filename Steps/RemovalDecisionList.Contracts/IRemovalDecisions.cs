@@ -14,6 +14,9 @@ public interface IRemovalDecisions
 
     bool IsDecided(TargetId id);
 
+    /// <summary>What a round that removes the object does with it.</summary>
+    WhenRemoved WhenRemovedOf(TargetId id);
+
     /// <summary>Whether an also-remove round may still decide the object: it is undecided, or kept shrunk or turned where it stands.</summary>
     bool MayStillBeRemoved(TargetId id);
 

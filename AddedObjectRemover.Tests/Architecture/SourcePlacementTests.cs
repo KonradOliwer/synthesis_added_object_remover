@@ -37,6 +37,17 @@ public class SourcePlacementTests
     {
         ["Tools/PluginRecordReadingAndWriting/LinkReader.cs"] = "An enable parent is a link; the link reader names its relation.",
         ["Tools/PluginRecordReadingAndWriting/PlacedRecordWriter.cs"] = "Writes the enable parent a removal sets.",
+        ["Tools/PluginRecordReadingAndWriting/PlacedRecordParts.cs"] = "Compares and copies the presence flags with the enable parent as one part of the record; it decides nothing about whether the game has it.",
+        ["Tools/PluginRecordReadingAndWriting/PlacedOverrideWriter.cs"] = "Writes a deleted record back whole when its presence part goes back; it decides nothing about whether the game has it.",
+        ["Steps/BuildLogAndReports/Tables.Restored.cs"] = "Names the presence part in the report; it decides nothing about whether the game has the record.",
+        ["Steps/BuildLogAndReports/RestoreOutcomes.cs"] = "Words a restored record as shown or hidden again when its presence part goes back; it decides nothing about whether the game has the record.",
+        ["Tools/PluginRecordReadingAndWriting/NavmeshPartHistory.cs"] = "Judges a navmesh's Deleted flag, not a placed record's presence.",
+        ["Tools/PluginRecordReadingAndWriting/NavmeshVersionCollector.cs"] = "Reads the judged Deleted flag of a navmesh, not a placed record's presence.",
+        ["Steps/RestoreWhereRemoved/NavmeshUndoPlan.cs"] = "Reads the judged Deleted flag of a navmesh, not a placed record's presence.",
+        ["Steps/RestoreWhereRemoved/NavmeshGroupGuards.cs"] = "Reads the judged Deleted flag of a navmesh, and whether a later plugin changed a linked door's presence part; it decides nothing about whether the game has the door.",
+        ["Steps/RestoreWhereRemoved/FinalPresence.cs"] = "Reads whether a restore brings back a record's presence part; whether the game has a version comes from the collector's presence rule, which it follows along the enable parents.",
+        ["Steps/CollectPlacedObjects.Contracts/EarlierVersion.cs"] = "Reads whether a restore brings back the presence part, which puts the record back into its earlier child list; it decides nothing about whether the game has the record.",
+        ["Steps/RestoreWhereRemoved/DoorLinks.cs"] ="Reads whether a door's restore brings back its presence part, which its navmesh link goes back with; it decides nothing about whether the game has the door.",
     };
 
     private static readonly string[] ParallelismApis = ["Parallel.", "AsParallel", "Partitioner", "Task.Run", "new Thread("];
@@ -70,7 +81,7 @@ public class SourcePlacementTests
     public void OnlyThePatchWritingOverridesRecordsIntoThePatch() =>
         PlacementCheck.AssertUsedOnlyIn(
             file => Regex.IsMatch(file.Code, @"\bGetOrAddAsOverride\b|\bI?SkyrimMod\??\s+[A-Za-z_]"),
-            ["Tools/PluginRecordReadingAndWriting/PatchWriting.cs", "Tools/PluginRecordReadingAndWriting/PlacedOverrideWriter.cs"]);
+            ["Tools/PluginRecordReadingAndWriting/PatchWriting.cs", "Tools/PluginRecordReadingAndWriting/CellOverrides.cs", "Tools/PluginRecordReadingAndWriting/NavmeshMapWriter.cs"]);
 
     /// <summary>
     /// Whether the game has a placed record is decided once, by the collector's presence rule, from the presence facts the

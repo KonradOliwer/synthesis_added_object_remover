@@ -26,6 +26,10 @@ public static class TerrainGrid
         }
     }
 
+    /// <summary>The corner vertices of every terrain square the box overlaps seen from above, listed as for a rectangle.</summary>
+    public static IEnumerable<CellVertices> VerticesUnder(Box area) =>
+        VerticesUnder((new Vector2(area.Min.X, area.Min.Y), new Vector2(area.Max.X, area.Max.Y)));
+
     /// <returns>The first and last square index (counted from the world origin) the interval overlaps; a zero-width interval overlaps the square it starts in.</returns>
     private static (int First, int Last) SquareRange(float min, float max)
     {

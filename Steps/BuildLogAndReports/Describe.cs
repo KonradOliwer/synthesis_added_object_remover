@@ -58,6 +58,9 @@ internal static class Describe
 
     public static string Cell(CellFact cell) => RecordLabels.Of(cell.Key, cell.EditorId);
 
+    /// <summary>E.g. "its cell Cell [...] is deleted by CityMod.esp".</summary>
+    public static string DeletedCell(DeletedCell deleted) => $"its cell {Cell(deleted.Cell)} is deleted by {deleted.DeletedBy}";
+
     /// <summary>Empty for an interior, whose cell is the space itself.</summary>
     public static string CellOrEmpty(TargetObject target) => target.Cell is { } cell ? Cell(cell) : string.Empty;
 
@@ -74,6 +77,40 @@ internal static class Describe
         PointReasonKind.NoBodyMeshNoBoundsNotPlayable =>
             $"no body mesh for race {RecordLabels.Of(reason.Race, reason.RaceEditorId)}, no Object Bounds, race not playable",
         _ => throw new UnreachableException($"Unknown point reason {reason.Kind}."),
+    };
+
+    /// <summary>Why the object left its place, and, for another mod's object disabled although its mode restores it, why it was not restored.</summary>
+    /// <param name="final">The decisions, which tell a target object the reason names as taken from its place, restored or removed.</param>
+    public static string LeftItsPlaceReason(CollectedObjects world, ObjectWithReason removal, IRemovalDecisions final) =>
+        RemovalReason(world, removal, final) + NotRestoredReason(world, removal.TargetIndex, final);
+
+    /// <summary>Between the parts left to one plugin and those left to the next.</summary>
+    private const string PluginGroupSeparator = "; ";
+
+    /// <summary>
+    /// E.g. "rotation, scale (Later.esp); position (Other.esp)": the parts of a record that a later plugin changed again, each group
+    /// with the last plugin that did, in the order of each plugin's first part.
+    /// </summary>
+    public static string PartsByPlugin(IEnumerable<(string Part, PluginName Plugin)> parts) =>
+        string.Join(
+            PluginGroupSeparator,
+            parts.GroupBy(left => left.Plugin).Select(byPlugin => $"{string.Join(ListSeparator, byPlugin.Select(left => left.Part))} ({byPlugin.Key})"));
+
+    /// <summary>"; not restored: changed again by Later.esp" for another mod's object disabled although its mode restores it; nothing for any other object.</summary>
+    private static string NotRestoredReason(CollectedObjects world, int targetIndex, IRemovalDecisions final) =>
+        final.WhenRemovedOf(new TargetId(targetIndex)) switch
+        {
+            WhenRemoved.DisableInsteadOfRestore { CellDeleted: { } deleted } => $"; not restored: the cell it would go back into, {Cell(deleted.Cell)}, is deleted by {deleted.DeletedBy}",
+            WhenRemoved.DisableInsteadOfRestore { ChangedLaterBy: { } later } => $"; not restored: changed again by {later}",
+            WhenRemoved.DisableInsteadOfRestore => $"; not restored: its {ShownChange(world.Targets[targetIndex].Origin)} does not go back",
+            _ => string.Empty,
+        };
+
+    private static string ShownChange(TargetOrigin origin) => origin switch
+    {
+        TargetOrigin.Moved => "position",
+        TargetOrigin.Replaced => "base object",
+        _ => throw new UnreachableException($"Unknown changed-object origin {origin}."),
     };
 
     /// <param name="final">The decisions, which tell a target object the reason names as taken from its place, restored or removed.</param>

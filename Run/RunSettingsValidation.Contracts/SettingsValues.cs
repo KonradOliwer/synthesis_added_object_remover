@@ -3,6 +3,7 @@ using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover;
@@ -34,6 +35,7 @@ public interface ISettingsValues
     IFollowUpSettingsValues FollowUpRemoval { get; }
     IVisibleLeftoverSettingsValues LeftoverVisibleObjects { get; }
     ILeftoverSettingsValues LeftoverInvisibleObjects { get; }
+    IRestoreWhereRemovedSettingsValues RestoreWhereRemoved { get; }
 }
 
 /// <summary>How other mods' objects the cleaned mod changed are checked, and what happens when one would be removed.</summary>
@@ -144,4 +146,21 @@ public interface ILeftoverSettingsValues
     ISurroundingObjectsSettingsValues SurroundingObjects { get; }
     IReadOnlyList<InvisibleObjectKind> NeverRemove { get; }
     bool MoveKeptMarkersOutOfOtherModsObjects { get; }
+}
+
+public interface IRestoreWhereRemovedSettingsValues
+{
+    bool RestoreOtherModsObjects { get; }
+    bool RestoreTerrain { get; }
+    bool RestoreCells { get; }
+    bool RestoreNavmeshes { get; }
+    IClearedAreaSettingsValues ClearedArea { get; }
+    float TerrainEdgeBlendDistanceInUnits { get; }
+}
+
+public interface IClearedAreaSettingsValues
+{
+    float SearchRadius { get; }
+    float MaxStandingPercent { get; }
+    ClearedAreaMeasure Measure { get; }
 }

@@ -16,7 +16,8 @@ internal sealed record WeightsBefore(Dictionary<OtherId, float> WeightOf);
 /// or turned at their new placement, and the objects already found left without support taken away.
 /// The rounds start from the changed targets; each round judges the judged objects whose box comes within the gap of a supporter
 /// changed in the round before, against the world after that round, so the result does not depend on order. An object the patch
-/// cannot change stays as it is, and so, with RemoveFloatingObject, does one that may not be removed; both keep holding up others.
+/// cannot change (a later plugin wins it, or it stands in a cell the final world deletes) stays as it is, and so, with
+/// RemoveFloatingObject, does one that may not be removed; both keep holding up others.
 /// Pulling then moves the objects one by one, lowest first, each onto what is below it with the objects pulled before at their new
 /// place, so a stack lands from the bottom up.
 /// </summary>
@@ -97,6 +98,7 @@ internal sealed class LeftWithoutSupport(
     private bool Decide(OtherObject other, float lostShare, Progress progress)
     {
         if (!rules.PatchCanChange(other)) return Leave(other, OtherModsObjectFate.LeftWonAfterPatch, lostShare, ReferenceRoles.None, progress);
+        if (other.CellDeleted is not null) return Leave(other, OtherModsObjectFate.LeftInDeletedCell, lostShare, ReferenceRoles.None, progress);
         if (settings.Handling == OtherModsObjectsHandling.PullObjectToTheGround) return TakeAwayToPull(other, lostShare, progress);
         return OtherModsObjectRules.RemovalBlockers(other) is var blockers and not ReferenceRoles.None
             ? Leave(other, OtherModsObjectFate.LeftNotRemovable, lostShare, blockers, progress)

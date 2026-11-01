@@ -3,6 +3,7 @@ using AddedObjectRemover.Caches.BaseObjectShapeAndKind;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;
+using Mutagen.Bethesda.Plugins.Cache;
 using Mutagen.Bethesda.Skyrim;
 using NiflySharp.Enums;
 
@@ -10,7 +11,9 @@ namespace AddedObjectRemover.Tests.Fixtures;
 
 /// <summary>A static base object whose model is a loose mesh of the given triangles.</summary>
 /// <param name="Collision">The layer of the mesh's collision rigid body; null for a mesh without collision.</param>
-internal sealed record TestStatic(FormKey FormKey, string Model, IReadOnlyList<MeshTriangle> Triangles, SkyrimLayer? Collision = null)
+/// <param name="Bounds">The record's object bounds, whole units; null for none set.</param>
+/// <param name="IsMarker">The record carries the engine's IsMarker flag.</param>
+internal sealed record TestStatic(FormKey FormKey, string Model, IReadOnlyList<MeshTriangle> Triangles, SkyrimLayer? Collision = null, Box? Bounds = null, bool IsMarker = false)
 {
     public BaseKey Base => new(FormKey.ToRecordKey(), BaseLinkKind.PlaceableObject);
 }
@@ -31,20 +34,25 @@ internal static class TestShapes
         var mod = skyrimMod.ModKey;
         foreach (var model in statics)
         {
-            skyrimMod.Statics.Add(new Static(model.FormKey, SkyrimRelease.SkyrimSE) { Model = new Model { File = model.Model } });
+            var record = new Static(model.FormKey, SkyrimRelease.SkyrimSE) { Model = new Model { File = model.Model } };
+            if (model.Bounds is { } bounds) record.ObjectBounds = new ObjectBounds { First = Corner(bounds.Min), Second = Corner(bounds.Max) };
+            if (model.IsMarker) record.MajorFlags |= Static.MajorFlag.IsMarker;
+            skyrimMod.Statics.Add(record);
         }
 
         var dataPath = Path.Combine(AppContext.BaseDirectory, dataFolderName);
         foreach (var model in statics) WriteMesh(dataPath, model.Model, model.Triangles, model.Collision);
 
-        return Catalog(TestBaseFacts.Reader(skyrimMod.ToImmutableLinkCache()), dataPath, mod);
+        return Catalog(skyrimMod.ToImmutableLinkCache(), dataPath, mod);
     }
 
-    /// <summary>A catalog over the loose meshes in a Data folder, reading them through the real mesh reader.</summary>
-    public static IBaseObjectShapes Catalog(IBaseFacts bases, string dataPath, ModKey mod)
+    private static Noggog.P3Int16 Corner(Vector3 corner) => new((short)corner.X, (short)corner.Y, (short)corner.Z);
+
+    /// <summary>A catalog over the records of the link cache and the loose meshes in a Data folder, reading them through the real readers.</summary>
+    public static IBaseObjectShapes Catalog(ILinkCache linkCache, string dataPath, ModKey mod)
     {
         var meshFiles = new MeshFilesFactory(dataPath, GameRelease.SkyrimSE, [mod]).Open(BaseObjectShapes.SolidShapes, new UnexpectedErrors());
-        var shapes = new BaseObjectShapes(bases, meshFiles);
+        var shapes = new BaseObjectShapes(TestBaseFacts.Reader(linkCache), meshFiles, CollisionLayerReader.Read(linkCache));
         MeshFilesOfCatalog.Add(shapes, meshFiles);
         return shapes;
     }
@@ -61,12 +69,12 @@ internal static class TestShapes
         new(new OtherId(index), new FormKey(mod, 0x900 + (uint)index).ToRecordKey(), TestTargets.Space, mod.ToPluginName(), EditorId: null, baseKey, position, new Vector3(0, 0, zRadians), 1f,
             IsPrimitive: false, HasMapMarker: false, new ObjectChange(mod.ToPluginName(), AcceptedFrom: null), ReferenceRoles.None, ChangeWithoutCleanedMod: null);
 
-    /// <summary>Writes a loose NIF of the triangles at the model path under the Data folder.</summary>
+    /// <summary>Writes a loose NIF of the triangles at the model path under the Data folder; without triangles it holds no shape to render.</summary>
     /// <param name="collision">The layer of a collision rigid body on the root node; null for none.</param>
     public static void WriteMesh(string dataPath, string model, IReadOnlyList<MeshTriangle> triangles, SkyrimLayer? collision = null)
     {
         var nif = TestNifs.CreateWithRoot();
-        TestNifs.AddShape(nif, TestNifs.Root(nif), triangles);
+        if (triangles.Count > 0) TestNifs.AddShape(nif, TestNifs.Root(nif), triangles);
         if (collision is { } layer) TestNifs.AddRigidBodyCollision(nif, TestNifs.Root(nif), layer);
         var meshPath = Path.Combine(dataPath, MeshFileSource.NormalizeMeshPath(model).Replace('\\', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(Path.GetDirectoryName(meshPath)!);

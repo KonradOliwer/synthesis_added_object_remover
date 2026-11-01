@@ -13,12 +13,8 @@ internal sealed class TerrainDifference(ChangedTerrainSettings settings)
     /// <remarks>
     /// A version without heights next to one with heights differs. The tolerance applies whether height changes are counted or not.
     /// </remarks>
-    public bool HeightDiffersAt(ComparedVersion one, ComparedVersion other, int vertex) => (one.Heights, other.Heights) switch
-    {
-        (null, null) => false,
-        ({ } oneHeights, { } otherHeights) => MathF.Abs(otherHeights[vertex] - oneHeights[vertex]) > settings.HeightTolerance,
-        _ => true,
-    };
+    public bool HeightDiffersAt(ComparedVersion one, ComparedVersion other, int vertex) =>
+        HeightGridComparison.DiffersAt(one.Heights, other.Heights, vertex, settings.HeightTolerance);
 
     /// <remarks>Never true when terrain type changes are not counted: the versions then hold no types.</remarks>
     public bool TypeDiffersAt(ComparedVersion one, ComparedVersion other, int vertex) =>

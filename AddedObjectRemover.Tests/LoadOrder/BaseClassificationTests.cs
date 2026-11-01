@@ -127,6 +127,6 @@ public class BaseClassificationTests
         });
         mod.AcousticSpaces.Add(new AcousticSpace(AcousticSpaceBase, SkyrimRelease.SkyrimSE));
 
-        return TestShapes.Catalog(TestBaseFacts.Reader(mod.ToImmutableLinkCache()), Path.GetTempPath(), Mod);
+        return TestShapes.Catalog(mod.ToImmutableLinkCache(), Path.GetTempPath(), Mod);
     }
 }

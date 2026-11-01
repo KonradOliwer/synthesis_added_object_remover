@@ -149,14 +149,14 @@ public sealed class ChainEqualsBatchTests : IDisposable
     /// <summary>
     /// The base game puts a crate at A in the interior, the first mod moves it to B, the second mod (loading after it, not needing
     /// it) moves it to C, and a city mod puts a wall beside B and beside C. The crate stands too close to the wall at C and, once
-    /// the second mod's run wrote it to B, at B. Each run restores it to the version just below its own cleaned mod: the second
-    /// mod's run to B, the first mod's run to A. When the first mod runs first, the second mod wins the crate and the first mod's
-    /// run has nothing to restore; the second mod's run then restores it to B. When the second mod runs first, the first mod's run
-    /// judges the patch's crate at B against the base game's at A. The wall stood at B without either mod, so it is no collision.
+    /// the second mod's run wrote it to B, at B. The second mod's run restores it to the version just below its own cleaned mod, B.
+    /// When the first mod runs first, the second mod wins the crate and the first mod's run has nothing to restore. When the second
+    /// mod runs first, the first mod's run finds the crate where the patch put it, which is where the first mod put it: the position
+    /// the first mod set stands again, so it goes back to the base game's place A.
     /// </summary>
     [Theory]
     [MemberData(nameof(MovedCrateCases))]
-    public void ChainedStandardRunsGiveTheResultOfOneBatchRunWhenBothModsMovedTheSameObjectAndEachRunRestoresItToTheVersionBelowItsOwnCleanedMod(
+    public void ChainedStandardRunsGiveTheResultOfOneBatchRunWhenBothModsMovedTheSameObjectAndTheFirstModsRunPutsItBackAtTheBaseGamesPlace(
         bool secondModFirst, RestoreMode mode, int workers)
     {
         var world = CreateWorld(_dataFolder, withPluginBelowPatch: false, withMovedCrate: true) with { WhenMovedObjectsAreRemoved = mode };
@@ -167,11 +167,11 @@ public sealed class ChainEqualsBatchTests : IDisposable
 
         AssertChainEqualsBatch(order, chain, batch);
         var crate = LineOf(batch.Patch, world.MovedCrate!.Value);
-        Assert.Contains(RestoredAt(secondModFirst ? CrateInBaseGame : CrateInFirstMod), crate);
         Assert.Contains(KeptLineMark, crate);
+        Assert.Contains(PositionText(secondModFirst ? CrateInBaseGame : CrateInFirstMod), crate);
     }
 
-    private static string RestoredAt(Vector3 position) =>
+    private static string PositionText(Vector3 position) =>
         FormattableString.Invariant($"position ({position.X:F2}, {position.Y:F2}, {position.Z:F2})");
 
     private static void AssertChainEqualsBatch(IReadOnlyList<Config> order, IReadOnlyList<StandardRun> chain, BatchRun batch)

@@ -12,7 +12,8 @@ internal sealed class FailingHomeCellPlugin(IPluginRecords inner) : IPluginRecor
 
     public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk) => inner.ReadPlacedRecords(scope, stopsTheWalk);
 
-    public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets) => inner.ReadLinks(target, targets);
+    public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets, IReadOnlySet<PluginName> linkedPlugins) =>
+        inner.ReadLinks(target, targets, linkedPlugins);
 
     public IWritableRecords ReadWritableRecords() => inner.ReadWritableRecords();
 
@@ -22,6 +23,8 @@ internal sealed class FailingHomeCellPlugin(IPluginRecords inner) : IPluginRecor
 
     public float[]? ReadTerrain(ExteriorCell cell) => inner.ReadTerrain(cell);
 
+    public float[]? ReadTerrainBelowTarget(ExteriorCell cell) => inner.ReadTerrainBelowTarget(cell);
+
     public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => inner.ReadTerrainVersions(cell);
 
     public WaterCopies ReadWaterCopies(ExteriorCell cell) => inner.ReadWaterCopies(cell);
@@ -29,7 +32,7 @@ internal sealed class FailingHomeCellPlugin(IPluginRecords inner) : IPluginRecor
 
     public RecordKey? FindLandWorldspace(RecordKey space) => inner.FindLandWorldspace(space);
 
-    public MeshTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => inner.ReadNavmeshes(bucket);
+    public NavmeshWorldTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => inner.ReadNavmeshes(bucket);
 
     public NpcTraits? NpcTraitsOf(BaseKey npc) => inner.NpcTraitsOf(npc);
 

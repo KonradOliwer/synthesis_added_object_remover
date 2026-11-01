@@ -607,7 +607,7 @@ public class RemovalDecisionsTests
         var earlierBase = new BaseKey(new RecordKey(new PluginName("Earlier.esp"), 0x301), BaseLinkKind.PlaceableObject);
         var targets = TestTargets.CreateMany(TargetCount);
         targets[10] = targets[10] with { Base = cleanedModsBase };
-        var wholeRecord = Earlier with { Base = earlierBase, RestoresWholeRecord = true };
+        var wholeRecord = Earlier with { Base = earlierBase, Undo = Earlier.Undo | PlacedParts.BaseAndData };
         var start = RemovalDecisions.Start(
             Protection(references: null),
             [.. Enumerable.Range(0, TargetCount).Select(index => index == 10 ? (WhenRemoved)new WhenRemoved.Restore(wholeRecord) : new WhenRemoved.Disable())]);
@@ -624,14 +624,14 @@ public class RemovalDecisionsTests
     public void AWholeRecordRestoreStandsWithTheReferenceFactsOfTheEarlierVersionAndAPlacementOnlyRestoreKeepsTheCleanedModsOwn()
     {
         var target = TestTargets.Create(0, TestTargets.At(Vector3.Zero));
-        var reference = new ReferenceFacts(IsTeleportDoor: true, IsPrimitive: true, HasMapMarker: true, ReferenceRadius: 8f, PrimitiveBounds: new Vector3(1, 2, 3));
+        var reference = new ReferenceFacts(IsTeleportDoor: true, IsPrimitive: true, HasMapMarker: true, ReferenceRadius: 8f, PrimitiveBounds: new Vector3(1, 2, 3), CollisionLayer: 12, IsCullingVolume: true);
 
-        var wholeRecord = target.RestoredAs(Earlier with { RestoresWholeRecord = true, Reference = reference });
+        var wholeRecord = target.RestoredAs(Earlier with { Undo = Earlier.Undo | PlacedParts.BaseAndData, Reference = reference });
         var placementOnly = target.RestoredAs(Earlier with { Reference = reference });
 
         Assert.Equal(
-            (true, true, true, (float?)8f, (Vector3?)new Vector3(1, 2, 3)),
-            (wholeRecord.IsTeleportDoor, wholeRecord.IsPrimitive, wholeRecord.HasMapMarker, wholeRecord.ReferenceRadius, wholeRecord.PrimitiveBounds));
+            (true, true, true, (float?)8f, (Vector3?)new Vector3(1, 2, 3), (uint?)12, true),
+            (wholeRecord.IsTeleportDoor, wholeRecord.IsPrimitive, wholeRecord.HasMapMarker, wholeRecord.ReferenceRadius, wholeRecord.PrimitiveBounds, wholeRecord.CollisionLayer, wholeRecord.IsCullingVolume));
         Assert.Equal(target.PlacedAt(Earlier.Placement), placementOnly);
     }
 

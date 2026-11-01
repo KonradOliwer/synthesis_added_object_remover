@@ -4,19 +4,17 @@ using Mutagen.Bethesda.Skyrim;
 namespace AddedObjectRemover;
 
 /// <summary>
-/// Gives the patch's override of a target placed record, creating it on first use, and keeps it in one cell: it never holds the
-/// record twice. Not thread-safe.
+/// Gives the patch's override of a target placed record, creating it on first use, and keeps it in one child list: it never holds
+/// the record twice. Not thread-safe.
 /// </summary>
-internal sealed class PlacedOverrideWriter(SynthesisWriteCache synthesis, ISkyrimMod patchMod)
+/// <param name="parts">The table a part is copied through.</param>
+internal sealed class PlacedOverrideWriter(CellOverrides cells, PlacedRecordParts parts)
 {
-    /// <summary>The patch's cell overrides this writer gave out, by cell FormKey.</summary>
-    private readonly Dictionary<FormKey, ICell> _cells = [];
-
     /// <summary>Per overridden child list (by reference): its records by FormKey.</summary>
     private readonly Dictionary<object, Dictionary<FormKey, IPlaced>> _placedByList = new(ReferenceEqualityComparer.Instance);
 
-    /// <summary>The cell each record this writer moved now stands in, in its temporary children.</summary>
-    private readonly Dictionary<FormKey, FormKey> _cellOfMoved = [];
+    /// <summary>The child list each record this writer moved now stands in.</summary>
+    private readonly Dictionary<FormKey, (FormKey Cell, bool InPersistentList)> _listOfMoved = [];
 
     /// <summary>
     /// Mirrors Mutagen's placed-record context: override the cell (without its children), then add a copy of the
@@ -30,45 +28,73 @@ internal sealed class PlacedOverrideWriter(SynthesisWriteCache synthesis, ISkyri
     }
 
     /// <summary>
-    /// The record stands in the temporary children of <paramref name="toCellKey"/> and nowhere else in the patch. The cell it
-    /// leaves is not overridden for it: only a copy that cell already holds in the patch, in the list the record was found in, is
-    /// taken out.
+    /// The record stands in the given child list of <paramref name="toCellKey"/> and nowhere else in the patch, with its Persistent
+    /// flag following that list. The cell it leaves is not overridden for it: only a copy that cell already holds in the patch, in
+    /// the list the record was found in, is taken out.
     /// </summary>
     /// <param name="fromCellKey">The cell the record was found in.</param>
     /// <param name="fromPersistentList">Whether the record was found in the persistent children of that cell.</param>
-    public void MoveToCell(IPlacedGetter record, FormKey fromCellKey, bool fromPersistentList, FormKey toCellKey)
+    public void MoveToList(IPlacedGetter record, FormKey fromCellKey, bool fromPersistentList, FormKey toCellKey, bool toPersistentList)
     {
-        if (_cellOfMoved.ContainsKey(record.FormKey))
-            throw new InvalidOperationException($"Record {record.FormKey} was already moved to another cell by this writer.");
-        var held = PatchHoldsCell(fromCellKey) ? TakeOutOfList(record.FormKey, fromCellKey, fromPersistentList) : null;
-        var (list, byKey) = ChildListOf(toCellKey, inPersistentList: false);
-        Add(list, byKey, held ?? (IPlaced)record.DeepCopy());
-        _cellOfMoved[record.FormKey] = toCellKey;
+        if (_listOfMoved.ContainsKey(record.FormKey))
+            throw new InvalidOperationException($"Record {record.FormKey} was already moved to another list by this writer.");
+        var held = cells.PatchHolds(fromCellKey) ? TakeOutOfList(record.FormKey, fromCellKey, fromPersistentList) : null;
+        var (list, byKey) = ChildListOf(toCellKey, toPersistentList);
+        var moved = held ?? (IPlaced)record.DeepCopy();
+        moved.SetPersistent(toPersistentList);
+        Add(list, byKey, moved);
+        _listOfMoved[record.FormKey] = (toCellKey, toPersistentList);
+    }
+
+    /// <summary>
+    /// The patch's record takes, in each of <paramref name="undone"/>, the values of <paramref name="earlier"/>; every other part keeps
+    /// the value of the record the game shows now. A deleted record whose presence goes back becomes a whole copy of
+    /// <paramref name="earlier"/>, because deleting dropped its fields, except for its door link: a door link goes back only with
+    /// its navmesh, so unless it is undone the copy keeps the deleted record's.
+    /// </summary>
+    /// <param name="cellKey">The cell the record was found in.</param>
+    public void UndoParts(IPlacedGetter record, IPlacedGetter earlier, PlacedParts undone, FormKey cellKey, bool inPersistentList)
+    {
+        if (record.IsDeleted && undone.HasFlag(PlacedParts.Presence))
+        {
+            var copy = ReplaceWithCopyOf(earlier, cellKey, inPersistentList);
+            if (!undone.HasFlag(PlacedParts.NavDoorLink)) parts.NavDoorLink.CopyInto(copy, record);
+            return;
+        }
+        var placed = GetOrAddOverride(record, cellKey, inPersistentList);
+        foreach (var (part, compare) in parts.Parts.Where(entry => undone.HasFlag(entry.Part)))
+        {
+            if (!RawByteFormat.AllowsCopy(compare, earlier, placed))
+                throw new InvalidOperationException($"Part {part} of record {record.FormKey} holds bytes of another record format and cannot go back.");
+            compare.CopyInto(placed, earlier);
+        }
     }
 
     /// <summary>
     /// The patch's record becomes a copy of <paramref name="version"/>, in the child list it stands in. The copy's Persistent flag
     /// follows that list, so the flag and the list agree whatever the version had.
     /// </summary>
-    public void ReplaceWithCopyOf(IPlacedGetter version, FormKey cellKey, bool inPersistentList)
+    private IPlaced ReplaceWithCopyOf(IPlacedGetter version, FormKey cellKey, bool inPersistentList)
     {
         var persistent = StandsInPersistentList(version.FormKey, inPersistentList);
         var (list, byKey) = ChildListOfRecord(version.FormKey, cellKey, inPersistentList);
         if (byKey.Remove(version.FormKey, out var replaced)) list.Remove(replaced);
         var copy = (IPlaced)version.DeepCopy();
         copy.SetPersistent(persistent);
-        Add(list, byKey, copy);
+        return Add(list, byKey, copy);
     }
 
     private (IList<IPlaced> List, Dictionary<FormKey, IPlaced> ByKey) ChildListOfRecord(FormKey record, FormKey foundInCellKey, bool foundInPersistentList) =>
-        _cellOfMoved.TryGetValue(record, out var movedTo) ? ChildListOf(movedTo, inPersistentList: false) : ChildListOf(foundInCellKey, foundInPersistentList);
+        _listOfMoved.TryGetValue(record, out var movedTo)
+            ? ChildListOf(movedTo.Cell, movedTo.InPersistentList)
+            : ChildListOf(foundInCellKey, foundInPersistentList);
 
     private bool StandsInPersistentList(FormKey record, bool foundInPersistentList) =>
-        !_cellOfMoved.ContainsKey(record) && foundInPersistentList;
+        _listOfMoved.TryGetValue(record, out var movedTo) ? movedTo.InPersistentList : foundInPersistentList;
 
     private (IList<IPlaced> List, Dictionary<FormKey, IPlaced> ByKey) ChildListOf(FormKey cellKey, bool inPersistentList)
     {
-        var cell = GetOrAddCellOverride(cellKey);
+        var cell = cells.GetOrAdd(cellKey);
         IList<IPlaced> list = inPersistentList ? cell.Persistent : cell.Temporary;
         if (!_placedByList.TryGetValue(list, out var byKey))
         {
@@ -92,20 +118,5 @@ internal sealed class PlacedOverrideWriter(SynthesisWriteCache synthesis, ISkyri
         if (!byKey.Remove(record, out var held)) return null;
         list.Remove(held);
         return held;
-    }
-
-    private bool PatchHoldsCell(FormKey cellKey) =>
-        _cells.ContainsKey(cellKey) || (synthesis.Cache.TryResolveContext<ICell, ICellGetter>(cellKey, out var context) && context.ModKey == patchMod.ModKey);
-
-    /// <remarks>
-    /// The cell's context comes from the Synthesis cache, so an exterior cell's worldspace is copied from a plugin above the patch,
-    /// and a cell copy an earlier run wrote is reused.
-    /// </remarks>
-    private ICell GetOrAddCellOverride(FormKey cellKey)
-    {
-        if (_cells.TryGetValue(cellKey, out var cell)) return cell;
-        cell = synthesis.Cache.ResolveContext<ICell, ICellGetter>(cellKey).GetOrAddAsOverride(patchMod);
-        _cells[cellKey] = cell;
-        return cell;
     }
 }

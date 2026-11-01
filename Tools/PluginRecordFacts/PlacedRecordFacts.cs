@@ -17,6 +17,12 @@ namespace AddedObjectRemover;
 /// <paramref name="TerrainVersions"/>, <paramref name="TerrainLayers"/> and <paramref name="Water"/> are asked for only to check records the
 /// target plugin overrides: they are skipped when it overrides no placed record of another plugin.
 /// </param>
+/// <param name="PartTolerances">The gaps that are no change when the parts of a record the target plugin overrides are compared (<see cref="PlacedRecordFact.CleanedModChanges"/>).</param>
+/// <param name="AreaRecordVersions">
+/// Also judge, part by part, the cell and LAND records of other plugins that the target plugin overrides, as far as asked for, and
+/// the navmeshes of the target spaces it overrides, deletes or adds (<see cref="PlacedRecordFacts.ChangedCells"/>,
+/// <see cref="PlacedRecordFacts.ChangedLands"/>, <see cref="PlacedRecordFacts.ChangedNavmeshes"/>); null when not asked for.
+/// </param>
 public sealed record PlacedReadScope(
     PluginName Target,
     bool Terrain,
@@ -25,7 +31,18 @@ public sealed record PlacedReadScope(
     bool TerrainLayers,
     bool Water,
     RecordKey HoldKeyword,
-    bool TerrainReadsNeedAnOverride);
+    bool TerrainReadsNeedAnOverride,
+    PlacedPartTolerances PartTolerances,
+    AreaRecordReads? AreaRecordVersions);
+
+/// <summary>The largest gap per value of a placed record that is no change: rounding by plugins that re-save a record.</summary>
+/// <param name="Position">Per axis, in game units.</param>
+/// <param name="Rotation">Per axis, in radians.</param>
+public readonly record struct PlacedPartTolerances(float Position, float Rotation, float Scale)
+{
+    /// <summary>Plugins that re-save a record round its floats, so two positions or vertices this close on every axis, in game units, coincide.</summary>
+    public const float ResavedPosition = 0.01f;
+}
 
 /// <summary>One placed record: its winning version as its plugin stores it, and the versions below it that were kept. It is not judged here.</summary>
 /// <param name="Cell">The cell whose child list holds the winning version; for an interior it is the space itself.</param>
@@ -38,6 +55,10 @@ public sealed record PlacedReadScope(
 /// <param name="Versions">
 /// Lowest first, the winner last: the record's versions from the winner down to and including the first one whose plugin stops the
 /// walk (<see cref="IPluginRecords.ReadPlacedRecords"/>), or all of them when none does. Each plugin gives one version.
+/// </param>
+/// <param name="CleanedModChanges">
+/// Only for a record of another plugin that the target plugin overrides and that has a version below the target plugin's; null for
+/// every other record.
 /// </param>
 public sealed record PlacedRecordFact(
     RecordKey Key,
@@ -53,7 +74,8 @@ public sealed record PlacedRecordFact(
     bool HasLocationRefType,
     float? ReferenceRadius,
     Vector3? PrimitiveBounds,
-    ImmutableArray<PlacedVersionFact> Versions)
+    ImmutableArray<PlacedVersionFact> Versions,
+    PlacedPartChanges? CleanedModChanges)
 {
     /// <summary>The winning version, the last of <see cref="Versions"/>.</summary>
     public PlacedVersionFact Winner => Versions[^1];
@@ -84,6 +106,25 @@ public sealed record PlacedRecordFact(
 /// </param>
 /// <param name="CellAreas">The winning cell records of the target spaces, by cell key.</param>
 /// <param name="LinkedFromPlacedRecords">Every record that the winning version of a placed record of a target space links to, other than its base.</param>
+/// <param name="ChangedCells">
+/// Only with <see cref="AreaRecordReads.Cells"/>: the cell records of other plugins in the target spaces that the target
+/// plugin changed, in the order their walk ended; the persistent cell of a worldspace is none of them.
+/// </param>
+/// <param name="ChangedLands">
+/// Only with <see cref="AreaRecordReads.Lands"/>: the LAND records of other plugins that the target plugin changed in the
+/// worldspaces whose land a target space uses, in the order their walk ended.
+/// </param>
+/// <param name="ChangedNavmeshes">
+/// Only with <see cref="PlacedReadScope.AreaRecordVersions"/>: the navmeshes of the target spaces that the target plugin overrides,
+/// deletes or adds, with a part it changed, in <see cref="RecordKeyOrder"/>.
+/// </param>
+/// <param name="DeletedCells">Only with <see cref="PlacedReadScope.AreaRecordVersions"/>: the cells of the target spaces that some plugin's version deletes.</param>
+/// <param name="OverriddenDoorLinks">
+/// Only with <see cref="PlacedReadScope.AreaRecordVersions"/>: the navmesh link of each placed record the target plugin overrides
+/// that has one in its version below the target plugin's or its winning version, by key.
+/// </param>
+/// <param name="CellsDeletedInFinalWorld">The cells of the target spaces whose winning version deletes them, each with that version's plugin.</param>
+/// <param name="Spaces">Every space whose cells the walk read, by key.</param>
 public sealed record PlacedRecordFacts(
     ImmutableArray<PlacedRecordFact> Records,
     int RecordsScanned,
@@ -91,4 +132,11 @@ public sealed record PlacedRecordFacts(
     ImmutableArray<LinkFact> Links,
     int NavmeshCount,
     IReadOnlyDictionary<RecordKey, CellAreaFact> CellAreas,
-    IReadOnlySet<RecordKey> LinkedFromPlacedRecords);
+    IReadOnlySet<RecordKey> LinkedFromPlacedRecords,
+    ImmutableArray<CellRecordFact> ChangedCells,
+    ImmutableArray<LandRecordFact> ChangedLands,
+    ImmutableArray<NavmeshRecordFact> ChangedNavmeshes,
+    IReadOnlySet<RecordKey> DeletedCells,
+    IReadOnlyDictionary<RecordKey, DoorLinkFact> OverriddenDoorLinks,
+    IReadOnlyDictionary<RecordKey, PluginName> CellsDeletedInFinalWorld,
+    IReadOnlyDictionary<RecordKey, SpaceFact> Spaces);

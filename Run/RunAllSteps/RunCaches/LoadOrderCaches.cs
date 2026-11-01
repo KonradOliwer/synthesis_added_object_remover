@@ -58,6 +58,7 @@ internal sealed class LoadOrderCaches : ILoadOrderCaches
 
     /// <remarks>The terrain and navmesh caches read through <paramref name="plugin"/>, so they answer once its placed records are read.</remarks>
     /// <param name="unexpectedErrors">The run's unexpected-error channel, which the mesh files record into.</param>
+    /// <param name="collisionLayers">The load order's collision layer records, by layer number.</param>
     /// <param name="npcBodyRules">How C8 works out the bodies of the NPCs.</param>
     /// <param name="placedNpcRules">How C10 picks, places and counts the placed NPCs.</param>
     /// <param name="surfaceSamplesPerMesh">How many points C15 spreads over each mesh's surface.</param>
@@ -66,6 +67,7 @@ internal sealed class LoadOrderCaches : ILoadOrderCaches
         IUnexpectedErrors unexpectedErrors,
         IPluginRecords plugin,
         IBaseFacts bases,
+        IReadOnlyDictionary<uint, CollisionLayerFact> collisionLayers,
         NpcBodyRules npcBodyRules,
         PlacedNpcRules placedNpcRules,
         int surfaceSamplesPerMesh)
@@ -76,7 +78,7 @@ internal sealed class LoadOrderCaches : ILoadOrderCaches
         return new LoadOrderCaches(
             bases,
             meshFiles,
-            new BaseObjectShapes(bases, meshFiles),
+            new BaseObjectShapes(bases, meshFiles, collisionLayers),
             triangles,
             new SurfaceSampleStore(triangles, surfaceSamplesPerMesh),
             bodyBounds,

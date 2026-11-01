@@ -36,6 +36,17 @@ internal static class TestScenes
             new Execution(threads));
     }
 
+    /// <summary>The object caches over a world a step builds, as the runner builds them; no placed NPC needs a body.</summary>
+    public static ObjectCaches Index(CollectedObjects world, IBaseObjectShapes shapes, int threads) =>
+        ObjectCaches.Create(
+            world,
+            shapes,
+            new TriangleStore(shapes.ReadTriangles),
+            CreateBodiesWithoutRecords(shapes),
+            RemovalCauseSelector.MeasurementRules(new ThrowingUnexpectedErrors()),
+            TooCloseObjects.PlacedNpcRules,
+            new Execution(threads));
+
     /// <summary>A channel for scenes that expect no unexpected failure: recording one fails the test.</summary>
     private sealed class ThrowingUnexpectedErrors : IUnexpectedErrors
     {
@@ -55,6 +66,10 @@ internal static class TestScenes
             [.. targets],
             [.. otherModObjects],
             supportOnlyObjects is null ? [] : [.. supportOnlyObjects],
+            [],
+            [],
+            [],
+            [],
             [],
             [],
             new Dictionary<RecordKey, SpaceFact>(),

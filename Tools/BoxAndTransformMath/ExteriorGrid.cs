@@ -6,4 +6,13 @@ public static class ExteriorGrid
     public const float CellSize = 4096f;
 
     public static int CellIndex(float coordinate) => (int)MathF.Floor(coordinate / CellSize);
+
+    /// <summary>Every cell whose square the box's footprint seen from above reaches into or touches, column by column.</summary>
+    public static IEnumerable<(int X, int Y)> CellsUnder(Box box)
+    {
+        for (var x = CellIndex(box.Min.X); x <= CellIndex(box.Max.X); x++)
+        {
+            for (var y = CellIndex(box.Min.Y); y <= CellIndex(box.Max.Y); y++) yield return (x, y);
+        }
+    }
 }

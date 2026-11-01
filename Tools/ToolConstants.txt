@@ -59,10 +59,11 @@ WaterLevel.UseWorldspaceDefault | game format | A cell's stored water height of 
 LandLayerReader.QuadrantPlaces | game format | The column and row of each texture quadrant of a LAND record in its cell.
 ScriptPropertyReader.NamedKinds | game format | The library record type behind each ScriptNamedKind, the record kinds a script property is reported for.
 PluginRecords.NotReadMessage | internal | Error text for using the records before they were read.
+RecordHandles.AreaRecordsNotReadMessage | internal | Error text for using the cell and land versions when the read scope did not ask for them.
 PatchWriting.ForeignRecordsMessage | internal | Error text for handing the patch writing records another reader read.
 PatchMarker.Text | file format | Text of a plugin's header description that marks the output of this patcher.
 PatchMarker.DescriptionLineBreak | file format | Line break that plugin editors write into a header description; the marker goes on a new line after an existing description.
-BaseFactsFactory.ForeignIndexMessage | internal | Error text for opening the base facts over a record index another reader opened.
+RunLinkCache.ForeignIndexMessage | internal | Error text for reading through a record index another reader opened.
 MeshFileSource.MeshesPrefix | game format | Mesh paths in the game's data start with "meshes\".
 MeshFileSource.DataPrefix | game format | A model path may carry a leading "data\" folder name, which is not part of the archive path.
 MeshFileSource.ArchiveSuffixDelimiter | game format | An archive named "<Plugin> - <Suffix>" belongs to the plugin before the delimiter.
@@ -83,3 +84,55 @@ NifFooterReader.LittleEndian | file format | The endian marker byte of a little-
 NifFooterReader.SkyrimUserVersion | file format | NIF user version 12.
 NifFooterReader.SkyrimLeStreamVersion | file format | Bethesda stream version of Skyrim LE.
 NifFooterReader.SkyrimSeStreamVersion | file format | Bethesda stream version of Skyrim SE.
+RecordHeader.Fields | game format | A record's identity (FormKey, EditorID) and header stamps (VersionControl, FormVersion, Version2), which no record part compares or writes.
+RecordHeader.FlagFields | game format | The two views of a record's flags in a translation mask (raw and typed); the parts take the flags bit by bit.
+RecordHeader.CompressedBit | game format | The record flag that marks a record stored compressed.
+RecordHeader.DeletedBit | game format | The record flag that marks a record deleted.
+PlacedRecordParts.UnscaledScale | game format | A placed reference without a stored scale shows at scale 1.
+PlacedRecordParts.PersistentBit | game format | The record flag that marks a placed reference persistent; it follows the cell child list.
+PlacedRecordParts.PresenceBits | game format | The Initially Disabled and Deleted record flags, which decide with the enable parent whether a placed reference shows.
+PlacedRecordParts.ExcludedFlagBits | game format | The record flags of a placed reference no part compares or writes: Persistent and Compressed.
+PlacedRecordParts.RestFlagBits | game format | The record flags of a placed reference the rest of the record holds.
+PartHistory.TargetVersionIndex | internal | The versions judged start just below the target plugin's, so its own version is the second.
+PointSet.PointCount | game format | A LAND record's grids hold 33 by 33 points.
+PointSet.BitsPerWord | math | Bits in the 64-bit words of the point bitset.
+PointSet.WordCount | math | Words that hold one bit per grid point.
+QuarterSet.QuarterCount | game format | A cell's terrain has 2 by 2 quarters.
+CellRecordParts.HasWaterBit | game format | The cell flag that gives a cell its own water level.
+CellRecordParts.ExcludedFlagBits | game format | The cell flag no part compares or writes: Is Interior Cell.
+CellRecordParts.ExcludedMajorFlagBits | game format | The record flags of a cell no part compares or writes: Persistent and Compressed.
+CellRecordParts.ExcludedFields | game format | The cell fields no part compares or writes: identity, header stamps, group data, child records and the grid.
+CellRecordParts.FieldParts | game format | The cell parts made of whole fields, with their fields.
+CellRecordParts.FlagParts | game format | The cell parts made of one cell flag.
+CellRecordParts.MajorFlagParts | game format | The cell parts made of one record flag.
+LandRecordParts.PointCount | game format | A LAND record's grids hold 33 by 33 points.
+LandRecordParts.ExcludedFields | game format | The LAND fields no part compares or writes: identity, header stamps and the flags the writer derives.
+LandRecordParts.ExcludedFlagBits | game format | The record flag of a LAND record no part compares or writes: Compressed.
+LandRecordParts.GridFields | game format | The LAND grids whose values the point and colour parts hold.
+LandPoints.VerticesPerSide | game format | A LAND record's grids are 33 by 33 points (the same value as TerrainHeights.VerticesPerSide).
+NavmeshRecordParts.ExcludedFlagBits | game format | The record flag of a navmesh no part compares or writes: Compressed.
+NavmeshRecordParts.GeometryFlagBits | game format | The record flags of a navmesh its geometry holds: all but Deleted and Compressed.
+NavmeshTriangleEdges.None | file format | A navmesh triangle's edge value for an edge with no neighbour.
+NavmeshWriter.PathFlags | file format | The navmesh triangle flags a sunk navmesh loses besides its edge links: Preferred and Door.
+LandHeightEncoder.UnitsPerStep | game format | One step of a stored terrain height is 8 game units.
+LandHeightEncoder.VerticesPerSide | game format | A LAND record's height map is 33 by 33 points (the same value as TerrainHeights.VerticesPerSide).
+LandWriter.VerticesPerSide | game format | A LAND record's grids are 33 by 33 points (the same value as TerrainHeights.VerticesPerSide).
+LandWriter.StoredUnitNormal | file format | A LAND record's vertex normals store each component as a signed byte, 127 standing for 1.
+LandWriter.HeldDataFlags | file format | The LAND record flags that say which grids and layers it holds: normals and height map, colours, layers.
+TerrainNormals.VerticesPerSide | game format | A cell's terrain grid is 33 by 33 points (the same value as TerrainHeights.VerticesPerSide).
+TerrainNormals.Last | game format | The index of the last point in a row or column of a cell's terrain grid.
+TerrainNormals.Spacing | game format | Terrain grid points are 128 units apart (TerrainGrid.VertexSpacing).
+CellEdgeHeights.Side | game format | A cell's terrain grid is 33 by 33 points (the same value as TerrainHeights.VerticesPerSide).
+CellEdgeHeights.SecondLine | game format | A neighbouring cell's grid line one grid step beyond the shared edge: its first line is the shared edge itself.
+CellEdgeHeights.SecondLastLine | game format | The other side's neighbouring grid line one grid step beyond the shared edge: its last line is the shared edge itself.
+TerrainQuadrants.SquaresPerSide | game format | Each texture quadrant spans 16 grid squares, one fewer than its vertices.
+TerrainQuadrants.Size | game format | A texture quadrant is half a cell wide.
+TerrainQuadrants.HalfWay | math | A quadrant's centre lies half its width from its corner.
+WorldGridPoint.Side | game format | A cell's terrain grid is 33 by 33 points (the same value as TerrainHeights.VerticesPerSide).
+WorldGridPoint.Squares | game format | A cell's terrain has 32 squares across; neighbouring cells share their edge points (TerrainGrid.SquaresPerSide).
+LandGridPointHolders.Side | game format | A cell's terrain grid is 33 by 33 points (the same value as TerrainHeights.VerticesPerSide).
+LandGridPointHolders.Squares | game format | A cell's terrain has 32 squares across, so a point on a cell's first line is the last line of the cell before (TerrainGrid.SquaresPerSide).
+TriangleFootprints.CornerCount | math | A triangle has 3 corners.
+NavmeshConsistency.CornerCount | math | A triangle has 3 corners and 3 edges.
+NavmeshConsistency.VertexTolerance | budget | The one rounding tolerance of re-saved positions (PlacedPartTolerances.ResavedPosition), named for the vertices it compares.
+PlacedPartTolerances.ResavedPosition | budget | Plugins that re-save a record round its floats; positions and vertices this close on every axis coincide.

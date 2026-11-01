@@ -7,11 +7,15 @@ namespace AddedObjectRemover;
 /// <param name="landWorldspaces">Target worldspace -> the worldspace whose LAND records it uses (itself, or a parent whose land data it uses).</param>
 /// <param name="versions">Every plugin's own LAND record by cell, highest priority first; null when the versions were not asked for.</param>
 /// <param name="layerNames">Spells the plugins of the texture keys when the versions' texture layers are decoded; null when the layers were not asked for.</param>
+/// <param name="landscapesBelowTarget">
+/// The LAND record versions just below the target plugin's by cell; null when the LAND area record versions were not asked for.
+/// </param>
 internal sealed class LandscapeTerrain(
     IReadOnlyDictionary<ExteriorCell, ILandscapeGetter> landscapes,
     IReadOnlyDictionary<RecordKey, RecordKey> landWorldspaces,
     IReadOnlyDictionary<ExteriorCell, List<LandscapeVersion>>? versions,
-    PluginNames? layerNames)
+    PluginNames? layerNames,
+    IReadOnlyDictionary<ExteriorCell, ILandscapeGetter>? landscapesBelowTarget)
 {
     private readonly IReadOnlySet<RecordKey> _worldspacesWithTerrain = landscapes.Keys.Select(cell => cell.WorldspaceKey).ToHashSet();
 
@@ -24,6 +28,13 @@ internal sealed class LandscapeTerrain(
     /// <returns>Null where the cell has no LAND record, or a deleted or empty one.</returns>
     public float[]? ReadHeights(ExteriorCell cell) =>
         landscapes.TryGetValue(cell, out var landscape) ? LandHeightReader.Read(landscape) : null;
+
+    /// <returns>Null where no plugin below the target plugin has a LAND record for the cell, or it is deleted or empty.</returns>
+    public float[]? ReadHeightsBelowTarget(ExteriorCell cell)
+    {
+        if (landscapesBelowTarget is null) throw new InvalidOperationException("The LAND area record versions were not read; ask for them in the read scope.");
+        return landscapesBelowTarget.TryGetValue(cell, out var landscape) ? LandHeightReader.Read(landscape) : null;
+    }
 
     /// <returns>Every plugin's version of the cell in load order (lowest priority first); empty where no plugin has a LAND record for it.</returns>
     public TerrainVersion[] ReadVersions(ExteriorCell cell)

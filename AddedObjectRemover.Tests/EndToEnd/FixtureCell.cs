@@ -10,6 +10,9 @@ internal sealed class FixtureCell(FixtureMod owner, Cell cell)
 {
     public FormKey Key => cell.FormKey;
 
+    /// <summary>The plugin's copy of the cell, for tests that change the cell's own settings or land.</summary>
+    public Cell Record => cell;
+
     public PlacedObject Place(string editorId, FormKey baseKey, Vector3 position, bool persistent = false)
     {
         var placed = new PlacedObject(owner.NextKey(), FixtureMod.Release)

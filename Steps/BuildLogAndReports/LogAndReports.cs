@@ -15,6 +15,7 @@ using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 using AddedObjectRemover.Steps.WriteThePatch.Contracts;
 
@@ -213,6 +214,20 @@ public sealed partial class LogAndReports
         return [WithStepTimeWhenPerformed(section, moves.Outcome, LogSections.MarkerMovesName, elapsed), TakeUnexpectedErrors(Present(moves.Failure))];
     }
 
+    /// <remarks>A switched-off step prints nothing, and a section without a line is left out, not printed empty.</remarks>
+    public ImmutableArray<LogSection> BuildStepSections(RestoreWhereRemovedResult found, CollectedObjects world, TimeSpan elapsed) =>
+        found.Outcome == StepOutcome.SwitchedOff
+            ? []
+            :
+            [
+                .. WhenItHasLines(LogSections.BuildRestoreWhereRemovedSection(world, found, AreaMeasure, elapsed, _context)),
+                .. WhenItHasLines(TakeUnexpectedErrors(found.Failures)),
+            ];
+
+    /// <remarks>Only asked for a run whose restore step is on, since a switched-off step prints and writes nothing.</remarks>
+    private ClearedAreaMeasure AreaMeasure =>
+        _settings.RestoreWhereRemoved?.ClearedArea.Measure ?? throw new UnreachableException("The restore step ran with its settings switched off.");
+
     public ImmutableArray<LogSection> BuildStepSections(WriteSummary written, TimeSpan elapsed) => [LogSections.BuildWriteSection(written, elapsed, _context)];
 
     /// <summary>
@@ -263,7 +278,7 @@ public sealed partial class LogAndReports
         if (!_reportFilesWritten) return ReportTables.SwitchedOff;
 
         return Failures.Attempt(
-            () => new ReportTables(StepOutcome.Performed, Tables.BuildTables(outcome, _settings.AlsoRemove, _context), Failure: null),
+            () => new ReportTables(StepOutcome.Performed, Tables.BuildTables(outcome, _settings.AlsoRemove, _settings.RestoreWhereRemoved, _context), Failure: null),
             failure => new ReportTables(StepOutcome.StoppedByUnexpectedError, [], PartFailure.OfWholePart(ReportFileParts.ReportFiles, failure)));
     }
 
@@ -377,13 +392,15 @@ public sealed partial class LogAndReports
         var restoredObjects = LogSections.BuildRestoredSection(world, outcome.Restorations, outcome.Final, _context);
         var restoreSummary = LogSections.BuildRestoreSummarySection(
             outcome.Restorations, outcome.Final, _settings.TargetAsTyped, outcome.ChangedTerrain.Outcome, outcome.VisibleLeftBehind.Outcome);
+        var restoredWhereRemoved = LogSections.BuildRestoreWhereRemovedSummarySection(outcome.RestoreWhereRemoved);
         var warnings = LogSections.BuildRemovalWarningsSection(world, removals, outcome.RemovalRisks);
         var kept = RemovalList.Kept(outcome.Final);
         var keptOnPurpose = LogSections.BuildKeptOnPurposeSection(world, kept);
         var keptSummary = LogSections.BuildKeptSummarySection(kept);
         var markersByType = LogSections.BuildMarkersByTypeSection(world.Targets, removals, _context);
         var hints = LogSections.BuildHintsSection(world, outcome.Hints);
-        var changedObjects = LogSections.BuildChangedObjectsSection(world, outcome.Final, _settings.TargetAsTyped, _context);
+        var changedObjects = LogSections.BuildChangedObjectsSection(
+            world, outcome.Final, FitOutcomes.RestoredWhereRemoved(outcome.RestoreWhereRemoved), _settings.TargetAsTyped, _context);
         var ownShrunkOrTurned = LogSections.BuildOwnObjectsShrunkOrTurnedSection(world, outcome.Final, _settings.TargetAsTyped, _context);
         var leftWithoutSupport = LogSections.BuildLeftWithoutSupportSection(world, outcome.OtherModsObjects, _context);
         var ownRemoved = TargetOrigins.CountOwn(outcome.Written.Removed.Select(id => world[id]));
@@ -397,6 +414,7 @@ public sealed partial class LogAndReports
             LogSections.BuildRunSummarySection(world, _settings.TargetAsTyped, ownRemoved),
             LogSections.BuildRemovalSummarySection(world, removals, outcome.Final, _settings.TargetAsTyped, outcome.ChangedTerrain.Outcome, outcome.VisibleLeftBehind.Outcome),
             .. WhenItHasLines(restoreSummary),
+            .. WhenItHasLines(restoredWhereRemoved),
             .. WhenItHasLines(changedObjects),
             .. WhenItHasLines(ownShrunkOrTurned),
             .. WhenItHasLines(leftWithoutSupport),

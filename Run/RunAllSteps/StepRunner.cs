@@ -30,6 +30,8 @@ using AddedObjectRemover.Steps.RemoveTooCloseObjects;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 using AddedObjectRemover.Steps.WriteThePatch;
@@ -75,12 +77,13 @@ public static class StepRunner
         var unexpectedErrors = new UnexpectedErrors();
         var reportFolder = PrepareReportFolder(settings, environment);
         var plugin = environment.PluginRecords.Open();
-        var bases = environment.Bases.Open(plugin.ReadRecordIndex());
+        var records = plugin.ReadRecordIndex();
         var loadOrderCaches = LoadOrderCaches.Create(
             environment.MeshFiles,
             unexpectedErrors,
             plugin,
-            bases,
+            environment.Bases.Open(records),
+            environment.Bases.ReadCollisionLayers(records),
             TooCloseObjects.NpcBodyRules,
             TooCloseObjects.PlacedNpcRules,
             RestingObjects.SurfaceSamplesPerMesh);
@@ -159,7 +162,7 @@ public static class StepRunner
 
     private static WriteSummary WritePatch(RunScope scope, StepResults decided) =>
         scope.Environment.Log.Timed(
-            () => PatchWriter.Write(decided.Final, decided.Collected.Targets, decided.OtherModsObjects, scope.Plugin, scope.Environment.PatchWriting),
+            () => PatchWriter.Write(decided.Final, decided.Collected.Targets, decided.OtherModsObjects, decided.RestoreWhereRemoved, scope.Plugin, scope.Environment.PatchWriting),
             scope.Report.BuildStepSections);
 
     private static RunResult FinishReports(RunScope scope, StepResults decided, WriteSummary written)
@@ -176,7 +179,8 @@ public static class StepRunner
     /// Selects the objects that can cause removals and finds the objects to keep, other mods' objects rest on included, then
     /// decides the fits of clashing objects and the removal rounds in order (changed terrain, too close, also remove, visible objects left behind
     /// with the also-remove follow-up of each of its rounds, other mods' objects left without support with the target objects that go
-    /// with them, leftover invisible objects), then the moves of the kept markers.
+    /// with them, leftover invisible objects), then the moves of the kept markers, and last what the cleaned mod changed that goes
+    /// back where it was removed.
     /// </summary>
     /// <remarks>
     /// The runner holds no error boundary: each step catches its own errors inside the step. Applying a step's
@@ -198,10 +202,11 @@ public static class StepRunner
         var visibleLeftBehind = RunVisibleLeftBehind(scope, runCaches, collected, alsoRemove.Decisions);
         var otherMods = RunOtherModsObjects(scope, runCaches, trust, collected, fitted.Decisions, visibleLeftBehind.Decisions);
         var otherModsObjectsTakenAway = otherMods.Result.TakenAway();
+        var visibleTargetsAsTheRoundsMeasureThem = ClashingObjectFitter.IndexAsTheRoundsMeasureThem(collected.Targets, otherMods.Decisions, runCaches);
         var leftBehind = RunLeftBehind(
             scope,
             runCaches,
-            ClashingObjectFitter.IndexAsTheRoundsMeasureThem(collected.Targets, otherMods.Decisions, runCaches),
+            visibleTargetsAsTheRoundsMeasureThem,
             collected,
             selected.ObjectsThatCanCauseRemovals,
             otherModsObjectsTakenAway,
@@ -214,6 +219,7 @@ public static class StepRunner
             otherModsObjectsTakenAway,
             leftBehind);
         var final = leftBehind.Decisions.AddMoves(markerMoves.Moves);
+        var whereRemoved = RunRestoreWhereRemoved(scope, runCaches, trust, visibleTargetsAsTheRoundsMeasureThem, collected, otherMods.Result, final);
         return new StepResults(
             Collected: collected,
             ObjectsToKeep: kept.ObjectsToKeep,
@@ -226,7 +232,8 @@ public static class StepRunner
             LeftBehind: leftBehind.Result,
             MarkerMoves: markerMoves,
             OtherModsObjects: otherMods.Result,
-            Final: final);
+            Final: final,
+            RestoreWhereRemoved: whereRemoved);
     }
 
     private static HeldUpTargets RunHeldUpTargets(RunScope scope, IRunCaches runCaches, ModTrustTable trust, CollectedObjects collected) =>
@@ -336,7 +343,7 @@ public static class StepRunner
                 RemovalCauseSelector.SelectForOldPlace(
                     caches.Value.OtherModObjects,
                     world.Value.OtherModObjects.Length,
-                    ChangedObjectJudging.OldPlaceIdOf(target),
+                    [ChangedObjectJudging.OldPlaceIdOf(target)],
                     scope.Settings.ChangedObjectCollision.TooClose.Npcs),
                 caches.Value.PlacedNpcs,
                 runCaches.Shapes,
@@ -613,6 +620,72 @@ public static class StepRunner
                 scope.Settings.Execution,
                 scope.Settings.MarkerMoves),
             (markerMoves, elapsed) => scope.Report.BuildStepSections(markerMoves, collected, elapsed));
+
+    /// <param name="visibleTargets">The visible targets where the rounds measure them.</param>
+    /// <param name="final">The decisions with every round and every move.</param>
+    /// <remarks>
+    /// The object caches of the world its guards judge in are built only when the step asks, so a run with no placed record to guard
+    /// builds none; the step gives them only the objects its guards can reach.
+    /// </remarks>
+    private static RestoreWhereRemovedResult RunRestoreWhereRemoved(
+        RunScope scope,
+        IRunCaches runCaches,
+        ModTrustTable trust,
+        IVisibleTargetObjects visibleTargets,
+        CollectedObjects collected,
+        OtherModsObjectsResult otherModsObjects,
+        IRemovalDecisions final) =>
+        scope.Environment.Log.Timed(
+            () => PlanWhereRemoved(scope, runCaches, trust, visibleTargets, collected, otherModsObjects, final),
+            (result, elapsed) => scope.Report.BuildStepSections(result, collected, elapsed));
+
+    private static RestoreWhereRemovedResult PlanWhereRemoved(
+        RunScope scope,
+        IRunCaches runCaches,
+        ModTrustTable trust,
+        IVisibleTargetObjects visibleTargets,
+        CollectedObjects collected,
+        OtherModsObjectsResult otherModsObjects,
+        IRemovalDecisions final) =>
+        WhereRemovedRestorer.Plan(
+            collected,
+            final,
+            otherModsObjects,
+            visibleTargets,
+            world => scope.LoadOrderCaches.AddObjectCaches(
+                world, RemovalCauseSelector.MeasurementRules(scope.UnexpectedErrors, RestoreWhereRemovedParts.ObjectThatStays), scope.Settings.Execution),
+            (world, caches, excluded, settings) => TooCloseObjects.CreatePlacementRule(
+                world.Targets,
+                caches.VisibleTargets,
+                RemovalCauseSelector.SelectForOldPlace(caches.OtherModObjects, world.OtherModObjects.Length, excluded, settings.Npcs),
+                caches.PlacedNpcs,
+                runCaches.Shapes,
+                runCaches.Triangles,
+                settings),
+            (holders, holderIndex, movesAway, staying, copiesOfMoving) => RestingObjects.FindHoldersOfObjectsThatStay(
+                holders,
+                holderIndex,
+                movesAway,
+                staying,
+                copiesOfMoving,
+                trust,
+                scope.Environment.Plugins,
+                scope.Settings.OtherModsObjects,
+                runCaches.Shapes,
+                runCaches.Triangles,
+                runCaches.SurfaceSamples,
+                runCaches.Terrain,
+                scope.Settings.Execution),
+            scope.Settings.OtherModsObjects,
+            runCaches.Shapes,
+            runCaches.Navmeshes,
+            scope.Plugin.FindLandWorldspace,
+            cell => new LandHeights(scope.Plugin.ReadTerrainBelowTarget(cell), scope.Plugin.ReadTerrain(cell)),
+            orders => scope.Environment.PatchWriting.FindNavmeshFaultIfWritten(scope.Plugin.ReadWritableRecords(), orders),
+            scope.Environment.Plugins,
+            trust.CleanedMod,
+            scope.Settings.Execution,
+            scope.Settings.RestoreWhereRemoved);
 
     /// <summary>What every phase method reads besides its own inputs.</summary>
     /// <param name="ReportFolder">What the report writer prepared, which says whether the report files are written.</param>

@@ -1,0 +1,191 @@
+using System.Numerics;
+using Mutagen.Bethesda.Plugins;
+using Mutagen.Bethesda.Skyrim;
+using Noggog;
+
+namespace AddedObjectRemover.Tests.EndToEnd;
+
+/// <summary>
+/// Small worlds in which the cleaned mod's objects are removed from a whole area, so the step that restores what the cleaned mod
+/// changed there has something to act on. The base game is Skyrim.esm, the cleaned mod is the fixture's target, and CityMod.esp is
+/// a later plugin whose pads stand beside the cleaned mod's crates (which removes those crates) and which changes some of what the
+/// cleaned mod changed.
+/// </summary>
+internal static class RestoreWhereRemovedWorlds
+{
+    public const string BaseGamePlugin = "Skyrim.esm";
+    public const string CityPlugin = "CityMod.esp";
+
+    /// <summary>A plugin that has the cleaned mod as a master.</summary>
+    public const string PatchOfTheCleanedModPlugin = "VillagePatch.esp";
+
+    public const float BaseFogNear = 10f;
+    public const float CleanedModFogNear = 20f;
+    public const float CleanedModTurn = 1f;
+    public const float CleanedModScale = 2f;
+    public const float CityScale = 3f;
+
+    /// <summary>The cleaned mod's height of the land in the terrain world, in height steps; the base game's is <see cref="BaseLandSteps"/>.</summary>
+    public const float CleanedModLandSteps = 24f;
+
+    public const float BaseLandSteps = 16f;
+    public const float UnitsPerLandStep = 8f;
+
+    /// <summary>Where the other mods' objects stand in the village, along a line.</summary>
+    public static readonly Vector3 RockAt = At(2000, 0);
+    public static readonly Vector3 StumpAt = At(2000, 1000);
+    public static readonly Vector3 MoverAt = At(3000, 0);
+    public static readonly Vector3 MoverMovedTo = At(3000, 600);
+    public static readonly Vector3 LampAt = At(4000, 0);
+    public static readonly Vector3 StatueAt = At(5000, 0);
+    public static readonly Vector3 TableAt = At(6000, 0);
+
+    private const float PadDistance = 75f;
+
+    /// <summary>A tiny object 5 units from the side of a crate: too close to it, yet far too small to count against clearing the area.</summary>
+    private const float PebbleDistance = 60f;
+    private const int InitiallyDisabled = (int)SkyrimMajorRecord.SkyrimMajorRecordFlag.InitiallyDisabled;
+    private const int Side = TerrainHeights.VerticesPerSide;
+
+    /// <summary>
+    /// The interior, where the cleaned mod has two crates of its own, each with a city pad beside it, so all of its objects there are
+    /// removed. Beside them it changed, among other mods' objects: a rock (disabled), a stump (deleted), a crate (moved), a lamp
+    /// (turned and resized, then resized again by the city mod), a statue (disabled, with a tiny object of the cleaned mod that
+    /// stays beside its place), a table (resized, with a city lantern resting on its top) and the cell's music, location and lighting
+    /// (music changed again by the city mod). Expected to go back: all but the statue and the table, the lamp's size and the cell's
+    /// music.
+    /// </summary>
+    public static IReadOnlyList<ISkyrimMod> CreateVillage(string dataFolder)
+    {
+        FixtureMeshes.WriteAll(dataFolder);
+        var (baseGame, target, city, _) = CreateMods();
+        ChangeTheCellSettings(baseGame, target, city);
+        var crate = baseGame.AddModeledStatic("B_CrateBase", FixtureMeshes.CrateModel);
+        var pad = city.AddModeledStatic("C_PadBase", FixtureMeshes.PadModel);
+        var own = target.AddModeledStatic("T_CrateBase", FixtureMeshes.CrateModel);
+        foreach (var (name, at) in new[] { ("T_Crate1", At(0, 0)), ("T_Crate2", At(0, 1000)) })
+        {
+            target.Interior.Place(name, own, at);
+            city.Interior.Place("C_Pad" + name, pad, at + new Vector3(PadDistance, 0, 0));
+        }
+
+        target.Interior.PlaceCopyOf(baseGame.Interior.Place("B_Rock", crate, RockAt)).MajorRecordFlagsRaw |= InitiallyDisabled;
+        DeleteInTarget(target, baseGame.Interior.Place("B_Stump", crate, StumpAt));
+        MoveCopy(target.Interior.PlaceCopyOf(baseGame.Interior.Place("B_Mover", crate, MoverAt)), MoverMovedTo);
+        TurnAndResizeInBothMods(baseGame.Interior.Place("B_Lamp", crate, LampAt), target, city);
+        target.Interior.PlaceCopyOf(baseGame.Interior.Place("B_Statue", crate, StatueAt)).MajorRecordFlagsRaw |= InitiallyDisabled;
+        target.Interior.Place("T_Pebble", target.AddBoundsOnlyStatic("T_PebbleBase", new Box(new Vector3(-5, -5, 0), new Vector3(5, 5, 10))), StatueAt + new Vector3(PebbleDistance, 0, 0));
+        target.Interior.PlaceCopyOf(baseGame.Interior.Place("B_Table", crate, TableAt)).Scale = CleanedModScale;
+        city.Interior.Place("C_Lantern", pad, TableAt + new Vector3(0, 0, FixtureMeshes.CrateSize * CleanedModScale));
+        return [baseGame.Mod, target.Mod, city.Mod];
+    }
+
+    /// <summary>
+    /// The exterior cell at grid (0, 0), where the cleaned mod raised the land by 64 units and has two crates of its own: one in the
+    /// middle of the cell, which has a city pad beside it and is removed, and one in its north-east quarter, which stays. With a
+    /// search radius of 1500 units, the other three quarters see only the removed crate and count as cleared.
+    /// </summary>
+    public static IReadOnlyList<ISkyrimMod> CreateTerrain(string dataFolder)
+    {
+        FixtureMeshes.WriteAll(dataFolder);
+        var (baseGame, target, city, _) = CreateMods();
+        var land = baseGame.Exterior.Record.Landscape!.FormKey;
+        baseGame.Exterior.Record.Landscape = FlatLand(land, BaseLandSteps);
+        target.Exterior.Record.Landscape = FlatLand(land, CleanedModLandSteps);
+        var ground = CleanedModLandSteps * UnitsPerLandStep;
+        var own = target.AddModeledStatic("T_CrateBase", FixtureMeshes.CrateModel);
+        var middle = new Vector3(ExteriorGrid.CellSize / 2, ExteriorGrid.CellSize / 2, ground);
+        target.Exterior.Place("T_Middle", own, middle);
+        city.Exterior.Place("C_Pad", city.AddModeledStatic("C_PadBase", FixtureMeshes.PadModel), middle + new Vector3(PadDistance, 0, 0));
+        target.Exterior.Place("T_Standing", own, new Vector3(ExteriorGrid.CellSize * 3 / 4, ExteriorGrid.CellSize * 3 / 4, ground));
+        return [baseGame.Mod, target.Mod, city.Mod];
+    }
+
+    /// <summary>
+    /// The interior, where the cleaned mod has a crate with a city pad beside it, so its only object is removed, and disabled a rock of
+    /// the base game; a patch that requires the cleaned mod places a table where the rock stood. The cleaned mod moved and replaced
+    /// nothing, so no old place is judged. Expected: the rock stays disabled, too close to the table.
+    /// </summary>
+    public static IReadOnlyList<ISkyrimMod> CreateVillageWithAPatchOfTheCleanedMod(string dataFolder)
+    {
+        FixtureMeshes.WriteAll(dataFolder);
+        var (baseGame, target, city, spaces) = CreateMods();
+        var patch = new FixtureMod(PatchOfTheCleanedModPlugin, baseGame, target);
+        spaces.AddOverridesTo(patch);
+        var crate = baseGame.AddModeledStatic("B_CrateBase", FixtureMeshes.CrateModel);
+        target.Interior.Place("T_Crate1", target.AddModeledStatic("T_CrateBase", FixtureMeshes.CrateModel), At(0, 0));
+        city.Interior.Place("C_PadT_Crate1", city.AddModeledStatic("C_PadBase", FixtureMeshes.PadModel), At(PadDistance, 0));
+        target.Interior.PlaceCopyOf(baseGame.Interior.Place("B_Rock", crate, RockAt)).MajorRecordFlagsRaw |= InitiallyDisabled;
+        patch.Interior.Place("P_Table", patch.AddModeledStatic("P_TableBase", FixtureMeshes.CrateModel), RockAt);
+        return [baseGame.Mod, target.Mod, city.Mod, patch.Mod];
+    }
+
+    private static (FixtureMod BaseGame, FixtureMod Target, FixtureMod City, FixtureSpaces Spaces) CreateMods()
+    {
+        var baseGame = new FixtureMod(BaseGamePlugin);
+        var target = new FixtureMod(FixtureWorld.TargetName, baseGame);
+        var city = new FixtureMod(CityPlugin, baseGame);
+        var spaces = FixtureSpaces.CreateIn(baseGame);
+        spaces.AddOverridesTo(target);
+        spaces.AddOverridesTo(city);
+        return (baseGame, target, city, spaces);
+    }
+
+    /// <summary>The cleaned mod changes the music, the location and the lighting; the city mod carries them and changes the music again.</summary>
+    private static void ChangeTheCellSettings(FixtureMod baseGame, FixtureMod target, FixtureMod city)
+    {
+        var (calm, tense, epic) = (AddMusic(baseGame, "B_Calm"), AddMusic(baseGame, "B_Tense"), AddMusic(baseGame, "B_Epic"));
+        var (town, village) = (AddLocation(baseGame, "B_Town"), AddLocation(baseGame, "B_Village"));
+        Settle(baseGame.Interior.Record, calm, town, BaseFogNear);
+        Settle(target.Interior.Record, tense, village, CleanedModFogNear);
+        Settle(city.Interior.Record, epic, village, CleanedModFogNear);
+    }
+
+    private static void Settle(Cell cell, FormKey music, FormKey location, float fogNear)
+    {
+        cell.Music.SetTo(music);
+        cell.Location.SetTo(location);
+        cell.Lighting = new CellLighting { FogNear = fogNear };
+    }
+
+    private static FormKey AddMusic(FixtureMod mod, string editorId)
+    {
+        var record = new MusicType(mod.NextKey(), FixtureMod.Release) { EditorID = editorId };
+        mod.Mod.MusicTypes.Add(record);
+        return record.FormKey;
+    }
+
+    private static FormKey AddLocation(FixtureMod mod, string editorId)
+    {
+        var record = new Location(mod.NextKey(), FixtureMod.Release) { EditorID = editorId };
+        mod.Mod.Locations.Add(record);
+        return record.FormKey;
+    }
+
+    private static void DeleteInTarget(FixtureMod target, PlacedObject original)
+    {
+        var deleted = target.Interior.PlaceCopyOf(original);
+        deleted.IsDeleted = true;
+        deleted.Placement = null;
+    }
+
+    /// <summary>The cleaned mod turns and resizes the object; the city mod carries the turn and resizes it again.</summary>
+    private static void TurnAndResizeInBothMods(PlacedObject original, FixtureMod target, FixtureMod city)
+    {
+        var cleaned = target.Interior.PlaceCopyOf(original);
+        cleaned.Placement!.Rotation = new P3Float(0, 0, CleanedModTurn);
+        cleaned.Scale = CleanedModScale;
+        city.Interior.PlaceCopyOf(cleaned).Scale = CityScale;
+    }
+
+    private static void MoveCopy(PlacedObject copy, Vector3 to) => copy.Placement!.Position = new P3Float(to.X, to.Y, to.Z);
+
+    private static Vector3 At(float x, float y) => new(x, y, 0);
+
+    private static Landscape FlatLand(FormKey key, float steps) => new(key, FixtureMod.Release)
+    {
+        VertexHeightMap = new LandscapeVertexHeightMap { Offset = steps, HeightMap = new Array2d<sbyte>(new P2Int(Side, Side), default) },
+        VertexNormals = new Array2d<P3UInt8>(new P2Int(Side, Side), default),
+        VertexColors = new Array2d<P3UInt8>(new P2Int(Side, Side), default),
+    };
+}

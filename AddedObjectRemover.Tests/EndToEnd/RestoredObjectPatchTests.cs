@@ -22,6 +22,7 @@ public sealed class RestoredObjectPatchTests : IDisposable
     private const string EastCellEditorId = "AorEast";
     private const float CleanedModRadius = 77f;
     private const string CleanedModEditorId = "Renamed_Crate";
+    private const float LaterRadius = 99f;
 
     private static readonly Vector3 EarlierPosition = new(1000, 1000, 40);
     private static readonly Vector3 EarlierRotation = new(0, 0, 0.5f);
@@ -39,6 +40,9 @@ public sealed class RestoredObjectPatchTests : IDisposable
     private readonly FixtureCell _cleanedEast;
     private readonly FormKey _crateBase;
 
+    /// <summary>The crate the base game places, once a test placed it.</summary>
+    private FormKey _crate;
+
     public RestoredObjectPatchTests()
     {
         _cleaned = new FixtureMod("Cleaned.esp", _baseGame);
@@ -51,10 +55,11 @@ public sealed class RestoredObjectPatchTests : IDisposable
 
     public void Dispose() => _root.Delete(recursive: true);
 
+    /// <summary>The radius lies in the base and data, whose last changer is the cleaned mod, so it goes back with the placement; the editor ID is the record's identity and stays.</summary>
     [Theory]
     [InlineData(null)]
     [InlineData(2f)]
-    public void APlacementOnlyRestoreWritesTheEarlierPositionRotationAndScaleAndChangesNothingElse(float? earlierScale)
+    public void ARestoreWritesBackEveryPartTheCleanedModLastChangedAndKeepsTheEditorId(float? earlierScale)
     {
         var original = PlaceOriginal(_baseGame.Interior, earlierScale);
         var moved = Move(_cleaned.Interior, original);
@@ -62,15 +67,52 @@ public sealed class RestoredObjectPatchTests : IDisposable
         var patch = RestoreTheMovedCrate();
 
         var written = Assert.Single(patch.EnumerateMajorRecords<IPlacedObjectGetter>());
-        Assert.Equal((EarlierPosition, EarlierRotation, earlierScale), (PositionOf(written), RotationOf(written), written.Scale));
-        var expected = moved.DeepCopy();
-        expected.Placement = original.Placement!.DeepCopy();
-        expected.Scale = original.Scale;
+        Assert.Equal((EarlierPosition, EarlierRotation, earlierScale, (float?)null), (PositionOf(written), RotationOf(written), written.Scale, written.Radius));
+        var expected = original.DeepCopy();
+        expected.EditorID = moved.EditorID;
         Assert.True(expected.Equals(written));
     }
 
+    /// <summary>An earlier patcher of the group gave the crate another radius after the cleaned mod, so the base and data stay as the patch has them.</summary>
     [Fact]
-    public void AWholeRecordRestoreCopiesTheEarlierRecordBaseIncluded()
+    public void ARadiusAnEarlierPatcherChangedAgainStaysWhileThePlacementGoesBack()
+    {
+        var original = PlaceOriginal(_baseGame.Interior, scale: 2f);
+        Move(_cleaned.Interior, original);
+
+        var patch = RestoreTheMovedCrate(earlierPatcherChange: placed => placed.Radius = LaterRadius);
+
+        var written = Assert.Single(patch.EnumerateMajorRecords<IPlacedObjectGetter>());
+        Assert.Equal((EarlierPosition, EarlierRotation, (float?)2f, (float?)LaterRadius), (PositionOf(written), RotationOf(written), written.Scale, written.Radius));
+    }
+
+    /// <summary>The cleaned mod deleted the crate, which dropped its fields: its presence goes back as a whole copy of the earlier version, in that version's list.</summary>
+    [Fact]
+    public void UndoingADeletionWritesAWholeUndeletedCopyOfTheEarlierVersionIntoTheListItIsPlacedIn()
+    {
+        var original = PlaceOriginal(_baseGame.Interior, scale: 2f, persistent: true);
+        var deleted = _cleaned.Interior.PlaceCopyOf(original);
+        deleted.SetPersistent(false);
+        deleted.IsDeleted = true;
+        deleted.Placement = null;
+        var state = FixturePatcherState.Create([_baseGame.Mod, _cleaned.Mod], _root.FullName, Path.Combine(_root.FullName, FixturePatcherState.PatchModKey.FileName));
+        var key = original.FormKey.ToRecordKey();
+        var handles = new RecordHandles(
+            new Dictionary<RecordKey, PlacedRecordHandle> { [key] = new(deleted, new PlacedRecordLocation(state.LinkCache.Resolve<ICellGetter>(_cleaned.Interior.Key), InPersistentList: false)) },
+            new Dictionary<RecordKey, IPlacedGetter> { [key] = original },
+            new PlacedRecordParts(new PlacedPartTolerances()),
+            areaRecords: null);
+
+        new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod).Write(
+            handles, [new PlaceInCell(key, _baseGame.Interior.Key.ToRecordKey(), InPersistentList: true), new UndoPlacedParts(key, PlacedParts.Position | PlacedParts.Presence)]);
+
+        var written = Assert.Single(state.PatchMod.EnumerateMajorRecords<IPlacedObjectGetter>());
+        Assert.True(original.Equals(written));
+        Assert.Equal((true, false), StandsInPersistentAndTemporaryList(state.PatchMod, written));
+    }
+
+    [Fact]
+    public void ARestoreOfAnotherBaseCopiesTheEarlierBaseWithTheEarlierData()
     {
         var original = PlaceOriginal(_baseGame.Interior, scale: 2f);
         var moved = Move(_cleaned.Interior, original);
@@ -80,7 +122,9 @@ public sealed class RestoredObjectPatchTests : IDisposable
 
         var written = Assert.Single(patch.EnumerateMajorRecords<IPlacedObjectGetter>());
         Assert.Equal(_crateBase, written.Base.FormKey);
-        Assert.True(original.Equals(written));
+        var expected = original.DeepCopy();
+        expected.EditorID = moved.EditorID;
+        Assert.True(expected.Equals(written));
     }
 
     [Fact]
@@ -144,7 +188,7 @@ public sealed class RestoredObjectPatchTests : IDisposable
     }
 
     [Fact]
-    public void TheInputRecordsAreNotChangedByARestoreIntoAnotherCellWithAWholeRecordCopy()
+    public void TheInputRecordsAreNotChangedByARestoreOfAnotherBaseIntoAnotherCell()
     {
         var original = PlaceOriginal(_baseGame.Exterior);
         var moved = Move(_cleanedEast, original);
@@ -159,7 +203,7 @@ public sealed class RestoredObjectPatchTests : IDisposable
     }
 
     [Fact]
-    public void AWholeRecordCopyOfATemporaryEarlierVersionIsPersistentWhereTheObjectNowStandsInThePersistentList()
+    public void ARestoreOfAnotherBaseFromATemporaryEarlierVersionStaysPersistentWhereTheObjectNowStandsInThePersistentList()
     {
         var original = PlaceOriginal(_baseGame.Exterior);
         var moved = Move(_cleanedEast, original, persistent: true);
@@ -174,7 +218,7 @@ public sealed class RestoredObjectPatchTests : IDisposable
     }
 
     [Fact]
-    public void AWholeRecordCopyOfAPersistentEarlierVersionIsTemporaryWhereTheObjectNowStandsInTheTemporaryList()
+    public void ARestoreOfAnotherBaseFromAPersistentEarlierVersionStaysTemporaryWhereTheObjectNowStandsInTheTemporaryList()
     {
         var original = PlaceOriginal(_baseGame.Exterior, persistent: true);
         var moved = Move(_cleanedEast, original, persistent: false);
@@ -191,6 +235,7 @@ public sealed class RestoredObjectPatchTests : IDisposable
     private PlacedObject PlaceOriginal(FixtureCell cell, float? scale = null, bool persistent = false)
     {
         var original = cell.Place("B_Crate", _crateBase, EarlierPosition, persistent);
+        _crate = original.FormKey;
         original.Placement!.Rotation = new P3Float(EarlierRotation.X, EarlierRotation.Y, EarlierRotation.Z);
         original.Scale = scale;
         original.SetPersistent(persistent);
@@ -211,8 +256,9 @@ public sealed class RestoredObjectPatchTests : IDisposable
     }
 
     /// <summary>
-    /// The earlier patcher of the group has written the crate into its output before this patcher starts, as a real group runs: the
-    /// scan sees the patch as the winner, in the cell the earlier patcher left it in.
+    /// The earlier patcher of the group has written the crate, unchanged, into its output before this patcher starts, as a real group
+    /// runs: the scan sees the patch as the winner, in the cell the earlier patcher left it in. A position the earlier patcher changed
+    /// would stay, so it writes the cleaned mod's.
     /// </summary>
     [Fact]
     public void ARestoreMovesTheCopyAnEarlierPatchersOutputHoldsAndTheScanSawAsTheWinner()
@@ -220,7 +266,7 @@ public sealed class RestoredObjectPatchTests : IDisposable
         var original = PlaceOriginal(_baseGame.Exterior);
         Move(_cleanedEast, original);
 
-        var patch = RestoreTheMovedCrate(earlierPatcherWrites: key => [new SetPosition(key, MovedPosition + Vector3.UnitX)], earlierPatchLoadedBeforeTheScan: true);
+        var patch = RestoreTheMovedCrate(earlierPatcherWrites: key => [new SetPosition(key, MovedPosition)], earlierPatchLoadedBeforeTheScan: true);
 
         var written = Assert.Single(patch.EnumerateMajorRecords<IPlacedObjectGetter>());
         Assert.Equal(EarlierPosition, PositionOf(written));
@@ -244,13 +290,13 @@ public sealed class RestoredObjectPatchTests : IDisposable
     }
 
     [Fact]
-    public void AWholeRecordCopyIntoAnotherCellReplacesTheCopyAnEarlierPatchersOutputHoldsSoThePatchHoldsTheRecordOnce()
+    public void ARestoreOfAnotherBaseIntoAnotherCellMovesTheCopyAnEarlierPatchersOutputHoldsSoThePatchHoldsTheRecordOnce()
     {
         var original = PlaceOriginal(_baseGame.Exterior);
         var moved = Move(_cleanedEast, original);
         moved.Base.SetTo(_cleaned.AddModeledStatic("C_OtherCrateBase", FixtureMeshes.CrateModel));
 
-        var patch = RestoreTheMovedCrate(earlierPatcherWrites: key => [new SetPosition(key, MovedPosition + Vector3.UnitX)], earlierPatchLoadedBeforeTheScan: true);
+        var patch = RestoreTheMovedCrate(earlierPatcherWrites: key => [new SetPosition(key, MovedPosition)], earlierPatchLoadedBeforeTheScan: true);
 
         var written = Assert.Single(patch.EnumerateMajorRecords<IPlacedObjectGetter>());
         Assert.Equal(_crateBase, written.Base.FormKey);
@@ -263,11 +309,14 @@ public sealed class RestoredObjectPatchTests : IDisposable
     /// <summary>Collects the cleaned mod's moved crate, restores it in a TooClose round and writes the patch.</summary>
     /// <param name="earlierPatcherWrites">What an earlier patcher of the group already wrote into the patch for the crate; none when the patch starts empty.</param>
     /// <param name="earlierPatchLoadedBeforeTheScan">Whether the earlier patcher's output is the patch this patcher starts from, so the scan sees it; otherwise it is written after the scan.</param>
-    private ISkyrimModGetter RestoreTheMovedCrate(Func<RecordKey, IReadOnlyList<WriteOrder>>? earlierPatcherWrites = null, bool earlierPatchLoadedBeforeTheScan = false)
+    /// <param name="earlierPatcherChange">A change an earlier patcher of the group made to its override of the cleaned mod's crate, which the scan sees; none when null.</param>
+    private ISkyrimModGetter RestoreTheMovedCrate(
+        Func<RecordKey, IReadOnlyList<WriteOrder>>? earlierPatcherWrites = null, bool earlierPatchLoadedBeforeTheScan = false, Action<IPlacedObject>? earlierPatcherChange = null)
     {
         var state = earlierPatchLoadedBeforeTheScan
             ? CreateStateAfterEarlierPatcher(earlierPatcherWrites!)
             : FixturePatcherState.Create([_baseGame.Mod, _cleaned.Mod], _root.FullName, Path.Combine(_root.FullName, FixturePatcherState.PatchModKey.FileName));
+        earlierPatcherChange?.Invoke(OverrideInPatch(state));
         using var world = FixturePatcherState.CreateFinalWorld(state);
         var reader = new PluginRecordsFactory(world, Workers).Open();
         var targets = PlacedObjects.Collect(reader, Trust(), Plan).Targets;
@@ -278,7 +327,7 @@ public sealed class RestoredObjectPatchTests : IDisposable
         var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved);
         var final = RemovalDecisions.Start(protection, [new WhenRemoved.Restore(moved.EarlierVersion!)]).Apply(RoundKind.TooClose, [new ProposedRemoval(moved.Id, Reason)]);
 
-        PatchWriter.Write(final, targets, OtherModsObjectsResult.SwitchedOff, reader, writing);
+        PatchWriter.Write(final, targets, OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff, reader, writing);
 
         return state.PatchMod;
     }
@@ -299,6 +348,10 @@ public sealed class RestoredObjectPatchTests : IDisposable
         return FixturePatcherState.CreateAfterEarlierPatcher(
             [_baseGame.Mod, _cleaned.Mod], _root.FullName, Path.Combine(_root.FullName, FixturePatcherState.PatchModKey.FileName), earlierOutput);
     }
+
+    /// <summary>The patch's override of the crate, a copy of the cleaned mod's version in the patch's copy of its cell.</summary>
+    private IPlacedObject OverrideInPatch(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) =>
+        state.LinkCache.ResolveContext<IPlacedObject, IPlacedObjectGetter>(_crate).GetOrAddAsOverride(state.PatchMod);
 
     private ModTrustTable Trust() =>
         TestModTrust.Of(

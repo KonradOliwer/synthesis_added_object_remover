@@ -35,7 +35,12 @@ internal static partial class Tables
             .. Numbers(other.Position),
             OptionalText(outcome.Fate == OtherModsObjectFate.PulledDown ? Number(outcome.NewPosition.Z) : null),
             Number(outcome.LostShare),
-            OptionalText(OtherModsObjectText.Roles(outcome.Blocking)),
+            OptionalText(NotRemovableBecause(outcome)),
         ]);
     }
+
+    /// <summary>What keeps the object from being removed: the cell the final world deletes, else its roles; empty for none.</summary>
+    private static string NotRemovableBecause(OtherModsObjectOutcome outcome) => outcome.Fate == OtherModsObjectFate.LeftInDeletedCell
+        ? Describe.DeletedCell(outcome.Object.CellDeleted!)
+        : OtherModsObjectText.Roles(outcome.Blocking);
 }

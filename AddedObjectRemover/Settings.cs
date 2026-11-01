@@ -5,6 +5,7 @@ using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Synthesis.Settings;
@@ -103,7 +104,9 @@ public class StandardSettings : ISettingsValues, ICollisionSettingsValues
         "Removes an object of the cleaned mod when another mod changed the terrain under or around it: raised, lowered or flattened it,\n"
         + "changed the kind of ground (for example grass to road), or raised, lowered, added or removed the water there,\n"
         + "so the object may float, sink, stand under water or look out of place.\n"
-        + "Interiors and worlds without terrain are not checked.")]
+        + "Interiors and worlds without terrain are not checked.\n"
+        + "Its two \"Count only ... larger than\" values also decide which ground and water height changes\n"
+        + "\"Restore what the cleaned mod changed where it was removed\" puts back: only those larger than them.")]
     public TerrainChangeSettings TerrainChange { get; set; } = new();
 
     [SynthesisOrder]
@@ -140,6 +143,14 @@ public class StandardSettings : ISettingsValues, ICollisionSettingsValues
         + "another mod's object (a building, a boulder) or when the visible objects around them were removed.")]
     public LeftoverInvisibleObjectSettings LeftoverInvisibleObjects { get; set; } = new();
 
+    [SynthesisOrder]
+    [SynthesisSettingName("Restore what the cleaned mod changed where it was removed")]
+    [SynthesisTooltip(
+        "Where the cleaned mod's objects were removed from an area, the area's other changes by the cleaned mod go back to how the game showed them without it:\n"
+        + "other mods' objects it moved, turned, hid or replaced, the terrain, the cells' settings and the navmeshes.\n"
+        + "What a later plugin or the patch changed again stays, unless the patch only repeats the cleaned mod's value; so does anything that would not fit the objects that stay.")]
+    public RestoreWhereRemovedSettings RestoreWhereRemoved { get; set; } = new();
+
     string? ISettingsValues.CleanedMod => CleanedMod.IsNull ? null : CleanedMod.ToString();
     IChangedObjectsSettingsValues ISettingsValues.ChangedObjects => ChangedObjects ?? new OtherModsChangedObjectsSettings();
     ITrustSettingsValues ISettingsValues.Trust => Trust ?? new TrustSettings();
@@ -150,6 +161,7 @@ public class StandardSettings : ISettingsValues, ICollisionSettingsValues
     IFollowUpSettingsValues ISettingsValues.FollowUpRemoval => FollowUpRemoval ?? new FollowUpRemovalSettings();
     IVisibleLeftoverSettingsValues ISettingsValues.LeftoverVisibleObjects => LeftoverVisibleObjects ?? new LeftoverVisibleObjectSettings();
     ILeftoverSettingsValues ISettingsValues.LeftoverInvisibleObjects => LeftoverInvisibleObjects ?? new LeftoverInvisibleObjectSettings();
+    IRestoreWhereRemovedSettingsValues ISettingsValues.RestoreWhereRemoved => RestoreWhereRemoved ?? new RestoreWhereRemovedSettings();
 }
 
 public class OtherModsChangedObjectsSettings : IChangedObjectsSettingsValues
@@ -200,7 +212,9 @@ public class ReplacedObjectSettings : IReplacedObjectsSettingsValues
 {
     [SynthesisOrder]
     [SynthesisSettingName("Process replaced objects")]
-    [SynthesisTooltip("Off: these objects are never checked; the cleaned mod's model stays. On: they are checked like moved objects, with the two settings below.")]
+    [SynthesisTooltip(
+        "Off: these objects are never checked for removal; the cleaned mod's model stays, unless the area around them was cleared and \"Restore other mods' objects\" is on (see \"Restore what the cleaned mod changed where it was removed\").\n"
+        + "On: they are checked like moved objects, with the two settings below.")]
     public bool Process { get; set; } = SettingDefaults.ProcessReplacedObjects;
 
     [SynthesisOrder]
@@ -223,17 +237,23 @@ internal static class ChangedObjectTexts
         + "If that fits, it stays there; otherwise \"When it would be removed\" decides.";
 
     public const string WhenRemovedForMoved =
-        "Restore: put it back as it stood before the cleaned mod (as the plugin loading just before the cleaned mod has it): its position, rotation and size;\n"
-        + "when the cleaned mod also gave it another model, the whole object as it was.\n"
+        "Restore: put back what the cleaned mod changed, as the plugin loading just before the cleaned mod has it: position, rotation, size, enable state, model and the rest of its data.\n"
+        + "What a later plugin or an earlier patcher changed again keeps that value; when that is its position, it is removed instead.\n"
         + "RestoreIfNoCollision: the same, but only when it does not collide there under \"Collision handling\" with something that exists only because of the cleaned mod:\n"
         + "its objects, its changes to other objects or to the terrain, or the objects of mods that need it; otherwise it is removed.\n"
-        + "Remove: it is disabled like the cleaned mod's own objects.";
+        + "Remove: it is disabled like the cleaned mod's own objects.\n"
+        + GoesBackByArea;
 
     public const string WhenRemovedForReplaced =
-        "Restore: write back the object as the plugin loading just before the cleaned mod has it, with its own model.\n"
+        "Restore: put back what the cleaned mod changed, as the plugin loading just before the cleaned mod has it, its own model included.\n"
+        + "What a later plugin or an earlier patcher changed again keeps that value; when that is its model, it is removed instead.\n"
         + "RestoreIfNoCollision: the same, but only when that object does not collide there under \"Collision handling\" (as for moved objects); otherwise it is removed.\n"
         + "Remove: it is disabled like the cleaned mod's own objects.\n"
-        + "Only used when \"Process replaced objects\" is on.";
+        + "Only used when \"Process replaced objects\" is on.\n"
+        + GoesBackByArea;
+
+    private const string GoesBackByArea =
+        "An object that is not removed can still go back when the area around it was cleared (see \"Restore what the cleaned mod changed where it was removed\").";
 }
 
 public class ChangedObjectCollisionSettings : ICollisionSettingsValues
@@ -844,4 +864,73 @@ public class KeptInvisibleObjectSettings
         (InvisibleObjectKind.TriggerBoxes, TriggerBoxes),
         (InvisibleObjectKind.Decals, Decals),
     ];
+}
+
+public class RestoreWhereRemovedSettings : IRestoreWhereRemovedSettingsValues
+{
+    [SynthesisOrder]
+    [SynthesisSettingName("Restore other mods' objects")]
+    [SynthesisTooltip(
+        "Puts back, in a cleared area, the other mods' objects the cleaned mod moved, turned, resized, hid, disabled, deleted or gave another model.\n"
+        + "Objects that would be removed because they are in the way are handled under \"Other mods' objects the cleaned mod changed\" instead.")]
+    public bool RestoreOtherModsObjects { get; set; } = SettingDefaults.RestoreOtherModsObjects;
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Restore terrain")]
+    [SynthesisTooltip(
+        "Puts back the ground heights, ground colours and ground textures the cleaned mod changed in a cleared area.\n"
+        + "Ground under objects that stay is kept as the cleaned mod made it.")]
+    public bool RestoreTerrain { get; set; } = SettingDefaults.RestoreTerrain;
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Restore cell settings")]
+    [SynthesisTooltip(
+        "Puts back the settings of the cells in a cleared area that the cleaned mod changed: lighting, image space, acoustic space, music, water, regions, name, owner, encounter zone, location and every other cell setting.")]
+    public bool RestoreCells { get; set; } = SettingDefaults.RestoreCells;
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Restore navmeshes")]
+    [SynthesisTooltip(
+        "Puts back the navmeshes the cleaned mod edited, deleted or replaced in a cleared area, and cuts off the ones it added, so characters walk the earlier paths again.\n"
+        + "A navmesh goes back only when every navmesh and door it is linked with can go back too.")]
+    public bool RestoreNavmeshes { get; set; } = SettingDefaults.RestoreNavmeshes;
+
+    [SynthesisOrder]
+    [SynthesisSettingName("When an area counts as cleared")]
+    [SynthesisTooltip(
+        "Nothing is restored unless the cleaned mod's visible objects around the place have mostly been removed.\n"
+        + "In an interior, the whole interior is one area. If the cleaned mod has no visible object in the area, nothing is restored there.")]
+    public ClearedAreaSettings ClearedArea { get; set; } = new();
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Blend terrain edges over (game units)")]
+    [SynthesisTooltip(
+        "Where restored ground meets ground that stays as the cleaned mod changed it, the height is blended over this distance, so no step or crack shows.\n"
+        + "0-1024; 0 means no blending.")]
+    public float TerrainEdgeBlendDistanceInUnits { get; set; } = SettingDefaults.TerrainEdgeBlendDistanceInUnits;
+
+    IClearedAreaSettingsValues IRestoreWhereRemovedSettingsValues.ClearedArea => ClearedArea ?? new();
+}
+
+public class ClearedAreaSettings : IClearedAreaSettingsValues
+{
+    [SynthesisOrder]
+    [SynthesisSettingName("Look this far around the place (game units)")]
+    [SynthesisTooltip(
+        "The area is everything this far from the place in every direction, so it is twice this wide. 1024-16384.")]
+    public float SearchRadius { get; set; } = SettingDefaults.ClearedAreaSearchRadius;
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Cleared when at most this share still stands (%)")]
+    [SynthesisTooltip(
+        "The area counts as cleared when at most this share of the cleaned mod's visible objects in it is still standing, measured as set below.\n"
+        + "0.1 is a tenth of a percent; 0 means none may stand. Decimals are allowed. 0-100.")]
+    public float MaxStandingPercent { get; set; } = SettingDefaults.ClearedAreaMaxStandingPercent;
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Measure the share by")]
+    [SynthesisTooltip(
+        "ObjectSize: each object counts by the volume of its box, so a house counts for more than a bucket.\n"
+        + "ObjectCount: each object counts once.")]
+    public ClearedAreaMeasure Measure { get; set; } = SettingDefaults.AreaMeasure;
 }

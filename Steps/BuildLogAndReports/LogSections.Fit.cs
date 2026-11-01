@@ -26,18 +26,27 @@ internal static partial class LogSections
             ]);
     }
 
-    /// <summary>What became of the other mods' objects the cleaned mod changed; the detailed log lists them by outcome. Nothing when there are none.</summary>
-    public static LogSection BuildChangedObjectsSection(CollectedObjects world, IRemovalDecisions final, PluginName target, ReportContext context)
+    /// <summary>
+    /// What became of the other mods' objects the cleaned mod changed; the detailed log lists them by outcome. An object this step
+    /// kept that went back where the cleaned mod was removed is counted with the kept ones and named as gone back. Nothing when there
+    /// are none.
+    /// </summary>
+    /// <param name="restoredWhereRemoved">The earlier version of each target that went back where the cleaned mod was removed.</param>
+    public static LogSection BuildChangedObjectsSection(
+        CollectedObjects world, IRemovalDecisions final, IReadOnlyDictionary<TargetId, EarlierVersion> restoredWhereRemoved, PluginName target, ReportContext context)
     {
         var changed = FitOutcomes.ChangedObjects(world).ToImmutableArray();
         if (changed.IsEmpty) return new LogSection("changed-objects", []);
-        var byOutcome = changed.ToLookup(changedObject => FitOutcomes.OutcomeOf(final, changedObject.Id));
+        var byOutcome = changed.ToLookup(changedObject => FitOutcomes.ChangedObjectOutcomeOf(final, restoredWhereRemoved, changedObject.Id));
         int CountOf(ChangedObjectOutcome outcome) => byOutcome[outcome].Count();
+        var restoredLater = CountOf(ChangedObjectOutcome.KeptThenRestoredWhereRemoved);
         return new LogSection(
             "changed-objects",
             [
                 $"{TargetOrigins.ChangedHeading(target)}: {TextFormat.Count(changed.Length)} ({TargetOrigins.CountedKinds(changed)}); "
-                + $"kept where {target} put them: {TextFormat.Count(CountOf(ChangedObjectOutcome.KeptWherePut))}; "
+                + $"kept where {target} put them: {TextFormat.Count(CountOf(ChangedObjectOutcome.KeptWherePut) + restoredLater)}"
+                + (restoredLater > 0 ? $" ({TextFormat.Count(restoredLater)} then {RestoredWhereRemovedPhrase})" : string.Empty)
+                + "; "
                 + $"kept there shrunk or turned: {TextFormat.Count(CountOf(ChangedObjectOutcome.KeptShrunkOrTurned))}; "
                 + (CountOf(ChangedObjectOutcome.Restored) is > 0 and var restored ? $"restored: {TextFormat.Count(restored)}; " : string.Empty)
                 + $"removed: {TextFormat.Count(CountOf(ChangedObjectOutcome.Removed))}.",
@@ -61,16 +70,26 @@ internal static partial class LogSections
             ]);
     }
 
+    private const string RestoredWhereRemovedPhrase = "restored where the cleaned mod was removed";
+
     private static string OutcomeText(ChangedObjectOutcome outcome, PluginName target, IRemovalDecisions final, TargetObject changedObject) => outcome switch
     {
         ChangedObjectOutcome.KeptWherePut => $"Kept where {target} put it",
+        ChangedObjectOutcome.KeptThenRestoredWhereRemoved => $"Kept where {target} put it, then {RestoredWhereRemovedPhrase}",
         ChangedObjectOutcome.KeptShrunkOrTurned => "Kept there, shrunk or turned",
-        ChangedObjectOutcome.Restored => ((Decision.Restored)final.Of(changedObject.Id)!).EarlierVersion.RestoresWholeRecord
-            ? $"Restored as it was before {target}"
-            : $"Restored where it stood before {target}",
+        ChangedObjectOutcome.Restored => RestoredText(((Decision.Restored)final.Of(changedObject.Id)!).EarlierVersion, target),
         ChangedObjectOutcome.Removed => "Removed",
         _ => throw new UnreachableException($"Unknown changed object outcome {outcome}."),
     };
+
+    private static string RestoredText(EarlierVersion earlier, PluginName target) =>
+        IsRestoredWhole(earlier) ? $"Restored as it was before {target}"
+        : earlier.LeftToLaterPlugins.ContainsKey(PlacedParts.Position) ? $"Restored except its position, which stays as changed after {target}"
+        : $"Restored where it stood before {target}";
+
+    /// <summary>The base and data go back, and no part the cleaned mod changed stays.</summary>
+    private static bool IsRestoredWhole(EarlierVersion earlier) =>
+        earlier.Undo.HasFlag(PlacedParts.BaseAndData) && earlier.LeftToLaterPlugins.IsEmpty && earlier.KeptForRecordFormat == PlacedParts.None;
 
     private static string FittedObjectLine(string outcome, CollectedObjects world, IRemovalDecisions final, TargetObject fitted)
     {

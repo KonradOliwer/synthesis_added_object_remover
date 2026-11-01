@@ -26,6 +26,16 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 /// Only the checks of the changed objects ask for the terrain, water and layer reads above, so the scan skips them when the cleaned
 /// mod overrides no placed record of another plugin, which means it has no changed object.
 /// </param>
+/// <param name="AreaRecordVersions">
+/// Null unless restoring where the cleaned mod's objects were removed is on. On, the cell and LAND records of other plugins the
+/// cleaned mod changed are read and judged as far as asked for, so are the navmeshes it overrides, deletes or adds, and the links
+/// into the records and cells the cleaned mod changed are read, to tell which of them the cleaned mod's own records link to.
+/// </param>
+/// <param name="DecideEveryObjectWithoutCleanedMod">
+/// With <paramref name="JudgeOldPlaces"/>, every other-mod and support-only object is decided in the world without the cleaned mod
+/// even when the scan finds no changed object: other mods' objects that go back where the cleaned mod was removed are checked
+/// against every object that exists because of the cleaned mod.
+/// </param>
 public sealed record WhatToCollect(
     bool Navmesh,
     bool OtherModDetails,
@@ -35,4 +45,6 @@ public sealed record WhatToCollect(
     float MovedDistance,
     bool ProcessReplaced,
     bool JudgeOldPlaces,
-    bool TerrainForChangedObjectsOnly);
+    bool TerrainForChangedObjectsOnly,
+    AreaRecordReads? AreaRecordVersions = null,
+    bool DecideEveryObjectWithoutCleanedMod = false);

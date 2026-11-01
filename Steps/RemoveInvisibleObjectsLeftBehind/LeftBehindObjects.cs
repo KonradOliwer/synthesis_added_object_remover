@@ -3,6 +3,7 @@ using System.Diagnostics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
@@ -18,7 +19,7 @@ public static class LeftBehindObjects
     /// <param name="settings">Null when the step is switched off.</param>
     /// <returns>
     /// The evaluations, and the proposals. An object the round keeps as referenced is already <see cref="LeftBehindOutcome.KeptReferenced"/>
-    /// with its keep reason, and one the round removes as a linked member is <see cref="LeftBehindOutcome.RemovedLinkedToRemoval"/> or <see cref="LeftBehindOutcome.RemovedLinkedToRestoration"/>: the step decides its round on a working copy of <paramref name="decisions"/> and joins the verdicts itself.
+    /// with its keep reason (<see cref="LeftBehindOutcome.KeptInDeletedCell"/> when the reason is a deleted cell), and one the round removes as a linked member is <see cref="LeftBehindOutcome.RemovedLinkedToRemoval"/> or <see cref="LeftBehindOutcome.RemovedLinkedToRestoration"/>: the step decides its round on a working copy of <paramref name="decisions"/> and joins the verdicts itself.
     /// When <paramref name="settings"/> is null the step does not look for containing objects, makes no copy, and the result is
     /// <see cref="StepOutcome.SwitchedOff"/>. An unexpected failure stops the step: <see cref="StepOutcome.StoppedByUnexpectedError"/>,
     /// with the failure and no proposals.
@@ -73,6 +74,7 @@ public static class LeftBehindObjects
         var effect = RoundEffects.Of(decision);
         return effect switch
         {
+            { Outcome: RoundOutcome.KeptAsReferenced, KeepReason.Kind: KeepKind.CellDeleted } => evaluation with { Decision = LeftBehindOutcome.KeptInDeletedCell, KeepReason = effect.KeepReason },
             { Outcome: RoundOutcome.KeptAsReferenced } => evaluation with { Decision = LeftBehindOutcome.KeptReferenced, KeepReason = effect.KeepReason },
             { Outcome: RoundOutcome.Removed, AsLinked: true } => evaluation with { Decision = RemovedAsLinked(decision, decided) },
             { Outcome: RoundOutcome.Untouched or RoundOutcome.Removed } => evaluation,

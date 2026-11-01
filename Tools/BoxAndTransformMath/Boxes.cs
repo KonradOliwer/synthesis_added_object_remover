@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 
 namespace AddedObjectRemover;
@@ -26,6 +27,21 @@ public static class Boxes
         var scaled = local.Scaled(scale);
         var padding = scaled.Size * multiplier;
         return new Box(scaled.Min - padding, scaled.Max + padding);
+    }
+
+    /// <summary>
+    /// The axis-aligned world boxes around a local box placed by <paramref name="transform"/>, grown on every side: the first by its
+    /// scaled size on each axis times <paramref name="sizeMultiplier"/>, the second by <paramref name="distance"/>.
+    /// </summary>
+    /// <param name="sizeMultiplier">Null leaves out the box grown by size.</param>
+    /// <param name="distance">Null leaves out the box grown by distance.</param>
+    public static ImmutableArray<Box> GrownWorldAabbs(Box local, PlacedTransform transform, float? sizeMultiplier, float? distance)
+    {
+        var (position, rotation, scale) = (transform.Position, transform.Rotation, transform.Scale);
+        var boxes = ImmutableArray.CreateBuilder<Box>();
+        if (sizeMultiplier is { } multiplier) boxes.Add(WorldAabb(ExpandedLocalBox(local, scale, multiplier), position, rotation));
+        if (distance is { } units) boxes.Add(WorldAabb(local.Scaled(scale), position, rotation).Grown(units));
+        return boxes.ToImmutable();
     }
 
     /// <summary>The box's sizes multiplied by <paramref name="scale"/>, largest first; assumes a non-negative scale.</summary>

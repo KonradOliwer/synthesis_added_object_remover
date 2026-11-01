@@ -27,12 +27,15 @@ public sealed class BaseObjectShapes : IBaseObjectShapes
 
     private readonly IBaseFacts _bases;
     private readonly IMeshFiles _meshFiles;
+    private readonly IReadOnlyDictionary<uint, CollisionLayerFact> _layers;
     private readonly ComputedOncePerKey<RecordKey, MeasuredBase> _byBase = new(Publication.BuiltOnce, EqualityComparer<RecordKey>.Default);
 
-    public BaseObjectShapes(IBaseFacts bases, IMeshFiles meshFiles)
+    /// <param name="layers">The load order's collision layer records, by layer number.</param>
+    public BaseObjectShapes(IBaseFacts bases, IMeshFiles meshFiles, IReadOnlyDictionary<uint, CollisionLayerFact> layers)
     {
         _bases = bases;
         _meshFiles = meshFiles;
+        _layers = layers;
     }
 
     public IReadOnlyList<MeasuredBase> Computed() => _byBase.Contents();
@@ -70,10 +73,27 @@ public sealed class BaseObjectShapes : IBaseObjectShapes
             : ObjectVisibility.Visible;
     }
 
-    /// <summary>NIF bounds when readable, else OBND, else none.</summary>
+    /// <remarks>
+    /// The load order's own collision layer records decide: a layer blocks when it carries the Navmesh Obstacle flag, or its
+    /// "collides with" list names the character controller's layer and it is no trigger. A number no record has is not known, so it blocks.
+    /// </remarks>
+    public bool LayerBlocksActors(uint collisionLayer) =>
+        _layers.GetValueOrDefault(collisionLayer) is not { } layer
+        || layer.IsNavmeshObstacle
+        || (!layer.IsTrigger && layer.CollidesWith.Contains((uint)CollisionLayer.CharController));
+
     private MeasuredBase MeasureBase(BaseKey baseKey)
     {
         var facts = _bases.Of(baseKey);
+        var measured = MeasureShape(facts);
+        return facts.Kind is BaseRecordKind.Activator or BaseRecordKind.AcousticSpace
+            ? measured with { Shape = measured.Shape with { PrimitiveWithoutLayerIsWalkThrough = true } }
+            : measured;
+    }
+
+    /// <summary>NIF bounds when readable, else OBND, else none.</summary>
+    private MeasuredBase MeasureShape(BaseFacts facts)
+    {
         if (!facts.Resolved) return new MeasuredBase(BaseShape.Missing, BoundsSource.Unresolved, MeshGaveNoBounds: false);
 
         var hasModel = facts.ModelPath != null;
@@ -84,6 +104,7 @@ public sealed class BaseObjectShapes : IBaseObjectShapes
         }
 
         var meshWithoutGeometry = false;
+        bool? collisionBlocksMovement = null;
         if (facts.ModelPath != null)
         {
             var meshPath = _meshFiles.NormalizeMeshPath(facts.ModelPath);
@@ -99,16 +120,22 @@ public sealed class BaseObjectShapes : IBaseObjectShapes
                 return new MeasuredBase(BaseObjectRules.ClassifyEffectOnlyShape(facts), BoundsSource.EffectOnlyMesh, MeshGaveNoBounds: true);
             }
             meshWithoutGeometry = mesh.Status == MeshReadStatus.NoRenderGeometry;
+            // A mesh with collision but nothing to render is an invisible wall or blocker; its collision is read all the same.
+            if (meshWithoutGeometry) collisionBlocksMovement = BaseObjectRules.BlocksMovement(mesh.CollisionLayers);
         }
 
         var meshUnreadable = hasModel;
         if (facts.ObjectBounds is { } bounds)
         {
             return new MeasuredBase(
-                BaseObjectRules.ClassifyShape(facts, bounds, meshPath: null, hasModel, meshWithoutGeometry), BoundsSource.ObjectBounds, meshUnreadable);
+                BaseObjectRules.ClassifyShape(facts, bounds, meshPath: null, hasModel, meshWithoutGeometry) with { CollisionBlocksMovement = collisionBlocksMovement },
+                BoundsSource.ObjectBounds,
+                meshUnreadable);
         }
 
         return new MeasuredBase(
-            BaseObjectRules.ClassifyShape(facts, Box.Zero, meshPath: null, hasModel, meshWithoutGeometry), BoundsSource.None, meshUnreadable);
+            BaseObjectRules.ClassifyShape(facts, Box.Zero, meshPath: null, hasModel, meshWithoutGeometry) with { CollisionBlocksMovement = collisionBlocksMovement },
+            BoundsSource.None,
+            meshUnreadable);
     }
 }

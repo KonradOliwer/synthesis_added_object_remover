@@ -45,6 +45,8 @@ internal static class TestVisibility
         public ObjectVisibility VisibilityOf(BaseKey? baseKey, bool isPrimitive, bool hasMapMarker) =>
             baseKey is { } key && ByTaggedBase.TryGetValue(key, out var visibility) ? visibility : inner.VisibilityOf(baseKey, isPrimitive, hasMapMarker);
 
+        public bool LayerBlocksActors(uint collisionLayer) => inner.LayerBlocksActors(collisionLayer);
+
         public IReadOnlyList<MeasuredBase> Computed() => inner.Computed();
     }
 }

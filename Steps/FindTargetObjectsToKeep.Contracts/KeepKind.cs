@@ -29,4 +29,7 @@ public enum KeepKind
 
     /// <summary>An unexpected error stopped the check of what depends on it, and keeping an object is safe when that is unknown.</summary>
     CheckFailed,
+
+    /// <summary>The final world deletes the cell it stands in, and the patch writes nothing into a deleted cell.</summary>
+    CellDeleted,
 }

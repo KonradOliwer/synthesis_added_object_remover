@@ -13,17 +13,13 @@ internal sealed class CheckArea(IBaseObjectShapes shapes, ChangedTerrainSettings
     /// by its size on each axis times the multiplier (as the too-close box zone grows it) or by the distance in game units.
     /// An object without size gives a box around its position.
     /// </summary>
-    public ImmutableArray<Box> Around(TargetObject target)
-    {
-        var local = shapes.Of(target.Base).Box;
-        var (position, rotation, scale) = (target.Transform.Position, target.Transform.Rotation, target.Transform.Scale);
-        var areas = ImmutableArray.CreateBuilder<Box>();
-        if (settings.AreaBySize) areas.Add(Boxes.WorldAabb(Boxes.ExpandedLocalBox(local, scale, settings.AreaMultiplier), position, rotation));
-        if (settings.AreaByDistance) areas.Add(Boxes.WorldAabb(local.Scaled(scale), position, rotation).Grown(settings.AreaDistanceInUnits));
-        return areas.ToImmutable();
-    }
+    public ImmutableArray<Box> Around(TargetObject target) =>
+        Boxes.GrownWorldAabbs(
+            shapes.Of(target.Base).Box,
+            target.Transform,
+            settings.AreaBySize ? settings.AreaMultiplier : null,
+            settings.AreaByDistance ? settings.AreaDistanceInUnits : null);
 
     /// <summary>The terrain vertices under the box seen from above, cell by cell.</summary>
-    public IEnumerable<CellVertices> VerticesUnder(Box area) =>
-        TerrainGrid.VerticesUnder((new(area.Min.X, area.Min.Y), new(area.Max.X, area.Max.Y)));
+    public IEnumerable<CellVertices> VerticesUnder(Box area) => TerrainGrid.VerticesUnder(area);
 }

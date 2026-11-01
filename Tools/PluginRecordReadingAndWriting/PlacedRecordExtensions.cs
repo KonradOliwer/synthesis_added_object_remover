@@ -26,9 +26,23 @@ internal static class PlacedRecordExtensions
             ? new Vector3(primitive.Bounds.X, primitive.Bounds.Y, primitive.Bounds.Z)
             : null;
 
+    /// <returns>The layer number of the reference's collision layer (XTRI, numbered as the COLL records' index); null when it stores none.</returns>
+    public static uint? GetCollisionLayer(this IPlacedGetter record) => (record as IPlacedObjectGetter)?.CollisionLayer;
+
+    public static bool IsCullingVolume(this IPlacedGetter record) =>
+        record is IPlacedObjectGetter placed
+        && (placed.IsMultiBoundPrimitive || placed.LinkedRooms is { Count: > 0 } || placed.Portals is { Count: > 0 } || placed.RoomPortal is not null);
+
     /// <returns>Null also when the enable parent's reference is null: the game then has no parent to follow.</returns>
     public static IEnableParentGetter? GetEnableParent(this IPlacedGetter record) =>
         record.EnableParent is { Reference.IsNull: false } parent ? parent : null;
+
+    public static PresenceFacts GetPresence(this IPlacedGetter record, PluginNames names) => new(
+        record.IsDeleted,
+        record.IsInitiallyDisabled(),
+        record.GetEnableParent() is { } parent
+            ? new EnableParentFact(names.KeyOf(parent.Reference.FormKey), parent.Flags.HasFlag(EnableParent.Flag.SetEnableStateToOppositeOfParent))
+            : null);
 
     public static bool IsInitiallyDisabled(this IPlacedGetter record) =>
         (record.MajorRecordFlagsRaw & (int)SkyrimMajorRecord.SkyrimMajorRecordFlag.InitiallyDisabled) != 0;

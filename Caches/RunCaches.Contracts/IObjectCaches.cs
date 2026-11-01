@@ -41,6 +41,12 @@ public interface IVisibleTargetObjects
     /// <summary>Replaces <paramref name="into"/> with the visible targets whose box lies within <paramref name="radius"/> of <paramref name="point"/>, ascending.</summary>
     void Around(RecordKey space, Vector3 point, float radius, List<VisibleTargetNear> into);
 
+    /// <summary>
+    /// Replaces <paramref name="into"/> with the visible targets whose box centre lies within <paramref name="radius"/> of
+    /// <paramref name="point"/> horizontally, at any height, ascending.
+    /// </summary>
+    void InColumn(RecordKey space, Vector2 point, float radius, List<VisibleTargetNear> into);
+
     /// <summary>Whether the mesh of some included visible target surrounds <paramref name="point"/>.</summary>
     bool AnyContains(RecordKey space, Vector3 point, Func<TargetId, bool> include, ObjectQueryScratch scratch);
 

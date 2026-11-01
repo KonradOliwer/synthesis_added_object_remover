@@ -6,6 +6,7 @@ using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover.Tests.Reporting;
@@ -30,6 +31,7 @@ public class RunPartTextTests
         { "MarkerMoves", "  Unexpected error in the marker moves (InvalidOperationException: broke). No kept marker was moved, so markers inside other mods' objects stay where they are." },
         { "ReportFileDetails", "  Unexpected error in the report-file details (InvalidOperationException: broke). The touching pairs or mesh origins that the report files list are missing from them." },
         { "LoaderStartUp", "  Unexpected error in the NIF loader start-up (InvalidOperationException: broke). Meshes are read one at a time, which is slower; the results are not affected." },
+        { "Step", "  Unexpected error in the step that restores what the cleaned mod changed where it was removed (InvalidOperationException: broke). Nothing was restored by area; the objects restored because they themselves were removed are written as decided." },
     };
 
     public static TheoryData<string, string> PerSubjectParts { get; } = new()
@@ -37,6 +39,8 @@ public class RunPartTextTests
         { "TooCloseCheck", "  Unexpected error while checking objects for being too close (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were not removed." },
         { "TerrainCheck", "  Unexpected error while checking objects for changed terrain (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were not removed." },
         { "KeepCheck", "  Unexpected error while finding the cleaned mod's objects to keep (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were kept." },
+        { "ObjectCheck", "  Unexpected error while checking objects the cleaned mod changed against what stays (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They stay as the cleaned mod changed them." },
+        { "ObjectThatStays", "  Unexpected error while measuring objects that stay, which objects restored where the cleaned mod was removed are checked against (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were treated as invisible, so an object restored next to them was not checked against them for coming too close." },
         { "RemovalCauseSelection", "  Unexpected error while selecting the objects that can cause removals (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were not used to remove the cleaned mod's objects." },
         { "MeshShapes", @"  Unexpected error while reading mesh shapes (InvalidOperationException: broke): 1 mesh, e.g. meshes\crate.nif. Objects using the mesh are treated as having no mesh shape." },
         { "MeshTriangles", @"  Unexpected error while reading mesh triangles (InvalidOperationException: broke): 1 mesh, e.g. meshes\crate.nif. Objects using the mesh are treated as having no mesh triangles." },
@@ -115,5 +119,6 @@ public class RunPartTextTests
             ReportFileParts.ReportFiles, RestingObjectsParts.AlsoRemove, RestingObjectsParts.FollowUp, RestingObjectsParts.TouchChains, LeftBehindParts.LeftBehind, MarkerMoveParts.MarkerMoves,
             RestingObjectsParts.ReportFileDetails, ChangedTerrainParts.TerrainCheck, TooCloseParts.TooCloseCheck, KeepParts.KeepCheck, SelectionParts.RemovalCauseSelection,
             MeshReadingParts.MeshShapes, MeshReadingParts.MeshTriangles, MeshReadingParts.LoaderStartUp,
+            RestoreWhereRemovedParts.Step, RestoreWhereRemovedParts.ObjectCheck, RestoreWhereRemovedParts.ObjectThatStays,
         }.Single(key => key.Name == name);
 }

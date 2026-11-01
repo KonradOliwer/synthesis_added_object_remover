@@ -3,6 +3,7 @@ using System.Diagnostics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
@@ -19,7 +20,7 @@ public static class VisibleLeftBehindObjects
     /// <returns>
     /// The evaluations, the proposed rounds, the visible rounds as the decisions number them once the proposed rounds are applied, and
     /// the follow-up's summary. Each evaluation is the object's newest check joined with the decision a visible round made: an object a
-    /// round keeps as referenced is <see cref="VisibleLeftBehindOutcome.KeptReferenced"/> with its keep reason, and one a round removes
+    /// round keeps as referenced is <see cref="VisibleLeftBehindOutcome.KeptReferenced"/> with its keep reason (<see cref="VisibleLeftBehindOutcome.KeptInDeletedCell"/> when the reason is a deleted cell), and one a round removes
     /// as a linked member is <see cref="VisibleLeftBehindOutcome.RemovedLinkedToRemoval"/> or <see cref="VisibleLeftBehindOutcome.RemovedLinkedToRestoration"/>:
     /// the step decides its rounds on a working copy of <paramref name="decisions"/> and joins the verdicts itself.
     /// When <paramref name="settings"/> is null the result is <see cref="StepOutcome.SwitchedOff"/>. An unexpected failure stops the step:
@@ -92,6 +93,7 @@ public static class VisibleLeftBehindObjects
         var effect = RoundEffects.Of(decision);
         return effect switch
         {
+            { Outcome: RoundOutcome.KeptAsReferenced, KeepReason.Kind: KeepKind.CellDeleted } => evaluation with { Decision = VisibleLeftBehindOutcome.KeptInDeletedCell, KeepReason = effect.KeepReason },
             { Outcome: RoundOutcome.KeptAsReferenced } => evaluation with { Decision = VisibleLeftBehindOutcome.KeptReferenced, KeepReason = effect.KeepReason },
             { Outcome: RoundOutcome.Removed, AsLinked: true } => evaluation with { Decision = RemovedAsLinked(decision, decided) },
             { Outcome: RoundOutcome.Untouched or RoundOutcome.Removed } => evaluation,

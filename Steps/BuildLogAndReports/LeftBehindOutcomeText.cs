@@ -21,6 +21,7 @@ internal static class LeftBehindOutcomeText
         LeftBehindOutcome.KeptSurroundingsMostlyKept => "surroundings mostly kept",
         LeftBehindOutcome.KeptProtectedType => "protected type",
         LeftBehindOutcome.KeptReferenced => "referenced",
+        LeftBehindOutcome.KeptInDeletedCell => "in a deleted cell",
         _ => throw new UnreachableException($"Unknown left-behind outcome {outcome}."),
     };
 

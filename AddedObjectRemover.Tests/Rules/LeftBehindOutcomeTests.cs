@@ -126,6 +126,25 @@ public class LeftBehindOutcomeTests
         Assert.Equal(2, result.Evaluations.Count);
     }
 
+    [Fact]
+    public void AMarkerInsideAnObjectInADeletedCellIsKeptInADeletedCellNotAsReferenced()
+    {
+        var inRoom = Vector3.Zero;
+        var xMarker = TestVisibility.TaggedBase(ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers));
+        var targets = new List<TargetObject>
+        {
+            TestTargets.Create(0, TestTargets.At(inRoom), xMarker, TestTargets.Space) with { CellDeleted = TestKeepReasons.DeletedByCityMod },
+        };
+        var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Count, new Dictionary<int, KeepReason>()), TestBaseFacts.Unresolved);
+        var room = TestShapes.Placed(OtherMod, 0, Room.Base, inRoom);
+
+        var result = TestLeftBehind.Find(targets, Shapes, [room], Config(), protection);
+
+        var evaluation = Assert.Single(result.Evaluations);
+        Assert.Equal(LeftBehindOutcome.KeptInDeletedCell, evaluation.Decision);
+        Assert.Equal(KeepKind.CellDeleted, evaluation.KeepReason?.Kind);
+    }
+
     /// <summary>The first <paramref name="removed"/> of <paramref name="occupied"/> directions fully removed, the rest fully kept.</summary>
     private static SectorAreas Areas(int occupied, int removed)
     {

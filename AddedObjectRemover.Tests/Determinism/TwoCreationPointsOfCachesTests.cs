@@ -78,6 +78,7 @@ public class TwoCreationPointsOfCachesTests
             new UnexpectedErrors(),
             new NpcRecordsPlugin(linkCache),
             TestBaseFacts.Reader(linkCache),
+            CollisionLayerReader.Read(linkCache),
             npcBodyRules,
             TooCloseObjects.PlacedNpcRules,
             RestingObjects.SurfaceSamplesPerMesh);

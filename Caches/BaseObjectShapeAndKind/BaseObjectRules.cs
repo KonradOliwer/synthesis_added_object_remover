@@ -48,9 +48,9 @@ internal static class BaseObjectRules
 
     /// <summary>
     /// The layers the game's character controller collides with in its collision layer matrix. Pick, zone, trigger, camera,
-    /// line-of-sight, small debris and non-collidable layers do not stop a character, so a mesh with only those can be walked through.
+    /// line-of-sight, small debris and non-collidable layers do not stop a character, so something on only those can be walked through.
     /// </summary>
-    private static bool IsMovementBlocking(CollisionLayer layer) => layer is
+    internal static bool IsMovementBlocking(CollisionLayer layer) => layer is
         CollisionLayer.Static or CollisionLayer.AnimStatic or CollisionLayer.Transparent or CollisionLayer.Clutter
         or CollisionLayer.Trees or CollisionLayer.Props or CollisionLayer.Terrain or CollisionLayer.Trap or CollisionLayer.Ground
         or CollisionLayer.DebrisLarge or CollisionLayer.InvisibleWall or CollisionLayer.StairHelper;

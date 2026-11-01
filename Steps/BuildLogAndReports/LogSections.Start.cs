@@ -9,6 +9,7 @@ using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
@@ -35,6 +36,7 @@ internal static partial class LogSections
             DescribeAlsoRemove(settings.AlsoRemove, settings.OtherModsObjects),
             DescribeVisibleLeftBehind(settings.VisibleLeftBehind),
             DescribeLeftBehind(settings),
+            DescribeRestoreWhereRemoved(settings.RestoreWhereRemoved),
             DescribeDetailedLogAndReports(settings.Reports),
             DescribeOnlyWarnWhenRequiringModLoadsAfterPatch(settings),
         ]);
@@ -167,6 +169,26 @@ internal static partial class LogSections
         + $"Decide only if at least this many of the 8 directions have objects: {minOccupiedDirections}; "
         + $"A direction is cleared when this much of it was removed: {directionClearedPercent}%; "
         + $"Remove when this share of the directions with objects is cleared: {clearedDirectionsPercent}%";
+
+    private static string DescribeRestoreWhereRemoved(WhereRemovedRestoreSettings? restore)
+    {
+        const string group = "Restore where the cleaned mod was removed";
+        if (restore is null) return $"{group}: off.";
+
+        var area = restore.ClearedArea;
+        var terrainEdges = restore.Terrain ? $"; terrain edges blended over {restore.TerrainEdgeBlendDistance} units" : string.Empty;
+        return $"{group}: {string.Join(Describe.ListSeparator, RestoredKindNames(restore))}; "
+            + $"an area {area.SearchRadius * 2} units wide counts as cleared when at most {area.MaxStandingPercent}% of the cleaned mod's objects there still stand, "
+            + $"by {ClearedAreaText.MeasureName(area.Measure)}{terrainEdges}.";
+    }
+
+    private static IEnumerable<string> RestoredKindNames(WhereRemovedRestoreSettings restore)
+    {
+        if (restore.OtherModsObjects) yield return "other mods' objects";
+        if (restore.Terrain) yield return "terrain";
+        if (restore.Cells) yield return "cell settings";
+        if (restore.Navmeshes) yield return "navmeshes";
+    }
 
     private static string DescribeLeftBehind(RunSettings settings)
     {

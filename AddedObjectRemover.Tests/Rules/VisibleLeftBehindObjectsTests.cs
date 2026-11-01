@@ -172,6 +172,21 @@ public class VisibleLeftBehindObjectsTests
     }
 
     [Fact]
+    public void ARemovalOfAnObjectInADeletedCellIsKeptInADeletedCellNotAsReferenced()
+    {
+        var ring = Ring(SixDirections);
+        var targets = ring.SetItem(0, ring[0] with { CellDeleted = TestKeepReasons.DeletedByCityMod });
+        var protection = ObjectsToKeep.Build(targets, [], References(targets.Length, []), UnresolvedBases);
+        var decisions = TestSeededDecisions.StartDisablingAll(protection, targets.Length).Apply(RoundKind.TooClose, [.. new[] { 1, 2, 3, 4, 5, 6 }.Select(TooClose)]);
+
+        var result = Find(targets, decisions, Settings);
+
+        var evaluation = Assert.Single(result.Evaluations);
+        Assert.Equal(VisibleLeftBehindOutcome.KeptInDeletedCell, evaluation.Decision);
+        Assert.Equal(KeepKind.CellDeleted, evaluation.KeepReason?.Kind);
+    }
+
+    [Fact]
     public void AMemberOfTheRemovedObjectsLinkedGroupIsRemovedWithItWhenTheRoundIsApplied()
     {
         var partner = 7;
@@ -976,6 +991,8 @@ public class VisibleLeftBehindObjectsTests
         public IReadOnlyList<RecordKey> Spaces => inner.Spaces;
 
         public void Around(RecordKey space, Vector3 point, float radius, List<VisibleTargetNear> into) => throw new InvalidOperationException("it broke.");
+
+        public void InColumn(RecordKey space, Vector2 point, float radius, List<VisibleTargetNear> into) => inner.InColumn(space, point, radius, into);
 
         public bool AnyContains(RecordKey space, Vector3 point, Func<TargetId, bool> include, ObjectQueryScratch scratch) => inner.AnyContains(space, point, include, scratch);
 

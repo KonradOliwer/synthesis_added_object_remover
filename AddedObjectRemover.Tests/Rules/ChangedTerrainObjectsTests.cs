@@ -1268,6 +1268,8 @@ public class ChangedTerrainObjectsTests
             : baseKey == Marker ? ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers)
             : ObjectVisibility.Visible;
 
+        public bool LayerBlocksActors(uint collisionLayer) => throw new NotSupportedException();
+
         public IReadOnlyList<MeasuredBase> Computed() => [];
     }
 
@@ -1305,7 +1307,7 @@ public class ChangedTerrainObjectsTests
 
         public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk) => throw new NotSupportedException();
 
-        public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets) => throw new NotSupportedException();
+        public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets, IReadOnlySet<PluginName> linkedPlugins) => throw new NotSupportedException();
 
         public IWritableRecords ReadWritableRecords() => throw new NotSupportedException();
 
@@ -1315,7 +1317,9 @@ public class ChangedTerrainObjectsTests
 
         public float[]? ReadTerrain(ExteriorCell cell) => throw new NotSupportedException();
 
-        public MeshTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => throw new NotSupportedException();
+        public float[]? ReadTerrainBelowTarget(ExteriorCell cell) => throw new NotSupportedException();
+
+        public NavmeshWorldTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => throw new NotSupportedException();
 
         public NpcTraits? NpcTraitsOf(BaseKey npc) => throw new NotSupportedException();
 

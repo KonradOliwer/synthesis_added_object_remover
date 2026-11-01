@@ -5,7 +5,9 @@ namespace AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 /// <param name="Keeper">The member of the linked group that must stay; set only for <see cref="KeepKind.LinkedGroup"/>.</param>
 /// <param name="Script">What the object's script names; set only for <see cref="KeepKind.ScriptNamesQuestOrScene"/>.</param>
 /// <param name="Resting">What rests on the object; set only for <see cref="KeepKind.OtherModsObjectRestsOnIt"/>.</param>
-public sealed record KeepReason(KeepKind Kind, LinkFact? Link = null, GroupKeeper? Keeper = null, ScriptFinding? Script = null, RestingObject? Resting = null);
+/// <param name="CellDeleted">The deleted cell the object stands in; set only for <see cref="KeepKind.CellDeleted"/>.</param>
+public sealed record KeepReason(
+    KeepKind Kind, LinkFact? Link = null, GroupKeeper? Keeper = null, ScriptFinding? Script = null, RestingObject? Resting = null, DeletedCell? CellDeleted = null);
 
 /// <summary>An object resting on a target object.</summary>
 /// <param name="KeptFor">

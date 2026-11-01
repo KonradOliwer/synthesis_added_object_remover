@@ -97,8 +97,15 @@ internal static partial class LogSections
         OtherModsObjectFate.PulledDown => $" by {TextFormat.Fixed(outcome.Drop, 1)} units",
         OtherModsObjectFate.LeftNotRemovable or OtherModsObjectFate.LeftNothingBelowNotRemovable => $" ({OtherModsObjectText.Roles(outcome.Blocking)})",
         OtherModsObjectFate.LeftWonAfterPatch => $" ({outcome.Object.WinningMod} loads after the patch)",
+        OtherModsObjectFate.LeftInDeletedCell => DeletedCellDetail(outcome),
         _ => string.Empty,
     };
+
+    private static string DeletedCellDetail(OtherModsObjectOutcome outcome)
+    {
+        var deleted = outcome.Object.CellDeleted!;
+        return $" ({Describe.Cell(deleted.Cell)}, deleted by {deleted.DeletedBy})";
+    }
 
     private static string DescribePosition(OtherObject other) =>
         $"({TextFormat.Fixed(other.Position.X, 0)}, {TextFormat.Fixed(other.Position.Y, 0)}, {TextFormat.Fixed(other.Position.Z, 0)})";

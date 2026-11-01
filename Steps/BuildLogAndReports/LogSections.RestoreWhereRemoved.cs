@@ -1,0 +1,170 @@
+using System.Diagnostics;
+using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
+using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
+
+namespace AddedObjectRemover.Steps.BuildLogAndReports;
+
+internal static partial class LogSections
+{
+    /// <summary>The step's name in the log.</summary>
+    public const string RestoreWhereRemovedName = "Restore where removed";
+
+    private const string RestoreWhereRemovedSectionId = "restore-where-removed";
+    private const string CountsSeparator = ", ";
+    private const string AreasSeparator = "; ";
+
+    /// <summary>
+    /// What went back and what stays where the cleaned mod was removed. The normal log has the counts; the detailed log adds the
+    /// counts of what stays for each reason and one line per change. A line with no fact is not printed.
+    /// </summary>
+    public static LogSection BuildRestoreWhereRemovedSection(
+        CollectedObjects world, RestoreWhereRemovedResult result, ClearedAreaMeasure measure, TimeSpan elapsed, ReportContext context)
+    {
+        switch (result.Outcome)
+        {
+            case StepOutcome.SwitchedOff:
+                return new LogSection(RestoreWhereRemovedSectionId, []);
+            case StepOutcome.StoppedByUnexpectedError:
+                return new LogSection(RestoreWhereRemovedSectionId, [BuildNotPerformedLine(RestoreWhereRemovedName)]);
+            case StepOutcome.Performed:
+                break;
+            default:
+                throw new UnreachableException($"Unexpected outcome {result.Outcome} of {RestoreWhereRemovedName}.");
+        }
+
+        var judged = new RestoreJudgements(result);
+        return new LogSection(
+            RestoreWhereRemovedSectionId,
+            [
+                .. FactLine("Restored where the cleaned mod was removed", RestoreCountLines.Restored(judged), CountsSeparator),
+                .. FactLine("Left as the cleaned mod changed them", RestoreCountLines.LeftAsChanged(judged), AreasSeparator),
+                .. context.Detailed ? RestoreWhereRemovedDetailLines(world, judged, measure, elapsed, context) : [],
+            ]);
+    }
+
+    /// <summary>The line that closes the log with what went back; nothing when nothing did.</summary>
+    public static LogSection BuildRestoreWhereRemovedSummarySection(RestoreWhereRemovedResult result) =>
+        new("restore-where-removed-summary", [.. FactLine("Restored where the cleaned mod was removed", RestoreCountLines.RestoredInSummary(new RestoreJudgements(result)), CountsSeparator)]);
+
+    private static IEnumerable<string> RestoreWhereRemovedDetailLines(
+        CollectedObjects world, RestoreJudgements judged, ClearedAreaMeasure measure, TimeSpan elapsed, ReportContext context)
+    {
+        if (judged.IsEmpty) return [];
+
+        var label = RestoreOutcomes.LabelsIn(world);
+        return
+        [
+            .. FactLine("Left to later plugins in the changes judged", RestoreCountLines.LeftToLaterPlugins(judged), CountsSeparator),
+            .. FactLine("Kept because the cleaned mod's objects still stand around them", RestoreCountLines.KeptForArea(judged, AreaVerdict.StillStanding), CountsSeparator),
+            .. FactLine("Kept because the cleaned mod has no objects around them", RestoreCountLines.KeptForArea(judged, AreaVerdict.NoObjectsAround), CountsSeparator),
+            .. FactLine("Not restored whatever the area around them", RestoreCountLines.NeverRestored(judged), CountsSeparator),
+            .. judged.Result.Objects.Select(change => RestoredObjectLine(world, change, measure, label, context)),
+            .. judged.Result.Cells.Select(cell => RestoredCellLine(world, cell, measure, label)),
+            .. judged.Lands.SelectMany(land => RestoredLandLines(world, land, measure)),
+            .. judged.Navmeshes.Select(navmesh => RestoredNavmeshLine(world, navmesh, measure, label)),
+            $"{RestoreWhereRemovedName}: {TextFormat.Count(judged.Result.Passes, "pass", "passes")}{Describe.TimedSuffix(elapsed, context)}.",
+        ];
+    }
+
+    /// <summary>"Heading: fact, fact."; nothing when there is no fact.</summary>
+    private static IEnumerable<string> FactLine(string heading, IEnumerable<string> facts, string separator)
+    {
+        var list = facts.ToList();
+        if (list.Count > 0) yield return $"{heading}: {string.Join(separator, list)}.";
+    }
+
+    /// <param name="label">Names a record a guard found.</param>
+    private static string RestoredObjectLine(CollectedObjects world, PlacedChangeJudged judged, ClearedAreaMeasure measure, Func<RecordKey, string> label, ReportContext context)
+    {
+        var change = judged.Change;
+        var cell = change.Cell.Key == change.SpaceKey ? string.Empty : $", cell {Describe.Cell(change.Cell)}";
+        var record = $"{RecordLabels.Of(change.Key, change.EditorId)} (base {RecordNames.DescribeBase(context.Bases, change.BaseNow)}) in {Describe.Space(world, change.SpaceKey)}{cell}";
+        var later = Tables.LeftToLaterPlugins(change.Earlier) is { } plugins ? $"; left to later plugins: {plugins}" : string.Empty;
+        var areas = ObjectAreas(judged, measure);
+        return RestoreOutcomes.KeptBecause(judged, label) is { } kept
+            ? $"  Kept as changed: {record}: {kept}{areas}{later}"
+            : $"  {RestoreWhereRemovedText.KindVerb(RestoreOutcomes.KindOf(change))}: {record}{WhereObjectGoesBack(change, context)}{areas}{later}";
+    }
+
+    /// <summary>E.g. " to (10, 20, 30)", and " to base X" for a model that goes back.</summary>
+    private static string WhereObjectGoesBack(RecordChangedByCleanedMod change, ReportContext context)
+    {
+        var earlier = change.Earlier;
+        var position = earlier.Undo.HasFlag(PlacedParts.Position)
+            ? $" to ({string.Join(Describe.ListSeparator, new[] { earlier.Placement.Position.X, earlier.Placement.Position.Y, earlier.Placement.Position.Z }.Select(value => TextFormat.Fixed(value, 0)))})"
+            : string.Empty;
+        var model = earlier.Undo.HasFlag(PlacedParts.BaseAndData) && earlier.Base != change.BaseNow ? $" to base {RecordNames.DescribeBase(context.Bases, earlier.Base)}" : string.Empty;
+        return position + model;
+    }
+
+    /// <summary>"; 0 of 214 objects still stand (0.0% by size)" around the old place and, for an object the removals left in place, where it stands now.</summary>
+    private static string ObjectAreas(PlacedChangeJudged judged, ClearedAreaMeasure measure) =>
+        judged.WhereItIsNow is null
+            ? ClearedAreaText.After(judged.OldPlace, measure)
+            : ClearedAreaText.After(judged.OldPlace, measure, "at its old place ") + ClearedAreaText.After(judged.WhereItIsNow, measure, "where it stands now ");
+
+    /// <param name="label">Names the record that keeps the water level.</param>
+    private static string RestoredCellLine(CollectedObjects world, CellChangeJudged judged, ClearedAreaMeasure measure, Func<RecordKey, string> label)
+    {
+        var change = judged.Change;
+        var place = change.Grid is var (x, y) ? $"{Describe.Space(world, change.SpaceKey)}, cell ({x}, {y})" : Describe.Space(world, change.SpaceKey);
+        var area = ClearedAreaText.After(judged.Area, measure);
+        var later = Describe.PartsByPlugin(RestoreOutcomes.LeftToLaterPlugins(change)) is { Length: > 0 } plugins ? $"; left to later plugins: {plugins}" : string.Empty;
+        if (RestoreOutcomes.KeptBecause(judged, label) is { } kept) return $"  Kept as changed: cell {place}: {kept}{area}{later}";
+
+        var parts = string.Join(Describe.ListSeparator, RestoreOutcomes.UndoneParts(judged).Select(RestoreWhereRemovedText.PartOfCell));
+        var water = judged.WaterKeptBy is { } by ? $"; water level kept: {RestoreWhereRemovedText.WaterKept(by, label)}" : string.Empty;
+        return $"  Cell {place}: {parts}{water}{area}{later}";
+    }
+
+    private static IEnumerable<string> RestoredLandLines(CollectedObjects world, LandJudgement land, ClearedAreaMeasure measure)
+    {
+        var change = land.Land.Change;
+        var place = $"{Describe.Space(world, change.Cell.WorldspaceKey)}, cell ({change.Cell.X}, {change.Cell.Y})";
+        if (land.Land.Never is { } never)
+        {
+            yield return $"  Kept as changed: terrain {place}: {RestoreWhereRemovedText.Never(never)}";
+            yield break;
+        }
+
+        foreach (var quarter in land.Quarters.Where(quarter => quarter.HoldsChange))
+        {
+            var area = ClearedAreaText.After(RestoreOutcomes.AreaOf(quarter), measure);
+            var name = $"{RestoreWhereRemovedText.Quarter(quarter.Quarter)} quarter";
+            yield return RestoreOutcomes.KeptBecause(land.Land, quarter) is { } kept
+                ? $"  Kept as changed: terrain {place}, {name}: {kept}{area}"
+                : $"  Terrain {place}, {name}: {RestoredTerrainPieces(quarter)}{area}";
+        }
+        if (land.Land.Rest) yield return $"  Terrain {place}: {RestoreWhereRemovedText.RestOfLandRecord}";
+        else if (RestoreOutcomes.HoldsOnlyTheRest(land)) yield return $"  Kept as changed: terrain {place}: {RestoreWhereRemovedText.RestOfLandRecord}: {RestoreOutcomes.KeptBecauseOfRest(land.Land)}";
+    }
+
+    /// <summary>E.g. "210 heights, ground textures; 14 heights kept under objects that stay".</summary>
+    private static string RestoredTerrainPieces(LandQuarterFacts quarter)
+    {
+        List<string> restored = [];
+        if (quarter.RestoredHeights > 0) restored.Add(TextFormat.Count(quarter.RestoredHeights, "height", "heights"));
+        if (quarter.RestoredColours > 0) restored.Add(TextFormat.Count(quarter.RestoredColours, "vertex colour", "vertex colours"));
+        if (quarter.RestoredTextures) restored.Add("ground textures");
+        var kept = quarter.Kept.Select(entry => $"{TextFormat.Count(entry.Points, "height", "heights")} kept {RestoreWhereRemovedText.TerrainKept(entry.Reason)}");
+        return string.Join(AreasSeparator, new[] { string.Join(Describe.ListSeparator, restored) }.Concat(kept).Where(piece => piece.Length > 0));
+    }
+
+    /// <param name="label">Names a record a guard found.</param>
+    private static string RestoredNavmeshLine(CollectedObjects world, NavmeshOutcome outcome, ClearedAreaMeasure measure, Func<RecordKey, string> label)
+    {
+        var change = outcome.Judged.Change;
+        var place = $"{change.Navmesh} in {Describe.Space(world, change.SpaceKey)}, cell {change.Cell}";
+        if (RestoreOutcomes.KeptBecause(outcome, label) is { } kept)
+        {
+            return $"  Kept as changed: navmesh {place}: {kept}{ClearedAreaText.After(outcome.Judged.Area, measure)}";
+        }
+
+        var undo = outcome.Judged.Undo ?? throw new UnreachableException($"The navmesh {change.Navmesh} goes back with its group but has no navmesh undo.");
+        var group = outcome.Group ?? throw new UnreachableException($"The navmesh {change.Navmesh} goes back but is in no group.");
+        var others = group.Members.Length - 1;
+        var together = others > 0 ? $" together with {TextFormat.Count(others, "other navmesh", "other navmeshes")}" : string.Empty;
+        return $"  Navmesh {place}: {RestoreWhereRemovedText.UndoVerb(undo)}{together}";
+    }
+}

@@ -8,8 +8,8 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 internal static partial class LogSections
 {
     /// <summary>
-    /// Where the report files went, in the order touch, support, mesh origins, visible leftovers, invisible leftovers, removals, restored objects, moved and fitted objects, other mods'
-    /// objects left without support, hints. The mesh-origin summary
+    /// Where the report files went, in the order touch, support, mesh origins, visible leftovers, invisible leftovers, removals, restored objects, objects and cells judged for restoring where the cleaned mod was removed,
+    /// moved and fitted objects, other mods' objects left without support, hints. The mesh-origin summary
     /// comes from the explanations, so it shows even when its file could not be written. Only written files have lines;
     /// when writing the files was stopped, the not-performed line comes first.
     /// </summary>
@@ -43,6 +43,8 @@ internal static partial class LogSections
         }
         AddRowsLine(lines, tables, ReportFileNames.RemovalsFileName, "Removals");
         AddRowsLine(lines, tables, ReportFileNames.RestoredFileName, "Restored objects");
+        AddRowsLine(lines, tables, ReportFileNames.RestoredWhereRemovedObjectsFileName, "Objects judged for restoring where the cleaned mod was removed");
+        AddRowsLine(lines, tables, ReportFileNames.RestoredWhereRemovedCellsFileName, "Cells, terrain quarters and navmeshes judged for restoring where the cleaned mod was removed");
         AddRowsLine(lines, tables, ReportFileNames.FitsFileName, "Changed and fitted objects");
         AddRowsLine(lines, tables, ReportFileNames.LeftWithoutSupportFileName, LeftWithoutSupportName);
         AddRowsLine(lines, tables, ReportFileNames.HintsFileName, "Removed markers and kept objects");

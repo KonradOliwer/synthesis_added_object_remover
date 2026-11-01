@@ -1,6 +1,7 @@
 # Static methods and local functions of this module that mention no domain type (Ids or a Contracts type), each with its reason.
 # Form: Type.Member | reason  (local function: Type.Method.Local). The test fails when an entry stops being flagged.
 Describe.Cell | Report wording: labels a cell fact (a plugin-facts type outside the domain list).
+Describe.DeletedCell | Report wording: names the deleted cell of a record (a plugin-facts type outside the domain list).
 Describe.Space | Report wording: labels a space fact (a plugin-facts type outside the domain list).
 AreaText.Worldspace | Report wording: names a space fact by its display name (a plugin-facts type outside the domain list).
 AreaText.Grid | Report wording: prints a cell grid point (a plugin-facts type outside the domain list).
@@ -43,3 +44,16 @@ Tables.LeftBehindObjectHeader | Report columns: the leading column names the two
 Tables.SectorHeader | Report columns: the per-direction column names of the left-behind tables (a tool's compass type).
 Tables.SectorColumns | Report columns: the per-direction fields of a step's surroundings (a tool's area type).
 Tables.PlacementColumns | Report wording: the CSV columns of a placement (a tool's placement type).
+Tables.PartName | Report wording: the name of one part of a placed record (a tool's part type).
+Tables.PartNames | Report wording: the names of the parts of a placed record that are set (a tool's part type).
+LogSections.FactLine | Report wording: "Heading: fact, fact." for the facts a count line states, or no line when there is none; it takes only words.
+RestoreCountLines.Breakdown | Report wording: the "N name" items of a count line joined (the names are given in).
+RestoreCountLines.Item | Report wording: one name with its count, for a count line (the name is given in).
+RestoreOutcomes.PointsPerQuarter | Report counting: how many points of a LAND record's point set each of its four quarters holds (a tool's point set, not a domain type).
+RestoreWhereRemovedText.PartOfCell | Report wording: the name of one part of a cell record (a tool's part type).
+RestoreWhereRemovedText.Fault | Report wording: one navmesh consistency fault as a phrase (a tool's fault record).
+RestoreWhereRemovedText.FaultKind | Report wording: how a navmesh breaks a consistency rule (a tool's fault kind).
+RestoreWhereRemovedText.Quarter | Report wording: the name of one quarter of a cell's terrain by its number.
+RestoreWhereRemovedText.Result | Report wording: "restored", or "kept: " and the reason; it takes only the reason's text.
+Tables.TableWhenAnyRow | Report columns: a CSV table, or none when it has no row (a CSV tool's table record, not a domain type).
+Tables.TerrainPieces | Report wording: the counts of heights, vertex colours and ground textures of a terrain quarter; it takes only the counts.

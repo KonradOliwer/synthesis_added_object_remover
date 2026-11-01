@@ -40,9 +40,13 @@ internal static class ChangedObjectKind
     private static PlacedVersionFact? VersionBelowCleanedMod(PlacedRecordFact record, PluginName cleanedMod, AcceptedWorld world)
     {
         var versions = record.Versions;
-        var cleanedModIndex = versions.TakeWhile(version => version.Plugin != cleanedMod).Count();
+        var cleanedModIndex = CleanedModIndexOf(record, cleanedMod);
         if (cleanedModIndex == 0 || cleanedModIndex == versions.Length) return null;
         var trustedAboveCleanedMod = versions.Skip(cleanedModIndex + 1).Any(version => world.TrustOf(version.Plugin) == VersionTrust.Full);
         return trustedAboveCleanedMod ? null : versions[cleanedModIndex - 1];
     }
+
+    /// <returns>The index of the cleaned mod's version in <see cref="PlacedRecordFact.Versions"/>; their count when it has none there.</returns>
+    public static int CleanedModIndexOf(PlacedRecordFact record, PluginName cleanedMod) =>
+        record.Versions.TakeWhile(version => version.Plugin != cleanedMod).Count();
 }

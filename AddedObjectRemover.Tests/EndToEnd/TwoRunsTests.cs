@@ -226,6 +226,8 @@ public sealed class TwoRunsTests : IDisposable
             Indexes.Add(records);
             return inner.Open(records);
         }
+
+        public IReadOnlyDictionary<uint, CollisionLayerFact> ReadCollisionLayers(IRecordIndex records) => inner.ReadCollisionLayers(records);
     }
 
     /// <summary>One run's folders: its output plugin's folder, and the report folder inside it.</summary>

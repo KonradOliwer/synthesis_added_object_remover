@@ -12,7 +12,7 @@ namespace AddedObjectRemover;
 internal static class LandHeightReader
 {
     private const int VerticesPerSide = TerrainHeights.VerticesPerSide;
-    private const float UnitsPerHeightStep = 8f;
+    private const float UnitsPerHeightStep = LandHeightEncoder.UnitsPerStep;
 
     /// <returns>Heights row by row (<see cref="VerticesPerSide"/> per row); null for a deleted record or one without a height map.</returns>
     public static float[]? Read(ILandscapeGetter landscape)

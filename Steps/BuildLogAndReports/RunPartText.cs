@@ -10,6 +10,7 @@ using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
@@ -48,6 +49,16 @@ internal static class RunPartText
             "checking the old places of objects the cleaned mod changed", "Each was treated as colliding at its old place.", SubjectKind.OldPlaceObject),
         [KeepParts.KeepCheck] = new("finding the cleaned mod's objects to keep", "They were kept.", SubjectKind.Object),
         [SelectionParts.RemovalCauseSelection] = new("selecting the objects that can cause removals", "They were not used to remove the cleaned mod's objects.", SubjectKind.Object),
+        [RestoreWhereRemovedParts.Step] = new(
+            "the step that restores what the cleaned mod changed where it was removed",
+            "Nothing was restored by area; the objects restored because they themselves were removed are written as decided.",
+            Subjects: null),
+        [RestoreWhereRemovedParts.ObjectCheck] = new(
+            "checking objects the cleaned mod changed against what stays", "They stay as the cleaned mod changed them.", SubjectKind.Object),
+        [RestoreWhereRemovedParts.ObjectThatStays] = new(
+            "measuring objects that stay, which objects restored where the cleaned mod was removed are checked against",
+            "They were treated as invisible, so an object restored next to them was not checked against them for coming too close.",
+            SubjectKind.Object),
         [MeshReadingParts.MeshShapes] = new("reading mesh shapes", "Objects using the mesh are treated as having no mesh shape.", SubjectKind.Mesh),
         [MeshReadingParts.MeshTriangles] = new("reading mesh triangles", "Objects using the mesh are treated as having no mesh triangles.", SubjectKind.Mesh),
         [MeshReadingParts.LoaderStartUp] = new("the NIF loader start-up", "Meshes are read one at a time, which is slower; the results are not affected.", Subjects: null),

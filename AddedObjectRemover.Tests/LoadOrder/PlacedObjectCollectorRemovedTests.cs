@@ -74,6 +74,27 @@ public class PlacedObjectCollectorRemovedTests
         Assert.Equal(kept.Key, Assert.Single(collected.Links).Source);
     }
 
+    /// <summary>
+    /// Initially Disabled hides a winning target record whatever its enable parent says, as the collector's presence rule does, so
+    /// the winning presence calls it removed; on another plugin's record the parent decides, so the presence follows the parent.
+    /// </summary>
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void InitiallyDisabledWithAnEnableParentIsRemovedInTheWinningPresenceOnlyForAWinningTargetRecord(bool winningTarget, bool removed)
+    {
+        var parent = new RecordKey(OtherPlugin, 0x77);
+        var record = winningTarget
+            ? TestPlacedRecords.Create(TestTargets.Key(1), TestTargets.TargetName, new Vector3(FarAway, 0, 0))
+            : OtherRecord(1, new Vector3(FarAway, 0, 0));
+        var disabledWithParent = TestPlacedRecords.WithWinningPresence(
+            record, new PresenceFacts(Deleted: false, InitiallyDisabled: true, new EnableParentFact(parent, Opposite: false)));
+
+        var collected = Collect([Target, disabledWithParent]);
+
+        Assert.Equal(new PlacedPresence(removed, parent, OppositeOfParent: false), collected.WinningPresence[record.Key]);
+    }
+
     [Fact]
     public void LinksFromARemovedRecordOutsideTheTargetSpacesAreDropped()
     {

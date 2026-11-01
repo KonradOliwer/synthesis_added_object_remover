@@ -2,15 +2,24 @@ using System.Collections.Immutable;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Steps.WriteThePatch.Contracts;
 
 namespace AddedObjectRemover.Steps.WriteThePatch;
 
-/// <summary>Turns the final removal decisions and what became of other mods' objects into write orders and has the patch writing run them.</summary>
+/// <summary>
+/// Turns the final removal decisions, what became of other mods' objects and what goes back where the cleaned mod was removed into
+/// write orders and has the patch writing run them.
+/// </summary>
 public static class PatchWriter
 {
     public static WriteSummary Write(
-        IRemovalDecisions final, ImmutableArray<TargetObject> targets, OtherModsObjectsResult otherModsObjects, IPluginRecords plugin, IPatchWriting writing)
+        IRemovalDecisions final,
+        ImmutableArray<TargetObject> targets,
+        OtherModsObjectsResult otherModsObjects,
+        RestoreWhereRemovedResult whereRemoved,
+        IPluginRecords plugin,
+        IPatchWriting writing)
     {
         var removed = ListRemovalsInWriteOrder(final);
         var orders = new List<WriteOrder>();
@@ -26,18 +35,23 @@ public static class PatchWriter
         orders.AddRange(fitted);
 
         var restored = ListRestoresInWriteOrder(final);
-        orders.AddRange(restored.SelectMany(id => RestoreWrite.OrdersFor(targets[id.Index], ((Decision.Restored)final.Of(id)!).EarlierVersion)));
+        orders.AddRange(restored.SelectMany(id => RestoreOrdersFor(targets[id.Index], ((Decision.Restored)final.Of(id)!).EarlierVersion)));
+        var whereRemovedOrders = WhereRemovedOrders(whereRemoved).ToList();
+        orders.AddRange(whereRemovedOrders);
 
         var moves = final.Moves.Select(move => new SetPosition(targets[move.Target.Index].Key, move.To)).ToList();
         orders.AddRange(moves);
 
-        var otherRemovals = otherModsObjects.Objects.Where(IsRemoved).ToList();
+        var otherRemovals = otherModsObjects.Objects.Where(outcome => outcome.IsRemoved).ToList();
         orders.AddRange(otherRemovals.SelectMany(outcome => RemovalWrite.OrdersFor(outcome.Object)));
         var pulled = otherModsObjects.Objects.Where(outcome => outcome.Fate == OtherModsObjectFate.PulledDown).Select(outcome => new SetPosition(outcome.Object.Key, outcome.NewPosition)).ToList();
         orders.AddRange(pulled);
 
-        writing.Write(plugin.ReadWritableRecords(), orders);
-        return new WriteSummary(removed, restored, moves.Count, enableParentsReplaced, fitted.Count, otherRemovals.Count, pulled.Count);
+        var records = plugin.ReadWritableRecords();
+        writing.Write(records, orders);
+        NavmeshOutputCheck.ThrowOnFault(orders, whereRemoved.DoorsLeftRemoved.ToHashSet(), () => writing.ReadFinalNavmeshes(records));
+        return new WriteSummary(
+            removed, restored, moves.Count, enableParentsReplaced, fitted.Count, otherRemovals.Count, pulled.Count, whereRemovedOrders.Select(order => order.Record).Distinct().Count());
     }
 
     /// <summary>Round by round, each round's direct removals in target order, then the linked ones.</summary>
@@ -56,7 +70,27 @@ public static class PatchWriter
             .Select(id => ToSetPlacement(targets[id.Index].Key, ((Decision.Fitted)final.Of(id)!).To)),
     ];
 
-    private static SetPlacement ToSetPlacement(RecordKey key, EulerPlacement placement) => new(key, placement.Position, placement.Rotation, placement.Scale);
+    private static IEnumerable<WriteOrder> RestoreOrdersFor(TargetObject target, EarlierVersion earlier) =>
+        PlacedUndoWrite.OrdersFor(target.Key, target.Cell, target.IsPersistent, earlier);
 
-    private static bool IsRemoved(OtherModsObjectOutcome outcome) => outcome.Fate is OtherModsObjectFate.Removed or OtherModsObjectFate.RemovedNothingBelow;
+    /// <summary>
+    /// The placed records, then the cells, each in record key order, then the LAND records, in the order of their cells, then the
+    /// navmesh groups, in their order, that go back where the cleaned mod was removed.
+    /// </summary>
+    private static IEnumerable<WriteOrder> WhereRemovedOrders(RestoreWhereRemovedResult whereRemoved) =>
+        whereRemoved.Objects.Where(judged => judged.IsRestored)
+            .SelectMany(judged => PlacedUndoWrite.OrdersFor(judged.Change.Key, judged.Change.Cell, judged.Change.IsPersistent, judged.Change.Earlier))
+            .Concat(whereRemoved.Cells.Where(judged => judged.IsRestored)
+                .Select(judged => new UndoCellParts(judged.Change.Cell, [.. judged.Undone.Select(part => part.Name)])))
+            .Concat(whereRemoved.Lands.Where(judged => judged.IsRestored).SelectMany(LandOrdersFor))
+            .Concat(whereRemoved.NavmeshGroups.Where(group => group.IsRestored).SelectMany(group => group.Orders));
+
+    /// <summary>The parts copied back first, then the heights, so the heights are written into the grids the rest brings back.</summary>
+    private static IEnumerable<WriteOrder> LandOrdersFor(LandChangeJudged land)
+    {
+        if (!land.Colours.IsEmpty || !land.Textures.IsEmpty || land.Rest) yield return new UndoLandParts(land.Change.LandKey, land.Colours, land.Textures, land.Rest);
+        if (land.FinalHeights is { } heights) yield return new SetLandHeights(land.Change.LandKey, heights, land.Heights, land.Beyond);
+    }
+
+    private static SetPlacement ToSetPlacement(RecordKey key, EulerPlacement placement) => new(key, placement.Position, placement.Rotation, placement.Scale);
 }

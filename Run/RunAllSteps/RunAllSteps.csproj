@@ -38,6 +38,8 @@
     <ProjectReference Include="..\..\Steps\RemoveInvisibleObjectsLeftBehind\RemoveInvisibleObjectsLeftBehind.csproj" />
     <ProjectReference Include="..\..\Steps\MoveKeptMarkers.Contracts\MoveKeptMarkers.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\MoveKeptMarkers\MoveKeptMarkers.csproj" />
+    <ProjectReference Include="..\..\Steps\RestoreWhereRemoved.Contracts\RestoreWhereRemoved.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\RestoreWhereRemoved\RestoreWhereRemoved.csproj" />
     <ProjectReference Include="..\..\Steps\WriteThePatch.Contracts\WriteThePatch.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\WriteThePatch\WriteThePatch.csproj" />
     <ProjectReference Include="..\..\Steps\BuildLogAndReports.Contracts\BuildLogAndReports.Contracts.csproj" />

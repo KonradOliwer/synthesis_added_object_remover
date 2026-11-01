@@ -104,9 +104,33 @@ public class UnreadableRecordTests : IDisposable
         var state = FixturePatcherState.Create([_base.Mod, _target.Mod, lower.Mod, unrelated.Mod, higher.Mod], _folder, _folder);
         var plugin = new PluginRecordsFactory(FixturePatcherState.CreateFinalWorld(state), ManyWorkers).Open();
 
-        var read = plugin.ReadLinks(TestTargets.TargetName, new HashSet<RecordKey> { TestTargets.Key(0), TestTargets.Key(1) });
+        var read = plugin.ReadLinks(TestTargets.TargetName, new HashSet<RecordKey> { TestTargets.Key(0), TestTargets.Key(1) }, new HashSet<PluginName>());
 
         Assert.Equal(new[] { higher.Key.ToPluginName(), lower.Key.ToPluginName() },read.Links.Select(link => link.Source.Plugin));
+    }
+
+    /// <summary>
+    /// A plugin that needs only the base game links to a base game record. Asking for links into that record reads the plugin only
+    /// when the base game is among the given plugins: the records asked for never widen the plugins read.
+    /// </summary>
+    [Fact]
+    public void ThePluginsReadForLinksFollowTheGivenPluginsNotThePluginsOfTheRecordsAskedFor()
+    {
+        var baseRecord = new FormList(_base.NextKey(), FixtureMod.Release);
+        _base.Mod.FormLists.Add(baseRecord);
+        var baseOnly = new FixtureMod("BaseOnly.esp", _base);
+        var list = new FormList(baseOnly.NextKey(), FixtureMod.Release);
+        list.Items.Add(new FormLink<ISkyrimMajorRecordGetter>(baseRecord.FormKey));
+        baseOnly.Mod.FormLists.Add(list);
+        var state = FixturePatcherState.Create([_base.Mod, _target.Mod, baseOnly.Mod], _folder, _folder);
+        var plugin = new PluginRecordsFactory(FixturePatcherState.CreateFinalWorld(state), ManyWorkers).Open();
+        var asked = new HashSet<RecordKey> { baseRecord.FormKey.ToRecordKey() };
+
+        var targetOnly = plugin.ReadLinks(TestTargets.TargetName, asked, new HashSet<PluginName>());
+        var withBaseGame = plugin.ReadLinks(TestTargets.TargetName, asked, new HashSet<PluginName> { _base.Key.ToPluginName() });
+
+        Assert.Empty(targetOnly.Links);
+        Assert.Equal(baseOnly.Key.ToPluginName(), Assert.Single(withBaseGame.Links).Source.Plugin);
     }
 
     [Fact]

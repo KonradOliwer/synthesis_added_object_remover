@@ -7,7 +7,9 @@ namespace AddedObjectRemover.Steps.JudgeChangedObjects;
 
 /// <summary>
 /// Decides, before any removal round, what a round that removes a target object does with it: the cleaned mod's own objects are
-/// disabled, and another mod's object the cleaned mod changed is disabled or put back to its earlier version as its mode says.
+/// disabled, and another mod's object the cleaned mod changed is disabled or put back to its earlier version as its mode says; it is
+/// disabled also when the part that shows the change does not go back, or the restore would write it into a cell the final world
+/// deletes.
 /// With <see cref="RestoreMode.RestoreIfNoCollision"/> the earlier version is checked once, standing at its old place, by the
 /// rules of <see cref="OldPlaceRules"/>; a failed check counts as a clash. The step removes nothing.
 /// </summary>
@@ -15,7 +17,8 @@ public static class ChangedObjectJudging
 {
     public static ChangedObjectJudgingResult Prepare(CollectedObjects collected, OldPlaceRules rules, ChangedObjectSettings settings, Execution execution)
     {
-        List<int> toCheck = [.. collected.Targets.Where(target => ModeOf(target, settings) == RestoreMode.RestoreIfNoCollision).Select(target => target.Id.Index)];
+        List<int> toCheck =
+            [.. collected.Targets.Where(target => ModeOf(target, settings) == RestoreMode.RestoreIfNoCollision && RestoreCanBeWritten(target)).Select(target => target.Id.Index)];
         var checks = ParallelMap.RunOver(
             execution,
             collected.Order,
@@ -41,7 +44,7 @@ public static class ChangedObjectJudging
     {
         if (!read.JudgeOldPlaces) throw new InvalidOperationException("The old-place world was asked for, but the scan did not judge the old places.");
 
-        var cleanedModObjects = collected.Targets.Select(target => AsOtherObject(target, cleanedMod));
+        var cleanedModObjects = collected.Targets.Select(target => target.AsOtherObject(OldPlaceIdOf(target), cleanedMod));
         var changed = collected.OtherModAndSupportOnlyObjects
             .Where(other => other.ChangeWithoutCleanedMod is not null)
             .Select(other => other with { Change = other.ChangeWithoutCleanedMod });
@@ -67,6 +70,7 @@ public static class ChangedObjectJudging
     private static WhenRemoved WhenRemovedOf(TargetObject target, RestoreMode mode, IReadOnlyDictionary<int, OldPlaceCheck> checkOf) => mode switch
     {
         RestoreMode.Remove => new WhenRemoved.Disable(),
+        _ when !RestoreCanBeWritten(target) => DisableInsteadOfRestore(target),
         RestoreMode.Restore => RestoreTo(target),
         RestoreMode.RestoreIfNoCollision => checkOf[target.Id.Index] is { Collision: null, Failure: null } ? RestoreTo(target) : new WhenRemoved.Disable(),
         _ => throw new UnreachableException($"Unknown restore mode {mode}."),
@@ -74,42 +78,46 @@ public static class ChangedObjectJudging
 
     private static WhenRemoved.Restore RestoreTo(TargetObject target) => new(EarlierVersionOf(target));
 
+    /// <summary>The part that shows the cleaned mod's change goes back, and the cell the restore writes into is not deleted.</summary>
+    private static bool RestoreCanBeWritten(TargetObject target) => ShownChangeGoesBack(target) && EarlierVersionOf(target).DeletedCellRestoredInto is null;
+
+    /// <summary>
+    /// Whether the part that shows the cleaned mod's change goes back: the position of a moved object, the base of a replaced one.
+    /// Without it a restore would leave the object as the cleaned mod shows it.
+    /// </summary>
+    private static bool ShownChangeGoesBack(TargetObject target) => EarlierVersionOf(target).Undo.HasFlag(ShownChangeOf(target));
+
+    private static WhenRemoved.DisableInsteadOfRestore DisableInsteadOfRestore(TargetObject target)
+    {
+        var earlier = EarlierVersionOf(target);
+        return ShownChangeGoesBack(target)
+            ? new(ChangedLaterBy: null, earlier.DeletedCellRestoredInto)
+            : new(earlier.LeftToLaterPlugins.TryGetValue(ShownChangeOf(target), out var later) ? later : null, CellDeleted: null);
+    }
+
+    private static PlacedParts ShownChangeOf(TargetObject target) => target.Origin switch
+    {
+        TargetOrigin.Moved => PlacedParts.Position,
+        TargetOrigin.Replaced => PlacedParts.BaseAndData,
+        _ => throw new UnreachableException($"Target {target.Key} of origin {target.Origin} is not a changed object."),
+    };
+
     private static EarlierVersion EarlierVersionOf(TargetObject target) =>
         target.EarlierVersion ?? throw new InvalidOperationException($"Target {target.Key} is not a changed object, so it has no earlier version.");
 
+    /// <remarks>The object is checked as the restore writes it: a part left to a later plugin keeps its value there too.</remarks>
     private static OldPlaceCheck CheckOldPlace(TargetObject target, OldPlaceRules rules)
     {
-        var earlier = EarlierVersionOf(target);
-        var atOldPlace = target.RestoredAs(earlier);
-        var check = CheckOnce(rules.TooClose(atOldPlace), atOldPlace, earlier.Placement);
-        if (check.Clash is null && check.Failure is null) check = CheckOnce(rules.ChangedTerrain, atOldPlace, earlier.Placement);
+        var atOldPlace = target.RestoredAs(EarlierVersionOf(target));
+        var check = CheckOnce(rules.TooClose(atOldPlace), atOldPlace);
+        if (check.Clash is null && check.Failure is null) check = CheckOnce(rules.ChangedTerrain, atOldPlace);
         return new OldPlaceCheck(target.Id, check.Clash, check.Failure);
     }
 
-    private static PlacementCheck CheckOnce(IPlacementRule rule, TargetObject target, EulerPlacement placement)
+    private static PlacementCheck CheckOnce(IPlacementRule rule, TargetObject target)
     {
         using var tries = rule.StartTries(target);
-        return tries.Check(placement);
-    }
-
-    private static OtherObject AsOtherObject(TargetObject target, PluginName cleanedMod)
-    {
-        var change = new ObjectChange(cleanedMod, AcceptedFrom: null);
-        return new OtherObject(
-            OldPlaceIdOf(target),
-            target.Key,
-            target.SpaceKey,
-            cleanedMod,
-            target.EditorId,
-            target.Base,
-            target.Transform.Position,
-            target.Rotation,
-            target.Transform.Scale,
-            target.IsPrimitive,
-            target.HasMapMarker,
-            change,
-            ReferenceRoles.None,
-            change);
+        return tries.Check(target.Placement);
     }
 
     private static PartFailure FailureOf(OldPlaceCheck check, TargetObject target) =>

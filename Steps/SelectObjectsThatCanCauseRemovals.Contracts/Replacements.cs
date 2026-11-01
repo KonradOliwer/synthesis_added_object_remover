@@ -24,8 +24,9 @@ public sealed class Replacements
 
     public static Replacements Of(int otherModObjectCount, IReadOnlyList<Replacement> list) => new(otherModObjectCount, list, []);
 
-    /// <summary>No replacement is listed, but the given object never matches either: it is not a cause of removals.</summary>
-    public static Replacements Excluding(int otherModObjectCount, OtherId excluded) => new(otherModObjectCount, [], [excluded]);
+    /// <summary>No replacement is listed, but the given objects never match either: they are no cause of removals.</summary>
+    /// <param name="excluded">Each must be one of the other-mod objects.</param>
+    public static Replacements Excluding(int otherModObjectCount, IEnumerable<OtherId> excluded) => new(otherModObjectCount, [], excluded);
 
     /// <summary>False for ids beyond the other-mod objects, such as support-only objects, which are never replaced.</summary>
     public bool IsReplaced(OtherId id) => _replaced.Contains(id.Index);

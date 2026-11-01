@@ -1,0 +1,573 @@
+using System.Collections.Immutable;
+using System.Numerics;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
+using AddedObjectRemover.Tests.Fixtures;
+using Mutagen.Bethesda.Plugins;
+
+namespace AddedObjectRemover.Tests.Rules;
+
+/// <summary>
+/// The area rule of restoring where the cleaned mod was removed: the cleaned mod's own visible objects in a column around a judged
+/// point, their fates, the share left standing and the never-rules, over in-memory target objects.
+/// </summary>
+public sealed class RestoreWhereRemovedTests
+{
+    private const float SearchRadius = 1000f;
+    private const float OutsideTheArea = 1500f;
+    private const double TenthOfAPercent = 0.1;
+    private const double BlockVolume = 40d * 40 * 40;
+    private const double BigBlockVolume = 200d * 200 * 200;
+
+    private static readonly ModKey ShapeMod = ModKey.FromNameAndExtension("RestoreAreaShapes.esp");
+    private static readonly TestStatic Block = new(new FormKey(ShapeMod, 0x801), @"test\restorearea\block.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20), new Vector3(20))));
+    private static readonly TestStatic BigBlock = new(new FormKey(ShapeMod, 0x802), @"test\restorearea\bigblock.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-100), new Vector3(100))));
+    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(ShapeMod, "RestoreWhereRemovedData", Block, BigBlock));
+
+    private static readonly ModKey BaseGameMod = ModKey.FromNameAndExtension("Base.esm");
+    private static readonly PluginName BaseGame = BaseGameMod.ToPluginName();
+    private static readonly PluginName Later = new("Later.esp");
+    private static readonly PluginName[] PluginList = [BaseGame, TestTargets.TargetName, TestTargets.PatchName, Later];
+    private static readonly LoadOrderPlugins Plugins = TestLoadOrderPlugins.Of(
+        new KnownPluginNames(PluginList), TestTargets.PatchName, [.. PluginList.Select(plugin => new PluginListing(plugin, true, []))], PluginList, []);
+
+    private static readonly WhereRemovedRestoreSettings Settings = new(
+        OtherModsObjects: true,
+        Terrain: false,
+        Cells: true,
+        Navmeshes: false,
+        new ClearedArea(SearchRadius, TenthOfAPercent, ClearedAreaMeasure.ObjectSize),
+        TerrainEdgeBlendDistance: 0f,
+        HeightChangeTolerance: 8f,
+        WaterHeightChangeTolerance: 8f,
+        new TooCloseSettings(BySize: false, Multiplier: 0f, ByDistance: true, DistanceInUnits: 10f, ZoneShape.BoundingBox, NpcHandling.Never),
+        new ChangedTerrainSettings(
+            On: false, TerrainCheckedObjects.VisibleObjectsOnTheGround, CountHeightChanges: false, 8f, CountTerrainTypeChanges: false, 0,
+            CountWaterHeightChanges: false, 0f, CountWaterAddedOrRemoved: false, 0, AreaBySize: false, 0f, AreaByDistance: false, 0f));
+
+    private static readonly RecordKey ExteriorCellKey = new(BaseGame, 0x500);
+
+    private static readonly INavmeshes NoNavmeshes = TestGround.Navmeshes(new Dictionary<RecordKey, List<CellNavmesh>>());
+
+    private static readonly GuardReach Reach = new(Shapes, Settings.TooClose, touchGap: 1f);
+
+    [Fact]
+    public void AChangeWhoseAreaIsClearedOfTheCleanedModsObjectsGoesBack()
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0)), Own(1, new Vector3(0, 100, 0)), Own(2, new Vector3(-100, 0, 0))];
+
+        var judged = Assert.Single(Plan(targets, removed: [0, 1, 2], [ChangedRock(0x900, Vector3.Zero)]).Objects);
+
+        Assert.Equal((3, 0, AreaVerdict.Cleared), (judged.OldPlace!.Objects, judged.OldPlace.Standing, judged.OldPlace.Verdict));
+        Assert.Equal(3 * BlockVolume, judged.OldPlace.Size);
+        Assert.True(judged.IsRestored);
+    }
+
+    [Fact]
+    public void AChangeWhereOneRemovedPieceStandsAmongKeptOnesStays()
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0)), Own(1, new Vector3(0, 100, 0)), Own(2, new Vector3(-100, 0, 0))];
+
+        var judged = Assert.Single(Plan(targets, removed: [1], [ChangedRock(0x900, Vector3.Zero)]).Objects);
+
+        Assert.Equal((3, 2, AreaVerdict.StillStanding), (judged.OldPlace!.Objects, judged.OldPlace.Standing, judged.OldPlace.Verdict));
+        Assert.False(judged.IsRestored);
+    }
+
+    [Fact]
+    public void ALoneRemovedPieceLeavesNothingStandingSoItsChangeGoesBack()
+    {
+        var judged = Assert.Single(Plan([Own(0, new Vector3(300, 0, 0))], removed: [0], [ChangedRock(0x900, Vector3.Zero)]).Objects);
+
+        Assert.Equal((1, 0, AreaVerdict.Cleared), (judged.OldPlace!.Objects, judged.OldPlace.Standing, judged.OldPlace.Verdict));
+        Assert.True(judged.IsRestored);
+    }
+
+    /// <summary>The cleaned mod's only object stands outside the area, and another plugin's object it moved stands inside, which does not count.</summary>
+    [Fact]
+    public void AChangeWithNoObjectOfTheCleanedModAroundStays()
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(OutsideTheArea, 0, 0)), Own(1, new Vector3(50, 0, 0)) with { Origin = TargetOrigin.Moved }];
+
+        var judged = Assert.Single(Plan(targets, removed: [0, 1], [ChangedRock(0x900, Vector3.Zero)]).Objects);
+
+        Assert.Equal((0, AreaVerdict.NoObjectsAround), (judged.OldPlace!.Objects, judged.OldPlace.Verdict));
+        Assert.False(judged.IsRestored);
+    }
+
+    [Fact]
+    public void TheAreaIsAColumnSoAnObjectFarAboveTheOldPlaceCounts()
+    {
+        var judged = Assert.Single(Plan([Own(0, new Vector3(0, 0, 20000))], removed: [], [ChangedRock(0x900, Vector3.Zero)]).Objects);
+
+        Assert.Equal((1, AreaVerdict.StillStanding), (judged.OldPlace!.Objects, judged.OldPlace.Verdict));
+    }
+
+    /// <summary>One object of the area stands; at a tenth of a percent, 1 in 1000 is just allowed and 1 in 999 is not.</summary>
+    [Theory]
+    [InlineData(1000, AreaVerdict.Cleared)]
+    [InlineData(999, AreaVerdict.StillStanding)]
+    public void OneStandingObjectInAThousandIsTheMostATenthOfAPercentAllows(int objects, AreaVerdict expected)
+    {
+        const int Side = 32;
+        const float Spacing = 20f;
+        ImmutableArray<TargetObject> targets = [.. Enumerable.Range(0, objects).Select(index => Own(index, new Vector3(index % Side * Spacing, index / Side * Spacing, 0)))];
+        var byCount = Settings with { ClearedArea = Settings.ClearedArea with { Measure = ClearedAreaMeasure.ObjectCount } };
+
+        var judged = Assert.Single(Plan(targets, removed: [.. Enumerable.Range(1, objects - 1)], [ChangedRock(0x900, Vector3.Zero)], settings: byCount).Objects);
+
+        Assert.Equal((objects, 1, expected), (judged.OldPlace!.Objects, judged.OldPlace.Standing, judged.OldPlace.Verdict));
+    }
+
+    /// <summary>A big object stands among three small removed ones: a quarter of them by count, nearly all by size.</summary>
+    [Theory]
+    [InlineData(ClearedAreaMeasure.ObjectCount, AreaVerdict.Cleared)]
+    [InlineData(ClearedAreaMeasure.ObjectSize, AreaVerdict.StillStanding)]
+    public void ByCountAndBySizeGiveDifferentVerdictsForOneBigObjectStandingAmongSmallRemovedOnes(ClearedAreaMeasure measure, AreaVerdict expected)
+    {
+        ImmutableArray<TargetObject> targets =
+        [
+            Own(0, new Vector3(300, 0, 0), BigBlock), Own(1, new Vector3(0, 100, 0)), Own(2, new Vector3(-100, 0, 0)), Own(3, new Vector3(0, -100, 0)),
+        ];
+        var halfMayStand = Settings with { ClearedArea = new ClearedArea(SearchRadius, MaxStandingPercent: 50, measure) };
+
+        var judged = Assert.Single(Plan(targets, removed: [1, 2, 3], [ChangedRock(0x900, Vector3.Zero)], settings: halfMayStand).Objects);
+
+        Assert.Equal(expected, judged.OldPlace!.Verdict);
+        Assert.Equal((BigBlockVolume, BigBlockVolume + 3 * BlockVolume), (judged.OldPlace.StandingSize, judged.OldPlace.Size));
+    }
+
+    [Fact]
+    public void AnInteriorIsOneAreaSoAnObjectFarFromTheOldPlaceCounts()
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(20000, 0, 0))];
+        var interior = new Dictionary<RecordKey, SpaceFact> { [TestTargets.Space] = new(TestTargets.Space, null, SpaceKind.Interior, null) };
+
+        var inInterior = Assert.Single(Plan(targets, removed: [], [ChangedRock(0x900, Vector3.Zero)], spaces: interior).Objects);
+        var inWorldspace = Assert.Single(Plan(targets, removed: [], [ChangedRock(0x900, Vector3.Zero)]).Objects);
+
+        Assert.Equal((AreaVerdict.StillStanding, AreaVerdict.NoObjectsAround), (inInterior.OldPlace!.Verdict, inWorldspace.OldPlace!.Verdict));
+    }
+
+    /// <summary>Another plugin's object the cleaned mod moved from a cleared place into a village that stays.</summary>
+    [Theory]
+    [InlineData(false, AreaVerdict.StillStanding, false)]
+    [InlineData(true, AreaVerdict.Cleared, true)]
+    public void AnUndecidedMovedTargetIsJudgedAtItsOldPlaceAndWhereItStands(bool villageRemoved, AreaVerdict whereItIsNow, bool restored)
+    {
+        var village = new Vector3(5000, 0, 0);
+        ImmutableArray<TargetObject> targets =
+        [
+            Own(0, new Vector3(100, 0, 0)),
+            Own(1, village + new Vector3(100, 0, 0)),
+            Own(2, village) with { Origin = TargetOrigin.Moved },
+        ];
+
+        var judged = Assert.Single(Plan(targets, removed: villageRemoved ? [0, 1] : [0], [ChangedRock(0x900, Vector3.Zero, target: new TargetId(2))]).Objects);
+
+        Assert.Equal((AreaVerdict.Cleared, whereItIsNow, restored), (judged.OldPlace!.Verdict, judged.WhereItIsNow!.Verdict, judged.IsRestored));
+    }
+
+    [Fact]
+    public void ATargetTheRemovalStepsDecidedOrWhoseMarkerTheyMovedIsNotJudged()
+    {
+        ImmutableArray<TargetObject> targets =
+        [
+            Own(0, new Vector3(100, 0, 0)),
+            Own(1, new Vector3(200, 0, 0)) with { Origin = TargetOrigin.Moved },
+            Own(2, new Vector3(300, 0, 0)) with { Origin = TargetOrigin.Moved },
+        ];
+        var final = DecisionsRemoving(targets, 0, 1).AddMoves([new MarkerMove(new TargetId(2), new Vector3(300, 0, 0), new Vector3(310, 0, 0))]);
+
+        var result = Plan(
+            targets, final, [ChangedRock(0x900, Vector3.Zero, target: new TargetId(1)), ChangedRock(0x901, Vector3.Zero, target: new TargetId(2))]);
+
+        Assert.Empty(result.Objects);
+    }
+
+    /// <summary>A marker move took a target the cleaned mod moved 10 units on; the after-removal world has it standing there now.</summary>
+    [Fact]
+    public void ACandidateThatIsATargetStandsNowWhereTheRunsMovesLeaveIt()
+    {
+        var movedTo = new Vector3(310, 0, 0);
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0)), Own(1, new Vector3(300, 0, 0)) with { Origin = TargetOrigin.Moved }];
+        var final = DecisionsRemoving(targets, 0).AddMoves([new MarkerMove(new TargetId(1), new Vector3(300, 0, 0), movedTo)]);
+
+        var change = ChangedRock(0x900, Vector3.Zero, target: new TargetId(1)) with { Key = targets[1].Key };
+
+        var world = AfterRemovalWorld.Of(TestScenes.CreateWorld(targets, []), final, OtherModsObjectsResult.SwitchedOff, TestTargets.TargetName, [change], Reach);
+
+        Assert.Equal(movedTo, Assert.Single(world.Now).Transform.Position);
+    }
+
+    /// <summary>
+    /// Two rocks the cleaned mod changed stand now: one is a change in the world without the cleaned mod, one is not (a later
+    /// plugin carries the cleaned mod's value), so its copy is a support-only object and causes no removals.
+    /// </summary>
+    [Fact]
+    public void OnlyTheCopiesOfCandidatesThatAreAChangeWithoutTheCleanedModAreCausesTheTooCloseRuleLeavesOut()
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0))];
+        var changed = TestShapes.Placed(BaseGameMod, 0, Block.Base, new Vector3(500, 0, 0)) with { ChangeWithoutCleanedMod = new ObjectChange(TestTargets.TargetName, BaseGame) };
+        var carried = TestShapes.Placed(BaseGameMod, 1, Block.Base, new Vector3(900, 0, 0));
+        var collected = TestScenes.CreateWorld(targets, [changed], [carried]);
+
+        var world = AfterRemovalWorld.Of(
+            collected, DecisionsRemoving(targets, 0), OtherModsObjectsResult.SwitchedOff, TestTargets.TargetName, [ChangedRock(0x900, Vector3.Zero), ChangedRock(0x901, Vector3.Zero)], Reach);
+        var both = new HashSet<int> { 0, 1 };
+
+        Assert.Equal(2, world.CopiesNowOf(both).Count());
+        var cause = Assert.Single(world.CauseCopiesNowOf(both));
+        Assert.Equal(changed.Key, world.World.Other(cause).Key);
+    }
+
+    /// <summary>The cleaned mod moved a vanilla rock into its camp, and a later mod's lantern rests on the rock there, so the rock is kept.</summary>
+    [Fact]
+    public void AKeptTargetIsNotJudgedSoWhatRestsOnItWhereItStandsIsNotLeftFloating()
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0)), Own(1, new Vector3(300, 0, 0)) with { Origin = TargetOrigin.Moved }];
+        var resting = new Dictionary<int, KeepReason> { [1] = new(KeepKind.OtherModsObjectRestsOnIt) };
+        var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length, resting), TestBaseFacts.Unresolved);
+        var final = TestSeededDecisions.StartDisablingAll(protection, targets.Length).Apply(RoundKind.TooClose, [TooClose(0)]);
+
+        var result = Plan(targets, final, [ChangedRock(0x900, Vector3.Zero, target: new TargetId(1))]);
+
+        Assert.Empty(result.Objects);
+    }
+
+    /// <summary>The other mods' objects step pulled one changed rock down and removed another.</summary>
+    [Fact]
+    public void ARecordTheOtherModsObjectsStepTookAwayIsNotJudged()
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0))];
+        var otherModsObjects = OtherModsObjectsResult.SwitchedOff with
+        {
+            Outcome = StepOutcome.Performed,
+            Objects =
+            [
+                new OtherModsObjectOutcome(TestShapes.Placed(BaseGameMod, 0, Block.Base, Vector3.Zero), OtherModsObjectFate.PulledDown, LostShare: 1f, Drop: 10f, ReferenceRoles.None),
+                new OtherModsObjectOutcome(TestShapes.Placed(BaseGameMod, 1, Block.Base, Vector3.Zero), OtherModsObjectFate.Removed, LostShare: 1f, Drop: 0f, ReferenceRoles.None),
+            ],
+        };
+
+        var result = Plan(
+            targets, DecisionsRemoving(targets, 0), [ChangedRock(0x900, Vector3.Zero), ChangedRock(0x901, Vector3.Zero), ChangedRock(0x902, Vector3.Zero)], otherModsObjects: otherModsObjects);
+
+        Assert.Equal([new RecordKey(BaseGame, 0x902)], result.Objects.Select(judged => judged.Change.Key));
+    }
+
+    /// <summary>A kept marker of the cleaned mod stands next to its only visible object, which was removed.</summary>
+    [Fact]
+    public void AnInvisibleObjectOfTheCleanedModDoesNotCount()
+    {
+        var marker = TestVisibility.TaggedBase(ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers));
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0)), TestTargets.Create(1, TestTargets.At(new Vector3(200, 0, 0)), marker, TestTargets.Space)];
+
+        var judged = Assert.Single(Plan(targets, removed: [0], [ChangedRock(0x900, Vector3.Zero)]).Objects);
+
+        Assert.Equal((1, 0, AreaVerdict.Cleared), (judged.OldPlace!.Objects, judged.OldPlace.Standing, judged.OldPlace.Verdict));
+    }
+
+    /// <summary>The big block was kept shrunk to half its size, so it counts with an eighth of its volume.</summary>
+    [Fact]
+    public void AnObjectKeptShrunkCountsAtItsShrunkBox()
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0), BigBlock), Own(1, new Vector3(-100, 0, 0))];
+        var shrunk = DecisionsRemoving(targets, 1).ApplyFits([new ProposedFit(targets[0].Id, TooClose(0).Reason, targets[0].Placement with { Scale = 0.5f })]);
+        var asTheRoundsMeasureThem = ClashingObjectFitter.IndexAsTheRoundsMeasureThem(targets, shrunk, TestScenes.Create(targets, [], Shapes));
+
+        var judged = Assert.Single(Plan(targets, shrunk, [ChangedRock(0x900, Vector3.Zero)], visibleTargets: asTheRoundsMeasureThem).Objects);
+
+        Assert.Equal((1, BigBlockVolume / 8), (judged.OldPlace!.Standing, judged.OldPlace.StandingSize));
+    }
+
+    [Fact]
+    public void TheCandidatesAreJudgedInKeyOrderWhateverOrderTheyComeIn()
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0)), Own(1, new Vector3(3000, 0, 0))];
+        RecordChangedByCleanedMod[] rocks = [.. Enumerable.Range(0, 6).Select(index => ChangedRock(0x900 + (uint)index, new Vector3(index * 600, 0, 0)))];
+        CellChangedByCleanedMod[] cells = [.. Enumerable.Range(0, 4).Select(index => ChangedCell(new RecordKey(BaseGame, 0x500 + (uint)index), (index % 2 - 1, index / 2 - 1)))];
+
+        var inOrder = Plan(targets, removed: [0], rocks, cells);
+        var reversed = Plan(targets, removed: [0], Enumerable.Reverse(rocks), Enumerable.Reverse(cells));
+
+        Assert.Equal(inOrder.Objects.Select(Describe), reversed.Objects.Select(Describe));
+        Assert.Equal(inOrder.Cells.Select(Describe), reversed.Cells.Select(Describe));
+        Assert.Equal(rocks.Select(rock => rock.Key), inOrder.Objects.Select(judged => judged.Change.Key));
+    }
+
+    [Fact]
+    public void ARecordWithNothingThatGoesBackIsNotJudged()
+    {
+        var leftToLater = ChangedRock(0x900, Vector3.Zero, undo: PlacedParts.None);
+
+        Assert.Empty(Plan([Own(0, new Vector3(100, 0, 0))], removed: [0], [leftToLater]).Objects);
+    }
+
+    [Theory]
+    [InlineData(true, false, NeverRestoredReason.WinnerLoadsAfterPatch)]
+    [InlineData(true, true, NeverRestoredReason.WinnerLoadsAfterPatch)]
+    [InlineData(false, true, NeverRestoredReason.LinkedFromCleanedMod)]
+    public void AChangeANeverRuleHoldsForStaysInACleanedArea(bool winnerLoadsAfterPatch, bool linkedFromCleanedMod, NeverRestoredReason expected)
+    {
+        var rock = ChangedRock(0x900, Vector3.Zero, winner: winnerLoadsAfterPatch ? Later : TestTargets.TargetName, linked: linkedFromCleanedMod);
+
+        var judged = Assert.Single(Plan([Own(0, new Vector3(100, 0, 0))], removed: [0], [rock]).Objects);
+
+        Assert.Equal(((NeverRestoredReason?)expected, (AreaShare?)null, false), (judged.Never, judged.OldPlace, judged.IsRestored));
+    }
+
+    [Fact]
+    public void AnExteriorCellIsJudgedAtItsCentreAndOnlyItsUndonePartsAreListed()
+    {
+        var centre = new Vector3(ExteriorGrid.CellSize / 2, ExteriorGrid.CellSize / 2, 0);
+        ImmutableArray<TargetObject> targets = [Own(0, centre), Own(1, Vector3.Zero)];
+        var cell = ChangedCell(ExteriorCellKey, (0, 0));
+
+        var judged = Assert.Single(Plan(targets, removed: [0], [], [cell]).Cells);
+
+        Assert.Equal((1, AreaVerdict.Cleared, true), (judged.Area!.Objects, judged.Area.Verdict, judged.IsRestored));
+        Assert.Equal([new PartChange(new CellPartName(CellPart.Music, null), new PartOutcome.Undo())], judged.Undone.ToList());
+    }
+
+    [Fact]
+    public void AnInteriorCellIsJudgedOverTheWholeInterior()
+    {
+        var interior = new Dictionary<RecordKey, SpaceFact> { [TestTargets.Space] = new(TestTargets.Space, null, SpaceKind.Interior, null) };
+        var cell = ChangedCell(TestTargets.Space, grid: null);
+
+        var judged = Assert.Single(Plan([Own(0, new Vector3(20000, 0, 0))], removed: [], [], [cell], spaces: interior).Cells);
+
+        Assert.Equal((1, AreaVerdict.StillStanding), (judged.Area!.Objects, judged.Area.Verdict));
+    }
+
+    [Fact]
+    public void ACellALaterPluginWinsOrTheCleanedModLinksToStays()
+    {
+        var later = ChangedCell(ExteriorCellKey, (0, 0)) with { WinningMod = Later };
+        var linked = ChangedCell(new RecordKey(BaseGame, 0x501), (1, 0)) with { LinkedFromCleanedMod = true };
+
+        var result = Plan([Own(0, Vector3.Zero)], removed: [0], [], [later, linked]);
+
+        Assert.Equal(
+            [(NeverRestoredReason.WinnerLoadsAfterPatch, false), (NeverRestoredReason.LinkedFromCleanedMod, false)],
+            result.Cells.Select(judged => (judged.Never!.Value, judged.IsRestored)));
+    }
+
+    [Fact]
+    public void AnUnexpectedErrorStopsTheStepWithItsFailureAndJudgesNothing()
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(300, 0, 0))];
+
+        var result = Plan(targets, DecisionsRemoving(targets, 0), [ChangedRock(0x900, Vector3.Zero)], indexObjects: _ => throw new InvalidOperationException("broke"));
+
+        Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
+        Assert.Empty(result.Objects);
+        Assert.Empty(result.Cells);
+        Assert.Empty(result.NavmeshGroups);
+        var failure = Assert.Single(result.Failures);
+        Assert.Equal((RestoreWhereRemovedParts.Step, "InvalidOperationException: broke", (FailureSubject?)null), (failure.Part, failure.Failure, failure.Subject));
+        Assert.NotNull(failure.Details);
+    }
+
+    /// <summary>The record whose check stopped stays as the cleaned mod changed it, and the failure names it.</summary>
+    [Fact]
+    public void ARecordWhoseCheckStoppedUnexpectedlyStaysAndIsNamedByAnObjectCheckFailure()
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(300, 0, 0))];
+
+        var result = Plan(targets, DecisionsRemoving(targets, 0), [ChangedRock(0x900, Vector3.Zero)], tooClose: (_, _, _, _) => new StoppingRule());
+
+        var judged = Assert.Single(result.Objects);
+        Assert.False(judged.IsRestored);
+        Assert.Equal("InvalidOperationException: broke", judged.Refused!.Failure);
+        var failure = Assert.Single(result.Failures);
+        Assert.Equal((RestoreWhereRemovedParts.ObjectCheck, "InvalidOperationException: broke"), (failure.Part, failure.Failure));
+        Assert.Equal((judged.Change.Key.ToString(), 0), (failure.Subject!.Key, failure.Subject.Position));
+        Assert.Equal(StepOutcome.Performed, result.Outcome);
+    }
+
+    [Fact]
+    public void EachKindIsJudgedOnlyWithItsSwitchOn()
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, Vector3.Zero)];
+        RecordChangedByCleanedMod[] rocks = [ChangedRock(0x900, Vector3.Zero)];
+        CellChangedByCleanedMod[] cells = [ChangedCell(ExteriorCellKey, (0, 0))];
+
+        var rules = GuardRules(workers: 1);
+        var groupOff = WhereRemovedRestorer.Plan(
+            TestScenes.CreateWorld(targets, []),
+            DecisionsRemoving(targets),
+            OtherModsObjectsResult.SwitchedOff,
+            TestScenes.Create(targets, [], Shapes).VisibleTargets,
+            rules.IndexObjects,
+            rules.TooClose,
+            rules.FindHoldersOfObjectsThatStay,
+            rules.Support,
+            Shapes,
+            NoNavmeshes,
+            space => space,
+            _ => new LandHeights(null, null),
+            _ => null,
+            Plugins,
+            TestTargets.TargetName,
+            new Execution(1),
+            settings: null);
+        var objectsOff = Plan(targets, removed: [0], rocks, cells, Settings with { OtherModsObjects = false });
+        var cellsOff = Plan(targets, removed: [0], rocks, cells, Settings with { Cells = false });
+
+        Assert.Equal(StepOutcome.SwitchedOff, groupOff.Outcome);
+        Assert.Equal((0, 1), (objectsOff.Objects.Length, objectsOff.Cells.Length));
+        Assert.Equal((1, 0), (cellsOff.Objects.Length, cellsOff.Cells.Length));
+    }
+
+    [Fact]
+    public void TheResultsDoNotDependOnTheNumberOfWorkers()
+    {
+        const int ObjectCount = 400;
+        const int RockCount = 200;
+        var random = new Random(8);
+        ImmutableArray<TargetObject> targets =
+        [
+            .. Enumerable.Range(0, ObjectCount).Select(index => Own(index, RandomPoint(random), random.Next(5) == 0 ? BigBlock : Block)),
+        ];
+        int[] removed = [.. Enumerable.Range(0, ObjectCount).Where(_ => random.Next(10) != 0)];
+        RecordChangedByCleanedMod[] rocks = [.. Enumerable.Range(0, RockCount).Select(index => ChangedRock(0x900 + (uint)index, RandomPoint(random)))];
+        CellChangedByCleanedMod[] cells = [.. Enumerable.Range(0, 4).Select(index => ChangedCell(new RecordKey(BaseGame, 0x500 + (uint)index), (index % 2 - 1, index / 2 - 1)))];
+
+        var one = Plan(targets, removed, rocks, cells, workers: 1);
+        var eight = Plan(targets, removed, rocks, cells, workers: 8);
+
+        Assert.Equal(one.Objects.Select(Describe), eight.Objects.Select(Describe));
+        Assert.Equal(one.Cells.Select(Describe), eight.Cells.Select(Describe));
+        Assert.Contains(one.Objects, judged => judged.IsRestored);
+        Assert.Contains(one.Objects, judged => !judged.IsRestored);
+    }
+
+    private static string Describe(PlacedChangeJudged judged) => $"{judged.Change.Key} {judged.Never} {judged.OldPlace} {judged.WhereItIsNow} {judged.Refused} {judged.IsRestored}";
+
+    private static string Describe(CellChangeJudged judged) => $"{judged.Change.Cell} {string.Join(", ", judged.Undone)} {judged.Never} {judged.Area} {judged.IsRestored}";
+
+    private static Vector3 RandomPoint(Random random) => new((random.NextSingle() * 2 - 1) * 4000, (random.NextSingle() * 2 - 1) * 4000, 0);
+
+    private static TargetObject Own(int index, Vector3 position, TestStatic? model = null) =>
+        TestTargets.Create(index, TestTargets.At(position), (model ?? Block).Base, TestTargets.Space);
+
+    /// <summary>A rock of the base game that the cleaned mod changed, which goes back to <paramref name="oldPlace"/>.</summary>
+    private static RecordChangedByCleanedMod ChangedRock(
+        uint id, Vector3 oldPlace, PluginName? winner = null, bool linked = false, TargetId? target = null, PlacedParts undo = PlacedParts.Position) =>
+        new(
+            new RecordKey(BaseGame, id),
+            EditorId: null,
+            TestTargets.Space,
+            new CellFact(TestTargets.Space, null),
+            winner ?? TestTargets.TargetName,
+            WhereItIsNow: null,
+            BaseNow: null,
+            TestPlacedRecords.PlainReference,
+            IsPersistent: false,
+            TestTargets.EarlierVersionAt(BaseGame, new EulerPlacement(oldPlace, Vector3.Zero, 1f)) with { Undo = undo },
+            target,
+            linked,
+            PresenceBefore: default);
+
+    /// <summary>A cell of the base game whose music the cleaned mod changed and whose location a later plugin changed again.</summary>
+    private static CellChangedByCleanedMod ChangedCell(RecordKey cell, (int X, int Y)? grid)
+    {
+        var water = new CellWaterCopy(BaseGame, HasWater: false, OwnLevel: null);
+        return new CellChangedByCleanedMod(
+            cell,
+            TestTargets.Space,
+            grid,
+            [
+                new PartChange(new CellPartName(CellPart.Music, null), new PartOutcome.Undo()),
+                new PartChange(new CellPartName(CellPart.Location, null), new PartOutcome.LeftToLaterPlugin(Later)),
+            ],
+            LinkedFromCleanedMod: false,
+            TestTargets.TargetName,
+            water,
+            water,
+            DefaultWaterLevel: null);
+    }
+
+    private static RemovalDecisions DecisionsRemoving(ImmutableArray<TargetObject> targets, params int[] removed) =>
+        TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved), targets.Length)
+            .Apply(RoundKind.TooClose, [.. removed.Select(TooClose)]);
+
+    private static ProposedRemoval TooClose(int index) => new(new TargetId(index), new RemovalReason.TooClose(new OtherId(0), new TooCloseCause.ObjectSize()));
+
+    private static RestoreWhereRemovedResult Plan(
+        ImmutableArray<TargetObject> targets,
+        int[] removed,
+        IEnumerable<RecordChangedByCleanedMod> records,
+        IEnumerable<CellChangedByCleanedMod>? cells = null,
+        WhereRemovedRestoreSettings? settings = null,
+        IReadOnlyDictionary<RecordKey, SpaceFact>? spaces = null,
+        int workers = 1) =>
+        Plan(targets, DecisionsRemoving(targets, removed), records, cells, settings, spaces, workers);
+
+    /// <param name="visibleTargets">The targets as they stand when null.</param>
+    /// <param name="otherModsObjects">Switched off when null.</param>
+    private static RestoreWhereRemovedResult Plan(
+        ImmutableArray<TargetObject> targets,
+        IRemovalDecisions final,
+        IEnumerable<RecordChangedByCleanedMod> records,
+        IEnumerable<CellChangedByCleanedMod>? cells = null,
+        WhereRemovedRestoreSettings? settings = null,
+        IReadOnlyDictionary<RecordKey, SpaceFact>? spaces = null,
+        int workers = 1,
+        IVisibleTargetObjects? visibleTargets = null,
+        OtherModsObjectsResult? otherModsObjects = null,
+        Func<CollectedObjects, IObjectCaches>? indexObjects = null,
+        Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule>? tooClose = null)
+    {
+        var collected = TestScenes.CreateWorld(targets, []) with
+        {
+            ChangedRecords = [.. records],
+            ChangedCells = [.. cells ?? []],
+            Spaces = spaces ?? new Dictionary<RecordKey, SpaceFact>(),
+        };
+        var rules = GuardRules(workers);
+        return WhereRemovedRestorer.Plan(
+            collected,
+            final,
+            otherModsObjects ?? OtherModsObjectsResult.SwitchedOff,
+            visibleTargets ?? TestScenes.Create(targets, [], Shapes).VisibleTargets,
+            indexObjects ?? rules.IndexObjects,
+            tooClose ?? rules.TooClose,
+            rules.FindHoldersOfObjectsThatStay,
+            rules.Support,
+            Shapes,
+            NoNavmeshes,
+            space => space,
+            _ => new LandHeights(null, null),
+            _ => null,
+            Plugins,
+            TestTargets.TargetName,
+            new Execution(workers),
+            settings ?? Settings);
+    }
+
+    /// <summary>A too-close rule whose check stops unexpectedly.</summary>
+    private sealed class StoppingRule : IPlacementRule
+    {
+        public IPlacementTries StartTries(TargetObject target) => new StoppingTries();
+
+        private sealed class StoppingTries : IPlacementTries
+        {
+            public PlacementCheck Check(EulerPlacement placement) => new(Clash: null, Failure: "InvalidOperationException: broke");
+
+            public void Dispose()
+            {
+            }
+        }
+    }
+
+    private static TestPlacedGuardRules GuardRules(int workers) =>
+        TestPlacedGuardRules.Create(
+            Shapes,
+            TestModTrust.Of(TestTargets.TargetName, TestTargets.PatchName, trusted: [], untrusted: []),
+            Plugins,
+            new OtherModsObjectsSettings(OtherModsObjectsHandling.PullObjectToTheGround, TouchGap: 1f, SupportLostFraction: 0.5f),
+            TestGround.NoTerrain(),
+            workers);
+}

@@ -381,6 +381,245 @@ public class RunSettingsValidationTests
             ready.Settings.VisibleLeftBehind!.NeverRemove.Order());
     }
 
+    private const string RestoreGroup = "Restore what the cleaned mod changed where it was removed > ";
+    private const string ClearedAreaGroup = RestoreGroup + "When an area counts as cleared > ";
+
+    [Fact]
+    public void TheRestoreGroupIsOnByDefaultWithItsDefaultsAndTheReusedCollisionSettings()
+    {
+        var ready = BuildReady(SettingsFor());
+
+        var restore = ready.Settings.RestoreWhereRemoved!;
+        Assert.Equal((true, true, true, true), (restore.OtherModsObjects, restore.Terrain, restore.Cells, restore.Navmeshes));
+        Assert.Equal(new ClearedArea(5000f, 0.1, ClearedAreaMeasure.ObjectSize), restore.ClearedArea);
+        Assert.Equal(256f, restore.TerrainEdgeBlendDistance);
+        Assert.Equal(
+            (ready.Settings.Collision.ChangedTerrain.HeightTolerance, ready.Settings.Collision.ChangedTerrain.WaterHeightTolerance),
+            (restore.HeightChangeTolerance, restore.WaterHeightChangeTolerance));
+        Assert.Equal((ready.Settings.ChangedObjectCollision.TooClose, ready.Settings.ChangedObjectCollision.ChangedTerrain), (restore.TooClose, restore.ChangedTerrain));
+        Assert.Equal(
+            new AreaRecordReads(new AreaPartTolerances(restore.HeightChangeTolerance, restore.WaterHeightChangeTolerance), Cells: true, Lands: true),
+            ready.Settings.Read.AreaRecordVersions);
+        Assert.Empty(ready.Warnings);
+    }
+
+    [Fact]
+    public void TheRestoreGroupTakesTheHeightAndWaterTolerancesOfTheCleanedModsTerrainCheck()
+    {
+        var settings = SettingsFor();
+        settings.TerrainChange.HeightChangeTolerance = 30f;
+        settings.TerrainChange.WaterHeightChangeTolerance = 40f;
+        settings.ChangedObjects.Collision.TerrainChange.HeightChangeTolerance = 50f;
+
+        var restore = BuildReady(settings).Settings.RestoreWhereRemoved!;
+
+        Assert.Equal((30f, 40f), (restore.HeightChangeTolerance, restore.WaterHeightChangeTolerance));
+        Assert.Equal(50f, restore.ChangedTerrain.HeightTolerance);
+    }
+
+    [Theory]
+    [InlineData(true, false, false, false)]
+    [InlineData(false, true, false, false)]
+    [InlineData(false, false, true, false)]
+    [InlineData(false, false, false, true)]
+    public void TheRestoreGroupIsOnWhenAnyOneSwitchIsOn(bool objects, bool terrain, bool cells, bool navmeshes)
+    {
+        var settings = SettingsFor();
+        settings.RestoreWhereRemoved = new RestoreWhereRemovedSettings
+        {
+            RestoreOtherModsObjects = objects, RestoreTerrain = terrain, RestoreCells = cells, RestoreNavmeshes = navmeshes,
+        };
+
+        var ready = BuildReady(settings);
+
+        var restore = ready.Settings.RestoreWhereRemoved!;
+        Assert.Equal((objects, terrain, cells, navmeshes), (restore.OtherModsObjects, restore.Terrain, restore.Cells, restore.Navmeshes));
+        Assert.NotNull(ready.Settings.Read.AreaRecordVersions);
+    }
+
+    /// <summary>
+    /// A kind whose switch is off is read when another switched-on kind's guards look at it: restored objects and navmeshes look at
+    /// the cells and the ground that stay changed, the terrain looks at no cell and the cells at no ground.
+    /// </summary>
+    [Theory]
+    [InlineData(true, false, false, false, true, true)]
+    [InlineData(false, true, false, false, false, true)]
+    [InlineData(false, false, true, false, true, false)]
+    [InlineData(false, false, false, true, true, true)]
+    [InlineData(false, true, true, false, true, true)]
+    public void TheCellsAndTheGroundAreReadWhenTheirOwnSwitchOrTheGuardsOfAnotherSwitchedOnKindNeedThem(
+        bool objects, bool terrain, bool cells, bool navmeshes, bool cellsRead, bool landsRead)
+    {
+        var settings = SettingsFor();
+        settings.RestoreWhereRemoved = new RestoreWhereRemovedSettings
+        {
+            RestoreOtherModsObjects = objects, RestoreTerrain = terrain, RestoreCells = cells, RestoreNavmeshes = navmeshes,
+        };
+
+        var reads = BuildReady(settings).Settings.Read.AreaRecordVersions!;
+
+        Assert.Equal((cellsRead, landsRead), (reads.Cells, reads.Lands));
+    }
+
+    [Fact]
+    public void TheRestoreGroupIsNullAndReadsNothingWhenAllFourSwitchesAreOff()
+    {
+        var settings = SettingsFor();
+        settings.RestoreWhereRemoved = AllRestoresOff();
+
+        var ready = BuildReady(settings);
+
+        Assert.Null(ready.Settings.RestoreWhereRemoved);
+        Assert.Null(ready.Settings.Read.AreaRecordVersions);
+    }
+
+    [Theory]
+    [InlineData(1023f, 1024f)]
+    [InlineData(16385f, 16384f)]
+    [InlineData(0f, 1024f)]
+    [InlineData(1024f, 1024f)]
+    [InlineData(16384f, 16384f)]
+    public void TheClearedAreaRadiusIsLimitedTo1024To16384(float configured, float expected)
+    {
+        var settings = SettingsFor();
+        settings.RestoreWhereRemoved.ClearedArea.SearchRadius = configured;
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(expected, ready.Settings.RestoreWhereRemoved!.ClearedArea.SearchRadius);
+        AssertOnlyWarning(ready, configured != expected, $"Warning: {ClearedAreaGroup}Look this far around the place {configured} is outside 1024-16384; using {expected}.");
+    }
+
+    [Theory]
+    [InlineData(-0.5f, 0.0)]
+    [InlineData(100.5f, 100.0)]
+    [InlineData(0f, 0.0)]
+    [InlineData(100f, 100.0)]
+    public void TheMaxStandingPercentIsLimitedTo0To100(float configured, double expected)
+    {
+        var settings = SettingsFor();
+        settings.RestoreWhereRemoved.ClearedArea.MaxStandingPercent = configured;
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(expected, ready.Settings.RestoreWhereRemoved!.ClearedArea.MaxStandingPercent);
+        AssertOnlyWarning(
+            ready,
+            configured != expected,
+            $"Warning: {ClearedAreaGroup}Cleared when at most this share still stands {configured} is outside 0-100; using {expected}.");
+    }
+
+    [Theory]
+    [InlineData(0.1f, 0.1)]
+    [InlineData(0.7f, 0.7)]
+    [InlineData(12.5f, 12.5)]
+    public void ADecimalMaxStandingPercentIsKeptAsTyped(float configured, double expected)
+    {
+        var settings = SettingsFor();
+        settings.RestoreWhereRemoved.ClearedArea.MaxStandingPercent = configured;
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(expected, ready.Settings.RestoreWhereRemoved!.ClearedArea.MaxStandingPercent);
+        Assert.Empty(ready.Warnings);
+    }
+
+    [Theory]
+    [InlineData(-1f, 0f)]
+    [InlineData(1025f, 1024f)]
+    [InlineData(0f, 0f)]
+    [InlineData(1024f, 1024f)]
+    public void TheTerrainEdgeBlendDistanceIsLimitedTo0To1024(float configured, float expected)
+    {
+        var settings = SettingsFor();
+        settings.RestoreWhereRemoved.TerrainEdgeBlendDistanceInUnits = configured;
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(expected, ready.Settings.RestoreWhereRemoved!.TerrainEdgeBlendDistance);
+        AssertOnlyWarning(ready, configured != expected, $"Warning: {RestoreGroup}Blend terrain edges over {configured} is outside 0-1024; using {expected}.");
+    }
+
+    [Fact]
+    public void ARestoreNumberThatIsNotANumberBecomesTheDefaultWithAWarning()
+    {
+        var settings = SettingsFor();
+        settings.RestoreWhereRemoved.ClearedArea.SearchRadius = float.NaN;
+        settings.RestoreWhereRemoved.ClearedArea.MaxStandingPercent = float.NaN;
+        settings.RestoreWhereRemoved.TerrainEdgeBlendDistanceInUnits = float.NaN;
+
+        var ready = BuildReady(settings);
+
+        var restore = ready.Settings.RestoreWhereRemoved!;
+        Assert.Equal((new ClearedArea(5000f, 0.1, ClearedAreaMeasure.ObjectSize), 256f), (restore.ClearedArea, restore.TerrainEdgeBlendDistance));
+        Assert.Equal(
+            [
+                $"Warning: {ClearedAreaGroup}Look this far around the place is not a valid number; using 5000.",
+                $"Warning: {ClearedAreaGroup}Cleared when at most this share still stands is not a valid number; using 0.1.",
+                $"Warning: {RestoreGroup}Blend terrain edges over is not a valid number; using 256.",
+            ],
+            ready.Warnings.Select(warning => warning.Message));
+    }
+
+    [Fact]
+    public void AnUndefinedMeasureBecomesObjectSizeWithAWarning()
+    {
+        var settings = SettingsFor();
+        settings.RestoreWhereRemoved.ClearedArea.Measure = (ClearedAreaMeasure)99;
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(ClearedAreaMeasure.ObjectSize, ready.Settings.RestoreWhereRemoved!.ClearedArea.Measure);
+        Assert.Equal($"Warning: {ClearedAreaGroup}Measure the share by 99 is invalid; using ObjectSize.", Assert.Single(ready.Warnings).Message);
+    }
+
+    [Fact]
+    public void ObjectCountIsKept()
+    {
+        var settings = SettingsFor();
+        settings.RestoreWhereRemoved.ClearedArea.Measure = ClearedAreaMeasure.ObjectCount;
+
+        Assert.Equal(ClearedAreaMeasure.ObjectCount, BuildReady(settings).Settings.RestoreWhereRemoved!.ClearedArea.Measure);
+    }
+
+    [Fact]
+    public void InvalidRestoreSettingsAreReportedInOrderEvenWhenAllSwitchesAreOff()
+    {
+        var settings = SettingsFor();
+        settings.RestoreWhereRemoved = AllRestoresOff();
+        settings.RestoreWhereRemoved.ClearedArea = new ClearedAreaSettings { SearchRadius = 1f, MaxStandingPercent = 101f, Measure = (ClearedAreaMeasure)7 };
+        settings.RestoreWhereRemoved.TerrainEdgeBlendDistanceInUnits = 2000f;
+
+        var ready = BuildReady(settings);
+
+        Assert.Null(ready.Settings.RestoreWhereRemoved);
+        Assert.Equal(
+            [
+                $"Warning: {ClearedAreaGroup}Look this far around the place 1 is outside 1024-16384; using 1024.",
+                $"Warning: {ClearedAreaGroup}Cleared when at most this share still stands 101 is outside 0-100; using 100.",
+                $"Warning: {ClearedAreaGroup}Measure the share by 7 is invalid; using ObjectSize.",
+                $"Warning: {RestoreGroup}Blend terrain edges over 2000 is outside 0-1024; using 1024.",
+            ],
+            ready.Warnings.Select(warning => warning.Message));
+    }
+
+    [Fact]
+    public void AMissingRestoreGroupOrClearedAreaGroupHasTheDefaults()
+    {
+        var withoutGroup = SettingsFor();
+        withoutGroup.RestoreWhereRemoved = null!;
+        var withoutArea = SettingsFor();
+        withoutArea.RestoreWhereRemoved.ClearedArea = null!;
+
+        var expected = BuildReady(SettingsFor()).Settings.RestoreWhereRemoved;
+
+        Assert.Equal(expected, BuildReady(withoutGroup).Settings.RestoreWhereRemoved);
+        Assert.Equal(expected, BuildReady(withoutArea).Settings.RestoreWhereRemoved);
+    }
+
+    private static void AssertOnlyWarning(RunRequest.Ready ready, bool warns, string message) =>
+        Assert.Equal(warns ? new[] { message } : [], ready.Warnings.Select(warning => warning.Message));
+
     [Fact]
     public void TheTrustListsHoldTheNamesAsTheSettingsSpellThemWithoutUnsetEntries()
     {
@@ -501,7 +740,7 @@ public class RunSettingsValidationTests
     }
 
     [Fact]
-    public void SurroundingsAreAlwaysReadAndNavmeshesOnlyForMarkerMoves()
+    public void SurroundingsAreAlwaysReadAndNavmeshesOnlyForMarkerMovesOrTheRestoreGroup()
     {
         var relocating = WithoutChangedObjectsTerrainAndOldPlaces(SettingsFor());
         relocating.TerrainChange.RemoveOnChangedTerrain = false;
@@ -511,6 +750,7 @@ public class RunSettingsValidationTests
             RemoveLeftoverInvisibleObjects = true,
             MoveKeptMarkersOutOfOtherModsObjects = true,
         };
+        TurnRestoreWhereRemovedOff(relocating);
         var runSettings = BuildReady(relocating).Settings;
         Assert.Equal(new WhatToCollect(true, false, false, false, false, 10f, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false), runSettings.Read);
         Assert.NotNull(runSettings.MarkerMoves);
@@ -519,8 +759,44 @@ public class RunSettingsValidationTests
         neither.TerrainChange.RemoveOnChangedTerrain = false;
         neither.LeftoverInvisibleObjects.MoveKeptMarkersOutOfOtherModsObjects = false;
         neither.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.Nothing };
+        TurnRestoreWhereRemovedOff(neither);
         Assert.Equal(new WhatToCollect(false, false, false, false, false, 10f, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false), BuildReady(neither).Settings.Read);
+
+        var restoring = WithoutChangedObjectsTerrainAndOldPlaces(SettingsFor());
+        restoring.TerrainChange.RemoveOnChangedTerrain = false;
+        restoring.LeftoverInvisibleObjects.MoveKeptMarkersOutOfOtherModsObjects = false;
+        restoring.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.Nothing };
+        var restoringSettings = BuildReady(restoring).Settings;
+        Assert.Equal(
+            new WhatToCollect(
+                true, false, false, false, false, 10f, ProcessReplaced: false, JudgeOldPlaces: true, TerrainForChangedObjectsOnly: false, AreaRecordVersions: AreaReadsOf(restoringSettings),
+                DecideEveryObjectWithoutCleanedMod: true),
+            restoringSettings.Read);
     }
+
+    /// <summary>Only restoring other mods' objects where the cleaned mod was removed decides every object in the world without the cleaned mod.</summary>
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void EveryObjectIsDecidedWithoutTheCleanedModOnlyWhenOtherModsObjectsAreRestoredWhereItWasRemoved(bool otherModsObjects, bool decided)
+    {
+        var settings = SettingsFor();
+        settings.RestoreWhereRemoved.RestoreOtherModsObjects = otherModsObjects;
+
+        Assert.Equal(decided, BuildReady(settings).Settings.Read.DecideEveryObjectWithoutCleanedMod);
+    }
+
+    private static void TurnRestoreWhereRemovedOff(StandardSettings settings)
+    {
+        settings.RestoreWhereRemoved.RestoreOtherModsObjects = false;
+        settings.RestoreWhereRemoved.RestoreTerrain = false;
+        settings.RestoreWhereRemoved.RestoreCells = false;
+        settings.RestoreWhereRemoved.RestoreNavmeshes = false;
+    }
+
+    /// <remarks>Every restore switch is on by default, so every kind is read.</remarks>
+    private static AreaRecordReads AreaReadsOf(RunSettings settings) =>
+        new(new AreaPartTolerances(settings.RestoreWhereRemoved!.HeightChangeTolerance, settings.RestoreWhereRemoved.WaterHeightChangeTolerance), Cells: true, Lands: true);
 
     [Fact]
     public void OtherModsObjectsAreJudgedByTheGapAndShareOfTheAlsoRemoveGroup()
@@ -1163,10 +1439,25 @@ public class RunSettingsValidationTests
         var settings = SettingsFor();
         settings.ChangedObjects.Moved.WhenRemoved = moved;
         settings.ChangedObjects.Replaced = new ReplacedObjectSettings { Process = process, WhenRemoved = replaced };
+        settings.RestoreWhereRemoved.RestoreOtherModsObjects = false;
 
         var read = BuildReady(settings).Settings.Read;
 
         Assert.Equal((process, judged), (read.ProcessReplaced, read.JudgeOldPlaces));
+    }
+
+    /// <summary>The objects that go back where the cleaned mod was removed are checked against the changes of the world without it.</summary>
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void TheOldPlacesAreJudgedWhenOtherModsObjectsGoBackWhereTheCleanedModWasRemovedWhateverTheModes(bool restoreObjects, bool judged)
+    {
+        var settings = SettingsFor();
+        settings.ChangedObjects.Moved.WhenRemoved = RestoreMode.Remove;
+        settings.ChangedObjects.Replaced = new ReplacedObjectSettings { Process = true, WhenRemoved = RestoreMode.Restore };
+        settings.RestoreWhereRemoved.RestoreOtherModsObjects = restoreObjects;
+
+        Assert.Equal(judged, BuildReady(settings).Settings.Read.JudgeOldPlaces);
     }
 
     [Theory]
@@ -1206,19 +1497,29 @@ public class RunSettingsValidationTests
         Assert.Equal((true, true, true), TerrainReadsOf(settings));
     }
 
+    /// <summary>The restore group reads the records the cleaned mod changed itself, so it does not change when the terrain reads wait for an override.</summary>
     [Theory]
-    [InlineData(false, true, true)]
-    [InlineData(true, true, false)]
-    [InlineData(true, false, false)]
-    [InlineData(false, false, false)]
-    public void TheTerrainReadsNeedAnOverrideOnlyWhenNothingButTheChangedObjectsTerrainAsksForThem(bool standard, bool changedObjects, bool needsAnOverride)
+    [InlineData(false, true, false, true)]
+    [InlineData(true, true, false, false)]
+    [InlineData(true, false, false, false)]
+    [InlineData(false, false, false, false)]
+    [InlineData(false, true, true, true)]
+    [InlineData(true, true, true, false)]
+    [InlineData(true, false, true, false)]
+    [InlineData(false, false, true, false)]
+    public void TheTerrainReadsNeedAnOverrideOnlyWhenNothingButTheChangedObjectsTerrainAsksForThemWhetherOrNotTheRestoreGroupIsOn(
+        bool standard, bool changedObjects, bool restoreGroup, bool needsAnOverride)
     {
         var settings = SettingsFor();
+        if (!restoreGroup) settings.RestoreWhereRemoved = AllRestoresOff();
         settings.TerrainChange.RemoveOnChangedTerrain = standard;
         settings.ChangedObjects.Collision.TerrainChange.RemoveOnChangedTerrain = changedObjects;
 
         Assert.Equal(needsAnOverride, BuildReady(settings).Settings.Read.TerrainForChangedObjectsOnly);
     }
+
+    private static RestoreWhereRemovedSettings AllRestoresOff() =>
+        new() { RestoreOtherModsObjects = false, RestoreTerrain = false, RestoreCells = false, RestoreNavmeshes = false };
 
     private static (bool Versions, bool Layers, bool Water) TerrainReadsOf(StandardSettings settings)
     {

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda.Plugins;
@@ -29,6 +30,9 @@ public class ChangedObjectJudgingTests
     private static readonly PluginName Compat = new("CompatPatch.esp");
     private static readonly PluginName Cleaned = TestTargets.TargetName;
     private static readonly PluginName Patch = TestTargets.PatchName;
+
+    /// <summary>Named only in facts a test gives directly: a plugin that moved the barrel again after the cleaned mod.</summary>
+    private static readonly PluginName Mover = new("MovedAgain.esp");
 
     private static readonly Vector3 A = new(-2000, 1024, 0);
     private static readonly Vector3 B = new(1024, 1024, 0);
@@ -160,6 +164,79 @@ public class ChangedObjectJudgingTests
         var restore = Assert.IsType<WhenRemoved.Restore>(judged.WhenRemovedOf(Barrel));
         Assert.Equal((City, B), (restore.To.Plugin, restore.To.Placement.Position));
         Assert.Empty(judged.Result.OldPlaceChecks);
+    }
+
+    /// <summary>An earlier patcher of the group moved the barrel again after the cleaned mod, so its position stays as the patch has it.</summary>
+    [Theory]
+    [InlineData(RestoreMode.Restore)]
+    [InlineData(RestoreMode.RestoreIfNoCollision)]
+    public void ARestoreWhosePositionALaterPluginChangedAgainDisablesTheObjectWithoutACheckAndNamesThePlugin(RestoreMode mode)
+    {
+        var barrel = ChangedBarrel(B, C);
+        var movedAgain = barrel with { Versions = barrel.Versions.Add(Version(Patch, FarFromB)) };
+
+        var judged = Judge(mode, [movedAgain], rules: Unused());
+
+        Assert.Equal(new WhenRemoved.DisableInsteadOfRestore(Patch, CellDeleted: null), judged.WhenRemovedOf(Barrel));
+        Assert.Empty(judged.Result.OldPlaceChecks);
+    }
+
+    /// <summary>The facts say a later plugin moved the barrel again after the cleaned mod and the patch turned it again: the position decides, so its plugin is named.</summary>
+    [Fact]
+    public void ARestoreDisabledForItsPositionNamesThePluginThatChangedThePositionAgainNotALaterOneThatChangedAnotherPart()
+    {
+        var barrel = ChangedBarrel(B, C);
+        var movedAgain = barrel with
+        {
+            Versions = barrel.Versions.Add(Version(Patch, FarFromB)),
+            CleanedModChanges = new PlacedPartChanges(
+                PlacedParts.None,
+                ImmutableSortedDictionary.CreateRange([KeyValuePair.Create(PlacedParts.Position, Mover), KeyValuePair.Create(PlacedParts.Rotation, Patch)]),
+                PlacedParts.None),
+        };
+
+        var judged = Judge(RestoreMode.Restore, [movedAgain], rules: Unused());
+
+        Assert.Equal(new WhenRemoved.DisableInsteadOfRestore(Mover, CellDeleted: null), judged.WhenRemovedOf(Barrel));
+    }
+
+    /// <summary>The facts say the barrel's earlier base is stored in another record format, so it cannot go back: no plugin changed it again, so none is named.</summary>
+    [Fact]
+    public void AReplacedObjectWhoseBaseStaysForItsRecordFormatIsDisabledWithoutACheckAndWithoutAPlugin()
+    {
+        var barrel = ChangedBarrel(B, B + new Vector3(3, 0, 0));
+        var restyled = barrel with
+        {
+            Versions = barrel.Versions.SetItem(2, barrel.Winner with { Base = OtherBase }),
+            CleanedModChanges = new PlacedPartChanges(PlacedParts.None, ImmutableSortedDictionary<PlacedParts, PluginName>.Empty, PlacedParts.BaseAndData),
+        };
+
+        var judged = Judge(new ChangedObjectSettings(Moved: RestoreMode.Remove, Replaced: RestoreMode.RestoreIfNoCollision), [restyled], Plan with { ProcessReplaced = true }, rules: Unused());
+
+        Assert.Equal(TargetOrigin.Replaced, judged.TargetOf(Barrel).Origin);
+        Assert.Equal(new WhenRemoved.DisableInsteadOfRestore(null, CellDeleted: null), judged.WhenRemovedOf(Barrel));
+        Assert.Empty(judged.Result.OldPlaceChecks);
+    }
+
+    /// <summary>
+    /// The cleaned mod moves the barrel and sizes it to 1.5; an earlier patcher of the group sizes it to 3 and carries the move. Only
+    /// the position goes back, so the barrel is checked at its old place at size 3, as the restore writes it.
+    /// </summary>
+    [Fact]
+    public void TheOldPlaceCheckMeasuresTheObjectWithTheSizeALaterPluginChangedAgain()
+    {
+        var barrel = ChangedBarrel(B, C);
+        var resized = barrel with
+        {
+            Versions = barrel.Versions.SetItem(2, barrel.Winner with { Scale = 1.5f }).Add(barrel.Winner with { Plugin = Patch, Scale = 3f }),
+        };
+        var rule = new RecordingRule();
+
+        var judged = Judge(RestoreMode.RestoreIfNoCollision, [resized], rules: new OldPlaceRules(_ => rule, rule));
+
+        Assert.Equal([PlacedParts.Scale], judged.TargetOf(Barrel).EarlierVersion!.LeftToLaterPlugins.Keys);
+        Assert.Equal(2, rule.Checked.Count);
+        Assert.All(rule.Checked, check => Assert.Equal((B, 3f, B, 3f), (check.Target.Transform.Position, check.Target.Transform.Scale, check.Placement.Position, check.Placement.Scale)));
     }
 
     [Fact]
@@ -389,7 +466,7 @@ public class ChangedObjectJudgingTests
             target => TooCloseObjects.CreatePlacementRule(
                 collected.Targets,
                 visibleTargets,
-                RemovalCauseSelector.SelectForOldPlace(oldPlace.OtherModObjects, world.OtherModObjects.Length, ChangedObjectJudging.OldPlaceIdOf(target), Zone.Npcs),
+                RemovalCauseSelector.SelectForOldPlace(oldPlace.OtherModObjects, world.OtherModObjects.Length, [ChangedObjectJudging.OldPlaceIdOf(target)], Zone.Npcs),
                 oldPlace.PlacedNpcs,
                 Shapes,
                 triangles,
@@ -455,6 +532,27 @@ public class ChangedObjectJudgingTests
         }
     }
 
+    /// <summary>A rule that finds every placement free and keeps each object and placement it was asked to check.</summary>
+    private sealed class RecordingRule : IPlacementRule
+    {
+        public List<(TargetObject Target, EulerPlacement Placement)> Checked { get; } = [];
+
+        public IPlacementTries StartTries(TargetObject target) => new Tries(this, target);
+
+        private sealed class Tries(RecordingRule rule, TargetObject target) : IPlacementTries
+        {
+            public PlacementCheck Check(EulerPlacement placement)
+            {
+                rule.Checked.Add((target, placement));
+                return new PlacementCheck(Clash: null, Failure: null);
+            }
+
+            public void Dispose()
+            {
+            }
+        }
+    }
+
     /// <summary>The terrain versions of the one test cell; only the test worldspace has land.</summary>
     private sealed class TerrainRecords(params TerrainVersion[] versions) : IPluginRecords
     {
@@ -464,7 +562,7 @@ public class ChangedObjectJudgingTests
 
         public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk) => throw new NotSupportedException();
 
-        public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets) => throw new NotSupportedException();
+        public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets, IReadOnlySet<PluginName> linkedPlugins) => throw new NotSupportedException();
 
         public IWritableRecords ReadWritableRecords() => throw new NotSupportedException();
 
@@ -474,11 +572,13 @@ public class ChangedObjectJudgingTests
 
         public float[]? ReadTerrain(ExteriorCell cell) => throw new NotSupportedException();
 
+        public float[]? ReadTerrainBelowTarget(ExteriorCell cell) => throw new NotSupportedException();
+
         public WaterCopies ReadWaterCopies(ExteriorCell cell) => throw new NotSupportedException();
 
         public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => throw new NotSupportedException();
 
-        public MeshTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => throw new NotSupportedException();
+        public NavmeshWorldTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => throw new NotSupportedException();
 
         public NpcTraits? NpcTraitsOf(BaseKey npc) => throw new NotSupportedException();
 

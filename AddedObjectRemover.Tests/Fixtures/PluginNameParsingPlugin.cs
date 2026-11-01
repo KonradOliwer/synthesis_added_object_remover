@@ -9,7 +9,7 @@ internal sealed class PluginNameParsingPlugin : IPluginRecords
 
     public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk) => throw new NotSupportedException();
 
-    public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets) => throw new NotSupportedException();
+    public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets, IReadOnlySet<PluginName> linkedPlugins) => throw new NotSupportedException();
 
     public IWritableRecords ReadWritableRecords() => throw new NotSupportedException();
 
@@ -19,6 +19,8 @@ internal sealed class PluginNameParsingPlugin : IPluginRecords
 
     public float[]? ReadTerrain(ExteriorCell cell) => throw new NotSupportedException();
 
+    public float[]? ReadTerrainBelowTarget(ExteriorCell cell) => throw new NotSupportedException();
+
     public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new NotSupportedException();
 
     public WaterCopies ReadWaterCopies(ExteriorCell cell) => throw new NotSupportedException();
@@ -26,7 +28,7 @@ internal sealed class PluginNameParsingPlugin : IPluginRecords
 
     public RecordKey? FindLandWorldspace(RecordKey space) => throw new NotSupportedException();
 
-    public MeshTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => throw new NotSupportedException();
+    public NavmeshWorldTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => throw new NotSupportedException();
 
     public NpcTraits? NpcTraitsOf(BaseKey npc) => throw new NotSupportedException();
 

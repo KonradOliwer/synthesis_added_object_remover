@@ -233,6 +233,21 @@ public sealed class SharedReportingTests
     private static PluginName? PluginOrNull(string? name) => name is null ? null : new PluginName(name);
 
     [Fact]
+    public void AnObjectDisabledInsteadOfRestoredNamesThePluginThatChangedItAgainAndAPlainRemovalNamesNone()
+    {
+        var world = CreateWorld();
+        var decisions = RemovalDecisions.Start(
+                CreateProtection(world.Targets),
+                [.. world.Targets.Select((_, index) => index == 0 ? (WhenRemoved)new WhenRemoved.DisableInsteadOfRestore(new PluginName("Later.esp"), CellDeleted: null) : new WhenRemoved.Disable())])
+            .Apply(RoundKind.TooClose, [Propose(0, new RemovalReason.TooClose(new OtherId(0), BySize)), Propose(1, new RemovalReason.TooClose(new OtherId(0), BySize))]);
+        var notRestored = new ObjectWithReason.TooClose(0, world.OtherModObjects[0], BySize);
+        var removed = new ObjectWithReason.TooClose(1, world.OtherModObjects[0], BySize);
+
+        Assert.Equal($"{Describe.RemovalReason(world, notRestored, decisions)}; not restored: changed again by Later.esp", Describe.LeftItsPlaceReason(world, notRestored, decisions));
+        Assert.Equal(Describe.RemovalReason(world, removed, decisions), Describe.LeftItsPlaceReason(world, removed, decisions));
+    }
+
+    [Fact]
     public void Removals_ComeInTheOrderTheStepNineResultGives()
     {
         var (world, decisions) = RunRounds();
@@ -301,7 +316,7 @@ public sealed class SharedReportingTests
         };
         var protection = CreateProtection(tagged.Targets);
         var decided = new StepResults(
-            tagged, protection, new RemovalRisks([], []), null!, OldPlaceWorld: null, new ChangedTerrainResult([]), null!, TestVisibleLeftBehind.SwitchedOff, TestLeftBehind.PerformedWithoutFindings, null!, null!, decisions);
+            tagged, protection, new RemovalRisks([], []), null!, OldPlaceWorld: null, new ChangedTerrainResult([]), null!, TestVisibleLeftBehind.SwitchedOff, TestLeftBehind.PerformedWithoutFindings, null!, null!, decisions, RestoreWhereRemovedResult.SwitchedOff);
 
         var hints = ManualPatchHints.FindManualPatchHints(decided, TestVisibility.OfTaggedBasesOnly(), RemovalList.WithReasons(PatchWriter.ListRemovalsInWriteOrder(decided.Final), decided.Final, decided.Collected, decided.VisibleLeftBehind, decided.LeftBehind));
 
@@ -329,7 +344,7 @@ public sealed class SharedReportingTests
             TestTargets.References(TargetCount, new Dictionary<int, KeepReason> { [Protected] = QuestReason, [ProtectedTouching] = listed }),
             TestBaseFacts.Unresolved);
         var decided = new StepResults(
-            visible, protection, new RemovalRisks([], []), null!, OldPlaceWorld: null, new ChangedTerrainResult([]), null!, TestVisibleLeftBehind.SwitchedOff, TestLeftBehind.PerformedWithoutFindings, null!, null!, decisions);
+            visible, protection, new RemovalRisks([], []), null!, OldPlaceWorld: null, new ChangedTerrainResult([]), null!, TestVisibleLeftBehind.SwitchedOff, TestLeftBehind.PerformedWithoutFindings, null!, null!, decisions, RestoreWhereRemovedResult.SwitchedOff);
 
         var hints = ManualPatchHints.FindManualPatchHints(decided, TestVisibility.OfTaggedBasesOnly(), RemovalList.WithReasons(PatchWriter.ListRemovalsInWriteOrder(decided.Final), decided.Final, decided.Collected, decided.VisibleLeftBehind, decided.LeftBehind));
 
@@ -464,6 +479,10 @@ public sealed class SharedReportingTests
         return new CollectedObjects(
             [.. targets],
             [CreateOtherModObject()],
+            [],
+            [],
+            [],
+            [],
             [],
             [],
             [],

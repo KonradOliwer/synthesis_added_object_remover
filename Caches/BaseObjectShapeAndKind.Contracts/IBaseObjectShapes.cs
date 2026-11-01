@@ -13,6 +13,12 @@ public interface IBaseObjectShapes
     /// </summary>
     ObjectVisibility VisibilityOf(BaseKey? baseKey, bool isPrimitive, bool hasMapMarker);
 
+    /// <summary>
+    /// Whether something on the collision layer stops characters or is kept out of by the navmesh; <paramref name="collisionLayer"/> is the
+    /// layer number a reference stores (XTRI), numbered as the collision layer records and the mesh files number them.
+    /// </summary>
+    bool LayerBlocksActors(uint collisionLayer);
+
     /// <summary>Every base measured so far, in no particular order. Statistics are counted from it.</summary>
     IReadOnlyList<MeasuredBase> Computed();
 }

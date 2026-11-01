@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using static AddedObjectRemover.CsvFormat;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 
@@ -12,9 +13,11 @@ internal static partial class Tables
     /// <param name="alsoRemove">Only for the printed touch distance and support threshold; whether a table exists comes from the step's result and the status of its report-file details.</param>
     /// <remarks>A stopped left-behind step still gets its header-only table.</remarks>
     /// <returns>In the order the steps ran.</returns>
+    /// <param name="whereRemoved">Null when the restore step is switched off.</param>
     public static ImmutableArray<CsvTable> BuildTables(
         RunOutcome outcome,
         AlsoRemoveSettings alsoRemove,
+        WhereRemovedRestoreSettings? whereRemoved,
         ReportContext context)
     {
         var tables = ImmutableArray.CreateBuilder<CsvTable>();
@@ -32,7 +35,11 @@ internal static partial class Tables
         if (outcome.LeftBehind.Outcome != StepOutcome.SwitchedOff) tables.Add(BuildLeftBehindTable(outcome.Collected, outcome.LeftBehind.Evaluations, outcome.MarkerMoves, context));
         tables.Add(BuildRemovalsTable(outcome.Collected, outcome.Removals, outcome.Final, context));
         if (BuildRestoredTable(outcome.Collected, outcome.Restorations, outcome, context) is { } restored) tables.Add(restored);
-        if (BuildFitsTable(outcome.Collected, outcome.Final, context) is { } fits) tables.Add(fits);
+        if (whereRemoved is not null && outcome.RestoreWhereRemoved.Outcome == StepOutcome.Performed)
+        {
+            tables.AddRange(BuildRestoredWhereRemovedTables(outcome.Collected, outcome.RestoreWhereRemoved, whereRemoved.ClearedArea.Measure, context));
+        }
+        if (BuildFitsTable(outcome.Collected, outcome.Final, FitOutcomes.RestoredWhereRemoved(outcome.RestoreWhereRemoved), context) is { } fits) tables.Add(fits);
         if (BuildLeftWithoutSupportTable(outcome.Collected, outcome.OtherModsObjects, context) is { } leftWithoutSupport) tables.Add(leftWithoutSupport);
         tables.Add(BuildHintsTable(outcome.Collected, outcome.Hints));
         return tables.ToImmutable();

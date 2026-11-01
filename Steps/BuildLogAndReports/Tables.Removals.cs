@@ -38,7 +38,7 @@ internal static partial class Tables
         return
         [
             .. RecordColumns(target, context),
-            Quote(Describe.RemovalReason(world, removal, final)),
+            Quote(Describe.LeftItsPlaceReason(world, removal, final)),
             Quote(AreaText.Worldspace(space)),
             Quote(AreaText.Hold(target.Area)),
             Quote(AreaText.Place(target.Area, space)),

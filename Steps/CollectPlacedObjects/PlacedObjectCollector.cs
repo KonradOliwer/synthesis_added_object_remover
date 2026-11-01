@@ -9,8 +9,10 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 /// <summary>
 /// Turns the placed record facts into target objects (the target plugin's own and the other plugins' objects it changed,
 /// <see cref="ChangedObjectKind"/>), other mods' objects the game shows changed from their accepted values
-/// (<see cref="OtherRecordChange"/>), and support-only objects, with their roles, and joins the links into the target objects. A
-/// removed record (<see cref="RemovedForm"/>) is none of them and its links are dropped. The facts are the final world, which
+/// (<see cref="OtherRecordChange"/>), and support-only objects, with their roles, and joins the links into the target objects. Apart
+/// from these, it lists every record of another plugin whose parts the cleaned mod changed (<see cref="RecordChangedByCleanedMod"/>),
+/// and with <see cref="WhatToCollect.AreaRecordVersions"/> every such cell and LAND record (<see cref="CellChangedByCleanedMod"/>,
+/// <see cref="LandChangedByCleanedMod"/>). A removed record (<see cref="RemovedForm"/>) is no object and its links are dropped. The facts are the final world, which
 /// includes what earlier patchers in this group wrote into the patch. The facts come in the order the plugins were read; the
 /// objects are then put in <see cref="RecordKeyOrder"/>, which gives them their ids.
 /// </summary>
@@ -47,9 +49,9 @@ public sealed class PlacedObjectCollector
     private readonly List<TargetObject> _targets = [];
     private readonly List<OtherObject> _otherModObjects = [];
     private readonly List<OtherObject> _supportOnlyObjects = [];
-    private readonly List<SpaceFact> _targetSpaces = [];
     private readonly List<OverriddenOtherRecord> _overriddenOthers = [];
     private readonly List<RecordKey> _removedRecords = [];
+    private readonly List<RecordChangedByCleanedMod> _changedRecords = [];
 
     private int _cleanedModObjects;
     private int _targetsOverriddenLater;
@@ -75,7 +77,16 @@ public sealed class PlacedObjectCollector
     {
         var facts = plugin.ReadPlacedRecords(
             new PlacedReadScope(
-                trust.CleanedMod, Terrain: true, plan.Navmesh, plan.TerrainVersions, plan.TerrainLayers, plan.Water, HoldLocationKeyword, plan.TerrainForChangedObjectsOnly),
+                trust.CleanedMod,
+                Terrain: true,
+                plan.Navmesh,
+                plan.TerrainVersions,
+                plan.TerrainLayers,
+                plan.Water,
+                HoldLocationKeyword,
+                plan.TerrainForChangedObjectsOnly,
+                OtherRecordChange.Tolerances,
+                plan.AreaRecordVersions),
             candidate => StopsTheWalk(trust, world, plan, candidate));
         var collector = new PlacedObjectCollector(trust, world, plan, facts);
         foreach (var record in facts.Records) collector.Collect(record);
@@ -83,21 +94,38 @@ public sealed class PlacedObjectCollector
         return collector.CreateScannedPlacedRecords();
     }
 
-    /// <summary>Reads the links from records other than placed objects into the scanned targets and adds them after the placed records' links.</summary>
+    /// <summary>
+    /// Reads the links from records other than placed objects into the scanned targets, the changed records and the changed cells,
+    /// adds those into the targets after the placed records' links, and marks the changed records and cells the cleaned mod's
+    /// records link to.
+    /// </summary>
+    /// <remarks>
+    /// Only the plugins that can link to a target are read: the changed records and cells count only links from the cleaned mod's
+    /// records, which lie in plugins that can link to the cleaned mod, so they add no plugin to read.
+    /// </remarks>
     public static CollectedObjects ReadNonPlacedLinks(ScannedPlacedRecords scanned, IPluginRecords plugin)
     {
         var objects = scanned.Objects;
         var targetKeys = TargetKeys(objects.Targets);
-        var nonPlaced = plugin.ReadLinks(scanned.CleanedMod, targetKeys);
+        var changedKeys = scanned.MarksLinksIntoChangedRecords
+            ? objects.ChangedRecords.Select(changed => changed.Key).Concat(objects.ChangedCells.Select(changed => changed.Cell))
+            : [];
+        var nonPlaced = plugin.ReadLinks(
+            scanned.CleanedMod,
+            targetKeys.Concat(changedKeys).ToHashSet(),
+            targetKeys.Select(key => key.Plugin).ToHashSet());
         var links = KeepLinksIntoTargets(nonPlaced.Links, scanned.RemovedRecords, scanned.CleanedMod, targetKeys);
-        return objects with { Links = [.. objects.Links, .. links], UnreadableRecords = nonPlaced.Unreadable };
+        var linked = scanned.MarksLinksIntoChangedRecords
+            ? LinkedFromCleanedMod(nonPlaced.Links, scanned.RemovedRecords, scanned.CleanedMod)
+            : [];
+        return MarkLinked(objects with { Links = [.. objects.Links, .. links], UnreadableRecords = nonPlaced.Unreadable }, linked);
     }
 
     private ScannedPlacedRecords CreateScannedPlacedRecords()
     {
         var removed = _removedRecords.ToImmutableHashSet();
         var placedLinks = KeepLinksIntoTargets(_facts.Links, removed, _trust.CleanedMod, TargetKeys(_targets));
-        return new ScannedPlacedRecords(CreateCollectedObjects(placedLinks), _trust.CleanedMod, removed);
+        return new ScannedPlacedRecords(CreateCollectedObjects(placedLinks, removed), _trust.CleanedMod, removed, _plan.AreaRecordVersions is not null);
     }
 
     private static HashSet<RecordKey> TargetKeys(IEnumerable<TargetObject> targets) => targets.Select(target => target.Key).ToHashSet();
@@ -117,9 +145,48 @@ public sealed class PlacedObjectCollector
     private void Collect(PlacedRecordFact record)
     {
         if (IsCreatedByTarget(record)) _cleanedModObjects++;
+        if (CreateChangedRecord(record) is { } changed) _changedRecords.Add(changed);
         if (RemovedForm.IsRemoved(record.Placement.Presence)) CountRemovedRecord(record);
         else CollectByRole(record);
     }
+
+    /// <remarks>
+    /// An earlier version in another space has no old place in the record's space, as for a changed object (<see cref="ChangedObjectKind"/>).
+    /// A deleted earlier version is never written back: a deleted placed reference in a plugin crashes the game.
+    /// </remarks>
+    /// <returns>
+    /// Null when the cleaned mod does not override the record, its earlier version has no old place there or is deleted, or no part
+    /// goes back, was changed again or stays for its record format.
+    /// </returns>
+    private RecordChangedByCleanedMod? CreateChangedRecord(PlacedRecordFact record)
+    {
+        if (record.CleanedModChanges is null) return null;
+        var earlier = record.Versions[ChangedObjectKind.CleanedModIndexOf(record, _trust.CleanedMod) - 1];
+        if (earlier.SpaceKey != record.Space.Key || earlier.Placement is not { Position: not null, EulerRotation: not null, Presence.Deleted: false }) return null;
+
+        var earlierVersion = CreateEarlierVersion(record, earlier);
+        if (earlierVersion is { Undo: PlacedParts.None, LeftToLaterPlugins.IsEmpty: true, KeptForRecordFormat: PlacedParts.None }) return null;
+        return new RecordChangedByCleanedMod(
+            record.Key,
+            record.EditorId,
+            record.Space.Key,
+            record.Cell,
+            record.WinningMod,
+            record.Placement is { Position: { } position, EulerRotation: { } rotation } ? new EulerPlacement(position, rotation, ReferenceScale.Normalize(record.Scale)) : null,
+            record.Base,
+            record.Winner.Reference,
+            record.IsPersistent,
+            earlierVersion,
+            Target: null,
+            LinkedFromCleanedMod: false,
+            RemovedForm.PresenceOf(earlier.Placement.Presence, isWinningTarget: false),
+            _facts.OverriddenDoorLinks.GetValueOrDefault(record.Key),
+            IsInDeletedCell(record, earlier));
+    }
+
+    /// <summary>A version read deletes the cell holding the record's winning version or the one holding the given version.</summary>
+    private bool IsInDeletedCell(PlacedRecordFact record, PlacedVersionFact earlier) =>
+        _facts.DeletedCells.Contains(record.Cell.Key) || _facts.DeletedCells.Contains(earlier.Cell.Key);
 
     /// <summary>The record's final version is removed in the game, so it is no object of any kind and its links keep nothing.</summary>
     private void CountRemovedRecord(PlacedRecordFact record)
@@ -144,6 +211,20 @@ public sealed class PlacedObjectCollector
         IEnumerable<LinkFact> links, IReadOnlySet<RecordKey> removed, PluginName cleanedMod, IReadOnlySet<RecordKey> targetKeys) =>
         [.. links.Where(link => !removed.Contains(link.Source) && (link.Target.Plugin == cleanedMod || targetKeys.Contains(link.Target)))];
 
+    /// <summary>
+    /// The records that a record the cleaned mod creates, not removed in the game, links to. The links into the changed records and
+    /// cells are not kept with the target links: those count the links from the targets.
+    /// </summary>
+    private static HashSet<RecordKey> LinkedFromCleanedMod(IEnumerable<LinkFact> links, IReadOnlySet<RecordKey> removed, PluginName cleanedMod) =>
+        links.Where(link => link.Source.Plugin == cleanedMod && !removed.Contains(link.Source)).Select(link => link.Target).ToHashSet();
+
+    /// <summary>Marks each changed record and cell that is in <paramref name="linked"/>.</summary>
+    private static CollectedObjects MarkLinked(CollectedObjects objects, IReadOnlySet<RecordKey> linked) => objects with
+    {
+        ChangedRecords = [.. objects.ChangedRecords.Select(record => linked.Contains(record.Key) ? record with { LinkedFromCleanedMod = true } : record)],
+        ChangedCells = [.. objects.ChangedCells.Select(cell => linked.Contains(cell.Cell) ? cell with { LinkedFromCleanedMod = true } : cell)],
+    };
+
     /// <remarks>
     /// Targets define the target spaces, so no placement outside them can matter: a record there is hidden. A target record there
     /// (one an earlier patcher moved into another space) counts with the hidden ones.
@@ -156,7 +237,7 @@ public sealed class PlacedObjectCollector
 
         if (!classification.IsJudged && role != RecordRole.OtherChanged && presence == ShownInGame.Present)
         {
-            _supportOnlyObjects.Add(CreateOtherObject(record, editorId: null, change: null));
+            _supportOnlyObjects.Add(CreateOtherObject(record, _plan.OtherModDetails ? record.EditorId : null, change: null));
         }
         if (CountIfSkipped(role, record, presence)) return;
 
@@ -219,8 +300,6 @@ public sealed class PlacedObjectCollector
 
     private void AddTarget(PlacedRecordFact record, TargetOrigin origin, PlacedVersionFact? earlierVersion)
     {
-        _targetSpaces.Add(record.Space);
-
         var (position, rotation) = PlacementOf(record);
         _targets.Add(new TargetObject(
             Id: default,
@@ -240,20 +319,61 @@ public sealed class PlacedObjectCollector
             HasLocationRefType: record.HasLocationRefType,
             ReferenceRadius: record.ReferenceRadius,
             PrimitiveBounds: record.PrimitiveBounds,
+            CollisionLayer: record.Winner.Reference.CollisionLayer,
+            IsCullingVolume: record.Winner.Reference.IsCullingVolume,
             Area: _areaNames.Name(record.Space, record.Cell.Key, position),
             Origin: origin,
-            EarlierVersion: earlierVersion is { } earlier ? CreateEarlierVersion(record, earlier) : null));
+            EarlierVersion: earlierVersion is { } earlier ? CreateEarlierVersion(record, earlier) : null)
+        {
+            CellDeleted = DeletedInFinalWorld(record.Cell),
+        });
     }
 
-    private static EarlierVersion CreateEarlierVersion(PlacedRecordFact record, PlacedVersionFact earlier) => new(
-        earlier.Plugin,
-        new EulerPlacement(earlier.Placement.Position!.Value, earlier.Placement.EulerRotation!.Value, ReferenceScale.Normalize(earlier.Scale)),
-        earlier.Scale,
-        earlier.Base,
-        earlier.Cell,
-        earlier.IsPersistent,
-        RestoresWholeRecord: earlier.Base != record.Base,
-        earlier.Reference);
+    /// <param name="earlier">The version just below the cleaned mod's, with a position and a rotation.</param>
+    /// <remarks>A record that a version above the cleaned mod's removes was taken out after it, so none of its parts goes back.</remarks>
+    private EarlierVersion CreateEarlierVersion(PlacedRecordFact record, PlacedVersionFact earlier)
+    {
+        var changes = record.CleanedModChanges
+            ?? throw new UnreachableException($"The reader judged no parts of the record {record.Key}, which the cleaned mod overrides.");
+        var removedLater = record.Versions
+            .Skip(ChangedObjectKind.CleanedModIndexOf(record, _trust.CleanedMod) + 1)
+            .Any(version => RemovedForm.IsRemoved(version.Placement.Presence));
+        var version = new EarlierVersion(
+            earlier.Plugin,
+            new EulerPlacement(earlier.Placement.Position!.Value, earlier.Placement.EulerRotation!.Value, ReferenceScale.Normalize(earlier.Scale)),
+            earlier.Base,
+            earlier.Cell,
+            earlier.IsPersistent,
+            removedLater ? PlacedParts.None : changes.Undo,
+            changes.LeftToLaterPlugins,
+            changes.KeptForRecordFormat,
+            PersistenceGoesBack(record),
+            earlier.Reference,
+            DeletedCellRestoredInto: null);
+        return version with { DeletedCellRestoredInto = DeletedInFinalWorld(CellRestoredInto(record, version)) };
+    }
+
+    /// <summary>The cell a restore writes the record into: the earlier version's when the restore moves it there, else the one it stands in.</summary>
+    private static CellFact CellRestoredInto(PlacedRecordFact record, EarlierVersion earlier) =>
+        earlier.GoesBackToEarlierList || earlier.GoesBackToEarlierCell(record.Cell, record.IsPersistent) ? earlier.Cell : record.Cell;
+
+    private DeletedCell? DeletedInFinalWorld(CellFact cell) =>
+        _facts.CellsDeletedInFinalWorld.TryGetValue(cell.Key, out var plugin) ? new DeletedCell(cell, plugin) : null;
+
+    /// <summary>
+    /// The Persistent flag is no part, since it follows the child list, but a later plugin may set it for its own use, such as
+    /// filling a quest alias; so it is judged like a part, from the version facts.
+    /// </summary>
+    private bool PersistenceGoesBack(PlacedRecordFact record)
+    {
+        var versions = record.Versions;
+        var outcome = PartHistory.Of(
+            [.. versions.Select(version => version.Plugin)],
+            ChangedObjectKind.CleanedModIndexOf(record, _trust.CleanedMod),
+            _trust.Patch,
+            (lower, higher) => versions[lower].IsPersistent != versions[higher].IsPersistent);
+        return outcome is PartOutcome.Undo;
+    }
 
     private OtherObject CreateOtherObject(PlacedRecordFact record, string? editorId, ObjectChange? change)
     {
@@ -272,13 +392,21 @@ public sealed class PlacedObjectCollector
             record.HasMapMarker,
             change,
             RolesOf(record),
-            ChangeWithoutCleanedMod: null);
+            ChangeWithoutCleanedMod: null)
+        {
+            CellDeleted = DeletedInFinalWorld(record.Cell),
+        };
     }
 
-    /// <remarks>Only a changed object has an old place to judge, so a run without one decides nothing in the world without the cleaned mod.</remarks>
+    /// <remarks>
+    /// Only a changed object has an old place to judge, so a run without one decides nothing in the world without the cleaned mod,
+    /// unless the plan asks for every object and some placed record of another plugin the cleaned mod changed can go back.
+    /// </remarks>
     private void DecideChangesWithoutCleanedModIfOldPlacesAreJudged()
     {
-        if (!_plan.JudgeOldPlaces || _targets.All(target => target.Origin == TargetOrigin.CleanedMod)) return;
+        if (!_plan.JudgeOldPlaces) return;
+        var everyObject = _plan.DecideEveryObjectWithoutCleanedMod && _changedRecords.Count > 0;
+        if (!everyObject && _targets.All(target => target.Origin == TargetOrigin.CleanedMod)) return;
 
         var recordOf = _facts.Records.ToDictionary(record => record.Key);
         DecideChangesWithoutCleanedMod(_otherModObjects, recordOf);
@@ -308,19 +436,24 @@ public sealed class PlacedObjectCollector
         (record.Placement.Position!.Value, record.Placement.EulerRotation!.Value);
 
     /// <summary>The objects with the placed records' links; the step's second part adds the other links and the unreadable records.</summary>
-    private CollectedObjects CreateCollectedObjects(ImmutableArray<LinkFact> placedLinks)
+    private CollectedObjects CreateCollectedObjects(ImmutableArray<LinkFact> placedLinks, IReadOnlySet<RecordKey> removed)
     {
         var targets = _targets
             .OrderBy(target => target.Key, RecordKeyOrder.Comparer)
             .Select((target, index) => target with { Id = new TargetId(index) })
             .ToImmutableArray();
-        return new CollectedObjects(
+        var linked = _plan.AreaRecordVersions is not null ? LinkedFromCleanedMod(_facts.Links, removed, _trust.CleanedMod) : [];
+        var objects = new CollectedObjects(
             targets,
             NumberInKeyOrder(_otherModObjects, firstId: 0),
             NumberInKeyOrder(_supportOnlyObjects, firstId: _otherModObjects.Count),
+            OrderChangedRecords(targets),
+            ChangedCellsInKeyOrder(),
+            ChangedLandsInKeyOrder(),
+            ChangedNavmeshesInKeyOrder(),
             placedLinks,
             [],
-            _targetSpaces.DistinctBy(space => space.Key).ToDictionary(space => space.Key),
+            _facts.Spaces,
             new ReadCounts(
                 _facts.RecordsScanned,
                 _cleanedModObjects,
@@ -334,8 +467,82 @@ public sealed class PlacedObjectCollector
                 _facts.NavmeshCount),
             [.. _overriddenOthers],
             TargetWorkOrder.Of(targets),
-            targets.IsEmpty ? new StopReason(StopKind.NoTargetObjects, null) : null);
+            targets.IsEmpty ? new StopReason(StopKind.NoTargetObjects, null) : null)
+        {
+            WinningPresence = WinningPresenceOfTargetSpaces(),
+            WinningPrimitives = WinningPrimitivesOfTargetSpaces(),
+        };
+        return MarkLinked(objects, linked);
     }
+
+    private Dictionary<RecordKey, ReferenceFacts> WinningPrimitivesOfTargetSpaces() =>
+        _facts.Records.Where(record => record is { InTargetSpace: true, IsPrimitive: true }).ToDictionary(record => record.Key, record => record.Winner.Reference);
+
+    private Dictionary<RecordKey, PlacedPresence> WinningPresenceOfTargetSpaces() =>
+        _facts.Records
+            .Where(record => record.InTargetSpace)
+            .Select(record => KeyValuePair.Create(record.Key, WinningPresenceOf(record)))
+            .Where(entry => entry.Value != default)
+            .ToDictionary();
+
+    /// <remarks>Only a record that is Initially Disabled needs its role, which is costly to decide, to tell whether the flag hides it.</remarks>
+    private PlacedPresence WinningPresenceOf(PlacedRecordFact record) =>
+        RemovedForm.PresenceOf(record.Placement.Presence, isWinningTarget: record.Placement.Presence.InitiallyDisabled && Classify(record).IsJudged);
+
+    /// <summary>The changed records in key order, each with the id of the target object it is judged as.</summary>
+    private ImmutableArray<RecordChangedByCleanedMod> OrderChangedRecords(ImmutableArray<TargetObject> targets)
+    {
+        var targetIds = targets.ToDictionary(target => target.Key, target => target.Id);
+        return InKeyOrder(_changedRecords, changed => changed.Key, changed => targetIds.TryGetValue(changed.Key, out var id) ? changed with { Target = id } : changed);
+    }
+
+    private ImmutableArray<CellChangedByCleanedMod> ChangedCellsInKeyOrder() => InKeyOrder(_facts.ChangedCells, cell => cell.Key, ToChangedCell);
+
+    private ImmutableArray<LandChangedByCleanedMod> ChangedLandsInKeyOrder() => InKeyOrder(_facts.ChangedLands, land => land.Key, ToChangedLand);
+
+    private ImmutableArray<NavmeshChangedByCleanedMod> ChangedNavmeshesInKeyOrder() => InKeyOrder(_facts.ChangedNavmeshes, navmesh => navmesh.Key, ToChangedNavmesh);
+
+    private static ImmutableArray<TChanged> InKeyOrder<TFact, TChanged>(IEnumerable<TFact> facts, Func<TFact, RecordKey> keyOf, Func<TFact, TChanged> toChanged) =>
+        [.. facts.OrderBy(keyOf, RecordKeyOrder.Comparer).Select(toChanged)];
+
+    private static CellChangedByCleanedMod ToChangedCell(CellRecordFact cell) =>
+        new(cell.Key, cell.SpaceKey, cell.Grid, cell.Parts, LinkedFromCleanedMod: false, cell.WinningMod, cell.EarlierWater, cell.CurrentWater, cell.DefaultWaterLevel);
+
+    private static LandChangedByCleanedMod ToChangedLand(LandRecordFact land)
+    {
+        var changes = land.Changes;
+        return new(
+            land.Cell,
+            land.Key,
+            changes.UndoPoints,
+            changes.UndoColours,
+            changes.UndoQuarters,
+            changes.UndoRest,
+            changes.LeftToLater,
+            land.WinningMod,
+            land.Heights,
+            land.CellDeletedInAVersion);
+    }
+
+    private static NavmeshChangedByCleanedMod ToChangedNavmesh(NavmeshRecordFact navmesh) => new(
+        navmesh.Key,
+        navmesh.SpaceKey,
+        navmesh.Cell,
+        navmesh.WinningMod,
+        navmesh.Case,
+        navmesh.Geometry,
+        navmesh.Presence,
+        navmesh.MapEntry,
+        navmesh.Earlier,
+        navmesh.Current,
+        navmesh.ReplacedBy,
+        navmesh.Neighbours,
+        navmesh.Doors,
+        navmesh.NamedInPreferredPaths,
+        navmesh.WinningMapMod,
+        navmesh.CellDeletedInAVersion,
+        navmesh.LaterWinner,
+        navmesh.WinningMapEntry);
 
     private static ImmutableArray<OtherObject> NumberInKeyOrder(IEnumerable<OtherObject> others, int firstId) =>
         DenseNumbering.InOrder(

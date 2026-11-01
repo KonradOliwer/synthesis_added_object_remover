@@ -19,6 +19,7 @@ internal static class OtherModsObjectText
         OtherModsObjectFate.LeftNotRemovable => "left where they stand, not removable",
         OtherModsObjectFate.LeftNothingBelowNotRemovable => $"left where they stand, {NothingBelow} and not removable",
         OtherModsObjectFate.LeftWonAfterPatch => "left as they are, a plugin after the patch wins them",
+        OtherModsObjectFate.LeftInDeletedCell => "left as they are, in a deleted cell",
         _ => throw new UnreachableException($"Unknown fate {fate}."),
     };
 
@@ -32,6 +33,7 @@ internal static class OtherModsObjectText
         OtherModsObjectFate.LeftNotRemovable => "left where it stands, not removable",
         OtherModsObjectFate.LeftNothingBelowNotRemovable => $"left where it stands, {NothingBelow} and not removable",
         OtherModsObjectFate.LeftWonAfterPatch => "left as it is, a plugin after the patch wins it",
+        OtherModsObjectFate.LeftInDeletedCell => "left as it is, in a deleted cell",
         _ => throw new UnreachableException($"Unknown fate {fate}."),
     };
 

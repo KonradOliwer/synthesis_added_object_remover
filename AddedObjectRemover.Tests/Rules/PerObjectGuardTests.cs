@@ -37,6 +37,8 @@ public class PerObjectGuardTests
         public ObjectVisibility VisibilityOf(BaseKey? baseKey, bool isPrimitive, bool hasMapMarker) =>
             baseKey == faultyBase ? throw new InvalidDataException(FailureMessage) : inner.VisibilityOf(baseKey, isPrimitive, hasMapMarker);
 
+        public bool LayerBlocksActors(uint collisionLayer) => inner.LayerBlocksActors(collisionLayer);
+
         public IReadOnlyList<MeasuredBase> Computed() => inner.Computed();
     }
 
@@ -129,6 +131,20 @@ public class PerObjectGuardTests
                 "InvalidDataException: " + FailureMessage,
                 new FailureSubject(others[Faulty].Key.ToString(), others[Faulty].EditorId, Faulty)),
             failure);
+    }
+
+    /// <summary>The world the restored objects of other mods are checked in records the failure under the restore step's part.</summary>
+    [Fact]
+    public void AnObjectThatCannotBeMeasuredIsReportedUnderThePartGivenToTheMeasurementRules()
+    {
+        var (targets, others) = CreateScene(middleTargetBase: Table.Base, middleOtherBase: Boulder.Base);
+        var errors = new UnexpectedErrors();
+        var shapes = FaultyWhenAskedAbout(Boulder.Base);
+        var world = TestScenes.Create(targets, others, shapes, measurementRules: RemovalCauseSelector.MeasurementRules(errors, RestoreWhereRemovedParts.ObjectThatStays));
+
+        FindTooClose(targets, world, shapes, threads: 1, Replacements.None(others.Count));
+
+        Assert.Equal(RestoreWhereRemovedParts.ObjectThatStays, Assert.Single(errors.Since(default)).Part);
     }
 
     [Fact]

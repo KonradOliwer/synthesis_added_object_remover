@@ -4,4 +4,5 @@ PlacedObjectCollector.PlacementOf | Reads a placed record's position and rotatio
 OtherRecordChange.DiffersBeyond | Comparison of two optional vectors within a tolerance per axis, shared by the position and rotation comparers of the accepted-value rule.
 ReferenceScale.Normalize | Rule over a plain number: a placed reference's scale, shared by Collect and the NPC body rule.
 StartsDisabledRule.Of | Rule over a placed record's plugin facts (PlacementFacts, outside the domain list): is it shown in the game.
+StartsDisabledRule.HidesWinningTarget | Rule over a placed record's plugin facts (PresenceFacts, outside the domain list): does Initially Disabled hide it despite an enable parent.
 RemovedForm.IsRemoved | Rule over a placed record's plugin facts (PresenceFacts, outside the domain list): is it removed in the game.

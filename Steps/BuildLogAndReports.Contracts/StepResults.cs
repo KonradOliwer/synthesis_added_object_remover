@@ -7,6 +7,7 @@ using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 
@@ -17,6 +18,7 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 /// <param name="OtherModsObjects">What became of the other mods' objects left without support.</param>
 /// <param name="RestingObjects">The also-remove rounds that follow the removals before the visible left-behind step.</param>
 /// <param name="Final">The removal decisions with every round and every move.</param>
+/// <param name="RestoreWhereRemoved">What the cleaned mod changed that goes back where it was removed.</param>
 public record StepResults(
     CollectedObjects Collected,
     IObjectsToKeep ObjectsToKeep,
@@ -29,4 +31,5 @@ public record StepResults(
     LeftBehindResult LeftBehind,
     MarkerMoves MarkerMoves,
     OtherModsObjectsResult OtherModsObjects,
-    IRemovalDecisions Final);
+    IRemovalDecisions Final,
+    RestoreWhereRemovedResult RestoreWhereRemoved);

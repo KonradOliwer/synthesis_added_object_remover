@@ -141,7 +141,7 @@ public class PlacedObjectCollectorReplacementTests
 
         var earlier = EarlierVersionOf(Collect(Tree, At(BaseGame, Vector3.Zero), cityVersion, At(Target, Moved)));
 
-        Assert.Equal((City, new EulerPlacement(Placed, turned, 1.5f), 1.5f, TreeBase), (earlier.Plugin, earlier.Placement, earlier.StoredScale, earlier.Base));
+        Assert.Equal((City, new EulerPlacement(Placed, turned, 1.5f), TreeBase), (earlier.Plugin, earlier.Placement, earlier.Base));
     }
 
     [Fact]
@@ -149,7 +149,7 @@ public class PlacedObjectCollectorReplacementTests
     {
         var earlier = EarlierVersionOf(Collect(Tree, At(BaseGame, Placed), At(Target, Moved)));
 
-        Assert.Equal(((float?)null, 1f), (earlier.StoredScale, earlier.Placement.Scale));
+        Assert.Equal(1f, earlier.Placement.Scale);
     }
 
     [Fact]
@@ -189,7 +189,7 @@ public class PlacedObjectCollectorReplacementTests
 
     [Fact]
     public void AMovedObjectWithTheModelOfItsEarlierVersionRestoresOnlyThePlacement() =>
-        Assert.False(EarlierVersionOf(Collect(Tree, At(BaseGame, Placed), At(Target, Moved))).RestoresWholeRecord);
+        Assert.False(EarlierVersionOf(Collect(Tree, At(BaseGame, Placed), At(Target, Moved))).Undo.HasFlag(PlacedParts.BaseAndData));
 
     /// <summary>The earlier version's own model comes back with the whole record of that plugin.</summary>
     [Fact]
@@ -199,7 +199,7 @@ public class PlacedObjectCollectorReplacementTests
 
         var earlier = EarlierVersionOf(Collect(Tree, At(BaseGame, Placed), restyled));
 
-        Assert.Equal((true, TreeBase, BaseGame), (earlier.RestoresWholeRecord, earlier.Base, earlier.Plugin));
+        Assert.Equal((true, TreeBase, BaseGame), (earlier.Undo.HasFlag(PlacedParts.BaseAndData), earlier.Base, earlier.Plugin));
     }
 
     [Fact]
@@ -213,7 +213,7 @@ public class PlacedObjectCollectorReplacementTests
         Assert.Equal(TargetOrigin.Replaced, replaced.Origin);
         Assert.Equal(Placed + new Vector3(3, 0, 0), replaced.Transform.Position);
         var earlier = EarlierVersionOf(collected);
-        Assert.Equal((BaseGame, TreeBase, true), (earlier.Plugin, earlier.Base, earlier.RestoresWholeRecord));
+        Assert.Equal((BaseGame, TreeBase, true), (earlier.Plugin, earlier.Base, earlier.Undo.HasFlag(PlacedParts.BaseAndData)));
         Assert.Equal(0, collected.Counts.OthersOverriddenByTarget);
     }
 

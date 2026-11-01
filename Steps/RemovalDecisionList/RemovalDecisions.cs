@@ -86,6 +86,8 @@ public sealed class RemovalDecisions : IRemovalDecisions
 
     public bool IsDecided(TargetId id) => Of(id) != null;
 
+    public WhenRemoved WhenRemovedOf(TargetId id) => _store.WhenRemoved[id.Index];
+
     public bool MayStillBeRemoved(TargetId id) => Of(id) is null or Decision.Fitted;
 
     public bool IsRemoved(TargetId id) => Of(id) is Decision.Removed;
@@ -273,7 +275,7 @@ public sealed class RemovalDecisions : IRemovalDecisions
 
     private Decision DecideRemoval(TargetId target, Round round, RemovalReason reason) => _store.WhenRemoved[target.Index] switch
     {
-        WhenRemoved.Disable => new Decision.Removed(round, reason),
+        WhenRemoved.Disable or WhenRemoved.DisableInsteadOfRestore => new Decision.Removed(round, reason),
         WhenRemoved.Restore restore => new Decision.Restored(round, reason, restore.To),
         var unknown => throw new UnreachableException($"Unknown entry {unknown} in the when-removed table."),
     };

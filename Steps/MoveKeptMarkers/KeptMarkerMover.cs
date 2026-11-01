@@ -35,7 +35,8 @@ internal sealed class KeptMarkerMover(
 
     public MarkerMoves Move(IReadOnlyList<LeftBehindCheck> evaluations, Execution execution)
     {
-        var candidates = evaluations.Where(IsMovableMarkerKeptInsideOtherObject).ToArray();
+        var keptInside = evaluations.Where(IsMovableMarkerKeptInsideOtherObject).ToArray();
+        var candidates = keptInside.Where(evaluation => !IsInDeletedCell(evaluation)).ToArray();
         var moves = ParallelMap.Run(
             execution,
             candidates.Length,
@@ -48,12 +49,18 @@ internal sealed class KeptMarkerMover(
             [.. found.Select(move => move.Move)],
             [.. found.Select(move => move.Detail)],
             ParallelResults.IndicesWhere(moves, move => move == null).Select(i => candidates[i]).ToList(),
+            [.. keptInside.Where(IsInDeletedCell)],
             maxDistance,
             Failure: null);
     }
 
-    private static bool IsMovableMarkerKeptInsideOtherObject(LeftBehindCheck evaluation) =>
-        evaluation.ContainingObject != null && !evaluation.IsRemoved && MovableKinds.Contains(evaluation.Kind);
+    private bool IsMovableMarkerKeptInsideOtherObject(LeftBehindCheck evaluation) =>
+        evaluation.ContainingObject != null
+        && !evaluation.IsRemoved
+        && MovableKinds.Contains(evaluation.Kind);
+
+    /// <remarks>A marker in a cell the final world deletes stays where it is: the patch writes nothing into a deleted cell.</remarks>
+    private bool IsInDeletedCell(LeftBehindCheck evaluation) => targets[evaluation.TargetIndex].CellDeleted is not null;
 
     private FoundMove? TryFindMove(LeftBehindCheck evaluation, ObjectQueryScratch scratch)
     {

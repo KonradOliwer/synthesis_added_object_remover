@@ -199,6 +199,43 @@ public sealed class StartSetupTooCloseSectionsTests
             VisibleLine());
     }
 
+    [Fact]
+    public void Config_GivesTheRestoreWhereRemovedLineOffAndOnWithOnlyWhatIsOn()
+    {
+        var settings = SettingsFor();
+        var mods = Facts();
+        string RestoreLine()
+        {
+            var runSettings = Assert.IsType<RunRequest.Ready>(Build(settings, mods)).Settings;
+            return LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(mods, runSettings.ModTrust), mods).Lines
+                .Single(line => line.StartsWith("Restore where the cleaned mod was removed: ", StringComparison.Ordinal));
+        }
+
+        settings.RestoreWhereRemoved = new RestoreWhereRemovedSettings
+        {
+            RestoreOtherModsObjects = false, RestoreTerrain = false, RestoreCells = false, RestoreNavmeshes = false,
+        };
+        Assert.Equal("Restore where the cleaned mod was removed: off.", RestoreLine());
+
+        settings.RestoreWhereRemoved = new RestoreWhereRemovedSettings();
+        Assert.Equal(
+            "Restore where the cleaned mod was removed: other mods' objects, terrain, cell settings, navmeshes; "
+            + "an area 10000 units wide counts as cleared when at most 0.1% of the cleaned mod's objects there still stand, by size; "
+            + "terrain edges blended over 256 units.",
+            RestoreLine());
+
+        settings.RestoreWhereRemoved = new RestoreWhereRemovedSettings
+        {
+            RestoreOtherModsObjects = false,
+            RestoreTerrain = false,
+            ClearedArea = new ClearedAreaSettings { SearchRadius = 2048f, MaxStandingPercent = 2.5f, Measure = ClearedAreaMeasure.ObjectCount },
+        };
+        Assert.Equal(
+            "Restore where the cleaned mod was removed: cell settings, navmeshes; "
+            + "an area 4096 units wide counts as cleared when at most 2.5% of the cleaned mod's objects there still stand, by count.",
+            RestoreLine());
+    }
+
     [Theory]
     [InlineData(true, 80, 15, "Shrink or turn objects to make them fit: Shrink down to: 80% of its size; Turn by at most: 15 degrees either way.")]
     [InlineData(true, 100, 15, "Shrink or turn objects to make them fit: Shrink down to: 100% of its size; Turn by at most: 15 degrees either way.")]
@@ -930,6 +967,10 @@ public sealed class StartSetupTooCloseSectionsTests
             [.. targets],
             [CreateOtherModObject(0, "Alpha"), CreateOtherModObject(1, "Beta")],
             ImmutableArray.Create(CreateOtherModObject(2, "Gamma")),
+            [],
+            [],
+            [],
+            [],
             [],
             [],
             new Dictionary<RecordKey, SpaceFact> { [space] = new(space, "Tamriel", SpaceKind.Worldspace, "Skyrim") },

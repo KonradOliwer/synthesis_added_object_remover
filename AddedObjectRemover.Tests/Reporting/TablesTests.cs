@@ -43,7 +43,7 @@ public sealed class TablesTests : IDisposable
     {
         var scene = TouchScene();
         var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouchingIt, TouchDistance, Threshold, TouchChainsShown: true);
-        var tables = Tables.BuildTables(WithDetails(scene.Outcome, TouchDetails(scene)), settings, Context);
+        var tables = BuildTables(WithDetails(scene.Outcome, TouchDetails(scene)), settings);
 
         Assert.NotEmpty(scene.Run.Explanation!.Edges);
         Assert.Single(scene.Run.TouchChains.Members);
@@ -59,8 +59,8 @@ public sealed class TablesTests : IDisposable
         var plain = TouchScene();
         var withTerrain = TouchScene(terrainSeeds: [0]);
 
-        var plainRow = ComponentRow(Tables.BuildTables(WithDetails(plain.Outcome, TouchDetails(plain)), settings, Context));
-        var terrainRow = ComponentRow(Tables.BuildTables(WithDetails(withTerrain.Outcome, TouchDetails(withTerrain)), settings, Context));
+        var plainRow = ComponentRow(BuildTables(WithDetails(plain.Outcome, TouchDetails(plain)), settings));
+        var terrainRow = ComponentRow(BuildTables(WithDetails(withTerrain.Outcome, TouchDetails(withTerrain)), settings));
 
         Assert.Equal(
             new[] { new Round(1, RoundKind.ChangedTerrain), new Round(2, RoundKind.TooClose) },
@@ -164,6 +164,7 @@ public sealed class TablesTests : IDisposable
             [new MarkerMove(new TargetId(evaluations[0].TargetIndex), new Vector3(1, 2, 3), new Vector3(4, 5, 9))],
             [new MarkerMoveDetail(evaluations[0], RelocationSurface.Terrain, LeftHomeCell: false)],
             [],
+            [],
             MarkerMoveLimits.MaxDistance,
             Failure: null);
 
@@ -182,7 +183,7 @@ public sealed class TablesTests : IDisposable
         tally.Add(DirectionSector.West, 40f, BoxFate.Removed);
         LeftBehindCheck[] evaluations = [new(3, InvisibleObjectKind.IdleMarkers, 100f, null, tally.Build(), LeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null)];
 
-        var table = Tables.BuildLeftBehindTable(world, evaluations, new MarkerMoves(StepOutcome.Performed, [], [], [], MarkerMoveLimits.MaxDistance, Failure: null), Context);
+        var table = Tables.BuildLeftBehindTable(world, evaluations, new MarkerMoves(StepOutcome.Performed, [], [], [], [], MarkerMoveLimits.MaxDistance, Failure: null), Context);
 
         var row = Assert.Single(table.Rows);
         string Cell(string column) => row[table.Header.IndexOf(column)];
@@ -250,7 +251,7 @@ public sealed class TablesTests : IDisposable
         var scene = TouchScene();
         var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouchingIt, TouchDistance, Threshold, TouchChainsShown: true);
 
-        var tables = Tables.BuildTables(WithDetails(scene.Outcome, TouchDetails(scene)), settings, Context);
+        var tables = BuildTables(WithDetails(scene.Outcome, TouchDetails(scene)), settings);
 
         Assert.Equal(
             [ReportFileNames.EdgesFileName, ReportFileNames.ComponentsFileName, ReportFileNames.RemovalsFileName, ReportFileNames.HintsFileName],
@@ -266,7 +267,7 @@ public sealed class TablesTests : IDisposable
         var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouchingIt, TouchDistance, Threshold, TouchChainsShown: true);
         var details = ReportFileDetails.SwitchedOff with { Outcome = detailsOutcome };
 
-        var tables = Tables.BuildTables(WithDetails(scene.Outcome, details), settings, Context);
+        var tables = BuildTables(WithDetails(scene.Outcome, details), settings);
 
         Assert.Equal([ReportFileNames.RemovalsFileName, ReportFileNames.HintsFileName], tables.Select(table => table.FileName));
     }
@@ -277,7 +278,7 @@ public sealed class TablesTests : IDisposable
         var scene = TouchScene();
         var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouchingIt, TouchDistance, Threshold, TouchChainsShown: true);
 
-        Assert.Throws<InvalidOperationException>(() => Tables.BuildTables(WithDetails(scene.Outcome, ReportFileDetails.None), settings, Context));
+        Assert.Throws<InvalidOperationException>(() => BuildTables(WithDetails(scene.Outcome, ReportFileDetails.None), settings));
     }
 
     [Fact]
@@ -287,7 +288,7 @@ public sealed class TablesTests : IDisposable
         var settings = new AlsoRemoveSettings(FollowUpRemovalMode.OnlyWhatLosesItsSupport, TouchDistance, Threshold, TouchChainsShown: true);
         var outcome = scene.Outcome with { RestingObjects = scene.Outcome.RestingObjects with { Mode = settings.Mode, Rounds = [], Evidence = [] } };
 
-        Assert.Throws<InvalidOperationException>(() => Tables.BuildTables(WithDetails(outcome, ReportFileDetails.None), settings, Context));
+        Assert.Throws<InvalidOperationException>(() => BuildTables(WithDetails(outcome, ReportFileDetails.None), settings));
     }
 
     [Theory]
@@ -301,7 +302,7 @@ public sealed class TablesTests : IDisposable
         var alsoRemove = scene.Outcome.RestingObjects with { Mode = mode, HadSeeds = hadSeeds, Rounds = [], Evidence = [] };
         var outcome = scene.Outcome with { RestingObjects = alsoRemove };
 
-        var tables = Tables.BuildTables(WithDetails(outcome, ReportFileDetails.SwitchedOff), new AlsoRemoveSettings(mode, TouchDistance, Threshold, TouchChainsShown: true), Context);
+        var tables = BuildTables(WithDetails(outcome, ReportFileDetails.SwitchedOff), new AlsoRemoveSettings(mode, TouchDistance, Threshold, TouchChainsShown: true));
 
         Assert.Equal(expected, tables.Any(table => table.FileName == ReportFileNames.SupportFileName));
     }
@@ -315,7 +316,7 @@ public sealed class TablesTests : IDisposable
         var settings = new AlsoRemoveSettings(FollowUpRemovalMode.OnlyWhatLosesItsSupport, TouchDistance, Threshold, TouchChainsShown: true);
         var alsoRemove = scene.Outcome.RestingObjects with { Outcome = outcome, Mode = settings.Mode, HadSeeds = false, Rounds = [], Evidence = [] };
 
-        var tables = Tables.BuildTables(WithDetails(scene.Outcome with { RestingObjects = alsoRemove }, ReportFileDetails.SwitchedOff), settings, Context);
+        var tables = BuildTables(WithDetails(scene.Outcome with { RestingObjects = alsoRemove }, ReportFileDetails.SwitchedOff), settings);
 
         Assert.DoesNotContain(tables, table => table.FileName == ReportFileNames.SupportFileName);
     }
@@ -331,7 +332,7 @@ public sealed class TablesTests : IDisposable
         var followUp = AsSupportRounds(TestRestingObjects.SwitchedOff, followUpRounds);
 
         var outcome = scene.Outcome with { RestingObjects = alsoRemove, VisibleLeftBehind = scene.Outcome.VisibleLeftBehind with { FollowUp = followUp } };
-        var tables = Tables.BuildTables(WithDetails(outcome, ReportFileDetails.SwitchedOff), settings, Context);
+        var tables = BuildTables(WithDetails(outcome, ReportFileDetails.SwitchedOff), settings);
 
         var support = tables.Single(table => table.FileName == ReportFileNames.SupportFileName);
         var iterations = support.Rows.Select(row => row[support.Header.IndexOf("iteration")]);
@@ -359,7 +360,7 @@ public sealed class TablesTests : IDisposable
         var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouchingIt, TouchDistance, Threshold, TouchChainsShown: true);
         var stopped = new LeftBehindResult(StepOutcome.StoppedByUnexpectedError, [], [], new PartFailure(LeftBehindParts.LeftBehind, "it broke", Subject: null));
 
-        var tables = Tables.BuildTables(WithDetails(scene.Outcome with { LeftBehind = stopped }, ReportFileDetails.SwitchedOff), settings, Context);
+        var tables = BuildTables(WithDetails(scene.Outcome with { LeftBehind = stopped }, ReportFileDetails.SwitchedOff), settings);
 
         Assert.Empty(tables.Single(table => table.FileName == ReportFileNames.LeftBehindFileName).Rows);
     }
@@ -378,7 +379,7 @@ public sealed class TablesTests : IDisposable
         var origins = new ReportFileDetails(
             StepOutcome.Performed, null, [new MeshOrigin("m.nif", [], 1, default, Vector3.Zero, MeshOriginPlace.Other)], Failure: null);
 
-        var tables = Tables.BuildTables(WithDetails(outcome, origins), settings, Context);
+        var tables = BuildTables(WithDetails(outcome, origins), settings);
 
         Assert.Equal(
             [
@@ -390,6 +391,9 @@ public sealed class TablesTests : IDisposable
 
     private static ImmutableArray<string> ComponentRow(ImmutableArray<CsvTable> tables) =>
         tables.Single(table => table.FileName == ReportFileNames.ComponentsFileName).Rows.Single();
+
+    private static ImmutableArray<CsvTable> BuildTables(RunOutcome outcome, AlsoRemoveSettings settings) =>
+        Tables.BuildTables(outcome, settings, whereRemoved: null, Context);
 
     private static RunOutcome WithDetails(RunOutcome outcome, ReportFileDetails details) =>
         outcome with { RestingObjects = outcome.RestingObjects with { ReportFileDetails = details } };
@@ -411,7 +415,7 @@ public sealed class TablesTests : IDisposable
         var world = CreateWorld(targets, out _);
         var decided = new StepResults(
             world, protection, new RemovalRisks([], []), new ChangedObjectJudgingResult([], [], []), OldPlaceWorld: null, new ChangedTerrainResult([]), run.Result, TestVisibleLeftBehind.SwitchedOff, LeftBehindResult.SwitchedOff, MarkerMoves.SwitchedOff,
-            OtherModsObjectsResult.SwitchedOff, run.RemovalDecisions);
+            OtherModsObjectsResult.SwitchedOff, run.RemovalDecisions, RestoreWhereRemovedResult.SwitchedOff);
         var removals = RemovalList.WithReasons(PatchWriter.ListRemovalsInWriteOrder(run.RemovalDecisions), run.RemovalDecisions, world, TestVisibleLeftBehind.SwitchedOff, TestLeftBehind.PerformedWithoutFindings).ToImmutableArray();
         var outcome = new RunOutcome(decided, removals, [], ManualPatchHints.FindManualPatchHints(decided, Shapes, removals), null!, default);
         return new Scene(outcome, run);
@@ -449,6 +453,10 @@ public sealed class TablesTests : IDisposable
         return new CollectedObjects(
             [.. targets],
             [otherModObject],
+            [],
+            [],
+            [],
+            [],
             [],
             [],
             [],

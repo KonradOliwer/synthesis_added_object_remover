@@ -19,6 +19,7 @@ internal static class VisibleLeftBehindOutcomeText
         VisibleLeftBehindOutcome.KeptSurroundingsMostlyKept => "surroundings mostly kept",
         VisibleLeftBehindOutcome.KeptProtectedType => "protected type",
         VisibleLeftBehindOutcome.KeptReferenced => "referenced",
+        VisibleLeftBehindOutcome.KeptInDeletedCell => "in a deleted cell",
         _ => throw new UnreachableException($"Unknown visible left-behind outcome {outcome}."),
     };
 

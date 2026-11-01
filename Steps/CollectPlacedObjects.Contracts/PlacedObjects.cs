@@ -12,6 +12,8 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 /// <param name="HasLocationRefType">The reference itself has at least one location ref type (XLRT).</param>
 /// <param name="ReferenceRadius">The reference's own radius (XRDS) as the record stores it; null when it has none.</param>
 /// <param name="PrimitiveBounds">The reference's primitive box, full sizes as the record exposes them; null when it is not a primitive.</param>
+/// <param name="CollisionLayer">The layer number of the reference's own collision layer (XTRI); null when it stores none.</param>
+/// <param name="IsCullingVolume">The reference carries room, portal or multibound data (XRMR/XLRM, XPOD, XMBP): it only culls, it has no collision.</param>
 /// <param name="Area">Where it is below its space, named from the winning cells.</param>
 /// <param name="Origin">Where the object comes from.</param>
 /// <param name="EarlierVersion">The version the game shows without the cleaned mod; null for the cleaned mod's own objects.</param>
@@ -33,10 +35,15 @@ public sealed record TargetObject(
     bool HasLocationRefType,
     float? ReferenceRadius,
     Vector3? PrimitiveBounds,
+    uint? CollisionLayer,
+    bool IsCullingVolume,
     TargetArea Area,
     TargetOrigin Origin,
     EarlierVersion? EarlierVersion)
 {
+    /// <summary>The cell the winning version stands in, when the final world deletes it; the patch writes nothing for the object then.</summary>
+    public DeletedCell? CellDeleted { get; init; }
+
     /// <summary>The placement as the winning version stores it, the scale normalized.</summary>
     public EulerPlacement Placement => new(Transform.Position, Rotation, Transform.Scale);
 
@@ -44,13 +51,17 @@ public sealed record TargetObject(
     public TargetObject PlacedAt(EulerPlacement placement) => this with { Transform = placement.Transform, Rotation = placement.Rotation };
 
     /// <summary>
-    /// The same object as its earlier version has it: the placement, and when that restores the whole record also the base object
-    /// and what the version says about the reference itself.
+    /// The same object with the parts that go back taken from its earlier version: the position, rotation and scale each, and with
+    /// the base and data also the base object and what the version says about the reference itself. Every other part stays as it is.
     /// </summary>
     public TargetObject RestoredAs(EarlierVersion earlier)
     {
-        var restored = PlacedAt(earlier.Placement);
-        if (!earlier.RestoresWholeRecord) return restored;
+        var undo = earlier.Undo;
+        var restored = PlacedAt(new EulerPlacement(
+            undo.HasFlag(PlacedParts.Position) ? earlier.Placement.Position : Transform.Position,
+            undo.HasFlag(PlacedParts.Rotation) ? earlier.Placement.Rotation : Rotation,
+            undo.HasFlag(PlacedParts.Scale) ? earlier.Placement.Scale : Transform.Scale));
+        if (!undo.HasFlag(PlacedParts.BaseAndData)) return restored;
 
         var reference = earlier.Reference;
         return restored with
@@ -61,7 +72,17 @@ public sealed record TargetObject(
             HasMapMarker = reference.HasMapMarker,
             ReferenceRadius = reference.ReferenceRadius,
             PrimitiveBounds = reference.PrimitiveBounds,
+            CollisionLayer = reference.CollisionLayer,
+            IsCullingVolume = reference.IsCullingVolume,
         };
+    }
+
+    /// <summary>The same object where it stands, as an object of <paramref name="changingMod"/> that has no accepted version and no role.</summary>
+    public OtherObject AsOtherObject(OtherId id, PluginName changingMod)
+    {
+        var change = new ObjectChange(changingMod, AcceptedFrom: null);
+        return new OtherObject(
+            id, Key, SpaceKey, changingMod, EditorId, Base, Transform.Position, Rotation, Transform.Scale, IsPrimitive, HasMapMarker, change, ReferenceRoles.None, change);
     }
 }
 
@@ -132,6 +153,9 @@ public readonly record struct OtherObject(
     ReferenceRoles Roles,
     ObjectChange? ChangeWithoutCleanedMod)
 {
+    /// <summary>The cell the winning version stands in, when the final world deletes it; the patch writes nothing for the object then.</summary>
+    public DeletedCell? CellDeleted { get; init; }
+
     public PlacedTransform Transform => new(Position, Mat3.FromEuler(Rotation), Scale);
 
     /// <summary>A placed NPC or creature (ACHR), the only placed type whose base link is an NPC.</summary>

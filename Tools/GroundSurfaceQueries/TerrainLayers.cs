@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace AddedObjectRemover;
 
 /// <summary>The four texture quadrants of a cell's terrain; each covers 17 by 17 vertices, and the quadrants share the vertices on their common edges.</summary>
@@ -6,9 +8,25 @@ public static class TerrainQuadrants
     public const int PerSide = 2;
     public const int VerticesPerSide = 17;
     public const int VertexCount = VerticesPerSide * VerticesPerSide;
+    private const int SquaresPerSide = VerticesPerSide - 1;
+    private const float Size = ExteriorGrid.CellSize / PerSide;
+    private const float HalfWay = 0.5f;
 
     /// <summary>The position of a quadrant in <see cref="TerrainLayers.Quadrants"/>: bottom row first, left before right.</summary>
     public static int IndexOf(int quadrantX, int quadrantY) => quadrantY * PerSide + quadrantX;
+
+    /// <summary>The quadrants holding a vertex of the cell's grid (row by row from the bottom, x fastest), ascending: one, or two or four on their common edges.</summary>
+    public static IEnumerable<int> Holding(int vertex) =>
+        from quadrantY in Along(vertex / TerrainHeights.VerticesPerSide)
+        from quadrantX in Along(vertex % TerrainHeights.VerticesPerSide)
+        select IndexOf(quadrantX, quadrantY);
+
+    /// <summary>The world position, seen from above, of the centre of a quadrant of an exterior cell.</summary>
+    public static Vector2 CentreOf(int cellX, int cellY, int quadrant) =>
+        new Vector2(cellX, cellY) * ExteriorGrid.CellSize + new Vector2(quadrant % PerSide + HalfWay, quadrant / PerSide + HalfWay) * Size;
+
+    private static IEnumerable<int> Along(int coordinate) =>
+        Enumerable.Range(0, PerSide).Where(quadrant => coordinate >= quadrant * SquaresPerSide && coordinate <= (quadrant + 1) * SquaresPerSide);
 }
 
 /// <summary>The texture layers of one land record.</summary>

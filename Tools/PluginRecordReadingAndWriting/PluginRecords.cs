@@ -26,13 +26,13 @@ internal sealed class PluginRecords(
         return scanned.Facts;
     }
 
-    public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> records)
+    public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> records, IReadOnlySet<PluginName> linkedPlugins)
     {
-        var linkedPlugins = records.Select(record => record.Plugin).Append(target).ToHashSet();
+        var linkedOrTarget = linkedPlugins.Append(target).ToHashSet();
         var referencingMods = order.PriorityOrder
             .Select(listing => listing.Mod)
             .OfType<ISkyrimModGetter>()
-            .Where(mod => LinkablePlugins.MayLinkToAny(mod, linkedPlugins, patch, names))
+            .Where(mod => LinkablePlugins.MayLinkToAny(mod, linkedOrTarget, patch, names))
             .ToList();
         return LinkReader.ReadFromNonPlaced(referencingMods, records, target, names, execution);
     }
@@ -46,6 +46,8 @@ internal sealed class PluginRecords(
 
     public float[]? ReadTerrain(ExteriorCell cell) => Scanned.Terrain.ReadHeights(cell);
 
+    public float[]? ReadTerrainBelowTarget(ExteriorCell cell) => Scanned.Terrain.ReadHeightsBelowTarget(cell);
+
     public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => Scanned.Terrain.ReadVersions(cell);
 
     public WaterCopies ReadWaterCopies(ExteriorCell cell) => Scanned.Water.ReadCopies(cell);
@@ -54,7 +56,7 @@ internal sealed class PluginRecords(
 
     public RecordKey? FindLandWorldspace(RecordKey space) => Scanned.Terrain.FindLandWorldspace(space);
 
-    public MeshTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => Scanned.Navmeshes.ReadTriangles(bucket);
+    public NavmeshWorldTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => Scanned.Navmeshes.ReadTriangles(bucket);
 
     public NpcTraits? NpcTraitsOf(BaseKey npc) => _npcReads.NpcTraitsOf(npc);
 

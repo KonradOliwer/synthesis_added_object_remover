@@ -115,6 +115,37 @@ public static class RestingObjects
             targets, visibleTargets, new OtherModsObjectsContext(trust, plugins, settings, shapes, triangles, surfaces, terrain, objectsOfAnyPlugin, execution));
 
     /// <summary>
+    /// The objects that move away from where they stand now and that an object that stays rests on there, by the test that finds the
+    /// other mods' objects left without support (see <see cref="OtherModsObjects"/>). Every object of <paramref name="staying"/> that
+    /// can rest counts, whichever plugin it belongs to.
+    /// </summary>
+    /// <param name="holders">Where they stand now; the id of each is its position.</param>
+    /// <param name="holderIndex">The index of <paramref name="holders"/>.</param>
+    /// <param name="movesAway">Which holders move away; the others stay, as their copies in <paramref name="staying"/>.</param>
+    /// <param name="staying">The visible objects of any plugin as they stand once the run is done, with a copy of each holder.</param>
+    /// <param name="copiesOfMoving">The copies in <paramref name="staying"/> of the holders that move away, which neither rest nor hold up.</param>
+    /// <returns>Each holder that moves away and holds up an object that stays, with the first such object in id order.</returns>
+    public static IReadOnlyDictionary<TargetId, OtherObject> FindHoldersOfObjectsThatStay(
+        IReadOnlyList<TargetObject> holders,
+        IVisibleTargetObjects holderIndex,
+        Func<TargetId, bool> movesAway,
+        IVisibleObjectsOfAnyPlugin staying,
+        IReadOnlySet<OtherId> copiesOfMoving,
+        ModTrustTable trust,
+        LoadOrderPlugins plugins,
+        OtherModsObjectsSettings settings,
+        IBaseObjectShapes shapes,
+        ITriangleMeshes triangles,
+        ISurfaceSamples surfaces,
+        ITerrainHeights terrain,
+        Execution execution) =>
+        OtherModsObjects.FindHoldersOfObjectsThatStay(
+            new SupportWorld(holders, holderIndex, movesAway, staying, copiesOfMoving.ToDictionary(id => id, _ => (PlacedTransform?)null), shapes),
+            holders.Where(holder => movesAway(holder.Id)),
+            copiesOfMoving,
+            new OtherModsObjectsContext(trust, plugins, settings, shapes, triangles, surfaces, terrain, () => staying, execution));
+
+    /// <summary>
     /// RemoveFloatingObject and PullObjectToTheGround: what becomes of the other mods' objects left without support once the
     /// also-remove rounds are decided, and the also-remove rounds for the target objects resting on or touching those taken away;
     /// switched off with KeepSupportingObject (see <see cref="OtherModsObjects"/>). The rounds are decided on a working copy of

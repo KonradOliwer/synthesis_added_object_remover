@@ -9,6 +9,9 @@ internal static class RecordKeyConversion
     public static PluginName ToPluginName(this ModKey key) => new(key.FileName.String);
 
     public static FormKey ToFormKey(this RecordKey key) => new(ModKey.FromFileName(key.Plugin.FileName), key.Id);
+
+    /// <summary>The key spelled as the FormKey's own plugin name; keys compare equal whatever the spelling.</summary>
+    public static RecordKey KeyAsWritten(this FormKey key) => key.IsNull ? RecordKey.Null : new(key.ModKey.ToPluginName(), key.ID);
 }
 
 /// <summary>

@@ -64,6 +64,13 @@ internal static partial class LogSections
                 $"  Left kept {RecordNames.Describe(target)} in {Describe.Space(world, target.SpaceKey)} "
                 + $"inside {Describe.OtherObject(evaluation.ContainingObject!.Value)}: no free navmesh or terrain spot within {TextFormat.Fixed(markerMoves.MaxDistance, 0)} units.");
         }
+        foreach (var evaluation in markerMoves.LeftInDeletedCell)
+        {
+            var target = world.Targets[evaluation.TargetIndex];
+            lines.Add(
+                $"  Left kept {RecordNames.Describe(target)} in {Describe.Space(world, target.SpaceKey)} "
+                + $"inside {Describe.OtherObject(evaluation.ContainingObject!.Value)}: {Describe.DeletedCell(target.CellDeleted!)}.");
+        }
         lines.Add(MarkerMovesClosingLine(markerMoves));
         return new LogSection("relocations", [.. lines]);
     }
@@ -77,7 +84,7 @@ internal static partial class LogSections
     };
 
     private static string MarkerMovesSummaryLine(MarkerMoves markerMoves) =>
-        $"Moved {TextFormat.Count(markerMoves.Moves.Length)} kept markers out of other mods' objects; {TextFormat.Count(markerMoves.LeftInPlace.Count)} left in place.";
+        $"Moved {TextFormat.Count(markerMoves.Moves.Length)} kept markers out of other mods' objects; {TextFormat.Count(markerMoves.LeftInPlace.Count + markerMoves.LeftInDeletedCell.Count)} left in place.";
 
     private static string LeftBehindOutcomeLine(CollectedObjects world, LeftBehindCheck evaluation)
     {
@@ -94,7 +101,7 @@ internal static partial class LogSections
             LeftBehindOutcomes.IsRemoval,
             LeftBehindOutcomes.IsRestoration,
             outcome => LeftBehindOutcomes.IsRemovedAsLinked(outcome) || LeftBehindOutcomes.IsRestoration(outcome)
-                || outcome == LeftBehindOutcome.RemovedSurroundingsRemovedAndRestored,
+                || outcome is LeftBehindOutcome.RemovedSurroundingsRemovedAndRestored or LeftBehindOutcome.KeptInDeletedCell,
             LeftBehindOutcomeText.Describe,
             elapsed,
             context);

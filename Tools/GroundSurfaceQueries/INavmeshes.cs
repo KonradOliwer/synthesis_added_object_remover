@@ -10,4 +10,7 @@ public interface INavmeshes
     /// that <paramref name="isFree"/> accepts.
     /// </summary>
     bool TryFindNearestFreePoint(RecordKey spaceKey, Vector3 point, float maxDistance, Func<Vector3, bool> isFree, out Vector3 found);
+
+    /// <summary>Whether a triangle of an included navmesh crosses the box or lies inside it; touching counts, and the box is not grown.</summary>
+    bool AnyTriangleIn(RecordKey spaceKey, OrientedBox box, Func<RecordKey, bool> include);
 }

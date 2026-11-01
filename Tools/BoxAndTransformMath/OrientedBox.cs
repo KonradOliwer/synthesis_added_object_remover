@@ -31,6 +31,8 @@ public readonly record struct OrientedBox(Vector3 Center, Mat3 Rotation, Vector3
               + HalfExtents.X * HalfExtents.Z * MathF.Abs(Rotation.M32)
               + HalfExtents.X * HalfExtents.Y * MathF.Abs(Rotation.M33));
 
+    public float Volume => 8f * HalfExtents.X * HalfExtents.Y * HalfExtents.Z;
+
     public IEnumerable<Vector3> Corners()
     {
         var center = Center;

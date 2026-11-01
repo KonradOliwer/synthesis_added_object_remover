@@ -18,8 +18,25 @@ public readonly record struct TargetLink(TargetId From, TargetId To);
 /// Every other present placed object of the target spaces (other mods' objects the game shows with their accepted values, records
 /// the target overrides, target records a later plugin overrides), in <see cref="RecordKeyOrder"/>.
 /// </param>
+/// <param name="ChangedRecords">
+/// The placed records of other plugins with parts that go back to their earlier version or that later plugins changed again, in
+/// <see cref="RecordKeyOrder"/>.
+/// </param>
+/// <param name="ChangedCells">
+/// Only when restoring where the cleaned mod was removed is on: the cell records of other plugins in the target spaces whose parts
+/// the cleaned mod changed, in <see cref="RecordKeyOrder"/>.
+/// </param>
+/// <param name="ChangedLands">
+/// Only when restoring where the cleaned mod was removed is on: the LAND records of other plugins whose parts the cleaned mod changed,
+/// in the worldspaces whose land the target spaces use, in <see cref="RecordKeyOrder"/> of their keys.
+/// </param>
+/// <param name="ChangedNavmeshes">
+/// Only when restoring where the cleaned mod was removed is on: the navmeshes of the target spaces the cleaned mod overrides, deletes
+/// or adds, with a part it changed, in <see cref="RecordKeyOrder"/>.
+/// </param>
 /// <param name="Links">Every link into the target plugin as read, placed records before non-placed ones, in the order found; none from a removed record.</param>
 /// <param name="UnreadableRecords">The non-placed records that could not be read, in the order found; the links read from them before the problem are in <paramref name="Links"/>.</param>
+/// <param name="Spaces">Every space whose cells the scan read, by key.</param>
 /// <param name="OverriddenOthers">Only with the detailed log.</param>
 /// <param name="Order">The order the steps visit <paramref name="Targets"/> in, by space and exterior cell, so neighbouring targets run close together in time.</param>
 /// <param name="Stop">Why the run ends after this step; null when it goes on.</param>
@@ -27,6 +44,10 @@ public sealed record CollectedObjects(
     ImmutableArray<TargetObject> Targets,
     ImmutableArray<OtherObject> OtherModObjects,
     ImmutableArray<OtherObject> SupportOnlyObjects,
+    ImmutableArray<RecordChangedByCleanedMod> ChangedRecords,
+    ImmutableArray<CellChangedByCleanedMod> ChangedCells,
+    ImmutableArray<LandChangedByCleanedMod> ChangedLands,
+    ImmutableArray<NavmeshChangedByCleanedMod> ChangedNavmeshes,
     ImmutableArray<LinkFact> Links,
     ImmutableArray<UnreadableRecord> UnreadableRecords,
     IReadOnlyDictionary<RecordKey, SpaceFact> Spaces,
@@ -35,6 +56,15 @@ public sealed record CollectedObjects(
     WorkOrder Order,
     StopReason? Stop)
 {
+    /// <summary>
+    /// What the winning version of each placed record of the target spaces says about whether the game has it, for the records that are
+    /// removed or follow an enable parent; any other record, and any record outside the target spaces, is plainly present.
+    /// </summary>
+    public IReadOnlyDictionary<RecordKey, PlacedPresence> WinningPresence { get; init; } = new Dictionary<RecordKey, PlacedPresence>();
+
+    /// <summary>What the winning version of each primitive placed record of the target spaces says about the reference itself.</summary>
+    public IReadOnlyDictionary<RecordKey, ReferenceFacts> WinningPrimitives { get; init; } = new Dictionary<RecordKey, ReferenceFacts>();
+
     public TargetObject this[TargetId id] => Targets[id.Index];
 
     /// <summary>The spaces holding a target object.</summary>

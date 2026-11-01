@@ -17,4 +17,10 @@ public static class RemovalConvention
 
     /// <summary>Standard "safe disable" depth.</summary>
     public const float RemovedZ = -30000f;
+
+    /// <summary>
+    /// The depth a navmesh the patch takes out of the walkable world is lowered to, flat: the removed objects' depth. Navmeshes much
+    /// lower are reported to slow the game down.
+    /// </summary>
+    public const float SunkNavmeshZ = RemovedZ;
 }

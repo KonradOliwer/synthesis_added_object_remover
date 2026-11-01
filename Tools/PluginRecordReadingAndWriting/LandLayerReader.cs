@@ -7,7 +7,7 @@ namespace AddedObjectRemover;
 internal static class LandLayerReader
 {
     /// <summary>Where each of Mutagen's quadrants lies in the cell: its column (x, to the right) and row (y, up).</summary>
-    private static readonly (Quadrant Quadrant, int X, int Y)[] QuadrantPlaces =
+    public static readonly (Quadrant Quadrant, int X, int Y)[] QuadrantPlaces =
     [
         (Quadrant.BottomLeft, 0, 0),
         (Quadrant.BottomRight, 1, 0),

@@ -33,11 +33,12 @@ internal sealed record OtherModsObjectsContext(
 
     public SupportLoss CreateSupportLoss() => new(CreateSupport(), CreateDropFinder(), Settings.SupportLostFraction);
 
-    public JudgedObjectsNear CreateNear(IVisibleObjectsOfAnyPlugin others, OtherModsObjectRules rules) => new(others, rules, Settings.TouchGap, Execution);
+    public JudgedObjectsNear CreateNear(IVisibleObjectsOfAnyPlugin others, Func<OtherObject, bool> isJudged) => new(others, isJudged, Settings.TouchGap, Execution);
 
-    /// <param name="world">Every target object and object of any plugin where it stands before any decision.</param>
-    public TargetsHoldingUpOtherModsObjects CreateHolding(SupportWorld world, IVisibleObjectsOfAnyPlugin others, OtherModsObjectRules rules) =>
-        new(world, CreateNear(others, rules), rules, CreateSupportLoss(), Execution);
+    /// <param name="world">The target objects and objects of any plugin the support is judged among.</param>
+    /// <param name="isJudged">Which objects of <paramref name="others"/> are checked for resting on a target object.</param>
+    public TargetsHoldingUpOtherModsObjects CreateHolding(SupportWorld world, IVisibleObjectsOfAnyPlugin others, OtherModsObjectRules rules, Func<OtherObject, bool> isJudged) =>
+        new(world, CreateNear(others, isJudged), rules, CreateSupportLoss(), Execution);
 }
 
 /// <summary>The target objects as the also-remove step left them.</summary>
@@ -79,6 +80,17 @@ internal static class OtherModsObjects
                 StepOutcome.StoppedByUnexpectedError, new Dictionary<TargetId, RestingObject>(), PartFailure.OfWholePart(OtherModsObjectsParts.HeldUpTargets, failure)));
     }
 
+    /// <param name="world">The holders that move away, and every object that stays, each once.</param>
+    /// <param name="moving">The holders that move away, where they stand now.</param>
+    /// <param name="copiesOfMoving">The copies among the objects of any plugin of the holders that move away, which are never checked.</param>
+    public static Dictionary<TargetId, OtherObject> FindHoldersOfObjectsThatStay(
+        SupportWorld world, IEnumerable<TargetObject> moving, IReadOnlySet<OtherId> copiesOfMoving, OtherModsObjectsContext context)
+    {
+        var staying = context.ObjectsOfAnyPlugin();
+        var rules = context.CreateRules();
+        return context.CreateHolding(world, staying, rules, rules.CanRest).Find(moving, copiesOfMoving.Contains);
+    }
+
     public static OtherModsObjectsResult SettleLeftWithoutSupport(DecidedTargets decided, AlsoRemoveSettings alsoRemove, OtherModsObjectsContext context)
     {
         if (context.Settings.Handling == OtherModsObjectsHandling.KeepSupportingObject) return OtherModsObjectsResult.SwitchedOff;
@@ -107,7 +119,7 @@ internal static class OtherModsObjects
 
     private static IEnumerable<TargetId> FindHeldUpAmong(
         ImmutableArray<TargetObject> targets, IVisibleTargetObjects visibleTargets, OtherModsObjectsContext context, IReadOnlySet<TargetId> checkedObjects) =>
-        CreateHolding(targets, visibleTargets, context).Find(checkedObjects.Select(target => targets[target.Index])).Keys.Where(checkedObjects.Contains);
+        CreateHolding(targets, visibleTargets, context).Find(checkedObjects.Select(target => targets[target.Index]), isLeftOut: _ => false).Keys.Where(checkedObjects.Contains);
 
     private static HeldUpTargetsFinder CreateHeldUpTargetsFinder(ImmutableArray<TargetObject> targets, IVisibleTargetObjects visibleTargets, OtherModsObjectsContext context) =>
         new(targets, CreateHolding(targets, visibleTargets, context), context.Execution);
@@ -116,7 +128,7 @@ internal static class OtherModsObjects
     {
         var others = context.ObjectsOfAnyPlugin();
         var rules = context.CreateRules();
-        return context.CreateHolding(new SupportWorld(targets, visibleTargets, _ => true, others, SupportWorld.NoChanges, context.Shapes), others, rules);
+        return context.CreateHolding(new SupportWorld(targets, visibleTargets, _ => true, others, SupportWorld.NoChanges, context.Shapes), others, rules, rules.IsJudged);
     }
 
     /// <remarks>Without a changed target object nothing can have lost its support, so the objects of any plugin are not asked for.</remarks>
@@ -186,7 +198,7 @@ internal static class OtherModsObjects
         var settler = new LeftWithoutSupport(
             new SupportWorld(decided.Targets, decided.Visible, _ => true, others, SupportWorld.NoChanges, context.Shapes),
             new SupportWorld(standing.Targets, standing.Index, target => !current.IsRemoved(target), others, SupportWorld.NoChanges, context.Shapes),
-            context.CreateNear(others, rules),
+            context.CreateNear(others, rules.IsJudged),
             rules,
             context.CreateSupportLoss(),
             context.CreateDropFinder(),

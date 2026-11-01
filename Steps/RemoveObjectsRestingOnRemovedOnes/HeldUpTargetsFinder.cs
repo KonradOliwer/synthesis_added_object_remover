@@ -14,7 +14,7 @@ internal sealed class HeldUpTargetsFinder(ImmutableArray<TargetObject> targets, 
 {
     public Dictionary<TargetId, RestingObject> Find()
     {
-        var restingOn = holding.Find(targets).ToDictionary(entry => entry.Key, entry => new RestingObject(entry.Value.Key, entry.Value.EditorId, KeptFor: null));
+        var restingOn = holding.Find(targets, isLeftOut: _ => false).ToDictionary(entry => entry.Key, entry => new RestingObject(entry.Value.Key, entry.Value.EditorId, KeptFor: null));
         AddTargetsBelow(restingOn);
         return restingOn;
     }

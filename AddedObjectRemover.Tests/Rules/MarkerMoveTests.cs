@@ -65,6 +65,22 @@ public class MarkerMoveTests
         Assert.Single(result.LeftInPlace);
     }
 
+    /// <summary>The patch writes nothing into a deleted cell, so a marker standing in one is not moved although a free spot exists.</summary>
+    [Fact]
+    public void MarkerInACellALaterPluginDeletesStaysInPlaceAndIsListedApartFromThoseWithoutAFreeSpot()
+    {
+        var marker = TestTargets.Create(0, TestTargets.At(Marker)) with { CellDeleted = TestKeepReasons.DeletedByCityMod };
+        var mover = new KeptMarkerMover([marker], _ => HomeCell, [new FakeSurface(RelocationSurface.Navmesh, new Vector3(4200, 100, 0))], MarkerMoveLimits.MaxDistance);
+        var evaluation = KeptMarkerInsideOtherObject();
+
+        var result = mover.Move([evaluation], new Execution(Environment.ProcessorCount));
+
+        Assert.Empty(result.Moves);
+        Assert.Empty(result.Details);
+        Assert.Empty(result.LeftInPlace);
+        Assert.Equal(evaluation, Assert.Single(result.LeftInDeletedCell));
+    }
+
     private static (MarkerMove Move, MarkerMoveDetail Detail) Move(CellArea? homeCell, params IFreeSpotSearch[] surfaces)
     {
         var result = CreateMover(homeCell, surfaces).Move([KeptMarkerInsideOtherObject()], new Execution(Environment.ProcessorCount));
@@ -120,7 +136,7 @@ public class FreeSpotSearchTests
     {
         var marker = new Vector3(500, 500, 0);
         var search = new NavmeshSpotSearch(
-            TestGround.Navmeshes(new Dictionary<RecordKey, List<CellNavmesh>> { [TestTargets.Space] = [new CellNavmesh((0, 0), SquareNavmesh(1000))] }),
+            TestGround.Navmeshes(new Dictionary<RecordKey, List<CellNavmesh>> { [TestTargets.Space] = [new CellNavmesh(new RecordKey(TestTargets.TargetName, 0x400), (0, 0), SquareNavmesh(1000))] }),
             CreateObjectsAroundMarker(Wall));
 
         Assert.True(search.TryFindNearestFreePoint(TestTargets.Space, marker, MarkerMoveLimits.MaxDistance, HomeCell, new ObjectQueryScratch(), out var found));

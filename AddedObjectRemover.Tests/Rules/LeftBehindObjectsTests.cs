@@ -273,6 +273,8 @@ public class LeftBehindObjectsTests
 
         public void Around(RecordKey space, Vector3 point, float radius, List<VisibleTargetNear> into) => throw new InvalidOperationException("it broke.");
 
+        public void InColumn(RecordKey space, Vector2 point, float radius, List<VisibleTargetNear> into) => inner.InColumn(space, point, radius, into);
+
         public bool AnyContains(RecordKey space, Vector3 point, Func<TargetId, bool> include, ObjectQueryScratch scratch) => inner.AnyContains(space, point, include, scratch);
 
         public IEnumerable<OrientedBox> BoxesNear(RecordKey space, Vector3 point, float radius, Func<TargetId, bool> include) =>
@@ -290,7 +292,7 @@ public class LeftBehindObjectsTests
             objectsOfAnyPlugin ?? scene.VisibleObjectsOfAnyPlugin,
             scene.VisibleTargets,
             new InteriorOnlyPlugin(),
-            TestGround.Navmeshes(new Dictionary<RecordKey, List<CellNavmesh>> { [TestTargets.Space] = [new CellNavmesh((0, 0), SquareNavmesh(1000))] }),
+            TestGround.Navmeshes(new Dictionary<RecordKey, List<CellNavmesh>> { [TestTargets.Space] = [new CellNavmesh(new RecordKey(TestTargets.TargetName, 0x400), (0, 0), SquareNavmesh(1000))] }),
             TestGround.NoTerrain(),
             Shapes,
             new Execution(Environment.ProcessorCount),
@@ -325,7 +327,7 @@ public class LeftBehindObjectsTests
     {
         public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk) => throw new NotSupportedException();
 
-        public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets) => throw new NotSupportedException();
+        public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets, IReadOnlySet<PluginName> linkedPlugins) => throw new NotSupportedException();
 
         public IWritableRecords ReadWritableRecords() => throw new NotSupportedException();
 
@@ -335,6 +337,8 @@ public class LeftBehindObjectsTests
 
         public float[]? ReadTerrain(ExteriorCell cell) => throw new NotSupportedException();
 
+        public float[]? ReadTerrainBelowTarget(ExteriorCell cell) => throw new NotSupportedException();
+
         public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new NotSupportedException();
 
         public WaterCopies ReadWaterCopies(ExteriorCell cell) => throw new NotSupportedException();
@@ -342,7 +346,7 @@ public class LeftBehindObjectsTests
 
         public RecordKey? FindLandWorldspace(RecordKey space) => throw new NotSupportedException();
 
-        public MeshTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => throw new NotSupportedException();
+        public NavmeshWorldTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => throw new NotSupportedException();
 
         public NpcTraits? NpcTraitsOf(BaseKey npc) => throw new NotSupportedException();
 

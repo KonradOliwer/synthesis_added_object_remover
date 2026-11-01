@@ -49,6 +49,8 @@
     <Using Include="AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts" />
     <Using Include="AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind" />
     <Using Include="AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts" />
+    <Using Include="AddedObjectRemover.Steps.RestoreWhereRemoved" />
+    <Using Include="AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts" />
     <Using Include="AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals" />
     <Using Include="AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts" />
     <Using Include="AddedObjectRemover.Steps.WriteThePatch" />
@@ -104,6 +106,8 @@
     <ProjectReference Include="..\Steps\RemoveVisibleObjectsLeftBehind\RemoveVisibleObjectsLeftBehind.csproj" />
     <ProjectReference Include="..\Steps\RemoveInvisibleObjectsLeftBehind.Contracts\RemoveInvisibleObjectsLeftBehind.Contracts.csproj" />
     <ProjectReference Include="..\Steps\RemoveInvisibleObjectsLeftBehind\RemoveInvisibleObjectsLeftBehind.csproj" />
+    <ProjectReference Include="..\Steps\RestoreWhereRemoved.Contracts\RestoreWhereRemoved.Contracts.csproj" />
+    <ProjectReference Include="..\Steps\RestoreWhereRemoved\RestoreWhereRemoved.csproj" />
     <ProjectReference Include="..\Steps\MoveKeptMarkers.Contracts\MoveKeptMarkers.Contracts.csproj" />
     <ProjectReference Include="..\Steps\MoveKeptMarkers\MoveKeptMarkers.csproj" />
     <ProjectReference Include="..\Steps\WriteThePatch.Contracts\WriteThePatch.Contracts.csproj" />

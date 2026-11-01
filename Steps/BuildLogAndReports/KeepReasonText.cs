@@ -14,6 +14,7 @@ internal static class KeepReasonText
     private const string LocationRoleCategory = "location role";
     private const string OwnLocationRefType = "it has a location ref type, by which a quest can pick it";
     private const string OtherModsObjectRestsOnIt = "another mod's object rests on it";
+    private const string CellDeletedCategory = "in a deleted cell";
 
     /// <summary>Groups reasons in the summary, e.g. "placed object: Enable Parent" or "Quest record".</summary>
     public static string Category(KeepReason reason) => reason.Kind switch
@@ -26,6 +27,7 @@ internal static class KeepReasonText
         KeepKind.LinkedGroup => LinkedGroupCategory,
         KeepKind.OtherModsObjectRestsOnIt => OtherModsObjectRestsOnIt,
         KeepKind.CheckFailed => CheckFailed,
+        KeepKind.CellDeleted => CellDeletedCategory,
         _ => throw new UnreachableException($"Unknown keep kind {reason.Kind}."),
     };
 
@@ -42,8 +44,12 @@ internal static class KeepReasonText
         KeepKind.LinkedGroup => LinkedGroupDetail(reason.Keeper!),
         KeepKind.OtherModsObjectRestsOnIt => RestingDetail(reason.Resting!),
         KeepKind.CheckFailed => CheckFailed,
+        KeepKind.CellDeleted => Describe.DeletedCell(reason.CellDeleted!),
         _ => throw new UnreachableException($"Unknown keep kind {reason.Kind}."),
     };
+
+    /// <summary>For a line that already says the object is in a deleted cell: "deleted by CityMod.esp".</summary>
+    public static string DeletingPlugin(KeepReason reason) => $"deleted by {reason.CellDeleted!.DeletedBy}";
 
     /// <summary>
     /// What rests on an object kept because another mod's object rests on it, for a line that already says so: "Lantern [...]",
@@ -75,7 +81,6 @@ internal static class KeepReasonText
 
     private static LinkFact Link(KeepReason reason) =>
         reason.Link ?? throw new InvalidOperationException($"A {reason.Kind} reason needs the link that keeps the object.");
-
     private static string Relation(RelationKind relation) => relation switch
     {
         RelationKind.TeleportDestination => "teleport destination",

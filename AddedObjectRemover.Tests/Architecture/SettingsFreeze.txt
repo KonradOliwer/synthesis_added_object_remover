@@ -1,5 +1,8 @@
 Batch
 Batch.GroupFileName
+ClearedAreaMeasure
+ClearedAreaMeasure.ObjectCount
+ClearedAreaMeasure.ObjectSize
 DetailedLogAndReports
 FollowUpRemovalMode
 FollowUpRemovalMode.EverythingTouchingIt
@@ -101,6 +104,16 @@ Standard.LeftoverVisibleObjects.SurroundingObjects.ClearedDirectionsPercent
 Standard.LeftoverVisibleObjects.SurroundingObjects.DirectionThresholdPercent
 Standard.LeftoverVisibleObjects.SurroundingObjects.MinOccupiedDirections
 Standard.LeftoverVisibleObjects.SurroundingObjects.SearchRadius
+Standard.RestoreWhereRemoved
+Standard.RestoreWhereRemoved.ClearedArea
+Standard.RestoreWhereRemoved.ClearedArea.MaxStandingPercent
+Standard.RestoreWhereRemoved.ClearedArea.Measure
+Standard.RestoreWhereRemoved.ClearedArea.SearchRadius
+Standard.RestoreWhereRemoved.RestoreCells
+Standard.RestoreWhereRemoved.RestoreNavmeshes
+Standard.RestoreWhereRemoved.RestoreOtherModsObjects
+Standard.RestoreWhereRemoved.RestoreTerrain
+Standard.RestoreWhereRemoved.TerrainEdgeBlendDistanceInUnits
 Standard.ShrinkOrTurn
 Standard.ShrinkOrTurn.ShrinkLimitPercent
 Standard.ShrinkOrTurn.ShrinkOrTurnObjects

@@ -40,6 +40,10 @@ public interface IBaseFactsFactory
 {
     /// <param name="records">The index of the run's plugin records.</param>
     IBaseFacts Open(IRecordIndex records);
+
+    /// <summary>The collision layer records (COLL) at their winning versions, by layer number, which the base shapes judge layers by.</summary>
+    /// <param name="records">The index of the run's plugin records.</param>
+    IReadOnlyDictionary<uint, CollisionLayerFact> ReadCollisionLayers(IRecordIndex records);
 }
 
 /// <summary>The base records of the load order, by base; each value depends only on its key.</summary>

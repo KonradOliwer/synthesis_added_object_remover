@@ -4,16 +4,16 @@ namespace AddedObjectRemover;
 
 /// <summary>
 /// Winning navmesh triangles (world space) of each space, for finding the nearest point on them
-/// that is free. The navmeshes of one exterior cell, or of all of a space outside the exterior
+/// that is free and the navmeshes a box reaches. The navmeshes of one exterior cell, or of all of a space outside the exterior
 /// grid, are read and indexed on the first query that reaches them. Thread-safe.
 /// </summary>
 /// <param name="readNavmeshes">The triangles of a bucket; null where the bucket has no navmesh.</param>
-public sealed class NavmeshIndex(Func<NavmeshBucket, MeshTriangle[]?> readNavmeshes) : INavmeshes
+public sealed class NavmeshIndex(Func<NavmeshBucket, NavmeshWorldTriangle[]?> readNavmeshes) : INavmeshes
 {
     /// <summary>Points tried per triangle side when the triangle's closest point is not free.</summary>
     private const int SamplesPerSide = 8;
 
-    private sealed record BucketTriangles(MeshTriangle[] Triangles, SpatialGrid Grid);
+    private sealed record BucketTriangles(NavmeshWorldTriangle[] Triangles, SpatialGrid Grid);
 
     private readonly record struct Candidate(Vector3 Point, float Distance);
 
@@ -40,18 +40,34 @@ public sealed class NavmeshIndex(Func<NavmeshBucket, MeshTriangle[]?> readNavmes
         return bestDistance < maxDistance;
     }
 
+    public bool AnyTriangleIn(RecordKey spaceKey, OrientedBox box, Func<RecordKey, bool> include)
+    {
+        var query = box.WorldAabb(0f);
+        var localBox = new Box(-box.HalfExtents, box.HalfExtents);
+        return FindTrianglesNear(spaceKey, query)
+            .Any(triangle => include(triangle.Navmesh) && TriangleBoxOverlap.Overlaps(InBoxFrame(triangle.Triangle, box), localBox));
+    }
+
+    private static MeshTriangle InBoxFrame(MeshTriangle triangle, OrientedBox box) =>
+        new(InBoxFrame(triangle.A, box), InBoxFrame(triangle.B, box), InBoxFrame(triangle.C, box));
+
+    private static Vector3 InBoxFrame(Vector3 point, OrientedBox box) => box.Rotation.TransformTransposed(point - box.Center);
+
     private List<(MeshTriangle Triangle, float Distance)> FindTrianglesByDistance(RecordKey spaceKey, Vector3 point, float maxDistance)
     {
         var query = new Box(point, point).Grown(maxDistance);
-        return EnumerateBuckets(spaceKey, query)
-            .Select(bucket => _triangles.Get(bucket, () => IndexBucket(bucket)))
-            .OfType<BucketTriangles>()
-            .SelectMany(bucket => FindTrianglesIn(bucket, query))
-            .Select(triangle => (Triangle: triangle, Distance: Vector3.Distance(point, ClosestPoint(triangle, point))))
+        return FindTrianglesNear(spaceKey, query)
+            .Select(found => (found.Triangle, Distance: Vector3.Distance(point, ClosestPoint(found.Triangle, point))))
             .Where(entry => entry.Distance < maxDistance)
             .OrderBy(entry => entry.Distance)
             .ToList();
     }
+
+    private IEnumerable<NavmeshWorldTriangle> FindTrianglesNear(RecordKey spaceKey, Box query) =>
+        EnumerateBuckets(spaceKey, query)
+            .Select(bucket => _triangles.Get(bucket, () => IndexBucket(bucket)))
+            .OfType<BucketTriangles>()
+            .SelectMany(bucket => FindTrianglesIn(bucket, query));
 
     /// <summary>An exterior cell's navmesh lies within the cell's square, so only the cells overlapping the query can hold a triangle in it.</summary>
     private static IEnumerable<NavmeshBucket> EnumerateBuckets(RecordKey spaceKey, Box query) =>
@@ -60,11 +76,11 @@ public sealed class NavmeshIndex(Func<NavmeshBucket, MeshTriangle[]?> readNavmes
     private BucketTriangles? IndexBucket(NavmeshBucket bucket)
     {
         if (readNavmeshes(bucket) is not { } triangles) return null;
-        return new BucketTriangles(triangles, SpatialGrid.FromBoxes(triangles.Select(triangle => triangle.Bounds).ToArray()));
+        return new BucketTriangles(triangles, SpatialGrid.FromBoxes(triangles.Select(triangle => triangle.Triangle.Bounds).ToArray()));
     }
 
     /// <summary>Triangles can be indexed in several grid cells, so duplicates are removed.</summary>
-    private static IEnumerable<MeshTriangle> FindTrianglesIn(BucketTriangles bucket, Box query)
+    private static IEnumerable<NavmeshWorldTriangle> FindTrianglesIn(BucketTriangles bucket, Box query)
     {
         var candidates = new List<int>();
         bucket.Grid.Collect(query, candidates);

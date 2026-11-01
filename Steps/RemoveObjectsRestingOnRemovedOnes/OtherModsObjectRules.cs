@@ -19,14 +19,16 @@ internal sealed class OtherModsObjectRules(ModTrustTable trust, LoadOrderPlugins
     /// plugins listed as never trusted are ignored. The cleaned mod's records that a later plugin overrides are left to that
     /// plugin, as everywhere else. Only visible objects reach the step: an invisible object or marker rests on nothing in game.
     /// </summary>
-    public bool IsJudged(OtherObject other)
+    public bool IsJudged(OtherObject other) =>
+        other.Key.Plugin != trust.CleanedMod
+        && CanRest(other)
+        && (BelongsToJudgedPlugin(other.Key.Plugin) || BelongsToJudgedPlugin(other.WinningMod));
+
+    /// <summary>An object that can rest on another, whichever plugin it belongs to: one with a solid mesh, not a placed NPC or creature.</summary>
+    public bool CanRest(OtherObject other)
     {
         var shape = shapes.Of(other.Base);
-        return other.Key.Plugin != trust.CleanedMod
-            && !other.IsPlacedNpc
-            && shape.MeshPath is not null
-            && !shape.EffectOnlyMesh
-            && (BelongsToJudgedPlugin(other.Key.Plugin) || BelongsToJudgedPlugin(other.WinningMod));
+        return !other.IsPlacedNpc && shape.MeshPath is not null && !shape.EffectOnlyMesh;
     }
 
     private bool BelongsToJudgedPlugin(PluginName plugin) =>

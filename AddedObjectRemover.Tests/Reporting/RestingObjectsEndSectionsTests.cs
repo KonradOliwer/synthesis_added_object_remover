@@ -463,7 +463,7 @@ public sealed class RestingObjectsEndSectionsTests
         var (world, _) = MarkerMovesScene();
 
         var lines = LogSections.BuildKeptMarkerMovesSection(
-            world, new MarkerMoves(StepOutcome.StoppedByUnexpectedError, [], [], [], MarkerMoveLimits.MaxDistance, Broke(MarkerMoveParts.MarkerMoves)), Normal).Lines.ToList();
+            world, new MarkerMoves(StepOutcome.StoppedByUnexpectedError, [], [], [], [], MarkerMoveLimits.MaxDistance, Broke(MarkerMoveParts.MarkerMoves)), Normal).Lines.ToList();
 
         Assert.Equal("Moved kept markers: not performed because of an unexpected error.", Assert.Single(lines));
     }
@@ -501,7 +501,7 @@ public sealed class RestingObjectsEndSectionsTests
     public void Write_ShowsTheTimeOnlyInTheDetailedLogAndTheEnableParentLineAlways()
     {
         var written = new WriteSummary(
-            Removed: [.. Enumerable.Range(0, 5).Select(index => new TargetId(index))], Restored: [], Moved: 2, EnableParentsReplaced: 3, Fitted: 0, OtherModsObjectsRemoved: 0, OtherModsObjectsPulledDown: 0);
+            Removed: [.. Enumerable.Range(0, 5).Select(index => new TargetId(index))], Restored: [], Moved: 2, EnableParentsReplaced: 3, Fitted: 0, OtherModsObjectsRemoved: 0, OtherModsObjectsPulledDown: 0, WrittenWhereRemoved: 0);
 
         Assert.Equal(
             [
@@ -515,13 +515,13 @@ public sealed class RestingObjectsEndSectionsTests
     [Fact]
     public void Write_OmitsTheEnableParentLineWhenNoneWasReplaced()
     {
-        Assert.Single(LogSections.BuildWriteSection(new WriteSummary([new TargetId(0)], [], 0, 0, 0, 0, 0), Elapsed, Normal).Lines.ToList());
+        Assert.Single(LogSections.BuildWriteSection(new WriteSummary([new TargetId(0)], [], 0, 0, 0, 0, 0, 0), Elapsed, Normal).Lines.ToList());
     }
 
     [Fact]
     public void Write_CountsTheRestoredObjectsInTheTotalAndNamesThemAfterTheRemovedOnlyWhenThereAreAny()
     {
-        var withRestored = new WriteSummary([new TargetId(0)], Restored: [new TargetId(1), new TargetId(2)], Moved: 1, EnableParentsReplaced: 0, Fitted: 0, OtherModsObjectsRemoved: 0, OtherModsObjectsPulledDown: 0);
+        var withRestored = new WriteSummary([new TargetId(0)], Restored: [new TargetId(1), new TargetId(2)], Moved: 1, EnableParentsReplaced: 0, Fitted: 0, OtherModsObjectsRemoved: 0, OtherModsObjectsPulledDown: 0, WrittenWhereRemoved: 0);
         var withoutRestored = withRestored with { Restored = [] };
 
         Assert.Equal("Wrote 4 overrides (1 removed, 2 restored, 1 kept markers moved).", LogSections.BuildWriteSection(withRestored, Elapsed, Normal).Lines[0]);
@@ -531,11 +531,19 @@ public sealed class RestingObjectsEndSectionsTests
     [Fact]
     public void Write_NamesTheOtherModsObjectsPulledDownAndRemovedOnlyWhenThereAreAny()
     {
-        var written = new WriteSummary([new TargetId(0)], Restored: [], Moved: 0, EnableParentsReplaced: 0, Fitted: 1, OtherModsObjectsRemoved: 2, OtherModsObjectsPulledDown: 3);
+        var written = new WriteSummary([new TargetId(0)], Restored: [], Moved: 0, EnableParentsReplaced: 0, Fitted: 1, OtherModsObjectsRemoved: 2, OtherModsObjectsPulledDown: 3, WrittenWhereRemoved: 0);
 
         Assert.Equal(
             "Wrote 7 overrides (1 removed, 1 shrunk or turned to fit; other mods' objects: 3 pulled down, 2 removed).",
             LogSections.BuildWriteSection(written, Elapsed, Normal).Lines[0]);
+    }
+
+    [Fact]
+    public void Write_CountsTheRecordsWrittenToRestoreWhereTheCleanedModWasRemovedInTheTotal()
+    {
+        var written = new WriteSummary([new TargetId(0)], Restored: [], Moved: 0, EnableParentsReplaced: 0, Fitted: 0, OtherModsObjectsRemoved: 0, OtherModsObjectsPulledDown: 0, WrittenWhereRemoved: 5);
+
+        Assert.Equal("Wrote 6 overrides (1 removed, 5 to restore where the cleaned mod was removed).", LogSections.BuildWriteSection(written, Elapsed, Normal).Lines[0]);
     }
 
     [Fact]
@@ -833,7 +841,7 @@ public sealed class RestingObjectsEndSectionsTests
             new(inside, RelocationSurface.Navmesh, LeftHomeCell: false),
             new(inside, RelocationSurface.Terrain, LeftHomeCell: true),
         ];
-        return (world, new MarkerMoves(StepOutcome.Performed, [.. moves], details, [inside], MarkerMoveLimits.MaxDistance, Failure: null));
+        return (world, new MarkerMoves(StepOutcome.Performed, [.. moves], details, [inside], [], MarkerMoveLimits.MaxDistance, Failure: null));
     }
 
     /// <summary>Round 1: target 0 too close, protected target 3 held. Round 2: 1 follows from 0 (its linked partner 2 goes along), protected 4 held.</summary>
@@ -850,6 +858,10 @@ public sealed class RestingObjectsEndSectionsTests
         var world = new CollectedObjects(
             [.. targets],
             [CreateOtherModObject()],
+            [],
+            [],
+            [],
+            [],
             [],
             [],
             [],

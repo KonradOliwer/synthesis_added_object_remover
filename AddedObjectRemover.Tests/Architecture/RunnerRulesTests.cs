@@ -74,7 +74,9 @@ public class RunnerRulesTests
     /// <summary>The names the loop over the requests may use besides its own request: the environment and the results it collects.</summary>
     private static readonly string[] RequestLoopNames = ["Add", "PatchOneRun", "environment", "results"];
 
-    private static readonly Regex LinkCacheBuild = new(@"\bTo(?:Immutable|Mutable)LinkCache\b");
+    private static readonly Regex UsingDirective = new(@"^\s*using\s+[\w.]+\s*;", RegexOptions.Multiline);
+
+    private static readonly Regex LinkCacheBuild =new(@"\bTo(?:Immutable|Mutable)LinkCache\b");
 
     /// <summary>The build call inside the body of <c>Open()</c>, before any other member starts.</summary>
     private static readonly Regex LinkCacheBuildInOpen =
@@ -135,10 +137,10 @@ public class RunnerRulesTests
         var settings = SettingsOfRunSettings();
 
         Assert.Equal(
-            ["AlsoRemoveSettings", "ChangedObjectCollision", "ChangedObjectSettings", "CollisionSettings", "Execution", "LeftBehindSettings", "MarkerMoveSettings", "ModTrustSettings", "OtherModsObjectsSettings", "ReportFileSettings", "SelectionSettings", "VisibleLeftBehindSettings", "WhatToCollect"],
+            ["AlsoRemoveSettings", "ChangedObjectCollision", "ChangedObjectSettings", "CollisionSettings", "Execution", "LeftBehindSettings", "MarkerMoveSettings", "ModTrustSettings", "OtherModsObjectsSettings", "ReportFileSettings", "SelectionSettings", "VisibleLeftBehindSettings", "WhatToCollect", "WhereRemovedRestoreSettings"],
             settings.RecordTypes.Order(StringComparer.Ordinal));
         Assert.Equal(
-            ["AlsoRemove", "ChangedObjectCollision", "ChangedObjects", "Collision", "Execution", "LeftBehind", "MarkerMoves", "ModTrust", "OtherModsObjects", "Read", "Reports", "Selection", "VisibleLeftBehind"],
+            ["AlsoRemove", "ChangedObjectCollision", "ChangedObjects", "Collision", "Execution", "LeftBehind", "MarkerMoves", "ModTrust", "OtherModsObjects", "Read", "Reports", "RestoreWhereRemoved", "Selection", "VisibleLeftBehind"],
             settings.RecordProperties.Order(StringComparer.Ordinal));
         Assert.Equal(
             ["DetailedLog", "OnlyWarnWhenRequiringModLoadsAfterPatch", "Target", "TargetAsTyped"],
@@ -436,9 +438,11 @@ public class RunnerRulesTests
     /// "Record.Member" for a member read on a settings record: through a RunSettings property (<c>settings.TooClose.Npcs</c>),
     /// through a name declared with a record type, or through a <c>var</c> local assigned from such a property.
     /// A read of one of RunSettings' other properties (<c>settings.DetailedLog</c>) is "RunSettings.Property".
+    /// Using directives are left out: a step's namespace may carry the name of its settings property.
     /// </summary>
     private static IReadOnlyList<string> FindSettingsReads(string code, RunSettingsMembers settings)
     {
+        code = UsingDirective.Replace(code, string.Empty);
         var propertyNames = string.Join("|", settings.RecordProperties.Select(Regex.Escape));
         var typeNames = string.Join("|", settings.RecordTypes.Select(Regex.Escape));
         var plainNames = string.Join("|", settings.PlainProperties.Select(Regex.Escape));

@@ -9,7 +9,12 @@ namespace AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 /// not from its record type or marker flag; a primitive reference of such a base is a trigger volume.
 /// </param>
 /// <param name="CollisionBlocksMovement">
-/// Whether the mesh the bounds came from has collision that stops characters walking through it; null when the bounds did not come from a mesh.
+/// Whether the mesh has collision that stops characters walking through it; null when the bounds did not come from a mesh and the mesh
+/// is not one without render geometry, whose collision is read as well.
+/// </param>
+/// <param name="PrimitiveWithoutLayerIsWalkThrough">
+/// The base is an activator or an acoustic space. A primitive reference of such a base that stores no collision layer has the default
+/// layer of its kind (trigger, acoustic space), which does not stop characters.
 /// </param>
 public sealed record BaseShape(
     Box Box,
@@ -18,7 +23,8 @@ public sealed record BaseShape(
     bool Resolved = true,
     bool EffectOnlyMesh = false,
     bool InvisibleForLackOfGeometry = false,
-    bool? CollisionBlocksMovement = null)
+    bool? CollisionBlocksMovement = null,
+    bool PrimitiveWithoutLayerIsWalkThrough = false)
 {
     /// <summary>A zero-size box at the origin: what a missing or unknown base measures as.</summary>
     public static readonly BaseShape Missing = new(Box.Zero, null, null, Resolved: false);

@@ -31,6 +31,9 @@ public enum OtherModsObjectFate
 
     /// <summary>Left as it is: a plugin that loads after the patch wins it, so the patch cannot change it.</summary>
     LeftWonAfterPatch,
+
+    /// <summary>Left as it is: the final world deletes the cell it stands in, and the patch writes nothing into a deleted cell.</summary>
+    LeftInDeletedCell,
 }
 
 /// <param name="LostShare">The share (0-1) of its support it no longer has where it stood.</param>
@@ -42,7 +45,10 @@ public sealed record OtherModsObjectOutcome(OtherObject Object, OtherModsObjectF
     public Vector3 NewPosition => Object.Position with { Z = Object.Position.Z - Drop };
 
     /// <summary>Whether it no longer stands where it stood: pulled down or removed.</summary>
-    public bool IsTakenAway => Fate is OtherModsObjectFate.PulledDown or OtherModsObjectFate.Removed or OtherModsObjectFate.RemovedNothingBelow;
+    public bool IsTakenAway => Fate is OtherModsObjectFate.PulledDown || IsRemoved;
+
+    /// <summary>Whether the patch removes it.</summary>
+    public bool IsRemoved => Fate is OtherModsObjectFate.Removed or OtherModsObjectFate.RemovedNothingBelow;
 }
 
 /// <summary>What the step did with the other mods' objects left without support.</summary>

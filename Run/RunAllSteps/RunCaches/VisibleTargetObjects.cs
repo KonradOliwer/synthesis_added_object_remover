@@ -47,6 +47,17 @@ internal sealed class VisibleTargetObjects : IVisibleTargetObjects
         foreach (var entry in near) into.Add(new VisibleTargetNear(entries.Targets[entry], entries.Boxes[entry]));
     }
 
+    /// <remarks>The grid buckets X and Y only, so a query at height 0 finds the whole column.</remarks>
+    public void InColumn(RecordKey space, Vector2 point, float radius, List<VisibleTargetNear> into)
+    {
+        into.Clear();
+        if (EntriesOf(space) is not { } entries) return;
+
+        var inColumn = new List<int>();
+        entries.Grid.CollectWithinRadius(new Vector3(point, 0f), radius, entry => IsWithinHorizontally(entries.Boxes[entry].Center, point, radius), inColumn);
+        foreach (var entry in inColumn) into.Add(new VisibleTargetNear(entries.Targets[entry], entries.Boxes[entry]));
+    }
+
     public bool AnyContains(RecordKey space, Vector3 point, Func<TargetId, bool> include, ObjectQueryScratch scratch)
     {
         if (EntriesOf(space) is not { } entries) return false;
@@ -72,6 +83,9 @@ internal sealed class VisibleTargetObjects : IVisibleTargetObjects
             .ToArray();
         return new SpaceEntries(visible, boxes, GridCandidates.OfBoxes(boxes.Select(box => box.WorldAabb(0f)).ToArray()));
     }
+
+    private static bool IsWithinHorizontally(Vector3 center, Vector2 point, float radius) =>
+        Vector2.DistanceSquared(new Vector2(center.X, center.Y), point) <= radius * radius;
 
     /// <summary>The entries whose box may come within <paramref name="radius"/> of <paramref name="point"/>, ascending and distinct.</summary>
     private static List<int> FindCandidates(SpaceEntries entries, Vector3 point, float radius)

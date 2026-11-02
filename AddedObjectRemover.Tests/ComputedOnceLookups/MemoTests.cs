@@ -211,6 +211,40 @@ public class MemoTests
         for (var i = 0; i < seen.Length; i++) Assert.Equal((i % Calls, i % Calls * 2), seen[i]);
     }
 
+    [Fact]
+    public void IndexMemoComputesAPositionOnceWhileOtherThreadsWait()
+    {
+        var computations = 0;
+        var memo = new IndexMemo<int>(1);
+        var results = new int[Threads];
+
+        RunTogether(Threads, (i, threads) =>
+        {
+            results[i] = memo.GetOrCompute(0, _ =>
+            {
+                Interlocked.Increment(ref computations);
+                WaitUntilOtherThreadsAreBlocked(threads);
+                return i + 1;
+            });
+        });
+
+        Assert.Equal(1, computations);
+        Assert.All(results, result => Assert.Equal(results[0], result));
+    }
+
+    [Fact]
+    public void IndexMemoComputesAgainAfterAFailure()
+    {
+        var calls = 0;
+        var memo = new IndexMemo<int>(1);
+        int Compute(int _) => ++calls == 1 ? throw new IOException("unreadable") : 7;
+
+        Assert.Throws<IOException>(() => memo.GetOrCompute(0, Compute));
+        Assert.Equal(7, memo.GetOrCompute(0, Compute));
+        Assert.Equal(7, memo.GetOrCompute(0, Compute));
+        Assert.Equal(2, calls);
+    }
+
     private const long BlobSize = 100;
     private const long LimitSize = 250;
     private const long EvictDownTo = 200;

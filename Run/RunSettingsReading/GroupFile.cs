@@ -59,5 +59,5 @@ internal sealed record GroupFile(string FilePath, ImmutableArray<string> ConfigF
     }
 
     private static ConfigFilesProblem NotAListOfNames(string filePath, JToken found) =>
-        new($"Group file {filePath} must hold a list of config names, like [\"first\", \"second\"]; found {JsonFileParsing.DescribeKind(found)} at line {JsonFileParsing.LineOf(found)}.");
+        new($"Group file {filePath} must hold a list of config names, like [\"first\", \"second\"]; found {JsonFileParsing.DescribeKind(found)} at line {JsonFiles.LineOf(found)}.");
 }

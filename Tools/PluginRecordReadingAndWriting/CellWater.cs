@@ -1,15 +1,15 @@
 namespace AddedObjectRemover;
 
-/// <summary>Every plugin's own water fields of the target worldspaces' exterior cells and of the worldspaces that supply their default water.</summary>
+/// <summary>Every plugin's own water fields of the plugin worldspaces' exterior cells and of the worldspaces that supply their default water.</summary>
 /// <param name="cells">Every plugin's copy of each cell's water fields, highest priority first; null when the water was not asked for.</param>
 /// <param name="worldspaces">Every plugin's copy of each water-supplying worldspace's default water height, in load order.</param>
-/// <param name="waterWorldspaces">Target worldspace -> the worldspace whose default water it uses (itself, or a parent whose water data it uses).</param>
+/// <param name="waterWorldspaces">Plugin worldspace -> the worldspace whose default water it uses (itself, or a parent whose water data it uses).</param>
 internal sealed class CellWater(
     IReadOnlyDictionary<ExteriorCell, List<CellWaterCopy>>? cells,
     IReadOnlyDictionary<RecordKey, List<WorldspaceWaterCopy>> worldspaces,
     IReadOnlyDictionary<RecordKey, RecordKey> waterWorldspaces)
 {
-    /// <param name="cell">The cell in the worldspace the target's objects are in.</param>
+    /// <param name="cell">The cell in the plugin worldspace, not the worldspace whose land it uses.</param>
     /// <returns>Each part empty where no plugin has a copy of it.</returns>
     public WaterCopies ReadCopies(ExteriorCell cell)
     {

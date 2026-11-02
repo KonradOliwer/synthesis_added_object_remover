@@ -1,5 +1,5 @@
-using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
+using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 

@@ -34,18 +34,10 @@ internal sealed record NavmeshMember(NavmeshChangedByCleanedMod Change, NavmeshU
     /// <summary>The entry it gets is the one in force before the cleaned mod.</summary>
     public bool CopiesEarlierEntry => Undo is NavmeshUndo.MapEntry or NavmeshUndo.BroughtBack || (Undo == NavmeshUndo.Geometry && Change.MapEntry is PartOutcome.Undo);
 
-    /// <summary>The order that writes its navmesh record; null when only its map entry goes back.</summary>
-    public WriteOrder? NavmeshOrder => Undo switch
-    {
-        NavmeshUndo.Geometry => new CopyEarlierNavmeshGeometry(Key),
-        NavmeshUndo.BroughtBack => new CopyEarlierNavmesh(Key),
-        NavmeshUndo.Sunk => new FlattenAndDetachNavmesh(Key, RemovalConvention.SunkNavmeshZ),
-        _ => null,
-    };
+    /// <summary>The patch writes its navmesh record; it does not when only its map entry goes back.</summary>
+    public bool WritesNavmeshRecord => Undo != NavmeshUndo.MapEntry;
 
-    /// <summary>The order that copies <see cref="EntryCopied"/>, lowered for a sunk one; null when no entry is copied.</summary>
-    public NavmeshEntryOrder? EntryOrder =>
-        EntryCopied is { } entry ? new NavmeshEntryOrder(Key, entry.Plugin, Undo == NavmeshUndo.Sunk ? RemovalConvention.SunkNavmeshZ : null) : null;
+    public NavmeshMemberWrite Write => new(Key, Undo, EntryCopied);
 
     /// <summary>The triangles flagged Preferred as the game shows them now; none while the navmesh is deleted.</summary>
     public ImmutableHashSet<int> PreferredNow => Change.Current.IsDeleted ? [] : Change.Current.PreferredTriangles();
@@ -57,9 +49,9 @@ internal sealed record NavmeshMember(NavmeshChangedByCleanedMod Change, NavmeshU
 /// <summary>Navmeshes that go back together or not at all.</summary>
 /// <param name="Members">In key order.</param>
 /// <param name="Doors">The doors linked to a member from either side, in key order.</param>
-/// <param name="Orders">The orders that put the group back; empty while it is refused.</param>
+/// <param name="Write">What the patch writes to put the group back; null until the group passes its check, and while it is refused.</param>
 /// <param name="Refused">The first guard that keeps the group; null when none does.</param>
-internal sealed record NavmeshGroup(ImmutableArray<NavmeshMember> Members, ImmutableArray<DoorLinkChange> Doors, ImmutableArray<WriteOrder> Orders, NavmeshRefusal? Refused)
+internal sealed record NavmeshGroup(ImmutableArray<NavmeshMember> Members, ImmutableArray<DoorLinkChange> Doors, NavmeshGroupWrite? Write, NavmeshRefusal? Refused)
 {
     public bool Holds(RecordKey navmesh) => Members.Any(member => member.Key == navmesh);
 
@@ -73,23 +65,10 @@ internal sealed record NavmeshGroup(ImmutableArray<NavmeshMember> Members, Immut
             .Order(RecordKeyOrder.Comparer);
 
     /// <summary>The group kept as the cleaned mod made it, for the first reason found; a group refused before keeps its first reason.</summary>
-    public NavmeshGroup RefusedFor(NavmeshRefusal refusal) => Refused is null ? this with { Refused = refusal, Orders = [] } : this;
+    public NavmeshGroup RefusedFor(NavmeshRefusal refusal) => Refused is null ? this with { Refused = refusal, Write = null } : this;
 
-    /// <summary>
-    /// The members' navmesh orders in key order, then one map entry order per map, then the door links the group writes, then those
-    /// cleared, each in key order.
-    /// </summary>
     /// <param name="linksToClear">The doors whose navmesh link is cleared, in key order.</param>
     /// <param name="writesLink">Whether the group writes the door's link before the cleaned mod.</param>
-    public ImmutableArray<WriteOrder> OrdersToPutBack(IEnumerable<RecordKey> linksToClear, Func<DoorLinkChange, bool> writesLink) =>
-    [
-        .. Members.Select(member => member.NavmeshOrder).OfType<WriteOrder>(),
-        .. Members
-            .Where(member => member.EntryCopied is not null)
-            .GroupBy(member => member.EntryCopied!.Map)
-            .OrderBy(map => map.Key, RecordKeyOrder.Comparer)
-            .Select(map => new WriteNavmeshMapEntries(map.Key, [.. map.Select(member => member.EntryOrder!)])),
-        .. Doors.Where(writesLink).Select(door => new CopyEarlierPlacedParts(door.Door, PlacedParts.NavDoorLink)),
-        .. linksToClear.Select(door => new ClearNavDoorLink(door)),
-    ];
+    public NavmeshGroupWrite CreateWrite(IEnumerable<RecordKey> linksToClear, Func<DoorLinkChange, bool> writesLink) =>
+        new([.. Members.Select(member => member.Write)], [.. Doors.Where(writesLink).Select(door => door.Door)], [.. linksToClear]);
 }

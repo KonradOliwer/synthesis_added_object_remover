@@ -11,10 +11,15 @@ namespace AddedObjectRemover;
 internal static class LoadOrderPluginsReader
 {
     /// <param name="missingPlugins">The enabled entries of the plugin list whose file was not found.</param>
+    /// <param name="patchMarker">The text in a plugin's header description that marks it as this patcher's output.</param>
     public static LoadOrderPlugins Read(
-        ILoadOrderGetter<IModListingGetter<ISkyrimModGetter>> loadOrder, ModKey patch, PluginListRead.Found pluginList, IEnumerable<PluginName> missingPlugins)
+        ILoadOrderGetter<IModListingGetter<ISkyrimModGetter>> loadOrder,
+        ModKey patch,
+        PluginListRead.Found pluginList,
+        IEnumerable<PluginName> missingPlugins,
+        string patchMarker)
     {
-        var listings = loadOrder.ListedOrder.Select(listing => ReadListing(listing, patch)).ToList();
+        var listings = loadOrder.ListedOrder.Select(listing => ReadListing(listing, patch, patchMarker)).ToList();
         var entries = pluginList.Listings.Select(listing => new PluginListEntry(listing.ModKey.ToPluginName(), listing.Enabled)).ToList();
         return Create(listings, patch.ToPluginName(), pluginList.FilePath, entries, missingPlugins);
     }
@@ -54,15 +59,16 @@ internal static class LoadOrderPluginsReader
     /// The patch's own header is not read: the runs of a batch change it, and these facts are read once for every run, so a
     /// later run must not see it as it was before the earlier runs. The patch is listed as read, without masters or marker.
     /// </remarks>
-    private static (PluginName Plugin, List<PluginName>? Masters, bool CarriesPatchMarker) ReadListing(IModListingGetter<ISkyrimModGetter> listing, ModKey patch) =>
+    private static (PluginName Plugin, List<PluginName>? Masters, bool CarriesPatchMarker) ReadListing(
+        IModListingGetter<ISkyrimModGetter> listing, ModKey patch, string patchMarker) =>
         listing.ModKey == patch
             ? (listing.ModKey.ToPluginName(), [], false)
-            : (listing.ModKey.ToPluginName(), ReadMasters(listing.Mod), ReadPatchMarker(listing.Mod));
+            : (listing.ModKey.ToPluginName(), ReadMasters(listing.Mod), ReadPatchMarker(listing.Mod, patchMarker));
 
     /// <returns>Null when the plugin could not be read.</returns>
     private static List<PluginName>? ReadMasters(ISkyrimModGetter? mod) =>
         mod?.MasterReferences.Select(master => master.Master.ToPluginName()).ToList();
 
     /// <returns>False when the plugin could not be read.</returns>
-    private static bool ReadPatchMarker(ISkyrimModGetter? mod) => PatchMarker.IsIn(mod?.ModHeader.Description);
+    private static bool ReadPatchMarker(ISkyrimModGetter? mod, string patchMarker) => PatchMarker.IsIn(mod?.ModHeader.Description, patchMarker);
 }

@@ -1,3 +1,4 @@
+using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Plugins.Cache;
 using Mutagen.Bethesda.Skyrim;
 
@@ -17,12 +18,13 @@ internal sealed class NpcTemplateChain(ILinkCache linkCache, PluginNames names)
         while (visited.Add(spawn))
         {
             var spawnKey = spawn.ToFormKey();
-            if (!linkCache.TryResolve<INpcGetter>(spawnKey, out var npc))
+            var npc = ReadNpcTemplate(spawnKey, followed);
+            if (!npc.IsNpc)
             {
-                return linkCache.TryResolve<ILeveledNpcGetter>(spawnKey, out _) ? new TraitSupplier(spawn, TraitSupplierKind.LeveledList) : null;
+                return IsLeveledList(spawnKey) ? new TraitSupplier(spawn, TraitSupplierKind.LeveledList) : null;
             }
-            if (!InheritsTraits(npc, followed)) return new TraitSupplier(spawn, TraitSupplierKind.Npc);
-            spawn = names.KeyOf(npc.Template.FormKey);
+            if (npc.Template is not { } template) return new TraitSupplier(spawn, TraitSupplierKind.Npc);
+            spawn = names.KeyOf(template);
         }
         return null;
     }
@@ -42,16 +44,16 @@ internal sealed class NpcTemplateChain(ILinkCache linkCache, PluginNames names)
     {
         if (!visited.Add(spawn)) return;
         var spawnKey = spawn.ToFormKey();
-        if (linkCache.TryResolve<INpcGetter>(spawnKey, out var npc))
+        var npc = ReadNpcTemplate(spawnKey, followed);
+        if (npc.IsNpc)
         {
-            if (InheritsTraits(npc, followed)) CollectTraitSources(names.KeyOf(npc.Template.FormKey),followed, visited, sources);
+            if (npc.Template is { } template) CollectTraitSources(names.KeyOf(template), followed, visited, sources);
             else sources.Add(spawn);
             return;
         }
-        if (!linkCache.TryResolve<ILeveledNpcGetter>(spawnKey, out var list)) return;
-        foreach (var entry in list.Entries ?? [])
+        foreach (var entry in ReadLeveledEntries(spawnKey))
         {
-            if (entry.Data is { Reference.IsNull: false } data) CollectTraitSources(names.KeyOf(data.Reference.FormKey),followed, visited, sources);
+            CollectTraitSources(names.KeyOf(entry), followed, visited, sources);
         }
     }
 
@@ -61,7 +63,20 @@ internal sealed class NpcTemplateChain(ILinkCache linkCache, PluginNames names)
         _ => throw new ArgumentOutOfRangeException(nameof(flag), flag, null),
     };
 
-    /// <summary>The template flag has no effect without a template.</summary>
-    private static bool InheritsTraits(INpcGetter npc, NpcConfiguration.TemplateFlag followed) =>
-        npc.Configuration.TemplateFlags.HasFlag(followed) && !npc.Template.IsNull;
+    /// <returns>
+    /// Whether the record is an NPC, and the template it takes the followed traits from; null when it supplies them itself.
+    /// The template flag has no effect without a template.
+    /// </returns>
+    private (bool IsNpc, FormKey? Template) ReadNpcTemplate(FormKey npcKey, NpcConfiguration.TemplateFlag followed) =>
+        MutagenCalls.Read(() => linkCache.TryResolve<INpcGetter>(npcKey, out var npc)
+            ? (true, npc.Configuration.TemplateFlags.HasFlag(followed) && !npc.Template.IsNull ? npc.Template.FormKey : (FormKey?)null)
+            : (false, null));
+
+    private bool IsLeveledList(FormKey key) => MutagenCalls.Read(() => linkCache.TryResolve<ILeveledNpcGetter>(key, out _));
+
+    /// <returns>The records the leveled list spawns, in the order listed; empty when the record is not a leveled list.</returns>
+    private FormKey[] ReadLeveledEntries(FormKey listKey) =>
+        MutagenCalls.Read(() => linkCache.TryResolve<ILeveledNpcGetter>(listKey, out var list)
+            ? (list.Entries ?? []).Select(entry => entry.Data is { Reference.IsNull: false } data ? data.Reference.FormKey : (FormKey?)null).OfType<FormKey>().ToArray()
+            : []);
 }

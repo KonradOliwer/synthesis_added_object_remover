@@ -1,3 +1,4 @@
+using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using Mutagen.Bethesda.Synthesis.Settings;
 
@@ -6,17 +7,17 @@ namespace AddedObjectRemover;
 public class OtherModsChangedObjectsSettings : IChangedObjectsSettingsValues
 {
     [SynthesisOrder]
-    [SynthesisSettingName("Moved objects")]
+    [SynthesisSettingName(SettingNames.MovedObjects)]
     [SynthesisTooltip("Objects the cleaned mod moved farther than the distance below from where they stood before it.")]
     public MovedObjectSettings Moved { get; set; } = new();
 
     [SynthesisOrder]
-    [SynthesisSettingName("Replaced objects")]
+    [SynthesisSettingName(SettingNames.ReplacedObjects)]
     [SynthesisTooltip("Objects the cleaned mod left in place (within the distance above) but gave another model.")]
     public ReplacedObjectSettings Replaced { get; set; } = new();
 
     [SynthesisOrder]
-    [SynthesisSettingName("Collision handling")]
+    [SynthesisSettingName(SettingNames.CollisionHandling)]
     [SynthesisTooltip(
         "How these objects are checked, where the cleaned mod put them and, for RestoreIfNoCollision, where they stood before.\n"
         + "The same settings as the cleaned mod's own objects have, with the same defaults.")]
@@ -30,14 +31,14 @@ public class OtherModsChangedObjectsSettings : IChangedObjectsSettingsValues
 public class MovedObjectSettings : IMovedObjectsSettingsValues
 {
     [SynthesisOrder]
-    [SynthesisSettingName("Count as moved when moved farther than (game units)")]
+    [SynthesisSettingName(SettingNames.MovedDistance + SettingNames.GameUnitsSuffix)]
     [SynthesisTooltip(
         "Moved this far or less, the object counts as standing where it stood: it is checked only when it got another model and \"Process replaced objects\" is on.\n"
         + "Measured in a straight line, in any direction. 0 or more; 0 counts every move.")]
     public float MovedDistanceInUnits { get; set; } = SettingDefaults.MovedDistanceInUnits;
 
     [SynthesisOrder]
-    [SynthesisSettingName("When it would be removed")]
+    [SynthesisSettingName(SettingNames.WhenRemoved)]
     [SynthesisTooltip(ChangedObjectTexts.WhenRemovedForMoved)]
     public RestoreMode WhenRemoved { get; set; } = SettingDefaults.MovedObjectsWhenRemoved;
 
@@ -57,7 +58,7 @@ public class ReplacedObjectSettings : IReplacedObjectsSettingsValues
     public bool Process { get; set; } = SettingDefaults.ProcessReplacedObjects;
 
     [SynthesisOrder]
-    [SynthesisSettingName("When it would be removed")]
+    [SynthesisSettingName(SettingNames.WhenRemoved)]
     [SynthesisTooltip(ChangedObjectTexts.WhenRemovedForReplaced)]
     public RestoreMode WhenRemoved { get; set; } = SettingDefaults.ReplacedObjectsWhenRemoved;
 
@@ -98,14 +99,14 @@ internal static class ChangedObjectTexts
 public class ChangedObjectCollisionSettings : ICollisionSettingsValues
 {
     [SynthesisOrder]
-    [SynthesisSettingName("Remove objects too close to other mods' objects")]
+    [SynthesisSettingName(SettingNames.TooClose)]
     [SynthesisTooltip(
         "The main check, the same as for the cleaned mod's own objects. An object would be removed when an object from another mod comes within a margin around it.\n"
         + "Turn on one or both margins; an object caught by either is removed once. With both off, nothing is removed for being too close.")]
     public TooCloseRemovalSettings TooClose { get; set; } = new();
 
     [SynthesisOrder]
-    [SynthesisSettingName("Remove objects on terrain changed by other mods")]
+    [SynthesisSettingName(SettingNames.ChangedTerrain)]
     [SynthesisTooltip(
         "Removes an object when another mod changed the terrain under or around it: raised, lowered or flattened it,\n"
         + "changed the kind of ground (for example grass to road), or raised, lowered, added or removed the water there,\n"
@@ -116,7 +117,7 @@ public class ChangedObjectCollisionSettings : ICollisionSettingsValues
     public TerrainChangeSettings TerrainChange { get; set; } = new();
 
     [SynthesisOrder]
-    [SynthesisSettingName("Shrink down to (% of its size)")]
+    [SynthesisSettingName(SettingNames.ShrinkLimit + SettingNames.PercentOfItsSizeSuffix)]
     [SynthesisTooltip(
         "An object that would be removed for being too close to another mod's object may be shrunk where it stands, down to this share of its size, to make it fit,\n"
         + "in steps of 5%; the largest size that fits is used.\n"
@@ -124,7 +125,7 @@ public class ChangedObjectCollisionSettings : ICollisionSettingsValues
     public int ShrinkLimitPercent { get; set; } = SettingDefaults.ShrinkLimitPercent;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Turn by at most (degrees either way)")]
+    [SynthesisSettingName(SettingNames.TurnLimit + SettingNames.DegreesEitherWaySuffix)]
     [SynthesisTooltip(
         "An object may be turned about its upright axis by up to this many degrees to the left or to the right to make it fit,\n"
         + "in steps of 15 degrees; the smallest turn that fits is used. It is never tilted.\n"

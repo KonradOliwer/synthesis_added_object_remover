@@ -9,7 +9,9 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 /// </summary>
 /// <param name="patch">The patch, whose version holds what earlier patchers of the group wrote.</param>
 /// <param name="placedDifferences">How the parts of each placed record the cleaned mod overrides differ across its versions, by key.</param>
-internal sealed class AreaRecordChanges(PluginName patch, IReadOnlyDictionary<RecordKey, PlacedPartDifferences> placedDifferences)
+/// <param name="navmeshReplacements">The replacements of each deleted navmesh that has some (<see cref="NavmeshReplacements"/>), by key.</param>
+internal sealed class AreaRecordChanges(
+    PluginName patch, IReadOnlyDictionary<RecordKey, PlacedPartDifferences> placedDifferences, IReadOnlyDictionary<RecordKey, ImmutableArray<RecordKey>> navmeshReplacements)
 {
     /// <returns>
     /// Null when no part is listed: every part that is not <see cref="PartOutcome.Unchanged"/> is, in the order of the cell's part
@@ -80,7 +82,7 @@ internal sealed class AreaRecordChanges(PluginName patch, IReadOnlyDictionary<Re
             mapEntry,
             navmesh.Earlier,
             navmesh.Current,
-            navmesh.ReplacedBy,
+            navmeshReplacements.TryGetValue(navmesh.Key, out var replacedBy) ? replacedBy : [],
             outcomes.Any(outcome => outcome is PartOutcome.LeftToLaterPlugin) ? [] : navmesh.Neighbours,
             [.. navmesh.Doors.Select(DoorOf)],
             navmesh.NamedInPreferredPaths,

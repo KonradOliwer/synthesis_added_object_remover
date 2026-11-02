@@ -37,14 +37,14 @@ public sealed class RemovalDecisions : IRunDecisions
     {
         private RemovalDecisions _newest = newest;
 
-        public IRemovalDecisions DecideRound(RoundKind kind, IReadOnlyList<ProposedRemoval> proposals)
+        public IRemovalDecisions DecideRound(RoundOpening opening, IReadOnlyList<ProposedRemoval> proposals)
         {
-            _newest = _newest.Apply(kind, proposals);
+            _newest = _newest.Apply(opening, proposals);
             return _newest;
         }
 
         public (IRemovalDecisions Decisions, ImmutableArray<RoundProposals<TDetails>> Rounds) DecideRoundsUntilNothingRemoved<TDetails>(
-            IRemovalRounds<TDetails> rounds, ImmutableArray<TargetId> seeds)
+            RoundOpening opening, IRemovalRounds<TDetails> rounds, ImmutableArray<TargetId> seeds)
         {
             var decided = ImmutableArray.CreateBuilder<RoundProposals<TDetails>>();
             var removedLastRound = seeds;
@@ -52,7 +52,7 @@ public sealed class RemovalDecisions : IRunDecisions
             {
                 var next = rounds.Next(_newest, removedLastRound);
                 decided.Add(next);
-                DecideRound(RoundKind.AlsoRemove, next.Proposals);
+                DecideRound(opening, next.Proposals);
                 removedLastRound = _newest.LeftIn(_newest.Rounds[^1]);
             }
             return (_newest, decided.ToImmutable());
@@ -121,10 +121,6 @@ public sealed class RemovalDecisions : IRunDecisions
 
     public ImmutableArray<TargetObject> TargetsAsTheyStand(ImmutableArray<TargetObject> targets) => PlaceTargets(targets, AsStanding);
 
-    public bool AnyMeasuredElsewhere() => All().Any(entry => entry.Decision is Decision.Fitted);
-
-    public bool AnyStandsElsewhere() => All().Any(entry => entry.Decision is Decision.Fitted or Decision.Restored);
-
     public IEnumerable<(TargetId Target, Decision Decision)> All()
     {
         for (var index = 0; index < _store.Decisions.Length; index++)
@@ -149,25 +145,29 @@ public sealed class RemovalDecisions : IRunDecisions
 
     public ImmutableArray<Round> RoundsAfter(IRemovalDecisions older) => [.. Rounds.Skip(older.Rounds.Length)];
 
+    /// <summary>Opens the next round of <paramref name="kind"/>, which skips an object kept shrunk or turned (see <see cref="Apply(RoundOpening, IReadOnlyList{ProposedRemoval})"/>).</summary>
+    /// <returns>The view that includes the new round.</returns>
+    public RemovalDecisions Apply(RoundKind kind, IReadOnlyList<ProposedRemoval> proposals) => Apply(new RoundOpening(kind, MayReplaceFits: false), proposals);
+
     /// <summary>
     /// Opens the next round in two phases. Direct: proposals in target order (for a target proposed
     /// twice the first proposal counts) decide each undecided target: a protected one is kept,
     /// any other removed, which disables it or restores it as the object's entry in the when-removed table says.
-    /// An object kept shrunk or turned where it stands still stands there, so an also-remove round decides it
-    /// like an undecided one; the rounds that judge a clash with other mods skip it, since it fits.
+    /// An object kept shrunk or turned where it stands still stands there, so a round whose opening may replace fits decides it
+    /// like an undecided one; any other round skips it, since it fits.
     /// Spread: the undecided members of the linked group of each target removed
     /// directly are removed, each as its own entry says, as linked to the group's lowest-id direct removal. A protected group
     /// never has a removed member, since protection covers whole groups.
     /// </summary>
     /// <returns>The view that includes the new round.</returns>
-    public RemovalDecisions Apply(RoundKind kind, IReadOnlyList<ProposedRemoval> proposals)
+    internal RemovalDecisions Apply(RoundOpening opening, IReadOnlyList<ProposedRemoval> proposals)
     {
         RequireNewestView();
 
-        var round = new Round(_roundCount + 1, kind);
+        var round = new Round(_roundCount + 1, opening.Kind);
         _store.Rounds.Add(round);
         var next = new RemovalDecisions(_store, round.Number, _moveCount);
-        var (removed, kept) = next.DecideDirectly(round, proposals);
+        var (removed, kept) = next.DecideDirectly(round, opening.MayReplaceFits, proposals);
         _store.LeftIn.Add([.. removed, .. next.SpreadToLinkedMembers(round, removed)]);
         _store.KeptIn.Add([.. kept]);
         _store.FittedIn.Add([]);
@@ -176,7 +176,7 @@ public sealed class RemovalDecisions : IRunDecisions
 
     /// <summary>
     /// Opens a fit round, when there is a fit: each fitted object is decided as kept at its new placement, so no later round
-    /// judges it, except an also-remove round (see <see cref="Apply"/>). A fit may only be proposed once for an undecided object that is not protected and has no linked partner, so
+    /// judges it, except a round whose opening may replace fits (see <see cref="Apply(RoundOpening, IReadOnlyList{ProposedRemoval})"/>). A fit may only be proposed once for an undecided object that is not protected and has no linked partner, so
     /// fitting never splits a linked group; anything else is a bug.
     /// </summary>
     /// <returns>The view that includes the new round; this view when there is no fit.</returns>
@@ -208,19 +208,19 @@ public sealed class RemovalDecisions : IRunDecisions
         }
     }
 
-    /// <summary>Opens one round per entry of <paramref name="rounds"/>, in order, each as <see cref="Apply"/> does with the entry's kind.</summary>
+    /// <summary>Opens one round per entry of <paramref name="rounds"/>, in order, each as <see cref="Apply(RoundOpening, IReadOnlyList{ProposedRemoval})"/> does with the entry's opening.</summary>
     /// <returns>The view that includes the new rounds.</returns>
     public RemovalDecisions ApplyRounds(IReadOnlyList<ProposedRound> rounds) =>
-        rounds.Aggregate(this, (decisions, round) => decisions.Apply(round.Kind, round.Proposals));
+        rounds.Aggregate(this, (decisions, round) => decisions.Apply(round.Opening, round.Proposals));
 
-    /// <summary>Opens one round of <paramref name="kind"/> per entry of <paramref name="rounds"/>, in order.</summary>
+    /// <summary>Opens one round per entry of <paramref name="rounds"/>, in order, each as <paramref name="opening"/> says.</summary>
     /// <returns>The view that includes the new rounds.</returns>
-    public RemovalDecisions ApplyRounds(RoundKind kind, IReadOnlyList<IReadOnlyList<ProposedRemoval>> rounds) =>
-        ApplyRounds([.. rounds.Select(proposals => new ProposedRound(kind, proposals))]);
+    public RemovalDecisions ApplyRounds(RoundOpening opening, IReadOnlyList<IReadOnlyList<ProposedRemoval>> rounds) =>
+        ApplyRounds([.. rounds.Select(proposals => new ProposedRound(opening, proposals))]);
 
     public IReadOnlyDictionary<TargetId, Decision> DecideRoundOnCopy(RoundKind kind, IReadOnlyList<ProposedRemoval> proposals)
     {
-        var decided = WorkingCopy().DecideRound(kind, proposals);
+        var decided = WorkingCopy().DecideRound(new RoundOpening(kind, MayReplaceFits: false), proposals);
         var round = decided.Rounds[^1];
         return decided.LeftIn(round).Concat(decided.KeptIn(round)).ToDictionary(target => target, target => decided.Of(target)!);
     }
@@ -242,7 +242,7 @@ public sealed class RemovalDecisions : IRunDecisions
 
     IRunDecisions IRunDecisions.ApplyRounds(IReadOnlyList<ProposedRound> rounds) => ApplyRounds(rounds);
 
-    IRunDecisions IRunDecisions.ApplyRounds(RoundKind kind, IReadOnlyList<IReadOnlyList<ProposedRemoval>> rounds) => ApplyRounds(kind, rounds);
+    IRunDecisions IRunDecisions.ApplyRounds(RoundOpening opening, IReadOnlyList<IReadOnlyList<ProposedRemoval>> rounds) => ApplyRounds(opening, rounds);
 
     IRunDecisions IRunDecisions.AddMoves(IReadOnlyList<MarkerMove> moves) => AddMoves(moves);
 
@@ -267,14 +267,14 @@ public sealed class RemovalDecisions : IRunDecisions
         }
     }
 
-    private (List<TargetId> Removed, List<TargetId> Kept) DecideDirectly(Round round, IReadOnlyList<ProposedRemoval> proposals)
+    private (List<TargetId> Removed, List<TargetId> Kept) DecideDirectly(Round round, bool mayReplaceFits, IReadOnlyList<ProposedRemoval> proposals)
     {
         var removed = new List<TargetId>();
         var kept = new List<TargetId>();
         foreach (var proposal in proposals.OrderBy(proposal => proposal.Target))
         {
             var target = proposal.Target;
-            if (round.Kind == RoundKind.AlsoRemove ? !MayStillBeRemoved(target) : IsDecided(target)) continue;
+            if (mayReplaceFits ? !MayStillBeRemoved(target) : IsDecided(target)) continue;
             if (Of(target) is Decision.Fitted fitted) _store.Replaced[target.Index] = fitted;
             if (_store.Protection.TryGetKeepReason(target.Index, out var keepReason))
             {

@@ -14,6 +14,9 @@ public sealed record CellEdgeHeights(float[]? West, float[]? East, float[]? Sout
 
     private const int SecondLastLine = TerrainGrid.VerticesPerSide - 2;
 
+    /// <summary>The index step from one grid point to the next in the same row.</summary>
+    private const int NextInRow = 1;
+
     public static CellEdgeHeights Unknown { get; } = new(null, null, null, null);
 
     /// <summary>The heights next to a cell's edges, taken from the grids of its four neighbouring cells.</summary>
@@ -21,11 +24,12 @@ public sealed record CellEdgeHeights(float[]? West, float[]? East, float[]? Sout
     public static CellEdgeHeights Beside(float[]? west, float[]? east, float[]? south, float[]? north) =>
         new(Column(west, SecondLastLine), Column(east, SecondLine), Row(south, SecondLastLine), Row(north, SecondLine));
 
-    private static float[]? Column(float[]? heights, int x) =>
-        heights is null ? null : [.. Enumerable.Range(0, TerrainGrid.VerticesPerSide).Select(y => heights[y * TerrainGrid.VerticesPerSide + x])];
+    private static float[]? Column(float[]? heights, int x) => ReadLine(heights, x, TerrainGrid.VerticesPerSide);
 
-    private static float[]? Row(float[]? heights, int y) =>
-        heights is null ? null : [.. Enumerable.Range(0, TerrainGrid.VerticesPerSide).Select(x => heights[y * TerrainGrid.VerticesPerSide + x])];
+    private static float[]? Row(float[]? heights, int y) => ReadLine(heights, y * TerrainGrid.VerticesPerSide, NextInRow);
+
+    private static float[]? ReadLine(float[]? heights, int first, int step) =>
+        heights is null ? null : [.. Enumerable.Range(0, TerrainGrid.VerticesPerSide).Select(point => heights[first + point * step])];
 }
 
 /// <summary>The normals of a cell's terrain surface at its grid points.</summary>

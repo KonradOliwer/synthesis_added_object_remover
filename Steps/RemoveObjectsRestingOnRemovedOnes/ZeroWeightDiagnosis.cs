@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
@@ -34,10 +35,10 @@ internal static class ZeroWeightDiagnosis
             [.. hitsBySupporter.Select(entry => DescribeSupporter(entry, samples.Weights, supportersPerPoint))]);
     }
 
-    private static SupporterSamples DescribeSupporter(SupporterHits entry, float[] weights, int[] supportersPerPoint) =>
+    private static SupporterSamples DescribeSupporter(SupporterHits entry, ImmutableArray<float> weights, int[] supportersPerPoint) =>
         new(entry.Supporter, entry.Hits.Count(hit => hit), SampleWeights.WeightHeldBy(entry.Hits, weights, supportersPerPoint));
 
-    private static SampleWeightCounts CountWeights(float[] weights) =>
+    private static SampleWeightCounts CountWeights(ImmutableArray<float> weights) =>
         new(
             weights.Count(weight => float.IsFinite(weight) && weight > 0),
             weights.Count(weight => float.IsFinite(weight) && !(weight > 0)),

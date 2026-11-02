@@ -1,8 +1,8 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
+using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 
@@ -10,6 +10,9 @@ namespace AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
 
 public static class VisibleLeftBehindObjects
 {
+    /// <summary>The rules this step judges its objects by (see <see cref="LeftBehindJudging"/>).</summary>
+    public static ILeftBehindJudging CreateLeftBehindJudging() => new LeftBehindJudging();
+
     /// <param name="Decisions">The newest decisions, which the step's rounds and their follow-ups are added to.</param>
     /// <param name="Caches">Index the visible target objects where the rounds measure them; their base facts and shapes are read.</param>
     /// <param name="FollowUp">Follows up the removals of each round that took something from its place before the next round; no pass ran yet.</param>
@@ -45,11 +48,11 @@ public static class VisibleLeftBehindObjects
     private static VisibleLeftBehindResult FindRounds(Input input)
     {
         var (decisions, followUp) = (input.Decisions, input.FollowUp);
-        var surroundings = input.Caches.IndexVisibleTargetsAsTheRoundsMeasureThem(decisions);
         // Taken before the first pass: a step that stops proposes no round, so it must not report the passes it ran.
         var nothingFollowedUp = followUp.Summarize(decisions);
         if (input.Settings is not { } settings) return new VisibleLeftBehindResult(StepOutcome.SwitchedOff, [], [], [], TimeSpan.Zero, nothingFollowedUp, Failure: null);
 
+        var surroundings = input.Caches.IndexVisibleTargets(decisions.TargetsAsTheRoundsMeasureThem(input.Targets));
         return Failures.Attempt(
             () => JoinVerdicts(DecideRounds(input, surroundings, settings), decisions, followUp),
             failure => new VisibleLeftBehindResult(

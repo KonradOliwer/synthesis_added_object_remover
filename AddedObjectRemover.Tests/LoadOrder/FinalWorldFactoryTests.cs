@@ -91,7 +91,7 @@ public sealed class FinalWorldFactoryTests : IDisposable
     [Fact]
     public void APluginBothAboveAndBelowThePatchIsABug()
     {
-        var factory = new FinalWorldFactory(OpenInMemory(_first));
+        var factory = new FinalWorldFactory(OpenInMemory(_first), Program.PatchMarkerText);
 
         Assert.Throws<ArgumentException>(() =>
             factory.Create(StateOf(_first), _patch, ListOf(Entry(_first), Entry(_patch), Entry(_first)), _dataFolder.FullName));
@@ -153,7 +153,7 @@ public sealed class FinalWorldFactoryTests : IDisposable
     }
 
     private FinalWorld Create(IReadOnlyList<IModListing<ISkyrimModGetter>> state, PluginOpener opener, params ILoadOrderListingGetter[] entries) =>
-        new FinalWorldFactory(opener).Create(state, _patch, ListOf(entries), _dataFolder.FullName);
+        new FinalWorldFactory(opener, Program.PatchMarkerText).Create(state, _patch, ListOf(entries), _dataFolder.FullName);
 
     /// <summary>The Synthesis state's listings: the given plugins, then the patch last, as Synthesis appends it.</summary>
     private List<IModListing<ISkyrimModGetter>> StateOf(params SkyrimMod[] above) =>

@@ -37,26 +37,14 @@ internal sealed class VisibleTargetObjects : IVisibleTargetObjects
 
     public IReadOnlyList<RecordKey> Spaces { get; }
 
-    public void Around(RecordKey space, Vector3 point, float radius, List<VisibleTargetNear> into)
-    {
-        into.Clear();
-        if (EntriesOf(space) is not { } entries) return;
-
-        var near = new List<int>();
-        entries.Grid.CollectWithinRadius(point, radius, entry => !Vectors.IsFartherThan(entries.Boxes[entry].ClosestPoint(point), point, radius), near);
-        foreach (var entry in near) into.Add(new VisibleTargetNear(entries.Targets[entry], entries.Boxes[entry]));
-    }
+    public void Around(RecordKey space, Vector3 point, float radius, List<VisibleTargetNear> into) =>
+        CollectWithinRadius(
+            space, point, radius, (point, radius), static (box, state) => !Vectors.IsFartherThan(box.ClosestPoint(state.point), state.point, state.radius), into);
 
     /// <remarks>The grid buckets X and Y only, so a query at height 0 finds the whole column.</remarks>
-    public void InColumn(RecordKey space, Vector2 point, float radius, List<VisibleTargetNear> into)
-    {
-        into.Clear();
-        if (EntriesOf(space) is not { } entries) return;
-
-        var inColumn = new List<int>();
-        entries.Grid.CollectWithinRadius(new Vector3(point, 0f), radius, entry => IsWithinHorizontally(entries.Boxes[entry].Center, point, radius), inColumn);
-        foreach (var entry in inColumn) into.Add(new VisibleTargetNear(entries.Targets[entry], entries.Boxes[entry]));
-    }
+    public void InColumn(RecordKey space, Vector2 point, float radius, List<VisibleTargetNear> into) =>
+        CollectWithinRadius(
+            space, new Vector3(point, 0f), radius, (point, radius), static (box, state) => IsWithinHorizontally(box.Center, state.point, state.radius), into);
 
     public bool AnyContains(RecordKey space, Vector3 point, Func<TargetId, bool> include, ObjectQueryScratch scratch)
     {
@@ -72,6 +60,22 @@ internal sealed class VisibleTargetObjects : IVisibleTargetObjects
         EntriesOf(space) is { } entries
             ? FindCandidates(entries, point, radius).Where(entry => include(entries.Targets[entry])).Select(entry => entries.Boxes[entry])
             : [];
+
+    /// <summary>
+    /// Replaces <paramref name="into"/> with the targets the grid finds within the radius whose box passes <paramref name="isNear"/>,
+    /// in ascending order. The test takes the caller's state, so it can be a static lambda.
+    /// </summary>
+    private void CollectWithinRadius<TState>(
+        RecordKey space, Vector3 point, float radius, TState state, Func<OrientedBox, TState, bool> isNear, List<VisibleTargetNear> into)
+    {
+        into.Clear();
+        if (EntriesOf(space) is not { } entries) return;
+
+        foreach (var entry in FindCandidates(entries, point, radius))
+        {
+            if (isNear(entries.Boxes[entry], state)) into.Add(new VisibleTargetNear(entries.Targets[entry], entries.Boxes[entry]));
+        }
+    }
 
     private SpaceEntries? EntriesOf(RecordKey space) =>
         _visibleBySpace.TryGetValue(space, out var visible) ? _entries.Get(space, () => CreateEntries(visible)) : null;

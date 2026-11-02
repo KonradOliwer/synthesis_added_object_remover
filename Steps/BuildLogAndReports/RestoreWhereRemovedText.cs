@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
@@ -11,6 +12,11 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 /// </summary>
 internal static class RestoreWhereRemovedText
 {
+    /// <summary>The rows and the columns of the quarters, as <see cref="TerrainQuadrants.IndexOf"/> numbers them: <see cref="TerrainQuadrants.PerSide"/> of each.</summary>
+    private static readonly ImmutableArray<string> SouthToNorth = ["south", "north"];
+
+    private static readonly ImmutableArray<string> WestToEast = ["west", "east"];
+
     /// <summary>What became of a change, as the report files say it: "restored", or "kept: " and the reason.</summary>
     /// <param name="keptBecause">Why the change stays; null when it goes back.</param>
     public static string Result(string? keptBecause) => keptBecause is null ? "restored" : $"kept: {keptBecause}";
@@ -38,13 +44,7 @@ internal static class RestoreWhereRemovedText
     };
 
     /// <summary>What was done to a navmesh of a group that went back, in its line.</summary>
-    public static string UndoVerb(NavmeshUndo undo) => undo switch
-    {
-        NavmeshUndo.Geometry or NavmeshUndo.MapEntry => "restored",
-        NavmeshUndo.BroughtBack => "brought back",
-        NavmeshUndo.Sunk => "sunk under the world and cut off",
-        _ => throw new UnreachableException($"Unknown navmesh undo {undo}."),
-    };
+    public static string UndoVerb(NavmeshUndo undo) => Undone(undo, "sunk under the world and cut off");
 
     public static string Never(NeverRestoredReason reason) => reason switch
     {
@@ -142,11 +142,14 @@ internal static class RestoreWhereRemovedText
     };
 
     /// <summary>What a restored navmesh is, in a count: restored, brought back, or one the cleaned mod added, sunk.</summary>
-    public static string Undo(NavmeshUndo undo) => undo switch
+    public static string Undo(NavmeshUndo undo) => Undone(undo, "of the cleaned mod's sunk under the world");
+
+    /// <param name="sunk">How the line or the count words a navmesh of the cleaned mod that was sunk.</param>
+    private static string Undone(NavmeshUndo undo, string sunk) => undo switch
     {
         NavmeshUndo.Geometry or NavmeshUndo.MapEntry => "restored",
         NavmeshUndo.BroughtBack => "brought back",
-        NavmeshUndo.Sunk => "of the cleaned mod's sunk under the world",
+        NavmeshUndo.Sunk => sunk,
         _ => throw new UnreachableException($"Unknown navmesh undo {undo}."),
     };
 
@@ -210,13 +213,22 @@ internal static class RestoreWhereRemovedText
         _ => throw new UnreachableException($"Unknown navmesh fault kind {kind}."),
     };
 
+    public static string Heights(int count) => TextFormat.Count(count, "height", "heights");
+
+    public static string VertexColours(int count) => TextFormat.Count(count, "vertex colour", "vertex colours");
+
+    /// <summary>E.g. "210 heights, 3 vertex colours, ground textures"; empty when there is none.</summary>
+    public static string Pieces(TerrainPieces pieces) =>
+        string.Join(
+            Describe.ListSeparator,
+            new[]
+            {
+                pieces.Heights > 0 ? Heights(pieces.Heights) : null,
+                pieces.Colours > 0 ? VertexColours(pieces.Colours) : null,
+                pieces.Textures ? "ground textures" : null,
+            }.OfType<string>());
+
     /// <summary>The quarter of a cell's terrain, by <see cref="TerrainQuadrants.IndexOf"/>.</summary>
-    public static string Quarter(int quarter) => quarter switch
-    {
-        0 => "south-west",
-        1 => "south-east",
-        2 => "north-west",
-        3 => "north-east",
-        _ => throw new UnreachableException($"Unknown terrain quarter {quarter}."),
-    };
+    public static string Quarter(int quarter) =>
+        $"{SouthToNorth[quarter / TerrainQuadrants.PerSide]}-{WestToEast[quarter % TerrainQuadrants.PerSide]}";
 }

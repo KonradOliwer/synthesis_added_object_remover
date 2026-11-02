@@ -156,7 +156,7 @@ public class VisibleObjectSurroundingsTests
         var protection = ObjectsToKeep.Build(targets, links, TestTargets.References(TargetCount, referenced), TestBaseFacts.Unresolved);
         var unjudged = RemovalDecisions.Start(protection, [.. targets.Select(target => random.Next(RestoredOneIn) == 0 ? Restore(target) : new WhenRemoved.Disable())]);
         var fitted = unjudged.ApplyFits(FitRandomly(random, targets, protection));
-        var start = fitted.Apply(RoundKind.TooClose, ProposeRandomly(random, fitted, RoundKind.TooClose));
+        var start = fitted.Apply(RoundKind.TooClose, ProposeRandomly(random, fitted, new RoundOpening(RoundKind.TooClose, MayReplaceFits: false)));
         return new World(targets, TestScenes.Create(targets, [], Shapes).VisibleTargets, unjudged, start);
     }
 
@@ -206,18 +206,19 @@ public class VisibleObjectSurroundingsTests
 
     private static IRemovalDecisions DecideRandomRound(Random random, IRemovalDecisionsCopy copy, IRemovalDecisions decisions)
     {
-        var kind = RandomKind(random);
-        return copy.DecideRound(kind, ProposeRandomly(random, decisions, kind));
+        var opening = RandomOpening(random);
+        return copy.DecideRound(opening, ProposeRandomly(random, decisions, opening));
     }
 
-    private static RoundKind RandomKind(Random random) => random.Next(2) == 0 ? RoundKind.VisibleLeftBehind : RoundKind.AlsoRemove;
+    private static RoundOpening RandomOpening(Random random) =>
+        random.Next(2) == 0 ? new RoundOpening(RoundKind.VisibleLeftBehind, MayReplaceFits: false) : AlsoRemoveRounds.Opening;
 
     /// <remarks>Only an also-remove round may remove a fitted object.</remarks>
-    private static ProposedRemoval[] ProposeRandomly(Random random, IRemovalDecisions decisions, RoundKind kind) =>
-        Propose([.. Enumerable.Range(0, TargetCount).Where(index => MayBeProposed(decisions, new TargetId(index), kind) && random.Next(ProposedOneIn) == 0)]);
+    private static ProposedRemoval[] ProposeRandomly(Random random, IRemovalDecisions decisions, RoundOpening opening) =>
+        Propose([.. Enumerable.Range(0, TargetCount).Where(index => MayBeProposed(decisions, new TargetId(index), opening) && random.Next(ProposedOneIn) == 0)]);
 
-    private static bool MayBeProposed(IRemovalDecisions decisions, TargetId target, RoundKind kind) =>
-        kind == RoundKind.AlsoRemove ? decisions.MayStillBeRemoved(target) : !decisions.IsDecided(target);
+    private static bool MayBeProposed(IRemovalDecisions decisions, TargetId target, RoundOpening opening) =>
+        opening.MayReplaceFits ? decisions.MayStillBeRemoved(target) : !decisions.IsDecided(target);
 
     private static ProposedRemoval[] Propose(params int[] targets) => [.. targets.Select(index => new ProposedRemoval(new TargetId(index), AnyReason))];
 

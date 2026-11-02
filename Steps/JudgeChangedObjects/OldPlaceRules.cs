@@ -1,5 +1,5 @@
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
+using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 
 namespace AddedObjectRemover.Steps.JudgeChangedObjects;
 

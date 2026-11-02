@@ -23,6 +23,14 @@ public sealed class DirectionAreaTally
         _categoryBoxes = [.. Enumerable.Range(0, categoryCount).Select(_ => new int[CompassDirections.SectorCount])];
     }
 
+    /// <summary>The areas of the boxes added in the given order.</summary>
+    public static DirectionAreas Of(int categoryCount, IEnumerable<(SectorFootprint Footprint, int? Category)> boxesInOrder)
+    {
+        var tally = new DirectionAreaTally(categoryCount);
+        foreach (var (footprint, category) in boxesInOrder) tally.Add(footprint, category);
+        return tally.Build();
+    }
+
     public void Add(SectorFootprint footprint, int? category)
     {
         foreach (var sector in footprint.Sectors) Add(sector, footprint.GroundArea, category);

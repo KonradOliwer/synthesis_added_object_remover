@@ -133,10 +133,7 @@ public sealed class MeshTriangleTree
                     if (start < bounds.Min[axis] || start > bounds.Max[axis]) return false;
                     continue;
                 }
-                var toMin = (bounds.Min[axis] - start) / step;
-                var toMax = (bounds.Max[axis] - start) / step;
-                enter = MathF.Max(enter, MathF.Min(toMin, toMax));
-                exit = MathF.Min(exit, MathF.Max(toMin, toMax));
+                Boxes.NarrowToSlab(start, step, bounds.Min[axis], bounds.Max[axis], ref enter, ref exit);
             }
             return enter <= exit;
         }

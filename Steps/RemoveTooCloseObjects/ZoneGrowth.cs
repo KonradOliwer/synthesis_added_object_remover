@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Numerics;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 
@@ -50,8 +51,12 @@ internal abstract record ZoneGrowth
         public override ShapeZone CreateShapeZone(Box localBox, PlacedTransform transform)
         {
             var zoneBox = OrientedBox.FromLocal(Boxes.ExpandedLocalBox(localBox, 1f, Multiplier), transform);
-            return new ShapeZone(zoneBox, TooCloseZoneReach.EnlargeBySize(transform, localBox.Center, Multiplier), IntersectionTolerance);
+            return new ShapeZone(zoneBox, EnlargeMeshAroundCentre(transform, localBox.Center), IntersectionTolerance);
         }
+
+        /// <summary>The placement of the target's mesh enlarged uniformly around the centre of its local box by the size zone: its size plus the multiplier of it on both sides of each axis.</summary>
+        private PlacedTransform EnlargeMeshAroundCentre(PlacedTransform transform, Vector3 localCentre) =>
+            Boxes.EnlargeAroundCentre(transform, localCentre, Boxes.SizeGrowthFactor(Multiplier));
     }
 
     /// <summary>Grown by a distance in game units. Its shape zone is the object's own mesh as placed, and other meshes count when they come within the distance of it.</summary>

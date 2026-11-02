@@ -94,7 +94,7 @@ public class NpcStuckTestTests
     [Fact]
     public void AnyOfSeveralPossibleBodiesInARoomIsStuck()
     {
-        var bodies = TooCloseObjects.NpcBodyRules.DistinctBodies([
+        var bodies = NpcCacheRules.Bodies.DistinctBodies([
             new NpcBody(NpcSizeSource.BodyMesh, NpcBodyBox, null),
             new NpcBody(NpcSizeSource.BodyMesh, new Box(new Vector3(-10, -10, 0), new Vector3(10, 10, 40)), null)]);
 
@@ -112,7 +112,7 @@ public class NpcStuckTestTests
     {
         var farAway = new Box(new Vector3(-5, -5, 500), new Vector3(5, 5, 580));
         var evenFartherAway = new Box(new Vector3(-5, -5, 1000), new Vector3(5, 5, 1080));
-        var bodies = TooCloseObjects.NpcBodyRules.DistinctBodies([
+        var bodies = NpcCacheRules.Bodies.DistinctBodies([
             new NpcBody(NpcSizeSource.BodyMesh, farAway, null),
             new NpcBody(NpcSizeSource.BodyMesh, evenFartherAway, null)]);
         var scratch = new NpcScratch();
@@ -128,7 +128,7 @@ public class NpcStuckTestTests
     {
         var besideThePlatform = new Box(new Vector3(60, -5, 0), new Vector3(70, 5, 80));
         var sinksIntoThePlatform = NpcBodyBox;
-        var bodies = TooCloseObjects.NpcBodyRules.DistinctBodies([
+        var bodies = NpcCacheRules.Bodies.DistinctBodies([
             new NpcBody(NpcSizeSource.BodyMesh, besideThePlatform, null),
             new NpcBody(NpcSizeSource.BodyMesh, sinksIntoThePlatform, null)]);
         var scratch = new NpcScratch();

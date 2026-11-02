@@ -22,7 +22,7 @@ public sealed class ChangedCellAndLandCollectingTests
     private const float BaseWaterHeight = -100f;
     private const float CleanedWaterHeight = 0f;
 
-    private static readonly WhatToCollect Plan = new(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false, AreaRecordVersions: new AreaRecordReads(new AreaPartTolerances(HeightTolerance, WaterHeightTolerance), Cells: true, Lands: true));
+    private static readonly WhatToCollect Plan = new(new ScanNeeds(AreaRecordVersions: new AreaRecordReads(new AreaPartTolerances(HeightTolerance, WaterHeightTolerance), Cells: true, Lands: true)), SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false);
     private static readonly PluginName Patch = FixturePatcherState.PatchModKey.ToPluginName();
     private static readonly FormKey FirstRegion = FormKey.Factory("000C00:Base.esm");
     private static readonly FormKey SecondRegion = FormKey.Factory("000C01:Base.esm");
@@ -220,7 +220,7 @@ public sealed class ChangedCellAndLandCollectingTests
         ChangedInCleanedMod(CellPart.Music);
         RaisePoint(LandCopyIn(_cleaned.Mod), LastColumn, 10, steps: 2);
 
-        var collected = Collect(plan: Plan with { AreaRecordVersions = null });
+        var collected = Collect(plan: Plan with { Needs = Plan.Needs with { AreaRecordVersions = null } });
 
         Assert.Empty(collected.ChangedCells);
         Assert.Empty(collected.ChangedLands);
@@ -234,7 +234,7 @@ public sealed class ChangedCellAndLandCollectingTests
         ChangedInCleanedMod(CellPart.Music);
         RaisePoint(LandCopyIn(_cleaned.Mod), LastColumn, 10, steps: 2);
 
-        var collected = Collect(plan: Plan with { AreaRecordVersions = Plan.AreaRecordVersions! with { Cells = cells, Lands = lands } });
+        var collected = Collect(plan: Plan with { Needs = Plan.Needs with { AreaRecordVersions = Plan.Needs.AreaRecordVersions! with { Cells = cells, Lands = lands } } });
 
         Assert.Equal((cells, lands), (collected.ChangedCells.Length == 1, collected.ChangedLands.Length == 1));
     }
@@ -600,7 +600,7 @@ public sealed class ChangedCellAndLandCollectingTests
         var collected = PlacedObjects.Collect(records, TestModTrust.Of(Cleaned, Patch, trusted: [BaseGame, Later], untrusted: []), Plan);
         var protection = ObjectsToKeep.Build(collected.Targets, [], TestTargets.References(collected.Targets.Length), TestBaseFacts.Unresolved);
         var final = RemovalDecisions.Start(protection, [.. collected.Targets.Select(_ => (WhenRemoved)new WhenRemoved.Disable())]);
-        PatchWriter.Write(new(final, collected.Targets, OtherModsObjectsResult.SwitchedOff, judge(collected), records, new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod)));
+        PatchWriter.Write(new(final, collected.Targets, OtherModsObjectsResult.SwitchedOff, judge(collected), records, new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod, Program.PatchMarkerText)));
         return state.PatchMod;
     }
 

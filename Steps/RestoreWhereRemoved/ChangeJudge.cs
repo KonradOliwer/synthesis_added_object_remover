@@ -26,15 +26,16 @@ internal sealed class ChangeJudge(
     public PlacedChangeJudged Placed(RecordChangedByCleanedMod change)
     {
         var kind = KindOf(change);
+        EulerPlacement? placedBack = change.Target is { } restoredTarget ? targets[restoredTarget.Index].RestoredAs(change.Earlier).Placement : null;
         if (NeverRestored(change.WinningMod, change.LinkedFromCleanedMod, change.InDeletedCell) is { } never)
         {
-            return new PlacedChangeJudged(change, never, OldPlace: null, WhereItIsNow: null, Refused: null, IsRestored: false, kind, KeptForArea: null);
+            return new PlacedChangeJudged(change, never, OldPlace: null, WhereItIsNow: null, Refused: null, IsRestored: false, kind, KeptForArea: null, placedBack);
         }
 
         var oldPlace = areas.Judge(change.SpaceKey, change.Earlier.Placement.Position);
         var whereItIsNow = change.Target is { } target ? areas.Judge(change.SpaceKey, targets[target.Index].Transform.Position) : null;
         var keptForArea = VerdictKeeping(whereItIsNow is null ? [oldPlace.Verdict] : [oldPlace.Verdict, whereItIsNow.Verdict]);
-        return new PlacedChangeJudged(change, Never: null, oldPlace, whereItIsNow, Refused: null, IsRestored: keptForArea is null, kind, keptForArea);
+        return new PlacedChangeJudged(change, Never: null, oldPlace, whereItIsNow, Refused: null, IsRestored: keptForArea is null, kind, keptForArea, placedBack);
     }
 
     /// <summary>What a placed record's restore puts back, by the first of its undone parts in the order of <see cref="PlacedRestoreKind"/>.</summary>
@@ -80,7 +81,7 @@ internal sealed class ChangeJudge(
             land,
             Never: null,
             [
-                .. Enumerable.Range(0, TerrainQuadrants.PerSide * TerrainQuadrants.PerSide)
+                .. Enumerable.Range(0, TerrainQuadrants.Count)
                     .Select(quarter => TerrainQuadrants.CentreOf(land.Cell.X, land.Cell.Y, quarter))
                     .Select(centre => Quarter([.. spaces.Select(space => areas.Judge(space, new Vector3(centre, 0f)))])),
             ]);
@@ -98,7 +99,7 @@ internal sealed class ChangeJudge(
             return new NavmeshChangeJudged(navmesh, never, Area: null, Undo: null, KeptForArea: null, NothingGoesBack: false);
         }
 
-        var shape = navmesh.Case is NavmeshCase.DeletedWithoutReplacement or NavmeshCase.DeletedAndReplaced ? navmesh.Earlier : navmesh.Current;
+        var shape = navmesh.Case == NavmeshCase.Deleted ? navmesh.Earlier : navmesh.Current;
         if (shape is not { Vertices.IsEmpty: false } judged) return new NavmeshChangeJudged(navmesh, Never: null, Area: null, Undo: null, KeptForArea: null, NothingGoesBack: true);
         var (min, max) = (judged.Vertices.Aggregate(Vector3.Min), judged.Vertices.Aggregate(Vector3.Max));
         var area = areas.Judge(navmesh.SpaceKey, Vector3.Lerp(min, max, Halfway));

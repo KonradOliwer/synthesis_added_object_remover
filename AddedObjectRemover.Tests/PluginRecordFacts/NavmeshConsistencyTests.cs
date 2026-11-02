@@ -26,7 +26,7 @@ public sealed class NavmeshConsistencyTests
     private static readonly NavmeshPlace Cell = new(Worldspace, new CellGridPoint(0, 0));
 
     private readonly TestWorld _world = new();
-    private readonly HashSet<RecordKey> _broughtBack = [];
+    private readonly HashSet<RecordKey> _copiedFromEarlier = [];
     private readonly HashSet<RecordKey> _doorsThatDoNotStand = [];
 
     public NavmeshConsistencyTests()
@@ -195,7 +195,7 @@ public sealed class NavmeshConsistencyTests
     [Fact]
     public void ADoorTriangleBroughtBackNamingADoorThatDoesNotStandBreaksTheDoors()
     {
-        _broughtBack.Add(West);
+        _copiedFromEarlier.Add(West);
         _doorsThatDoNotStand.Add(Door);
 
         AssertFault(new NavmeshFault(West, NavmeshRule.Doors, NavmeshFaultKind.DoorDoesNotStand, DoorTriangle, Door));
@@ -292,7 +292,7 @@ public sealed class NavmeshConsistencyTests
         AssertFault(expected, named: [East, West]);
     }
 
-    private NavmeshFault? FirstFault(params RecordKey[] named) => NavmeshConsistency.FirstFault(_world, named, _broughtBack, _doorsThatDoNotStand);
+    private NavmeshFault? FirstFault(params RecordKey[] named) => NavmeshConsistency.FirstFault(_world, named, _copiedFromEarlier, _doorsThatDoNotStand);
 
     private void AssertFault(NavmeshFault expected, params RecordKey[] named) => Assert.Equal(expected, FirstFault(named.Length == 0 ? [West] : named));
 

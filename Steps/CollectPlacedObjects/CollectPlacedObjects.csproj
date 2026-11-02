@@ -14,7 +14,9 @@
     <ProjectReference Include="..\..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
     <ProjectReference Include="..\..\Tools\BoxSpatialIndex\BoxSpatialIndex.csproj" />
     <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
+    <ProjectReference Include="..\..\Tools\TimingAndDisposal\TimingAndDisposal.csproj" />
     <ProjectReference Include="..\..\Tools\DenseIdTables\DenseIdTables.csproj" />
+    <ProjectReference Include="..\..\Tools\TriangleMeshTests\TriangleMeshTests.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />

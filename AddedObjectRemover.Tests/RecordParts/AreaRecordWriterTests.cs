@@ -281,7 +281,7 @@ public sealed class AreaRecordWriterTests
         laterMap.MapInfos.Add(Entry(_later.NextKey(), z: 0f));
         var order = new WriteNavmeshMapEntries(
             _map.FormKey.ToRecordKey(),
-            [new NavmeshEntryOrder(added.ToRecordKey(), Cleaned, RemovalConvention.SunkNavmeshZ), new NavmeshEntryOrder(NavmeshKey, BaseGame, SetZ: null)]);
+            [new NavmeshEntryOrder(added.ToRecordKey(), Cleaned, RemovalConvention.SunkNavmeshZ), new NavmeshEntryOrder(NavmeshKey, BaseGame, FlattenAndDetachZ: null)]);
 
         var map = Assert.Single(Write(MapHandles(cleanedMap, laterMap), order).EnumerateMajorRecords<INavigationMeshInfoMapGetter>());
 
@@ -321,8 +321,8 @@ public sealed class AreaRecordWriterTests
 
         var map = Assert.Single(Write(
             MapHandles(cleanedMap),
-            new WriteNavmeshMapEntries(mapKey, [new NavmeshEntryOrder(added.ToRecordKey(), Cleaned, SetZ: null)]),
-            new WriteNavmeshMapEntries(mapKey, [new NavmeshEntryOrder(NavmeshKey, BaseGame, SetZ: null)])).EnumerateMajorRecords<INavigationMeshInfoMapGetter>());
+            new WriteNavmeshMapEntries(mapKey, [new NavmeshEntryOrder(added.ToRecordKey(), Cleaned, FlattenAndDetachZ: null)]),
+            new WriteNavmeshMapEntries(mapKey, [new NavmeshEntryOrder(NavmeshKey, BaseGame, FlattenAndDetachZ: null)])).EnumerateMajorRecords<INavigationMeshInfoMapGetter>());
 
         Assert.Equal([_navmesh.FormKey, added], map.MapInfos.Select(entry => entry.NavigationMesh.FormKey));
     }
@@ -374,7 +374,7 @@ public sealed class AreaRecordWriterTests
         List<IMajorRecordGetter> inputs = [.. new[] { _base.Mod, _cleaned.Mod, _later.Mod }.SelectMany(mod => mod.EnumerateMajorRecords())];
         var before = inputs.Select(record => record.DeepCopy()).ToList();
         var state = FixturePatcherState.Create([_base.Mod, _cleaned.Mod, _later.Mod], Path.GetTempPath(), Path.GetTempPath());
-        new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod).Write(handles, orders);
+        new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod, Program.PatchMarkerText).Write(handles, orders);
         Assert.All(inputs.Zip(before), input => Assert.True(input.First.Equals(input.Second), $"Input record {input.First.FormKey} was changed by the writing."));
         return state.PatchMod;
     }

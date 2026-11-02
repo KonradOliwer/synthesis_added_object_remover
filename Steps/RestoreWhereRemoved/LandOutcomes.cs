@@ -7,8 +7,6 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 /// <summary>What became of a LAND record once its plan is final: in each quarter holding a change, and for the rest of the record.</summary>
 internal static class LandOutcomes
 {
-    private const int Quarters = TerrainQuadrants.PerSide * TerrainQuadrants.PerSide;
-
     /// <summary>A LAND record a never-rule keeps whole.</summary>
     public static LandChangeJudged NeverRestored(LandChangedByCleanedMod change, NeverRestoredReason never)
     {
@@ -70,7 +68,7 @@ internal static class LandOutcomes
         var keptPerQuarter = kept.Select(entry => (entry.Reason, Counts: TerrainQuadrants.CountPerQuadrant(entry.Points.Points))).ToList();
         return
         [
-            .. Enumerable.Range(0, Quarters)
+            .. Enumerable.Range(0, TerrainQuadrants.Count)
                 .Select(quarter => (
                     Quarter: quarter,
                     Judged: quarters.IsEmpty ? null : quarters[quarter],

@@ -6,7 +6,7 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 
 /// <summary>
 /// The grid points the terrain plan keeps for what stays besides the cleaned mod's objects: the objects of other plugins placed for
-/// the ground as it is (G2), and the navmeshes lying on the ground as it is where they would not lie on the ground that goes back (G3).
+/// the ground as it is, and the navmeshes lying on the ground as it is where they would not lie on the ground that goes back.
 /// Thread-safe.
 /// </summary>
 /// <param name="listOtherObjects">
@@ -32,7 +32,7 @@ internal sealed class TerrainGuards(
         new(() => IndexByCell(listOtherObjects(), ground, execution));
 
     /// <summary>
-    /// G2: the points under each object that stands in the final world and some of whose ground would go back, when its bottom lies as
+    /// The points under each object that stands in the final world and some of whose ground would go back, when its bottom lies as
     /// close to the lowest ground under it as it is as to the lowest ground once written, or closer: it was placed for the ground as it
     /// is. In key order of the objects.
     /// </summary>
@@ -48,7 +48,7 @@ internal sealed class TerrainGuards(
     }
 
     /// <summary>
-    /// G3: every record's point at each world grid point that would go back where a navmesh as it will stand lies within the height
+    /// Every record's point at each world grid point that would go back where a navmesh as it will stand lies within the height
     /// tolerance of the ground as it is but not of the ground once written, in the order of the points.
     /// </summary>
     public IEnumerable<LandGridPoint> UnderNavmeshesOnTheGroundAsItIs(TerrainUndoPlan plan, NavmeshesAsTheyWillStand navmeshes)

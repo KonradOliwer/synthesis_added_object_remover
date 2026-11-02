@@ -36,14 +36,14 @@ internal sealed class AlsoRemoveFollowUp(RestingObjects.FollowUpInput input) : I
     /// <remarks>Stopped by its first pass, the follow-ups count as stopped; stopped later, they keep the passes before.</remarks>
     public RestingObjectsResult Summarize(IRemovalDecisions final)
     {
-        if (Settings.Mode == FollowUpRemovalMode.Nothing) return RestingObjects.WithoutRounds(StepOutcome.SwitchedOff, Settings.Mode, hadSeeds: false, failure: null);
+        if (Settings.Mode == FollowUpRemovalMode.Nothing) return RestingRounds.WithoutRounds(StepOutcome.SwitchedOff, Settings.Mode, hadSeeds: false, failure: null);
         if (_passes.Count == 0)
         {
             var outcome = _failure is null ? StepOutcome.Performed : StepOutcome.StoppedByUnexpectedError;
-            return RestingObjects.WithoutRounds(outcome, Settings.Mode, hadSeeds: false, _failure);
+            return RestingRounds.WithoutRounds(outcome, Settings.Mode, hadSeeds: false, _failure);
         }
 
-        var result = RestingObjects.SummarizeSeededRounds(
+        var result = RestingRounds.SummarizeSeededRounds(
             Settings.Mode,
             [.. _passes.SelectMany(pass => pass.SeedRounds)],
             [.. _passes.SelectMany(pass => pass.Rounds)],
@@ -53,26 +53,23 @@ internal sealed class AlsoRemoveFollowUp(RestingObjects.FollowUpInput input) : I
             RoundsTime = _passes.Aggregate(TimeSpan.Zero, (sum, pass) => sum + pass.Time),
             Failure = _failure,
         };
-        return RestingObjects.WithTouchChains(result, Settings, () => FindTouchChains(final, result.Evidence));
+        return RestingRounds.WithTouchChains(result, Settings, () => FindTouchChains(final, result.Evidence));
     }
 
     /// <remarks>The objects of any plugin are asked only when the support rounds have seeds.</remarks>
     private DecidedPass DecidePass(IRemovalDecisions decided, ImmutableArray<TargetId> seeds)
     {
-        var ((decisions, roundProposals), time) = RestingObjects.TimeRounds(
-            _rule is null && RestingObjects.ReadsObjectsOfAnyPlugin(Settings.Mode),
+        var ((decisions, roundProposals), time) = RestingRounds.TimeRounds(
+            _rule is null && RestingRounds.ReadsObjectsOfAnyPlugin(Settings.Mode),
             input.Caches.VisibleObjectsOfAnyPlugin,
             input.TimeSinceStart,
-            objects => decided.WorkingCopy().DecideRoundsUntilNothingRemoved(RuleFor(decided, objects).Rounds, seeds));
+            objects => decided.WorkingCopy().DecideRoundsUntilNothingRemoved(AlsoRemoveRounds.Opening, RuleFor(decided, objects).Rounds, seeds));
         return new DecidedPass(seeds, SeedRoundsOf(decided, seeds), decisions.RoundsAfter(decided), roundProposals, time);
     }
 
-    private SpreadRule RuleFor(IRemovalDecisions decided, IVisibleObjectsOfAnyPlugin? objects)
-    {
-        var caches = input.Caches;
-        return _rule ??= RestingObjects.PrepareFrom(
-            decided, new RoundsInput(input.Targets, objects, caches.Shapes, caches.Triangles, caches.SurfaceSamples, caches.Terrain, input.Execution), Settings);
-    }
+    private SpreadRule RuleFor(IRemovalDecisions decided, IVisibleObjectsOfAnyPlugin? objects) =>
+        _rule ??= RestingRounds.PrepareFrom(
+            decided, RoundsInput.From(input.Decisions.TargetsAsTheRoundsMeasureThem(input.Targets), objects, input.Caches, input.Execution), Settings);
 
     /// <returns>The pass's proposals.</returns>
     private FollowUpPass RecordPass(DecidedPass pass)

@@ -14,19 +14,38 @@ internal sealed class VisibleObjectsOfAnyPluginAsTheyStand(
     IObjectsOfAnyPluginBySpace objectsOfAnyPlugin, IReadOnlyDictionary<OtherId, OtherObject?> changed, IBaseObjectShapes shapes, ObjectContainment containment)
     : IVisibleObjectsOfAnyPlugin
 {
-    public void Overlapping(RecordKey space, Box area, ObjectQueryScratch scratch, List<OtherId> into)
-    {
-        var index = objectsOfAnyPlugin.IndexOf(space);
-        index.Bounds.Overlapping(area, slot => index.IsVisible(slot) && IsUnchanged(index[slot]), scratch.Spatial, scratch.Matches);
-        Collect(scratch.Matches.Select(slot => index[slot].Id), MovedIn(space).Where(moved => BoxOf(moved).WorldAabb(0f).Overlaps(area)), into);
-    }
+    public void Overlapping(RecordKey space, Box area, ObjectQueryScratch scratch, List<OtherId> into) =>
+        CollectVisible(
+            space, area, area,
+            static (_, _, _) => true,
+            static (movedBox, searchBox) => movedBox.WorldAabb(0f).Overlaps(searchBox),
+            scratch, into);
 
-    public void Touching(RecordKey space, OrientedBox box, float distance, ObjectQueryScratch scratch, List<OtherId> into)
+    public void Touching(RecordKey space, OrientedBox box, float distance, ObjectQueryScratch scratch, List<OtherId> into) =>
+        CollectVisible(
+            space, box.WorldAabb(distance), (box, distance),
+            static (index, slot, state) => state.box.Intersects(index.OrientedBoxOf(slot), state.distance),
+            static (movedBox, state) => state.box.Intersects(movedBox, state.distance),
+            scratch, into);
+
+    /// <summary>
+    /// Replaces <paramref name="into"/> with the ids, ascending, of the visible objects that pass the tests: an unchanged one when its bounds overlap
+    /// <paramref name="searchBox"/> and <paramref name="unchangedMatches"/> holds, a moved one when <paramref name="movedMatches"/> holds for its box where it stands now.
+    /// The tests take the caller's state, so they can be static lambdas.
+    /// </summary>
+    private void CollectVisible<TState>(
+        RecordKey space, Box searchBox, TState state, Func<IOtherObjectIndex, int, TState, bool> unchangedMatches, Func<OrientedBox, TState, bool> movedMatches,
+        ObjectQueryScratch scratch, List<OtherId> into)
     {
         var index = objectsOfAnyPlugin.IndexOf(space);
-        index.Bounds.Overlapping(
-            box.WorldAabb(distance), slot => index.IsVisible(slot) && IsUnchanged(index[slot]) && box.Intersects(index.OrientedBoxOf(slot), distance), scratch.Spatial, scratch.Matches);
-        Collect(scratch.Matches.Select(slot => index[slot].Id), MovedIn(space).Where(moved => box.Intersects(BoxOf(moved), distance)), into);
+        index.Bounds.Overlapping(searchBox, slot => index.IsVisible(slot) && IsUnchanged(index[slot]) && unchangedMatches(index, slot, state), scratch.Spatial, scratch.Matches);
+        into.Clear();
+        foreach (var slot in scratch.Matches) into.Add(index[slot].Id);
+        foreach (var moved in changed.Values)
+        {
+            if (moved is { } standing && standing.SpaceKey == space && movedMatches(BoxOf(standing), state)) into.Add(standing.Id);
+        }
+        into.Sort();
     }
 
     public bool Contains(RecordKey space, Vector3 point, ObjectQueryScratch scratch) =>
@@ -40,12 +59,4 @@ internal sealed class VisibleObjectsOfAnyPluginAsTheyStand(
     private IEnumerable<OtherObject> MovedIn(RecordKey space) => changed.Values.OfType<OtherObject>().Where(moved => moved.SpaceKey == space);
 
     private OrientedBox BoxOf(OtherObject other) => OrientedBox.FromLocal(shapes.Of(other.Base).Box, other.Transform);
-
-    /// <summary>Replaces <paramref name="into"/> with both lists' ids in ascending order.</summary>
-    private static void Collect(IEnumerable<OtherId> unchanged, IEnumerable<OtherObject> moved, List<OtherId> into)
-    {
-        List<OtherId> found = [.. unchanged, .. moved.Select(other => other.Id)];
-        into.Clear();
-        into.AddRange(found.OrderBy(id => id.Index));
-    }
 }

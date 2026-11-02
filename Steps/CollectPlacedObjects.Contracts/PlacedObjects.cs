@@ -54,36 +54,29 @@ public sealed record TargetObject(
     /// The same object with the parts that go back taken from its earlier version: the position, rotation and scale each, and with
     /// the base and data also the base object and what the version says about the reference itself. Every other part stays as it is.
     /// </summary>
-    public TargetObject RestoredAs(EarlierVersion earlier)
-    {
-        var undo = earlier.Undo;
-        var restored = PlacedAt(new EulerPlacement(
-            undo.HasFlag(PlacedParts.Position) ? earlier.Placement.Position : Transform.Position,
-            undo.HasFlag(PlacedParts.Rotation) ? earlier.Placement.Rotation : Rotation,
-            undo.HasFlag(PlacedParts.Scale) ? earlier.Placement.Scale : Transform.Scale));
-        if (!undo.HasFlag(PlacedParts.BaseAndData)) return restored;
-
-        var reference = earlier.Reference;
-        return restored with
-        {
-            Base = earlier.Base,
-            IsTeleportDoor = reference.IsTeleportDoor,
-            IsPrimitive = reference.IsPrimitive,
-            HasMapMarker = reference.HasMapMarker,
-            ReferenceRadius = reference.ReferenceRadius,
-            PrimitiveBounds = reference.PrimitiveBounds,
-            CollisionLayer = reference.CollisionLayer,
-            IsCullingVolume = reference.IsCullingVolume,
-        };
-    }
+    public TargetObject RestoredAs(EarlierVersion earlier) =>
+        (earlier.Undo.HasFlag(PlacedParts.BaseAndData)
+            ? this with
+            {
+                Base = earlier.Base,
+                IsTeleportDoor = earlier.Reference.IsTeleportDoor,
+                IsPrimitive = earlier.Reference.IsPrimitive,
+                HasMapMarker = earlier.Reference.HasMapMarker,
+                ReferenceRadius = earlier.Reference.ReferenceRadius,
+                PrimitiveBounds = earlier.Reference.PrimitiveBounds,
+                CollisionLayer = earlier.Reference.CollisionLayer,
+                IsCullingVolume = earlier.Reference.IsCullingVolume,
+            }
+            : this)
+        .PlacedAt(new EulerPlacement(
+            earlier.Undo.HasFlag(PlacedParts.Position) ? earlier.Placement.Position : Transform.Position,
+            earlier.Undo.HasFlag(PlacedParts.Rotation) ? earlier.Placement.Rotation : Rotation,
+            earlier.Undo.HasFlag(PlacedParts.Scale) ? earlier.Placement.Scale : Transform.Scale));
 
     /// <summary>The same object where it stands, as an object of <paramref name="changingMod"/> that has no accepted version and no role.</summary>
-    public OtherObject AsOtherObject(OtherId id, PluginName changingMod)
-    {
-        var change = new ObjectChange(changingMod, AcceptedFrom: null);
-        return new OtherObject(
-            id, Key, SpaceKey, changingMod, EditorId, Base, Transform.Position, Rotation, Transform.Scale, IsPrimitive, HasMapMarker, change, ReferenceRoles.None, change);
-    }
+    public OtherObject AsOtherObject(OtherId id, PluginName changingMod) =>
+        new(id, Key, SpaceKey, changingMod, EditorId, Base, Transform.Position, Rotation, Transform.Scale, IsPrimitive, HasMapMarker,
+            new ObjectChange(changingMod, AcceptedFrom: null), ReferenceRoles.None, new ObjectChange(changingMod, AcceptedFrom: null));
 }
 
 /// <summary>Where a target object comes from. <see cref="CleanedMod"/> is the only origin of the target plugin's own objects.</summary>

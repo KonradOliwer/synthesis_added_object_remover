@@ -88,7 +88,7 @@ public class TrustRunTests
     private static SkyrimMod CreateCompatibilityPatch(FixtureMod baseGame, FixtureMod target, FixtureMod city, bool carriesMarker)
     {
         var patch = new FixtureMod(CompatibilityPatchPlugin, baseGame, target, city).Mod;
-        if (carriesMarker) patch.ModHeader.Description = PatchMarker.Text;
+        if (carriesMarker) patch.ModHeader.Description = Program.PatchMarkerText;
         return patch;
     }
 }

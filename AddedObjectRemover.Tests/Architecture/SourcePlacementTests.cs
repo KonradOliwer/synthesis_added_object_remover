@@ -58,12 +58,12 @@ public class SourcePlacementTests
         ["Tools/PluginRecordReadingAndWriting/PlacedOverrideWriter.cs"] = "Writes a deleted record back whole when its presence part goes back; it decides nothing about whether the game has it.",
         ["Steps/BuildLogAndReports/Tables.Restored.cs"] = "Names the presence part in the report; it decides nothing about whether the game has the record.",
         ["Steps/BuildLogAndReports/RestoreOutcomes.cs"] = "Names a navmesh's existence part in the report, not a placed record's presence.",
-        ["Steps/RestoreWhereRemoved/ChangeJudge.cs"] = "Names a restored record shown or hidden again when its presence part goes back; it decides nothing about whether the game has the record.",
+        ["Steps/RestoreWhereRemoved/ChangeJudge.cs"] = "Reads the removed flag of the presence before the cleaned mod, to name a restored record as shown or hidden again when its presence part goes back; it decides nothing about whether the game has the record.",
         ["Tools/PluginRecordReadingAndWriting/NavmeshPartComparison.cs"] = "Compares a navmesh's Deleted flag across its versions, not a placed record's presence.",
         ["Tools/PluginRecordReadingAndWriting/NavmeshVersionCollector.cs"] = "Compares the Deleted flag of a navmesh's versions, not a placed record's presence.",
         ["Steps/RestoreWhereRemoved/NavmeshUndoPlan.cs"] = "Reads the judged Deleted flag of a navmesh, not a placed record's presence.",
         ["Steps/RestoreWhereRemoved/NavmeshGroupGuards.cs"] = "Reads the judged Deleted flag of a navmesh, and whether a later plugin changed a linked door's presence part; it decides nothing about whether the game has the door.",
-        ["Steps/RestoreWhereRemoved/FinalPresence.cs"] = "Reads whether a restore brings back a record's presence part; whether the game has a version comes from the collector's presence rule, which it follows along the enable parents.",
+        ["Steps/RestoreWhereRemoved/FinalPresence.cs"] = "Walks the enable-parent chain itself over the collector's winning presence of each placed record, to tell which records end removed once the run's orders and the restore are applied; it reads no record, only the presence facts the collector took.",
         ["Steps/CollectPlacedObjects.Contracts/EarlierVersion.cs"] = "Reads whether a restore brings back the presence part, which puts the record back into its earlier child list; it decides nothing about whether the game has the record.",
         ["Steps/RestoreWhereRemoved/DoorLinks.cs"] ="Reads whether a door's restore brings back its presence part, which its navmesh link goes back with; it decides nothing about whether the game has the door.",
     };
@@ -75,14 +75,28 @@ public class SourcePlacementTests
 
     private static readonly string[] DecisionListProjects = ["RemovalDecisionList", "RemovalDecisionList.Contracts"];
 
+    /// <summary>Only the steps and the run can reach the run's decisions; a tool's call of the same name is on another type.</summary>
+    private static readonly string[] DecisionHoldingFolders = ["Steps", "Run"];
+
     private static readonly string[] DecidingStepInputs =
     [
         "ChangedTerrainObjects.Input", "ClashingObjectFitter.Input", "LeftBehindObjects.Input", "MarkerMovePlanner.Input", "OtherModsObjects.Input",
         "RestingObjects.Input", "TooCloseObjects.Input", "VisibleLeftBehindObjects.Input",
     ];
 
-    private const BindingFlags DeclaredMembers = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+    /// <summary>The step entry of each step that adds to the run's decisions, "Type.Method".</summary>
+    private static readonly string[] DecidingStepEntries =
+    [
+        "ChangedTerrainObjects.Find", "ClashingObjectFitter.Fit", "LeftBehindObjects.Find", "MarkerMovePlanner.Plan", "OtherModsObjects.Settle",
+        "RestingObjects.Find", "TooCloseObjects.Find", "VisibleLeftBehindObjects.Find",
+    ];
+
+    private const string FailuresType = "Failures";
+    private const string AttemptMethod = "Attempt";
+
+    private const BindingFlags DeclaredMembers =BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
     private const string StepsNamespace = "AddedObjectRemover.Steps.";
+    private const string RunnerNamespace = "AddedObjectRemover.Run.RunAllSteps";
     private const string InputRecordName = "Input";
     private const string RecordCloneMethod = "<Clone>$";
     private const string DeconstructMethod = "Deconstruct";
@@ -116,15 +130,21 @@ public class SourcePlacementTests
             ["Tools/PluginRecordReadingAndWriting/PatchWriting.cs", "Tools/PluginRecordReadingAndWriting/CellOverrides.cs", "Tools/PluginRecordReadingAndWriting/NavmeshMapWriter.cs"]);
 
     /// <summary>
-    /// Whether the game has a placed record is decided once, by the collector's presence rule, from the presence facts the
-    /// reader takes from the record's final version; the patch writing writes the same convention.
+    /// Whether the game has a placed record is decided by the collector's presence rule, from the presence facts the reader takes
+    /// from the record's final version; the patch writing writes the same convention. The restore step derives it again over those
+    /// facts once the run's orders are applied (listed in <see cref="PresenceExceptions"/>).
     /// </summary>
     [Fact]
     public void OnlyTheCollectorAndThePatchWritingReadThePresenceOfPlacedRecords() =>
         PlacementCheck.AssertUsedOnlyIn(
-            file => Regex.IsMatch(file.Code, @"\.Presence\b|\bPresenceFacts\b|\bEnableParentFact\b|(?<!RelationKind)\.EnableParent\b|\bGetEnableParent\(|\bIsInitiallyDisabled\("),
+            file => Regex.IsMatch(
+                file.Code,
+                @"\.Presence\b|\bPresenceFacts\b|\bEnableParentFact\b|(?<!RelationKind)\.EnableParent\b|\bGetEnableParent\(|\bIsInitiallyDisabled\(|\bPlacedPresence\b|\bWinningPresence\b|\bPresenceBefore\b"),
             [
                 "Steps/CollectPlacedObjects", "Steps/WriteThePatch", "Steps/WriteThePatch.Contracts",
+                "Steps/CollectPlacedObjects.Contracts/PlacedPresence.cs",
+                "Steps/CollectPlacedObjects.Contracts/CollectedObjects.cs",
+                "Steps/CollectPlacedObjects.Contracts/RecordChangedByCleanedMod.cs",
                 "Tools/PluginRecordFacts/PlacementFacts.cs",
                 "Tools/PluginRecordReadingAndWriting/PlacedRecordReader.cs",
                 "Tools/PluginRecordReadingAndWriting/PlacedRecordExtensions.cs",
@@ -147,8 +167,8 @@ public class SourcePlacementTests
         PlacementCheck.AssertUsedOnlyIn(UsesNamespace("NetTopologySuite"), ["Tools/FlatAreaNearestPoint"]);
 
     [Fact]
-    public void NewtonsoftIsUsedOnlyInTheSettingsReading() =>
-        PlacementCheck.AssertUsedOnlyIn(UsesNamespace("Newtonsoft"), ["Run/RunSettingsReading"], NewtonsoftExceptions);
+    public void NewtonsoftIsUsedOnlyInTheSettingsReadingAndTheJsonFileTool() =>
+        PlacementCheck.AssertUsedOnlyIn(UsesNamespace("Newtonsoft"), ["Run/RunSettingsReading", "Tools/JsonSettingsFiles"], NewtonsoftExceptions);
 
     [Fact]
     public void OnlyTheRunnerTheEntryAndTheCsvWritingReadTheClock() =>
@@ -170,10 +190,12 @@ public class SourcePlacementTests
 
     /// <summary>
     /// Only what holds an <see cref="IRunDecisions"/> can add rounds or moves to the run's decisions. Outside the decision list and its
-    /// contracts, neither it nor a type that implements it is the type, or part of the type, of a field, a property or a method or
+    /// contracts, neither it nor a type that implements it nor a type that carries it (such as <c>Decided&lt;T&gt;</c>) is the type, or part
+    /// of the type, of a field, a property or a method or
     /// constructor parameter, except a property of a step's nested Input record, with the constructor, Deconstruct and accessor
     /// parameters and the backing field the compiler writes for it. Locals, lambdas, local functions and return types are not checked. The
-    /// step Input records that hold the decisions are listed, so the check cannot pass by finding none.
+    /// step Input records that hold the decisions are listed, so the check cannot pass by finding none. The runner may take the carrier,
+    /// because it hands each step's result on to the next step, but never the decisions themselves.
     /// </summary>
     [Fact]
     public void OnlyTheInputRecordsOfTheDecidingStepsHoldTheRunsDecisions()
@@ -212,19 +234,61 @@ public class SourcePlacementTests
     private static IEnumerable<string> FindDecisionHolders(Type type)
     {
         var isInput = IsStepInputRecord(type);
+        var holds = HoldsDecisionsAs(type);
         var fields = type.GetFields(DeclaredMembers)
-            .Where(field => HoldsDecisions(field.FieldType) && !(isInput && field.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false)))
+            .Where(field => holds(field.FieldType) && !(isInput && field.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false)))
             .Select(field => $"field {field.Name}");
         var properties = type.GetProperties(DeclaredMembers)
-            .Where(property => HoldsDecisions(property.PropertyType) && !isInput)
+            .Where(property => holds(property.PropertyType) && !isInput)
             .Select(property => $"property {property.Name}");
         var parameters = type.GetMethods(DeclaredMembers).Where(method => !IsNamedByTheCompiler(method)).Cast<MethodBase>().Concat(type.GetConstructors(DeclaredMembers))
             .Where(method => !(isInput && IsWrittenForPositionalProperties(method)))
-            .SelectMany(method => method.GetParameters().Where(parameter => HoldsDecisions(parameter.ParameterType)).Select(parameter => $"parameter {parameter.Name} of {method.Name}"));
+            .SelectMany(method => method.GetParameters().Where(parameter => holds(parameter.ParameterType)).Select(parameter => $"parameter {parameter.Name} of {method.Name}"));
         return [.. fields, .. properties, .. parameters];
     }
 
-    private static bool HoldsDecisions(Type type) => BusinessCode.Mentions(type, typeof(IRunDecisions).IsAssignableFrom);
+    private static bool HoldsDecisions(Type type) => BusinessCode.Mentions(type, IsDecisionsOrCarrierOfDecisions);
+
+    /// <summary>The runner hands each step's <c>Decided</c> result on to the next step's input and adds nothing itself, so it may take the carrier but not the decisions.</summary>
+    private static Func<Type, bool> HoldsDecisionsAs(Type holder) =>
+        held => BusinessCode.Mentions(held, holder.Namespace == RunnerNamespace ? IsDecisions : IsDecisionsOrCarrierOfDecisions);
+
+    private static bool IsDecisions(Type type) => typeof(IRunDecisions).IsAssignableFrom(type);
+
+    private static bool IsDecisionsOrCarrierOfDecisions(Type type) => IsDecisions(type) || IsCarrierOfDecisions(type);
+
+    /// <summary>A type of the decision list's contracts with a property that is the run's decisions, such as <c>Decided&lt;TResult&gt;</c>; it carries them to whoever holds it.</summary>
+    private static bool IsCarrierOfDecisions(Type type) =>
+        type.Assembly == typeof(IRunDecisions).Assembly
+            && type.GetProperties(DeclaredMembers).Any(property => typeof(IRunDecisions).IsAssignableFrom(property.PropertyType));
+
+    /// <summary>
+    /// A call that adds rounds, fits or moves to the run's decisions sits in the step's entry (the method that returns the <c>Decided</c>
+    /// result), and outside <c>Failures.Attempt</c>, so a failure while adding is never taken for a failure of the step's own work. The
+    /// entries that add are listed, so the check cannot pass by finding none.
+    /// </summary>
+    [Fact]
+    public void EveryCallThatAddsToTheRunsDecisionsSitsInAStepEntryOutsideFailuresAttempt()
+    {
+        var addingNames = typeof(IRunDecisions).GetMethods().Select(method => method.Name).ToHashSet();
+        var members = WrittenMember.Of(SourceFile.All().Where(file => file.IsIn(DecisionHoldingFolders) && !DecisionListProjects.Contains(file.Project)));
+
+        var adders = members.Where(member => member.IndicesOfCallsTo(addingNames).Count > 0).ToList();
+        var wrong = adders.SelectMany(member => FindMisplacedAdditions(member, addingNames)).ToList();
+
+        Assert.True(wrong.Count == 0, $"Calls that add to the run's decisions outside a step entry or inside Failures.Attempt:{Environment.NewLine}{string.Join(Environment.NewLine, wrong)}");
+        Assert.Equal(DecidingStepEntries, adders.Select(member => member.Place).Order(StringComparer.Ordinal));
+    }
+
+    private static IEnumerable<string> FindMisplacedAdditions(WrittenMember member, IReadOnlyCollection<string> addingNames)
+    {
+        if (!member.ReturnsDecided) yield return $"{member.Place} ({member.Where}) adds to the decisions but does not return the Decided result";
+        var attempts = member.ArgumentRangesOfCallsTo(FailuresType, AttemptMethod);
+        foreach (var call in member.IndicesOfCallsTo(addingNames))
+        {
+            if (attempts.Any(attempt => attempt.Open < call && call < attempt.Close)) yield return $"{member.Place} ({member.Where}) adds to the decisions inside {FailuresType}.{AttemptMethod}";
+        }
+    }
 
     private static bool IsStepInputRecord(Type type) =>
         type.Name == InputRecordName

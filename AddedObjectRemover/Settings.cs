@@ -56,7 +56,7 @@ public class BatchSettings
 public class StandardSettings : ISettingsValues, ICollisionSettingsValues
 {
     [SynthesisOrder]
-    [SynthesisSettingName("Mod to clean up")]
+    [SynthesisSettingName(SettingNames.CleanedMod)]
     [SynthesisTooltip(
         "The cleaned mod: the plugin whose added objects are checked. Those that clash with other mods are removed in the patch, this Synthesis group's output plugin.\n"
         + "Nothing is deleted: a removed object is disabled; one that is not persistent is also moved below the world.\n"
@@ -70,28 +70,28 @@ public class StandardSettings : ISettingsValues, ICollisionSettingsValues
     public ModKey CleanedMod { get; set; } = ModKey.Null;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Other mods' objects the cleaned mod changed")]
+    [SynthesisSettingName(SettingNames.ChangedObjects)]
     [SynthesisTooltip(
         "The cleaned mod can override an object of the base game, of one of its masters or of another mod: move it, or give it another model.\n"
         + "These settings decide how such an object is checked and what happens when it would be removed. The cleaned mod's own objects are not affected.")]
     public OtherModsChangedObjectsSettings ChangedObjects { get; set; } = new();
 
     [SynthesisOrder]
-    [SynthesisSettingName("Which other mods can cause removals")]
+    [SynthesisSettingName(SettingNames.Trust)]
     [SynthesisTooltip(
         "Only untrusted mods' objects and terrain changes can remove the cleaned mod's objects.\n"
         + "Always trusted: the base game (Skyrim.esm, Update.esm and the three DLCs), the cleaned mod, and its masters (the plugins it requires).")]
     public TrustSettings Trust { get; set; } = new();
 
     [SynthesisOrder]
-    [SynthesisSettingName("Remove objects too close to other mods' objects")]
+    [SynthesisSettingName(SettingNames.TooClose)]
     [SynthesisTooltip(
         "The main check. An object of the cleaned mod is removed when an object from another mod comes within a margin around it.\n"
         + "Turn on one or both margins; an object caught by either is removed once. With both off, nothing is removed for being too close.")]
     public TooCloseRemovalSettings TooClose { get; set; } = new();
 
     [SynthesisOrder]
-    [SynthesisSettingName("Remove objects on terrain changed by other mods")]
+    [SynthesisSettingName(SettingNames.ChangedTerrain)]
     [SynthesisTooltip(
         "Removes an object of the cleaned mod when another mod changed the terrain under or around it: raised, lowered or flattened it,\n"
         + "changed the kind of ground (for example grass to road), or raised, lowered, added or removed the water there,\n"
@@ -102,7 +102,7 @@ public class StandardSettings : ISettingsValues, ICollisionSettingsValues
     public TerrainChangeSettings TerrainChange { get; set; } = new();
 
     [SynthesisOrder]
-    [SynthesisSettingName("Shrink or turn objects to make them fit")]
+    [SynthesisSettingName(SettingNames.ShrinkOrTurn)]
     [SynthesisTooltip(
         "An object of the cleaned mod that would be removed for being too close to another mod's object\n"
         + "is first tried shrunk or turned where it stands, when \"Shrink or turn objects that are too close\" is on. If it fits, it is kept that way; otherwise it is removed.\n"
@@ -115,28 +115,28 @@ public class StandardSettings : ISettingsValues, ICollisionSettingsValues
     public ShrinkOrTurnSettings ShrinkOrTurn { get; set; } = new();
 
     [SynthesisOrder]
-    [SynthesisSettingName("Also remove what rests on removed objects")]
+    [SynthesisSettingName(SettingNames.AlsoRemove)]
     [SynthesisTooltip(
         "When an object is removed by any removal step (too close, changed terrain, visible objects left behind), the cleaned mod's objects resting on it or touching it would be left floating. This removes them too.\n"
         + "Only the cleaned mod's own visible objects are removed this way; the last setting of this group decides about other mods' objects.")]
     public FollowUpRemovalSettings FollowUpRemoval { get; set; } = new();
 
     [SynthesisOrder]
-    [SynthesisSettingName("Visible objects left behind")]
+    [SynthesisSettingName(SettingNames.VisibleLeftBehind)]
     [SynthesisTooltip(
         "The cleaned mod's visible objects are removed when most of the cleaned mod's visible objects around them were removed by the other removal steps\n"
         + "(too close, changed terrain, also remove). Only the cleaned mod's objects, including other mods' objects it changed, count as surroundings.")]
     public LeftoverVisibleObjectSettings LeftoverVisibleObjects { get; set; } = new();
 
     [SynthesisOrder]
-    [SynthesisSettingName("Invisible objects left behind")]
+    [SynthesisSettingName(SettingNames.InvisibleLeftBehind)]
     [SynthesisTooltip(
         "The cleaned mod's sounds, lights, markers, spawners and similar invisible objects are removed when they end up inside\n"
         + "another mod's object (a building, a boulder) or when the visible objects around them were removed.")]
     public LeftoverInvisibleObjectSettings LeftoverInvisibleObjects { get; set; } = new();
 
     [SynthesisOrder]
-    [SynthesisSettingName("Restore what the cleaned mod changed where it was removed")]
+    [SynthesisSettingName(SettingNames.RestoreWhereRemoved)]
     [SynthesisTooltip(
         "Where the cleaned mod's objects were removed from an area, the area's other changes by the cleaned mod go back to how the game showed them without it:\n"
         + "other mods' objects it moved, turned, hid or replaced, the terrain, the cells' settings and the navmeshes.\n"

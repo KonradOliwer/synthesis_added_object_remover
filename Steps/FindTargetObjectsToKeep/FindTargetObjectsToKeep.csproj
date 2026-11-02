@@ -13,6 +13,7 @@
     <ProjectReference Include="..\..\Tools\PluginRecordFacts\PluginRecordFacts.csproj" />
     <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
     <ProjectReference Include="..\..\Tools\IndexGraphQueries\IndexGraphQueries.csproj" />
+    <ProjectReference Include="..\..\Tools\TimingAndDisposal\TimingAndDisposal.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />

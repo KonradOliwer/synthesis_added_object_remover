@@ -21,7 +21,7 @@ internal sealed record RecordVersions<TVersion>(ImmutableArray<PluginName> Plugi
 /// </summary>
 /// <typeparam name="TVersion">One version of the record as read.</typeparam>
 /// <typeparam name="TPlace">Where the winning version stands, as the caller needs it.</typeparam>
-internal sealed class TargetOverrideWalk<TVersion, TPlace>(PluginName target)
+internal sealed class NamedPluginOverrideWalk<TVersion, TPlace>(PluginName namedPlugin)
 {
     private readonly Dictionary<RecordKey, (TPlace Place, List<(PluginName Plugin, TVersion Version)> Versions)> _open = new();
     private readonly Dictionary<RecordKey, (TPlace Place, RecordVersions<TVersion> Versions)> _read = new();
@@ -40,9 +40,9 @@ internal sealed class TargetOverrideWalk<TVersion, TPlace>(PluginName target)
         var versions = open.Versions;
         if (versions.Count > 0 && versions[^1].Plugin == plugin) return;
 
-        var isBelowTarget = versions.Count > 0 && versions[^1].Plugin == target;
+        var isBelowNamedPlugin = versions.Count > 0 && versions[^1].Plugin == namedPlugin;
         versions.Add((plugin, version));
-        if (!isBelowTarget) return;
+        if (!isBelowNamedPlugin) return;
 
         _open.Remove(key);
         var lowestFirst = Enumerable.Reverse(versions).ToList();
@@ -55,9 +55,9 @@ internal sealed class TargetOverrideWalk<TVersion, TPlace>(PluginName target)
         _readOrder.Select(key => (key, _read[key].Place, _read[key].Versions));
 
     /// <summary>The records the named plugin itself defines, walked down to its own version, which is their lowest; lowest first.</summary>
-    public IEnumerable<(RecordKey Key, TPlace Place, ImmutableArray<PluginName> Plugins, ImmutableArray<TVersion> Versions)> DefinedByTarget =>
+    public IEnumerable<(RecordKey Key, TPlace Place, ImmutableArray<PluginName> Plugins, ImmutableArray<TVersion> Versions)> DefinedByNamedPlugin =>
         _open
-            .Where(entry => entry.Key.Plugin == target)
+            .Where(entry => entry.Key.Plugin == namedPlugin)
             .Select(entry => (
                 entry.Key,
                 entry.Value.Place,

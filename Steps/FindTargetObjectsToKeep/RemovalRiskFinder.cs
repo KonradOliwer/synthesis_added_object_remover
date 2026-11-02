@@ -6,7 +6,7 @@ namespace AddedObjectRemover.Steps.FindTargetObjectsToKeep;
 
 /// <summary>
 /// Finds, from the links into the target plugin, the target objects that stay removable but whose removal can still
-/// harm the game, so the log can warn about them.
+/// harm the game.
 /// </summary>
 internal static class RemovalRiskFinder
 {

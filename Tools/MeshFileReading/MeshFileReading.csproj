@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>Reads mesh files (loose files and archives) with Nifly and Mutagen's archive reader. It references MeshFileFacts, UnexpectedFailureHandling, BoxAndTransformMath, TriangleMeshTests, ComputedOnceLookups, FileSystemAccess and OrderIndependentParallelWork and holds the Nifly, Mutagen.Bethesda.Core, SharpZipLib and ini-parser packages; only the entry references it.</Description>
+    <Description>Reads mesh files (loose files and archives) with Nifly and Mutagen's archive reader. It references AddedObjectRemover.Ids, MeshFileFacts, UnexpectedFailureHandling, BoxAndTransformMath, TriangleMeshTests, ComputedOnceLookups, FileSystemAccess and OrderIndependentParallelWork and holds the Nifly, Mutagen.Bethesda.Core, SharpZipLib and ini-parser packages; only the entry references it.</Description>
   </PropertyGroup>
   <ItemGroup>
     <!-- Pinned exactly: NifShapes.cs reads Nifly's private _points/_stripLengths fields via reflection,
@@ -16,6 +16,7 @@
     <PackageReference Include="ini-parser-netstandard" Version="2.5.3" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
     <ProjectReference Include="..\MeshFileFacts\MeshFileFacts.csproj" />
     <ProjectReference Include="..\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
     <ProjectReference Include="..\BoxAndTransformMath\BoxAndTransformMath.csproj" />

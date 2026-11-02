@@ -86,7 +86,7 @@ public sealed class SharedReportingTests
         var decisions = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(world.Targets, [], TestTargets.References(TargetCount), TestBaseFacts.Unresolved), TargetCount)
             .ApplyFits([new ProposedFit(new TargetId(1), new TooClose(new OtherId(0), BySize), new EulerPlacement(Vector3.Zero, Vector3.Zero, 0.8f))])
             .Apply(RoundKind.TooClose, [Propose(0, new TooClose(new OtherId(0), BySize))])
-            .Apply(RoundKind.AlsoRemove, [Propose(1, new TouchingTargetThatLeft(new TargetId(0)))]);
+            .Apply(AlsoRemoveRounds.Opening, [Propose(1, new TouchingTargetThatLeft(new TargetId(0)))]);
         var removals = RemovalList.WithReasons(PatchWriter.ListRemovalsInWriteOrder(decisions), decisions, world, TestVisibleLeftBehind.SwitchedOff, TestLeftBehind.PerformedWithoutFindings);
 
         var summary = LogSections.BuildRemovalSummarySection(world, removals, decisions, TestTargets.TargetName, StepOutcome.SwitchedOff, StepOutcome.SwitchedOff);
@@ -488,7 +488,7 @@ public sealed class SharedReportingTests
         var world = CreateWorld();
         var decisions = TestSeededDecisions.StartDisablingAll(CreateProtection(world.Targets), TargetCount)
             .Apply(RoundKind.TooClose, [Propose(0, new TooClose(new OtherId(0), BySize)), Propose(Protected, new TooClose(new OtherId(0), BySize))])
-            .Apply(RoundKind.AlsoRemove, [Propose(1, new TouchingTargetThatLeft(new TargetId(0))), Propose(ProtectedTouching, new TouchingTargetThatLeft(new TargetId(0)))]);
+            .Apply(AlsoRemoveRounds.Opening, [Propose(1, new TouchingTargetThatLeft(new TargetId(0))), Propose(ProtectedTouching, new TouchingTargetThatLeft(new TargetId(0)))]);
         return (world, decisions);
     }
 

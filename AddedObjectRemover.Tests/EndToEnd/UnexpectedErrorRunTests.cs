@@ -8,7 +8,7 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 /// <summary>A failure of the user's data stops only the part it happened in: it is reported with its scope and the patch is still written.</summary>
 public class UnexpectedErrorRunTests
 {
-    private static IMeshFilesFactory DefaultMeshFiles(string dataFolder, GameRelease release, IReadOnlyList<ModKey> listedPlugins) =>
+    private static IMeshFilesFactory DefaultMeshFiles(string dataFolder, GameRelease release, IReadOnlyList<PluginName> listedPlugins) =>
         new MeshFilesFactory(dataFolder, release, listedPlugins);
 
     private static RunOutcome Run(RecordingLogSink log, Func<IPluginRecords, IPluginRecords>? wrapPlugin = null) =>
@@ -190,45 +190,25 @@ public class UnexpectedErrorRunTests
         Assert.Equal("done", log.Sections.Last().Id);
     }
 
-    /// <remarks>Report words the failures the steps return in their results; it never adds them to the channel the steps record into.</remarks>
+    /// <remarks>Report words the failures the steps return in their results; it never adds them to the channel the steps record into, which would print them twice.</remarks>
     [Fact]
-    public void FailuresTheStepsReturnInTheirResultsAreNeverAddedToTheRunsErrorChannel()
+    public void AFailureAStepReturnsInItsResultIsPrintedOnce()
     {
-        var wholePart = CaptureChannelAfter(wrapPlugin: inner => new FailingHomeCellPlugin(inner), wrapBases: null);
-        var reportTables = CaptureChannelAfter(wrapPlugin: null, wrapBases: inner => new BaseFactsFailingInReportTables(inner));
+        var wholePart = RunLogged(wrapPlugin: inner => new FailingHomeCellPlugin(inner), wrapBases: null);
+        var reportTables = RunLogged(wrapPlugin: null, wrapBases: inner => new BaseFactsFailingInReportTables(inner));
 
-        Assert.Contains("marker moves", wholePart.Log.Sections.SelectMany(section => section.Lines).Single(line => line.Contains("Unexpected error in")));
-        Assert.NotEmpty(wholePart.Channels);
-        Assert.NotEmpty(reportTables.Channels);
-        Assert.All(wholePart.Channels, channel => Assert.Empty(channel.Since(default)));
-        Assert.Contains("report files", Assert.Single(UnexpectedErrorLines(reportTables.Log)));
-        Assert.All(reportTables.Channels, channel => Assert.Empty(channel.Since(default)));
+        Assert.Contains("marker moves", Assert.Single(AllLines(wholePart), IsErrorLine));
+        Assert.Contains("report files", Assert.Single(AllLines(reportTables), IsErrorLine));
     }
 
-    private static (RecordingLogSink Log, List<IUnexpectedErrors> Channels) CaptureChannelAfter(
-        Func<IPluginRecords, IPluginRecords>? wrapPlugin, Func<IBaseFacts, IBaseFacts>? wrapBases)
+    private static RecordingLogSink RunLogged(Func<IPluginRecords, IPluginRecords>? wrapPlugin, Func<IBaseFacts, IBaseFacts>? wrapBases)
     {
         var log = new RecordingLogSink();
-        var channels = new List<IUnexpectedErrors>();
-
-        FixtureRun.Run(
-            SettingsVariants.Of(SettingsVariants.TouchWithLeftBehindAndMarkerMoves),
-            workers: 1,
-            log,
-            (dataFolder, release, plugins) => new ChannelCapturingFactory(DefaultMeshFiles(dataFolder, release, plugins), channels),
-            wrapPlugin,
-            wrapBases);
-        return (log, channels);
+        FixtureRun.Run(SettingsVariants.Of(SettingsVariants.TouchWithLeftBehindAndMarkerMoves), workers: 1, log, DefaultMeshFiles, wrapPlugin, wrapBases);
+        return log;
     }
 
-    private sealed class ChannelCapturingFactory(IMeshFilesFactory inner, List<IUnexpectedErrors> channels) : IMeshFilesFactory
-    {
-        public IMeshFiles Open(ShapeInclusion inclusion, IUnexpectedErrors unexpectedErrors)
-        {
-            channels.Add(unexpectedErrors);
-            return inner.Open(inclusion, unexpectedErrors);
-        }
-    }
+    private static IEnumerable<string> AllLines(RecordingLogSink log) => log.Sections.SelectMany(section => section.Lines);
 
     /// <summary>
     /// The run's clock, which calls the action at the reading that ends the also-remove rounds. The too-close section prints just

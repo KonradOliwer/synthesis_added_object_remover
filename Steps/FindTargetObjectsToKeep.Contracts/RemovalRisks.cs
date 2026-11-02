@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 
 namespace AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 
-/// <summary>Target objects that may still be removed, but whose removal the log warns about.</summary>
+/// <summary>Target objects that may still be removed, but whose removal is risky.</summary>
 /// <param name="UniqueActors">
 /// The placed NPCs whose base a quest alias that is neither optional nor allows disabled actors fills as its Unique Actor, in target order.
 /// </param>

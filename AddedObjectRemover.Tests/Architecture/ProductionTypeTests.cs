@@ -5,24 +5,44 @@ using System.Text.RegularExpressions;
 namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
-/// Rules over the built types of all production projects: type names are unique, and the contracts projects hold
-/// only public data shapes.
+/// Rules over the built types of all production projects: type names are unique, and the contracts projects (the rows of kind C
+/// and Q in the project table) hold only public data shapes. A contracts type carries no method, operator, computed property, accessor
+/// with a body, constructor or initialiser unless it is listed with a reason, and every listed one is a single expression of at most
+/// <see cref="MaxMemberLines"/> lines unless it is listed as over that budget with a reason.
 /// </summary>
 public class ProductionTypeTests
 {
     private const BindingFlags AllDeclared =
         BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;
 
-    private const string ContractsSuffix = ".Contracts";
     private const string GetterPrefix = "get_";
+    private const string SetterPrefix = "set_";
+    private const string ConstructorName = ".ctor";
+    private const string ConstructorKeySuffix = "." + ConstructorName;
+    private const string IndexerReflectionName = "Item";
+    private const string IndexerSourceName = "this";
+    private const string OperatorPrefix = "op_";
+    private const int MaxMemberLines = 10;
 
     private static readonly ProjectRules Rules = ProjectRules.Load();
 
-    /// <summary>The members the compiler writes for records and readonly record structs.</summary>
-    private static readonly string[] RecordSynthesisedMethods = ["Equals", "GetHashCode", "ToString", "PrintMembers", "<Clone>$", "Deconstruct"];
+    /// <summary>The source name of each operator a contracts type writes, by the name the compiled method has.</summary>
+    private static readonly Dictionary<string, string> OperatorSourceNames = new() { ["op_Addition"] = "operator +" };
 
-    /// <summary>Contract types that are not a record, interface, enum or readonly struct, each with why it is allowed.</summary>
-    private static readonly Dictionary<string, string> AllowedOtherTypes = new()
+    /// <summary>
+    /// Listed members that are longer than <see cref="MaxMemberLines"/> lines, each "Type.Member" with why it is allowed: a rule that
+    /// several steps need and that cannot be shorter.
+    /// </summary>
+    private static readonly Dictionary<string, string> OverBudgetMembers = new()
+    {
+        ["TargetObject.RestoredAs"] = "the one rule of how a restore changes an object, applied by the decision list, the judge and the restore step; it names every part a restore can put back, so its length follows the parts",
+    };
+
+    /// <summary>
+    /// Static classes that hold only named values, each with what it names. They carry no method; a value they hold (a constant, or a
+    /// static field or property set where it is declared) needs no listing in <see cref="AllowedMembers"/>, but is a single expression.
+    /// </summary>
+    private static readonly Dictionary<string, string> NamedConstantTypes = new()
     {
         ["MeshLimits"] = "named constants: the mesh size limits",
         ["MarkerMoveLimits"] = "named constants: the marker move limit",
@@ -30,6 +50,7 @@ public class ProductionTypeTests
         ["OtherModsObjectsParts"] = "named constants: the part keys the step for other mods' objects records its unexpected errors under",
         ["RemovalConvention"] = "named constants: the game's convention for a placed object switched off for good",
         ["ReportFileNames"] = "named constants: the report file names",
+        ["SettingNames"] = "named constants: the names the settings screen shows, which the settings screen and the validation warnings share",
         ["SelectionParts"] = "named constants: the part key the select step records its unexpected errors under",
         ["KeepParts"] = "named constants: the part key the keep step records its unexpected errors under",
         ["FitParts"] = "named constants: the part key the fit step records its unexpected errors under",
@@ -37,27 +58,35 @@ public class ProductionTypeTests
         ["TooCloseParts"] = "named constants: the part key the too-close step records its unexpected errors under",
         ["ChangedTerrainParts"] = "named constants: the part key the changed-terrain step records its unexpected errors under",
         ["RestingObjectsParts"] = "named constants: the part keys the also-remove step records its unexpected errors under",
+        ["AlsoRemoveRounds"] = "named constants: how the also-remove rounds open, whichever step decides them",
         ["LeftBehindParts"] = "named constants: the part key the left-behind step records its unexpected errors under",
         ["VisibleLeftBehindParts"] = "named constants: the part key the visible left-behind step records its unexpected errors under",
         ["MarkerMoveParts"] = "named constants: the part key the marker-move step records its unexpected errors under",
         ["ReportFileParts"] = "named constants: the part key the report step records its unexpected errors under",
         ["RestoreWhereRemovedParts"] = "named constants: the part keys the restore-where-removed step records its unexpected errors under",
-        ["ReferenceScale"] = "one-line rule over a contract value: a reference's scale",
-        ["TargetVisibility"] = "one-line rule over contract types: how a target looks in the game",
-        ["LeftBehindOutcomes"] = "one-line rule over a contract enum: whether an outcome is a removal",
-        ["LeftBehindVerdicts"] = "the verdict rules both left-behind steps share: the outcome by the surroundings, protected kinds, the proposals of the removed verdicts and a round's decision joined into a verdict",
-        ["SectorAreaTally"] = "the surroundings rule both left-behind steps share: the areas around an object by what became of each neighbour, and the state of each direction",
-        ["SectorRule"] = "the surroundings rule both left-behind steps share: the verdict over the directions",
-        ["SupporterShares"] = "one-line rule over contract records: the total share of a support category",
-        ["TooCloseZoneReach"] = "the zone reach the too-close step and the restore step's guards share: how far the zones that are on reach from the centre of a box, and the size zone's enlargement of a placement",
+    };
+
+    /// <summary>
+    /// Contract types that are not a record, interface, enum, readonly struct or set of named constants, each with why it is allowed.
+    /// Every method, computed property, constructor and initialiser of one is listed in <see cref="AllowedMembers"/> on its own.
+    /// </summary>
+    private static readonly Dictionary<string, string> AllowedRuleAndLookupTypes = new()
+    {
+        ["ReferenceScale"] = "rule over a contract value: a reference's scale",
+        ["TargetVisibility"] = "rule over contract types: how a target looks in the game",
+        ["LeftBehindOutcomes"] = "one-line rules over a contract enum: whether an outcome is a removal or a restoration",
+        ["SupporterShares"] = "rules over contract records: the total share of a support category, and whether a category left its place",
+        ["TooCloseZoneReach"] = "how far the zones of the too-close rule that are on reach from the centre of a box, restated from the too-close step's zone growth and held equal to it by a test",
         ["ContainingObjects"] = "read-only lookup of the object containing each target",
         ["Replacements"] = "read-only lookup of the replaced other-mod objects",
         ["ObjectQueryScratch"] = "per-worker buffers for the object queries",
     };
 
     /// <summary>
-    /// Methods and computed properties (a getter with a body) on the records and structs of the contracts, each
-    /// "Type.Member" with why it is allowed. Auto-properties and init-only properties are not listed.
+    /// Members of the contracts that carry logic, each "Type.Member" with why it is allowed: a method, a computed property, an
+    /// accessor with a body ("Type.Property"), a constructor ("Type..ctor"), and a field or property with an initialiser. Auto-properties,
+    /// init-only properties without a body, constants and the values of <see cref="NamedConstantTypes"/> are not listed. Every listed
+    /// member is a single expression; a longer one belongs in the step that uses it.
     /// </summary>
     private static readonly Dictionary<string, string> AllowedMembers = new()
     {
@@ -65,46 +94,72 @@ public class ProductionTypeTests
         ["CollectedObjects.TargetSpaces"] = "accessor over the collected objects",
         ["CollectedObjects.OtherModAndSupportOnlyObjects"] = "accessor joining two collected lists",
         ["CollectedObjects.Item"] = "indexer",
-        ["NpcBodySet.Source"] = "one-line value derived from its own bodies",
-        ["NpcBodySet.FirstPoint"] = "one-line value derived from its own bodies",
-        ["LeftBehindVerdict.IsRemoved"] = "one-line rule over its own outcome",
-        ["LeftBehindVerdict.IsRestored"] = "one-line rule over its own outcome",
-        ["FitSettings.ShrinksOrTurns"] = "one-line rule over its own limits",
+        ["CollectedObjects.WinningPresence"] = "the empty default of a lookup the collector fills",
+        ["CollectedObjects.WinningPrimitives"] = "the empty default of a lookup the collector fills",
+        ["NpcBodySet.Source"] = "single-expression value derived from its own bodies",
+        ["NpcBodySet.FirstPoint"] = "single-expression value derived from its own bodies",
+        ["LeftBehindVerdict.IsRemoved"] = "single-expression rule over its own outcome",
+        ["LeftBehindVerdict.IsRestored"] = "single-expression rule over its own outcome",
+        ["FitSettings.ShrinksOrTurns"] = "single-expression rule over its own limits",
+        ["FitSettings.Off"] = "the fixed settings of the switched-off step",
+        ["BaseShape.Missing"] = "the fixed shape of a base object that could not be resolved",
         ["NpcBody.FromBox"] = "factory",
         ["NpcBody.Point"] = "factory",
-        ["NpcSizeCounts.Add"] = "one-line sum of two counts",
+        ["NpcSizeCounts.Add"] = "single-expression sum of two counts",
         ["NpcWork.Zero"] = "factory for the empty value",
         ["ObjectVisibility.Invisible"] = "factory",
         ["ObjectVisibility.Visible"] = "factory for a fixed value",
         ["ObjectVisibility.MissingBase"] = "factory for a fixed value",
         ["ObjectVisibility.EffectOnly"] = "factory for a fixed value",
-        ["ObjectVisibility.IsVisible"] = "one-line value derived from its own fields",
-        ["OtherObject.Transform"] = "one-line value derived from its own fields",
-        ["OtherObject.IsPlacedNpc"] = "one-line value derived from its own fields",
-        ["OtherModsObjectOutcome.NewPosition"] = "one-line value derived from its own fields",
-        ["OtherModsObjectOutcome.IsTakenAway"] = "one-line value derived from its own fields",
-        ["OtherModsObjectOutcome.IsRemoved"] = "one-line value derived from its own fields",
+        ["ObjectVisibility.IsVisible"] = "single-expression value derived from its own fields",
+        ["ObjectVisibility.IsUsedByActorsOrMap"] = "single-expression value derived from its own fields",
+        ["RestingObjectsResult.EvaluatedSupport"] = "single-expression value derived from its own fields",
+        ["RestingObjectsResult.DetailsHoldTouch"] = "single-expression value derived from its own fields",
+        ["RestingObjectsResult.DetailsHoldMeshOrigins"] = "single-expression value derived from its own fields",
+        ["OtherObject.Transform"] = "single-expression value derived from its own fields",
+        ["OtherObject.IsPlacedNpc"] = "single-expression value derived from its own fields",
+        ["OtherModsObjectOutcome.NewPosition"] = "single-expression value derived from its own fields",
+        ["OtherModsObjectOutcome.IsTakenAway"] = "single-expression value derived from its own fields",
+        ["OtherModsObjectOutcome.IsRemoved"] = "single-expression value derived from its own fields",
         ["OtherModsObjectsResult.TakenAway"] = "the objects as the step leaves them, read by the later steps and derived only from its own outcomes",
-        ["TargetObject.Placement"] = "one-line value derived from its own fields",
-        ["TargetObject.PlacedAt"] = "one-line copy of itself at a given placement, for the rules asked about a shrunk or turned object",
+        ["OtherModsObjectsResult.SwitchedOff"] = "the fixed result of the switched-off step",
+        ["HeldUpTargets.SwitchedOff"] = "the fixed result of the switched-off step",
+        ["ReportTables.SwitchedOff"] = "the fixed result of the switched-off step",
+        ["MarkerMoves.SwitchedOff"] = "the fixed result of the switched-off step",
+        ["MarkerMoves.NotPerformedAfterLeftBehindStopped"] = "the fixed result of the step when the left-behind step before it stopped",
+        ["LeftBehindResult.SwitchedOff"] = "the fixed result of the switched-off step",
+        ["RestoreWhereRemovedResult.SwitchedOff"] = "the fixed result of the switched-off step",
+        ["ReportFileDetails.None"] = "the fixed value for no details",
+        ["ReportFileDetails.StoppedByEarlierFailure"] = "the fixed value for a step an earlier failure stopped",
+        ["ReportFileDetails.SwitchedOff"] = "the fixed value for the switched-off step",
+        ["WeightedSurfaceSamples.Empty"] = "the fixed value for no samples",
+        ["RoundEffect.Untouched"] = "the fixed effect of a round that did nothing to an object",
+        ["TargetObject.Placement"] = "single-expression value derived from its own fields",
+        ["TargetObject.PlacedAt"] = "single-expression copy of itself at a given placement, for the rules asked about a shrunk or turned object",
         ["TargetObject.RestoredAs"] = "copy of itself with the parts that go back taken from its earlier version, for the views of the objects as they stand and the old-place check",
-        ["NavmeshChangedByCleanedMod.Winner"] = "one-line choice between two of its own fields, the version the game shows",
-        ["NavmeshChangedByCleanedMod.ChangesTriangles"] = "one-line test of two of its own fields, shared by the navmesh plan and the restore step's switched-off case",
+        ["NavmeshChangedByCleanedMod.Winner"] = "single-expression choice between two of its own fields, the version the game shows",
+        ["NavmeshChangedByCleanedMod.ChangesTriangles"] = "single-expression test of two of its own fields, shared by the navmesh plan and the restore step's switched-off case",
         ["TargetObject.AsOtherObject"] ="field-by-field copy of itself as another plugin's object, for the worlds the old-place check and the restore guards judge in",
-        ["EarlierVersion.GoesBackToEarlierList"] = "one-line rule over its own fields, shared by the collector, which judges the cell a restore writes into, and the patch writing",
-        ["EarlierVersion.GoesBackToEarlierCell"] = "one-line rule over its own fields and the record's cell now, shared by the collector, which judges the cell a restore writes into, and the patch writing",
-        ["RunSettings.DetailedLog"] = "one-line value derived from its own fields: the one setting that has the report files, so it is stored once",
-        ["ModTrustTable.IsPatch"] = "one-line rule over its own field",
-        ["ModTrustTable.IsTrustedItself"] = "one-line fact over its own entries: a rule names the plugin itself as trusted",
-        ["ModTrustTable.IsBaseGame"] = "one-line fact over its own entries: the plugin is one of the game's own",
-        ["ModTrustTable.IsMasterOfCleanedMod"] = "one-line fact over its own entries: the cleaned mod lists the plugin as a master",
-        ["ModTrustTable.IsNeverTrusted"] = "one-line fact over its own entries: the user listed the plugin as never trusted",
+        ["EarlierVersion.GoesBackToEarlierList"] = "single-expression rule over its own fields, shared by the collector, which judges the cell a restore writes into, and the patch writing",
+        ["EarlierVersion.GoesBackToEarlierCell"] = "single-expression rule over its own fields and the record's cell now, shared by the collector, which judges the cell a restore writes into, and the patch writing",
+        ["RunSettings.DetailedLog"] = "single-expression value derived from its own fields: the one setting that has the report files, so it is stored once",
+        ["ModTrustTable.IsPatch"] = "single-expression rule over its own field",
+        ["ModTrustTable.IsTrustedItself"] = "single-expression fact over its own entries: a rule names the plugin itself as trusted",
+        ["ModTrustTable.IsBaseGame"] = "single-expression fact over its own entries: the plugin is one of the game's own",
+        ["ModTrustTable.IsMasterOfCleanedMod"] = "single-expression fact over its own entries: the cleaned mod lists the plugin as a master",
+        ["ModTrustTable.IsNeverTrusted"] = "single-expression fact over its own entries: the user listed the plugin as never trusted",
         ["ModTrustTable.VersionTrustOf"] = "the one mapping of a plugin's trust to the version trust of the accepted-value rule",
-        ["ChangedTerrainSettings.CountsWaterChanges"] = "one-line value derived from its own fields: either water switch, asked by the validator, the step and the log",
-        ["ScanNeeds.UnionOf"] = "the one union of the steps' needs, which the validator hands to the scan",
+        ["ModTrustTable.AcceptedWorld"] = "the world the cleaned mod's objects are judged in, built once from the table's own plugins by the one mapping of plugin trust to version trust",
+        ["ModTrustTable.AcceptedWorldWithoutCleanedMod"] = "the world without the cleaned mod, built once from the table's own plugins",
+        ["ChangedTerrainSettings.CountsWaterChanges"] = "single-expression value derived from its own fields: either water switch is on",
+        ["ChangedTerrainSettings.CountsAChange"] = "single-expression value derived from its own fields: any of the three kinds of change is counted",
+        ["ChangedTerrainSettings.HasAnArea"] = "single-expression value derived from its own fields: either terrain area is on",
+        ["ChangedTerrainSettings.Runs"] = "single-expression rule over its own fields: on, and counting a change in at least one area, so the step could find something",
+        ["ChangedTerrainSettings.AsRun"] = "single-expression copy with the switch as the step runs, so the step and the log compare groups as they run",
+        ["WhereRemovedRestoreSettings.Runs"] = "single-expression rule over its own switches: the step runs when any kind goes back",
+        ["ScanNeeds.UnionOf"] = "the one union of the steps' needs",
         ["ScanNeeds.Union"] = "the flag-by-flag union of two steps' needs",
         ["ScanNeeds.UnionOfAreaRecordVersions"] = "the area record reads come from the one step that asks for them",
-        ["WhatToCollect.Of"] = "factory from the union of the steps' needs and the changed objects' values",
         ["MarkerMoveSettings.Needs"] = "what the step needs the scan to read, derived from its own settings",
         ["ReportFileSettings.Needs"] = "what the log and the report files need the scan to read, derived from their own settings",
         ["ChangedTerrainSettings.Needs"] = "what the step needs the scan to read, derived from its own settings",
@@ -113,45 +168,75 @@ public class ProductionTypeTests
         ["WhereRemovedRestoreSettings.Needs"] = "what the step needs the scan to read, derived from its own settings",
         ["WhereRemovedRestoreSettings.ReadAreaRecords"] = "the area records the step's guards look at, derived from its own switches",
         ["ShapeZoneWork.Zero"] = "factory for the empty value",
-        ["SupportEvaluation.RemovedShare"] = "one-line sum over its own shares",
-        ["SupportEvaluation.RestoredShare"] = "one-line sum over its own shares",
-        ["SupportEvaluation.LeftItsPlaceShare"] = "one-line sum over its own shares",
-        ["SupportEvaluation.MainLeftItsPlaceSupporter"] = "one-line pick from its own shares",
+        ["ShapeZoneWork.op_Addition"] = "the sum of two work counts, field by field, which the tool that adds up the counts of the workers needs",
+        ["NpcWork.op_Addition"] = "the sum of two work counts, field by field, which the tool that adds up the counts of the workers needs",
+        ["TooCloseWork.op_Addition"] = "the sum of two work counts, part by part, which the tool that adds up the counts of the workers needs",
+        ["SupportEvaluation.RemovedShare"] = "single-expression sum over its own shares",
+        ["SupportEvaluation.RestoredShare"] = "single-expression sum over its own shares",
+        ["SupportEvaluation.LeftItsPlaceShare"] = "single-expression sum over its own shares",
+        ["SupportEvaluation.MainLeftItsPlaceSupporter"] = "single-expression pick from its own shares",
         ["Supporter.Placed"] = "factory",
         ["Supporter.Target"] = "factory",
+        ["Supporter.Terrain"] = "the fixed supporter that stands for the terrain",
         ["TooCloseWork.Zero"] = "factory for the empty value",
         ["ChangedTerrainPass.SwitchedOff"] = "factory for a pass of a switched-off step",
-        ["JudgedPasses.Outcome"] = "one-line rule over its own passes: the step is switched off when every pass is",
+        ["JudgedPasses.Outcome"] = "single-expression rule over its own passes: the step is switched off when every pass is",
         ["JudgedPasses.Proposals"] = "the one merge of the passes' proposals into target order",
         ["JudgedPasses.Failures"] = "the one merge of the passes' failures into target order",
-        ["CollisionGroup.TooClose"] = "one-line view of its objects with the too-close part of its settings",
-        ["CollisionGroup.ChangedTerrain"] = "one-line view of its objects with the changed-terrain part of its settings",
-        ["CollisionGroup.Fit"] = "one-line view of its objects with the shrink-or-turn part of its settings",
+        ["CollisionGroup.TooClose"] = "single-expression view of its objects with the too-close part of its settings",
+        ["CollisionGroup.ChangedTerrain"] = "single-expression view of its objects with the changed-terrain part of its settings",
+        ["CollisionGroup.Fit"] = "single-expression view of its objects with the shrink-or-turn part of its settings",
         ["RunSettings.CollisionGroupsOf"] = "one group of the target objects of each origin with the collision settings of that origin, handed to the steps as their groups",
         ["RunSettings.CollisionOf"] = "the pick of the collision settings of an origin",
-        ["ChangedObjectCollision.Section"] = "one-line view of the section's settings as typed",
-        ["ChangedObjectCollision.ForMoved"] = "one-line view of the section's settings for moved objects: the limits only when their switch is on",
-        ["ChangedObjectCollision.ForReplaced"] = "one-line view of the section's settings for replaced objects: the limits only when their switch is on",
-        ["SelectedObjects.ObjectsThatCanCauseRemovals"] = "one-line pick of the view for the standard NPC handling",
-        ["SelectedObjects.ViewFor"] = "one-line lookup of the view for an NPC handling",
+        ["ChangedObjectCollision.Section"] = "single-expression view of the section's settings as typed",
+        ["ChangedObjectCollision.ForMoved"] = "single-expression view of the section's settings for moved objects: the limits only when their switch is on",
+        ["ChangedObjectCollision.ForReplaced"] = "single-expression view of the section's settings for replaced objects: the limits only when their switch is on",
+        ["SelectedObjects.ObjectsThatCanCauseRemovals"] = "single-expression pick of the view for the standard NPC handling",
+        ["SelectedObjects.ViewFor"] = "single-expression lookup of the view for an NPC handling",
         ["SectorAreas.Total"] = "index accessor",
         ["SectorAreas.Removed"] = "index accessor",
         ["SectorAreas.Restored"] = "index accessor",
         ["SectorAreas.State"] = "index accessor",
-        ["SectorAreas.OccupiedCount"] = "one-line count over its own states",
-        ["SectorAreas.ClearedCount"] = "one-line count over its own states",
-        ["SectorAreas.RemovedCount"] = "one-line count over its own states",
-        ["SectorAreas.RestoredCount"] = "one-line count over its own states",
-        ["Decision.Effect"] = "the one reading of what the decision's round did to the object, one line per kind of decision",
-        ["ObjectsJudgedWith.MergeEqualSettings"] = "one-line factory over the tool's merge: the groups with equal settings as one group each",
-        ["Decision.EffectIn"] = "one-line rule over its own round",
-        ["Decision.FollowedARestoredMember"] = "one-line rule over its own reason and the decision of the group member it names",
-        ["LandQuarterJudged.Verdict"] = "one-line value derived from its own area",
-        ["TerrainPieces.Any"] = "one-line value derived from its own fields",
+        ["SectorAreas.OccupiedCount"] = "single-expression count over its own states",
+        ["SectorAreas.ClearedCount"] = "single-expression count over its own states",
+        ["SectorAreas.RemovedCount"] = "single-expression count over its own states",
+        ["SectorAreas.RestoredCount"] = "single-expression count over its own states",
+        ["Decision.Effect"] = "the one reading of what the decision's round did to the object, one arm per kind of decision",
+        ["ObjectsJudgedWith.MergeEqualSettings"] = "single-expression factory over the tool's merge: the groups with equal settings as one group each",
+        ["Decision.EffectIn"] = "single-expression rule over its own round",
+        ["Decision.FollowedARestoredMember"] = "single-expression rule over its own reason and the decision of the group member it names",
+        ["LandQuarterJudged.Verdict"] = "single-expression value derived from its own area",
+        ["TerrainPieces.Any"] = "single-expression value derived from its own fields",
+        ["ReferenceScale.Normalize"] = "the one rule of a placed reference's scale",
+        ["TargetVisibility.VisibilityOf"] = "the one question of how a target looks, asked of the base object shapes",
+        ["LeftBehindOutcomes.IsRemoval"] = "single-expression rule over the outcome enum",
+        ["LeftBehindOutcomes.IsRestoration"] = "single-expression rule over the outcome enum",
+        ["IPlacementRule.CheckWhereItStands"] = "single-expression default member: the protocol's first check, the check of the object where it stands",
+        ["ChangedTerrainSettings.AreasAround"] = "single-expression rule over its own fields: the areas around an object whose ground is checked",
+        ["SupporterShares.TotalOf"] = "single-expression sum over a category of the shares",
+        ["SupporterShares.HasLeftItsPlace"] = "single-expression rule over the support category enum",
+        ["TooCloseZoneReach.CornerReach"] = "the corner factor of a box, a fact of geometry",
+        ["TooCloseZoneReach.ReachRadius"] = "the reach of the zones that are on, from the centre of a box of the given half extents",
+        ["Replacements..ctor"] = "private constructor of the factories: it builds the set of replaced objects",
+        ["Replacements.Count"] = "single-expression count of the list",
+        ["Replacements.None"] = "factory",
+        ["Replacements.Of"] = "factory",
+        ["Replacements.Excluding"] = "factory",
+        ["Replacements.IsReplaced"] = "single-expression lookup in the set of replaced objects",
+        ["ContainingObjects.Of"] = "single-expression lookup by target index",
+        ["ObjectQueryScratch.Spatial"] = "the buffer each worker owns",
+        ["ObjectQueryScratch.Triangles"] = "the buffer each worker owns",
+        ["ObjectQueryScratch.Matches"] = "the buffer each worker owns",
+        ["ObjectQueryScratch.Others"] = "the buffer each worker owns",
+        ["Supporter..ctor"] = "private constructor of the factories: it only stores the type and the index",
+        ["RunOutcome..ctor"] = "constructor that stores what the run decided and found",
     };
 
     /// <summary>The name of the generic Lazy type; every delegate type (Func, Action, custom ones) is found by its base type instead.</summary>
     private static readonly Regex CallbackTypePattern = new(@"^Lazy`\d+$");
+
+    /// <summary>The members of the contracts projects as their source files write them, by the path of their type.</summary>
+    private static readonly Lazy<ILookup<string, WrittenMember>> WrittenMembers = new(ReadWrittenMembers);
 
     /// <summary>
     /// Contract members that hold a Lazy or a delegate (Func, Action or a custom one), also inside generic arguments, arrays or nullables, each "Type.Member" with why it is allowed. Any other one is a
@@ -159,15 +244,14 @@ public class ProductionTypeTests
     /// </summary>
     private static readonly Dictionary<string, string> AllowedCallbackMembers = new()
     {
-        ["RestingObjectsInput.TimeSinceStart"] = "steps may not read the clock themselves; the entry hands them the clock",
         ["RunEnvironment.TimeSinceStart"] = "steps may not read the clock themselves; the entry hands them the clock",
-        ["ObjectMeasurementRules.OtherModObjects"] = "a step's rule handed to a cache at creation (Q3)",
-        ["ObjectMeasurementRules.ObjectsOfAnyPlugin"] = "a step's rule handed to a cache at creation (Q3)",
-        ["NpcBodyRules.CreateOwnBodyResolver"] = "a step's rule handed to a cache at creation (Q3)",
-        ["NpcBodyRules.DistinctBodies"] = "a step's rule handed to a cache at creation (Q3)",
-        ["PlacedNpcRules.IsPlacedNpc"] = "a step's rule handed to a cache at creation (Q3)",
-        ["PlacedNpcRules.BodyTransform"] = "a step's rule handed to a cache at creation (Q3)",
-        ["PlacedNpcRules.CountSizes"] = "a step's rule handed to a cache at creation (Q3)",
+        ["ObjectMeasurementRules.OtherModObjects"] = "a step's rule handed to a cache at creation",
+        ["ObjectMeasurementRules.ObjectsOfAnyPlugin"] = "a step's rule handed to a cache at creation",
+        ["NpcBodyRules.CreateOwnBodyResolver"] = "a step's rule handed to a cache at creation",
+        ["NpcBodyRules.DistinctBodies"] = "a step's rule handed to a cache at creation",
+        ["PlacedNpcRules.IsPlacedNpc"] = "a step's rule handed to a cache at creation",
+        ["PlacedNpcRules.BodyTransform"] = "a step's rule handed to a cache at creation",
+        ["PlacedNpcRules.CountSizes"] = "a step's rule handed to a cache at creation",
     };
 
     [Fact]
@@ -254,38 +338,184 @@ public class ProductionTypeTests
     }
 
     [Fact]
-    public void ContractsHoldOnlyRecordsInterfacesEnumsAndReadonlyStructs()
+    public void ContractsHoldOnlyRecordsInterfacesEnumsReadonlyStructsAndTheListedOtherTypes()
     {
         var others = ContractsTypes().Where(type => !IsDataShape(type)).Select(BusinessCode.PathName).Order(StringComparer.Ordinal).ToList();
 
-        Assert.Equal(AllowedOtherTypes.Keys.Order(StringComparer.Ordinal), others);
+        Assert.Equal(NamedConstantTypes.Keys.Concat(AllowedRuleAndLookupTypes.Keys).Order(StringComparer.Ordinal), others);
     }
 
     [Fact]
-    public void ContractRecordsAndStructsCarryNoMethodsOrComputedPropertiesExceptTheListedOnes()
+    public void ContractTypesCarryNoMethodsAccessorsConstructorsOrInitialisersExceptTheListedOnes()
     {
-        var members = ContractsTypes()
-            .Where(type => IsDataShape(type) && !type.IsInterface && !type.IsEnum)
-            .SelectMany(type => type.GetMethods(AllDeclared)
-                .Where(IsWrittenMethodOrComputedGetter)
-                .Select(method => $"{BusinessCode.PathName(type)}.{MemberName(method)}"))
-            .Distinct()
+        var found = FindLogicMembers();
+
+        var notListed = found.Where(member => !AllowedMembers.ContainsKey(member.Key)).Select(member => $"{member.Key} ({member.Value})").ToList();
+        var notFound = AllowedMembers.Keys.Except(found.Keys).Order(StringComparer.Ordinal).ToList();
+
+        Assert.True(
+            notListed.Count == 0 && notFound.Count == 0,
+            $"Contract members with logic that are not listed in {nameof(AllowedMembers)} (list with a reason, or move into the step that uses them):{Environment.NewLine}"
+                + $"{string.Join(Environment.NewLine, notListed)}{Environment.NewLine}Listed but not found (remove):{Environment.NewLine}{string.Join(Environment.NewLine, notFound)}");
+    }
+
+    [Fact]
+    public void EveryListedContractMemberAndEveryNamedConstantIsOneExpression()
+    {
+        var notFound = new List<string>();
+        var longer = new List<string>();
+        foreach (var key in AllowedMembers.Keys.Order(StringComparer.Ordinal))
+        {
+            var members = SourceMembersOfKey(key).ToList();
+            if (members.Count == 0) notFound.Add(key);
+            longer.AddRange(members.Where(member => !member.IsOneExpression).Select(member => $"{key} ({member.Where})"));
+        }
+        longer.AddRange(
+            WrittenMembers.Value.SelectMany(group => group)
+                .Where(member => NamedConstantTypes.ContainsKey(member.Type) && member.HasInitialiser && !member.IsOneExpression)
+                .Select(member => $"{member.Place} ({member.Where})"));
+
+        Assert.True(
+            longer.Count == 0 && notFound.Count == 0,
+            $"Members of the contracts longer than one expression (listed in {nameof(AllowedMembers)} or a named constant; move into the step that uses them):{Environment.NewLine}"
+                + $"{string.Join(Environment.NewLine, longer)}{Environment.NewLine}Listed but not found in the source:{Environment.NewLine}{string.Join(Environment.NewLine, notFound)}");
+    }
+
+    [Fact]
+    public void EveryListedContractMemberIsWithinTheLineBudgetExceptTheListedOnes()
+    {
+        var overBudget = AllowedMembers.Keys
+            .Where(key => SourceMembersOfKey(key).Any(member => member.LineCount > MaxMemberLines))
             .Order(StringComparer.Ordinal)
             .ToList();
 
-        var notListed = members.Except(AllowedMembers.Keys).ToList();
-        var notFound = AllowedMembers.Keys.Except(members).Order(StringComparer.Ordinal).ToList();
+        var notListed = overBudget.Except(OverBudgetMembers.Keys).ToList();
+        var notNeeded = OverBudgetMembers.Keys.Except(overBudget).Order(StringComparer.Ordinal).ToList();
 
-        Assert.True(notListed.Count == 0 && notFound.Count == 0, $"Not listed: {string.Join(", ", notListed)}. Listed but not found: {string.Join(", ", notFound)}");
+        Assert.True(
+            notListed.Count == 0 && notNeeded.Count == 0,
+            $"Listed members longer than {MaxMemberLines} lines (shorten them, move them into the step that uses them, or list them in {nameof(OverBudgetMembers)} with a reason): {string.Join(", ", notListed)}. "
+                + $"Listed in {nameof(OverBudgetMembers)} but within the budget (remove): {string.Join(", ", notNeeded)}");
     }
 
-    private static bool IsWrittenMethodOrComputedGetter(MethodInfo method) =>
-        (!method.IsSpecialName || method.Name.StartsWith(GetterPrefix, StringComparison.Ordinal))
-            && !RecordSynthesisedMethods.Contains(method.Name)
+    [Fact]
+    public void TheMemberReaderCountsTheLinesOfAMemberAndNamesAnOperatorBySymbol()
+    {
+        const string source = """
+            class Sample
+            {
+                public static Sample operator +(Sample a, Sample b) => a;
+                public int Block(int x)
+                {
+                    var y = x;
+                    return y;
+                }
+            }
+            """;
+
+        var members = WrittenMember.Of("Sample.cs", source).Select(member => $"{member.Name} lines={member.LineCount} oneExpression={member.IsOneExpression}");
+
+        Assert.Equal(["operator + lines=1 oneExpression=True", "Block lines=5 oneExpression=False"], members);
+    }
+
+    [Fact]
+    public void TheMemberReaderSeesConstructorsInitialisersAndExpressionBodies()
+    {
+        const string source = """
+            class Sample
+            {
+                private const int Limit = 3;
+                private static readonly int[] Cache = [1];
+                public int Value { get; } = 2;
+                public Sample(int a)
+                {
+                    Value = a;
+                }
+                public int Twice(int x) => x * 2;
+                public int Block(int x)
+                {
+                    return x;
+                }
+                public int Statements(int x) => Run(y => { Use(y); return y; });
+                public int Prop { get => 1; }
+                public int Computed => a == b ? 1 : 2;
+            }
+            """;
+
+        var members = WrittenMember.Of("Sample.cs", source)
+            .Select(member => $"{member.Name} constructor={member.IsConstructor} initialiser={member.HasInitialiser} oneExpression={member.IsOneExpression}");
+
+        Assert.Equal(
+            [
+                "Limit constructor=False initialiser=False oneExpression=False",
+                "Cache constructor=False initialiser=True oneExpression=True",
+                "Value constructor=False initialiser=True oneExpression=True",
+                "Sample constructor=True initialiser=False oneExpression=False",
+                "Twice constructor=False initialiser=False oneExpression=True",
+                "Block constructor=False initialiser=False oneExpression=False",
+                "Statements constructor=False initialiser=False oneExpression=False",
+                "Prop constructor=False initialiser=False oneExpression=False",
+                "Computed constructor=False initialiser=False oneExpression=True",
+            ],
+            members);
+    }
+
+    /// <summary>"Type.Member" of each member that carries logic, with where it is written.</summary>
+    private static SortedDictionary<string, string> FindLogicMembers()
+    {
+        var found = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        foreach (var type in ContractsTypes().Where(type => !type.IsEnum))
+        {
+            var path = BusinessCode.PathName(type);
+            foreach (var name in WrittenMethodAndAccessorNames(type)) found.TryAdd($"{path}.{name}", WhereIsMember(path, name));
+            foreach (var member in WrittenMembers.Value[path].Where(NeedsListing)) found.TryAdd($"{path}.{(member.IsConstructor ? ConstructorName : member.Name)}", member.Where);
+        }
+        return found;
+    }
+
+    /// <summary>A constructor, or a field or property with an initialiser; the values of a set of named constants need no listing.</summary>
+    private static bool NeedsListing(WrittenMember member) =>
+        member.IsConstructor || (member.HasInitialiser && !NamedConstantTypes.ContainsKey(member.Type));
+
+    private static IEnumerable<string> WrittenMethodAndAccessorNames(Type type) =>
+        type.GetMethods(AllDeclared).Where(method => IsWrittenMethodOrAccessor(type, method)).Select(MemberName);
+
+    /// <summary>An interface member counts only when it has a body (a default implementation); the members the compiler writes for records do not.</summary>
+    private static bool IsWrittenMethodOrAccessor(Type type, MethodInfo method) =>
+        (!type.IsInterface || !method.IsAbstract)
+            && (!method.IsSpecialName || IsAccessorOfProperty(method) || IsOperator(method))
             && !method.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false);
 
+    private static bool IsAccessorOfProperty(MethodInfo method) =>
+        method.Name.StartsWith(GetterPrefix, StringComparison.Ordinal) || method.Name.StartsWith(SetterPrefix, StringComparison.Ordinal);
+
+    private static bool IsOperator(MethodInfo method) => method.Name.StartsWith(OperatorPrefix, StringComparison.Ordinal);
+
     private static string MemberName(MethodInfo method) =>
-        method.Name.StartsWith(GetterPrefix, StringComparison.Ordinal) ? method.Name[GetterPrefix.Length..] : method.Name;
+        IsAccessorOfProperty(method) ? method.Name[GetterPrefix.Length..] : method.Name;
+
+    private static string WhereIsMember(string typePath, string reflectedName) =>
+        WrittenMembers.Value[typePath].Where(member => member.Name == SourceNameOf(reflectedName)).Select(member => member.Where).FirstOrDefault() ?? "source not found";
+
+    private static string SourceNameOf(string reflectedName) =>
+        reflectedName == IndexerReflectionName ? IndexerSourceName : OperatorSourceNames.GetValueOrDefault(reflectedName, reflectedName);
+
+    private static IEnumerable<WrittenMember> SourceMembersOfKey(string key)
+    {
+        if (key.EndsWith(ConstructorKeySuffix, StringComparison.Ordinal))
+        {
+            return WrittenMembers.Value[key[..^ConstructorKeySuffix.Length]].Where(member => member.IsConstructor);
+        }
+        var split = key.LastIndexOf('.');
+        var name = SourceNameOf(key[(split + 1)..]);
+        return WrittenMembers.Value[key[..split]].Where(member => member.Name == name);
+    }
+
+    private static ILookup<string, WrittenMember> ReadWrittenMembers()
+    {
+        var contractsProjects = Rules.Projects.Where(Rules.IsContracts).Select(rule => rule.Name).ToHashSet();
+        return WrittenMember.Of(SourceFile.All().Where(file => contractsProjects.Contains(file.Project))).ToLookup(member => member.Type);
+    }
 
     private static IEnumerable<Type> WrittenTopLevelTypes(IEnumerable<Assembly> assemblies) =>
         assemblies.SelectMany(assembly => assembly.GetTypes())
@@ -300,11 +530,9 @@ public class ProductionTypeTests
     private static IReadOnlyList<Assembly> ContractsAssemblies() =>
         ProductionSources.Assemblies().Where(IsContractsProject).ToList();
 
-    private static bool IsContractsProject(Assembly assembly)
-    {
-        var name = assembly.GetName().Name!;
-        return name.EndsWith(ContractsSuffix, StringComparison.Ordinal) && Rules.Projects.Any(rule => rule.Name == name);
-    }
+    /// <summary>A project whose row in the project table has a contracts kind (C or Q).</summary>
+    private static bool IsContractsProject(Assembly assembly) =>
+        Rules.Projects.Any(rule => rule.Name == assembly.GetName().Name && Rules.IsContracts(rule));
 
     private static bool IsDataShape(Type type) =>
         type.IsInterface

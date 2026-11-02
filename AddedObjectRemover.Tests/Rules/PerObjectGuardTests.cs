@@ -68,15 +68,18 @@ public class PerObjectGuardTests
         new(part, "PlantedUserDataException: " + FailureMessage, new FailureSubject(target.Key.ToString(), target.EditorId, Faulty));
 
     private static TooClosePass FindTooClose(
-        List<TargetObject> targets, ObjectCaches world, IBaseObjectShapes shapes, int threads, Replacements replacements) =>
+        List<TargetObject> targets, List<OtherObject> others, ObjectCaches world, IBaseObjectShapes shapes, int threads, Replacements replacements) =>
         TooCloseObjects.Find(
             new(
-                TestScenes.CreateWorld(targets, []),
-                world.VisibleTargets,
-                world.Selected(replacements, NpcHandling.Never),
-                world.PlacedNpcs,
-                shapes,
-                new TriangleStore(shapes.ReadTriangles),
+                new(
+                    targets,
+                    world.VisibleTargets,
+                    world.Selected(replacements, NpcHandling.Never),
+                    world.PlacedNpcs,
+                    shapes,
+                    new TriangleStore(shapes.ReadTriangles)),
+                TestScenes.CreateWorld(targets, others),
+                TargetWorkOrder.Of(targets),
                 new Execution(threads),
                 [TestJudgedGroups.OfAll(targets, new TooCloseSettings(BySize: true, Multiplier, ByDistance: false, DistanceInUnits: 0f, ZoneShape.BoundingBox, NpcHandling.Never))],
                 TestSeededDecisions.StartUnprotected(targets)))
@@ -91,7 +94,7 @@ public class PerObjectGuardTests
         var world = TestScenes.Create(targets, others, Shapes, threads: threads);
         var replacements = Replacements.None(others.Count);
 
-        var result = FindTooClose(targets, world, FaultyWhenAskedAbout(Boulder.Base), threads, replacements);
+        var result = FindTooClose(targets, others, world, FaultyWhenAskedAbout(Boulder.Base), threads, replacements);
 
         Assert.Equal([Healthy, AlsoHealthy], result.Hits.Select(hit => hit.TargetIndex));
         Assert.Equal([Healthy, AlsoHealthy], result.Proposals.Select(proposal => proposal.Target.Index));
@@ -104,7 +107,7 @@ public class PerObjectGuardTests
         var (targets, others) = CreateScene(middleTargetBase: Table.Base, middleOtherBase: Table.Base);
         var world = TestScenes.Create(targets, others, Shapes);
 
-        var result = FindTooClose(targets, world, Shapes, threads: 1, Replacements.None(others.Count));
+        var result = FindTooClose(targets, others, world, Shapes, threads: 1, Replacements.None(others.Count));
 
         Assert.Equal([Healthy, Faulty, AlsoHealthy], result.Hits.Select(hit => hit.TargetIndex));
         Assert.Empty(result.Failures);
@@ -120,7 +123,7 @@ public class PerObjectGuardTests
         var shapes = FaultyWhenAskedAbout(Boulder.Base);
         var world = TestScenes.Create(targets, others, shapes, threads: threads, unexpectedErrors: errors);
 
-        var result = FindTooClose(targets, world, shapes, threads, Replacements.None(others.Count));
+        var result = FindTooClose(targets, others, world, Shapes, threads, Replacements.None(others.Count));
 
         Assert.Equal([Healthy, AlsoHealthy], result.Hits.Select(hit => hit.TargetIndex));
         Assert.Empty(result.Failures);
@@ -142,7 +145,7 @@ public class PerObjectGuardTests
         var shapes = FaultyWhenAskedAbout(Boulder.Base);
         var world = TestScenes.Create(targets, others, shapes, measurementRules: RemovalCauseSelector.MeasurementRules(errors, RestoreWhereRemovedParts.ObjectThatStays));
 
-        FindTooClose(targets, world, shapes, threads: 1, Replacements.None(others.Count));
+        FindTooClose(targets, others, world, Shapes, threads: 1, Replacements.None(others.Count));
 
         Assert.Equal(RestoreWhereRemovedParts.ObjectThatStays, Assert.Single(errors.Since(default)).Part);
     }
@@ -183,7 +186,7 @@ public class PerObjectGuardTests
         var seeded = TestSeededDecisions.Seed(protection, targets.Count, [Healthy]);
         var triangles = new TriangleStore(Shapes.ReadTriangles);
         var input = new RoundsInput(
-            [.. targets], ObjectsOfAnyPlugin: null, Shapes, triangles, TestSurfaceSamples.Over(triangles), TestGround.NoTerrain(), new Execution(1));
+            new SupportReads([.. targets], Shapes, triangles, TestSurfaceSamples.Over(triangles), TestGround.NoTerrain(), new Execution(1)), ObjectsOfAnyPlugin: null);
         var restingObjects = TestRestingObjects.Run(
             seeded, input, new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouchingIt, 1f, SupportLostFraction: 1f, TouchChainsShown: false));
 

@@ -42,29 +42,27 @@ public static class OtherModsObjects
     /// <summary>What every part of the step reads, and every rule it provides to other steps.</summary>
     /// <param name="Targets">Where they stand before any decision.</param>
     /// <param name="Caches">
-    /// Index the target objects; their objects of any plugin are asked only when there is something to judge: the first ask builds
-    /// their index. The search for the holders of objects that stay asks the caches of its worlds instead.
+    /// Index the target objects and give the shapes, triangles and terrain; their objects of any plugin are asked only when there is
+    /// something to judge: the first ask builds their index. The search for the holders of objects that stay asks the caches of its
+    /// worlds instead.
     /// </param>
     /// <param name="Trust">Decides whose objects are judged; the cleaned mod's records a later plugin overrides are not judged.</param>
     /// <param name="Contacts">The support rule the support of an object is measured with.</param>
     public sealed record SupportJudging(
         ImmutableArray<TargetObject> Targets,
-        IObjectCaches Caches,
+        IRunCaches Caches,
         ModTrustTable Trust,
         LoadOrderPlugins Plugins,
         OtherModsObjectsSettings Settings,
-        IBaseObjectShapes Shapes,
-        ITriangleMeshes Triangles,
         ISupportContacts Contacts,
-        ITerrainHeights Terrain,
         Execution Execution)
     {
-        internal OtherModsObjectRules CreateRules() => new(Trust, Plugins, Shapes);
+        internal OtherModsObjectRules CreateRules() => new(Trust, Plugins, Caches.Shapes);
 
         internal OtherObjectSupport CreateSupport() => new(Contacts, Settings.TouchGap);
 
         /// <param name="touchGap">The largest gap that counts as touching for the rule that asks.</param>
-        internal DropFinder CreateDropFinder(float touchGap) => new(Contacts, Triangles, Terrain, touchGap);
+        internal DropFinder CreateDropFinder(float touchGap) => new(Contacts, Caches.Triangles, Caches.Terrain, touchGap);
 
         internal SupportLoss CreateSupportLoss() => new(CreateSupport(), CreateDropFinder(Settings.TouchGap), Settings.SupportLostFraction);
 
@@ -80,7 +78,7 @@ public static class OtherModsObjects
         {
             var others = Caches.VisibleObjectsOfAnyPlugin();
             var rules = CreateRules();
-            return CreateHolding(new SupportWorld(Targets, Caches.VisibleTargets, _ => true, others, SupportWorld.NoChanges, Shapes), others, rules, rules.IsJudged);
+            return CreateHolding(new SupportWorld(Targets, Caches.VisibleTargets, _ => true, others, SupportWorld.NoChanges, Caches.Shapes), others, rules, rules.IsJudged);
         }
     }
 
@@ -90,27 +88,58 @@ public static class OtherModsObjects
     public sealed record Input(
         SupportJudging Judging, IRemovalDecisions AfterFits, IRunDecisions Decisions, AlsoRemoveSettings AlsoRemove, IAlsoRemoveRoundsAfter AlsoRemoveRounds);
 
+    /// <summary>
+    /// RemoveFloatingObject and PullObjectToTheGround: what becomes of the other mods' objects left without support (see
+    /// <see cref="SettleLeftWithoutSupport"/>), with the step's also-remove rounds added to the run's decisions.
+    /// </summary>
+    public static Decided<OtherModsObjectsResult> Settle(Input input)
+    {
+        var result = SettleLeftWithoutSupport(input);
+        return new Decided<OtherModsObjectsResult>(result, input.Decisions.ApplyRounds(AlsoRemoveRounds.Opening, result.ProposedRounds));
+    }
+
+    /// <summary>
+    /// What becomes of the other mods' objects left without support once the also-remove rounds are decided, and the also-remove
+    /// rounds for the target objects resting on or touching those taken away; switched off with KeepSupportingObject. The rounds
+    /// are decided on a working copy of the decisions, which never changes, and proposed. The rounds measure each target object
+    /// kept shrunk or turned at its new placement.
+    /// </summary>
+    /// <remarks>The objects of any plugin are asked only when a target object was removed, shrunk or turned.</remarks>
+    private static OtherModsObjectsResult SettleLeftWithoutSupport(Input input)
+    {
+        var judging = input.Judging;
+        if (judging.Settings.Handling == OtherModsObjectsHandling.KeepSupportingObject) return OtherModsObjectsResult.SwitchedOff;
+
+        var targetsAsMeasured = input.AfterFits.TargetsAsTheRoundsMeasureThem(judging.Targets);
+        var visibleTargetsAsMeasured = judging.Caches.IndexVisibleTargets(targetsAsMeasured);
+        var targetsDecided = new DecidedTargets(
+            judging.Targets, targetsAsMeasured, input.Decisions, judging.Caches.VisibleTargets, visibleTargetsAsMeasured, placed => judging.Caches.IndexVisibleTargets(placed));
+        return Failures.Attempt(
+            () => Settle(targetsDecided, input.AlsoRemove, decided => input.AlsoRemoveRounds.After(decided, targetsAsMeasured), judging),
+            failure => new OtherModsObjectsResult(StepOutcome.StoppedByUnexpectedError, [], [], [], PartFailure.OfWholePart(OtherModsObjectsParts.LeftWithoutSupport, failure)));
+    }
+
     /// <param name="TargetObjects">The objects other target objects rest on.</param>
     /// <param name="HeldUp">What the search of <see cref="CreateHeldUpTargetsSearch"/> found for the same targets.</param>
     public sealed record RestingRuleInput(SupportJudging Judging, IRestingRule TargetObjects, HeldUpTargets HeldUp);
 
-    /// <param name="AlsoRemove">The settings of the rule that asks, whose gap counts as touching.</param>
+    /// <param name="AlsoRemove">The settings whose gap counts as touching.</param>
     public sealed record DropTestInput(SupportJudging Judging, AlsoRemoveSettings AlsoRemove);
 
     /// <param name="WorldCaches">The object caches of the worlds asked about.</param>
     public sealed record HoldersInput(SupportJudging Judging, IObjectCachesOfWorlds WorldCaches);
 
-    /// <summary>The keep step's question, asked before any decision (see <see cref="HeldUpTargetsSearch"/>).</summary>
+    /// <summary>Finds the target objects that hold up other mods' objects, in the world before any decision (see <see cref="HeldUpTargetsSearch"/>).</summary>
     public static IHeldUpTargetsSearch CreateHeldUpTargetsSearch(SupportJudging judging) => new HeldUpTargetsSearch(judging);
 
     /// <summary>
-    /// The fit step's question asked before any removal: the objects the target objects' rule finds, and those judged objects
+    /// The objects resting on checked objects, before any removal: those the target objects' rule finds, and those judged objects
     /// of other mods rest on, whatever the settings say (see <see cref="AnyObjectRestingRule"/>).
     /// </summary>
     /// <remarks>
     /// When the held-up targets were found, the judged objects' holders are not searched again: that search ran the same test
-    /// before any decision near every target, so every holder the fit's own search would find is a held-up target, and each
-    /// of those is kept, so the fit never checks one.
+    /// before any decision near every target, so every holder this rule's own search would find is a held-up target, and each
+    /// of those is kept, so it is never checked.
     /// </remarks>
     public static IRestingRule CreateRestingRule(RestingRuleInput input) =>
         new AnyObjectRestingRule(
@@ -131,68 +160,13 @@ public static class OtherModsObjects
             judging.Caches.VisibleTargets,
             judging.CreateRules(),
             judging.CreateDropFinder(input.AlsoRemove.TouchGap),
-            judging.Shapes,
+            judging.Caches.Shapes,
             judging.Caches.VisibleObjectsOfAnyPlugin,
             judging.Execution);
     }
 
-    /// <summary>The restore step's question about the objects that move away, asked in worlds of what stays (see <see cref="FindHoldersOfObjectsThatStay"/>).</summary>
+    /// <summary>Finds, in worlds of what stays, the objects moving away that an object that stays rests on (see <see cref="HoldersOfObjectsThatStay"/>).</summary>
     public static IHoldersOfObjectsThatStay CreateHoldersOfObjectsThatStay(HoldersInput input) => new HoldersOfObjectsThatStay(input.WorldCaches, input.Judging);
-
-    /// <summary>
-    /// The objects that move away from where they stand now and that an object that stays rests on there, by the test that finds the
-    /// other mods' objects left without support. Every object of <paramref name="staying"/> that can rest counts, whichever plugin it
-    /// belongs to.
-    /// </summary>
-    /// <param name="holders">Where they stand now; the id of each is its position.</param>
-    /// <param name="holderIndex">The index of <paramref name="holders"/>.</param>
-    /// <param name="movesAway">Which holders move away; the others stay, as their copies in <paramref name="staying"/>.</param>
-    /// <param name="staying">The visible objects of any plugin as they stand once the run is done, with a copy of each holder.</param>
-    /// <param name="copiesOfMoving">The copies in <paramref name="staying"/> of the holders that move away, which neither rest nor hold up.</param>
-    /// <returns>Each holder that moves away and holds up an object that stays, with the first such object in id order.</returns>
-    internal static IReadOnlyDictionary<TargetId, OtherObject> FindHoldersOfObjectsThatStay(
-        IReadOnlyList<TargetObject> holders,
-        IVisibleTargetObjects holderIndex,
-        Func<TargetId, bool> movesAway,
-        IVisibleObjectsOfAnyPlugin staying,
-        IReadOnlySet<OtherId> copiesOfMoving,
-        SupportJudging judging)
-    {
-        var world = new SupportWorld(holders, holderIndex, movesAway, staying, copiesOfMoving.ToDictionary(id => id, _ => (PlacedTransform?)null), judging.Shapes);
-        var rules = judging.CreateRules();
-        return judging.CreateHolding(world, staying, rules, rules.CanRest).Find(holders.Where(holder => movesAway(holder.Id)), copiesOfMoving.Contains);
-    }
-
-    /// <summary>
-    /// RemoveFloatingObject and PullObjectToTheGround: what becomes of the other mods' objects left without support (see
-    /// <see cref="SettleLeftWithoutSupport"/>), with the step's also-remove rounds added to the run's decisions.
-    /// </summary>
-    public static Decided<OtherModsObjectsResult> Settle(Input input)
-    {
-        var result = SettleLeftWithoutSupport(input);
-        return new Decided<OtherModsObjectsResult>(result, input.Decisions.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds));
-    }
-
-    /// <summary>
-    /// What becomes of the other mods' objects left without support once the also-remove rounds are decided, and the also-remove
-    /// rounds for the target objects resting on or touching those taken away; switched off with KeepSupportingObject. The rounds
-    /// are decided on a working copy of the decisions, which never changes, and proposed. The rounds measure each target object
-    /// kept shrunk or turned at its new placement.
-    /// </summary>
-    /// <remarks>The objects of any plugin are asked only when a target object was removed, shrunk or turned.</remarks>
-    private static OtherModsObjectsResult SettleLeftWithoutSupport(Input input)
-    {
-        var judging = input.Judging;
-        var targetsAsMeasured = input.AfterFits.TargetsAsTheRoundsMeasureThem(judging.Targets);
-        var visibleTargetsAsMeasured = judging.Caches.IndexVisibleTargetsAsTheRoundsMeasureThem(input.AfterFits);
-        if (judging.Settings.Handling == OtherModsObjectsHandling.KeepSupportingObject) return OtherModsObjectsResult.SwitchedOff;
-
-        var targetsDecided = new DecidedTargets(
-            judging.Targets, targetsAsMeasured, input.Decisions, judging.Caches.VisibleTargets, visibleTargetsAsMeasured, placed => judging.Caches.IndexVisibleTargets(placed));
-        return Failures.Attempt(
-            () => Settle(targetsDecided, input.AlsoRemove, decided => input.AlsoRemoveRounds.After(decided, targetsAsMeasured), judging),
-            failure => new OtherModsObjectsResult(StepOutcome.StoppedByUnexpectedError, [], [], [], PartFailure.OfWholePart(OtherModsObjectsParts.LeftWithoutSupport, failure)));
-    }
 
     private static IEnumerable<TargetId> FindHeldUpAmong(SupportJudging judging, IReadOnlySet<TargetId> checkedObjects) =>
         judging.CreateHoldingBeforeAnyDecision().Find(checkedObjects.Select(target => judging.Targets[target.Index]), isLeftOut: _ => false).Keys.Where(checkedObjects.Contains);
@@ -222,12 +196,12 @@ public static class OtherModsObjects
                 : CreateTargetsOnTakenAway(decided, others, rules, alsoRemove, judging).Propose(current, TakenAway(outcomes));
             if (proposals.Count == 0) return Summarize(outcomes, decided.Decided, current, rounds);
 
-            current = copy.DecideRound(RoundKind.AlsoRemove, proposals);
+            current = copy.DecideRound(AlsoRemoveRounds.Opening, proposals);
             rounds.Add(proposals);
             var removed = current.LeftIn(current.Rounds[^1]);
             if (removed.IsEmpty) return Summarize(outcomes, decided.Decided, current, rounds);
 
-            (current, var spreadRounds) = copy.DecideRoundsUntilNothingRemoved(alsoRemoveRoundsAfter(current), removed);
+            (current, var spreadRounds) = copy.DecideRoundsUntilNothingRemoved(AlsoRemoveRounds.Opening, alsoRemoveRoundsAfter(current), removed);
             rounds.AddRange(spreadRounds.Select(round => round.Proposals));
         }
     }
@@ -265,8 +239,8 @@ public static class OtherModsObjects
         SupportJudging judging)
     {
         var settler = new LeftWithoutSupport(
-            new SupportWorld(decided.Targets, decided.Visible, _ => true, others, SupportWorld.NoChanges, judging.Shapes),
-            new SupportWorld(standing.Targets, standing.Index, target => !current.IsRemoved(target), others, SupportWorld.NoChanges, judging.Shapes),
+            new SupportWorld(decided.Targets, decided.Visible, _ => true, others, SupportWorld.NoChanges, judging.Caches.Shapes),
+            new SupportWorld(standing.Targets, standing.Index, target => !current.IsRemoved(target), others, SupportWorld.NoChanges, judging.Caches.Shapes),
             judging.CreateNear(others, rules.IsJudged),
             rules,
             judging.CreateSupportLoss(),
@@ -282,10 +256,10 @@ public static class OtherModsObjects
         new(
             decided.AsMeasured,
             decided.VisibleAsMeasured,
-            new SupportWorld(decided.AsMeasured, decided.VisibleAsMeasured, _ => true, others, SupportWorld.NoChanges, judging.Shapes),
+            new SupportWorld(decided.AsMeasured, decided.VisibleAsMeasured, _ => true, others, SupportWorld.NoChanges, judging.Caches.Shapes),
             judging.CreateSupport(),
             rules,
-            judging.Triangles,
+            judging.Caches.Triangles,
             alsoRemove,
             judging.Execution);
 

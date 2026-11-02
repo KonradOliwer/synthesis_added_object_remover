@@ -32,7 +32,7 @@ internal static class TestScenes
             new TriangleStore(shapes.ReadTriangles),
             bodies ?? CreateBodiesWithoutRecords(shapes),
             measurementRules ?? RemovalCauseSelector.MeasurementRules(unexpectedErrors ?? new ThrowingUnexpectedErrors()),
-            placedNpcRules ?? TooCloseObjects.PlacedNpcRules,
+            placedNpcRules ?? NpcCacheRules.PlacedNpcs,
             new Execution(threads));
     }
 
@@ -44,7 +44,7 @@ internal static class TestScenes
             new TriangleStore(shapes.ReadTriangles),
             CreateBodiesWithoutRecords(shapes),
             RemovalCauseSelector.MeasurementRules(new ThrowingUnexpectedErrors()),
-            TooCloseObjects.PlacedNpcRules,
+            NpcCacheRules.PlacedNpcs,
             new Execution(threads));
 
     /// <summary>A channel for scenes that expect no unexpected failure: recording one fails the test.</summary>

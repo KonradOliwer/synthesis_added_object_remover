@@ -21,8 +21,8 @@ namespace AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 /// <param name="ChangedObjectCollision">How another mod's object the cleaned mod changed is checked for a clash, where the cleaned mod put it and where it stood before.</param>
 /// <param name="VisibleLeftBehind">Null when the left-behind visible objects step is off.</param>
 /// <param name="LeftBehind">Null when the left-behind invisible objects step is off.</param>
-/// <param name="RestoreWhereRemoved">Null when all four restore switches are off.</param>
-/// <param name="MarkerMoves">Null unless kept markers are moved, which needs the invisible left-behind step.</param>
+/// <param name="RestoreWhereRemoved">Always set; the step decides whether it runs.</param>
+/// <param name="MarkerMoves">Always set; the step decides whether it runs.</param>
 /// <param name="Reports">Null when the detailed log and reports are off.</param>
 /// <param name="OnlyWarnWhenRequiringModLoadsAfterPatch">Whether a mod that requires the cleaned mod and loads after the patch is a warning instead of a stop.</param>
 public sealed record RunSettings(
@@ -38,8 +38,8 @@ public sealed record RunSettings(
     OtherModsObjectsSettings OtherModsObjects,
     VisibleLeftBehindSettings? VisibleLeftBehind,
     LeftBehindSettings? LeftBehind,
-    WhereRemovedRestoreSettings? RestoreWhereRemoved,
-    MarkerMoveSettings? MarkerMoves,
+    WhereRemovedRestoreSettings RestoreWhereRemoved,
+    MarkerMoveSettings MarkerMoves,
     ReportFileSettings? Reports,
     bool OnlyWarnWhenRequiringModLoadsAfterPatch,
     Execution Execution)

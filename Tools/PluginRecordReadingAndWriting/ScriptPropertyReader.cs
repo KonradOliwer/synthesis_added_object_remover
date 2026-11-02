@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Plugins.Cache;
 using Mutagen.Bethesda.Plugins.Records;
 using Mutagen.Bethesda.Skyrim;
@@ -19,12 +20,14 @@ internal static class ScriptPropertyReader
     public static ScriptNamedRecord? FindQuestOrScene(IAVirtualMachineAdapterGetter? adapter, ILinkCache linkCache, PluginNames names)
     {
         if (adapter is null) return null;
-        foreach (var link in adapter.Scripts.SelectMany(script => script.EnumerateFormLinks()))
+        var links = MutagenCalls.Read(() => adapter.Scripts.SelectMany(script => script.EnumerateFormLinks()).Select(link => link.FormKey).ToArray());
+        foreach (var link in links)
         {
             if (link.IsNull) continue;
             foreach (var (type, kind) in NamedKinds)
             {
-                if (linkCache.TryResolve(link.FormKey, type, out var record)) return new ScriptNamedRecord(names.KeyOf(record.FormKey), record.EditorID, kind);
+                var named = MutagenCalls.Read(() => linkCache.TryResolve(link, type, out var record) ? (record.FormKey, record.EditorID) : ((FormKey, string?)?)null);
+                if (named is (var key, var editorId)) return new ScriptNamedRecord(names.KeyOf(key), editorId, kind);
             }
         }
         return null;

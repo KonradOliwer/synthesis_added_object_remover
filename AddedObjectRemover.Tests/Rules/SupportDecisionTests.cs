@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using AddedObjectRemover.Tests.Fixtures;
 
@@ -42,7 +43,7 @@ public class SupportDecisionTests
             new(first, [true, true, false]),
             new(Supporter.Terrain, [false, true, false]),
         ];
-        float[] weights = [float.NaN, 0f, 2f];
+        ImmutableArray<float> weights = [float.NaN, 0f, 2f];
         var samples = new WeightedSurfaceSamples([Vector3.Zero, Vector3.Zero, Vector3.Zero], weights, new Box(Vector3.Zero, new Vector3(3, 4, 0)), Falloff: 0.75f);
 
         var contacts = SupportContactWeights.SplitWeightsAmongSupporters(hits, weights);
@@ -69,7 +70,7 @@ public class SupportDecisionTests
     {
         var tree = MeshTriangleTree.Build(BoxMesh.CreateTriangles(TestMeshes.UnitCube), MeshLimits.Tree)!;
 
-        var samples = SurfaceContacts.Weigh(new SampledSurface([.. SurfaceSampler.Sample(tree, RestingObjects.SurfaceSamplesPerMesh)], tree.Bounds));
+        var samples = SurfaceContacts.Weigh(new SampledSurface([.. SurfaceSampler.Sample(tree, SurfaceContacts.SamplesPerMesh)], tree.Bounds));
 
         Assert.True(samples.Falloff > 0);
         Assert.Equal(SampleWeights.FalloffOf(samples.Bounds, SurfaceContacts.OriginFalloffFraction), samples.Falloff);
@@ -82,7 +83,7 @@ public class SupportDecisionTests
     public void ContactsWithWeightAreNotDescribed()
     {
         SupporterHits[] hits = [new(Supporter.Terrain, [true, false])];
-        float[] weights = [1f, 1f];
+        ImmutableArray<float> weights = [1f, 1f];
         var samples = new WeightedSurfaceSamples([Vector3.Zero, Vector3.Zero], weights, Box.Zero, Falloff: 0f);
 
         var contacts = SupportContactWeights.SplitWeightsAmongSupporters(hits, weights);

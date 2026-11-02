@@ -10,7 +10,7 @@ internal static class TestNpcBodies
     public static NpcBodyCache Create(ILinkCache linkCache, IBaseObjectShapes shapes, IBodyMeshBounds? bodyBounds = null)
     {
         var meshFiles = TestShapes.MeshFilesOf(shapes);
-        var rules = TooCloseObjects.NpcBodyRules;
+        var rules = NpcCacheRules.Bodies;
         return new(
             new NpcRecordsPlugin(linkCache),
             rules.TemplateFlag,

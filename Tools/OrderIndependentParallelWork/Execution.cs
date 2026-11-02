@@ -1,6 +1,6 @@
 namespace AddedObjectRemover;
 
-/// <summary>How many workers a step's parallel work may use.</summary>
+/// <summary>How many workers parallel work may use.</summary>
 public sealed record Execution
 {
     public Execution(int workers)

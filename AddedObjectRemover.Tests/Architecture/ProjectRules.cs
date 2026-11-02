@@ -24,12 +24,18 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
 
     private const string ContractsKind = "C";
     private const string CacheCatalogKind = "Q";
+    private const string StepLogicKind = "L";
+    private const string CacheBuilderKind = "B";
+    private const string IdsFolder = "Ids";
+    private const string ToolsFolderPrefix = "Tools/";
     private const string StepsFolderPrefix = "Steps/";
     private const string CachesFolderPrefix = "Caches/";
     private const string RunFolderPrefix = "Run/";
+    private const string ContractsNameSuffix = ".Contracts";
+    private const string TestsNameSuffix = ".Tests";
     private const string RunCachesContractsName = "RunCaches.Contracts";
 
-    public static readonly IReadOnlyList<string> LogicKinds = ["L", "B"];
+    public static readonly IReadOnlyList<string> LogicKinds = [StepLogicKind, CacheBuilderKind];
 
     /// <summary>The logic projects that may reference the run's contracts, with the reason.</summary>
     public static readonly IReadOnlyDictionary<string, string> LogicReferencesToRunContracts = new Dictionary<string, string>
@@ -98,6 +104,32 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
     /// <summary>Cache contracts sit between the steps and the caches: they may see step contracts and other cache contracts, but not the run's own contracts.</summary>
     public IReadOnlyList<string> FindCacheContractsReferencingRunContracts() =>
         FindReferences(IsCacheContracts, IsRunContracts);
+
+    /// <summary>One line per row whose kind is none of those its folder and name allow, so a logic project marked as contracts cannot pass every kind rule.</summary>
+    public IReadOnlyList<string> FindRowsWhoseKindDoesNotFitFolderAndName() =>
+        Projects
+            .Where(project => !KindsThatFit(project).Contains(project.Kind))
+            .Select(project => $"{project.Name} ({project.Folder}) is kind {project.Kind}; its folder and name allow {DescribeKinds(KindsThatFit(project))}")
+            .ToList();
+
+    /// <summary>
+    /// Ids: K. Tools: T or A. Under Steps: C for a contracts project, otherwise L. Under Caches: C or Q for a contracts project, otherwise B.
+    /// Under Run: C for a contracts project, otherwise V or R. Outside those folders: X for the tests, otherwise E for the entry.
+    /// </summary>
+    private static IReadOnlyList<string> KindsThatFit(ProjectRule project)
+    {
+        var isContracts = project.Name.EndsWith(ContractsNameSuffix, StringComparison.Ordinal);
+        if (project.Folder == IdsFolder) return [IdsKind];
+        if (InFolder(project, ToolsFolderPrefix)) return ToolKinds;
+        if (InFolder(project, StepsFolderPrefix)) return isContracts ? [ContractsKind] : [StepLogicKind];
+        if (InFolder(project, CachesFolderPrefix)) return isContracts ? ContractsKinds : [CacheBuilderKind];
+        if (InFolder(project, RunFolderPrefix)) return isContracts ? [ContractsKind] : [ValidationKind, RunnerKind];
+        if (project.Folder.Contains('/')) return [];
+        return project.Name.EndsWith(TestsNameSuffix, StringComparison.Ordinal) ? [TestKind] : [EntryKind];
+    }
+
+    private static string DescribeKinds(IReadOnlyList<string> kinds) =>
+        kinds.Count == 0 ? "no kind" : $"only {string.Join(" or ", kinds)}";
 
     /// <summary>One line per reference that closes a loop, written as the loop's path, e.g. "A -> B -> A".</summary>
     public IReadOnlyList<string> FindCycles()

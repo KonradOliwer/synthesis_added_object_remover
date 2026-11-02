@@ -1,3 +1,4 @@
+using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 using Mutagen.Bethesda.Synthesis.Settings;
 
@@ -6,12 +7,12 @@ namespace AddedObjectRemover;
 public class TooCloseRemovalSettings : ITooCloseSettingsValues
 {
     [SynthesisOrder]
-    [SynthesisSettingName("Margin by object size")]
+    [SynthesisSettingName(SettingNames.MarginBySize)]
     [SynthesisTooltip("Bigger objects get a bigger margin. An object is removed when another mod's object comes within this margin around it.")]
     public TooCloseBySizeSettings BySize { get; set; } = new();
 
     [SynthesisOrder]
-    [SynthesisSettingName("Margin by fixed distance")]
+    [SynthesisSettingName(SettingNames.MarginByDistance)]
     [SynthesisTooltip("Every object gets the same margin. An object is removed when another mod's object comes within this margin around it.")]
     public TooCloseByDistanceSettings ByDistance { get; set; } = new();
 
@@ -25,7 +26,7 @@ public class TooCloseRemovalSettings : ITooCloseSettingsValues
     public bool UseRoughBoxes { get; set; } = SettingDefaults.UseRoughBoxes;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Other mods' NPCs and creatures cause removal")]
+    [SynthesisSettingName(SettingNames.Npcs)]
     [SynthesisTooltip(
         "AlwaysLikeAnyObject: they count like any other object.\n"
         + "OnlyWhenStuckInsideTheObject: only when their body sinks into the object or they stand inside it (a boulder, a room of a building);\n"

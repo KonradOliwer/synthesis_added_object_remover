@@ -147,9 +147,9 @@ public class NpcBodyResolverTests
         var npc = PlaceNpc(0, BaseRaceMale, Vector3.Zero);
         var shifted = new Vector3(500, 0, 0);
 
-        var noneArePlacedNpcs = BuildIndex(TooCloseObjects.PlacedNpcRules with { IsPlacedNpc = _ => false }, npc);
-        var placedElsewhere = BuildIndex(TooCloseObjects.PlacedNpcRules with { BodyTransform = _ => TestTargets.At(shifted) }, npc);
-        var counted = BuildIndex(TooCloseObjects.PlacedNpcRules with { CountSizes = (_, _) => new NpcSizeCounts(7, 0, 0, 0, 0, 0) }, npc);
+        var noneArePlacedNpcs = BuildIndex(NpcCacheRules.PlacedNpcs with { IsPlacedNpc = _ => false }, npc);
+        var placedElsewhere = BuildIndex(NpcCacheRules.PlacedNpcs with { BodyTransform = _ => TestTargets.At(shifted) }, npc);
+        var counted = BuildIndex(NpcCacheRules.PlacedNpcs with { CountSizes = (_, _) => new NpcSizeCounts(7, 0, 0, 0, 0, 0) }, npc);
 
         Assert.Equal(0, noneArePlacedNpcs.Counts.Evaluated);
         Assert.Equal(shifted, placedElsewhere.TransformOf(0).Position);
@@ -162,7 +162,7 @@ public class NpcBodyResolverTests
         TestNpcBodies.Create(Records.ToImmutableLinkCache(), Shapes, bodyBounds);
 
     private static PlacedNpcIndex BuildIndex(params OtherObject[] npcs) =>
-        BuildIndex(TooCloseObjects.PlacedNpcRules, npcs);
+        BuildIndex(NpcCacheRules.PlacedNpcs, npcs);
 
     private static PlacedNpcIndex BuildIndex(PlacedNpcRules rules, params OtherObject[] npcs) =>
         PlacedNpcIndex.Build(npcs, CreateCache(), rules, new Execution(Environment.ProcessorCount));

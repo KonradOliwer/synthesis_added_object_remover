@@ -86,7 +86,7 @@ internal sealed class CellRecordParts(float waterHeightTolerance)
         [
             .. FieldParts.Select(entry => (Key(entry.Part), FieldPart(entry.Fields))),
             (Key(CellPart.WaterLevel), new([nameof(ICellGetter.WaterHeight)],
-                (one, other) => WaterLevelDiffers(one, other, waterHeightTolerance), CopyWaterLevel, static _ => false)),
+                (one, other) => WaterLevelDiffers(one, other, waterHeightTolerance), CopyWaterLevel)),
             .. FlagParts.Select(entry => (Key(entry.Part), FlagPart((int)entry.Bit))),
             .. MajorFlagParts.Select(entry => (Key(entry.Part), MajorFlagPart((int)entry.Bit))),
         ];
@@ -99,8 +99,11 @@ internal sealed class CellRecordParts(float waterHeightTolerance)
     private static RecordPart<ICellGetter, ICell> FieldPart(ImmutableArray<string> fields)
     {
         var mask = TranslationMasks.Only<Cell.TranslationMask>(fields);
-        return new(fields, (one, other) => !one.Equals(other, mask), (target, source) => ((ICellInternal)target).DeepCopyIn(source, errorMask: null, copyMask: mask.GetCrystal()), static _ => false);
+        return new(fields, (one, other) => !one.Equals(other, mask), (target, source) => CopyFields(target, source, mask));
     }
+
+    private static void CopyFields(ICell target, ICellGetter source, Cell.TranslationMask mask) =>
+        MutagenCalls.Copy(() => ((ICellInternal)target).DeepCopyIn(source, errorMask: null, copyMask: mask.GetCrystal()));
 
     private static bool WaterLevelDiffers(ICellGetter one, ICellGetter other, float tolerance) =>
         FlagBits.Differ((int)one.Flags, (int)other.Flags, HasWaterBit) || (one.WaterHeight, other.WaterHeight) switch
@@ -118,20 +121,17 @@ internal sealed class CellRecordParts(float waterHeightTolerance)
     private static RecordPart<ICellGetter, ICell> FlagPart(int bit) => new(
         [],
         (one, other) => FlagBits.Differ((int)one.Flags, (int)other.Flags, bit),
-        (target, source) => target.Flags = (Cell.Flag)FlagBits.CopyBits((int)target.Flags, (int)source.Flags, bit),
-        static _ => false);
+        (target, source) => target.Flags = (Cell.Flag)FlagBits.CopyBits((int)target.Flags, (int)source.Flags, bit));
 
     private static RecordPart<ICellGetter, ICell> MajorFlagPart(int bit) => new(
         [],
-        (one, other) => FlagBits.Differ(one.MajorRecordFlagsRaw, other.MajorRecordFlagsRaw, bit),
-        (target, source) => target.MajorRecordFlagsRaw = FlagBits.CopyBits(target.MajorRecordFlagsRaw, source.MajorRecordFlagsRaw, bit),
-        static _ => false);
+        (one, other) => FlagBits.DifferIn(one, other, bit),
+        (target, source) => FlagBits.CopyMajorBits(target, source, bit));
 
     private static RecordPart<ICellGetter, ICell> RegionPart(FormKey region) => new(
         [nameof(ICellGetter.Regions)],
         (one, other) => Lists(one, region) != Lists(other, region),
-        (target, source) => CopyRegion(target, source, region),
-        static _ => false);
+        (target, source) => CopyRegion(target, source, region));
 
     private static bool Lists(ICellGetter version, FormKey region) => version.Regions?.Any(link => link.FormKey == region) ?? false;
 
@@ -157,13 +157,13 @@ internal sealed class CellRecordParts(float waterHeightTolerance)
         return new(
             [],
             (one, other) => FlagBits.Differ((int)one.Flags, (int)other.Flags, flagBits)
-                || FlagBits.Differ(one.MajorRecordFlagsRaw, other.MajorRecordFlagsRaw, majorFlagBits)
+                || FlagBits.DifferIn(one, other, majorFlagBits)
                 || !one.Equals(other, mask),
             (target, source) =>
             {
                 target.Flags = (Cell.Flag)FlagBits.CopyBits((int)target.Flags, (int)source.Flags, flagBits);
-                target.MajorRecordFlagsRaw = FlagBits.CopyBits(target.MajorRecordFlagsRaw, source.MajorRecordFlagsRaw, majorFlagBits);
-                ((ICellInternal)target).DeepCopyIn(source, errorMask: null, copyMask: mask.GetCrystal());
+                FlagBits.CopyMajorBits(target, source, majorFlagBits);
+                CopyFields(target, source, mask);
             },
             static version => version.OcclusionData is not null || version.LNAM is not null || version.XWCN is not null
                 || version.XWCS is not null || version.MaxHeightData is not null);

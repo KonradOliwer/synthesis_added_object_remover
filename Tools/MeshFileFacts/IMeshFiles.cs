@@ -3,8 +3,7 @@ namespace AddedObjectRemover;
 /// <summary>Opens the mesh reader of one run, counting the mesh shapes the caller's inclusion says.</summary>
 public interface IMeshFilesFactory
 {
-    /// <param name="unexpectedErrors">Where the reader records the unexpected errors of reading one mesh.</param>
-    IMeshFiles Open(ShapeInclusion inclusion, IUnexpectedErrors unexpectedErrors);
+    IMeshFiles Open(ShapeInclusion inclusion);
 }
 
 /// <summary>Finds mesh files the way the game does (loose file first, then archives) and reads them. Thread-safe.</summary>

@@ -8,7 +8,7 @@ namespace AddedObjectRemover;
 /// and not kept.
 /// </summary>
 internal sealed class MeshFiles(
-    MeshFileSource source, NifGeometryReader reader, AssetProblemLog problems, IUnexpectedErrors unexpectedErrors, ShapeInclusion inclusion)
+    MeshFileSource source, NifGeometryReader reader, AssetProblemLog problems, ShapeInclusion inclusion)
     : IMeshFiles, IMeshBounds
 {
     private readonly ComputedOncePerKey<string, MeshBounds> _byMesh = new(Publication.BuiltOnce, StringComparer.OrdinalIgnoreCase);
@@ -24,7 +24,6 @@ internal sealed class MeshFiles(
     {
         source.BuildArchiveIndexNow();
         reader.WarmUpLoader();
-        ReportLoaderWarmUpFailure();
     }
 
     public string NormalizeMeshPath(string givenPath) => MeshFileSource.NormalizeMeshPath(givenPath);
@@ -96,12 +95,6 @@ internal sealed class MeshFiles(
             problems.Add(AssetProblem.ReadWarning(meshPath, result.MismatchedStrips));
         }
         return (result, meshSource);
-    }
-
-    private void ReportLoaderWarmUpFailure()
-    {
-        if (reader.LoaderWarmUp is not { Succeeded: false }) return;
-        unexpectedErrors.Add(new PartFailure(MeshReadingParts.LoaderStartUp, Failure: null, Subject: null));
     }
 
     private bool RecordFooterRoot(string meshPath, NifRoot? footerRoot)

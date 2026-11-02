@@ -39,7 +39,17 @@ public sealed record RestingObjectsResult(
     TouchChainSet? TouchChains,
     PartFailure? Failure,
     PartFailure? TouchChainsFailure,
-    ReportFileDetails ReportFileDetails);
+    ReportFileDetails ReportFileDetails)
+{
+    /// <summary>The step judged what the removed objects supported: mode OnlyWhatLosesItsSupport, with seeds.</summary>
+    public bool EvaluatedSupport => Outcome == StepOutcome.Performed && Mode == FollowUpRemovalMode.OnlyWhatLosesItsSupport && HadSeeds;
+
+    /// <summary>The report-file details were performed and promise the touching pairs: mode EverythingTouchingIt, with seeds.</summary>
+    public bool DetailsHoldTouch => ReportFileDetails.Outcome == StepOutcome.Performed && Mode == FollowUpRemovalMode.EverythingTouchingIt && HadSeeds;
+
+    /// <summary>The report-file details were performed and promise the mesh origins: mode OnlyWhatLosesItsSupport, with seeds.</summary>
+    public bool DetailsHoldMeshOrigins => ReportFileDetails.Outcome == StepOutcome.Performed && Mode == FollowUpRemovalMode.OnlyWhatLosesItsSupport && HadSeeds;
+}
 
 /// <summary>The connected chains of the touch cascade.</summary>
 /// <param name="ComponentOf">Target index -&gt; chain id, or -1 when not a node.</param>

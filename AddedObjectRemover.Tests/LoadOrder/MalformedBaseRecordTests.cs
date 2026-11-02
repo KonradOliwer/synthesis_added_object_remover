@@ -5,7 +5,7 @@ using Mutagen.Bethesda.Skyrim;
 
 namespace AddedObjectRemover.Tests.LoadOrder;
 
-/// <summary>A base record the game library cannot parse fails as malformed user data, which a run records and carries on from; our own errors do not.</summary>
+/// <summary>A base record the game library cannot parse fails as malformed user data, which a run records and carries on from.</summary>
 public class MalformedBaseRecordTests : IDisposable
 {
     private readonly string _folder = Directory.CreateTempSubdirectory().FullName;
@@ -29,13 +29,5 @@ public class MalformedBaseRecordTests : IDisposable
 
         Assert.IsType(libraryException, failure.InnerException);
         Assert.True(Failures.IsRecoverable(failure));
-    }
-
-    [Fact]
-    public void TheSameExceptionTypesThrownByOurOwnCodeInsideALibraryReadStayBugs()
-    {
-        Assert.Throws<ArgumentOutOfRangeException>(() => MutagenCalls.Read(() => new List<int>()[0]));
-        Assert.Throws<IndexOutOfRangeException>(() => MutagenCalls.Read(() => Array.Empty<int>()[0]));
-        Assert.Throws<NotImplementedException>(() => MutagenCalls.Read<int>(() => throw new NotImplementedException()));
     }
 }

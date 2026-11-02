@@ -11,7 +11,6 @@
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
     <ProjectReference Include="..\SelectObjectsThatCanCauseRemovals.Contracts\SelectObjectsThatCanCauseRemovals.Contracts.csproj" />
     <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
-    <ProjectReference Include="..\FitClashingObjects.Contracts\FitClashingObjects.Contracts.csproj" />
     <ProjectReference Include="..\JudgeChangedObjects.Contracts\JudgeChangedObjects.Contracts.csproj" />
     <ProjectReference Include="..\RestoreWhereRemoved.Contracts\RestoreWhereRemoved.Contracts.csproj" />
     <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
@@ -24,8 +23,8 @@
     <ProjectReference Include="..\..\Tools\TriangleMeshTests\TriangleMeshTests.csproj" />
     <ProjectReference Include="..\..\Tools\BoxSpatialIndex\BoxSpatialIndex.csproj" />
     <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
-    <ProjectReference Include="..\..\Tools\KeyedGroupingInInputOrder\KeyedGroupingInInputOrder.csproj" />
     <ProjectReference Include="..\..\Tools\ComputedOnceLookups\ComputedOnceLookups.csproj" />
+    <ProjectReference Include="..\..\Tools\KeyedGroupingInInputOrder\KeyedGroupingInInputOrder.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />

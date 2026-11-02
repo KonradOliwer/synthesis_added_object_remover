@@ -28,16 +28,16 @@ internal static class FitOutcomes
         var unknown => throw new UnreachableException($"Unknown round outcome {unknown}."),
     };
 
-    /// <param name="restoredWhereRemoved">The earlier version of each target that went back where the cleaned mod was removed.</param>
-    public static ChangedObjectOutcome ChangedObjectOutcomeOf(IRemovalDecisions final, IReadOnlyDictionary<TargetId, EarlierVersion> restoredWhereRemoved, TargetId target)
+    /// <param name="restoredWhereRemoved">The judged record of each target that went back where the cleaned mod was removed.</param>
+    public static ChangedObjectOutcome ChangedObjectOutcomeOf(IRemovalDecisions final, IReadOnlyDictionary<TargetId, PlacedChangeJudged> restoredWhereRemoved, TargetId target)
     {
         var outcome = OutcomeOf(final, target);
         return outcome == ChangedObjectOutcome.KeptWherePut && restoredWhereRemoved.ContainsKey(target) ? ChangedObjectOutcome.KeptThenRestoredWhereRemoved : outcome;
     }
 
-    /// <summary>The earlier version of each target the step that restores where the cleaned mod was removed put back.</summary>
-    public static IReadOnlyDictionary<TargetId, EarlierVersion> RestoredWhereRemoved(RestoreWhereRemovedResult result) =>
-        result.Objects.Where(judged => judged.IsRestored && judged.Change.Target is not null).ToDictionary(judged => judged.Change.Target!.Value, judged => judged.Change.Earlier);
+    /// <summary>The judged record of each target the step that restores where the cleaned mod was removed put back.</summary>
+    public static IReadOnlyDictionary<TargetId, PlacedChangeJudged> RestoredWhereRemoved(RestoreWhereRemovedResult result) =>
+        result.Objects.Where(judged => judged.IsRestored && judged.Change.Target is not null).ToDictionary(judged => judged.Change.Target!.Value);
 
     /// <summary>The other mods' objects the cleaned mod changed, of every origin but the own one, in target order.</summary>
     public static IEnumerable<TargetObject> ChangedObjects(CollectedObjects world) =>
@@ -57,12 +57,20 @@ internal static class FitOutcomes
     /// The placement the object was given: where it was shrunk or turned to, or where a restore put it (each of position, rotation
     /// and scale from the earlier version only when it goes back); null when it kept its placement.
     /// </summary>
-    /// <param name="restoredWhereRemoved">The earlier version of each target that went back where the cleaned mod was removed.</param>
-    public static EulerPlacement? NewPlacementOf(IRemovalDecisions final, IReadOnlyDictionary<TargetId, EarlierVersion> restoredWhereRemoved, TargetObject target) =>
-        final.Of(target.Id) is Decision.Fitted fitted ? fitted.To : EarlierVersionWritten(final, restoredWhereRemoved, target.Id) is { } earlier ? target.RestoredAs(earlier).Placement : null;
+    /// <param name="restoredWhereRemoved">The judged record of each target that went back where the cleaned mod was removed.</param>
+    public static EulerPlacement? NewPlacementOf(IRemovalDecisions final, IReadOnlyDictionary<TargetId, PlacedChangeJudged> restoredWhereRemoved, TargetObject target) =>
+        final.Of(target.Id) switch
+        {
+            Decision.Fitted fitted => fitted.To,
+            Decision.Restored => PlacementItStandsAt(final, target),
+            _ => restoredWhereRemoved.GetValueOrDefault(target.Id)?.PlacedBack,
+        };
+
+    /// <summary>Where the decisions leave the target: the placement a fit or a restore gave it, otherwise the one it has.</summary>
+    public static EulerPlacement PlacementItStandsAt(IRemovalDecisions final, TargetObject target) => final.TargetsAsTheyStand([target])[0].Placement;
 
     /// <summary>The earlier version the patch writes back for the target, by either restore; null when it writes none.</summary>
-    /// <param name="restoredWhereRemoved">The earlier version of each target that went back where the cleaned mod was removed.</param>
-    public static EarlierVersion? EarlierVersionWritten(IRemovalDecisions final, IReadOnlyDictionary<TargetId, EarlierVersion> restoredWhereRemoved, TargetId target) =>
-        (final.Of(target) as Decision.Restored)?.EarlierVersion ?? restoredWhereRemoved.GetValueOrDefault(target);
+    /// <param name="restoredWhereRemoved">The judged record of each target that went back where the cleaned mod was removed.</param>
+    public static EarlierVersion? EarlierVersionWritten(IRemovalDecisions final, IReadOnlyDictionary<TargetId, PlacedChangeJudged> restoredWhereRemoved, TargetId target) =>
+        (final.Of(target) as Decision.Restored)?.EarlierVersion ?? restoredWhereRemoved.GetValueOrDefault(target)?.Change.Earlier;
 }

@@ -51,7 +51,7 @@ internal static class TestShapes
     /// <summary>A catalog over the records of the link cache and the loose meshes in a Data folder, reading them through the real readers.</summary>
     public static IBaseObjectShapes Catalog(ILinkCache linkCache, string dataPath, ModKey mod)
     {
-        var meshFiles = new MeshFilesFactory(dataPath, GameRelease.SkyrimSE, [mod]).Open(BaseObjectShapes.SolidShapes, new UnexpectedErrors());
+        var meshFiles = new MeshFilesFactory(dataPath, GameRelease.SkyrimSE, [mod.ToPluginName()]).Open(BaseObjectShapes.SolidShapes);
         var shapes = new BaseObjectShapes(TestBaseFacts.Reader(linkCache), meshFiles, CollisionLayerReader.Read(linkCache));
         MeshFilesOfCatalog.Add(shapes, meshFiles);
         return shapes;

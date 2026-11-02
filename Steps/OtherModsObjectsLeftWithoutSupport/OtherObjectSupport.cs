@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 
@@ -5,7 +6,7 @@ namespace AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport;
 
 /// <summary>Which samples of an object's surface touch each supporter in a world, and the samples' weights.</summary>
 /// <param name="BySupporter">In the order the world gives the supporters.</param>
-internal readonly record struct SupportHits(List<SupporterHits> BySupporter, float[] Weights);
+internal readonly record struct SupportHits(List<SupporterHits> BySupporter, ImmutableArray<float> Weights);
 
 /// <summary>
 /// The support of an object in a world: its contact points with what may hold it up (<see cref="ISupportContacts"/>), each

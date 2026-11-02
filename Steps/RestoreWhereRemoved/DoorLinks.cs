@@ -1,4 +1,5 @@
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 
@@ -37,7 +38,7 @@ internal sealed class DoorLinks(IEnumerable<RecordChangedByCleanedMod> changedRe
     public NavDoorLinkFact? FinalLinkOf(DoorLinkChange door, Func<int, bool> goesBack) =>
         !_goWithPlacement.Contains(door.Door) || (_candidateOf.TryGetValue(door.Door, out var candidate) && goesBack(candidate)) ? LinkGoingBack(door) : door.Current;
 
-    /// <summary>The restore of each of the doors that is a candidate, as its placed restore writes it, in the order given.</summary>
-    public IEnumerable<WriteOrder> RestoresOf(IEnumerable<RecordKey> doors) =>
-        doors.Where(door => _candidateOf.ContainsKey(door)).Select(door => new CopyEarlierPlacedParts(door, candidates[_candidateOf[door]].Earlier.Undo));
+    /// <summary>The parts each of the doors that is a candidate restores, as its placed restore writes them, in the order given.</summary>
+    public IEnumerable<PlacedPartsRestored> RestoresOf(IEnumerable<RecordKey> doors) =>
+        doors.Where(door => _candidateOf.ContainsKey(door)).Select(door => new PlacedPartsRestored(door, candidates[_candidateOf[door]].Earlier.Undo));
 }

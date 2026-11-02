@@ -193,7 +193,7 @@ public sealed class TwoRunsTests : IDisposable
         new(
             world.Plugins,
             pluginRecords,
-            new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod),
+            new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod, Program.PatchMarkerText),
             new MeshFilesFactory(state.DataFolderPath.Path, state.GameRelease, world.ListedPlugins),
             bases,
             new ConsoleLogSink(),

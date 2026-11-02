@@ -765,7 +765,7 @@ public class MovedReplacementRunTests
     private static bool IsInitiallyDisabled(IPlacedObjectGetter placed) =>
         (placed.MajorRecordFlagsRaw & (int)SkyrimMajorRecord.SkyrimMajorRecordFlag.InitiallyDisabled) != 0;
 
-    private static IMeshFilesFactory OpenMeshFiles(string dataFolder, Mutagen.Bethesda.GameRelease release, IReadOnlyList<ModKey> plugins) =>
+    private static IMeshFilesFactory OpenMeshFiles(string dataFolder, Mutagen.Bethesda.GameRelease release, IReadOnlyList<PluginName> plugins) =>
         new MeshFilesFactory(dataFolder, release, plugins);
 
     private static RunOutcome Run(Vector3 movedTo, IReadOnlyList<Vector3> walls) => Run(CrateSettings(), movedTo, walls);

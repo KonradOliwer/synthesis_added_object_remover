@@ -1,71 +1,47 @@
 namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
-/// No business code is copied: no 40 consecutive tokens (names and numbers normalised, comments ignored) appear
-/// twice. Limit: shorter copies that the known-idiom list does not name are not found. Repetition that is
-/// structure rather than logic is listed with its reason, by the places it occurs in (file and type.member), which
-/// the failure message prints with the lines of each copy.
+/// No production code (every file of every production project: steps, caches, tools, the runner and the entry) is copied: no 40
+/// consecutive tokens of one member (names and numbers normalised, comments and lists ignored, names renamed one to one) appear
+/// twice; <see cref="CodeCopies"/> says what counts as a copy. Limit: shorter copies that the known-idiom list does not name are
+/// not found. Limit: code that repeats one pattern per axis, item or switch arm, written one per line or side by side on one line, is
+/// not compared, so a copied per-axis test or transform is not found. Repetition that is structure rather than logic is listed with its reason, by the members it occurs in, which the
+/// failure message prints with the lines of each copy.
 /// </summary>
 public class CopiedCodeTests
 {
     private const int WindowLength = 40;
 
-    private const string CountLines = "One count per line of a statistics record; each line names its own kind, so there is no logic to share.";
-    private const string EnumTextArms = "Enum-to-text switch arms ending in the same unreachable-case throw; each switch lists the values of its own enum.";
     private const string CsvColumnNames = "CSV header column names; each table lists its own columns.";
-    private const string CounterRecord = "Counter records: each lists its own counters and its sum, which only repeat in shape.";
-    private const string PartKeyLines = "One line per part key: Report's own keys and the wording table; each line names its own part, so there is no logic to share.";
-    private const string ViewForwarders ="One-line members of a read-only view, each forwarding one question of the index to its caller; no logic to share.";
     private const string SettingChecks = "Setting-by-setting check lines; each reads another setting with its own default, limit and wording.";
-    private const string TableDeclarations = "Declaration of a report class with a constant or header list; the tables share only the shape of the declaration.";
-
-    private const string StepSections = "Overloads of the log's entry type: each hands one step's result to its own section builder under the same skeleton; they share only the shape.";
-
-    private const string PartKeyHolders = "Part key holders of steps, each with an owner and its keys; each key names its own part, so there is no logic to share.";
+    private const string PartKeyLines = "One entry per part key in the wording table; each entry names its own part and words its own consequence, so there is no logic to share.";
 
     private const string PlacementRules = "The placement rule of two steps: each places the object and runs its own step's check, which returns its own result type; they share only the shape.";
 
-    private const string ParallelCalls ="One call of the order-independent parallel map over a list with per-worker buffers; each asks its own question, so there is no logic to share.";
+    private const string ParallelCalls = "One call of the order-independent parallel map over a list with per-worker buffers; each asks its own question, so there is no logic to share.";
 
-    private const string Shapes = "Caches/BaseObjectShapeAndKind/BaseObjectShapes.cs:BaseObjectShapes.";
-    private const string TooClose = "Steps/RemoveTooCloseObjects/";
-    private const string TooCloseContracts = "Steps/RemoveTooCloseObjects.Contracts/";
-    private const string Settings = "Run/RunSettingsValidation/SettingsValidator.cs:SettingsValidator.";
+    private const string CollisionBuilder = "Run/RunSettingsValidation/CollisionSettingsBuilder.cs:CollisionSettingsBuilder.";
     private const string Report = "Steps/BuildLogAndReports/";
-    private const string Collector = "Steps/CollectPlacedObjects/PlacedObjectCollector.cs:PlacedObjectCollector.";
-    private const string Describe = Report + "Describe.cs:Describe.";
-    private const string LeftBehindText = Report + "LeftBehindOutcomeText.cs:LeftBehindOutcomeText.";
-    private const string VisibleKindText = Report + "VisibleObjectKindText.cs:VisibleObjectKindText.";
-    private const string MeshText = Report + "MeshProblemText.cs:MeshProblemText.";
-    private const string KeepText = Report + "KeepReasonText.cs:KeepReasonText.";
-    private const string PartText = Report + "RunPartText.cs:RunPartText.";
-    private const string VisibilityText = Report + "ObjectVisibilityText.cs:ObjectVisibilityText.";
-    private const string OtherModsText = Report + "OtherModsObjectText.cs:OtherModsObjectText.";
     private const string Resting = "Steps/RemoveObjectsRestingOnRemovedOnes/";
-    private const string RestingContracts = "Steps/RemoveObjectsRestingOnRemovedOnes.Contracts/";
     private const string OtherMods = "Steps/OtherModsObjectsLeftWithoutSupport/";
-    private const string OtherModsContracts = "Steps/OtherModsObjectsLeftWithoutSupport.Contracts/";
-    private const string RestoreContracts = "Steps/RestoreWhereRemoved.Contracts/";
-    private const string Restore = "Steps/RestoreWhereRemoved/";
 
     private const string RoundAddingEntries =
-        "Entries of the deciding steps: each decides inside its own step code and then adds its own kind of round or its moves to the run's "
-        + "decisions, outside the step's error boundary; they share only that shape, next to the end of their input record.";
+        "Entries of the deciding steps: each runs its step and returns its own result with the run's decisions after its own kind of "
+        + "addition (a round, rounds or moves). A shared helper would only wrap the constructor of Decided around that one addition, "
+        + "so they share only this two-line shape.";
 
-    private const string FitEntry = "Steps/FitClashingObjects/ClashingObjectFitter.cs:ClashingObjectFitter.";
-    private const string MarkerEntry = "Steps/MoveKeptMarkers/MarkerMovePlanner.cs:MarkerMovePlanner.";
-    private const string LeftBehindEntry = "Steps/RemoveInvisibleObjectsLeftBehind/LeftBehindObjects.cs:LeftBehindObjects.";
-    private const string VisibleEntry = "Steps/RemoveVisibleObjectsLeftBehind/VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.";
-
-    private const string TwoTimedParts =
-        "Steps whose two parts print their own lines: each times its own two calls through the run's clock; they share only the clock readings around them.";
-
-    private const string ProviderInputs =
-        "The records the rule providers take: each names what its own rule reads; they share only the shape of record declarations next to one-line providers.";
-
-    private const string RestingEntry = Resting + "RestingObjects.cs";
-    private const string RestoreText = Report + "RestoreWhereRemovedText.cs:RestoreWhereRemovedText.";
-    private const string ReportContracts = "Steps/BuildLogAndReports.Contracts/ReportFileNames.cs:ReportFileNames.";
+    private const string Runner = "Run/RunAllSteps/StepRunner.Decide.cs:StepRunner.";
+    private const string StepCalls =
+        "Timed calls of two different steps: each builds its own step's input from its own earlier results and settings. They repeat the "
+        + "Log.Timed call around them and the report lambda that prints the step's sections; that lambda cannot be one method, because "
+        + "BuildStepSections is overloaded per result type and each lambda picks its own overload.";
+    private const string LeftBehindSettings = "LeftBehindSettingsBuilder.cs:LeftBehindSettingsBuilder.";
+    private const string ParallelMapFile = "Tools/OrderIndependentParallelWork/ParallelMap.cs:ParallelMap.";
+    private const string ParallelMapOverloads =
+        "Overloads of the parallel map: each takes its own item order (index order, a permutation, a work order or a subset) and its own mix "
+        + "of per-worker buffers and summed work, and checks or maps the order its own way before the one shared core; they share only the "
+        + "parameter list, which C# cannot share between methods.";
+    private const string Records = "Tools/PluginRecordReadingAndWriting/";
 
     private const string RestoreCountFacts =
         "The facts of a count line about what the restore step judged: each counts its own kind of change, tests its own rule and words its own count, so there is no logic to share.";
@@ -76,130 +52,54 @@ public class CopiedCodeTests
         "Why each kind of change the restore step judged stays: each reads its own judged record's never-rule, guard and area; they share only the opening "
         + "\"restored: none, never-rule: its words\" and the label parameter.";
 
-    private const string FileNameConstants = "The report file names: one constant declaration per name; the names share only the shape of the declaration.";
-
     /// <summary>Each copy by the places it occurs in (see <see cref="CopyFamily.Key"/>), with the reason it is not shared.</summary>
     private static readonly Dictionary<string, string> Allowed = new()
     {
-        [CopyFamily.KeyOf([Report + "LogAndReports.cs:LogAndReports.BuildStepSections"])] = StepSections,
         [CopyFamily.KeyOf([
-            FitEntry + "FindFits", FitEntry + "Fit", FitEntry + "Input", MarkerEntry + "Input", MarkerEntry + "Plan", MarkerEntry + "PlanMoves",
-            OtherMods + "OtherModsObjects.cs:OtherModsObjects.FindHoldersOfObjectsThatStay", OtherMods + "OtherModsObjects.cs:OtherModsObjects.Settle",
-            OtherMods + "OtherModsObjects.cs:OtherModsObjects.SettleLeftWithoutSupport", LeftBehindEntry + "Evaluate", LeftBehindEntry + "Find",
-            LeftBehindEntry + "Input", VisibleEntry + "Find", VisibleEntry + "FindRounds", VisibleEntry + "Input"])] = RoundAddingEntries,
+            "Steps/FitClashingObjects/ClashingObjectFitter.cs:ClashingObjectFitter.Fit", "Steps/MoveKeptMarkers/MarkerMovePlanner.cs:MarkerMovePlanner.Plan",
+            "Steps/RemoveVisibleObjectsLeftBehind/VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.Find"])] = RoundAddingEntries,
         [CopyFamily.KeyOf([
-            "Steps/CollectPlacedObjects/PlacedObjectCollector.cs:PlacedObjectCollector.Collect", "Steps/CollectPlacedObjects/PlacedObjectCollector.cs:PlacedObjectCollector.Input",
-            "Steps/FindTargetObjectsToKeep/ObjectsToKeepFinder.cs:ObjectsToKeepFinder.Find", "Steps/FindTargetObjectsToKeep/ObjectsToKeepFinder.cs:ObjectsToKeepFinder.Input"])] = TwoTimedParts,
-        [CopyFamily.KeyOf([
-            RestingEntry + ":RestingObjects.CreateFollowUp", RestingEntry + ":RestingObjects.FollowUpInput", RestingEntry + ":RestingObjects.RestingRuleInput",
-            RestingEntry + ":RestingObjects.RoundsAfterInput", TooClose + "TooCloseObjects.cs:TooCloseObjects.CreatePlacementRule",
-            TooClose + "TooCloseObjects.cs:TooCloseObjects.OldPlaceRuleInput", TooClose + "TooCloseObjects.cs:TooCloseObjects.PlacementRuleInput",
-            TooClose + "TooCloseObjects.cs:TooCloseObjects.WhatStaysRuleInput"])] = ProviderInputs,
-        [CopyFamily.KeyOf([Shapes + "CountBounds", TooClose + "TooCloseObjects.cs:TooCloseObjects.CountSizes"])] = CountLines + " " + CounterRecord,
-        [CopyFamily.KeyOf([Settings + "CreateChangedTerrainSettings", Settings + "CreateTooCloseSettings"])] = SettingChecks,
-        [CopyFamily.KeyOf([Settings + "CreateChangedTerrainSettings"])] = SettingChecks,
-        [CopyFamily.KeyOf([Settings + "CreateChangedTerrainSettings", Settings + "CreateRestoreWhereRemovedSettings"])] = SettingChecks,
-        [CopyFamily.KeyOf([Settings + "ClampMarginInUnits", Settings + "CreateChangedTerrainSettings", Settings + "CreateCollisionSettings", Settings + "CreateTooCloseSettings"])] = SettingChecks,
-        [CopyFamily.KeyOf([
-            Describe + "HintType", Describe + "LeftItsPlaceReason", Describe + "PointReason", Describe + "TimedSuffix", RestoreText + "Refusal", RestoreText + "Undo"])] = EnumTextArms,
-        [CopyFamily.KeyOf([
-            Describe + "LeftItsPlaceReason", Describe + "PointReason", Describe + "RemovalReason", Describe + "ShownChange"])] = EnumTextArms,
-        [CopyFamily.KeyOf([
-            ReportContracts + "ComponentsFileName", ReportContracts + "EdgesFileName", ReportContracts + "FitsFileName", ReportContracts + "HintsFileName",
-            ReportContracts + "LeftBehindFileName", ReportContracts + "LeftWithoutSupportFileName", ReportContracts + "MeshOriginsFileName", ReportContracts + "RemovalsFileName",
-            ReportContracts + "RestoredFileName", ReportContracts + "RestoredWhereRemovedCellsFileName", ReportContracts + "RestoredWhereRemovedObjectsFileName",
-            ReportContracts + "SupportFileName", ReportContracts + "VisibleLeftBehindFileName"])] = FileNameConstants,
-        [CopyFamily.KeyOf([
-            Describe + "HintType", Describe + "LeftBehindReason", Describe + "OriginPlace", Describe + "TimedSuffix", KeepText + "Link", KeepText + "Relation",
-            Report + "LeftBehindOutcomeText.cs", Report + "LeftBehindOutcomeText.cs:LeftBehindOutcomeText",
-            LeftBehindText + "Describe", LeftBehindText + "Verdict",
-            MeshText + "FailureCategory", MeshText + "Line", MeshText + "ReadFailure",
-            VisibilityText + "Describe", VisibilityText + "KindName", OtherModsText + "NothingBelow", OtherModsText + "Outcome", OtherModsText + "RoleName",
-            OtherModsText + "Roles", OtherModsText + "Summary",
-            RestoreText + "Area", RestoreText + "Fault", RestoreText + "FaultKind", RestoreText + "Guard", RestoreText + "Kind", RestoreText + "KindVerb", RestoreText + "Never",
-            RestoreText + "PartOfCell", RestoreText + "Quarter", RestoreText + "Refusal", RestoreText + "RefusalKind", RestoreText + "Result",
-            RestoreText + "TerrainKept", RestoreText + "Undo", RestoreText + "UndoVerb",
-            PartText + "LinkedStep", PartText + "Word",
-            Report + "Tables.Fits.cs:Tables.ChangedObjectOutcomeName", Report + "Tables.Fits.cs:Tables.OwnShrunkOrTurned",
-            Report + "Tables.Restored.cs:Tables.PartName", Report + "Tables.Restored.cs:Tables.PartNames",
-            Report + "Tables.Support.cs:Tables.DescribeCategory", Report + "Tables.Support.cs:Tables.DescribeTopSupporters",
-            Report + "TargetOrigins.cs:TargetOrigins.ChangedHeading", Report + "TargetOrigins.cs:TargetOrigins.ChangedPhrase",
-            Report + "TargetOrigins.cs:TargetOrigins.CountedOtherOrigins", Report + "TargetOrigins.cs:TargetOrigins.KindName", Report + "TargetOrigins.cs:TargetOrigins.Phrase",
-            Report + "VisibleObjectKindText.cs", Report + "VisibleObjectKindText.cs:VisibleObjectKindText",
-            VisibleKindText + "KindName", VisibleKindText + "KindNameOrEmpty"])] = EnumTextArms,
-        [CopyFamily.KeyOf([
-            Report + "RestoreCountLines.cs:RestoreCountLines.KeptForArea", Report + "RestoreCountLines.cs:RestoreCountLines.LeftAsChanged",
-            Report + "RestoreCountLines.cs:RestoreCountLines.NeverRestored", Report + "RestoreCountLines.cs:RestoreCountLines.RestoredInSummary"])] = RestoreCountFacts,
+            OtherMods + "OtherModsObjects.cs:OtherModsObjects.Settle", "Steps/RemoveInvisibleObjectsLeftBehind/LeftBehindObjects.cs:LeftBehindObjects.Find"])] = RoundAddingEntries,
+        [CopyFamily.KeyOf([CollisionBuilder + "CreateChangedTerrainSettings", CollisionBuilder + "CreateTooCloseSettings"])] = SettingChecks,
+        [CopyFamily.KeyOf([CollisionBuilder + "CreateChangedTerrainSettings"])] = SettingChecks,
         [CopyFamily.KeyOf([Report + "RestoreCountLines.cs:RestoreCountLines.LeftToLaterPlugins"])] = RestoreCountFacts,
         [CopyFamily.KeyOf([Report + "RestoreCountLines.cs:RestoreCountLines.Restored"])] = RestoreCountFacts,
         [CopyFamily.KeyOf([Report + "RestoreCountLines.cs:RestoreCountLines.KeptForArea"])] = RestoreCountFacts,
-        [CopyFamily.KeyOf([RestoreOutcomesType + "IEnumerable", RestoreOutcomesType + "KeptBecause", RestoreOutcomesType + "LabelsIn"])] = KeptReasons,
+        [CopyFamily.KeyOf([RestoreOutcomesType + "KeptBecause"])] = KeptReasons,
         [CopyFamily.KeyOf([
-            Report + "ClearedAreaText.cs:ClearedAreaText.After", Report + "ClearedAreaText.cs:ClearedAreaText.MeasureName",
-            Describe + "RemovalReason", Describe + "ShownChange"])] = EnumTextArms,
-        [CopyFamily.KeyOf([
-            Report + "Tables.RestoreWhereRemoved.cs", Report + "Tables.RestoreWhereRemoved.cs:Tables", Report + "Tables.RestoreWhereRemoved.cs:Tables.AreaColumnCount",
-            Report + "Tables.RestoreWhereRemoved.cs:Tables.AreaHeader", Report + "Tables.Support.cs", Report + "Tables.Support.cs:Tables",
-            Report + "Tables.Support.cs:Tables.MaxListedSupporters", Report + "Tables.Support.cs:Tables.SupportHeader"])] = TableDeclarations + " " + CsvColumnNames,
-        [CopyFamily.KeyOf([
-            "Steps/FitClashingObjects.Contracts/FitParts.cs", "Steps/FitClashingObjects.Contracts/FitParts.cs:FitParts",
-            "Steps/FitClashingObjects.Contracts/FitParts.cs:FitParts.FitCheck", "Steps/FitClashingObjects.Contracts/FitParts.cs:FitParts.Owner",
-            "Steps/FitClashingObjects.Contracts/FitParts.cs:FitParts.RestingCheck",
-            OtherModsContracts + "OtherModsObjectsParts.cs", OtherModsContracts + "OtherModsObjectsParts.cs:OtherModsObjectsParts",
-            OtherModsContracts + "OtherModsObjectsParts.cs:OtherModsObjectsParts.HeldUpTargets", OtherModsContracts + "OtherModsObjectsParts.cs:OtherModsObjectsParts.LeftWithoutSupport",
-            OtherModsContracts + "OtherModsObjectsParts.cs:OtherModsObjectsParts.Owner",
-            RestingContracts + "RestingObjectsParts.cs", RestingContracts + "RestingObjectsParts.cs:RestingObjectsParts",
-            RestingContracts + "RestingObjectsParts.cs:RestingObjectsParts.AlsoRemove", RestingContracts + "RestingObjectsParts.cs:RestingObjectsParts.FollowUp",
-            RestingContracts + "RestingObjectsParts.cs:RestingObjectsParts.Owner", RestingContracts + "RestingObjectsParts.cs:RestingObjectsParts.ReportFileDetails",
-            RestingContracts + "RestingObjectsParts.cs:RestingObjectsParts.TouchChains",
-            RestoreContracts + "RestoreWhereRemovedParts.cs", RestoreContracts + "RestoreWhereRemovedParts.cs:RestoreWhereRemovedParts",
-            RestoreContracts + "RestoreWhereRemovedParts.cs:RestoreWhereRemovedParts.ObjectCheck", RestoreContracts + "RestoreWhereRemovedParts.cs:RestoreWhereRemovedParts.ObjectThatStays",
-            RestoreContracts + "RestoreWhereRemovedParts.cs:RestoreWhereRemovedParts.Owner", RestoreContracts + "RestoreWhereRemovedParts.cs:RestoreWhereRemovedParts.Step"])] = PartKeyHolders,
-        [CopyFamily.KeyOf([MeshText + "FailureCategory", MeshText + "Line", MeshText + "ReadFailure"])] = EnumTextArms,
-        [CopyFamily.KeyOf([PartText + "Wordings"])] = PartKeyLines,
-        [CopyFamily.KeyOf([
-            Report + "Tables.Fits.cs:Tables.FitsHeader", Report + "Tables.Support.cs:Tables.MaxListedSupporters", Report + "Tables.Support.cs:Tables.SupportHeader",
-            Report + "Tables.Touch.cs:Tables.ComponentHeader", Report + "Tables.Touch.cs:Tables.EdgeHeader", Report + "Tables.Touch.cs:Tables.MaxTopBases"])] =
-            TableDeclarations + " " + CsvColumnNames,
-        [CopyFamily.KeyOf([
-            Report + "Tables.Fits.cs", Report + "Tables.Fits.cs:Tables", Report + "Tables.Fits.cs:Tables.FitsHeader",
-            Report + "Tables.OtherModsObjects.cs", Report + "Tables.OtherModsObjects.cs:Tables", Report + "Tables.OtherModsObjects.cs:Tables.LeftWithoutSupportHeader",
-            Report + "Tables.Removals.cs", Report + "Tables.Removals.cs:Tables", Report + "Tables.Removals.cs:Tables.RemovalsHeader"])] = TableDeclarations + " " + CsvColumnNames,
-        [CopyFamily.KeyOf([
-            Report + "Tables.Removals.cs:Tables.BuildRemovalsTable", Report + "Tables.Removals.cs:Tables.RemovalsHeader",
-            Report + "Tables.Support.cs:Tables.BuildSupportTable", Report + "Tables.Support.cs:Tables.SupportHeader"])] =
-            TableDeclarations + " " + CsvColumnNames,
+            Report + "Tables.Fits.cs:Tables.FitsHeader", Report + "Tables.Support.cs:Tables.SupportHeader", Report + "Tables.Touch.cs:Tables.ComponentHeader",
+            Report + "Tables.Touch.cs:Tables.EdgeHeader"])] = CsvColumnNames,
+        [CopyFamily.KeyOf([Report + "Tables.Support.cs:Tables.SupportHeader", Report + "Tables.Touch.cs:Tables.ComponentHeader"])] = CsvColumnNames,
+        [CopyFamily.KeyOf([Report + "RunPartText.cs:RunPartText.Wordings"])] = PartKeyLines,
         [CopyFamily.KeyOf(["Steps/MoveKeptMarkers/KeptMarkerMover.cs:KeptMarkerMover.Move", OtherMods + "TargetsHoldingUpOtherModsObjects.cs:TargetsHoldingUpOtherModsObjects.Find"])] =
             ParallelCalls,
         [CopyFamily.KeyOf([Resting + "SupportContactFinder.cs:SupportContactFinder.FindContactsOfAll", OtherMods + "TargetsHoldingUpOtherModsObjects.cs:TargetsHoldingUpOtherModsObjects.Find"])] =
             ParallelCalls,
-        [CopyFamily.KeyOf(["Steps/JudgeChangedObjects/ChangedObjectJudging.cs:ChangedObjectJudging.Prepare", "Steps/RemoveObjectsOnChangedTerrain/ChangedTerrainObjects.cs:ChangedTerrainObjects.FindPass"])] =
-            ParallelCalls,
-        [CopyFamily.KeyOf([OtherMods + "LeftWithoutSupport.cs:LeftWithoutSupport.FindMissingWeightsBefore", OtherMods + "TargetObjectsDropTest.cs:TargetObjectsDropTest.FindResting"])] =
-            ParallelCalls,
         [CopyFamily.KeyOf([
-            "Steps/RemoveObjectsOnChangedTerrain/ChangedTerrainPlacementRule.cs:ChangedTerrainPlacementRule.StartTries",
-            "Steps/RemoveObjectsOnChangedTerrain/ChangedTerrainPlacementRule.cs:ChangedTerrainPlacementRule.Tries",
             "Steps/RemoveObjectsOnChangedTerrain/ChangedTerrainPlacementRule.cs:ChangedTerrainPlacementRule.Tries.Check",
-            "Steps/RemoveObjectsOnChangedTerrain/ChangedTerrainPlacementRule.cs:ChangedTerrainPlacementRule.Tries.Dispose",
-            TooClose + "TooClosePlacementRule.cs:TooClosePlacementRule.StartTries",
-            TooClose + "TooClosePlacementRule.cs:TooClosePlacementRule.Tries",
-            TooClose + "TooClosePlacementRule.cs:TooClosePlacementRule.Tries.Check",
-            TooClose + "TooClosePlacementRule.cs:TooClosePlacementRule.Tries.Dispose"])] = PlacementRules,
-        [CopyFamily.KeyOf([
-            TooCloseContracts + "NpcWork.cs:NpcWork", TooCloseContracts + "NpcWork.cs:NpcWork.Zero", TooCloseContracts + "NpcWork.cs:NpcWork.operator",
-            TooCloseContracts + "ShapeZoneStats.cs:ShapeZoneWork", TooCloseContracts + "ShapeZoneStats.cs:ShapeZoneWork.Zero", TooCloseContracts + "ShapeZoneStats.cs:ShapeZoneWork.operator",
-            TooCloseContracts + "TooCloseWork.cs:TooCloseWork", TooCloseContracts + "TooCloseWork.cs:TooCloseWork.Zero", TooCloseContracts + "TooCloseWork.cs:TooCloseWork.operator"])] = CounterRecord,
-        [CopyFamily.KeyOf([
-            TooClose + "NpcsThatCanSpawn.cs:NpcsThatCanSpawn.BodiesOf", TooClose + "NpcsThatCanSpawn.cs:NpcsThatCanSpawn.MeasureBodiesIn",
-            TooClose + "NpcsThatCanSpawn.cs:NpcsThatCanSpawn.NpcOf", TooClose + "NpcsThatCanSpawn.cs:NpcsThatCanSpawn.Overlapping",
-            TooClose + "NpcsThatCanSpawn.cs:NpcsThatCanSpawn.TransformOf", TooClose + "NpcsThatCanSpawn.cs:NpcsThatCanSpawn.WorldBoxOf"])] = ViewForwarders,
+            "Steps/RemoveTooCloseObjects/TooClosePlacementRule.cs:TooClosePlacementRule.Tries.Check"])] = PlacementRules,
+        [CopyFamily.KeyOf([Runner + "RunMarkerMoves", Runner + "RunSelection"])] = StepCalls,
+        [CopyFamily.KeyOf([Runner + "RunAlsoRemove", Runner + "RunVisibleLeftBehind"])] = StepCalls,
+        [CopyFamily.KeyOf([Runner + "RunLeftBehind", Runner + "RunVisibleLeftBehind"])] = StepCalls,
+        [CopyFamily.KeyOf(["Run/RunSettingsValidation/" + LeftBehindSettings + "CreateInvisible", "Run/RunSettingsValidation/" + LeftBehindSettings + "CreateVisible"])] =
+            "Each builds a different settings record from a different settings group, values type and on-switch; the surroundings check they "
+            + "share is already one method.",
+        [CopyFamily.KeyOf([ParallelMapFile + "Run", ParallelMapFile + "RunOver"])] = ParallelMapOverloads,
+        [CopyFamily.KeyOf([ParallelMapFile + "Run"])] = ParallelMapOverloads,
+        [CopyFamily.KeyOf([Records + "CellRecordParts.cs:CellRecordParts.FieldParts"])] =
+            "The table of the cell's whole-field parts: each entry pairs its own part with its own fields, so neighbouring entries of one shape repeat "
+            + "and there is no logic to share.",
+        [CopyFamily.KeyOf([Records + "CellRecordParts.cs:CellRecordParts.CopyFields", Records + "LandRecordParts.cs:LandRecordParts.CopyFields"])] =
+            "A masked copy into a cell and into a landscape: Mutagen generates DeepCopyIn per record type, on internal interfaces that share no "
+            + "base, so each type needs its own one-line call.",
+        [CopyFamily.KeyOf(["Tools/IndexGraphQueries/AdjacencyPairs.cs:AdjacencyPairs.Collect", "Tools/IndexGraphQueries/AdjacencyPairs.cs:AdjacencyPairs.From"])] =
+            "From is Collect kept to each pair's smaller end; the two share only their parameter list, which C# cannot share between methods.",
     };
 
     [Fact]
-    public void NoBusinessCodeIsCopiedExceptTheListed()
+    public void NoProductionCodeIsCopiedExceptTheListed()
     {
-        var files = BusinessCode.SourceFiles().Select(file => (file.Path, File.ReadAllText(file.FullPath))).ToList();
+        var files = SourceFile.All().Select(file => (file.Path, File.ReadAllText(file.FullPath))).ToList();
 
         var families = CodeCopies.Find(files, WindowLength);
 
@@ -208,6 +108,82 @@ public class CopiedCodeTests
 
         Assert.True(unlisted.Count == 0, $"Copied code (reuse a tool or share one method, or list its places with a reason):{Environment.NewLine}{string.Join(Environment.NewLine, unlisted)}");
         AllowListAssert.NoneStale(stale, "Listed but no longer copied");
+    }
+
+    [Fact]
+    public void TheScanFindsAPlantedCopyButNotItsLookAlikes()
+    {
+        const string copied = """
+            class Prices
+            {
+                decimal Total(IReadOnlyList<Item> items, decimal rate)
+                {
+                    var sum = 0m;
+                    foreach (var item in items) { if (item.Count > 0) sum += item.Price * item.Count; }
+                    return Math.Round(sum * rate, 2);
+                }
+            }
+            """;
+        const string copy = """
+            class Orders
+            {
+                decimal Charge(IReadOnlyList<Line> lines, decimal tax)
+                {
+                    var amount = 0m;
+                    foreach (var line in lines) { if (line.Count > 0) amount += line.Price * line.Count; }
+                    return Math.Round(amount * tax, 2);
+                }
+            }
+            """;
+        const string propertiesAndArms = """
+            class Window
+            {
+                public int Width { get; set; } = 640;
+                public int Height { get; set; } = 480;
+                public bool Resizable { get; set; } = true;
+                public string Title { get; set; } = "Main";
+                string Describe(Side side) => side switch
+                {
+                    Side.Left => "left",
+                    Side.Right => "right",
+                    Side.Top => "top",
+                    _ => throw new UnreachableException(),
+                };
+            }
+            """;
+        const string otherPropertiesAndArms = """
+            class Sound
+            {
+                public int Volume { get; set; } = 80;
+                public int Balance { get; set; } = 0;
+                public bool Muted { get; set; } = false;
+                public string Device { get; set; } = "Default";
+                string Describe(Level level) => level switch
+                {
+                    Level.Low => "low",
+                    Level.Middle => "middle",
+                    Level.High => "high",
+                    _ => throw new UnreachableException(),
+                };
+            }
+            """;
+        const string area = """
+            class Rectangle
+            {
+                int Margin(Box box) { return box.Width * box.Height - box.Width; }
+            }
+            """;
+        const string crossedArea = """
+            class Square
+            {
+                int Margin(Box box) { return box.Height * box.Width - box.Width; }
+            }
+            """;
+
+        var families = CodeCopies.Find(
+            [("a", copied), ("b", copy), ("c", propertiesAndArms), ("d", otherPropertiesAndArms), ("e", area), ("f", crossedArea)], windowLength: 20);
+
+        Assert.Equal("a:Prices.Total | b:Orders.Charge", Assert.Single(families).Key);
     }
 
     [Fact]
@@ -242,75 +218,91 @@ public class CopiedCodeTests
         Assert.Equal("a:Total | b:Count", family.Key);
     }
 
-    private const string TwoMemberCopyFirst = """
-        class A
-        {
-            void X()
+    [Fact]
+    public void AStretchAcrossTwoMembersIsNoCopy()
+    {
+        const string first = """
+            class A
             {
-                Run(a);
-                if (c > 2) Stop(c);
+                void X()
+                {
+                    Prepare(first);
+                    if (count > 2) Stop(count);
+                }
+                void Y()
+                {
+                    foreach (var item in items) Use(item);
+                    Finish();
+                }
             }
-            void Y()
+            """;
+        const string second = """
+            class B
             {
-                foreach (var d in c) Use(d);
-                Finish(a);
+                void P()
+                {
+                    return;
+                    if (count > 2) Stop(count);
+                }
+                void Q()
+                {
+                    foreach (var item in items) Use(item);
+                    return;
+                }
             }
-        }
-        """;
+            """;
 
-    private const string TwoMemberCopySecond = """
+        Assert.Empty(CodeCopies.Find([("a", first), ("b", second)], windowLength: 20));
+    }
+
+    private const string CopyInOneMember = """
         class B
         {
             void P()
             {
                 Other(a, b);
-                if (c > 2) Stop(c);
-            }
-            void Q()
-            {
-                foreach (var d in c) Use(d);
-                Done(a, b, d);
+                foreach (var item in items) { if (item > 2) Stop(item); }
+                Done(a, b);
             }
         }
         """;
 
     [Fact]
-    public void ACopyThatSpansTwoMembersIsPlacedInBoth()
-    {
-        var family = Assert.Single(CodeCopies.Find([("a", TwoMemberCopyFirst), ("b", TwoMemberCopySecond)], windowLength: 12));
-
-        Assert.Equal("a:A.X | a:A.Y | b:B.P | b:B.Q", family.Key);
-    }
-
-    [Fact]
     public void TheKeyOfACopyStaysTheSameWhenOtherCodeNextToItChanges()
     {
+        const string original = """
+            class A
+            {
+                void P()
+                {
+                    Begin(x);
+                    foreach (var entry in entries) { if (entry > 5) Stop(entry); }
+                    End(x);
+                }
+            }
+            """;
         const string changed = """
             class A
             {
                 int Unrelated() => 5;
-                void X()
+                void P()
                 {
-                    Run(a);
-                    Extra(c);
-                    if (c > 2) Stop(c);
-                }
-                void Y()
-                {
-                    foreach (var d in c) Use(d);
-                    Finish(a);
-                    Finish(b);
+                    Begin(x, y, z);
+                    foreach (var entry in entries) { if (entry > 5) Stop(entry); }
+                    End(x, y, z);
                 }
             }
             """;
 
-        var family = Assert.Single(CodeCopies.Find([("a", changed), ("b", TwoMemberCopySecond)], windowLength: 12));
+        var before = Assert.Single(CodeCopies.Find([("a", original), ("b", CopyInOneMember)], windowLength: 12));
+        var after = Assert.Single(CodeCopies.Find([("a", changed), ("b", CopyInOneMember)], windowLength: 12));
 
-        Assert.Equal("a:A.X | a:A.Y | b:B.P | b:B.Q", family.Key);
+        Assert.Equal("a:A.P | b:B.P", before.Key);
+        Assert.Equal(before.Key, after.Key);
     }
 
     [Fact]
-    public void TheOutlineNamesMembersTypesAndCodeOutsideThem()
+    public void TheOutlineNamesTheMemberOfEachLineAndNoneOutsideMembers()
     {
         const string source = """
             namespace N;
@@ -331,26 +323,100 @@ public class CopiedCodeTests
 
         var outline = CodeOutline.Of(source);
 
-        Assert.Empty(outline.PlacesOfLine(1));
-        Assert.Equal(["Outer"], outline.PlacesOfLine(2));
-        Assert.Equal(["Outer.field"], outline.PlacesOfLine(4));
-        Assert.Equal(["Outer.Outer"], outline.PlacesOfLine(5));
-        Assert.Equal(["Outer.Prop"], outline.PlacesOfLine(6));
-        Assert.Equal(["Outer.Expr"], outline.PlacesOfLine(7));
-        Assert.Equal(["Outer.Method"], outline.PlacesOfLine(8));
-        Assert.Equal(["Outer.Method"], outline.PlacesOfLine(10));
-        Assert.Equal(["Outer.Inner.Deep"], outline.PlacesOfLine(12));
-        Assert.Equal(["Point"], outline.PlacesOfLine(14));
+        Assert.Null(outline.OnlyMemberOfLine(1));
+        Assert.Null(outline.OnlyMemberOfLine(2));
+        Assert.Equal("Outer.field", outline.OnlyMemberOfLine(4)?.Place);
+        Assert.Equal("Outer.Outer", outline.OnlyMemberOfLine(5)?.Place);
+        Assert.Equal("Outer.Prop", outline.OnlyMemberOfLine(6)?.Place);
+        Assert.Equal("Outer.Expr", outline.OnlyMemberOfLine(7)?.Place);
+        Assert.Equal("Outer.Method", outline.OnlyMemberOfLine(8)?.Place);
+        Assert.Equal("Outer.Method", outline.OnlyMemberOfLine(10)?.Place);
+        Assert.Equal("Outer.Inner.Deep", outline.OnlyMemberOfLine(12)?.Place);
+        Assert.Null(outline.OnlyMemberOfLine(14));
+    }
+
+    [Fact]
+    public void TheOutlineNamesEachMemberByItsOwnNameWhateverTypeOrTupleItsHeaderHolds()
+    {
+        const string source = """
+            class Shapes
+            {
+                ImmutableArray<(int A, int B)> Table = [];
+                (int A, int B) Pair() => (1, 2);
+                Dictionary<string, (int, int)> Map { get; } = new();
+                List<(int, int)> Pairs<T>(T value) => [];
+                int this[int index] => index;
+                int IShape.Area => 1;
+                static Shapes operator +(Shapes a, Shapes b) => a;
+                static Shapes operator -(Shapes a, Shapes b) => a;
+                static bool operator <(Shapes a, Shapes b) => true;
+                static implicit operator int(Shapes a) => 1;
+            }
+            """;
+
+        const int firstMemberLine = 3;
+        string[] members =
+            ["Shapes.Table", "Shapes.Pair", "Shapes.Map", "Shapes.Pairs", "Shapes.this", "Shapes.Area", "Shapes.operator +", "Shapes.operator -", "Shapes.operator <", "Shapes.operator int"];
+
+        var outline = CodeOutline.Of(source);
+
+        Assert.Equal(members, Enumerable.Range(firstMemberLine, members.Length).Select(line => outline.OnlyMemberOfLine(line)?.Place));
+    }
+
+    [Fact]
+    public void TheOutlineNamesNoMemberForALineOfTwoMembers()
+    {
+        var outline = CodeOutline.Of("class C\n{\n    int A; int B;\n}");
+
+        Assert.Null(outline.OnlyMemberOfLine(3));
     }
 
     [Fact]
     public void TheScanFindsACopyInsideOneFileButNotOverlappingRepetition()
     {
-        const string copiedTwice = "int A(int x) { return x + 1 * 2 - 3; } int B(int y) { return y + 1 * 2 - 3; }";
-        const string repeatingPattern = "a(); a(); a(); a();";
+        const string copiedTwice = """
+            class C
+            {
+                int A(int x) { return x + 1 * 2 - 3; }
+                int B(int y) { return y + 1 * 2 - 3; }
+            }
+            """;
+        const string repeatingPattern = """
+            class C
+            {
+                void A() { a(); a(); a(); a(); }
+            }
+            """;
 
         Assert.Equal(2, Assert.Single(CodeCopies.Find([("a", copiedTwice)], windowLength: 10)).Runs.Count);
         Assert.Empty(CodeCopies.Find([("a", repeatingPattern)], windowLength: 10));
+    }
+
+    private const int TermWindowLength = 24;
+
+    /// <summary>
+    /// A member of one line that is written as an arrow in one file and as a block in the other, so only the stretch from "new" on is the same.
+    /// Each window of that stretch is a copy unless the repetition rule skips it.
+    /// </summary>
+    private static IReadOnlyList<CopyFamily> FindTermsCopiedInArrowAndBlockMembers(string terms)
+    {
+        var arrow = $"class Product\n{{\n    Vector3 Scale(Vector3 a, Vector3 b) => new Vector3({terms});\n}}";
+        var block = $"class Order\n{{\n    Vector3 Scale(Vector3 a, Vector3 b) {{ return new Vector3({terms}); }}\n}}";
+        return CodeCopies.Find([("a", arrow), ("b", block)], TermWindowLength);
+    }
+
+    [Fact]
+    public void TheScanSkipsACopyWhoseSharedStretchIsOnePatternRepeatedPerAxisOnOneLine()
+    {
+        Assert.Empty(FindTermsCopiedInArrowAndBlockMembers("a.X * b.X, a.Y * b.Y, a.Z * b.Z"));
+    }
+
+    [Fact]
+    public void TheScanFindsACopyWhoseSharedStretchRepeatsNoPattern()
+    {
+        var family = Assert.Single(FindTermsCopiedInArrowAndBlockMembers("a.X * b.X, a.Y + 1, Math.Abs(a.Z)"));
+
+        Assert.Equal("a:Product.Scale | b:Order.Scale", family.Key);
     }
 
     [Fact]

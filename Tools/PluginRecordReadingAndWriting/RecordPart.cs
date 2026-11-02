@@ -18,6 +18,12 @@ internal sealed class RecordPart<TVersion, TTarget>(
     Action<TTarget, TVersion> copy,
     Func<TVersion, bool> holdsRawBytes)
 {
+    /// <summary>A part that holds no bytes Mutagen does not read.</summary>
+    public RecordPart(IReadOnlyList<string> fields, Func<TVersion, TVersion, bool> differs, Action<TTarget, TVersion> copy)
+        : this(fields, differs, copy, static _ => false)
+    {
+    }
+
     public IReadOnlyList<string> Fields => fields;
 
     public bool Differs(TVersion one, TVersion other) => differs(one, other);

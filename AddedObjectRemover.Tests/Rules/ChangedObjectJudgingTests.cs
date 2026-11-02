@@ -45,8 +45,7 @@ public class ChangedObjectJudgingTests
     private static readonly PresenceFacts Shown = new(Deleted: false, InitiallyDisabled: false, EnableParent: null);
     private static readonly ExteriorCell Cell = new(TestTargets.Space, 0, 0);
 
-    private static readonly WhatToCollect Plan = new(
-        Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: MovedDistance, ProcessReplaced: false, JudgeOldPlaces: true, TerrainForChangedObjectsOnly: false);
+    private static readonly WhatToCollect Plan = new(new ScanNeeds(JudgeOldPlaces: true), MovedDistance, ProcessReplaced: false);
 
     private static readonly ModTrustTable Mods = TestModTrust.Of(
         Cleaned, Patch, trusted: [BaseGame], untrusted: [City, Fence], neverTrusted: [Grass], needingCleanedMod: [Compat]);
@@ -354,7 +353,7 @@ public class ChangedObjectJudgingTests
     [Fact]
     public void AskingForTheOldPlaceWorldOfAScanThatDidNotJudgeTheOldPlacesThrows()
     {
-        var notJudged = Plan with { JudgeOldPlaces = false };
+        var notJudged = Plan with { Needs = new ScanNeeds(JudgeOldPlaces: false) };
         var collected = Collect([ChangedBarrel(B, C)], notJudged);
 
         Assert.Throws<InvalidOperationException>(() => ChangedObjectJudging.CreateOldPlaceWorld(collected, Cleaned, notJudged));
@@ -470,12 +469,13 @@ public class ChangedObjectJudgingTests
         return new OldPlaceRules(
             target => TooCloseObjects.CreatePlacementRule(
                 new(
-                    collected.Targets,
-                    visibleTargets,
-                    RemovalCauseSelector.SelectForOldPlace(oldPlace.OtherModObjects, world.OtherModObjects.Length, [ChangedObjectJudging.OldPlaceIdOf(target)], Zone.Npcs),
-                    oldPlace.PlacedNpcs,
-                    Shapes,
-                    triangles,
+                    new(
+                        collected.Targets,
+                        visibleTargets,
+                        RemovalCauseSelector.SelectForOldPlace(oldPlace.OtherModObjects, world.OtherModObjects.Length, [ChangedObjectJudging.OldPlaceIdOf(target)], Zone.Npcs),
+                        oldPlace.PlacedNpcs,
+                        Shapes,
+                        triangles),
                     Zone)),
             ChangedTerrainObjects.CreatePlacementRule(
                 new(Mods.AcceptedWorldWithoutCleanedMod, LoadOrder, terrain ?? new TerrainRecords(), Shapes, terrain is null ? TerrainOff : Terrain())));

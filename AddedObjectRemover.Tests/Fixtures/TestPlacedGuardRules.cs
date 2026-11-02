@@ -7,10 +7,9 @@ namespace AddedObjectRemover.Tests.Fixtures;
 internal sealed record TestPlacedGuardRules(
     IObjectCachesOfWorlds WorldCaches,
     Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule> TooClose,
-    IHoldersOfObjectsThatStay HoldersOfObjectsThatStay,
-    OtherModsObjectsSettings Support)
+    IHoldersOfObjectsThatStay HoldersOfObjectsThatStay)
 {
-    /// <param name="support">The touch gap and lost share of the support test.</param>
+    /// <param name="support">The touch gap and lost share of the support test, which the holders test reads its touch gap from.</param>
     public static TestPlacedGuardRules Create(
         IBaseObjectShapes shapes, ModTrustTable trust, LoadOrderPlugins plugins, OtherModsObjectsSettings support, ITerrainHeights terrain, int threads)
     {
@@ -18,25 +17,15 @@ internal sealed record TestPlacedGuardRules(
         var worldCaches = new TestObjectCachesOfWorlds(world => TestScenes.Index(world, shapes, threads));
         var causes = RemovalCauseSelector.CreateCausesOfWorlds(worldCaches);
         var noWorld = TestScenes.Index(TestScenes.CreateWorld([], []), shapes, threads);
+        var runCaches = new TestRunCaches(shapes, triangles, terrain, TestBaseFacts.Unresolved, objects: noWorld);
         return new TestPlacedGuardRules(
             worldCaches,
             (world, caches, excluded, settings) => TooCloseObjects.CreatePlacementRule(
-                new(world.Targets, caches.VisibleTargets, causes.Of(world, excluded, settings.Npcs), caches.PlacedNpcs, shapes, triangles, settings)),
+                new(new(world.Targets, caches.VisibleTargets, causes.Of(world, excluded, settings.Npcs), caches.PlacedNpcs, shapes, triangles), settings)),
             OtherModsObjects.CreateHoldersOfObjectsThatStay(
                 new(
-                    new(
-                        [],
-                        noWorld,
-                        trust,
-                        plugins,
-                        support,
-                        shapes,
-                        triangles,
-                        RestingObjects.CreateSupportContacts(new TestRunCaches(shapes, triangles, terrain, TestBaseFacts.Unresolved, noWorld.VisibleObjectsOfAnyPlugin)),
-                        terrain,
-                        new Execution(threads)),
-                    worldCaches)),
-            support);
+                    new([], runCaches, trust, plugins, support, RestingObjects.CreateSupportContacts(runCaches), new Execution(threads)),
+                    worldCaches)));
     }
 
     /// <param name="tooClose">Builds the rule over a world and its caches; <see cref="TooClose"/> when null.</param>
@@ -59,11 +48,11 @@ internal sealed class TestTooCloseToWhatStays(
     public IPlacementRule Create(CollectedObjects world, IEnumerable<OtherId> leftOut, TooCloseSettings settings) => create(world, worldCaches.Of(world), leftOut, settings);
 }
 
-internal sealed class TestNavmeshCheck(Func<IReadOnlyList<WriteOrder>, NavmeshFault?> findFault) : INavmeshCheckIfWritten
+internal sealed class TestNavmeshCheck(Func<NavmeshWriteTrial, NavmeshFault?> findFault) : INavmeshCheckIfWritten
 {
     public static TestNavmeshCheck NoFault { get; } = new(_ => null);
 
-    public NavmeshFault? FindFaultIfWritten(IReadOnlyList<WriteOrder> orders) => findFault(orders);
+    public NavmeshFault? FindFaultIfWritten(NavmeshWriteTrial trial) => findFault(trial);
 }
 
 /// <summary>Plugin records that answer only the land questions of the restore step.</summary>

@@ -21,7 +21,7 @@ public sealed class ChangedRecordCollectingTests
     private const ushort NewerFormVersion = 44;
     private const int InitiallyDisabled = (int)SkyrimMajorRecord.SkyrimMajorRecordFlag.InitiallyDisabled;
 
-    private static readonly WhatToCollect Plan = new(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false, AreaRecordVersions: new AreaRecordReads(new AreaPartTolerances(LandHeight: 8f, WaterHeight: 8f), Cells: true, Lands: true));
+    private static readonly WhatToCollect Plan = new(new ScanNeeds(AreaRecordVersions: new AreaRecordReads(new AreaPartTolerances(LandHeight: 8f, WaterHeight: 8f), Cells: true, Lands: true)), SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false);
     private static readonly PluginName Patch = FixturePatcherState.PatchModKey.ToPluginName();
 
     private readonly FixtureMod _base = new("Base.esm");
@@ -431,7 +431,7 @@ public sealed class ChangedRecordCollectingTests
     [Fact]
     public void WithoutTheRestoreGroupTheLinksIntoAChangedRecordThatIsNoTargetAreNeitherReadNorMarked()
     {
-        var read = CollectLinkedChangedRecordThatIsNoTarget(Plan with { AreaRecordVersions = null }, out var collected);
+        var read = CollectLinkedChangedRecordThatIsNoTarget(Plan with { Needs = Plan.Needs with { AreaRecordVersions = null } }, out var collected);
 
         Assert.False(ChangedRecordOf(collected).LinkedFromCleanedMod);
         Assert.DoesNotContain(Rock, read.LinkedRecords);
@@ -527,11 +527,11 @@ public sealed class ChangedRecordCollectingTests
         var cleared = TestAreaShares.Of(AreaVerdict.Cleared);
         var whereRemoved = new RestoreWhereRemovedResult(
             StepOutcome.Performed,
-            [.. collected.ChangedRecords.Select(changed => new PlacedChangeJudged(changed, null, cleared, null, Refused: null, IsRestored: true, ChangeJudge.KindOf(changed), KeptForArea: null))],
+            [.. collected.ChangedRecords.Select(changed => new PlacedChangeJudged(changed, null, cleared, null, Refused: null, IsRestored: true, ChangeJudge.KindOf(changed), KeptForArea: null, PlacedBack: null))],
             [], [], [], [], Passes: 1, DoorsLeftRemoved: [], Failures: []);
         var protection = ObjectsToKeep.Build(collected.Targets, [], TestTargets.References(collected.Targets.Length), TestBaseFacts.Unresolved);
         var final = RemovalDecisions.Start(protection, [.. collected.Targets.Select(_ => (WhenRemoved)new WhenRemoved.Disable())]);
-        PatchWriter.Write(new(final, collected.Targets, OtherModsObjectsResult.SwitchedOff, whereRemoved, records, new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod)));
+        PatchWriter.Write(new(final, collected.Targets, OtherModsObjectsResult.SwitchedOff, whereRemoved, records, new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod, Program.PatchMarkerText)));
         return (collected, state.PatchMod);
     }
 

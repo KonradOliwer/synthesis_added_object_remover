@@ -33,7 +33,7 @@ internal readonly record struct WaterLine(float Lower, float Upper)
 
 /// <summary>
 /// Whether the water level of each cell the cleaned mod last changed it in goes back. It goes back with the cell's other undone parts,
-/// unless an object or a navmesh that stays lies partly between the level before the cleaned mod and the cleaned mod's (W); then the
+/// unless an object or a navmesh that stays lies partly between the level before the cleaned mod and the cleaned mod's; then the
 /// cell keeps the cleaned mod's level, and its other parts still go back. Immutable: <see cref="KeepAtWaterLines"/> gives a new plan.
 /// </summary>
 /// <remarks>Everything runs in ascending key order on one thread, so the plan does not depend on the thread count.</remarks>

@@ -49,7 +49,7 @@ public class RunSettingsValidationTests
         Assert.IsType<RunRequest.Ready>(Build(settings, facts, detailedLogAndReports, workers));
 
     private static BatchRequest BuildAll(ConfigsRead read, LoadOrderPlugins? facts = null) =>
-        SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), facts ?? Facts(), detailedLogAndReports: false, onlyWarnWhenRequiringModLoadsAfterPatch: false, ReportsFolder, 1);
+        BatchRequests.BuildAll(read, new PluginNameParsingPlugin(), facts ?? Facts(), detailedLogAndReports: false, onlyWarnWhenRequiringModLoadsAfterPatch: false, ReportsFolder, 1);
 
     [Fact]
     public void TheShrinkAndTurnDefaultsReachTheRunUnchanged()
@@ -399,7 +399,7 @@ public class RunSettingsValidationTests
         Assert.Equal((ready.Settings.ChangedObjectCollision.TooClose, ready.Settings.ChangedObjectCollision.ChangedTerrain), (restore.TooClose, restore.ChangedTerrain));
         Assert.Equal(
             new AreaRecordReads(new AreaPartTolerances(restore.HeightChangeTolerance, restore.WaterHeightChangeTolerance), Cells: true, Lands: true),
-            ready.Settings.Read.AreaRecordVersions);
+            ready.Settings.Read.Needs.AreaRecordVersions);
         Assert.Empty(ready.Warnings);
     }
 
@@ -434,7 +434,7 @@ public class RunSettingsValidationTests
 
         var restore = ready.Settings.RestoreWhereRemoved!;
         Assert.Equal((objects, terrain, cells, navmeshes), (restore.OtherModsObjects, restore.Terrain, restore.Cells, restore.Navmeshes));
-        Assert.NotNull(ready.Settings.Read.AreaRecordVersions);
+        Assert.NotNull(ready.Settings.Read.Needs.AreaRecordVersions);
     }
 
     /// <summary>
@@ -456,21 +456,21 @@ public class RunSettingsValidationTests
             RestoreOtherModsObjects = objects, RestoreTerrain = terrain, RestoreCells = cells, RestoreNavmeshes = navmeshes,
         };
 
-        var reads = BuildReady(settings).Settings.Read.AreaRecordVersions!;
+        var reads = BuildReady(settings).Settings.Read.Needs.AreaRecordVersions!;
 
         Assert.Equal((cellsRead, landsRead), (reads.Cells, reads.Lands));
     }
 
     [Fact]
-    public void TheRestoreGroupIsNullAndReadsNothingWhenAllFourSwitchesAreOff()
+    public void TheRestoreGroupDoesNotRunAndReadsNothingWhenAllFourSwitchesAreOff()
     {
         var settings = SettingsFor();
         settings.RestoreWhereRemoved = AllRestoresOff();
 
         var ready = BuildReady(settings);
 
-        Assert.Null(ready.Settings.RestoreWhereRemoved);
-        Assert.Null(ready.Settings.Read.AreaRecordVersions);
+        Assert.False(ready.Settings.RestoreWhereRemoved.Runs);
+        Assert.Null(ready.Settings.Read.Needs.AreaRecordVersions);
     }
 
     [Theory]
@@ -592,7 +592,7 @@ public class RunSettingsValidationTests
 
         var ready = BuildReady(settings);
 
-        Assert.Null(ready.Settings.RestoreWhereRemoved);
+        Assert.False(ready.Settings.RestoreWhereRemoved.Runs);
         Assert.Equal(
             [
                 $"Warning: {ClearedAreaGroup}Look this far around the place 1 is outside 1024-16384; using 1024.",
@@ -686,7 +686,7 @@ public class RunSettingsValidationTests
     public void EditorIdAndOverriddenListsFollowTheDetailedLog(bool detailed)
     {
         var plan = BuildReady(SettingsFor(), detailedLogAndReports: detailed).Settings.Read;
-        Assert.Equal(detailed, plan.OtherModDetails);
+        Assert.Equal(detailed, plan.Needs.OtherModDetails);
     }
 
     [Theory]
@@ -752,15 +752,15 @@ public class RunSettingsValidationTests
         };
         TurnRestoreWhereRemovedOff(relocating);
         var runSettings = BuildReady(relocating).Settings;
-        Assert.Equal(new WhatToCollect(true, false, false, false, false, 10f, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false), runSettings.Read);
-        Assert.NotNull(runSettings.MarkerMoves);
+        Assert.Equal(new WhatToCollect(new ScanNeeds(Navmesh: true), 10f, ProcessReplaced: false), runSettings.Read);
+        Assert.True(runSettings.MarkerMoves.Runs);
 
         var neither = WithoutChangedObjectsTerrainAndOldPlaces(SettingsFor());
         neither.TerrainChange.RemoveOnChangedTerrain = false;
         neither.LeftoverInvisibleObjects.MoveKeptMarkersOutOfOtherModsObjects = false;
         neither.FollowUpRemoval = new FollowUpRemovalSettings { Mode = FollowUpRemovalMode.Nothing };
         TurnRestoreWhereRemovedOff(neither);
-        Assert.Equal(new WhatToCollect(false, false, false, false, false, 10f, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false), BuildReady(neither).Settings.Read);
+        Assert.Equal(new WhatToCollect(new ScanNeeds(), 10f, ProcessReplaced: false), BuildReady(neither).Settings.Read);
 
         var restoring = WithoutChangedObjectsTerrainAndOldPlaces(SettingsFor());
         restoring.TerrainChange.RemoveOnChangedTerrain = false;
@@ -769,8 +769,9 @@ public class RunSettingsValidationTests
         var restoringSettings = BuildReady(restoring).Settings;
         Assert.Equal(
             new WhatToCollect(
-                true, false, false, false, false, 10f, ProcessReplaced: false, JudgeOldPlaces: true, TerrainForChangedObjectsOnly: false, AreaRecordVersions: AreaReadsOf(restoringSettings),
-                DecideEveryObjectWithoutCleanedMod: true),
+                new ScanNeeds(Navmesh: true, JudgeOldPlaces: true, AreaRecordVersions: AreaReadsOf(restoringSettings), DecideEveryObjectWithoutCleanedMod: true),
+                10f,
+                ProcessReplaced: false),
             restoringSettings.Read);
     }
 
@@ -783,7 +784,7 @@ public class RunSettingsValidationTests
         var settings = SettingsFor();
         settings.RestoreWhereRemoved.RestoreOtherModsObjects = otherModsObjects;
 
-        Assert.Equal(decided, BuildReady(settings).Settings.Read.DecideEveryObjectWithoutCleanedMod);
+        Assert.Equal(decided, BuildReady(settings).Settings.Read.Needs.DecideEveryObjectWithoutCleanedMod);
     }
 
     private static void TurnRestoreWhereRemovedOff(StandardSettings settings)
@@ -797,6 +798,11 @@ public class RunSettingsValidationTests
     /// <remarks>Every restore switch is on by default, so every kind is read.</remarks>
     private static AreaRecordReads AreaReadsOf(RunSettings settings) =>
         new(new AreaPartTolerances(settings.RestoreWhereRemoved!.HeightChangeTolerance, settings.RestoreWhereRemoved.WaterHeightChangeTolerance), Cells: true, Lands: true);
+
+    /// <summary>An object counts as resting only within the touch gap, so the drop test stops at the first distance within it without measuring up to the pull limit.</summary>
+    [Fact]
+    public void TheLargestTouchGapIsBelowTheLimitOtherModsObjectsArePulledDownBy() =>
+        Assert.True(AlsoRemoveSettingsBuilder.MaxTouchDistance < OtherModsObjectsLimits.MaxPullDistance);
 
     [Fact]
     public void OtherModsObjectsAreJudgedByTheGapAndShareOfTheAlsoRemoveGroup()
@@ -846,7 +852,7 @@ public class RunSettingsValidationTests
             CountWaterAddedOrRemoved = waterAddedOrRemoved,
         };
 
-        Assert.Equal(water, BuildReady(settings).Settings.Read.Water);
+        Assert.Equal(water, BuildReady(settings).Settings.Read.Needs.Water);
     }
 
     [Theory]
@@ -858,7 +864,7 @@ public class RunSettingsValidationTests
         var settings = WithoutChangedObjectsTerrainAndOldPlaces(SettingsFor());
         settings.TerrainChange = new TerrainChangeSettings { RemoveOnChangedTerrain = on, CountTerrainTypeChanges = types };
 
-        var read = BuildReady(settings).Settings.Read;
+        var read = BuildReady(settings).Settings.Read.Needs;
 
         Assert.Equal((versions, layers), (read.TerrainVersions, read.TerrainLayers));
     }
@@ -912,8 +918,8 @@ public class RunSettingsValidationTests
 
         var ready = BuildReady(settings);
 
-        Assert.False(ready.Settings.Collision.ChangedTerrain.On);
-        Assert.False(ready.Settings.Read.TerrainVersions);
+        Assert.False(ready.Settings.Collision.ChangedTerrain.Runs);
+        Assert.False(ready.Settings.Read.Needs.TerrainVersions);
         Assert.Equal(
             "Warning: changed terrain is on, but neither terrain margin is on; no object is removed for changed terrain.",
             Assert.Single(ready.Warnings).Message);
@@ -1011,8 +1017,8 @@ public class RunSettingsValidationTests
 
         var ready = BuildReady(settings);
 
-        Assert.False(ready.Settings.Collision.ChangedTerrain.On);
-        Assert.False(ready.Settings.Read.TerrainVersions);
+        Assert.False(ready.Settings.Collision.ChangedTerrain.Runs);
+        Assert.False(ready.Settings.Read.Needs.TerrainVersions);
         Assert.Equal(
             "Warning: changed terrain is on, but no height, ground type or water changes are counted; no object is removed for changed terrain.",
             Assert.Single(ready.Warnings).Message);
@@ -1035,8 +1041,8 @@ public class RunSettingsValidationTests
 
         var ready = BuildReady(settings);
 
-        Assert.True(ready.Settings.Collision.ChangedTerrain.On);
-        Assert.True(ready.Settings.Read.TerrainVersions);
+        Assert.True(ready.Settings.Collision.ChangedTerrain.Runs);
+        Assert.True(ready.Settings.Read.Needs.TerrainVersions);
         Assert.Empty(ready.Warnings);
     }
 
@@ -1100,7 +1106,7 @@ public class RunSettingsValidationTests
             MoveKeptMarkersOutOfOtherModsObjects = true,
         };
         var runSettings = BuildReady(settings).Settings;
-        Assert.Null(runSettings.MarkerMoves);
+        Assert.False(runSettings.MarkerMoves.Runs);
         Assert.Null(runSettings.LeftBehind);
     }
 
@@ -1120,7 +1126,7 @@ public class RunSettingsValidationTests
     public void AConfigFilesReportsGoToASubfolderNamedAfterTheConfig()
     {
         var read = new ConfigsRead.Ready([new ConfiguredSettings(ConfigSource("town_walls", 1, 1), SettingsFor())]);
-        var batch = Assert.IsType<BatchRequest.Ready>(SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), Facts(), detailedLogAndReports: true, onlyWarnWhenRequiringModLoadsAfterPatch: false, ReportsFolder, 1));
+        var batch = Assert.IsType<BatchRequest.Ready>(BatchRequests.BuildAll(read, new PluginNameParsingPlugin(), Facts(), detailedLogAndReports: true, onlyWarnWhenRequiringModLoadsAfterPatch: false, ReportsFolder, 1));
         var ready = Assert.IsType<RunRequest.Ready>(Assert.Single(batch.Requests));
 
         Assert.Equal(Path.Combine(ReportsFolder, "town_walls"), ready.Settings.Reports?.Folder);
@@ -1251,8 +1257,6 @@ public class RunSettingsValidationTests
     private static SettingsSource.ConfigFile ConfigSource(string name, int number, int count) =>
         new(name, name + ".json", FilePathOf(name), number, count, new ConfigFileNotes([], [], []));
 
-    private static BatchRequest.Ready BuildBatch(StandardSettings settings) => BuildBatch(ConfigSource("town_walls", 1, 1), settings);
-
     private static BatchRequest.Ready BuildBatch(SettingsSource source, StandardSettings settings) =>
         Assert.IsType<BatchRequest.Ready>(BuildAll(new ConfigsRead.Ready([new ConfiguredSettings(source, settings)])));
 
@@ -1285,7 +1289,7 @@ public class RunSettingsValidationTests
 
         Assert.Equal(new ChangedObjectSettings(RestoreMode.RestoreIfNoCollision, RestoreMode.RestoreIfNoCollision), ready.Settings.ChangedObjects);
         Assert.False(ready.Settings.Read.ProcessReplaced);
-        Assert.True(ready.Settings.Read.JudgeOldPlaces);
+        Assert.True(ready.Settings.Read.Needs.JudgeOldPlaces);
         Assert.Equal(ready.Settings.Collision with { Fit = FitSettings.Off }, ready.Settings.ChangedObjectCollision.ForMoved());
         Assert.Equal(ready.Settings.Collision with { Fit = FitSettings.Off }, ready.Settings.ChangedObjectCollision.ForReplaced());
         Assert.Equal(ready.Settings.Collision, ready.Settings.ChangedObjectCollision.Section());
@@ -1403,8 +1407,8 @@ public class RunSettingsValidationTests
 
         var ready = BuildReady(settings);
 
-        Assert.False(ready.Settings.ChangedObjectCollision.ChangedTerrain.On);
-        Assert.True(ready.Settings.Collision.ChangedTerrain.On);
+        Assert.False(ready.Settings.ChangedObjectCollision.ChangedTerrain.Runs);
+        Assert.True(ready.Settings.Collision.ChangedTerrain.Runs);
         Assert.Equal(
             ChangedCollisionGroup + "changed terrain is on, but no height, ground type or water changes are counted; "
             + "no changed object is found on changed terrain, neither where the cleaned mod put it nor at its old place.",
@@ -1420,7 +1424,7 @@ public class RunSettingsValidationTests
 
         var ready = BuildReady(settings);
 
-        Assert.False(ready.Settings.ChangedObjectCollision.ChangedTerrain.On);
+        Assert.False(ready.Settings.ChangedObjectCollision.ChangedTerrain.Runs);
         Assert.Equal(
             ChangedCollisionGroup + "changed terrain is on, but neither terrain margin is on; "
             + "no changed object is found on changed terrain, neither where the cleaned mod put it nor at its old place.",
@@ -1443,7 +1447,7 @@ public class RunSettingsValidationTests
 
         var read = BuildReady(settings).Settings.Read;
 
-        Assert.Equal((process, judged), (read.ProcessReplaced, read.JudgeOldPlaces));
+        Assert.Equal((process, judged), (read.ProcessReplaced, read.Needs.JudgeOldPlaces));
     }
 
     /// <summary>The objects that go back where the cleaned mod was removed are checked against the changes of the world without it.</summary>
@@ -1457,7 +1461,7 @@ public class RunSettingsValidationTests
         settings.ChangedObjects.Replaced = new ReplacedObjectSettings { Process = true, WhenRemoved = RestoreMode.Restore };
         settings.RestoreWhereRemoved.RestoreOtherModsObjects = restoreObjects;
 
-        Assert.Equal(judged, BuildReady(settings).Settings.Read.JudgeOldPlaces);
+        Assert.Equal(judged, BuildReady(settings).Settings.Read.Needs.JudgeOldPlaces);
     }
 
     [Theory]
@@ -1479,7 +1483,7 @@ public class RunSettingsValidationTests
             CountWaterAddedOrRemoved = waterAddedOrRemoved,
         };
 
-        var read = BuildReady(settings).Settings.Read;
+        var read = BuildReady(settings).Settings.Read.Needs;
 
         Assert.Equal((versions, layers, water), (read.TerrainVersions, read.TerrainLayers, read.Water));
     }
@@ -1515,7 +1519,7 @@ public class RunSettingsValidationTests
         settings.TerrainChange.RemoveOnChangedTerrain = standard;
         settings.ChangedObjects.Collision.TerrainChange.RemoveOnChangedTerrain = changedObjects;
 
-        Assert.Equal(needsAnOverride, BuildReady(settings).Settings.Read.TerrainForChangedObjectsOnly);
+        Assert.Equal(needsAnOverride, BuildReady(settings).Settings.Read.Needs.TerrainForChangedObjectsOnly);
     }
 
     private static RestoreWhereRemovedSettings AllRestoresOff() =>
@@ -1523,7 +1527,7 @@ public class RunSettingsValidationTests
 
     private static (bool Versions, bool Layers, bool Water) TerrainReadsOf(StandardSettings settings)
     {
-        var read = BuildReady(settings).Settings.Read;
+        var read = BuildReady(settings).Settings.Read.Needs;
         return (read.TerrainVersions, read.TerrainLayers, read.Water);
     }
 

@@ -1,6 +1,6 @@
 # Every named value (const, or static read-only field of a number, text, key, enum or struct, or an array of those) in Tools/.
 # Form: Type.Field | kind | reason
-# Kinds: math, file format, game format, budget (performance or robustness limit), internal (code or text used only inside the tool).
+# Kinds: math, file format, game format, budget (performance or robustness limit), layout (where a tool puts an item in the data it hands out, so callers can address it), internal (code or text used only inside the tool).
 # A game convention (a naming habit, a rule about what the game's objects mean) is not allowed here: the business caller owns it and passes it in.
 BoxMesh.CornerCount | math | A box has 8 corners.
 BoxMesh.TriangleCount | math | A box surface is 12 triangles.
@@ -35,7 +35,8 @@ CompassDirections.CentredSectorShift | math | Half a sector, so sectors are cent
 CompassDirections.Sectors | math | All sector values.
 SectorFootprint.SingleSectors | internal | Each sector as a list of its own, shared so that no footprint allocates one.
 TerrainQuadrants.PerSide | game format | A cell's terrain textures are split into 2 by 2 quadrants.
-TerrainQuadrants.VerticesPerSide | game format | Each texture quadrant covers 17 by 17 vertices (the quadrants share their edge vertices).
+TerrainQuadrants.Count | game format | A cell's terrain textures are split into 4 quadrants (2 by 2).
+TerrainQuadrants.VerticesPerSide | game format | Each texture quadrant covers 17 by 17 vertices (the quadrants share their edge vertices); derived from the terrain grid.
 TerrainQuadrants.VertexCount | game format | The vertices of one texture quadrant (17 by 17); alpha layer positions run 0 to 288.
 TerrainGrid.VerticesPerSide | game format | A cell's terrain grid is 33 by 33 vertices; every terrain grid value in the tools derives from this one.
 TerrainGrid.SquaresPerSide | game format | A cell's terrain has 32 squares across, one fewer than its vertices.
@@ -46,8 +47,6 @@ BodyMeshBounds.KeySeparator | internal | Joins the mesh paths of a set into its 
 NavmeshIndex.SamplesPerSide | budget | Points sampled along a triangle edge when searching for the nearest navmesh point.
 ExteriorGrid.CellSize | game format | An exterior cell is 4096 game units wide.
 TextFormat.SecondsDecimals | internal | Seconds are written with one decimal in log text.
-IndexMemo.NotComputed | internal | Slot state before the value is published.
-IndexMemo.Computed | internal | Slot state after the value is published.
 OrientedBox.ParallelAxisEpsilon | math | Axis lengths below this count as parallel; float robustness.
 OrientedBox.CornerSigns | math | The two sides of each axis when generating box corners.
 ParallelMap.RangesPerWorker | budget | Work ranges per worker for load balancing.
@@ -59,15 +58,13 @@ ScriptPropertyReader.NamedKinds | game format | The library record type behind e
 PluginRecords.NotReadMessage | internal | Error text for using the records before they were read.
 RecordHandles.AreaRecordsNotReadMessage | internal | Error text for using the cell and land versions when the read scope did not ask for them.
 PatchWriting.ForeignRecordsMessage | internal | Error text for handing the patch writing records another reader read.
-PatchMarker.Text | file format | Text of a plugin's header description that marks the output of this patcher.
 PatchMarker.DescriptionLineBreak | file format | Line break that plugin editors write into a header description; the marker goes on a new line after an existing description.
 RunLinkCache.ForeignIndexMessage | internal | Error text for reading through a record index another reader opened.
-MutagenCalls.Parsers | internal | The library assemblies whose throws of general exception types count as malformed plugin data.
 MeshFileSource.MeshesPrefix | game format | Mesh paths in the game's data start with "meshes\".
 MeshFileSource.DataPrefix | game format | A model path may carry a leading "data\" folder name, which is not part of the archive path.
 MeshFileSource.ArchiveSuffixDelimiter | game format | An archive named "<Plugin> - <Suffix>" belongs to the plugin before the delimiter.
-MeshReadingParts.Owner | internal | The owner name of the mesh reader's part keys; the keys are only compared.
-MeshReadingParts.LoaderStartUp | internal | Part key the mesh reader records a failed loader start-up under; the log words it.
+MeshFileSource.CopyBufferSize | budget | Bytes read at a time from an archived file; the runtime's own stream copy size.
+NifGeometryReader.WarmUpFailedMessage | internal | Error text for a NiflySharp version that cannot load the minimal NIF it saved, which ends the run.
 NifShapes.StripFieldFlags | internal | Binding flags for reading the library's private strip fields.
 BoundsAccumulator.MaxCoordinate | budget | Largest accepted absolute mesh coordinate; larger values come from broken exports and would blow up spatial grids and triangle indexes.
 NodeTransformResolver.MaxDepth | budget | Cycle and malformed-graph guard for the parent walk.
@@ -90,10 +87,9 @@ PlacedRecordParts.PersistentBit | game format | The record flag that marks a pla
 PlacedRecordParts.PresenceBits | game format | The Initially Disabled and Deleted record flags, which decide with the enable parent whether a placed reference shows.
 PlacedRecordParts.ExcludedFlagBits | game format | The record flags of a placed reference no part compares or writes: Persistent and Compressed.
 PlacedRecordParts.RestFlagBits | game format | The record flags of a placed reference the rest of the record holds.
-VersionComparison.NamedPluginIndex | math | The versions compared start just below the named plugin's, so its own version is the second; callers address that version by this index.
+VersionComparison.NamedPluginIndex | layout | The versions read start just below the named plugin's, so its own version is the second; callers address that version by this index.
 PointSet.BitsPerWord | math | Bits in the 64-bit words of the point bitset.
 PointSet.WordCount | math | Words that hold one bit per grid point.
-QuarterSet.QuarterCount | game format | A cell's terrain has 2 by 2 quarters.
 CellRecordParts.HasWaterBit | game format | The cell flag that gives a cell its own water level.
 CellRecordParts.ExcludedFlagBits | game format | The cell flag no part compares or writes: Is Interior Cell.
 CellRecordParts.ExcludedMajorFlagBits | game format | The record flags of a cell no part compares or writes: Persistent and Compressed.
@@ -107,16 +103,15 @@ LandRecordParts.GridFields | game format | The LAND grids whose values the point
 NavmeshRecordParts.ExcludedFlagBits | game format | The record flag of a navmesh no part compares or writes: Compressed.
 NavmeshRecordParts.GeometryFlagBits | game format | The record flags of a navmesh its geometry holds: all but Deleted and Compressed.
 NavmeshTriangleEdges.None | file format | A navmesh triangle's edge value for an edge with no neighbour.
-NavmeshWriter.PathFlags | file format | The navmesh triangle flags a sunk navmesh loses besides its edge links: Preferred and Door.
+NavmeshWriter.PathFlags | file format | The navmesh triangle flags a flattened and detached navmesh loses besides its edge links: Preferred and Door.
 LandWriter.StoredUnitNormal | file format | A LAND record's vertex normals store each component as a signed byte, 127 standing for 1.
 LandWriter.HeldDataFlags | file format | The LAND record flags that say which grids and layers it holds: normals and height map, colours, layers.
 TerrainNormals.Last | game format | The index of the last point in a row or column of a cell's terrain grid.
 CellEdgeHeights.SecondLine | game format | A neighbouring cell's grid line one grid step beyond the shared edge: its first line is the shared edge itself.
 CellEdgeHeights.SecondLastLine | game format | The other side's neighbouring grid line one grid step beyond the shared edge: its last line is the shared edge itself.
+CellEdgeHeights.NextInRow | game format | The terrain heights are stored row by row, so the next point of a row is the next value.
 TerrainQuadrants.SquaresPerSide | game format | Each texture quadrant spans 16 grid squares, one fewer than its vertices.
 TerrainQuadrants.Size | game format | A texture quadrant is half a cell wide.
 TerrainQuadrants.HalfWay | math | A quadrant's centre lies half its width from its corner.
-TriangleFootprints.CornerCount | math | A triangle has 3 corners.
-NavmeshConsistency.CornerCount | math | A triangle has 3 corners and 3 edges.
-NavmeshConsistency.VertexTolerance | budget | The one rounding tolerance of re-saved positions (PlacedPartTolerances.ResavedPosition), named for the vertices it compares.
 PlacedPartTolerances.ResavedPosition | budget | Plugins that re-save a record round its floats; positions and vertices this close on every axis coincide.
+MeshTriangle.CornerCount | math | A triangle has 3 corners and 3 edges.

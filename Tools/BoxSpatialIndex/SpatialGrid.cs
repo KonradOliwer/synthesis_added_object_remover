@@ -62,24 +62,20 @@ public sealed class SpatialGrid
         var oversize = new List<int>();
         for (var i = 0; i < boxes.Count; i++)
         {
-            if (!TryGetItemCellRange(boxes[i], out var x0, out var x1, out var y0, out var y1))
+            if (!TryGetItemCells(boxes[i], out var cells))
             {
                 oversize.Add(i);
                 continue;
             }
-            for (var x = x0; x <= x1; x++)
+            foreach (var key in cells)
             {
-                for (var y = y0; y <= y1; y++)
+                if (!slotByCell.TryGetValue(key, out var slot))
                 {
-                    var key = Pack(x, y);
-                    if (!slotByCell.TryGetValue(key, out var slot))
-                    {
-                        slot = counts.Count;
-                        slotByCell[key] = slot;
-                        counts.Add(0);
-                    }
-                    counts[slot]++;
+                    slot = counts.Count;
+                    slotByCell[key] = slot;
+                    counts.Add(0);
                 }
+                counts[slot]++;
             }
         }
         return (slotByCell, counts, oversize);
@@ -94,14 +90,8 @@ public sealed class SpatialGrid
         Array.Copy(slotStart, fill, slotCount);
         for (var i = 0; i < boxes.Count; i++)
         {
-            if (!TryGetItemCellRange(boxes[i], out var x0, out var x1, out var y0, out var y1)) continue;
-            for (var x = x0; x <= x1; x++)
-            {
-                for (var y = y0; y <= y1; y++)
-                {
-                    items[fill[slotByCell[Pack(x, y)]]++] = i;
-                }
-            }
+            if (!TryGetItemCells(boxes[i], out var cells)) continue;
+            foreach (var key in cells) items[fill[slotByCell[key]]++] = i;
         }
         return items;
     }
@@ -121,13 +111,10 @@ public sealed class SpatialGrid
             return;
         }
 
-        for (var x = range.X0; x <= range.X1; x++)
+        foreach (var key in range)
         {
-            for (var y = range.Y0; y <= range.Y1; y++)
-            {
-                if (!_slotByCell.TryGetValue(Pack((int)x, (int)y), out var slot)) continue;
-                for (var i = _slotStart[slot]; i < _slotStart[slot + 1]; i++) results.Add(_items[i]);
-            }
+            if (!_slotByCell.TryGetValue(key, out var slot)) continue;
+            for (var i = _slotStart[slot]; i < _slotStart[slot + 1]; i++) results.Add(_items[i]);
         }
     }
 
@@ -154,14 +141,15 @@ public sealed class SpatialGrid
     /// <summary>Number of grid cells the X/Y range of <paramref name="box"/> overlaps.</summary>
     public static double CountCells(Box box) => CellRange.Of(box).CellCount;
 
-    private static bool TryGetItemCellRange(Box box, out int x0, out int x1, out int y0, out int y1)
+    private static bool TryGetItemCells(Box box, out CellRange cells)
     {
-        x0 = ToCell(box.Min.X);
-        x1 = ToCell(box.Max.X);
-        y0 = ToCell(box.Min.Y);
-        y1 = ToCell(box.Max.Y);
+        var x0 = ToCell(box.Min.X);
+        var x1 = ToCell(box.Max.X);
+        var y0 = ToCell(box.Min.Y);
+        var y1 = ToCell(box.Max.Y);
         if (x1 < x0) (x0, x1) = (x1, x0);
         if (y1 < y0) (y0, y1) = (y1, y0);
+        cells = new CellRange(x0, x1, y0, y1);
         return ((long)x1 - x0 + 1) * ((long)y1 - y0 + 1) <= MaxCellsPerItem;
     }
 
@@ -182,5 +170,35 @@ public sealed class SpatialGrid
 
         /// <summary>In double so a full int range cannot overflow.</summary>
         public double CellCount => Math.Max(0, X1 - X0 + 1) * (double)Math.Max(0, Y1 - Y0 + 1);
+
+        /// <summary>The packed key of each cell, x outermost and y innermost; none when either range is empty. Allocates nothing.</summary>
+        public CellKeys GetEnumerator() => new(this);
+    }
+
+    private struct CellKeys
+    {
+        private readonly CellRange _range;
+        private long _x;
+        private long _y;
+
+        public CellKeys(CellRange range)
+        {
+            _range = range;
+            _x = range.X0;
+            _y = range.Y0 - 1;
+        }
+
+        public readonly long Current => Pack((int)_x, (int)_y);
+
+        public bool MoveNext()
+        {
+            _y++;
+            if (_y > _range.Y1)
+            {
+                _x++;
+                _y = _range.Y0;
+            }
+            return _x <= _range.X1 && _y <= _range.Y1;
+        }
     }
 }

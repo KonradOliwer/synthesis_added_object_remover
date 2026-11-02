@@ -16,7 +16,7 @@ public sealed class PatchWriterTests
         var protection = ObjectsToKeep.Build(targets, [TestTargets.Link(1, 2)], TestTargets.References(TargetCount, new Dictionary<int, KeepReason>()), TestBaseFacts.Unresolved);
         var final = TestSeededDecisions.StartDisablingAll(protection, TargetCount)
             .Apply(RoundKind.TooClose, [Propose(4), Propose(0)])
-            .Apply(RoundKind.AlsoRemove, [Propose(1)]);
+            .Apply(AlsoRemoveRounds.Opening, [Propose(1)]);
         var writing = new RecordingWriting();
 
         var written = PatchWriter.Write(new(final, [.. targets], OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff, new ReadPlugin(), writing));
@@ -257,8 +257,8 @@ public sealed class PatchWriterTests
         var whereRemoved = new RestoreWhereRemovedResult(
             StepOutcome.Performed,
             [
-                new PlacedChangeJudged(rock, null, cleared, null, Refused: null, IsRestored: true, ChangeJudge.KindOf(rock), KeptForArea: null),
-                new PlacedChangeJudged(stays, null, standing, null, Refused: null, IsRestored: false, ChangeJudge.KindOf(stays), AreaVerdict.StillStanding),
+                new PlacedChangeJudged(rock, null, cleared, null, Refused: null, IsRestored: true, ChangeJudge.KindOf(rock), KeptForArea: null, PlacedBack: null),
+                new PlacedChangeJudged(stays, null, standing, null, Refused: null, IsRestored: false, ChangeJudge.KindOf(stays), AreaVerdict.StillStanding, PlacedBack: null),
             ],
             [new CellChangeJudged(cell, [cell.Parts[0]], null, cleared, WaterKeptBy: null, IsRestored: true, KeptForArea: null)],
             [],
@@ -349,7 +349,8 @@ public sealed class PatchWriterTests
 
         public INavmeshWorldView ReadFinalNavmeshes(IWritableRecords records) => throw new NotSupportedException();
 
-        public NavmeshFault? FindNavmeshFaultIfWritten(IWritableRecords records, IReadOnlyList<WriteOrder> orders) => throw new NotSupportedException();
+        public TResult ReadNavmeshesIfWritten<TResult>(IWritableRecords records, IReadOnlyList<WriteOrder> orders, Func<INavmeshWorldView, TResult> read) =>
+            throw new NotSupportedException();
     }
 
     private sealed class NoRecords : IWritableRecords;

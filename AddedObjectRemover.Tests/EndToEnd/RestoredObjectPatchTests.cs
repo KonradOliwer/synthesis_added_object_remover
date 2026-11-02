@@ -29,14 +29,13 @@ public sealed class RestoredObjectPatchTests : IDisposable
     private static readonly Vector3 MovedPosition = new(ExteriorGrid.CellSize + 1000, 1000, 40);
     private static readonly Vector3 MovedRotation = new(0, 0, 1.5f);
 
-    private static readonly WhatToCollect Plan = new(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false);
+    private static readonly WhatToCollect Plan = new(new ScanNeeds(), SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false);
 
     private static readonly RemovalReason Reason = new TooClose(new OtherId(0), new TooCloseCause.ObjectSize());
 
     private readonly FixtureMod _baseGame = new("Skyrim.esm");
     private readonly FixtureMod _cleaned;
     private readonly FormKey _eastKey;
-    private readonly FixtureCell _baseEast;
     private readonly FixtureCell _cleanedEast;
     private readonly FormKey _crateBase;
 
@@ -48,7 +47,7 @@ public sealed class RestoredObjectPatchTests : IDisposable
         _cleaned = new FixtureMod("Cleaned.esp", _baseGame);
         FixtureSpaces.CreateIn(_baseGame).AddOverridesTo(_cleaned);
         _eastKey = _baseGame.NextKey();
-        _baseEast = _baseGame.AddExteriorCell(_eastKey, EastCellEditorId, EastGridX);
+        _baseGame.AddExteriorCell(_eastKey, EastCellEditorId, EastGridX);
         _cleanedEast = _cleaned.AddExteriorCell(_eastKey, EastCellEditorId, EastGridX);
         _crateBase = _baseGame.AddModeledStatic("B_CrateBase", FixtureMeshes.CrateModel);
     }
@@ -103,7 +102,7 @@ public sealed class RestoredObjectPatchTests : IDisposable
             new PlacedRecordParts(new PlacedPartTolerances()),
             areaRecords: null);
 
-        new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod).Write(
+        new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod, Program.PatchMarkerText).Write(
             handles, [new PlaceInCell(key, _baseGame.Interior.Key.ToRecordKey(), InPersistentList: true), new CopyEarlierPlacedParts(key, PlacedParts.Position | PlacedParts.Presence)]);
 
         var written = Assert.Single(state.PatchMod.EnumerateMajorRecords<IPlacedObjectGetter>());
@@ -322,7 +321,7 @@ public sealed class RestoredObjectPatchTests : IDisposable
         var targets = PlacedObjects.Collect(reader, Trust(), Plan).Targets;
         var moved = Assert.Single(targets);
         Assert.Equal(TargetOrigin.Moved, moved.Origin);
-        var writing = new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod);
+        var writing = new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod, Program.PatchMarkerText);
         if (earlierPatcherWrites is not null && !earlierPatchLoadedBeforeTheScan) writing.Write(reader.ReadWritableRecords(), earlierPatcherWrites(moved.Key));
         var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved);
         var final = RemovalDecisions.Start(protection, [new WhenRemoved.Restore(moved.EarlierVersion!)]).Apply(RoundKind.TooClose, [new ProposedRemoval(moved.Id, Reason)]);
@@ -341,7 +340,7 @@ public sealed class RestoredObjectPatchTests : IDisposable
         {
             var reader = new PluginRecordsFactory(world, Workers).Open();
             var moved = Assert.Single(PlacedObjects.Collect(reader, Trust(), Plan).Targets);
-            new PatchWriting(new SynthesisWriteCache(earlier.LinkCache), earlier.PatchMod).Write(reader.ReadWritableRecords(), earlierPatcherWrites(moved.Key));
+            new PatchWriting(new SynthesisWriteCache(earlier.LinkCache), earlier.PatchMod, Program.PatchMarkerText).Write(reader.ReadWritableRecords(), earlierPatcherWrites(moved.Key));
         }
 
         earlier.PatchMod.WriteToBinary(earlierOutput);

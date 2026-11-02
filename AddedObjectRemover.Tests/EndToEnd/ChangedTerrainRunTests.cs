@@ -136,7 +136,7 @@ public class ChangedTerrainRunTests
         return log;
     }
 
-    private static IMeshFilesFactory DefaultMeshFiles(string dataFolder, GameRelease release, IReadOnlyList<ModKey> listedPlugins) =>
+    private static IMeshFilesFactory DefaultMeshFiles(string dataFolder, GameRelease release, IReadOnlyList<PluginName> listedPlugins) =>
         new MeshFilesFactory(dataFolder, release, listedPlugins);
 
     private static string[] SectionLines(RecordingLogSink log, string id) =>

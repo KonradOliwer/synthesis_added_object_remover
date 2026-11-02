@@ -15,8 +15,8 @@ internal sealed record StandingBox(RecordKey Key, RecordKey SpaceKey, OrientedBo
 /// Which navmeshes the cleaned mod edited, deleted or added go back, in groups that go back whole or not at all: an edited one gets
 /// its earlier geometry or map entry, a deleted one comes back, an added one is sunk. Candidates linked to each other in either
 /// world, an added navmesh and the deleted one it replaces, and navmeshes named by one door form a group. Each group is checked
-/// once against the guards on the facts read and against the consistency check of its own orders (N9); the guards on the ground,
-/// objects and water (N4–N6) refuse more against the current plans of the other kinds. Immutable: each refusal gives a new plan.
+/// once against the guards on the facts read and against the consistency check of its own writes; the guards on the ground,
+/// objects and water refuse more against the current plans of the other kinds. Immutable: each refusal gives a new plan.
 /// </summary>
 /// <remarks>Everything runs in ascending key order on one thread, so the plan does not depend on the thread count.</remarks>
 internal sealed class NavmeshUndoPlan
@@ -27,11 +27,11 @@ internal sealed class NavmeshUndoPlan
 
     /// <param name="judged">Every navmesh the cleaned mod changed or added, with its area judged, in key order.</param>
     /// <param name="createGuards">The guards on the facts read, given the candidates that are sunk.</param>
-    /// <param name="findFaultIfWritten">The consistency check's first fault over the world the orders alone would leave; null when none.</param>
+    /// <param name="findFaultIfWritten">The consistency check's first fault over the world the trial's writes alone would leave; null when none.</param>
     public NavmeshUndoPlan(
         IReadOnlyList<NavmeshChangeJudged> judged,
         Func<IReadOnlySet<RecordKey>, NavmeshGroupGuards> createGuards,
-        Func<IReadOnlyList<WriteOrder>, NavmeshFault?> findFaultIfWritten)
+        Func<NavmeshWriteTrial, NavmeshFault?> findFaultIfWritten)
     {
         _judged = [.. judged.Select(WithUndo)];
         _guards = createGuards(_judged.Where(navmesh => navmesh.Undo == NavmeshUndo.Sunk).Select(navmesh => navmesh.Change.Navmesh).ToHashSet());
@@ -71,7 +71,7 @@ internal sealed class NavmeshUndoPlan
     }
 
     /// <summary>
-    /// N4: the plan with every group refused under whose members going back, footprint grown by one grid step, a grid point ends more
+    /// The plan with every group refused under whose members going back, footprint grown by one grid step, a grid point ends more
     /// than the height tolerance from its height before the cleaned mod.
     /// </summary>
     /// <param name="findLandWorldspace">A space → the worldspace whose land it uses; null for a space without land.</param>
@@ -86,7 +86,7 @@ internal sealed class NavmeshUndoPlan
             .FirstOrDefault());
 
     /// <summary>
-    /// N5: the plan with every group refused that a member going back reaches into one of the objects' boxes; the first object in key
+    /// The plan with every group refused that a member going back reaches into one of the objects' boxes; the first object in key
     /// order is named. An object is asked once whether it reaches any group still open, and only one that does is asked per group.
     /// </summary>
     /// <param name="objects">In key order.</param>
@@ -108,7 +108,7 @@ internal sealed class NavmeshUndoPlan
     }
 
     /// <summary>
-    /// N3 against the placed records that go back: the plan with every group refused that a member going back names a door the final
+    /// The door guard against the placed records that go back: the plan with every group refused that a member going back names a door the final
     /// world leaves removed, or whose doors and members would not name each other with the doors' links as they end.
     /// </summary>
     /// <param name="doors">Whether each door stands and where its link points, given which placed records go back.</param>
@@ -117,7 +117,7 @@ internal sealed class NavmeshUndoPlan
     /// <summary>The members of the groups going back.</summary>
     public IReadOnlySet<RecordKey> MembersGoingBack() => GroupsGoingBack().SelectMany(group => group.Members).Select(member => member.Key).ToHashSet();
 
-    /// <summary>N6: the plan with every group refused that has a member going back in a cell whose water level does not end as before the cleaned mod.</summary>
+    /// <summary>The plan with every group refused that has a member going back in a cell whose water level does not end as before the cleaned mod.</summary>
     /// <param name="waterEndsAsBefore">Whether a cell's water level ends as it was before the cleaned mod.</param>
     public NavmeshUndoPlan RefuseOnWater(Func<RecordKey, bool> waterEndsAsBefore) =>
         RefuseEach(group => group.Members
@@ -128,7 +128,7 @@ internal sealed class NavmeshUndoPlan
     public ImmutableArray<NavmeshChangeJudged> Navmeshes() => _judged;
 
     public ImmutableArray<NavmeshGroupJudged> Groups() =>
-        [.. _groups.Select(group => new NavmeshGroupJudged([.. group.Members.Select(member => member.Key)], group.Orders, group.Refused, group.Refused is null))];
+        [.. _groups.Select(group => new NavmeshGroupJudged([.. group.Members.Select(member => member.Key)], group.Write, group.Refused))];
 
     private static RecordKey FirstKeyOf(NavmeshGroup group) => group.Members[0].Key;
 
@@ -153,11 +153,11 @@ internal sealed class NavmeshUndoPlan
         return navmesh with { Undo = undo, NothingGoesBack = undo is null };
     }
 
-    /// <remarks>A part a later plugin changed again still makes a candidate, so its group is refused (N0) rather than split.</remarks>
+    /// <remarks>A part a later plugin changed again still makes a candidate, so its group is refused for the later change rather than split.</remarks>
     private static NavmeshUndo? UndoOf(NavmeshChangedByCleanedMod change) => change.Case switch
     {
         NavmeshCase.Added => NavmeshUndo.Sunk,
-        NavmeshCase.DeletedWithoutReplacement or NavmeshCase.DeletedAndReplaced => change.Presence is PartOutcome.Unchanged ? null : NavmeshUndo.BroughtBack,
+        NavmeshCase.Deleted => change.Presence is PartOutcome.Unchanged ? null : NavmeshUndo.BroughtBack,
         _ when change.Geometry is not PartOutcome.Unchanged => NavmeshUndo.Geometry,
         _ when change.MapEntry is not PartOutcome.Unchanged => NavmeshUndo.MapEntry,
         _ => null,
@@ -171,7 +171,7 @@ internal sealed class NavmeshUndoPlan
     private static IEnumerable<NavmeshGroup> FormGroups(ImmutableArray<NavmeshChangeJudged> judged)
     {
         var members = judged.Where(navmesh => navmesh.Undo is not null).Select(navmesh => new NavmeshMember(navmesh.Change, navmesh.Undo!.Value)).ToList();
-        var indexOf = members.Select((member, index) => (member.Key, index)).ToDictionary(entry => entry.Key, entry => entry.index);
+        var indexOf = KeyedGroups.PositionByKey(members, member => member.Key);
         var linked = members.SelectMany((member, index) => RelatedNavmeshes(member.Change).Where(indexOf.ContainsKey).Select(other => (index, indexOf[other])));
         var byDoor = members
             .SelectMany((member, index) => member.Change.Doors.Select(door => (door.Door, index)))
@@ -181,7 +181,7 @@ internal sealed class NavmeshUndoPlan
         {
             ImmutableArray<NavmeshMember> group = [.. component.Select(index => members[index])];
             ImmutableArray<DoorLinkChange> doors = [.. group.SelectMany(member => member.Change.Doors).DistinctBy(door => door.Door).OrderBy(door => door.Door, RecordKeyOrder.Comparer)];
-            return new NavmeshGroup(group, doors, Orders: [], Refused: null);
+            return new NavmeshGroup(group, doors, Write: null, Refused: null);
         });
     }
 

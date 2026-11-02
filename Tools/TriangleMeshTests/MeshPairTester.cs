@@ -99,30 +99,35 @@ public sealed class MeshPairTester(
     }
 
     /// <summary>Minimum surface distance of a pair known to touch, world units; NaN when either mesh has no usable triangles.</summary>
-    public float MeasureMinSurfaceDistance(IndexPair pair, TouchScratch scratch)
+    public float MeasureMinSurfaceDistance(IndexPair pair, TouchScratch scratch) =>
+        MeasureMeshes(
+            pair, (tolerance, scratch), float.NaN,
+            static (first, firstPlacement, second, secondPlacement, state) =>
+                MeshContact.MinSurfaceDistance(first, firstPlacement, second, secondPlacement, state.tolerance, state.scratch));
+
+    private PairTouch TestPair(IndexPair pair, TouchScratch scratch) =>
+        MeasureMeshes(
+            pair, (tolerance, scratch), PairTouch.NoGeometry,
+            static (first, firstPlacement, second, secondPlacement, state) =>
+                MeshContact.SurfacesTouch(first, firstPlacement, second, secondPlacement, state.tolerance, state.scratch) ? PairTouch.Touching : PairTouch.Apart);
+
+    private bool EnclosesCentreOfSecond(IndexPair pair, List<int> scratch) =>
+        MeasureMeshes(
+            pair, scratch, false,
+            static (enclosing, enclosingPlacement, enclosed, enclosedPlacement, state) =>
+                MeshContact.PointEnclosed(enclosing, RelativeTransform.Create(from: enclosedPlacement, to: enclosingPlacement).Apply(enclosed.Bounds.Center), state));
+
+    /// <summary>
+    /// The measure of the pair's two meshes, each with its placement, both held while measured; <paramref name="withoutGeometry"/>
+    /// when either mesh has no usable triangles. The state is handed to <paramref name="measure"/> so that it can be a static
+    /// lambda: this runs for every pair on the parallel path, where a closure would be allocated per pair.
+    /// </summary>
+    private T MeasureMeshes<TState, T>(
+        IndexPair pair, TState state, T withoutGeometry, Func<MeshTriangleTree, PlacedTransform, MeshTriangleTree, PlacedTransform, TState, T> measure)
     {
         using var first = meshes.Acquire(pathOf(pair.First));
         using var second = meshes.Acquire(pathOf(pair.Second));
-        if (first.Value == null || second.Value == null) return float.NaN;
-        return MeshContact.MinSurfaceDistance(first.Value, transformOf(pair.First), second.Value, transformOf(pair.Second), tolerance, scratch);
-    }
-
-    private PairTouch TestPair(IndexPair pair, TouchScratch scratch)
-    {
-        using var first = meshes.Acquire(pathOf(pair.First));
-        using var second = meshes.Acquire(pathOf(pair.Second));
-        if (first.Value == null || second.Value == null) return PairTouch.NoGeometry;
-        var touches = MeshContact.SurfacesTouch(first.Value, transformOf(pair.First), second.Value, transformOf(pair.Second), tolerance, scratch);
-        return touches ? PairTouch.Touching : PairTouch.Apart;
-    }
-
-    private bool EnclosesCentreOfSecond(IndexPair pair, List<int> scratch)
-    {
-        using var first = meshes.Acquire(pathOf(pair.First));
-        using var second = meshes.Acquire(pathOf(pair.Second));
-        if (first.Value is not { } enclosing || second.Value is not { } enclosed) return false;
-
-        var toFirst = RelativeTransform.Create(from: transformOf(pair.Second), to: transformOf(pair.First));
-        return MeshContact.PointEnclosed(enclosing, toFirst.Apply(enclosed.Bounds.Center), scratch);
+        if (first.Value is not { } firstMesh || second.Value is not { } secondMesh) return withoutGeometry;
+        return measure(firstMesh, transformOf(pair.First), secondMesh, transformOf(pair.Second), state);
     }
 }

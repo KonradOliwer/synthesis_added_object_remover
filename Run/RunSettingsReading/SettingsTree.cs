@@ -14,19 +14,9 @@ internal static class SettingsTree
     public static IEnumerable<SettingNode> SettingsOf(Type group, SettingsSchema schema) =>
         group.GetProperties().Select(property =>
         {
-            var valueType = ElementTypeOrSelf(property.PropertyType);
+            var valueType = PropertyValues.ElementTypeOrSelf(property.PropertyType);
             return new SettingNode(property, ScreenNameOf(property, schema), valueType, valueType.IsClass && valueType.Assembly == schema.Root.Assembly);
         });
 
     public static string ScreenNameOf(PropertyInfo property, SettingsSchema schema) => schema.DisplayNameOf(property) ?? property.Name;
-
-    /// <summary>The item type of a list setting (its elements are what a saved value replaces), or the type itself.</summary>
-    public static Type ElementTypeOrSelf(Type type)
-    {
-        if (type == typeof(string)) return type;
-        var enumerable = type.GetInterfaces()
-            .Prepend(type)
-            .FirstOrDefault(candidate => candidate.IsGenericType && candidate.GetGenericTypeDefinition() == typeof(IEnumerable<>));
-        return enumerable?.GetGenericArguments()[0] ?? type;
-    }
 }

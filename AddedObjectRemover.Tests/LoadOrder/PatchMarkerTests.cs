@@ -17,7 +17,7 @@ public class PatchMarkerTests
     private const string OtherDescription = "Hand-made notes";
 
     [Fact]
-    public void TheMarkerTextIsTheDecidedWording() => Assert.Equal(MarkerText, PatchMarker.Text);
+    public void TheMarkerTextIsTheDecidedWording() => Assert.Equal(MarkerText, Program.PatchMarkerText);
 
     [Theory]
     [InlineData(null)]
@@ -101,7 +101,7 @@ public class PatchMarkerTests
     public void TheMarkerThePatchWritesIsTheOneThePluginReaderFlags()
     {
         var otherGroupPatch = Plugin("OtherGroupPatch.esp", description: null);
-        new PatchWriting(new SynthesisWriteCache(CreateState(description: null).LinkCache), otherGroupPatch).WritePatchMarker();
+        new PatchWriting(new SynthesisWriteCache(CreateState(description: null).LinkCache), otherGroupPatch, Program.PatchMarkerText).WritePatchMarker();
         var state = FixturePatcherState.Create([otherGroupPatch], Path.GetTempPath(), Path.GetTempPath());
 
         using var world = FixturePatcherState.CreateFinalWorld(state);
@@ -158,5 +158,5 @@ public class PatchMarkerTests
     }
 
     private static PatchWriting WritingInto(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) =>
-        new(new SynthesisWriteCache(state.LinkCache), state.PatchMod);
+        new(new SynthesisWriteCache(state.LinkCache), state.PatchMod, Program.PatchMarkerText);
 }

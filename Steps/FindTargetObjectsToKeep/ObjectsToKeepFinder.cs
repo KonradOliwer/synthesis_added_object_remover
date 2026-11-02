@@ -5,8 +5,8 @@ using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 namespace AddedObjectRemover.Steps.FindTargetObjectsToKeep;
 
 /// <summary>
-/// Step 4: finds the target objects that must never be removed, from the links into the target plugin, the scripts and what
-/// rests on them, and the target objects whose removal the log warns about.
+/// Finds the target objects that must never be removed, from the links into the target plugin, the scripts and what
+/// rests on them, and the target objects whose removal can still harm the game.
 /// </summary>
 public static class ObjectsToKeepFinder
 {
@@ -18,12 +18,9 @@ public static class ObjectsToKeepFinder
     /// <summary>Finds what other mods' objects rest on first, since what rests on a target object keeps it.</summary>
     public static ObjectsToKeepFound Find(Input input)
     {
-        var clock = input.TimeSinceStart;
-        var start = clock();
-        var heldUp = input.HeldUp.Find();
-        var heldUpEnd = clock();
-        var kept = Find(input.Targets, input.Links, input.Bases, heldUp.Targets);
-        return new ObjectsToKeepFound(heldUp, heldUpEnd - start, kept, clock() - heldUpEnd);
+        var (heldUp, heldUpTime) = Timed.Run(input.TimeSinceStart, input.HeldUp.Find);
+        var (kept, keepTime) = Timed.Run(input.TimeSinceStart, () => Find(input.Targets, input.Links, input.Bases, heldUp.Targets));
+        return new ObjectsToKeepFound(heldUp, heldUpTime, kept, keepTime);
     }
 
     /// <param name="restingOn">The target objects other mods' objects rest on, with what rests on each; empty unless they are kept.</param>

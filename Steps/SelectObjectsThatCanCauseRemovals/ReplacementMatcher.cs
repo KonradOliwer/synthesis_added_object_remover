@@ -81,7 +81,7 @@ internal sealed class ReplacementMatcher
         var claims = Enumerable.Range(0, _targets.Count).SelectMany(
             t => matchesByTarget[t] ?? [],
             (t, match) => new Replacement(match.OtherModObject, new TargetId(t), match.Distance, match.SizeRatio));
-        return Replacements.Of(otherModObjectCount, KeyedGroups.DistinctBy(claims, claim => claim.OtherModObject, EqualityComparer<OtherId>.Default));
+        return Replacements.Of(otherModObjectCount, claims.DistinctBy(claim => claim.OtherModObject).ToList());
     }
 
     /// <summary>

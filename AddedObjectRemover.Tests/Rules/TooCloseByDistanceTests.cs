@@ -35,12 +35,15 @@ public class TooCloseByDistanceTests
         var replacements = Replacements.None(others.Count);
         return TooCloseObjects.Find(
             new(
+                new(
+                    targets,
+                    world.VisibleTargets,
+                    world.Selected(replacements, NpcHandling.Never),
+                    world.PlacedNpcs,
+                    Shapes,
+                    new TriangleStore(Shapes.ReadTriangles)),
                 TestScenes.CreateWorld(targets, others),
-                world.VisibleTargets,
-                world.Selected(replacements, NpcHandling.Never),
-                world.PlacedNpcs,
-                Shapes,
-                new TriangleStore(Shapes.ReadTriangles),
+                TargetWorkOrder.Of(targets),
                 new Execution(1),
                 [TestJudgedGroups.OfAll(targets, settings)],
                 TestSeededDecisions.StartUnprotected(targets))).Result.Passes.Single();

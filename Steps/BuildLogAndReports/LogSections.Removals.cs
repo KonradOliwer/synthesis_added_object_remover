@@ -96,7 +96,7 @@ internal static partial class LogSections
     /// <summary>Each kept target once, counted under the first reason found for it.</summary>
     public static LogSection BuildKeptSummarySection(IEnumerable<KeptObject> kept)
     {
-        var keptOnce = KeyedGroups.DistinctBy(kept, entry => entry.TargetIndex, EqualityComparer<int>.Default).ToList();
+        var keptOnce = kept.DistinctBy(entry => entry.TargetIndex).ToList();
         var byCategory = KeyedGroups.Rank(
             KeyedGroups.CountBy(keptOnce, entry => KeepReasonText.Category(entry.Reason), StringComparer.Ordinal),
             StringComparer.Ordinal);

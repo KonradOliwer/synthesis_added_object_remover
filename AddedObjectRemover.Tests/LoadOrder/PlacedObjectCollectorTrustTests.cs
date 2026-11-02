@@ -27,8 +27,8 @@ public class PlacedObjectCollectorTrustTests
     private static readonly BaseKey OtherWall = new(new RecordKey(BaseGame, 0x101), BaseLinkKind.PlaceableObject);
     private static readonly PresenceFacts Shown = new(Deleted: false, InitiallyDisabled: false, EnableParent: null);
 
-    private static readonly WhatToCollect Plan = new(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false);
-    private static readonly WhatToCollect OldPlacesJudged = Plan with { JudgeOldPlaces = true };
+    private static readonly WhatToCollect Plan = new(new ScanNeeds(), SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false);
+    private static readonly WhatToCollect OldPlacesJudged = Plan with { Needs = new ScanNeeds(JudgeOldPlaces: true) };
     private static readonly ModTrustTable Mods = TestModTrust.Of(
         TestTargets.TargetName, Patch, trusted: [BaseGame, Carrier], untrusted: [City, Later], trustedForOwnChanges: [Birds]);
 
@@ -229,7 +229,7 @@ public class PlacedObjectCollectorTrustTests
     [Fact]
     public void AnUnchangedObjectOutsideTheTargetSpacesIsNotCounted()
     {
-        var hidden = Record(BaseGame, At(BaseGame, Placed)) with { InTargetSpace = false };
+        var hidden = Record(BaseGame, At(BaseGame, Placed)) with { InPluginSpace = false };
 
         Assert.Equal(0, Collect(hidden).Counts.OthersUnchanged);
     }

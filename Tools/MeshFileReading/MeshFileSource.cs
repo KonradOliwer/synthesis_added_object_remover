@@ -15,6 +15,7 @@ internal sealed class MeshFileSource
     private const string MeshesPrefix = "meshes\\";
     private const string DataPrefix = "data\\";
     private const string ArchiveSuffixDelimiter = " - ";
+    private const int CopyBufferSize = 81920;
 
     private readonly string _dataPath;
     private readonly GameRelease _release;
@@ -96,14 +97,22 @@ internal sealed class MeshFileSource
     /// <remarks>
     /// Not <see cref="IArchiveFile.GetBytes"/>: Mutagen's BSA reader reads once and ignores how much it got, so a short read
     /// would leave zeros. Reading to the archive's stated size turns a short read into an <see cref="EndOfStreamException"/>.
-    /// The size is asked after opening the stream, which caches it.
+    /// The size is asked after opening the stream, which caches it. The bytes grow as they are read, never to the stated size
+    /// up front: a corrupt size beyond the largest array would otherwise end the run.
     /// </remarks>
     private static byte[] ReadToStatedSize(IArchiveFile archiveFile)
     {
         using var stream = archiveFile.AsStream();
-        var bytes = new byte[archiveFile.Size];
-        stream.ReadExactly(bytes);
-        return bytes;
+        var statedSize = archiveFile.Size;
+        using var bytes = new MemoryStream();
+        var buffer = new byte[CopyBufferSize];
+        while (bytes.Length < statedSize)
+        {
+            var read = stream.Read(buffer, 0, (int)Math.Min(buffer.Length, statedSize - bytes.Length));
+            if (read == 0) throw new EndOfStreamException();
+            bytes.Write(buffer, 0, read);
+        }
+        return bytes.ToArray();
     }
 
     /// <summary>
@@ -115,25 +124,36 @@ internal sealed class MeshFileSource
         var index = new Dictionary<string, IArchiveFile>(StringComparer.OrdinalIgnoreCase);
         foreach (var archivePath in GetArchivePathsInPriorityOrder())
         {
-            try
-            {
-                AddArchiveMeshes(archivePath, index);
-                _archivesIndexed.Increment();
-            }
-            catch (Exception ex) when (KnownProblems.IsCorruptArchive(ex))
-            {
-                _problems.Add(new ArchiveProblem(ArchiveProblemKind.ArchiveUnreadable, Path.GetFileName(archivePath), ex.Message));
-            }
+            var files = new List<(string Path, IArchiveFile File)>();
+            var listedWhole = TryListArchiveFiles(archivePath, files);
+            AddMeshes(files, index);
+            if (listedWhole) _archivesIndexed.Increment();
         }
         return index;
     }
 
-    private void AddArchiveMeshes(string archivePath, Dictionary<string, IArchiveFile> index)
+    /// <remarks>The reader parses the archive's directory lazily, so every file and path is read here, inside the one catch around the library.</remarks>
+    /// <param name="into">Receives the files in the archive's order; for a corrupt archive, the files read before the fault.</param>
+    /// <returns>Whether the whole list was read.</returns>
+    private bool TryListArchiveFiles(string archivePath, List<(string Path, IArchiveFile File)> into)
     {
-        var reader = Archive.CreateReader(_release, new FilePath(archivePath));
-        foreach (var file in reader.Files)
+        try
         {
-            var path = NormalizeArchivePath(file.Path);
+            foreach (var file in Archive.CreateReader(_release, new FilePath(archivePath)).Files) into.Add((file.Path, file));
+            return true;
+        }
+        catch (Exception ex) when (KnownProblems.IsCorruptArchive(ex))
+        {
+            _problems.Add(new ArchiveProblem(ArchiveProblemKind.ArchiveUnreadable, Path.GetFileName(archivePath), ex.Message));
+            return false;
+        }
+    }
+
+    private static void AddMeshes(List<(string Path, IArchiveFile File)> files, Dictionary<string, IArchiveFile> index)
+    {
+        foreach (var (givenPath, file) in files)
+        {
+            var path = NormalizeArchivePath(givenPath);
             if (path.EndsWith(".nif", StringComparison.OrdinalIgnoreCase))
             {
                 index[path] = file;

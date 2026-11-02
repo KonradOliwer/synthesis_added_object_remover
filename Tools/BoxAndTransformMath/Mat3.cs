@@ -96,10 +96,7 @@ public readonly struct Mat3
         M31 * v.X + M32 * v.Y + M33 * v.Z);
 
     /// <summary>M^T * v (world -> local for a rotation matrix, since R^-1 = R^T).</summary>
-    public Vector3 TransformTransposed(Vector3 v) => new(
-        M11 * v.X + M21 * v.Y + M31 * v.Z,
-        M12 * v.X + M22 * v.Y + M32 * v.Z,
-        M13 * v.X + M23 * v.Y + M33 * v.Z);
+    public Vector3 TransformTransposed(Vector3 v) => Transposed().Transform(v);
 
     /// <summary>|M| * v with element-wise absolute values; used to get world half-extents of a rotated box.</summary>
     public Vector3 AbsTransform(Vector3 v) => new(

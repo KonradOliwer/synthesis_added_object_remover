@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Plugins.Records;
 using Mutagen.Bethesda.Skyrim;
 
@@ -20,40 +21,42 @@ internal static class LandLayerReader
     public static TerrainLayers? Read(ILandscapeGetter landscape, PluginNames names)
     {
         if (landscape.IsDeleted) return null;
+        var layers = ReadHeadedLayers(landscape);
         var quadrants = new QuadrantLayers[QuadrantPlaces.Length];
-        foreach (var (quadrant, x, y) in QuadrantPlaces) quadrants[TerrainQuadrants.IndexOf(x, y)] = ReadQuadrant(landscape.Layers, quadrant, names);
+        foreach (var (quadrant, x, y) in QuadrantPlaces) quadrants[TerrainQuadrants.IndexOf(x, y)] = ReadQuadrant(layers, quadrant, names);
         return new TerrainLayers(quadrants);
     }
 
-    /// <remarks>If a quadrant stores several base layers, the last one stored shows.</remarks>
-    private static QuadrantLayers ReadQuadrant(IReadOnlyList<IBaseLayerGetter> layers, Quadrant quadrant, PluginNames names)
+    /// <summary>The layers in the order stored that have a header; a layer without a header is in no quadrant.</summary>
+    private static StoredLayer[] ReadHeadedLayers(ILandscapeGetter landscape)
     {
-        var inQuadrant = LayersIn(layers, quadrant);
-        return new QuadrantLayers(
-            inQuadrant.Where(entry => entry.Layer is not IAlphaLayerGetter).Select(entry => (RecordKey?)names.KeyOf(entry.Header.Texture.FormKey)).LastOrDefault(),
-            [.. inQuadrant.Select(entry => entry.Layer is IAlphaLayerGetter alpha ? ReadAlpha(alpha, entry.Header, names) : null).OfType<TerrainAlphaLayer>()]);
+        var stored = MutagenCalls.Read(() => landscape.Layers
+            .Select(layer => layer.Header is { } header
+                ? (Headed: true, header.Quadrant, Texture: header.Texture.FormKey, header.LayerNumber,
+                    Alphas: layer is IAlphaLayerGetter alpha ? (alpha.AlphaLayerData ?? []).Select(data => (data.Position, data.Opacity)).ToArray() : null)
+                : default)
+            .ToArray());
+        return [.. stored.Where(layer => layer.Headed).Select(layer => new StoredLayer(layer.Quadrant, layer.Texture, layer.LayerNumber, layer.Alphas))];
     }
 
-    /// <summary>The quadrant's layers in the order stored, each with its header; a layer without a header is in no quadrant.</summary>
-    private static List<(IBaseLayerGetter Layer, ILayerHeaderGetter Header)> LayersIn(IReadOnlyList<IBaseLayerGetter> layers, Quadrant quadrant)
+    /// <remarks>If a quadrant stores several base layers, the last one stored shows.</remarks>
+    private static QuadrantLayers ReadQuadrant(StoredLayer[] layers, Quadrant quadrant, PluginNames names)
     {
-        var inQuadrant = new List<(IBaseLayerGetter Layer, ILayerHeaderGetter Header)>();
-        foreach (var layer in layers)
-        {
-            if (layer.Header is { } header && header.Quadrant == quadrant) inQuadrant.Add((layer, header));
-        }
-        return inQuadrant;
+        var inQuadrant = layers.Where(layer => layer.Quadrant == quadrant).ToList();
+        return new QuadrantLayers(
+            inQuadrant.Where(layer => layer.Alphas is null).Select(layer => (RecordKey?)names.KeyOf(layer.Texture)).LastOrDefault(),
+            [.. inQuadrant.Select(layer => layer.Alphas is { } alphas ? ReadAlpha(layer, alphas, names) : null).OfType<TerrainAlphaLayer>()]);
     }
 
     /// <remarks>A position outside the quadrant's vertices (a malformed record) paints nothing.</remarks>
-    private static TerrainAlphaLayer ReadAlpha(IAlphaLayerGetter layer, ILayerHeaderGetter header, PluginNames names)
+    private static TerrainAlphaLayer ReadAlpha(StoredLayer layer, (ushort Position, float Opacity)[] alphas, PluginNames names)
     {
         var opacities = new float[TerrainQuadrants.VertexCount];
-        foreach (var data in layer.AlphaLayerData ?? [])
+        foreach (var (position, opacity) in alphas)
         {
-            if (data.Position < TerrainQuadrants.VertexCount) opacities[OpacityIndexOf(data.Position)] = data.Opacity;
+            if (position < TerrainQuadrants.VertexCount) opacities[OpacityIndexOf(position)] = opacity;
         }
-        return new TerrainAlphaLayer(names.KeyOf(header.Texture.FormKey), header.LayerNumber, opacities);
+        return new TerrainAlphaLayer(names.KeyOf(layer.Texture), layer.LayerNumber, opacities);
     }
 
     /// <summary>
@@ -62,4 +65,7 @@ internal static class LandLayerReader
     /// the layout of <see cref="TerrainAlphaLayer.Opacities"/>, so the position is the opacity index unchanged.
     /// </summary>
     private static int OpacityIndexOf(int alphaPosition) => alphaPosition;
+
+    /// <param name="Alphas">The opacities by position of an alpha layer; null for a base layer.</param>
+    private readonly record struct StoredLayer(Quadrant Quadrant, FormKey Texture, ushort LayerNumber, (ushort Position, float Opacity)[]? Alphas);
 }

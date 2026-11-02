@@ -21,8 +21,8 @@ internal sealed class NavmeshWriter(CellOverrides cells, RecordHandles handles)
         var earlier = Present(versions.Earlier, navmesh);
         var target = GetOrAddOverride(Present(versions.Winner, navmesh));
         if (!RawByteFormat.AllowsCopy(NavmeshRecordParts.Geometry, earlier.Record, target))
-            throw new InvalidOperationException($"The geometry of navmesh {navmesh} holds bytes of another record format and cannot go back.");
-        var parent = target.Data?.Parent.DeepCopy();
+            throw new InvalidOperationException($"The geometry of navmesh {navmesh} holds bytes of another record format and cannot be copied.");
+        var parent = MutagenCalls.Read(() => target.Data?.Parent.DeepCopy());
         NavmeshRecordParts.Geometry.CopyInto(target, earlier.Record);
         if ((parent, target.Data) is ({ } kept, { } data)) data.Parent = kept;
     }
@@ -34,7 +34,7 @@ internal sealed class NavmeshWriter(CellOverrides cells, RecordHandles handles)
     public void CopyEarlier(RecordKey navmesh)
     {
         var earlier = Present(handles.NavmeshOf(navmesh).Earlier, navmesh);
-        var copy = (NavigationMesh)earlier.Record.DeepCopy();
+        var copy = CopyOf(earlier.Record);
         var list = cells.GetOrAdd(earlier.Cell.ToFormKey()).NavigationMeshes;
         list.RemoveAll(existing => existing.FormKey == copy.FormKey);
         list.Add(copy);
@@ -86,12 +86,14 @@ internal sealed class NavmeshWriter(CellOverrides cells, RecordHandles handles)
         var navmesh = list.FirstOrDefault(existing => existing.FormKey == key);
         if (navmesh is null)
         {
-            navmesh = (NavigationMesh)winner.Record.DeepCopy();
+            navmesh = CopyOf(winner.Record);
             list.Add(navmesh);
         }
         _navmeshes.Add(key, navmesh);
         return navmesh;
     }
+
+    private static NavigationMesh CopyOf(INavigationMeshGetter record) => (NavigationMesh)MutagenCalls.Read(() => record.DeepCopy());
 
     private static NavmeshVersion Present(NavmeshVersion? version, RecordKey navmesh) =>
         version ?? throw new InvalidOperationException($"Navmesh {navmesh} has no such version to write from.");

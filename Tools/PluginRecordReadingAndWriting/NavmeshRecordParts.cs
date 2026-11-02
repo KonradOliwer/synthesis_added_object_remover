@@ -23,20 +23,19 @@ internal static class NavmeshRecordParts
     /// </summary>
     public static RecordPart<INavigationMeshGetter, INavigationMesh> Geometry { get; } = new(
         [],
-        static (one, other) => FlagBits.Differ(one.MajorRecordFlagsRaw, other.MajorRecordFlagsRaw, GeometryFlagBits) || !one.Equals(other, GeometryMask),
+        static (one, other) => FlagBits.DifferIn(one, other, GeometryFlagBits) || !one.Equals(other, GeometryMask),
         static (target, source) =>
         {
-            target.MajorRecordFlagsRaw = FlagBits.CopyBits(target.MajorRecordFlagsRaw, source.MajorRecordFlagsRaw, GeometryFlagBits);
-            ((INavigationMeshInternal)target).DeepCopyIn(source, errorMask: null, copyMask: GeometryMask.GetCrystal());
+            FlagBits.CopyMajorBits(target, source, GeometryFlagBits);
+            MutagenCalls.Copy(() => ((INavigationMeshInternal)target).DeepCopyIn(source, errorMask: null, copyMask: GeometryMask.GetCrystal()));
         },
         static version => version.NNAM is not null || version.ONAM is not null || version.PNAM is not null || version.Data is { NavmeshGrid.Length: > 0 });
 
     /// <summary>The Deleted flag.</summary>
     public static RecordPart<INavigationMeshGetter, INavigationMesh> Presence { get; } = new(
         [],
-        static (one, other) => FlagBits.Differ(one.MajorRecordFlagsRaw, other.MajorRecordFlagsRaw, RecordHeader.DeletedBit),
-        static (target, source) => target.MajorRecordFlagsRaw = FlagBits.CopyBits(target.MajorRecordFlagsRaw, source.MajorRecordFlagsRaw, RecordHeader.DeletedBit),
-        static _ => false);
+        static (one, other) => FlagBits.DifferIn(one, other, RecordHeader.DeletedBit),
+        static (target, source) => FlagBits.CopyMajorBits(target, source, RecordHeader.DeletedBit));
 
     /// <summary>A navmesh's whole entry in the navmesh info map; the copy replaces the target map's entry of the same navmesh.</summary>
     public static RecordPart<INavigationMapInfoGetter, INavigationMeshInfoMap> MapEntry { get; } = new(
@@ -45,7 +44,6 @@ internal static class NavmeshRecordParts
         static (target, source) =>
         {
             target.MapInfos.RemoveAll(entry => entry.NavigationMesh.FormKey == source.NavigationMesh.FormKey);
-            target.MapInfos.Add(source.DeepCopy());
-        },
-        static _ => false);
+            target.MapInfos.Add(MutagenCalls.Read(() => source.DeepCopy()));
+        });
 }

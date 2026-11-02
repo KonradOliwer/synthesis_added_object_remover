@@ -33,16 +33,46 @@ public sealed class ScanNeedsTests
     [Fact]
     public void TheWhatToCollectTakesTheUnionAndTheChangedObjectsValues()
     {
-        var needs = new ScanNeeds(Navmesh: true, JudgeOldPlaces: true, AreaRecordVersions: AreaReads);
+        var needs = new ScanNeeds(
+            Navmesh: true,
+            JudgeOldPlaces: true,
+            DecideEveryObjectWithoutCleanedMod: true,
+            AreaRecordVersions: new AreaRecordReads(new AreaPartTolerances(8f, 4f), Cells: true, Lands: true));
 
         Assert.Equal(
-            new WhatToCollect(true, false, false, false, false, 7f, ProcessReplaced: true, JudgeOldPlaces: true, TerrainForChangedObjectsOnly: false, AreaRecordVersions: AreaReads),
-            WhatToCollect.Of(needs, 7f, processReplaced: true));
+            new WhatToCollect(needs, 7f, ProcessReplaced: true),
+            WhatToCollectBuilder.Create(
+                new MarkerMoveSettings(10f, Runs: true),
+                reports: null,
+                Terrain(on: false, types: false, water: false),
+                Terrain(on: false, types: false, water: false),
+                new ChangedObjectSettings(RestoreMode.Remove, RestoreMode.Remove),
+                processReplaced: true,
+                movedDistance: 7f,
+                Restore(otherModsObjects: true, terrain: false, cells: false, navmeshes: false)));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AMarkerMoveReadsTheNavmeshesOnlyWhenItRuns(bool runs) =>
+        Assert.Equal(new ScanNeeds(Navmesh: runs), new MarkerMoveSettings(10f, runs).Needs);
+
+    [Theory]
+    [InlineData(true, true, true, true)]
+    [InlineData(true, false, true, false)]
+    [InlineData(true, true, false, false)]
+    [InlineData(false, true, true, false)]
+    public void ChangedTerrainRunsOnlyWhenOnAndCountingAChangeInAnArea(bool on, bool countsAChange, bool hasAnArea, bool runs) =>
+        Assert.Equal(runs, (Terrain(on, types: false, water: false) with { CountHeightChanges = countsAChange, AreaByDistance = hasAnArea }).Runs);
+
     [Fact]
-    public void AMarkerMoveReadsTheNavmeshes() =>
-        Assert.Equal(new ScanNeeds(Navmesh: true), new MarkerMoveSettings(10f).Needs);
+    public void TheRestoreRunsAndReadsOnlyWhenAKindIsOn()
+    {
+        Assert.False(Restore(false, false, false, false).Runs);
+        Assert.Equal(new ScanNeeds(), Restore(false, false, false, false).Needs);
+        Assert.True(Restore(false, false, false, true).Runs);
+    }
 
     [Fact]
     public void TheReportsReadTheOtherModDetails() =>
@@ -100,8 +130,8 @@ public sealed class ScanNeedsTests
 
     private static ChangedTerrainSettings Terrain(bool on, bool types, bool water) =>
         new(
-            on, TerrainCheckedObjects.VisibleObjectsOnTheGround, CountHeightChanges: false, 8f, CountTerrainTypeChanges: types, 0,
-            CountWaterHeightChanges: water, 0f, CountWaterAddedOrRemoved: false, 0, AreaBySize: false, 0f, AreaByDistance: false, 0f);
+            on, TerrainCheckedObjects.VisibleObjectsOnTheGround, CountHeightChanges: true, 8f, CountTerrainTypeChanges: types, 0,
+            CountWaterHeightChanges: water, 0f, CountWaterAddedOrRemoved: false, 0, AreaBySize: false, 0f, AreaByDistance: true, 64f);
 
     private static WhereRemovedRestoreSettings Restore(bool otherModsObjects, bool terrain, bool cells, bool navmeshes) =>
         new(

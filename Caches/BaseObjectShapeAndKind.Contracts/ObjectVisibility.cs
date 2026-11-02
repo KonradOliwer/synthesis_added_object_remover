@@ -15,4 +15,8 @@ public readonly record struct ObjectVisibility(InvisibleObjectKind? Kind, bool B
     public static ObjectVisibility Invisible(InvisibleObjectKind kind) => new(kind, false);
 
     public bool IsVisible => Kind == null && !BaseMissing && !EffectOnlyMesh;
+
+    /// <summary>The object is a marker that actors or the map use (door, map, idle or furniture marker), so removing it can need a manual patch.</summary>
+    public bool IsUsedByActorsOrMap =>
+        Kind is InvisibleObjectKind.DoorMarkers or InvisibleObjectKind.MapMarkers or InvisibleObjectKind.IdleMarkers or InvisibleObjectKind.FurnitureMarkers;
 }

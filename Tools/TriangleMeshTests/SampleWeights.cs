@@ -13,10 +13,11 @@ public static class SampleWeights
     public static float FalloffOf(Box bounds, float fractionOfDiagonal) => bounds.Size.Length() * fractionOfDiagonal;
 
     /// <summary>Per point: weight = 1 / (1 + (d / L)^2), with d the point's distance from the origin and L the falloff.</summary>
-    public static float[] ByOriginDistance(ImmutableArray<Vector3> points, float falloff) => points.Select(point => WeightAt(point.Length(), falloff)).ToArray();
+    public static ImmutableArray<float> ByOriginDistance(ImmutableArray<Vector3> points, float falloff) =>
+        ImmutableArray.CreateRange(points, point => WeightAt(point.Length(), falloff));
 
     /// <returns>Per sample: how many of the hit sets include it.</returns>
-    public static int[] CountHitsPerSample(IEnumerable<bool[]> hitSets, int sampleCount)
+    public static int[] CountHitsPerSample(IEnumerable<ImmutableArray<bool>> hitSets, int sampleCount)
     {
         var hitsPerSample = new int[sampleCount];
         foreach (var hits in hitSets)
@@ -31,7 +32,7 @@ public static class SampleWeights
 
     /// <summary>The weight one set of hits holds when each sample's weight is split equally among the sets that include it.</summary>
     /// <param name="hitsPerSample">Per sample: how many sets include it (<see cref="CountHitsPerSample"/>).</param>
-    public static float WeightHeldBy(bool[] hits, float[] weights, int[] hitsPerSample)
+    public static float WeightHeldBy(ImmutableArray<bool> hits, ImmutableArray<float> weights, int[] hitsPerSample)
     {
         var weight = 0f;
         for (var i = 0; i < weights.Length; i++)

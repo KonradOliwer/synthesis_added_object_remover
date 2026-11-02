@@ -157,7 +157,7 @@ public class RequiringModAfterPatchTests
     {
         var source = new SettingsSource.ConfigFile("town_walls", "town_walls.json", FilePath, 1, 1, new ConfigFileNotes([], [], []));
         var read = new ConfigsRead.Ready([new ConfiguredSettings(source, SettingsForTarget())]);
-        return SettingsValidator.BuildAll(
+        return BatchRequests.BuildAll(
             read, new PluginNameParsingPlugin(), facts, detailedLogAndReports: false, onlyWarnWhenRequiringModLoadsAfterPatch: onlyWarn, ReportsFolder, 1);
     }
 }

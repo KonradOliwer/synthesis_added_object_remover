@@ -24,9 +24,12 @@ internal static class RemovalWrite
     public static IEnumerable<WriteOrder> OrdersFor(OtherObject other) =>
         OrdersFor(other.Key, other.Position, other.Roles.HasFlag(ReferenceRoles.Persistent), other.Roles.HasFlag(ReferenceRoles.HasEnableParent));
 
+    /// <summary>The order that marks the record removed; the game shows no record set Initially Disabled.</summary>
+    public static WriteOrder DisableOrderFor(RecordKey key) => new SetInitiallyDisabled(key);
+
     private static IEnumerable<WriteOrder> OrdersFor(RecordKey key, Vector3 position, bool isPersistent, bool hasEnableParent)
     {
-        yield return new SetInitiallyDisabled(key);
+        yield return DisableOrderFor(key);
         if (!isPersistent) yield return new SetPosition(key, position with { Z = RemovalConvention.RemovedZ });
         if (hasEnableParent) yield return new SetEnableParent(key, RemovalConvention.PlayerRef, RemovalConvention.OppositeOfParent);
     }

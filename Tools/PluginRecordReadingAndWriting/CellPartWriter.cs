@@ -19,7 +19,7 @@ internal sealed class CellPartWriter(CellOverrides cells, RecordHandles handles)
             var key = new CellPartKey(name.Part, name.Region?.ToFormKey());
             var (_, part) = table.Single(entry => entry.Key == key);
             if (!RawByteFormat.AllowsCopy(part, versions.Earlier, target))
-                throw new InvalidOperationException($"Part {name.Part} of cell {cell} holds bytes of another record format and cannot go back.");
+                throw new InvalidOperationException($"Part {name.Part} of cell {cell} holds bytes of another record format and cannot be copied.");
             part.CopyInto(target, versions.Earlier);
         }
     }

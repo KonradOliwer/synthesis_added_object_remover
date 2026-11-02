@@ -34,6 +34,7 @@ internal static class TestLeftBehind
                 order,
                 new Execution(Environment.ProcessorCount)),
             new ReachRule(TestBaseFacts.Reader(new SkyrimMod(ReachRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache())),
+            VisibleLeftBehindObjects.CreateLeftBehindJudging(),
             config,
             order);
     }
@@ -51,10 +52,13 @@ internal static class TestLeftBehind
             new(
                 [.. targets],
                 scene.ObjectsThatCanCauseRemovals(Replacements.None(others.Count), NpcHandling.OnlyWhenStuckInsideTheObject),
-                new Dictionary<OtherId, OtherObject?>(),
+                OtherModsObjectsResult.SwitchedOff,
                 TestSeededDecisions.StartDisablingAll(protection, targets.Count),
-                scene.VisibleTargets,
-                new TestRunCaches(shapes, bases: TestBaseFacts.Reader(new SkyrimMod(ReachRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache())),
+                new TestRunCaches(
+                    shapes,
+                    bases: TestBaseFacts.Reader(new SkyrimMod(ReachRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
+                    visibleTargets: scene.IndexVisibleTargets),
+                VisibleLeftBehindObjects.CreateLeftBehindJudging(),
                 TargetWorkOrder.Of(targets),
                 new Execution(Environment.ProcessorCount),
                 config)).Result;

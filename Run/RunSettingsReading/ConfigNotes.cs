@@ -53,7 +53,7 @@ internal sealed class ConfigNotes(SettingsSchema schema, JsonSerializerSettings 
         {
             NoteGroup((JObject)value, setting.Property.GetValue(read)!, defaultValue, keyPath + ".", screenName + " > ");
         }
-        else if (DiffersFromDefault(setting.Property.GetValue(read), defaultValue, setting.Property.PropertyType))
+        else if (PropertyValues.DifferByValue(setting.Property.GetValue(read), defaultValue, setting.Property.PropertyType))
         {
             _changedFromDefault.Add(new SettingInFile(keyPath, screenName, value.ToString(Formatting.None)));
         }
@@ -79,17 +79,4 @@ internal sealed class ConfigNotes(SettingsSchema schema, JsonSerializerSettings 
         defaultValue.GetType() == schema.PluginType && defaultValue.Equals(Activator.CreateInstance(schema.PluginType))
             ? "null"
             : JsonConvert.SerializeObject(defaultValue, Formatting.None, json);
-
-    /// <summary>
-    /// Values are compared, not text: 32 and 32.0 are the same number, and lists are the same when their items are in the same order.
-    /// A null list is an empty one, as the settings treat it.
-    /// </summary>
-    private static bool DiffersFromDefault(object? readValue, object? defaultValue, Type type) =>
-        IsList(type)
-            ? !ItemsOf(readValue).SequenceEqual(ItemsOf(defaultValue))
-            : !Equals(readValue, defaultValue);
-
-    private static bool IsList(Type type) => type != typeof(string) && typeof(System.Collections.IEnumerable).IsAssignableFrom(type);
-
-    private static IEnumerable<object> ItemsOf(object? list) => list is System.Collections.IEnumerable items ? items.Cast<object>() : [];
 }

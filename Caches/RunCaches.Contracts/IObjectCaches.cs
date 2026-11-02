@@ -1,6 +1,5 @@
 using System.Numerics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
 namespace AddedObjectRemover.Caches.RunCaches.Contracts;
 
@@ -70,22 +69,12 @@ public interface IObjectCaches
 
     IVisibleTargetObjects VisibleTargets { get; }
 
-    /// <summary>A new index like <see cref="VisibleTargets"/> over <paramref name="targets"/>: the collected targets, some shrunk or turned. <see cref="VisibleTargets"/> stays as it is.</summary>
+    /// <summary>
+    /// An index like <see cref="VisibleTargets"/> over <paramref name="targets"/>: the collected targets, some placed elsewhere.
+    /// <see cref="VisibleTargets"/> itself when each of them is the collected object; asked again with equal targets, the index built
+    /// for them. <see cref="VisibleTargets"/> stays as it is.
+    /// </summary>
     IVisibleTargetObjects IndexVisibleTargets(IReadOnlyList<TargetObject> targets);
-
-    /// <summary>
-    /// The visible targets where the rounds measure them: a new index with each object kept shrunk or turned at its new placement
-    /// and every other object, a restored one too, where the cleaned mod put it, or <see cref="VisibleTargets"/> when there is no
-    /// fit. An object kept shrunk or turned and removed later stands where it stood, as the patch leaves it.
-    /// </summary>
-    IVisibleTargetObjects IndexVisibleTargetsAsTheRoundsMeasureThem(IRemovalDecisions decisions);
-
-    /// <summary>
-    /// The visible targets where they stand: a new index with each object kept shrunk or turned at its new placement and each
-    /// restored object at its earlier placement, or <see cref="VisibleTargets"/> when none stands elsewhere. An object kept shrunk
-    /// or turned and removed later stands where it stood, as the patch leaves it.
-    /// </summary>
-    IVisibleTargetObjects IndexVisibleTargetsAsTheyStand(IRemovalDecisions decisions);
 
     /// <summary>The visible objects of <see cref="ObjectsOfAnyPlugin"/>; asking builds it.</summary>
     IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPlugin();

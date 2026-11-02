@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
@@ -83,9 +82,8 @@ internal sealed class VisibleLeftBehindRounds
     /// <returns>Whether the round took something from its place.</returns>
     private bool DecideNextVisibleRound()
     {
-        var start = _timeSinceStart();
-        var tookSomething = JudgeAndDecideRound();
-        RoundsTime += _timeSinceStart() - start;
+        var (tookSomething, time) = Timed.Run(_timeSinceStart, JudgeAndDecideRound);
+        RoundsTime += time;
         return tookSomething;
     }
 
@@ -96,7 +94,7 @@ internal sealed class VisibleLeftBehindRounds
         if (checks.Length == 0) return false;
 
         RecordLatestChecks(checks);
-        DecideRound(new ProposedRound(RoundKind.VisibleLeftBehind, ProposalsOf(checks)));
+        DecideRound(new ProposedRound(new RoundOpening(RoundKind.VisibleLeftBehind, MayReplaceFits: false), ProposalsOf(checks)));
         return !LeftInNewestRound().IsEmpty;
     }
 
@@ -108,7 +106,7 @@ internal sealed class VisibleLeftBehindRounds
     private void FollowUpNewestRound()
     {
         var pass = _followUp.FollowUp(Decided, LeftInNewestRound());
-        foreach (var proposals in pass.ProposedRounds) DecideRound(new ProposedRound(RoundKind.AlsoRemove, proposals));
+        foreach (var proposals in pass.ProposedRounds) DecideRound(new ProposedRound(AlsoRemoveRounds.Opening, proposals));
     }
 
     private void RecordLatestChecks(IEnumerable<VisibleLeftBehindCheck> checks)
@@ -119,7 +117,7 @@ internal sealed class VisibleLeftBehindRounds
     private void DecideRound(ProposedRound round)
     {
         _proposedRounds.Add(round);
-        Decided = _copy.DecideRound(round.Kind, round.Proposals);
+        Decided = _copy.DecideRound(round.Opening, round.Proposals);
     }
 
     private ImmutableArray<TargetId> LeftInNewestRound() => Decided.LeftIn(Decided.Rounds[^1]);

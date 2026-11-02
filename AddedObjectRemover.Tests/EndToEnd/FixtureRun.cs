@@ -26,7 +26,7 @@ internal static class FixtureRun
         Settings settings,
         int workers,
         ILogSink log,
-        Func<string, GameRelease, IReadOnlyList<ModKey>, IMeshFilesFactory> openMeshFiles,
+        Func<string, GameRelease, IReadOnlyList<PluginName>, IMeshFilesFactory> openMeshFiles,
         Func<IPluginRecords, IPluginRecords>? wrapPlugin = null,
         Func<IBaseFacts, IBaseFacts>? wrapBases = null,
         Func<TimeSpan>? timeSinceStart = null,
@@ -58,7 +58,7 @@ internal static class FixtureRun
             var environment = new RunEnvironment(
                 world.Plugins,
                 new WrappedPluginRecordsFactory(pluginRecords, wrapPlugin),
-                new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod),
+                new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod, Program.PatchMarkerText),
                 openMeshFiles(state.DataFolderPath.Path, state.GameRelease, world.ListedPlugins),
                 new WrappedBaseFactsFactory(new BaseFactsFactory(world.Plugins.Mods), wrapBases),
                 log,
@@ -106,7 +106,7 @@ internal static class FixtureRun
         return (((RunResult.Done)result).Outcome, new RunOutput(OutputMasks.MaskLog(printed, runFolder), patch, reports, printed));
     }
 
-    private static IMeshFilesFactory DefaultMeshFiles(string dataFolder, GameRelease release, IReadOnlyList<ModKey> listedPlugins) =>
+    private static IMeshFilesFactory DefaultMeshFiles(string dataFolder, GameRelease release, IReadOnlyList<PluginName> listedPlugins) =>
         new MeshFilesFactory(dataFolder, release, listedPlugins);
 
     private sealed class WrappedPluginRecordsFactory(

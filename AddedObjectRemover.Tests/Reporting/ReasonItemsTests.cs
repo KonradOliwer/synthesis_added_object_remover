@@ -90,7 +90,7 @@ public sealed class ReasonItemsTests
         var decisions = StartDecisions()
             .ApplyFits([new ProposedFit(new TargetId(1), new TooClose(new OtherId(0), BySize), new EulerPlacement(Vector3.Zero, Vector3.Zero, 0.8f))])
             .Apply(RoundKind.TooClose, [Propose(0, new TooClose(new OtherId(0), BySize))])
-            .Apply(RoundKind.AlsoRemove, [Propose(1, new TouchingTargetThatLeft(new TargetId(0)))]);
+            .Apply(AlsoRemoveRounds.Opening, [Propose(1, new TouchingTargetThatLeft(new TargetId(0)))]);
         ObjectWithReason[] objects = [new ObjectWithReason.Touching(1, 0), new ObjectWithReason.LostSupport(2, 0.5f, 0f, 0)];
 
         Assert.Equal(

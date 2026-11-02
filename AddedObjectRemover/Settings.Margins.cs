@@ -1,3 +1,4 @@
+using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using Mutagen.Bethesda.Synthesis.Settings;
 
 namespace AddedObjectRemover;
@@ -21,7 +22,7 @@ public abstract class MarginBySizeSettings(bool use, float sizeMultiplier)
     public bool Use { get; set; } = use;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Margin on every side (× object size)")]
+    [SynthesisSettingName(SettingNames.MarginOnEverySide + SettingNames.TimesObjectSizeSuffix)]
     [SynthesisTooltip(
         "A multiple of the object's own size, added on every side. 0.5 adds half the object's size on every side,\n"
         + "so the checked area is twice as large as the object; 1 adds a whole size on every side (three times as large).\n"
@@ -38,7 +39,7 @@ public abstract class MarginByDistanceSettings(bool use, float distanceInUnits)
     public bool Use { get; set; } = use;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Margin on every side (game units)")]
+    [SynthesisSettingName(SettingNames.MarginOnEverySide + SettingNames.GameUnitsSuffix)]
     [SynthesisTooltip("The same margin for every object, whatever its size, added on every side. 0 adds no margin. 0-1024.")]
     public float DistanceInUnits { get; set; } = distanceInUnits;
 }

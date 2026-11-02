@@ -39,6 +39,6 @@ public sealed partial class LogAndReports
         [
             section,
             LogSections.BuildLinkedSection(decisions, alsoRemove.Rounds, pass.LinkedStep, pass.IdSuffix, _context),
-            TakeUnexpectedErrors(Present(alsoRemove.Failure, alsoRemove.TouchChainsFailure)),
+            TakeUnexpectedErrors(PartFailure.Present(alsoRemove.Failure, alsoRemove.TouchChainsFailure)),
         ];
 }

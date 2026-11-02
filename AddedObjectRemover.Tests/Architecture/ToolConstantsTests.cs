@@ -6,7 +6,7 @@ namespace AddedObjectRemover.Tests.Architecture;
 /// The tools hold generic operations only. Every named value in a tool (a constant or a static read-only field of a
 /// number, text, key, enum or struct type, or an array of those) is listed in Tools/ToolConstants.txt with its kind, so
 /// a game convention cannot slip in unnoticed; and no tool method has an optional parameter, because a rule is passed
-/// in by the caller. Inline literals in a tool are covered only by the magic-number rule and by review.
+/// in by the caller. These tests do not look at inline literals written inside a tool method; review checks those.
 /// </summary>
 public class ToolConstantsTests
 {
@@ -15,10 +15,11 @@ public class ToolConstantsTests
 
     /// <summary>
     /// math: a fact of arithmetic or geometry. file format / game format: how files and records are encoded.
-    /// budget: a performance or robustness limit. internal: a code or text the tool uses only inside itself.
+    /// budget: a performance or robustness limit. layout: where a tool puts an item in the data it hands out, so callers can
+    /// address it. internal: a code or text the tool uses only inside itself.
     /// A game convention (a naming habit, a rule about what the game's objects mean) is none of these.
     /// </summary>
-    private static readonly string[] Kinds = ["math", "file format", "game format", "budget", "internal"];
+    private static readonly string[] Kinds = ["math", "file format", "game format", "budget", "layout", "internal"];
 
     private static readonly BindingFlags AllDeclared =
         BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;

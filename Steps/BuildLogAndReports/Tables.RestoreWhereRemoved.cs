@@ -53,14 +53,11 @@ internal static partial class Tables
         [
             .. new[]
             {
-                TableWhenAnyRow(ReportFileNames.RestoredWhereRemovedObjectsFileName, RestoredWhereRemovedObjectsHeader, objects),
-                TableWhenAnyRow(ReportFileNames.RestoredWhereRemovedCellsFileName, RestoredWhereRemovedCellsHeader, cells),
+                CsvTable.WhenAnyRow(ReportFileNames.RestoredWhereRemovedObjectsFileName, RestoredWhereRemovedObjectsHeader, objects),
+                CsvTable.WhenAnyRow(ReportFileNames.RestoredWhereRemovedCellsFileName, RestoredWhereRemovedCellsHeader, cells),
             }.OfType<CsvTable>(),
         ];
     }
-
-    private static CsvTable? TableWhenAnyRow(string fileName, ImmutableArray<string> header, ImmutableArray<ImmutableArray<string>> rows) =>
-        rows.IsEmpty ? null : new CsvTable(fileName, header, rows);
 
     /// <param name="label">Names a record a guard found.</param>
     private static ImmutableArray<string> RestoredWhereRemovedObjectRow(
@@ -130,7 +127,7 @@ internal static partial class Tables
             world,
             land,
             RestoreWhereRemovedText.Quarter(quarter.Quarter),
-            PiecesText(quarter.Changed),
+            RestoreWhereRemovedText.Pieces(quarter.Changed),
             LaterTerrain(land.Change.LeftToLater, quarter),
             quarter.Area,
             RestoreWhereRemovedText.Result(RestoreOutcomes.KeptBecause(land, quarter)),
@@ -216,21 +213,10 @@ internal static partial class Tables
                 Quote(share.Verdict.ToString()),
             ]);
 
-    /// <summary>E.g. "210 heights, 3 vertex colours, ground textures".</summary>
-    private static string PiecesText(TerrainPieces pieces) =>
-        string.Join(
-            Describe.ListSeparator,
-            new[]
-            {
-                pieces.Heights > 0 ? TextFormat.Count(pieces.Heights, "height", "heights") : null,
-                pieces.Colours > 0 ? TextFormat.Count(pieces.Colours, "vertex colour", "vertex colours") : null,
-                pieces.Textures ? "ground textures" : null,
-            }.OfType<string>());
-
     /// <summary>E.g. "12 heights (Later.esp, Other.esp)": what a later plugin changed again in the quarter, with the plugins that did so in the land.</summary>
     private static string? LaterTerrain(LandLeftToLater later, LandQuarterOutcome quarter)
     {
-        var pieces = PiecesText(quarter.Later);
+        var pieces = RestoreWhereRemovedText.Pieces(quarter.Later);
         return pieces.Length == 0 ? null : $"{pieces} ({string.Join(Describe.ListSeparator, later.Plugins)})";
     }
 }

@@ -534,31 +534,31 @@ public sealed class RestoreWhereRemovedReportTests
             [Land()],
             [
                 Navmesh(0xA01, NavmeshCase.Edited, NavmeshUndo.Geometry, Cleared),
-                Navmesh(0xA02, NavmeshCase.DeletedWithoutReplacement, NavmeshUndo.BroughtBack, Cleared),
+                Navmesh(0xA02, NavmeshCase.Deleted,NavmeshUndo.BroughtBack, Cleared),
                 Navmesh(0xA03, NavmeshCase.Added, NavmeshUndo.Sunk, Cleared),
                 Navmesh(0xA04, NavmeshCase.Edited, NavmeshUndo.Geometry, Cleared),
                 Navmesh(0xA05, NavmeshCase.Edited, undo: null, StillStanding, keptForArea: AreaVerdict.StillStanding),
             ],
             [
-                new NavmeshGroupJudged([Key(0xA01), Key(0xA02)], [], Refused: null, IsRestored: true),
-                new NavmeshGroupJudged([Key(0xA03)], [], Refused: null, IsRestored: true),
-                new NavmeshGroupJudged([Key(0xA04)], [], new NavmeshRefusal(NavmeshGuard.EdgeLinkUnmatched, Key(0xA09), Fault: null), IsRestored: false),
+                new NavmeshGroupJudged([Key(0xA01), Key(0xA02)], new NavmeshGroupWrite([], [], []), Refused: null),
+                new NavmeshGroupJudged([Key(0xA03)], new NavmeshGroupWrite([], [], []), Refused: null),
+                new NavmeshGroupJudged([Key(0xA04)], Write: null, new NavmeshRefusal(NavmeshGuard.EdgeLinkUnmatched, Key(0xA09), Fault: null)),
             ],
             Passes: 3,
             DoorsLeftRemoved: [],
             Failures: []);
 
     private static PlacedChangeJudged Restored(RecordChangedByCleanedMod change, AreaShare area) =>
-        new(change, Never: null, area, WhereItIsNow: null, Refused: null, IsRestored: true, ChangeJudge.KindOf(change), KeptForArea: null);
+        new(change, Never: null, area, WhereItIsNow: null, Refused: null, IsRestored: true, ChangeJudge.KindOf(change), KeptForArea: null, PlacedBack: null);
 
     private static PlacedChangeJudged Refused(RecordChangedByCleanedMod change, AreaShare area, PlacedRefusal refusal) =>
-        new(change, Never: null, area, WhereItIsNow: null, refusal, IsRestored: false, ChangeJudge.KindOf(change), KeptForArea: null);
+        new(change, Never: null, area, WhereItIsNow: null, refusal, IsRestored: false, ChangeJudge.KindOf(change), KeptForArea: null, PlacedBack: null);
 
     private static PlacedChangeJudged KeptForArea(RecordChangedByCleanedMod change, AreaShare area, AreaVerdict keeping, AreaShare? now = null) =>
-        new(change, Never: null, area, now, Refused: null, IsRestored: false, ChangeJudge.KindOf(change), keeping);
+        new(change, Never: null, area, now, Refused: null, IsRestored: false, ChangeJudge.KindOf(change), keeping, PlacedBack: null);
 
     private static PlacedChangeJudged NeverRestored(RecordChangedByCleanedMod change, NeverRestoredReason never) =>
-        new(change, never, OldPlace: null, WhereItIsNow: null, Refused: null, IsRestored: false, ChangeJudge.KindOf(change), KeptForArea: null);
+        new(change, never, OldPlace: null, WhereItIsNow: null, Refused: null, IsRestored: false, ChangeJudge.KindOf(change), KeptForArea: null, PlacedBack: null);
 
     private static RecordChangedByCleanedMod Rock(uint id, PlacedParts undo, bool removedBefore = false, IReadOnlyDictionary<PlacedParts, PluginName>? later = null)
     {

@@ -10,6 +10,13 @@ public enum RoundKind { Fit, ChangedTerrain, TooClose, AlsoRemove, VisibleLeftBe
 /// <param name="Number">1 for the first round of a run, counting up.</param>
 public readonly record struct Round(int Number, RoundKind Kind);
 
+/// <summary>How a step opens its rounds.</summary>
+/// <param name="MayReplaceFits">
+/// Whether the round also decides an object kept shrunk or turned where it stands, like an undecided one, which replaces its fit;
+/// otherwise the round skips that object, since it fits.
+/// </param>
+public readonly record struct RoundOpening(RoundKind Kind, bool MayReplaceFits);
+
 /// <summary>What happened to a target object, once and for all.</summary>
 /// <param name="Reason">Why a step proposed to remove it; for a fitted object, why it did not fit where it stood.</param>
 public abstract record Decision(Round Round, RemovalReason Reason)
@@ -49,8 +56,8 @@ public abstract record Decision(Round Round, RemovalReason Reason)
 /// <summary>A step's proposal to remove one target object.</summary>
 public readonly record struct ProposedRemoval(TargetId Target, RemovalReason Reason);
 
-/// <summary>A step's proposals for one round, with the kind of round they open.</summary>
-public readonly record struct ProposedRound(RoundKind Kind, IReadOnlyList<ProposedRemoval> Proposals);
+/// <summary>A step's proposals for one round, with how they open it.</summary>
+public readonly record struct ProposedRound(RoundOpening Opening, IReadOnlyList<ProposedRemoval> Proposals);
 
 /// <summary>A step's proposal to keep one target object where it stands, shrunk or turned until it fits.</summary>
 /// <param name="Clash">Why it would be removed as it is.</param>

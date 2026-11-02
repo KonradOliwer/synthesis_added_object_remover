@@ -1,5 +1,4 @@
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveTooCloseObjects;
@@ -9,9 +8,10 @@ internal sealed class OldPlaceTooCloseRule(TooCloseObjects.OldPlaceRuleInput inp
 {
     public IPlacementRule Create(CollectedObjects oldPlaceWorld, OtherId leftOut)
     {
-        var (caches, settings) = (input.Caches, input.Settings);
-        var worldObjects = input.WorldCaches.Of(oldPlaceWorld);
+        var (worlds, settings) = (input.Worlds, input.Settings);
+        var worldObjects = worlds.WorldCaches.Of(oldPlaceWorld);
+        var caches = worlds.Caches;
         return TooCloseObjects.CreatePlacementRule(
-            new(input.Targets, caches.VisibleTargets, input.Causes.Of(oldPlaceWorld, [leftOut], settings.Npcs), worldObjects.PlacedNpcs, caches.Shapes, caches.Triangles, settings));
+            new(new(input.Targets, caches.VisibleTargets, worlds.Causes.Of(oldPlaceWorld, [leftOut], settings.Npcs), worldObjects.PlacedNpcs, caches.Shapes, caches.Triangles), settings));
     }
 }

@@ -563,7 +563,7 @@ public sealed class ConfigFilesTests : IDisposable
         var target = new PluginName("A.esp");
         var patch = new PluginName("Patch.esp");
         var facts = TestLoadOrderPlugins.Of(new KnownPluginNames([target, patch]), patch, [new PluginListing(target, true, []), new PluginListing(patch, true, [])]);
-        return SettingsValidator.BuildAll(read, new PluginNameParsingPlugin(), facts, detailedLogAndReports: false, onlyWarnWhenRequiringModLoadsAfterPatch: false, "/out", 1);
+        return BatchRequests.BuildAll(read, new PluginNameParsingPlugin(), facts, detailedLogAndReports: false, onlyWarnWhenRequiringModLoadsAfterPatch: false, "/out", 1);
     }
 
     [Fact]

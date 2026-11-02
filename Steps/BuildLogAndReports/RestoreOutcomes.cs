@@ -8,7 +8,7 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 /// <summary>A navmesh the step judged and the group it goes back or stays with; the group is null for a navmesh that is no candidate.</summary>
 internal sealed record NavmeshOutcome(NavmeshChangeJudged Judged, NavmeshGroupJudged? Group)
 {
-    public bool IsRestored => Group is { IsRestored: true };
+    public bool IsRestored => Group is { Write: not null };
 }
 
 /// <summary>What became of each change the step judged, as the log and the report files both say it.</summary>

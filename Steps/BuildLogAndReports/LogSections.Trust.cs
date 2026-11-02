@@ -16,7 +16,8 @@ internal static partial class LogSections
         + $"Also trust mods that require the cleaned mod, and their masters: {OnWith(trust.TrustRequiringMods, $"only if it has at most {OtherMasters(trust.MaxOtherMastersOfRequiringMod)}")}; "
         + $"Trust mods loading before the cleaned mod: {OnOff(trust.TrustLoadingBefore)}.";
 
-    private static string JoinPluginsOrNone(ImmutableArray<PluginName> plugins) => JoinOrNone(plugins.Select(plugin => plugin.ToString()));
+    private static string JoinPluginsOrNone(ImmutableArray<PluginName> plugins) =>
+        TextLists.JoinOr(plugins.Select(plugin => plugin.ToString()), Describe.ListSeparator, "(none)");
 
     private static string OtherMasters(int count) => TextFormat.Count(count, "other master", "other masters");
 

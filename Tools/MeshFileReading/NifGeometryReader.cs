@@ -6,39 +6,21 @@ namespace AddedObjectRemover;
 /// <summary>Reads a NIF's render geometry (bounds and optionally triangles) in root-node space, and its collision layers, with NiflySharp.</summary>
 internal sealed class NifGeometryReader
 {
+    private const string WarmUpFailedMessage =
+        "NiflySharp could not load the minimal NIF it had just saved, so its block-type cache was not built and meshes cannot be read safely in parallel.";
+
     /// <summary>
     /// NifFile.Load lazily fills NiflySharp's own static, unlocked block-type cache, which every reader in the
-    /// process shares, so this lock must be process-wide too. The cache is built once under the lock, after
-    /// which loads are parallel-safe. If that fails, every load is serialized.
+    /// process shares, so this lock must be process-wide too. The cache is built under the lock, after which
+    /// loads are parallel-safe.
     /// </summary>
-    private static readonly object LoadLock = new();
+    private static readonly object WarmUpLock = new();
 
-    private readonly ComputedOnce<LoaderStartUp> _loaderWarmUp;
+    private readonly ComputedOnce<bool> _loaderWarmUp = new(PrimeBlockTypeCache);
     private readonly RenderGeometryTypes _renderTypes = new();
 
-    public NifGeometryReader()
-        : this(PrimeBlockTypeCache)
-    {
-    }
-
-    /// <param name="primeBlockTypeCache">Builds the loader's block-type cache and tells how that went.</param>
-    internal NifGeometryReader(Func<LoaderStartUp> primeBlockTypeCache)
-    {
-        _loaderWarmUp = new ComputedOnce<LoaderStartUp>(primeBlockTypeCache);
-    }
-
-    /// <summary>Warms the loader up now, so a failure is known before the first mesh is read.</summary>
+    /// <summary>Warms the loader up now, so a library defect ends the run before the first mesh is read.</summary>
     public void WarmUpLoader() => _ = _loaderWarmUp.Value;
-
-    /// <summary>
-    /// How this reader's warm-up went; null when it has not run yet. Each run reports it
-    /// itself, so the report does not depend on which run in the process warmed up first.
-    /// </summary>
-    public LoaderStartUp? LoaderWarmUp => HasWarmedUp ? _loaderWarmUp.Value : null;
-
-    public bool HasWarmedUp => _loaderWarmUp.IsComputed;
-
-    public int ShapeClassesDecided => _renderTypes.ShapeClassesDecided;
 
     /// <summary>
     /// Loads a NIF from memory and computes the AABB, in the local space of the root node picked by
@@ -56,16 +38,10 @@ internal sealed class NifGeometryReader
     /// </summary>
     public NifReadResult ReadGeometry(byte[] data, bool includeTriangles, ShapeInclusion inclusion)
     {
+        WarmUpLoader();
         try
         {
-            if (_loaderWarmUp.Value.Succeeded)
-            {
-                return ReadGeometryUnlocked(data, includeTriangles, inclusion);
-            }
-            lock (LoadLock)
-            {
-                return ReadGeometryUnlocked(data, includeTriangles, inclusion);
-            }
+            return LoadAndReadGeometry(data, includeTriangles, inclusion);
         }
         catch (MalformedNifException ex)
         {
@@ -75,11 +51,12 @@ internal sealed class NifGeometryReader
 
     /// <summary>
     /// Builds NiflySharp's static block-type cache by saving and re-loading a minimal in-memory NIF
-    /// (one root NiNode). Safe if that load read a block, i.e. the cache now exists.
+    /// (one root NiNode). The cache exists once that load read a block; a load that read none is a library defect.
     /// </summary>
-    private static LoaderStartUp PrimeBlockTypeCache()
+    /// <returns>True; the value only marks the warm-up as done.</returns>
+    private static bool PrimeBlockTypeCache()
     {
-        lock (LoadLock)
+        lock (WarmUpLock)
         {
             var template = new NifFile(NiVersion.GetSSE(), withRootNode: true);
             using var stream = new MemoryStream();
@@ -87,12 +64,12 @@ internal sealed class NifGeometryReader
             stream.Position = 0;
             var nif = new NifFile();
             return saved && nif.Load(stream) == 0 && nif.Valid && nif.Blocks.Count > 0
-                ? LoaderStartUp.Success()
-                : LoaderStartUp.HeldNoBlocks();
+                ? true
+                : throw new InvalidOperationException(WarmUpFailedMessage);
         }
     }
 
-    private NifReadResult ReadGeometryUnlocked(byte[] data, bool includeTriangles, ShapeInclusion inclusion)
+    private NifReadResult LoadAndReadGeometry(byte[] data, bool includeTriangles, ShapeInclusion inclusion)
     {
         using var stream = new MemoryStream(data, writable: false);
         var nif = new NifFile();

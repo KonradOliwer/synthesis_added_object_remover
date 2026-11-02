@@ -19,6 +19,10 @@ public sealed record PartFailure(PartKey Part, string? Failure, FailureSubject? 
 
     public static PartFailure OfWholePart(PartKey part, CaughtFailure failure) =>
         new(part, failure.Description, Subject: null) { Details = failure.Details };
+
+    /// <param name="failures">The failures a result carries; null where there was none.</param>
+    /// <returns>The failures that are set, in order.</returns>
+    public static IEnumerable<PartFailure> Present(params PartFailure?[] failures) => failures.OfType<PartFailure>();
 }
 
 /// <param name="Key">The thing's key text, such as a record key or a file path.</param>

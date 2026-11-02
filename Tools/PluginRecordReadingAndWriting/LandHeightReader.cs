@@ -1,4 +1,5 @@
 using Mutagen.Bethesda.Skyrim;
+using Noggog;
 using static AddedObjectRemover.TerrainGrid;
 
 namespace AddedObjectRemover;
@@ -16,18 +17,31 @@ internal static class LandHeightReader
     public static float[]? Read(ILandscapeGetter landscape)
     {
         if (landscape.IsDeleted) return null;
-        if (landscape.VertexHeightMap is not { } map) return null;
+        if (MutagenCalls.Read(() => landscape.VertexHeightMap) is not { } map) return null;
+        var (offset, steps) = MutagenCalls.Read(() => (map.Offset, map.HeightMap.ToArray()));
+        return Decode(offset, StepsByVertex(steps));
+    }
 
+    /// <returns>The height steps row by row, read out of the map by the positions it gives.</returns>
+    private static sbyte[] StepsByVertex(IEnumerable<IKeyValue<P2Int, sbyte>> steps)
+    {
+        var byVertex = new sbyte[VertexCount];
+        foreach (var step in steps) byVertex[step.Key.Y * VerticesPerSide + step.Key.X] = step.Value;
+        return byVertex;
+    }
+
+    private static float[] Decode(float offset, sbyte[] steps)
+    {
         var heights = new float[VertexCount];
-        var rowStart = map.Offset;
+        var rowStart = offset;
         for (var y = 0; y < VerticesPerSide; y++)
         {
-            rowStart += map.HeightMap[0, y];
+            rowStart += steps[y * VerticesPerSide];
             var value = rowStart;
             heights[y * VerticesPerSide] = value * UnitsPerHeightStep;
             for (var x = 1; x < VerticesPerSide; x++)
             {
-                value += map.HeightMap[x, y];
+                value += steps[y * VerticesPerSide + x];
                 heights[y * VerticesPerSide + x] = value * UnitsPerHeightStep;
             }
         }

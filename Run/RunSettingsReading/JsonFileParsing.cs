@@ -5,9 +5,6 @@ namespace AddedObjectRemover;
 
 internal static class JsonFileParsing
 {
-    /// <summary>Without this a comment ahead of the first value would be read as the file's value.</summary>
-    private static readonly JsonLoadSettings IgnoreComments = new() { CommentHandling = CommentHandling.Ignore };
-
     /// <param name="kind">What the file is called in the message: "Group file" or "Config file".</param>
     public static string ReadText(string kind, string filePath)
     {
@@ -26,7 +23,7 @@ internal static class JsonFileParsing
     {
         try
         {
-            return JToken.Parse(text, IgnoreComments);
+            return JsonFiles.ParseIgnoringComments(text);
         }
         catch (JsonReaderException ex)
         {
@@ -44,6 +41,4 @@ internal static class JsonFileParsing
         JTokenType.Null => "null",
         _ => token.Type.ToString(),
     };
-
-    public static int LineOf(JToken token) => ((IJsonLineInfo)token).LineNumber;
 }

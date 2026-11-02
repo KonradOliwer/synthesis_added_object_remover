@@ -21,52 +21,55 @@ internal sealed class PluginRecords(
 
     public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk)
     {
-        var scanned = MutagenCalls.Read(() => PlacedRecordReader.Read(order, runCache.Cache, patch, names, scope, stopsTheWalk, execution));
+        var scanned = PlacedRecordReader.Read(order, runCache.Cache, patch, names, scope, stopsTheWalk, execution);
         _scanned = scanned.Lookups;
         return scanned.Facts;
     }
 
-    public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> records, IReadOnlySet<PluginName> linkedPlugins) =>
-        MutagenCalls.Read(() => ReadLinksFromLinkablePlugins(target, records, linkedPlugins));
+    public NonPlacedLinks ReadLinks(PluginName plugin, IReadOnlySet<RecordKey> records, IReadOnlySet<PluginName> linkedPlugins) =>
+        ReadLinksFromLinkablePlugins(plugin, records, linkedPlugins);
 
     public IWritableRecords ReadWritableRecords() => Scanned.Handles;
 
     public IRecordIndex ReadRecordIndex() => runCache;
 
-    public CellGridPoint? ReadHomeCellGrid(RecordKey record) =>
-        MutagenCalls.Read(() => Scanned.Handles.LocationOf(record).WinningCell.Grid is { } grid ? new CellGridPoint(grid.Point.X, grid.Point.Y) : (CellGridPoint?)null);
+    public CellGridPoint? ReadHomeCellGrid(RecordKey record)
+    {
+        var cell = Scanned.Handles.LocationOf(record).WinningCell;
+        return MutagenCalls.Read(() => cell.Grid?.Point) is { } point ? new CellGridPoint(point.X, point.Y) : null;
+    }
 
-    public float[]? ReadTerrain(ExteriorCell cell) => MutagenCalls.Read(() => Scanned.Terrain.ReadHeights(cell));
+    public float[]? ReadTerrain(ExteriorCell cell) => Scanned.Terrain.ReadHeights(cell);
 
-    public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => MutagenCalls.Read(() => Scanned.Terrain.ReadHeightsBelow(plugin, cell));
+    public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => Scanned.Terrain.ReadHeightsBelow(plugin, cell);
 
-    public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => MutagenCalls.Read(() => Scanned.Terrain.ReadVersions(cell));
+    public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => Scanned.Terrain.ReadVersions(cell);
 
-    public WaterCopies ReadWaterCopies(ExteriorCell cell) => MutagenCalls.Read(() => Scanned.Water.ReadCopies(cell));
+    public WaterCopies ReadWaterCopies(ExteriorCell cell) => Scanned.Water.ReadCopies(cell);
 
-    public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => MutagenCalls.Read(() => _materials.ChainOf(texture));
+    public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => _materials.ChainOf(texture);
 
-    public RecordKey? FindLandWorldspace(RecordKey space) => MutagenCalls.Read(() => Scanned.Terrain.FindLandWorldspace(space));
+    public RecordKey? FindLandWorldspace(RecordKey space) => Scanned.Terrain.FindLandWorldspace(space);
 
-    public NavmeshWorldTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => MutagenCalls.Read(() => Scanned.Navmeshes.ReadTriangles(bucket));
+    public NavmeshWorldTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => Scanned.Navmeshes.ReadTriangles(bucket);
 
-    public NpcTraits? NpcTraitsOf(BaseKey npc) => MutagenCalls.Read(() => _npcReads.NpcTraitsOf(npc));
+    public NpcTraits? NpcTraitsOf(BaseKey npc) => _npcReads.NpcTraitsOf(npc);
 
-    public TraitSupplier? TraitSupplierOf(BaseKey spawn, NpcTemplateFlag templateFlag) => MutagenCalls.Read(() => _npcReads.TraitSupplierOf(spawn, templateFlag));
+    public TraitSupplier? TraitSupplierOf(BaseKey spawn, NpcTemplateFlag templateFlag) => _npcReads.TraitSupplierOf(spawn, templateFlag);
 
-    public IReadOnlyList<RecordKey> LeveledEntriesOf(RecordKey list, NpcTemplateFlag templateFlag) => MutagenCalls.Read(() => _npcReads.LeveledEntriesOf(list, templateFlag));
+    public IReadOnlyList<RecordKey> LeveledEntriesOf(RecordKey list, NpcTemplateFlag templateFlag) => _npcReads.LeveledEntriesOf(list, templateFlag);
 
     public bool TryParsePluginName(string text, out PluginName name) => PluginNameParser.TryParsePluginName(text, out name);
 
-    private NonPlacedLinks ReadLinksFromLinkablePlugins(PluginName target, IReadOnlySet<RecordKey> records, IReadOnlySet<PluginName> linkedPlugins)
+    private NonPlacedLinks ReadLinksFromLinkablePlugins(PluginName plugin, IReadOnlySet<RecordKey> records, IReadOnlySet<PluginName> linkedPlugins)
     {
-        var linkedOrTarget = linkedPlugins.Append(target).ToHashSet();
+        var linkedOrPlugin = linkedPlugins.Append(plugin).ToHashSet();
         var referencingMods = order.PriorityOrder
             .Select(listing => listing.Mod)
             .OfType<ISkyrimModGetter>()
-            .Where(mod => LinkablePlugins.MayLinkToAny(mod, linkedOrTarget, patch, names))
+            .Where(mod => LinkablePlugins.MayLinkToAny(mod, linkedOrPlugin, patch, names))
             .ToList();
-        return LinkReader.ReadFromNonPlaced(referencingMods, records, target, names, execution);
+        return LinkReader.ReadFromNonPlaced(referencingMods, records, plugin, names, execution);
     }
 
     private ScanLookups Scanned => _scanned ?? throw new InvalidOperationException(NotReadMessage);

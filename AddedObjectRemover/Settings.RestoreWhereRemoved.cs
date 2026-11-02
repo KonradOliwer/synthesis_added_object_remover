@@ -1,3 +1,4 @@
+using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using Mutagen.Bethesda.Synthesis.Settings;
 
@@ -33,14 +34,14 @@ public class RestoreWhereRemovedSettings : IRestoreWhereRemovedSettingsValues
     public bool RestoreNavmeshes { get; set; } = SettingDefaults.RestoreNavmeshes;
 
     [SynthesisOrder]
-    [SynthesisSettingName("When an area counts as cleared")]
+    [SynthesisSettingName(SettingNames.ClearedArea)]
     [SynthesisTooltip(
         "Nothing is restored unless the cleaned mod's visible objects around the place have mostly been removed.\n"
         + "In an interior, the whole interior is one area. If the cleaned mod has no visible object in the area, nothing is restored there.")]
     public ClearedAreaSettings ClearedArea { get; set; } = new();
 
     [SynthesisOrder]
-    [SynthesisSettingName("Blend terrain edges over (game units)")]
+    [SynthesisSettingName(SettingNames.EdgeBlendDistance + SettingNames.GameUnitsSuffix)]
     [SynthesisTooltip(
         "Where restored ground meets ground that stays as the cleaned mod changed it, the height is blended over this distance, so no step or crack shows.\n"
         + "0-1024; 0 means no blending.")]
@@ -52,20 +53,20 @@ public class RestoreWhereRemovedSettings : IRestoreWhereRemovedSettingsValues
 public class ClearedAreaSettings : IClearedAreaSettingsValues
 {
     [SynthesisOrder]
-    [SynthesisSettingName("Look this far around the place (game units)")]
+    [SynthesisSettingName(SettingNames.ClearedAreaRadius + SettingNames.GameUnitsSuffix)]
     [SynthesisTooltip(
         "The area is everything this far from the place in every direction, so it is twice this wide. 1024-16384.")]
     public float SearchRadius { get; set; } = SettingDefaults.ClearedAreaSearchRadius;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Cleared when at most this share still stands (%)")]
+    [SynthesisSettingName(SettingNames.MaxStandingPercent + SettingNames.PercentSuffix)]
     [SynthesisTooltip(
         "The area counts as cleared when at most this share of the cleaned mod's visible objects in it is still standing, measured as set below.\n"
         + "0.1 is a tenth of a percent; 0 means none may stand. Decimals are allowed. 0-100.")]
     public float MaxStandingPercent { get; set; } = SettingDefaults.ClearedAreaMaxStandingPercent;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Measure the share by")]
+    [SynthesisSettingName(SettingNames.Measure)]
     [SynthesisTooltip(
         "ObjectSize: each object counts by the volume of its box, so a house counts for more than a bucket.\n"
         + "ObjectCount: each object counts once.")]

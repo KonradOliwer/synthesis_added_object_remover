@@ -30,15 +30,20 @@ public sealed record WhereRemovedRestoreSettings(
     TooCloseSettings TooClose,
     ChangedTerrainSettings ChangedTerrain)
 {
+    /// <summary>Whether any kind goes back; with all four switches off the step is switched off.</summary>
+    public bool Runs => OtherModsObjects || Terrain || Cells || Navmeshes;
+
     /// <summary>
-    /// The navmeshes are always read. Other mods' objects that go back are judged at their old places and against every object that
-    /// exists because of the cleaned mod, which is told from the world without the cleaned mod.
+    /// Nothing when the step is off. Otherwise the navmeshes are always read. Other mods' objects that go back are judged at their old
+    /// places and against every object that exists because of the cleaned mod, which is told from the world without the cleaned mod.
     /// </summary>
-    public ScanNeeds Needs => new(
-        Navmesh: true,
-        JudgeOldPlaces: OtherModsObjects,
-        DecideEveryObjectWithoutCleanedMod: OtherModsObjects,
-        AreaRecordVersions: ReadAreaRecords());
+    public ScanNeeds Needs => Runs
+        ? new ScanNeeds(
+            Navmesh: true,
+            JudgeOldPlaces: OtherModsObjects,
+            DecideEveryObjectWithoutCleanedMod: OtherModsObjects,
+            AreaRecordVersions: ReadAreaRecords())
+        : new ScanNeeds();
 
     /// <summary>
     /// A kind whose switch is off stays as the cleaned mod made it, so it is still read when the guards of a kind that is on look at

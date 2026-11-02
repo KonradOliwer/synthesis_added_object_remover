@@ -46,7 +46,7 @@ internal static class FixturePatcherState
     public static FinalWorld CreateFinalWorld(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, IReadOnlyList<ISkyrimMod>? belowPatch = null)
     {
         var below = belowPatch ?? [];
-        return new FinalWorldFactory(OpenInMemory(below)).Create(state.LoadOrder.ListedOrder, state.PatchMod, PluginListOf(state, below), state.DataFolderPath);
+        return new FinalWorldFactory(OpenInMemory(below), Program.PatchMarkerText).Create(state.LoadOrder.ListedOrder, state.PatchMod, PluginListOf(state, below), state.DataFolderPath);
     }
 
     /// <summary>The state of the first patcher of the group, which starts from an empty patch.</summary>

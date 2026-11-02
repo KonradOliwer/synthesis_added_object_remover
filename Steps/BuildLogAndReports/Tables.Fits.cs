@@ -3,6 +3,7 @@ using System.Diagnostics;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using static AddedObjectRemover.CsvFormat;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
@@ -15,9 +16,9 @@ internal static partial class Tables
     ];
 
     /// <summary>One row per changed object, then one per object of the target plugin kept shrunk or turned, each in target order.</summary>
-    /// <param name="restoredWhereRemoved">The earlier version of each target that went back where the cleaned mod was removed.</param>
+    /// <param name="restoredWhereRemoved">The judged record of each target that went back where the cleaned mod was removed.</param>
     /// <returns>Null when there is no row.</returns>
-    public static CsvTable? BuildFitsTable(CollectedObjects world, IRemovalDecisions final, IReadOnlyDictionary<TargetId, EarlierVersion> restoredWhereRemoved, ReportContext context)
+    public static CsvTable? BuildFitsTable(CollectedObjects world, IRemovalDecisions final, IReadOnlyDictionary<TargetId, PlacedChangeJudged> restoredWhereRemoved, ReportContext context)
     {
         ImmutableArray<ImmutableArray<string>> rows =
         [
@@ -45,7 +46,7 @@ internal static partial class Tables
     /// restore writes, with the earlier base when that goes back.
     /// </remarks>
     private static ImmutableArray<string> FitRow(
-        CollectedObjects world, IRemovalDecisions final, IReadOnlyDictionary<TargetId, EarlierVersion> restoredWhereRemoved, TargetObject target, string outcome, ReportContext context)
+        CollectedObjects world, IRemovalDecisions final, IReadOnlyDictionary<TargetId, PlacedChangeJudged> restoredWhereRemoved, TargetObject target, string outcome, ReportContext context)
     {
         var newPlacement = FitOutcomes.NewPlacementOf(final, restoredWhereRemoved, target);
         return CsvRow.Of(

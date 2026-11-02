@@ -285,9 +285,8 @@ public sealed class RestoreWhereRemovedTests
     {
         ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0), BigBlock), Own(1, new Vector3(-100, 0, 0))];
         var shrunk = DecisionsRemoving(targets, 1).ApplyFits([new ProposedFit(targets[0].Id, TooClose(0).Reason, targets[0].Placement with { Scale = 0.5f })]);
-        var asTheRoundsMeasureThem = TestScenes.Create(targets, [], Shapes).IndexVisibleTargetsAsTheRoundsMeasureThem(shrunk);
 
-        var judged = Assert.Single(Plan(targets, shrunk, [ChangedRock(0x900, Vector3.Zero)], visibleTargets: asTheRoundsMeasureThem).Objects);
+        var judged = Assert.Single(Plan(targets, shrunk, [ChangedRock(0x900, Vector3.Zero)]).Objects);
 
         Assert.Equal((1, BigBlockVolume / 8), (judged.OldPlace!.Standing, judged.OldPlace.StandingSize));
     }
@@ -408,22 +407,11 @@ public sealed class RestoreWhereRemovedTests
         var rules = GuardRules(workers: 1);
         var groupOff = WhereRemovedRestorer.Plan(
             new(
-                TestScenes.CreateWorld(targets, []),
-                DecisionsRemoving(targets),
-                OtherModsObjectsResult.SwitchedOff,
-                TestScenes.Create(targets, [], Shapes).VisibleTargets,
-                rules.WorldCaches,
-                rules.TooCloseRule(),
-                rules.HoldersOfObjectsThatStay,
-                TestNavmeshCheck.NoFault,
-                rules.Support,
-                Shapes,
-                NoNavmeshes,
-                TestLandPlugin.Flat,
-                Plugins,
-                TestTargets.TargetName,
+                new(TestScenes.CreateWorld(targets, []), DecisionsRemoving(targets), OtherModsObjectsResult.SwitchedOff),
+                new(rules.WorldCaches, rules.TooCloseRule(), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),
+                new(CachesOf(targets), TestLandPlugin.Flat, Plugins, TestTargets.TargetName),
                 new Execution(1),
-                Settings: null));
+                Settings with { OtherModsObjects = false, Terrain = false, Cells = false, Navmeshes = false }));
         var objectsOff = Plan(targets, removed: [0], rocks, cells, Settings with { OtherModsObjects = false });
         var cellsOff = Plan(targets, removed: [0], rocks, cells, Settings with { Cells = false });
 
@@ -517,7 +505,6 @@ public sealed class RestoreWhereRemovedTests
         int workers = 1) =>
         Plan(targets, DecisionsRemoving(targets, removed), records, cells, settings, spaces, workers);
 
-    /// <param name="visibleTargets">The targets as they stand when null.</param>
     /// <param name="otherModsObjects">Switched off when null.</param>
     private static RestoreWhereRemovedResult Plan(
         ImmutableArray<TargetObject> targets,
@@ -527,7 +514,6 @@ public sealed class RestoreWhereRemovedTests
         WhereRemovedRestoreSettings? settings = null,
         IReadOnlyDictionary<RecordKey, SpaceFact>? spaces = null,
         int workers = 1,
-        IVisibleTargetObjects? visibleTargets = null,
         OtherModsObjectsResult? otherModsObjects = null,
         IObjectCachesOfWorlds? worldCaches = null,
         Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule>? tooClose = null)
@@ -541,23 +527,15 @@ public sealed class RestoreWhereRemovedTests
         var rules = GuardRules(workers);
         return WhereRemovedRestorer.Plan(
             new(
-                collected,
-                final,
-                otherModsObjects ?? OtherModsObjectsResult.SwitchedOff,
-                visibleTargets ?? TestScenes.Create(targets, [], Shapes).VisibleTargets,
-                worldCaches ?? rules.WorldCaches,
-                rules.TooCloseRule(tooClose),
-                rules.HoldersOfObjectsThatStay,
-                TestNavmeshCheck.NoFault,
-                rules.Support,
-                Shapes,
-                NoNavmeshes,
-                TestLandPlugin.Flat,
-                Plugins,
-                TestTargets.TargetName,
+                new(collected, final, otherModsObjects ?? OtherModsObjectsResult.SwitchedOff),
+                new(worldCaches ?? rules.WorldCaches, rules.TooCloseRule(tooClose), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),
+                new(CachesOf(targets), TestLandPlugin.Flat, Plugins, TestTargets.TargetName),
                 new Execution(workers),
                 settings ?? Settings));
     }
+
+    private static TestRunCaches CachesOf(ImmutableArray<TargetObject> targets) =>
+        new(Shapes, navmeshes: NoNavmeshes, visibleTargets: TestScenes.Create(targets, [], Shapes).IndexVisibleTargets);
 
     /// <summary>A too-close rule whose check stops unexpectedly.</summary>
     private sealed class StoppingRule : IPlacementRule

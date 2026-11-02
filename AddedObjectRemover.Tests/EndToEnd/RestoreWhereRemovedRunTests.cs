@@ -44,6 +44,57 @@ public class RestoreWhereRemovedRunTests
     }
 
     [Fact]
+    public void AMalformedRecordTheRestoreStepReadsStopsOnlyThatStepAndTheOtherStepsAndTheirWritesStay()
+    {
+        var settings = SettingsOf();
+        var healthy = FixtureRun.Execute(settings, Workers, RestoreWhereRemovedWorlds.CreateVillage);
+
+        var outcome = ((RunResult.Done)FixtureRun.Run(
+            settings,
+            Workers,
+            new RecordingLogSink(),
+            (dataFolder, release, listedPlugins) => new MeshFilesFactory(dataFolder, release, listedPlugins),
+            plugin => new MalformedLandWorldspacePlugin(plugin),
+            createLoadOrder: RestoreWhereRemovedWorlds.CreateVillage)).Outcome;
+
+        Assert.NotEmpty(healthy.RestoreWhereRemoved.Objects);
+        Assert.Equal(StepOutcome.StoppedByUnexpectedError, outcome.RestoreWhereRemoved.Outcome);
+        var failure = Assert.Single(outcome.RestoreWhereRemoved.Failures);
+        Assert.Equal(RestoreWhereRemovedParts.Step, failure.Part);
+        Assert.StartsWith(nameof(MalformedRecordException), failure.Failure, StringComparison.Ordinal);
+        Assert.Empty(outcome.RestoreWhereRemoved.Objects);
+        Assert.NotEmpty(outcome.Removals);
+        Assert.Equal(healthy.Removals.Select(removal => removal.TargetIndex), outcome.Removals.Select(removal => removal.TargetIndex));
+        Assert.Equal(healthy.Written.Removed.Select(id => id.Index), outcome.Written.Removed.Select(id => id.Index));
+        Assert.Equal([failure], FailuresOf(outcome));
+        AssertSameAsHealthy(healthy, outcome);
+    }
+
+    private static IEnumerable<PartFailure> FailuresOf(RunOutcome outcome) =>
+        outcome.RestoreWhereRemoved.Failures
+            .Concat(new[]
+            {
+                outcome.RestingObjects.Failure,
+                outcome.RestingObjects.TouchChainsFailure,
+                outcome.VisibleLeftBehind.Failure,
+                outcome.LeftBehind.Failure,
+                outcome.MarkerMoves.Failure,
+                outcome.OtherModsObjects.Failure,
+            }.OfType<PartFailure>());
+
+    private static void AssertSameAsHealthy(RunOutcome healthy, RunOutcome outcome)
+    {
+        Assert.Equal(healthy.RestingObjects.Outcome, outcome.RestingObjects.Outcome);
+        Assert.Equal(healthy.RestingObjects.SeedRounds.ToArray(), outcome.RestingObjects.SeedRounds.ToArray());
+        Assert.Equal(healthy.RestingObjects.Rounds.ToArray(), outcome.RestingObjects.Rounds.ToArray());
+        Assert.Equal(healthy.OtherModsObjects.Outcome, outcome.OtherModsObjects.Outcome);
+        Assert.Equal(healthy.OtherModsObjects.Objects.ToArray(), outcome.OtherModsObjects.Objects.ToArray());
+        Assert.Equal(healthy.OtherModsObjects.Rounds.ToArray(), outcome.OtherModsObjects.Rounds.ToArray());
+        Assert.Equal(healthy.MarkerMoves.Outcome, outcome.MarkerMoves.Outcome);
+        Assert.Equal(healthy.MarkerMoves.Moves.ToArray(), outcome.MarkerMoves.Moves.ToArray());
+    }
+
+    [Fact]
     public void ANavmeshTheCleanedModDeletedComesBackWithItsEntryAndItsNeighbourLinksToItAgain()
     {
         var (_, run) = Run(SettingsOf(), dataFolder => NavmeshWorld.Create(dataFolder, NavmeshScenario.DeletedWithoutReplacement));

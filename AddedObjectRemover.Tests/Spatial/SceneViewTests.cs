@@ -71,11 +71,11 @@ public class SceneViewTests
         var turnedAQuarter = targets[0].Placement with { Rotation = new Vector3(0, 0, MathF.PI / 2) };
         var kept = started.ApplyFits([new ProposedFit(targets[0].Id, new TooClose(new OtherId(0), new TooCloseCause.ObjectSize()), turnedAQuarter)]);
 
-        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(caches.IndexVisibleTargetsAsTheyStand(kept)));
-        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(caches.IndexVisibleTargetsAsTheRoundsMeasureThem(kept)));
+        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(caches.IndexVisibleTargets(kept.TargetsAsTheyStand(targets))));
+        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(caches.IndexVisibleTargets(kept.TargetsAsTheRoundsMeasureThem(targets))));
         Assert.Empty(NearEastOfTheSlab(caches.VisibleTargets));
-        Assert.Same(caches.VisibleTargets, caches.IndexVisibleTargetsAsTheyStand(started));
-        Assert.Same(caches.VisibleTargets, caches.IndexVisibleTargetsAsTheRoundsMeasureThem(started));
+        Assert.Same(caches.VisibleTargets, caches.IndexVisibleTargets(started.TargetsAsTheyStand(targets)));
+        Assert.Same(caches.VisibleTargets, caches.IndexVisibleTargets(started.TargetsAsTheRoundsMeasureThem(targets)));
     }
 
     /// <summary>
@@ -93,8 +93,8 @@ public class SceneViewTests
         var restored = started.Apply(
             RoundKind.TooClose, [new ProposedRemoval(targets[0].Id, new TooClose(new OtherId(0), new TooCloseCause.ObjectSize()))]);
 
-        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(caches.IndexVisibleTargetsAsTheyStand(restored)));
-        Assert.Same(caches.VisibleTargets, caches.IndexVisibleTargetsAsTheRoundsMeasureThem(restored));
+        Assert.Equal([new TargetId(0)], NearEastOfTheSlab(caches.IndexVisibleTargets(restored.TargetsAsTheyStand(targets))));
+        Assert.Same(caches.VisibleTargets, caches.IndexVisibleTargets(restored.TargetsAsTheRoundsMeasureThem(targets)));
     }
 
     private static List<TargetId> NearEastOfTheSlab(IVisibleTargetObjects index)

@@ -3,11 +3,11 @@ using Mutagen.Bethesda.Skyrim;
 
 namespace AddedObjectRemover;
 
-/// <summary>A winning cell record of a target space.</summary>
+/// <summary>A winning cell record of a plugin space.</summary>
 internal sealed record SpaceCell(RecordKey Key, SpaceFact Space, ICellGetter Record);
 
 /// <summary>
-/// Reads where each winning cell of the target spaces is, after the scan and in parallel passes: the cells' own fields, then the
+/// Reads where each winning cell of the plugin spaces is, after the scan and in parallel passes: the cells' own fields, then the
 /// top Location of each worldspace once, then each Location chain once per (Location, worldspace top). Every pass maps its
 /// items to results by index, so the facts do not depend on the number of workers.
 /// </summary>
@@ -17,7 +17,7 @@ internal static class CellAreaReader
 
     public static IReadOnlyDictionary<RecordKey, CellAreaFact> Read(IReadOnlyList<SpaceCell> cells, LocationNameReader locations, Execution execution)
     {
-        var fields = ParallelMap.Run(execution, cells.Count, item => MutagenCalls.Read(() => ReadFields(cells[item])), ParallelMap.AutomaticRangeSize);
+        var fields = ParallelMap.Run(execution, cells.Count, item => ReadFields(cells[item]), ParallelMap.AutomaticRangeSize);
         var tops = ReadOncePerKey(fields.Select(cell => cell.Worldspace).OfType<FormKey>(), worldspace => locations.FindWorldspaceTop(worldspace), execution);
         var chains = ReadOncePerKey(
             fields.Where(cell => cell.Location is not null).Select(cell => ChainKey(cell, tops)),
@@ -46,7 +46,7 @@ internal static class CellAreaReader
         where TKey : notnull
     {
         var distinct = keys.Distinct().ToArray();
-        var values = ParallelMap.Run(execution, distinct.Length, item => MutagenCalls.Read(() => read(distinct[item])), ParallelMap.OneItemPerRange);
+        var values = ParallelMap.Run(execution, distinct.Length, item => read(distinct[item]), ParallelMap.OneItemPerRange);
         return distinct.Zip(values).ToDictionary(pair => pair.First, pair => pair.Second);
     }
 }

@@ -1,3 +1,4 @@
+using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Synthesis.Settings;
 using Newtonsoft.Json;
@@ -7,7 +8,7 @@ namespace AddedObjectRemover;
 public class TrustSettings : ITrustSettingsValues
 {
     [SynthesisOrder]
-    [SynthesisSettingName("Trusted mods, and their masters")]
+    [SynthesisSettingName(SettingNames.TrustedMods)]
     [SynthesisTooltip(
         "Everything these plugins and their masters contain is accepted, even values they only carry over, everywhere.\n"
         + "For example, list a compatibility patch made for the cleaned mod and a city mod: the city mod's wall standing where the cleaned mod puts a cart\n"
@@ -16,7 +17,7 @@ public class TrustSettings : ITrustSettingsValues
     public List<ModKey> TrustedModsAndTheirMasters { get; set; } = [];
 
     [SynthesisOrder]
-    [SynthesisSettingName("Mods trusted for their own changes only")]
+    [SynthesisSettingName(SettingNames.OwnChangesMods)]
     [SynthesisTooltip(
         "A record these plugins add is accepted in full. In other records, only the values that differ from the plugin loading just before them are accepted.\n"
         + "Their masters are not affected. For example, a bird-sound mod's new sound markers are accepted, but a wall it only carries over from a city mod is not.")]
@@ -24,7 +25,7 @@ public class TrustSettings : ITrustSettingsValues
     public List<ModKey> ModsTrustedForOwnChangesOnly { get; set; } = [];
 
     [SynthesisOrder]
-    [SynthesisSettingName("Never trusted mods")]
+    [SynthesisSettingName(SettingNames.NeverTrustedMods)]
     [SynthesisTooltip(
         "These plugins can always cause removals, even when they are listed above, require the cleaned mod, load before it, or are its masters.\n"
         + "For example, another Synthesis patcher's output. The cleaned mod and the patch cannot be listed.")]
@@ -40,7 +41,7 @@ public class TrustSettings : ITrustSettingsValues
     public bool TrustModsRequiringCleanedModAndTheirMasters { get; set; } = true;
 
     [SynthesisOrder]
-    [SynthesisSettingName("...only if it has at most this many other masters")]
+    [SynthesisSettingName(SettingNames.MaxOtherMasters)]
     [SynthesisTooltip(
         "Other masters are those besides the cleaned mod, the base game and the cleaned mod's masters: a patch requiring Skyrim.esm, the cleaned mod\n"
         + "and CityMod.esp has 1. Mods with more (a merged plugin, a Bashed Patch) are not trusted, and the log lists them.\n"

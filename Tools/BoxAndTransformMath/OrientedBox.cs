@@ -88,10 +88,7 @@ public readonly record struct OrientedBox(Vector3 Center, Mat3 Rotation, Vector3
     private static bool NarrowToSlab(float origin, float direction, float halfExtent, ref float entry, ref float exit)
     {
         if (MathF.Abs(direction) <= ParallelAxisEpsilon) return MathF.Abs(origin) <= halfExtent;
-        var first = (-halfExtent - origin) / direction;
-        var second = (halfExtent - origin) / direction;
-        entry = MathF.Max(entry, MathF.Min(first, second));
-        exit = MathF.Min(exit, MathF.Max(first, second));
+        Boxes.NarrowToSlab(origin, direction, -halfExtent, halfExtent, ref entry, ref exit);
         return true;
     }
 

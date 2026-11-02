@@ -59,8 +59,8 @@ internal static class MeshOriginSurvey
     /// <returns>Each base once, by Editor ID or, without one, by record key; sorted ignoring case.</returns>
     private static ImmutableArray<string> ListBaseEditorIds(IEnumerable<TargetObject> users, IBaseFacts bases) =>
     [
-        .. KeyedGroups
-            .DistinctBy(users.Select(user => user.Base).OfType<BaseKey>(), baseKey => baseKey.Record, EqualityComparer<RecordKey>.Default)
+        .. users.Select(user => user.Base).OfType<BaseKey>()
+            .DistinctBy(baseKey => baseKey.Record)
             .Select(baseKey => NameBase(bases.Of(baseKey), baseKey))
             .Order(StringComparer.OrdinalIgnoreCase),
     ];

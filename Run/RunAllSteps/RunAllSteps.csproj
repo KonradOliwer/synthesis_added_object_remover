@@ -55,6 +55,7 @@
     <ProjectReference Include="..\..\Tools\BoxSpatialIndex\BoxSpatialIndex.csproj" />
     <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
     <ProjectReference Include="..\..\Tools\ComputedOnceLookups\ComputedOnceLookups.csproj" />
+    <ProjectReference Include="..\..\Tools\TimingAndDisposal\TimingAndDisposal.csproj" />
     <ProjectReference Include="..\..\Tools\GroundSurfaceQueries\GroundSurfaceQueries.csproj" />
     <ProjectReference Include="..\..\Tools\CsvFileWriting\CsvFileWriting.csproj" />
   </ItemGroup>

@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 

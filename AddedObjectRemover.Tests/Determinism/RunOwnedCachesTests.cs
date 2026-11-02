@@ -38,23 +38,18 @@ public class RunOwnedCachesTests
     }
 
     [Fact]
-    public void TwoNifReadersEachKeepTheirOwnWarmUpAndShapeClassMemo()
+    public void TwoNifReadersInOneProcessEachReadTheSameGeometry()
     {
-        var first = new NifGeometryReader();
-        var second = new NifGeometryReader();
         var nif = TestNifs.CreateWithRoot();
         TestNifs.AddShape(nif, TestNifs.Root(nif), TestMeshes.BoxTriangles(Crate));
+        var bytes = TestNifs.Save(nif);
 
-        first.ReadGeometry(TestNifs.Save(nif), includeTriangles: false, BaseObjectShapes.SolidShapes);
+        var firstRead = new NifGeometryReader().ReadGeometry(bytes, includeTriangles: false, BaseObjectShapes.SolidShapes);
+        var secondRead = new NifGeometryReader().ReadGeometry(bytes, includeTriangles: false, BaseObjectShapes.SolidShapes);
 
-        Assert.True(first.HasWarmedUp);
-        Assert.True(first.ShapeClassesDecided > 0);
-        Assert.False(second.HasWarmedUp);
-        Assert.Equal(0, second.ShapeClassesDecided);
-
-        second.ReadGeometry(TestNifs.Save(nif), includeTriangles: false, BaseObjectShapes.SolidShapes);
-
-        Assert.True(second.HasWarmedUp);
-        Assert.Equal(first.ShapeClassesDecided, second.ShapeClassesDecided);
+        Assert.Equal(MeshReadStatus.Success, firstRead.Status);
+        Assert.Equal(MeshReadStatus.Success, secondRead.Status);
+        Assert.Equal((Crate.Min, Crate.Max), (firstRead.Geometry!.Min, firstRead.Geometry.Max));
+        Assert.Equal((Crate.Min, Crate.Max), (secondRead.Geometry!.Min, secondRead.Geometry.Max));
     }
 }

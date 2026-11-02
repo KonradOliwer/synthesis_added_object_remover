@@ -14,6 +14,9 @@ namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 /// </summary>
 internal sealed class SurfaceContacts(ITerrainHeights terrain, ITriangleMeshes cache, ISurfaceSamples surfaces) : ISupportContacts
 {
+    /// <summary>The number of points sampled on a mesh's surface (<see cref="ISurfaceSamples"/>).</summary>
+    internal const int SamplesPerMesh = 4096;
+
     /// <summary>Distance from the origin, as a fraction of the bounds diagonal, at which a sample has half weight.</summary>
     internal const float OriginFalloffFraction = 0.25f;
 
@@ -30,7 +33,7 @@ internal sealed class SurfaceContacts(ITerrainHeights terrain, ITriangleMeshes c
         return hits;
     }
 
-    public CandidateContacts SplitWeightsAmongSupporters(IReadOnlyList<SupporterHits> hitsBySupporter, float[] weights) =>
+    public CandidateContacts SplitWeightsAmongSupporters(IReadOnlyList<SupporterHits> hitsBySupporter, ImmutableArray<float> weights) =>
         SupportContactWeights.SplitWeightsAmongSupporters(hitsBySupporter, weights);
 
     public bool ReachesThreshold(float lostShare, float threshold) => SupportContactWeights.ReachesThreshold(lostShare, threshold);

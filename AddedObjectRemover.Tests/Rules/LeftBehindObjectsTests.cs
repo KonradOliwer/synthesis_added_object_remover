@@ -150,7 +150,11 @@ public class LeftBehindObjectsTests
     [Fact]
     public void NoObjectIsInsideAnotherModsObjectThatTheRunRemovesOrPullsDown()
     {
-        var evaluated = Find(StartDecisions(), Settings, takenAway: new Dictionary<OtherId, OtherObject?> { [Others[0].Id] = null });
+        var removedOtherObject = new OtherModsObjectOutcome(Others[0], OtherModsObjectFate.Removed, LostShare: 1f, Drop: 0f, ReferenceRoles.None);
+        var evaluated = Find(
+            StartDecisions(),
+            Settings,
+            otherMods: new OtherModsObjectsResult(StepOutcome.Performed, [removedOtherObject], [], [], Failure: null));
 
         Assert.All(evaluated.Evaluations, evaluation => Assert.Null(evaluation.ContainingObject));
     }
@@ -177,7 +181,7 @@ public class LeftBehindObjectsTests
     {
         var asked = false;
 
-        var result = Plan(settings: null, () => { asked = true; return CreateScene().VisibleObjectsOfAnyPlugin(); });
+        var result = Plan(MovesOn() with { Runs = false }, () => { asked = true; return CreateScene().VisibleObjectsOfAnyPlugin(); });
 
         Assert.Equal(StepOutcome.SwitchedOff, result.Outcome);
         Assert.Empty(result.Moves);
@@ -189,7 +193,7 @@ public class LeftBehindObjectsTests
     [Fact]
     public void EveryMoveHasItsDetailInTheSameOrder()
     {
-        var (result, decided) = DecideMoves(new MarkerMoveSettings(MarkerMoveLimits.MaxDistance));
+        var (result, decided) = DecideMoves(MovesOn());
 
         Assert.Equal(new TargetId(Assert.Single(result.Details).Evaluation.TargetIndex), Assert.Single(result.Moves).Target);
         Assert.Equal(result.Moves.AsEnumerable(), decided.Moves.AsEnumerable());
@@ -211,7 +215,7 @@ public class LeftBehindObjectsTests
     [Fact]
     public void AFailureInsideTheMarkerMoveStepStopsItWithTheFailureAndNoMoves()
     {
-        var result = Plan(new MarkerMoveSettings(MarkerMoveLimits.MaxDistance), () => throw new PlantedUserDataException("it broke."));
+        var result = Plan(MovesOn(), () => throw new PlantedUserDataException("it broke."));
 
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
         Assert.Equal(new PartFailure(MarkerMoveParts.MarkerMoves, "PlantedUserDataException: it broke", Subject: null), result.Failure! with { Details = null });
@@ -229,7 +233,7 @@ public class LeftBehindObjectsTests
 
         var result = DecideMoves(
             stopped,
-            new MarkerMoveSettings(MarkerMoveLimits.MaxDistance),
+            MovesOn(),
             () =>
             {
                 asked = true;
@@ -245,7 +249,9 @@ public class LeftBehindObjectsTests
         Assert.False(asked);
     }
 
-    private static MarkerMoves Plan(float maxDistance) => Plan(new MarkerMoveSettings(maxDistance));
+    private static MarkerMoveSettings MovesOn(float maxDistance = MarkerMoveLimits.MaxDistance) => new(maxDistance, Runs: true);
+
+    private static MarkerMoves Plan(float maxDistance) => Plan(MovesOn(maxDistance));
 
     private sealed class FailingSurroundings(IVisibleTargetObjects inner) : IVisibleTargetObjects
     {
@@ -261,11 +267,11 @@ public class LeftBehindObjectsTests
             inner.BoxesNear(space, point, radius, include);
     }
 
-    private static MarkerMoves Plan(MarkerMoveSettings? settings, Func<IVisibleObjectsOfAnyPlugin>? objectsOfAnyPlugin = null) =>
+    private static MarkerMoves Plan(MarkerMoveSettings settings, Func<IVisibleObjectsOfAnyPlugin>? objectsOfAnyPlugin = null) =>
         DecideMoves(settings, objectsOfAnyPlugin).Result;
 
     /// <summary>The marker moves after the left-behind step kept every marker, over a navmesh square around the targets' space origin.</summary>
-    private static Decided<MarkerMoves> DecideMoves(MarkerMoveSettings? settings, Func<IVisibleObjectsOfAnyPlugin>? objectsOfAnyPlugin = null) =>
+    private static Decided<MarkerMoves> DecideMoves(MarkerMoveSettings settings, Func<IVisibleObjectsOfAnyPlugin>? objectsOfAnyPlugin = null) =>
         DecideMoves(
             Find(StartDecisions(), Settings with { NeverRemove = new HashSet<InvisibleObjectKind> { InvisibleObjectKind.XMarkers } }),
             settings,
@@ -276,7 +282,7 @@ public class LeftBehindObjectsTests
     /// <returns>The step's result, with its moves added to decisions where no round has run.</returns>
     private static Decided<MarkerMoves> DecideMoves(
         LeftBehindResult leftBehind,
-        MarkerMoveSettings? settings,
+        MarkerMoveSettings settings,
         Func<IVisibleObjectsOfAnyPlugin>? objectsOfAnyPlugin,
         Dictionary<RecordKey, List<CellNavmesh>> navmeshes)
     {
@@ -287,14 +293,14 @@ public class LeftBehindObjectsTests
             Shapes,
             terrain: TestGround.NoTerrain(),
             navmeshes: TestGround.Navmeshes(navmeshes),
-            visibleTargetsAsTheyStand: scene.IndexVisibleTargetsAsTheyStand,
+            visibleTargets: scene.IndexVisibleTargets,
             objectsOfAnyPluginAsTheyStand: asTheyStand);
         return MarkerMovePlanner.Plan(
             new(
                 Targets,
                 leftBehind,
                 StartDecisions(),
-                new Dictionary<OtherId, OtherObject?>(),
+                OtherModsObjectsResult.SwitchedOff,
                 caches,
                 new InteriorOnlyPlugin(),
                 new Execution(Environment.ProcessorCount),
@@ -308,27 +314,31 @@ public class LeftBehindObjectsTests
 
     private static ObjectCaches CreateScene() => TestScenes.Create(Targets, Others, Shapes, supportOnlyObjects: []);
 
-    private static LeftBehindResult Find(IRunDecisions decisions, LeftBehindSettings? settings, IReadOnlyDictionary<OtherId, OtherObject?>? takenAway = null) =>
-        Decide(decisions, settings, takenAway).Result;
+    private static LeftBehindResult Find(IRunDecisions decisions, LeftBehindSettings? settings, OtherModsObjectsResult? otherMods = null) =>
+        Decide(decisions, settings, otherMods).Result;
 
-    /// <param name="takenAway">None by default.</param>
+    /// <param name="otherMods">Takes nothing away by default.</param>
     /// <param name="surroundings">The visible targets of the scene by default.</param>
     /// <returns>The step's result, with its round added to <paramref name="decisions"/>.</returns>
     private static Decided<LeftBehindResult> Decide(
         IRunDecisions decisions,
         LeftBehindSettings? settings,
-        IReadOnlyDictionary<OtherId, OtherObject?>? takenAway = null,
+        OtherModsObjectsResult? otherMods = null,
         Func<ObjectCaches, IVisibleTargetObjects>? surroundings = null)
     {
         var scene = CreateScene();
+        Func<IReadOnlyList<TargetObject>, IVisibleTargetObjects> indexTargets = surroundings is null ? scene.IndexVisibleTargets : _ => surroundings(scene);
         return LeftBehindObjects.Find(
             new(
                 Targets,
                 scene.ObjectsThatCanCauseRemovals(Replacements.None(Others.Length), NpcHandling.OnlyWhenStuckInsideTheObject),
-                takenAway ?? new Dictionary<OtherId, OtherObject?>(),
+                otherMods ?? OtherModsObjectsResult.SwitchedOff,
                 decisions,
-                surroundings?.Invoke(scene) ?? scene.VisibleTargets,
-                new TestRunCaches(Shapes, bases: TestBaseFacts.Reader(new SkyrimMod(ModKey.FromNameAndExtension("Reach.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache())),
+                new TestRunCaches(
+                    Shapes,
+                    bases: TestBaseFacts.Reader(new SkyrimMod(ModKey.FromNameAndExtension("Reach.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
+                    visibleTargets: indexTargets),
+                VisibleLeftBehindObjects.CreateLeftBehindJudging(),
                 TargetWorkOrder.Of(Targets),
                 new Execution(Environment.ProcessorCount),
                 settings));

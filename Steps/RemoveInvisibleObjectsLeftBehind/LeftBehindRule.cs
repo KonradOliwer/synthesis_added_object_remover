@@ -1,10 +1,9 @@
-using System.Numerics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
 
@@ -22,6 +21,7 @@ internal sealed class LeftBehindRule(
     IVisibleTargetObjects surroundings,
     ContainingObjects containingObjects,
     ReachRule reach,
+    ILeftBehindJudging judging,
     LeftBehindSettings config,
     WorkOrder order)
 {
@@ -29,7 +29,7 @@ internal sealed class LeftBehindRule(
     public LeftBehindResult SelectRemovals(IRemovalDecisions decisions, Execution execution)
     {
         var evaluations = EvaluateAll(decisions, execution);
-        return new LeftBehindResult(StepOutcome.Performed, evaluations, LeftBehindVerdicts.ProposalsOf(evaluations, ReasonOf), Failure: null);
+        return new LeftBehindResult(StepOutcome.Performed, evaluations, judging.ProposalsOf(evaluations, ReasonOf), Failure: null);
     }
 
     private static RemovalReason ReasonOf(LeftBehindCheck evaluation) =>
@@ -37,20 +37,14 @@ internal sealed class LeftBehindRule(
             ? new InsideAnotherModsObject(container.Id)
             : new SurroundingsRemoved();
 
-    private LeftBehindCheck[] EvaluateAll(IRemovalDecisions decisions, Execution execution)
-    {
-        var candidates = Enumerable.Range(0, targets.Count)
-            .Where(index => shapes.VisibilityOf(targets[index]).Kind != null && !decisions.IsDecided(targets[index].Id))
-            .ToArray();
-
-        return ParallelMap.RunOver(
+    private LeftBehindCheck[] EvaluateAll(IRemovalDecisions decisions, Execution execution) =>
+        ParallelMap.RunOver(
             execution,
             order,
-            candidates,
+            judging.Candidates(targets, decisions, target => shapes.VisibilityOf(target).Kind != null),
             () => new List<VisibleTargetNear>(),
             (targetIndex, neighbours) => Evaluate(targetIndex, decisions, neighbours),
             ParallelMap.AutomaticRangeSize);
-    }
 
     /// <param name="neighbours">The calling worker's buffer.</param>
     private LeftBehindCheck Evaluate(int targetIndex, IRemovalDecisions decisions, List<VisibleTargetNear> neighbours)
@@ -60,8 +54,7 @@ internal sealed class LeftBehindRule(
         var radius = GetEffectiveRadius(target);
         var containingObject = containingObjects.Of(targetIndex);
         var areas = MeasureSurroundings(target, radius, decisions, neighbours);
-        var ruleDecision = containingObject != null ? LeftBehindOutcome.RemovedInsideOtherObject : LeftBehindVerdicts.BySurroundings(areas, config.Surroundings);
-        var decision = LeftBehindVerdicts.KeptWhenProtected(ruleDecision, config.NeverRemove.Contains(kind));
+        var decision = judging.Judge(areas, config.Surroundings, isInsideAnotherModsObject: containingObject != null, isProtectedKind: config.NeverRemove.Contains(kind));
         return new LeftBehindCheck(targetIndex, kind, radius, containingObject, areas, decision, KeepReason: null);
     }
 
@@ -80,6 +73,6 @@ internal sealed class LeftBehindRule(
         surroundings.Around(target.SpaceKey, target.Transform.Position, radius, neighbours);
         // The neighbours come in ascending target id, which fixes the order of the float sums.
         var boxes = neighbours.Select(neighbour => (neighbour.Box, decisions.FateOf(neighbour.Target)));
-        return SectorAreaTally.Measure(boxes, target.Transform.Position, config.Surroundings.DirectionClearedPercent);
+        return judging.MeasureSurroundings(boxes, target.Transform.Position, config.Surroundings.DirectionClearedPercent);
     }
 }

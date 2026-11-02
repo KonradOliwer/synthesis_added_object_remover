@@ -89,7 +89,7 @@ public static class PatchWriter
             .Concat(whereRemoved.Cells.Where(judged => judged.IsRestored)
                 .Select(judged => new CopyEarlierCellParts(judged.Change.Cell, [.. judged.Undone.Select(part => part.Name)])))
             .Concat(whereRemoved.Lands.Where(judged => judged.IsRestored).SelectMany(LandOrdersFor))
-            .Concat(whereRemoved.NavmeshGroups.Where(group => group.IsRestored).SelectMany(group => group.Orders));
+            .Concat(whereRemoved.NavmeshGroups.Select(group => group.Write).OfType<NavmeshGroupWrite>().SelectMany(NavmeshUndoWrite.OrdersFor));
 
     /// <summary>The parts copied back first, then the heights, so the heights are written into the grids the rest brings back.</summary>
     private static IEnumerable<WriteOrder> LandOrdersFor(LandChangeJudged land)

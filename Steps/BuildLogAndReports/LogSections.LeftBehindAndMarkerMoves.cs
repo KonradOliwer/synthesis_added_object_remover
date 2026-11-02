@@ -1,8 +1,8 @@
 using System.Diagnostics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
-using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
@@ -108,10 +108,14 @@ internal static partial class LogSections
             [.. evaluations.Select(evaluation => evaluation.Decision)],
             LeftBehindOutcomes.IsRemoval,
             LeftBehindOutcomes.IsRestoration,
-            outcome => LeftBehindOutcomes.IsRemovedAsLinked(outcome) || LeftBehindOutcomes.IsRestoration(outcome)
+            outcome => IsRemovedAsLinked(outcome) || LeftBehindOutcomes.IsRestoration(outcome)
                 || outcome is LeftBehindOutcome.RemovedSurroundingsRemovedAndRestored or LeftBehindOutcome.KeptInDeletedCell
                 || (outcome is LeftBehindOutcome.RemovedInsideOtherObject && !judgesInsideOtherObjects),
             LeftBehindOutcomeText.Describe,
             elapsed,
             context);
+
+    /// <summary>The outcomes of an object disabled as a linked group member.</summary>
+    private static bool IsRemovedAsLinked(LeftBehindOutcome outcome) =>
+        outcome is LeftBehindOutcome.RemovedLinkedToRemoval or LeftBehindOutcome.RemovedLinkedToRestoration;
 }

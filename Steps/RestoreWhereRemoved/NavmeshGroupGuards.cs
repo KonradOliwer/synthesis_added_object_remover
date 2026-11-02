@@ -1,13 +1,13 @@
+using System.Collections.Immutable;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 
 /// <summary>
-/// The guards a group of navmeshes is checked against once, on the facts read: N0 (later changes), the record format, N1 (edge
-/// links), N7 (only what existed comes back), N8 (navmesh info map and preferred paths), N2 (map entries) and N3 (doors). A
-/// navmesh outside the target spaces has no facts, so what a link or door into it needs is left to the consistency check (N9).
-/// Thread-safe.
+/// The guards a group of navmeshes is checked against once, on the facts read: later changes, the record format, edge links, only
+/// what existed comes back, navmesh info map and preferred paths, map entries and doors. A navmesh outside the target spaces has no
+/// facts, so what a link or door into it needs is left to the consistency check. Thread-safe.
 /// </summary>
 /// <param name="changed">Every navmesh the cleaned mod changed or added, by key.</param>
 /// <param name="sunk">Every candidate navmesh the patch sinks when its group goes back; a group never checks whether another one goes back.</param>
@@ -33,17 +33,17 @@ internal sealed class NavmeshGroupGuards(
 
     /// <summary>
     /// The group refused for the first guard on the facts read it fails, in the order of <see cref="NavmeshGuard"/>; otherwise with
-    /// its orders, refused when the consistency check over what they alone would leave finds a fault (N9). The check sees the doors
-    /// as N3 does: the removals the run writes and the restores of the doors that are placed candidates. The guards on the facts
-    /// come first, so a fault they name more precisely is reported by them.
+    /// what the patch writes for it, refused when the consistency check over what that alone would leave finds a fault. The check
+    /// sees the doors as the door guard does: the removals the run writes and the restores of the doors that are placed candidates.
+    /// The guards on the facts come first, so a fault they name more precisely is reported by them.
     /// </summary>
-    /// <param name="findFaultIfWritten">The consistency check's first fault over the world the orders alone would leave; null when none.</param>
-    public NavmeshGroup Check(NavmeshGroup group, Func<IReadOnlyList<WriteOrder>, NavmeshFault?> findFaultIfWritten)
+    /// <param name="findFaultIfWritten">The consistency check's first fault over the world the trial's writes alone would leave; null when none.</param>
+    public NavmeshGroup Check(NavmeshGroup group, Func<NavmeshWriteTrial, NavmeshFault?> findFaultIfWritten)
     {
         if (FirstRefusal(group) is { } refusal) return group.RefusedFor(refusal);
-        var orders = group.OrdersToPutBack(LinksToClear(group), links.WrittenByGroup);
-        var doorOrders = RemovalsOf(group).Concat(links.RestoresOf(group.Doors.Select(door => door.Door)));
-        return findFaultIfWritten([.. doorOrders, .. orders]) is { } fault ? group.RefusedFor(InconsistentData(group, fault)) : group with { Orders = orders };
+        var write = group.CreateWrite(LinksToClear(group), links.WrittenByGroup);
+        var trial = new NavmeshWriteTrial(RemovedDoorsOf(group), [.. links.RestoresOf(group.Doors.Select(door => door.Door))], write);
+        return findFaultIfWritten(trial) is { } fault ? group.RefusedFor(InconsistentData(group, fault)) : group with { Write = write };
     }
 
     /// <summary>
@@ -55,9 +55,9 @@ internal sealed class NavmeshGroupGuards(
             .Where(door => door.Door.Plugin == cleanedMod && removedByRun(door.Door) && door.Current is { } link && group.MemberOf(link.Navmesh)?.Undo == NavmeshUndo.Sunk)
             .Select(door => door.Door);
 
-    /// <summary>The patch's removal of each door of the group the run removes, so the consistency check sees those doors as the patch leaves them.</summary>
-    private IEnumerable<WriteOrder> RemovalsOf(NavmeshGroup group) =>
-        group.Doors.Where(door => removedByRun(door.Door)).Select(door => new SetInitiallyDisabled(door.Door));
+    /// <summary>The doors of the group the run removes, so the consistency check sees those doors as the patch leaves them.</summary>
+    private ImmutableArray<RecordKey> RemovedDoorsOf(NavmeshGroup group) =>
+        [.. group.Doors.Where(door => removedByRun(door.Door)).Select(door => door.Door)];
 
     /// <summary>A fault in a member whose earlier triangles come back lies in the data before the cleaned mod; any other lies in the data as it stands.</summary>
     private static NavmeshRefusal InconsistentData(NavmeshGroup group, NavmeshFault fault) =>
@@ -72,7 +72,7 @@ internal sealed class NavmeshGroupGuards(
         ?? MapEntries(group)
         ?? Doors(group, doorsIfAllGoBack);
 
-    /// <summary>N0: a later plugin changed a member's geometry, presence or map entry, or a linked door's navmesh link or presence.</summary>
+    /// <summary>A later plugin changed a member's geometry, presence or map entry, or a linked door's navmesh link or presence.</summary>
     private NavmeshRefusal? ChangedLater(NavmeshGroup group)
     {
         var member = group.Members.FirstOrDefault(member =>
@@ -85,7 +85,7 @@ internal sealed class NavmeshGroupGuards(
     private static NavmeshRefusal? StoredInAnotherRecordFormat(NavmeshGroup group) => FirstMember(
         group, member => member.Undo == NavmeshUndo.Geometry && member.Change.Geometry is PartOutcome.KeptForRecordFormat, NavmeshGuard.StoredInAnotherRecordFormat);
 
-    /// <summary>N1: every edge link between a member as planned and a navmesh that stays, either way, is answered over the same edge.</summary>
+    /// <summary>Every edge link between a member as planned and a navmesh that stays, either way, is answered over the same edge.</summary>
     private static NavmeshRefusal? UnmatchedEdgeLink(NavmeshGroup group)
     {
         foreach (var member in group.Members)
@@ -127,7 +127,7 @@ internal sealed class NavmeshGroupGuards(
             && NavmeshConsistency.EdgesCoincide((back.From, back.To), (link.From, link.To)));
 
     /// <summary>
-    /// N7: no member whose navmesh record is written goes into a cell some version deletes; a member that goes back existed before
+    /// No member whose navmesh record is written goes into a cell some version deletes; a member that goes back existed before
     /// the cleaned mod, in the cell holding it now, with a map entry when one goes back; a replacement of a deleted member is in the
     /// group; a sunk member lies in a cell that exists below the cleaned mod.
     /// </summary>
@@ -144,7 +144,7 @@ internal sealed class NavmeshGroupGuards(
     private RecordKey? FirstMissingBefore(NavmeshGroup group, NavmeshMember member)
     {
         var change = member.Change;
-        if (member.NavmeshOrder is not null && change.CellDeletedInAVersion) return change.Cell;
+        if (member.WritesNavmeshRecord && change.CellDeletedInAVersion) return change.Cell;
         if (member.Undo == NavmeshUndo.Sunk) return change.Current.Cell.Plugin == cleanedMod ? change.Current.Cell : null;
         if (change.Earlier is not { IsDeleted: false } earlier || earlier.Cell != change.Cell) return member.Key;
         if (member.CopiesEarlierEntry && earlier.MapEntry is null) return member.Key;
@@ -152,7 +152,7 @@ internal sealed class NavmeshGroupGuards(
     }
 
     /// <summary>
-    /// N8: no plugin after the patch overrides the navmesh info map, no linked door's winner loads after the patch, and the winning
+    /// No plugin after the patch overrides the navmesh info map, no linked door's winner loads after the patch, and the winning
     /// preferred paths name no member whose Preferred triangles change.
     /// </summary>
     private NavmeshRefusal? PreferredPaths(NavmeshGroup group)
@@ -165,7 +165,7 @@ internal sealed class NavmeshGroupGuards(
     }
 
     /// <summary>
-    /// N2: the planned entries merge only with navmeshes that end walkable, and no navmesh that stays, next to the group or changed by
+    /// The planned entries merge only with navmeshes that end walkable, and no navmesh that stays, next to the group or changed by
     /// the cleaned mod, merges with a sunk member in its winning entry.
     /// </summary>
     /// <remarks>
@@ -201,7 +201,7 @@ internal sealed class NavmeshGroupGuards(
             : !sunk.Contains(navmesh) && !(changed.TryGetValue(navmesh, out var other) && other.Current.IsDeleted);
 
     /// <summary>
-    /// N3: a door a member that goes back names stands; every standing door's final navmesh link names a navmesh that is not sunk
+    /// A door a member that goes back names stands; every standing door's final navmesh link names a navmesh that is not sunk
     /// and, in the group, a triangle whose door triangle names the door, and the other way round; a door whose link the group writes
     /// leaves no navmesh that stays and lies in no deleted cell. A removed door's link is not checked; the patch clears it on the
     /// cleaned mod's own doors that link into a sunk member. A door whose link goes with it joins the group this way: the group goes

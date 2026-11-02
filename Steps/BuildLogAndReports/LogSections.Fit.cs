@@ -4,6 +4,7 @@ using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
@@ -31,9 +32,9 @@ internal static partial class LogSections
     /// kept that went back where the cleaned mod was removed is counted with the kept ones and named as gone back. Nothing when there
     /// are none.
     /// </summary>
-    /// <param name="restoredWhereRemoved">The earlier version of each target that went back where the cleaned mod was removed.</param>
+    /// <param name="restoredWhereRemoved">The judged record of each target that went back where the cleaned mod was removed.</param>
     public static LogSection BuildChangedObjectsSection(
-        CollectedObjects world, IRemovalDecisions final, IReadOnlyDictionary<TargetId, EarlierVersion> restoredWhereRemoved, PluginName target, ReportContext context)
+        CollectedObjects world, IRemovalDecisions final, IReadOnlyDictionary<TargetId, PlacedChangeJudged> restoredWhereRemoved, PluginName target, ReportContext context)
     {
         var changed = FitOutcomes.ChangedObjects(world).ToImmutableArray();
         if (changed.IsEmpty) return new LogSection("changed-objects", []);

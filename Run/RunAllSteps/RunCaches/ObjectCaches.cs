@@ -1,8 +1,6 @@
-using System.Collections.Immutable;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
 namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
 
@@ -12,11 +10,14 @@ namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
 /// </summary>
 internal sealed class ObjectCaches : IObjectCaches
 {
-    private readonly ImmutableArray<TargetObject> _targets;
+    private static readonly EqualTargets SameTargets = new();
+
+    private readonly IReadOnlyList<TargetObject> _targets;
     private readonly ComputedOnce<PlacedSpaces> _objectsOfAnyPlugin;
     private readonly ObjectContainment _containment;
     private readonly IBaseObjectShapes _shapes;
     private readonly Execution _execution;
+    private readonly ComputedOncePerKey<IReadOnlyList<TargetObject>, IVisibleTargetObjects> _indexes = new(Publication.BuiltOnce, SameTargets);
 
     private ObjectCaches(
         CollectedObjects world,
@@ -59,19 +60,22 @@ internal sealed class ObjectCaches : IObjectCaches
 
     public IVisibleTargetObjects VisibleTargets { get; }
 
-    public IVisibleTargetObjects IndexVisibleTargets(IReadOnlyList<TargetObject> targets) => new VisibleTargetObjects(targets, _shapes, _containment, _execution);
+    public IVisibleTargetObjects IndexVisibleTargets(IReadOnlyList<TargetObject> targets) =>
+        AreTheCollectedObjects(targets) ? VisibleTargets : _indexes.Get(targets, () => new VisibleTargetObjects(targets, _shapes, _containment, _execution));
 
-    public IVisibleTargetObjects IndexVisibleTargetsAsTheRoundsMeasureThem(IRemovalDecisions decisions) =>
-        IndexPlaced(decisions.AnyMeasuredElsewhere(), decisions.TargetsAsTheRoundsMeasureThem);
-
-    public IVisibleTargetObjects IndexVisibleTargetsAsTheyStand(IRemovalDecisions decisions) =>
-        IndexPlaced(decisions.AnyStandsElsewhere(), decisions.TargetsAsTheyStand);
-
-    private IVisibleTargetObjects IndexPlaced(bool anyElsewhere, Func<ImmutableArray<TargetObject>, ImmutableArray<TargetObject>> placeTargets) =>
-        anyElsewhere ? IndexVisibleTargets(placeTargets(_targets)) : VisibleTargets;
+    private bool AreTheCollectedObjects(IReadOnlyList<TargetObject> targets) => SameTargets.Equals(targets, _targets);
 
     public IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPlugin() => new VisibleObjectsOfAnyPlugin(ObjectsOfAnyPlugin);
 
     public IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPluginAsTheyStand(IReadOnlyDictionary<OtherId, OtherObject?> changed) =>
         new VisibleObjectsOfAnyPluginAsTheyStand(ObjectsOfAnyPlugin, changed, _shapes, _containment);
+
+    /// <summary>Lists of the same target objects, in the same order and at the same placements.</summary>
+    private sealed class EqualTargets : IEqualityComparer<IReadOnlyList<TargetObject>>
+    {
+        public bool Equals(IReadOnlyList<TargetObject>? first, IReadOnlyList<TargetObject>? second) =>
+            ReferenceEquals(first, second) || (first is not null && second is not null && first.SequenceEqual(second));
+
+        public int GetHashCode(IReadOnlyList<TargetObject> targets) => targets.Aggregate(targets.Count, (hash, target) => HashCode.Combine(hash, target));
+    }
 }

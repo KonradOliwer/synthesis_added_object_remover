@@ -38,7 +38,7 @@ internal static partial class Tables
         [
             .. RemovedObjectColumns(world, restoration, outcome.Final, context),
             Quote(earlier.Plugin.ToString()),
-            .. PlacementColumns(target.RestoredAs(earlier).Placement),
+            .. PlacementColumns(FitOutcomes.PlacementItStandsAt(outcome.Final, target)),
             NewBaseColumn(target, earlier, context),
             Quote(outcome.ChangedObjects.OldPlaceChecks.Any(check => check.Target.Index == restoration.TargetIndex) ? OldPlaceFree : OldPlaceNotChecked),
             OptionalText(LeftToLaterPlugins(earlier)),
@@ -55,8 +55,7 @@ internal static partial class Tables
             : Describe.PartsByPlugin(earlier.LeftToLaterPlugins.Select(left => (PartName(left.Key), left.Value)));
 
     /// <summary>The names of the parts of a placed record that are set, in the order of the parts.</summary>
-    internal static string PartNames(PlacedParts parts) =>
-        string.Join(Describe.ListSeparator, Enum.GetValues<PlacedParts>().Where(part => part != PlacedParts.None && parts.HasFlag(part)).Select(PartName));
+    internal static string PartNames(PlacedParts parts) => TextLists.JoinSetFlags(parts, PartName, Describe.ListSeparator);
 
     private static string PartName(PlacedParts part) => part switch
     {

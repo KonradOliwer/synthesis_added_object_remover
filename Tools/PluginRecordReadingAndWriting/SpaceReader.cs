@@ -7,7 +7,7 @@ namespace AddedObjectRemover;
 
 /// <summary>
 /// Reads the space and cell records met on the load order walk: each space (worldspace or interior cell) at its first sighting,
-/// the worldspaces whose land and water each target space uses, the winning cells of the target spaces, and, with the area record
+/// the worldspaces whose land and water each plugin space uses, the winning cells of the plugin spaces, and, with the area record
 /// versions asked for, the cells some plugin's version deletes and the versions of the cells of other plugins the read's plugin
 /// overrides, compared (<see cref="CellPartComparison"/>).
 /// </summary>
@@ -15,43 +15,43 @@ internal sealed class SpaceReader
 {
     private readonly ILinkCache<ISkyrimMod, ISkyrimModGetter> _linkCache;
     private readonly PluginNames _names;
-    private readonly TargetFootprint _footprint;
+    private readonly PluginFootprint _footprint;
 
     /// <summary>The part table the cells are compared with; null when the area record versions were not asked for.</summary>
     private readonly CellRecordParts? _cellParts;
 
     private readonly Dictionary<RecordKey, ICellGetter> _winningCells = new();
     private readonly Dictionary<RecordKey, SpaceFact> _spaces = new();
-    private readonly List<SpaceCell> _targetSpaceCells = [];
+    private readonly List<SpaceCell> _pluginSpaceCells = [];
     private readonly Dictionary<RecordKey, RecordKey> _landWorldspaceOf = new();
     private readonly Dictionary<RecordKey, RecordKey> _waterWorldspaceOf = new();
 
-    /// <summary>With the area record versions asked for, the cells of the target spaces that some plugin's version deletes.</summary>
+    /// <summary>With the area record versions asked for, the cells of the plugin spaces that some plugin's version deletes.</summary>
     private readonly HashSet<RecordKey> _deletedCells = new();
 
-    /// <summary>The cells of the target spaces whose winning version deletes them, with that version's plugin.</summary>
+    /// <summary>The cells of the plugin spaces whose winning version deletes them, with that version's plugin.</summary>
     private readonly Dictionary<RecordKey, PluginName> _cellsDeletedInFinalWorld = new();
 
-    private readonly TargetOverrideWalk<ICellGetter, CellPlace> _cellWalk;
+    private readonly NamedPluginOverrideWalk<ICellGetter, CellPlace> _cellWalk;
 
-    public SpaceReader(ILinkCache<ISkyrimMod, ISkyrimModGetter> linkCache, PluginNames names, TargetFootprint footprint, PluginName target, CellRecordParts? cellParts)
+    public SpaceReader(ILinkCache<ISkyrimMod, ISkyrimModGetter> linkCache, PluginNames names, PluginFootprint footprint, PluginName namedPlugin, CellRecordParts? cellParts)
     {
         _linkCache = linkCache;
         _names = names;
         _footprint = footprint;
         _cellParts = cellParts;
-        _cellWalk = new(target);
+        _cellWalk = new(namedPlugin);
     }
 
     public IReadOnlyDictionary<RecordKey, SpaceFact> Spaces => _spaces;
 
-    /// <summary>The winning cells of the target spaces, in the order found.</summary>
-    public IReadOnlyList<SpaceCell> TargetSpaceCells => _targetSpaceCells;
+    /// <summary>The winning cells of the plugin spaces, in the order found.</summary>
+    public IReadOnlyList<SpaceCell> PluginSpaceCells => _pluginSpaceCells;
 
-    /// <summary>For each target worldspace, the worldspace whose land it uses.</summary>
+    /// <summary>For each plugin worldspace, the worldspace whose land it uses.</summary>
     public IReadOnlyDictionary<RecordKey, RecordKey> LandWorldspaceOf => _landWorldspaceOf;
 
-    /// <summary>For each target worldspace, the worldspace whose water it uses.</summary>
+    /// <summary>For each plugin worldspace, the worldspace whose water it uses.</summary>
     public IReadOnlyDictionary<RecordKey, RecordKey> WaterWorldspaceOf => _waterWorldspaceOf;
 
     public IReadOnlySet<RecordKey> DeletedCells => _deletedCells;
@@ -71,7 +71,7 @@ internal sealed class SpaceReader
     /// <remarks>
     /// A parent chain that loops back (broken data) stops at the last worldspace not yet seen. The parent and its flags come from
     /// the winning worldspace records only, so a mod switching "use water data" on a child is not seen as a water change; that
-    /// misses the change but never causes a wrong removal.
+    /// misses the change but never reports one that is not there.
     /// </remarks>
     private RecordKey FollowParents(IWorldspaceGetter worldspace, WorldspaceParent.Flag usesParent)
     {
@@ -86,20 +86,20 @@ internal sealed class SpaceReader
         return _names.KeyOf(worldspace.FormKey);
     }
 
-    /// <summary>Keeps the cell as the winning cell of a target space, as a version of a cell the read's plugin overrides and as a deleted cell, as far as each applies.</summary>
-    public void SeeCell(ICellGetter cell, RecordKey cellKey, SpaceFact space, PluginName plugin, bool inTargetSpace)
+    /// <summary>Keeps the cell as the winning cell of a plugin space, as a version of a cell the read's plugin overrides and as a deleted cell, as far as each applies.</summary>
+    public void SeeCell(ICellGetter cell, RecordKey cellKey, SpaceFact space, PluginName plugin, bool inPluginSpace)
     {
-        if (inTargetSpace && _winningCells.TryAdd(cellKey, cell)) KeepWinningCell(cell, cellKey, space, plugin);
+        if (inPluginSpace && _winningCells.TryAdd(cellKey, cell)) KeepWinningCell(cell, cellKey, space, plugin);
         if (_footprint.OverriddenCells.Contains(cellKey)) _cellWalk.Keep(cellKey, plugin, cell, new CellPlace(space.Key, GridOf(cell, cellKey, space)));
-        if (_cellParts is not null && inTargetSpace && cell.IsDeleted) _deletedCells.Add(cellKey);
+        if (_cellParts is not null && inPluginSpace && cell.IsDeleted) _deletedCells.Add(cellKey);
     }
 
-    /// <param name="cellKey">A cell of a target space.</param>
+    /// <param name="cellKey">A cell of a plugin space.</param>
     public ICellGetter WinningCellOf(RecordKey cellKey) => _winningCells[cellKey];
 
     private void KeepWinningCell(ICellGetter cell, RecordKey cellKey, SpaceFact space, PluginName plugin)
     {
-        _targetSpaceCells.Add(new SpaceCell(cellKey, space, cell));
+        _pluginSpaceCells.Add(new SpaceCell(cellKey, space, cell));
         if (cell.IsDeleted) _cellsDeletedInFinalWorld.Add(cellKey, plugin);
     }
 

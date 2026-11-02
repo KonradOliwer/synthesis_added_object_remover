@@ -54,14 +54,6 @@ public class KeyedGroupsTests
         Assert.Empty(KeyedGroups.IndicesByKey(Array.Empty<int>(), item => item, EqualityComparer<int>.Default));
 
     [Fact]
-    public void DistinctByKeepsTheFirstItemOfEachKeyInInputOrder()
-    {
-        string[] items = ["b1", "a1", "b2", "c1", "a2"];
-
-        Assert.Equal(["b1", "a1", "c1"], KeyedGroups.DistinctBy(items, item => item[0], EqualityComparer<char>.Default));
-    }
-
-    [Fact]
     public void CountByCountsEachKeyInFirstSeenOrder()
     {
         string[] items = ["b1", "a1", "b2", "c1", "a2", "b3"];
@@ -80,6 +72,14 @@ public class KeyedGroupsTests
 
         Assert.Equal([KeyValuePair.Create("Mesh", 2), KeyValuePair.Create("other", 1)], counts);
     }
+
+    [Fact]
+    public void PositionByKeyGivesEachItemsPositionUnderItsKey() =>
+        Assert.Equal(new Dictionary<char, int> { ['b'] = 0, ['a'] = 1, ['c'] = 2 }, KeyedGroups.PositionByKey(new[] { "b1", "a1", "c1" }, item => item[0]));
+
+    [Fact]
+    public void PositionByKeyThrowsForTwoItemsWithOneKey() =>
+        Assert.Throws<ArgumentException>(() => KeyedGroups.PositionByKey(new[] { "a1", "a2" }, item => item[0]));
 
     [Fact]
     public void CountByOfNothingGivesNoCounts() =>
@@ -138,12 +138,4 @@ public class KeyedGroupsTests
     [Fact]
     public void ArgMaxFirstWinsOfOneItemGivesThatItem() =>
         Assert.Equal(7, KeyedGroups.ArgMaxFirstWins([7], item => item, Comparer<int>.Default));
-
-    [Fact]
-    public void DistinctByUsesTheComparer()
-    {
-        string[] items = ["Mesh", "MESH", "other"];
-
-        Assert.Equal(["Mesh", "other"], KeyedGroups.DistinctBy(items, item => item, StringComparer.OrdinalIgnoreCase));
-    }
 }

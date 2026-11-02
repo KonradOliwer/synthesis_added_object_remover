@@ -11,8 +11,8 @@ public class MeshFilesTriangleFailureTests
 
     private static readonly Box CrateBox = new(new System.Numerics.Vector3(-1, -2, 0), new System.Numerics.Vector3(1, 2, 3));
 
-    private static MeshFiles Open(string dataFolder, AssetProblemLog problems, IUnexpectedErrors errors) =>
-        new(new MeshFileSource(dataFolder, GameRelease.SkyrimSE, [], problems), new NifGeometryReader(), problems, errors, BaseObjectShapes.SolidShapes);
+    private static MeshFiles Open(string dataFolder, AssetProblemLog problems) =>
+        new(new MeshFileSource(dataFolder, GameRelease.SkyrimSE, [], problems), new NifGeometryReader(), problems, BaseObjectShapes.SolidShapes);
 
     private static string NewDataFolder(string name)
     {
@@ -24,7 +24,7 @@ public class MeshFilesTriangleFailureTests
     [Fact]
     public void AMissingMeshCountsOnceAsNotFoundAndNotAsFailedAfterAGoodRead()
     {
-        var files = Open(NewDataFolder(nameof(AMissingMeshCountsOnceAsNotFoundAndNotAsFailedAfterAGoodRead)), new AssetProblemLog(), new UnexpectedErrors());
+        var files = Open(NewDataFolder(nameof(AMissingMeshCountsOnceAsNotFoundAndNotAsFailedAfterAGoodRead)), new AssetProblemLog());
 
         Assert.Null(files.ReadTriangles(@"meshes\missing.nif"));
         Assert.Null(files.ReadTriangles(@"Meshes\Missing.nif"));
@@ -40,7 +40,7 @@ public class MeshFilesTriangleFailureTests
         var folder = NewDataFolder(nameof(AMeshThatFailsAfterItsTrianglesWereReadFineIsCountedAndListedApart));
         TestShapes.WriteMesh(folder, Crate, TestMeshes.BoxTriangles(CrateBox));
         var problems = new AssetProblemLog();
-        var files = Open(folder, problems, new UnexpectedErrors());
+        var files = Open(folder, problems);
         Assert.NotNull(files.ReadTriangles(Crate));
         File.Delete(Path.Combine(folder, MeshFileSource.InLooseFileForm(Crate)));
 
@@ -56,14 +56,12 @@ public class MeshFilesTriangleFailureTests
     [Fact]
     public void ATrianglesReadThatHitsABugEndsTheRunAndCountsNoFailure()
     {
-        var errors = new UnexpectedErrors();
         var files = new MeshFiles(
-            new MeshFileSource(null!, GameRelease.SkyrimSE, [], new AssetProblemLog()), new NifGeometryReader(), new AssetProblemLog(), errors, BaseObjectShapes.SolidShapes);
+            new MeshFileSource(null!, GameRelease.SkyrimSE, [], new AssetProblemLog()), new NifGeometryReader(), new AssetProblemLog(), BaseObjectShapes.SolidShapes);
 
         Assert.Throws<ArgumentNullException>(() => files.ReadTriangles(@"meshes\broken.nif"));
 
         Assert.Empty(files.CountTriangleFailures().ByKind);
-        Assert.Empty(errors.Since(default));
     }
 
     [Fact]
@@ -71,7 +69,7 @@ public class MeshFilesTriangleFailureTests
     {
         var folder = NewDataFolder(nameof(MeshesReadFineCountNoFailure));
         TestShapes.WriteMesh(folder, Crate, TestMeshes.BoxTriangles(CrateBox));
-        var files = Open(folder, new AssetProblemLog(), new UnexpectedErrors());
+        var files = Open(folder, new AssetProblemLog());
 
         Assert.NotNull(files.ReadTriangles(Crate));
 

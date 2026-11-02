@@ -1,3 +1,4 @@
+using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using Mutagen.Bethesda.Synthesis.Settings;
 
@@ -12,7 +13,7 @@ public class ShrinkOrTurnSettings : IShrinkOrTurnSettingsValues
     public bool ShrinkOrTurnObjects { get; set; } = SettingDefaults.ShrinkOrTurnObjects;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Shrink down to (% of its size)")]
+    [SynthesisSettingName(SettingNames.ShrinkLimit + SettingNames.PercentOfItsSizeSuffix)]
     [SynthesisTooltip(
         "An object that would be removed for being too close to another mod's object may be shrunk where it stands, down to this share of its size, to make it fit,\n"
         + "in steps of 5%; the largest size that fits is used. This applies to the cleaned mod's own objects.\n"
@@ -20,7 +21,7 @@ public class ShrinkOrTurnSettings : IShrinkOrTurnSettingsValues
     public int ShrinkLimitPercent { get; set; } = SettingDefaults.ShrinkLimitPercent;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Turn by at most (degrees either way)")]
+    [SynthesisSettingName(SettingNames.TurnLimit + SettingNames.DegreesEitherWaySuffix)]
     [SynthesisTooltip(
         "An object may be turned about its upright axis by up to this many degrees to the left or to the right to make it fit,\n"
         + "in steps of 15 degrees; the smallest turn that fits is used. It is never tilted.\n"

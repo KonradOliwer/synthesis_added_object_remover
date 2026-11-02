@@ -68,7 +68,7 @@ public class NifCollisionLayersTests
         var meshFile = Path.Combine(dataPath, "meshes", "rock.nif");
         Directory.CreateDirectory(Path.GetDirectoryName(meshFile)!);
         File.WriteAllBytes(meshFile, TestNifs.Save(nif));
-        var meshFiles = new MeshFilesFactory(dataPath, GameRelease.SkyrimSE, []).Open(BaseObjectShapes.SolidShapes, new UnexpectedErrors());
+        var meshFiles = new MeshFilesFactory(dataPath, GameRelease.SkyrimSE, []).Open(BaseObjectShapes.SolidShapes);
 
         var bounds = meshFiles.Bounds.Of(@"meshes\rock.nif");
 

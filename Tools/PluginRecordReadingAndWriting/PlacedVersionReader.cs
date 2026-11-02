@@ -8,11 +8,11 @@ namespace AddedObjectRemover;
 /// overrides, no plugin stops the walk before the version just below the read's plugin's is kept, and the parts of the versions
 /// from that one up are compared (<see cref="PlacedRecordPartComparison"/>).
 /// </summary>
-internal sealed class PlacedVersionReader(PluginName target, PluginNames names, TargetFootprint footprint, Func<PluginName, bool> stopsTheWalk, PlacedRecordParts parts)
+internal sealed class PlacedVersionReader(PluginName namedPlugin, PluginNames names, PluginFootprint footprint, Func<PluginName, bool> stopsTheWalk, PlacedRecordParts parts)
 {
-    private readonly PluginName _target = target;
+    private readonly PluginName _namedPlugin = namedPlugin;
     private readonly PluginNames _names = names;
-    private readonly TargetFootprint _footprint = footprint;
+    private readonly PluginFootprint _footprint = footprint;
     private readonly Func<PluginName, bool> _stopsTheWalk = stopsTheWalk;
     private readonly PlacedRecordParts _parts = parts;
 
@@ -49,20 +49,20 @@ internal sealed class PlacedVersionReader(PluginName target, PluginNames names, 
     public void KeepLowerVersion(IPlacedGetter record, RecordKey key, ScannedCell cell)
     {
         if (!_openVersions.TryGetValue(key, out var versions) || versions[^1].Plugin == cell.Plugin) return;
-        var isBelowTarget = versions[^1].Plugin == _target;
-        if (isBelowTarget && _footprint.OverriddenRecords.Contains(key)) _earlierRecords.Add(key, record);
+        var isBelowNamedPlugin = versions[^1].Plugin == _namedPlugin;
+        if (isBelowNamedPlugin && _footprint.OverriddenRecords.Contains(key)) _earlierRecords.Add(key, record);
         versions.Add(ReadVersion(record, cell));
-        if (_versionsToCompare.TryGetValue(key, out var versionsToCompare)) KeepVersionToCompare(record, key, versionsToCompare, isBelowTarget, versions);
+        if (_versionsToCompare.TryGetValue(key, out var versionsToCompare)) KeepVersionToCompare(record, key, versionsToCompare, isBelowNamedPlugin, versions);
         if (StopsTheWalk(key, cell.Plugin)) _openVersions.Remove(key);
     }
 
     /// <summary>Once the version just below the read's plugin's is read, compares the parts of the record's versions.</summary>
     /// <param name="versions">The versions read so far, highest first; <paramref name="versionsToCompare"/> holds the same versions as stored.</param>
     private void KeepVersionToCompare(
-        IPlacedGetter record, RecordKey key, List<IPlacedGetter> versionsToCompare, bool isBelowTarget, List<PlacedVersionFact> versions)
+        IPlacedGetter record, RecordKey key, List<IPlacedGetter> versionsToCompare, bool isBelowNamedPlugin, List<PlacedVersionFact> versions)
     {
         versionsToCompare.Add(record);
-        if (!isBelowTarget) return;
+        if (!isBelowNamedPlugin) return;
         _versionsToCompare.Remove(key);
         IPlacedGetter[] lowestFirst = [.. Enumerable.Reverse(versionsToCompare)];
         PluginName[] plugins = [.. versions.Select(version => version.Plugin).Reverse()];

@@ -20,7 +20,6 @@ public sealed class FinalWorldEntryRunTests : IDisposable
     private const string MissingPlugin = "Missing.esp";
     private const string RequiringPlugin = "Requiring.esp";
     private const string RemovedLineMark = "disabled True";
-    private const string PatchMarker = "Added Object Remover patch";
     private const float FarPadCentre = 2000f;
     private const float FarCrateDistance = 1000f;
 
@@ -68,7 +67,7 @@ public sealed class FinalWorldEntryRunTests : IDisposable
     {
         var run = Run([WriteEmptyPlugin(BelowPlugin)], patchEnabled: true);
 
-        Assert.Equal(PatchMarker, run.PatchDescription);
+        Assert.Equal(Program.PatchMarkerText, run.PatchDescription);
     }
 
     /// <summary>An old copy of the patch moves the pad next to the crate; the crate stays because that copy is never read.</summary>
@@ -135,7 +134,7 @@ public sealed class FinalWorldEntryRunTests : IDisposable
     [Fact]
     public void APluginOnDiskCarryingThePatchMarkerIsNamedAsAPatchOfAnotherGroup()
     {
-        var requiring = WriteRequiringPlugin(RequiringPlugin, PatchMarker);
+        var requiring = WriteRequiringPlugin(RequiringPlugin, Program.PatchMarkerText);
 
         var run = Run([requiring], patchEnabled: true, onlyWarn: true);
 

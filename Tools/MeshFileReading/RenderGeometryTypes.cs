@@ -8,8 +8,6 @@ internal sealed class RenderGeometryTypes
 {
     private readonly ComputedOncePerKey<Type, bool> _byType = new(Publication.FirstWriteWins, EqualityComparer<Type>.Default);
 
-    public int ShapeClassesDecided => _byType.Contents().Count;
-
     public bool IsRenderGeometry(INiShape shape) => _byType.Get(shape.GetType(), () => IsRenderGeometryType(shape.GetType()));
 
     /// <summary>

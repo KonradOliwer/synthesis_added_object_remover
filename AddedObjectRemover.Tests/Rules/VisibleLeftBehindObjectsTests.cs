@@ -71,7 +71,7 @@ public class VisibleLeftBehindObjectsTests
         var (result, applied) = Decide(CascadeTargets, decisions, Settings);
 
         Assert.Equal(3, result.ProposedRounds.Length);
-        Assert.All(result.ProposedRounds, round => Assert.Equal(RoundKind.VisibleLeftBehind, round.Kind));
+        Assert.All(result.ProposedRounds, round => Assert.Equal(RoundKind.VisibleLeftBehind, round.Opening.Kind));
         Assert.Equal(applied.RoundsAfter(decisions).ToArray(), result.Rounds.ToArray());
     }
 
@@ -106,7 +106,7 @@ public class VisibleLeftBehindObjectsTests
     {
         var targets = Ring(SixDirections);
         var decisions = DecisionsRemoving(targets, 1, 2, 3)
-            .Apply(RoundKind.AlsoRemove, [.. new[] { 4, 5, 6 }.Select(index => new ProposedRemoval(new TargetId(index), new TouchingTargetThatLeft(new TargetId(1))))]);
+            .Apply(AlsoRemoveRounds.Opening, [.. new[] { 4, 5, 6 }.Select(index => new ProposedRemoval(new TargetId(index), new TouchingTargetThatLeft(new TargetId(1))))]);
 
         var evaluation = Assert.Single(Find(targets, decisions, Settings).Evaluations);
 
@@ -766,11 +766,11 @@ public class VisibleLeftBehindObjectsTests
         IBaseFacts? bases = null,
         IAlsoRemoveFollowUp? followUp = null,
         Func<TimeSpan>? timeSinceStart = null,
-        Func<IRemovalDecisions, IVisibleTargetObjects>? surroundings = null) =>
+        Func<IReadOnlyList<TargetObject>, IVisibleTargetObjects>? surroundings = null) =>
         Decide(targets, decisions, settings, others, workers, bases, followUp, timeSinceStart, surroundings).Result;
 
     /// <param name="followUp">By default one that proposes nothing.</param>
-    /// <param name="surroundings">The visible targets the caches index for the decisions; by default where the rounds measure them, among <paramref name="others"/>.</param>
+    /// <param name="surroundings">The visible targets the caches index for the given targets; by default the scene's index among <paramref name="others"/>.</param>
     /// <returns>The step's result, with its rounds added to <paramref name="decisions"/>.</returns>
     private static Decided<VisibleLeftBehindResult> Decide(
         ImmutableArray<TargetObject> targets,
@@ -781,7 +781,7 @@ public class VisibleLeftBehindObjectsTests
         IBaseFacts? bases = null,
         IAlsoRemoveFollowUp? followUp = null,
         Func<TimeSpan>? timeSinceStart = null,
-        Func<IRemovalDecisions, IVisibleTargetObjects>? surroundings = null) =>
+        Func<IReadOnlyList<TargetObject>, IVisibleTargetObjects>? surroundings = null) =>
         VisibleLeftBehindObjects.Find(
             new(
                 targets,
@@ -789,7 +789,7 @@ public class VisibleLeftBehindObjectsTests
                 new TestRunCaches(
                     Shapes,
                     bases: bases ?? UnresolvedBases,
-                    visibleTargetsAsTheRoundsMeasureThem: surroundings ?? Scene(targets, others ?? []).IndexVisibleTargetsAsTheRoundsMeasureThem),
+                    visibleTargets: surroundings ?? Scene(targets, others ?? []).IndexVisibleTargets),
                 followUp ?? new ScriptedFollowUp(),
                 timeSinceStart ?? (() => TimeSpan.Zero),
                 TargetWorkOrder.Of(targets),
@@ -826,11 +826,11 @@ public class VisibleLeftBehindObjectsTests
 
         public IAlsoRemoveFollowUp CreateFollowUp(int workers) =>
             RestingObjects.CreateFollowUp(
-                new(Targets, AlsoRemove, new Execution(workers), () => TimeSpan.Zero, new TestRunCaches(Shapes, _triangles, TestGround.NoTerrain(), UnresolvedBases, ObjectsOfAnyPlugin)));
+                new(Targets, TestSeededDecisions.StartUnprotected(Targets), AlsoRemove, new Execution(workers), () => TimeSpan.Zero, new TestRunCaches(Shapes, _triangles, TestGround.NoTerrain(), UnresolvedBases, ObjectsOfAnyPlugin)));
 
         /// <summary>The also-remove step seeded by the newest round of <paramref name="decisions"/>, without report files.</summary>
         public RestingObjectsResult FindAlsoRemoveRounds(IRemovalDecisions decisions) =>
-            RestingObjects.Find(
+            RestingObjectsFinder.Find(
                 new RestingObjectsInput(Targets, decisions, [decisions.Rounds[^1]], AlsoRemove, new Execution(1), () => TimeSpan.Zero, StepOutcome.SwitchedOff),
                 new TestRunCaches(Shapes, _triangles, TestGround.NoTerrain(), UnresolvedBases, ObjectsOfAnyPlugin));
 
@@ -889,21 +889,21 @@ public class VisibleLeftBehindObjectsTests
             foreach (var check in round) checks[check.TargetIndex] = check;
             var proposals = VisibleLeftBehindRounds.ProposalsOf(round);
             proposed.Add(DescribeRound(RoundKind.VisibleLeftBehind, proposals));
-            view = copy.DecideRound(RoundKind.VisibleLeftBehind, proposals);
+            view = copy.DecideRound(new RoundOpening(RoundKind.VisibleLeftBehind, MayReplaceFits: false), proposals);
             tookSomething = !view.LeftIn(view.Rounds[^1]).IsEmpty;
             if (!tookSomething) continue;
 
             foreach (var alsoRemove in world.FindAlsoRemoveRounds(view).ProposedRounds)
             {
                 proposed.Add(DescribeRound(RoundKind.AlsoRemove, alsoRemove));
-                view = copy.DecideRound(RoundKind.AlsoRemove, alsoRemove);
+                view = copy.DecideRound(AlsoRemoveRounds.Opening, alsoRemove);
             }
         }
         while (tookSomething);
         return new ReferenceRounds(proposed, view, checks.Values);
     }
 
-    private static IEnumerable<string> DescribeRounds(IEnumerable<ProposedRound> rounds) => rounds.Select(round => DescribeRound(round.Kind, round.Proposals));
+    private static IEnumerable<string> DescribeRounds(IEnumerable<ProposedRound> rounds) => rounds.Select(round => DescribeRound(round.Opening.Kind, round.Proposals));
 
     private static string DescribeRound(RoundKind kind, IEnumerable<ProposedRemoval> proposals) =>
         $"{kind}:{string.Join(',', proposals.Select(proposal => proposal.Target.Index))}";

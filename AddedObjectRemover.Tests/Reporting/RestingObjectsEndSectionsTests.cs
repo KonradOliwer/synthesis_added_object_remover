@@ -872,7 +872,7 @@ public sealed class RestingObjectsEndSectionsTests
             null);
         var decisions = TestSeededDecisions.StartDisablingAll(protection, TargetCount)
             .Apply(RoundKind.TooClose, [Propose(0, new TooClose(new OtherId(0), new TooCloseCause.ObjectSize())), Propose(Protected, new TooClose(new OtherId(0), new TooCloseCause.ObjectSize()))])
-            .Apply(RoundKind.AlsoRemove, [Propose(1, reasonOf(1)), Propose(ProtectedAlsoRemove, reasonOf(ProtectedAlsoRemove))]);
+            .Apply(AlsoRemoveRounds.Opening, [Propose(1, reasonOf(1)), Propose(ProtectedAlsoRemove, reasonOf(ProtectedAlsoRemove))]);
         return (world, decisions);
     }
 

@@ -64,15 +64,15 @@ public static partial class StepRunner
         var reportFolder = PrepareReportFolder(settings, environment);
         var plugin = environment.PluginRecords.Open();
         var records = plugin.ReadRecordIndex();
+        var npcCacheRules = TooCloseObjects.CreateNpcCacheRules();
         var loadOrderCaches = LoadOrderCaches.Create(
             environment.MeshFiles,
-            unexpectedErrors,
             plugin,
             environment.Bases.Open(records),
             environment.Bases.ReadCollisionLayers(records),
-            TooCloseObjects.NpcBodyRules,
-            TooCloseObjects.PlacedNpcRules,
-            RestingObjects.SurfaceSamplesPerMesh);
+            npcCacheRules.Bodies,
+            npcCacheRules.PlacedNpcs,
+            RestingObjects.SurfaceSamplesPerMesh());
         var report = new LogAndReports(settings, reportFolder, loadOrderCaches, unexpectedErrors);
         return new RunScope(settings, source, environment, plugin, loadOrderCaches, unexpectedErrors, report, reportFolder);
     }
@@ -115,10 +115,8 @@ public static partial class StepRunner
     /// <remarks>Timed through the run's clock, since the log times only work that returns a result.</remarks>
     private static void PrepareMeshReading(RunScope scope)
     {
-        var clock = scope.Environment.TimeSinceStart;
-        var start = clock();
-        scope.LoadOrderCaches.PrepareMeshReading();
-        Print(scope.Environment.Log, scope.Report.BuildArchiveSections(clock() - start));
+        var elapsed = Timed.Run(scope.Environment.TimeSinceStart, scope.LoadOrderCaches.PrepareMeshReading);
+        Print(scope.Environment.Log, scope.Report.BuildArchiveSections(elapsed));
     }
 
     private static ModTrustTable ClassifyModTrust(RunScope scope) =>
@@ -136,10 +134,7 @@ public static partial class StepRunner
 
     private static IRunCaches AddObjectCaches(RunScope scope, CollectedObjects collected) =>
         scope.Environment.Log.Timed(
-            () => scope.LoadOrderCaches.AddObjectCaches(
-                collected,
-                RemovalCauseSelector.MeasurementRules(scope.UnexpectedErrors),
-                scope.Settings.Execution),
+            () => scope.LoadOrderCaches.AddObjectCaches(collected, CreateMeasurementRules(scope), scope.Settings.Execution),
             (_, elapsed) => scope.Report.BuildIndexSections(collected, elapsed));
 
     private static WriteSummary WritePatch(RunScope scope, StepResults decided) =>

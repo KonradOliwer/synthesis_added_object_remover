@@ -18,17 +18,17 @@ public partial class ObjectFailureRunTests
     [GeneratedRegex(@"^(?<count>\d+) objects?, e\.g\. .+\. They were not removed\.$")]
     private static partial Regex TooCloseGroup();
 
-    private static Func<string, GameRelease, IReadOnlyList<ModKey>, IMeshFilesFactory> BrokenCrate =>
+    private static Func<string, GameRelease, IReadOnlyList<PluginName>, IMeshFilesFactory> BrokenCrate =>
         (folder, release, plugins) => new BrokenTrianglesFactory(new MeshFilesFactory(folder, release, plugins), FixtureMeshes.CrateModel);
 
-    private static (RunOutcome Outcome, ImmutableArray<string> ErrorLines) Run(string variant, int workers, Func<string, GameRelease, IReadOnlyList<ModKey>, IMeshFilesFactory> openMeshFiles)
+    private static (RunOutcome Outcome, ImmutableArray<string> ErrorLines) Run(string variant, int workers, Func<string, GameRelease, IReadOnlyList<PluginName>, IMeshFilesFactory> openMeshFiles)
     {
         var log = new RecordingLogSink();
         var done = (RunResult.Done)FixtureRun.Run(SettingsVariants.Of(variant), workers, log, openMeshFiles);
         return (done.Outcome, [.. log.Sections.Where(section => section.Id == "unexpectedErrors").SelectMany(section => section.Lines)]);
     }
 
-    private static Func<string, GameRelease, IReadOnlyList<ModKey>, IMeshFilesFactory> Healthy =>
+    private static Func<string, GameRelease, IReadOnlyList<PluginName>, IMeshFilesFactory> Healthy =>
         (folder, release, plugins) => new MeshFilesFactory(folder, release, plugins);
 
     [Fact]
@@ -74,9 +74,9 @@ public partial class ObjectFailureRunTests
 
     private sealed class BrokenTrianglesFactory(IMeshFilesFactory inner, string brokenModel) : IMeshFilesFactory
     {
-        public IMeshFiles Open(ShapeInclusion inclusion, IUnexpectedErrors unexpectedErrors)
+        public IMeshFiles Open(ShapeInclusion inclusion)
         {
-            var files = inner.Open(inclusion, unexpectedErrors);
+            var files = inner.Open(inclusion);
             return new BrokenTriangles(files, files.NormalizeMeshPath(brokenModel));
         }
     }

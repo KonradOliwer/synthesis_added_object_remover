@@ -43,15 +43,15 @@ public sealed record CopyEarlierCellParts(RecordKey Record, ImmutableArray<CellP
 public sealed record CopyEarlierLandParts(RecordKey Record, PointSet Colours, QuarterSet Quarters, bool Rest) : WriteOrder(Record);
 
 /// <summary>
-/// Sets the height of every grid point of a LAND record, and the normal of each restored one: a restored point whose own height and
-/// those of its neighbours in the cell all equal the record's earlier version takes that version's normal; one whose all equal the
-/// winner's keeps the winner's; every other restored point gets the normal of the new heights. Every point not restored keeps the
+/// Sets the height of every grid point of a LAND record, and the normal of each point in <paramref name="NewNormals"/>: such a point
+/// whose own height and those of its neighbours in the cell all equal the record's earlier version takes that version's normal; one
+/// whose all equal the winner's keeps the winner's; every other one gets the normal of the new heights. Every other point keeps the
 /// winner's normal, or gets the normal of the new heights when the winner holds none.
 /// </summary>
 /// <param name="Heights">In game units, row by row from the bottom, x fastest; they must be storable (<see cref="LandHeightEncoder"/>).</param>
-/// <param name="Restored">The points whose height and normal go back.</param>
+/// <param name="NewNormals">The points whose normal is chosen for their new heights.</param>
 /// <param name="Beyond">The final heights just outside the cell, for the normals at its edges.</param>
-public sealed record SetLandHeights(RecordKey Record, float[] Heights, PointSet Restored, CellEdgeHeights Beyond) : WriteOrder(Record);
+public sealed record SetLandHeights(RecordKey Record, float[] Heights, PointSet NewNormals, CellEdgeHeights Beyond) : WriteOrder(Record);
 
 /// <summary>The navmesh takes the geometry of its earlier version (<see cref="CopyEarlierPlacedParts"/>); its deleted state and its parent stay.</summary>
 public sealed record CopyEarlierNavmeshGeometry(RecordKey Record) : WriteOrder(Record);
@@ -72,10 +72,10 @@ public sealed record FlattenAndDetachNavmesh(RecordKey Record, float Z) : WriteO
 public sealed record WriteNavmeshMapEntries(RecordKey Record, ImmutableArray<NavmeshEntryOrder> Entries) : WriteOrder(Record);
 
 /// <param name="From">The plugin whose navmesh info map carries the entry copied.</param>
-/// <param name="SetZ">
+/// <param name="FlattenAndDetachZ">
 /// Null for an entry copied as it is; otherwise the height its point and island are set to, and its merges and doors are emptied.
 /// </param>
-public sealed record NavmeshEntryOrder(RecordKey Navmesh, PluginName From, float? SetZ);
+public sealed record NavmeshEntryOrder(RecordKey Navmesh, PluginName From, float? FlattenAndDetachZ);
 
 /// <param name="Opposite">The record's enable state is the opposite of the parent's.</param>
 public sealed record SetEnableParent(RecordKey Record, RecordKey Parent, bool Opposite) : WriteOrder(Record);

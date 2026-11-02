@@ -857,22 +857,22 @@ public class OtherModsObjectsTests
         return OtherModsObjects.CreateHeldUpTargetsSearch(CreateInput(scene, caches, triangles)).Find();
     }
 
-    private static OtherModsObjects.SupportJudging CreateInput(Scene scene, IObjectCaches caches, TriangleStore triangles) =>
-        new(
+    private static OtherModsObjects.SupportJudging CreateInput(Scene scene, IObjectCaches caches, TriangleStore triangles)
+    {
+        var runCaches = CreateRunCaches(scene, caches, triangles);
+        return new(
             [.. scene.Targets],
-            caches,
+            runCaches,
             Trust,
             Plugins,
             scene.OtherModsSettings,
-            Shapes,
-            triangles,
-            RestingObjects.CreateSupportContacts(CreateRunCaches(scene, caches, triangles)),
-            scene.Terrain,
+            RestingObjects.CreateSupportContacts(runCaches),
             new Execution(scene.Threads));
+    }
 
-    /// <summary>The load-order caches of the scene, with the objects of any plugin of <paramref name="caches"/>.</summary>
+    /// <summary>The load-order caches of the scene, with the object caches of <paramref name="caches"/>.</summary>
     private static TestRunCaches CreateRunCaches(Scene scene, IObjectCaches caches, TriangleStore triangles) =>
-        new(Shapes, triangles, scene.Terrain, TestBaseFacts.Unresolved, caches.VisibleObjectsOfAnyPlugin);
+        new(Shapes, triangles, scene.Terrain, TestBaseFacts.Unresolved, objects: caches);
 
     /// <summary>The fit step's answer after the held-up step: which of the scene's target objects others rest on.</summary>
     private static List<TargetId> FindRestedOn(Scene scene) => FindRestedOn(scene, FindHeldUp(scene), scene.Targets.Select(target => target.Id));

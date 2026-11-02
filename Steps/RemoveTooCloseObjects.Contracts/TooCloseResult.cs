@@ -31,4 +31,5 @@ public sealed record TooClosePass(
     NpcHandling Npcs) : IJudgedPass;
 
 /// <summary>The target objects too close to another mod's object.</summary>
-public sealed record TooCloseResult(ImmutableArray<TooClosePass> Passes) : JudgedPasses<TooClosePass>(Passes);
+/// <param name="LeftOut">The other-mod objects the check leaves out as a whole; empty when the step is switched off.</param>
+public sealed record TooCloseResult(ImmutableArray<TooClosePass> Passes, OtherObjectsLeftOut LeftOut) : JudgedPasses<TooClosePass>(Passes);

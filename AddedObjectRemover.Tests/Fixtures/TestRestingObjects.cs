@@ -19,8 +19,8 @@ internal static class TestRestingObjects
         ReportFileDetails.SwitchedOff);
 
     public static RestingObjectsRun Run(RemovalDecisions afterTooClose, RoundsInput input, AlsoRemoveSettings settings) =>
-        Run(afterTooClose, RestingObjects.Prepare(afterTooClose, afterTooClose.Rounds, input, settings));
+        Run(afterTooClose, RestingRounds.Prepare(afterTooClose, afterTooClose.Rounds, input, settings));
 
     public static RestingObjectsRun Run(RemovalDecisions afterTooClose, RestingObjectsPlan plan) =>
-        RestingObjects.DecideOnWorkingCopy(plan, afterTooClose, afterTooClose.Rounds);
+        RestingRounds.DecideOnWorkingCopy(plan, afterTooClose, afterTooClose.Rounds);
 }

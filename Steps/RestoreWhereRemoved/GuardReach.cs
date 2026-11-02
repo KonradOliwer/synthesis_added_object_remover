@@ -7,8 +7,8 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 
 /// <summary>
 /// How far the placed guards that read the object caches look around a placed record going back, so an object beyond that cannot
-/// change their answers: the too-close rule within the zones its settings grow around the record as it goes back (P1), and the test
-/// of what rests on the record within the touch gap around it where it stands now and around each object found resting on it (P6).
+/// change their answers: the too-close rule within the zones its settings grow around the record as it goes back, and the test of
+/// what rests on the record within the touch gap around it where it stands now and around each object found resting on it.
 /// Seen from above, at any height. Thread-safe.
 /// </summary>
 /// <param name="touchGap">The largest gap between two surfaces that the test of what rests on what counts as touching.</param>

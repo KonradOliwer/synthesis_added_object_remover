@@ -1,3 +1,4 @@
+using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using Mutagen.Bethesda.Synthesis.Settings;
 
@@ -11,7 +12,7 @@ public class TerrainChangeSettings : ITerrainChangeSettingsValues
     public bool RemoveOnChangedTerrain { get; set; } = SettingDefaults.RemoveOnChangedTerrain;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Which of the cleaned mod's objects are checked")]
+    [SynthesisSettingName(SettingNames.TerrainCheckedObjects)]
     [SynthesisTooltip(
         "VisibleObjectsOnTheGround: visible objects that reach the ground (objects on roofs, bridges or high shelves are skipped).\n"
         + "VisibleObjectsAtAnyHeight: every visible object.\n"
@@ -19,14 +20,14 @@ public class TerrainChangeSettings : ITerrainChangeSettingsValues
     public TerrainCheckedObjects TerrainCheckedObjects { get; set; } = SettingDefaults.TerrainChecked;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Margin by object size")]
+    [SynthesisSettingName(SettingNames.MarginBySize)]
     [SynthesisTooltip(
         "The terrain under the object plus this margin around it is checked for height, ground type and water changes.\n"
         + "Bigger objects get a bigger margin. The terrain points right around the object are always checked.")]
     public TerrainBySizeSettings BySize { get; set; } = new();
 
     [SynthesisOrder]
-    [SynthesisSettingName("Margin by fixed distance")]
+    [SynthesisSettingName(SettingNames.MarginByDistance)]
     [SynthesisTooltip(
         "The terrain under the object plus this margin around it is checked for height, ground type and water changes.\n"
         + "Every object gets the same margin. The terrain points right around the object are always checked.")]
@@ -38,7 +39,7 @@ public class TerrainChangeSettings : ITerrainChangeSettingsValues
     public bool CountHeightChanges { get; set; } = SettingDefaults.CountHeightChanges;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Count only height changes larger than (game units)")]
+    [SynthesisSettingName(SettingNames.HeightChangeTolerance + SettingNames.GameUnitsSuffix)]
     [SynthesisTooltip(
         "Small smoothing edits are common and rarely visible under an object. 0 counts every change. 0-256.\n"
         + "Counting uses it only when \"Count height changes\" is on.\n"
@@ -51,7 +52,7 @@ public class TerrainChangeSettings : ITerrainChangeSettingsValues
     public bool CountTerrainTypeChanges { get; set; } = SettingDefaults.CountTerrainTypeChanges;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Remove only when this share of the ground points changed type (%)")]
+    [SynthesisSettingName(SettingNames.TerrainTypeChangePercent + SettingNames.PercentSuffix)]
     [SynthesisTooltip(
         "A ground type change removes an object only when at least this share of the terrain points checked around it changed type.\n"
         + "Small touch-ups at the edges of painted patches then don't remove objects. 0 removes on any one changed point. 0-100.\n"
@@ -66,7 +67,7 @@ public class TerrainChangeSettings : ITerrainChangeSettingsValues
     public bool CountWaterHeightChanges { get; set; } = SettingDefaults.CountWaterHeightChanges;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Count only water height changes larger than (game units)")]
+    [SynthesisSettingName(SettingNames.WaterHeightChangeTolerance + SettingNames.GameUnitsSuffix)]
     [SynthesisTooltip(
         "Small water level edits rarely matter. 0 counts every change. 0-256.\n"
         + "Counting uses it only when \"Count water height changes\" is on.\n"
@@ -83,7 +84,7 @@ public class TerrainChangeSettings : ITerrainChangeSettingsValues
     public bool CountWaterAddedOrRemoved { get; set; } = SettingDefaults.CountWaterAddedOrRemoved;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Remove only when this share of the ground got covered/uncovered (%)")]
+    [SynthesisSettingName(SettingNames.WaterCoverChangePercent + SettingNames.PercentSuffix)]
     [SynthesisTooltip(
         "A water change removes an object only when at least this share of the terrain points checked around it went under water\n"
         + "or came out of it. A point that changed only because the ground itself was raised or lowered is left to the height check.\n"

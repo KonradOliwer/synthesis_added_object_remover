@@ -101,4 +101,15 @@ public class IndexGraphQueriesTests
 
         Assert.Equal([(1, 2)], pairs);
     }
+
+    [Fact]
+    public void CollectedAdjacencyPairsKeepEveryAcceptedNeighbourFromBothEndsInNodeThenNeighbourOrder()
+    {
+        int[] nodes = [4, 1];
+        IReadOnlyList<int>[] neighbors = [[1, 7, 9], [4, 7]];
+
+        var pairs = AdjacencyPairs.Collect(nodes, neighbors, (_, second) => second != 9, (first, second) => (first, second));
+
+        Assert.Equal([(4, 1), (4, 7), (1, 4), (1, 7)], pairs);
+    }
 }

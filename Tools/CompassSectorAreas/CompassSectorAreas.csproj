@@ -4,10 +4,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>Adds up the ground area and the number of the boxes around a point per compass direction, in all and per category the caller defines. It references BoxAndTransformMath and holds no packages.</Description>
+    <Description>Adds up the ground area and the number of the boxes around a point per compass direction, in all and per category the caller defines, and tells whether some categories reach a share of a direction. It references BoxAndTransformMath and NumericRanges and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\BoxAndTransformMath\BoxAndTransformMath.csproj" />
+    <ProjectReference Include="..\NumericRanges\NumericRanges.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />

@@ -48,8 +48,6 @@ public sealed class PointSet : IEquatable<PointSet>
 /// <summary>A set of the four quarters of a cell's terrain, by <see cref="TerrainQuadrants.IndexOf"/>, as a bitset.</summary>
 public readonly record struct QuarterSet(int Bits)
 {
-    private const int QuarterCount = TerrainQuadrants.PerSide * TerrainQuadrants.PerSide;
-
     public static QuarterSet Of(IEnumerable<int> quarters) => new(quarters.Aggregate(0, (bits, quarter) => bits | (1 << quarter)));
 
     public bool Contains(int quarter) => (Bits & (1 << quarter)) != 0;
@@ -57,5 +55,5 @@ public readonly record struct QuarterSet(int Bits)
     public bool IsEmpty => Bits == 0;
 
     /// <summary>In ascending order.</summary>
-    public IEnumerable<int> Quarters => Enumerable.Range(0, QuarterCount).Where(Contains);
+    public IEnumerable<int> Quarters => Enumerable.Range(0, TerrainQuadrants.Count).Where(Contains);
 }

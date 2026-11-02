@@ -12,7 +12,10 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 /// <param name="MapEntry">Its entry in the navmesh info map; unchanged when the cleaned mod's map carries none.</param>
 /// <param name="Earlier">The version just below the cleaned mod's; null for <see cref="NavmeshCase.Added"/>.</param>
 /// <param name="Current">The cleaned mod's version; for a deletion, the earlier version with the deleted state.</param>
-/// <param name="ReplacedBy">For <see cref="NavmeshCase.DeletedAndReplaced"/>: the added navmeshes that overlap it, in key order.</param>
+/// <param name="ReplacedBy">
+/// For <see cref="NavmeshCase.Deleted"/>: the navmeshes the cleaned mod adds in its cell whose triangles overlap its earlier ones seen
+/// from above, in key order; empty when none does.
+/// </param>
 /// <param name="Neighbours">
 /// The navmeshes edge-linked to it in either direction, with their winning version, in key order; none when a later plugin changed
 /// a part again, since it then never goes back.

@@ -4,9 +4,8 @@ using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 namespace AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport;
 
 /// <summary>
-/// The objects others rest on, as the fit step asks: those another target object rests on and would lose its support without,
-/// as the also-remove step's rule finds them (<paramref name="targetObjects"/>), and those a judged object of another mod rests
-/// on (<see cref="TargetsHoldingUpOtherModsObjects"/>) whatever the also-remove mode and the setting for other mods' objects are,
+/// The objects others rest on: those another target object rests on and would lose its support without, as the also-remove
+/// step's rule finds them (<paramref name="targetObjects"/>), and those a judged object of another mod rests on (<see cref="TargetsHoldingUpOtherModsObjects"/>) whatever the also-remove mode and the setting for other mods' objects are,
 /// so no shrinking or turning leaves an object without support.
 /// </summary>
 /// <param name="heldUpAmong">The checked objects a judged object rests on; asked only when there is an object to check.</param>

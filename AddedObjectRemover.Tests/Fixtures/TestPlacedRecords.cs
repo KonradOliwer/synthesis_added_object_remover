@@ -16,7 +16,7 @@ internal static class TestPlacedRecords
             EditorId: null,
             new SpaceFact(TestTargets.Space, null, SpaceKind.Worldspace, Name: null),
             new CellFact(TestTargets.Space, null),
-            InTargetSpace: true,
+            InPluginSpace: true,
             IsTeleportDoor: false,
             IsPrimitive: false,
             HasMapMarker: false,

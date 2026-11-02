@@ -3,11 +3,16 @@ using System.Reflection;
 namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
-/// The public surface of each logic project (a step, the removal decision list and the base-object shapes) is its one
-/// entry type. Everything else in the project is internal; the data it passes lives in the contracts projects. A step's entry
-/// type also declares the record its entry takes, <c>Input</c>, since that record holds the run caches, which no step contract
-/// may name. A step has one entry, which takes that record; its other public methods are the listed rule providers, which
-/// provide the rules other modules ask of it, and each takes one record the entry type declares too, or one cache.
+/// The public surface of each logic project (a step, the removal decision list, the base-object shapes and the log) is its one
+/// entry type. Everything else in the project is internal; the data it passes lives in the contracts projects.
+/// A step works out its result from its input, so the run never creates its entry type. A logic project whose entry type the run
+/// creates, through a public constructor or a public method that returns it, and hands on (the decision list, the shapes cache,
+/// the log) is not a step.
+/// A step's entry type also declares the record its entry takes, <c>Input</c>, since that record holds the run caches, which no
+/// step contract may name, and the records it is made of. A step has one entry, which takes that record; its other public members
+/// are the listed rule providers, methods that provide the rules other modules ask of it, each taking one record the entry type
+/// declares too, one cache or nothing. The public members of an entry type that is not a step are how the run creates it, the
+/// members of the interfaces it implements, what it builds of its own contracts' types, and the listed rule providers.
 /// </summary>
 public class LogicPublicTypesTests
 {
@@ -16,8 +21,9 @@ public class LogicPublicTypesTests
     /// <summary>The name of the record a step's entry takes, declared in its entry type.</summary>
     private const string InputRecordName = "Input";
 
-    /// <summary>The logic projects that are not pipeline steps: the shapes cache, the decision list the steps add to, and the log, which words each step's result.</summary>
-    private static readonly string[] NotSteps = ["BaseObjectShapeAndKind", "RemovalDecisionList", "BuildLogAndReports"];
+    private const string ContractsSuffix = ".Contracts";
+
+    private const BindingFlags DeclaredPublic = BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
 
     /// <summary>The entry type of each logic project, by project name.</summary>
     private static readonly Dictionary<string, string> EntryTypes = new()
@@ -42,146 +48,23 @@ public class LogicPublicTypesTests
         ["BuildLogAndReports"] = "LogAndReports",
     };
 
-    /// <summary>The public members of each entry type, by project name; see <see cref="PublicMemberNames"/> for the spelling.</summary>
-    private static readonly Dictionary<string, string[]> EntryMembers = new()
-    {
-        ["BaseObjectShapeAndKind"] =
-        [
-            "BaseObjectShapes(IBaseFacts, IMeshFiles, IReadOnlyDictionary<UInt32, CollisionLayerFact>)",
-            "static ShapeInclusion SolidShapes",
-            "static BoundsStats CountBounds(IReadOnlyList<MeasuredBase>, IReadOnlyList<MeshBounds>, Int32)",
-            "IReadOnlyList<MeasuredBase> Computed()",
-            "BaseShape Of(BaseKey?)",
-            "ObjectVisibility VisibilityOf(BaseKey?, Boolean, Boolean)",
-            "Boolean LayerBlocksActors(UInt32)",
-        ],
-        ["IdentifyTheMods"] = ["static ModTrustTable Classify(Input)"],
-        ["CollectPlacedObjects"] = ["static PlacedObjectsCollected Collect(Input)"],
-        ["SelectObjectsThatCanCauseRemovals"] =
-        [
-            "static ObjectMeasurementRules MeasurementRules(IUnexpectedErrors)",
-            "static ObjectMeasurementRules MeasurementRules(IUnexpectedErrors, PartKey)",
-            "static SelectedObjects Select(Input)",
-            "static ICausesOfWorlds CreateCausesOfWorlds(IObjectCachesOfWorlds)",
-        ],
-        ["FindTargetObjectsToKeep"] = ["static ObjectsToKeepFound Find(Input)"],
-        ["RemovalDecisionList"] =
-        [
-            "IEnumerable<ValueTuple<TargetId, Decision>> All()",
-            "ImmutableArray<MarkerMove> Moves { get; }",
-            "ImmutableArray<Round> Rounds { get; }",
-            "ImmutableArray<Round> RoundsAfter(IRemovalDecisions)",
-            "ImmutableArray<TargetId> KeptIn(Round)",
-            "ImmutableArray<TargetId> FittedIn(Round)",
-            "ImmutableArray<TargetId> FittedAtFirstIn(Round)",
-            "ImmutableArray<TargetId> RemovedIn(Round)",
-            "ImmutableArray<TargetId> RestoredIn(Round)",
-            "ImmutableArray<TargetId> LeftIn(Round)",
-            "ImmutableArray<TargetId> RemovedTargets()",
-            "ImmutableArray<TargetObject> TargetsAsTheRoundsMeasureThem(ImmutableArray<TargetObject>)",
-            "Boolean AnyMeasuredElsewhere()",
-            "ImmutableArray<TargetObject> TargetsAsTheyStand(ImmutableArray<TargetObject>)",
-            "Boolean AnyStandsElsewhere()",
-            "Boolean IsDecided(TargetId)",
-            "WhenRemoved WhenRemovedOf(TargetId)",
-            "Boolean MayStillBeRemoved(TargetId)",
-            "Boolean IsProtected(TargetId)",
-            "Boolean IsRemoved(TargetId)",
-            "Boolean HasLeftItsPlace(TargetId)",
-            "BoxFate FateOf(TargetId)",
-            "Decision Of(TargetId)",
-            "IRemovalDecisionsCopy WorkingCopy()",
-            "IReadOnlyDictionary<TargetId, Decision> DecideRoundOnCopy(RoundKind, IReadOnlyList<ProposedRemoval>)",
-            "RemovalDecisions AddMoves(IReadOnlyList<MarkerMove>)",
-            "RemovalDecisions ApplyFits(IReadOnlyList<ProposedFit>)",
-            "RemovalDecisions Apply(RoundKind, IReadOnlyList<ProposedRemoval>)",
-            "RemovalDecisions ApplyRounds(IReadOnlyList<ProposedRound>)",
-            "RemovalDecisions ApplyRounds(RoundKind, IReadOnlyList<IReadOnlyList<ProposedRemoval>>)",
-            "static RemovalDecisions Start(IObjectsToKeep, ImmutableArray<WhenRemoved>)",
-        ],
-        ["JudgeChangedObjects"] = ["static ChangedObjectsJudged Judge(Input)"],
-        ["FitClashingObjects"] = ["static Decided<FitResult> Fit(Input)"],
-        ["RemoveObjectsOnChangedTerrain"] =
-        [
-            "static IPlacementRule CreatePlacementRule(PlacementRuleInput)",
-            "static Decided<ChangedTerrainResult> Find(Input)",
-        ],
-        ["RemoveTooCloseObjects"] =
-        [
-            "static NpcBodyRules NpcBodyRules { get; }",
-            "static PlacedNpcRules PlacedNpcRules { get; }",
-            "static IPlacementRule CreatePlacementRule(PlacementRuleInput)",
-            "static IOldPlaceTooCloseRule CreateOldPlaceTooCloseRule(OldPlaceRuleInput)",
-            "static ITooCloseToWhatStaysRule CreateTooCloseToWhatStaysRule(WhatStaysRuleInput)",
-            "static Decided<TooCloseResult> Find(Input)",
-        ],
-        ["RemoveObjectsRestingOnRemovedOnes"] =
-        [
-            "static IAlsoRemoveFollowUp CreateFollowUp(FollowUpInput)",
-            "static IRestingRule CreateRestingRule(RestingRuleInput)",
-            "static IAlsoRemoveRoundsAfter CreateAlsoRemoveRoundsAfter(RoundsAfterInput)",
-            "static ISupportContacts CreateSupportContacts(ILoadOrderCaches)",
-            "static Int32 SurfaceSamplesPerMesh",
-            "static Decided<RestingObjectsResult> Find(Input)",
-        ],
-        ["OtherModsObjectsLeftWithoutSupport"] =
-        [
-            "static IHeldUpTargetsSearch CreateHeldUpTargetsSearch(SupportJudging)",
-            "static IRestingRule CreateRestingRule(RestingRuleInput)",
-            "static ITargetObjectsDropTest CreateDropTest(DropTestInput)",
-            "static IHoldersOfObjectsThatStay CreateHoldersOfObjectsThatStay(HoldersInput)",
-            "static Decided<OtherModsObjectsResult> Settle(Input)",
-        ],
-        ["RemoveVisibleObjectsLeftBehind"] = ["static Decided<VisibleLeftBehindResult> Find(Input)"],
-        ["RemoveInvisibleObjectsLeftBehind"] = ["static Decided<LeftBehindResult> Find(Input)"],
-        ["MoveKeptMarkers"] = ["static Decided<MarkerMoves> Plan(Input)"],
-        ["RestoreWhereRemoved"] = ["static RestoreWhereRemovedResult Plan(Input)"],
-        ["WriteThePatch"] =
-        [
-            "static INavmeshCheckIfWritten CreateNavmeshCheck(IPluginRecords, IPatchWriting)",
-            "static WriteSummary Write(Input)",
-        ],
-        ["BuildLogAndReports"] =
-        [
-            "LogAndReports(RunSettings, ReportFolderPrepared, ILoadOrderCaches, IUnexpectedErrors)",
-            "static ImmutableArray<LogSection> BuildReportFolderSections(ReportFolderPrepared)",
-            "static ImmutableArray<LogSection> BuildStartSections(RunRequest)",
-            "static ImmutableArray<LogSection> BuildStopSections(StopReason, SettingsSource)",
-            "ImmutableArray<LogSection> BuildArchiveSections(TimeSpan)",
-            "ImmutableArray<LogSection> BuildIndexSections(CollectedObjects, TimeSpan)",
-            "ImmutableArray<LogSection> BuildStepSections(ModTrustTable, LoadOrderPlugins, TimeSpan)",
-            "ImmutableArray<LogSection> BuildStepSections(CollectedObjects, TimeSpan, TimeSpan)",
-            "ImmutableArray<LogSection> BuildStepSections(Replacements, CollectedObjects, TimeSpan)",
-            "ImmutableArray<LogSection> BuildStepSections(ObjectsToKeepResult, TimeSpan)",
-            "ImmutableArray<LogSection> BuildStepSections(HeldUpTargets, TimeSpan)",
-            "ImmutableArray<LogSection> BuildStepSections(OtherModsObjectsResult, IRemovalDecisions, CollectedObjects, TimeSpan)",
-            "ImmutableArray<LogSection> BuildStepSections(ChangedObjectJudgingResult, CollectedObjects, CollectedObjects, TimeSpan)",
-            "ImmutableArray<LogSection> BuildStepSections(FitResult, TimeSpan)",
-            "ImmutableArray<LogSection> BuildStepSections(ChangedTerrainResult, IRemovalDecisions, CollectedObjects, TimeSpan)",
-            "ImmutableArray<LogSection> BuildStepSections(TooCloseResult, IRemovalDecisions, CollectedObjects, IVisibleTargetObjects, TimeSpan)",
-            "ImmutableArray<LogSection> BuildStepSections(RestingObjectsResult, IRemovalDecisions, CollectedObjects, TimeSpan)",
-            "ImmutableArray<LogSection> BuildStepSections(VisibleLeftBehindResult, IRemovalDecisions, CollectedObjects, TimeSpan)",
-            "ImmutableArray<LogSection> BuildStepSections(LeftBehindResult, IRemovalDecisions, CollectedObjects, TimeSpan)",
-            "ImmutableArray<LogSection> BuildStepSections(MarkerMoves, CollectedObjects, TimeSpan)",
-            "ImmutableArray<LogSection> BuildStepSections(RestoreWhereRemovedResult, CollectedObjects, TimeSpan)",
-            "ImmutableArray<LogSection> BuildStepSections(WriteSummary, TimeSpan)",
-            "EndOfRun BuildEndOfRun(StepResults, WriteSummary)",
-            "ImmutableArray<LogSection> BuildFilesWrittenSections(EndOfRun, ReportFilesResult, TimeSpan)",
-        ],
-    };
-
     /// <summary>
-    /// "EntryType.Method" of each public method of a step's entry type besides its entry, with the rule it provides and who asks
-    /// it. The runner binds each into the input of the step that asks; it calls no other method of a step.
+    /// "EntryType.Member" of each public member of an entry type that is neither a step's entry nor, for an entry type that is not
+    /// a step, how the run creates it, an interface member or what it builds of its own contracts' types; with the rule it provides
+    /// and who asks it. The runner binds each into the input of the step that asks, or hands it to the cache that applies it.
     /// </summary>
     internal static readonly Dictionary<string, string> RuleProviders = new()
     {
+        ["BaseObjectShapes.SolidShapes"] = "Which shapes of a mesh count for a base object's shape, which the mesh reader takes when the run opens it.",
         ["RemovalCauseSelector.MeasurementRules"] = "How the object caches measure other mods' objects; the caches take it when they are built.",
         ["RemovalCauseSelector.CreateCausesOfWorlds"] = "The objects that can cause removals in worlds other than the run's, which the too-close step's rules for those worlds ask.",
         ["ChangedTerrainObjects.CreatePlacementRule"] = "The changed-terrain check of one placement, which the fit step and the judge step's old-place check ask.",
+        ["TooCloseObjects.CreateNpcCacheRules"] = "How the NPC body cache and the placed-NPC index work out an NPC's body; the caches take them when they are built.",
         ["TooCloseObjects.CreatePlacementRule"] = "The too-close check of one placement, which the fit step asks.",
+        ["VisibleLeftBehindObjects.CreateLeftBehindJudging"] = "The left-behind rules the visible step owns (candidates, surroundings, verdicts, proposals), which the invisible left-behind step asks.",
         ["TooCloseObjects.CreateOldPlaceTooCloseRule"] = "The too-close check of an earlier version at its old place, which the judge step asks.",
         ["TooCloseObjects.CreateTooCloseToWhatStaysRule"] = "The too-close check of a placed record going back among what stays, which the restore step asks.",
+        ["RestingObjects.SurfaceSamplesPerMesh"] = "How many points the support rule samples on a mesh's surface; the surface sample cache takes it when it is built.",
         ["RestingObjects.CreateFollowUp"] = "The also-remove rounds that follow up each round of the visible step, which that step asks.",
         ["RestingObjects.CreateRestingRule"] = "The target objects other target objects rest on, which the fit step asks through the other-mods rule.",
         ["RestingObjects.CreateAlsoRemoveRoundsAfter"] = "The also-remove rounds the step for other mods' objects asks after its own rounds.",
@@ -190,6 +73,7 @@ public class LogicPublicTypesTests
         ["OtherModsObjects.CreateRestingRule"] = "The objects others rest on, other mods' objects included, which the fit step asks.",
         ["OtherModsObjects.CreateDropTest"] = "Whether a target object holds up another, which the also-remove step's resting rule asks.",
         ["OtherModsObjects.CreateHoldersOfObjectsThatStay"] = "The objects that move away and hold up an object that stays, which the restore step asks.",
+        ["WhereRemovedRestorer.MeasurementFailurePart"] = "The part the measurement failures in the worlds of what stays are recorded under; the world caches the restore step and its rules share take it.",
         ["PatchWriter.CreateNavmeshCheck"] = "The navmesh check of a trial write, which the restore step asks.",
     };
 
@@ -230,23 +114,86 @@ public class LogicPublicTypesTests
         Assert.Empty(wrong);
     }
 
+    /// <summary>A logic project cannot leave the steps' rules by making its entry type an object while it keeps a step's input.</summary>
     [Fact]
-    public void EveryOtherPublicMethodOfAStepsEntryTypeIsAListedRuleProvider()
+    public void NoEntryTypeThatIsNotAStepDeclaresAnInputRecord()
     {
-        var providers = StepProjectNames().SelectMany(RuleProviderNamesOf).ToHashSet();
+        var wrong = LogicProjectNames().Except(StepProjectNames()).Where(project => InputRecordOf(project) is not null).ToList();
+
+        Assert.Empty(wrong);
+    }
+
+    /// <summary>A step's entry type holds its entry and its rule providers; a value it provides is a provider method too.</summary>
+    [Fact]
+    public void NoStepsEntryTypeHasAPublicPropertyFieldOrConstant()
+    {
+        var wrong = StepProjectNames()
+            .SelectMany(project => EntryTypeOf(project).GetMembers(DeclaredPublic)
+                .Where(member => member is PropertyInfo or FieldInfo or EventInfo)
+                .Select(member => $"{EntryTypes[project]}.{member.Name}"))
+            .ToList();
+
+        Assert.True(wrong.Count == 0, $"Public properties, fields or constants of a step's entry type:{Environment.NewLine}{string.Join(Environment.NewLine, wrong)}");
+    }
+
+    [Fact]
+    public void EveryOtherPublicMemberOfAnEntryTypeIsAListedRuleProvider()
+    {
+        var providers = LogicProjectNames().SelectMany(RuleProviderNamesOf).ToHashSet();
 
         var notListed = providers.Except(RuleProviders.Keys).Order(StringComparer.Ordinal).ToList();
         var stale = RuleProviders.Keys.Except(providers).Order(StringComparer.Ordinal).ToList();
 
-        Assert.True(notListed.Count == 0, $"Public methods of a step's entry type besides its entry, not listed in {nameof(RuleProviders)}:{Environment.NewLine}{string.Join(Environment.NewLine, notListed)}");
+        Assert.True(notListed.Count == 0, $"Public members of an entry type that are no entry, creation, interface member or own output, not listed in {nameof(RuleProviders)}:{Environment.NewLine}{string.Join(Environment.NewLine, notListed)}");
         AllowListAssert.NoneStale(stale, $"Listed in {nameof(RuleProviders)} but no longer found (remove)");
     }
 
-    /// <summary>"EntryType.Method" of each public method of the step's entry type besides its entry.</summary>
-    private static IEnumerable<string> RuleProviderNamesOf(string project) =>
-        EntryTypeOf(project).GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
-            .Where(method => !method.IsSpecialName && !EntryMethodsOf(project).Contains(method))
-            .Select(method => $"{EntryTypes[project]}.{method.Name}");
+    /// <summary>"EntryType.Member" of each public member of the project's entry type that the structure of the type does not account for.</summary>
+    private static IEnumerable<string> RuleProviderNamesOf(string project)
+    {
+        var entry = EntryTypeOf(project);
+        var accountedFor = IsStep(project)
+            ? (Func<MemberInfo, bool>)(member => EntryMethodsOf(project).Contains(member))
+            : member => IsCreation(entry, member) || IsInterfaceMember(entry, member) || BuildsOwnContractsType(project, member);
+        return PublicMembersOf(entry).Where(member => !accountedFor(member)).Select(member => $"{EntryTypes[project]}.{member.Name}").Distinct();
+    }
+
+    /// <summary>The constructors, methods, properties and fields the type declares itself; accessors are covered by their properties.</summary>
+    private static IEnumerable<MemberInfo> PublicMembersOf(Type entry) =>
+        entry.GetMembers(DeclaredPublic)
+            .Where(member => member is ConstructorInfo or PropertyInfo or FieldInfo or EventInfo || member is MethodInfo { IsSpecialName: false })
+            .Where(member => !member.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute)));
+
+    private static bool IsCreation(Type entry, MemberInfo member) =>
+        member is ConstructorInfo || member is MethodInfo { IsStatic: true } method && method.ReturnType == entry;
+
+    /// <summary>A member with the name and parameter types of an interface method the type implements, also a typed overload of one it implements explicitly.</summary>
+    private static bool IsInterfaceMember(Type entry, MemberInfo member)
+    {
+        var method = member switch
+        {
+            MethodInfo own => own,
+            PropertyInfo property => property.GetMethod,
+            _ => null,
+        };
+        return method is not null && entry.GetInterfaces().SelectMany(contract => contract.GetMethods())
+            .Any(contractMethod => contractMethod.Name == method.Name && ParameterTypesOf(contractMethod).SequenceEqual(ParameterTypesOf(method)));
+    }
+
+    /// <summary>A method or value whose type is declared in the project's own contracts, also as the element of a collection.</summary>
+    private static bool BuildsOwnContractsType(string project, MemberInfo member)
+    {
+        var type = member switch
+        {
+            MethodInfo method => method.ReturnType,
+            PropertyInfo property => property.PropertyType,
+            FieldInfo field => field.FieldType,
+            _ => null,
+        };
+        return type is not null && new[] { type }.Concat(type.GetGenericArguments()).Any(part => part.Assembly.GetName().Name == project + ContractsSuffix);
+    }
+
+    private static IEnumerable<Type> ParameterTypesOf(MethodInfo method) => method.GetParameters().Select(parameter => parameter.ParameterType);
 
     /// <summary>
     /// The method of each step that takes its <c>Input</c> record, the step's one entry, by step project; the runner calls it once
@@ -254,19 +201,38 @@ public class LogicPublicTypesTests
     /// </summary>
     internal static IReadOnlyList<MethodInfo> StepEntries() => [.. StepProjectNames().Select(project => EntryMethodsOf(project).Single())];
 
-    private static IEnumerable<string> StepProjectNames() => LogicProjectNames().Except(NotSteps);
+    private static IEnumerable<string> StepProjectNames() => LogicProjectNames().Where(IsStep);
 
-    private static IEnumerable<string> AllowedPublicTypeNames(string project) =>
-        NotSteps.Contains(project) ? [EntryTypes[project]] : [EntryTypes[project], $"{EntryTypes[project]}.{InputRecordName}", .. ProviderRecordNamesOf(project)];
+    /// <summary>A step's entry type is no object the run creates: it has no public constructor and no public method that returns it.</summary>
+    private static bool IsStep(string project)
+    {
+        var entry = EntryTypeOf(project);
+        return entry.GetConstructors().Length == 0
+            && !entry.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly).Any(method => method.ReturnType == entry);
+    }
 
-    /// <summary>The records the entry type declares that one of its rule providers takes as its one parameter.</summary>
-    private static IEnumerable<string> ProviderRecordNamesOf(string project) =>
+    private static IEnumerable<string> AllowedPublicTypeNames(string project)
+    {
+        if (!IsStep(project)) return [EntryTypes[project]];
+
+        var records = RecordsOfEntriesAndProviders(project).ToList();
+        return [EntryTypes[project], .. records.Concat(RecordsHeldBy(project, records)).Select(BusinessCode.PathName).Distinct()];
+    }
+
+    /// <summary>The step's <c>Input</c> record and the records the entry type declares that one of its rule providers takes as its one parameter.</summary>
+    private static IEnumerable<Type> RecordsOfEntriesAndProviders(string project) =>
         EntryTypeOf(project).GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
             .Select(method => method.GetParameters() is [var only] ? only.ParameterType : null)
             .OfType<Type>()
-            .Where(type => type.DeclaringType == EntryTypeOf(project) && IsRecord(type))
-            .Select(BusinessCode.PathName)
-            .Distinct();
+            .Where(type => IsDeclaredRecordOf(project, type));
+
+    /// <summary>The records the entry type declares that one of <paramref name="holders"/> holds as a member: the parts of an input.</summary>
+    private static IEnumerable<Type> RecordsHeldBy(string project, IEnumerable<Type> holders) =>
+        holders.SelectMany(holder => holder.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            .Select(property => property.PropertyType)
+            .Where(type => IsDeclaredRecordOf(project, type));
+
+    private static bool IsDeclaredRecordOf(string project, Type type) => type.DeclaringType == EntryTypeOf(project) && IsRecord(type);
 
     private static Type EntryTypeOf(string project) =>
         Assembly.Load(project).GetTypes().Single(type => type.IsVisible && BusinessCode.PathName(type) == EntryTypes[project]);
@@ -292,70 +258,8 @@ public class LogicPublicTypesTests
         Assert.Empty(missing);
     }
 
-    [Fact]
-    public void EveryEntryTypeHasExactlyTheListedPublicMembers()
-    {
-        Assert.Equal(EntryTypes.Keys.Order(StringComparer.Ordinal), EntryMembers.Keys.Order(StringComparer.Ordinal));
-
-        var problems = EntryTypes.Keys.Order(StringComparer.Ordinal)
-            .SelectMany(project =>
-            {
-                var actual = PublicMemberNames(project);
-                return actual.Except(EntryMembers[project]).Select(member => $"{project}: not listed: {member}")
-                    .Concat(EntryMembers[project].Except(actual).Select(member => $"{project}: listed but missing: {member}"));
-            })
-            .ToList();
-
-        Assert.True(problems.Count == 0, $"Public members of the entry types differ from the list in {nameof(LogicPublicTypesTests)}:{Environment.NewLine}{string.Join(Environment.NewLine, problems)}");
-    }
-
     private static List<string> LogicProjectNames() =>
         Rules.Projects.Where(Rules.IsLogic).Select(project => project.Name).Order(StringComparer.Ordinal).ToList();
-
-    /// <summary>
-    /// The public constructors, methods, properties and fields the entry type declares itself, written as
-    /// "[static ]ReturnType Name(ParameterTypes)" or "[static ]Type Name { accessors }". Names and types only.
-    /// </summary>
-    private static List<string> PublicMemberNames(string project)
-    {
-        var entry = EntryTypeOf(project);
-        const BindingFlags Declared = BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
-
-        var constructors = entry.GetConstructors(Declared).Select(constructor => $"{BusinessCode.NameWithoutArity(entry)}({ParameterTypes(constructor)})");
-        var methods = entry.GetMethods(Declared)
-            .Where(method => !method.IsSpecialName && !method.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute)))
-            .Select(method => $"{StaticPrefix(method.IsStatic)}{TypeText(method.ReturnType)} {MethodName(method)}({ParameterTypes(method)})");
-        var properties = entry.GetProperties(Declared)
-            .Select(property => $"{StaticPrefix(property.GetMethod?.IsStatic ?? property.SetMethod!.IsStatic)}{TypeText(property.PropertyType)} {property.Name} {{ {Accessors(property)} }}");
-        var fields = entry.GetFields(Declared)
-            .Where(field => !field.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute)))
-            .Select(field => $"{StaticPrefix(field.IsStatic)}{TypeText(field.FieldType)} {field.Name}");
-
-        return constructors.Concat(methods).Concat(properties).Concat(fields).Order(StringComparer.Ordinal).ToList();
-    }
-
-    private static string StaticPrefix(bool isStatic) => isStatic ? "static " : "";
-
-    private static string MethodName(MethodInfo method) =>
-        method.IsGenericMethodDefinition ? $"{method.Name}<{string.Join(", ", method.GetGenericArguments().Select(argument => argument.Name))}>" : method.Name;
-
-    private static string ParameterTypes(MethodBase method) =>
-        string.Join(", ", method.GetParameters().Select(parameter => TypeText(parameter.ParameterType)));
-
-    private static string Accessors(PropertyInfo property) =>
-        string.Join(" ", new[] { property.GetMethod is { IsPublic: true } ? "get;" : null, property.SetMethod is { IsPublic: true } setter ? (IsInitOnly(setter) ? "init;" : "set;") : null }.OfType<string>());
-
-    private static bool IsInitOnly(MethodInfo setter) =>
-        setter.ReturnParameter.GetRequiredCustomModifiers().Any(modifier => modifier.FullName == "System.Runtime.CompilerServices.IsExternalInit");
-
-    private static string TypeText(Type type)
-    {
-        if (type.IsByRef) return $"ref {TypeText(type.GetElementType()!)}";
-        if (type.IsArray) return $"{TypeText(type.GetElementType()!)}[]";
-        if (Nullable.GetUnderlyingType(type) is { } underlying) return $"{TypeText(underlying)}?";
-        if (!type.IsGenericType) return type.Name;
-        return $"{BusinessCode.NameWithoutArity(type)}<{string.Join(", ", type.GetGenericArguments().Select(TypeText))}>";
-    }
 
     /// <summary>The types a caller outside the project can name, nested ones included.</summary>
     private static List<string> PublicTypeNames(string project) =>

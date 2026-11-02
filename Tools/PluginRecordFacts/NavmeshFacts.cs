@@ -3,17 +3,14 @@ using System.Numerics;
 
 namespace AddedObjectRemover;
 
-/// <summary>How the read's plugin changed a navmesh of a target space.</summary>
+/// <summary>How the read's plugin changed a navmesh of a plugin space.</summary>
 public enum NavmeshCase
 {
     /// <summary>It overrides another plugin's navmesh and does not delete it.</summary>
     Edited,
 
-    /// <summary>It deletes another plugin's navmesh, and no navmesh it adds overlaps that navmesh's earlier triangles.</summary>
-    DeletedWithoutReplacement,
-
-    /// <summary>It deletes another plugin's navmesh, and a navmesh it adds overlaps that navmesh's earlier triangles in XY in the same cell.</summary>
-    DeletedAndReplaced,
+    /// <summary>It deletes another plugin's navmesh.</summary>
+    Deleted,
 
     /// <summary>It defines the navmesh itself.</summary>
     Added,
@@ -87,7 +84,7 @@ public readonly record struct NavDoorLinkFact(RecordKey Navmesh, int Triangle);
 public sealed record NavDoorLinkVersions(RecordKey Door, NavDoorLinkFact? Earlier, NavDoorLinkFact? Current, bool InDeletedCell);
 
 /// <summary>
-/// A navmesh of a target space that the read's plugin overrides, deletes or adds and changed, with how its parts differ across the
+/// A navmesh of a plugin space that the read's plugin overrides, deletes or adds and changed, with how its parts differ across the
 /// versions from the one just below the read's plugin's up to the winner, the patch included; the read's plugin is the named plugin
 /// of the comparison (<see cref="VersionComparison"/>).
 /// </summary>
@@ -101,7 +98,6 @@ public sealed record NavDoorLinkVersions(RecordKey Door, NavDoorLinkFact? Earlie
 /// <param name="DeletedAboveNamedPlugin">The read's plugin's version is not deleted, and a version above it is.</param>
 /// <param name="Earlier">The version just below the read's plugin's; null for <see cref="NavmeshCase.Added"/>.</param>
 /// <param name="Current">The read's plugin's version; for a deletion, the earlier version with the deleted state.</param>
-/// <param name="ReplacedBy">For <see cref="NavmeshCase.DeletedAndReplaced"/>: the added navmeshes that overlap it, in key order.</param>
 /// <param name="Neighbours">In key order.</param>
 /// <param name="Doors">In key order.</param>
 /// <param name="NamedInPreferredPaths">The winning navmesh info map's preferred paths name it.</param>
@@ -121,7 +117,6 @@ public sealed record NavmeshRecordFact(
     bool DeletedAboveNamedPlugin,
     NavmeshShape? Earlier,
     NavmeshShape Current,
-    ImmutableArray<RecordKey> ReplacedBy,
     ImmutableArray<NeighbourNavmesh> Neighbours,
     ImmutableArray<NavDoorLinkVersions> Doors,
     bool NamedInPreferredPaths,

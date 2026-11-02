@@ -315,7 +315,7 @@ public sealed class NavmeshOutputCheckTests
     private (ISkyrimMod Patch, PatchWriting Writing, RecordHandles Handles) Write(WriteOrder[] orders, RecordHandles? handles = null)
     {
         var state = FixturePatcherState.Create([_base.Mod, _cleaned.Mod, .. _later.Select(later => later.Mod)], Path.GetTempPath(), Path.GetTempPath());
-        var writing = new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod);
+        var writing = new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod, Program.PatchMarkerText);
         handles ??= Handles();
         writing.Write(handles, orders);
         return (state.PatchMod, writing, handles);
@@ -352,8 +352,8 @@ public sealed class NavmeshOutputCheckTests
         return new Dictionary<RecordKey, NavDoorLinkFact> { [DoorKey] = new(link.NavMesh.FormKey.ToRecordKey(), link.TeleportMarkerTriangle) };
     }
 
-    private WriteNavmeshMapEntries Entries(params (RecordKey Navmesh, PluginName From, float? SetZ)[] entries) =>
-        new(MapKey, [.. entries.Select(entry => new NavmeshEntryOrder(entry.Navmesh, entry.From, entry.SetZ))]);
+    private WriteNavmeshMapEntries Entries(params (RecordKey Navmesh, PluginName From, float? FlattenAndDetachZ)[] entries) =>
+        new(MapKey, [.. entries.Select(entry => new NavmeshEntryOrder(entry.Navmesh, entry.From, entry.FlattenAndDetachZ))]);
 
     private void Change(NavigationMesh navmesh, NavigationMesh[] versions, PluginName[] plugins)
     {

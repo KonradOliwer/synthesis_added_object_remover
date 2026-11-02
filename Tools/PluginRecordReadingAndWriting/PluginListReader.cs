@@ -61,7 +61,7 @@ public static partial class PluginListReader
     /// <returns>Null when every plugin of the state other than the patch is listed above the patch's entry.</returns>
     private static PluginListProblem? FindStatePluginProblem(PluginListRead.Found found, IEnumerable<ModKey> statePlugins, ModKey patch)
     {
-        var positions = found.Listings.Select((listing, position) => (listing.ModKey, position)).ToDictionary(entry => entry.ModKey, entry => entry.position);
+        var positions = KeyedGroups.PositionByKey(found.Listings, listing => listing.ModKey);
         var patchPosition = positions.GetValueOrDefault(patch, found.Listings.Length);
         foreach (var plugin in statePlugins.Where(plugin => plugin != patch))
         {

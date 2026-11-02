@@ -29,7 +29,7 @@ public sealed class WorkOrder
             throw new ArgumentException($"The work order covers {ItemsInOrder.Length} items, not {itemCount}.", nameof(itemCount));
     }
 
-    /// <param name="items">Item indexes, e.g. a step's candidates.</param>
+    /// <param name="items">Item indexes, e.g. the candidates of one search.</param>
     /// <returns>A permutation of the positions in <paramref name="items"/>, in this order; equal items keep their positions' order.</returns>
     /// <exception cref="ArgumentOutOfRangeException">An item index is not one of the items this order was built for.</exception>
     public ImmutableArray<int> Among(IReadOnlyList<int> items)

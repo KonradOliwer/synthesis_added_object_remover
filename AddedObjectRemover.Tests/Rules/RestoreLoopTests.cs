@@ -214,8 +214,8 @@ public sealed class RestoreLoopTests
         var result = Plan(scene);
 
         var group = Assert.Single(result.NavmeshGroups);
-        Assert.Equal((new NavmeshRefusal(NavmeshGuard.Ground, NavmeshKey, Fault: null), false), (group.Refused, group.IsRestored));
-        Assert.Empty(group.Orders);
+        Assert.Equal(new NavmeshRefusal(NavmeshGuard.Ground, NavmeshKey, Fault: null), group.Refused);
+        Assert.Null(group.Write);
     }
 
     /// <summary>The rock goes back into the navmesh's place now, which is free while the navmesh goes back and not once it is taken back.</summary>
@@ -318,7 +318,26 @@ public sealed class RestoreLoopTests
         var land = Assert.Single(result.Lands);
         Assert.Equal(0f, land.FinalHeights![PointAt(12, 20)]);
         Assert.DoesNotContain(land.Kept, kept => kept.Reason == TerrainKeptReason.UnderObjectKeptAsChanged);
-        Assert.True(Assert.Single(result.NavmeshGroups).IsRestored);
+        Assert.NotNull(Assert.Single(result.NavmeshGroups).Write);
+    }
+
+    /// <summary>
+    /// The trial write meets a record the game library cannot parse: the step stops with that failure and judges nothing, so the run
+    /// goes on and the patch is written without anything of this step.
+    /// </summary>
+    [Fact]
+    public void AMalformedRecordTheTrialWriteMeetsStopsTheStepWithItsFailureAndJudgesNothing()
+    {
+        var scene = new Scene { Navmeshes = [MovedNavmesh()], FindFault = _ => throw new MalformedRecordException(new ArgumentOutOfRangeException()) };
+
+        var result = Plan(scene);
+
+        Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
+        Assert.Empty(result.Objects);
+        Assert.Empty(result.NavmeshGroups);
+        var failure = Assert.Single(result.Failures);
+        Assert.Equal(RestoreWhereRemovedParts.Step, failure.Part);
+        Assert.StartsWith(nameof(MalformedRecordException), failure.Failure, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -603,7 +622,7 @@ public sealed class RestoreLoopTests
     {
         var scene = new Scene { Navmeshes = [MovedNavmesh()], Lands = [], Cells = [WaterSetToTheDefault(NavmeshCell)], Settings = AllOn with { Cells = false } };
 
-        Assert.True(Assert.Single(Plan(scene).NavmeshGroups).IsRestored);
+        Assert.NotNull(Assert.Single(Plan(scene).NavmeshGroups).Write);
     }
 
     /// <summary>With the navmeshes switched off, the cleaned mod's navmesh stays; it lies in the water cell between the two levels.</summary>
@@ -720,7 +739,7 @@ public sealed class RestoreLoopTests
             Rocks = [door],
             Others = [RockNow(DoorIndex, DoorNow)],
             Lands = [],
-            FindFault = orders => fault && orders.OfType<CopyEarlierPlacedParts>().Any(order => order.Record == door.Key)
+            FindFault = trial => fault && trial.RestoredParts.Any(restored => restored.Record == door.Key)
                 ? new NavmeshFault(UnchangedNavmesh, NavmeshRule.Doors, NavmeshFaultKind.DoorLinkWithoutDoorTriangle, 0, door.Key)
                 : null,
         };
@@ -779,10 +798,10 @@ public sealed class RestoreLoopTests
         var judged = Assert.Single(result.Objects);
         var group = Assert.Single(result.NavmeshGroups);
         var together = !houseStands && !crateAtTheDoor;
-        Assert.Equal((together, together), (judged.IsRestored, group.IsRestored));
+        Assert.Equal((together, together), (judged.IsRestored, group.Write is not null));
         if (houseStands) Assert.Equal(new PlacedRefusal(PlacedGuard.DoorLinkDoesNotMatch, NavmeshKey, Failure: null), judged.Refused);
         if (crateAtTheDoor) Assert.Equal(new NavmeshRefusal(NavmeshGuard.Door, door.Key, Fault: null), group.Refused);
-        Assert.DoesNotContain(group.Orders, order => order.Record == door.Key);
+        Assert.False(group.Write is { } write && write.DoorLinksCopied.Concat(write.DoorLinksCleared).Contains(door.Key));
     }
 
     /// <summary>
@@ -809,7 +828,7 @@ public sealed class RestoreLoopTests
             Navmeshes = [navmesh],
             Lands = [],
             Presence = Disabled(DoorKey),
-            FindFault = orders => orders.Any(order => order is CopyEarlierPlacedParts { Parts: var parts } undo && undo.Record == DoorKey && parts.HasFlag(PlacedParts.Presence))
+            FindFault = trial => trial.RestoredParts.Any(restored => restored.Record == DoorKey && restored.Parts.HasFlag(PlacedParts.Presence))
                 ? null
                 : new NavmeshFault(NavmeshKey, NavmeshRule.Doors, NavmeshFaultKind.DoorMissing, 0, DoorKey),
         };
@@ -817,7 +836,7 @@ public sealed class RestoreLoopTests
         var result = Plan(scene);
 
         Assert.True(Assert.Single(result.Objects).IsRestored);
-        Assert.True(Assert.Single(result.NavmeshGroups).IsRestored);
+        Assert.NotNull(Assert.Single(result.NavmeshGroups).Write);
     }
 
     /// <summary>
@@ -839,7 +858,7 @@ public sealed class RestoreLoopTests
             Others = CrateBesideTheRock(DoorOldPlace, crateAtTheFirstDoor),
             Lands = [],
             Presence = Disabled(first.Key, second.Key),
-            FindFault = orders => new[] { first.Key, second.Key }.All(door => orders.Any(order => order is CopyEarlierPlacedParts { Parts: var parts } undo && undo.Record == door && parts.HasFlag(PlacedParts.Presence)))
+            FindFault = trial => new[] { first.Key, second.Key }.All(door => trial.RestoredParts.Any(restored => restored.Record == door && restored.Parts.HasFlag(PlacedParts.Presence)))
                 ? null
                 : new NavmeshFault(UnchangedNavmesh, NavmeshRule.Doors, NavmeshFaultKind.DoorMissing, 0, first.Key),
         };
@@ -958,7 +977,7 @@ public sealed class RestoreLoopTests
         Assert.Equal((2, 1), (checks.Count(key => key == scene.Rocks[1].Key), checks.Count(key => key == scene.Rocks[2].Key)));
     }
 
-    /// <summary>With no ground going back, the objects of other plugins are neither listed nor indexed for the ground placed for them (G2).</summary>
+    /// <summary>With no ground going back, the objects of other plugins are neither listed nor indexed for the ground placed for them.</summary>
     [Fact]
     public void WithoutRestoredGroundNoObjectIsIndexedForTheGroundPlacedForIt()
     {
@@ -1068,7 +1087,7 @@ public sealed class RestoreLoopTests
             .Concat(result.Cells.Select(cell => $"{cell.Change.Cell} {string.Join(",", cell.Undone.Select(part => part.Name))} {cell.WaterKeptBy} {cell.IsRestored}"))
             .Concat(result.Lands.Select(land =>
                 $"{land.Change.Cell} {string.Join(",", land.Heights.Points)} {string.Join(";", land.Kept.Select(kept => $"{kept.Reason}:{string.Join(",", kept.Points.Points)}"))} {string.Join(",", land.FinalHeights ?? [])}"))
-            .Concat(result.NavmeshGroups.Select(group => $"{string.Join(",", group.Members)} {group.Refused} {string.Join(",", group.Orders)}"))
+            .Concat(result.NavmeshGroups.Select(group => $"{string.Join(",", group.Members)} {group.Refused} {NavmeshWriteDescription.Of(group.Write)}"))
             .Append($"{result.Passes}"));
 
     private static int PointAt(int x, int y) => y * Side + x;
@@ -1258,20 +1277,16 @@ public sealed class RestoreLoopTests
             .Apply(RoundKind.TooClose, [.. removedTargets.Select(target => new ProposedRemoval(target.Id, new TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);
         return WhereRemovedRestorer.Plan(
             new(
-                collected,
-                final,
-                OtherModsObjectsResult.SwitchedOff,
-                TestScenes.Create(targets, [], Shapes).VisibleTargets,
-                rules.WorldCaches,
-                rules.TooCloseRule(tooClose),
-                rules.HoldersOfObjectsThatStay,
-                new TestNavmeshCheck(scene.FindFault),
-                rules.Support,
-                Shapes,
-                new NavmeshIndex(bucket => bucket.Grid is null && !winning.IsEmpty ? [.. winning] : null),
-                new TestLandPlugin(space => space, scene.ReadHeights),
-                Plugins,
-                TestTargets.TargetName,
+                new(collected, final, OtherModsObjectsResult.SwitchedOff),
+                new(rules.WorldCaches, rules.TooCloseRule(tooClose), rules.HoldersOfObjectsThatStay, new TestNavmeshCheck(scene.FindFault)),
+                new(
+                    new TestRunCaches(
+                        Shapes,
+                        navmeshes: new NavmeshIndex(bucket => bucket.Grid is null && !winning.IsEmpty ? [.. winning] : null),
+                        visibleTargets: TestScenes.Create(targets, [], Shapes).IndexVisibleTargets),
+                    new TestLandPlugin(space => space, scene.ReadHeights),
+                    Plugins,
+                    TestTargets.TargetName),
                 new Execution(scene.Workers),
                 scene.Settings));
     }
@@ -1300,8 +1315,8 @@ public sealed class RestoreLoopTests
         /// <summary>What the winning version of each primitive says about the reference itself.</summary>
         public Dictionary<RecordKey, ReferenceFacts> Primitives { get; init; } = new();
 
-        /// <summary>The consistency check's first fault over what the given orders alone would leave; none by default.</summary>
-        public Func<IReadOnlyList<WriteOrder>, NavmeshFault?> FindFault { get; init; } = _ => null;
+        /// <summary>The consistency check's first fault over what the trial's writes alone would leave; none by default.</summary>
+        public Func<NavmeshWriteTrial, NavmeshFault?> FindFault { get; init; } = _ => null;
 
         /// <summary>When set, collects every placed record the too-close rule checks, once per check.</summary>
         public ConcurrentQueue<RecordKey>? TooCloseChecks { get; init; }

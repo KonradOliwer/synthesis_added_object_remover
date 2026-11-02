@@ -40,7 +40,7 @@ public class RestingObjectsGatingTests
     {
         var decisions = AfterTooClose(seeded ? [1] : []);
 
-        Assert.Equal(expected, RestingObjects.NeedsObjectsOfAnyPlugin(decisions, decisions.Rounds, Options((FollowUpRemovalMode)mode)));
+        Assert.Equal(expected, RestingRounds.NeedsObjectsOfAnyPlugin(decisions, decisions.Rounds, Options((FollowUpRemovalMode)mode)));
     }
 
     [Theory]
@@ -53,6 +53,6 @@ public class RestingObjectsGatingTests
     {
         var result = Result((FollowUpRemovalMode)mode, hadSeeds);
 
-        Assert.Equal(expected, RestingObjects.NeedsTouchChains(result, Options((FollowUpRemovalMode)mode, shown)));
+        Assert.Equal(expected, RestingRounds.NeedsTouchChains(result, Options((FollowUpRemovalMode)mode, shown)));
     }
 }

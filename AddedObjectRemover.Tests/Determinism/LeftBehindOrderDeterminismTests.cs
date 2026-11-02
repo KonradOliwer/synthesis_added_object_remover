@@ -73,10 +73,13 @@ public class LeftBehindOrderDeterminismTests
             new(
                 immutableTargets,
                 otherModObjects,
-                new Dictionary<OtherId, OtherObject?>(),
+                OtherModsObjectsResult.SwitchedOff,
                 decisions,
-                scene.VisibleTargets,
-                new TestRunCaches(Shapes, bases: TestBaseFacts.Reader(new SkyrimMod(ModKey.FromNameAndExtension("Facts.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache())),
+                new TestRunCaches(
+                    Shapes,
+                    bases: TestBaseFacts.Reader(new SkyrimMod(ModKey.FromNameAndExtension("Facts.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
+                    visibleTargets: scene.IndexVisibleTargets),
+                VisibleLeftBehindObjects.CreateLeftBehindJudging(),
                 order,
                 execution,
                 Settings)).Result;

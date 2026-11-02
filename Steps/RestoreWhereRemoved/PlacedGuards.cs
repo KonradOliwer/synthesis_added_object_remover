@@ -4,7 +4,7 @@ using System.Numerics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
+using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
@@ -47,7 +47,7 @@ internal sealed record PlacedGuardInputs(
 internal sealed class PlacedGuards(
     AfterRemovalWorld world, PlacedGuardInputs inputs, GuardReach reach, FinalPresence presence, DoorLinkGuard doors, Execution execution)
 {
-    /// <summary>P4 for every candidate: which other candidates go back does not change which invisible object a candidate holds.</summary>
+    /// <summary>The invisible-object guard for every candidate: which other candidates go back does not change which invisible object a candidate holds.</summary>
     private readonly ComputedOnce<Dictionary<int, RecordKey>> _holdingInvisible = new(() => FindCandidatesHoldingInvisibleObjects(world, inputs.Caches, inputs.Shapes, execution));
 
     /// <summary>The door rule's consistency checks, made once, one after another.</summary>
@@ -59,7 +59,7 @@ internal sealed class PlacedGuards(
     /// <summary>The first guard each candidate going back fails, with every other one of them going back too.</summary>
     /// <param name="goingBack">The indexes of the candidates still going back.</param>
     /// <param name="causesLeftOutBefore">
-    /// What the pass before left out of the causes; null in the first pass. The too-close rule (P1) checks again only the candidates
+    /// What the pass before left out of the causes; null in the first pass. The too-close rule checks again only the candidates
     /// that a cause no longer left out can reach: a candidate it passed before passes again otherwise.
     /// </param>
     public PlacedChecks CheckGoingBack(IReadOnlySet<int> goingBack, OtherKindsAsPlanned plans, IReadOnlySet<OtherId>? causesLeftOutBefore)
@@ -125,27 +125,21 @@ internal sealed class PlacedGuards(
     }
 
     /// <summary>
-    /// P2: ground that stays changed lies under the box or an area the changed terrain settings grow around it: ground the terrain plan
+    /// Ground that stays changed lies under the box or an area the changed terrain settings grow around it: ground the terrain plan
     /// keeps as the cleaned mod made it, or ground a later plugin changed. The plan's own blend does not count, so one refusal does
     /// not spread through a cleared area by the slopes around the ground it keeps.
     /// </summary>
     private PlacedRefusal? CheckGround(TargetObject restored, TerrainUndoPlan terrain)
     {
         if (inputs.FindLandWorldspace(restored.SpaceKey) is not { } land) return null;
-        var local = inputs.Shapes.Of(restored.Base).Box;
-        var changedTerrain = inputs.ChangedTerrain;
-        var areas = Boxes.GrownWorldAabbs(
-            local,
-            restored.Transform,
-            changedTerrain.AreaBySize ? changedTerrain.AreaMultiplier : null,
-            changedTerrain.AreaByDistance ? changedTerrain.AreaDistanceInUnits : null);
+        var areas = inputs.ChangedTerrain.AreasAround(inputs.Shapes.Of(restored.Base).Box, restored.Transform);
         var found = areas.Prepend(BoxOf(restored))
             .Select(area => terrain.GroundThatStaysChangedUnder(land, (new Vector2(area.Min.X, area.Min.Y), new Vector2(area.Max.X, area.Max.Y))))
             .FirstOrDefault(ground => ground is not null);
         return found is { } changed ? new PlacedRefusal(PlacedGuard.OnGroundThatStaysChanged, changed.Land, Failure: null) : null;
     }
 
-    /// <summary>P3: the box lies partly between a cell's water level before the cleaned mod and the one that stays.</summary>
+    /// <summary>The box lies partly between a cell's water level before the cleaned mod and the one that stays.</summary>
     private PlacedRefusal? CheckWater(TargetObject restored, WaterUndoPlan water) =>
         water.CellWithChangedWaterLineIn(restored.SpaceKey, BoxOf(restored)) is { } cell ? new PlacedRefusal(PlacedGuard.AtWaterLineThatStaysChanged, cell, Failure: null) : null;
 
@@ -153,8 +147,7 @@ internal sealed class PlacedGuards(
 
     private PlacedRefusal? CheckTooClose(TargetObject restored, IPlacementRule rule)
     {
-        using var tries = rule.StartTries(restored);
-        var check = tries.Check(restored.Placement);
+        var check = rule.CheckWhereItStands(restored);
         if (check.Failure is { } failure) return new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, By: null, failure);
         return check.Clash switch
         {

@@ -4,7 +4,7 @@ using Mutagen.Bethesda.Skyrim;
 namespace AddedObjectRemover;
 
 /// <summary>
-/// Gives the patch's override of a target placed record, creating it on first use, and keeps it in one child list: it never holds
+/// Gives the patch's override of a placed record, creating it on first use, and keeps it in one child list: it never holds
 /// the record twice. Not thread-safe.
 /// </summary>
 /// <param name="parts">The table a part is copied through.</param>
@@ -24,7 +24,7 @@ internal sealed class PlacedOverrideWriter(CellOverrides cells, PlacedRecordPart
     public IPlaced GetOrAddOverride(IPlacedGetter record, FormKey cellKey, bool inPersistentList)
     {
         var (list, byKey) = ChildListOfRecord(record.FormKey, cellKey, inPersistentList);
-        return byKey.TryGetValue(record.FormKey, out var placed) ? placed : Add(list, byKey, (IPlaced)record.DeepCopy());
+        return byKey.TryGetValue(record.FormKey, out var placed) ? placed : Add(list, byKey, CopyOf(record));
     }
 
     /// <summary>
@@ -40,32 +40,32 @@ internal sealed class PlacedOverrideWriter(CellOverrides cells, PlacedRecordPart
             throw new InvalidOperationException($"Record {record.FormKey} was already moved to another list by this writer.");
         var held = cells.PatchHolds(fromCellKey) ? TakeOutOfList(record.FormKey, fromCellKey, fromPersistentList) : null;
         var (list, byKey) = ChildListOf(toCellKey, toPersistentList);
-        var moved = held ?? (IPlaced)record.DeepCopy();
+        var moved = held ?? CopyOf(record);
         moved.SetPersistent(toPersistentList);
         Add(list, byKey, moved);
         _listOfMoved[record.FormKey] = (toCellKey, toPersistentList);
     }
 
     /// <summary>
-    /// The patch's record takes, in each of <paramref name="undone"/>, the values of <paramref name="earlier"/>; every other part keeps
-    /// the value of the record the game shows now. A deleted record whose presence goes back becomes a whole copy of
-    /// <paramref name="earlier"/>, because deleting dropped its fields, except for its door link: a door link goes back only with
-    /// its navmesh, so unless it is undone the copy keeps the deleted record's.
+    /// The patch's record takes, in each of <paramref name="copied"/>, the values of <paramref name="earlier"/>; every other part keeps
+    /// the value of the record the game shows now. A deleted record whose presence is copied becomes a whole copy of
+    /// <paramref name="earlier"/>, because deleting dropped its fields, except for its door link: unless the door link is copied
+    /// too, the copy keeps the deleted record's.
     /// </summary>
     /// <param name="cellKey">The cell the record was found in.</param>
-    public void CopyEarlierParts(IPlacedGetter record, IPlacedGetter earlier, PlacedParts undone, FormKey cellKey, bool inPersistentList)
+    public void CopyEarlierParts(IPlacedGetter record, IPlacedGetter earlier, PlacedParts copied, FormKey cellKey, bool inPersistentList)
     {
-        if (record.IsDeleted && undone.HasFlag(PlacedParts.Presence))
+        if (record.IsDeleted && copied.HasFlag(PlacedParts.Presence))
         {
             var copy = ReplaceWithCopyOf(earlier, cellKey, inPersistentList);
-            if (!undone.HasFlag(PlacedParts.NavDoorLink)) parts.NavDoorLink.CopyInto(copy, record);
+            if (!copied.HasFlag(PlacedParts.NavDoorLink)) parts.NavDoorLink.CopyInto(copy, record);
             return;
         }
         var placed = GetOrAddOverride(record, cellKey, inPersistentList);
-        foreach (var (part, compare) in parts.Parts.Where(entry => undone.HasFlag(entry.Part)))
+        foreach (var (part, compare) in parts.Parts.Where(entry => copied.HasFlag(entry.Part)))
         {
             if (!RawByteFormat.AllowsCopy(compare, earlier, placed))
-                throw new InvalidOperationException($"Part {part} of record {record.FormKey} holds bytes of another record format and cannot go back.");
+                throw new InvalidOperationException($"Part {part} of record {record.FormKey} holds bytes of another record format and cannot be copied.");
             compare.CopyInto(placed, earlier);
         }
     }
@@ -79,10 +79,12 @@ internal sealed class PlacedOverrideWriter(CellOverrides cells, PlacedRecordPart
         var persistent = StandsInPersistentList(version.FormKey, inPersistentList);
         var (list, byKey) = ChildListOfRecord(version.FormKey, cellKey, inPersistentList);
         if (byKey.Remove(version.FormKey, out var replaced)) list.Remove(replaced);
-        var copy = (IPlaced)version.DeepCopy();
+        var copy = CopyOf(version);
         copy.SetPersistent(persistent);
         return Add(list, byKey, copy);
     }
+
+    private static IPlaced CopyOf(IPlacedGetter record) => (IPlaced)MutagenCalls.Read(() => record.DeepCopy());
 
     private (IList<IPlaced> List, Dictionary<FormKey, IPlaced> ByKey) ChildListOfRecord(FormKey record, FormKey foundInCellKey, bool foundInPersistentList) =>
         _listOfMoved.TryGetValue(record, out var movedTo)

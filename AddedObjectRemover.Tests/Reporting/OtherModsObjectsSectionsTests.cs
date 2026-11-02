@@ -66,7 +66,7 @@ public class OtherModsObjectsSectionsTests
         var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(2), TestBaseFacts.Unresolved);
         var decisions = TestSeededDecisions.StartDisablingAll(protection, 2)
             .Apply(RoundKind.TooClose, [new ProposedRemoval(new TargetId(0), new TooClose(new OtherId(0), new TooCloseCause.ObjectSize()))])
-            .Apply(RoundKind.AlsoRemove, [new ProposedRemoval(new TargetId(1), new TouchingAnotherModsObject(new OtherId(0)))]);
+            .Apply(AlsoRemoveRounds.Opening, [new ProposedRemoval(new TargetId(1), new TouchingAnotherModsObject(new OtherId(0)))]);
         var settled = Settled with { Rounds = [decisions.Rounds[^1]] };
 
         var lines = LogSections.BuildLeftWithoutSupportStepSection(World with { Targets = [.. targets] }, settled, decisions, TestTargets.TargetName, TimeSpan.Zero, Detailed).Lines;

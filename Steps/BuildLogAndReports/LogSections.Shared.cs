@@ -41,10 +41,6 @@ internal static partial class LogSections
     private static string DescribeRestoredOfFound(int restoredCount) =>
         restoredCount > 0 ? $"; {TextFormat.Count(restoredCount)} of them restored" : string.Empty;
 
-    /// <summary>E.g. "2 inside another mod's object, 2 surroundings removed", with a count for each outcome.</summary>
-    private static string CountOutcomes<TOutcome>(IEnumerable<TOutcome> outcomes, Func<TOutcome, string> describe, Func<TOutcome, int> countOf) =>
-        string.Join(Describe.ListSeparator, TextLists.Counts(outcomes.Select(outcome => KeyValuePair.Create(describe(outcome), countOf(outcome)))));
-
     /// <summary>
     /// E.g. "Step: 14 evaluated; removed 2 (2 surroundings removed); kept 12 (12 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 0 referenced)." for the outcomes of a step's evaluations.
     /// With restored objects, "restored 1 (1 surroundings removed); " comes between the two.
@@ -63,15 +59,16 @@ internal static partial class LogSections
         where TOutcome : struct, Enum
     {
         Func<TOutcome, int> countOf = outcome => decisions.Count(decision => decision.Equals(outcome));
+        Func<IEnumerable<TOutcome>, string> countOutcomes = outcomes => TextLists.JoinCounts(outcomes, describe, countOf, Describe.ListSeparator);
         var listed = Enum.GetValues<TOutcome>().Where(outcome => !isListedOnlyWhenCounted(outcome) || countOf(outcome) > 0).ToList();
         var removedCount = decisions.Count(isRemoval);
         var restoredCount = decisions.Count(isRestoration);
-        var restored = restoredCount > 0 ? $"restored {TextFormat.Count(restoredCount)} ({CountOutcomes(listed.Where(isRestoration), describe, countOf)}); " : string.Empty;
+        var restored = restoredCount > 0 ? $"restored {TextFormat.Count(restoredCount)} ({countOutcomes(listed.Where(isRestoration))}); " : string.Empty;
         return $"{stepName}: {TextFormat.Count(decisions.Count)} evaluated{Describe.TimedSuffix(elapsed, context)}; "
-            + $"removed {TextFormat.Count(removedCount)} ({CountOutcomes(listed.Where(isRemoval), describe, countOf)}); "
+            + $"removed {TextFormat.Count(removedCount)} ({countOutcomes(listed.Where(isRemoval))}); "
             + restored
             + $"kept {TextFormat.Count(decisions.Count - removedCount - restoredCount)} "
-            + $"({CountOutcomes(listed.Where(outcome => !isRemoval(outcome) && !isRestoration(outcome)), describe, countOf)}).";
+            + $"({countOutcomes(listed.Where(outcome => !isRemoval(outcome) && !isRestoration(outcome)))}).";
     }
 
     /// <summary>The also-remove section when no round ran.</summary>

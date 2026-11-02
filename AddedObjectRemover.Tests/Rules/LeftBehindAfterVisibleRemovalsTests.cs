@@ -64,10 +64,10 @@ public class LeftBehindAfterVisibleRemovalsTests
             new(
                 Targets,
                 scene.ObjectsThatCanCauseRemovals(Replacements.None(0), NpcHandling.OnlyWhenStuckInsideTheObject),
-                new Dictionary<OtherId, OtherObject?>(),
+                OtherModsObjectsResult.SwitchedOff,
                 decisions,
-                scene.VisibleTargets,
-                new TestRunCaches(Shapes, bases: TestBaseFacts.Unresolved),
+                new TestRunCaches(Shapes, bases: TestBaseFacts.Unresolved, visibleTargets: scene.IndexVisibleTargets),
+                VisibleLeftBehindObjects.CreateLeftBehindJudging(),
                 TargetWorkOrder.Of(Targets),
                 new Execution(Environment.ProcessorCount),
                 Settings)).Result;

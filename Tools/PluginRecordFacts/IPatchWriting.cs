@@ -18,10 +18,10 @@ public interface IPatchWriting
     INavmeshWorldView ReadFinalNavmeshes(IWritableRecords records);
 
     /// <summary>
-    /// Writes the orders into an empty trial plugin, never into the patch, and runs <see cref="NavmeshWriteConsistency.FirstFault"/>
-    /// over the world it gives: the navmeshes, map and doors as these orders alone would leave them on top of the winning records read.
-    /// Only the orders' own removals count as doors that do not stand.
+    /// Writes the orders into an empty trial plugin, never into the patch, and reads the world it gives: the navmeshes, map and doors
+    /// as these orders alone would leave them on top of the winning records read.
     /// </summary>
     /// <param name="records">The records the orders address.</param>
-    NavmeshFault? FindNavmeshFaultIfWritten(IWritableRecords records, IReadOnlyList<WriteOrder> orders);
+    /// <param name="read">What is read from that world.</param>
+    TResult ReadNavmeshesIfWritten<TResult>(IWritableRecords records, IReadOnlyList<WriteOrder> orders, Func<INavmeshWorldView, TResult> read);
 }

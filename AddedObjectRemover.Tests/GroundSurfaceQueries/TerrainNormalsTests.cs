@@ -49,6 +49,25 @@ public class TerrainNormalsTests
         AssertClose(Vector3.Normalize(new Vector3(-(64f - 0f) / Spacing, 0, 1)), withoutNeighbour[edge]);
     }
 
+    [Fact]
+    public void TheHeightsBesideACellAreTheNeighboursSecondLinesAlongTheSharedEdge()
+    {
+        var neighbour = Heights((x, y) => y * 100f + x);
+
+        var beside = CellEdgeHeights.Beside(neighbour, neighbour, neighbour, neighbour);
+
+        Assert.Equal(Enumerable.Range(0, Side).Select(y => y * 100f + (Side - 2)).ToArray(), beside.West!);
+        Assert.Equal(Enumerable.Range(0, Side).Select(y => y * 100f + 1).ToArray(), beside.East!);
+        Assert.Equal(Enumerable.Range(0, Side).Select(x => (Side - 2) * 100f + x).ToArray(), beside.South!);
+        Assert.Equal(Enumerable.Range(0, Side).Select(x => 100f + x).ToArray(), beside.North!);
+    }
+
+    [Fact]
+    public void ASideBesideACellWhoseHeightsAreNotKnownStaysUnknown()
+    {
+        Assert.Equal(CellEdgeHeights.Unknown, CellEdgeHeights.Beside(null, null, null, null));
+    }
+
     private static float[] Heights(Func<int, int, float> heightAt) =>
         [.. Enumerable.Range(0, Side * Side).Select(point => heightAt(point % Side, point / Side))];
 

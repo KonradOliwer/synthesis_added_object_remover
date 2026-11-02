@@ -37,6 +37,22 @@ public class DirectionAreaTallyTests
     }
 
     [Fact]
+    public void TheAreasOfGivenBoxesAreThoseOfATallyThatAddedThemInOrder()
+    {
+        (SectorFootprint Footprint, int? Category)[] boxes =
+            [(new SectorFootprint(Area, DirectionSector.North), 0), (new SectorFootprint(2 * Area, Sector: null), null), (new SectorFootprint(4 * Area, DirectionSector.North), 1)];
+        var tally = new DirectionAreaTally(CategoryCount);
+        foreach (var (footprint, category) in boxes) tally.Add(footprint, category);
+
+        var areas = DirectionAreaTally.Of(CategoryCount, boxes);
+
+        var added = tally.Build();
+        Assert.All(CompassDirections.All, sector => Assert.Equal(
+            (added.Total(sector), added.Boxes(sector), added.Area(0, sector), added.Area(1, sector)),
+            (areas.Total(sector), areas.Boxes(sector), areas.Area(0, sector), areas.Area(1, sector))));
+    }
+
+    [Fact]
     public void ATallyHoldingBoxesInACategoryCannotGiveTheAreasWithCategories()
     {
         var tally = new DirectionAreaTally(CategoryCount);
@@ -73,6 +89,20 @@ public class DirectionAreaTallyTests
 
         Assert.Equal(Area, withCategories.Area(0, DirectionSector.North));
         Assert.Equal(before, Fingerprint(tally.Build()));
+    }
+
+    [Theory]
+    [InlineData(1f, 1f, 2f, true)]
+    [InlineData(1f, 0f, 3f, false)]
+    [InlineData(0f, 0f, 0f, true)]
+    public void CategoriesReachAShareOfTheAreaOrOfTheBoxesWhenTheDirectionHasNoArea(float first, float second, float none, bool reaches)
+    {
+        var tally = new DirectionAreaTally(CategoryCount);
+        tally.Add(DirectionSector.North, first, category: 0);
+        tally.Add(DirectionSector.North, second, category: 1);
+        tally.Add(DirectionSector.North, none, category: null);
+
+        Assert.Equal(reaches, tally.Build().CategoriesReachShare(DirectionSector.North, [0, 1], percent: 50));
     }
 
     /// <summary>Some areas are zero, and some footprints count in every direction.</summary>

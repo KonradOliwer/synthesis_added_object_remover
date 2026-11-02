@@ -1,26 +1,16 @@
 namespace AddedObjectRemover;
 
 /// <summary>
-/// One value per position of a fixed-size list, computed on first use without locks. Two threads
-/// may compute the same position at the same time, so the computation must give the same value
-/// every time. The value is written before its state is published with an interlocked store and
-/// read only after a load sees the state.
+/// One value per position of a fixed-size list, computed on first use by exactly one thread; threads asking for the same
+/// position at the same time wait for it. Thread-safe. A computation that throws is passed on to its caller, and the next
+/// caller of that position computes again.
 /// </summary>
 public sealed class IndexMemo<T>(int count) where T : struct
 {
-    private const int NotComputed = 0;
-    private const int Computed = 1;
-
     private readonly T[] _values = new T[count];
-    private readonly int[] _state = new int[count];
+    private readonly bool[] _computed = new bool[count];
+    private readonly object?[] _locks = new object?[count];
 
-    public T GetOrCompute(int index, Func<int, T> compute)
-    {
-        if (Volatile.Read(ref _state[index]) == Computed) return _values[index];
-
-        var value = compute(index);
-        _values[index] = value;
-        Interlocked.CompareExchange(ref _state[index], Computed, NotComputed);
-        return value;
-    }
+    public T GetOrCompute(int index, Func<int, T> compute) =>
+        LazyInitializer.EnsureInitialized(ref _values[index], ref _computed[index], ref _locks[index], () => compute(index));
 }

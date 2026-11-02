@@ -6,7 +6,7 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 /// <summary>The visible left-behind step inside a whole run of the fixture world: where it stands in the order and how its removals are reported.</summary>
 public class VisibleLeftBehindRunTests
 {
-    private static IMeshFilesFactory DefaultMeshFiles(string dataFolder, GameRelease release, IReadOnlyList<ModKey> listedPlugins) =>
+    private static IMeshFilesFactory DefaultMeshFiles(string dataFolder, GameRelease release, IReadOnlyList<PluginName> listedPlugins) =>
         new MeshFilesFactory(dataFolder, release, listedPlugins);
 
     private static Settings SettingsWith(bool visibleOn)

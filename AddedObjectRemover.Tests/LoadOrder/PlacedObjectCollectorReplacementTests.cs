@@ -26,7 +26,7 @@ public class PlacedObjectCollectorReplacementTests
     private static readonly BaseKey OtherTreeBase = new(new RecordKey(BaseGame, 0x101), BaseLinkKind.PlaceableObject);
     private static readonly PresenceFacts Shown = new(Deleted: false, InitiallyDisabled: false, EnableParent: null);
 
-    private static readonly WhatToCollect Plan = new(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false);
+    private static readonly WhatToCollect Plan = new(new ScanNeeds(), SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false);
     private static readonly ModTrustTable Mods = TestModTrust.Of(
         Target, Patch, trusted: [BaseGame, TrustedPatchOfAnotherMod], untrusted: [City, Later], trustedForOwnChanges: [], needingCleanedMod: [NeedsTarget]);
 
@@ -274,7 +274,7 @@ public class PlacedObjectCollectorReplacementTests
     public void ATrustedPluginBetweenTheTargetPluginAndThePatchLeavesTheRecordUnjudgedWhetherOrNotItNeedsTheTargetPlugin(bool judgeOldPlaces, bool needsTarget)
     {
         var between = needsTarget ? NeedsTarget : TrustedPatchOfAnotherMod;
-        var plan = Plan with { JudgeOldPlaces = judgeOldPlaces };
+        var plan = Plan with { Needs = new ScanNeeds(JudgeOldPlaces: judgeOldPlaces) };
 
         var collected = Collect(plan, Tree, At(BaseGame, Placed), At(Target, Moved), At(between, Moved), At(Patch, Moved * 2));
 
@@ -286,7 +286,7 @@ public class PlacedObjectCollectorReplacementTests
     [InlineData(true)]
     public void TheTargetPluginsVersionDirectlyBelowThePatchIsStillJudgedWhetherOrNotTheOldPlacesAreJudged(bool judgeOldPlaces)
     {
-        var collected = Collect(Plan with { JudgeOldPlaces = judgeOldPlaces }, Tree, At(BaseGame, Placed), At(Target, Moved), At(Patch, Moved * 2));
+        var collected = Collect(Plan with { Needs = new ScanNeeds(JudgeOldPlaces: judgeOldPlaces) }, Tree, At(BaseGame, Placed), At(Target, Moved), At(Patch, Moved * 2));
 
         Assert.Contains(collected.Targets, target => target.Key == Tree);
     }
@@ -300,7 +300,7 @@ public class PlacedObjectCollectorReplacementTests
     [InlineData(true)]
     public void AnObjectAnotherCleanedModOfTheGroupChangedAboveTheTargetPluginIsJudgedAgainstTheVersionBelowTheTargetPlugin(bool judgeOldPlaces)
     {
-        var collected = Collect(Plan with { JudgeOldPlaces = judgeOldPlaces }, Tree, At(BaseGame, Placed), At(Target, Moved), At(City, Moved * 2), At(Patch, Moved));
+        var collected = Collect(Plan with { Needs = new ScanNeeds(JudgeOldPlaces: judgeOldPlaces) }, Tree, At(BaseGame, Placed), At(Target, Moved), At(City, Moved * 2), At(Patch, Moved));
 
         var judged = Assert.Single(collected.Targets, target => target.Key == Tree);
         Assert.Equal((Moved, BaseGame), (judged.Transform.Position, EarlierVersionOf(collected).Plugin));

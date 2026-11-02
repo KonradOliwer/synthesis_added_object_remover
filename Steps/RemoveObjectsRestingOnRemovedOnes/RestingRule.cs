@@ -7,7 +7,7 @@ using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 
 /// <summary>
-/// The objects other target objects rest on, as the fit step asks, with EverythingTouchingIt and OnlyWhatLosesItsSupport alike:
+/// The objects other target objects rest on, with EverythingTouchingIt and OnlyWhatLosesItsSupport alike:
 /// an object holds up another target object when it holds at least the threshold share of that object's support, and that object
 /// rests on what is below it and no longer does without it (the drop test of <paramref name="input"/>). An object kept shrunk or
 /// turned stays standing, so only what rests on it from above could end up floating; objects that only touch it from the side or
@@ -29,23 +29,16 @@ internal sealed class RestingRule(RestingObjects.RestingRuleInput input) : IRest
         if (Settings.Mode == FollowUpRemovalMode.Nothing || objects.Count == 0) return [];
 
         var checkedObjects = objects.Select(target => target.Index).Distinct().Order().ToList();
-        var (shapes, triangles) = (Caches.Shapes, Caches.Triangles);
-        var search = TouchSearch.Create(
-            Targets,
-            excluded: [],
-            shapes,
-            triangles,
-            Settings.TouchGap,
-            Execution);
-        var held = FindHoldingEnough(search, checkedObjects, Caches.VisibleObjectsOfAnyPlugin());
+        var support = SupportSearch.Create(SupportReads.From(Targets, Caches, Execution), Caches.VisibleObjectsOfAnyPlugin, Settings.TouchGap);
+        var held = FindHoldingEnough(support, checkedObjects);
         return [.. FindHoldingUp(held).Distinct().Order().Select(index => new TargetId(index))];
     }
 
     /// <returns>(checked object, neighbour) pairs where the checked object holds at least the threshold share of the neighbour's support.</returns>
-    private List<IndexPair> FindHoldingEnough(TouchSearch search, IReadOnlyList<int> checkedObjects, IVisibleObjectsOfAnyPlugin others)
+    private List<IndexPair> FindHoldingEnough(SupportSearch support, IReadOnlyList<int> checkedObjects)
     {
-        var neighbours = search.FindNeighborsOfAll(checkedObjects);
-        var contactsOf = FindContactsOf([.. neighbours.SelectMany(list => list).Distinct().Order()], search, others);
+        var neighbours = support.Search.FindNeighborsOfAll(checkedObjects);
+        var contactsOf = FindContactsOf([.. neighbours.SelectMany(list => list).Distinct().Order()], support.Contacts);
         return
         [
             .. checkedObjects.SelectMany((checkedObject, k) => neighbours[k]
@@ -61,9 +54,8 @@ internal sealed class RestingRule(RestingObjects.RestingRuleInput input) : IRest
         return held.Zip(holdsUp).Where(entry => entry.Second).Select(entry => entry.First.First);
     }
 
-    private Dictionary<int, CandidateContacts> FindContactsOf(List<int> resting, TouchSearch search, IVisibleObjectsOfAnyPlugin others)
+    private Dictionary<int, CandidateContacts> FindContactsOf(List<int> resting, SupportContactFinder contactFinder)
     {
-        var contactFinder = RestingObjects.CreateSupportContactFinder(Targets, search, others, Caches.Shapes, Caches.Terrain, Caches.SurfaceSamples, Settings.TouchGap);
         var found = contactFinder.FindContactsOfAll(resting, Execution);
         return resting.Zip(found).ToDictionary(entry => entry.First, entry => entry.Second.Contacts);
     }

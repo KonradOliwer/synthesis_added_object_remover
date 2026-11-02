@@ -28,7 +28,7 @@ public sealed class NavmeshUndoPlanTests
     private const int WestSide = 2;
     private const int CornerOffTheSharedEdge = 3;
 
-    private static readonly WhatToCollect Plan = new(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false, AreaRecordVersions: new AreaRecordReads(new AreaPartTolerances(HeightTolerance, HeightTolerance), Cells: true, Lands: true));
+    private static readonly WhatToCollect Plan = new(new ScanNeeds(AreaRecordVersions: new AreaRecordReads(new AreaPartTolerances(HeightTolerance, HeightTolerance), Cells: true, Lands: true)), SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false);
     private static readonly PluginName Patch = FixturePatcherState.PatchModKey.ToPluginName();
     private static readonly Vector3 Origin = new(CellX * ExteriorGrid.CellSize, CellY * ExteriorGrid.CellSize, 0f);
 
@@ -91,7 +91,7 @@ public sealed class NavmeshUndoPlanTests
         var (plan, patch) = Run();
 
         var group = Assert.Single(plan.Groups());
-        Assert.True(group.IsRestored);
+        Assert.NotNull(group.Write);
         Assert.Equal(new[] { WestKey, EastKey }, group.Members.ToArray());
         Assert.Equal([NavmeshUndo.Geometry, NavmeshUndo.Geometry], plan.Navmeshes().Select(navmesh => navmesh.Undo));
         Assert.All(WrittenNavmeshes(patch), navmesh => Assert.All(navmesh.Data!.Vertices, vertex => Assert.Equal(0f, vertex.Z)));
@@ -106,7 +106,7 @@ public sealed class NavmeshUndoPlanTests
         var (plan, patch) = Run();
 
         var group = Assert.Single(plan.Groups());
-        Assert.True(group.IsRestored);
+        Assert.NotNull(group.Write);
         Assert.Equal([NavmeshUndo.BroughtBack, NavmeshUndo.Geometry], plan.Navmeshes().Select(navmesh => navmesh.Undo));
         Assert.False(WrittenNavmesh(patch, _west).IsDeleted);
         Assert.Equal(_west.FormKey, Assert.Single(WrittenNavmesh(patch, _east).Data!.EdgeLinks).Mesh.FormKey);
@@ -121,7 +121,7 @@ public sealed class NavmeshUndoPlanTests
         var (plan, patch) = Run();
 
         var group = Assert.Single(plan.Groups());
-        Assert.True(group.IsRestored);
+        Assert.NotNull(group.Write);
         Assert.Equal(new[] { WestKey, EastKey, replacement.ToRecordKey() }, group.Members.ToArray());
         Assert.All(WrittenNavmesh(patch, replacement).Data!.Vertices, vertex => Assert.Equal(RemovalConvention.SunkNavmeshZ, vertex.Z));
         Assert.Equal(_west.FormKey, Assert.Single(WrittenNavmesh(patch, _east).Data!.EdgeLinks).Mesh.FormKey);
@@ -136,7 +136,7 @@ public sealed class NavmeshUndoPlanTests
         var (plan, patch) = Run();
 
         var group = Assert.Single(plan.Groups());
-        Assert.True(group.IsRestored);
+        Assert.NotNull(group.Write);
         Assert.Equal(new[] { EastKey, added.ToRecordKey() }, group.Members.ToArray());
         Assert.Empty(WrittenNavmesh(patch, added).Data!.EdgeLinks);
         Assert.Equal([_west.FormKey], WrittenNavmesh(patch, _east).Data!.EdgeLinks.Select(link => link.Mesh.FormKey));
@@ -228,7 +228,7 @@ public sealed class NavmeshUndoPlanTests
         var (plan, patch) = Run();
 
         var group = Assert.Single(plan.Groups());
-        Assert.True(group.IsRestored);
+        Assert.NotNull(group.Write);
         Assert.Equal(new[] { WestKey, replacement.ToRecordKey() }, group.Members.ToArray());
         Assert.DoesNotContain(WrittenNavmeshes(patch), navmesh => navmesh.FormKey == _east.FormKey);
     }
@@ -278,7 +278,7 @@ public sealed class NavmeshUndoPlanTests
         var (plan, patch) = Run(stands: record => !ownDoors.Contains(record));
 
         var group = Assert.Single(plan.Groups());
-        Assert.True(group.IsRestored);
+        Assert.NotNull(group.Write);
         Assert.Equal([NavmeshUndo.Sunk], plan.Navmeshes().Select(navmesh => navmesh.Undo));
         Assert.Empty(WrittenNavmesh(patch, added).Data!.DoorTriangles);
         Assert.All(ownDoors, door =>
@@ -490,7 +490,7 @@ public sealed class NavmeshUndoPlanTests
     private static string Describe(NavmeshUndoPlan plan) => string.Join(
         Environment.NewLine,
         plan.Navmeshes().Select(navmesh => $"{navmesh.Change.Navmesh} {navmesh.Undo}")
-            .Concat(plan.Groups().Select(group => $"{string.Join(",", group.Members)} {group.Refused} {string.Join(",", group.Orders)}")));
+            .Concat(plan.Groups().Select(group => $"{string.Join(",", group.Members)} {group.Refused} {NavmeshWriteDescription.Of(group.Write)}")));
 
     /// <param name="verdictOf">The verdict of each navmesh's area; every area is cleared when null.</param>
     /// <param name="stands">Whether a placed record stands in the final world; every one does when null. A target that does not is removed in the patch.</param>
@@ -507,8 +507,7 @@ public sealed class NavmeshUndoPlanTests
         using var world = FixturePatcherState.CreateFinalWorld(state);
         var records = new PluginRecordsFactory(world, threads).Open();
         var collected = PlacedObjects.Collect(records, TestModTrust.Of(Cleaned, Patch, trusted: [BaseGame, Later], untrusted: []), Plan);
-        var writing = new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod);
-        var handles = records.ReadWritableRecords();
+        var writing = new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod, Program.PatchMarkerText);
         PluginName[] list = pluginList ?? [BaseGame, Cleaned, Later, Patch];
         var plugins = TestLoadOrderPlugins.Of(new KnownPluginNames(list), Patch, [.. list.Select(plugin => new PluginListing(plugin, Loaded: true, []))], list, []);
         var judged = collected.ChangedNavmeshes
@@ -527,7 +526,7 @@ public sealed class NavmeshUndoPlanTests
         var plan = new NavmeshUndoPlan(
             judged,
             sunk => new NavmeshGroupGuards(changed, sunk, changedRecords, removedByRun.Contains, doors, doorsAsTheyEnd, plugins, Cleaned),
-            orders => writing.FindNavmeshFaultIfWritten(handles, orders));
+            PatchWriter.CreateNavmeshCheck(records, writing).FindFaultIfWritten);
         plan = then?.Invoke(plan, records, collected) ?? plan;
         var protection = ObjectsToKeep.Build(collected.Targets, [], TestTargets.References(collected.Targets.Length), TestBaseFacts.Unresolved);
         int[] removed = [.. collected.Targets.Where(target => stands?.Invoke(target.Key) == false).Select(target => target.Id.Index)];

@@ -111,8 +111,8 @@ public class MeshProblemsSectionRunTests
     /// <summary>Records one archive problem the first time the bounds are asked for once <c>armed</c> says so, as a mesh read at the end of the run would.</summary>
     private sealed class ProblemOnBoundsAfterFactory(IMeshFilesFactory inner, Func<bool> armed, ArchiveProblem problem) : IMeshFilesFactory
     {
-        public IMeshFiles Open(ShapeInclusion inclusion, IUnexpectedErrors unexpectedErrors) =>
-            new ProblemOnBounds(inner.Open(inclusion, unexpectedErrors), armed, problem);
+        public IMeshFiles Open(ShapeInclusion inclusion) =>
+            new ProblemOnBounds(inner.Open(inclusion), armed, problem);
     }
 
     private sealed class ProblemOnBounds(IMeshFiles inner, Func<bool> armed, ArchiveProblem problem) : IMeshFiles
@@ -151,9 +151,9 @@ public class MeshProblemsSectionRunTests
     {
         public IMeshFiles? Files { get; private set; }
 
-        public IMeshFiles Open(ShapeInclusion inclusion, IUnexpectedErrors unexpectedErrors)
+        public IMeshFiles Open(ShapeInclusion inclusion)
         {
-            Files = inner.Open(inclusion, unexpectedErrors);
+            Files = inner.Open(inclusion);
             return Files;
         }
     }

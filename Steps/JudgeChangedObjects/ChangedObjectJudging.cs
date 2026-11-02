@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
@@ -44,8 +43,7 @@ public static class ChangedObjectJudging
             execution,
             collected.Order,
             toCheck,
-            static () => (object?)null,
-            (index, _) => CheckOldPlace(collected.Targets[index], rules),
+            index => CheckOldPlace(collected.Targets[index], rules),
             ParallelMap.OneItemPerRange);
         var checkOf = toCheck.Zip(checks).ToDictionary(pair => pair.First, pair => pair.Second);
         return new ChangedObjectJudgingResult(
@@ -63,7 +61,7 @@ public static class ChangedObjectJudging
     /// <param name="read">What the scan collected; the world needs the scan to have judged the old places.</param>
     internal static CollectedObjects CreateOldPlaceWorld(CollectedObjects collected, PluginName cleanedMod, WhatToCollect read)
     {
-        if (!read.JudgeOldPlaces) throw new InvalidOperationException("The old-place world was asked for, but the scan did not judge the old places.");
+        if (!read.Needs.JudgeOldPlaces) throw new InvalidOperationException("The old-place world was asked for, but the scan did not judge the old places.");
 
         var cleanedModObjects = collected.Targets.Select(target => target.AsOtherObject(OldPlaceIdOf(target), cleanedMod));
         var changed = collected.OtherModAndSupportOnlyObjects
@@ -130,15 +128,9 @@ public static class ChangedObjectJudging
     private static OldPlaceCheck CheckOldPlace(TargetObject target, OldPlaceRules rules)
     {
         var atOldPlace = target.RestoredAs(EarlierVersionOf(target));
-        var check = CheckOnce(rules.TooClose(atOldPlace), atOldPlace);
-        if (check.Clash is null && check.Failure is null) check = CheckOnce(rules.ChangedTerrain, atOldPlace);
+        var check = rules.TooClose(atOldPlace).CheckWhereItStands(atOldPlace);
+        if (check.Clash is null && check.Failure is null) check = rules.ChangedTerrain.CheckWhereItStands(atOldPlace);
         return new OldPlaceCheck(target.Id, check.Clash, check.Failure);
-    }
-
-    private static PlacementCheck CheckOnce(IPlacementRule rule, TargetObject target)
-    {
-        using var tries = rule.StartTries(target);
-        return tries.Check(target.Placement);
     }
 
     private static PartFailure FailureOf(OldPlaceCheck check, TargetObject target) =>

@@ -20,6 +20,9 @@ public static class Program
 
     internal const string ReportsFolderName = "Reports";
 
+    /// <summary>The text in a plugin's header description that marks it as this patcher's output.</summary>
+    internal const string PatchMarkerText = "Added Object Remover patch";
+
     internal static readonly SettingsSchema SettingsSchema = SchemaOf(typeof(Settings));
 
     private static readonly SettingsSchema ConfigSchema = SchemaOf(typeof(StandardSettings));
@@ -46,7 +49,7 @@ public static class Program
         }
     }
 
-    /// <param name="loadSettings">Called after the banner, so a settings failure message follows it.</param>
+    /// <param name="loadSettings">Reads the settings; it runs once the banner is printed, so a settings failure message follows the banner.</param>
     /// <param name="pluginsFile">The game's plugins file; null reads the library's default location for the game.</param>
     internal static void RunPatch(
         IPatcherState<ISkyrimMod, ISkyrimModGetter> state, Func<IModeSettingsValues> loadSettings, int workers, FilePath? pluginsFile)
@@ -59,7 +62,7 @@ public static class Program
         using var world = OpenFinalWorld(state, pluginsFile);
         var pluginRecords = new PluginRecordsFactory(world, workers);
         var requests = ValidateRequests(state, settings, configs, world, pluginRecords, workers);
-        var patchWriting = new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod);
+        var patchWriting = new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod, PatchMarkerText);
         StepRunner.PatchLoadOrder(requests, CreateEnvironment(state, world, pluginRecords, patchWriting, totalTimer));
     }
 
@@ -71,7 +74,7 @@ public static class Program
             pluginsFile,
             state.LoadOrder.ListedOrder.Select(listing => listing.ModKey),
             state.PatchMod.ModKey);
-        var worlds = new FinalWorldFactory(FinalWorldFactory.ImportFromDataFolder(state.GameRelease));
+        var worlds = new FinalWorldFactory(FinalWorldFactory.ImportFromDataFolder(state.GameRelease), PatchMarkerText);
         return worlds.Create(state.LoadOrder.ListedOrder, state.PatchMod, TakeListOrFail(pluginList), state.DataFolderPath);
     }
 
@@ -82,7 +85,7 @@ public static class Program
         FinalWorld world,
         PluginRecordsFactory pluginRecords,
         int workers) =>
-        TakeRequestsOrFail(SettingsValidator.BuildAll(
+        TakeRequestsOrFail(BatchRequests.BuildAll(
             configs,
             pluginRecords.Open(),
             world.Plugins,
@@ -105,7 +108,7 @@ public static class Program
 
     /// <summary>
     /// A folder in the patcher's own data folder in Synthesis ("Data\&lt;profile&gt;\&lt;patcher name&gt;"), which lasts between runs
-    /// (the output folder is wiped at the start of every run). Only a run with the detailed log and reports on needs it; a run started with arguments but without that folder fails then.
+    /// (the output folder is wiped at the start of every run).
     /// </summary>
     internal static string ReportsFolder(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) =>
         Path.Combine(
@@ -126,7 +129,7 @@ public static class Program
     private static PluginListRead.Found TakeListOrFail(PluginListRead pluginList) => pluginList switch
     {
         PluginListRead.Found found => found,
-        PluginListRead.Failed unusable => throw StopRun(SettingsValidator.StopOnUnusablePluginList(unusable.Problem)),
+        PluginListRead.Failed unusable => throw StopRun(BatchRequests.StopOnUnusablePluginList(unusable.Problem)),
         _ => throw new UnreachableException(),
     };
 

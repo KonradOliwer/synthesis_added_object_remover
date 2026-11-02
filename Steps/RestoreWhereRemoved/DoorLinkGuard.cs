@@ -6,7 +6,7 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 /// <summary>
 /// The guard of a door going back whose navmesh link goes with it (<see cref="DoorLinks"/>): its link must be consistent in the
 /// final world. A link a later plugin changed again cannot go back. The navmesh the link names either is a member of a navmesh group
-/// going back, which then judges the door with it (N3), or stands as it wins and passes the consistency check with the restores of
+/// going back, which then judges the door with it, or stands as it wins and passes the consistency check with the restores of
 /// every door whose written link names it; and no navmesh the cleaned mod changed that stays as it wins names the door at another
 /// triangle. Thread-safe.
 /// </summary>
@@ -16,11 +16,11 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 /// </remarks>
 /// <param name="candidates">The placed records whose areas let them go back, in key order, each with the parts its restore writes.</param>
 /// <param name="changedNavmeshes">Every navmesh the cleaned mod changed or added.</param>
-/// <param name="findFaultIfWritten">The consistency check's first fault over the world the orders alone would leave; null when none.</param>
+/// <param name="findFaultIfWritten">The consistency check's first fault over the world the trial's writes alone would leave; null when none.</param>
 internal sealed class DoorLinkGuard(
     IReadOnlyList<RecordChangedByCleanedMod> candidates,
     IEnumerable<NavmeshChangedByCleanedMod> changedNavmeshes,
-    Func<IReadOnlyList<WriteOrder>, NavmeshFault?> findFaultIfWritten)
+    Func<NavmeshWriteTrial, NavmeshFault?> findFaultIfWritten)
 {
     /// <summary>For each door, the links the winning versions of the navmeshes the cleaned mod changed give it through their door triangles, in key order of the navmeshes.</summary>
     private readonly ILookup<RecordKey, NavDoorLinkFact> _namedByChanged = changedNavmeshes
@@ -43,7 +43,7 @@ internal sealed class DoorLinkGuard(
     public IReadOnlyDictionary<RecordKey, NavmeshFault?> CheckEachNavmeshWithItsDoors() =>
         _doorsByNavmesh
             .OrderBy(doors => doors.Key, RecordKeyOrder.Comparer)
-            .ToDictionary(doors => doors.Key, doors => findFaultIfWritten([.. doors.Select(RestoreOf)]));
+            .ToDictionary(doors => doors.Key, doors => findFaultIfWritten(new NavmeshWriteTrial(RemovedDoors: [], [.. doors.Select(RestoreOf)], Group: null)));
 
     /// <param name="goingBack">The indexes of the candidates still going back.</param>
     /// <param name="navmeshesGoingBack">The members of the navmesh groups going back.</param>
@@ -81,7 +81,7 @@ internal sealed class DoorLinkGuard(
             .Where(written => written.Link is not null)
             .Select(written => (written.Candidate, written.Link!.Value.Navmesh));
 
-    private CopyEarlierPlacedParts RestoreOf(int candidate) => new(candidates[candidate].Key, candidates[candidate].Earlier.Undo);
+    private PlacedPartsRestored RestoreOf(int candidate) => new(candidates[candidate].Key, candidates[candidate].Earlier.Undo);
 
     private static PlacedRefusal DoesNotMatch(RecordKey navmesh) => new(PlacedGuard.DoorLinkDoesNotMatch, navmesh, Failure: null);
 }

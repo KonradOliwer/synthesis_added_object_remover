@@ -582,7 +582,7 @@ public class ChangedTerrainObjectsTests
 
     /// <summary>Every quadrant painted with the base texture, and optionally one alpha layer of the same opacity everywhere.</summary>
     private static TerrainLayers Painted(RecordKey baseTexture, RecordKey? alpha = null, float opacity = 1f) =>
-        new([.. Enumerable.Range(0, TerrainQuadrants.PerSide * TerrainQuadrants.PerSide).Select(_ => new QuadrantLayers(
+        new([.. Enumerable.Range(0, TerrainQuadrants.Count).Select(_ => new QuadrantLayers(
             baseTexture,
             alpha is { } texture ? [new TerrainAlphaLayer(texture, LayerNumber: 0, Enumerable.Repeat(opacity, TerrainQuadrants.VertexCount).ToArray())] : []))]);
 
@@ -862,7 +862,7 @@ public class ChangedTerrainObjectsTests
     [Fact]
     public void SharesOfTexturesOfOneTypeAddUp()
     {
-        var mostlyGrass = FlatPainted(Other, new TerrainLayers([.. Enumerable.Range(0, TerrainQuadrants.PerSide * TerrainQuadrants.PerSide).Select(_ => new QuadrantLayers(
+        var mostlyGrass = FlatPainted(Other, new TerrainLayers([.. Enumerable.Range(0, TerrainQuadrants.Count).Select(_ => new QuadrantLayers(
             Road,
             [
                 new TerrainAlphaLayer(Grass, LayerNumber: 0, Enumerable.Repeat(0.3f, TerrainQuadrants.VertexCount).ToArray()),

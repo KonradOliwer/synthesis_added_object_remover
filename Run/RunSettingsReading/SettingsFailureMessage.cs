@@ -18,7 +18,7 @@ internal static class SettingsFailureMessage
 
     /// <param name="lead">How the message opens; it says which file holds the setting when that is not settings.json.</param>
     public static string Describe(JsonException exception, SettingsSchema schema, string fileName, string lead = SavedSettingLead) =>
-        Describe(PathOf(exception), LocationOf(exception), exception.Message, schema, fileName, lead);
+        Describe(JsonFiles.PathOf(exception), LocationOf(exception), exception.Message, schema, fileName, lead);
 
     /// <summary>The plugin type's own parse failure, thrown while a plugin name is read; it carries no path, so the settings holding plugin names are listed.</summary>
     public static bool IsUnreadablePluginName(ArgumentException exception, SettingsSchema schema) =>
@@ -45,23 +45,8 @@ internal static class SettingsFailureMessage
         }
     }
 
-    /// <summary>Path is on <see cref="JsonSerializationException"/> and <see cref="JsonReaderException"/> individually, not on the shared base type.</summary>
-    private static string? PathOf(JsonException exception) => exception switch
-    {
-        JsonSerializationException serialization => serialization.Path,
-        JsonReaderException reader => reader.Path,
-        _ => null,
-    };
-
-    /// <summary>Like the path, the line and position are on the two exception types individually; line 0 means unknown.</summary>
-    private static string? LocationOf(JsonException exception) => exception switch
-    {
-        JsonSerializationException { LineNumber: > 0 } serialization => DescribeLocation(serialization.LineNumber, serialization.LinePosition),
-        JsonReaderException { LineNumber: > 0 } reader => DescribeLocation(reader.LineNumber, reader.LinePosition),
-        _ => null,
-    };
-
-    private static string DescribeLocation(int line, int position) => $"line {line}, position {position}";
+    private static string? LocationOf(JsonException exception) =>
+        JsonFiles.PositionOf(exception) is { } at ? $"line {at.Line}, position {at.Position}" : null;
 
     /// <param name="location">Where in the settings file the error lies; named only when no setting can be.</param>
     private static string Describe(string? path, string? location, string exceptionMessage, SettingsSchema schema, string fileName, string lead)
@@ -104,7 +89,7 @@ internal static class SettingsFailureMessage
             }
             names.Add(SettingsTree.ScreenNameOf(property, schema));
             current = property.PropertyType;
-            leaf = SettingsTree.ElementTypeOrSelf(current);
+            leaf = PropertyValues.ElementTypeOrSelf(current);
         }
         return (string.Join(" > ", names), leaf);
     }

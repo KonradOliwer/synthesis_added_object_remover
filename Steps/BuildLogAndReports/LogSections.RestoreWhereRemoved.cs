@@ -36,15 +36,15 @@ internal static partial class LogSections
         return new LogSection(
             RestoreWhereRemovedSectionId,
             [
-                .. FactLine("Restored where the cleaned mod was removed", RestoreCountLines.Restored(judged), CountsSeparator),
-                .. FactLine("Left as the cleaned mod changed them", RestoreCountLines.LeftAsChanged(judged), AreasSeparator),
+                .. TextLists.Headed("Restored where the cleaned mod was removed", RestoreCountLines.Restored(judged), CountsSeparator),
+                .. TextLists.Headed("Left as the cleaned mod changed them", RestoreCountLines.LeftAsChanged(judged), AreasSeparator),
                 .. context.Detailed ? RestoreWhereRemovedDetailLines(world, judged, elapsed, context) : [],
             ]);
     }
 
     /// <summary>The line that closes the log with what went back; nothing when nothing did.</summary>
     public static LogSection BuildRestoreWhereRemovedSummarySection(RestoreWhereRemovedResult result) =>
-        new("restore-where-removed-summary", [.. FactLine("Restored where the cleaned mod was removed", RestoreCountLines.RestoredInSummary(new RestoreJudgements(result)), CountsSeparator)]);
+        new("restore-where-removed-summary", [.. TextLists.Headed("Restored where the cleaned mod was removed", RestoreCountLines.RestoredInSummary(new RestoreJudgements(result)), CountsSeparator)]);
 
     private static IEnumerable<string> RestoreWhereRemovedDetailLines(CollectedObjects world, RestoreJudgements judged, TimeSpan elapsed, ReportContext context)
     {
@@ -53,23 +53,16 @@ internal static partial class LogSections
         var label = RestoreOutcomes.LabelsIn(world);
         return
         [
-            .. FactLine("Left to later plugins in the changes judged", RestoreCountLines.LeftToLaterPlugins(judged), CountsSeparator),
-            .. FactLine("Kept because the cleaned mod's objects still stand around them", RestoreCountLines.KeptForArea(judged, AreaVerdict.StillStanding), CountsSeparator),
-            .. FactLine("Kept because the cleaned mod has no objects around them", RestoreCountLines.KeptForArea(judged, AreaVerdict.NoObjectsAround), CountsSeparator),
-            .. FactLine("Not restored whatever the area around them", RestoreCountLines.NeverRestored(judged), CountsSeparator),
+            .. TextLists.Headed("Left to later plugins in the changes judged", RestoreCountLines.LeftToLaterPlugins(judged), CountsSeparator),
+            .. TextLists.Headed("Kept because the cleaned mod's objects still stand around them", RestoreCountLines.KeptForArea(judged, AreaVerdict.StillStanding), CountsSeparator),
+            .. TextLists.Headed("Kept because the cleaned mod has no objects around them", RestoreCountLines.KeptForArea(judged, AreaVerdict.NoObjectsAround), CountsSeparator),
+            .. TextLists.Headed("Not restored whatever the area around them", RestoreCountLines.NeverRestored(judged), CountsSeparator),
             .. judged.Result.Objects.Select(change => RestoredObjectLine(world, change, label, context)),
             .. judged.Result.Cells.Select(cell => RestoredCellLine(world, cell, label)),
             .. judged.Result.Lands.SelectMany(land => RestoredLandLines(world, land)),
             .. judged.Navmeshes.Select(navmesh => RestoredNavmeshLine(world, navmesh, label)),
             $"{RestoreWhereRemovedName}: {TextFormat.Count(judged.Result.Passes, "pass", "passes")}{Describe.TimedSuffix(elapsed, context)}.",
         ];
-    }
-
-    /// <summary>"Heading: fact, fact."; nothing when there is no fact.</summary>
-    private static IEnumerable<string> FactLine(string heading, IEnumerable<string> facts, string separator)
-    {
-        var list = facts.ToList();
-        if (list.Count > 0) yield return $"{heading}: {string.Join(separator, list)}.";
     }
 
     /// <param name="label">Names a record a guard found.</param>
@@ -141,12 +134,8 @@ internal static partial class LogSections
     /// <summary>E.g. "210 heights, ground textures; 14 heights kept under objects that stay".</summary>
     private static string RestoredTerrainPieces(LandQuarterOutcome quarter)
     {
-        List<string> restored = [];
-        if (quarter.Restored.Heights > 0) restored.Add(TextFormat.Count(quarter.Restored.Heights, "height", "heights"));
-        if (quarter.Restored.Colours > 0) restored.Add(TextFormat.Count(quarter.Restored.Colours, "vertex colour", "vertex colours"));
-        if (quarter.Restored.Textures) restored.Add("ground textures");
-        var kept = quarter.Kept.Select(entry => $"{TextFormat.Count(entry.Points, "height", "heights")} kept {RestoreWhereRemovedText.TerrainKept(entry.Reason)}");
-        return string.Join(AreasSeparator, new[] { string.Join(Describe.ListSeparator, restored) }.Concat(kept).Where(piece => piece.Length > 0));
+        var kept = quarter.Kept.Select(entry => $"{RestoreWhereRemovedText.Heights(entry.Points)} kept {RestoreWhereRemovedText.TerrainKept(entry.Reason)}");
+        return string.Join(AreasSeparator, new[] { RestoreWhereRemovedText.Pieces(quarter.Restored) }.Concat(kept).Where(piece => piece.Length > 0));
     }
 
     /// <param name="label">Names a record a guard found.</param>

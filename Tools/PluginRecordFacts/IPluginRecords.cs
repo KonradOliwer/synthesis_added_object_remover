@@ -25,13 +25,13 @@ public interface IPluginRecords
 
     /// <summary>
     /// The links into the given records from every version of every record that is not a placed record, in the plugins that can
-    /// link to the given plugins or <paramref name="target"/> (the patch, and the plugins that are one of them or have one as a master),
-    /// and the quest aliases that fill with an NPC of <paramref name="target"/> as their Unique Actor (<see cref="RelationKind.UniqueActor"/>, linking
+    /// link to the given plugins or <paramref name="plugin"/> (the patch, and the plugins that are one of them or have one as a master),
+    /// and the quest aliases that fill with an NPC of <paramref name="plugin"/> as their Unique Actor (<see cref="RelationKind.UniqueActor"/>, linking
     /// the NPC base). A record that cannot be parsed is not read further and is listed in <see cref="NonPlacedLinks.Unreadable"/>.
     /// The links of placed records are in <see cref="PlacedRecordFacts.Links"/>.
     /// </summary>
-    /// <param name="linkedPlugins">The plugins whose dependents are read, besides <paramref name="target"/>.</param>
-    NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> records, IReadOnlySet<PluginName> linkedPlugins);
+    /// <param name="linkedPlugins">The plugins whose dependents are read, besides <paramref name="plugin"/>.</param>
+    NonPlacedLinks ReadLinks(PluginName plugin, IReadOnlySet<RecordKey> records, IReadOnlySet<PluginName> linkedPlugins);
 
     /// <summary>The records <see cref="IPatchWriting"/> copies from; the placed records must have been read before.</summary>
     IWritableRecords ReadWritableRecords();
@@ -60,7 +60,7 @@ public interface IPluginRecords
     TerrainVersion[] ReadTerrainVersions(ExteriorCell cell);
 
     /// <summary>
-    /// Every plugin's own water fields of an exterior cell of a target worldspace (not the worldspace whose land it uses) and of
+    /// Every plugin's own water fields of an exterior cell of a plugin worldspace (not the worldspace whose land it uses) and of
     /// the worldspace that supplies its default water: the cell's own, or the parent whose water data it uses. The placed records
     /// must have been read before, with the water asked for. Thread-safe.
     /// </summary>
@@ -71,7 +71,7 @@ public interface IPluginRecords
     RecordKey[] ReadTextureMaterialChain(RecordKey texture);
 
     /// <summary>
-    /// The worldspace whose land data a target worldspace uses (itself, or a parent whose land data it uses); the placed records
+    /// The worldspace whose land data a plugin worldspace uses (itself, or a parent whose land data it uses); the placed records
     /// must have been read before, with the terrain asked for. Thread-safe.
     /// </summary>
     /// <returns>Null where the space is not such a worldspace or the worldspace holds no land data of its own.</returns>

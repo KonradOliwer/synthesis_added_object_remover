@@ -7,20 +7,17 @@ AreaText.Worldspace | Report wording: names a space fact by its display name (a 
 AreaText.Grid | Report wording: prints a cell grid point (a plugin-facts type outside the domain list).
 LogSections.Corner | Report wording: prints a box corner (a tool's vector type).
 KeepReasonText.Relation | Report wording: names a link relation.
-LogAndReports.Present | Report filter: keeps the failures a step result carries and drops the absent ones (an error-channel record, not a domain type).
 LogSections.AlsoRemoveMeshes | Report wording: prints mesh statistics (a tool's statistics type).
 LogSections.AlsoRemovePairs | Report wording: prints mesh-pair statistics (a tool's statistics type).
 LogSections.BuildNotPerformedLine | Report wording: the one line of a step or report files that an unexpected error stopped; it takes only the section's name.
 LogSections.BuildNotPerformedBecauseEarlierLine | Report wording: the one line of a step that an earlier section's step not being performed stopped; it takes only the two section names.
-LogSections.DescribeAlreadyRemoved | Report wording: the "of them already removed on changed terrain" part of the too-close line; it takes only the count.
+LogSections.DescribeAlreadyRemoved | Report wording: the "of them were already removed on changed terrain" part of the too-close line; it takes only the count.
 LogSections.DescribeRestoredOfFound | Report wording: the "of them restored" part of a step's found line; it takes only the count.
 LogSections.AddRowsLine | Report wording: the "wrote N rows" line of a written report file (a CSV tool's table record, not a domain type).
 LogSections.DescribePluginList | Report wording: prints where the game's plugin list was read from and how many listings it has (a plugin-facts type outside the domain list).
 LogSections.OnOff | Report wording: prints a setting's switch as on or off.
 LogSections.WhenAny | Report wording: one counted item of the write line, left out when its count is 0; it takes only the count and the words.
-LogSections.CountOutcomes | Report wording: counts each outcome of a step's evaluations as "N outcome text" (a step's own outcome enum and text function are given in).
 LogSections.OnWith | Report wording: prints a setting's switch as off, or as on with the detail that matters when it is on.
-LogSections.JoinOrNone | Report wording: joins names or prints "(none)".
 LogSections.TrustReasonLine | Report wording: one trust reason's line of described plugins, or no line when no plugin has that reason.
 LogSections.OtherMasters | Report wording: a number of other masters, singular for 1.
 LogSections.MeshFailureCounts | Report wording: the counts of the "Mesh failures" and "Mesh triangle failures" lines (a mesh tool's category, not a domain type).
@@ -40,12 +37,10 @@ Tables.SectorHeader | Report columns: the per-direction column names of the left
 Tables.PlacementColumns | Report wording: the CSV columns of a placement (a tool's placement type).
 Tables.PartName | Report wording: the name of one part of a placed record (a tool's part type).
 Tables.PartNames | Report wording: the names of the parts of a placed record that are set (a tool's part type).
-LogSections.FactLine | Report wording: "Heading: fact, fact." for the facts a count line states, or no line when there is none; it takes only words.
-RestoreCountLines.Breakdown | Report wording: the "N name" items of a count line joined (the names are given in).
-RestoreCountLines.Item | Report wording: one name with its count, for a count line (the name is given in).
+RestoreWhereRemovedText.Heights | Report wording: a number of terrain heights, singular for 1.
+RestoreWhereRemovedText.VertexColours | Report wording: a number of terrain vertex colours, singular for 1.
 RestoreWhereRemovedText.PartOfCell | Report wording: the name of one part of a cell record (a tool's part type).
 RestoreWhereRemovedText.Fault | Report wording: one navmesh consistency fault as a phrase (a tool's fault record).
 RestoreWhereRemovedText.FaultKind | Report wording: how a navmesh breaks a consistency rule (a tool's fault kind).
 RestoreWhereRemovedText.Quarter | Report wording: the name of one quarter of a cell's terrain by its number.
 RestoreWhereRemovedText.Result | Report wording: "restored", or "kept: " and the reason; it takes only the reason's text.
-Tables.TableWhenAnyRow | Report columns: a CSV table, or none when it has no row (a CSV tool's table record, not a domain type).

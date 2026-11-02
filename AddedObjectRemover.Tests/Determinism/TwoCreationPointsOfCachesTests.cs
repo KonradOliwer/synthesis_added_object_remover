@@ -56,7 +56,7 @@ public class TwoCreationPointsOfCachesTests
             var mod = new SkyrimMod(Mod, SkyrimRelease.SkyrimSE);
             var npc = mod.Npcs.AddNew();
             var plantedBody = new NpcBody(NpcSizeSource.BodyMesh, new Box(Vector3.Zero, new Vector3(1, 2, 3)), null);
-            var plantedRules = TooCloseObjects.NpcBodyRules with { CreateOwnBodyResolver = (_, _) => _ => plantedBody };
+            var plantedRules = NpcCacheRules.Bodies with { CreateOwnBodyResolver = (_, _) => _ => plantedBody };
 
             var planted = CreateLoadOrderCaches(dataFolder.FullName, mod, plantedRules).Bodies.GetBodies(npc.FormKey.ToRecordKey());
 
@@ -69,19 +69,18 @@ public class TwoCreationPointsOfCachesTests
     }
 
     private static LoadOrderCaches CreateLoadOrderCaches(string dataFolder) =>
-        CreateLoadOrderCaches(dataFolder, new SkyrimMod(Mod, SkyrimRelease.SkyrimSE), TooCloseObjects.NpcBodyRules);
+        CreateLoadOrderCaches(dataFolder, new SkyrimMod(Mod, SkyrimRelease.SkyrimSE), NpcCacheRules.Bodies);
 
     private static LoadOrderCaches CreateLoadOrderCaches(string dataFolder, SkyrimMod mod, NpcBodyRules npcBodyRules)
     {
         var linkCache = mod.ToImmutableLinkCache();
         return LoadOrderCaches.Create(
-            new MeshFilesFactory(dataFolder, GameRelease.SkyrimSE, [Mod]),
-            new UnexpectedErrors(),
+            new MeshFilesFactory(dataFolder, GameRelease.SkyrimSE, [Mod.ToPluginName()]),
             new NpcRecordsPlugin(linkCache),
             TestBaseFacts.Reader(linkCache),
             CollisionLayerReader.Read(linkCache),
             npcBodyRules,
-            TooCloseObjects.PlacedNpcRules,
-            RestingObjects.SurfaceSamplesPerMesh);
+            NpcCacheRules.PlacedNpcs,
+            SurfaceContacts.SamplesPerMesh);
     }
 }

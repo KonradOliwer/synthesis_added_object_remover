@@ -19,7 +19,7 @@ public class MeshSpellingTests
         Directory.CreateDirectory(dataFolder);
         var problems = new AssetProblemLog();
         var files = new MeshFiles(
-            new MeshFileSource(dataFolder, GameRelease.SkyrimSE, [], problems), new NifGeometryReader(), problems, new UnexpectedErrors(), BaseObjectShapes.SolidShapes);
+            new MeshFileSource(dataFolder, GameRelease.SkyrimSE, [], problems), new NifGeometryReader(), problems, BaseObjectShapes.SolidShapes);
         return (files, problems);
     }
 

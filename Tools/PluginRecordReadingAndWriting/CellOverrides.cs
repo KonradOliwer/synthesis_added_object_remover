@@ -15,14 +15,14 @@ internal sealed class CellOverrides(SynthesisWriteCache synthesis, ISkyrimMod pa
     /// <remarks>
     /// The cell's context comes from the Synthesis cache, so an exterior cell's worldspace is copied from a plugin above the patch,
     /// and a cell copy an earlier run wrote is reused. A new override is a copy of the winning cell without its children. A deleted
-    /// winning cell throws: the steps decide nothing that writes into one.
+    /// winning cell throws: no caller asks to write into one.
     /// </remarks>
     public ICell GetOrAdd(FormKey cellKey)
     {
         if (_cells.TryGetValue(cellKey, out var cell)) return cell;
         var context = synthesis.Cache.ResolveContext<ICell, ICellGetter>(cellKey);
         if (context.Record.IsDeleted) throw new InvalidOperationException($"Cell {cellKey} is deleted in the load order; nothing is written into it.");
-        cell = context.GetOrAddAsOverride(patchMod);
+        cell = MutagenCalls.Read(() => context.GetOrAddAsOverride(patchMod));
         _cells[cellKey] = cell;
         return cell;
     }

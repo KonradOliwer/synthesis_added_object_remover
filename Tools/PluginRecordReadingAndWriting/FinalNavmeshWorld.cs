@@ -7,11 +7,11 @@ using Noggog;
 namespace AddedObjectRemover;
 
 /// <summary>
-/// The navmeshes, navmesh info map and doors of the final world: the patch's records on top of the winning records of the target
+/// The navmeshes, navmesh info map and doors of the final world: the patch's records on top of the winning records of the plugin
 /// spaces. Read after the writing ends; it never changes the patch. The reverse links of the winning records are shared by every
 /// final world over the same read, so a world reads the links of the patch's own records only. Not thread-safe.
 /// </summary>
-/// <param name="synthesis">Resolves the navmeshes outside the target spaces that a navmesh info map names, and the winning cells.</param>
+/// <param name="synthesis">Resolves the navmeshes outside the plugin spaces that a navmesh info map names, and the winning cells.</param>
 internal sealed class FinalNavmeshWorld(ISkyrimModGetter patch, RecordHandles handles, SynthesisWriteCache synthesis) : INavmeshWorldView
 {
     private readonly NavmeshRecordHandles _read = handles.NavmeshRecords;
@@ -22,8 +22,15 @@ internal sealed class FinalNavmeshWorld(ISkyrimModGetter patch, RecordHandles ha
     private Dictionary<RecordKey, List<RecordKey>>? _patchNavmeshesLinkingTo;
     private Dictionary<RecordKey, List<RecordKey>>? _patchDoorsLinkingTo;
 
-    public IEnumerable<ImmutableArray<RecordKey>> PreferredPathSets =>
-        FinalMap()?.PreferredPathing?.NavmeshSets.Select(set => set.Navmeshes.Select(navmesh => navmesh.FormKey.KeyAsWritten()).ToImmutableArray()) ?? [];
+    public IEnumerable<ImmutableArray<RecordKey>> PreferredPathSets
+    {
+        get
+        {
+            var map = FinalMap();
+            var sets = MutagenCalls.Read(() => map?.PreferredPathing?.NavmeshSets.Select(set => set.Navmeshes.Select(navmesh => navmesh.FormKey).ToArray()).ToArray()) ?? [];
+            return sets.Select(set => set.Select(navmesh => navmesh.KeyAsWritten()).ToImmutableArray());
+        }
+    }
 
     private Dictionary<RecordKey, NavmeshVersion> PatchNavmeshes => _patchNavmeshes ??= ReadPatchNavmeshes();
 
@@ -46,15 +53,27 @@ internal sealed class FinalNavmeshWorld(ISkyrimModGetter patch, RecordHandles ha
     public NavmeshEntryView? EntryOf(RecordKey navmesh)
     {
         var key = navmesh.ToFormKey();
-        var entry = LastEntryIn(patch.NavigationMeshInfoMaps, key)
-            ?? _read.Maps.Reverse().Select(version => LastEntryIn([version.Map], key)).FirstOrDefault(found => found is not null);
-        return entry is null
+        List<IEnumerable<INavigationMeshInfoMapGetter>> searches =
+            [patch.NavigationMeshInfoMaps, .. _read.Maps.Reverse().Select(version => (IEnumerable<INavigationMeshInfoMapGetter>)[version.Map])];
+        var stored = MutagenCalls.Read<(IANavigationMapInfoParentGetter Parent, FormKey[] MergedTo, FormKey[] PreferredMerges, FormKey[] Doors)?>(() =>
+        {
+            var entry = searches
+                .Select(maps => maps.SelectMany(map => map.MapInfos).LastOrDefault(info => info.NavigationMesh.FormKey == key))
+                .FirstOrDefault(found => found is not null);
+            return entry is null
+                ? null
+                : (entry.Parent,
+                    entry.MergedTo.Select(merged => merged.FormKey).ToArray(),
+                    entry.PreferredMerges.Select(merged => merged.FormKey).ToArray(),
+                    entry.LinkedDoors.Select(door => door.Door.FormKey).ToArray());
+        });
+        return stored is not { } found
             ? null
             : new NavmeshEntryView(
-                PlaceOf(entry.Parent),
-                [.. entry.MergedTo.Select(merged => merged.FormKey.KeyAsWritten())],
-                [.. entry.PreferredMerges.Select(merged => merged.FormKey.KeyAsWritten())],
-                [.. entry.LinkedDoors.Select(door => door.Door.FormKey.KeyAsWritten())]);
+                PlaceOf(found.Parent),
+                [.. found.MergedTo.Select(merged => merged.KeyAsWritten())],
+                [.. found.PreferredMerges.Select(merged => merged.KeyAsWritten())],
+                [.. found.Doors.Select(door => door.KeyAsWritten())]);
     }
 
     public DoorView? DoorOf(RecordKey door)
@@ -67,9 +86,7 @@ internal sealed class FinalNavmeshWorld(ISkyrimModGetter patch, RecordHandles ha
     public IEnumerable<RecordKey> NavmeshesLinkingTo(RecordKey navmesh)
     {
         var patchLinking = _patchNavmeshesLinkingTo ??= WinningNavmeshLinks.IndexNavmeshesLinkingTo(PatchNavmeshes);
-        return _read.Links.NavmeshesLinkingTo(navmesh).Where(winner => !PatchNavmeshes.ContainsKey(winner))
-            .Concat(patchLinking.GetValueOrDefault(navmesh) ?? [])
-            .Order(RecordKeyOrder.Comparer);
+        return WithPatchLinks(_read.Links.NavmeshesLinkingTo(navmesh), PatchNavmeshes.ContainsKey, patchLinking, navmesh);
     }
 
     /// <returns>In key order: the winning doors that link to it but those the patch holds, and the patch's placed records that link to it.</returns>
@@ -77,10 +94,13 @@ internal sealed class FinalNavmeshWorld(ISkyrimModGetter patch, RecordHandles ha
     {
         var patchLinking = _patchDoorsLinkingTo ??= WinningNavmeshLinks.IndexDoorsLinkingTo(
             PatchPlaced.Select(placed => (placed.Key, Link: LinkOf(placed.Value))).Where(placed => placed.Link is not null).Select(placed => KeyValuePair.Create(placed.Key, placed.Link!.Value)));
-        return _read.Links.DoorsLinkingTo(navmesh).Where(door => !PatchPlaced.ContainsKey(door))
-            .Concat(patchLinking.GetValueOrDefault(navmesh) ?? [])
-            .Order(RecordKeyOrder.Comparer);
+        return WithPatchLinks(_read.Links.DoorsLinkingTo(navmesh), PatchPlaced.ContainsKey, patchLinking, navmesh);
     }
+
+    /// <returns>In key order: the winners that link to the navmesh but those the patch holds, and the patch's records that link to it.</returns>
+    private static IEnumerable<RecordKey> WithPatchLinks(
+        IEnumerable<RecordKey> winnersLinking, Func<RecordKey, bool> patchHolds, Dictionary<RecordKey, List<RecordKey>> patchLinking, RecordKey navmesh) =>
+        winnersLinking.Where(winner => !patchHolds(winner)).Concat(patchLinking.GetValueOrDefault(navmesh) ?? []).Order(RecordKeyOrder.Comparer);
 
     private NavmeshVersion? FinalVersionOf(RecordKey navmesh) =>
         PatchNavmeshes.GetValueOrDefault(navmesh) ?? _read.Winners.GetValueOrDefault(navmesh);
@@ -110,66 +130,95 @@ internal sealed class FinalNavmeshWorld(ISkyrimModGetter patch, RecordHandles ha
     {
         var record = version.Record;
         var inDeletedCell = HeldInDeletedCell(key, version);
-        if (record.Data is not { } data) return new NavmeshView(record.IsDeleted, version.Place, inDeletedCell, null, [], [], [], [], Vector3.Zero, Vector3.Zero, []);
+        if (MutagenCalls.Read(() => record.Data) is not { } data) return new NavmeshView(record.IsDeleted, version.Place, inDeletedCell, null, [], [], [], [], Vector3.Zero, Vector3.Zero, []);
+        var (parent, vertices, triangles, edgeLinks, doorTriangles, min, max) = MutagenCalls.Read(() => (
+            data.Parent,
+            data.Vertices.ToArray(),
+            data.Triangles.Select(triangle => (
+                Corners: triangle.Vertices,
+                Edges: NavmeshTriangleEdges.All.Select(edge => (IsEdgeLink: triangle.Flags.HasFlag(edge.Flag), Value: edge.Value(triangle))).ToArray())).ToArray(),
+            data.EdgeLinks.Select(link => (Mesh: link.Mesh.FormKey, link.TriangleIndex)).ToArray(),
+            data.DoorTriangles.Select(door => (door.TriangleBeforeDoor, Door: door.Door.FormKey)).ToArray(),
+            data.Min,
+            data.Max));
         return new NavmeshView(
             record.IsDeleted,
             version.Place,
             inDeletedCell,
-            PlaceOf(data.Parent),
-            [.. data.Vertices.Select(ToVector)],
-            [.. data.Triangles.Select(TriangleOf)],
-            [.. data.EdgeLinks.Select(link => new NavmeshLinkTarget(link.Mesh.FormKey.KeyAsWritten(), link.TriangleIndex))],
-            [.. data.DoorTriangles.Select(door => new NavmeshDoorTriangleFact(door.TriangleBeforeDoor, door.Door.FormKey.KeyAsWritten()))],
-            ToVector(data.Min),
-            ToVector(data.Max),
-            GridSourceTriangleCounts(key, data));
+            PlaceOf(parent),
+            [.. vertices.Select(ToVector)],
+            [.. triangles.Select(TriangleOf)],
+            [.. edgeLinks.Select(link => new NavmeshLinkTarget(link.Mesh.KeyAsWritten(), link.TriangleIndex))],
+            [.. doorTriangles.Select(door => new NavmeshDoorTriangleFact(door.TriangleBeforeDoor, door.Door.KeyAsWritten()))],
+            ToVector(min),
+            ToVector(max),
+            GridSourceTriangleCounts(key, data, triangles.Length));
     }
 
     /// <summary>
     /// A navmesh the patch holds takes its grid from one of the versions read; any other navmesh is the version read, whose grid is
     /// its own.
     /// </summary>
-    private ImmutableArray<int> GridSourceTriangleCounts(RecordKey key, INavigationMeshDataGetter data)
+    private ImmutableArray<int> GridSourceTriangleCounts(RecordKey key, INavigationMeshDataGetter data, int triangleCount)
     {
-        if (!PatchNavmeshes.ContainsKey(key)) return [data.Triangles.Count];
+        if (!PatchNavmeshes.ContainsKey(key)) return [triangleCount];
         var changed = _read.Navmeshes.TryGetValue(key, out var versions) ? versions.Versions : [];
+        var sources = changed.Append(_read.Winners.GetValueOrDefault(key)).Select(version => version?.Record).OfType<INavigationMeshGetter>().ToList();
         return
         [
-            .. changed.Append(_read.Winners.GetValueOrDefault(key))
-                .Select(version => version?.Record.Data)
+            .. MutagenCalls.Read(() => sources
+                .Select(source => source.Data)
                 .OfType<INavigationMeshDataGetter>()
                 .Where(source => source.NavmeshGridDivisor == data.NavmeshGridDivisor && source.NavmeshGrid.Span.SequenceEqual(data.NavmeshGrid.Span))
                 .Select(source => source.Triangles.Count)
-                .Distinct(),
+                .Distinct()
+                .ToList()),
         ];
     }
 
-    private static NavmeshTriangleView TriangleOf(INavmeshTriangleGetter triangle) => new(
-        [triangle.Vertices.X, triangle.Vertices.Y, triangle.Vertices.Z],
-        [.. NavmeshTriangleEdges.All.Select(edge => new NavmeshEdgeView(triangle.Flags.HasFlag(edge.Flag), edge.Value(triangle) is var value && value == NavmeshTriangleEdges.None ? null : value))]);
+    private static NavmeshTriangleView TriangleOf((P3Int16 Corners, (bool IsEdgeLink, short Value)[] Edges) triangle) => new(
+        [triangle.Corners.X, triangle.Corners.Y, triangle.Corners.Z],
+        [.. triangle.Edges.Select(edge => new NavmeshEdgeView(edge.IsEdgeLink, edge.Value == NavmeshTriangleEdges.None ? null : edge.Value))]);
 
-    private static NavDoorLinkFact? LinkOf(IPlacedGetter record) =>
-        record is IPlacedObjectGetter { NavigationDoorLink: { } link } ? new NavDoorLinkFact(link.NavMesh.FormKey.KeyAsWritten(), link.TeleportMarkerTriangle) : null;
+    private static NavDoorLinkFact? LinkOf(IPlacedGetter record)
+    {
+        if (record is not IPlacedObjectGetter placed) return null;
+        var link = MutagenCalls.Read(() => placed.NavigationDoorLink is { } stored ? (Navmesh: stored.NavMesh.FormKey, Triangle: (int)stored.TeleportMarkerTriangle) : ((FormKey Navmesh, int Triangle)?)null);
+        return link is { } found ? new NavDoorLinkFact(found.Navmesh.KeyAsWritten(), found.Triangle) : null;
+    }
 
     /// <summary>The patch's map when it holds one, which carries the winning map's preferred paths; otherwise the last plugin's.</summary>
     private INavigationMeshInfoMapGetter? FinalMap() => patch.NavigationMeshInfoMaps.FirstOrDefault() ?? _read.Maps.LastOrDefault()?.Map;
 
-    private static INavigationMapInfoGetter? LastEntryIn(IEnumerable<INavigationMeshInfoMapGetter> maps, FormKey navmesh) =>
-        maps.SelectMany(map => map.MapInfos).LastOrDefault(entry => entry.NavigationMesh.FormKey == navmesh);
+    private static NavmeshPlace PlaceOf(IANavmeshParentGetter parent) =>
+        PlaceOf<IWorldspaceNavmeshParentGetter, ICellNavmeshParentGetter>(parent, ReadWorldParent, ReadCellParent);
 
-    private static NavmeshPlace PlaceOf(IANavmeshParentGetter parent) => parent switch
+    private static NavmeshPlace PlaceOf(IANavigationMapInfoParentGetter parent) =>
+        PlaceOf<INavigationMapInfoWorldParentGetter, INavigationMapInfoCellParentGetter>(parent, ReadMapWorldParent, ReadMapCellParent);
+
+    private static (FormKey Worldspace, P2Int16 Coordinates) ReadWorldParent(IWorldspaceNavmeshParentGetter world) =>
+        MutagenCalls.Read(() => (world.Parent.FormKey, world.Coordinates));
+
+    private static FormKey ReadCellParent(ICellNavmeshParentGetter cell) => MutagenCalls.Read(() => cell.Parent.FormKey);
+
+    private static (FormKey Worldspace, P2Int16 Coordinates) ReadMapWorldParent(INavigationMapInfoWorldParentGetter world) =>
+        MutagenCalls.Read(() => (world.ParentWorldspace.FormKey, world.ParentWorldspaceCoord));
+
+    private static FormKey ReadMapCellParent(INavigationMapInfoCellParentGetter cell) => MutagenCalls.Read(() => cell.ParentCell.FormKey);
+
+    /// <summary>Mutagen's navmesh parent families share no base, so each arm is told which of its own getters to read.</summary>
+    private static NavmeshPlace PlaceOf<TWorldParent, TCellParent>(
+        object parent, Func<TWorldParent, (FormKey Worldspace, P2Int16 Coordinates)> readWorldParent, Func<TCellParent, FormKey> readCellParent) => parent switch
     {
-        IWorldspaceNavmeshParentGetter world => new NavmeshPlace(world.Parent.FormKey.KeyAsWritten(), NavmeshParentCoordinates.GridPointOf(world.Coordinates)),
-        ICellNavmeshParentGetter cell => new NavmeshPlace(cell.Parent.FormKey.KeyAsWritten(), null),
+        TWorldParent world => WorldPlace(readWorldParent(world)),
+        TCellParent cell => CellPlace(readCellParent(cell)),
         _ => throw new InvalidOperationException($"A navmesh parent of kind {parent.GetType().Name} is not read."),
     };
 
-    private static NavmeshPlace PlaceOf(IANavigationMapInfoParentGetter parent) => parent switch
-    {
-        INavigationMapInfoWorldParentGetter world => new NavmeshPlace(world.ParentWorldspace.FormKey.KeyAsWritten(), NavmeshParentCoordinates.GridPointOf(world.ParentWorldspaceCoord)),
-        INavigationMapInfoCellParentGetter cell => new NavmeshPlace(cell.ParentCell.FormKey.KeyAsWritten(), null),
-        _ => throw new InvalidOperationException($"A navmesh info map entry's parent of kind {parent.GetType().Name} is not read."),
-    };
+    private static NavmeshPlace WorldPlace((FormKey Worldspace, P2Int16 Coordinates) parent) =>
+        new(parent.Worldspace.KeyAsWritten(), NavmeshParentCoordinates.GridPointOf(parent.Coordinates));
+
+    private static NavmeshPlace CellPlace(FormKey cell) => new(cell.KeyAsWritten(), null);
 
     private static Vector3 ToVector(P3Float point) => new(point.X, point.Y, point.Z);
 }

@@ -1,6 +1,3 @@
-using System.Collections.Immutable;
-using System.Diagnostics;
-using System.Numerics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 
@@ -17,58 +14,29 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 /// </summary>
 public sealed class PlacedObjectCollector
 {
-    private enum RecordRole { Target, TargetOverriddenLater, Moved, Replaced, OverriddenByTarget, OtherUnchanged, OtherChanged }
-
-    /// <param name="Change">Only for <see cref="RecordRole.OtherChanged"/>.</param>
-    /// <param name="EarlierVersion">Only for <see cref="RecordRole.Moved"/> and <see cref="RecordRole.Replaced"/>.</param>
-    private readonly record struct Classification(RecordRole Role, ObjectChange? Change, PlacedVersionFact? EarlierVersion)
-    {
-        /// <summary>Null for a record that is not a target object.</summary>
-        public TargetOrigin? Origin => Role switch
-        {
-            RecordRole.Target => TargetOrigin.CleanedMod,
-            RecordRole.Moved => TargetOrigin.Moved,
-            RecordRole.Replaced => TargetOrigin.Replaced,
-            RecordRole.TargetOverriddenLater or RecordRole.OverriddenByTarget or RecordRole.OtherUnchanged or RecordRole.OtherChanged => null,
-            _ => throw new UnreachableException($"Unknown record role {Role}."),
-        };
-
-        public bool IsJudged => Origin is not null;
-    }
-
     /// <summary>Vanilla keyword LocTypeHold. Only the Location of the hold itself is sure to have it: the Major and Minor variants are not on every hold.</summary>
     private static readonly RecordKey HoldLocationKeyword = new(new PluginName("Skyrim.esm"), 0x016771);
 
-    private readonly ModTrustTable _trust;
-    private readonly AcceptedWorld _world;
     private readonly WhatToCollect _plan;
     private readonly PlacedRecordFacts _facts;
-    private readonly TargetAreaNames _areaNames;
     private readonly ChangedAreaRecordCollector _changedAreaRecords;
-
-    private readonly List<TargetObject> _targets = [];
-    private readonly List<OtherObject> _otherModObjects = [];
-    private readonly List<OtherObject> _supportOnlyObjects = [];
-    private readonly List<OverriddenOtherRecord> _overriddenOthers = [];
-    private readonly List<RecordKey> _removedRecords = [];
-
-    private int _cleanedModObjects;
-    private int _targetsOverriddenLater;
-    private int _targetsHiddenOrWithoutPlacement;
-    private int _removedByEarlierPatchers;
-    private int _removedByOtherPlugins;
-    private int _othersOverriddenByTarget;
-    private int _othersUnchanged;
-    private int _otherInvalidPlacements;
+    private readonly RecordClassifier _classifier;
+    private readonly ReadCounters _counters;
+    private readonly PlacedObjectFactory _factory;
+    private readonly WorldWithoutCleanedMod _worldWithoutCleanedMod;
+    private readonly CollectedObjectsAssembler _assembler;
+    private readonly GatheredObjects _gathered = new();
 
     private PlacedObjectCollector(ModTrustTable trust, AcceptedWorld world, WhatToCollect plan, PlacedRecordFacts facts)
     {
-        _trust = trust;
-        _world = world;
         _plan = plan;
         _facts = facts;
-        _areaNames = TargetAreaNames.Of(facts.CellAreas);
         _changedAreaRecords = new ChangedAreaRecordCollector(trust, facts);
+        _classifier = new RecordClassifier(trust, world, plan, facts);
+        _counters = new ReadCounters(trust);
+        _factory = new PlacedObjectFactory(plan, facts, TargetAreaNames.Of(facts.CellAreas), _changedAreaRecords);
+        _worldWithoutCleanedMod = new WorldWithoutCleanedMod(trust, plan, facts, _changedAreaRecords);
+        _assembler = new CollectedObjectsAssembler(trust, plan, facts, _changedAreaRecords, _classifier);
     }
 
     /// <param name="World">The accepted world the other mods' records are judged in.</param>
@@ -77,12 +45,9 @@ public sealed class PlacedObjectCollector
 
     public static PlacedObjectsCollected Collect(Input input)
     {
-        var clock = input.TimeSinceStart;
-        var start = clock();
-        var scanned = ScanPlacedRecords(input.Plugin, input.Trust, input.World, input.Plan);
-        var scanEnd = clock();
-        var collected = ReadNonPlacedLinks(scanned, input.Plugin);
-        return new PlacedObjectsCollected(collected, scanEnd - start, clock() - scanEnd);
+        var (scanned, scanTime) = Timed.Run(input.TimeSinceStart, () => ScanPlacedRecords(input.Plugin, input.Trust, input.World, input.Plan));
+        var (collected, linkReadTime) = Timed.Run(input.TimeSinceStart, () => ReadNonPlacedLinks(scanned, input.Plugin));
+        return new PlacedObjectsCollected(collected, scanTime, linkReadTime);
     }
 
     /// <summary>The first part of the step: reads the placed records and sorts them into objects; <see cref="ReadNonPlacedLinks"/> finishes it.</summary>
@@ -93,19 +58,16 @@ public sealed class PlacedObjectCollector
             new PlacedReadScope(
                 trust.CleanedMod,
                 Terrain: true,
-                plan.Navmesh,
-                plan.TerrainVersions,
-                plan.TerrainLayers,
-                plan.Water,
+                plan.Needs.Navmesh,
+                plan.Needs.TerrainVersions,
+                plan.Needs.TerrainLayers,
+                plan.Needs.Water,
                 HoldLocationKeyword,
-                plan.TerrainForChangedObjectsOnly,
+                plan.Needs.TerrainForChangedObjectsOnly,
                 OtherRecordChange.Tolerances,
-                plan.AreaRecordVersions),
+                plan.Needs.AreaRecordVersions),
             candidate => StopsTheWalk(trust, world, plan, candidate));
-        var collector = new PlacedObjectCollector(trust, world, plan, facts);
-        foreach (var record in facts.Records) collector.Collect(record);
-        collector.DecideChangesWithoutCleanedModIfOldPlacesAreJudged();
-        return collector.CreateScannedPlacedRecords();
+        return new PlacedObjectCollector(trust, world, plan, facts).Scan();
     }
 
     /// <summary>
@@ -120,7 +82,7 @@ public sealed class PlacedObjectCollector
     internal static CollectedObjects ReadNonPlacedLinks(ScannedPlacedRecords scanned, IPluginRecords plugin)
     {
         var objects = scanned.Objects;
-        var targetKeys = TargetKeys(objects.Targets);
+        var targetKeys = LinksIntoTargets.KeysOf(objects.Targets);
         var changedKeys = scanned.MarksLinksIntoChangedRecords
             ? objects.ChangedRecords.Select(changed => changed.Key).Concat(objects.ChangedCells.Select(changed => changed.Cell))
             : [];
@@ -128,21 +90,12 @@ public sealed class PlacedObjectCollector
             scanned.CleanedMod,
             targetKeys.Concat(changedKeys).ToHashSet(),
             targetKeys.Select(key => key.Plugin).ToHashSet());
-        var links = KeepLinksIntoTargets(nonPlaced.Links, scanned.RemovedRecords, scanned.CleanedMod, targetKeys);
+        var links = LinksIntoTargets.Keep(nonPlaced.Links, scanned.RemovedRecords, scanned.CleanedMod, targetKeys);
         var linked = scanned.MarksLinksIntoChangedRecords
             ? ChangedAreaRecordCollector.LinkedFromCleanedMod(nonPlaced.Links, scanned.RemovedRecords, scanned.CleanedMod)
             : [];
         return ChangedAreaRecordCollector.MarkLinked(objects with { Links = [.. objects.Links, .. links], UnreadableRecords = nonPlaced.Unreadable }, linked);
     }
-
-    private ScannedPlacedRecords CreateScannedPlacedRecords()
-    {
-        var removed = _removedRecords.ToImmutableHashSet();
-        var placedLinks = KeepLinksIntoTargets(_facts.Links, removed, _trust.CleanedMod, TargetKeys(_targets));
-        return new ScannedPlacedRecords(CreateCollectedObjects(placedLinks, removed), _trust.CleanedMod, removed, _plan.AreaRecordVersions is not null);
-    }
-
-    private static HashSet<RecordKey> TargetKeys(IEnumerable<TargetObject> targets) => targets.Select(target => target.Key).ToHashSet();
 
     /// <remarks>
     /// A version fully trusted in the accepted world has its values accepted whatever lies below it, so no lower version can change
@@ -154,11 +107,18 @@ public sealed class PlacedObjectCollector
     private static bool StopsTheWalk(ModTrustTable trust, AcceptedWorld world, WhatToCollect plan, PluginName plugin) =>
         plugin != trust.CleanedMod
         && world.TrustOf(plugin) == VersionTrust.Full
-        && (!plan.JudgeOldPlaces || trust.AcceptedWorldWithoutCleanedMod.TrustOf(plugin) == VersionTrust.Full);
+        && (!plan.Needs.JudgeOldPlaces || trust.AcceptedWorldWithoutCleanedMod.TrustOf(plugin) == VersionTrust.Full);
+
+    private ScannedPlacedRecords Scan()
+    {
+        foreach (var record in _facts.Records) Collect(record);
+        _worldWithoutCleanedMod.DecideChangesIfOldPlacesAreJudged(_gathered);
+        return _assembler.CreateScannedPlacedRecords(_gathered, _counters);
+    }
 
     private void Collect(PlacedRecordFact record)
     {
-        if (IsCreatedByTarget(record)) _cleanedModObjects++;
+        if (_classifier.IsCreatedByTarget(record)) _counters.CountCleanedModObject();
         _changedAreaRecords.Collect(record);
         if (RemovedForm.IsRemoved(record.Placement.Presence)) CountRemovedRecord(record);
         else CollectByRole(record);
@@ -167,25 +127,9 @@ public sealed class PlacedObjectCollector
     /// <summary>The record's final version is removed in the game, so it is no object of any kind and its links keep nothing.</summary>
     private void CountRemovedRecord(PlacedRecordFact record)
     {
-        _removedRecords.Add(record.Key);
-        if (IsCreatedByTarget(record)) CountRemovedTargetRecord(record.WinningMod);
+        _gathered.RemovedRecords.Add(record.Key);
+        if (_classifier.IsCreatedByTarget(record)) _counters.CountRemovedTargetRecord(record.WinningMod);
     }
-
-    /// <param name="winner">The plugin whose version removes the record; the target's own removal counts with its hidden records.</param>
-    private void CountRemovedTargetRecord(PluginName winner)
-    {
-        if (winner == _trust.Patch) _removedByEarlierPatchers++;
-        else if (winner == _trust.CleanedMod) _targetsHiddenOrWithoutPlacement++;
-        else _removedByOtherPlugins++;
-    }
-
-    /// <summary>
-    /// The links into the target plugin and into the changed objects, without those from removed records. The reader also gives
-    /// the links into the records the target overrides and leaves where they were, which judge nothing.
-    /// </summary>
-    private static ImmutableArray<LinkFact> KeepLinksIntoTargets(
-        IEnumerable<LinkFact> links, IReadOnlySet<RecordKey> removed, PluginName cleanedMod, IReadOnlySet<RecordKey> targetKeys) =>
-        [.. links.Where(link => !removed.Contains(link.Source) && (link.Target.Plugin == cleanedMod || targetKeys.Contains(link.Target)))];
 
     /// <remarks>
     /// Targets define the target spaces, so no placement outside them can matter: a record there is hidden. A target record there
@@ -193,25 +137,25 @@ public sealed class PlacedObjectCollector
     /// </remarks>
     private void CollectByRole(PlacedRecordFact record)
     {
-        var classification = Classify(record);
+        var classification = _classifier.Classify(record);
         var role = classification.Role;
-        var presence = record.InTargetSpace ? StartsDisabledRule.Of(record.Placement, isWinningTarget: classification.IsJudged) : ShownInGame.Hidden;
+        var presence = record.InPluginSpace ? StartsDisabledRule.Of(record.Placement, isWinningTarget: classification.IsJudged) : ShownInGame.Hidden;
 
         if (!classification.IsJudged && role != RecordRole.OtherChanged && presence == ShownInGame.Present)
         {
-            _supportOnlyObjects.Add(CreateOtherObject(record, _plan.OtherModDetails ? record.EditorId : null, change: null));
+            _gathered.SupportOnlyObjects.Add(_factory.CreateOtherObject(record, change: null));
         }
         if (CountIfSkipped(role, record, presence)) return;
 
         if (presence != ShownInGame.Present)
         {
-            if (role == RecordRole.Target) _targetsHiddenOrWithoutPlacement++;
-            else if (presence == ShownInGame.InvalidPlacement) _otherInvalidPlacements++;
+            if (role == RecordRole.Target) _counters.CountTargetHiddenOrWithoutPlacement();
+            else if (presence == ShownInGame.InvalidPlacement) _counters.CountOtherInvalidPlacement();
             return;
         }
 
-        if (classification.Origin is { } origin) AddTarget(record, origin, classification.EarlierVersion);
-        else _otherModObjects.Add(CreateOtherObject(record, _plan.OtherModDetails ? record.EditorId : null, classification.Change));
+        if (classification.Origin is { } origin) _gathered.Targets.Add(_factory.CreateTarget(record, origin, classification.EarlierVersion));
+        else _gathered.OtherModObjects.Add(_factory.CreateOtherObject(record, classification.Change));
     }
 
     /// <returns>True when the record is neither a target nor another mod's object.</returns>
@@ -220,192 +164,18 @@ public sealed class PlacedObjectCollector
         switch (role)
         {
             case RecordRole.TargetOverriddenLater:
-                _targetsOverriddenLater++;
+                _counters.CountTargetOverriddenLater();
                 return true;
             case RecordRole.OverriddenByTarget:
-                _othersOverriddenByTarget++;
-                if (_plan.OtherModDetails) _overriddenOthers.Add(new OverriddenOtherRecord(record.Key, record.EditorId, record.WinningMod));
+                _counters.CountOtherOverriddenByTarget();
+                if (_plan.Needs.OtherModDetails) _gathered.OverriddenOthers.Add(new OverriddenOtherRecord(record.Key, record.EditorId, record.WinningMod));
                 return true;
             case RecordRole.OtherUnchanged:
-                if (presence == ShownInGame.Present) _othersUnchanged++;
-                else if (presence == ShownInGame.InvalidPlacement) _otherInvalidPlacements++;
+                if (presence == ShownInGame.Present) _counters.CountOtherUnchanged();
+                else if (presence == ShownInGame.InvalidPlacement) _counters.CountOtherInvalidPlacement();
                 return true;
             default:
                 return false;
         }
     }
-
-    /// <summary>Creator first: the target's own records, then the records the target overrides, then the rule decides once.</summary>
-    private Classification Classify(PlacedRecordFact record)
-    {
-        if (IsCreatedByTarget(record)) return new(WinsInTargetOrPatch(record) ? RecordRole.Target : RecordRole.TargetOverriddenLater, null, null);
-        if (_facts.OverriddenRecords.Contains(record.Key)) return ClassifyOverriddenRecord(record);
-        var change = OtherRecordChange.Decide(record, _world);
-        return new(change is null ? RecordRole.OtherUnchanged : RecordRole.OtherChanged, change, null);
-    }
-
-    private Classification ClassifyOverriddenRecord(PlacedRecordFact record)
-    {
-        var changed = ChangedObjectKind.Of(record, _trust.CleanedMod, _world, _plan.MovedDistance);
-        return changed switch
-        {
-            { Origin: TargetOrigin.Moved } => new(RecordRole.Moved, null, changed.Value.EarlierVersion),
-            { Origin: TargetOrigin.Replaced } when _plan.ProcessReplaced => new(RecordRole.Replaced, null, changed.Value.EarlierVersion),
-            _ => new(RecordRole.OverriddenByTarget, null, null),
-        };
-    }
-
-    private bool IsCreatedByTarget(PlacedRecordFact record) => record.Key.Plugin == _trust.CleanedMod;
-
-    /// <remarks>The patch's version holds what earlier patchers in this group wrote, so a target record it wins is judged as the patch left it.</remarks>
-    private bool WinsInTargetOrPatch(PlacedRecordFact record) => record.WinningMod == _trust.CleanedMod || record.WinningMod == _trust.Patch;
-
-    private void AddTarget(PlacedRecordFact record, TargetOrigin origin, PlacedVersionFact? earlierVersion)
-    {
-        var (position, rotation) = PlacementOf(record);
-        _targets.Add(new TargetObject(
-            Id: default,
-            Key: record.Key,
-            EditorId: record.EditorId,
-            SpaceKey: record.Space.Key,
-            Cell: record.Cell.Key != record.Space.Key ? record.Cell : null,
-            Transform: new PlacedTransform(position, Mat3.FromEuler(rotation), ReferenceScale.Normalize(record.Scale)),
-            Rotation: rotation,
-            Base: record.Base,
-            IsTeleportDoor: record.IsTeleportDoor,
-            IsPrimitive: record.IsPrimitive,
-            HasMapMarker: record.HasMapMarker,
-            IsPersistent: record.IsPersistent,
-            HasEnableParent: record.Placement.Presence.EnableParent is not null,
-            NamedByScript: record.NamedByScript,
-            HasLocationRefType: record.HasLocationRefType,
-            ReferenceRadius: record.ReferenceRadius,
-            PrimitiveBounds: record.PrimitiveBounds,
-            CollisionLayer: record.Winner.Reference.CollisionLayer,
-            IsCullingVolume: record.Winner.Reference.IsCullingVolume,
-            Area: _areaNames.Name(record.Space, record.Cell.Key, position),
-            Origin: origin,
-            EarlierVersion: earlierVersion is { } earlier ? _changedAreaRecords.CreateEarlierVersion(record, earlier) : null)
-        {
-            CellDeleted = _changedAreaRecords.DeletedInFinalWorld(record.Cell),
-        });
-    }
-
-    private OtherObject CreateOtherObject(PlacedRecordFact record, string? editorId, ObjectChange? change)
-    {
-        var (position, rotation) = PlacementOf(record);
-        return new OtherObject(
-            default,
-            record.Key,
-            record.Space.Key,
-            record.WinningMod,
-            editorId,
-            record.Base,
-            position,
-            rotation,
-            ReferenceScale.Normalize(record.Scale),
-            record.IsPrimitive,
-            record.HasMapMarker,
-            change,
-            RolesOf(record),
-            ChangeWithoutCleanedMod: null)
-        {
-            CellDeleted = _changedAreaRecords.DeletedInFinalWorld(record.Cell),
-        };
-    }
-
-    /// <remarks>
-    /// Only a changed object has an old place to judge, so a run without one decides nothing in the world without the cleaned mod,
-    /// unless the plan asks for every object and some placed record of another plugin the cleaned mod changed can go back.
-    /// </remarks>
-    private void DecideChangesWithoutCleanedModIfOldPlacesAreJudged()
-    {
-        if (!_plan.JudgeOldPlaces) return;
-        var everyObject = _plan.DecideEveryObjectWithoutCleanedMod && _changedAreaRecords.HasChangedRecords;
-        if (!everyObject && _targets.All(target => target.Origin == TargetOrigin.CleanedMod)) return;
-
-        var recordOf = _facts.Records.ToDictionary(record => record.Key);
-        DecideChangesWithoutCleanedMod(_otherModObjects, recordOf);
-        DecideChangesWithoutCleanedMod(_supportOnlyObjects, recordOf);
-    }
-
-    private void DecideChangesWithoutCleanedMod(List<OtherObject> objects, IReadOnlyDictionary<RecordKey, PlacedRecordFact> recordOf)
-    {
-        for (var index = 0; index < objects.Count; index++)
-        {
-            var change = OtherRecordChange.Decide(recordOf[objects[index].Key], _trust.AcceptedWorldWithoutCleanedMod);
-            objects[index] = objects[index] with { ChangeWithoutCleanedMod = change };
-        }
-    }
-
-    private ReferenceRoles RolesOf(PlacedRecordFact record) =>
-        (record.IsPersistent ? ReferenceRoles.Persistent : ReferenceRoles.None)
-        | (record.IsTeleportDoor ? ReferenceRoles.TeleportDoor : ReferenceRoles.None)
-        | (record.Placement.Presence.EnableParent is not null ? ReferenceRoles.HasEnableParent : ReferenceRoles.None)
-        | (record.NamedByScript is not null ? ReferenceRoles.ScriptNamesQuestOrScene : ReferenceRoles.None)
-        | (record.HasLocationRefType ? ReferenceRoles.LocationRefType : ReferenceRoles.None)
-        | (_facts.LinkedFromPlacedRecords.Contains(record.Key) ? ReferenceRoles.LinkedFromPlacedRecord : ReferenceRoles.None)
-        | (record.HasMapMarker ? ReferenceRoles.MapMarker : ReferenceRoles.None);
-
-    /// <remarks>Only for a record whose presence is <see cref="ShownInGame.Present"/>, which has a position and a rotation.</remarks>
-    private static (Vector3 Position, Vector3 Rotation) PlacementOf(PlacedRecordFact record) =>
-        (record.Placement.Position!.Value, record.Placement.EulerRotation!.Value);
-
-    /// <summary>The objects with the placed records' links; the step's second part adds the other links and the unreadable records.</summary>
-    private CollectedObjects CreateCollectedObjects(ImmutableArray<LinkFact> placedLinks, IReadOnlySet<RecordKey> removed)
-    {
-        var targets = _targets
-            .OrderBy(target => target.Key, RecordKeyOrder.Comparer)
-            .Select((target, index) => target with { Id = new TargetId(index) })
-            .ToImmutableArray();
-        var linked = _plan.AreaRecordVersions is not null ? ChangedAreaRecordCollector.LinkedFromCleanedMod(_facts.Links, removed, _trust.CleanedMod) : [];
-        var objects = new CollectedObjects(
-            targets,
-            NumberInKeyOrder(_otherModObjects, firstId: 0),
-            NumberInKeyOrder(_supportOnlyObjects, firstId: _otherModObjects.Count),
-            _changedAreaRecords.OrderChangedRecords(targets),
-            _changedAreaRecords.ChangedCellsInKeyOrder(),
-            _changedAreaRecords.ChangedLandsInKeyOrder(),
-            _changedAreaRecords.ChangedNavmeshesInKeyOrder(),
-            placedLinks,
-            [],
-            _facts.Spaces,
-            new ReadCounts(
-                _facts.RecordsScanned,
-                _cleanedModObjects,
-                _targetsOverriddenLater,
-                _targetsHiddenOrWithoutPlacement,
-                _removedByEarlierPatchers,
-                _removedByOtherPlugins,
-                _othersOverriddenByTarget,
-                _othersUnchanged,
-                _otherInvalidPlacements,
-                _facts.NavmeshCount),
-            [.. _overriddenOthers],
-            TargetWorkOrder.Of(targets),
-            targets.IsEmpty ? new StopReason(StopKind.NoTargetObjects, null) : null)
-        {
-            WinningPresence = WinningPresenceOfTargetSpaces(),
-            WinningPrimitives = WinningPrimitivesOfTargetSpaces(),
-        };
-        return ChangedAreaRecordCollector.MarkLinked(objects, linked);
-    }
-
-    private Dictionary<RecordKey, ReferenceFacts> WinningPrimitivesOfTargetSpaces() =>
-        _facts.Records.Where(record => record is { InTargetSpace: true, IsPrimitive: true }).ToDictionary(record => record.Key, record => record.Winner.Reference);
-
-    private Dictionary<RecordKey, PlacedPresence> WinningPresenceOfTargetSpaces() =>
-        _facts.Records
-            .Where(record => record.InTargetSpace)
-            .Select(record => KeyValuePair.Create(record.Key, WinningPresenceOf(record)))
-            .Where(entry => entry.Value != default)
-            .ToDictionary();
-
-    /// <remarks>Only a record that is Initially Disabled needs its role, which is costly to decide, to tell whether the flag hides it.</remarks>
-    private PlacedPresence WinningPresenceOf(PlacedRecordFact record) =>
-        RemovedForm.PresenceOf(record.Placement.Presence, isWinningTarget: record.Placement.Presence.InitiallyDisabled && Classify(record).IsJudged);
-
-    private static ImmutableArray<OtherObject> NumberInKeyOrder(IEnumerable<OtherObject> others, int firstId) =>
-        DenseNumbering.InOrder(
-            others, other => other.Key, RecordKeyOrder.Comparer, firstId, (other, id) => other with { Id = new OtherId(id) });
 }

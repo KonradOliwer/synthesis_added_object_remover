@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>Judges other mods' objects resting on target objects: keeps the target objects they rest on, or removes or pulls down those left without support with the target objects that go with them. Its support test also answers the fit and restore steps. It holds no packages.</Description>
+    <Description>Judges other mods' objects resting on target objects: keeps the target objects they rest on, or removes or pulls down those left without support with the target objects that go with them. Its support test also answers the keep, resting, fit and restore steps. It holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\OtherModsObjectsLeftWithoutSupport.Contracts\OtherModsObjectsLeftWithoutSupport.Contracts.csproj" />

@@ -1,4 +1,5 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
+using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using Mutagen.Bethesda.Synthesis.Settings;
 
 namespace AddedObjectRemover;
@@ -11,7 +12,7 @@ public class LeftoverInvisibleObjectSettings : ILeftoverSettingsValues
     public bool RemoveLeftoverInvisibleObjects { get; set; } = true;
 
     [SynthesisOrder]
-    [SynthesisSettingName("When the cleaned mod's visible objects around it were removed")]
+    [SynthesisSettingName(SettingNames.SurroundingObjects)]
     [SynthesisTooltip(
         "For each invisible object, the cleaned mod's visible objects around it (the cleaned mod's objects, including other mods' objects it changed) are sorted into 8 directions\n"
         + "(north, north-east, ...) and measured by the ground area they cover. Objects removed by the earlier steps count as removed.\n"
@@ -40,22 +41,22 @@ public class LeftoverInvisibleObjectSettings : ILeftoverSettingsValues
 public class SurroundingObjectsSettings : ISurroundingObjectsSettingsValues
 {
     [SynthesisOrder]
-    [SynthesisSettingName("Look this far around it (game units)")]
+    [SynthesisSettingName(SettingNames.SearchRadius + SettingNames.GameUnitsSuffix)]
     [SynthesisTooltip("Visible objects of the cleaned mod within this distance are its surroundings. A light, sound or trigger box that reaches less far uses its own reach. 64-8192.")]
     public float SearchRadius { get; set; } = SettingDefaults.SearchRadius;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Decide only if at least this many of the 8 directions have objects")]
+    [SynthesisSettingName(SettingNames.MinOccupiedDirections)]
     [SynthesisTooltip("A direction has objects when a visible object of the cleaned mod lies that way. With fewer such directions the invisible object is kept. 1-8.")]
     public int MinOccupiedDirections { get; set; } = SettingDefaults.MinOccupiedDirections;
 
     [SynthesisOrder]
-    [SynthesisSettingName("A direction is cleared when this much of it was removed (%)")]
+    [SynthesisSettingName(SettingNames.DirectionThreshold + SettingNames.PercentSuffix)]
     [SynthesisTooltip("Measured by the ground area the cleaned mod's visible objects cover in that direction. 10-100, in steps of 10.")]
     public int DirectionThresholdPercent { get; set; } = SettingDefaults.DirectionThresholdPercent;
 
     [SynthesisOrder]
-    [SynthesisSettingName("Remove when this share of the directions with objects is cleared (%)")]
+    [SynthesisSettingName(SettingNames.ClearedDirections + SettingNames.PercentSuffix)]
     [SynthesisTooltip(
         "Counted only among the directions that have objects, not among all 8. Example: objects lie in 5 directions and 3 of them are cleared: "
         + "3 of 5 is 60%, so it is removed with 60 or less and kept with 70 or more. 10-100, in steps of 10.")]

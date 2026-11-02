@@ -18,14 +18,8 @@ public sealed record RunOutcome : StepResults
         ImmutableArray<ManualPatchHint> hints,
         WriteSummary written,
         BoundsStats shapes)
-        : base(decided)
-    {
-        Removals = removals;
-        Restorations = restorations;
-        Hints = hints;
-        Written = written;
-        Shapes = shapes;
-    }
+        : base(decided) =>
+        (Removals, Restorations, Hints, Written, Shapes) = (removals, restorations, hints, written, shapes);
 
     public ImmutableArray<ObjectWithReason> Removals { get; }
 

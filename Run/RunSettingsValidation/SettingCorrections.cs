@@ -5,7 +5,7 @@ namespace AddedObjectRemover;
 /// <summary>Replaces an invalid setting value with a valid one and adds one warning saying so.</summary>
 internal static class SettingCorrections
 {
-    private const int PercentStep = 10;
+    internal const int PercentStep = 10;
 
     public static T ValidateDefined<T>(T value, T fallback, string label, ICollection<SettingWarning> warnings) where T : struct, Enum
     {

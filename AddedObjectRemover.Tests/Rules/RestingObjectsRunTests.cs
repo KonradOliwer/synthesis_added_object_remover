@@ -101,7 +101,7 @@ public class RestingObjectsRunTests
         var afterVisible = earlier.Apply(RoundKind.VisibleLeftBehind, [Removal(Table, new VisibleObjectSurroundingsRemoved())]);
 
         var result = RunSeededBy(new Probe(), mode, afterVisible, afterVisible.RoundsAfter(earlier), StepOutcome.SwitchedOff);
-        var applied = afterVisible.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds);
+        var applied = afterVisible.ApplyRounds(AlsoRemoveRounds.Opening, result.ProposedRounds);
 
         Assert.Equal(new[] { new Round(2, RoundKind.VisibleLeftBehind) }, result.SeedRounds.ToArray());
         Assert.True(applied.IsRemoved(new TargetId(ItemOnTable)));
@@ -117,7 +117,7 @@ public class RestingObjectsRunTests
         var afterVisible = earlier.Apply(RoundKind.VisibleLeftBehind, [Removal(2, new VisibleObjectSurroundingsRemoved())]);
 
         var result = RunSeededBy(new Probe(), mode, afterVisible, afterVisible.RoundsAfter(earlier), StepOutcome.SwitchedOff);
-        var applied = afterVisible.ApplyRounds(RoundKind.AlsoRemove, result.ProposedRounds);
+        var applied = afterVisible.ApplyRounds(AlsoRemoveRounds.Opening, result.ProposedRounds);
 
         Assert.True(result.HadSeeds);
         Assert.False(applied.IsRemoved(new TargetId(ItemOnTable)));
@@ -301,7 +301,7 @@ public class RestingObjectsRunTests
     /// <summary>The step's rounds and details seeded by the removals of <paramref name="seedRounds"/> alone; nothing is added to <paramref name="decisions"/>.</summary>
     private static RestingObjectsResult RunSeededBy(
         Probe probe, FollowUpRemovalMode mode, RemovalDecisions decisions, ImmutableArray<Round> seedRounds, StepOutcome reportFiles) =>
-        RestingObjects.Find(
+        RestingObjectsFinder.Find(
             new RestingObjectsInput([.. Targets], decisions, seedRounds, Settings(mode, touchChainsShown: false, reportFiles), new Execution(1), probe.ReadClock, reportFiles),
             CreateCaches(probe));
 

@@ -4,6 +4,7 @@ using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
+using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
 namespace AddedObjectRemover.Steps.FitClashingObjects;
@@ -81,7 +82,7 @@ public static class ClashingObjectFitter
     /// <returns>One result per index, in the given order.</returns>
     private static T[] CheckEach<T>(
         ImmutableArray<TargetObject> targets, IReadOnlyList<int> indexes, Func<TargetObject, T> check, WorkOrder order, Execution execution) =>
-        ParallelMap.RunOver(execution, order, indexes, static () => (object?)null, (index, _) => check(targets[index]), ParallelMap.OneItemPerRange);
+        ParallelMap.RunOver(execution, order, indexes, index => check(targets[index]), ParallelMap.OneItemPerRange);
 
     private static IEnumerable<Trial> TrialsOf(FitGroup group, ImmutableArray<TargetObject> targets, IObjectsToKeep objectsToKeep, IBaseObjectShapes shapes)
     {
@@ -102,14 +103,8 @@ public static class ClashingObjectFitter
     /// </returns>
     private static RemovalReason? ClashWhereItStands(TargetObject target, FitGroup group)
     {
-        if (Stops(CheckOnce(group.Unfittable, target))) return null;
-        return CheckOnce(group.Fittable, target) is { Failure: null, Clash: { } clash } ? clash : null;
-    }
-
-    private static PlacementCheck CheckOnce(IPlacementRule rule, TargetObject target)
-    {
-        using var tries = rule.StartTries(target);
-        return tries.Check(target.Placement);
+        if (Stops(group.Unfittable.CheckWhereItStands(target))) return null;
+        return group.Fittable.CheckWhereItStands(target) is { Failure: null, Clash: { } clash } ? clash : null;
     }
 
     /// <returns>An empty set and the failure when the search stopped unexpectedly: no object is tried then.</returns>

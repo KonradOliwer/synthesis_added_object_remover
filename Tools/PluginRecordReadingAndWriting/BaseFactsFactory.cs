@@ -5,5 +5,5 @@ public sealed class BaseFactsFactory(KnownPluginNames knownPlugins) : IBaseFacts
 {
     public IBaseFacts Open(IRecordIndex records) => new BaseFactsReader(RunLinkCache.CacheOf(records), knownPlugins);
 
-    public IReadOnlyDictionary<uint, CollisionLayerFact> ReadCollisionLayers(IRecordIndex records) => MutagenCalls.Read(() => CollisionLayerReader.Read(RunLinkCache.CacheOf(records)));
+    public IReadOnlyDictionary<uint, CollisionLayerFact> ReadCollisionLayers(IRecordIndex records) => CollisionLayerReader.Read(RunLinkCache.CacheOf(records));
 }

@@ -6,9 +6,10 @@ namespace AddedObjectRemover;
 public static class TerrainQuadrants
 {
     public const int PerSide = 2;
-    public const int VerticesPerSide = 17;
+    public const int Count = PerSide * PerSide;
+    private const int SquaresPerSide = TerrainGrid.SquaresPerSide / PerSide;
+    public const int VerticesPerSide = SquaresPerSide + 1;
     public const int VertexCount = VerticesPerSide * VerticesPerSide;
-    private const int SquaresPerSide = VerticesPerSide - 1;
     private const float Size = ExteriorGrid.CellSize / PerSide;
     private const float HalfWay = 0.5f;
 
@@ -24,7 +25,7 @@ public static class TerrainQuadrants
     /// <summary>Per quadrant, in the order of <see cref="IndexOf"/>, how many of the vertices it holds; a vertex on a common edge counts in each.</summary>
     public static int[] CountPerQuadrant(IEnumerable<int> vertices)
     {
-        var counts = new int[PerSide * PerSide];
+        var counts = new int[Count];
         foreach (var quadrant in vertices.SelectMany(Holding)) counts[quadrant]++;
         return counts;
     }

@@ -1,9 +1,10 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
@@ -11,18 +12,21 @@ namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
 public static class LeftBehindObjects
 {
     /// <param name="OtherModObjects">The other-mod objects that can cause removals (the selection step's view).</param>
-    /// <param name="OtherModObjectsTakenAway">Those of any plugin this run removes or pulls down, by id: no object sits inside them any more.</param>
+    /// <param name="OtherModsObjects">What became of the other mods' objects: no object sits inside one the run removes or pulls down any more.</param>
     /// <param name="Decisions">The newest decisions, which the step's round is added to.</param>
-    /// <param name="Surroundings">The visible target objects, removed or not, where the rounds measure them: a restored one where the cleaned mod put it.</param>
-    /// <param name="Caches">Its base facts and shapes are read.</param>
+    /// <param name="Caches">
+    /// Index the visible target objects, removed or not, where the rounds measure them: a restored one where the cleaned mod put it;
+    /// their base facts and shapes are read.
+    /// </param>
+    /// <param name="Judging">Judges an object by its surroundings and joins a round's decision into its verdict.</param>
     /// <param name="Settings">Null when the step is switched off.</param>
     public sealed record Input(
         ImmutableArray<TargetObject> Targets,
         IObjectsThatCanCauseRemovals OtherModObjects,
-        IReadOnlyDictionary<OtherId, OtherObject?> OtherModObjectsTakenAway,
+        OtherModsObjectsResult OtherModsObjects,
         IRunDecisions Decisions,
-        IVisibleTargetObjects Surroundings,
         IRunCaches Caches,
+        ILeftBehindJudging Judging,
         WorkOrder Order,
         Execution Execution,
         LeftBehindSettings? Settings);
@@ -45,19 +49,22 @@ public static class LeftBehindObjects
         if (input.Settings is not { } settings) return LeftBehindResult.SwitchedOff;
 
         var (targets, shapes, order, execution) = (input.Targets, input.Caches.Shapes, input.Order, input.Execution);
-        var takenAway = input.OtherModObjectsTakenAway.Keys.ToHashSet();
+        var takenAway = input.OtherModsObjects.TakenAway().Keys.ToHashSet();
+        var surroundings = input.Caches.IndexVisibleTargets(input.Decisions.TargetsAsTheRoundsMeasureThem(targets));
         return Failures.Attempt(
             () => JoinVerdicts(
                 new LeftBehindRule(
                         targets,
                         shapes,
-                        input.Surroundings,
+                        surroundings,
                         ContainingObjectFinder.Find(targets, shapes, input.OtherModObjects, takenAway, order, execution),
                         new ReachRule(input.Caches.Bases),
+                        input.Judging,
                         settings,
                         order)
                     .SelectRemovals(input.Decisions, execution),
-                input.Decisions),
+                input.Decisions,
+                input.Judging),
             failure => new LeftBehindResult(StepOutcome.StoppedByUnexpectedError, [], [], PartFailure.OfWholePart(LeftBehindParts.LeftBehind, failure)));
     }
 
@@ -65,7 +72,7 @@ public static class LeftBehindObjects
     /// The result with the round decided on a copy of the decisions: an object the round kept is kept as referenced, and one it removed
     /// as a linked group member is removed as linked.
     /// </returns>
-    private static LeftBehindResult JoinVerdicts(LeftBehindResult evaluated, IRemovalDecisions decisions)
+    private static LeftBehindResult JoinVerdicts(LeftBehindResult evaluated, IRemovalDecisions decisions, ILeftBehindJudging judging)
     {
         var decided = decisions.DecideRoundOnCopy(RoundKind.LeftBehind, [.. evaluated.Proposals]);
         Func<TargetId, Decision?> decisionOf = target => decided.GetValueOrDefault(target);
@@ -74,7 +81,7 @@ public static class LeftBehindObjects
             Evaluations =
             [
                 .. evaluated.Evaluations.Select(evaluation =>
-                    LeftBehindVerdicts.JoinRoundDecision(evaluation, decisionOf(new TargetId(evaluation.TargetIndex)), decisionOf)),
+                    judging.JoinRoundDecision(evaluation, decisionOf(new TargetId(evaluation.TargetIndex)), decisionOf)),
             ],
         };
     }

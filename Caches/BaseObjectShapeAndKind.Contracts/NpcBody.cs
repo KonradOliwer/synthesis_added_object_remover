@@ -12,8 +12,7 @@ public enum NpcSizeSource
 /// <summary>
 /// The body of an NPC as an upright box standing on the placement point, in NPC-local units at
 /// reference scale 1 (the race and NPC height are already applied). A <see cref="NpcSizeSource.Point"/>
-/// body is a zero-size box at the placement point, so it is stuck only when its feet are deeper
-/// in the target than the foot clearance of the stuck test.
+/// body is a zero-size box at the placement point.
 /// </summary>
 /// <param name="PointReason">Why the real size could not be determined; set only for <see cref="NpcSizeSource.Point"/>.</param>
 public sealed record NpcBody(NpcSizeSource Source, Box LocalBox, PointReason? PointReason)

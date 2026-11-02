@@ -45,7 +45,7 @@ public class LogSequenceTests
         RemovedAndMarkersMoved,
     }
 
-    private static IMeshFilesFactory DefaultMeshFiles(string dataFolder, Mutagen.Bethesda.GameRelease release, IReadOnlyList<Mutagen.Bethesda.Plugins.ModKey> listedPlugins) =>
+    private static IMeshFilesFactory DefaultMeshFiles(string dataFolder, Mutagen.Bethesda.GameRelease release, IReadOnlyList<PluginName> listedPlugins) =>
         new MeshFilesFactory(dataFolder, release, listedPlugins);
 
     /// <summary>Each section as its id, then its lines masked as the end-to-end log is.</summary>

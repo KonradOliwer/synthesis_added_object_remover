@@ -37,12 +37,7 @@ public static class TriangleDistance
         if (d3 >= 0 && d4 <= d3) return b;
 
         var vc = d1 * d4 - d3 * d2;
-        if (vc <= 0 && d1 >= 0 && d3 <= 0)
-        {
-            var abDenominator = d1 - d3;
-            var v = abDenominator != 0 ? d1 / abDenominator : 0f;
-            return a + v * ab;
-        }
+        if (vc <= 0 && d1 >= 0 && d3 <= 0) return PointAlongEdge(a, ab, d1, d1 - d3);
 
         var cp = p - c;
         var d5 = Vector3.Dot(ab, cp);
@@ -50,20 +45,10 @@ public static class TriangleDistance
         if (d6 >= 0 && d5 <= d6) return c;
 
         var vb = d5 * d2 - d1 * d6;
-        if (vb <= 0 && d2 >= 0 && d6 <= 0)
-        {
-            var acDenominator = d2 - d6;
-            var w = acDenominator != 0 ? d2 / acDenominator : 0f;
-            return a + w * ac;
-        }
+        if (vb <= 0 && d2 >= 0 && d6 <= 0) return PointAlongEdge(a, ac, d2, d2 - d6);
 
         var va = d3 * d6 - d5 * d4;
-        if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0)
-        {
-            var bcDenominator = (d4 - d3) + (d5 - d6);
-            var w = bcDenominator != 0 ? (d4 - d3) / bcDenominator : 0f;
-            return b + w * (c - b);
-        }
+        if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) return PointAlongEdge(b, c - b, d4 - d3, (d4 - d3) + (d5 - d6));
 
         // Equals |ab x ac|^2 in exact arithmetic; rounding can still cancel it when p is far from the triangle.
         var sum = va + vb + vc;
@@ -72,6 +57,13 @@ public static class TriangleDistance
         var vv = vb * denominator;
         var ww = vc * denominator;
         return a + ab * vv + ac * ww;
+    }
+
+    /// <summary>The point at numerator / denominator of the way along <paramref name="edge"/> from <paramref name="origin"/>; the origin when the denominator is 0.</summary>
+    private static Vector3 PointAlongEdge(Vector3 origin, Vector3 edge, float numerator, float denominator)
+    {
+        var fraction = denominator != 0 ? numerator / denominator : 0f;
+        return origin + fraction * edge;
     }
 
     private static Vector3 ClosestPointOnEdges(Vector3 p, Vector3 a, Vector3 b, Vector3 c)

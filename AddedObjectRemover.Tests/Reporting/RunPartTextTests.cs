@@ -78,16 +78,7 @@ public class RunPartTextTests
     }
 
     [Fact]
-    public void ALoaderStartUpWhoseReloadedFileHeldNoBlocksIsWordedAsToday()
-    {
-        Assert.Equal(
-            "  Unexpected error in the NIF loader start-up (the minimal NIF it saved and loaded again held no blocks). "
-            + "Meshes are read one at a time, which is slower; the results are not affected.",
-            Assert.Single(LinesOf(new PartFailure(MeshReadingParts.LoaderStartUp, Failure: null, Subject: null))));
-    }
-
-    [Fact]
-    public void AFailureWithoutExceptionOfAKeyWithoutSuchWordingThrows()
+    public void AFailureWithoutExceptionThrows()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => RunPartText.Word(new PartFailure(RestingObjectsParts.AlsoRemove, Failure: null, Subject: null)));
     }

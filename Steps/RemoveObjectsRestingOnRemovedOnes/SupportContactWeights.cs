@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
@@ -15,7 +16,7 @@ internal static class SupportContactWeights
     public static bool ReachesThreshold(float removedShare, float threshold) =>
         Tolerant.AtLeast(removedShare, threshold, ShareRoundingTolerance);
 
-    public static CandidateContacts SplitWeightsAmongSupporters(IReadOnlyList<SupporterHits> hitsBySupporter, float[] weights)
+    public static CandidateContacts SplitWeightsAmongSupporters(IReadOnlyList<SupporterHits> hitsBySupporter, ImmutableArray<float> weights)
     {
         var supportersPerPoint = CountSupportersPerPoint(hitsBySupporter, weights.Length);
         var bySupporter = new List<SupporterWeight>();

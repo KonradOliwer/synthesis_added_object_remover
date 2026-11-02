@@ -8,10 +8,14 @@ internal readonly record struct CodeToken(string Text, int Line, string Word = "
 /// <summary>
 /// Reads C# source into tokens for the copied-code scan. Comments are dropped, every string or character
 /// literal is one token, names and numbers are replaced by placeholders so a copy with renamed variables still
-/// matches. Lines that hold only braces, a using or an attribute are dropped, because they repeat everywhere.
+/// matches. Lines that hold only braces, a using or an attribute are dropped, because they repeat everywhere, and so
+/// are lists: three or more lines in a row with the same tokens (switch arms, one item or one axis per line), whose
+/// items differ while their placeholders repeat.
 /// </summary>
 internal static class CodeTokens
 {
+    private const int MinLinesOfAList = 3;
+
     public const string Name = "name";
     public const string Number = "number";
     public const string Text = "text";
@@ -30,16 +34,30 @@ internal static class CodeTokens
     private const int MinimumRawQuotes = 3;
     private static readonly string[] LineOnlyPunctuation = ["{", "}", ";", ","];
 
-    /// <summary>The tokens that count for the scan: comments and lines of braces, usings and attributes removed.</summary>
+    /// <summary>The tokens that count for the scan: comments, lines of braces, usings and attributes, and lists removed.</summary>
     public static IReadOnlyList<CodeToken> Significant(string source)
     {
-        var significant = new List<CodeToken>();
-        foreach (var line in Tokenize(source).GroupBy(token => token.Line).OrderBy(group => group.Key))
+        var lines = Tokenize(source).GroupBy(token => token.Line).OrderBy(group => group.Key)
+            .Select(line => line.ToList())
+            .Where(tokens => !IsSkippedLine(tokens))
+            .ToList();
+        return WithoutLists(lines).SelectMany(line => line).ToList();
+    }
+
+    private static IEnumerable<List<CodeToken>> WithoutLists(List<List<CodeToken>> lines)
+    {
+        var shapes = lines.Select(line => string.Join(" ", line.Select(token => token.Text))).ToList();
+        var start = 0;
+        while (start < lines.Count)
         {
-            var tokens = line.ToList();
-            if (!IsSkippedLine(tokens)) significant.AddRange(tokens);
+            var end = start + 1;
+            while (end < lines.Count && shapes[end] == shapes[start]) end++;
+            if (end - start < MinLinesOfAList)
+            {
+                for (var line = start; line < end; line++) yield return lines[line];
+            }
+            start = end;
         }
-        return significant;
     }
 
     public static IReadOnlyList<CodeToken> Tokenize(string source)

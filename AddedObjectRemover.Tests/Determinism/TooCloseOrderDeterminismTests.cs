@@ -67,12 +67,15 @@ public class TooCloseOrderDeterminismTests
         var world = TestScenes.Create(scene.Targets, scene.OtherModObjects, Shapes, bodies: NewBodies(), threads: Threads);
         return TooCloseObjects.Find(
             new(
-                TestScenes.CreateWorld(scene.Targets, scene.OtherModObjects) with { Order = order },
-                world.VisibleTargets,
-                world.Selected(replacements, settings.Npcs),
-                world.PlacedNpcs,
-                Shapes,
-                new TriangleStore(Shapes.ReadTriangles),
+                new(
+                    scene.Targets,
+                    world.VisibleTargets,
+                    world.Selected(replacements, settings.Npcs),
+                    world.PlacedNpcs,
+                    Shapes,
+                    new TriangleStore(Shapes.ReadTriangles)),
+                TestScenes.CreateWorld(scene.Targets, scene.OtherModObjects),
+                order,
                 new Execution(Threads),
                 [TestJudgedGroups.OfAll(scene.Targets, settings)],
                 TestSeededDecisions.StartUnprotected(scene.Targets))).Result.Passes.Single();

@@ -19,7 +19,7 @@ internal sealed record AreaRecordHandles(
     LandRecordParts LandParts);
 
 /// <summary>
-/// The plugin tool's record map: the winning load-order records of the target spaces, which can be written, by <see cref="RecordKey"/>.
+/// The plugin tool's record map: the winning load-order records of the plugin spaces, which can be written, by <see cref="RecordKey"/>.
 /// Only the plugin tool reads it.
 /// </summary>
 /// <param name="parts">The part table the reader compared the records' parts with, so a part is written exactly as it was compared.</param>
@@ -37,7 +37,7 @@ internal sealed class RecordHandles(
 
     public IPlacedGetter RecordOf(RecordKey key) => handles[key].Record;
 
-    /// <returns>Null when the record is no winning placed record of the target spaces.</returns>
+    /// <returns>Null when the record is no winning placed record of the plugin spaces.</returns>
     public IPlacedGetter? FindRecord(RecordKey key) => handles.TryGetValue(key, out var handle) ? handle.Record : null;
 
     /// <summary>The version of the record just below the read's plugin's, for a record the read's plugin overrides. A writer copies it; it never changes it.</summary>
@@ -57,7 +57,7 @@ internal sealed class RecordHandles(
     /// <summary>Every plugin's navmesh info map, in load order. A writer copies them; it never changes them.</summary>
     public ImmutableArray<NavmeshMapVersion> NavmeshMaps => AreaRecords.Navmeshes.Maps;
 
-    /// <summary>The navmeshes read, the navmesh info maps and the door links of the target spaces. A reader never changes them.</summary>
+    /// <summary>The navmeshes read, the navmesh info maps and the door links of the plugin spaces. A reader never changes them.</summary>
     public NavmeshRecordHandles NavmeshRecords => AreaRecords.Navmeshes;
 
     public CellRecordParts CellParts => AreaRecords.CellParts;

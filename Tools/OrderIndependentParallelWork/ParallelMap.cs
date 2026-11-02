@@ -12,7 +12,7 @@ public interface IWork<TSelf> where TSelf : IWork<TSelf>
 }
 
 /// <summary>
-/// The only way steps run work in parallel. Result i is always body(i), whatever the order or the
+/// The only way work is run in parallel. Result i is always body(i), whatever the order or the
 /// number of workers, and work counts are summed with an associative and commutative add, so
 /// neither depends on scheduling. The order only groups items that share cached data.
 /// </summary>
@@ -106,6 +106,10 @@ public static class ParallelMap
         Func<int, TScratch, TOut> body,
         int rangeSize) =>
         Run(execution, order.Among(indices), newScratch, (position, scratch) => body(indices[position], scratch), rangeSize);
+
+    /// <summary>As the other <c>RunOver</c>, with no per-worker buffers.</summary>
+    public static TOut[] RunOver<TOut>(Execution execution, WorkOrder order, IReadOnlyList<int> indices, Func<int, TOut> body, int rangeSize) =>
+        RunOver(execution, order, indices, static () => (object?)null, (index, _) => body(index), rangeSize);
 
     /// <summary>As the other <c>RunOver</c>, also summing the work counts.</summary>
     public static (TOut[] Results, TWork Work) RunOver<TScratch, TOut, TWork>(

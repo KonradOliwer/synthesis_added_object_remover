@@ -11,7 +11,7 @@
     <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
     <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
-    <ProjectReference Include="..\FitClashingObjects.Contracts\FitClashingObjects.Contracts.csproj" />
+    <ProjectReference Include="..\JudgeChangedObjects.Contracts\JudgeChangedObjects.Contracts.csproj" />
     <ProjectReference Include="..\OtherModsObjectsLeftWithoutSupport.Contracts\OtherModsObjectsLeftWithoutSupport.Contracts.csproj" />
     <ProjectReference Include="..\RemoveTooCloseObjects.Contracts\RemoveTooCloseObjects.Contracts.csproj" />
     <ProjectReference Include="..\..\Tools\IndexGraphQueries\IndexGraphQueries.csproj" />
@@ -23,6 +23,7 @@
     <ProjectReference Include="..\..\Tools\ComputedOnceLookups\ComputedOnceLookups.csproj" />
     <ProjectReference Include="..\..\Tools\GroundSurfaceQueries\GroundSurfaceQueries.csproj" />
     <ProjectReference Include="..\..\Tools\NumericRanges\NumericRanges.csproj" />
+    <ProjectReference Include="..\..\Tools\KeyedGroupingInInputOrder\KeyedGroupingInInputOrder.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />

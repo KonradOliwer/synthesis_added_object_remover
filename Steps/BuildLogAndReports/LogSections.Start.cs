@@ -5,7 +5,6 @@ using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
-using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
@@ -55,7 +54,7 @@ internal static partial class LogSections
         [
             $"Other mods' objects {target} changed: moved farther than {settings.Read.MovedDistance} units: "
                 + $"{DescribeWhenRemoved(settings.ChangedObjects.Moved, collision.ResizeMoved, collision.ResizeLimits)}; replaced: {replaced}.",
-            .. collision.TooClose == settings.Collision.TooClose && collision.ChangedTerrain == settings.Collision.ChangedTerrain
+            .. collision.TooClose == settings.Collision.TooClose && collision.ChangedTerrain.AsRun == settings.Collision.ChangedTerrain.AsRun
                 ? [$"{collisionLabel}as for {target}'s objects."]
                 : DescribeTooCloseAndChangedTerrain(collision.TooClose, collision.ChangedTerrain, collisionLabel),
         ];
@@ -98,7 +97,7 @@ internal static partial class LogSections
     private static string DescribeChangedTerrain(ChangedTerrainSettings terrain)
     {
         const string group = "Remove objects on terrain changed by other mods";
-        if (!terrain.On) return $"{group}: off.";
+        if (!terrain.Runs) return $"{group}: off.";
 
         return $"{group}: on; Which of the cleaned mod's objects are checked: {terrain.Objects}; "
             + $"Margin by object size: {OnWith(terrain.AreaBySize, $"{terrain.AreaMultiplier} x object size")}; "
@@ -148,8 +147,6 @@ internal static partial class LogSections
         _ => throw new UnreachableException($"Unknown stop kind {reason.Kind}."),
     };
 
-    private static string JoinOrNone(IEnumerable<string> names) => TextLists.JoinOr(names, Describe.ListSeparator, "(none)");
-
     /// <remarks>The gap and the share are printed in every mode, since other mods' objects are judged by them whatever the mode.</remarks>
     private static string DescribeAlsoRemove(AlsoRemoveSettings settings, OtherModsObjectsSettings otherModsObjects) =>
         $"Also remove what rests on removed objects: {settings.Mode}; Gap that still counts as touching: {settings.TouchGap} units; "
@@ -171,10 +168,10 @@ internal static partial class LogSections
         + $"Remove when this share of the directions with objects is cleared: {surroundings.ClearedDirectionsPercent}%; "
         + $"Never remove these as {objectsKind} objects left behind: {TextLists.JoinOr(protectedKindNames, Describe.ListSeparator, Describe.NoEntries)}";
 
-    private static string DescribeRestoreWhereRemoved(WhereRemovedRestoreSettings? restore)
+    private static string DescribeRestoreWhereRemoved(WhereRemovedRestoreSettings restore)
     {
         const string group = "Restore where the cleaned mod was removed";
-        if (restore is null) return $"{group}: off.";
+        if (!restore.Runs) return $"{group}: off.";
 
         var area = restore.ClearedArea;
         var terrainEdges = restore.Terrain ? $"; terrain edges blended over {restore.TerrainEdgeBlendDistance} units" : string.Empty;
@@ -195,5 +192,5 @@ internal static partial class LogSections
         settings.LeftBehind is not { } leftovers
             ? $"{LeftBehindStepName}: off."
             : $"{DescribeLeftBehindStep(LeftBehindStepName, leftovers.Surroundings, "invisible", leftovers.NeverRemove.Order().Select(ObjectVisibilityText.KindName))}; "
-                + $"Move kept markers out of other mods' objects: {OnOff(settings.MarkerMoves != null)}.";
+                + $"Move kept markers out of other mods' objects: {OnOff(settings.MarkerMoves.Runs)}.";
 }

@@ -151,7 +151,7 @@ public class VisibleLeftBehindFollowUpRunTests
             Assert.Single(log.Sections.Single(section => section.Id == "follow-up-after-visible").Lines));
     }
 
-    private static IMeshFilesFactory DefaultMeshFiles(string dataFolder, Mutagen.Bethesda.GameRelease release, IReadOnlyList<ModKey> listedPlugins) =>
+    private static IMeshFilesFactory DefaultMeshFiles(string dataFolder, Mutagen.Bethesda.GameRelease release, IReadOnlyList<PluginName> listedPlugins) =>
         new MeshFilesFactory(dataFolder, release, listedPlugins);
 
     private static Settings CreateSettings(FollowUpRemovalMode mode) => RingWorld.CreateSettings(mode);

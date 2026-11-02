@@ -19,7 +19,7 @@ public sealed class RemovalRoundTripTests
 
     private static readonly Vector3 MovedTo = new(Spacing, Spacing, 0);
 
-    private static readonly WhatToCollect Plan = new(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false);
+    private static readonly WhatToCollect Plan = new(new ScanNeeds(), SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false);
 
     private readonly FixtureMod _baseGame = new("Skyrim.esm");
     private readonly FixtureMod _second;
@@ -158,7 +158,7 @@ public sealed class RemovalRoundTripTests
     }
 
     private static void Write(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, IPluginRecords reader, IReadOnlyList<WriteOrder> orders) =>
-        new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod).Write(reader.ReadWritableRecords(), orders);
+        new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod, Program.PatchMarkerText).Write(reader.ReadWritableRecords(), orders);
 
     private PlacedObject PlaceCrateLinkedTo(PlacedObject pad, string name, FormKey crateBase, int row)
     {

@@ -7,8 +7,8 @@ using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 namespace AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals;
 
 /// <summary>
-/// Step 3: from the other mods' objects, finds the ones a target object replaces and the ones that can cause removals.
-/// The measurement rules of the object caches belong to this step; the runner passes them to the caches.
+/// From the other mods' objects, finds the ones a target object replaces and the ones that can cause removals.
+/// The measurement rules of the object caches belong to this step.
 /// </summary>
 public static class RemovalCauseSelector
 {

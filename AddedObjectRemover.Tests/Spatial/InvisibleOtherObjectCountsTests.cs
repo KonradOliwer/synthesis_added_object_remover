@@ -1,5 +1,7 @@
 using System.Numerics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
+using AddedObjectRemover.Steps.RemoveTooCloseObjects;
+using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Skyrim;
@@ -40,14 +42,18 @@ public class InvisibleOtherObjectCountsTests
         var scene = TestScenes.Create(targets, otherModObjects, Shapes);
         var world = TestScenes.CreateWorld(targets, otherModObjects);
 
-        var census = InvisibleOtherObjectCounter.Take(world, Shapes, scene.VisibleTargets);
+        var census = OtherObjectsLeftOutCounter.Take(world, Shapes, scene.VisibleTargets);
 
         Assert.Equal(
-            new[] { KeyValuePair.Create("Map markers", 1), KeyValuePair.Create("base not found", 1) },
-            census.InvisibleByReason);
+            new[]
+            {
+                new InvisibleObjectCount(ObjectVisibility.MissingBase, 1),
+                new InvisibleObjectCount(ObjectVisibility.Invisible(InvisibleObjectKind.MapMarkers), 1),
+            },
+            census.Invisible.ToArray());
         Assert.Equal(1, census.PlacedNpcs);
         QueryEveryOtherModObjectOfTheSpace(scene, otherModObjects.Count);
-        Assert.Equal(census.InvisibleByReason, InvisibleOtherObjectCounter.Take(world, Shapes, scene.VisibleTargets).InvisibleByReason);
+        Assert.Equal(census.Invisible.ToArray(), OtherObjectsLeftOutCounter.Take(world, Shapes, scene.VisibleTargets).Invisible.ToArray());
     }
 
     /// <summary>What a too-close search asks, so the census can show it does not depend on those questions.</summary>

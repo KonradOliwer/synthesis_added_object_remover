@@ -20,7 +20,7 @@ public sealed class ChangedNavmeshCollectingTests
     private const short DoorTriangle = 1;
     private const short LinkedTriangle = 0;
 
-    private static readonly WhatToCollect Plan = new(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false, AreaRecordVersions: new AreaRecordReads(new AreaPartTolerances(8f, 8f), Cells: true, Lands: true));
+    private static readonly WhatToCollect Plan = new(new ScanNeeds(AreaRecordVersions: new AreaRecordReads(new AreaPartTolerances(8f, 8f), Cells: true, Lands: true)), SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false);
     private static readonly PluginName Patch = FixturePatcherState.PatchModKey.ToPluginName();
 
     private readonly FixtureMod _base = new("Base.esm");
@@ -123,7 +123,7 @@ public sealed class ChangedNavmeshCollectingTests
 
         var changed = ChangedNavmeshOf(Collect());
 
-        Assert.Equal((NavmeshCase.DeletedWithoutReplacement, (PartOutcome)new PartOutcome.Undo()), (changed.Case, changed.Presence));
+        Assert.Equal((NavmeshCase.Deleted, (PartOutcome)new PartOutcome.Undo()), (changed.Case, changed.Presence));
         Assert.True(changed.Current.IsDeleted);
         Assert.False(changed.Earlier!.IsDeleted);
         Assert.Equal(changed.Earlier.Triangles.ToList(), changed.Current.Triangles.ToList());
@@ -139,7 +139,7 @@ public sealed class ChangedNavmeshCollectingTests
         var collected = Collect();
 
         var deleted = ChangedNavmeshOf(collected);
-        Assert.Equal((NavmeshCase.DeletedAndReplaced, added.ToRecordKey()), (deleted.Case, Assert.Single(deleted.ReplacedBy)));
+        Assert.Equal((NavmeshCase.Deleted, added.ToRecordKey()), (deleted.Case, Assert.Single(deleted.ReplacedBy)));
         var addedFact = Assert.Single(collected.ChangedNavmeshes, navmesh => navmesh.Navmesh == added.ToRecordKey());
         Assert.Equal((NavmeshCase.Added, (PartOutcome)new PartOutcome.Undo(), (PartOutcome)new PartOutcome.Undo()), (addedFact.Case, addedFact.Geometry, addedFact.Presence));
         Assert.Null(addedFact.Earlier);
@@ -153,7 +153,7 @@ public sealed class ChangedNavmeshCollectingTests
 
         var collected = Collect();
 
-        Assert.Equal(NavmeshCase.DeletedWithoutReplacement, ChangedNavmeshOf(collected).Case);
+        Assert.Empty(ChangedNavmeshOf(collected).ReplacedBy);
         Assert.Equal(NavmeshCase.Added, Assert.Single(collected.ChangedNavmeshes, navmesh => navmesh.Navmesh == added.ToRecordKey()).Case);
     }
 
@@ -400,7 +400,7 @@ public sealed class ChangedNavmeshCollectingTests
         NavmeshCopyIn(_cleaned.Mod).IsDeleted = true;
         AddNavmeshOfTheCleanedMod(minX: Size / 4);
 
-        Assert.Empty(Collect(plan: Plan with { AreaRecordVersions = null }).ChangedNavmeshes);
+        Assert.Empty(Collect(plan: Plan with { Needs = Plan.Needs with { AreaRecordVersions = null } }).ChangedNavmeshes);
     }
 
     [Fact]

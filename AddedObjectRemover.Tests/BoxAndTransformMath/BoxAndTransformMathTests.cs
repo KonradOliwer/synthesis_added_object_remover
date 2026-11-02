@@ -87,6 +87,19 @@ public class BoxAndTransformMathTests
     }
 
     [Theory]
+    [InlineData(1f, 2f, 0f, 1f)]
+    [InlineData(4f, -2f, 0.5f, 1.5f)]
+    public void NarrowToSlabKeepsThePartOfTheRangeBetweenTheSlabsPlanesInEitherDirection(float origin, float direction, float expectedEntry, float expectedExit)
+    {
+        var entry = 0f;
+        var exit = 10f;
+
+        Boxes.NarrowToSlab(origin, direction, min: 1f, max: 3f, ref entry, ref exit);
+
+        Assert.Equal((expectedEntry, expectedExit), (entry, exit));
+    }
+
+    [Theory]
     [InlineData(15f, 6f, 7f, true)]
     [InlineData(11f, 2f, 3f, true)]
     [InlineData(15.001f, 6f, 7f, false)]

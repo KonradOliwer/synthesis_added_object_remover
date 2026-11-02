@@ -17,7 +17,8 @@ namespace AddedObjectRemover;
 /// Builds the final world from the Synthesis state's plugins, the patch being written and the game's plugin list. The patch sits
 /// at the position of its entry in the list (the end when it has none); only the enabled entries after it are opened.
 /// </summary>
-public sealed class FinalWorldFactory(PluginOpener openPlugins)
+/// <param name="patchMarker">The text in a plugin's header description that marks it as this patcher's output.</param>
+public sealed class FinalWorldFactory(PluginOpener openPlugins, string patchMarker)
 {
     /// <summary>
     /// Opens the plugins as lazy read-only views, as Synthesis opens its own. Synthesis does not hand its language and encoding
@@ -33,10 +34,6 @@ public sealed class FinalWorldFactory(PluginOpener openPlugins)
     /// </param>
     /// <param name="patch">The patch being written; it replaces any old copy of itself on disk.</param>
     public FinalWorld Create(
-        IEnumerable<IModListing<ISkyrimModGetter>> stateListings, ISkyrimModGetter patch, PluginListRead.Found pluginList, DirectoryPath dataFolder) =>
-        MutagenCalls.Read(() => OpenAndReadPlugins(stateListings, patch, pluginList, dataFolder));
-
-    private FinalWorld OpenAndReadPlugins(
         IEnumerable<IModListing<ISkyrimModGetter>> stateListings, ISkyrimModGetter patch, PluginListRead.Found pluginList, DirectoryPath dataFolder)
     {
         var opened = openPlugins(dataFolder, EnabledEntriesBelow(patch.ModKey, pluginList));
@@ -46,7 +43,7 @@ public sealed class FinalWorldFactory(PluginOpener openPlugins)
                 .Append(new ModListing<ISkyrimModGetter>(patch, enabled: true))
                 .Concat(opened.ListedOrder.Where(listing => listing.Mod != null)),
             disposeItems: false);
-        return new FinalWorld(order, patch.ModKey, LoadOrderPluginsReader.Read(order, patch.ModKey, pluginList, MissingPlugins(opened)), opened);
+        return new FinalWorld(order, patch.ModKey, LoadOrderPluginsReader.Read(order, patch.ModKey, pluginList, MissingPlugins(opened), patchMarker), opened);
     }
 
     /// <remarks>The patch's own entry is never opened, enabled or not: an old copy of the patch on disk is not part of the final world.</remarks>

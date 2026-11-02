@@ -18,7 +18,7 @@ public enum NavmeshRule
     /// <summary>V3: each edge link names a triangle that links back over an edge whose vertices coincide.</summary>
     Links,
 
-    /// <summary>V4: door triangles and the navmesh links of the doors that stand name each other; door triangles brought back name only doors that stand.</summary>
+    /// <summary>V4: door triangles and the navmesh links of the doors that stand name each other; door triangles copied from an earlier version name only doors that stand.</summary>
     Doors,
 
     /// <summary>V5: the bounds hold every vertex, and the grid comes from a version with as many triangles.</summary>
@@ -79,7 +79,7 @@ public enum NavmeshFaultKind
     /// <summary>A door triangle names a door that does not resolve or is deleted.</summary>
     DoorMissing,
 
-    /// <summary>A door triangle brought back names a door that does not stand.</summary>
+    /// <summary>A door triangle copied from an earlier version names a door that does not stand.</summary>
     DoorDoesNotStand,
 
     /// <summary>A door triangle names a door whose navmesh link names another navmesh or triangle, or none.</summary>
@@ -185,22 +185,18 @@ public interface INavmeshWorldView
 /// </summary>
 public static class NavmeshConsistency
 {
-    private const float VertexTolerance = PlacedPartTolerances.ResavedPosition;
-
-    private const int CornerCount = 3;
-
-    /// <param name="broughtBack">The named navmeshes whose triangles were brought back from an earlier version.</param>
+    /// <param name="copiedFromEarlier">The named navmeshes whose triangles were copied from an earlier version.</param>
     /// <param name="doorsThatDoNotStand">
-    /// Placed records removed although the world does not mark them deleted. Like a deleted door, one that does not stand has its
-    /// navmesh link checked neither way, and a door triangle brought back may not name it.
+    /// Placed records that do not stand although the world does not mark them deleted. Like a deleted door, one that does not stand
+    /// has its navmesh link checked neither way, and a door triangle copied from an earlier version may not name it.
     /// </param>
     /// <returns>The first fault, navmesh by navmesh in key order and rule by rule; null when every checked navmesh passes.</returns>
     public static NavmeshFault? FirstFault(
-        INavmeshWorldView world, IReadOnlyCollection<RecordKey> navmeshes, IReadOnlySet<RecordKey> broughtBack, IReadOnlySet<RecordKey> doorsThatDoNotStand)
+        INavmeshWorldView world, IReadOnlyCollection<RecordKey> navmeshes, IReadOnlySet<RecordKey> copiedFromEarlier, IReadOnlySet<RecordKey> doorsThatDoNotStand)
     {
         foreach (var key in NavmeshesToCheck(world, navmeshes))
         {
-            if (FirstFaultOf(world, broughtBack.Contains(key), doorsThatDoNotStand, key) is { } fault) return fault;
+            if (FirstFaultOf(world, copiedFromEarlier.Contains(key), doorsThatDoNotStand, key) is { } fault) return fault;
         }
         return null;
     }
@@ -220,13 +216,13 @@ public static class NavmeshConsistency
         return toCheck.Order(RecordKeyOrder.Comparer);
     }
 
-    private static NavmeshFault? FirstFaultOf(INavmeshWorldView world, bool broughtBack, IReadOnlySet<RecordKey> doorsThatDoNotStand, RecordKey key)
+    private static NavmeshFault? FirstFaultOf(INavmeshWorldView world, bool copiedFromEarlier, IReadOnlySet<RecordKey> doorsThatDoNotStand, RecordKey key)
     {
         if (IdentityFault(world, key) is { } identity) return identity;
         var navmesh = world.NavmeshOf(key)!;
         return TriangleFault(key, navmesh)
             ?? LinkFault(world, key, navmesh)
-            ?? DoorFault(world, broughtBack, doorsThatDoNotStand, key, navmesh)
+            ?? DoorFault(world, copiedFromEarlier, doorsThatDoNotStand, key, navmesh)
             ?? SpatialFault(key, navmesh)
             ?? PathDataFault(world, key, world.EntryOf(key)!);
     }
@@ -275,7 +271,7 @@ public static class NavmeshConsistency
         for (var index = 0; index < navmesh.Triangles.Length; index++)
         {
             var triangle = navmesh.Triangles[index];
-            for (var edge = 0; edge < CornerCount; edge++)
+            for (var edge = 0; edge < MeshTriangle.CornerCount; edge++)
             {
                 if (triangle.Edges[edge] is not { IsEdgeLink: true, Index: { } entry }) continue;
                 var target = navmesh.EdgeLinks[entry];
@@ -293,7 +289,7 @@ public static class NavmeshConsistency
         if (world.NavmeshOf(target.Navmesh) is not { IsDeleted: false } other) return NavmeshFaultKind.LinkedNavmeshMissing;
         if (!IsIndex(target.Triangle, other.Triangles.Length)) return NavmeshFaultKind.LinkedTriangleOutOfRange;
         var triangle = other.Triangles[target.Triangle];
-        var linksBack = Enumerable.Range(0, CornerCount)
+        var linksBack = Enumerable.Range(0, MeshTriangle.CornerCount)
             .Where(edge => triangle.Edges[edge] is { IsEdgeLink: true, Index: { } entry } && IsIndex(entry, other.EdgeLinks.Length) && other.EdgeLinks[entry] == from)
             .ToList();
         if (linksBack.Count == 0) return NavmeshFaultKind.NoLinkBack;
@@ -301,20 +297,20 @@ public static class NavmeshConsistency
     }
 
     /// <summary>
-    /// A door triangle still names a door that resolves and is not deleted, and one brought back a door that stands; only a door that
-    /// stands has its link checked, either way.
+    /// A door triangle still names a door that resolves and is not deleted, and one copied from an earlier version a door that
+    /// stands; only a door that stands has its link checked, either way.
     /// </summary>
     /// <remarks>
     /// A door that does not stand may stay named by a door triangle the world already had: the game keeps such triangles for doors
     /// a quest enables later.
     /// </remarks>
-    private static NavmeshFault? DoorFault(INavmeshWorldView world, bool broughtBack, IReadOnlySet<RecordKey> doorsThatDoNotStand, RecordKey key, NavmeshView navmesh)
+    private static NavmeshFault? DoorFault(INavmeshWorldView world, bool copiedFromEarlier, IReadOnlySet<RecordKey> doorsThatDoNotStand, RecordKey key, NavmeshView navmesh)
     {
         foreach (var (triangle, door) in navmesh.DoorTriangles)
         {
             var kind = !IsIndex(triangle, navmesh.Triangles.Length) ? NavmeshFaultKind.DoorTriangleOutOfRange
                 : world.DoorOf(door) is not { IsDeleted: false } placed ? NavmeshFaultKind.DoorMissing
-                : doorsThatDoNotStand.Contains(door) ? (broughtBack ? NavmeshFaultKind.DoorDoesNotStand : (NavmeshFaultKind?)null)
+                : doorsThatDoNotStand.Contains(door) ? (copiedFromEarlier ? NavmeshFaultKind.DoorDoesNotStand : (NavmeshFaultKind?)null)
                 : placed.Link != new NavDoorLinkFact(key, triangle) ? NavmeshFaultKind.DoorLinksElsewhere
                 : (NavmeshFaultKind?)null;
             if (kind is { } broken) return new NavmeshFault(key, NavmeshRule.Doors, broken, triangle, door);
@@ -330,8 +326,8 @@ public static class NavmeshConsistency
 
     private static NavmeshFault? SpatialFault(RecordKey key, NavmeshView navmesh)
     {
-        var low = navmesh.Min - new Vector3(VertexTolerance);
-        var high = navmesh.Max + new Vector3(VertexTolerance);
+        var low = navmesh.Min - new Vector3(PlacedPartTolerances.ResavedPosition);
+        var high = navmesh.Max + new Vector3(PlacedPartTolerances.ResavedPosition);
         for (var index = 0; index < navmesh.Vertices.Length; index++)
         {
             var vertex = navmesh.Vertices[index];
@@ -355,7 +351,7 @@ public static class NavmeshConsistency
         keys.Where(key => !holds(key)).Select(key => (RecordKey?)key).FirstOrDefault();
 
     private static (Vector3 From, Vector3 To) EdgeEnds(NavmeshView navmesh, NavmeshTriangleView triangle, int edge) =>
-        (VertexAt(navmesh, triangle.Corners[edge]), VertexAt(navmesh, triangle.Corners[(edge + 1) % CornerCount]));
+        (VertexAt(navmesh, triangle.Corners[edge]), VertexAt(navmesh, triangle.Corners[(edge + 1) % MeshTriangle.CornerCount]));
 
     /// <summary>A corner out of range lies nowhere, so no edge through it coincides with another.</summary>
     private static Vector3 VertexAt(NavmeshView navmesh, int corner) =>
@@ -368,7 +364,9 @@ public static class NavmeshConsistency
     private static bool Near(Vector3 one, Vector3 other)
     {
         var apart = Vector3.Abs(one - other);
-        return apart.X <= VertexTolerance && apart.Y <= VertexTolerance && apart.Z <= VertexTolerance;
+        return apart.X <= PlacedPartTolerances.ResavedPosition
+            && apart.Y <= PlacedPartTolerances.ResavedPosition
+            && apart.Z <= PlacedPartTolerances.ResavedPosition;
     }
 
     private static bool IsIndex(int value, int count) => value >= 0 && value < count;

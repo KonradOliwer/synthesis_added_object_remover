@@ -62,7 +62,7 @@ public class VisibleLeftBehindRoundsRunTests
         Assert.Equal(new[] { middle.Round, outer.Round }, outcome.VisibleLeftBehind.Rounds.ToArray());
     }
 
-    private static IMeshFilesFactory DefaultMeshFiles(string dataFolder, GameRelease release, IReadOnlyList<ModKey> listedPlugins) =>
+    private static IMeshFilesFactory DefaultMeshFiles(string dataFolder, GameRelease release, IReadOnlyList<PluginName> listedPlugins) =>
         new MeshFilesFactory(dataFolder, release, listedPlugins);
 
     /// <summary>A direction is cleared only when all of it is gone; a share of 70% of the directions with objects suffices, also with one of them standing.</summary>

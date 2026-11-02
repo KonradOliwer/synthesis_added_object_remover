@@ -95,7 +95,7 @@ public sealed class RequiringModAfterPatchRunTests
         },
     };
 
-    private static IMeshFilesFactory OpenMeshFiles(string dataFolder, GameRelease release, IReadOnlyList<ModKey> listedPlugins) =>
+    private static IMeshFilesFactory OpenMeshFiles(string dataFolder, GameRelease release, IReadOnlyList<PluginName> listedPlugins) =>
         new MeshFilesFactory(dataFolder, release, listedPlugins);
 
     private static IReadOnlyList<ISkyrimMod> CreateWorld(string dataFolder)

@@ -125,7 +125,7 @@ public class PlacedRecordFactReadingTests
 
         var facts = Read(workers: 1, linker).Records.ToDictionary(fact => fact.Key.ToFormKey());
 
-        Assert.False(facts[linking].InTargetSpace);
+        Assert.False(facts[linking].InPluginSpace);
         Assert.False(facts.ContainsKey(unlinked));
     }
 
@@ -470,7 +470,7 @@ public class PlacedRecordFactReadingTests
         var collected = PlacedObjects.Collect(
             new PluginRecordsFactory(world, Environment.ProcessorCount).Open(),
             table,
-            new WhatToCollect(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false));
+            new WhatToCollect(new ScanNeeds(), SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false));
 
         Assert.All(plugins, plugin => Assert.True(table.Plugins.ContainsKey(plugin)));
         Assert.Contains(new PluginName(BelowPlugin), table.Plugins.Keys);

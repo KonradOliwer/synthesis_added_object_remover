@@ -44,11 +44,11 @@ internal sealed record RestoreLoopInputs(
     DoorLinks Doors);
 
 /// <summary>
-/// Repeats the guards between the kinds until nothing more changes: the placed records failing P1–P7 against the current plans
-/// are refused, the navmesh groups failing N4–N6 or N3 with the doors as they end; the grid points under objects of other plugins
-/// placed for the ground as it is (G2), under navmeshes on the ground as it is (G3), under the targets that end present (G1), under
-/// refused placed records that stand now and reach the ground and in cells no longer storable are protected; and the water levels
-/// with something at their water line (W) are kept. Every pass reads only the state before it.
+/// Repeats the guards between the kinds until nothing more changes: the placed records failing their guards against the current
+/// plans are refused, the navmesh groups failing the ground, object and water guards or the door guard with the doors as they end;
+/// the grid points under objects of other plugins placed for the ground as it is, under navmeshes on the ground as it is, under the
+/// targets that end present, under refused placed records that stand now and reach the ground and in cells no longer storable are
+/// protected; and the water levels with something at their water line are kept. Every pass reads only the state before it.
 /// </summary>
 /// <param name="placedGuards">Null when no placed record's areas let it go back.</param>
 /// <param name="terrainGuards">Null while the terrain is switched off.</param>
@@ -84,7 +84,7 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
         return new(placed, RefuseNavmeshGroups(before, objectsThatStay), ProtectGround(before), KeepWater(before, objectsThatStay), causesLeftOut);
     }
 
-    /// <summary>P1–P7 against the current plans, for the placed records still going back.</summary>
+    /// <summary>The placed guards against the current plans, for the placed records still going back.</summary>
     private (ImmutableArray<PlacedRefusal?> Placed, IReadOnlySet<OtherId>? CausesLeftOut) RefusePlaced(PassInput before)
     {
         var state = before.State;
@@ -94,7 +94,7 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
         return ([.. state.Placed.Select((refusal, index) => refusal ?? checks.Found[index])], checks.CausesLeftOut);
     }
 
-    /// <summary>N4–N6 and N3 with the doors as they end against the current plans, for the groups still going back.</summary>
+    /// <summary>The ground, object and water guards, and the door guard with the doors as they end, against the current plans, for the groups still going back.</summary>
     /// <param name="objectsThatStay">In key order.</param>
     private NavmeshUndoPlan? RefuseNavmeshGroups(PassInput before, IReadOnlyList<StandingBox> objectsThatStay)
     {
@@ -107,9 +107,9 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
     }
 
     /// <summary>
-    /// The points under the targets that end present given the refusals so far and reach the ground (G1), under refused placed
-    /// records that stand now, where they stand and reach the ground, then G2, G3 and the cells no longer storable, each reason kept
-    /// first.
+    /// The points under the targets that end present given the refusals so far and reach the ground, under refused placed records
+    /// that stand now, where they stand and reach the ground, then under objects of other plugins placed for the ground as it is,
+    /// under navmeshes on the ground as it is and in the cells no longer storable, each reason kept first.
     /// </summary>
     private TerrainUndoPlan ProtectGround(PassInput before)
     {

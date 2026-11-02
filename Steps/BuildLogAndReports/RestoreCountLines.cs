@@ -16,7 +16,7 @@ internal static class RestoreCountLines
         if (objects.Count > 0)
         {
             yield return $"{TextFormat.Count(objects.Count, "object", "objects")} of other mods "
-                + $"({Breakdown(objects.GroupBy(change => change.Kind).OrderBy(group => group.Key).Select(group => Item(RestoreWhereRemovedText.Kind(group.Key), group.Count())))})";
+                + $"({TextLists.JoinCounts(objects.GroupBy(change => change.Kind).OrderBy(group => group.Key), group => RestoreWhereRemovedText.Kind(group.Key), group => group.Count(), Describe.ListSeparator)})";
         }
 
         var lands = judged.Result.Lands.Where(land => land.IsRestored).ToList();
@@ -32,14 +32,14 @@ internal static class RestoreCountLines
         {
             var parts = cells.SelectMany(cell => RestoreOutcomes.UndoneParts(cell)).GroupBy(part => part).OrderBy(group => group.Key);
             yield return $"settings of {TextFormat.Count(cells.Count, "cell", "cells")} "
-                + $"({Breakdown(parts.Select(group => Item(RestoreWhereRemovedText.PartOfCell(group.Key), group.Count())))})";
+                + $"({TextLists.JoinCounts(parts, group => RestoreWhereRemovedText.PartOfCell(group.Key), group => group.Count(), Describe.ListSeparator)})";
         }
 
         var navmeshes = judged.Navmeshes.Where(navmesh => navmesh.IsRestored).Select(navmesh => navmesh.Judged.Undo ?? throw MissingUndo(navmesh)).ToList();
         if (navmeshes.Count > 0)
         {
             var kinds = navmeshes.GroupBy(RestoreWhereRemovedText.Undo).OrderBy(group => group.Min());
-            yield return $"{TextFormat.Count(navmeshes.Count, "navmesh", "navmeshes")} ({Breakdown(kinds.Select(group => Item(group.Key, group.Count())))})";
+            yield return $"{TextFormat.Count(navmeshes.Count, "navmesh", "navmeshes")} ({TextLists.JoinCounts(kinds, group => group.Key, group => group.Count(), Describe.ListSeparator)})";
         }
     }
 
@@ -66,7 +66,7 @@ internal static class RestoreCountLines
         if (refusals.Count > 0)
         {
             var kinds = refusals.GroupBy(RestoreWhereRemovedText.RefusalKind).OrderBy(group => group.First().Failure is not null).ThenBy(group => group.First().Guard);
-            yield return $"{TextFormat.Count(refusals.Count, "object", "objects")} ({Breakdown(kinds.Select(group => Item(group.Key, group.Count())))})";
+            yield return $"{TextFormat.Count(refusals.Count, "object", "objects")} ({TextLists.JoinCounts(kinds, group => group.Key, group => group.Count(), Describe.ListSeparator)})";
         }
 
         var kept = judged.Result.Lands.SelectMany(land => land.Kept).ToList();
@@ -75,7 +75,7 @@ internal static class RestoreCountLines
         {
             var reasons = kept.GroupBy(entry => entry.Reason).OrderBy(group => group.Key);
             yield return $"terrain at {TextFormat.Count(points, "point", "points")} "
-                + $"({Breakdown(reasons.Select(group => Item(RestoreWhereRemovedText.TerrainKept(group.Key), group.Sum(entry => entry.Points.Count))))})";
+                + $"({TextLists.JoinCounts(reasons, group => RestoreWhereRemovedText.TerrainKept(group.Key), group => group.Sum(entry => entry.Points.Count), Describe.ListSeparator)})";
         }
 
         var water = judged.Result.Cells.Count(cell => cell.WaterKeptBy is not null);
@@ -86,7 +86,7 @@ internal static class RestoreCountLines
         {
             var guards = refused.GroupBy(group => group.Guard).OrderBy(group => group.Key);
             yield return $"{TextFormat.Count(refused.Sum(group => group.Members), "navmesh", "navmeshes")} "
-                + $"({Breakdown(guards.Select(group => Item(RestoreWhereRemovedText.Guard(group.Key), group.Sum(member => member.Members))))})";
+                + $"({TextLists.JoinCounts(guards, group => RestoreWhereRemovedText.Guard(group.Key), group => group.Sum(member => member.Members), Describe.ListSeparator)})";
         }
     }
 
@@ -161,7 +161,7 @@ internal static class RestoreCountLines
         if (reasons.Count > 0)
         {
             yield return $"{TextFormat.Count(reasons.Count, "change", "changes")} "
-                + $"({Breakdown(reasons.GroupBy(reason => reason).OrderBy(group => group.Key).Select(group => Item(RestoreWhereRemovedText.Never(group.Key), group.Count())))})";
+                + $"({TextLists.JoinCounts(reasons.GroupBy(reason => reason).OrderBy(group => group.Key), group => RestoreWhereRemovedText.Never(group.Key), group => group.Count(), Describe.ListSeparator)})";
         }
     }
 
@@ -169,10 +169,10 @@ internal static class RestoreCountLines
     {
         var later = judged.Result.Lands.Select(land => land.Change.LeftToLater).ToList();
         var heights = later.Sum(entry => entry.Points.Count);
-        if (heights > 0) yield return TextFormat.Count(heights, "height", "heights");
+        if (heights > 0) yield return RestoreWhereRemovedText.Heights(heights);
 
         var colours = later.Sum(entry => entry.Colours.Count);
-        if (colours > 0) yield return TextFormat.Count(colours, "vertex colour", "vertex colours");
+        if (colours > 0) yield return RestoreWhereRemovedText.VertexColours(colours);
 
         var textures = later.Sum(entry => entry.Quarters.Quarters.Count());
         if (textures > 0) yield return TextFormat.Count(textures, "texture quarter", "texture quarters");
@@ -187,10 +187,6 @@ internal static class RestoreCountLines
             Describe.ListSeparator,
             KeyedGroups.Rank(KeyedGroups.CountBy(plugins.Select(plugin => plugin.ToString()), plugin => plugin, StringComparer.Ordinal), StringComparer.Ordinal)
                 .Select(entry => $"{entry.Key} {TextFormat.Count(entry.Value)}"));
-
-    private static KeyValuePair<string, int> Item(string name, int count) => KeyValuePair.Create(name, count);
-
-    private static string Breakdown(IEnumerable<KeyValuePair<string, int>> items) => string.Join(Describe.ListSeparator, TextLists.Counts(items));
 
     private static InvalidOperationException MissingUndo(NavmeshOutcome navmesh) =>
         new($"The navmesh {navmesh.Judged.Change.Navmesh} goes back with its group but has no navmesh undo.");

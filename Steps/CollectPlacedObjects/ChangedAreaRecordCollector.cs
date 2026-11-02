@@ -7,7 +7,7 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 
 /// <summary>
 /// What a restore reads besides the objects: every placed record of another plugin whose parts the cleaned mod changed
-/// (<see cref="RecordChangedByCleanedMod"/>), and with <see cref="WhatToCollect.AreaRecordVersions"/> every such cell, LAND and
+/// (<see cref="RecordChangedByCleanedMod"/>), and with <see cref="ScanNeeds.AreaRecordVersions"/> every such cell, LAND and
 /// navmesh record (<see cref="CellChangedByCleanedMod"/>, <see cref="LandChangedByCleanedMod"/>, <see cref="NavmeshChangedByCleanedMod"/>);
 /// the earlier versions of the records the cleaned mod overrides, the cells deleted in the final world, and which changed records
 /// and cells the cleaned mod's records link to.
@@ -24,7 +24,9 @@ internal sealed class ChangedAreaRecordCollector
         _trust = trust;
         _facts = facts;
         _areaRecordChanges = new AreaRecordChanges(
-            trust.Patch, facts.Records.Where(record => record.PartDifferences is not null).ToDictionary(record => record.Key, record => record.PartDifferences!));
+            trust.Patch,
+            facts.Records.Where(record => record.PartDifferences is not null).ToDictionary(record => record.Key, record => record.PartDifferences!),
+            NavmeshReplacements.Of(facts.ChangedNavmeshes));
     }
 
     /// <summary>Whether some placed record of another plugin the cleaned mod changed was collected.</summary>

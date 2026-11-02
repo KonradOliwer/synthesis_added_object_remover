@@ -87,6 +87,8 @@ public class FailuresTests
         Assert.True(Failures.IsRecoverable(onlyUserData));
         Assert.False(Failures.IsRecoverable(withABug));
         Assert.False(Failures.IsRecoverable(withOutOfMemory));
+        Assert.False(Failures.IsRecoverable(new AggregateException()));
+        Assert.False(Failures.IsRecoverable(new AggregateException(new AggregateException())));
         Assert.Throws<AggregateException>(() => Failures.Attempt<int>(() => throw withABug, _ => -1));
     }
 }

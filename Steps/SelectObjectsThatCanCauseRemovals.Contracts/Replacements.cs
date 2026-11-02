@@ -9,11 +9,8 @@ public sealed class Replacements
 {
     private readonly IdSet _replaced;
 
-    private Replacements(int otherModObjectCount, IReadOnlyList<Replacement> list, IEnumerable<OtherId> excluded)
-    {
-        _replaced = IdSet.Of(otherModObjectCount, list.Select(replacement => replacement.OtherModObject).Concat(excluded).Select(id => id.Index));
-        List = list;
-    }
+    private Replacements(int otherModObjectCount, IReadOnlyList<Replacement> list, IEnumerable<OtherId> excluded) =>
+        (_replaced, List) = (IdSet.Of(otherModObjectCount, list.Select(replacement => replacement.OtherModObject).Concat(excluded).Select(id => id.Index)), list);
 
     /// <summary>In <see cref="TargetId"/> order, then in the order the matches were found.</summary>
     public IReadOnlyList<Replacement> List { get; }

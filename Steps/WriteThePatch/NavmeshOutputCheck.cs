@@ -1,11 +1,11 @@
 namespace AddedObjectRemover.Steps.WriteThePatch;
 
 /// <summary>
-/// Checks the navmeshes the patch wrote, and every navmesh linked to them, over the final world. The groups that go back passed the
-/// same check on the same orders before, so a fault here is a bug of the writers.
+/// Checks the navmeshes the patch wrote, and every navmesh linked to them, over the final world. The orders of a group that goes back
+/// were checked in a trial plugin first, so a fault here is a bug of the writers.
 /// </summary>
 /// <remarks>
-/// The check does not compare a navmesh's Preferred triangles with the preferred paths: the plan's N8 is the only guard of those.
+/// The check does not compare a navmesh's Preferred triangles with the preferred paths.
 /// </remarks>
 internal static class NavmeshOutputCheck
 {

@@ -87,15 +87,7 @@ internal sealed class TouchSearch
     public List<IndexPair> CollectFrontierPairs(IReadOnlyList<int> frontier, Func<int, bool> skip)
     {
         var neighbors = FindNeighborsOfAll(frontier);
-        var pairs = new List<IndexPair>();
-        for (var i = 0; i < frontier.Count; i++)
-        {
-            foreach (var neighbor in neighbors[i])
-            {
-                if (!skip(neighbor)) pairs.Add(new IndexPair(frontier[i], neighbor));
-            }
-        }
-        return pairs;
+        return AdjacencyPairs.Collect(frontier, neighbors, (_, neighbor) => !skip(neighbor), (node, neighbor) => new IndexPair(node, neighbor));
     }
 
     public List<int>[] FindNeighborsOfAll(IReadOnlyList<int> nodes)

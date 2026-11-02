@@ -31,7 +31,7 @@ public sealed class FinalWorld : IDisposable
     internal ModKey Patch { get; }
 
     /// <summary>The plugins of <see cref="Order"/>, lowest priority first.</summary>
-    public IReadOnlyList<ModKey> ListedPlugins => [.. Order.ListedOrder.Select(listing => listing.ModKey)];
+    public IReadOnlyList<PluginName> ListedPlugins => [.. Order.ListedOrder.Select(listing => listing.ModKey.ToPluginName())];
 
     public LoadOrderPlugins Plugins { get; }
 

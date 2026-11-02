@@ -62,37 +62,34 @@ public static class KeyedGroups
         IEnumerable<T> items, Func<T, TKey> keyOf, IEqualityComparer<TKey> comparer)
         where TKey : notnull
     {
-        var counts = new List<KeyValuePair<TKey, int>>();
-        var slotOf = new Dictionary<TKey, int>(comparer);
+        var keys = new List<TKey>();
+        var counts = new List<int>();
+        var positionOf = new Dictionary<TKey, int>(comparer);
         foreach (var item in items)
         {
             var key = keyOf(item);
-            if (slotOf.TryGetValue(key, out var slot))
+            if (!positionOf.TryGetValue(key, out var position))
             {
-                counts[slot] = KeyValuePair.Create(counts[slot].Key, counts[slot].Value + 1);
+                position = keys.Count;
+                positionOf[key] = position;
+                keys.Add(key);
+                counts.Add(0);
             }
-            else
-            {
-                slotOf[key] = counts.Count;
-                counts.Add(KeyValuePair.Create(key, 1));
-            }
+            counts[position]++;
         }
-        return counts;
+        return [.. keys.Zip(counts, (key, count) => KeyValuePair.Create(key, count))];
     }
+
+    /// <returns>Each item's position in the list by the item's key.</returns>
+    /// <remarks>Throws when two items have the same key.</remarks>
+    public static Dictionary<TKey, int> PositionByKey<T, TKey>(IEnumerable<T> items, Func<T, TKey> keyOf)
+        where TKey : notnull =>
+        items.Select((item, position) => (Key: keyOf(item), Position: position)).ToDictionary(entry => entry.Key, entry => entry.Position);
 
     /// <returns>The counts with the highest first; equal counts are ordered by key, and keys the comparer treats as equal keep their input order.</returns>
     public static List<KeyValuePair<TKey, int>> Rank<TKey>(
         IEnumerable<KeyValuePair<TKey, int>> counts, IComparer<TKey> keyComparer) =>
         counts.OrderByDescending(entry => entry.Value).ThenBy(entry => entry.Key, keyComparer).ToList();
-
-    /// <returns>The first item of each distinct key, in input order.</returns>
-    public static List<T> DistinctBy<T, TKey>(
-        IEnumerable<T> items, Func<T, TKey> keyOf, IEqualityComparer<TKey> comparer)
-        where TKey : notnull
-    {
-        var seen = new HashSet<TKey>(comparer);
-        return items.Where(item => seen.Add(keyOf(item))).ToList();
-    }
 
     /// <returns>The list stored under the key; an empty one is stored first when the key has none.</returns>
     public static List<T> GetOrAddList<TKey, T>(Dictionary<TKey, List<T>> lists, TKey key)

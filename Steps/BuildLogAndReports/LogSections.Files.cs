@@ -22,7 +22,7 @@ internal static partial class LogSections
         {
             lines.Add($"Anchoring diagnostics: wrote {TextFormat.Count(support.Rows)} evaluations to {support.Path}.");
         }
-        if (context.Detailed && ExplanationEvidence.HasMeshOrigins(alsoRemove))
+        if (context.Detailed && alsoRemove.DetailsHoldMeshOrigins)
         {
             var origins = ExplanationEvidence.MeshOrigins(alsoRemove);
             lines.Add(

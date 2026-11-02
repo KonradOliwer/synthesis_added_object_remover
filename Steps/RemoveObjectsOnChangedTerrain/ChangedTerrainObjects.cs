@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
+using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 
@@ -33,12 +33,15 @@ public static class ChangedTerrainObjects
     /// <summary>
     /// Runs once for each distinct set of settings over the objects judged with it, and proposes the removals of all of them in target order.
     /// </summary>
-    /// <remarks>A pass whose step is off reads no terrain and is <see cref="StepOutcome.SwitchedOff"/>.</remarks>
+    /// <remarks>
+    /// A pass whose step is off reads no terrain and is <see cref="StepOutcome.SwitchedOff"/>. A group switched on that counts no change
+    /// or has no area runs as off, so it merges with the groups switched off.
+    /// </remarks>
     public static Decided<ChangedTerrainResult> Find(Input input)
     {
         ChangedTerrainResult result = new(
             [
-                .. ObjectsJudgedWith<ChangedTerrainSettings>.MergeEqualSettings(input.Groups)
+                .. ObjectsJudgedWith<ChangedTerrainSettings>.MergeEqualSettings(input.Groups.Select(group => group with { Settings = group.Settings.AsRun }))
                     .Select(group => FindPass(input.World, input.Accepted, input.LoadOrder, input.Records, input.Shapes, input.Execution, group)),
             ]);
         return new Decided<ChangedTerrainResult>(result, input.Decisions.Apply(RoundKind.ChangedTerrain, result.Proposals));
@@ -50,7 +53,7 @@ public static class ChangedTerrainObjects
 
     /// <summary>The step's check of one target object at a given placement; it finds nothing when the step is off.</summary>
     public static IPlacementRule CreatePlacementRule(PlacementRuleInput input) =>
-        new ChangedTerrainPlacementRule(input.Settings.On ? CreateCheck(input.Accepted, input.LoadOrder, input.Records, input.Shapes, input.Settings) : null);
+        new ChangedTerrainPlacementRule(input.Settings.Runs ? CreateCheck(input.Accepted, input.LoadOrder, input.Records, input.Shapes, input.Settings) : null);
 
     /// <summary>How the step words a finding as the reason of a removal.</summary>
     internal static RemovalReason ReasonOf(ObjectOnChangedTerrain hit) => new TerrainChanged(hit.ChangedBy, hit.Kind);
@@ -64,7 +67,7 @@ public static class ChangedTerrainObjects
         Execution execution,
         ObjectsJudgedWith<ChangedTerrainSettings> group)
     {
-        if (!group.Settings.On) return ChangedTerrainPass.SwitchedOff(group.Objects);
+        if (!group.Settings.Runs) return ChangedTerrainPass.SwitchedOff(group.Objects);
 
         var check = CreateCheck(accepted, loadOrder, records, shapes, group.Settings);
         List<int> indexes = [.. group.Objects.Select(target => target.Index)];
@@ -72,8 +75,7 @@ public static class ChangedTerrainObjects
             execution,
             world.Order,
             indexes,
-            static () => (object?)null,
-            (index, _) => check.Check(world.Targets[index]),
+            index => check.Check(world.Targets[index]),
             ParallelMap.AutomaticRangeSize);
         ImmutableArray<ObjectOnChangedTerrain> hits = [.. checks.Select(objectCheck => objectCheck.Hit).OfType<ObjectOnChangedTerrain>()];
         return new ChangedTerrainPass(

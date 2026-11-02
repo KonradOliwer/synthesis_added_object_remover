@@ -32,13 +32,8 @@ internal static class TestSupportCascade
             : TestSeededDecisions.SeedRestoring(protection, targets, restoredTargets, seeds);
         var triangles = new TriangleStore(shapes.ReadTriangles);
         var input = new RoundsInput(
-            [.. targets],
-            objectsOfAnyPlugin,
-            shapes,
-            triangles,
-            TestSurfaceSamples.Over(triangles),
-            terrain,
-            new Execution(threads));
+            new SupportReads([.. targets], shapes, triangles, TestSurfaceSamples.Over(triangles), terrain, new Execution(threads)),
+            objectsOfAnyPlugin);
         var run = TestRestingObjects.Run(seeded, input, new AlsoRemoveSettings(FollowUpRemovalMode.OnlyWhatLosesItsSupport, touchDistance, threshold, TouchChainsShown: false));
         return new Run(run.Decisions, run.Result.Rounds) { Result = run.Result };
     }

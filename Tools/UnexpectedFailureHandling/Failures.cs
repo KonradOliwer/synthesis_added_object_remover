@@ -13,7 +13,7 @@ public static class Failures
     /// </summary>
     public static bool IsRecoverable(Exception ex) =>
         ex is AggregateException aggregate
-            ? aggregate.Flatten().InnerExceptions.All(IsRecoverable)
+            ? aggregate.Flatten().InnerExceptions is { Count: > 0 } inner && inner.All(IsRecoverable)
             : ex is IOException or UnauthorizedAccessException or UserDataException;
 
     /// <remarks>Parallel work wraps its failures; the distinct inner ones are listed in a fixed order, so the text does not depend on which worker failed first.</remarks>

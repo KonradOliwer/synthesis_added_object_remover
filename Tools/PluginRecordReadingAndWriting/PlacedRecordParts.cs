@@ -49,21 +49,22 @@ internal sealed class PlacedRecordParts
     /// <summary>The parts with fields of their own; only placed objects (REFR) have the door link.</summary>
     private static List<(PlacedParts Part, RecordPart<IPlacedGetter, IPlaced> Compare)> ListedParts(PlacedPartTolerances tolerances) =>
         [
-            (PlacedParts.Position, new([nameof(IPlacedGetter.Placement)],
-                (one, other) => DiffersBeyond(one.Placement, other.Placement, PlacedRecordExtensions.GetPosition, static (a, b) => Vector3.Abs(a - b), tolerances.Position),
-                static (target, source) => CopyPlacement(target, source, static (into, from) => into.Position = from.Position),
-                static _ => false)),
-            (PlacedParts.Rotation, new([nameof(IPlacedGetter.Placement)],
-                (one, other) => DiffersBeyond(one.Placement, other.Placement, PlacedRecordExtensions.GetRotation, Vectors.ShortestAngles, tolerances.Rotation),
-                static (target, source) => CopyPlacement(target, source, static (into, from) => into.Rotation = from.Rotation),
-                static _ => false)),
+            PlacementPart(PlacedParts.Position, PlacedRecordExtensions.GetPosition, static (a, b) => Vector3.Abs(a - b), tolerances.Position, static (into, from) => into.Position = from.Position),
+            PlacementPart(PlacedParts.Rotation, PlacedRecordExtensions.GetRotation, Vectors.ShortestAngles, tolerances.Rotation, static (into, from) => into.Rotation = from.Rotation),
             (PlacedParts.Scale, new([nameof(IPlacedGetter.Scale)],
                 (one, other) => MathF.Abs((one.Scale ?? UnscaledScale) - (other.Scale ?? UnscaledScale)) > tolerances.Scale,
-                static (target, source) => target.Scale = source.Scale,
-                static _ => false)),
-            (PlacedParts.Presence, new([nameof(IPlacedGetter.EnableParent)], PresenceDiffers, CopyPresence, static _ => false)),
-            (PlacedParts.NavDoorLink, new([nameof(IPlacedObjectGetter.NavigationDoorLink)], NavDoorLinkDiffers, CopyNavDoorLink, static _ => false)),
+                static (target, source) => target.Scale = source.Scale)),
+            (PlacedParts.Presence, new([nameof(IPlacedGetter.EnableParent)], PresenceDiffers, CopyPresence)),
+            (PlacedParts.NavDoorLink, new([nameof(IPlacedObjectGetter.NavigationDoorLink)], NavDoorLinkDiffers, CopyNavDoorLink)),
         ];
+
+    /// <param name="gapOf">The gap between two values, per axis.</param>
+    /// <param name="copyValue">Writes the source placement's value into the target placement.</param>
+    private static (PlacedParts Part, RecordPart<IPlacedGetter, IPlaced> Compare) PlacementPart(
+        PlacedParts part, Func<IPlacementGetter, Vector3> valueOf, Func<Vector3, Vector3, Vector3> gapOf, float tolerance, Action<Placement, IPlacementGetter> copyValue) =>
+        (part, new([nameof(IPlacedGetter.Placement)],
+            (one, other) => DiffersBeyond(one.Placement, other.Placement, valueOf, gapOf, tolerance),
+            (target, source) => CopyPlacement(target, source, copyValue)));
 
     private static bool DiffersBeyond(
         IPlacementGetter? one, IPlacementGetter? other, Func<IPlacementGetter, Vector3> valueOf, Func<Vector3, Vector3, Vector3> gapOf, float tolerance) =>
@@ -86,12 +87,12 @@ internal sealed class PlacedRecordParts
     }
 
     private static bool PresenceDiffers(IPlacedGetter one, IPlacedGetter other) =>
-        FlagBits.Differ(one.MajorRecordFlagsRaw, other.MajorRecordFlagsRaw, PresenceBits) || !Equals(one.EnableParent, other.EnableParent);
+        FlagBits.DifferIn(one, other, PresenceBits) || !Equals(one.EnableParent, other.EnableParent);
 
     private static void CopyPresence(IPlaced target, IPlacedGetter source)
     {
-        target.MajorRecordFlagsRaw = FlagBits.CopyBits(target.MajorRecordFlagsRaw, source.MajorRecordFlagsRaw, PresenceBits);
-        target.EnableParent = source.EnableParent?.DeepCopy();
+        FlagBits.CopyMajorBits(target, source, PresenceBits);
+        target.EnableParent = MutagenCalls.Read(() => source.EnableParent?.DeepCopy());
     }
 
     private static bool NavDoorLinkDiffers(IPlacedGetter one, IPlacedGetter other) =>
@@ -99,12 +100,12 @@ internal sealed class PlacedRecordParts
 
     private static void CopyNavDoorLink(IPlaced target, IPlacedGetter source)
     {
-        if (target is IPlacedObject door) door.NavigationDoorLink = (source as IPlacedObjectGetter)?.NavigationDoorLink?.DeepCopy();
+        if (target is IPlacedObject door) door.NavigationDoorLink = MutagenCalls.Read(() => (source as IPlacedObjectGetter)?.NavigationDoorLink?.DeepCopy());
     }
 
     /// <remarks>Versions of different record types always differ here.</remarks>
     private bool RestDiffers(IPlacedGetter one, IPlacedGetter other) =>
-        FlagBits.Differ(one.MajorRecordFlagsRaw, other.MajorRecordFlagsRaw, RestFlagBits) || !((one, other) switch
+        FlagBits.DifferIn(one, other, RestFlagBits) || !((one, other) switch
         {
             (IPlacedObjectGetter a, IPlacedObjectGetter b) => a.Equals(b, _objectRest),
             (IPlacedNpcGetter a, IPlacedNpcGetter b) => a.Equals(b, _npcRest),
@@ -115,12 +116,12 @@ internal sealed class PlacedRecordParts
     /// <remarks>Versions of different record types cannot be copied into each other; the caller keeps such a record.</remarks>
     private void CopyRest(IPlaced target, IPlacedGetter source)
     {
-        target.MajorRecordFlagsRaw = FlagBits.CopyBits(target.MajorRecordFlagsRaw, source.MajorRecordFlagsRaw, RestFlagBits);
+        FlagBits.CopyMajorBits(target, source, RestFlagBits);
         switch (target, source)
         {
-            case (IPlacedObjectInternal copy, IPlacedObjectGetter version): copy.DeepCopyIn(version, errorMask: null, copyMask: _objectRest.GetCrystal()); break;
-            case (IPlacedNpcInternal copy, IPlacedNpcGetter version): copy.DeepCopyIn(version, errorMask: null, copyMask: _npcRest.GetCrystal()); break;
-            case (IAPlacedTrapInternal copy, IAPlacedTrapGetter version): copy.DeepCopyIn(version, errorMask: null, copyMask: _trapRest.GetCrystal()); break;
+            case (IPlacedObjectInternal copy, IPlacedObjectGetter version): MutagenCalls.Copy(() => copy.DeepCopyIn(version, errorMask: null, copyMask: _objectRest.GetCrystal())); break;
+            case (IPlacedNpcInternal copy, IPlacedNpcGetter version): MutagenCalls.Copy(() => copy.DeepCopyIn(version, errorMask: null, copyMask: _npcRest.GetCrystal())); break;
+            case (IAPlacedTrapInternal copy, IAPlacedTrapGetter version): MutagenCalls.Copy(() => copy.DeepCopyIn(version, errorMask: null, copyMask: _trapRest.GetCrystal())); break;
             default: throw new ArgumentException($"A {source.GetType().Name} cannot be copied into a {target.GetType().Name}.", nameof(source));
         }
     }

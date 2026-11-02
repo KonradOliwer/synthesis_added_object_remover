@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 
 public enum SupporterType { Target, PlacedObject, Terrain }
@@ -6,11 +8,7 @@ public readonly record struct Supporter
 {
     private const int NoIndex = -1;
 
-    private Supporter(SupporterType type, int index)
-    {
-        Type = type;
-        Index = index;
-    }
+    private Supporter(SupporterType type, int index) => (Type, Index) = (type, index);
 
     public SupporterType Type { get; }
 
@@ -34,4 +32,4 @@ public sealed record CandidateContacts(int ContactPoints, float TotalWeight, IRe
 public readonly record struct MeshSupporter(Supporter Supporter, PlacedTransform Transform, string MeshPath);
 
 /// <param name="Hits">Per surface sample: whether it is in contact with the supporter.</param>
-public readonly record struct SupporterHits(Supporter Supporter, bool[] Hits);
+public readonly record struct SupporterHits(Supporter Supporter, ImmutableArray<bool> Hits);

@@ -12,7 +12,7 @@ namespace AddedObjectRemover;
 /// has no terrain (no, a deleted, or an empty land record).
 /// </param>
 /// <param name="findLandWorldspace">
-/// Target worldspace -> the worldspace whose land data it uses (itself, or a parent whose land data it uses);
+/// Worldspace -> the worldspace whose land data it uses (itself, or a parent whose land data it uses);
 /// null where that worldspace holds no land data of its own. Asked on every query, so it may start to answer only after the placed records are read.
 /// </param>
 public sealed class TerrainHeights(

@@ -605,20 +605,13 @@ public sealed class RestoreWhereRemovedTerrainTests
             .Apply(RoundKind.TooClose, [.. scene.Removals.Select(index => new ProposedRemoval(new TargetId(index), new TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);
         return WhereRemovedRestorer.Plan(
             new(
-                collected,
-                final,
-                OtherModsObjectsResult.SwitchedOff,
-                TestScenes.Create(targets, [], Shapes).VisibleTargets,
-                rules.WorldCaches,
-                rules.TooCloseRule(),
-                rules.HoldersOfObjectsThatStay,
-                TestNavmeshCheck.NoFault,
-                rules.Support,
-                Shapes,
-                NoNavmeshes,
-                new TestLandPlugin(space => space == ChildSpace ? Space : space, _ => new LandHeights(null, null)),
-                Plugins,
-                TestTargets.TargetName,
+                new(collected, final, OtherModsObjectsResult.SwitchedOff),
+                new(rules.WorldCaches, rules.TooCloseRule(), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),
+                new(
+                    new TestRunCaches(Shapes, navmeshes: NoNavmeshes, visibleTargets: TestScenes.Create(targets, [], Shapes).IndexVisibleTargets),
+                    new TestLandPlugin(space => space == ChildSpace ? Space : space, _ => new LandHeights(null, null)),
+                    Plugins,
+                    TestTargets.TargetName),
                 new Execution(workers),
                 settings ?? Settings));
     }

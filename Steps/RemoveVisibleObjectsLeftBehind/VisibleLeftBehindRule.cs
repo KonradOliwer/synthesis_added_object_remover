@@ -1,7 +1,6 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 
@@ -20,13 +19,13 @@ internal sealed class VisibleLeftBehindRule(
     /// <param name="decisions">The decisions of the earlier steps: the objects they decided are not judged again.</param>
     /// <returns>Target indexes of the visible targets <paramref name="decisions"/> left undecided, ascending.</returns>
     public int[] Candidates(IRemovalDecisions decisions) =>
-        [.. Enumerable.Range(0, targets.Count).Where(index => shapes.VisibilityOf(targets[index]).IsVisible && !decisions.IsDecided(targets[index].Id))];
+        LeftBehindVerdicts.Candidates(targets, decisions, target => shapes.VisibilityOf(target).IsVisible);
 
     public VisibleLeftBehindCheck Judge(MeasuredSurroundings measured)
     {
         var kind = VisibleObjectKinds.Of(targets[measured.TargetIndex], bases);
-        var decision = LeftBehindVerdicts.KeptWhenProtected(
-            LeftBehindVerdicts.BySurroundings(measured.Surroundings, config.Surroundings), kind is { } listed && config.NeverRemove.Contains(listed));
+        var isProtectedKind = kind is { } listed && config.NeverRemove.Contains(listed);
+        var decision = LeftBehindVerdicts.Judge(measured.Surroundings, config.Surroundings, isInsideAnotherModsObject: false, isProtectedKind);
         return new VisibleLeftBehindCheck(measured.TargetIndex, kind, measured.Surroundings, decision, KeepReason: null);
     }
 }

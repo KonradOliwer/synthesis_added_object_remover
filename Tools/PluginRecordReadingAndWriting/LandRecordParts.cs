@@ -35,7 +35,7 @@ internal sealed class LandRecordParts
         var quarters = new RecordPart<ILandscapeGetter, ILandscape>[LandLayerReader.QuadrantPlaces.Length];
         foreach (var (quadrant, x, y) in LandLayerReader.QuadrantPlaces) quarters[TerrainQuadrants.IndexOf(x, y)] = LayerPart(quadrant);
         Quarters = quarters;
-        Rest = new([], RestDiffers, CopyRest, static _ => false);
+        Rest = new([], RestDiffers, CopyRest);
     }
 
     /// <summary>Per grid point (row by row from the bottom, x fastest): its height and normal.</summary>
@@ -53,29 +53,30 @@ internal sealed class LandRecordParts
     private static RecordPart<LandPoints, LandPoints> PointPart(int index, float heightTolerance) => new(
         [],
         (one, other) => (one.Heights, other.Heights) is ({ } a, { } b) && MathF.Abs(a[index] - b[index]) > heightTolerance
-            || (one.Normals, other.Normals) is ({ } m, { } n) && m[index] != n[index],
+            || DifferAt(one.Normals, other.Normals, index),
         (target, source) =>
         {
-            if ((target.Heights, source.Heights) is ({ } into, { } from)) into[index] = from[index];
-            if ((target.Normals, source.Normals) is ({ } normalsInto, { } normalsFrom)) normalsInto[index] = normalsFrom[index];
-        },
-        static _ => false);
+            CopyAt(target.Heights, source.Heights, index);
+            CopyAt(target.Normals, source.Normals, index);
+        });
 
     private static RecordPart<LandPoints, LandPoints> ColourPart(int index) => new(
         [],
-        (one, other) => (one.Colours, other.Colours) is ({ } a, { } b) && a[index] != b[index],
-        (target, source) =>
-        {
-            if ((target.Colours, source.Colours) is ({ } into, { } from)) into[index] = from[index];
-        },
-        static _ => false);
+        (one, other) => DifferAt(one.Colours, other.Colours, index),
+        (target, source) => CopyAt(target.Colours, source.Colours, index));
+
+    private static bool DifferAt(Noggog.P3UInt8[]? one, Noggog.P3UInt8[]? other, int index) => (one, other) is ({ } a, { } b) && a[index] != b[index];
+
+    private static void CopyAt<T>(T[]? target, T[]? source, int index)
+    {
+        if ((target, source) is ({ } into, { } from)) into[index] = from[index];
+    }
 
     /// <param name="quadrant">Null for the layers without a header, which lie in no quarter.</param>
     private static RecordPart<ILandscapeGetter, ILandscape> LayerPart(Quadrant? quadrant) => new(
         [nameof(ILandscapeGetter.Layers)],
         (one, other) => LayersDiffer(one, other, quadrant),
-        (target, source) => CopyLayers(target, source, quadrant),
-        static _ => false);
+        (target, source) => CopyLayers(target, source, quadrant));
 
     private static bool LayersDiffer(ILandscapeGetter one, ILandscapeGetter other, Quadrant? quadrant)
     {
@@ -91,14 +92,15 @@ internal sealed class LandRecordParts
     private static void CopyLayers(ILandscape target, ILandscapeGetter source, Quadrant? quadrant)
     {
         target.Layers.RemoveAll(layer => layer.Header?.Quadrant == quadrant);
-        target.Layers.AddRange(LayersIn(source.Layers, quadrant).Select(layer => layer.DeepCopy()));
+        var layers = LayersIn(source.Layers, quadrant).ToList();
+        target.Layers.AddRange(MutagenCalls.Read(() => layers.Select(layer => layer.DeepCopy()).ToList()));
     }
 
     private static IEnumerable<IBaseLayerGetter> LayersIn(IReadOnlyList<IBaseLayerGetter> layers, Quadrant? quadrant) =>
         layers.Where(layer => layer.Header?.Quadrant == quadrant);
 
     private bool RestDiffers(ILandscapeGetter one, ILandscapeGetter other) =>
-        FlagBits.Differ(one.MajorRecordFlagsRaw, other.MajorRecordFlagsRaw, ~ExcludedFlagBits)
+        FlagBits.DifferIn(one, other, ~ExcludedFlagBits)
         || !HasGrids(one).SequenceEqual(HasGrids(other))
         || (one.VertexHeightMap, other.VertexHeightMap) is ({ } a, { } b) && a.Unknown != b.Unknown
         || LayersDiffer(one, other, quadrant: null)
@@ -106,7 +108,7 @@ internal sealed class LandRecordParts
 
     private void CopyRest(ILandscape target, ILandscapeGetter source)
     {
-        target.MajorRecordFlagsRaw = FlagBits.CopyBits(target.MajorRecordFlagsRaw, source.MajorRecordFlagsRaw, ~ExcludedFlagBits);
+        FlagBits.CopyMajorBits(target, source, ~ExcludedFlagBits);
         var (targetHas, sourceHas) = (HasGrids(target), HasGrids(source));
         var gridsToCopy = GridFields.Where((_, grid) => targetHas[grid] != sourceHas[grid]).ToArray();
         if (gridsToCopy.Length > 0) CopyFields(target, source, TranslationMasks.Only<Landscape.TranslationMask>(gridsToCopy));
@@ -116,7 +118,7 @@ internal sealed class LandRecordParts
     }
 
     private static void CopyFields(ILandscape target, ILandscapeGetter source, Landscape.TranslationMask mask) =>
-        ((ILandscapeInternal)target).DeepCopyIn(source, errorMask: null, copyMask: mask.GetCrystal());
+        MutagenCalls.Copy(() => ((ILandscapeInternal)target).DeepCopyIn(source, errorMask: null, copyMask: mask.GetCrystal()));
 
     /// <summary>Per field of <see cref="GridFields"/>, whether the version has that grid.</summary>
     private static bool[] HasGrids(ILandscapeGetter version) =>

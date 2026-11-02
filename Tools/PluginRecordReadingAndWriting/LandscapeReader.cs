@@ -5,7 +5,7 @@ using Mutagen.Bethesda.Skyrim;
 namespace AddedObjectRemover;
 
 /// <summary>
-/// Reads the LAND records of the worldspaces whose land a target space uses and the water of the target spaces, as the terrain and
+/// Reads the LAND records of the worldspaces whose land a plugin space uses and the water of the plugin spaces, as the terrain and
 /// water lookups need them; and, with the LAND area record versions asked for, the versions of the LAND records of other plugins
 /// the read's plugin overrides, compared (<see cref="LandPartComparison"/>).
 /// </summary>
@@ -14,7 +14,7 @@ internal sealed class LandscapeReader
     private readonly ILoadOrderGetter<IModListingGetter<ISkyrimModGetter>> _loadOrder;
     private readonly PluginNames _names;
     private readonly PlacedReadScope _scope;
-    private readonly TargetFootprint _footprint;
+    private readonly PluginFootprint _footprint;
     private readonly IReadOnlyDictionary<RecordKey, RecordKey> _landWorldspaceOf;
     private readonly IReadOnlyDictionary<RecordKey, RecordKey> _waterWorldspaceOf;
     private readonly HashSet<RecordKey> _landWorldspaces;
@@ -23,23 +23,23 @@ internal sealed class LandscapeReader
     private readonly LandRecordParts? _landParts;
 
     private readonly Dictionary<ExteriorCell, ILandscapeGetter> _landscapes = new();
-    private readonly Dictionary<ExteriorCell, ILandscapeGetter> _landscapesBelowTarget = new();
+    private readonly Dictionary<ExteriorCell, ILandscapeGetter> _landscapesBelowNamedPlugin = new();
     private readonly Dictionary<ExteriorCell, List<LandscapeVersion>> _landscapeVersions = new();
     private readonly Dictionary<ExteriorCell, List<CellWaterCopy>> _cellWaterCopies = new();
 
     /// <summary>With the area record versions asked for, the cells of the land worldspaces that some plugin's version deletes.</summary>
     private readonly HashSet<ExteriorCell> _deletedLandCells = new();
 
-    private readonly TargetOverrideWalk<ILandscapeGetter, ExteriorCell> _landWalk;
+    private readonly NamedPluginOverrideWalk<ILandscapeGetter, ExteriorCell> _landWalk;
 
     /// <param name="scope">As narrowed by the footprint.</param>
-    /// <param name="landWorldspaceOf">For each target worldspace, the worldspace whose land it uses.</param>
-    /// <param name="waterWorldspaceOf">For each target worldspace, the worldspace whose water it uses.</param>
+    /// <param name="landWorldspaceOf">For each plugin worldspace, the worldspace whose land it uses.</param>
+    /// <param name="waterWorldspaceOf">For each plugin worldspace, the worldspace whose water it uses.</param>
     public LandscapeReader(
         ILoadOrderGetter<IModListingGetter<ISkyrimModGetter>> loadOrder,
         PluginNames names,
         PlacedReadScope scope,
-        TargetFootprint footprint,
+        PluginFootprint footprint,
         IReadOnlyDictionary<RecordKey, RecordKey> landWorldspaceOf,
         IReadOnlyDictionary<RecordKey, RecordKey> waterWorldspaceOf,
         LandRecordParts? landParts)
@@ -55,19 +55,19 @@ internal sealed class LandscapeReader
         _landWalk = new(scope.Plugin);
     }
 
-    /// <summary>The worldspaces whose land a target space uses.</summary>
+    /// <summary>The worldspaces whose land a plugin space uses.</summary>
     public IReadOnlySet<RecordKey> LandWorldspaces => _landWorldspaces;
 
     /// <summary>The LAND area record versions are asked for.</summary>
     private bool ReadsLandVersions => _scope.AreaRecordVersions is { Lands: true };
 
     /// <summary>Keeps the land and water of an exterior cell, as far as asked for.</summary>
-    /// <param name="belowTarget">The cell's plugin loads before the read's plugin.</param>
-    public void SeeCell(ICellGetter cell, RecordKey cellKey, SpaceFact space, PluginName plugin, bool belowTarget)
+    /// <param name="belowNamedPlugin">The cell's plugin loads before the read's plugin.</param>
+    public void SeeCell(ICellGetter cell, RecordKey cellKey, SpaceFact space, PluginName plugin, bool belowNamedPlugin)
     {
         if (ExteriorCellOf(cell, cellKey, space) is not { } exteriorCell) return;
         if (_landParts is not null && cell.IsDeleted && _landWorldspaces.Contains(space.Key)) _deletedLandCells.Add(exteriorCell);
-        if (_landWorldspaces.Contains(space.Key)) CollectLandscape(cell, exteriorCell, plugin, belowTarget);
+        if (_landWorldspaces.Contains(space.Key)) CollectLandscape(cell, exteriorCell, plugin, belowNamedPlugin);
         if (_scope.Water && _waterWorldspaceOf.ContainsKey(space.Key)) CollectCellWater(cell, exteriorCell, plugin);
     }
 
@@ -76,11 +76,11 @@ internal sealed class LandscapeReader
     /// terrain to a lower-priority plugin; the first cell copy found that carries one is the winner.
     /// With the terrain versions asked for, each plugin's copy is also kept, undecoded, in the order found.
     /// </remarks>
-    private void CollectLandscape(ICellGetter cell, ExteriorCell exteriorCell, PluginName plugin, bool belowTarget)
+    private void CollectLandscape(ICellGetter cell, ExteriorCell exteriorCell, PluginName plugin, bool belowNamedPlugin)
     {
         if (cell.Landscape is not { } landscape) return;
         _landscapes.TryAdd(exteriorCell, landscape);
-        if (belowTarget && ReadsLandVersions) _landscapesBelowTarget.TryAdd(exteriorCell, landscape);
+        if (belowNamedPlugin && ReadsLandVersions) _landscapesBelowNamedPlugin.TryAdd(exteriorCell, landscape);
         if (_scope.TerrainVersions) KeyedGroups.GetOrAddList(_landscapeVersions, exteriorCell).Add(new LandscapeVersion(plugin, landscape));
         if (_footprint.OverriddenLands.Count > 0 && _names.KeyOf(landscape.FormKey) is var landKey && _footprint.OverriddenLands.Contains(landKey))
         {
@@ -89,7 +89,7 @@ internal sealed class LandscapeReader
     }
 
     /// <remarks>
-    /// The water fields are part of the cell record itself, so they are read from the cells of the target spaces' own worldspaces, not
+    /// The water fields are part of the cell record itself, so they are read from the cells of the plugin spaces' own worldspaces, not
     /// of the worldspace whose land they use. Every plugin's copy of the cell is kept, with or without land, in the order found;
     /// like the land, two cells at one grid in one plugin are both kept.
     /// </remarks>
@@ -105,7 +105,7 @@ internal sealed class LandscapeReader
         _landWorldspaceOf,
         _scope.TerrainVersions ? _landscapeVersions : null,
         _scope.TerrainLayers ? _names : null,
-        ReadsLandVersions ? new LandscapesBelow(_scope.Plugin, _landscapesBelowTarget) : null);
+        ReadsLandVersions ? new LandscapesBelow(_scope.Plugin, _landscapesBelowNamedPlugin) : null);
 
     public CellWater CreateWater() => new(_scope.Water ? _cellWaterCopies : null, CollectWorldspaceWater(), _waterWorldspaceOf);
 

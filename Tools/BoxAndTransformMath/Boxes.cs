@@ -107,5 +107,18 @@ public static class Boxes
         transform.Rotation,
         transform.Scale * factor);
 
+    /// <summary>
+    /// Slab step of a line-against-box test: narrows the line's parameter range [<paramref name="entry"/>, <paramref name="exit"/>]
+    /// to where origin + t × direction lies between <paramref name="min"/> and <paramref name="max"/> on one axis. The direction
+    /// must not be parallel to the slab.
+    /// </summary>
+    public static void NarrowToSlab(float origin, float direction, float min, float max, ref float entry, ref float exit)
+    {
+        var toMin = (min - origin) / direction;
+        var toMax = (max - origin) / direction;
+        entry = MathF.Max(entry, MathF.Min(toMin, toMax));
+        exit = MathF.Min(exit, MathF.Max(toMin, toMax));
+    }
+
     private static float OriginFractionOnAxis(float min, float max) => max > min ? -min / (max - min) : float.NaN;
 }

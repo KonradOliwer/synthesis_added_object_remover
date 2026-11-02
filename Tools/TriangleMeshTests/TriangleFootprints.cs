@@ -5,8 +5,6 @@ namespace AddedObjectRemover;
 /// <summary>Triangles seen from above (X and Y only).</summary>
 public static class TriangleFootprints
 {
-    private const int CornerCount = 3;
-
     /// <summary>Whether the two triangles share an area seen from above; touching along an edge or at a corner is no overlap.</summary>
     /// <remarks>
     /// Two convex shapes with area are apart exactly when one of their edges' normals separates them. A triangle without area seen
@@ -30,9 +28,9 @@ public static class TriangleFootprints
 
     private static bool HasSeparatingEdge(Vector2[] edgesOf, Vector2[] other)
     {
-        for (var corner = 0; corner < CornerCount; corner++)
+        for (var corner = 0; corner < MeshTriangle.CornerCount; corner++)
         {
-            var edge = edgesOf[(corner + 1) % CornerCount] - edgesOf[corner];
+            var edge = edgesOf[(corner + 1) % MeshTriangle.CornerCount] - edgesOf[corner];
             if (Separates(new Vector2(-edge.Y, edge.X), edgesOf, other)) return true;
         }
         return false;

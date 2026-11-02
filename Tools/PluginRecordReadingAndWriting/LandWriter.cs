@@ -25,22 +25,22 @@ internal sealed class LandWriter(SynthesisWriteCache synthesis, CellOverrides ce
         var target = GetOrAddOverride(land, versions.Winner);
         if (rest) handles.LandParts.Rest.CopyInto(target, versions.Earlier);
         foreach (var quarter in quarters.Quarters) handles.LandParts.Quarters[quarter].CopyInto(target, versions.Earlier);
-        UndoColours(target, versions.Earlier, colours);
+        CopyEarlierColours(target, versions.Earlier, colours);
         SetHeldDataFlags(target);
     }
 
-    public void SetHeights(RecordKey land, float[] heights, PointSet restored, CellEdgeHeights beyond)
+    public void SetHeights(RecordKey land, float[] heights, PointSet newNormals, CellEdgeHeights beyond)
     {
         var steps = LandHeightEncoder.Encode(heights)
             ?? throw new InvalidOperationException($"The heights ordered for LAND record {land} have a step too steep to store.");
         var versions = handles.LandOf(land);
         var target = GetOrAddOverride(land, versions.Winner);
         WriteHeightMap(target, steps);
-        WriteGrid(target.VertexNormals ??= NewGrid(), NormalsFor(heights, restored, beyond, LandPoints.Read(versions.Earlier), LandPoints.Read(versions.Winner)));
+        WriteGrid(target.VertexNormals ??= NewGrid(), NormalsFor(heights, newNormals, beyond, LandPoints.Read(versions.Earlier), LandPoints.Read(versions.Winner)));
         SetHeldDataFlags(target);
     }
 
-    private void UndoColours(ILandscape target, ILandscapeGetter earlier, PointSet colours)
+    private void CopyEarlierColours(ILandscape target, ILandscapeGetter earlier, PointSet colours)
     {
         if (colours.IsEmpty) return;
         var into = LandPoints.Read(target);
@@ -59,14 +59,14 @@ internal sealed class LandWriter(SynthesisWriteCache synthesis, CellOverrides ce
         }
     }
 
-    /// <remarks>A point not restored keeps the winner's normal whatever the heights around it, so a normal a later plugin set stays.</remarks>
-    private static P3UInt8[] NormalsFor(float[] heights, PointSet restored, CellEdgeHeights beyond, LandPoints earlier, LandPoints winner)
+    /// <remarks>A point outside <paramref name="newNormals"/> keeps the winner's normal whatever the heights around it, so a normal a later plugin set stays.</remarks>
+    private static P3UInt8[] NormalsFor(float[] heights, PointSet newNormals, CellEdgeHeights beyond, LandPoints earlier, LandPoints winner)
     {
         var computed = TerrainNormals.Compute(heights, beyond);
         var normals = new P3UInt8[heights.Length];
         for (var point = 0; point < heights.Length; point++)
         {
-            normals[point] = (restored.Contains(point), earlier.Normals, winner.Normals) switch
+            normals[point] = (newNormals.Contains(point), earlier.Normals, winner.Normals) switch
             {
                 (false, _, { } winnerNormals) => winnerNormals[point],
                 (true, { } earlierNormals, _) when HeightsAroundEqual(heights, earlier.Heights, point) => earlierNormals[point],
@@ -119,7 +119,7 @@ internal sealed class LandWriter(SynthesisWriteCache synthesis, CellOverrides ce
         var cellKey = synthesis.Cache.ResolveContext<ILandscape, ILandscapeGetter>(key).Parent?.Record is ICellGetter cell
             ? cell.FormKey
             : throw new InvalidOperationException($"LAND record {land} lies in no cell.");
-        var landscape = cells.GetOrAdd(cellKey).Landscape ??= (Landscape)winner.DeepCopy();
+        var landscape = cells.GetOrAdd(cellKey).Landscape ??= (Landscape)MutagenCalls.Read(() => winner.DeepCopy());
         _lands.Add(key, landscape);
         return landscape;
     }

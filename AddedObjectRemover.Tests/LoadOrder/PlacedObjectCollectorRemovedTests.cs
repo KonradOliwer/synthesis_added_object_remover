@@ -17,7 +17,7 @@ public class PlacedObjectCollectorRemovedTests
     private static readonly PluginName OtherPlugin = new("Other.esp");
     private static readonly PluginName IgnoredPlugin = new("Ignored.esp");
 
-    private static readonly WhatToCollect Plan = new(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false);
+    private static readonly WhatToCollect Plan = new(new ScanNeeds(), SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false);
     private static readonly ModTrustTable Mods = TestModTrust.Of(TestTargets.TargetName, TestTargets.PatchName, trusted: [IgnoredPlugin], untrusted: [OtherPlugin]);
 
     private static readonly PlacedRecordFact Target = TestPlacedRecords.Create(TestTargets.Key(0), TestTargets.TargetName, Vector3.Zero);
@@ -98,8 +98,8 @@ public class PlacedObjectCollectorRemovedTests
     [Fact]
     public void LinksFromARemovedRecordOutsideTheTargetSpacesAreDropped()
     {
-        var removed = Removed(OtherRecord(1, Vector3.Zero), RemovedKind.InitiallyDisabledWithoutEnableParent) with { InTargetSpace = false };
-        var kept = OtherRecord(2, Vector3.Zero) with { InTargetSpace = false };
+        var removed = Removed(OtherRecord(1, Vector3.Zero), RemovedKind.InitiallyDisabledWithoutEnableParent) with { InPluginSpace = false };
+        var kept = OtherRecord(2, Vector3.Zero) with { InPluginSpace = false };
 
         var collected = Collect([Target, removed, kept], [LinkToTarget(removed), LinkToTarget(kept)]);
 

@@ -105,7 +105,7 @@ public class AlsoRemoveFollowUpTests
         var seeded = scene.Seed([BaseSlab]);
 
         var first = followUp.FollowUp(seeded, NewestLeft(seeded));
-        var afterFirst = seeded.ApplyRounds(RoundKind.AlsoRemove, first.ProposedRounds);
+        var afterFirst = seeded.ApplyRounds(AlsoRemoveRounds.Opening, first.ProposedRounds);
         var afterSideSlab = RemoveInNewRound(afterFirst, [SideSlab]);
         var second = followUp.FollowUp(afterSideSlab, NewestLeft(afterSideSlab));
 
@@ -127,7 +127,7 @@ public class AlsoRemoveFollowUpTests
             var seeded = scene.Seed(world.Seeds);
 
             var first = followUp.FollowUp(seeded, NewestLeft(seeded));
-            var afterFirst = seeded.ApplyRounds(RoundKind.AlsoRemove, first.ProposedRounds);
+            var afterFirst = seeded.ApplyRounds(AlsoRemoveRounds.Opening, first.ProposedRounds);
             var afterSecondSeeds = RemoveInNewRound(afterFirst, PickUndecided(afterFirst, new Random(Seed + trial)));
             var second = followUp.FollowUp(afterSecondSeeds, NewestLeft(afterSecondSeeds));
 
@@ -148,9 +148,9 @@ public class AlsoRemoveFollowUpTests
 
         var first = followUp.FollowUp(seeded, NewestLeft(seeded));
         var readsAfterFirst = scene.Surfaces.Reads;
-        var afterSideSlab = RemoveInNewRound(seeded.ApplyRounds(RoundKind.AlsoRemove, first.ProposedRounds), [SideSlab]);
+        var afterSideSlab = RemoveInNewRound(seeded.ApplyRounds(AlsoRemoveRounds.Opening, first.ProposedRounds), [SideSlab]);
         var second = followUp.FollowUp(afterSideSlab, NewestLeft(afterSideSlab));
-        var summary = followUp.Summarize(afterSideSlab.ApplyRounds(RoundKind.AlsoRemove, second.ProposedRounds));
+        var summary = followUp.Summarize(afterSideSlab.ApplyRounds(AlsoRemoveRounds.Opening, second.ProposedRounds));
 
         Assert.True(readsAfterFirst > 0);
         Assert.Equal(readsAfterFirst, scene.Surfaces.Reads);
@@ -203,7 +203,7 @@ public class AlsoRemoveFollowUpTests
         var seeded = scene.Seed([FirstSeed]);
 
         var first = followUp.FollowUp(seeded, NewestLeft(seeded));
-        var afterFirst = seeded.ApplyRounds(RoundKind.AlsoRemove, first.ProposedRounds);
+        var afterFirst = seeded.ApplyRounds(AlsoRemoveRounds.Opening, first.ProposedRounds);
         var afterSecondSeed = RemoveInNewRound(afterFirst, [SecondSeed]);
         var second = followUp.FollowUp(afterSecondSeed, NewestLeft(afterSecondSeed));
 
@@ -245,7 +245,7 @@ public class AlsoRemoveFollowUpTests
         var seeded = scene.Seed([RowStart]);
 
         var first = followUp.FollowUp(seeded, NewestLeft(seeded));
-        var afterFirst = seeded.ApplyRounds(RoundKind.AlsoRemove, first.ProposedRounds);
+        var afterFirst = seeded.ApplyRounds(AlsoRemoveRounds.Opening, first.ProposedRounds);
         var afterSecondSeeds = RemoveInNewRound(afterFirst, [OtherRowStart]);
         var second = followUp.FollowUp(afterSecondSeeds, NewestLeft(afterSecondSeeds));
         var third = followUp.FollowUp(afterSecondSeeds, NewestLeft(afterSecondSeeds));
@@ -270,7 +270,7 @@ public class AlsoRemoveFollowUpTests
         var seeded = scene.Seed([RowStart]);
 
         var first = followUp.FollowUp(seeded, NewestLeft(seeded));
-        var afterSecondSeeds = RemoveInNewRound(seeded.ApplyRounds(RoundKind.AlsoRemove, first.ProposedRounds), [OtherRowStart]);
+        var afterSecondSeeds = RemoveInNewRound(seeded.ApplyRounds(AlsoRemoveRounds.Opening, first.ProposedRounds), [OtherRowStart]);
         var second = followUp.FollowUp(afterSecondSeeds, NewestLeft(afterSecondSeeds));
         var summary = followUp.Summarize(afterSecondSeeds);
 
@@ -341,7 +341,7 @@ public class AlsoRemoveFollowUpTests
             var seeded = scene.Seed(world.Seeds);
 
             var pass = followUp.FollowUp(seeded, NewestLeft(seeded));
-            var summary = followUp.Summarize(seeded.ApplyRounds(RoundKind.AlsoRemove, pass.ProposedRounds));
+            var summary = followUp.Summarize(seeded.ApplyRounds(AlsoRemoveRounds.Opening, pass.ProposedRounds));
 
             AssertSameResult(scene.Find(seeded), summary);
         }
@@ -350,9 +350,9 @@ public class AlsoRemoveFollowUpTests
     private static RemovalDecisions RunTwoPasses(IAlsoRemoveFollowUp followUp, RemovalDecisions seeded, IReadOnlyList<int> secondSeeds)
     {
         var first = followUp.FollowUp(seeded, NewestLeft(seeded));
-        var afterSecondSeeds = RemoveInNewRound(seeded.ApplyRounds(RoundKind.AlsoRemove, first.ProposedRounds), secondSeeds);
+        var afterSecondSeeds = RemoveInNewRound(seeded.ApplyRounds(AlsoRemoveRounds.Opening, first.ProposedRounds), secondSeeds);
         var second = followUp.FollowUp(afterSecondSeeds, NewestLeft(afterSecondSeeds));
-        return afterSecondSeeds.ApplyRounds(RoundKind.AlsoRemove, second.ProposedRounds);
+        return afterSecondSeeds.ApplyRounds(AlsoRemoveRounds.Opening, second.ProposedRounds);
     }
 
     private static void AssertSameResult(RestingObjectsResult expected, RestingObjectsResult actual)
@@ -394,8 +394,6 @@ public class AlsoRemoveFollowUpTests
         result.Evidence.Cast<SupportRoundDetails>().SelectMany(round => round.Evaluations).Select(evaluation => evaluation.TargetIndex);
 
     private static IEnumerable<IEnumerable<int>> ProposedTargets(FollowUpPass pass) => ProposedTargets(pass.ProposedRounds);
-
-    private static IEnumerable<IEnumerable<int>> ProposedTargets(RestingObjectsResult result) => ProposedTargets(result.ProposedRounds);
 
     private static IEnumerable<IEnumerable<int>> ProposedTargets(ImmutableArray<IReadOnlyList<ProposedRemoval>> rounds) =>
         rounds.Select(round => round.Select(proposal => proposal.Target.Index));
@@ -461,11 +459,17 @@ public class AlsoRemoveFollowUpTests
 
         public IAlsoRemoveFollowUp CreateFollowUp(Func<TimeSpan> clock) =>
             RestingObjects.CreateFollowUp(
-                new([.. _targets], _settings, _execution, clock, new TestRunCaches(_shapes, _triangles, TestGround.NoTerrain(), TestBaseFacts.Unresolved, () => _objectsOfAnyPlugin, Surfaces)));
+                new(
+                    [.. _targets],
+                    TestSeededDecisions.StartDisablingAll(_protection, _targets.Count),
+                    _settings,
+                    _execution,
+                    clock,
+                    new TestRunCaches(_shapes, _triangles, TestGround.NoTerrain(), TestBaseFacts.Unresolved, () => _objectsOfAnyPlugin, Surfaces)));
 
         /// <summary>The also-remove step seeded by the newest round of <paramref name="decisions"/>, without report files.</summary>
         public RestingObjectsResult Find(RemovalDecisions decisions) =>
-            RestingObjects.Find(
+            RestingObjectsFinder.Find(
                 new RestingObjectsInput([.. _targets], decisions, [decisions.Rounds[^1]], _settings, _execution, () => TimeSpan.Zero, StepOutcome.SwitchedOff),
                 new TestRunCaches(
                     _shapes, _triangles, TestGround.NoTerrain(), TestBaseFacts.Unresolved, () => _objectsOfAnyPlugin, new CountedSurfaceSamples(TestSurfaceSamples.Over(_triangles))));

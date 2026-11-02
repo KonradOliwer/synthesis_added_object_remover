@@ -9,8 +9,9 @@ namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
 /// The runner only wires: it hands each step its own settings record and decides nothing about the domain. Three rules,
-/// checked on the source text (comments and literals removed): it reads no member of a settings record, it has no
-/// conditions of its own, and it holds no error boundary. A new settings read, condition or error boundary fails here.
+/// checked on the source text (comments and literals removed) of the runner and the run caches: it reads no member of a settings
+/// record, it has no condition (comparison, negation or loop included) of its own, and it holds no error boundary. A new settings
+/// read, condition or error boundary fails here. It calls every listed rule provider.
 /// It also carries nothing from one run to the next, so chained Standard runs equal one Batch run: the only state that
 /// crosses runs is what the patch writing writes into the patch. The runner holds no field, its loop over the requests hands
 /// each run only its request and the environment, every member of the environment is listed with why no run changes it,
@@ -20,7 +21,6 @@ namespace AddedObjectRemover.Tests.Architecture;
 public class RunnerRulesTests
 {
     private const string RunnerFolder = "Run/RunAllSteps";
-    private const string RunCachesFolder = "Run/RunAllSteps/RunCaches";
 
     /// <summary>"file: Record.Member" of a member read on a settings record or on the settings of a group, and why the runner may read it.</summary>
     private static readonly Dictionary<string, string> AllowedSettingsReads = new()
@@ -35,7 +35,7 @@ public class RunnerRulesTests
             "The old-place check takes the changed-terrain rule built with the changed-terrain settings of the changed objects; the step builds the rule.",
     };
 
-    /// <summary>"file: condition line (whitespace collapsed)" in the runner, and why the runner decides it.</summary>
+    /// <summary>"file: condition line (whitespace collapsed)" in the runner or the run caches, and why it is decided there.</summary>
     private static readonly Dictionary<string, string> AllowedConditions = new()
     {
         ["StepRunner.cs: return request switch"] =
@@ -43,8 +43,82 @@ public class RunnerRulesTests
         ["StepRunner.cs: if (requests.Any(request => request is RunRequest.Ready)) environment.PatchWriting.WritePatchMarker();"] =
             "Run policy: the patch gets its marker only when some run of the batch will write; the marker's text and merging belong to the plugin writer.",
         ["StepRunner.cs: if (collected.Stop is { } stop)"] =
-            "Step 2 returns the stop for a run without target objects; the runner ends the run on any stop a step returns.",
+            "The collect-placed-objects step returns the stop for a run without target objects; the runner ends the run on any stop a step returns.",
+        ["StepRunner.cs: foreach (var request in requests) results.Add(PatchOneRun(request, environment));"] =
+            "The batch runs its requests one after the other; each run gets only its request and the environment.",
+        ["StepRunner.cs: foreach (var section in sections) log.Print(section);"] =
+            "Prints the sections a step's builder returned, in the order returned; it decides nothing.",
+        ["OtherObjectIndex.cs: contains: slot => IsVisible(slot) && _containment.Contains(_objects[slot].Base, _objects[slot].Transform, worldPoint, scratch),"] = CacheQuery,
+        ["ObjectContainment.cs: if (shapes.Of(baseKey).MeshPath is not { } meshPath) return false;"] = ContainmentTest,
+        ["ObjectContainment.cs: if (!shapes.Of(baseKey).Box.Contains(local)) return false;"] = ContainmentTest,
+        ["ObjectContainment.cs: return lease.Value is { } tree && MeshContact.PointInside(tree, local, transform.Rotation, scratch.Triangles);"] = ContainmentTest,
+        ["PlacedSpaces.cs: foreach (var space in _bySpace.Spaces)"] = CacheIndexBuild,
+        ["PlacedSpaces.cs: for (var slot = 0; slot < space.Items.Count; slot++) _slotOf[space.Items[slot].Id.Index] = slot;"] = CacheIndexBuild,
+        ["VisibleObjectsOfAnyPlugin.cs: box.WorldAabb(distance), slot => index.IsVisible(slot) && box.Intersects(index.OrientedBoxOf(slot), distance), scratch.Spatial, scratch.Matches);"] = CacheQuery,
+        ["VisibleObjectsOfAnyPlugin.cs: objectsOfAnyPlugin.IndexOf(space).FindContainingVisible(point, include: _ => true, scratch) >= 0;"] = CacheQuery,
+        ["SurfaceSampleStore.cs: return lease.Value is { } tree ? new SampledSurface(SurfaceSampler.Sample(tree, samplesPerMesh).ToImmutableArray(), tree.Bounds) : null;"] =
+            "A mesh without a tree has no sampled surface.",
+        ["NpcBodyCache.cs: plugin.TraitSupplierOf(new BaseKey(placedBase, BaseLinkKind.Npc), templateFlag) switch"] =
+            "Follows a base to the NPC or the leveled list that supplies its body; which flag hands over the traits is passed in.",
+        ["NpcBodyCache.cs: return sources.Count == 0 ? null : distinctBodies(sources.Select(GetOwnBody).ToList());"] =
+            "A leveled list with no NPC has no body set; how bodies are reduced to distinct ones is passed in.",
+        ["NpcBodyCache.cs: ?? throw new InvalidOperationException(\"\");"] =
+            "An NPC the plugin reader named but cannot read is a bug of ours, so it throws.",
+        ["PlacedNpcIndex.cs: .Where(slot => bodies[slot].FirstPoint != null)"] = CacheIndexBuild,
+        ["PlacedNpcIndex.cs: var placedNpcs = spaceObjects.Where(rules.IsPlacedNpc).ToArray();"] = CacheIndexBuild,
+        ["PlacedNpcIndex.cs: var spawning = ParallelResults.IndicesWhere(placedBodies, body => body != null);"] = CacheIndexBuild,
+        ["PlacedNpcIndex.cs: npc.Base is { } baseKey ? bodies.GetBodies(baseKey.Record) : null;"] = CacheIndexBuild,
+        ["ObjectCaches.cs: AreTheCollectedObjects(targets) ? VisibleTargets : _indexes.Get(targets, () => new VisibleTargetObjects(targets, _shapes, _containment, _execution));"] =
+            "The collected objects have their index from the start; any other list of objects gets an index built once.",
+        ["ObjectCaches.cs: ReferenceEquals(first, second) || (first is not null && second is not null && first.SequenceEqual(second));"] =
+            "Two lists of target objects are the same list when they hold the same objects in the same order.",
+        ["LoadOrderCaches.cs: public int CountEffectOnlyMeshes() => MeshFiles.Bounds.Computed().Count(mesh => mesh.Status == MeshReadStatus.EffectOnly);"] = CacheStatistics,
+        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: index.Bounds.Overlapping(searchBox, slot => index.IsVisible(slot) && IsUnchanged(index[slot]) && unchangedMatches(index, slot, state), scratch.Spatial, scratch.Matches);"] = CacheQuery,
+        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: foreach (var slot in scratch.Matches) into.Add(index[slot].Id);"] = CacheQuery,
+        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: foreach (var moved in changed.Values)"] = CacheQuery,
+        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: if (moved is { } standing && standing.SpaceKey == space && movedMatches(BoxOf(standing), state)) into.Add(standing.Id);"] = CacheQuery,
+        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: objectsOfAnyPlugin.IndexOf(space).FindContainingVisible(point, IsUnchanged, scratch) >= 0"] = CacheQuery,
+        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: || MovedIn(space).Any(moved => containment.Contains(moved.Base, moved.Transform, point, scratch));"] = CacheQuery,
+        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: public OtherObject Get(OtherId id) => changed.TryGetValue(id, out var moved) && moved is { } standing ? standing : objectsOfAnyPlugin.Get(id);"] =
+            "An object that was moved is answered where it stands now.",
+        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: private bool IsUnchanged(OtherObject other) => !changed.ContainsKey(other.Id);"] =
+            "An object is unchanged when it was neither moved nor taken out.",
+        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: private IEnumerable<OtherObject> MovedIn(RecordKey space) => changed.Values.OfType<OtherObject>().Where(moved => moved.SpaceKey == space);"] =
+            "The moved objects of one space.",
+        ["VisibleTargetObjects.cs: var visible = targets.Where((_, index) => isVisible[index]).ToList();"] = CacheIndexBuild,
+        ["VisibleTargetObjects.cs: space, point, radius, (point, radius), static (box, state) => !Vectors.IsFartherThan(box.ClosestPoint(state.point), state.point, state.radius), into);"] = CacheQuery,
+        ["VisibleTargetObjects.cs: if (EntriesOf(space) is not { } entries) return false;"] = CacheQuery,
+        ["VisibleTargetObjects.cs: .Where(include)"] = CacheQuery,
+        ["VisibleTargetObjects.cs: .Any(target => _containment.Contains(target.Base, target.Transform, point, scratch));"] = CacheQuery,
+        ["VisibleTargetObjects.cs: EntriesOf(space) is { } entries"] = CacheQuery,
+        ["VisibleTargetObjects.cs: ? FindCandidates(entries, point, radius).Where(entry => include(entries.Targets[entry])).Select(entry => entries.Boxes[entry])"] = CacheQuery,
+        ["VisibleTargetObjects.cs: if (EntriesOf(space) is not { } entries) return;"] = CacheQuery,
+        ["VisibleTargetObjects.cs: foreach (var entry in FindCandidates(entries, point, radius))"] = CacheQuery,
+        ["VisibleTargetObjects.cs: if (isNear(entries.Boxes[entry], state)) into.Add(new VisibleTargetNear(entries.Targets[entry], entries.Boxes[entry]));"] = CacheQuery,
+        ["VisibleTargetObjects.cs: _visibleBySpace.TryGetValue(space, out var visible) ? _entries.Get(space, () => CreateEntries(visible)) : null;"] =
+            "A space without visible targets has no entries.",
+        ["VisibleTargetObjects.cs: Vector2.DistanceSquared(new Vector2(center.X, center.Y), point) <= radius * radius;"] = CacheQuery,
+        ["TriangleStore.cs: meshes.Count(mesh => !mesh.TooLarge),"] = CacheStatistics,
+        ["TriangleStore.cs: meshes.Count(mesh => mesh.TooLarge),"] = CacheStatistics,
+        ["TriangleStore.cs: if (triangles is not { TriangleCount: > 0 }) return null;"] = "A mesh without triangles has no tree.",
+        ["TriangleStore.cs: _builtMeshes.Get(meshPath, () => new BuiltMesh(tree?.TriangleCount ?? 0, TooLarge: tree == null));"] =
+            "Remembers for the statistics what the build gave: the triangle count, or that the mesh was too large.",
+        ["TriangleStore.cs: var large = triangles.TriangleCount > LargeMeshTriangles;"] = LargeMeshBuildSlot,
+        ["TriangleStore.cs: if (large) _largeBuilds.Wait();"] = LargeMeshBuildSlot,
+        ["TriangleStore.cs: if (large) _largeBuilds.Release();"] = LargeMeshBuildSlot,
     };
+
+    /// <summary>"file: use" of an error boundary in the runner or the run caches, and why it is there.</summary>
+    private static readonly Dictionary<string, string> AllowedErrorBoundaries = new()
+    {
+        ["TriangleStore.cs: try"] = "Releases the build slot of a large mesh when its build throws; the exception passes on.",
+    };
+
+    private const string CacheQuery = "A cache query picks the objects that answer the question asked of it; the rules it applies are given to the cache.";
+    private const string ContainmentTest = "Whether a point lies inside an object's mesh: geometry over the meshes the cache was given.";
+    private const string CacheIndexBuild = "A cache builds its index over the objects it was given; it decides nothing about the domain.";
+    private const string CacheStatistics = "Counts what the cache holds, for the statistics.";
+    private const string LargeMeshBuildSlot = "A large mesh waits for one of the few build slots, because reading and indexing it needs much memory; a limit on memory, not a domain rule.";
 
     private const string StepRunnerFile = "Run/RunAllSteps/StepRunner.cs";
 
@@ -78,6 +152,10 @@ public class RunnerRulesTests
 
     private static readonly Regex UsingDirective = new(@"^\s*using\s+[\w.]+\s*;", RegexOptions.Multiline);
 
+    /// <summary>The words and operators that make a condition or a loop, besides the conditional <c>?</c> and the comparisons <c>&lt;</c> and <c>&gt;</c> between spaces.</summary>
+    private const string ConditionWords =
+        @"\b(?:if|switch|when|is|for|foreach|while|do)\b|\b(?:Where|Any|All|First|FirstOrDefault|Count|TakeWhile)\s*\(|&&|\|\||\?\?|(?<!\?)\?\.|==|!=|<=|>=|(?<![\w)\]])!(?!=)";
+
     private static readonly Regex LinkCacheBuild =new(@"\bTo(?:Immutable|Mutable)LinkCache\b");
 
     /// <summary>The build call inside the body of <c>Open()</c>, before any other member starts.</summary>
@@ -89,7 +167,7 @@ public class RunnerRulesTests
     {
         var settings = SettingsOfRunSettings();
 
-        var found = RunnerAndRunCachesFiles()
+        var found = RunnerFiles()
             .SelectMany(file => FindSettingsReads(file.Code, settings).Concat(FindGroupSettingsReads(file.Code)).Select(read => $"{FileName(file)}: {read}"))
             .ToHashSet();
 
@@ -146,17 +224,28 @@ public class RunnerRulesTests
             .Select(match => match.Groups["method"].Value)
             .Where(name => entryType.GetNestedType(name) is null);
 
+    /// <summary>A rule provider the runner no longer calls or reads (a listed field) is a listed member nothing asks for.</summary>
+    [Fact]
+    public void TheRunnerUsesEveryListedRuleProvider()
+    {
+        var code = string.Concat(RunnerFiles().Select(file => file.Code));
+
+        var notUsed = LogicPublicTypesTests.RuleProviders.Keys
+            .Where(provider => !Regex.IsMatch(code, $@"\b{Regex.Escape(provider)}\b"))
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(notUsed.Count == 0, $"Listed in {nameof(LogicPublicTypesTests.RuleProviders)} but the runner never uses them:{Environment.NewLine}{string.Join(Environment.NewLine, notUsed)}");
+    }
+
     [Fact]
     public void TheRunnerHoldsNoErrorBoundary()
     {
         var found = RunnerFiles()
             .SelectMany(file => FindErrorBoundaryUses(file.Code).Select(use => $"{FileName(file)}: {use}"))
-            .Order(StringComparer.Ordinal)
-            .ToList();
+            .ToHashSet();
 
-        Assert.True(
-            found.Count == 0,
-            $"The runner holds an error boundary; each part catches its own failures:{Environment.NewLine}{string.Join(Environment.NewLine, found)}");
+        AssertOnlyAllowed(found, AllowedErrorBoundaries.Keys, "Error boundary in the runner; each part catches its own failures", nameof(AllowedErrorBoundaries));
     }
 
     [Fact]
@@ -259,6 +348,20 @@ public class RunnerRulesTests
             var vv = ww?.Length;
             var xx = yy.Count;
             long? zz = 1;
+            var eq = ab == cd;
+            var ne = ab != cd;
+            var le = ab <= cd;
+            var ge = ab >= cd;
+            var lt = ab < cd;
+            var gt = ab > cd;
+            var not = !ab;
+            var forgiving = ab!.Length;
+            var made = new List<int> { 1 };
+            Func<int> make = () => 1;
+            foreach (var item in items) use(item);
+            for (var step = 0; step < 3; step++) use(step);
+            while (go) use(go);
+            do use(go); while (go);
             """;
 
         var lines = FindConditionLines(code);
@@ -270,7 +373,9 @@ public class RunnerRulesTests
                 "var d = e is null;", "var dd = ee || ff;", "var j = k ? l : m;", "var jj = kk.All(ll => ll);", "var mm = nn.First();",
                 "var oo = pp.FirstOrDefault();", "var qq = rr.Count();", "var ss = tt.TakeWhile(uu => uu);", "var u = v.Where(w => w);",
                 "var vv = ww?.Length;", "var y = z.Any();",
-            },
+                "var eq = ab == cd;", "var ne = ab != cd;", "var le = ab <= cd;", "var ge = ab >= cd;", "var lt = ab < cd;", "var gt = ab > cd;", "var not = !ab;",
+                "foreach (var item in items) use(item);", "for (var step = 0; step < 3; step++) use(step);", "while (go) use(go);", "do use(go); while (go);",
+            }.Order(StringComparer.Ordinal),
             lines.Order(StringComparer.Ordinal));
     }
 
@@ -448,11 +553,8 @@ public class RunnerRulesTests
     private static IReadOnlyList<string> FindErrorBoundaryUses(string code) =>
         [.. Regex.Matches(code, @"\bPartKey\b|\bPartFailure\b|\bGuard\(|\bFailures\.|\btry\b|\bcatch\b").Select(match => match.Value).Distinct()];
 
-    /// <summary>The run caches take every rule from the steps, so they are scanned for settings reads too.</summary>
-    private static IEnumerable<SourceFile> RunnerAndRunCachesFiles() => SourceFile.All().Where(file => file.IsIn([RunnerFolder]));
-
-    private static IEnumerable<SourceFile> RunnerFiles() =>
-        SourceFile.All().Where(file => file.IsIn([RunnerFolder]) && !file.Path.StartsWith(RunCachesFolder + "/", StringComparison.Ordinal));
+    /// <summary>The runner's files, the run caches in its RunCaches folder included: they take every rule from the steps, so every rule of the runner holds for them too.</summary>
+    private static IEnumerable<SourceFile> RunnerFiles() => SourceFile.All().Where(file => file.IsIn([RunnerFolder]));
 
     private static string FileName(SourceFile file) => System.IO.Path.GetFileName(file.Path);
 
@@ -535,12 +637,14 @@ public class RunnerRulesTests
     /// <summary>
     /// The lines (whitespace collapsed) that hold an <c>if</c>, <c>switch</c>, <c>is</c>, <c>when</c>, a conditional operator,
     /// <c>Where(</c>, <c>Any(</c>, <c>All(</c>, <c>First(</c>, <c>FirstOrDefault(</c>, <c>Count(</c> (the call, not the property),
-    /// <c>TakeWhile(</c>, <c>&amp;&amp;</c>, <c>||</c>, <c>??</c> or <c>?.</c>.
+    /// <c>TakeWhile(</c>, <c>&amp;&amp;</c>, <c>||</c>, <c>??</c> or <c>?.</c>, a loop (<c>for</c>, <c>foreach</c>, <c>while</c>, <c>do</c>), a
+    /// comparison (<c>==</c>, <c>!=</c>, <c>&lt;</c>, <c>&lt;=</c>, <c>&gt;</c>, <c>&gt;=</c>) or a negation (<c>!</c>, not the
+    /// null-forgiving <c>!</c> after a name).
     /// </summary>
     private static IReadOnlyList<string> FindConditionLines(string code)
     {
-        var starts = Regex.Matches(code, @"\b(?:if|switch|when|is)\b|\b(?:Where|Any|All|First|FirstOrDefault|Count|TakeWhile)\s*\(|&&|\|\||\?\?|(?<!\?)\?\.").Select(match => match.Index)
-            .Concat(Regex.Matches(code, @"\s\?\s").Select(match => match.Index + match.Value.IndexOf('?')));
+        var starts = Regex.Matches(code, ConditionWords).Select(match => match.Index)
+            .Concat(Regex.Matches(code, @"\s[?<>]\s").Select(match => match.Index + 1));
         return [.. starts.Select(index => LineAt(code, index)).Distinct()];
     }
 

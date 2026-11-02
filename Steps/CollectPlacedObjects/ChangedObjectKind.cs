@@ -27,7 +27,7 @@ internal static class ChangedObjectKind
     public static ChangedObject? Of(PlacedRecordFact record, PluginName cleanedMod, AcceptedWorld world, float movedDistance)
     {
         if (record.WinningMod != cleanedMod && record.WinningMod != world.Patch) return null;
-        if (!record.InTargetSpace || StartsDisabledRule.Of(record.Placement, isWinningTarget: true) != ShownInGame.Present) return null;
+        if (!record.InPluginSpace || StartsDisabledRule.Of(record.Placement, isWinningTarget: true) != ShownInGame.Present) return null;
         if (VersionBelowCleanedMod(record, cleanedMod, world) is not { } earlier) return null;
         if (earlier.SpaceKey != record.Space.Key) return null;
         if (RemovedForm.IsRemoved(earlier.Placement.Presence) || earlier.Placement is not { Position: { } position, EulerRotation: not null }) return null;

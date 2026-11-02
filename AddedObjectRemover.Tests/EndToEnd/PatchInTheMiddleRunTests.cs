@@ -157,7 +157,7 @@ public sealed class PatchInTheMiddleRunTests : IDisposable
         return settings;
     }
 
-    private static IMeshFilesFactory OpenMeshFiles(string dataFolder, GameRelease release, IReadOnlyList<ModKey> listedPlugins) =>
+    private static IMeshFilesFactory OpenMeshFiles(string dataFolder, GameRelease release, IReadOnlyList<PluginName> listedPlugins) =>
         new MeshFilesFactory(dataFolder, release, listedPlugins);
 
     private static string[] BelowPluginNames(int count) => [.. Enumerable.Range(1, count).Select(number => $"Below{number}.esp")];

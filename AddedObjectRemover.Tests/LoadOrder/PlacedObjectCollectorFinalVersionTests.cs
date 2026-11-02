@@ -17,7 +17,7 @@ public class PlacedObjectCollectorFinalVersionTests
     private static readonly PluginName EarlierTarget = new("EarlierTarget.esp");
     private static readonly Vector3 NewPlace = new(250, 0, 0);
 
-    private static readonly WhatToCollect Plan = new(Navmesh: false, OtherModDetails: false, TerrainVersions: false, TerrainLayers: false, Water: false, MovedDistance: SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false, JudgeOldPlaces: false, TerrainForChangedObjectsOnly: false);
+    private static readonly WhatToCollect Plan = new(new ScanNeeds(), SettingDefaults.MovedDistanceInUnits, ProcessReplaced: false);
     private static readonly ModTrustTable Mods = TestModTrust.Of(TestTargets.TargetName, TestTargets.PatchName, trusted: [], untrusted: [EarlierTarget, LaterPlugin]);
 
     [Fact]
@@ -83,7 +83,7 @@ public class PlacedObjectCollectorFinalVersionTests
     [Fact]
     public void ATargetRecordThePatchMovedOutOfTheTargetSpacesCountsWithTheHiddenOnes()
     {
-        var movedAway = TargetRecord(1, Winner.Patch, NewPlace) with { InTargetSpace = false };
+        var movedAway = TargetRecord(1, Winner.Patch, NewPlace) with { InPluginSpace = false };
 
         var collected = Collect([TargetRecord(0, Winner.Target, Vector3.Zero), movedAway]);
 

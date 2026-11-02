@@ -9,3 +9,9 @@ dotnet_diagnostic.CS4014.severity = error
 
 # CS1998: Async function does not contain await
 dotnet_diagnostic.CS1998.severity = silent
+
+# Dead code: unused private members, private members never read, values assigned and never read, unused parameters
+dotnet_diagnostic.IDE0051.severity = error
+dotnet_diagnostic.IDE0052.severity = error
+dotnet_diagnostic.IDE0059.severity = error
+dotnet_diagnostic.IDE0060.severity = error

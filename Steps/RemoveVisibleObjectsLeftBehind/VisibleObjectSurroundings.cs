@@ -1,8 +1,8 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
+using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
 
@@ -120,8 +120,7 @@ internal sealed class VisibleObjectSurroundings
             _execution,
             _order,
             candidates,
-            static () => (object?)null,
-            (targetIndex, _) => new MeasuredSurroundings(targetIndex, _neighbours[Array.BinarySearch(_candidates, targetIndex)].WithGone(_fateOf)),
+            targetIndex => new MeasuredSurroundings(targetIndex, _neighbours[Array.BinarySearch(_candidates, targetIndex)].WithGone(_fateOf)),
             ParallelMap.AutomaticRangeSize);
 
     /// <summary>A candidate's visible neighbours in ascending target id, what each adds to its directions, and which of them left their place.</summary>

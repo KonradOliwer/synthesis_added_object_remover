@@ -539,20 +539,16 @@ public sealed class RestoreWhereRemovedGuardTests
         ImmutableArray<NavmeshWorldTriangle> navmesh = [.. scene.Navmesh];
         return WhereRemovedRestorer.Plan(
             new(
-                collected,
-                DecisionsRemoving(targets, scene.Removed),
-                scene.OtherMods,
-                TestScenes.Create(targets, [], Shapes).VisibleTargets,
-                rules.WorldCaches,
-                rules.TooCloseRule(),
-                rules.HoldersOfObjectsThatStay,
-                TestNavmeshCheck.NoFault,
-                rules.Support,
-                Shapes,
-                new NavmeshIndex(bucket => bucket.Grid is null && !navmesh.IsEmpty ? [.. navmesh] : null),
-                TestLandPlugin.Flat,
-                Plugins,
-                TestTargets.TargetName,
+                new(collected, DecisionsRemoving(targets, scene.Removed), scene.OtherMods),
+                new(rules.WorldCaches, rules.TooCloseRule(), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),
+                new(
+                    new TestRunCaches(
+                        Shapes,
+                        navmeshes: new NavmeshIndex(bucket => bucket.Grid is null && !navmesh.IsEmpty ? [.. navmesh] : null),
+                        visibleTargets: TestScenes.Create(targets, [], Shapes).IndexVisibleTargets),
+                    TestLandPlugin.Flat,
+                    Plugins,
+                    TestTargets.TargetName),
                 new Execution(scene.Workers),
                 Settings));
     }

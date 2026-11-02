@@ -19,19 +19,21 @@ internal sealed class NavmeshMapWriter(ISkyrimMod patchMod, RecordHandles handle
     {
         var mapKey = map.ToFormKey();
         var winner = handles.NavmeshMaps.Last(version => version.Map.FormKey == mapKey).Map;
-        var target = GetOrAddOverride(mapKey, winner);
-        target.FormVersion = winner.FormVersion;
-        target.PreferredPathing = winner.PreferredPathing?.DeepCopy();
-        target.NVSI = winner.NVSI is { } nvsi ? nvsi.ToArray() : null;
-        target.NavMeshVersion = winner.NavMeshVersion;
-        foreach (var order in entries) NavmeshRecordParts.MapEntry.CopyInto(target, EntryFor(mapKey, order));
-        SortByNavmesh(target.MapInfos);
+        var written = GetOrAddOverride(mapKey, winner);
+        var (preferredPathing, nvsi, navMeshVersion) = MutagenCalls.Read(() =>
+            (winner.PreferredPathing?.DeepCopy(), winner.NVSI is { } stored ? stored.ToArray() : null, winner.NavMeshVersion));
+        written.FormVersion = winner.FormVersion;
+        written.PreferredPathing = preferredPathing;
+        written.NVSI = nvsi;
+        written.NavMeshVersion = navMeshVersion;
+        foreach (var order in entries) NavmeshRecordParts.MapEntry.CopyInto(written, EntryFor(mapKey, order));
+        SortByNavmesh(written.MapInfos);
     }
 
     private NavigationMeshInfoMap GetOrAddOverride(FormKey mapKey, INavigationMeshInfoMapGetter winner)
     {
         if (patchMod.NavigationMeshInfoMaps.RecordCache.TryGetValue(mapKey, out var held)) return held;
-        var copy = (NavigationMeshInfoMap)winner.DeepCopy();
+        var copy = (NavigationMeshInfoMap)MutagenCalls.Read(() => winner.DeepCopy());
         copy.MapInfos.Clear();
         patchMod.NavigationMeshInfoMaps.Add(copy);
         return copy;
@@ -41,12 +43,12 @@ internal sealed class NavmeshMapWriter(ISkyrimMod patchMod, RecordHandles handle
     {
         var navmesh = order.Navmesh.ToFormKey();
         var source = handles.NavmeshMaps.Single(version => version.Plugin == order.From && version.Map.FormKey == mapKey).Map;
-        var entry = source.MapInfos.Last(info => info.NavigationMesh.FormKey == navmesh).DeepCopy();
-        if (order.SetZ is { } z) SetZ(entry, z);
+        var entry = MutagenCalls.Read(() => source.MapInfos.Last(info => info.NavigationMesh.FormKey == navmesh).DeepCopy());
+        if (order.FlattenAndDetachZ is { } z) FlattenAndDetach(entry, z);
         return entry;
     }
 
-    private static void SetZ(NavigationMapInfo entry, float z)
+    private static void FlattenAndDetach(NavigationMapInfo entry, float z)
     {
         entry.Point = entry.Point.WithZ(z);
         if (entry.Island is { } island)

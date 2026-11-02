@@ -54,6 +54,15 @@ public class SpatialGridTests
         Assert.Equal(9, SpatialGrid.CountCells(new Box(new Vector3(-512), new Vector3(512, 512, 0))));
     }
 
+    [Fact]
+    public void ABoxIsListedOncePerCellItCovers()
+    {
+        var corners = new Box(new Vector3(-1, -1, 0), new Vector3(1, 1, 0));
+        var grid = SpatialGrid.FromBoxes([corners]);
+
+        Assert.Equal(new[] { 0, 0, 0, 0 }, Collect(grid, corners));
+    }
+
     private static List<int> Collect(SpatialGrid grid, Box area)
     {
         var results = new List<int>();

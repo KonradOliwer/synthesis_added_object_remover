@@ -139,6 +139,47 @@ public class ProjectRulesTests
     }
 
     [Fact]
+    public void EveryRowsKindFitsItsFolderAndName() =>
+        Assert.Empty(Rules.FindRowsWhoseKindDoesNotFitFolderAndName());
+
+    [Fact]
+    public void ARowWhoseKindDoesNotFitItsFolderAndNameIsReported()
+    {
+        var table = Table(
+            new ProjectRule("Good", "L", "Steps/Good", [], []),
+            new ProjectRule("Good.Contracts", "C", "Steps/Good.Contracts", [], []),
+            new ProjectRule("Marked.Contracts", "L", "Steps/Marked.Contracts", [], []),
+            new ProjectRule("Marked", "C", "Steps/Marked", [], []),
+            new ProjectRule("Cache", "L", "Caches/Cache", [], []),
+            new ProjectRule("Catalog.Contracts", "Q", "Caches/Catalog.Contracts", [], []),
+            new ProjectRule("Other.Contracts", "V", "Caches/Other.Contracts", [], []),
+            new ProjectRule("Tool", "T", "Tools/Tool", [], []),
+            new ProjectRule("Facts", "A", "Tools/Facts", [], []),
+            new ProjectRule("Misplaced", "L", "Tools/Misplaced", [], []),
+            new ProjectRule("Run", "R", "Run/Run", [], []),
+            new ProjectRule("Settings", "V", "Run/Settings", [], []),
+            new ProjectRule("Settings.Contracts", "R", "Run/Settings.Contracts", [], []),
+            new ProjectRule("Ids", "K", "Ids", [], []),
+            new ProjectRule("Entry", "E", "Entry", [], []),
+            new ProjectRule("Entry.Tests", "X", "Entry.Tests", [], []),
+            new ProjectRule("Entry.Other.Tests", "E", "Entry.Other.Tests", [], []),
+            new ProjectRule("Odd", "T", "Elsewhere/Odd", [], []));
+
+        Assert.Equal(
+            [
+                "Marked.Contracts (Steps/Marked.Contracts) is kind L; its folder and name allow only C",
+                "Marked (Steps/Marked) is kind C; its folder and name allow only L",
+                "Cache (Caches/Cache) is kind L; its folder and name allow only B",
+                "Other.Contracts (Caches/Other.Contracts) is kind V; its folder and name allow only C or Q",
+                "Misplaced (Tools/Misplaced) is kind L; its folder and name allow only A or T",
+                "Settings.Contracts (Run/Settings.Contracts) is kind R; its folder and name allow only C",
+                "Entry.Other.Tests (Entry.Other.Tests) is kind E; its folder and name allow only X",
+                "Odd (Elsewhere/Odd) is kind T; its folder and name allow no kind",
+            ],
+            table.FindRowsWhoseKindDoesNotFitFolderAndName());
+    }
+
+    [Fact]
     public void TheReferencesHaveNoCycle() =>
         Assert.Empty(Rules.FindCycles());
 

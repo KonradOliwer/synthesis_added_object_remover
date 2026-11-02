@@ -6,7 +6,7 @@ namespace AddedObjectRemover.Caches.BaseObjectShapeAndKind;
 /// <summary>
 /// Shape facts about base objects: the local-space bounding box (measured from the NIF mesh when
 /// possible, else the base record's Object Bounds) and whether the base is invisible. Both are
-/// cached per base record, failures included; the meshes' own bounds are cached by the mesh reader.
+/// cached per base record and link kind, failures included; the meshes' own bounds are cached by the mesh reader.
 ///
 /// Thread-safe: each base is measured exactly once even under concurrent requests.
 /// </summary>
@@ -29,7 +29,7 @@ public sealed class BaseObjectShapes : IBaseObjectShapes
     private readonly IBaseFacts _bases;
     private readonly IMeshFiles _meshFiles;
     private readonly IReadOnlyDictionary<uint, CollisionLayerFact> _layers;
-    private readonly ComputedOncePerKey<RecordKey, MeasuredBase> _byBase = new(Publication.BuiltOnce, EqualityComparer<RecordKey>.Default);
+    private readonly ComputedOncePerKey<BaseKey, MeasuredBase> _byBase = new(Publication.BuiltOnce, EqualityComparer<BaseKey>.Default);
 
     /// <param name="layers">The load order's collision layer records, by layer number.</param>
     public BaseObjectShapes(IBaseFacts bases, IMeshFiles meshFiles, IReadOnlyDictionary<uint, CollisionLayerFact> layers)
@@ -60,7 +60,7 @@ public sealed class BaseObjectShapes : IBaseObjectShapes
                 meshes.Select(mesh => mesh.FailureCategory).OfType<MeshFailureCategory>(), category => category, EqualityComparer<MeshFailureCategory>.Default));
 
     public BaseShape Of(BaseKey? baseKey) =>
-        baseKey is { } key ? _byBase.Get(key.Record, () => MeasureBase(key)).Shape : BaseShape.Missing;
+        baseKey is { } key ? _byBase.Get(key, () => MeasureBase(key)).Shape : BaseShape.Missing;
 
     public ObjectVisibility VisibilityOf(BaseKey? baseKey, bool isPrimitive, bool hasMapMarker)
     {

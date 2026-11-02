@@ -1,4 +1,5 @@
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.WriteThePatch;
 
@@ -18,6 +19,9 @@ internal static class PlacedUndoWrite
         else if (earlier.GoesBackToEarlierCell(cellNow, persistentNow))
             yield return new PlaceInCell(key, earlier.Cell.Key, InPersistentList: false);
 
-        yield return new CopyEarlierPlacedParts(key, earlier.Undo);
+        yield return PartsOrderFor(new PlacedPartsRestored(key, earlier.Undo));
     }
+
+    /// <summary>The order that gives the record's parts their values before the cleaned mod.</summary>
+    public static WriteOrder PartsOrderFor(PlacedPartsRestored restored) => new CopyEarlierPlacedParts(restored.Record, restored.Parts);
 }

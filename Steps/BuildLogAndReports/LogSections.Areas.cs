@@ -22,7 +22,7 @@ internal static partial class LogSections
     {
         List<int> removedTargets = [.. removals.Select(removal => removal.TargetIndex)];
         var removed = removedTargets.ToHashSet();
-        var keptOnce = KeyedGroups.DistinctBy(kept, entry => entry.TargetIndex, EqualityComparer<int>.Default);
+        var keptOnce = kept.DistinctBy(entry => entry.TargetIndex).ToList();
         var hintList = hints.ToList();
         var removedMarkers = HintTargets(hintList.Where(IsRemovedMarker));
         var keptToCheck = HintTargets(hintList.Where(hint => !IsRemovedMarker(hint)));

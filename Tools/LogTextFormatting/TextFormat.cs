@@ -13,7 +13,10 @@ public static class TextFormat
 
     /// <summary>A whole number with its noun, singular only for 1, like "1 mod" or "143 mods".</summary>
     public static string Count<T>(T value, string singular, string plural) where T : IBinaryInteger<T> =>
-        $"{Count(value)} {(value == T.One ? singular : plural)}";
+        $"{Count(value)} {Agreeing(value, singular, plural)}";
+
+    /// <summary>The word that agrees with a whole number, singular only for 1, like "stands" after 1 or "stand" after 0 and 2.</summary>
+    public static string Agreeing<T>(T value, string singular, string plural) where T : IBinaryInteger<T> => value == T.One ? singular : plural;
 
     /// <summary>A number with every digit that matters: it reads back as the same value.</summary>
     public static string Exact<T>(T value) where T : IFormattable => value.ToString("R", CultureInfo.InvariantCulture);

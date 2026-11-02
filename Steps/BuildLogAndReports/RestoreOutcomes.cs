@@ -29,7 +29,7 @@ internal static class RestoreOutcomes
     public static string? KeptBecause(PlacedChangeJudged judged, Func<RecordKey, string> label)
     {
         if (judged.IsRestored) return null;
-        if (judged.Never is { } never) return RestoreWhereRemovedText.Never(never);
+        if (judged.Never is { } never) return RestoreWhereRemovedText.Never(never, judged.Change.WinningMod);
         if (judged.Refused is { } refusal) return RestoreWhereRemovedText.Refusal(refusal, label);
         return judged.KeptForArea is { } verdict
             ? RestoreWhereRemovedText.Area(verdict)
@@ -51,7 +51,7 @@ internal static class RestoreOutcomes
     public static string? KeptBecause(CellChangeJudged judged, Func<RecordKey, string> label)
     {
         if (judged.IsRestored) return null;
-        if (judged.Never is { } never) return RestoreWhereRemovedText.Never(never);
+        if (judged.Never is { } never) return RestoreWhereRemovedText.Never(never, judged.Change.WinningMod);
         if (judged.KeptForArea is { } verdict) return RestoreWhereRemovedText.Area(verdict);
         return judged.WaterKeptBy is { } by
             ? RestoreWhereRemovedText.WaterKept(by, label)
@@ -62,7 +62,7 @@ internal static class RestoreOutcomes
     public static string? KeptBecause(LandChangeJudged land, LandQuarterOutcome quarter)
     {
         if (quarter.Restored.Any) return null;
-        if (land.Never is { } never) return RestoreWhereRemovedText.Never(never);
+        if (land.Never is { } never) return RestoreWhereRemovedText.Never(never, land.Change.WinningMod);
         if (quarter.KeptForArea is { } verdict) return RestoreWhereRemovedText.Area(verdict);
         if (!quarter.Kept.IsEmpty) return string.Join(Describe.ListSeparator, quarter.Kept.Select(entry => RestoreWhereRemovedText.TerrainKept(entry.Reason)));
         return quarter.ColoursSharedWithGroundThatStays
@@ -77,7 +77,7 @@ internal static class RestoreOutcomes
     public static string? KeptBecauseOfRest(LandChangeJudged land)
     {
         if (land.Rest) return null;
-        if (land.Never is { } never) return RestoreWhereRemovedText.Never(never);
+        if (land.Never is { } never) return RestoreWhereRemovedText.Never(never, land.Change.WinningMod);
         return land.RestKeptForArea is { } verdict
             ? RestoreWhereRemovedText.Area(verdict)
             : throw new UnreachableException($"The rest of the land record {land.Change.LandKey} stays with no reason given.");
@@ -105,7 +105,7 @@ internal static class RestoreOutcomes
     {
         if (outcome.IsRestored) return null;
         var judged = outcome.Judged;
-        if (judged.Never is { } never) return RestoreWhereRemovedText.Never(never);
+        if (judged.Never is { } never) return RestoreWhereRemovedText.Never(never, judged.Change.WinningMod);
         if (outcome.Group?.Refused is { } refusal) return RestoreWhereRemovedText.Refusal(refusal, label);
         if (judged.KeptForArea is { } verdict) return RestoreWhereRemovedText.Area(verdict);
         return judged.NothingGoesBack

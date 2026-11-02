@@ -289,9 +289,22 @@ public class PlacedRecordFactReadingTests
     {
         var (placed, middle, later) = AddRecordWithTwoOverrides();
 
-        var versions = ReadVersions(placed, plugin => plugin == new PluginName(stoppingPlugin), middle, later);
+        var versions = ReadVersions(placed, (_, plugin) => plugin == new PluginName(stoppingPlugin), middle, later);
 
         Assert.Equal(expected.Select(name => new PluginName(name)), versions.Select(version => version.Plugin));
+    }
+
+    /// <summary>The middle plugin stops the walk of records other plugins win; the later plugin wins this one.</summary>
+    [Fact]
+    public void TheStopRuleIsAskedWithTheWinningPlugin()
+    {
+        var (placed, middle, later) = AddRecordWithTwoOverrides();
+
+        var versions = ReadVersions(placed, (winner, plugin) => winner != new PluginName(LaterPlugin) && plugin == new PluginName(MiddlePlugin), middle, later);
+
+        Assert.Equal(
+            [new PluginName(TargetPlugin), new PluginName(MiddlePlugin), new PluginName(LaterPlugin)],
+            versions.Select(version => version.Plugin));
     }
 
     [Fact]
@@ -449,7 +462,7 @@ public class PlacedRecordFactReadingTests
         var (placed, createdWorld) = CreateWorldWithOverridesAroundThePatch();
         using var world = createdWorld;
 
-        var facts = ReadWith(new PluginRecordsFactory(world, Environment.ProcessorCount).Open(), plugin => plugin == new PluginName(AbovePlugin));
+        var facts = ReadWith(new PluginRecordsFactory(world, Environment.ProcessorCount).Open(), (_, plugin) => plugin == new PluginName(AbovePlugin));
 
         Assert.Equal(
             [new PluginName(AbovePlugin), FixturePatcherState.PatchModKey.ToPluginName(), new PluginName(BelowPlugin)],
@@ -532,7 +545,7 @@ public class PlacedRecordFactReadingTests
         return (placed, middle, later);
     }
 
-    private ImmutableArray<PlacedVersionFact> ReadVersions(FormKey record, Func<PluginName, bool> stopsTheWalk, params FixtureMod[] laterMods)
+    private ImmutableArray<PlacedVersionFact> ReadVersions(FormKey record, VersionWalkStop stopsTheWalk, params FixtureMod[] laterMods)
     {
         var state = CreateState(laterMods);
         using var world = FixturePatcherState.CreateFinalWorld(state);
@@ -585,7 +598,7 @@ public class PlacedRecordFactReadingTests
 
     private PlacedRecordFacts ReadWith(IPluginRecords plugin) => ReadWith(plugin, TestVersionWalks.NoStop);
 
-    private PlacedRecordFacts ReadWith(IPluginRecords plugin, Func<PluginName, bool> stopsTheWalk) =>
+    private PlacedRecordFacts ReadWith(IPluginRecords plugin, VersionWalkStop stopsTheWalk) =>
         plugin.ReadPlacedRecords(
             new PlacedReadScope(_target.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: false, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword, TerrainReadsNeedAnOverride: false, OtherRecordChange.Tolerances, AreaRecordVersions: null),
             stopsTheWalk);

@@ -9,7 +9,7 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 /// </summary>
 internal sealed class MalformedLandWorldspacePlugin(IPluginRecords inner) : IPluginRecords
 {
-    public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk) => inner.ReadPlacedRecords(scope, stopsTheWalk);
+    public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, VersionWalkStop stopsTheWalk) => inner.ReadPlacedRecords(scope, stopsTheWalk);
 
     public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets, IReadOnlySet<PluginName> linkedPlugins) =>
         inner.ReadLinks(target, targets, linkedPlugins);

@@ -318,6 +318,41 @@ public sealed class ChangedNavmeshCollectingTests
             doorLink);
     }
 
+    /// <summary>The cleaned mod drops the door's link and a later plugin links it to another triangle: the earlier link is the base game's, the current one the later plugin's.</summary>
+    [Fact]
+    public void ADoorsEarlierLinkIsItsVersionBelowTheCleanedModsAndItsCurrentLinkItsWinners()
+    {
+        Raise(NavmeshCopyIn(_cleaned.Mod));
+        var dropped = (PlacedObject)_door.DeepCopy();
+        dropped.NavigationDoorLink = null;
+        CellCopyIn(_cleaned.Mod, _cell).Temporary.Add(dropped);
+        var relinked = (PlacedObject)_door.DeepCopy();
+        relinked.NavigationDoorLink!.TeleportMarkerTriangle = LinkedTriangle;
+        CellCopyIn(_later.Mod, _cell).Temporary.Add(relinked);
+
+        var doorLink = Assert.Single(ChangedNavmeshOf(Collect()).Doors, fact => fact.Door == _door.FormKey.ToRecordKey());
+
+        Assert.Equal(((NavDoorLinkFact?)new NavDoorLinkFact(NavmeshKey, DoorTriangle), (NavDoorLinkFact?)new NavDoorLinkFact(NavmeshKey, LinkedTriangle)), (doorLink.Earlier, doorLink.Current));
+    }
+
+    /// <summary>
+    /// The door's winner loads after the cleaned mod; the cleaned mod's version, neither the winner nor the one below the cleaned mod,
+    /// is passed by before its link is read: a version whose link getter answers nothing is never asked for it.
+    /// </summary>
+    [Fact]
+    public void ADoorVersionBetweenItsWinnerAndItsVersionBelowTheCleanedModIsPassedWithoutReadingItsLink()
+    {
+        var collector = new NavmeshVersionCollector(
+            Cleaned, new PluginFootprint([], [], [], [], [], [], []), new PluginNames(new KnownPluginNames([BaseGame, Cleaned, Later])));
+        var (door, cell) = (_door.FormKey.ToRecordKey(), _cell.FormKey.ToRecordKey());
+        collector.SeeDoorVersion(door, _door, cell, isWinner: true, belowNamedPlugin: false);
+        var unreadable = GetterProxy.Create<IPlacedObjectGetter>(new Dictionary<string, Func<object?>>());
+
+        var failure = Record.Exception(() => collector.SeeDoorVersion(door, unreadable, cell, isWinner: false, belowNamedPlugin: false));
+
+        Assert.Null(failure);
+    }
+
     /// <summary>A later plugin raises the neighbour; another base navmesh links into the changed one without a link back.</summary>
     [Fact]
     public void NeighboursAreKeptWithTheirWinningAndEarlierVersions()

@@ -19,7 +19,7 @@ internal sealed class PluginRecords(
     private readonly LandscapeMaterials _materials = new(runCache.Cache, names);
     private ScanLookups? _scanned;
 
-    public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk)
+    public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, VersionWalkStop stopsTheWalk)
     {
         var scanned = PlacedRecordReader.Read(order, runCache.Cache, patch, names, scope, stopsTheWalk, execution);
         _scanned = scanned.Lookups;

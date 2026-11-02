@@ -11,7 +11,7 @@ internal sealed class FailingHomeCellPlugin(IPluginRecords inner) : IPluginRecor
 {
     public const string FailureMessage = "home cells broke";
 
-    public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk) => inner.ReadPlacedRecords(scope, stopsTheWalk);
+    public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, VersionWalkStop stopsTheWalk) => inner.ReadPlacedRecords(scope, stopsTheWalk);
 
     public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets, IReadOnlySet<PluginName> linkedPlugins) =>
         inner.ReadLinks(target, targets, linkedPlugins);

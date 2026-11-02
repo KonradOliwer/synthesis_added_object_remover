@@ -11,6 +11,9 @@ public interface IPluginRecordsFactory
 /// <summary>The winning records of the load order by key, as one run's plugin records resolve them.</summary>
 public interface IRecordIndex;
 
+/// <summary>Whether a plugin's version is the lowest one kept of a record whose winning version comes from <paramref name="winner"/>.</summary>
+public delegate bool VersionWalkStop(PluginName winner, PluginName plugin);
+
 /// <summary>Reads the load order's plugin records. Not thread-safe, except <see cref="ReadHomeCellGrid"/>, <see cref="ReadTerrain"/>, <see cref="ReadTerrainBelow"/>, <see cref="ReadTerrainVersions"/>, <see cref="ReadWaterCopies"/>, <see cref="ReadTextureMaterialChain"/>, <see cref="FindLandWorldspace"/>, <see cref="ReadNavmeshes"/>, <see cref="NpcTraitsOf"/>, <see cref="TraitSupplierOf"/>, <see cref="LeveledEntriesOf"/> and <see cref="TryParsePluginName"/>.</summary>
 public interface IPluginRecords
 {
@@ -21,7 +24,7 @@ public interface IPluginRecords
     /// (<see cref="PlacedReadScope.Plugin"/>) overrides, no plugin from the winner down to it stops the walk, so the version just below
     /// its own is kept.
     /// </param>
-    PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk);
+    PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, VersionWalkStop stopsTheWalk);
 
     /// <summary>
     /// The links into the given records from every version of every record that is not a placed record, in the plugins that can

@@ -566,7 +566,7 @@ public class ChangedObjectJudgingTests
 
         public RecordKey? FindLandWorldspace(RecordKey space) => space == TestTargets.Space ? TestTargets.Space : null;
 
-        public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk) => throw new NotSupportedException();
+        public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, VersionWalkStop stopsTheWalk) => throw new NotSupportedException();
 
         public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets, IReadOnlySet<PluginName> linkedPlugins) => throw new NotSupportedException();
 

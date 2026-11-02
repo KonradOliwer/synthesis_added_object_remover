@@ -22,7 +22,10 @@ public enum VersionTrust
     None,
 }
 
-/// <param name="Accepted">The index of the highest version trusted for the property; null when no version is.</param>
+/// <param name="Accepted">
+/// The index of the highest version trusted for the property; when only a transparent version holds the final value, the highest
+/// trusted version holding it, if one does. Null when no version is trusted.
+/// </param>
 /// <param name="Changed">The final version's value differs from the accepted one, or there is no accepted version.</param>
 /// <param name="Changing">
 /// The index of the lowest version above the accepted one (the lowest at all when there is none) that differs from the
@@ -47,20 +50,42 @@ public static class AcceptedVersions
         IReadOnlyList<VersionTrust> trusts, IReadOnlyList<Func<int, int, bool>> differsByProperty) =>
         [.. differsByProperty.Select(differs => DecideProperty(trusts, differs))];
 
+    /// <remarks>
+    /// A final value only a transparent version holds is what an earlier patcher of the group wrote into the patch. When it equals
+    /// a trusted version's value, the base game's included, that patcher put a trusted value back, so it is accepted from that
+    /// version. A real plugin that sets a lower trusted version's value back still changes the property.
+    /// </remarks>
     private static PropertyAcceptance DecideProperty(IReadOnlyList<VersionTrust> trusts, Func<int, int, bool> differs)
     {
+        var acceptance = CompareWithHighestAccepted(trusts, differs);
+        return IsHeldOnlyByTransparentVersion(acceptance) && FindHighestAcceptedHoldingFinalValue(trusts, differs) is { } holding
+            ? new PropertyAcceptance(holding, Changed: false, Changing: null)
+            : acceptance;
+    }
+
+    private static PropertyAcceptance CompareWithHighestAccepted(IReadOnlyList<VersionTrust> trusts, Func<int, int, bool> differs)
+    {
         var finalIndex = trusts.Count - 1;
-        var accepted = FindHighestAccepted(trusts, differs);
+        var accepted = FindHighestAccepted(trusts, differs, static _ => true);
         var changed = accepted is not { } acceptedIndex || differs(acceptedIndex, finalIndex);
         var changing = changed ? FindChanging(trusts, differs, accepted, finalIndex) : null;
         return new PropertyAcceptance(accepted, changed, changing);
     }
 
-    private static int? FindHighestAccepted(IReadOnlyList<VersionTrust> trusts, Func<int, int, bool> differs)
+    private static bool IsHeldOnlyByTransparentVersion(PropertyAcceptance acceptance) => acceptance is { Changed: true, Changing: null };
+
+    private static int? FindHighestAcceptedHoldingFinalValue(IReadOnlyList<VersionTrust> trusts, Func<int, int, bool> differs)
+    {
+        var finalIndex = trusts.Count - 1;
+        return FindHighestAccepted(trusts, differs, index => !differs(index, finalIndex));
+    }
+
+    /// <param name="qualifies">Whether a version may be the one found, besides being accepted.</param>
+    private static int? FindHighestAccepted(IReadOnlyList<VersionTrust> trusts, Func<int, int, bool> differs, Func<int, bool> qualifies)
     {
         for (var index = trusts.Count - 1; index >= 0; index--)
         {
-            if (IsAccepted(trusts, differs, index)) return index;
+            if (qualifies(index) && IsAccepted(trusts, differs, index)) return index;
         }
         return null;
     }

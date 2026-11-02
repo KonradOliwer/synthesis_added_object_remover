@@ -29,9 +29,14 @@ internal static class TestShapes
 
     /// <param name="skyrimMod">Records the shapes may resolve besides the statics, which are added to it.</param>
     /// <param name="dataFolderName">A Data folder next to the test binaries, one per test class so parallel classes do not share files.</param>
-    public static IBaseObjectShapes Create(SkyrimMod skyrimMod, string dataFolderName, params TestStatic[] statics)
+    public static IBaseObjectShapes Create(SkyrimMod skyrimMod, string dataFolderName, params TestStatic[] statics) =>
+        Catalog(skyrimMod.ToImmutableLinkCache(), AddStatics(skyrimMod, dataFolderName, statics), skyrimMod.ModKey);
+
+    /// <summary>Adds the statics to the mod and writes their meshes under the Data folder.</summary>
+    /// <param name="dataFolderName">A Data folder next to the test binaries, one per test class so parallel classes do not share files.</param>
+    /// <returns>The Data folder's path.</returns>
+    public static string AddStatics(SkyrimMod skyrimMod, string dataFolderName, params TestStatic[] statics)
     {
-        var mod = skyrimMod.ModKey;
         foreach (var model in statics)
         {
             var record = new Static(model.FormKey, SkyrimRelease.SkyrimSE) { Model = new Model { File = model.Model } };
@@ -42,8 +47,7 @@ internal static class TestShapes
 
         var dataPath = Path.Combine(AppContext.BaseDirectory, dataFolderName);
         foreach (var model in statics) WriteMesh(dataPath, model.Model, model.Triangles, model.Collision);
-
-        return Catalog(skyrimMod.ToImmutableLinkCache(), dataPath, mod);
+        return dataPath;
     }
 
     private static Noggog.P3Int16 Corner(Vector3 corner) => new((short)corner.X, (short)corner.Y, (short)corner.Z);
@@ -52,7 +56,7 @@ internal static class TestShapes
     public static IBaseObjectShapes Catalog(ILinkCache linkCache, string dataPath, ModKey mod)
     {
         var meshFiles = new MeshFilesFactory(dataPath, GameRelease.SkyrimSE, [mod.ToPluginName()]).Open(BaseObjectShapes.SolidShapes);
-        var shapes = new BaseObjectShapes(TestBaseFacts.Reader(linkCache), meshFiles, CollisionLayerReader.Read(linkCache));
+        var shapes = new BaseObjectShapes(TestBaseFacts.Reader(linkCache), meshFiles, () => CollisionLayerReader.Read(linkCache));
         MeshFilesOfCatalog.Add(shapes, meshFiles);
         return shapes;
     }

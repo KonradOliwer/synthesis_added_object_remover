@@ -405,7 +405,7 @@ public sealed class RestoreWhereRemovedTests
         CellChangedByCleanedMod[] cells = [ChangedCell(ExteriorCellKey, (0, 0))];
 
         var rules = GuardRules(workers: 1);
-        var groupOff = WhereRemovedRestorer.Plan(
+        var groupOff = RestoreLoopReuse.Plan(
             new(
                 new(TestScenes.CreateWorld(targets, []), DecisionsRemoving(targets), OtherModsObjectsResult.SwitchedOff),
                 new(rules.WorldCaches, rules.TooCloseRule(), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),
@@ -525,7 +525,7 @@ public sealed class RestoreWhereRemovedTests
             Spaces = spaces ?? new Dictionary<RecordKey, SpaceFact>(),
         };
         var rules = GuardRules(workers);
-        return WhereRemovedRestorer.Plan(
+        return RestoreLoopReuse.Plan(
             new(
                 new(collected, final, otherModsObjects ?? OtherModsObjectsResult.SwitchedOff),
                 new(worldCaches ?? rules.WorldCaches, rules.TooCloseRule(tooClose), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),

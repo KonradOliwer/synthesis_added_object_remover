@@ -69,7 +69,7 @@ public static partial class StepRunner
             environment.MeshFiles,
             plugin,
             environment.Bases.Open(records),
-            environment.Bases.ReadCollisionLayers(records),
+            () => environment.Bases.ReadCollisionLayers(records),
             npcCacheRules.Bodies,
             npcCacheRules.PlacedNpcs,
             RestingObjects.SurfaceSamplesPerMesh());

@@ -314,4 +314,89 @@ public class AcceptedVersionsTests
 
         Assert.Equal(new PropertyAcceptance(0, true, 2), result);
     }
+
+    [Fact]
+    public void AValueOnlyATransparentVersionHoldsIsAcceptedFromALowerTrustedVersionHoldingIt()
+    {
+        // 0 Full 1, 1 Full 2, 2 Transparent 1
+        var result = DecideOne([Full, Full, Transparent], [1, 2, 1]);
+
+        Assert.Equal(new PropertyAcceptance(0, false, null), result);
+    }
+
+    [Fact]
+    public void AValueOnlyATransparentVersionHoldsIsAcceptedFromTheHighestTrustedVersionHoldingIt()
+    {
+        // 0 Full 1, 1 Full 1, 2 Full 2, 3 Transparent 1
+        var result = DecideOne([Full, Full, Full, Transparent], [1, 1, 2, 1]);
+
+        Assert.Equal(new PropertyAcceptance(1, false, null), result);
+    }
+
+    [Fact]
+    public void AValueOnlyATransparentVersionHoldsWithinTheToleranceOfALowerTrustedVersionIsAccepted()
+    {
+        // 0 Full 10, 1 Full 20, 2 Transparent 11, tolerance 2
+        var result = AcceptedVersions.Decide([Full, Full, Transparent], [DifferByMoreThan(2, [10, 20, 11])])[0];
+
+        Assert.Equal(new PropertyAcceptance(0, false, null), result);
+    }
+
+    [Fact]
+    public void AValueOnlyATransparentVersionHoldsThatDiffersFromEveryTrustedVersionStaysChanged()
+    {
+        // 0 Full 1, 1 Full 2, 2 Transparent 3
+        var result = DecideOne([Full, Full, Transparent], [1, 2, 3]);
+
+        Assert.Equal(new PropertyAcceptance(1, true, null), result);
+    }
+
+    [Fact]
+    public void AValueOnlyATransparentVersionAndAnUntrustedOneBelowTheAcceptedOneHoldStaysChanged()
+    {
+        // 0 None 1, 1 Full 2, 2 Transparent 1
+        var result = DecideOne([None, Full, Transparent], [1, 2, 1]);
+
+        Assert.Equal(new PropertyAcceptance(1, true, null), result);
+    }
+
+    [Fact]
+    public void AValueOnlyATransparentVersionHoldsIsNotAcceptedFromAnOwnEditsVersionThatOnlyCarriesIt()
+    {
+        // 0 None 1, 1 OwnEdits 1, 2 Full 2, 3 Transparent 1
+        var result = DecideOne([None, OwnEdits, Full, Transparent], [1, 1, 2, 1]);
+
+        Assert.Equal(new PropertyAcceptance(2, true, null), result);
+    }
+
+    [Fact]
+    public void AValueOnlyATransparentVersionHoldsIsAcceptedFromAnOwnEditsVersionThatOwnsIt()
+    {
+        // 0 Full 1, 1 OwnEdits 2, 2 Full 3, 3 Transparent 2
+        var result = DecideOne([Full, OwnEdits, Full, Transparent], [1, 2, 3, 2]);
+
+        Assert.Equal(new PropertyAcceptance(1, false, null), result);
+    }
+
+    [Fact]
+    public void APropertyThePatchPutsBackIsAcceptedWhileAnotherARealModChangedStaysChanged()
+    {
+        VersionTrust[] trusts = [Full, Full, None, Transparent];
+        int[] putBackByThePatch = [1, 2, 2, 1];
+        int[] changedByARealMod = [1, 1, 5, 5];
+
+        var results = AcceptedVersions.Decide(trusts, [DifferByMoreThan(0, putBackByThePatch), DifferByMoreThan(0, changedByARealMod)]);
+
+        PropertyAcceptance[] expected = [new(0, false, null), new(1, true, 2)];
+        Assert.Equal(expected, results);
+    }
+
+    [Fact]
+    public void AnUntrustedVersionSettingALowerTrustedValueBackIsStillTheChangingOne()
+    {
+        // 0 Full 1, 1 Full 2, 2 None 1
+        var result = DecideOne([Full, Full, None], [1, 2, 1]);
+
+        Assert.Equal(new PropertyAcceptance(1, true, 2), result);
+    }
 }

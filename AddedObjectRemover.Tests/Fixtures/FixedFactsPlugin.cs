@@ -17,7 +17,7 @@ internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records,
     }
 
     /// <summary>The stop predicate of the last read; null before any.</summary>
-    public Func<PluginName, bool>? StopsTheWalk { get; private set; }
+    public VersionWalkStop? StopsTheWalk { get; private set; }
 
     /// <summary>
     /// The parts the facts of a version show, each with its compare; the base part stands for the base and data. The facts hold no
@@ -35,7 +35,7 @@ internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records,
     private static PlacedPartCompare<PlacedVersionFact> Part(PlacedParts part, Func<PlacedVersionFact, PlacedVersionFact, bool> differs) =>
         new(part, differs, static (_, _) => true);
 
-    public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk)
+    public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, VersionWalkStop stopsTheWalk)
     {
         StopsTheWalk = stopsTheWalk;
         var walked = records.Select(record => Walk(record, scope.Plugin, stopsTheWalk)).ToImmutableArray();
@@ -61,13 +61,13 @@ internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records,
     /// A record the target plugin overrides is walked on down to its version just below the target plugin's, and its parts are
     /// compared from there up, unless the record comes with its part differences.
     /// </summary>
-    private PlacedRecordFact Walk(PlacedRecordFact record, PluginName target, Func<PluginName, bool> stopsTheWalk)
+    private PlacedRecordFact Walk(PlacedRecordFact record, PluginName target, VersionWalkStop stopsTheWalk)
     {
         var versions = record.Versions;
         var targetIndex = versions.TakeWhile(version => version.Plugin != target).Count();
         var isJudged = overridden.Contains(record.Key) && targetIndex > 0 && targetIndex < versions.Length;
         var lowestKept = isJudged ? targetIndex - 1 : versions.Length - 1;
-        while (lowestKept > 0 && !stopsTheWalk(versions[lowestKept].Plugin)) lowestKept--;
+        while (lowestKept > 0 && !stopsTheWalk(versions[^1].Plugin, versions[lowestKept].Plugin)) lowestKept--;
         return record with
         {
             Versions = versions.RemoveRange(0, lowestKept),

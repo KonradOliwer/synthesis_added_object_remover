@@ -8,12 +8,12 @@ namespace AddedObjectRemover;
 /// overrides, no plugin stops the walk before the version just below the read's plugin's is kept, and the parts of the versions
 /// from that one up are compared (<see cref="PlacedRecordPartComparison"/>).
 /// </summary>
-internal sealed class PlacedVersionReader(PluginName namedPlugin, PluginNames names, PluginFootprint footprint, Func<PluginName, bool> stopsTheWalk, PlacedRecordParts parts)
+internal sealed class PlacedVersionReader(PluginName namedPlugin, PluginNames names, PluginFootprint footprint, VersionWalkStop stopsTheWalk, PlacedRecordParts parts)
 {
     private readonly PluginName _namedPlugin = namedPlugin;
     private readonly PluginNames _names = names;
     private readonly PluginFootprint _footprint = footprint;
-    private readonly Func<PluginName, bool> _stopsTheWalk = stopsTheWalk;
+    private readonly VersionWalkStop _stopsTheWalk = stopsTheWalk;
     private readonly PlacedRecordParts _parts = parts;
 
     /// <summary>Each fact's versions, highest first.</summary>
@@ -42,7 +42,7 @@ internal sealed class PlacedVersionReader(PluginName namedPlugin, PluginNames na
         var versions = new List<PlacedVersionFact> { winner };
         _versions.Add(key, versions);
         if (_footprint.OverriddenRecords.Contains(key)) _versionsToCompare.Add(key, [record]);
-        if (!StopsTheWalk(key, winner.Plugin)) _openVersions.Add(key, versions);
+        if (!StopsTheWalk(key, winner.Plugin, winner.Plugin)) _openVersions.Add(key, versions);
     }
 
     /// <remarks>A plugin that holds the record twice (broken data) gives one version, the first found, as it does for the winner.</remarks>
@@ -53,7 +53,7 @@ internal sealed class PlacedVersionReader(PluginName namedPlugin, PluginNames na
         if (isBelowNamedPlugin && _footprint.OverriddenRecords.Contains(key)) _earlierRecords.Add(key, record);
         versions.Add(ReadVersion(record, cell));
         if (_versionsToCompare.TryGetValue(key, out var versionsToCompare)) KeepVersionToCompare(record, key, versionsToCompare, isBelowNamedPlugin, versions);
-        if (StopsTheWalk(key, cell.Plugin)) _openVersions.Remove(key);
+        if (StopsTheWalk(key, versions[0].Plugin, cell.Plugin)) _openVersions.Remove(key);
     }
 
     /// <summary>Once the version just below the read's plugin's is read, compares the parts of the record's versions.</summary>
@@ -70,7 +70,7 @@ internal sealed class PlacedVersionReader(PluginName namedPlugin, PluginNames na
     }
 
     /// <summary>A record the read's plugin overrides is walked on, whatever the plugin, until its version just below the read's plugin's is read.</summary>
-    private bool StopsTheWalk(RecordKey key, PluginName plugin) => _stopsTheWalk(plugin) && !_versionsToCompare.ContainsKey(key);
+    private bool StopsTheWalk(RecordKey key, PluginName winner, PluginName plugin) => _stopsTheWalk(winner, plugin) && !_versionsToCompare.ContainsKey(key);
 
     public PlacedVersionFact ReadVersion(IPlacedGetter record, ScannedCell cell) => new(
         cell.Plugin,

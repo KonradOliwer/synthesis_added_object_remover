@@ -115,7 +115,7 @@ internal static partial class LogSections
         var place = $"{Describe.Space(world, change.Cell.WorldspaceKey)}, cell ({change.Cell.X}, {change.Cell.Y})";
         if (land.Never is { } never)
         {
-            yield return $"  Kept as changed: terrain {place}: {RestoreWhereRemovedText.Never(never)}";
+            yield return $"  Kept as changed: terrain {place}: {RestoreWhereRemovedText.Never(never, change.WinningMod)}";
             yield break;
         }
 

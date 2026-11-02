@@ -14,7 +14,7 @@ internal sealed class UnreadableRecordPlugin(IPluginRecords inner) : IPluginReco
     /// <summary>The records the last link read was asked for; none before a link read.</summary>
     public IReadOnlySet<RecordKey> LinkedRecords { get; private set; } = new HashSet<RecordKey>();
 
-    public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk) => inner.ReadPlacedRecords(scope, stopsTheWalk);
+    public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, VersionWalkStop stopsTheWalk) => inner.ReadPlacedRecords(scope, stopsTheWalk);
 
     public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets, IReadOnlySet<PluginName> linkedPlugins)
     {

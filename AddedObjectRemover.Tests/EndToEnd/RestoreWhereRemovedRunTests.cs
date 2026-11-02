@@ -12,6 +12,7 @@ public class RestoreWhereRemovedRunTests
 {
     private const int Workers = 4;
     private const float SmallSearchRadius = 1500f;
+    private const string CellsFile = ReportFileNames.RestoredWhereRemovedCellsFileName;
 
     private static readonly int[] OtherWorkerCounts = [2, 8];
 
@@ -38,7 +39,7 @@ public class RestoreWhereRemovedRunTests
     [Fact]
     public void ALandRaisedByTheCleanedModGoesBackInTheClearedQuartersAndIsBlendedIntoTheQuarterWhereACrateStays()
     {
-        var (_, run) = Run(SettingsOf(restore => restore.ClearedArea.SearchRadius = SmallSearchRadius), RestoreWhereRemovedWorlds.CreateTerrain);
+        var (_, run) = Run(TerrainSettings(), RestoreWhereRemovedWorlds.CreateTerrain);
 
         ExpectedOutputFiles.AssertMatches("restore-where-removed/Terrain", run.ToExpectedOutputLines());
     }
@@ -97,7 +98,7 @@ public class RestoreWhereRemovedRunTests
     [Fact]
     public void ANavmeshTheCleanedModDeletedComesBackWithItsEntryAndItsNeighbourLinksToItAgain()
     {
-        var (_, run) = Run(SettingsOf(), dataFolder => NavmeshWorld.Create(dataFolder, NavmeshScenario.DeletedWithoutReplacement));
+        var (_, run) = Run(SettingsOf(), NavmeshAndLand(NavmeshAndLandScenario.DeletedWithoutReplacement));
 
         ExpectedOutputFiles.AssertMatches("restore-where-removed/NavmeshBroughtBack", run.ToExpectedOutputLines());
     }
@@ -105,7 +106,7 @@ public class RestoreWhereRemovedRunTests
     [Fact]
     public void ANavmeshTheCleanedModDeletedComesBackWithTheMapEntryTheCleanedModChanged()
     {
-        var (_, run) = Run(SettingsOf(), dataFolder => NavmeshWorld.Create(dataFolder, NavmeshScenario.DeletedWithItsMapEntryChanged));
+        var (_, run) = Run(SettingsOf(), NavmeshAndLand(NavmeshAndLandScenario.DeletedWithItsMapEntryChanged));
 
         ExpectedOutputFiles.AssertMatches("restore-where-removed/NavmeshBroughtBackWithItsEntry", run.ToExpectedOutputLines());
     }
@@ -113,7 +114,7 @@ public class RestoreWhereRemovedRunTests
     [Fact]
     public void ANavmeshTheCleanedModReplacedComesBackWithItsDoorAndItsReplacementIsSunkUnderTheWorld()
     {
-        var (_, run) = Run(SettingsOf(), dataFolder => NavmeshWorld.Create(dataFolder, NavmeshScenario.Replaced));
+        var (_, run) = Run(SettingsOf(), NavmeshAndLand(NavmeshAndLandScenario.Replaced));
 
         ExpectedOutputFiles.AssertMatches("restore-where-removed/NavmeshReplacementSunk", run.ToExpectedOutputLines());
     }
@@ -128,7 +129,7 @@ public class RestoreWhereRemovedRunTests
         var (_, run) = Run(SettingsOf(), RestoreWhereRemovedWorlds.CreateVillageWithAPatchOfTheCleanedMod);
 
         ExpectedOutputFiles.AssertMatches("restore-where-removed/VillageWithAPatchOfTheCleanedMod", run.ToExpectedOutputLines());
-        var objects = Assert.Single(run.Reports, report => report.Name == "restored-where-removed-objects.csv");
+        var objects = Assert.Single(run.Reports, report => report.Name == ReportFileNames.RestoredWhereRemovedObjectsFileName);
         var rock = Assert.Single(objects.Lines, line => line.Contains(",B_Rock,", StringComparison.Ordinal));
         Assert.EndsWith($":{RestoreWhereRemovedWorlds.PatchOfTheCleanedModPlugin}])", rock, StringComparison.Ordinal);
         Assert.Contains(",kept: too close to objects that stay (", rock, StringComparison.Ordinal);
@@ -159,7 +160,7 @@ public class RestoreWhereRemovedRunTests
     [Fact]
     public void ANavmeshInASpaceWhereTheCleanedModsOnlyObjectStartsDisabledIsNamedWithItsSpace()
     {
-        var (outcome, run) = Run(SettingsOf(), dataFolder => NavmeshWorld.Create(dataFolder, NavmeshScenario.DeletedWhereItsOnlyObjectStartsDisabled));
+        var (outcome, run) = Run(SettingsOf(), NavmeshAndLand(NavmeshAndLandScenario.DeletedWhereItsOnlyObjectStartsDisabled));
 
         var navmeshes = outcome.Collected.ChangedNavmeshes;
         Assert.NotEmpty(navmeshes);
@@ -168,32 +169,98 @@ public class RestoreWhereRemovedRunTests
         Assert.All(
             navmeshes,
             navmesh => Assert.Contains(run.Log, line => line.Contains($"avmesh {navmesh.Navmesh} in worldspace {navmesh.SpaceKey}, cell {navmesh.Cell}: ", StringComparison.Ordinal)));
-        var cells = Assert.Single(run.Reports, report => report.Name == "restored-where-removed-cells.csv");
-        Assert.All(navmeshes, navmesh => Assert.Contains(cells.Lines, line => line.Contains($"worldspace {navmesh.SpaceKey}", StringComparison.Ordinal)));
+        var cells = RowsOf(run, CellsFile);
+        Assert.All(navmeshes, navmesh => Assert.Contains(cells, row => row["space"] == $"worldspace {navmesh.SpaceKey}"));
     }
 
     [Fact]
     public void ANavmeshACityPluginEditedAgainStaysAsTheCleanedModMadeItAndNothingOfItsGroupIsWritten()
     {
-        var (_, run) = Run(SettingsOf(), dataFolder => NavmeshWorld.Create(dataFolder, NavmeshScenario.EditedAgainByTheCityMod));
+        var (_, run) = Run(SettingsOf(), NavmeshAndLand(NavmeshAndLandScenario.EditedAgainByTheCityMod));
 
         ExpectedOutputFiles.AssertMatches("restore-where-removed/NavmeshRefused", run.ToExpectedOutputLines());
     }
 
     [Fact]
-    public void OneTwoAndEightWorkersGiveTheSameOutputForTheVillageTheTerrainAndTheNavmeshes()
+    public void ALandTheCleanedModRaisedInACellOffTheDiagonalGoesBackInItsQuartersExceptWhereALaterPluginRaisedItAgain()
     {
-        Func<string, IReadOnlyList<ISkyrimMod>>[] worlds =
+        var (_, run) = Run(SettingsOf(), NavmeshAndLand(NavmeshAndLandScenario.LandRaisedWithABlockRaisedAgainByTheCityMod));
+
+        ExpectedOutputFiles.AssertMatches("restore-where-removed/TerrainOffTheDiagonal", run.ToExpectedOutputLines());
+        AssertEveryQuarterGoesBackAndTheNorthEastLeaves(run, "25 heights (CityMod.esp)");
+        Assert.Contains(" 0 0 0 0 0 ", LandRow(run, 16), StringComparison.Ordinal);
+        Assert.Contains(" 96 96 96 96 96 ", LandRow(run, 24), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The city mod's block is wider than it is tall and lies off the diagonal of the land's points, so a swap of columns and rows in
+    /// the quarters or in the points that go back would move the heights written.
+    /// </summary>
+    [Fact]
+    public void ALandBlockALaterPluginRaisedAgainOffThePointDiagonalStaysWhereItLiesAndTheRestOfItsQuarterGoesBack()
+    {
+        var (_, run) = Run(SettingsOf(), NavmeshAndLand(NavmeshAndLandScenario.LandRaisedWithANarrowBlockOffThePointDiagonalRaisedAgainByTheCityMod));
+
+        AssertEveryQuarterGoesBackAndTheNorthEastLeaves(run, "12 heights (CityMod.esp)");
+        Assert.Contains(" 0 24 40 96 96 96 96 40 24 0 ", LandRow(run, 24), StringComparison.Ordinal);
+        Assert.DoesNotContain(" 96 ", LandRow(run, 16), StringComparison.Ordinal);
+    }
+
+    /// <summary>The city mod changed every point of the land again, so a later plugin has the last word on all of it: no quarter is judged and no land is written.</summary>
+    [Fact]
+    public void ALandALaterPluginChangedAgainEverywhereIsNeitherJudgedNorWritten()
+    {
+        var (outcome, run) = Run(SettingsOf(), NavmeshAndLand(NavmeshAndLandScenario.LandRaisedFurtherEverywhereByTheCityMod));
+
+        Assert.NotEmpty(outcome.Collected.ChangedLands);
+        Assert.DoesNotContain(run.Reports.Where(report => report.Name == CellsFile).SelectMany(ReportRows.Of), row => row["kind"] == "quarter");
+        Assert.DoesNotContain(run.Patch, line => line.StartsWith("land ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ANavmeshTheCleanedModEditedGoesBackToItsEarlierShapeAndOneACityPluginEditedAgainStays()
+    {
+        IReadOnlyList<ISkyrimMod> mods = [];
+        Dictionary<string, string> patchGeometry = [];
+        var (_, run) = FixtureRun.Capture(
+            SettingsOf(),
+            Workers,
+            dataFolder => mods = NavmeshAndLandWorld.Create(dataFolder, NavmeshAndLandScenario.EditedWithAnUnlinkedOneEditedAgainByTheCityMod),
+            earlierPatcherWrites: null,
+            patch =>
+            {
+                patchGeometry = GeometryByKey(patch);
+                return AreaPatchDump.Describe(patch);
+            });
+
+        ExpectedOutputFiles.AssertMatches("restore-where-removed/NavmeshEditedOneRestoredOneKept", run.ToExpectedOutputLines());
+        var navmeshes = RowsOf(run, CellsFile).Where(row => row["kind"] == "navmesh").ToList();
+        Assert.Equal(2, navmeshes.Count);
+        var restored = Assert.Single(navmeshes, row => row["result"] == "restored");
+        Assert.Equal(("shape", "", "Cleared"), (restored["undone"], restored["leftToLaterPlugins"], restored["verdict"]));
+        var kept = Assert.Single(navmeshes, row => row["result"].StartsWith("kept: changed again by a later plugin", StringComparison.Ordinal));
+        Assert.Equal("shape (CityMod.esp)", kept["leftToLaterPlugins"]);
+        Assert.Equal(new[] { restored["navmesh"] }, patchGeometry.Keys);
+        Assert.Equal(GeometryByKey(mods[0])[restored["navmesh"]], patchGeometry[restored["navmesh"]]);
+        Assert.Single(run.Patch, line => line.StartsWith($"navmesh {restored["navmesh"]}:", StringComparison.Ordinal));
+        Assert.DoesNotContain(run.Patch, line => line.StartsWith($"navmesh {kept["navmesh"]}:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void OneTwoAndEightWorkersGiveTheSameOutputForTheVillageTheTerrainTheLandAndTheNavmeshes()
+    {
+        (Settings Settings, Func<string, IReadOnlyList<ISkyrimMod>> World)[] worlds =
         [
-            RestoreWhereRemovedWorlds.CreateVillage,
-            RestoreWhereRemovedWorlds.CreateVillageWithAPatchOfTheCleanedMod,
-            RestoreWhereRemovedWorlds.CreateTerrain,
-            dataFolder => NavmeshWorld.Create(dataFolder, NavmeshScenario.Replaced),
+            (SettingsOf(), RestoreWhereRemovedWorlds.CreateVillage),
+            (SettingsOf(), RestoreWhereRemovedWorlds.CreateVillageWithAPatchOfTheCleanedMod),
+            (TerrainSettings(), RestoreWhereRemovedWorlds.CreateTerrain),
+            (SettingsOf(), NavmeshAndLand(NavmeshAndLandScenario.Replaced)),
+            (SettingsOf(), NavmeshAndLand(NavmeshAndLandScenario.LandRaisedWithABlockRaisedAgainByTheCityMod)),
+            (SettingsOf(), NavmeshAndLand(NavmeshAndLandScenario.EditedWithAnUnlinkedOneEditedAgainByTheCityMod)),
         ];
 
-        foreach (var world in worlds)
+        foreach (var (settings, world) in worlds)
         {
-            var settings = SettingsOf(restore => restore.ClearedArea.SearchRadius = SmallSearchRadius);
             var oneWorker = Run(settings, world, workers: 1).Run.ToExpectedOutputLines();
             Assert.All(OtherWorkerCounts, workers => Assert.Equal(oneWorker, Run(settings, world, workers).Run.ToExpectedOutputLines()));
         }
@@ -201,6 +268,42 @@ public class RestoreWhereRemovedRunTests
 
     private static (RunOutcome Outcome, RunOutput Run) Run(Settings settings, Func<string, IReadOnlyList<ISkyrimMod>> createLoadOrder, int workers = Workers) =>
         FixtureRun.Capture(settings, workers, createLoadOrder, earlierPatcherWrites: null, AreaPatchDump.Describe);
+
+    private static Func<string, IReadOnlyList<ISkyrimMod>> NavmeshAndLand(NavmeshAndLandScenario scenario) =>
+        dataFolder => NavmeshAndLandWorld.Create(dataFolder, scenario);
+
+    private static List<Dictionary<string, string>> RowsOf(RunOutput run, string fileName) =>
+        ReportRows.Of(Assert.Single(run.Reports, report => report.Name == fileName));
+
+    /// <summary>
+    /// The cell's four quarters, south-west, south-east, north-west and north-east in that order, are cleared and go back; only the
+    /// north-east one leaves heights to later plugins.
+    /// </summary>
+    private static void AssertEveryQuarterGoesBackAndTheNorthEastLeaves(RunOutput run, string leftToLaterPlugins)
+    {
+        var quarters = RowsOf(run, CellsFile).Where(row => row["kind"] == "quarter").ToList();
+        Assert.Equal(["south-west", "south-east", "north-west", "north-east"], quarters.Select(quarter => quarter["quarter"]));
+        Assert.All(quarters, quarter => Assert.Equal(("Cleared", "restored"), (quarter["verdict"], quarter["result"])));
+        Assert.Equal(["", "", "", leftToLaterPlugins], quarters.Select(quarter => quarter["leftToLaterPlugins"]));
+    }
+
+    /// <summary>The patch's line of the land's heights in the row, one of those <see cref="AreaPatchDump"/> shows.</summary>
+    private static string LandRow(RunOutput run, int row) => Assert.Single(run.Patch, line => line.Contains($" row {row}: ", StringComparison.Ordinal));
+
+    /// <returns>By navmesh key, every vertex, every triangle with its edges and flags, and every edge link of each navmesh.</returns>
+    private static Dictionary<string, string> GeometryByKey(ISkyrimModGetter mod) =>
+        mod.EnumerateMajorRecords<INavigationMeshGetter>().ToDictionary(navmesh => navmesh.FormKey.ToString(), GeometryOf);
+
+    private static string GeometryOf(INavigationMeshGetter navmesh) =>
+        navmesh.Data is not { } data
+            ? "no data"
+            : string.Join(
+                " | ",
+                string.Join("; ", data.Vertices),
+                string.Join("; ", data.Triangles.Select(triangle => $"{triangle.Vertices} {triangle.EdgeLink_0_1} {triangle.EdgeLink_1_2} {triangle.EdgeLink_2_0} {triangle.Flags}")),
+                string.Join("; ", data.EdgeLinks.Select(link => $"{link.Mesh.FormKey} {link.TriangleIndex}")));
+
+    private static Settings TerrainSettings() => SettingsOf(restore => restore.ClearedArea.SearchRadius = SmallSearchRadius);
 
     private static void SwitchEverythingOff(RestoreWhereRemovedSettings restore)
     {

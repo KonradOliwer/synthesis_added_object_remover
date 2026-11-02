@@ -78,10 +78,12 @@ internal sealed class NavmeshVersionCollector(PluginName namedPlugin, PluginFoot
     /// <param name="cell">The cell whose child list holds the version.</param>
     /// <param name="isWinner">The first version of the record found.</param>
     /// <param name="belowNamedPlugin">The version's plugin loads before the read's plugin.</param>
+    /// <remarks>The link is read only for a version kept: most versions are neither the winner nor the awaited one below the read's plugin.</remarks>
     public void SeeDoorVersion(RecordKey key, IPlacedGetter record, RecordKey cell, bool isWinner, bool belowNamedPlugin)
     {
         if (record is not IPlacedObjectGetter placed) return;
-        var link = placed.NavigationDoorLink is { } doorLink ? new NavDoorLinkFact(names.KeyOf(doorLink.NavMesh.FormKey), doorLink.TeleportMarkerTriangle) : (NavDoorLinkFact?)null;
+        if (!isWinner && (!belowNamedPlugin || !_doorsAwaitingEarlierVersion.Remove(key))) return;
+        var link = DoorLinkIn(placed);
         if (isWinner)
         {
             if (footprint.OverriddenRecords.Contains(key)) _winningDoorCells.Add(key, cell);
@@ -92,9 +94,11 @@ internal sealed class NavmeshVersionCollector(PluginName namedPlugin, PluginFoot
                 return;
             }
         }
-        else if (!belowNamedPlugin || !_doorsAwaitingEarlierVersion.Remove(key)) return;
         if (link is { } earlier) _earlierDoorLinks.Add(key, earlier);
     }
+
+    private NavDoorLinkFact? DoorLinkIn(IPlacedObjectGetter placed) =>
+        placed.NavigationDoorLink is { } doorLink ? new NavDoorLinkFact(names.KeyOf(doorLink.NavMesh.FormKey), doorLink.TeleportMarkerTriangle) : null;
 
     /// <returns>
     /// The navmeshes whose read's plugin's version differs from the one below it in a part, in key order; and the navmesh link of

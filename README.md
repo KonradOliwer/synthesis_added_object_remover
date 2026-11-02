@@ -169,6 +169,8 @@ record rounds them, are no change, and neither is the same rotation stored a ful
 compatibility patch that keeps a moved wall, makes that change accepted. A plugin that changes only other data of an object, such
 as its ownership, changes nothing here: when it carries another mod's move, that other mod is the one named. The patch is neither
 trusted nor untrusted: its values are the final ones, so objects that earlier patchers of your group added or moved can cause removals like any other change.
+A value in the patch that equals the value of any plugin trusted for it, the base game included, is accepted, though: an object an
+earlier patcher of your group put back as the base game has it causes no removals.
 
 **Other patchers' outputs.** The output plugin of another Synthesis group, or of another patcher, carries values copied from
 many mods. Every Added Object Remover patch has the text *Added Object Remover patch* in its description (the plugin's header,
@@ -262,6 +264,7 @@ before it by more than *Count only height changes larger than*, and for a point'
 where it changes it; a mod that re-saves the terrain with small rounding differences therefore makes
 no height its own. A mod that requires the cleaned mod is trusted for terrain exactly as for objects.
 The patch is neither trusted nor untrusted, so an earlier patcher's copy of another mod's change does not make that change accepted.
+A height, ground type or water value in the patch that matches the one of any plugin trusted for it (within the tolerances of the *Count only … larger than* settings), the base game included, is accepted.
 Height and ground type are accepted point by point and apart: one point can take its height from
 one plugin and its ground type from another. A point with neither an accepted height nor an accepted
 ground type (for example in a world or cell that only untrusted mods add) is not checked, and does not
@@ -583,7 +586,8 @@ mod changed. In a config file this section is `RestoreWhereRemoved`, with the su
 | When an area counts as cleared: Measure the share by (`ClearedArea.Measure`) | `ObjectSize` | `ObjectSize`: each object counts by the volume of its box, so a house counts for more than a bucket. `ObjectCount`: each object counts once. |
 | Blend terrain edges over, game units (`TerrainEdgeBlendDistanceInUnits`) | `256` | Where restored ground meets ground that stays as the cleaned mod changed it, the height is blended over this distance, so no step or crack shows (0-1024; 0 means no blending). |
 
-With all four *Restore* switches off, nothing is restored this way and the log and the report files say nothing about it.
+With all four *Restore* switches off, nothing is restored this way: the log lists nothing restored or kept and no restore report file is written.
+The same holds when the cleaned mod changed no object, ground, cell setting or navmesh that a switched-on *Restore* setting covers.
 
 **What goes back.** Only what the cleaned mod changed in records that other mods or the base game own, and only in a cleared area:
 - **Other mods' objects.** Each part of an object goes back on its own: its position, its rotation, its size, whether it is shown (initially

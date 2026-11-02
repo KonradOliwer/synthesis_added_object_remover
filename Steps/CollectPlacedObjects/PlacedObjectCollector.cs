@@ -66,7 +66,7 @@ public sealed class PlacedObjectCollector
                 plan.Needs.TerrainForChangedObjectsOnly,
                 OtherRecordChange.Tolerances,
                 plan.Needs.AreaRecordVersions),
-            candidate => StopsTheWalk(trust, world, plan, candidate));
+            (winner, candidate) => StopsTheWalk(trust, world, plan, winner, candidate));
         return new PlacedObjectCollector(trust, world, plan, facts).Scan();
     }
 
@@ -102,10 +102,12 @@ public sealed class PlacedObjectCollector
     /// a decision in it. When the old places are judged, the same must hold in the world without the cleaned mod, so the walk goes
     /// on below a trusted plugin that needs the cleaned mod. The cleaned mod never stops the walk: a record it overrides keeps the
     /// version it replaces, which tells whether it changed the record (<see cref="ChangedObjectKind"/>); a record it creates has
-    /// no version below it.
+    /// no version below it. A record the patch wins is walked to its lowest version: a value only the patch holds is accepted when
+    /// any trusted version below holds it (<see cref="AcceptedVersions"/>).
     /// </remarks>
-    private static bool StopsTheWalk(ModTrustTable trust, AcceptedWorld world, WhatToCollect plan, PluginName plugin) =>
-        plugin != trust.CleanedMod
+    private static bool StopsTheWalk(ModTrustTable trust, AcceptedWorld world, WhatToCollect plan, PluginName winner, PluginName plugin) =>
+        world.TrustOf(winner) != VersionTrust.Transparent
+        && plugin != trust.CleanedMod
         && world.TrustOf(plugin) == VersionTrust.Full
         && (!plan.Needs.JudgeOldPlaces || trust.AcceptedWorldWithoutCleanedMod.TrustOf(plugin) == VersionTrust.Full);
 

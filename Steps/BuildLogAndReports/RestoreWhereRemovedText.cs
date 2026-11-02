@@ -54,6 +54,10 @@ internal static class RestoreWhereRemovedText
         _ => throw new UnreachableException($"Unknown reason {reason} for a change that never goes back."),
     };
 
+    /// <summary>The reason, naming the winning plugin when that plugin has the last word, as in "... the last word on it (Later.esp)".</summary>
+    public static string Never(NeverRestoredReason reason, PluginName winningMod) =>
+        reason == NeverRestoredReason.WinnerLoadsAfterPatch ? $"{Never(reason)} ({winningMod})" : Never(reason);
+
     /// <summary>Why a change stays for its area; a cleared area keeps nothing.</summary>
     public static string Area(AreaVerdict verdict) => verdict switch
     {

@@ -40,8 +40,12 @@ public sealed class RestoreLoopTests
     private static readonly TestStatic MarkerBase = new(
         new FormKey(ShapeMod, 0x805), @"test\restoreloop\markerbase.nif", [], Collision: null, new Box(new Vector3(-2), new Vector3(2)), IsMarker: true);
 
+    private const string ShapeDataFolder = "RestoreLoopData";
+
+    private static readonly TestStatic[] Statics = [Block, House, Tree, CollisionWall, MarkerBase];
+
     private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(
-        TestCollisionLayers.AddTo(new SkyrimMod(ShapeMod, SkyrimRelease.SkyrimSE)), "RestoreLoopData", Block, House, Tree, CollisionWall, MarkerBase));
+        TestCollisionLayers.AddTo(new SkyrimMod(ShapeMod, SkyrimRelease.SkyrimSE)), ShapeDataFolder, Statics));
 
     private static readonly ModKey BaseGameMod = ModKey.FromNameAndExtension("Base.esm");
     private static readonly ModKey LaterMod = ModKey.FromNameAndExtension("Later.esp");
@@ -319,6 +323,48 @@ public sealed class RestoreLoopTests
         Assert.Equal(0f, land.FinalHeights![PointAt(12, 20)]);
         Assert.DoesNotContain(land.Kept, kept => kept.Reason == TerrainKeptReason.UnderObjectKeptAsChanged);
         Assert.NotNull(Assert.Single(result.NavmeshGroups).Write);
+    }
+
+    /// <summary>
+    /// A later mod's crate refuses the rock, which stands now in the navmesh's earlier place: the group is refused in the pass after,
+    /// the first in which the rock stays.
+    /// </summary>
+    [Fact]
+    public void ARockRefusedInOnePassRefusesTheNavmeshGroupWhoseEarlierPlaceItStandsInInTheNext()
+    {
+        var oldPlace = new Vector3(1500, 1500, RockHalfSize);
+        var rockNow = new Vector3(1500, 2500, Raised + RockHalfSize);
+        var rock = Rock(0, oldPlace, rockNow);
+        var scene = new Scene
+        {
+            Rocks = [rock],
+            Others = [RockNow(0, rockNow), .. CrateBesideTheRock(oldPlace, present: true)],
+            Navmeshes = [MovedNavmesh() with { Earlier = Square(BaseGame, rockNow) }],
+            Lands = [],
+        };
+
+        var result = Plan(scene);
+
+        Assert.Equal(PlacedGuard.TooCloseToWhatStays, Assert.Single(result.Objects).Refused?.Guard);
+        Assert.Equal(new NavmeshRefusal(NavmeshGuard.Object, rock.Key, Fault: null), Assert.Single(result.NavmeshGroups).Refused);
+    }
+
+    /// <summary>
+    /// The rock's old place lies in cell (1, 0) and it stands now in the water cell, between its two levels. A later mod's crate
+    /// refuses it, and in the pass after, the first in which it stays, it keeps the cleaned mod's water level.
+    /// </summary>
+    [Fact]
+    public void ARockRefusedInOnePassKeepsTheWaterLevelAtWhoseLineItStandsInTheNext()
+    {
+        var oldPlace = new Vector3(ExteriorGrid.CellSize + 1500, 1500, RockHalfSize);
+        var rockNow = new Vector3(CellCentre, CellCentre, 0);
+        var rock = Rock(0, oldPlace, rockNow);
+        var scene = new Scene { Rocks = [rock], Others = [RockNow(0, rockNow), .. CrateBesideTheRock(oldPlace, present: true)], Lands = [], Cells = [ChangedWater()] };
+
+        var result = Plan(scene);
+
+        Assert.Equal(PlacedGuard.TooCloseToWhatStays, Assert.Single(result.Objects).Refused?.Guard);
+        Assert.Equal(rock.Key, Assert.Single(result.Cells).WaterKeptBy);
     }
 
     /// <summary>
@@ -707,14 +753,29 @@ public sealed class RestoreLoopTests
         Assert.Contains(Plan(scene).Objects, judged => judged.Refused is not null);
     }
 
+    /// <summary>
+    /// Every plan of this class and of the other restore step tests is made again with each pass recomputing everything instead of
+    /// taking over the pass before's work (<see cref="RestoreLoopReuse"/>); here over a scene that takes several passes and holds a
+    /// navmesh, a house, a tree, a rock and a water cell.
+    /// </summary>
+    [Fact]
+    public void TakingOverThePassBeforesWorkEndsInTheSameStateAsRecomputingEverythingInEveryPass()
+    {
+        var result = Plan(SceneOfSeveralPasses());
+
+        Assert.InRange(result.Passes, 3, int.MaxValue);
+    }
+
+    private static Scene SceneOfSeveralPasses() => RockInTheNavmeshTakenBack() with
+    {
+        Others = [.. RockInTheNavmeshTakenBack().Others, TestShapes.Placed(BaseGameMod, 11, Tree.Base, new Vector3(3000, 1000, 0)), LaterObject(12, Block.Base, new Vector3(CellCentre + 300, CellCentre, 0))],
+        Cells = [ChangedWater()],
+    };
+
     [Fact]
     public void TheOrdersDoNotDependOnTheNumberOfWorkers()
     {
-        var scene = RockInTheNavmeshTakenBack() with
-        {
-            Others = [.. RockInTheNavmeshTakenBack().Others, TestShapes.Placed(BaseGameMod, 11, Tree.Base, new Vector3(3000, 1000, 0)), LaterObject(12, Block.Base, new Vector3(CellCentre + 300, CellCentre, 0))],
-            Cells = [ChangedWater()],
-        };
+        var scene = SceneOfSeveralPasses();
 
         var results = new[] { 1, 2, 8 }.Select(workers => Describe(Plan(scene with { Workers = workers }))).ToList();
 
@@ -892,19 +953,57 @@ public sealed class RestoreLoopTests
     [InlineData(true, (uint)CollisionLayer.Trigger, false)]
     public void AnInvisibleObjectThatStopsCharactersInTheNavmeshsEarlierPlaceKeepsTheNavmesh(bool primitive, uint? layer, bool refused)
     {
+        var scene = BlockerInTheNavmeshsEarlierPlace(primitive, layer);
+
+        Assert.Equal(refused ? new NavmeshRefusal(NavmeshGuard.Object, scene.Others[0].Key, Fault: null) : null, Assert.Single(Plan(scene).NavmeshGroups).Refused);
+    }
+
+    /// <summary>
+    /// The collision layer records cannot be parsed: the step stops with that failure once the object guard first asks about the
+    /// primitive's layer, and judges nothing, so the run goes on and the patch is written without anything of this step.
+    /// </summary>
+    [Fact]
+    public void AMalformedCollisionLayerRecordTheObjectGuardMeetsStopsTheStepWithItsFailureAndJudgesNothing()
+    {
+        var folder = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            var mod = TestCollisionLayers.AddTo(new SkyrimMod(ShapeMod, SkyrimRelease.SkyrimSE));
+            var dataPath = TestShapes.AddStatics(mod, ShapeDataFolder, Statics);
+            using var plugin = BrokenCollisionLayerData.WriteAndOpen(mod, folder);
+            var scene = BlockerInTheNavmeshsEarlierPlace(primitive: true, (uint)CollisionLayer.CollisionBox) with
+            {
+                Shapes = TestVisibility.Over(TestShapes.Catalog(plugin.ToImmutableLinkCache(), dataPath, ShapeMod)),
+            };
+
+            var result = Plan(scene);
+
+            Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
+            Assert.Empty(result.NavmeshGroups);
+            var failure = Assert.Single(result.Failures);
+            Assert.Equal(RestoreWhereRemovedParts.Step, failure.Part);
+            Assert.StartsWith(nameof(MalformedRecordException), failure.Failure, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    /// <summary>A later mod's invisible wall, or a primitive of it on the given collision layer, stands in the navmesh's earlier place.</summary>
+    private static Scene BlockerInTheNavmeshsEarlierPlace(bool primitive, uint? layer)
+    {
         var blocker = primitive
             ? LaterObject(10, MarkerBase.Base, HousePlace with { Z = 0 }) with { IsPrimitive = true }
             : LaterObject(10, CollisionWall.Base, HousePlace with { Z = 0 });
         var facts = TestPlacedRecords.PlainReference with { IsPrimitive = true, PrimitiveBounds = new Vector3(2 * RockHalfSize), CollisionLayer = layer };
-        var scene = new Scene
+        return new Scene
         {
             Others = [blocker],
             Navmeshes = [MovedNavmesh()],
             Lands = [],
             Primitives = primitive ? new Dictionary<RecordKey, ReferenceFacts> { [blocker.Key] = facts } : new(),
         };
-
-        Assert.Equal(refused ? new NavmeshRefusal(NavmeshGuard.Object, blocker.Key, Fault: null) : null, Assert.Single(Plan(scene).NavmeshGroups).Refused);
     }
 
     /// <summary>
@@ -1250,7 +1349,10 @@ public sealed class RestoreLoopTests
     private static OtherObject LaterObject(int index, BaseKey model, Vector3 position) =>
         TestShapes.Placed(LaterMod, index, model, position) with { ChangeWithoutCleanedMod = new ObjectChange(LaterMod.ToPluginName(), AcceptedFrom: null) };
 
-    private static RestoreWhereRemovedResult Plan(Scene scene)
+    /// <summary>The step's result, after proving for the scene that taking over the pass before's work in the loop changes nothing; the checks counted are the real run's.</summary>
+    private static RestoreWhereRemovedResult Plan(Scene scene) => RestoreLoopReuse.Plan(InputOf(scene), InputOf(scene with { TooCloseChecks = null }));
+
+    private static WhereRemovedRestorer.Input InputOf(Scene scene)
     {
         var removedTargets = RemovedTargets();
         ImmutableArray<TargetObject> targets = [.. removedTargets, .. scene.Standing.Select((position, index) => StandingTarget(removedTargets.Count + index, position))];
@@ -1263,7 +1365,7 @@ public sealed class RestoreLoopTests
             WinningPresence = scene.Presence,
             WinningPrimitives = scene.Primitives,
         };
-        var rules = TestPlacedGuardRules.Create(Shapes, Trust, Plugins, Support, TestGround.NoTerrain(), scene.Workers);
+        var rules = TestPlacedGuardRules.Create(scene.Shapes, Trust, Plugins, Support, TestGround.NoTerrain(), scene.Workers);
         Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule> tooClose = scene.TooCloseChecks is { } checks
             ? (world, caches, excluded, settings) => new CountingRule(rules.TooClose(world, caches, excluded, settings), checks)
             : rules.TooClose;
@@ -1275,20 +1377,19 @@ public sealed class RestoreLoopTests
         ];
         var final = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved), targets.Length)
             .Apply(RoundKind.TooClose, [.. removedTargets.Select(target => new ProposedRemoval(target.Id, new TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);
-        return WhereRemovedRestorer.Plan(
+        return new(
+            new(collected, final, OtherModsObjectsResult.SwitchedOff),
+            new(rules.WorldCaches, rules.TooCloseRule(tooClose), rules.HoldersOfObjectsThatStay, new TestNavmeshCheck(scene.FindFault)),
             new(
-                new(collected, final, OtherModsObjectsResult.SwitchedOff),
-                new(rules.WorldCaches, rules.TooCloseRule(tooClose), rules.HoldersOfObjectsThatStay, new TestNavmeshCheck(scene.FindFault)),
-                new(
-                    new TestRunCaches(
-                        Shapes,
-                        navmeshes: new NavmeshIndex(bucket => bucket.Grid is null && !winning.IsEmpty ? [.. winning] : null),
-                        visibleTargets: TestScenes.Create(targets, [], Shapes).IndexVisibleTargets),
-                    new TestLandPlugin(space => space, scene.ReadHeights),
-                    Plugins,
-                    TestTargets.TargetName),
-                new Execution(scene.Workers),
-                scene.Settings));
+                new TestRunCaches(
+                    scene.Shapes,
+                    navmeshes: new NavmeshIndex(bucket => bucket.Grid is null && !winning.IsEmpty ? [.. winning] : null),
+                    visibleTargets: TestScenes.Create(targets, [], scene.Shapes).IndexVisibleTargets),
+                new TestLandPlugin(space => space, scene.ReadHeights),
+                Plugins,
+                TestTargets.TargetName),
+            new Execution(scene.Workers),
+            scene.Settings);
     }
 
     /// <summary>What the cleaned mod changed besides its own removed objects, and the other plugins' objects that stand now, numbered in this order.</summary>
@@ -1323,6 +1424,9 @@ public sealed class RestoreLoopTests
 
         public WhereRemovedRestoreSettings Settings { get; init; } = AllOn;
         public int Workers { get; init; } = 1;
+
+        /// <summary>The base object shapes and collision layers the guards read.</summary>
+        public IBaseObjectShapes Shapes { get; init; } = RestoreLoopTests.Shapes;
     }
 
     /// <summary>A too-close rule that notes each record it checks.</summary>

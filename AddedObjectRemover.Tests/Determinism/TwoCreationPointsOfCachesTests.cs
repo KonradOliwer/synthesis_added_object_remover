@@ -78,7 +78,7 @@ public class TwoCreationPointsOfCachesTests
             new MeshFilesFactory(dataFolder, GameRelease.SkyrimSE, [Mod.ToPluginName()]),
             new NpcRecordsPlugin(linkCache),
             TestBaseFacts.Reader(linkCache),
-            CollisionLayerReader.Read(linkCache),
+            () => CollisionLayerReader.Read(linkCache),
             npcBodyRules,
             NpcCacheRules.PlacedNpcs,
             SurfaceContacts.SamplesPerMesh);

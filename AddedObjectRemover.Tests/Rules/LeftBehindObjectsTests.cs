@@ -347,7 +347,7 @@ public class LeftBehindObjectsTests
     /// <summary>Every target stands in an interior cell, so it may move anywhere and its home cell is never asked for.</summary>
     private sealed class InteriorOnlyPlugin : IPluginRecords
     {
-        public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk) => throw new NotSupportedException();
+        public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, VersionWalkStop stopsTheWalk) => throw new NotSupportedException();
 
         public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets, IReadOnlySet<PluginName> linkedPlugins) => throw new NotSupportedException();
 

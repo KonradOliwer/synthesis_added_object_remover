@@ -71,7 +71,7 @@ public static class WhereRemovedRestorer
     }
 
     /// <summary>The candidates judged by the never-rules and their areas, and every kind's plan before the guards between the kinds.</summary>
-    private static Plans BuildPlans(StepInputs inputs)
+    internal static Plans BuildPlans(StepInputs inputs)
     {
         var (input, earlier) = (inputs.Input, inputs.Input.Earlier);
         var (collected, final, settings, execution) = (earlier.Collected, earlier.Final, inputs.Settings, input.Execution);
@@ -109,8 +109,14 @@ public static class WhereRemovedRestorer
             new RestoreState([.. cleared.Select(_ => (PlacedRefusal?)null)], navmeshPlan, terrain, water, CausesLeftOut: null));
     }
 
-    /// <summary>The guards between the kinds over the after-removal world, with the placed guards only when a placed record's area is cleared.</summary>
     private static RestoreLoop BuildLoop(StepInputs inputs, Plans plans)
+    {
+        var (placedGuards, terrainGuards, loopInputs) = BuildGuards(inputs, plans);
+        return new RestoreLoop(placedGuards, terrainGuards, loopInputs);
+    }
+
+    /// <summary>The guards between the kinds over the after-removal world, with the placed guards only when a placed record's area is cleared.</summary>
+    internal static (PlacedGuards? PlacedGuards, TerrainGuards? TerrainGuards, RestoreLoopInputs LoopInputs) BuildGuards(StepInputs inputs, Plans plans)
     {
         var (input, earlier) = (inputs.Input, inputs.Input.Earlier);
         var (collected, settings, shapes) = (earlier.Collected, inputs.Settings, input.Reads.Caches.Shapes);
@@ -121,7 +127,7 @@ public static class WhereRemovedRestorer
         var terrainGuards = settings.Terrain
             ? new TerrainGuards(() => ObjectsOfTheRun.OtherPluginsObjectsThatStay(world, collected, plans.Cleared), plans.Ground, plans.SpacesOnLand, cell => landHeights(cell).Current, settings.HeightChangeTolerance, input.Execution)
             : null;
-        return new RestoreLoop(
+        return (
             plans.Cleared.Count == 0 ? null : BuildPlacedGuards(inputs, plans, world, reach, blocking),
             terrainGuards,
             new RestoreLoopInputs(
@@ -162,7 +168,7 @@ public static class WhereRemovedRestorer
     }
 
     /// <summary>What every candidate became once the guards between the kinds change nothing more.</summary>
-    private static RestoreWhereRemovedResult ResultOf(Plans plans, RestoreState state, int passes, WhereRemovedRestoreSettings settings)
+    internal static RestoreWhereRemovedResult ResultOf(Plans plans, RestoreState state, int passes, WhereRemovedRestoreSettings settings)
     {
         var objects = PlacedJudgments.WithRefusals(plans.PlacedJudged, plans.Cleared, state.Placed);
         return new RestoreWhereRemovedResult(
@@ -220,7 +226,7 @@ public static class WhereRemovedRestorer
     }
 
     /// <summary>What <see cref="Plan"/> was given, with the step switched on.</summary>
-    private sealed record StepInputs(Input Input, WhereRemovedRestoreSettings Settings)
+    internal sealed record StepInputs(Input Input, WhereRemovedRestoreSettings Settings)
     {
         /// <returns>The worldspace whose land the space uses; null for a space without land.</returns>
         public RecordKey? FindLandWorldspace(RecordKey space) => Input.Reads.Plugin.FindLandWorldspace(space);
@@ -233,7 +239,7 @@ public static class WhereRemovedRestorer
     /// <param name="PlacedJudged">Every placed record judged by the never-rules and its areas, in key order.</param>
     /// <param name="Cleared">The placed records whose areas let them go back, in key order, each with the parts its restore writes.</param>
     /// <param name="Start">The state before the first pass.</param>
-    private sealed record Plans(
+    internal sealed record Plans(
         PlacedChangeJudged[] PlacedJudged,
         List<RecordChangedByCleanedMod> Cleared,
         FinalPresence FinalPresence,

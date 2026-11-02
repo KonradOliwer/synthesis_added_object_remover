@@ -603,7 +603,7 @@ public sealed class RestoreWhereRemovedTerrainTests
             workers);
         var final = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved), targets.Length)
             .Apply(RoundKind.TooClose, [.. scene.Removals.Select(index => new ProposedRemoval(new TargetId(index), new TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);
-        return WhereRemovedRestorer.Plan(
+        return RestoreLoopReuse.Plan(
             new(
                 new(collected, final, OtherModsObjectsResult.SwitchedOff),
                 new(rules.WorldCaches, rules.TooCloseRule(), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),

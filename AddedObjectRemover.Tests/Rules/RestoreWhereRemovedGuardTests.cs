@@ -537,7 +537,7 @@ public sealed class RestoreWhereRemovedGuardTests
         };
         var rules = TestPlacedGuardRules.Create(Shapes, Trust, Plugins, Support, TestGround.NoTerrain(), scene.Workers);
         ImmutableArray<NavmeshWorldTriangle> navmesh = [.. scene.Navmesh];
-        return WhereRemovedRestorer.Plan(
+        return RestoreLoopReuse.Plan(
             new(
                 new(collected, DecisionsRemoving(targets, scene.Removed), scene.OtherMods),
                 new(rules.WorldCaches, rules.TooCloseRule(), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),

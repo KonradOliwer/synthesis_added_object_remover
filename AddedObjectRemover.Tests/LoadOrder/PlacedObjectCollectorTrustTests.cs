@@ -159,6 +159,19 @@ public class PlacedObjectCollectorTrustTests
     public void ACopyInThePatchIsNeverTheAcceptedValue() =>
         Assert.Equal(new ObjectChange(City, BaseGame), ChangeOf(Record(BaseGame, At(BaseGame, Placed), At(Patch, Moved), At(City, Moved))));
 
+    /// <summary>An earlier patcher put the object back where the base game has it after a trusted mod moved it.</summary>
+    [Fact]
+    public void ThePatchSettingATrustedModsMoveBackToTheBaseGamesPlaceChangesNothing() =>
+        Assert.Null(ChangeOf(Record(BaseGame, At(BaseGame, Placed), At(Carrier, Moved), At(Patch, Placed))));
+
+    [Fact]
+    public void ThePatchMovingAnObjectToAPlaceNoTrustedVersionHoldsNamesNoPlugin() =>
+        Assert.Equal(new ObjectChange(ChangingMod: null, Carrier), ChangeOf(Record(BaseGame, At(BaseGame, Placed), At(Carrier, Moved), At(Patch, MovedAgain))));
+
+    [Fact]
+    public void ARealModSettingATrustedModsMoveBackToTheBaseGamesPlaceIsNamed() =>
+        Assert.Equal(new ObjectChange(City, Carrier), ChangeOf(Record(BaseGame, At(BaseGame, Placed), At(Carrier, Moved), At(City, Placed))));
+
     [Fact]
     public void AMoveOnlyThePatchHoldsNamesNoPlugin() =>
         Assert.Equal(new ObjectChange(ChangingMod: null, BaseGame), ChangeOf(Record(BaseGame, At(BaseGame, Placed), At(Patch, Moved))));
@@ -223,7 +236,7 @@ public class PlacedObjectCollectorTrustTests
 
         PlacedObjects.Collect(plugin, Mods, world, Plan);
 
-        Assert.Equal(stops, plugin.StopsTheWalk!(City));
+        Assert.Equal(stops, StopsBelow(plugin, Later)(City));
     }
 
     [Fact]
@@ -241,8 +254,22 @@ public class PlacedObjectCollectorTrustTests
 
         PlacedObjects.Collect(plugin, Mods, Plan);
 
-        var stops = plugin.StopsTheWalk!;
+        var stops = StopsBelow(plugin, Later);
         Assert.Equal((true, true, false, false, false), (stops(BaseGame), stops(Carrier), stops(Birds), stops(City), stops(Patch)));
+    }
+
+    /// <summary>A value only the patch holds is compared with every trusted version below it, whether the old places are judged or not.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TheScanDoesNotStopBelowAWinningPatch(bool oldPlacesJudged)
+    {
+        var plugin = new FixedFactsPlugin([Target]);
+
+        PlacedObjects.Collect(plugin, Mods, oldPlacesJudged ? OldPlacesJudged : Plan);
+
+        var stops = StopsBelow(plugin, Patch);
+        Assert.Equal((false, false), (stops(BaseGame), stops(Carrier)));
     }
 
     [Fact]
@@ -305,7 +332,7 @@ public class PlacedObjectCollectorTrustTests
 
         PlacedObjects.Collect(plugin, ModsWithNeedingPlugin, OldPlacesJudged);
 
-        var stops = plugin.StopsTheWalk!;
+        var stops = StopsBelow(plugin, Later);
         Assert.Equal((true, false, false), (stops(BaseGame), stops(Needing), stops(TestTargets.TargetName)));
     }
 
@@ -316,9 +343,12 @@ public class PlacedObjectCollectorTrustTests
 
         PlacedObjects.Collect(plugin, ModsWithNeedingPlugin, Plan);
 
-        var stops = plugin.StopsTheWalk!;
+        var stops = StopsBelow(plugin, Later);
         Assert.Equal((true, true, false), (stops(BaseGame), stops(Needing), stops(TestTargets.TargetName)));
     }
+
+    /// <summary>The stop rule of the plugin's last read, for records <paramref name="winner"/> wins.</summary>
+    private static Func<PluginName, bool> StopsBelow(FixedFactsPlugin plugin, PluginName winner) => candidate => plugin.StopsTheWalk!(winner, candidate);
 
     private static OtherObject SingleSupportOnly(CollectedObjects collected) => Assert.Single(collected.SupportOnlyObjects);
 

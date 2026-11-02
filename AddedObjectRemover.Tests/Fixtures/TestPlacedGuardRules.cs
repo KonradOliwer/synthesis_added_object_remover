@@ -68,7 +68,7 @@ internal sealed class TestLandPlugin(Func<RecordKey, RecordKey?> findLandWorldsp
 
     public float[]? ReadTerrain(ExteriorCell cell) => readHeights(cell).Current;
 
-    public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk) => throw new NotSupportedException();
+    public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, VersionWalkStop stopsTheWalk) => throw new NotSupportedException();
 
     public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> records, IReadOnlySet<PluginName> linkedPlugins) => throw new NotSupportedException();
 

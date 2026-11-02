@@ -151,7 +151,7 @@ public sealed class RestoreWhereRemovedReportTests
             $"  Kept as changed: {RecordLabels.Of(Key(0x908), null)} (base (none)) in {Space}: the cleaned mod has no objects around it",
             lines);
         Assert.Contains(
-            $"  Kept as changed: {RecordLabels.Of(Key(0x909), null)} (base (none)) in {Space}: a plugin that loads after the patch has the last word on it",
+            $"  Kept as changed: {RecordLabels.Of(Key(0x909), null)} (base (none)) in {Space}: a plugin that loads after the patch has the last word on it (Later.esp)",
             lines);
     }
 
@@ -163,6 +163,50 @@ public sealed class RestoreWhereRemovedReportTests
         var line = Assert.Single(Section(both, Detailed).Lines, text => text.StartsWith("  Kept as changed", StringComparison.Ordinal));
 
         Assert.EndsWith("; at its old place 0 of 214 objects still stand (0.0% by size); where it stands now 4 of 10 objects still stand (25.0% by size)", line);
+    }
+
+    [Fact]
+    public void TheVerbAgreesWithOneObjectStillStanding()
+    {
+        var one = StillStanding with { Objects = 1, Standing = 1, StandingPercent = 100 };
+
+        var line = Assert.Single(
+            Section(ObjectsOnly(KeptForArea(Rock(0x912, PlacedParts.Position), one, AreaVerdict.StillStanding)), Detailed).Lines,
+            text => text.StartsWith("  Kept as changed", StringComparison.Ordinal));
+
+        Assert.EndsWith("; 1 of 1 object still stands (100.0% by size)", line);
+    }
+
+    /// <summary>The cell's winning version loads after the patch and only carries the cleaned mod's values, so no part is left to a later plugin.</summary>
+    [Fact]
+    public void ACellKeptBecauseAPluginAfterThePatchHasTheLastWordNamesThatPluginInTheLogAndTheCellsFile()
+    {
+        var cell = Cell(9, 9, [CellPart.Region], area: null, never: NeverRestoredReason.WinnerLoadsAfterPatch);
+        var scene = Scene() with { Objects = [], Cells = [cell with { Change = cell.Change with { WinningMod = Later } }], Lands = [], Navmeshes = [], NavmeshGroups = [] };
+
+        var line = Assert.Single(Section(scene, Detailed).Lines, text => text.StartsWith("  Kept as changed", StringComparison.Ordinal));
+        var table = Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), scene, Normal));
+
+        Assert.Equal($"  Kept as changed: cell {Space}, cell (9, 9): a plugin that loads after the patch has the last word on it (Later.esp)", line);
+        Assert.Equal("kept: a plugin that loads after the patch has the last word on it (Later.esp)", Field(table, Assert.Single(table.Rows), "result"));
+    }
+
+    [Fact]
+    public void TerrainAndANavmeshKeptBecauseAPluginAfterThePatchHasTheLastWordNameThatPluginInTheLog()
+    {
+        var land = LandOutcomes.NeverRestored(Land().Change with { WinningMod = Later }, NeverRestoredReason.WinnerLoadsAfterPatch);
+        var navmesh = Navmesh(0xA06, NavmeshCase.Edited, undo: null, Cleared);
+        var neverNavmesh = navmesh with { Change = navmesh.Change with { WinningMod = Later }, Never = NeverRestoredReason.WinnerLoadsAfterPatch, Area = null };
+        var scene = Scene() with { Objects = [], Cells = [], Lands = [land], Navmeshes = [neverNavmesh], NavmeshGroups = [] };
+
+        var kept = Section(scene, Detailed).Lines.Where(text => text.StartsWith("  Kept as changed", StringComparison.Ordinal));
+
+        Assert.Equal(
+            [
+                $"  Kept as changed: terrain {Space}, cell (0, 0): a plugin that loads after the patch has the last word on it (Later.esp)",
+                $"  Kept as changed: navmesh {Key(0xA06)} in {Space}, cell {Key(0x600)}: a plugin that loads after the patch has the last word on it (Later.esp)",
+            ],
+            kept);
     }
 
     [Fact]
@@ -309,7 +353,7 @@ public sealed class RestoreWhereRemovedReportTests
         var objects = ObjectsTable();
 
         Assert.Equal(
-            ("", "", "", "kept: a plugin that loads after the patch has the last word on it"),
+            ("", "", "", "kept: a plugin that loads after the patch has the last word on it (Later.esp)"),
             (Field(objects, never, "objects"), Field(objects, never, "standing"), Field(objects, never, "verdict"), Field(objects, never, "result")));
         Assert.Equal("40", Field(byCount, byCount.Rows[0], "standingPercent"));
     }
@@ -523,7 +567,7 @@ public sealed class RestoreWhereRemovedReportTests
                 Refused(Rock(0x906, PlacedParts.Position), Cleared, new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, By: null, "InvalidOperationException: broke")),
                 KeptForArea(Rock(0x907, PlacedParts.Position), StillStanding, AreaVerdict.StillStanding),
                 KeptForArea(Rock(0x908, PlacedParts.Position), NoObjects, AreaVerdict.NoObjectsAround),
-                NeverRestored(Rock(0x909, PlacedParts.Position), NeverRestoredReason.WinnerLoadsAfterPatch),
+                NeverRestored(Rock(0x909, PlacedParts.Position) with { WinningMod = Later }, NeverRestoredReason.WinnerLoadsAfterPatch),
             ],
             [
                 Cell(1, 2, [CellPart.Lighting, CellPart.Music], Cleared, restored: true),

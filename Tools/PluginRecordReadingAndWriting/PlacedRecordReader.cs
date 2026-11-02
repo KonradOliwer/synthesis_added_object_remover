@@ -74,7 +74,7 @@ internal sealed class PlacedRecordReader
         ModKey patch,
         PluginNames names,
         PlacedReadScope scope,
-        Func<PluginName, bool> stopsTheWalk)
+        VersionWalkStop stopsTheWalk)
     {
         _loadOrder = loadOrder;
         _linkCache = linkCache;
@@ -104,7 +104,7 @@ internal sealed class PlacedRecordReader
         ModKey patch,
         PluginNames names,
         PlacedReadScope scope,
-        Func<PluginName, bool> stopsTheWalk,
+        VersionWalkStop stopsTheWalk,
         Execution execution)
     {
         var reader = new PlacedRecordReader(loadOrder, linkCache, patch, names, scope, stopsTheWalk);

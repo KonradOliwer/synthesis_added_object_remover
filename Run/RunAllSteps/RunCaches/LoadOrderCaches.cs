@@ -56,7 +56,7 @@ internal sealed class LoadOrderCaches : ILoadOrderCaches
     public INavmeshes Navmeshes { get; }
 
     /// <remarks>The terrain and navmesh caches read through <paramref name="plugin"/>, so they answer once its placed records are read.</remarks>
-    /// <param name="collisionLayers">The load order's collision layer records, by layer number.</param>
+    /// <param name="readCollisionLayers">Reads the load order's collision layer records, by layer number.</param>
     /// <param name="npcBodyRules">How the NPC body cache works out the bodies of the NPCs.</param>
     /// <param name="placedNpcRules">How the placed-NPC index picks, places and counts the placed NPCs.</param>
     /// <param name="surfaceSamplesPerMesh">How many points the surface sample spreads over each mesh's surface.</param>
@@ -64,7 +64,7 @@ internal sealed class LoadOrderCaches : ILoadOrderCaches
         IMeshFilesFactory meshFilesFactory,
         IPluginRecords plugin,
         IBaseFacts bases,
-        IReadOnlyDictionary<uint, CollisionLayerFact> collisionLayers,
+        Func<IReadOnlyDictionary<uint, CollisionLayerFact>> readCollisionLayers,
         NpcBodyRules npcBodyRules,
         PlacedNpcRules placedNpcRules,
         int surfaceSamplesPerMesh)
@@ -75,7 +75,7 @@ internal sealed class LoadOrderCaches : ILoadOrderCaches
         return new LoadOrderCaches(
             bases,
             meshFiles,
-            new BaseObjectShapes(bases, meshFiles, collisionLayers),
+            new BaseObjectShapes(bases, meshFiles, readCollisionLayers),
             triangles,
             new SurfaceSampleStore(triangles, surfaceSamplesPerMesh),
             bodyBounds,

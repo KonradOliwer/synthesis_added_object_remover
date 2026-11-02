@@ -371,6 +371,21 @@ public class ChangedTerrainObjectsTests
     public void AChangeOnlyThePatchHoldsNamesAnEarlierPatcher() =>
         Assert.Equal([Removal(0, changedBy: null)], FindInCell(Flat(Target), RaisedAt(Patch, Near)).Proposals.AsEnumerable());
 
+    /// <summary>An earlier patcher puts the target's height back over the trusted mod's raise: the height is accepted from the target.</summary>
+    [Fact]
+    public void AHeightThePatchPutsBackToALowerTrustedVersionsIsAcceptedFromThatVersion()
+    {
+        var comparison = new CellTerrainComparison(
+            new TerrainPlugins(Mods.AcceptedWorld, LoadOrder), new TerrainTypes(new TerrainPlugin(new Dictionary<ExteriorCell, TerrainVersion[]>())), Settings());
+        TerrainVersion[] versions = [Flat(Target), RaisedAt(TrustedMod, Near), Flat(Patch)];
+
+        var terrain = comparison.Compare(versions);
+
+        Assert.Equal(Ground, terrain!.AcceptedHeights![Near]);
+        Assert.Null(terrain.Changes);
+        Assert.Empty(FindInCell(versions).Proposals);
+    }
+
     [Fact]
     public void TheLastLoadingChangingModIsNamedOverEveryCellTheAreaCrosses()
     {
@@ -777,6 +792,13 @@ public class ChangedTerrainObjectsTests
             Find(plugin, Settings(), threads: 1, Placed(0, Rock, WideSpot)).Proposals.AsEnumerable());
     }
 
+    /// <summary>The trusted mod paves the ground and an earlier patcher paints the target's grass back: the type is accepted from the target.</summary>
+    [Fact]
+    public void AGroundTypeThePatchPutsBackToALowerTrustedVersionsIsAccepted() =>
+        Assert.Empty(
+            Find(PaintedCell(FlatPainted(Target, Painted(Grass)), FlatPainted(TrustedMod, Painted(Road)), FlatPainted(Patch, Painted(Grass))), Settings())
+                .Proposals);
+
     /// <summary>Grass everywhere, with road painted over the first <paramref name="count"/> vertices of the area of an object at <see cref="WideSpot"/>.</summary>
     private static TerrainLayers RoadAtWideSpot(int count)
     {
@@ -1060,6 +1082,11 @@ public class ChangedTerrainObjectsTests
             [Removal(0, changedBy: null, TerrainChangeKind.WaterHeight)],
             FindWithWater([Flat(Target)], [Water(Target, BelowTheGround), Water(Patch, AboveTheGround)]).Proposals.AsEnumerable());
 
+    /// <summary>The trusted mod raises the water and an earlier patcher puts the target's level back: the level is accepted from the target.</summary>
+    [Fact]
+    public void AWaterLevelThePatchPutsBackToALowerTrustedVersionsIsNoChange() =>
+        Assert.Empty(FindWithWater([Flat(Target)], [Water(Target, BelowTheGround), Water(TrustedMod, AboveTheGround), Water(Patch, BelowTheGround)]).Proposals);
+
     /// <summary>
     /// OwnChanges.esp re-saves the other mod's water: one height step above it is within the tolerance, so it owns no water height
     /// there and the other mod is named; twice the other mod's height is its own, which is accepted.
@@ -1310,7 +1337,7 @@ public class ChangedTerrainObjectsTests
             return materials?.GetValueOrDefault(texture) ?? [];
         }
 
-        public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, Func<PluginName, bool> stopsTheWalk) => throw new NotSupportedException();
+        public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, VersionWalkStop stopsTheWalk) => throw new NotSupportedException();
 
         public NonPlacedLinks ReadLinks(PluginName target, IReadOnlySet<RecordKey> targets, IReadOnlySet<PluginName> linkedPlugins) => throw new NotSupportedException();
 

@@ -28,15 +28,15 @@ public sealed class BaseObjectShapes : IBaseObjectShapes
 
     private readonly IBaseFacts _bases;
     private readonly IMeshFiles _meshFiles;
-    private readonly IReadOnlyDictionary<uint, CollisionLayerFact> _layers;
+    private readonly ComputedOnce<IReadOnlyDictionary<uint, CollisionLayerFact>> _layers;
     private readonly ComputedOncePerKey<BaseKey, MeasuredBase> _byBase = new(Publication.BuiltOnce, EqualityComparer<BaseKey>.Default);
 
-    /// <param name="layers">The load order's collision layer records, by layer number.</param>
-    public BaseObjectShapes(IBaseFacts bases, IMeshFiles meshFiles, IReadOnlyDictionary<uint, CollisionLayerFact> layers)
+    /// <param name="readLayers">Reads the load order's collision layer records, by layer number; called once, when a layer is first asked about.</param>
+    public BaseObjectShapes(IBaseFacts bases, IMeshFiles meshFiles, Func<IReadOnlyDictionary<uint, CollisionLayerFact>> readLayers)
     {
         _bases = bases;
         _meshFiles = meshFiles;
-        _layers = layers;
+        _layers = new ComputedOnce<IReadOnlyDictionary<uint, CollisionLayerFact>>(readLayers);
     }
 
     public IReadOnlyList<MeasuredBase> Computed() => _byBase.Contents();
@@ -79,7 +79,7 @@ public sealed class BaseObjectShapes : IBaseObjectShapes
     /// "collides with" list names the character controller's layer and it is no trigger. A number no record has is not known, so it blocks.
     /// </remarks>
     public bool LayerBlocksActors(uint collisionLayer) =>
-        _layers.GetValueOrDefault(collisionLayer) is not { } layer
+        _layers.Value.GetValueOrDefault(collisionLayer) is not { } layer
         || layer.IsNavmeshObstacle
         || (!layer.IsTrigger && layer.CollidesWith.Contains((uint)CollisionLayer.CharController));
 

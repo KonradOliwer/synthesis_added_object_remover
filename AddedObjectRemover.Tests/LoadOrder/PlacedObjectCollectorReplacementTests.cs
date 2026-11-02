@@ -323,7 +323,7 @@ public class PlacedObjectCollectorReplacementTests
 
         PlacedObjects.Collect(plugin, Mods, Plan);
 
-        Assert.Equal((false, true), (plugin.StopsTheWalk!(Target), plugin.StopsTheWalk!(BaseGame)));
+        Assert.Equal((false, true), (plugin.StopsTheWalk!(Target, Target), plugin.StopsTheWalk!(Target, BaseGame)));
     }
 
     private static EarlierVersion EarlierVersionOf(CollectedObjects collected) =>

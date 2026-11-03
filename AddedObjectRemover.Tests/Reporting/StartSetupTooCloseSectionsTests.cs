@@ -12,6 +12,7 @@ namespace AddedObjectRemover.Tests.Reporting;
 /// The start, setup and too-close log sections give the text checked in as expected-output files with the detailed log on,
 /// and only what a mod user needs, without timings, with it off.
 /// </summary>
+[ExpectedOutputTest]
 public sealed class StartSetupTooCloseSectionsTests
 {
     private const string ReportsFolder = "/out/Reports";

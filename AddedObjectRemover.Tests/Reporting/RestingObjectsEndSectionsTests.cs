@@ -15,6 +15,7 @@ namespace AddedObjectRemover.Tests.Reporting;
 /// The also-remove, left-behind, marker-move and closing log sections: what each log mode shows, where the
 /// mesh problems stay out of them, and that the detailed log reads exactly like its expected output.
 /// </summary>
+[ExpectedOutputTest]
 public sealed class RestingObjectsEndSectionsTests
 {
     private const int TargetCount = 5;

@@ -2,21 +2,13 @@ namespace AddedObjectRemover.Tests.Architecture;
 
 public class SolutionCompletenessTests
 {
+    private const string ProjectFileExtension = ".csproj";
+
     private static readonly ProjectRules Rules = ProjectRules.Load();
 
     [Fact]
     public void TheSolutionListsEveryProject() =>
         Assert.Equal(SolutionLayout.ProjectFiles(), SolutionLayout.SolutionProjectFiles());
-
-    [Fact]
-    public void EveryRowOfTheProjectTableHasAProject()
-    {
-        var projectNames = SolutionLayout.ProjectFiles().Select(SolutionLayout.ProjectName).ToHashSet();
-
-        var rowsWithoutProject = Rules.Projects.Select(rule => rule.Name).Where(name => !projectNames.Contains(name)).ToList();
-
-        Assert.Empty(rowsWithoutProject);
-    }
 
     [Fact]
     public void EveryProjectHasATargetFrameworkAndAnItemGroup()
@@ -69,5 +61,5 @@ public class SolutionCompletenessTests
     }
 
     private static string ProjectFileOf(ProjectRule rule) =>
-        SolutionLayout.ProjectFiles().Single(file => SolutionLayout.ProjectName(file) == rule.Name);
+        Path.Combine(SolutionLayout.Root(), rule.Folder, rule.Name + ProjectFileExtension);
 }

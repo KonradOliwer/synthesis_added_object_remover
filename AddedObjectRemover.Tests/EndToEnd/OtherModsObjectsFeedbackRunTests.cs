@@ -11,6 +11,7 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 /// the support it lost, and the upper trusted pad is pulled down onto the lower one where it lands.
 /// </summary>
 [Collection(ConsoleOutputCollection.Name)]
+[ExpectedOutputTest]
 public class OtherModsObjectsFeedbackRunTests
 {
     private const int ManyWorkers = 4;

@@ -13,6 +13,7 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 /// and is shrunk. An untrusted pad next to each crate makes it too close; in the untrusted column the resting pad itself does.
 /// </summary>
 [Collection(ConsoleOutputCollection.Name)]
+[ExpectedOutputTest]
 public class OtherModsObjectsRunTests
 {
     private const int ManyWorkers = 4;

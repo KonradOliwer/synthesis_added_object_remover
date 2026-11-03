@@ -3,16 +3,28 @@ using System.Text.Json;
 
 namespace AddedObjectRemover.Tests.Architecture;
 
+/// <summary>One row of ProjectRules.json: what kind the project is and which packages ("name version") it may use.</summary>
+internal sealed record ProjectRow(string Name, string Kind, IReadOnlyList<string> Packages);
+
+/// <summary>ProjectRules.json as written: the projects only the entry may reference, and one row per project.</summary>
+internal sealed record ProjectTable(IReadOnlyList<string> EntryOnlyProjects, IReadOnlyList<ProjectRow> Projects)
+{
+    public static ProjectTable Load([CallerFilePath] string sourceFile = "") =>
+        JsonSerializer.Deserialize<ProjectTable>(
+            File.ReadAllText(Path.Combine(Path.GetDirectoryName(sourceFile)!, "ProjectRules.json")),
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+}
+
 /// <summary>
-/// One row of the project table: where the project is, what kind it is, which projects it may reference
-/// and which packages ("name version") it may use.
+/// A project's row with where the project is and which projects its csproj references, so the kind rules judge the
+/// real references.
 /// </summary>
 internal sealed record ProjectRule(string Name, string Kind, string Folder, IReadOnlyList<string> References, IReadOnlyList<string> Packages);
 
 /// <summary>
-/// The project table from ProjectRules.json: one row per project, listing exactly the projects its csproj references.
-/// Kinds: K shared ids, A and T tools, C contracts, Q cache catalog, E entry, X test, R runner, L logic, B cache builder,
-/// V settings validation.
+/// The rows of ProjectRules.json whose project is in the solution, each with the folder and the references (to projects
+/// with a row) its csproj has. Kinds: K shared ids, A and T tools, C contracts, Q cache catalog, E entry, X test,
+/// R runner, L logic, B cache builder, V settings validation.
 /// </summary>
 internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IReadOnlyList<ProjectRule> Projects)
 {
@@ -47,10 +59,22 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
 
     private static readonly IReadOnlyList<string> ContractsKinds = [ContractsKind, CacheCatalogKind];
 
-    public static ProjectRules Load([CallerFilePath] string sourceFile = "") =>
-        JsonSerializer.Deserialize<ProjectRules>(
-            File.ReadAllText(Path.Combine(Path.GetDirectoryName(sourceFile)!, "ProjectRules.json")),
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+    public static ProjectRules Load()
+    {
+        var table = ProjectTable.Load();
+        var projectFiles = SolutionLayout.SolutionProjectFiles().ToDictionary(SolutionLayout.ProjectName);
+        var rows = table.Projects.Where(row => projectFiles.ContainsKey(row.Name)).ToList();
+        var names = rows.Select(row => row.Name).ToHashSet(StringComparer.Ordinal);
+        return new ProjectRules(table.EntryOnlyProjects, [.. rows.Select(row => ToRule(row, projectFiles[row.Name], names))]);
+    }
+
+    private static ProjectRule ToRule(ProjectRow row, string projectFile, IReadOnlySet<string> names) =>
+        new(
+            row.Name,
+            row.Kind,
+            SolutionLayout.FolderRelativeToRoot(projectFile),
+            [.. SolutionLayout.ReferencedProjectNames(projectFile).Where(names.Contains)],
+            row.Packages);
 
     public ProjectRule Find(string name) => Projects.Single(project => project.Name == name);
 

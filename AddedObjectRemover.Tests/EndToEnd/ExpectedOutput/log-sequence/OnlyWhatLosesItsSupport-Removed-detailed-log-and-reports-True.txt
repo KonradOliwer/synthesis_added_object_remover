@@ -2,26 +2,6 @@
 ## archiveWarnings
 ## unexpectedErrors
 ## config
-Mod to clean up: Target.esp
-Other mods' objects Target.esp changed: moved farther than 10 units: RestoreIfNoCollision, no resizing; replaced: not processed.
-  Collision handling: Remove objects too close to other mods' objects: Margin by object size: on, 0.5 x object size; Margin by fixed distance: on, 50 units; Use rough boxes instead of exact shapes (faster): off; Other mods' NPCs and creatures cause removal: OnlyWhenStuckInsideTheObjectWithCollision.
-  Collision handling: Remove objects on terrain changed by other mods: on; Which of the cleaned mod's objects are checked: AllObjectsIncludingInvisibleOnes; Margin by object size: on, 0.5 x object size; Margin by fixed distance: on, 64 units; Count height changes: on, ignoring changes up to 16 units; Count ground type changes: on, remove only when this share of the ground points changed type: 20%; Count water height changes: on, ignoring changes up to 16 units; Count water added/removed changes: on; remove only when this share of the ground got covered/uncovered: 20%.
-Plugin list read from Plugins.txt: 7 listings.
-Which other mods can cause removals: Trusted mods, and their masters: Trusted.esp; Mods trusted for their own changes only: (none); Never trusted mods: Rival.esp; Also trust mods that require the cleaned mod, and their masters: on, only if it has at most 5 other masters; Trust mods loading before the cleaned mod: on.
-Trusted, base game: Skyrim.esm
-Trusted, listed with masters: Trusted.esp
-Trusted, requires Target.esp: TargetPatch.esp (masters: Patched.esp)
-Never trusted, listed: Rival.esp
-Remove objects too close to other mods' objects: Margin by object size: on, 0.5 x object size; Margin by fixed distance: off; Use rough boxes instead of exact shapes (faster): off; Other mods' NPCs and creatures cause removal: OnlyWhenStuckInsideTheObject.
-Remove objects on terrain changed by other mods: off.
-Shrink or turn objects to make them fit: off.
-Also remove what rests on removed objects: OnlyWhatLosesItsSupport; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
-Objects left behind, direction method: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 6; A direction is cleared when this much of it was removed: 80%; Remove when this share of the directions with objects is cleared: 80%; Never remove these as objects left behind: none; kept with fewer than 5 of the cleaned mod's other objects around.
-Objects left behind, area method: radius 5000 units; cleared when at most 1% by size and 5% by number still stand; kept with fewer than 5 of the cleaned mod's other objects around.
-Invisible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 4; A direction is cleared when this much of it was removed: 50%; Remove when this share of the directions with objects is cleared: 60%; Never remove these as invisible objects left behind: none; Move kept markers out of other mods' objects: off.
-Restore where the cleaned mod was removed: other mods' objects, terrain, cell settings, navmeshes; an area 10000 units wide counts as cleared when at most 1% of the cleaned mod's objects there still stand by size and at most 5% by number; terrain edges blended over 256 units.
-Detailed log and reports: on, report files go to <root>/Reports.
-Only warn (don't stop) when a mod that requires the cleaned mod loads after the patch: off.
 ## scan
   Ignored other-mod object overridden by Target.esp: R_OverriddenByTarget_Pad [000821:Rival.esp].
 Scanned 75 placed records in <time>: 40 Target.esp objects to check, 28 objects from other mods.

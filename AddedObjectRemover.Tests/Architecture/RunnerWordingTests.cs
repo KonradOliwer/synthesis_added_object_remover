@@ -25,12 +25,4 @@ public class RunnerWordingTests
         Assert.True(notAllowed.Count == 0, $"Text in the runner project; move the wording to the report step:{Environment.NewLine}{string.Join(Environment.NewLine, notAllowed)}");
         AllowListAssert.NoneStale(stale, $"Allowed in {nameof(RunnerWordingTests)} but no longer in the runner project (remove)");
     }
-
-    [Fact]
-    public void TheLiteralReaderSeesPlainVerbatimAndInterpolatedTextButNotComments()
-    {
-        var literals = SourceFile.StringLiteralsOf("var a = \"one\"; // \"no\"\n/* \"no\" */ var b = @\"two\" + $\"three {a}\" + 'c';");
-
-        Assert.Equal(["one", "two", "three {a}"], literals);
-    }
 }

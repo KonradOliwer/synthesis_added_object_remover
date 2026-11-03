@@ -6,12 +6,15 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 /// <summary>
 /// Pins every printed log section, empty ones included, in order and with its lines, for every combination of the
 /// switches that decide which sections print: also remove, leftover invisible objects, moving kept markers, and the
-/// detailed log and reports.
+/// detailed log and reports. The settings section is pinned by its heading only: its lines differ here only by the
+/// switches, which the other sections show, and the settings wording has its own expected-output files and tests.
 /// </summary>
+[ExpectedOutputTest]
 public class LogSequenceTests
 {
     private const int Workers = 2;
     private const string ExpectedOutputSubfolder = "log-sequence";
+    private const string SettingsSectionId = "config";
 
     /// <summary>
     /// With the default minimum the scene's few objects around each candidate keep every visible one, so no saved log would show a
@@ -57,11 +60,17 @@ public class LogSequenceTests
     private static IMeshFilesFactory DefaultMeshFiles(string dataFolder, Mutagen.Bethesda.GameRelease release, IReadOnlyList<PluginName> listedPlugins) =>
         new MeshFilesFactory(dataFolder, release, listedPlugins);
 
-    /// <summary>Each section as its id, then its lines masked as the end-to-end log is.</summary>
+    /// <summary>Each section as its id, then its lines masked as the end-to-end log is; the settings section as its id only.</summary>
     private static List<string> Describe(IReadOnlyList<LogSection> sections)
     {
         var root = sections.SelectMany(section => section.Lines).Select(line => RunFolder().Match(line)).FirstOrDefault(match => match.Success)?.Value;
-        return [.. sections.SelectMany(section => (IEnumerable<string>)["## " + section.Id, .. root is null ? section.Lines : OutputMasks.MaskLog(section.Lines, root)])];
+        return [.. sections.SelectMany(section => (IEnumerable<string>)["## " + section.Id, .. PinnedLines(section, root)])];
+    }
+
+    private static IEnumerable<string> PinnedLines(LogSection section, string? root)
+    {
+        if (section.Id == SettingsSectionId) return [];
+        return root is null ? section.Lines : OutputMasks.MaskLog(section.Lines, root);
     }
 
     /// <summary>The temporary folder <see cref="FixtureRun"/> runs in.</summary>

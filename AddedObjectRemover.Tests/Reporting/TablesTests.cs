@@ -8,6 +8,7 @@ using Mutagen.Bethesda.Plugins;
 namespace AddedObjectRemover.Tests.Reporting;
 
 /// <summary>The report tables, written by <see cref="CsvReportOutput"/>, have the file names, headers and formatting of the checked-in expected-output files.</summary>
+[ExpectedOutputTest]
 public sealed class TablesTests : IDisposable
 {
     private const float TouchDistance = 1f;

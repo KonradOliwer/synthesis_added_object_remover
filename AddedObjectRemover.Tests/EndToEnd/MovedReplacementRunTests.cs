@@ -12,6 +12,7 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 /// crate of its own far away, and a city mod's walls and buildings stand where each test needs them. A wall 75 units from a
 /// crate's centre is within the 32-unit distance margin of the 100-unit crate.
 /// </summary>
+[ExpectedOutputTest]
 public class MovedReplacementRunTests
 {
     private const int Workers = 4;

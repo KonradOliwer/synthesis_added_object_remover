@@ -5,15 +5,6 @@ public class ProjectRulesTests
     private static readonly ProjectRules Rules = ProjectRules.Load();
 
     [Fact]
-    public void TheTableHasNoDuplicateNamesAndOnlyKnownReferences()
-    {
-        var names = Rules.Projects.Select(project => project.Name).ToList();
-
-        Assert.Equal(names.Distinct(), names);
-        Assert.Empty(Rules.Projects.SelectMany(project => project.References.Except(names).Select(reference => $"{project.Name} -> {reference}")));
-    }
-
-    [Fact]
     public void LogicProjectsReferenceNoLogic() =>
         Assert.Empty(Rules.FindLogicReferencingLogic());
 

@@ -9,6 +9,7 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 /// goes back: the saved expected-output files hold the log, the patch (placed records, cell settings, five rows of the land's
 /// heights, navmeshes and navmesh info maps) and both report files of each run.
 /// </summary>
+[ExpectedOutputTest]
 public class RestoreWhereRemovedRunTests
 {
     private const int Workers = 4;

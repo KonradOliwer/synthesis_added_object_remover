@@ -14,6 +14,13 @@ internal sealed record WrittenMember(string SourcePath, string Type, string Name
     private static readonly string[] NotAnAssignmentBefore = ["!", "<", ">", "=", "operator"];
     private static readonly string[] NotAnAssignmentAfter = ["=", ">"];
 
+    /// <summary>
+    /// The tokens by which a value can decide or compute something: a comparison, a further "=" (also of a lambda), a logical
+    /// or pattern operator, a conditional or null test, a switch, a throw, or arithmetic other than a sum ("-" also of a
+    /// negative number). "&lt;" and "&gt;" also stand for type arguments; both only make the check stricter.
+    /// </summary>
+    private static readonly HashSet<string> DecidingTokens = ["<", ">", "=", "!", "&", "|", "?", "is", "switch", "throw", "*", "/", "%", "-", "^"];
+
     /// <summary>"path:first-last", for a message that names where the member is.</summary>
     public string Where => $"{SourcePath}:{FirstLine}-{LastLine}";
 
@@ -35,6 +42,13 @@ internal sealed record WrittenMember(string SourcePath, string Type, string Name
 
     /// <summary>An expression body or an initialiser, and no other statement: the member ends with its one semicolon.</summary>
     public bool IsOneExpression => (IsExpressionBodied || HasInitialiser) && StatementEndCount() == 1;
+
+    /// <summary>
+    /// One expression that only builds or reads a value: a fixed value, a factory over its arguments, a plain accessor or
+    /// indexer, a sum. Its value holds no <see cref="DecidingTokens"/> and calls nothing but a constructor
+    /// (<c>new(</c>, <c>new Type(</c>); a constructor itself always decides how its object is built.
+    /// </summary>
+    public bool DecidesNothing => !IsConstructor && IsOneExpression && ValueTokens() is var value && !value.Any(IsDecidingToken) && !HoldsCall(value);
 
     /// <summary>The member's header, up to its first parenthesis, names the type <c>Decided</c>: a step entry returns the decisions it added to.</summary>
     public bool ReturnsDecided => Tokens.TakeWhile(token => token.Text != OpenCall).Any(token => token.Word == DecidedTypeName);
@@ -100,6 +114,20 @@ internal sealed record WrittenMember(string SourcePath, string Type, string Name
         Tokens.Where((token, index) => token.Text == ";" && !(index > 0 && AccessorKeywords.Contains(Tokens[index - 1].Text))).Count();
 
     private string TextAt(int index) => index >= 0 && index < Tokens.Count ? Tokens[index].Text : "";
+
+    /// <summary>The tokens after the <c>=</c> or <c>=&gt;</c> that starts the value.</summary>
+    private List<CodeToken> ValueTokens()
+    {
+        var start = FirstEqualsOutsideBrackets() + (IsExpressionBodied ? 2 : 1);
+        return [.. Tokens.Skip(start)];
+    }
+
+    private static bool IsDecidingToken(CodeToken token) => DecidingTokens.Contains(token.Text);
+
+    /// <summary>A "(" right after a name or keyword other than the "new" of a constructor or the type name it creates.</summary>
+    private static bool HoldsCall(List<CodeToken> value) =>
+        Enumerable.Range(1, Math.Max(0, value.Count - 1)).Any(index =>
+            value[index].Text == OpenCall && value[index - 1].Word != "" && value[index - 1].Text != "new" && !(index > 1 && value[index - 2].Text == "new"));
 
     private int FirstOpenCallBeforeStatementEnd(int start)
     {

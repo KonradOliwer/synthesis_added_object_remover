@@ -9,6 +9,7 @@ public sealed class ConsoleOutputCollection
 
 /// <summary>Pins the whole run: the log (in order), the patch overrides and the report files.</summary>
 [Collection(ConsoleOutputCollection.Name)]
+[ExpectedOutputTest]
 public class EndToEndTests
 {
     private const int OneWorker = 1;

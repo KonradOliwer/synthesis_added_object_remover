@@ -61,7 +61,7 @@ public sealed class RestoreLoopTests
         Terrain: true,
         Cells: true,
         Navmeshes: true,
-        new ClearedArea(SearchRadius: 1000f, MaxStandingSizePercent: 0.1, MaxStandingCountPercent: 0.1, ClearedAreaShares.Both),
+        new ClearedArea(SearchRadius: 1000f, MaxStandingSizePercent: 0.1, MaxStandingCountPercent: 0.1),
         TerrainEdgeBlendDistance: 0f,
         HeightChangeTolerance: 8f,
         WaterHeightChangeTolerance: 8f,
@@ -1381,16 +1381,17 @@ public sealed class RestoreLoopTests
         ];
         var final = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved), targets.Length)
             .Apply(RoundKind.TooClose, [.. removedTargets.Select(target => new ProposedRemoval(target.Id, new TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);
+        var caches = new TestRunCaches(
+            scene.Shapes,
+            navmeshes: new NavmeshIndex(bucket => bucket.Grid is null && !winning.IsEmpty ? [.. winning] : null),
+            shownTargets: TestScenes.Create(targets, [], scene.Shapes).IndexShownTargets);
         return new(
             new(collected, OtherModsObjectsResult.SwitchedOff),
             final,
+            TestClearedAreas.Of(collected, final, caches, scene.Settings),
             new(rules.WorldCaches, rules.TooCloseRule(tooClose), rules.HoldersOfObjectsThatStay, new TestNavmeshCheck(scene.FindFault)),
-            rules.Leftovers(targets, final, others),
             new(
-                new TestRunCaches(
-                    scene.Shapes,
-                    navmeshes: new NavmeshIndex(bucket => bucket.Grid is null && !winning.IsEmpty ? [.. winning] : null),
-                    shownTargets: TestScenes.Create(targets, [], scene.Shapes).IndexShownTargets),
+                caches,
                 new TestLandPlugin(space => space, scene.ReadHeights, scene.TerrainWinner),
                 Plugins,
                 TestTargets.TargetName),

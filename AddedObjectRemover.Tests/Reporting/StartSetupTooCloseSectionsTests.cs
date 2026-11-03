@@ -158,7 +158,7 @@ public sealed class StartSetupTooCloseSectionsTests
         {
             Mode = everythingOn ? FollowUpRemovalMode.OnlyWhatLosesItsSupport : FollowUpRemovalMode.Nothing,
         };
-        settings.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings { RemoveLeftoverVisibleObjects = everythingOn };
+        settings.LeftoverObjects = new LeftoverObjectSettings { RemoveBySurroundingDirections = everythingOn };
         settings.LeftoverInvisibleObjects = new LeftoverInvisibleObjectSettings
         {
             RemoveLeftoverInvisibleObjects = everythingOn,
@@ -173,30 +173,54 @@ public sealed class StartSetupTooCloseSectionsTests
         AssertExpectedOutput(lines, "Config_GivesTheTextWithAndWithoutPatchesAndLeftovers", $"{everythingOn}");
     }
 
+    [Theory]
+    [InlineData(true, 1f, 5f, "Objects left behind, area method: radius 5000 units; cleared when at most 1% by size and 5% by number still stand; kept with fewer than 5 of the cleaned mod's other objects around.")]
+    [InlineData(true, 0.5f, 2.5f, "Objects left behind, area method: radius 5000 units; cleared when at most 0.5% by size and 2.5% by number still stand; kept with fewer than 5 of the cleaned mod's other objects around.")]
+    [InlineData(false, 1f, 5f, "Objects left behind, area method: off.")]
+    [InlineData(true, 1f, 100f, "Objects left behind, area method: off (the count limit is 100% or more).")]
+    [InlineData(true, 150f, 5f, "Objects left behind, area method: off (the size limit is 100% or more).")]
+    [InlineData(true, 100f, 150f, "Objects left behind, area method: off (the size and count limits are 100% or more).")]
+    public void Config_GivesTheAreaMethodLineWithItsLimitsOrWhyItIsOff(bool switchedOn, float sizeLimit, float countLimit, string expected)
+    {
+        var settings = SettingsFor();
+        settings.LeftoverObjects = new LeftoverObjectSettings
+        {
+            RemoveObjectsInClearedAreas = switchedOn,
+            ClearedArea = new LeftoverClearedAreaSettings { MaxStandingSizePercent = sizeLimit, MaxStandingCountPercent = countLimit },
+        };
+        var mods = Facts();
+        var runSettings = Assert.IsType<RunRequest.Ready>(Build(settings, mods)).Settings;
+
+        var lines = LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(new(mods, runSettings.ModTrust)), mods).Lines;
+
+        Assert.Equal(expected, lines.Single(line => line.StartsWith("Objects left behind, area method: ", StringComparison.Ordinal)));
+    }
+
     [Fact]
     public void Config_GivesTheVisibleLeftBehindLineOffAndOnWithTheTickedKinds()
     {
         var settings = SettingsFor();
-        settings.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings { RemoveLeftoverVisibleObjects = false };
+        settings.LeftoverObjects = new LeftoverObjectSettings { RemoveBySurroundingDirections = false };
         var mods = Facts();
         string VisibleLine()
         {
             var runSettings = Assert.IsType<RunRequest.Ready>(Build(settings, mods)).Settings;
             return LogSections.BuildConfigSection(runSettings, ModTrustClassifier.Classify(new(mods, runSettings.ModTrust)), mods).Lines
-                .Single(line => line.StartsWith("Visible objects left behind: ", StringComparison.Ordinal));
+                .Single(line => line.StartsWith("Objects left behind, direction method: ",StringComparison.Ordinal));
         }
 
-        Assert.Equal("Visible objects left behind: off.", VisibleLine());
+        Assert.Equal("Objects left behind, direction method: off.",VisibleLine());
 
-        settings.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings
+        settings.LeftoverObjects = new LeftoverObjectSettings
         {
-            RemoveLeftoverVisibleObjects = true,
+            MinObjectsAround = 3,
+            RemoveBySurroundingDirections = true,
             AlwaysKeep = new KeptVisibleObjectSettings { Containers = true, Furniture = true },
         };
         Assert.Equal(
-            "Visible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 6; "
+            "Objects left behind, direction method: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 6; "
             + "A direction is cleared when this much of it was removed: 80%; Remove when this share of the directions with objects is cleared: 80%; "
-            + "Never remove these as visible objects left behind: Containers, Furniture.",
+            + "Never remove these as objects left behind: Containers, Furniture; kept with fewer than 3 of the cleaned mod's other objects around.",
             VisibleLine());
     }
 
@@ -229,11 +253,11 @@ public sealed class StartSetupTooCloseSectionsTests
         {
             RestoreOtherModsObjects = false,
             RestoreTerrain = false,
-            ClearedArea = new ClearedAreaSettings { SearchRadius = 2048f, MaxStandingSizePercent = 2.5f, MaxStandingCountPercent = 10f, SharesThatMustPass = ClearedAreaShares.Either },
+            ClearedArea = new ClearedAreaSettings { SearchRadius = 2048f, MaxStandingSizePercent = 2.5f, MaxStandingCountPercent = 10f },
         };
         Assert.Equal(
             "Restore where the cleaned mod was removed: cell settings, navmeshes; "
-            + "an area 4096 units wide counts as cleared when at most 2.5% of the cleaned mod's objects there still stand by size or at most 10% by number.",
+            + "an area 4096 units wide counts as cleared when at most 2.5% of the cleaned mod's objects there still stand by size and at most 10% by number.",
             RestoreLine());
     }
 

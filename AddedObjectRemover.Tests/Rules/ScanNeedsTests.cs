@@ -139,7 +139,7 @@ public sealed class ScanNeedsTests
             terrain,
             cells,
             navmeshes,
-            new ClearedArea(1000f, MaxStandingSizePercent: 1, MaxStandingCountPercent: 5, ClearedAreaShares.Both),
+            new ClearedArea(1000f, MaxStandingSizePercent: 1, MaxStandingCountPercent: 5),
             TerrainEdgeBlendDistance: 0f,
             HeightChangeTolerance: 8f,
             WaterHeightChangeTolerance: 4f,

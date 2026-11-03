@@ -15,7 +15,8 @@ Remove objects too close to other mods' objects: Margin by object size: on, 0.5 
 Remove objects on terrain changed by other mods: off.
 Shrink or turn objects to make them fit: off.
 Also remove what rests on removed objects: EverythingTouchingIt; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
-Visible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 6; A direction is cleared when this much of it was removed: 80%; Remove when this share of the directions with objects is cleared: 80%; Never remove these as visible objects left behind: none.
+Objects left behind, direction method: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 6; A direction is cleared when this much of it was removed: 80%; Remove when this share of the directions with objects is cleared: 80%; Never remove these as objects left behind: none; kept with fewer than 5 of the cleaned mod's other objects around.
+Objects left behind, area method: radius 5000 units; cleared when at most 1% by size and 5% by number still stand; kept with fewer than 5 of the cleaned mod's other objects around.
 Invisible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 4; A direction is cleared when this much of it was removed: 50%; Remove when this share of the directions with objects is cleared: 60%; Never remove these as invisible objects left behind: none; Move kept markers out of other mods' objects: off.
 Restore where the cleaned mod was removed: other mods' objects, terrain, cell settings, navmeshes; an area 10000 units wide counts as cleared when at most 1% of the cleaned mod's objects there still stand by size and at most 5% by number; terrain edges blended over 256 units.
 Detailed log and reports: off.
@@ -46,13 +47,15 @@ Found 19 of 40 Target.esp objects too close to other mods' objects.
 ## linked
 ## unexpectedErrors
 ## visible-leftovers
-Visible objects left behind: 10 evaluated; removed 0 (0 surroundings removed); kept 10 (10 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 0 referenced).
+Visible objects left behind: 10 evaluated; removed 0 (0 surroundings removed); kept 10 (10 fewer than 5 of the cleaned mod's other objects around, 0 too few directions with objects, 0 surroundings mostly kept, 0 protected type, 0 referenced).
+## linked
+## unexpectedErrors
 ## linked
 ## unexpectedErrors
 ## left-without-support-step
 ## unexpectedErrors
 ## leftovers
-Invisible objects left behind: 5 evaluated; removed 4 (2 inside another mod's object, 2 surroundings removed); kept 1 (0 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 1 referenced).
+Invisible objects left behind: 5 evaluated; removed 4 (2 inside another mod's object, 2 surroundings removed); kept 1 (0 too few directions with objects, 0 surroundings mostly kept, 0 protected type, 1 referenced).
   Kept T_ExteriorMarkerInBuilding [000829:Target.esp] in worldspace AorWorld [000801:Skyrim.esm]: linked from FormList TargetPatch_KeepList [000800:TargetPatch.esp].
 ## linked
 ## unexpectedErrors
@@ -72,7 +75,7 @@ Wrote 25 overrides (25 removed).
 ## run-summary
 Objects of Target.esp: 42; already removed by earlier patchers in this group: 0; not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 2; judged in this run: 40; removed in this run: 25.
 ## removal-summary
-Removed 25 objects (16 too close, 4 follow-up removals, 0 visible objects left behind, 4 invisible objects left behind, 1 linked to removed objects).
+Removed 25 objects (16 too close, 4 follow-up removals, 0 visible objects left behind, 0 objects in cleared areas, 4 invisible objects left behind, 1 linked to removed objects).
 ## kept-summary
 Kept 5 objects that would have been removed, because other records depend on them or because of their own script or location ref type.
   FormList record: 2

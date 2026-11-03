@@ -19,8 +19,9 @@ internal static class SettingPaths
     public const string AlsoRemoveGroup = SettingNames.AlsoRemove + SettingNames.PathSeparator;
     public const string InvisibleSurroundingObjectsGroup =
         SettingNames.InvisibleLeftBehind + SettingNames.PathSeparator + SettingNames.SurroundingObjects + SettingNames.PathSeparator;
-    public const string VisibleSurroundingObjectsGroup =
-        SettingNames.VisibleLeftBehind + SettingNames.PathSeparator + SettingNames.SurroundingObjects + SettingNames.PathSeparator;
+    public const string LeftoverObjectsGroup = SettingNames.LeftoverObjects + SettingNames.PathSeparator;
+    public const string VisibleSurroundingObjectsGroup = LeftoverObjectsGroup + SettingNames.DirectionSurroundingObjects + SettingNames.PathSeparator;
+    public const string AreaMethodClearedAreaGroup = LeftoverObjectsGroup + SettingNames.AreaMethodClearedArea + SettingNames.PathSeparator;
     public const string RestoreWhereRemovedGroup = SettingNames.RestoreWhereRemoved + SettingNames.PathSeparator;
     public const string ClearedAreaGroup = RestoreWhereRemovedGroup + SettingNames.ClearedArea + SettingNames.PathSeparator;
 }

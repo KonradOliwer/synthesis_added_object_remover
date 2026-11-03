@@ -98,7 +98,7 @@ public class VisibleLeftBehindFollowUpRunTests
 
         Assert.Equal(RingCrates + 2, outcome.Removals.Length);
         Assert.Equal(
-            "Removed 8 objects (6 too close, 1 follow-up removals, 1 visible objects left behind, 0 invisible objects left behind, 0 linked to removed objects).",
+            "Removed 8 objects (6 too close, 1 follow-up removals, 1 visible objects left behind, 0 objects in cleared areas, 0 invisible objects left behind, 0 linked to removed objects).",
             Assert.Single(log.Sections.Single(section => section.Id == "removal-summary").Lines));
     }
 
@@ -143,7 +143,7 @@ public class VisibleLeftBehindFollowUpRunTests
         var door = Assert.IsType<Decision.Removed>(outcome.Final.Of(IdOf(outcome, DoorEditorId)));
         Assert.Equal(outcome.VisibleLeftBehind.Rounds[1], door.Round);
         Assert.Equal(
-            $"  Unexpected error in the also-remove follow-ups of the visible objects left behind (PlantedUserDataException: {FailingAfterSectionClock.FailureMessage}). "
+            $"  Unexpected error in the also-remove follow-ups of the objects left behind (PlantedUserDataException: {FailingAfterSectionClock.FailureMessage}). "
             + "The follow-ups stopped there: the removals of the passes before stand, and objects resting on what the later rounds removed were not removed.",
             Assert.Single(log.Sections.Where(section => section.Id == "unexpectedErrors").SelectMany(section => section.Lines), line => line.StartsWith("  Unexpected error ", StringComparison.Ordinal)));
         Assert.Equal(

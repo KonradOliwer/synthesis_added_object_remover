@@ -99,14 +99,8 @@ public class RestoreWhereRemovedRunTests
         Assert.StartsWith(nameof(MalformedRecordException), failure.Failure, StringComparison.Ordinal);
         Assert.Empty(outcome.RestoreWhereRemoved.Objects);
         Assert.NotEmpty(outcome.Removals);
-        var leftovers = healthy.Removals.OfType<ObjectWithReason.LeftoverInRestoredArea>().Select(removal => removal.TargetIndex).ToHashSet();
-        Assert.NotEmpty(leftovers);
-        Assert.Equal(
-            healthy.Removals.Where(removal => !leftovers.Contains(removal.TargetIndex)).Select(removal => removal.TargetIndex),
-            outcome.Removals.Select(removal => removal.TargetIndex));
-        Assert.Equal(
-            healthy.Written.Removed.Select(id => id.Index).Where(index => !leftovers.Contains(index)),
-            outcome.Written.Removed.Select(id => id.Index));
+        Assert.Equal(healthy.Removals.Select(removal => removal.TargetIndex), outcome.Removals.Select(removal => removal.TargetIndex));
+        Assert.Equal(healthy.Written.Removed.Select(id => id.Index), outcome.Written.Removed.Select(id => id.Index));
         Assert.Equal([failure], FailuresOf(outcome));
         AssertSameAsHealthy(healthy, outcome);
     }
@@ -118,7 +112,7 @@ public class RestoreWhereRemovedRunTests
                 outcome.RestingObjects.Failure,
                 outcome.RestingObjects.TouchChainsFailure,
                 outcome.VisibleLeftBehind.Failure,
-                outcome.LeftBehind.Failure,
+                outcome.InvisibleLeftBehind.Failure,
                 outcome.MarkerMoves.Failure,
                 outcome.OtherModsObjects.Failure,
             }.OfType<PartFailure>());
@@ -381,7 +375,7 @@ public class RestoreWhereRemovedRunTests
                     BySize = new TooCloseBySizeSettings { Use = true, SizeMultiplier = 0.1f },
                     ByDistance = new TooCloseByDistanceSettings { Use = true, DistanceInUnits = 32f },
                 },
-                LeftoverVisibleObjects = new LeftoverVisibleObjectSettings { RemoveLeftoverVisibleObjects = false },
+                LeftoverObjects = new LeftoverObjectSettings { RemoveBySurroundingDirections = false },
             },
             DetailedLogAndReports = true,
         }.WithTheCollisionOfTheCleanedModsObjects();

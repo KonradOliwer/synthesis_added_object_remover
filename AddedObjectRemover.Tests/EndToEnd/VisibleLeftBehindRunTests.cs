@@ -12,9 +12,9 @@ public class VisibleLeftBehindRunTests
     private static Settings SettingsWith(bool visibleOn)
     {
         var settings = SettingsVariants.Of(SettingsVariants.TouchWithLeftBehindAndMarkerMoves);
-        settings.Standard.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings
+        settings.Standard.LeftoverObjects = new LeftoverObjectSettings
         {
-            RemoveLeftoverVisibleObjects = visibleOn,
+            RemoveBySurroundingDirections = visibleOn,
             SurroundingObjects = new VisibleSurroundingObjectsSettings
             {
                 SearchRadius = 8192f,

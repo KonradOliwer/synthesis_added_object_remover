@@ -8,7 +8,8 @@ Remove objects too close to other mods' objects: Margin by object size: on, 0.5 
 Remove objects on terrain changed by other mods: off.
 Shrink or turn objects to make them fit: Shrink down to: 80% of its size; Turn by at most: 360 degrees either way.
 Also remove what rests on removed objects: Nothing; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
-Visible objects left behind: off.
+Objects left behind, direction method: off.
+Objects left behind, area method: radius 5000 units; cleared when at most 1% by size and 5% by number still stand; kept with fewer than 5 of the cleaned mod's other objects around.
 Invisible objects left behind: off.
 Restore where the cleaned mod was removed: other mods' objects, terrain, cell settings, navmeshes; an area 10000 units wide counts as cleared when at most 1% of the cleaned mod's objects there still stand by size and at most 5% by number; terrain edges blended over 256 units.
 Detailed log and reports: off.

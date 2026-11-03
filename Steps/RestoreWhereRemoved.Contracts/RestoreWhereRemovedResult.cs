@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
@@ -18,11 +17,6 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 /// stopped, in record key order.
 /// </param>
 /// <param name="Times">Where the step spent its time; none for a step that did not run its parts.</param>
-/// <param name="Leftovers">The cleaned mod's objects that still stood in a restored area, in target order.</param>
-/// <param name="OtherModsObjects">
-/// What became of other mods' objects left without support, also of those the leftovers removed held up; the result of that step
-/// when the step removed none.
-/// </param>
 public sealed record RestoreWhereRemovedResult(
     StepOutcome Outcome,
     ImmutableArray<PlacedChangeJudged> Objects,
@@ -33,11 +27,8 @@ public sealed record RestoreWhereRemovedResult(
     int Passes,
     ImmutableArray<RecordKey> DoorsLeftRemoved,
     ImmutableArray<PartFailure> Failures,
-    RestoreWhereRemovedTimes Times,
-    ImmutableArray<LeftoverJudged> Leftovers,
-    OtherModsObjectsResult OtherModsObjects)
+    RestoreWhereRemovedTimes Times)
 {
-    /// <param name="otherModsObjects">What the step for other mods' objects left without support found.</param>
-    public static RestoreWhereRemovedResult SwitchedOff(OtherModsObjectsResult otherModsObjects) =>
-        new(StepOutcome.SwitchedOff, [], [], [], [], [], Passes: 0, DoorsLeftRemoved: [], Failures: [], RestoreWhereRemovedTimes.None, Leftovers: [], otherModsObjects);
+    public static RestoreWhereRemovedResult SwitchedOff() =>
+        new(StepOutcome.SwitchedOff, [], [], [], [], [], Passes: 0, DoorsLeftRemoved: [], Failures: [], RestoreWhereRemovedTimes.None);
 }

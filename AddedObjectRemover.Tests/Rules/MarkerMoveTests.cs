@@ -90,7 +90,7 @@ public class MarkerMoveTests
     private static KeptMarkerMover CreateMover(CellArea? homeCell, params IFreeSpotSearch[] surfaces) =>
         new([TestTargets.Create(0, TestTargets.At(Marker))], _ => homeCell, surfaces, MarkerMoveLimits.MaxDistance);
 
-    private static LeftBehindCheck KeptMarkerInsideOtherObject() => new(
+    private static InvisibleLeftBehindCheck KeptMarkerInsideOtherObject() => new(
         TargetIndex: 0,
         InvisibleObjectKind.XMarkers,
         Radius: 1024,

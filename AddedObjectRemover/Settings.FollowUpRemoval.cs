@@ -10,7 +10,7 @@ public class FollowUpRemovalSettings : IFollowUpSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName(SettingNames.FollowUpMode)]
     [SynthesisTooltip(
-        "Nothing: of the cleaned mod's objects, only those the removal steps remove (too close, changed terrain, visible objects left behind).\n"
+        "Nothing: of the cleaned mod's objects, only those the removal steps remove (too close, changed terrain, objects left behind).\n"
         + "EverythingTouchingIt: everything connected to it through touching objects, spreading one object at a time; this can reach a whole room.\n"
         + "OnlyWhatLosesItsSupport: a touching object only when enough of what it rests on was removed.")]
     public FollowUpRemovalMode Mode { get; set; } = SettingDefaults.FollowUpMode;

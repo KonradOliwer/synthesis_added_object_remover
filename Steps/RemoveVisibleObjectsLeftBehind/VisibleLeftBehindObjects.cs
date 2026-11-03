@@ -2,28 +2,30 @@ using System.Collections.Immutable;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
-using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
-using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
 
 public static class VisibleLeftBehindObjects
 {
-    /// <summary>The rules this step judges its objects by (see <see cref="LeftBehindJudging"/>).</summary>
-    public static ILeftBehindJudging CreateLeftBehindJudging() => new LeftBehindJudging();
+    /// <summary>The direction rule this step judges its objects by (see <see cref="SurroundingsJudging"/>).</summary>
+    public static ISurroundingsJudging CreateSurroundingsJudging() => new SurroundingsJudging();
 
-    /// <param name="Caches">Their base facts and shapes are read.</param>
-    /// <param name="NeverRemove">Honoured whether or not the step is switched off.</param>
+    /// <summary>The rules this step joins a round's decisions into its verdicts by (see <see cref="LeftBehindRoundJoin"/>).</summary>
+    public static ILeftBehindRoundJoin CreateLeftBehindRoundJoin() => new LeftBehindRoundJoin();
+
+    /// <param name="Caches">The base facts and shapes of the objects are read.</param>
+    /// <param name="NeverRemove">The kinds the step's settings list, also while the step is switched off.</param>
     public sealed record KindsInput(IRunCaches Caches, NeverRemovedVisibleKinds NeverRemove);
 
-    /// <summary>The kinds of shown objects this step's settings always keep (see <see cref="VisibleKindsAlwaysKept"/>).</summary>
+    /// <summary>The visible objects of the kinds the step's settings list (see <see cref="VisibleKindsAlwaysKept"/>).</summary>
     public static IKindsAlwaysKept CreateKindsAlwaysKept(KindsInput input) =>
         new VisibleKindsAlwaysKept(input.Caches.Shapes, input.Caches.Bases, input.NeverRemove.Kinds);
 
     /// <param name="Decisions">The newest decisions, which the step's rounds and their follow-ups are added to.</param>
     /// <param name="Caches">Index the visible target objects where the rounds measure them; their base facts and shapes are read.</param>
+    /// <param name="KindsAlwaysKept">The visible kinds the settings list (see <see cref="CreateKindsAlwaysKept"/>).</param>
     /// <param name="FollowUp">Follows up the removals of each round that took something from its place before the next round; no pass ran yet.</param>
     /// <param name="TimeSinceStart">The run's clock, which measures the visible rounds.</param>
     /// <param name="Settings">Null when the step is switched off.</param>
@@ -31,6 +33,7 @@ public static class VisibleLeftBehindObjects
         ImmutableArray<TargetObject> Targets,
         IRunDecisions Decisions,
         IRunCaches Caches,
+        IKindsAlwaysKept KindsAlwaysKept,
         IAlsoRemoveFollowUp FollowUp,
         Func<TimeSpan> TimeSinceStart,
         WorkOrder Order,
@@ -73,8 +76,7 @@ public static class VisibleLeftBehindObjects
     private static VisibleLeftBehindRounds DecideRounds(Input input, IVisibleTargetObjects surroundings, VisibleLeftBehindSettings settings)
     {
         var (targets, decisions) = (input.Targets, input.Decisions);
-        var kindsAlwaysKept = CreateKindsAlwaysKept(new(input.Caches, settings.NeverRemove));
-        var rule = new VisibleLeftBehindRule(targets, input.Caches.Shapes, input.Caches.Bases, settings, kindsAlwaysKept);
+        var rule = new VisibleLeftBehindRule(targets, input.Caches.Shapes, input.Caches.Bases, settings, input.KindsAlwaysKept);
         var candidatesSurroundings = VisibleObjectSurroundings.Measure(
             targets, rule.Candidates(decisions), surroundings, settings.Surroundings.LookAround, settings.Surroundings.DirectionClearedPercent, input.Order, input.Execution);
         return VisibleLeftBehindRounds.Decide(rule, candidatesSurroundings, input.FollowUp, input.TimeSinceStart, decisions);

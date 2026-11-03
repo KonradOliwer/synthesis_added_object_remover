@@ -115,8 +115,8 @@ public class RemovalDecisionsTests
         var afterTooClose = Start(new Dictionary<int, KeepReason> { [4] = QuestReason }).Apply(RoundKind.TooClose, [Propose(8, TooClose)]);
         var proposals = new[] { Propose(3, TooClose), Propose(5, TooClose), Propose(10, TooClose) };
 
-        var copy = afterTooClose.WorkingCopy().DecideRound(new RoundOpening(RoundKind.LeftBehind, MayReplaceFits: false), proposals);
-        var applied = afterTooClose.Apply(RoundKind.LeftBehind, proposals);
+        var copy = afterTooClose.WorkingCopy().DecideRound(new RoundOpening(RoundKind.InvisibleLeftBehind, MayReplaceFits: false), proposals);
+        var applied = afterTooClose.Apply(RoundKind.InvisibleLeftBehind, proposals);
 
         Assert.Equal(applied.Rounds.ToArray(), copy.Rounds.ToArray());
         Assert.Equal(applied.All().ToList(), copy.All().ToList());
@@ -131,7 +131,7 @@ public class RemovalDecisionsTests
     {
         var afterTooClose = Start().Apply(RoundKind.TooClose, [Propose(8, TooClose)]);
 
-        afterTooClose.WorkingCopy().DecideRound(new RoundOpening(RoundKind.LeftBehind, MayReplaceFits: false), [Propose(9, TooClose)]);
+        afterTooClose.WorkingCopy().DecideRound(new RoundOpening(RoundKind.InvisibleLeftBehind, MayReplaceFits: false), [Propose(9, TooClose)]);
 
         Assert.Single(afterTooClose.Rounds);
         Assert.False(afterTooClose.IsDecided(Id(9)));
@@ -304,11 +304,11 @@ public class RemovalDecisionsTests
         var decisions = Start()
             .Apply(RoundKind.TooClose, [Propose(0, TooClose)])
             .Apply(AlsoRemoveRounds.Opening, [Propose(3, TooClose)])
-            .Apply(RoundKind.LeftBehind, [Propose(5, TooClose)]);
+            .Apply(RoundKind.InvisibleLeftBehind, [Propose(5, TooClose)]);
 
         Assert.Equal(RoundKind.TooClose, Removed(decisions, 1).Round.Kind);
         Assert.Equal(RoundKind.AlsoRemove, Removed(decisions, 4).Round.Kind);
-        Assert.Equal(RoundKind.LeftBehind, Removed(decisions, 6).Round.Kind);
+        Assert.Equal(RoundKind.InvisibleLeftBehind, Removed(decisions, 6).Round.Kind);
         Assert.Equal(new LinkedTo(Id(0)), Removed(decisions, 2).Reason);
         Assert.Equal(new LinkedTo(Id(3)), Removed(decisions, 4).Reason);
         Assert.Equal(new LinkedTo(Id(5)), Removed(decisions, 7).Reason);
@@ -328,7 +328,7 @@ public class RemovalDecisionsTests
     public void RoundsAfterAnOlderViewAreTheRoundsAddedSince()
     {
         var first = Start().Apply(RoundKind.TooClose, [Propose(0, TooClose)]);
-        var second = first.Apply(AlsoRemoveRounds.Opening, [Propose(8, TooClose)]).Apply(RoundKind.LeftBehind, []);
+        var second = first.Apply(AlsoRemoveRounds.Opening, [Propose(8, TooClose)]).Apply(RoundKind.InvisibleLeftBehind, []);
 
         Assert.Equal(new[] { second.Rounds[1], second.Rounds[2] }, second.RoundsAfter(first).ToArray());
         Assert.Empty(first.RoundsAfter(first));
@@ -573,7 +573,7 @@ public class RemovalDecisionsTests
     {
         var start = StartRestoring([10]).Apply(RoundKind.TooClose, []);
 
-        var decided = start.DecideRoundOnCopy(RoundKind.LeftBehind, [Propose(10, TooClose), Propose(11, TooClose)]);
+        var decided = start.DecideRoundOnCopy(RoundKind.InvisibleLeftBehind, [Propose(10, TooClose), Propose(11, TooClose)]);
 
         Assert.IsType<Decision.Restored>(decided[Id(10)]);
         Assert.IsType<Decision.Removed>(decided[Id(11)]);

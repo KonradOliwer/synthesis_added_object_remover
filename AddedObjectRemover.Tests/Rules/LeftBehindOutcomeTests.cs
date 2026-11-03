@@ -15,15 +15,13 @@ public class LeftBehindOutcomeTests
 
     private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(OtherMod, "LeftBehindOutcomeData", Room));
 
-    private static LeftBehindSettings Config(int minOccupied = 4, int removedPercent = 60, params InvisibleObjectKind[] protectedKinds) => new(
-        Rule(minOccupied, removedPercent),
-        NeverRemove: new NeverRemovedInvisibleKinds(protectedKinds.ToHashSet()));
+    private static InvisibleLeftBehindSettings Config(int minOccupied = 4, int removedPercent = 60) => new(Rule(minOccupied, removedPercent));
 
     private static LeftBehindSurroundings Rule(int minOccupied = 4, int removedPercent = 60) =>
         new(LookAround: 1024, MinOccupiedDirections: minOccupied, DirectionClearedPercent: 50, ClearedDirectionsPercent: removedPercent);
 
     [Theory]
-    [InlineData(3, 3, nameof(LeftBehindOutcome.KeptTooFewSurroundingObjects))]
+    [InlineData(3, 3, nameof(LeftBehindOutcome.KeptTooFewOccupiedDirections))]
     [InlineData(4, 3, nameof(LeftBehindOutcome.RemovedSurroundingsRemoved))]
     [InlineData(4, 2, nameof(LeftBehindOutcome.KeptSurroundingsMostlyKept))]
     [InlineData(8, 5, nameof(LeftBehindOutcome.RemovedSurroundingsRemoved))]
@@ -45,7 +43,7 @@ public class LeftBehindOutcomeTests
     [Fact]
     public void NoSurroundingsKeepsTheObject() =>
         Assert.Equal(
-            LeftBehindOutcome.KeptTooFewSurroundingObjects,
+            LeftBehindOutcome.KeptTooFewOccupiedDirections,
             LeftBehindVerdicts.BySurroundings(new SectorAreaTally(50).Build(), Rule(minOccupied: 1)));
 
     [Fact]
@@ -85,15 +83,15 @@ public class LeftBehindOutcomeTests
             TestBaseFacts.Unresolved);
         var room = TestShapes.Placed(OtherMod, 0, Room.Base, inRoom);
 
-        var result = TestLeftBehind.Find(targets, Shapes, [room], Config(protectedKinds: InvisibleObjectKind.Lights), protection);
+        var result = TestLeftBehind.Find(targets, Shapes, [room], Config(), protection, TestLeftBehind.KindsAlwaysKept(Shapes, InvisibleObjectKind.Lights));
 
-        var decisions = PerIndexTable<LeftBehindCheck>.From(result.Evaluations, evaluation => evaluation.TargetIndex);
+        var decisions = PerIndexTable<InvisibleLeftBehindCheck>.From(result.Evaluations, evaluation => evaluation.TargetIndex);
         Assert.Equal(LeftBehindOutcome.KeptProtectedType, decisions.Get(protectedLightInRoom).Decision);
         Assert.Equal(LeftBehindOutcome.KeptReferenced, decisions.Get(referencedMarkerInRoom).Decision);
         Assert.Equal(KeepKind.NonPlacedReference, decisions.Get(referencedMarkerInRoom).KeepReason?.Kind);
         Assert.Equal(LeftBehindOutcome.RemovedInsideOtherObject, decisions.Get(markerInRoom).Decision);
         Assert.Null(decisions.Get(markerInRoom).KeepReason);
-        Assert.Equal(LeftBehindOutcome.KeptTooFewSurroundingObjects, decisions.Get(protectedLightAlone).Decision);
+        Assert.Equal(LeftBehindOutcome.KeptTooFewOccupiedDirections, decisions.Get(protectedLightAlone).Decision);
         Assert.Equal(markerInRoom, Assert.Single(result.Evaluations, evaluation => evaluation.IsRemoved).TargetIndex);
     }
 

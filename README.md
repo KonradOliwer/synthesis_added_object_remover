@@ -8,7 +8,8 @@ It removes objects added by one plugin (the *cleaned mod*, set as *Mod to clean 
 added by other mods, a common source of clipping and duplicated clutter when several mods edit
 the same area. By default it also removes the cleaned mod's objects that stand on terrain another mod
 changed (see *Remove objects on terrain changed by other mods*) and the cleaned mod's objects that lose their support when one is removed,
-the cleaned mod's visible objects whose surroundings were removed (see *Visible objects left behind*),
+the cleaned mod's visible objects whose surroundings were removed and its objects in areas where almost nothing of it still stands
+(see *Objects left behind*),
 and the cleaned mod's invisible objects (lights, sounds, critter spawners, ...) that sit inside another
 mod's object or are left behind once the objects around them are gone.
 
@@ -41,7 +42,7 @@ It can clean up one mod or, in Batch mode, several mods in one run (see *Batch m
 
 Some objects are always kept, whatever the settings, and objects of the cleaned mod linked
 together are always removed together or all kept (see *What is always kept*).
-A linked partner of an object removed for being too close, for standing on changed terrain, as a visible object left behind, or by
+A linked partner of an object removed for being too close, for standing on changed terrain, as an object left behind, or by
 *Also remove what rests on removed objects*, is itself treated as removed, so what rests on or touches it can go too.
 
 ## How to use
@@ -313,7 +314,7 @@ The cleaned mod can change an object another mod (or the base game) placed. Ther
 An object the cleaned mod left where it stood and changed in nothing but rotation, size or other data is never checked for removal: other mods were made to fit it there. Such an object, and an object the cleaned mod hid, disabled or deleted, can still go back to how it was when the area around it was cleared (see *Restore what the cleaned mod changed where it was removed*).
 
 A checked object is judged where the cleaned mod put it, with the options under *Collision handling*: too close to other mods' objects, NPCs stuck in it, terrain changed by other mods, for a visible object whether its
-surroundings were removed (see *Visible objects left behind*), and, for an invisible object
+surroundings were removed (see *Objects left behind*), and, for an invisible object
 such as a sound or a marker, sitting inside another mod's object. If it fits where the cleaned mod put it, it stays there, unchanged.
 If it is too close to another mod's object and *Attempt resizing before removal* is on for it, it is shrunk or turned there when that makes it fit
 (see *Shrink or turn objects to make them fit*). Otherwise, when a step would remove it, *When it would be removed* decides: it is put back where
@@ -326,7 +327,7 @@ mod's own objects (see *What is always kept*); a changed object linked to anothe
 
 A restored object is an object of another mod that the cleaned mod changed and that is put back to the version the game shows
 without the cleaned mod instead of being removed. Restored objects are counted apart from the removed ones and are called
-restored in the log and in the report files. *Visible objects left behind* and *Invisible objects left behind* name the reason
+restored in the log and in the report files. *Objects left behind* and *Invisible objects left behind* name the reason
 "surroundings removed and restored" when some of the objects around the checked object were restored.
 
 - **What a restored object is.** The patch puts back, part by part, what the cleaned mod was the last to change, as the plugin
@@ -405,14 +406,15 @@ it was: *Also remove what rests on removed objects* removes it like any other ob
 | OnlyWhatLosesItsSupport: remove when this much support is gone (%) | `50` | `OnlyWhatLosesItsSupport`: remove an object once this much of its support is gone (1-100). Whatever *When an object is removed, also remove* is set to, it also decides when another mod's object rests on an object or is left without support (see *Other mods' objects left without support*). Unless that is `Nothing`, it also decides when an object of the cleaned mod rests on another, which is then never shrunk or turned (see *Shrink or turn objects to make them fit*). |
 | Other mods' objects left without support | `PullObjectToTheGround` | What happens to another mod's object resting on an object of the cleaned mod that is removed (see *Other mods' objects left without support*). Whatever it is set to, an object such an object rests on is never shrunk or turned. |
 
-- **Nothing**: of the cleaned mod's objects, only those the removal steps remove (too close, changed terrain, visible objects left behind) are removed. (Other mods' objects are decided by *Other mods' objects left without support*, in every mode.)
+- **Nothing**: of the cleaned mod's objects, only those the removal steps remove (too close, changed terrain, objects left behind) are removed. (Other mods' objects are decided by *Other mods' objects left without support*, in every mode.)
 - **EverythingTouchingIt**: every object connected to a removed one through touching objects is removed too, spreading outward one touching object at a time until nothing more is added. This can spread through floors and walls to whole rooms. Only the cleaned mod's visible objects are removed this way; a kept object (see *What is always kept*) is not removed and the spread does not pass through it.
 - **OnlyWhatLosesItsSupport**: a touching object is removed only when at least *remove when this much support is gone (%)* of what it rests on or touches was removed. The ground and objects of any plugin, the base game included, count as support. It works best for objects whose mesh origin is at their base (true for most free-standing props); `mesh-origins.csv` (see *Reports and log*) shows how well that holds for the cleaned mod.
 
 #### Other mods' objects left without support
 
 This setting is in the *Also remove what rests on removed objects* group. *When an object is removed, also remove* applies to the
-objects removed by any removal step (too close, changed terrain, visible objects left behind, after each of its rounds) and decides only
+objects removed by any removal step (too close, changed terrain, objects left behind: after each round of the direction method and
+after the area method's one round) and decides only
 about the cleaned mod's objects; this setting decides about the objects of the plugins listed below (see *Which objects are
 checked*) that rest on an object of the cleaned mod the run removes. Whatever it is set to, an object of the cleaned mod that
 one of these objects rests on is never shrunk or turned to make it fit (see *Shrink or turn objects to make them fit*): it is
@@ -495,28 +497,55 @@ What goes with these removals goes as usual (touching or resting objects of the 
 objects are then checked again: a lantern of a patch on a removed bowl of the cleaned mod is pulled down or removed in turn. This
 repeats until no further object of the cleaned mod is removed. A kept object (see *What is always kept*) stays, as always.
 
-The other mods' objects are checked once, after *Also remove what rests on removed objects* has followed up the main removals and *Visible objects left behind*
-has run, each of its rounds followed up by *Also remove what rests on removed objects*, until neither removes anything; and before
+The other mods' objects are checked once, after *Also remove what rests on removed objects* has followed up the main removals and both
+methods of *Objects left behind* have run: the direction method, each of its rounds followed up by *Also remove what rests on removed
+objects* until neither removes anything, and then the area method, whose one round is followed up the same way; and before
 *Invisible objects left behind*, which also sees the cleaned mod's objects removed this way. That step and the step that moves kept markers see the
 other mods' objects as this one leaves them: an invisible object of the cleaned mod does not count as inside another mod's
 object that was removed or pulled down, and a kept marker is moved among the pulled-down objects at their new places, with the
 removed ones gone.
 
-#### Visible objects left behind
+#### Objects left behind
 
-Removes the cleaned mod's visible objects when most of the cleaned mod's visible objects around them were removed. It runs after
-*Also remove what rests on removed objects* has followed up the main removals (too close, changed terrain), so it sees all of those removals.
-The objects each of its rounds removes are followed up by *Also remove what rests on removed objects* before the next round, and the rounds
+Removes what is left of the cleaned mod where most of it around was removed. It runs after *Also remove what rests on removed objects*
+has followed up the main removals (too close, changed terrain), so it sees all of those removals. It has two methods, each with its own
+switch. The direction method looks at the cleaned mod's visible objects around an object in eight directions and works in rounds. The
+area method then looks at how much of the cleaned mod's drawn objects within a wide radius still stands and removes each object whose
+area holds almost none of it; every object is judged once. Both methods keep an object with fewer than *Fewest of the cleaned mod's
+other objects around it* around it, and both keep the kinds ticked under *Never remove these as objects left behind*. What they remove
+is followed up by *Also remove what rests on removed objects*.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| Fewest of the cleaned mod's other objects around it, for both methods | `5` | Neither method removes an object unless at least this many of the cleaned mod's other objects, standing or removed, lie within that method's distance; the area method counts only drawn objects (1-100). |
+
+What is counted is each method's own look around the object, standing and removed objects alike; the object itself never counts:
+
+- **Direction method:** the cleaned mod's other visible objects within *Look this far around it*, exactly those it sorts into
+  directions (the checked objects of other mods that the cleaned mod changed included, effect-only objects left out).
+- **Area method:** the cleaned mod's drawn objects its area counts, effect-only ones included.
+
+With fewer, the method keeps the object, and the log names this as the reason, before the directions or the area. For the direction
+method this is a second test beside *Decide only if at least this many of the 8 directions have objects*, and both must pass: the
+directions test checks that the objects around lie on enough sides, the minimum that there are enough of them at all. They differ where
+a few large objects fill many directions. Example: a lantern inside two removed buildings of the cleaned mod has buildings in all 8
+directions, so the directions test passes, but 2 is below 5, so the lantern stays. For the area method the minimum is the only such
+test; it also keeps an invisible object with no drawn object of the cleaned mod in its area. *Invisible objects left behind* has no such
+minimum. A value out of range is corrected to the nearest valid value, with a warning in the log.
+
+##### Direction method
+
+The objects each round removes are followed up by *Also remove what rests on removed objects* before the next round, and the rounds
 repeat until a round removes nothing, so what one round or its follow-up removes can clear the surroundings of objects judged in the next.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| Remove visible objects whose surroundings were removed | `true` | Turns this removal on. Each round's removals are followed up as *Also remove what rests on removed objects* says, and the rounds repeat until nothing more is removed. |
-| When the cleaned mod's visible objects around it were removed: Look this far around it (game units) | `1024` | How far around to look for the cleaned mod's other visible objects (64-8192). |
-| When the cleaned mod's visible objects around it were removed: Decide only if at least this many of the 8 directions have objects | `6` | A direction has objects when another visible object of the cleaned mod lies that way. With fewer such directions the object is kept (1-8). |
-| When the cleaned mod's visible objects around it were removed: A direction is cleared when this much of it was removed (%) | `80` | Share removed for a direction to count as cleared. |
-| When the cleaned mod's visible objects around it were removed: Remove when this share of the directions with objects is cleared (%) | `80` | Counted only among the directions that have objects, not among all 8. Example: objects lie in 7 directions and 6 of them are cleared: 6 of 7 is 86%, so it is removed with 80 or less and kept with 90 or more. |
-| Never remove these as visible objects left behind (ticked = kept) | *(none ticked)* | One tick box per kind (see below). A ticked kind is kept by this step, an unticked kind can be removed by it. A ticked kind is also kept where an area is restored, even while this step is switched off. Does not affect the too-close or changed-terrain removals, and *Also remove what rests on removed objects* can still remove a ticked kind. |
+| Direction method: remove visible objects whose surroundings were removed | `true` | Turns the direction method on. Each round's removals are followed up as *Also remove what rests on removed objects* says, and the rounds repeat until nothing more is removed. |
+| Direction method: when the cleaned mod's visible objects around it were removed: Look this far around it (game units) | `1024` | How far around to look for the cleaned mod's other visible objects (64-8192). |
+| Direction method: when the cleaned mod's visible objects around it were removed: Decide only if at least this many of the 8 directions have objects | `6` | A direction has objects when another visible object of the cleaned mod lies that way. With fewer such directions the object is kept (1-8). |
+| Direction method: when the cleaned mod's visible objects around it were removed: A direction is cleared when this much of it was removed (%) | `80` | Share removed for a direction to count as cleared. |
+| Direction method: when the cleaned mod's visible objects around it were removed: Remove when this share of the directions with objects is cleared (%) | `80` | Counted only among the directions that have objects, not among all 8. Example: objects lie in 7 directions and 6 of them are cleared: 6 of 7 is 86%, so it is removed with 80 or less and kept with 90 or more. |
+| Never remove these as objects left behind (ticked = kept) | *(none ticked)* | One tick box per kind (see below). A ticked kind is kept by both methods, an unticked kind can be removed by them. Invisible kinds ticked under *Invisible objects left behind* are kept by the area method too. Does not affect the too-close or changed-terrain removals, and *Also remove what rests on removed objects* can still remove a ticked kind. |
 
 The two percentages take values from 10 to 100 in steps of 10.
 
@@ -529,12 +558,44 @@ do not count towards each other, so the order of the objects never matters. An o
 round when its surroundings changed since, so an object removed in one round can clear the surroundings of the objects around it.
 
 Only the cleaned mod's visible objects, including the checked objects of other mods that it changed, count as surroundings, never an object itself or invisible objects. Effect-only objects (fog, water spray) are judged too, but they are no surroundings, so effects whose solid surroundings were removed never keep each other. A surrounding object that was restored counts as one that left its place.
-The objects listed under *What is always kept* are kept in any case, and so are the kinds ticked under *Never remove these as visible objects left behind*,
+The objects listed under *What is always kept* are kept in any case, and so are the kinds ticked under *Never remove these as objects left behind*,
 unless they are linked to a removed object. Every kind can be removed by default. The tick boxes are: NPCs and creatures, containers, furniture and activators.
 Other visible objects (doors, lights, trees and plants, loose items, statics) have no tick box: only their surroundings decide.
 
 Numbers out of range are corrected to the nearest valid value (a value that is not a number becomes
 the default), and percentages are rounded to the nearest step of 10, each with a warning in the log.
+
+##### Area method
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| Area method: remove objects in cleared areas | `true` | Removes each object of the cleaned mod, visible or invisible, whose area holds almost nothing of the cleaned mod any more. Every object is judged once, on what the earlier steps removed. Also off when a limit below is 100 or more. |
+| Area method: when the area around it counts as cleared: Look this far around it (game units) | `5000` | The area is everything this far from the object in every direction, so it is twice this wide (1024-16384). In an interior, the whole interior is one area. |
+| Area method: when the area around it counts as cleared: Cleared when at most this share of their size still stands (%) | `1` | Each of the cleaned mod's drawn objects weighs by the volume of its box; effect-only objects such as fog add no size. Decimals are allowed; 100 or more turns the area method off. |
+| Area method: when the area around it counts as cleared: Cleared when at most this share of their number still stands (%) | `5` | Each drawn object counts once, effect-only ones included. Decimals are allowed; 100 or more turns the area method off. |
+
+The area method judges each of the cleaned mod's objects that still stands once the direction method is done: those no step decided
+yet and those kept shrunk or turned (judged at their new place), drawn or invisible. Other mods' objects that the cleaned mod changed
+are never judged here; *Restore what the cleaned mod changed where it was removed* handles them. Its area is everything within *Look
+this far around it* of the object, horizontally and at any height; in an interior, the whole interior. In that area the cleaned mod's
+drawn objects are counted, the object itself included when it is drawn, each by the centre of its box: solid ones by number and by the
+volume of their box, effect-only ones by number alone. Invisible objects and other mods' objects are never counted. The area is
+cleared when at most *Cleared when at most this share of their number still stands* of these objects still stand and at most *Cleared
+when at most this share of their size still stands* of their size; an area whose objects are all effect-only has no size and is judged
+by number alone. An area with no drawn object of the cleaned mod in it is not cleared.
+
+Every object is judged on what the earlier steps removed, and all the removals are made together in one round. What the area method
+removes never makes another object's area count as cleared, so it never eats into the cleaned mod's content one area at a time: at the
+edge of content that stands, the edge's own area holds that content, so the edge stays. Example: 1 standing crate among 20 removed ones of
+the same size stands at 1 of 21 by number (4.8%) and by size (4.8%); by number that is within the 5% default, but by size it is over the
+1% default, so it stays. Among 20 removed buildings, each as large as a hundred crates, the same crate stands at 0.05% by size and goes.
+
+The objects listed under *What is always kept* are never judged, and the kinds ticked under *Never remove these as objects left behind*
+and, for invisible objects, under *Never remove these as invisible objects left behind* (even while that step is switched off) are kept
+unless they are linked to a removed object. A removed object takes its linked objects along. *Invisible objects left behind* and *Other
+mods' objects left without support* see the area method's removals like any other removal.
+
+A negative limit is corrected to 0, and a radius out of range to the nearest valid value, each with a warning in the log.
 
 #### Invisible objects left behind
 
@@ -545,7 +606,7 @@ the default), and percentages are rounded to the nearest step of 10, each with a
 | When the cleaned mod's visible objects around it were removed: Decide only if at least this many of the 8 directions have objects | `4` | A direction has objects when a visible object of the cleaned mod lies that way. With fewer such directions the invisible object is kept (1-8). |
 | When the cleaned mod's visible objects around it were removed: A direction is cleared when this much of it was removed (%) | `50` | Share removed for a direction to count as cleared. |
 | When the cleaned mod's visible objects around it were removed: Remove when this share of the directions with objects is cleared (%) | `60` | Counted only among the directions that have objects, not among all 8. Example: objects lie in 5 directions and 3 of them are cleared: 3 of 5 is 60%, so it is removed with 60 or less and kept with 70 or more. |
-| Never remove these as invisible objects left behind (ticked = kept) | *(none ticked)* | One tick box per kind (see below). A ticked kind is kept by this step, an unticked kind can be removed by it. A ticked kind is also kept where an area is restored, even while this step is switched off. Does not affect the too-close or changed-terrain removals, and *Also remove what rests on removed objects* can still remove a ticked kind. |
+| Never remove these as invisible objects left behind (ticked = kept) | *(none ticked)* | One tick box per kind (see below). A ticked kind is kept by this step, an unticked kind can be removed by it. A ticked kind is also kept by the area method of *Objects left behind*, even while this step is switched off. Does not affect the too-close or changed-terrain removals, and *Also remove what rests on removed objects* can still remove a ticked kind. |
 | Move kept markers out of other mods' objects | `true` | Move a kept map, X (including heading), idle or other marker that sits inside another mod's object to the nearest free spot on the navmesh or, failing that, the ground. Only its position changes. Needs *Remove invisible objects left inside other mods' objects or alone* on; markers are kept when *Never remove these as invisible objects left behind* ticks them or something depends on them. Lights, sounds, acoustic spaces, trigger boxes, critter spawners, decals, furniture and door markers are never moved, nor is a marker in a cell that the plugin winning the cell deletes. |
 
 The two percentages take values from 10 to 100 in steps of 10.
@@ -572,9 +633,8 @@ run; the log names the setting and what is allowed there.
 #### Restore what the cleaned mod changed where it was removed
 
 Where the cleaned mod's objects were removed from an area, the other changes the cleaned mod made there go back to how the game showed
-them without the cleaned mod. It does not change which objects other steps remove; it gives back what the cleaned mod changed, and in an
-area that goes back it also removes the cleaned mod's objects still standing there (see *Objects of the cleaned mod still standing in a
-restored area*). In a config file this section is `RestoreWhereRemoved`, with the subsection `ClearedArea`.
+them without the cleaned mod. It does not change which objects other steps remove; it only gives back what the cleaned mod changed.
+In a config file this section is `RestoreWhereRemoved`, with the subsection `ClearedArea`.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
@@ -585,12 +645,10 @@ restored area*). In a config file this section is `RestoreWhereRemoved`, with th
 | When an area counts as cleared: Look this far around the place, game units (`ClearedArea.SearchRadius`) | `5000` | The area is everything this far from the place in every direction, so its width is twice this (1024-16384). In an interior, the whole interior is one area. |
 | When an area counts as cleared: Cleared when at most this share of their size still stands, % (`ClearedArea.MaxStandingSizePercent`) | `1` | The share of the cleaned mod's objects in the area that may still stand, each weighed by the volume of its box; effect-only objects add no size (0-100, decimals allowed, 0 means none may stand). |
 | When an area counts as cleared: Cleared when at most this share of their number still stands, % (`ClearedArea.MaxStandingCountPercent`) | `5` | The share of the cleaned mod's objects in the area that may still stand, each counted once, effect-only ones included (0-100, decimals allowed, 0 means none may stand). |
-| When an area counts as cleared: Shares that must be under their limit (`ClearedArea.SharesThatMustPass`) | `Both` | `Both`: the area counts as cleared only when both shares are at most their limits. `Either`: one of them is enough, which clears more areas (see the example below). |
 | Blend terrain edges over, game units (`TerrainEdgeBlendDistanceInUnits`) | `256` | Where restored ground meets ground that stays as the cleaned mod changed it, the height is blended over this distance, so no step or crack shows (0-1024; 0 means no blending). |
 
 Only the cleaned mod's own objects that the game draws count in these shares, effect-only objects included; invisible objects
-(markers, sounds, lights) and other mods' objects do not. Where an area counts as cleared, the cleaned mod's invisible objects there are
-removed with the rest (see *Objects of the cleaned mod still standing in a restored area*).
+(markers, sounds, lights) and other mods' objects do not.
 
 With all four *Restore* switches off, nothing is restored this way: the log lists nothing restored or kept and no restore report file is written.
 The same holds when the cleaned mod changed no object, ground, cell setting or navmesh that a switched-on *Restore* setting covers.
@@ -615,19 +673,19 @@ navmesh at the centre of its bounds. An object that stands where the cleaned mod
 a moved object is never taken out of a village that stays. In a village the cleaned mod added, where the other mods' removals took away
 all but a few small objects, the village counts as cleared and what it changed there goes back.
 
-The share still standing is taken twice: by size (each object by the volume of its box) and by number (each object once). With the
-defaults, both must be under their limits, 1% by size and 5% by number. Example: around a change stand 200 objects of the cleaned mod;
+The share still standing is taken twice: by size (each object by the volume of its box) and by number (each object once). Both
+must be at most their limits, 1% by size and 5% by number with the defaults. Example: around a change stand 200 objects of the cleaned mod;
 a bridge (box 3,600 times a road piece) and 169 road pieces were removed, and 30 road pieces, signposts and lanterns of the same size
-still stand. By size 30 of 3,799 road-piece volumes stand, 0.8%; by number 30 of 200, 15%. With `Both` the area is not cleared and the
-road stays; with `Either` the size share alone clears it, and the standing pieces whose own surroundings are cleared by size too are
-removed as leftovers. The same holds the other way round: many small removed pieces do not clear an area where one large
+still stand. By size 30 of 3,799 road-piece volumes stand, 0.8%; by number 30 of 200, 15%. The area is not cleared, because by number
+most of it stands, and the road stays. The same holds the other way round: many small removed pieces do not clear an area where one large
 piece still stands, since by size most of it stands.
 
 A single removed object among many that stay does not clear its area; a lone object that was removed is a cleared area by itself.
 Effect-only objects (fog, light rays, embers) count by number, standing or removed, and add nothing to the size; an area of only
-effect-only objects is judged by number alone, also with `Either`. Invisible objects (markers, sounds, lights) do not count, and neither
+effect-only objects is judged by number alone. Invisible objects (markers, sounds, lights) do not count, and neither
 do other mods' objects the cleaned mod changed. Where the cleaned mod has no visible object around the place, nothing was removed there
-and nothing is restored. The share counts what stands once every removal is done; an object kept shrunk or turned counts at its new size.
+and nothing is restored. The share counts what stands once every removal is done, the removals of *Objects left behind* included;
+an object kept shrunk or turned counts at its new size.
 
 **What always stays as the cleaned mod made it, whatever the area:**
 - A part of a record that a later plugin, or the patch, changed again after the cleaned mod. Carrying a value over unchanged is not a
@@ -649,8 +707,10 @@ and nothing is restored. The share counts what stands once every removal is done
   stays inside it, on ground that stays changed (by the cleaned mod or a later plugin; the reason names the plugin whose land record
   keeps it changed), at a water line that stays, inside a navmesh that stays as the cleaned mod changed it, or with an object that stays
   resting on it. Objects that go back together never block each other. Objects another step restored to where they stood before the
-  cleaned mod do not block an object that goes back wholly as it stood before: they all stood there together. They do block one that
-  keeps a part a later plugin changed (its size, turn, place or model), since the two never stood together like that.
+  cleaned mod do not block an object that goes back to the shape it had before: its place, turn, size, model, map marker and, for a
+  primitive, its box, collision layer and culling data. They all stood there together. They do block one that keeps any of these as a
+  later plugin changed it, since the two never stood together like that. A kept part that does not shape the object, such as its
+  enable state, ownership or sound radius, does not count.
 - A door the cleaned mod moved, deleted or disabled goes back together with its navmesh link from before the cleaned mod. It keeps the
   cleaned mod's place and link when a later plugin changed the link again, or when that link would not match the navmeshes as they end:
   the navmesh it names must go back with it or already lead through the door there.
@@ -666,23 +726,6 @@ and nothing is restored. The share counts what stands once every removal is done
   (invisible walls and collision boxes included), when its water level stays, when its earlier data
   is missing or inconsistent, or when a plugin after the patch changes the navmesh map. A group that stays is not written at all.
 
-**Objects of the cleaned mod still standing in a restored area.** Where an area is restored, the cleaned mod's objects that still stand in it
-are removed too: visible, effect-only and invisible ones. This applies to every area around a change that counts as cleared, even when
-the checks under *What stays because it would not fit* then keep that change as the cleaned mod made it. An object stays when the
-area around the object itself does not count as cleared because the cleaned mod's objects there still stand: the area around an object
-at the edge of the cleaned mod's standing content holds that content, so with `Both` the edge stays.
-Three things keep such an object in place:
-- Its kind is one that *Never remove these as visible objects left behind* or *Never remove these as invisible objects left behind*
-  always keeps. A list counts also while its step is switched off.
-- An object of the cleaned mod depends on it: a quest, a script or another record of the cleaned mod links to it, or it has a location
-  ref type (the objects the log lists as kept, see *Kept objects that would have been removed, to check by hand*).
-- Another mod's object rests on it where it stands now.
-
-Other mods' objects that rested on a removed leftover are handled like those resting on any removed object: pulled down or removed
-as the setting *Other mods' objects left without support* says. The members of a removed leftover's linked group are removed with it.
-Every area is judged once, before any leftover is removed, so removing leftovers never makes another area count as cleared and the
-removal never spreads from area to area.
-
 **Terrain edges.** Where restored ground meets ground that stays as the cleaned mod changed it, the height is blended over *Blend terrain
 edges over* (counted in whole grid steps of 128 units), so no step or crack shows. A point on a cell edge goes back only when the cleaned mod changed it in
 every cell that holds it and they held the same height before, so the two cells never come apart. A height that is blended is rounded to
@@ -696,10 +739,9 @@ also decide which height changes go back.
 the earlier run wrote the value the cleaned mod set, the part counts as the cleaned mod's and goes back to the base game's value, whichever
 mod runs first. A part the earlier run wrote with a different value stays.
 
-**Reports.** The normal log has up to three lines: what was restored, what was left as the cleaned mod changed it, and the cleaned mod's
-objects still standing in restored areas (how many were removed as a leftover where the area was restored, and how many were kept in a
-restored area, counted per reason). With *Detailed log and reports* on, the log also lists every change and every such object with its
-reason, and three CSV files list every change that was judged and every such object (see *Reports and log*).
+**Reports.** The normal log has up to two lines: what was restored and what was left as the cleaned mod changed it. With *Detailed log
+and reports* on, the log also lists every change with its reason, and two CSV files list every change that was judged (see *Reports and
+log*).
 
 **Regenerate your LOD.** After terrain or cell changes, regenerate terrain LOD, object LOD and the grass cache. The patch cannot change
 the files they were built from.
@@ -848,7 +890,7 @@ After the removal summary, when the cleaned mod changed objects of other mods th
 
 When something was restored where the cleaned mod was removed (see *Restore what the cleaned mod changed where it was removed*), the normal log has a line that counts it by kind, like `Restored where the cleaned mod was removed: 12 objects of other mods (7 moved back, 3 shown again, 1 hidden again, 1 with their own model again), terrain in 34 cell quarters of 9 cells, settings of 6 cells (4 lighting, 2 music), 5 navmeshes (3 restored, 1 brought back, 1 of the cleaned mod's sunk under the world).`, and a line that counts what stayed as the cleaned mod changed it and why, like `Left as the cleaned mod changed them: 3 objects (2 too close to objects that stay, 1 carrying an object that stays); terrain at 412 points (...); water in 1 cell; 4 navmeshes (...).` Only the kinds that happened are named, and a line with nothing in it is not printed. The closing summary has one more item, like `Restored where the cleaned mod was removed: 12 objects, terrain in 9 cells, settings of 6 cells, 5 navmeshes.` The detailed log adds `Left to later plugins in the changes judged: ...` (the parts a later plugin or the patch changed again, by plugin, of the changes that have a part going back where their area is cleared), `Kept because the cleaned mod's objects still stand around them: ...` and `... has no objects around them: ...`, `Not restored whatever the area around them: ...`, a line for every change (what went back and the share of the cleaned mod's objects still standing around it, or why it stayed), and `Restore where removed: 2 passes in 0.3s.` If the step stops on an unexpected error, the log says `Restore where removed: not performed because of an unexpected error.`; nothing is restored by area then, and the objects restored because they themselves were removed are written as before. With every *Restore* switch off, the settings line reads `Restore where the cleaned mod was removed: off.` and nothing else is printed about it.
 
-The removal summary, in both logs, counts every removed object by why it was removed, like `Removed 2842 objects (238 on changed terrain, 2494 too close, 48 follow-up removals (24 of them first shrunk or turned), 17 visible objects left behind, 3 invisible objects left behind, 59 linked to removed objects); 2769 of them SomeTownMod.esp objects, 73 objects of other mods that SomeTownMod.esp changed.` Restored objects are not counted in it. The visible objects left behind item is printed only when that step is on. A follow-up removal *first shrunk or turned* was kept shrunk or turned to fit at first, then removed because what it rested on was removed. The split into the cleaned mod's objects and the changed objects of other mods is printed only when a changed object was removed; the first number matches *removed in this run* of the run summary line.
+The removal summary, in both logs, counts every removed object by why it was removed, like `Removed 2842 objects (238 on changed terrain, 2494 too close, 48 follow-up removals (24 of them first shrunk or turned), 17 visible objects left behind, 12 objects in cleared areas, 3 invisible objects left behind, 59 linked to removed objects); 2769 of them SomeTownMod.esp objects, 73 objects of other mods that SomeTownMod.esp changed.` Restored objects are not counted in it. The visible objects left behind item is printed only when the direction method of *Objects left behind* is on, and the objects in cleared areas item only when its area method is on. A follow-up removal *first shrunk or turned* was kept shrunk or turned to fit at first, then removed because what it rested on was removed. The split into the cleaned mod's objects and the changed objects of other mods is printed only when a changed object was removed; the first number matches *removed in this run* of the run summary line.
 
 The lines that report how many objects were found on changed terrain or too close, like `Found 3071 of 4436 objects (4076 SomeTownMod.esp objects and 360 objects of other mods that SomeTownMod.esp moved) too close to other mods' objects.`, name the objects of other mods that the cleaned mod changed beside the cleaned mod's objects (`moved`, or `gave another model` for replaced objects); without such objects they read like `Found 25 of 1098 SomeTownMod.esp objects too close to other mods' objects.` When some of the found objects were restored, the line ends with `; N of them restored`. When the too-close or terrain options under *Collision handling* differ from the standard ones, the cleaned mod's objects and the changed objects are checked separately and each set of options has its own *Found* line in that step. In the detailed log, the time on the too-close line does not include the shrink or turn check, which runs before it and checks many of the same objects; the line says so.
 
@@ -869,7 +911,9 @@ because other mods' objects rest on them, like `Objects of SomeTownMod.esp that 
 directly, 7 under those).`: those another mod's object rests on directly, and those these rest on, and so on down. Only the
 ones that would otherwise have been removed get a *Kept* line.
 
-With *Detailed log and reports* on, a line like `Objects too close where they stand: 126; not shrunk or turned because other objects rest on them: 6; tried shrunk or turned: 120; fit: 95.` counts the objects that may be shrunk or turned and were too close where they stood, those not tried because other objects rest on them (of the cleaned mod or of other mods), those tried, and those that fit; the others are removed. The line that reports the written patch, like `Wrote 140 overrides (40 removed, 2 restored, 5 kept markers moved, 95 shrunk or turned to fit).`, names the restored objects, the kept markers moved out of other mods' objects (see *Invisible objects left behind*), the shrunk or turned objects and the records written to restore what the cleaned mod changed where it was removed (placed objects, cells, land records, navmeshes and the navmesh info map, like `7 to restore where the cleaned mod was removed`) only when there are any, and likewise the other mods' objects pulled down and removed (`Wrote 144 overrides (40 removed, 5 kept markers moved, 95 shrunk or turned to fit; other mods' objects: 3 pulled down, 1 removed).`). Under the summary line of *Visible objects left behind*, a line like `Visible objects left behind: 2 rounds in 0.4s.` gives the number of rounds that judged at least one object and the time of those rounds, without the follow-ups between them.
+With *Detailed log and reports* on, a line like `Objects too close where they stand: 126; not shrunk or turned because other objects rest on them: 6; tried shrunk or turned: 120; fit: 95.` counts the objects that may be shrunk or turned and were too close where they stood, those not tried because other objects rest on them (of the cleaned mod or of other mods), those tried, and those that fit; the others are removed. The line that reports the written patch, like `Wrote 140 overrides (40 removed, 2 restored, 5 kept markers moved, 95 shrunk or turned to fit).`, names the restored objects, the kept markers moved out of other mods' objects (see *Invisible objects left behind*), the shrunk or turned objects and the records written to restore what the cleaned mod changed where it was removed (placed objects, cells, land records, navmeshes and the navmesh info map, like `7 to restore where the cleaned mod was removed`) only when there are any, and likewise the other mods' objects pulled down and removed (`Wrote 144 overrides (40 removed, 5 kept markers moved, 95 shrunk or turned to fit; other mods' objects: 3 pulled down, 1 removed).`). Under the summary line of *Objects left behind*, a line like `Visible objects left behind: 2 rounds in 0.4s.` gives the number of rounds that judged at least one object and the time of those rounds, without the follow-ups between them.
+
+When the area method of *Objects left behind* removed or kept something, both logs have a line like `Objects in cleared areas: 412 removed (380 drawn, 32 invisible); kept: 5 of a kind always kept, 3 with fewer than 5 of the cleaned mod's other objects around.` (drawn objects include effect-only ones; the kept part counts the objects of a ticked kind in a cleared area and those kept by *Fewest of the cleaned mod's other objects around it*, each left out when there are none). The detailed log adds `Objects in cleared areas: judged 30412 objects in 1.2s.`, names each removed object's reason like `in a cleared area: 2 of 140 of the cleaned mod's objects still stand (1.4%), 0.3% by size`, and, when *Also remove what rests on removed objects* removed something after it, a section `Also remove after objects in cleared areas` like the one after the direction method. The settings line reads like `Objects left behind, area method: radius 5000 units; cleared when at most 1% by size and 5% by number still stand; kept with fewer than 5 of the cleaned mod's other objects around.`, or `Objects left behind, area method: off.`, or, when a limit switched it off, `off (the count limit is 100% or more).`
 
 Right after the kept summary, each object kept for a reason of its own gets a line saying why: *Kept, script names a quest or scene* (its own script, or its base object's from the cleaned mod), *Kept, location role* (a location ref type of its own) or, with `KeepSupportingObject`, *Kept, another mod's object rests on it* (naming that object, like `...: Lantern [012345:SomePatch.esp].`, or the kept object of the cleaned mod resting on it and what rests on that one, like `...: Book [...] rests on it; Lantern [...] rests on that.`). They are kept on purpose and are not in the *Kept objects that would have been removed, to check by hand* list. When an object is kept because another mod's object rests on it, the kept summary's first line also names that reason, and the summary counts these objects on a line of their own, like `another mod's object rests on it: 4`.
 
@@ -907,7 +951,7 @@ Both logs show the same tree. In the detailed log, each removed object's line al
 
 If something goes wrong that the patcher did not expect, the log shows a line starting with "Unexpected error" that names the part that failed, the error, and what is missing from the results because of it. The run carries on and the patch is still written. When it happens for single objects (an object of the cleaned mod that is too close or on changed terrain, an other-mod object that can cause removals, an object of the cleaned mod that might have to be kept, or an object tried shrunk or turned), only that object is skipped: an object of the cleaned mod whose check failed is kept and not removed, an other-mod object that failed causes no removals, and a size or turn whose check failed is not used. When restoring where the cleaned mod was removed, an object of another mod changed by the cleaned mod whose check failed stays as the cleaned mod changed it, and an object that stays but cannot be measured is treated as invisible, so an object restored next to it is not checked against it for coming too close; each has its own "Unexpected error" line. When finding the objects other objects rest on fails, no object is shrunk or turned, so the objects that were too close are removed. Objects with the same error are grouped into one line with their number and a few examples; turn on the detailed log to list all of them. Besides the stops described in *How to use* and *What stops the whole run*, the run stops only if a plugin can't be read or the patch can't be written.
 
-When such an error stops a whole part of the run (*Also remove what rests on removed objects* (after the main removals), *Visible objects left behind*, *Invisible objects left behind*, moving kept markers, finding the cleaned mod's objects other mods' objects rest on, the step for other mods' objects left without support, the report files, or the details in them), the log says so with a line like "Also remove: not performed because of an unexpected error.", and the rest of the run still goes on. When finding the objects other mods' objects rest on fails, no object is kept for that reason; when the step for other mods' objects left without support fails, no other mod's object is removed or pulled down, and no object of the cleaned mod is removed because of them. When *Also remove what rests on removed objects* fails while following up the rounds of *Visible objects left behind*, the rounds of *Visible objects left behind* go on and no further follow-up runs. If the first follow-up fails, the log says "Also remove after visible objects left behind: not performed because of an unexpected error."; if a later one fails, the section of the earlier follow-ups stays, their removals stand, and the "Unexpected error" line says the follow-ups stopped there.
+When such an error stops a whole part of the run (*Also remove what rests on removed objects* (after the main removals), either method of *Objects left behind*, *Invisible objects left behind*, moving kept markers, finding the cleaned mod's objects other mods' objects rest on, the step for other mods' objects left without support, the report files, or the details in them), the log says so with a line like "Also remove: not performed because of an unexpected error.", and the rest of the run still goes on. When finding the objects other mods' objects rest on fails, no object is kept for that reason; when the step for other mods' objects left without support fails, no other mod's object is removed or pulled down, and no object of the cleaned mod is removed because of them. When *Also remove what rests on removed objects* fails while following up the rounds of *Objects left behind*, the rounds of *Objects left behind* go on and no further follow-up runs. If the first follow-up fails, the log says "Also remove after visible objects left behind: not performed because of an unexpected error."; if a later one fails, the section of the earlier follow-ups stays, their removals stand, and the "Unexpected error" line says the follow-ups stopped there.
 
 If the report files from earlier runs cannot be deleted or a report file cannot be written, the log has a line like "Warning: writing removals.csv in <folder> failed: <error>" (or "Warning: deleting earlier diagnostics files in <folder> failed: <error>") that names the folder, the file and the error. When a game archive, the folder of archives or the archive list in the game INI cannot be read, the log has a line like "Warning: could not read archive <name>: <error>", "Warning: could not list archives in <folder>: <error>" or "Warning: could not read archive list from game INI: <error>".
 
@@ -915,15 +959,15 @@ With *Detailed log and reports* on, CSV files (UTF-8, comma-separated, header in
 
 - **`anchoring.csv`**: why each object was removed, restored or kept, both when *Also remove what rests on removed objects* followed up the main removals and when it followed up the visible objects left behind. The share of an object's support held by objects that were removed is in `removedCleanedModShare`, and the share held by objects that were restored is in `restoredShare`. Only with *When an object is removed, also remove* `OnlyWhatLosesItsSupport` and something removed for being too close, on changed terrain or as a visible object left behind.
 - **`mesh-origins.csv`**: how the origin of each mesh the cleaned mod's objects use sits (near the bottom, near the centre, or elsewhere); check it if `OnlyWhatLosesItsSupport` removes or keeps unexpected objects. Only with *When an object is removed, also remove* `OnlyWhatLosesItsSupport` and something removed for being too close or on changed terrain.
-- **`edges.csv`** and **`components.csv`**: which objects were found touching and which chains were removed together. Only with *When an object is removed, also remove* `EverythingTouchingIt` and something removed for being too close or on changed terrain; the follow-up of the visible objects left behind is not in them.
-- **`leftover-visible-objects.csv`** (the *Visible objects left behind* step): why each visible object checked was removed, restored or kept, with the ground area covered in each of the 8 directions and how much of it was removed (`<Direction>Removed`) and how much restored (`<Direction>Restored`). `removedDirections` and `restoredDirections` count the directions cleared that have removed and restored objects in them. Only with *Remove visible objects whose surroundings were removed* on.
+- **`edges.csv`** and **`components.csv`**: which objects were found touching and which chains were removed together. Only with *When an object is removed, also remove* `EverythingTouchingIt` and something removed for being too close or on changed terrain; the follow-up of the objects left behind is not in them.
+- **`leftover-visible-objects.csv`** (the *Direction method* of *Objects left behind*): why each visible object checked was removed, restored or kept, with `objectsAround` (the cleaned mod's other visible objects within *Look this far around it*, which *Fewest of the cleaned mod's other objects around it* counts) and the ground area covered in each of the 8 directions and how much of it was removed (`<Direction>Removed`) and how much restored (`<Direction>Restored`). `removedDirections` and `restoredDirections` count the directions cleared that have removed and restored objects in them. Only with *Direction method: remove visible objects whose surroundings were removed* on.
+- **`objects-in-cleared-areas.csv`** (the *Area method* of *Objects left behind*): every object the area method judged, in the order the scan found them. Columns: formKey, editorId, base, space, cellFormKey, cellEditorId, x, y, z, kind (`drawn`, `effect-only` or `invisible`), objectsAround (the objects the area counts, the object itself left out, which *Fewest of the cleaned mod's other objects around it* counts), objects, standing, size, standingSize, standingPercentByCount, standingPercentBySize and verdict (the cleaned mod's drawn objects in the object's area, as in `restored-where-removed-objects.csv`), and result (`removed` or `kept`, with the reason). Only with *Area method: remove objects in cleared areas* on.
 - **`leftover-invisible-objects.csv`** (the *Invisible objects left behind* step): why each invisible object checked was removed, restored or kept, and where it was moved, with the same direction columns as `leftover-visible-objects.csv`. Only with *Remove invisible objects left inside other mods' objects or alone* on.
 - **`removals.csv`**: every removed object of the cleaned mod (and every removed object of another mod that the cleaned mod changed) with where it is, always written. Columns: formKey, editorId, base, reason, worldspace, hold, place, cellFormKey, cellEditorId, gridX, gridY, x, y, z. Sorted by worldspace, hold and place, then by form key.
 - **`restored.csv`**: every restored object of another mod, in the order of `removals.csv`. Only when there is such an object. Columns: those of `removals.csv` (formKey, editorId, base, reason, worldspace, hold, place, cellFormKey, cellEditorId, gridX, gridY, x, y, z, where x, y and z are where the cleaned mod put the object), then earlierPlugin (the plugin whose version it went back to), newX, newY, newZ, newRotZDeg, newScale (where the object now stands: the earlier version's position, rotation and size where each goes back, the current one where it stays), newBase (the earlier version's base object, filled only for a restored object whose model went back; empty when it is the same as before), oldPlaceCheck (`not checked` or `free`) and leftToLaterPlugins (the parts the cleaned mod changed that stay as a later plugin or an earlier patcher of your group changed them again, each with the last plugin that changed it, such as `rotation, scale (LaterMod.esp)` or `position (LaterMod.esp); rotation (OtherMod.esp)`; empty when there are none).
 - **`changed-and-fitted-objects.csv`**: every checked object of another mod that the cleaned mod changed, with what became of it (kept where the cleaned mod put it, kept there shrunk or turned, restored, removed), and every object of the cleaned mod kept shrunk or turned. Only when there is such an object. Columns: kind, outcome, formKey, editorId, base, worldspace, x, y, z, rotZDeg, scale, newX, newY, newZ, newRotZDeg, newScale and newBase. `kind` is `moved` or `replaced` for an object of another mod and `own` for an object of the cleaned mod. x, y, z, rotZDeg and scale are the placement before shrinking or turning; the new placement is empty when the placement did not change, and for a restored object it is where it now stands: the earlier version's position, rotation and size where each goes back, the current one where it stays. `newBase` is the earlier version's base object, filled only for a restored object whose model went back; empty when it is the same as before. The outcome is `changed object kept where moved`, `changed object kept where moved, then restored where the cleaned mod was removed` (its new placement is the one the patch writes), `changed object kept shrunk or turned`, `changed object restored` or `changed object removed` for an object of another mod, and `own object shrunk or turned` for an object of the cleaned mod.
 - **`restored-where-removed-objects.csv`** (the *Restore what the cleaned mod changed where it was removed* group): every object of another mod that the cleaned mod changed and that was judged for going back, with what became of it. Columns: formKey, editorId, base, space, cellFormKey, cellEditorId, winningMod, oldX, oldY, oldZ (where the object stood before the cleaned mod), undone (the parts that go back: `position`, `rotation`, `scale`, `enable state`, `base and data`), leftToLaterPlugins (the parts a later plugin or an earlier patcher of your group changed again, each with the plugin, like `scale (LaterMod.esp)`; empty when there are none), objects, standing, size, standingSize, standingPercentByCount, standingPercentBySize and verdict (the cleaned mod's visible objects in the area around the old place: how many, how many still stand, their summed box volumes, which effect-only objects add nothing to, and the share standing by count and by size; the verdict is `Cleared`, `StillStanding` or `NoObjectsAround`), the same seven values again with a `now` prefix for an object that stands where the cleaned mod put it (empty otherwise), and result (`restored`, or `kept: ` and the reason). Sorted by form key. Only when there is such an object.
 - **`restored-where-removed-cells.csv`**: the same for the cells, the terrain and the navmeshes. Columns: kind (`cell`, `quarter` for one quarter of a cell's terrain, `rest` for the parts of a land record that belong to no quarter, `navmesh`), space, gridX, gridY, cell, quarter, navmesh, undone (what the cleaned mod last changed: the cell settings; for a quarter the number of heights and vertex colours and whether its ground textures changed; `the rest of the record`; or the navmesh's shape, existence and map entry), leftToLaterPlugins, objects, standing, size, standingSize, standingPercentByCount, standingPercentBySize and verdict as above, result, and one column per reason a quarter's ground points stay (`keptUnderObjectThatStays`, `keptUnderObjectKeptAsChanged`, `keptUnderObjectPlacedForTheGroundAsItIs`, `keptUnderNavmesh`, `keptTooSteepToStore`, `keptOnEdgeOfLandThatStays`, `keptEarlierEdgeHeightsDiffer`, `keptEdgeStoredOnDifferentSteps`, `keptNextToQuarterThatStays`, `keptWithoutHeightMap`) with the number of points kept for it, filled on quarter rows only; in a quarter whose area is cleared, the heights in undone are those restored (in the detailed log's line) plus those kept. Cells first, in form key order; then the terrain, cell by cell in the order of worldspace and grid, each cell's quarters that hold a change in the order south-west, south-east, north-west, north-east, and a `rest` row only for a land record whose rest is the only change it holds; then navmeshes in form key order. Only when there is such a row.
-- **`restored-where-removed-leftovers.csv`**: every object of the cleaned mod that still stood in a restored area. Columns: formKey, editorId, base, space, cellFormKey, cellEditorId, areaCentreX and areaCentreY (the centre of the restored area seen from above; empty in an interior, which is one area) and result: `removed as a leftover where the area was restored`, or `kept in a restored area: ` and the reason (an object that something of the cleaned mod links to, with the link, or an always-kept kind such as `always kept kind: Containers`). In the order of the cleaned mod's objects. Only when there is such an object.
 - **`other-mods-objects-left-without-support.csv`**: every other mod's object left without support, with what became of it. Only when there is such an object. Columns: outcome, formKey, editorId, base, winningMod, worldspace, x, y, z, newZ (the height it was pulled down to; empty when it was not pulled down), supportGoneShare (0-1), notRemovableBecause (what kept it from being removed; empty otherwise). The outcome is worded as in the detailed log's lines, for example `pulled down`, `removed`, `left where it stands, not removable`. Other mods' objects removed this way are listed only here and in the detailed log.
 - **`removed-markers-and-kept-objects.csv`**: the rows of the *Removed markers that actors or the map use* and *Kept objects that would have been removed, to check by hand* lists, always written. Columns: kind (`RemovedMarker` for a removed marker; `KeptLinkedGroup`, `KeptForNonPlacedReference` or `KeptTeleportDoor` for a kept object), formKey, editorId, space, cell, detail.
 
@@ -953,8 +997,10 @@ With *Detailed log and reports* on, CSV files (UTF-8, comma-separated, header in
 - The cleaned mod's objects that a later-loading plugin changes are left alone, even if they still clip with
   something in game. Those an earlier patcher in the same group changed in the patch are checked as that patcher left them.
 - The cleaned mod's effect-only objects (such as fog, light rays or water spray) collide with nothing: they are never too close to
-  anything, are never found resting on anything and hold nothing up. They are visible all the same, so *Visible objects left behind*
-  judges them (by their solid surroundings only), and they count when an area is judged cleared, by number only. A mesh
+  anything, are never found resting on anything and hold nothing up. They are visible all the same, so the direction method of *Objects left behind*
+  judges them (by their solid surroundings only), and they count when an area is judged cleared, by number only. An area that holds
+  only effect-only objects of the cleaned mod therefore has no size, and the area method judges it by number alone; a large fog volume
+  left among removed solid pieces can be removed by it although by size it would be most of the area. A mesh
   whose effect shapes the game draws nowhere (all hidden or under an editor marker) is a mesh without anything to render, and one
   whose effect shapes hold invalid coordinates is a mesh that can't be read. An object whose mesh can't be read is never removed by *Also remove what rests on removed objects*; the log
   lists unreadable meshes.

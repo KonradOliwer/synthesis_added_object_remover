@@ -4,20 +4,16 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The settings and the result of restoring what the cleaned mod changed where its objects were removed, and the rules of other steps its guards and its leftover removal ask. It references Ids, CollectPlacedObjects.Contracts (for the changes it judges), RemoveTooCloseObjects.Contracts and RemoveObjectsOnChangedTerrain.Contracts (for the collision settings it reuses), JudgeChangedObjects.Contracts (for the placement rule it asks), PluginRecordFacts (for the navmesh check), RemovalDecisionList.Contracts and FindTargetObjectsToKeep.Contracts (for the leftovers' round and why one is kept), RemoveVisibleObjectsLeftBehind.Contracts and BaseObjectShapeAndKind.Contracts (for the kinds always kept) and OtherModsObjectsLeftWithoutSupport.Contracts (for what the leftovers held up) and holds no packages.</Description>
+    <Description>The settings and the result of restoring what the cleaned mod changed where its objects were removed, and the rules of other steps its guards ask. It references Ids, CollectPlacedObjects.Contracts (for the changes it judges), RemoveTooCloseObjects.Contracts and RemoveObjectsOnChangedTerrain.Contracts (for the collision settings it reuses), JudgeChangedObjects.Contracts (for the placement rule it asks), PluginRecordFacts (for the navmesh check) and RemoveObjectsInClearedAreas.Contracts (for the cleared-area settings and the shares the changes are judged by) and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
     <ProjectReference Include="..\..\Tools\PluginRecordFacts\PluginRecordFacts.csproj" />
-    <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
     <ProjectReference Include="..\JudgeChangedObjects.Contracts\JudgeChangedObjects.Contracts.csproj" />
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
-    <ProjectReference Include="..\FindTargetObjectsToKeep.Contracts\FindTargetObjectsToKeep.Contracts.csproj" />
-    <ProjectReference Include="..\OtherModsObjectsLeftWithoutSupport.Contracts\OtherModsObjectsLeftWithoutSupport.Contracts.csproj" />
-    <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
     <ProjectReference Include="..\RemoveObjectsOnChangedTerrain.Contracts\RemoveObjectsOnChangedTerrain.Contracts.csproj" />
     <ProjectReference Include="..\RemoveTooCloseObjects.Contracts\RemoveTooCloseObjects.Contracts.csproj" />
-    <ProjectReference Include="..\RemoveVisibleObjectsLeftBehind.Contracts\RemoveVisibleObjectsLeftBehind.Contracts.csproj" />
+    <ProjectReference Include="..\RemoveObjectsInClearedAreas.Contracts\RemoveObjectsInClearedAreas.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />

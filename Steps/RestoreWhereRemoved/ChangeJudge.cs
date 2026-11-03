@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Numerics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
@@ -14,12 +15,9 @@ internal sealed record LandAreasJudged(LandChangedByCleanedMod Change, NeverRest
 /// <summary>Judges whether a candidate's undone parts go back: the never-rules first, then its area. Thread-safe.</summary>
 /// <param name="spacesOnLand">Per worldspace holding land, the spaces holding a target whose ground it is, in key order.</param>
 internal sealed class ChangeJudge(
-    ImmutableArray<TargetObject> targets, ClearedAreaJudge areas, LoadOrderPlugins plugins, IReadOnlyDictionary<RecordKey, ImmutableArray<RecordKey>> spacesOnLand)
+    ImmutableArray<TargetObject> targets, IClearedAreas areas, LoadOrderPlugins plugins, IReadOnlyDictionary<RecordKey, ImmutableArray<RecordKey>> spacesOnLand)
 {
-    /// <summary>A cell is judged at its centre, half a cell from its corner.</summary>
-    private const float HalfCell = 0.5f;
-
-    /// <summary>The centre of bounds lies halfway between their corners.</summary>
+    /// <summary>Judged points are centres: a cell's lies half a cell from its corner, bounds' halfway between their corners.</summary>
     private const float Halfway = 0.5f;
 
     /// <remarks>A target the removal steps left undecided is judged both at its old place and where it stands, so a moved object is never taken out of a village that stays.</remarks>
@@ -68,9 +66,10 @@ internal sealed class ChangeJudge(
     /// null when every area is cleared.
     /// </summary>
     public static AreaVerdict? VerdictKeeping(IReadOnlyCollection<AreaVerdict> verdicts) =>
-        verdicts.Contains(AreaVerdict.StillStanding) ? AreaVerdict.StillStanding
-        : verdicts.Contains(AreaVerdict.NoObjectsAround) ? AreaVerdict.NoObjectsAround
-        : null;
+        FirstPresent(verdicts, AreaVerdict.StillStanding, AreaVerdict.NoObjectsAround);
+
+    private static AreaVerdict? FirstPresent(IReadOnlyCollection<AreaVerdict> verdicts, params AreaVerdict[] priority) =>
+        priority.Cast<AreaVerdict?>().FirstOrDefault(verdict => verdicts.Contains(verdict!.Value));
 
     public LandAreasJudged Land(LandChangedByCleanedMod land)
     {
@@ -100,29 +99,6 @@ internal sealed class ChangeJudge(
         return new NavmeshChangeJudged(navmesh, Never: null, area, Undo: null, VerdictKeeping([area.Verdict]), NothingGoesBack: false);
     }
 
-    /// <summary>The points a placed record whose areas let it go back was judged at; none for any other.</summary>
-    public IEnumerable<(RecordKey Space, Vector3 Point)> ClearedPoints(PlacedChangeJudged judged)
-    {
-        if (!judged.IsRestored) yield break;
-        var change = judged.Change;
-        yield return (change.SpaceKey, OldPlaceOf(change));
-        if (WhereItIsNowOf(change) is { } now) yield return (change.SpaceKey, now);
-    }
-
-    /// <summary>The point a cell record whose area lets it go back was judged at; none for any other.</summary>
-    public IEnumerable<(RecordKey Space, Vector3 Point)> ClearedPoints(CellChangeJudged judged) =>
-        judged.IsRestored ? [(judged.Change.SpaceKey, CentreOf(judged.Change))] : [];
-
-    /// <summary>The centres of the cleared quarters of a LAND record, in each space using its land.</summary>
-    public IEnumerable<(RecordKey Space, Vector3 Point)> ClearedPoints(LandAreasJudged judged) =>
-        Enumerable.Range(0, judged.Quarters.Length)
-            .Where(quarter => judged.Quarters[quarter].Verdict == AreaVerdict.Cleared)
-            .SelectMany(quarter => SpacesOn(judged.Change).Select(space => (space, QuarterCentreOf(judged.Change, quarter))));
-
-    /// <summary>The point a navmesh whose area is cleared was judged at; none for any other.</summary>
-    public IEnumerable<(RecordKey Space, Vector3 Point)> ClearedPoints(NavmeshChangeJudged judged) =>
-        judged is { Never: null, Area: not null, KeptForArea: null } && JudgedPointOf(judged.Change) is { } point ? [(judged.Change.SpaceKey, point)] : [];
-
     private static Vector3 OldPlaceOf(RecordChangedByCleanedMod change) => change.Earlier.Placement.Position;
 
     /// <returns>Null for a record that is no target.</returns>
@@ -144,9 +120,7 @@ internal sealed class ChangeJudge(
     private LandQuarterJudged Quarter(ImmutableArray<AreaShare> spaces)
     {
         var verdicts = spaces.Select(area => area.Verdict).ToList();
-        var verdict = verdicts.Contains(AreaVerdict.StillStanding) ? AreaVerdict.StillStanding
-            : verdicts.Contains(AreaVerdict.Cleared) ? AreaVerdict.Cleared
-            : AreaVerdict.NoObjectsAround;
+        var verdict = FirstPresent(verdicts, AreaVerdict.StillStanding, AreaVerdict.Cleared) ?? AreaVerdict.NoObjectsAround;
         return new LandQuarterJudged(areas.Sum(spaces, verdict));
     }
 
@@ -160,7 +134,7 @@ internal sealed class ChangeJudge(
         return inDeletedCell ? NeverRestoredReason.InDeletedCell : null;
     }
 
-    /// <remarks>An interior has no grid; any point serves, since <see cref="ClearedAreaJudge.Judge"/> measures the whole interior wherever it is judged.</remarks>
+    /// <remarks>An interior has no grid; any point serves, since <see cref="IClearedAreas.Judge"/> measures the whole interior wherever it is judged.</remarks>
     private static Vector3 CentreOf(CellChangedByCleanedMod cell) =>
-        cell.Grid is var (x, y) ? new Vector3((x + HalfCell) * ExteriorGrid.CellSize, (y + HalfCell) * ExteriorGrid.CellSize, 0f) : Vector3.Zero;
+        cell.Grid is var (x, y) ? new Vector3((x + Halfway) * ExteriorGrid.CellSize, (y + Halfway) * ExteriorGrid.CellSize, 0f) : Vector3.Zero;
 }

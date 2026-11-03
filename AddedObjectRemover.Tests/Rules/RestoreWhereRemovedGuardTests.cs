@@ -79,7 +79,7 @@ public sealed class RestoreWhereRemovedGuardTests
         Terrain: false,
         Cells: false,
         Navmeshes: false,
-        new ClearedArea(SearchRadius, MaxStandingSizePercent, MaxStandingCountPercent, ClearedAreaShares.Both),
+        new ClearedArea(SearchRadius, MaxStandingSizePercent, MaxStandingCountPercent),
         TerrainEdgeBlendDistance: 0f,
         HeightChangeTolerance: 8f,
         WaterHeightChangeTolerance: 8f,
@@ -317,6 +317,41 @@ public sealed class RestoreWhereRemovedGuardTests
         Assert.Equal(restored ? null : new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, crate.Key, Failure: null), judged.Refused);
     }
 
+    /// <summary>A later mod's crate stands next to the rock's old place; the patch removes it, or leaves it.</summary>
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void AnObjectThePatchRemovesNextToTheOldPlaceRefusesNothing(bool removedByThePatch, bool restored)
+    {
+        var crate = LaterObject(0, Block.Base, OldPlace + new Vector3(ZoneReach - 5f, 0, 0));
+        var removal = new OtherModsObjectOutcome(crate, OtherModsObjectFate.Removed, LostShare: 1f, Drop: 0f, ReferenceRoles.None);
+        var scene = new Scene
+        {
+            Rocks = [Rock(0, OldPlace, PlaceNow)],
+            Others = [crate, RockNow(0, PlaceNow)],
+            OtherMods = removedByThePatch ? new OtherModsObjectsResult(StepOutcome.Performed, [removal], [], [], Failure: null) : OtherModsObjectsResult.SwitchedOff,
+        };
+
+        var judged = Assert.Single(Plan(scene).Objects);
+
+        Assert.Equal(restored ? null : new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, crate.Key, Failure: null), judged.Refused);
+    }
+
+    /// <summary>
+    /// As <see cref="AnObjectARemovalStepRestoredBesideTheOldPlaceRefusesNothing"/>, with a later mod's crate also next to the rock's
+    /// old place: only the restored object is left out for a rock that ends in its earlier shape and place, so the later crate keeps it out.
+    /// </summary>
+    [Fact]
+    public void AnObjectARemovalStepRestoredLeavesOutNoOtherObjectThatStays()
+    {
+        var laterCrate = LaterObject(1, Block.Base, OldPlace - new Vector3(ZoneReach - 5f, 0, 0));
+        var scene = RestoredCrateBesideRock(Rock(0, OldPlace, PlaceNow)) with { Others = [RockNow(0, PlaceNow), laterCrate] };
+
+        var judged = Assert.Single(Plan(scene).Objects);
+
+        Assert.Equal(new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, laterCrate.Key, Failure: null), judged.Refused);
+    }
+
     /// <summary>
     /// The cleaned mod moved a base game crate too; a removal step put it back where it stood before, next to the rock's old place.
     /// The two stood together there before the cleaned mod.
@@ -324,15 +359,7 @@ public sealed class RestoreWhereRemovedGuardTests
     [Fact]
     public void AnObjectARemovalStepRestoredBesideTheOldPlaceRefusesNothing()
     {
-        var crate = Own(1, new Vector3(-300, 300, 0)) with { Origin = TargetOrigin.Moved };
-        var scene = new Scene
-        {
-            Targets = [RemovedHouse(), crate],
-            Removed = [0, 1],
-            RestoredTo = new Dictionary<int, Vector3> { [1] = OldPlace + new Vector3(ZoneReach - 5f, 0, 0) },
-            Rocks = [Rock(0, OldPlace, PlaceNow)],
-            Others = [RockNow(0, PlaceNow)],
-        };
+        var scene = RestoredCrateBesideRock(Rock(0, OldPlace, PlaceNow));
 
         var judged = Assert.Single(Plan(scene).Objects);
 
@@ -346,15 +373,11 @@ public sealed class RestoreWhereRemovedGuardTests
     [Fact]
     public void AnObjectWhoseEarlierBaseARemovalStepRestoredBesideTheOldPlaceRefusesNothing()
     {
-        var crate = Own(1, new Vector3(-300, 300, 0)) with { Origin = TargetOrigin.Replaced, Base = Lantern.Base };
-        var scene = new Scene
+        var replacedCrate = MovedCrate() with { Origin = TargetOrigin.Replaced, Base = Lantern.Base };
+        var scene = RestoredCrateBesideRock(Rock(0, OldPlace, PlaceNow)) with
         {
-            Targets = [RemovedHouse(), crate],
-            Removed = [0, 1],
-            RestoredTo = new Dictionary<int, Vector3> { [1] = OldPlace + new Vector3(ZoneReach - 5f, 0, 0) },
+            Targets = [RemovedHouse(), replacedCrate],
             EarlierBases = new Dictionary<int, BaseKey> { [1] = Block.Base },
-            Rocks = [Rock(0, OldPlace, PlaceNow)],
-            Others = [RockNow(0, PlaceNow)],
         };
 
         var judged = Assert.Single(Plan(scene).Objects);
@@ -370,25 +393,17 @@ public sealed class RestoreWhereRemovedGuardTests
     public void AnObjectARemovalStepRestoredRefusesARockThatKeepsTheSizeALaterPluginGaveIt()
     {
         const float LaterScale = 2f;
-        var crate = Own(1, new Vector3(-300, 300, 0)) with { Origin = TargetOrigin.Moved };
         var moved = Rock(0, OldPlace, PlaceNow);
         var rock = moved with
         {
             WhereItIsNow = new EulerPlacement(PlaceNow, Vector3.Zero, LaterScale),
             Earlier = moved.Earlier with { LeftToLaterPlugins = ImmutableSortedDictionary<PlacedParts, PluginName>.Empty.Add(PlacedParts.Scale, Later) },
         };
-        var scene = new Scene
-        {
-            Targets = [RemovedHouse(), crate],
-            Removed = [0, 1],
-            RestoredTo = new Dictionary<int, Vector3> { [1] = OldPlace + new Vector3(ZoneReach + 5f, 0, 0) },
-            Rocks = [rock],
-            Others = [RockNow(0, PlaceNow)],
-        };
+        var scene = RestoredCrateBesideRock(rock, ZoneReach + 5f);
 
         var judged = Assert.Single(Plan(scene).Objects);
 
-        Assert.Equal(new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, crate.Key, Failure: null), judged.Refused);
+        Assert.Equal(new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, MovedCrate().Key, Failure: null), judged.Refused);
     }
 
     /// <summary>
@@ -398,25 +413,99 @@ public sealed class RestoreWhereRemovedGuardTests
     [Fact]
     public void AnObjectARemovalStepRestoredRefusesARockThatKeepsTheModelALaterPluginGaveIt()
     {
-        var crate = Own(1, new Vector3(-300, 300, 0)) with { Origin = TargetOrigin.Moved };
         var moved = Rock(0, OldPlace, PlaceNow);
         var rock = moved with
         {
             BaseNow = Boulder.Base,
             Earlier = moved.Earlier with { LeftToLaterPlugins = ImmutableSortedDictionary<PlacedParts, PluginName>.Empty.Add(PlacedParts.BaseAndData, Later) },
         };
-        var scene = new Scene
-        {
-            Targets = [RemovedHouse(), crate],
-            Removed = [0, 1],
-            RestoredTo = new Dictionary<int, Vector3> { [1] = OldPlace + new Vector3(ZoneReach + 5f, 0, 0) },
-            Rocks = [rock],
-            Others = [RockNow(0, PlaceNow, Boulder.Base)],
-        };
+        var scene = RestoredCrateBesideRock(rock, ZoneReach + 5f) with { Others = [RockNow(0, PlaceNow, Boulder.Base)] };
 
         var judged = Assert.Single(Plan(scene).Objects);
 
-        Assert.Equal(new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, crate.Key, Failure: null), judged.Refused);
+        Assert.Equal(new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, MovedCrate().Key, Failure: null), judged.Refused);
+    }
+
+    /// <summary>
+    /// As <see cref="AnObjectARemovalStepRestoredBesideTheOldPlaceRefusesNothing"/>, but a later plugin gave the rock a sound radius,
+    /// which it keeps where it goes back: the radius does not shape the rock, so it still ends as it stood beside the crate.
+    /// </summary>
+    [Fact]
+    public void AnObjectARemovalStepRestoredRefusesNoRockThatKeepsOnlyReferenceDataALaterPluginGaveIt()
+    {
+        const float LaterRadius = 512f;
+        var moved = Rock(0, OldPlace, PlaceNow, reference: TestPlacedRecords.PlainReference with { ReferenceRadius = LaterRadius });
+        var rock = moved with
+        {
+            Earlier = moved.Earlier with { LeftToLaterPlugins = ImmutableSortedDictionary<PlacedParts, PluginName>.Empty.Add(PlacedParts.BaseAndData, Later) },
+        };
+        var scene = RestoredCrateBesideRock(rock);
+
+        var judged = Assert.Single(Plan(scene).Objects);
+
+        Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
+    }
+
+    public enum LaterShapeChange { Rotation, Scale, PrimitiveBounds, CollisionLayer }
+
+    /// <summary>
+    /// As <see cref="AnObjectARemovalStepRestoredBesideTheOldPlaceRefusesNothing"/>, but a later plugin changed a part that shapes the
+    /// rock, by just more than the rounding of plugins that re-save a record, and the rock keeps it: the crate keeps the rock out.
+    /// </summary>
+    [Theory]
+    [InlineData(LaterShapeChange.Rotation)]
+    [InlineData(LaterShapeChange.Scale)]
+    [InlineData(LaterShapeChange.PrimitiveBounds)]
+    [InlineData(LaterShapeChange.CollisionLayer)]
+    public void AnObjectARemovalStepRestoredRefusesARockThatKeepsAShapeALaterPluginGaveIt(LaterShapeChange change)
+    {
+        var scene = RestoredCrateBesideRock(RockKeeping(change));
+
+        var judged = Assert.Single(Plan(scene).Objects);
+
+        Assert.Equal(new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, MovedCrate().Key, Failure: null), judged.Refused);
+    }
+
+    /// <summary>The rock as it goes back to its old place, keeping the change a later plugin made, just beyond the rounding.</summary>
+    private static RecordChangedByCleanedMod RockKeeping(LaterShapeChange change)
+    {
+        const float beyond = 2f;
+        var earlierPrimitive = TestPlacedRecords.PlainReference with { IsPrimitive = true, PrimitiveBounds = new Vector3(100f) };
+        var (part, placementNow, referenceNow) = change switch
+        {
+            LaterShapeChange.Rotation => (PlacedParts.Rotation, new EulerPlacement(PlaceNow, new Vector3(0, 0, beyond * ResavedPlacedParts.Tolerances.Rotation), 1f), earlierPrimitive),
+            LaterShapeChange.Scale => (PlacedParts.Scale, new EulerPlacement(PlaceNow, Vector3.Zero, 1f + beyond * ResavedPlacedParts.Tolerances.Scale), earlierPrimitive),
+            LaterShapeChange.PrimitiveBounds => (PlacedParts.BaseAndData, new EulerPlacement(PlaceNow, Vector3.Zero, 1f),
+                earlierPrimitive with { PrimitiveBounds = new Vector3(100f + beyond * ResavedPlacedParts.Tolerances.Position) }),
+            LaterShapeChange.CollisionLayer => (PlacedParts.BaseAndData, new EulerPlacement(PlaceNow, Vector3.Zero, 1f), earlierPrimitive with { CollisionLayer = 15u }),
+            _ => throw new ArgumentOutOfRangeException(nameof(change), change, null),
+        };
+        var moved = Rock(0, OldPlace, PlaceNow, reference: referenceNow);
+        return moved with
+        {
+            WhereItIsNow = placementNow,
+            Earlier = moved.Earlier with
+            {
+                Reference = earlierPrimitive,
+                LeftToLaterPlugins = ImmutableSortedDictionary<PlacedParts, PluginName>.Empty.Add(part, Later),
+            },
+        };
+    }
+
+    /// <summary>
+    /// As <see cref="AnObjectARemovalStepRestoredBesideTheOldPlaceRefusesNothing"/>, but the cleaned mod stores the rock's rotation a
+    /// full turn on and its scale re-saved: both lie within the rounding, so they do not go back, and the rock still ends as it stood.
+    /// </summary>
+    [Fact]
+    public void AnObjectARemovalStepRestoredRefusesNoRockWhoseRotationAndScaleTheCleanedModOnlyReSaved()
+    {
+        const float ResavedScale = 0.99999994f;
+        var rock = Rock(0, OldPlace, PlaceNow) with { WhereItIsNow = new EulerPlacement(PlaceNow, new Vector3(MathF.Tau, 0, 0), ResavedScale) };
+        var scene = RestoredCrateBesideRock(rock);
+
+        var judged = Assert.Single(Plan(scene).Objects);
+
+        Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
     }
 
     /// <summary>Two pebbles of the cleaned mod stay beside the removed house: far under the limit by size, two of three by number.</summary>
@@ -621,6 +710,23 @@ public sealed class RestoreWhereRemovedGuardTests
     /// <summary>The cleaned mod's only visible object near the old places, which the rounds removed.</summary>
     private static TargetObject RemovedHouse() => Own(0, new Vector3(200, 300, 0));
 
+    /// <summary>The cleaned mod's second object: a base game crate it moved, which a removal step puts back.</summary>
+    private static TargetObject MovedCrate() => Own(1, new Vector3(-300, 300, 0)) with { Origin = TargetOrigin.Moved };
+
+    /// <summary>
+    /// The house and <see cref="MovedCrate"/> are removed, and the crate goes back to <paramref name="distance"/> east of the rock's old
+    /// place, where the rock goes back to; the rock stands at <see cref="PlaceNow"/> meanwhile.
+    /// </summary>
+    private static Scene RestoredCrateBesideRock(RecordChangedByCleanedMod rock, float distance = ZoneReach - 5f) =>
+        new()
+        {
+            Targets = [RemovedHouse(), MovedCrate()],
+            Removed = [0, 1],
+            RestoredTo = new Dictionary<int, Vector3> { [1] = OldPlace + new Vector3(distance, 0, 0) },
+            Rocks = [rock],
+            Others = [RockNow(0, PlaceNow)],
+        };
+
     private static TargetObject Own(int index, Vector3 position) => TestTargets.Create(index, TestTargets.At(position), Block.Base, TestTargets.Space);
 
     private static TargetObject PebbleAt(int index, Vector3 position) => TestTargets.Create(index, TestTargets.At(position), Pebble.Base, TestTargets.Space);
@@ -693,17 +799,18 @@ public sealed class RestoreWhereRemovedGuardTests
         var rules = TestPlacedGuardRules.Create(Shapes, Trust, Plugins, Support, TestGround.NoTerrain(), scene.Workers);
         ImmutableArray<NavmeshWorldTriangle> navmesh = [.. scene.Navmesh];
         var decisions = DecisionsRemoving(targets, scene.Removed, scene.RestoredTo, scene.EarlierBases);
+        var caches = new TestRunCaches(
+            Shapes,
+            navmeshes: new NavmeshIndex(bucket => bucket.Grid is null && !navmesh.IsEmpty ? [.. navmesh] : null),
+            shownTargets: TestScenes.Create(targets, [], Shapes).IndexShownTargets);
         return RestoreLoopReuse.Plan(
             new(
                 new(collected, scene.OtherMods),
                 decisions,
+                TestClearedAreas.Of(collected, decisions, caches, Settings),
                 new(rules.WorldCaches, rules.TooCloseRule(), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),
-                rules.Leftovers(targets, decisions, others),
                 new(
-                    new TestRunCaches(
-                        Shapes,
-                        navmeshes: new NavmeshIndex(bucket => bucket.Grid is null && !navmesh.IsEmpty ? [.. navmesh] : null),
-                        shownTargets: TestScenes.Create(targets, [], Shapes).IndexShownTargets),
+                    caches,
                     TestLandPlugin.Flat,
                     Plugins,
                     TestTargets.TargetName),
@@ -713,10 +820,7 @@ public sealed class RestoreWhereRemovedGuardTests
     }
 
     /// <param name="restoredTo">The removed targets that go back to the given place instead of being disabled.</param>
-    /// <remarks>
-    /// Every target that is not removed is an object to keep (a record of the cleaned mod links to it), so it stays even where the area
-    /// is cleared and the restore step would otherwise remove it as a leftover.
-    /// </remarks>
+    /// <remarks>Every target that is not removed is an object to keep (a record of the cleaned mod links to it).</remarks>
     private static RemovalDecisions DecisionsRemoving(
         ImmutableArray<TargetObject> targets, int[] removed, IReadOnlyDictionary<int, Vector3> restoredTo, IReadOnlyDictionary<int, BaseKey> earlierBases) =>
         RemovalDecisions.Start(

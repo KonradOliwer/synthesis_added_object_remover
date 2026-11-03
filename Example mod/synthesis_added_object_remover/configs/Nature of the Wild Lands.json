@@ -99,13 +99,20 @@
     "AnchoringThresholdPercent": 50.0,
     "OtherModsObjectsLeftWithoutSupport": "PullObjectToTheGround"
   },
-  "LeftoverVisibleObjects": {
-    "RemoveLeftoverVisibleObjects": true,
+  "LeftoverObjects": {
+    "MinObjectsAround": 5,
+    "RemoveBySurroundingDirections": true,
     "SurroundingObjects": {
       "SearchRadius": 1024.0,
       "MinOccupiedDirections": 6,
       "DirectionThresholdPercent": 80,
       "ClearedDirectionsPercent": 80
+    },
+    "RemoveObjectsInClearedAreas": true,
+    "ClearedArea": {
+      "SearchRadius": 5000.0,
+      "MaxStandingSizePercent": 1.0,
+      "MaxStandingCountPercent": 5.0
     },
     "AlwaysKeep": {
       "NpcsAndCreatures": false,
@@ -146,8 +153,7 @@
     "ClearedArea": {
       "SearchRadius": 5000.0,
       "MaxStandingSizePercent": 1.0,
-      "MaxStandingCountPercent": 5.0,
-      "SharesThatMustPass": "Both"
+      "MaxStandingCountPercent": 5.0
     },
     "TerrainEdgeBlendDistanceInUnits": 256.0
   }

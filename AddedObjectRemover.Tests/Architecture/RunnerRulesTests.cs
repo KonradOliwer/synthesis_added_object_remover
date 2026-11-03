@@ -33,79 +33,52 @@ public class RunnerRulesTests
             "The old-place check takes the too-close rule built with the too-close settings of the changed objects; the step builds the rule.",
         ["StepRunner.Rules.cs: ChangedObjectCollision.ChangedTerrain"] =
             "The old-place check takes the changed-terrain rule built with the changed-terrain settings of the changed objects; the step builds the rule.",
+        ["StepRunner.Rules.cs: RestoreWhereRemoved.ClearedArea"] =
+            "The restore takes the cleared-area rule built with its own cleared-area settings; the step for objects in cleared areas builds the rule.",
     };
 
-    /// <summary>"file: condition line (whitespace collapsed)" in the runner or the run caches, and why it is decided there.</summary>
-    private static readonly Dictionary<string, string> AllowedConditions = new()
+    /// <summary>"file: Type.Member", how many lines of that member hold a condition, and why it is decided there.</summary>
+    private static readonly Dictionary<string, (int Count, string Reason)> AllowedConditions = new()
     {
-        ["StepRunner.cs: return request switch"] =
-            "The settings validation may have ended the run before any step; the runner passes its stop on.",
-        ["StepRunner.cs: if (requests.Any(request => request is RunRequest.Ready)) environment.PatchWriting.WritePatchMarker();"] =
-            "Run policy: the patch gets its marker only when some run of the batch will write; the marker's text and merging belong to the plugin writer.",
-        ["StepRunner.cs: if (collected.Stop is { } stop)"] =
-            "The collect-placed-objects step returns the stop for a run without target objects; the runner ends the run on any stop a step returns.",
-        ["StepRunner.cs: foreach (var request in requests) results.Add(PatchOneRun(request, environment));"] =
-            "The batch runs its requests one after the other; each run gets only its request and the environment.",
-        ["StepRunner.cs: foreach (var section in sections) log.Print(section);"] =
-            "Prints the sections a step's builder returned, in the order returned; it decides nothing.",
-        ["OtherObjectIndex.cs: contains: slot => IsVisible(slot) && _containment.Contains(_objects[slot].Base, _objects[slot].Transform, worldPoint, scratch),"] = CacheQuery,
-        ["ObjectContainment.cs: if (shapes.Of(baseKey).MeshPath is not { } meshPath) return false;"] = ContainmentTest,
-        ["ObjectContainment.cs: if (!shapes.Of(baseKey).Box.Contains(local)) return false;"] = ContainmentTest,
-        ["ObjectContainment.cs: return lease.Value is { } tree && MeshContact.PointInside(tree, local, transform.Rotation, scratch.Triangles);"] = ContainmentTest,
-        ["PlacedSpaces.cs: foreach (var space in _bySpace.Spaces)"] = CacheIndexBuild,
-        ["PlacedSpaces.cs: for (var slot = 0; slot < space.Items.Count; slot++) _slotOf[space.Items[slot].Id.Index] = slot;"] = CacheIndexBuild,
-        ["VisibleObjectsOfAnyPlugin.cs: box.WorldAabb(distance), slot => index.IsVisible(slot) && box.Intersects(index.OrientedBoxOf(slot), distance), scratch.Spatial, scratch.Matches);"] = CacheQuery,
-        ["VisibleObjectsOfAnyPlugin.cs: objectsOfAnyPlugin.IndexOf(space).FindContainingVisible(point, include: _ => true, scratch) >= 0;"] = CacheQuery,
-        ["SurfaceSampleStore.cs: return lease.Value is { } tree ? new SampledSurface(SurfaceSampler.Sample(tree, samplesPerMesh).ToImmutableArray(), tree.Bounds) : null;"] =
-            "A mesh without a tree has no sampled surface.",
-        ["NpcBodyCache.cs: plugin.TraitSupplierOf(new BaseKey(placedBase, BaseLinkKind.Npc), templateFlag) switch"] =
-            "Follows a base to the NPC or the leveled list that supplies its body; which flag hands over the traits is passed in.",
-        ["NpcBodyCache.cs: return sources.Count == 0 ? null : distinctBodies(sources.Select(GetOwnBody).ToList());"] =
-            "A leveled list with no NPC has no body set; how bodies are reduced to distinct ones is passed in.",
-        ["NpcBodyCache.cs: ?? throw new InvalidOperationException(\"\");"] =
-            "An NPC the plugin reader named but cannot read is a bug of ours, so it throws.",
-        ["PlacedNpcIndex.cs: .Where(slot => bodies[slot].FirstPoint != null)"] = CacheIndexBuild,
-        ["PlacedNpcIndex.cs: var placedNpcs = spaceObjects.Where(rules.IsPlacedNpc).ToArray();"] = CacheIndexBuild,
-        ["PlacedNpcIndex.cs: var spawning = ParallelResults.IndicesWhere(placedBodies, body => body != null);"] = CacheIndexBuild,
-        ["PlacedNpcIndex.cs: npc.Base is { } baseKey ? bodies.GetBodies(baseKey.Record) : null;"] = CacheIndexBuild,
-        ["ObjectCaches.cs: AreTheCollectedObjects(targets) ? ofTheCollectedObjects() : built.Get(targets, () => new VisibleTargetObjects(targets, _shapes, _containment, _execution, counts));"] =
-            "The collected objects have their index of each visibility built once; any other list of objects gets an index built once.",
-        ["ObjectCaches.cs: ReferenceEquals(first, second) || (first is not null && second is not null && first.SequenceEqual(second));"] =
-            "Two lists of target objects are the same list when they hold the same objects in the same order.",
-        ["LoadOrderCaches.cs: public int CountEffectOnlyMeshes() => MeshFiles.Bounds.Computed().Count(mesh => mesh.Status == MeshReadStatus.EffectOnly);"] = CacheStatistics,
-        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: index.Bounds.Overlapping(searchBox, slot => index.IsVisible(slot) && IsUnchanged(index[slot]) && unchangedMatches(index, slot, state), scratch.Spatial, scratch.Matches);"] = CacheQuery,
-        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: foreach (var slot in scratch.Matches) into.Add(index[slot].Id);"] = CacheQuery,
-        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: foreach (var moved in changed.Values)"] = CacheQuery,
-        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: if (moved is { } standing && standing.SpaceKey == space && movedMatches(BoxOf(standing), state)) into.Add(standing.Id);"] = CacheQuery,
-        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: objectsOfAnyPlugin.IndexOf(space).FindContainingVisible(point, IsUnchanged, scratch) >= 0"] = CacheQuery,
-        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: || MovedIn(space).Any(moved => containment.Contains(moved.Base, moved.Transform, point, scratch));"] = CacheQuery,
-        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: public OtherObject Get(OtherId id) => changed.TryGetValue(id, out var moved) && moved is { } standing ? standing : objectsOfAnyPlugin.Get(id);"] =
-            "An object that was moved is answered where it stands now.",
-        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: private bool IsUnchanged(OtherObject other) => !changed.ContainsKey(other.Id);"] =
-            "An object is unchanged when it was neither moved nor taken out.",
-        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: private IEnumerable<OtherObject> MovedIn(RecordKey space) => changed.Values.OfType<OtherObject>().Where(moved => moved.SpaceKey == space);"] =
-            "The moved objects of one space.",
-        ["VisibleTargetObjects.cs: var visible = targets.Where((_, index) => isVisible[index]).ToList();"] = CacheIndexBuild,
-        ["VisibleTargetObjects.cs: space, point, radius, (point, radius), static (box, state) => !Vectors.IsFartherThan(box.ClosestPoint(state.point), state.point, state.radius), into);"] = CacheQuery,
-        ["VisibleTargetObjects.cs: if (EntriesOf(space) is not { } entries) return false;"] = CacheQuery,
-        ["VisibleTargetObjects.cs: .Where(include)"] = CacheQuery,
-        ["VisibleTargetObjects.cs: .Any(target => _containment.Contains(target.Base, target.Transform, point, scratch));"] = CacheQuery,
-        ["VisibleTargetObjects.cs: EntriesOf(space) is { } entries"] = CacheQuery,
-        ["VisibleTargetObjects.cs: ? FindCandidates(entries, point, radius).Where(entry => include(entries.Targets[entry])).Select(entry => entries.Boxes[entry])"] = CacheQuery,
-        ["VisibleTargetObjects.cs: if (EntriesOf(space) is not { } entries) return;"] = CacheQuery,
-        ["VisibleTargetObjects.cs: foreach (var entry in FindCandidates(entries, point, radius))"] = CacheQuery,
-        ["VisibleTargetObjects.cs: if (isNear(entries.Boxes[entry], state)) into.Add(new VisibleTargetNear(entries.Targets[entry], entries.Boxes[entry]));"] = CacheQuery,
-        ["VisibleTargetObjects.cs: _visibleBySpace.TryGetValue(space, out var visible) ? _entries.Get(space, () => CreateEntries(visible)) : null;"] =
-            "A space without visible targets has no entries.",
-        ["VisibleTargetObjects.cs: Vector2.DistanceSquared(new Vector2(center.X, center.Y), point) <= radius * radius;"] = CacheQuery,
-        ["TriangleStore.cs: meshes.Count(mesh => !mesh.TooLarge),"] = CacheStatistics,
-        ["TriangleStore.cs: meshes.Count(mesh => mesh.TooLarge),"] = CacheStatistics,
-        ["TriangleStore.cs: if (triangles is not { TriangleCount: > 0 }) return null;"] = "A mesh without triangles has no tree.",
-        ["TriangleStore.cs: _builtMeshes.Get(meshPath, () => new BuiltMesh(tree?.TriangleCount ?? 0, TooLarge: tree == null));"] =
-            "Remembers for the statistics what the build gave: the triangle count, or that the mesh was too large.",
-        ["TriangleStore.cs: var large = triangles.TriangleCount > LargeMeshTriangles;"] = LargeMeshBuildSlot,
-        ["TriangleStore.cs: if (large) _largeBuilds.Wait();"] = LargeMeshBuildSlot,
-        ["TriangleStore.cs: if (large) _largeBuilds.Release();"] = LargeMeshBuildSlot,
+        ["StepRunner.cs: StepRunner.PatchLoadOrder"] = (1, "The settings validation may have ended the run before any step; the runner passes its stop on."),
+        ["StepRunner.cs: StepRunner.MarkPatchWhenARunWillWrite"] =
+            (1, "Run policy: the patch gets its marker only when some run of the batch will write; the marker's text and merging belong to the plugin writer."),
+        ["StepRunner.cs: StepRunner.CollectDecideAndWrite"] =
+            (1, "The collect-placed-objects step returns the stop for a run without target objects; the runner ends the run on any stop a step returns."),
+        ["StepRunner.cs: StepRunner.PatchOneRun"] = (1, "The batch runs its requests one after the other; each run gets only its request and the environment."),
+        ["StepRunner.cs: StepRunner.Print"] = (1, "Prints the sections a step's builder returned, in the order returned; it decides nothing."),
+        ["OtherObjectIndex.cs: OtherObjectIndex.FindContainingVisible"] = (1, CacheQuery),
+        ["ObjectContainment.cs: ObjectContainment.Contains"] = (3, ContainmentTest),
+        ["PlacedSpaces.cs: PlacedSpaces.PlacedSpaces"] = (2, CacheIndexBuild),
+        ["VisibleObjectsOfAnyPlugin.cs: VisibleObjectsOfAnyPlugin.Touching"] = (1, CacheQuery),
+        ["VisibleObjectsOfAnyPlugin.cs: VisibleObjectsOfAnyPlugin.Contains"] = (1, CacheQuery),
+        ["SurfaceSampleStore.cs: SurfaceSampleStore.Sample"] = (1, "A mesh without a tree has no sampled surface."),
+        ["NpcBodyCache.cs: NpcBodyCache.ResolveBase"] =
+            (1, "Follows a base to the NPC or the leveled list that supplies its body; which flag hands over the traits is passed in."),
+        ["NpcBodyCache.cs: NpcBodyCache.ResolveList"] = (1, "A leveled list with no NPC has no body set; how bodies are reduced to distinct ones is passed in."),
+        ["NpcBodyCache.cs: NpcBodyCache.ReadTraits"] = (1, "An NPC the plugin reader named but cannot read is a bug of ours, so it throws."),
+        ["PlacedNpcIndex.cs: PlacedNpcIndex.Build"] = (2, CacheIndexBuild),
+        ["PlacedNpcIndex.cs: PlacedNpcIndex.GetBodies"] = (1, CacheIndexBuild),
+        ["PlacedNpcIndex.cs: PlacedNpcIndex.PlacedNpcIndex"] = (1, CacheIndexBuild),
+        ["ObjectCaches.cs: ObjectCaches.Index"] =
+            (1, "The collected objects have their index of each visibility built once; any other list of objects gets an index built once."),
+        ["ObjectCaches.cs: ObjectCaches.EqualTargets.Equals"] = (1, "Two lists of target objects are the same list when they hold the same objects in the same order."),
+        ["LoadOrderCaches.cs: LoadOrderCaches.CountEffectOnlyMeshes"] = (1, CacheStatistics),
+        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: VisibleObjectsOfAnyPluginAsTheyStand.CollectVisible"] = (4, CacheQuery),
+        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: VisibleObjectsOfAnyPluginAsTheyStand.Contains"] = (2, CacheQuery),
+        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: VisibleObjectsOfAnyPluginAsTheyStand.Get"] = (1, "An object that was moved is answered where it stands now."),
+        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: VisibleObjectsOfAnyPluginAsTheyStand.IsUnchanged"] =
+            (1, "An object is unchanged when it was neither moved nor taken out."),
+        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: VisibleObjectsOfAnyPluginAsTheyStand.MovedIn"] = (1, "The moved objects of one space."),
+        ["VisibleTargetObjects.cs: VisibleTargetObjects.VisibleTargetObjects"] = (1, CacheIndexBuild),
+        ["VisibleTargetObjects.cs: VisibleTargetObjects.Around"] = (1, CacheQuery),
+        ["VisibleTargetObjects.cs: VisibleTargetObjects.AnyContains"] = (3, CacheQuery),
+        ["VisibleTargetObjects.cs: VisibleTargetObjects.BoxesNear"] = (2, CacheQuery),
+        ["VisibleTargetObjects.cs: VisibleTargetObjects.CollectWithinRadius"] = (3, CacheQuery),
+        ["VisibleTargetObjects.cs: VisibleTargetObjects.EntriesOf"] = (1, "A space without visible targets has no entries."),
+        ["TriangleStore.cs: TriangleStore.GetStats"] = (2, CacheStatistics),
+        ["TriangleStore.cs: TriangleStore.Build"] = (2, "A mesh without triangles has no tree; remembers for the statistics what the build gave: the triangle count, or that the mesh was too large."),
+        ["TriangleStore.cs: TriangleStore.ReadAndIndexWithLargeMeshLimit"] = (4, LargeMeshBuildSlot),
     };
 
     /// <summary>"file: use" of an error boundary in the runner or the run caches, and why it is there.</summary>
@@ -177,11 +150,22 @@ public class RunnerRulesTests
     [Fact]
     public void TheRunnerHasNoConditionsOfItsOwnBesidesTheAllowedStops()
     {
-        var found = RunnerFiles()
-            .SelectMany(file => FindConditionLines(file.Code).Select(line => $"{FileName(file)}: {line}"))
-            .ToHashSet();
+        var found = RunnerFiles().SelectMany(ConditionPlaces).GroupBy(place => place).ToDictionary(group => group.Key, group => group.Count());
 
-        AssertOnlyAllowed(found, AllowedConditions.Keys, "Condition in the runner; the domain decision belongs to a step", nameof(AllowedConditions));
+        AllowListAssert.ExactCounts(
+            found,
+            AllowedConditions.ToDictionary(entry => entry.Key, entry => entry.Value.Count),
+            (place, count) => $"{place} x{count}",
+            "Condition in the runner; the domain decision belongs to a step",
+            $"Allowed in {nameof(AllowedConditions)} but no longer found (remove)");
+    }
+
+    /// <summary>"file: Type.Member" of each line of the file that holds a condition, once per line.</summary>
+    private static IEnumerable<string> ConditionPlaces(SourceFile file)
+    {
+        var text = File.ReadAllText(file.FullPath);
+        var outline = CodeOutline.Of(text, file.Path);
+        return FindConditionLines(SourceFile.CodeKeepingLinesOf(text)).Select(line => $"{FileName(file)}: {outline.PlaceOfLine(line.Number)}");
     }
 
     /// <summary>The runner makes one call per step: each step's one entry is called once, and the step runs its own phases.</summary>
@@ -268,13 +252,13 @@ public class RunnerRulesTests
         var settings = SettingsOfRunSettings();
 
         Assert.Equal(
-            ["AlsoRemoveSettings", "ChangedObjectCollision", "ChangedObjectSettings", "CollisionSettings", "Execution", "LeftBehindSettings", "MarkerMoveSettings", "ModTrustSettings", "NeverRemovedInvisibleKinds", "NeverRemovedVisibleKinds", "OtherModsObjectsSettings", "ReportFileSettings", "SelectionSettings", "VisibleLeftBehindSettings", "WhatToCollect", "WhereRemovedRestoreSettings"],
+            ["AlsoRemoveSettings", "ChangedObjectCollision", "ChangedObjectSettings", "CollisionSettings", "Execution", "InvisibleLeftBehindSettings", "MarkerMoveSettings", "ModTrustSettings", "NeverRemovedInvisibleKinds", "NeverRemovedVisibleKinds", "ObjectsInClearedAreasSettings", "OtherModsObjectsSettings", "ReportFileSettings", "SelectionSettings", "VisibleLeftBehindSettings", "WhatToCollect", "WhereRemovedRestoreSettings"],
             settings.RecordTypes.Order(StringComparer.Ordinal));
         Assert.Equal(
-            ["AlsoRemove", "ChangedObjectCollision", "ChangedObjects", "Collision", "Execution", "LeftBehind", "MarkerMoves", "ModTrust", "NeverRemovedInvisibleKinds", "NeverRemovedVisibleKinds", "OtherModsObjects", "Read", "Reports", "RestoreWhereRemoved", "Selection", "VisibleLeftBehind"],
+            ["AlsoRemove", "ChangedObjectCollision", "ChangedObjects", "Collision", "Execution", "InvisibleLeftBehind", "MarkerMoves", "ModTrust", "NeverRemovedInvisibleKinds", "NeverRemovedVisibleKinds", "ObjectsInClearedAreas", "OtherModsObjects", "Read", "Reports", "RestoreWhereRemoved", "Selection", "VisibleLeftBehind"],
             settings.RecordProperties.Order(StringComparer.Ordinal));
         Assert.Equal(
-            ["DetailedLog", "OnlyWarnWhenRequiringModLoadsAfterPatch", "Target", "TargetAsTyped"],
+            ["DetailedLog", "ObjectsInClearedAreasOff", "OnlyWarnWhenRequiringModLoadsAfterPatch", "Target", "TargetAsTyped"],
             settings.PlainProperties.Order(StringComparer.Ordinal));
     }
 
@@ -285,7 +269,7 @@ public class RunnerRulesTests
         const string code = """
             var a = settings.Collision.TooClose;
             var b = settings.Selection?.Npcs;
-            var local = settings.LeftBehind;
+            var local = settings.InvisibleLeftBehind;
             use(local.Radius);
             void Use(MarkerMoveSettings moves) => use(moves.Distance);
             use(settings.Execution);
@@ -297,7 +281,7 @@ public class RunnerRulesTests
         var reads = FindSettingsReads(code, settings);
 
         Assert.Equal(
-            ["Collision.TooClose", "LeftBehind.Radius", "MarkerMoveSettings moves.Distance", "RunSettings.DetailedLog", "RunSettings.TargetAsTyped", "Selection.Npcs"],
+            ["Collision.TooClose", "InvisibleLeftBehind.Radius", "MarkerMoveSettings moves.Distance", "RunSettings.DetailedLog", "RunSettings.TargetAsTyped", "Selection.Npcs"],
             reads.Order(StringComparer.Ordinal));
     }
 
@@ -364,7 +348,7 @@ public class RunnerRulesTests
             do use(go); while (go);
             """;
 
-        var lines = FindConditionLines(code);
+        var lines = FindConditionLines(code).Select(line => line.Text);
 
         Assert.Equal(
             new[]
@@ -635,25 +619,22 @@ public class RunnerRulesTests
     }
 
     /// <summary>
-    /// The lines (whitespace collapsed) that hold an <c>if</c>, <c>switch</c>, <c>is</c>, <c>when</c>, a conditional operator,
+    /// The lines (whitespace collapsed, numbered from 1) that hold an <c>if</c>, <c>switch</c>, <c>is</c>, <c>when</c>, a conditional operator,
     /// <c>Where(</c>, <c>Any(</c>, <c>All(</c>, <c>First(</c>, <c>FirstOrDefault(</c>, <c>Count(</c> (the call, not the property),
     /// <c>TakeWhile(</c>, <c>&amp;&amp;</c>, <c>||</c>, <c>??</c> or <c>?.</c>, a loop (<c>for</c>, <c>foreach</c>, <c>while</c>, <c>do</c>), a
     /// comparison (<c>==</c>, <c>!=</c>, <c>&lt;</c>, <c>&lt;=</c>, <c>&gt;</c>, <c>&gt;=</c>) or a negation (<c>!</c>, not the
     /// null-forgiving <c>!</c> after a name).
     /// </summary>
-    private static IReadOnlyList<string> FindConditionLines(string code)
+    private static IReadOnlyList<(int Number, string Text)> FindConditionLines(string code)
     {
+        var lines = code.Split('\n');
         var starts = Regex.Matches(code, ConditionWords).Select(match => match.Index)
             .Concat(Regex.Matches(code, @"\s[?<>]\s").Select(match => match.Index + 1));
-        return [.. starts.Select(index => LineAt(code, index)).Distinct()];
-    }
-
-    private static string LineAt(string code, int index)
-    {
-        var start = code.LastIndexOf('\n', index) + 1;
-        var end = code.IndexOf('\n', index);
-        var line = end < 0 ? code[start..] : code[start..end];
-        return Regex.Replace(line.Trim(), @"\s+", " ");
+        return
+        [
+            .. starts.Select(index => code.AsSpan(0, index).Count('\n')).Distinct()
+                .Select(lineIndex => (lineIndex + 1, Regex.Replace(lines[lineIndex].Trim(), @"\s+", " "))),
+        ];
     }
 
     private static void AssertOnlyAllowed(IReadOnlySet<string> found, IEnumerable<string> allowed, string problem, string listName)

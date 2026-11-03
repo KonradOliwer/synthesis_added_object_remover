@@ -41,12 +41,17 @@ internal sealed record PlacedGuardInputs(
     Func<ExteriorCell, PluginName?> FindTerrainWinner);
 
 /// <summary>
-/// The guards of the placed records whose areas let them go back, each checked as it goes back, with only its undone parts taken
-/// from its earlier version. The candidates that go back together are never checked against each other, and a candidate that goes
-/// back whole is not checked against the objects a removal step restored to their earlier version: they end where they stood together
-/// before the cleaned mod. A candidate that keeps a part a later plugin changed is checked against those objects. A refused candidate stays
-/// where it stands now, among what stays; an object that ends removed in the final world (<see cref="FinalPresence"/>) causes
-/// nothing. Thread-safe.
+/// The guards of the candidates, the placed records whose areas let them go back, each checked as it goes back, with only its undone
+/// parts taken from its earlier version. The too-close guard checks a candidate against the causes of <see cref="AfterRemovalWorld"/>,
+/// a refused candidate among them where it stands now, less the causes left out:
+/// <list type="bullet">
+/// <item>for every candidate, the candidates going back, which move away, and every cause that ends removed in the final world
+/// (<see cref="FinalPresence"/>);</item>
+/// <item>for a candidate that ends in its earlier shape and place (<see cref="AfterRemovalWorld.EndInEarlierShapeAndPlace"/>), also the
+/// causes a removal step restored, since the two stood together like that before the cleaned mod. A candidate that keeps a shaping part
+/// a later plugin changed never stood beside them like that, so they block it.</item>
+/// </list>
+/// Thread-safe.
 /// </summary>
 internal sealed class PlacedGuards(
     AfterRemovalWorld world, PlacedGuardInputs inputs, GuardReach reach, FinalPresence presence, DoorLinkGuard doors, Execution execution)
@@ -70,7 +75,7 @@ internal sealed class PlacedGuards(
     {
         var causesLeftOut = CausesLeftOut(goingBack);
         var rules = CreateTooCloseRules(causesLeftOut, goingBack);
-        // Covers the candidates that go back whole too: the restored causes they also leave out are the same in every pass.
+        // Covers the candidates that end in their earlier shape and place too: the causes restored by removal steps they also leave out are the same in every pass.
         var checkTooClose = causesLeftOutBefore is null ? null : CandidatesReaching([.. causesLeftOutBefore.Except(causesLeftOut).OrderBy(cause => cause.Index)], goingBack);
         var holdingInvisible = _holdingInvisible.Value;
         var carrying = FindCandidatesCarryingObjectsThatStay(goingBack);
@@ -86,26 +91,25 @@ internal sealed class PlacedGuards(
         return new PlacedChecks(found, causesLeftOut);
     }
 
-    /// <summary>
-    /// The too-close rules of one pass: a candidate that goes back whole is not checked against the objects a removal step restored, as
-    /// they stood together before the cleaned mod; one that keeps a part a later plugin changed is. Each rule is made only when a
-    /// candidate going back needs it.
-    /// </summary>
+    /// <summary>The too-close rules of one pass, each made only when a candidate going back needs it.</summary>
     /// <param name="causesLeftOut">The causes left out for every candidate.</param>
     private TooCloseRules CreateTooCloseRules(HashSet<OtherId> causesLeftOut, IReadOnlySet<int> goingBack)
     {
-        IPlacementRule? Create(IEnumerable<OtherId> leftOut, bool goBackWhole) =>
-            goingBack.Any(candidate => world.GoBackWhole[candidate] == goBackWhole) ? inputs.TooClose(leftOut.Distinct().OrderBy(cause => cause.Index)) : null;
+        IPlacementRule? Create(IEnumerable<OtherId> leftOut, bool inEarlierShapeAndPlace) =>
+            goingBack.Any(candidate => world.EndInEarlierShapeAndPlace[candidate] == inEarlierShapeAndPlace) ? inputs.TooClose(leftOut.Distinct().OrderBy(cause => cause.Index)) : null;
 
-        return new TooCloseRules(world.GoBackWhole, Create(causesLeftOut.Concat(world.RestoredCauses), goBackWhole: true), Create(causesLeftOut, goBackWhole: false));
+        return new TooCloseRules(
+            world.EndInEarlierShapeAndPlace,
+            Create(causesLeftOut.Concat(world.CausesRestoredByRemovalSteps), inEarlierShapeAndPlace: true),
+            Create(causesLeftOut, inEarlierShapeAndPlace: false));
     }
 
-    /// <param name="Whole">For the candidates that go back whole; null when none of them goes back.</param>
-    /// <param name="KeepingLaterParts">For the others; null when none of them goes back.</param>
-    private sealed record TooCloseRules(ImmutableArray<bool> GoBackWhole, IPlacementRule? Whole, IPlacementRule? KeepingLaterParts)
+    /// <param name="InEarlierShapeAndPlace">For the candidates that end in their earlier shape and place; null when none of them goes back.</param>
+    /// <param name="InOtherShapeOrPlace">For the others; null when none of them goes back.</param>
+    private sealed record TooCloseRules(ImmutableArray<bool> EndInEarlierShapeAndPlace, IPlacementRule? InEarlierShapeAndPlace, IPlacementRule? InOtherShapeOrPlace)
     {
         public IPlacementRule For(int candidate) =>
-            (GoBackWhole[candidate] ? Whole : KeepingLaterParts) ?? throw new UnreachableException($"No too-close rule was made for candidate {candidate}, which goes back.");
+            (EndInEarlierShapeAndPlace[candidate] ? InEarlierShapeAndPlace : InOtherShapeOrPlace) ?? throw new UnreachableException($"No too-close rule was made for candidate {candidate}, which goes back.");
     }
 
     /// <param name="rule">Null when the too-close rule needs no check.</param>
@@ -134,7 +138,7 @@ internal sealed class PlacedGuards(
             ?? doors.Check(candidate, goingBack, plans.NavmeshesGoingBack, doorNavmeshFaults);
     }
 
-    /// <summary>The causes that cause no removals for any candidate: the copies of the candidates going back, which move away, and those that end removed in the final world.</summary>
+    /// <summary>The causes left out for every candidate: the copies of the candidates going back where they stand now, and those that end removed.</summary>
     private HashSet<OtherId> CausesLeftOut(IReadOnlySet<int> goingBack) =>
     [
         .. world.CauseCopiesNowOf(goingBack),

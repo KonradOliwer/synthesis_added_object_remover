@@ -4,7 +4,7 @@ using Mutagen.Bethesda.Synthesis.Settings;
 
 namespace AddedObjectRemover;
 
-public class LeftoverInvisibleObjectSettings : ILeftoverSettingsValues
+public class LeftoverInvisibleObjectSettings : IInvisibleLeftoverSettingsValues
 {
     [SynthesisOrder]
     [SynthesisSettingName("Remove invisible objects left inside other mods' objects or alone")]
@@ -23,7 +23,8 @@ public class LeftoverInvisibleObjectSettings : ILeftoverSettingsValues
     [SynthesisSettingName("Never remove these as invisible objects left behind (ticked = kept)")]
     [SynthesisTooltip(
         "Ticked kinds are kept by this step (unless linked to a removed object); unticked kinds can be removed by it. "
-        + "They are also kept when an area is restored, even while this step is switched off. The too-close and changed-terrain removals are not affected; \"Also remove what rests on removed objects\" can still remove a ticked kind.\n"
+        + "They are also kept by the area method of \"Objects left behind\", even while this step is switched off. "
+        + "The too-close and changed-terrain removals are not affected; \"Also remove what rests on removed objects\" can still remove a ticked kind.\n"
         + "What \"Mod to clean up\" lists as always kept stays kept, ticked or not.")]
     public KeptInvisibleObjectSettings AlwaysKeep { get; set; } = new();
 
@@ -34,8 +35,8 @@ public class LeftoverInvisibleObjectSettings : ILeftoverSettingsValues
         + "Only its position changes. Lights, sounds, furniture and door markers are never moved. Needs the switch at the top of this group.")]
     public bool MoveKeptMarkersOutOfOtherModsObjects { get; set; } = true;
 
-    ISurroundingObjectsSettingsValues ILeftoverSettingsValues.SurroundingObjects => SurroundingObjects ?? new();
-    IReadOnlyList<InvisibleObjectKind> ILeftoverSettingsValues.NeverRemove => (AlwaysKeep ?? new()).Kinds();
+    ISurroundingObjectsSettingsValues IInvisibleLeftoverSettingsValues.SurroundingObjects => SurroundingObjects ?? new();
+    IReadOnlyList<InvisibleObjectKind> IInvisibleLeftoverSettingsValues.NeverRemove => (AlwaysKeep ?? new()).Kinds();
 }
 
 public class SurroundingObjectsSettings : ISurroundingObjectsSettingsValues

@@ -13,7 +13,7 @@ public class DeletedCellWordingTests
     [Fact]
     public void AnInvisibleObjectKeptInADeletedCellNamesTheCellAndThePlugin()
     {
-        var evaluation = new LeftBehindCheck(
+        var evaluation = new InvisibleLeftBehindCheck(
             0, InvisibleObjectKind.XMarkers, 100f, null, new SectorAreaTally(50).Build(), LeftBehindOutcome.KeptInDeletedCell, TestKeepReasons.InDeletedCell);
 
         Assert.Equal(Expected, LeftBehindOutcomeText.DescribeReason(evaluation));

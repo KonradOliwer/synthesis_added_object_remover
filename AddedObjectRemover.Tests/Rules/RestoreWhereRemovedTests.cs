@@ -41,7 +41,7 @@ public sealed class RestoreWhereRemovedTests
         Terrain: false,
         Cells: true,
         Navmeshes: false,
-        new ClearedArea(SearchRadius, MaxStandingSizePercent: TenthOfAPercent, MaxStandingCountPercent: TenthOfAPercent, ClearedAreaShares.Both),
+        new ClearedArea(SearchRadius, MaxStandingSizePercent: TenthOfAPercent, MaxStandingCountPercent: TenthOfAPercent),
         TerrainEdgeBlendDistance: 0f,
         HeightChangeTolerance: 8f,
         WaterHeightChangeTolerance: 8f,
@@ -51,11 +51,11 @@ public sealed class RestoreWhereRemovedTests
             CountWaterHeightChanges: false, 0f, CountWaterAddedOrRemoved: false, 0, AreaBySize: false, 0f, AreaByDistance: false, 0f));
 
     private static readonly WhereRemovedRestoreSettings HalfMayStand =
-        Settings with { ClearedArea = new ClearedArea(SearchRadius, MaxStandingSizePercent: 50, MaxStandingCountPercent: 50, ClearedAreaShares.Both) };
+        Settings with { ClearedArea = new ClearedArea(SearchRadius, MaxStandingSizePercent: 50, MaxStandingCountPercent: 50) };
 
-    /// <summary>The default limits, 1% by size and 5% by number, with either share enough.</summary>
-    private static readonly WhereRemovedRestoreSettings EitherAtTheDefaults =
-        Settings with { ClearedArea = new ClearedArea(SearchRadius, MaxStandingSizePercent: 1, MaxStandingCountPercent: 5, ClearedAreaShares.Either) };
+    /// <summary>The default limits, 1% by size and 5% by number.</summary>
+    private static readonly WhereRemovedRestoreSettings AtTheDefaults =
+        Settings with { ClearedArea = new ClearedArea(SearchRadius, MaxStandingSizePercent: 1, MaxStandingCountPercent: 5) };
 
     private static readonly RecordKey ExteriorCellKey = new(BaseGame, 0x500);
 
@@ -161,31 +161,25 @@ public sealed class RestoreWhereRemovedTests
         Assert.True(judged.OldPlace.SizePercent < 50);
     }
 
-    /// <summary>
-    /// A big object was removed beside a small one that stands: half by number, under 1% by size. Either share is enough with
-    /// <see cref="ClearedAreaShares.Either"/>, so the area is cleared; with both needed it is not.
-    /// </summary>
-    [Theory]
-    [InlineData(ClearedAreaShares.Either, AreaVerdict.Cleared)]
-    [InlineData(ClearedAreaShares.Both, AreaVerdict.StillStanding)]
-    public void OneBigRemovedObjectBesideASmallStandingOneClearsTheAreaOnlyWhenEitherShareIsEnough(ClearedAreaShares shares, AreaVerdict expected)
+    /// <summary>A big object was removed beside a small one that stands: under 1% by size but half by number, so the area is not cleared.</summary>
+    [Fact]
+    public void OneBigRemovedObjectBesideASmallStandingOneDoesNotClearTheArea()
     {
         ImmutableArray<TargetObject> targets = [Own(0, new Vector3(300, 0, 0), BigBlock), Own(1, new Vector3(0, 100, 0))];
-        var settings = EitherAtTheDefaults with { ClearedArea = EitherAtTheDefaults.ClearedArea with { SharesThatMustPass = shares } };
 
-        var judged = Assert.Single(Plan(targets, removed: [0], [ChangedRock(0x900, Vector3.Zero)], settings: settings).Objects);
+        var judged = Assert.Single(Plan(targets, removed: [0], [ChangedRock(0x900, Vector3.Zero)], settings: AtTheDefaults).Objects);
 
-        Assert.Equal((expected, 50d), (judged.OldPlace!.Verdict, judged.OldPlace.CountPercent));
+        Assert.Equal((AreaVerdict.StillStanding, 50d), (judged.OldPlace!.Verdict, judged.OldPlace.CountPercent));
         Assert.True(judged.OldPlace.SizePercent < 1);
     }
 
-    /// <summary>Effect objects have no size, so even when either share is enough their number alone decides: two of three still stand.</summary>
+    /// <summary>Effect objects have no size, so their number alone decides: two of three still stand.</summary>
     [Fact]
-    public void AnAreaOfOnlyEffectObjectsIsNotClearedByItsEmptySizeWhenEitherShareIsEnough()
+    public void AnAreaOfOnlyEffectObjectsIsJudgedByNumberAlone()
     {
         ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0), Fog), Own(1, new Vector3(-100, 0, 0), Fog), Own(2, new Vector3(0, 100, 0), Fog)];
 
-        var judged = Assert.Single(Plan(targets, removed: [0], [ChangedRock(0x900, Vector3.Zero)], settings: EitherAtTheDefaults).Objects);
+        var judged = Assert.Single(Plan(targets, removed: [0], [ChangedRock(0x900, Vector3.Zero)], settings: AtTheDefaults).Objects);
 
         Assert.Equal((0d, AreaVerdict.StillStanding), (judged.OldPlace!.Size, judged.OldPlace.Verdict));
     }
@@ -501,15 +495,18 @@ public sealed class RestoreWhereRemovedTests
 
         var rules = GuardRules(workers: 1);
         var decisions = DecisionsRemoving(targets);
+        var world = TestScenes.CreateWorld(targets, []);
+        var caches = CachesOf(targets);
+        var allOff = Settings with { OtherModsObjects = false, Terrain = false, Cells = false, Navmeshes = false };
         var groupOff = RestoreLoopReuse.Plan(
             new(
-                new(TestScenes.CreateWorld(targets, []), OtherModsObjectsResult.SwitchedOff),
+                new(world, OtherModsObjectsResult.SwitchedOff),
                 decisions,
+                TestClearedAreas.Of(world, decisions, caches, allOff),
                 new(rules.WorldCaches, rules.TooCloseRule(), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),
-                rules.Leftovers(targets, decisions),
-                new(CachesOf(targets), TestLandPlugin.Flat, Plugins, TestTargets.TargetName),
+                new(caches, TestLandPlugin.Flat, Plugins, TestTargets.TargetName),
                 new Execution(1),
-                Settings with { OtherModsObjects = false, Terrain = false, Cells = false, Navmeshes = false },
+                allOff,
                 () => TimeSpan.Zero));
         var objectsOff = Plan(targets, removed: [0], rocks, cells, Settings with { OtherModsObjects = false });
         var cellsOff = Plan(targets, removed: [0], rocks, cells, Settings with { Cells = false });
@@ -624,15 +621,17 @@ public sealed class RestoreWhereRemovedTests
             Spaces = spaces ?? new Dictionary<RecordKey, SpaceFact>(),
         };
         var rules = GuardRules(workers);
+        var caches = CachesOf(targets);
+        var restore = settings ?? Settings;
         return RestoreLoopReuse.Plan(
             new(
                 new(collected, otherModsObjects ?? OtherModsObjectsResult.SwitchedOff),
                 final,
+                TestClearedAreas.Of(collected, final, caches, restore),
                 new(worldCaches ?? rules.WorldCaches, rules.TooCloseRule(tooClose), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),
-                rules.Leftovers(targets, final),
-                new(CachesOf(targets), TestLandPlugin.Flat, Plugins, TestTargets.TargetName),
+                new(caches, TestLandPlugin.Flat, Plugins, TestTargets.TargetName),
                 new Execution(workers),
-                settings ?? Settings,
+                restore,
                 () => TimeSpan.Zero));
     }
 

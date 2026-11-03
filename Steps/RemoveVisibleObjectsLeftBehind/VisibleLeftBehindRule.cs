@@ -3,7 +3,6 @@ using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
-using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
 
@@ -29,7 +28,12 @@ internal sealed class VisibleLeftBehindRule(
         var target = targets[measured.TargetIndex];
         var kind = VisibleObjectKinds.Of(target, bases);
         var isProtectedKind = kindsAlwaysKept.KindKeeping(target) != null;
-        var decision = LeftBehindVerdicts.Judge(measured.Surroundings, config.Surroundings, isInsideAnotherModsObject: false, isProtectedKind);
-        return new VisibleLeftBehindCheck(measured.TargetIndex, kind, measured.Surroundings, decision, KeepReason: null);
+        return new VisibleLeftBehindCheck(measured.TargetIndex, kind, measured.Surroundings, Decide(measured.Surroundings, isProtectedKind), KeepReason: null);
     }
+
+    /// <summary>The minimum number of objects around comes before the directions, so it is the reason named when both keep the object.</summary>
+    private LeftBehindOutcome Decide(SectorAreas surroundings, bool isProtectedKind) =>
+        surroundings.Objects < config.MinObjectsAround
+            ? LeftBehindOutcome.KeptTooFewObjectsAround
+            : LeftBehindVerdicts.Judge(surroundings, config.Surroundings, isInsideAnotherModsObject: false, isProtectedKind);
 }

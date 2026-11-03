@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
@@ -39,7 +40,6 @@ internal static partial class LogSections
             [
                 .. TextLists.Headed("Restored where the cleaned mod was removed", RestoreCountLines.Restored(judged), CountsSeparator),
                 .. TextLists.Headed("Left as the cleaned mod changed them", RestoreCountLines.LeftAsChanged(judged), AreasSeparator),
-                .. TextLists.Headed("Objects of the cleaned mod still standing in restored areas", RestoreCountLines.Leftovers(judged), CountsSeparator),
                 .. context.Detailed ? RestoreWhereRemovedDetailLines(world, judged, elapsed, context) : [],
             ]);
     }
@@ -63,7 +63,6 @@ internal static partial class LogSections
             .. judged.Result.Cells.Select(cell => RestoredCellLine(world, cell, label)),
             .. judged.Result.Lands.SelectMany(land => RestoredLandLines(world, land)),
             .. judged.Navmeshes.Select(navmesh => RestoredNavmeshLine(world, navmesh, label)),
-            .. judged.Result.Leftovers.Select(leftover => LeftoverLine(world, leftover, context)),
             $"{RestoreWhereRemovedName}: {TextFormat.Count(judged.Result.Passes, "pass", "passes")}{Describe.TimedSuffix(elapsed, context)}.",
             .. RestoreWhereRemovedPartTimeLines(judged.Result.Times, context),
         ];
@@ -110,13 +109,6 @@ internal static partial class LogSections
         judged.WhereItIsNow is null
             ? ClearedAreaText.After(judged.OldPlace)
             : ClearedAreaText.After(judged.OldPlace, "at its old place ") + ClearedAreaText.After(judged.WhereItIsNow, "where it stands now ");
-
-    private static string LeftoverLine(CollectedObjects world, LeftoverJudged leftover, ReportContext context)
-    {
-        var target = world.Targets[leftover.Target.Index];
-        return $"  {RecordNames.Describe(target)} (base {RecordNames.DescribeBase(context.Bases, target.Base)}) in {Describe.Space(world, leftover.Column.Space)}"
-            + $"{RestoreWhereRemovedText.Centre(leftover.Column)}: {RestoreWhereRemovedText.Leftover(leftover)}";
-    }
 
     /// <param name="label">Names the record that keeps the water level.</param>
     private static string RestoredCellLine(CollectedObjects world, CellChangeJudged judged, Func<RecordKey, string> label)

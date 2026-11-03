@@ -14,23 +14,23 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 internal sealed class ObjectsThatBlockActors(IBaseObjectShapes shapes, IReadOnlyDictionary<RecordKey, ReferenceFacts> primitives)
 {
     /// <returns>Null when actors would not run into it.</returns>
-    public OrientedBox? SolidBoxOf(TargetObject placed) =>
-        SolidBoxOf(placed.Base, placed.IsPrimitive, placed.HasMapMarker, placed.CollisionLayer, placed.IsCullingVolume, placed.PrimitiveBounds, placed.Transform);
+    public OrientedBox? SolidBoxOf(TargetObject placed) => SolidBoxOf(PlacedShape.Of(placed));
 
     /// <returns>Null when actors would not run into it.</returns>
     public OrientedBox? SolidBoxOf(OtherObject placed)
     {
         var reference = placed.IsPrimitive ? primitives.GetValueOrDefault(placed.Key) : default;
-        return SolidBoxOf(placed.Base, placed.IsPrimitive, placed.HasMapMarker, reference.CollisionLayer, reference.IsCullingVolume, reference.PrimitiveBounds, placed.Transform);
+        return SolidBoxOf(new PlacedShape(
+            new EulerPlacement(placed.Position, placed.Rotation, placed.Scale), placed.Base, placed.IsPrimitive, placed.HasMapMarker,
+            reference.CollisionLayer, reference.IsCullingVolume, reference.PrimitiveBounds));
     }
 
     /// <remarks>The primitive bounds are full sizes, centred on the reference.</remarks>
-    private OrientedBox? SolidBoxOf(
-        BaseKey? model, bool isPrimitive, bool hasMapMarker, uint? collisionLayer, bool isCullingVolume, Vector3? primitiveBounds, PlacedTransform transform)
+    private OrientedBox? SolidBoxOf(PlacedShape placed)
     {
-        if (!BlocksActors(model, isPrimitive, hasMapMarker, collisionLayer, isCullingVolume)) return null;
-        var local = isPrimitive && primitiveBounds is { } size ? Box.FromCorners(-size / 2f, size / 2f) : shapes.Of(model).Box;
-        return OrientedBox.FromLocal(local, transform);
+        if (!BlocksActors(placed)) return null;
+        var local = placed.IsPrimitive && placed.PrimitiveBounds is { } size ? Box.FromCorners(-size / 2f, size / 2f) : shapes.Of(placed.Base).Box;
+        return OrientedBox.FromLocal(local, placed.Placement.Transform);
     }
 
     /// <summary>
@@ -38,13 +38,13 @@ internal sealed class ObjectsThatBlockActors(IBaseObjectShapes shapes, IReadOnly
     /// One that stores none has its kind's default layer: activators, acoustic spaces and culling volumes let actors through, every
     /// other kind (collision markers included) blocks. Any other object blocks when it is visible or its collision stops characters.
     /// </summary>
-    private bool BlocksActors(BaseKey? model, bool isPrimitive, bool hasMapMarker, uint? collisionLayer, bool isCullingVolume)
+    private bool BlocksActors(PlacedShape placed)
     {
-        var shape = shapes.Of(model);
-        if (isPrimitive && shape is { Resolved: true, MeshPath: null })
+        var shape = shapes.Of(placed.Base);
+        if (placed.IsPrimitive && shape is { Resolved: true, MeshPath: null })
         {
-            return collisionLayer is { } layer ? shapes.LayerBlocksActors(layer) : !isCullingVolume && !shape.PrimitiveWithoutLayerIsWalkThrough;
+            return placed.CollisionLayer is { } layer ? shapes.LayerBlocksActors(layer) : !placed.IsCullingVolume && !shape.PrimitiveWithoutLayerIsWalkThrough;
         }
-        return shapes.VisibilityOf(model, isPrimitive, hasMapMarker).IsVisible || shape.CollisionBlocksMovement == true;
+        return shapes.VisibilityOf(placed.Base, placed.IsPrimitive, placed.HasMapMarker).IsVisible || shape.CollisionBlocksMovement == true;
     }
 }

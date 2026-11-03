@@ -117,16 +117,17 @@ public class StandardSettings : ISettingsValues, ICollisionSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName(SettingNames.AlsoRemove)]
     [SynthesisTooltip(
-        "When an object is removed by any removal step (too close, changed terrain, visible objects left behind), the cleaned mod's objects resting on it or touching it would be left floating. This removes them too.\n"
+        "When an object is removed by any removal step (too close, changed terrain, objects left behind), the cleaned mod's objects resting on it or touching it would be left floating. This removes them too.\n"
         + "Only the cleaned mod's own visible objects are removed this way; the last setting of this group decides about other mods' objects.")]
     public FollowUpRemovalSettings FollowUpRemoval { get; set; } = new();
 
     [SynthesisOrder]
-    [SynthesisSettingName(SettingNames.VisibleLeftBehind)]
+    [SynthesisSettingName(SettingNames.LeftoverObjects)]
     [SynthesisTooltip(
-        "The cleaned mod's visible objects are removed when most of the cleaned mod's visible objects around them were removed by the other removal steps\n"
-        + "(too close, changed terrain, also remove). Only the cleaned mod's objects, including other mods' objects it changed, count as surroundings.")]
-    public LeftoverVisibleObjectSettings LeftoverVisibleObjects { get; set; } = new();
+        "Removes what is left of the cleaned mod where most of it around was removed by the other removal steps (too close, changed terrain, also remove).\n"
+        + "The direction method looks at the cleaned mod's visible objects around an object in eight directions and works in rounds.\n"
+        + "Only the cleaned mod's objects, including other mods' objects it changed, count as surroundings.")]
+    public LeftoverObjectSettings LeftoverObjects { get; set; } = new();
 
     [SynthesisOrder]
     [SynthesisSettingName(SettingNames.InvisibleLeftBehind)]
@@ -151,7 +152,7 @@ public class StandardSettings : ISettingsValues, ICollisionSettingsValues
     ITerrainChangeSettingsValues ICollisionSettingsValues.TerrainChange => TerrainChange ?? new TerrainChangeSettings();
     IShrinkOrTurnSettingsValues ICollisionSettingsValues.ShrinkOrTurn => ShrinkOrTurn ?? new ShrinkOrTurnSettings();
     IFollowUpSettingsValues ISettingsValues.FollowUpRemoval => FollowUpRemoval ?? new FollowUpRemovalSettings();
-    IVisibleLeftoverSettingsValues ISettingsValues.LeftoverVisibleObjects => LeftoverVisibleObjects ?? new LeftoverVisibleObjectSettings();
-    ILeftoverSettingsValues ISettingsValues.LeftoverInvisibleObjects => LeftoverInvisibleObjects ?? new LeftoverInvisibleObjectSettings();
+    ILeftoverObjectsSettingsValues ISettingsValues.LeftoverObjects => LeftoverObjects ?? new LeftoverObjectSettings();
+    IInvisibleLeftoverSettingsValues ISettingsValues.LeftoverInvisibleObjects => LeftoverInvisibleObjects ?? new LeftoverInvisibleObjectSettings();
     IRestoreWhereRemovedSettingsValues ISettingsValues.RestoreWhereRemoved => RestoreWhereRemoved ?? new RestoreWhereRemovedSettings();
 }

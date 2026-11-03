@@ -60,8 +60,8 @@ public sealed partial class LogAndReports
 
     private RunOutcome BuildOutcome(StepResults decided, WriteSummary written)
     {
-        ImmutableArray<ObjectWithReason> removals = [.. RemovalList.WithReasons(written.Removed, decided.Final, decided.Collected, decided.VisibleLeftBehind, decided.LeftBehind)];
-        ImmutableArray<ObjectWithReason> restorations = [.. RemovalList.WithReasons(written.Restored, decided.Final, decided.Collected, decided.VisibleLeftBehind, decided.LeftBehind)];
+        ImmutableArray<ObjectWithReason> removals = [.. RemovalList.WithReasons(written.Removed, decided.Final, decided.Collected, decided.VisibleLeftBehind, decided.InvisibleLeftBehind)];
+        ImmutableArray<ObjectWithReason> restorations = [.. RemovalList.WithReasons(written.Restored, decided.Final, decided.Collected, decided.VisibleLeftBehind, decided.InvisibleLeftBehind)];
         var hints = ManualPatchHints.FindManualPatchHints(decided, _caches.Shapes, removals);
         return new RunOutcome(decided, removals, restorations, hints, written, _caches.CountBounds());
     }
@@ -76,8 +76,7 @@ public sealed partial class LogAndReports
         var world = outcome.Collected;
         var removals = outcome.Removals;
         var restoredObjects = LogSections.BuildRestoredSection(world, outcome.Restorations, outcome.Final, _context);
-        var restoreSummary = LogSections.BuildRestoreSummarySection(
-            outcome.Restorations, outcome.Final, _settings.TargetAsTyped, outcome.ChangedTerrain.Outcome, outcome.VisibleLeftBehind.Outcome);
+        var restoreSummary = LogSections.BuildRestoreSummarySection(outcome.Restorations, outcome.Final, _settings.TargetAsTyped, SummarizedSteps.Of(outcome));
         var restoredWhereRemoved = LogSections.BuildRestoreWhereRemovedSummarySection(outcome.RestoreWhereRemoved);
         var warnings = LogSections.BuildRemovalWarningsSection(world, removals, outcome.RemovalRisks);
         var kept = RemovalList.Kept(outcome.Final);
@@ -98,7 +97,7 @@ public sealed partial class LogAndReports
             LogSections.BuildSpacesSection(world, removals, _settings.TargetAsTyped, _context),
             LogSections.BuildTargetVisibilitySection(world.Targets, world.Counts.TargetsHiddenOrWithoutPlacement, _settings.TargetAsTyped, _context),
             LogSections.BuildRunSummarySection(world, _settings.TargetAsTyped, ownRemoved),
-            LogSections.BuildRemovalSummarySection(world, removals, outcome.Final, _settings.TargetAsTyped, outcome.ChangedTerrain.Outcome, outcome.VisibleLeftBehind.Outcome),
+            LogSections.BuildRemovalSummarySection(world, removals, outcome.Final, _settings.TargetAsTyped, SummarizedSteps.Of(outcome)),
             .. WhenItHasLines(restoreSummary),
             .. WhenItHasLines(restoredWhereRemoved),
             .. WhenItHasLines(changedObjects),

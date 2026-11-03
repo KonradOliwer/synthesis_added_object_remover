@@ -54,7 +54,7 @@ internal static class RingWorld
                 FollowUpRemoval = new FollowUpRemovalSettings { Mode = mode },
             },
         };
-        if (surroundings is not null) settings.Standard.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings { SurroundingObjects = surroundings };
+        if (surroundings is not null) settings.Standard.LeftoverObjects = new LeftoverObjectSettings { SurroundingObjects = surroundings };
         return settings;
     }
 

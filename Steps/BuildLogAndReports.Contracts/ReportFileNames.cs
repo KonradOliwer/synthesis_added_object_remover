@@ -8,6 +8,7 @@ public static class ReportFileNames
     public const string SupportFileName = "anchoring.csv";
     public const string MeshOriginsFileName = "mesh-origins.csv";
     public const string VisibleLeftBehindFileName = "leftover-visible-objects.csv";
+    public const string ObjectsInClearedAreasFileName = "objects-in-cleared-areas.csv";
     public const string LeftBehindFileName = "leftover-invisible-objects.csv";
     public const string HintsFileName = "removed-markers-and-kept-objects.csv";
     public const string RemovalsFileName = "removals.csv";
@@ -16,5 +17,4 @@ public static class ReportFileNames
     public const string LeftWithoutSupportFileName = "other-mods-objects-left-without-support.csv";
     public const string RestoredWhereRemovedObjectsFileName = "restored-where-removed-objects.csv";
     public const string RestoredWhereRemovedCellsFileName = "restored-where-removed-cells.csv";
-    public const string RestoredWhereRemovedLeftoversFileName = "restored-where-removed-leftovers.csv";
 }

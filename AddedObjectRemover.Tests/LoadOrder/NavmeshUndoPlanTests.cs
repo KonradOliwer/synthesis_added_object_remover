@@ -533,7 +533,7 @@ public sealed class NavmeshUndoPlanTests
         var final = removed.Length == 0
             ? TestSeededDecisions.StartDisablingAll(protection, collected.Targets.Length)
             : TestSeededDecisions.Seed(protection, collected.Targets.Length, removed);
-        var result = new RestoreWhereRemovedResult(StepOutcome.Performed, [], [], [], plan.Navmeshes(), plan.Groups(), Passes: 1, DoorsLeftRemoved: [], Failures: [], RestoreWhereRemovedTimes.None, Leftovers: [], OtherModsObjectsResult.SwitchedOff);
+        var result = new RestoreWhereRemovedResult(StepOutcome.Performed, [], [], [], plan.Navmeshes(), plan.Groups(), Passes: 1, DoorsLeftRemoved: [], Failures: [], RestoreWhereRemovedTimes.None);
         PatchWriter.Write(new(final, collected.Targets, OtherModsObjectsResult.SwitchedOff, result, records, writing));
         return (plan, state.PatchMod);
     }

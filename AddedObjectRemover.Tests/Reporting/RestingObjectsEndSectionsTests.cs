@@ -116,8 +116,8 @@ public sealed class RestingObjectsEndSectionsTests
         var (touchWorld, touch, touchDecisions) = TouchScene();
         var (supportWorld, support, supportDecisions) = SupportScene();
 
-        var touchSection = LogSections.BuildAlsoRemoveAfterVisibleLeftBehindSection(touchWorld, touch, touchDecisions, Meshes, Detailed);
-        var supportSection = LogSections.BuildAlsoRemoveAfterVisibleLeftBehindSection(supportWorld, support, supportDecisions, Meshes, Detailed);
+        var touchSection = LogSections.BuildAlsoRemoveAfterStepSection(LogSections.AlsoRemovePass.AfterVisibleLeftBehind,touchWorld, touch, touchDecisions, Meshes, Detailed);
+        var supportSection = LogSections.BuildAlsoRemoveAfterStepSection(LogSections.AlsoRemovePass.AfterVisibleLeftBehind,supportWorld, support, supportDecisions, Meshes, Detailed);
 
         Assert.Equal("touch-after-visible", touchSection.Id);
         Assert.Equal("anchoring-after-visible", supportSection.Id);
@@ -134,7 +134,7 @@ public sealed class RestingObjectsEndSectionsTests
         var (world, alsoRemove, decisions) = TouchScene();
         var stopped = alsoRemove with { Outcome = StepOutcome.StoppedByUnexpectedError, HadSeeds = false, Rounds = [], Failure = Broke(RestingObjectsParts.FollowUp) };
 
-        var section = LogSections.BuildAlsoRemoveAfterVisibleLeftBehindSection(world, stopped, decisions, Meshes, Detailed);
+        var section = LogSections.BuildAlsoRemoveAfterStepSection(LogSections.AlsoRemovePass.AfterVisibleLeftBehind,world, stopped, decisions, Meshes, Detailed);
 
         Assert.Equal("follow-up-after-visible", section.Id);
         Assert.Equal(["Also remove after visible objects left behind: not performed because of an unexpected error."], section.Lines.ToList());
@@ -152,6 +152,20 @@ public sealed class RestingObjectsEndSectionsTests
         Assert.Equal(["Linked groups: 0 more objects removed with the follow-up after visible left-behind removals they are linked to."], section.Lines.ToList());
     }
 
+    [Fact]
+    public void AlsoRemoveAfterClearedAreas_PrintsUnderItsOwnIdAndNameAndNamesTheClearedAreaStep()
+    {
+        var (world, alsoRemove, decisions) = TouchScene();
+        var pass = LogSections.AlsoRemovePass.AfterClearedAreas;
+
+        var section = LogSections.BuildAlsoRemoveAfterStepSection(pass, world, alsoRemove, decisions, Meshes, Detailed);
+        var linked = LogSections.BuildLinkedSection(decisions, [], pass.LinkedStep, pass.IdSuffix, Detailed);
+
+        Assert.Equal("touch-after-cleared-areas", section.Id);
+        Assert.Equal("Also remove after objects in cleared areas: 1 rounds in 1.5s.", section.Lines[^1]);
+        Assert.Equal(["Linked groups: 0 more objects removed with the follow-up after cleared-area removals they are linked to."], linked.Lines.ToList());
+    }
+
     [Theory]
     [InlineData(StepOutcome.Performed, true, true)]
     [InlineData(StepOutcome.Performed, false, false)]
@@ -161,7 +175,7 @@ public sealed class RestingObjectsEndSectionsTests
     {
         var (_, alsoRemove, _) = TouchScene();
 
-        Assert.Equal(expected, LogSections.PrintsAfterVisibleLeftBehind(alsoRemove with { Outcome = outcome, HadSeeds = hadSeeds }));
+        Assert.Equal(expected, LogSections.PrintsFollowUp(alsoRemove with { Outcome = outcome, HadSeeds = hadSeeds }));
     }
 
     [Fact]
@@ -276,7 +290,7 @@ public sealed class RestingObjectsEndSectionsTests
         var secondPass = new SupportRoundDetails([], Pairs, [new ZeroWeightCase(3, ZeroWeightOf(2))]);
         var merged = alsoRemove with { Rounds = [decisions.Rounds[0], decisions.Rounds[^1]], Evidence = [firstPass, secondPass] };
 
-        var lines = LogSections.BuildAlsoRemoveAfterVisibleLeftBehindSection(world, merged, decisions, Meshes, Detailed).Lines;
+        var lines = LogSections.BuildAlsoRemoveAfterStepSection(LogSections.AlsoRemovePass.AfterVisibleLeftBehind,world, merged, decisions, Meshes, Detailed).Lines;
 
         var zeroWeights = lines.Where(line => line.StartsWith("  Anchoring found no support weight for ", StringComparison.Ordinal)).ToList();
         Assert.Equal(2, zeroWeights.Count);
@@ -341,7 +355,7 @@ public sealed class RestingObjectsEndSectionsTests
 
         Assert.DoesNotContain(sections[3].Lines, line => line.Contains("not performed", StringComparison.Ordinal));
         Assert.Equal(
-            "  Unexpected error in the also-remove follow-ups of the visible objects left behind (it broke). "
+            "  Unexpected error in the also-remove follow-ups of the objects left behind (it broke). "
             + "The follow-ups stopped there: the removals of the passes before stand, and objects resting on what the later rounds removed were not removed.",
             Assert.Single(sections[^1].Lines));
     }
@@ -357,7 +371,7 @@ public sealed class RestingObjectsEndSectionsTests
 
         Assert.Equal(["Also remove after visible objects left behind: not performed because of an unexpected error."], sections[3].Lines.ToList());
         Assert.Equal(
-            "  Unexpected error in the also-remove follow-ups of the visible objects left behind (it broke). "
+            "  Unexpected error in the also-remove follow-ups of the objects left behind (it broke). "
             + "The follow-ups stopped there: the removals of the passes before stand, and objects resting on what the later rounds removed were not removed.",
             Assert.Single(sections[^1].Lines));
     }
@@ -367,7 +381,7 @@ public sealed class RestingObjectsEndSectionsTests
     {
         var (world, leftBehind) = LeftBehindScene();
 
-        var lines = LogSections.BuildLeftBehindSection(world, leftBehind, [new KeptObject(Protected, QuestReason, null)], Elapsed, Normal).Lines.ToList();
+        var lines = LogSections.BuildInvisibleLeftBehindSection(world, leftBehind, [new KeptObject(Protected, QuestReason, null)], Elapsed, Normal).Lines.ToList();
 
         Assert.Equal(2, lines.Count);
         Assert.StartsWith("Invisible objects left behind: 2 evaluated; removed 1 (", lines[0]);
@@ -382,7 +396,7 @@ public sealed class RestingObjectsEndSectionsTests
         var removed = leftBehind.Evaluations[1] with { ContainingObject = null, Decision = LeftBehindOutcome.RemovedSurroundingsRemovedAndRestored };
         var restored = leftBehind.Evaluations[1] with { TargetIndex = Protected, ContainingObject = null, Decision = LeftBehindOutcome.RestoredSurroundingsRemovedAndRestored };
 
-        var lines = LogSections.BuildLeftBehindSection(world, leftBehind with { Evaluations = [removed, restored] }, [], Elapsed, Detailed).Lines.ToList();
+        var lines = LogSections.BuildInvisibleLeftBehindSection(world, leftBehind with { Evaluations = [removed, restored] }, [], Elapsed, Detailed).Lines.ToList();
 
         Assert.Contains(
             "removed 1 (0 inside another mod's object, 0 surroundings removed, 1 surroundings removed and restored); restored 1 (1 surroundings removed and restored); ",
@@ -397,7 +411,7 @@ public sealed class RestingObjectsEndSectionsTests
         var (world, leftBehind) = LeftBehindScene();
         var removed = leftBehind.Evaluations[1] with { ContainingObject = null, Decision = LeftBehindOutcome.RemovedSurroundingsRemoved };
 
-        var lines = LogSections.BuildLeftBehindSection(world, leftBehind with { Evaluations = [removed] }, [], Elapsed, Detailed).Lines.ToList();
+        var lines = LogSections.BuildInvisibleLeftBehindSection(world, leftBehind with { Evaluations = [removed] }, [], Elapsed, Detailed).Lines.ToList();
 
         Assert.DoesNotContain("and restored", lines[0], StringComparison.Ordinal);
         Assert.StartsWith("Invisible objects left behind: 1 evaluated in 1.5s; removed 1 (0 inside another mod's object, 1 surroundings removed); kept 0 (", lines[0]);
@@ -410,7 +424,7 @@ public sealed class RestingObjectsEndSectionsTests
         KeptObject[] kept = [new(Protected, QuestReason, null)];
 
 
-        AssertExpectedOutput(LogSections.BuildLeftBehindSection(world, leftBehind, kept, Elapsed, Detailed).Lines.ToList(), "Leftovers_DetailedLogMatchesTheExpectedOutput");
+        AssertExpectedOutput(LogSections.BuildInvisibleLeftBehindSection(world, leftBehind, kept, Elapsed, Detailed).Lines.ToList(), "Leftovers_DetailedLogMatchesTheExpectedOutput");
     }
 
     [Fact]
@@ -418,7 +432,7 @@ public sealed class RestingObjectsEndSectionsTests
     {
         var (world, _) = LeftBehindScene();
 
-        var section = LogSections.BuildLeftBehindSection(world, LeftBehindResult.SwitchedOff, [], Elapsed, Detailed);
+        var section = LogSections.BuildInvisibleLeftBehindSection(world, InvisibleLeftBehindResult.SwitchedOff, [], Elapsed, Detailed);
 
         Assert.Empty(section.Lines);
     }
@@ -428,8 +442,8 @@ public sealed class RestingObjectsEndSectionsTests
     {
         var (world, _) = LeftBehindScene();
 
-        var lines = LogSections.BuildLeftBehindSection(
-            world, new LeftBehindResult(StepOutcome.StoppedByUnexpectedError, [], [], Broke(LeftBehindParts.LeftBehind)), [], Elapsed, Normal).Lines.ToList();
+        var lines = LogSections.BuildInvisibleLeftBehindSection(
+            world, new InvisibleLeftBehindResult(StepOutcome.StoppedByUnexpectedError, [], [], Broke(InvisibleLeftBehindParts.LeftBehind)), [], Elapsed, Normal).Lines.ToList();
 
         Assert.Equal("Invisible objects left behind: not performed because of an unexpected error.", Assert.Single(lines));
     }
@@ -626,7 +640,7 @@ public sealed class RestingObjectsEndSectionsTests
             })
             .ToList();
 
-        AssertExpectedOutput(LogSections.BuildRemovalSummarySection(world, removals, decisions, TestTargets.TargetName, StepOutcome.SwitchedOff, StepOutcome.SwitchedOff).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "removal-summary");
+        AssertExpectedOutput(LogSections.BuildRemovalSummarySection(world, removals, decisions, TestTargets.TargetName, new SummarizedSteps(StepOutcome.SwitchedOff, StepOutcome.SwitchedOff, StepOutcome.SwitchedOff)).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "removal-summary");
         AssertExpectedOutput(LogSections.BuildKeptSummarySection(kept).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "kept-summary");
         AssertExpectedOutput(LogSections.BuildMarkersByTypeSection(targets, removals, context).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "markers");
         Assert.Equal(["Removed markers by type: 1 Invisible marker doors."], LogSections.BuildMarkersByTypeSection(targets, removals, context).Lines.ToList());
@@ -807,15 +821,15 @@ public sealed class RestingObjectsEndSectionsTests
             TouchChainsFailure: null,
             ReportFileDetails.SwitchedOff);
 
-    private static (CollectedObjects World, LeftBehindResult LeftBehind) LeftBehindScene()
+    private static (CollectedObjects World, InvisibleLeftBehindResult LeftBehind) LeftBehindScene()
     {
         var (world, _) = RunRounds();
-        LeftBehindCheck[] evaluations =
+        InvisibleLeftBehindCheck[] evaluations =
         [
             new(Protected, InvisibleObjectKind.MapMarkers, 500f, null, Surroundings(), LeftBehindOutcome.KeptProtectedType, null),
             new(ProtectedAlsoRemove, InvisibleObjectKind.XMarkers, 300f, world.OtherModObjects[0], Surroundings(), LeftBehindOutcome.RemovedInsideOtherObject, null),
         ];
-        return (world, new LeftBehindResult(StepOutcome.Performed, evaluations, [], Failure: null));
+        return (world, new InvisibleLeftBehindResult(StepOutcome.Performed, evaluations, [], Failure: null));
     }
 
     private static SectorAreas Surroundings()

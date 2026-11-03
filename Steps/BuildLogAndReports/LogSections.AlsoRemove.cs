@@ -12,16 +12,18 @@ internal static partial class LogSections
 {
     public const string AlsoRemoveName = "Also remove";
     public const string AlsoRemoveAfterVisibleLeftBehindName = "Also remove after visible objects left behind";
+    public const string AlsoRemoveAfterClearedAreasName = "Also remove after objects in cleared areas";
 
-    /// <summary>The also-remove step, or the follow-ups of the visible left-behind rounds as one section.</summary>
+    /// <summary>The also-remove step, or the follow-ups of a removal step's rounds as one section.</summary>
     /// <param name="LinkedStep">How the section's "Linked groups" line names the removals the linked ones followed.</param>
     internal sealed record AlsoRemovePass(string StepName, string IdSuffix, string LinkedStep)
     {
         public static readonly AlsoRemovePass First = new(AlsoRemoveName, string.Empty, RunPartText.LinkedStep(RoundKind.AlsoRemove));
-        public static readonly AlsoRemovePass AfterVisibleLeftBehind = new(
-            AlsoRemoveAfterVisibleLeftBehindName,
-            "-after-visible",
-            $"{RunPartText.LinkedStep(RoundKind.AlsoRemove)} after {RunPartText.LinkedStep(RoundKind.VisibleLeftBehind)}");
+        public static readonly AlsoRemovePass AfterVisibleLeftBehind = After(AlsoRemoveAfterVisibleLeftBehindName, "-after-visible", RoundKind.VisibleLeftBehind);
+        public static readonly AlsoRemovePass AfterClearedAreas = After(AlsoRemoveAfterClearedAreasName, "-after-cleared-areas", RoundKind.ClearedArea);
+
+        private static AlsoRemovePass After(string stepName, string idSuffix, RoundKind followed) =>
+            new(stepName, idSuffix, $"{RunPartText.LinkedStep(RoundKind.AlsoRemove)} after {RunPartText.LinkedStep(followed)}");
     }
 
     /// <summary>The section of the also-remove step's mode; the empty one when no round ran, and the not-performed line when the step was stopped.</summary>
@@ -39,19 +41,19 @@ internal static partial class LogSections
             _ => throw new UnreachableException($"Unexpected also-remove outcome {alsoRemove.Outcome}."),
         };
 
-    /// <summary>The also-remove section for the visible left-behind removals: the rounds of all its passes, numbered on from one pass to the next.</summary>
+    /// <summary>The also-remove section for a removal step's removals: the rounds of all its passes, numbered on from one pass to the next.</summary>
     /// <param name="decisions">The run's decisions with the follow-up rounds applied.</param>
-    public static LogSection BuildAlsoRemoveAfterVisibleLeftBehindSection(
-        CollectedObjects world, RestingObjectsResult alsoRemove, IRemovalDecisions decisions, TriangleStoreStats meshes, ReportContext context) =>
+    public static LogSection BuildAlsoRemoveAfterStepSection(
+        AlsoRemovePass pass, CollectedObjects world, RestingObjectsResult alsoRemove, IRemovalDecisions decisions, TriangleStoreStats meshes, ReportContext context) =>
         alsoRemove.Outcome == StepOutcome.StoppedByUnexpectedError
-            ? BuildStoppedSection(AlsoRemovePass.AfterVisibleLeftBehind)
-            : BuildModeSection(AlsoRemovePass.AfterVisibleLeftBehind, world, alsoRemove, decisions, alsoRemove.RoundsTime, meshes, context);
+            ? BuildStoppedSection(pass)
+            : BuildModeSection(pass, world, alsoRemove, decisions, alsoRemove.RoundsTime, meshes, context);
 
     private static LogSection BuildStoppedSection(AlsoRemovePass pass) =>
         new(FollowUpSectionId + pass.IdSuffix, [BuildNotPerformedLine(pass.StepName)]);
 
     /// <summary>Whether the follow-up has anything to say: some pass ran rounds from seeds, or the follow-ups were stopped.</summary>
-    public static bool PrintsAfterVisibleLeftBehind(RestingObjectsResult alsoRemove) =>
+    public static bool PrintsFollowUp(RestingObjectsResult alsoRemove) =>
         alsoRemove.HadSeeds || alsoRemove.Outcome == StepOutcome.StoppedByUnexpectedError;
 
     /// <summary>The section of the rounds that ran: the touch section or the anchoring section, by the step's mode.</summary>

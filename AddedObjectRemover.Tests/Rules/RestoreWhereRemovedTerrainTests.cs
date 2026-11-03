@@ -40,7 +40,7 @@ public sealed class RestoreWhereRemovedTerrainTests
         Terrain: true,
         Cells: false,
         Navmeshes: false,
-        new ClearedArea(SearchRadius: 1000f, MaxStandingSizePercent: 0.1, MaxStandingCountPercent: 0.1, ClearedAreaShares.Both),
+        new ClearedArea(SearchRadius: 1000f, MaxStandingSizePercent: 0.1, MaxStandingCountPercent: 0.1),
         TerrainEdgeBlendDistance: 0f,
         HeightTolerance,
         WaterHeightChangeTolerance: 8f,
@@ -603,19 +603,21 @@ public sealed class RestoreWhereRemovedTerrainTests
             workers);
         var final = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved), targets.Length)
             .Apply(RoundKind.TooClose, [.. scene.Removals.Select(index => new ProposedRemoval(new TargetId(index), new TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);
+        var caches = new TestRunCaches(Shapes, navmeshes: NoNavmeshes, shownTargets: TestScenes.Create(targets, [], Shapes).IndexShownTargets);
+        var restore = settings ?? Settings;
         return RestoreLoopReuse.Plan(
             new(
                 new(collected, OtherModsObjectsResult.SwitchedOff),
                 final,
+                TestClearedAreas.Of(collected, final, caches, restore),
                 new(rules.WorldCaches, rules.TooCloseRule(), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),
-                rules.Leftovers(targets, final),
                 new(
-                    new TestRunCaches(Shapes, navmeshes: NoNavmeshes, shownTargets: TestScenes.Create(targets, [], Shapes).IndexShownTargets),
+                    caches,
                     new TestLandPlugin(space => space == ChildSpace ? Space : space, _ => new LandHeights(null, null)),
                     Plugins,
                     TestTargets.TargetName),
                 new Execution(workers),
-                settings ?? Settings,
+                restore,
                 () => TimeSpan.Zero));
     }
 

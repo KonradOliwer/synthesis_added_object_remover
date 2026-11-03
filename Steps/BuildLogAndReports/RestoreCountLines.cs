@@ -1,4 +1,5 @@
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
@@ -87,20 +88,6 @@ internal static class RestoreCountLines
             var guards = refused.GroupBy(group => group.Guard).OrderBy(group => group.Key);
             yield return $"{TextFormat.Count(refused.Sum(group => group.Members), "navmesh", "navmeshes")} "
                 + $"({TextLists.JoinCounts(guards, group => RestoreWhereRemovedText.Guard(group.Key), group => group.Sum(member => member.Members), Describe.ListSeparator)})";
-        }
-    }
-
-    /// <summary>The cleaned mod's objects that still stood in a restored area: those removed, and those kept, per reason.</summary>
-    public static IEnumerable<string> Leftovers(RestoreJudgements judged)
-    {
-        var removed = judged.Result.Leftovers.Count(leftover => leftover.IsRemoved);
-        if (removed > 0) yield return $"{TextFormat.Count(removed)} {RestoreWhereRemovedText.LeftoverRemoved}";
-
-        var kept = judged.Result.Leftovers.Where(leftover => !leftover.IsRemoved).ToList();
-        if (kept.Count > 0)
-        {
-            var groups = KeyedGroups.Rank(KeyedGroups.CountBy(kept, RestoreWhereRemovedText.LeftoverKeptGroup, StringComparer.Ordinal), StringComparer.Ordinal);
-            yield return $"{TextFormat.Count(kept.Count)} {RestoreWhereRemovedText.LeftoverKept} ({string.Join(Describe.ListSeparator, TextLists.Counts(groups))})";
         }
     }
 

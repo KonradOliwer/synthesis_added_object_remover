@@ -3,6 +3,7 @@ using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
@@ -17,7 +18,7 @@ internal static class RemovalList
 {
     /// <summary>The objects with the reasons that took them from where the cleaned mod put them, in the order given: the order the patch was written in.</summary>
     public static List<ObjectWithReason> WithReasons(
-        IEnumerable<TargetId> inWriteOrder, IRemovalDecisions decisions, CollectedObjects world, VisibleLeftBehindResult visibleLeftBehind, LeftBehindResult leftBehind) =>
+        IEnumerable<TargetId> inWriteOrder, IRemovalDecisions decisions, CollectedObjects world, VisibleLeftBehindResult visibleLeftBehind, InvisibleLeftBehindResult leftBehind) =>
         WithReasons(inWriteOrder, decisions, world, ChecksOf(visibleLeftBehind, leftBehind));
 
     /// <summary>The objects of a round that holds no left-behind object, with their reasons.</summary>
@@ -53,7 +54,7 @@ internal static class RemovalList
     private static List<ObjectWithReason> WithReasons(IEnumerable<TargetId> targets, IRemovalDecisions decisions, CollectedObjects world, LeftBehindChecks checks) =>
         [.. targets.Select(target => ToObjectWithReason(target, decisions.Of(target)!.Reason, world, checks))];
 
-    private static LeftBehindChecks ChecksOf(VisibleLeftBehindResult visibleLeftBehind, LeftBehindResult leftBehind) =>
+    private static LeftBehindChecks ChecksOf(VisibleLeftBehindResult visibleLeftBehind, InvisibleLeftBehindResult leftBehind) =>
         new(VisibleLeftBehindByTarget(visibleLeftBehind.Evaluations), LeftBehindByTarget(leftBehind.Evaluations));
 
     private static readonly LeftBehindChecks NoChecks = new(VisibleLeftBehindByTarget([]), LeftBehindByTarget([]));
@@ -61,11 +62,12 @@ internal static class RemovalList
     private static PerIndexTable<VisibleLeftBehindCheck> VisibleLeftBehindByTarget(IEnumerable<VisibleLeftBehindCheck> evaluations) =>
         PerIndexTable<VisibleLeftBehindCheck>.From(evaluations, evaluation => evaluation.TargetIndex);
 
-    private static PerIndexTable<LeftBehindCheck> LeftBehindByTarget(IEnumerable<LeftBehindCheck> evaluations) =>
-        PerIndexTable<LeftBehindCheck>.From(evaluations, evaluation => evaluation.TargetIndex);
+    private static PerIndexTable<InvisibleLeftBehindCheck> LeftBehindByTarget(IEnumerable<InvisibleLeftBehindCheck> evaluations) =>
+        PerIndexTable<InvisibleLeftBehindCheck>.From(evaluations, evaluation => evaluation.TargetIndex);
 
     private static ObjectWithReason ToObjectWithReason(TargetId target, RemovalReason reason, CollectedObjects world, LeftBehindChecks checks) => reason switch
     {
+        InClearedArea cleared => new ObjectWithReason.InClearedArea(target.Index, cleared.Area),
         TerrainChanged changed => new ObjectWithReason.TerrainChanged(target.Index, changed.ChangedBy, changed.Kind),
         TooClose tooClose => new ObjectWithReason.TooClose(target.Index, world.OtherModObjects[tooClose.Other.Index], tooClose.Cause),
         TouchingTargetThatLeft touching => new ObjectWithReason.Touching(target.Index, touching.Touched.Index),
@@ -76,13 +78,12 @@ internal static class RemovalList
         VisibleObjectSurroundingsRemoved => new ObjectWithReason.VisibleLeftBehind(target.Index, checks.Visible.Get(target.Index)),
         InsideAnotherModsObject or SurroundingsRemoved => new ObjectWithReason.LeftBehind(target.Index, checks.Invisible.Get(target.Index)),
         LinkedTo linked => new ObjectWithReason.LinkedTo(target.Index, linked.To.Index),
-        LeftoverInRestoredArea => new ObjectWithReason.LeftoverInRestoredArea(target.Index),
         // Each step declares its own reasons, so the compiler cannot see that one is missing here.
         _ => throw new InvalidOperationException($"Unknown removal reason {reason}."),
     };
 
     /// <summary>The left-behind steps' checks of the removed objects, by target.</summary>
-    private sealed record LeftBehindChecks(PerIndexTable<VisibleLeftBehindCheck> Visible, PerIndexTable<LeftBehindCheck> Invisible);
+    private sealed record LeftBehindChecks(PerIndexTable<VisibleLeftBehindCheck> Visible, PerIndexTable<InvisibleLeftBehindCheck> Invisible);
 
     private static KeptObject ToKept(IRemovalDecisions decisions, TargetId target, Decision.Kept kept)
     {

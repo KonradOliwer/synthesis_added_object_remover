@@ -94,17 +94,9 @@ public static class OtherModsObjects
     /// </summary>
     public static Decided<OtherModsObjectsResult> Settle(Input input)
     {
-        var result = SettleLeftWithoutSupport(new(input.Judging, input.AfterFits, input.AlsoRemove, input.AlsoRemoveRounds), input.Decisions);
+        var result = SettleLeftWithoutSupport(input);
         return new Decided<OtherModsObjectsResult>(result, input.Decisions.ApplyRounds(AlsoRemoveRounds.Opening, result.ProposedRounds));
     }
-
-    /// <summary>What the step reads besides the decisions it settles against.</summary>
-    /// <param name="AfterFits">The decisions with every fit: the rounds measure an object shrunk or turned and removed later at its new placement.</param>
-    /// <param name="AlsoRemoveRounds">Asked only when <paramref name="AlsoRemove"/> is not Nothing.</param>
-    public sealed record SettlingInput(SupportJudging Judging, IRemovalDecisions AfterFits, AlsoRemoveSettings AlsoRemove, IAlsoRemoveRoundsAfter AlsoRemoveRounds);
-
-    /// <summary>The step settled again once the restore step removed the leftovers in the areas it restores (see <see cref="SettlingAfterLeftovers"/>).</summary>
-    public static IOtherModsObjectsAfterLeftovers CreateSettlingAfterLeftovers(SettlingInput input) => new SettlingAfterLeftovers(input);
 
     /// <summary>
     /// What becomes of the other mods' objects left without support once the also-remove rounds are decided, and the also-remove
@@ -112,10 +104,10 @@ public static class OtherModsObjects
     /// are decided on a working copy of the decisions, which never changes, and proposed. The rounds measure each target object
     /// kept shrunk or turned at its new placement.
     /// </summary>
-    /// <param name="decisions">The decisions of every removal round so far, the also-remove rounds included.</param>
     /// <remarks>The objects of any plugin are asked only when a target object was removed, shrunk or turned.</remarks>
-    internal static OtherModsObjectsResult SettleLeftWithoutSupport(SettlingInput input, IRemovalDecisions decisions)
+    private static OtherModsObjectsResult SettleLeftWithoutSupport(Input input)
     {
+        var decisions = input.Decisions;
         var judging = input.Judging;
         if (judging.Settings.Handling == OtherModsObjectsHandling.KeepSupportingObject) return OtherModsObjectsResult.SwitchedOff;
 

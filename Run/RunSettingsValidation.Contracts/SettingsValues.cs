@@ -34,8 +34,8 @@ public interface ISettingsValues
     ITrustSettingsValues Trust { get; }
     ICollisionSettingsValues Collision { get; }
     IFollowUpSettingsValues FollowUpRemoval { get; }
-    IVisibleLeftoverSettingsValues LeftoverVisibleObjects { get; }
-    ILeftoverSettingsValues LeftoverInvisibleObjects { get; }
+    ILeftoverObjectsSettingsValues LeftoverObjects { get; }
+    IInvisibleLeftoverSettingsValues LeftoverInvisibleObjects { get; }
     IRestoreWhereRemovedSettingsValues RestoreWhereRemoved { get; }
 }
 
@@ -134,14 +134,17 @@ public interface ISurroundingObjectsSettingsValues
     int ClearedDirectionsPercent { get; }
 }
 
-public interface IVisibleLeftoverSettingsValues
+public interface ILeftoverObjectsSettingsValues
 {
-    bool RemoveLeftoverVisibleObjects { get; }
+    int MinObjectsAround { get; }
+    bool RemoveBySurroundingDirections { get; }
     ISurroundingObjectsSettingsValues SurroundingObjects { get; }
+    bool RemoveObjectsInClearedAreas { get; }
+    IClearedAreaSettingsValues ClearedArea { get; }
     IReadOnlyList<VisibleObjectKind> NeverRemove { get; }
 }
 
-public interface ILeftoverSettingsValues
+public interface IInvisibleLeftoverSettingsValues
 {
     bool RemoveLeftoverInvisibleObjects { get; }
     ISurroundingObjectsSettingsValues SurroundingObjects { get; }
@@ -164,5 +167,4 @@ public interface IClearedAreaSettingsValues
     float SearchRadius { get; }
     float MaxStandingSizePercent { get; }
     float MaxStandingCountPercent { get; }
-    ClearedAreaShares SharesThatMustPass { get; }
 }

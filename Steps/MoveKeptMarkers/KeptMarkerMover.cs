@@ -33,7 +33,7 @@ internal sealed class KeptMarkerMover(
         InvisibleObjectKind.OtherMarkers,
     ];
 
-    public MarkerMoves Move(IReadOnlyList<LeftBehindCheck> evaluations, Execution execution)
+    public MarkerMoves Move(IReadOnlyList<InvisibleLeftBehindCheck> evaluations, Execution execution)
     {
         var keptInside = evaluations.Where(IsMovableMarkerKeptInsideOtherObject).ToArray();
         var candidates = keptInside.Where(evaluation => !IsInDeletedCell(evaluation)).ToArray();
@@ -54,22 +54,22 @@ internal sealed class KeptMarkerMover(
             Failure: null);
     }
 
-    private bool IsMovableMarkerKeptInsideOtherObject(LeftBehindCheck evaluation) =>
+    private bool IsMovableMarkerKeptInsideOtherObject(InvisibleLeftBehindCheck evaluation) =>
         evaluation.ContainingObject != null
         && !evaluation.IsRemoved
         && MovableKinds.Contains(evaluation.Kind);
 
     /// <remarks>A marker in a cell the final world deletes stays where it is: the patch writes nothing into a deleted cell.</remarks>
-    private bool IsInDeletedCell(LeftBehindCheck evaluation) => targets[evaluation.TargetIndex].CellDeleted is not null;
+    private bool IsInDeletedCell(InvisibleLeftBehindCheck evaluation) => targets[evaluation.TargetIndex].CellDeleted is not null;
 
-    private FoundMove? TryFindMove(LeftBehindCheck evaluation, ObjectQueryScratch scratch)
+    private FoundMove? TryFindMove(InvisibleLeftBehindCheck evaluation, ObjectQueryScratch scratch)
     {
         if (homeCellOf(evaluation.TargetIndex) is not { } homeCell) return TryFindMoveIn(evaluation, allowedCells: null, homeCell: null, scratch);
         return TryFindMoveIn(evaluation, homeCell, homeCell, scratch)
                ?? TryFindMoveIn(evaluation, homeCell.WithNeighbors(), homeCell, scratch);
     }
 
-    private FoundMove? TryFindMoveIn(LeftBehindCheck evaluation, CellArea? allowedCells, CellArea? homeCell, ObjectQueryScratch scratch)
+    private FoundMove? TryFindMoveIn(InvisibleLeftBehindCheck evaluation, CellArea? allowedCells, CellArea? homeCell, ObjectQueryScratch scratch)
     {
         var target = targets[evaluation.TargetIndex];
         var from = target.Transform.Position;

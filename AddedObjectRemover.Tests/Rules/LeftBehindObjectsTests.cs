@@ -22,9 +22,8 @@ public class LeftBehindObjectsTests
 
     private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(OtherMod, "LeftBehindObjectsData", Room));
 
-    private static readonly LeftBehindSettings Settings = new(
-        new LeftBehindSurroundings(LookAround: 1024, MinOccupiedDirections: 4, DirectionClearedPercent: 50, ClearedDirectionsPercent: 60),
-        NeverRemove: new NeverRemovedInvisibleKinds(new HashSet<InvisibleObjectKind>()));
+    private static readonly InvisibleLeftBehindSettings Settings = new(
+        new LeftBehindSurroundings(LookAround: 1024, MinOccupiedDirections: 4, DirectionClearedPercent: 50, ClearedDirectionsPercent: 60));
 
     private static readonly BaseKey XMarker = TestVisibility.TaggedBase(ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers));
 
@@ -66,7 +65,7 @@ public class LeftBehindObjectsTests
         var proposal = Assert.Single(result.Proposals);
         Assert.Equal(0, proposal.Target.Index);
         Assert.Equal(result.Evaluations.Where(evaluation => evaluation.IsRemoved).Select(evaluation => evaluation.TargetIndex), result.Proposals.Select(p => p.Target.Index));
-        Assert.Equal(new Round(1, RoundKind.LeftBehind), Assert.Single(decided.Rounds));
+        Assert.Equal(new Round(1, RoundKind.InvisibleLeftBehind), Assert.Single(decided.Rounds));
         Assert.Equal(proposal.Target, Assert.Single(decided.LeftIn(decided.Rounds[0])));
     }
 
@@ -206,7 +205,7 @@ public class LeftBehindObjectsTests
 
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
         Assert.Empty(decided.RemovedTargets());
-        Assert.Equal(new PartFailure(LeftBehindParts.LeftBehind, "PlantedUserDataException: it broke", Subject: null), result.Failure! with { Details = null });
+        Assert.Equal(new PartFailure(InvisibleLeftBehindParts.LeftBehind, "PlantedUserDataException: it broke", Subject: null), result.Failure! with { Details = null });
         Assert.StartsWith("AddedObjectRemover.Tests.Fixtures.PlantedUserDataException: it broke.", result.Failure.Details, StringComparison.Ordinal);
         Assert.Empty(result.Evaluations);
         Assert.Empty(result.Proposals);
@@ -228,8 +227,8 @@ public class LeftBehindObjectsTests
     public void AStoppedLeftBehindStepMeansTheMarkerMoveStepIsNotPerformedAndAsksForNothing()
     {
         var asked = false;
-        var stopped = new LeftBehindResult(
-            StepOutcome.StoppedByUnexpectedError, [], [], new PartFailure(LeftBehindParts.LeftBehind, "PlantedUserDataException: it broke", Subject: null));
+        var stopped = new InvisibleLeftBehindResult(
+            StepOutcome.StoppedByUnexpectedError, [], [], new PartFailure(InvisibleLeftBehindParts.LeftBehind, "PlantedUserDataException: it broke", Subject: null));
 
         var result = DecideMoves(
             stopped,
@@ -273,7 +272,7 @@ public class LeftBehindObjectsTests
     /// <summary>The marker moves after the left-behind step kept every marker, over a navmesh square around the targets' space origin.</summary>
     private static Decided<MarkerMoves> DecideMoves(MarkerMoveSettings settings, Func<IVisibleObjectsOfAnyPlugin>? objectsOfAnyPlugin = null) =>
         DecideMoves(
-            Find(StartDecisions(), Settings with { NeverRemove = new NeverRemovedInvisibleKinds(new HashSet<InvisibleObjectKind> { InvisibleObjectKind.XMarkers }) }),
+            Find(StartDecisions(), Settings, kindsAlwaysKept: TestLeftBehind.KindsAlwaysKept(Shapes, InvisibleObjectKind.XMarkers)),
             settings,
             objectsOfAnyPlugin,
             new Dictionary<RecordKey, List<CellNavmesh>> { [TestTargets.Space] = [new CellNavmesh(new RecordKey(TestTargets.TargetName, 0x400), (0, 0), SquareNavmesh(1000))] });
@@ -281,7 +280,7 @@ public class LeftBehindObjectsTests
     /// <param name="objectsOfAnyPlugin">Gives the objects of any plugin as the run leaves them; by default the scene's, none of them changed.</param>
     /// <returns>The step's result, with its moves added to decisions where no round has run.</returns>
     private static Decided<MarkerMoves> DecideMoves(
-        LeftBehindResult leftBehind,
+        InvisibleLeftBehindResult leftBehind,
         MarkerMoveSettings settings,
         Func<IVisibleObjectsOfAnyPlugin>? objectsOfAnyPlugin,
         Dictionary<RecordKey, List<CellNavmesh>> navmeshes)
@@ -307,28 +306,30 @@ public class LeftBehindObjectsTests
                 settings));
     }
 
-    private static IEnumerable<(int Target, InvisibleObjectKind Kind, float Radius, OtherId? Host, LeftBehindOutcome Decision, int Occupied, int Removed)> Summarize(LeftBehindResult result) =>
+    private static IEnumerable<(int Target, InvisibleObjectKind Kind, float Radius, OtherId? Host, LeftBehindOutcome Decision, int Occupied, int Removed)> Summarize(InvisibleLeftBehindResult result) =>
         result.Evaluations.Select(e => (e.TargetIndex, e.Kind, e.Radius, e.ContainingObject?.Id, e.Decision, e.Surroundings.OccupiedCount, e.Surroundings.RemovedCount));
 
     private static RemovalDecisions StartDecisions() => TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Length), TestBaseFacts.Unresolved), Targets.Length);
 
     private static ObjectCaches CreateScene() => TestScenes.Create(Targets, Others, Shapes, supportOnlyObjects: []);
 
-    private static LeftBehindResult Find(IRunDecisions decisions, LeftBehindSettings? settings, OtherModsObjectsResult? otherMods = null) =>
-        Decide(decisions, settings, otherMods).Result;
+    private static InvisibleLeftBehindResult Find(
+        IRunDecisions decisions, InvisibleLeftBehindSettings? settings, OtherModsObjectsResult? otherMods = null, IKindsAlwaysKept? kindsAlwaysKept = null) =>
+        Decide(decisions, settings, otherMods, kindsAlwaysKept: kindsAlwaysKept).Result;
 
     /// <param name="otherMods">Takes nothing away by default.</param>
     /// <param name="surroundings">The visible targets of the scene by default.</param>
     /// <returns>The step's result, with its round added to <paramref name="decisions"/>.</returns>
-    private static Decided<LeftBehindResult> Decide(
+    private static Decided<InvisibleLeftBehindResult> Decide(
         IRunDecisions decisions,
-        LeftBehindSettings? settings,
+        InvisibleLeftBehindSettings? settings,
         OtherModsObjectsResult? otherMods = null,
-        Func<ObjectCaches, IVisibleTargetObjects>? surroundings = null)
+        Func<ObjectCaches, IVisibleTargetObjects>? surroundings = null,
+        IKindsAlwaysKept? kindsAlwaysKept = null)
     {
         var scene = CreateScene();
         Func<IReadOnlyList<TargetObject>, IVisibleTargetObjects> indexTargets = surroundings is null ? scene.IndexVisibleTargets : _ => surroundings(scene);
-        return LeftBehindObjects.Find(
+        return InvisibleLeftBehindObjects.Find(
             new(
                 Targets,
                 scene.ObjectsThatCanCauseRemovals(Replacements.None(Others.Length), NpcHandling.OnlyWhenStuckInsideTheObject),
@@ -338,7 +339,9 @@ public class LeftBehindObjectsTests
                     Shapes,
                     bases: TestBaseFacts.Reader(new SkyrimMod(ModKey.FromNameAndExtension("Reach.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
                     visibleTargets: indexTargets),
-                VisibleLeftBehindObjects.CreateLeftBehindJudging(),
+                kindsAlwaysKept ?? TestLeftBehind.KindsAlwaysKept(Shapes),
+                VisibleLeftBehindObjects.CreateSurroundingsJudging(),
+                VisibleLeftBehindObjects.CreateLeftBehindRoundJoin(),
                 TargetWorkOrder.Of(Targets),
                 new Execution(Environment.ProcessorCount),
                 settings));

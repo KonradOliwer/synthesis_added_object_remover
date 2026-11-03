@@ -4,42 +4,39 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
-using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
 
 /// <summary>
-/// Final removal step: selects the target's invisible objects (critter spawners, sound and idle
-/// markers, lights, trigger boxes, ...) that sit inside another mod's visible object or whose
-/// surroundings, the target's visible objects around them, were removed. Every object is first
-/// evaluated against the removals of the earlier steps only, and the removals are applied together
-/// afterwards, so invisible objects never influence each other. The rule only proposes; the
-/// removal decisions keep referenced objects and removes the linked groups of the removals.
+/// Selects the target's invisible objects that sit inside another mod's visible object or whose surroundings, the target's visible
+/// objects around them, were removed. Every object is evaluated against the removals of the earlier steps only and the removals are
+/// applied together afterwards, so invisible objects never influence each other.
 /// </summary>
-internal sealed class LeftBehindRule(
+internal sealed class InvisibleLeftBehindRule(
     IReadOnlyList<TargetObject> targets,
     IBaseObjectShapes shapes,
     IVisibleTargetObjects surroundings,
     ContainingObjects containingObjects,
     ReachRule reach,
-    ILeftBehindJudging judging,
-    LeftBehindSettings config,
+    ISurroundingsJudging judging,
+    ILeftBehindRoundJoin roundJoin,
+    InvisibleLeftBehindSettings config,
     IKindsAlwaysKept kindsAlwaysKept,
     WorkOrder order)
 {
     /// <param name="decisions">The decisions of the earlier steps: their removals count as cleared, and the objects they decided are not evaluated again.</param>
-    public LeftBehindResult SelectRemovals(IRemovalDecisions decisions, Execution execution)
+    public InvisibleLeftBehindResult SelectRemovals(IRemovalDecisions decisions, Execution execution)
     {
         var evaluations = EvaluateAll(decisions, execution);
-        return new LeftBehindResult(StepOutcome.Performed, evaluations, judging.ProposalsOf(evaluations, ReasonOf), Failure: null);
+        return new InvisibleLeftBehindResult(StepOutcome.Performed, evaluations, roundJoin.ProposalsOf(evaluations, ReasonOf), Failure: null);
     }
 
-    private static RemovalReason ReasonOf(LeftBehindCheck evaluation) =>
+    private static RemovalReason ReasonOf(InvisibleLeftBehindCheck evaluation) =>
         evaluation.ContainingObject is { } container
             ? new InsideAnotherModsObject(container.Id)
             : new SurroundingsRemoved();
 
-    private LeftBehindCheck[] EvaluateAll(IRemovalDecisions decisions, Execution execution) =>
+    private InvisibleLeftBehindCheck[] EvaluateAll(IRemovalDecisions decisions, Execution execution) =>
         ParallelMap.RunOver(
             execution,
             order,
@@ -49,7 +46,7 @@ internal sealed class LeftBehindRule(
             ParallelMap.AutomaticRangeSize);
 
     /// <param name="neighbours">The calling worker's buffer.</param>
-    private LeftBehindCheck Evaluate(int targetIndex, IRemovalDecisions decisions, List<VisibleTargetNear> neighbours)
+    private InvisibleLeftBehindCheck Evaluate(int targetIndex, IRemovalDecisions decisions, List<VisibleTargetNear> neighbours)
     {
         var target = targets[targetIndex];
         var kind = shapes.VisibilityOf(target).Kind!.Value;
@@ -57,7 +54,7 @@ internal sealed class LeftBehindRule(
         var containingObject = containingObjects.Of(targetIndex);
         var areas = MeasureSurroundings(target, radius, decisions, neighbours);
         var decision = judging.Judge(areas, config.Surroundings, isInsideAnotherModsObject: containingObject != null, isProtectedKind: kindsAlwaysKept.KindKeeping(target) != null);
-        return new LeftBehindCheck(targetIndex, kind, radius, containingObject, areas, decision, KeepReason: null);
+        return new InvisibleLeftBehindCheck(targetIndex, kind, radius, containingObject, areas, decision, KeepReason: null);
     }
 
     private float GetEffectiveRadius(TargetObject target)

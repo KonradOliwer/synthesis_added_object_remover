@@ -71,12 +71,4 @@ public class ClearedAreaSettings : IClearedAreaSettingsValues
         "The share of the cleaned mod's objects in the area that may still stand, counted by number: each object once, effect-only ones included.\n"
         + "0 means none may stand. Decimals are allowed. 0-100.")]
     public float MaxStandingCountPercent { get; set; } = SettingDefaults.ClearedAreaMaxStandingCountPercent;
-
-    [SynthesisOrder]
-    [SynthesisSettingName(SettingNames.SharesThatMustPass)]
-    [SynthesisTooltip(
-        "Both: the area counts as cleared only when the share by size and the share by number are each at most their limit.\n"
-        + "Either: one of them is enough. Either clears more areas: a large removed piece can then clear an area where many small pieces still stand,\n"
-        + "and those pieces are removed as leftovers.")]
-    public ClearedAreaShares SharesThatMustPass { get; set; } = SettingDefaults.SharesThatMustPass;
 }

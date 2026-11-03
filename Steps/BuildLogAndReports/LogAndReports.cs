@@ -11,6 +11,7 @@ using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
@@ -177,7 +178,7 @@ public sealed partial class LogAndReports
     /// follow-up's sections, which print the follow-up's own failure; the log cannot tell which round recorded a cache error.
     /// </remarks>
     public ImmutableArray<LogSection> BuildStepSections(VisibleLeftBehindResult found, IRemovalDecisions decisions, CollectedObjects world, TimeSpan elapsed) =>
-        [.. BuildVisibleLeftBehindSections(found, decisions, world, elapsed), .. BuildFollowUpAfterVisibleLeftBehindSections(found.FollowUp, decisions, world)];
+        [.. BuildVisibleLeftBehindSections(found, decisions, world, elapsed), .. BuildFollowUpSections(LogSections.AlsoRemovePass.AfterVisibleLeftBehind, found.FollowUp, decisions, world)];
 
     /// <remarks>A switched-off step prints nothing, not even an empty section.</remarks>
     private ImmutableArray<LogSection> BuildVisibleLeftBehindSections(VisibleLeftBehindResult found, IRemovalDecisions decisions, CollectedObjects world, TimeSpan elapsed)
@@ -185,25 +186,45 @@ public sealed partial class LogAndReports
         if (found.Outcome == StepOutcome.SwitchedOff) return [];
 
         var kept = found.Rounds.SelectMany(round => RemovalList.KeptIn(decisions, round));
-        var section = LogSections.BuildVisibleLeftBehindSection(world, found, kept, elapsed, _context);
+        var settings = _settings.VisibleLeftBehind ?? throw new UnreachableException("The visible left-behind step ran without its settings.");
+        var section = LogSections.BuildVisibleLeftBehindSection(world, found, kept, settings.MinObjectsAround, elapsed, _context);
         return BuildRoundSections(section, decisions, found.Rounds, RoundKind.VisibleLeftBehind, PartFailure.Present(found.Failure));
+    }
+
+    /// <summary>The step's section, then those of the also-remove follow-up of its round.</summary>
+    /// <param name="decisions">The decisions that include the step's round and its follow-up rounds.</param>
+    /// <remarks>The follow-up's unexpected errors print as those of the visible step's follow-ups do (see the visible step's sections).</remarks>
+    public ImmutableArray<LogSection> BuildStepSections(ObjectsInClearedAreasResult found, IRemovalDecisions decisions, CollectedObjects world) =>
+        [.. BuildObjectsInClearedAreasSections(found, decisions, world), .. BuildFollowUpSections(LogSections.AlsoRemovePass.AfterClearedAreas, found.FollowUp, decisions, world)];
+
+    /// <remarks>A switched-off step prints nothing, and a section without a line is left out, not printed empty.</remarks>
+    private ImmutableArray<LogSection> BuildObjectsInClearedAreasSections(ObjectsInClearedAreasResult found, IRemovalDecisions decisions, CollectedObjects world)
+    {
+        if (found.Outcome == StepOutcome.SwitchedOff) return [];
+
+        var rounds = decisions.Rounds.Where(round => round.Kind == RoundKind.ClearedArea).ToList();
+        var settings = _settings.ObjectsInClearedAreas ?? throw new UnreachableException("The step for objects in cleared areas ran without its settings.");
+        var section = LogSections.BuildObjectsInClearedAreasSection(
+            world, found, rounds.SelectMany(round => RemovalList.KeptIn(decisions, round)), settings.MinObjectsAround, _context);
+        return [.. WhenItHasLines(section), .. BuildRoundSections(decisions, rounds, RoundKind.ClearedArea, PartFailure.Present(found.Failure))];
     }
 
     /// <summary>The step's section, the line for the removals linked to its own, then the step's unexpected errors.</summary>
     /// <param name="rounds">The step's rounds in <paramref name="decisions"/>.</param>
     private ImmutableArray<LogSection> BuildRoundSections(
-        LogSection section, IRemovalDecisions decisions, IEnumerable<Round> rounds, RoundKind kind, IEnumerable<PartFailure> failures)
-    {
-        var linked = LogSections.BuildLinkedSection(decisions, rounds, kind, _context);
-        return [section, linked, TakeUnexpectedErrors(failures)];
-    }
+        LogSection section, IRemovalDecisions decisions, IEnumerable<Round> rounds, RoundKind kind, IEnumerable<PartFailure> failures) =>
+        [section, .. BuildRoundSections(decisions, rounds, kind, failures)];
+
+    /// <summary>The line for the removals linked to the step's own, then the step's unexpected errors.</summary>
+    private ImmutableArray<LogSection> BuildRoundSections(IRemovalDecisions decisions, IEnumerable<Round> rounds, RoundKind kind, IEnumerable<PartFailure> failures) =>
+        [LogSections.BuildLinkedSection(decisions, rounds, kind, _context), TakeUnexpectedErrors(failures)];
 
     /// <param name="final">The decisions whose last round is the left-behind round.</param>
-    public ImmutableArray<LogSection> BuildStepSections(LeftBehindResult found, IRemovalDecisions final, CollectedObjects world, TimeSpan elapsed)
+    public ImmutableArray<LogSection> BuildStepSections(InvisibleLeftBehindResult found, IRemovalDecisions final, CollectedObjects world, TimeSpan elapsed)
     {
         var lastRound = final.Rounds[^1];
-        var leftBehind = LogSections.BuildLeftBehindSection(world, found, RemovalList.KeptIn(final, lastRound), elapsed, _context);
-        return BuildRoundSections(leftBehind, final, [lastRound], RoundKind.LeftBehind, PartFailure.Present(found.Failure));
+        var leftBehind = LogSections.BuildInvisibleLeftBehindSection(world, found, RemovalList.KeptIn(final, lastRound), elapsed, _context);
+        return BuildRoundSections(leftBehind, final, [lastRound], RoundKind.InvisibleLeftBehind, PartFailure.Present(found.Failure));
     }
 
     public ImmutableArray<LogSection> BuildStepSections(MarkerMoves moves, CollectedObjects world, TimeSpan elapsed)

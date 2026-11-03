@@ -23,25 +23,15 @@ public sealed class ReasonItemsTests
             new ObjectWithReason.TouchingAnotherModsObject(5, default),
             new ObjectWithReason.LostSupportWithAnotherModsObject(6, 0.5f, 0f, default),
             new ObjectWithReason.VisibleLeftBehind(7, new VisibleLeftBehindCheck(7, null, surroundings, LeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null)),
-            new ObjectWithReason.LeftBehind(8, new LeftBehindCheck(8, InvisibleObjectKind.XMarkers, 100f, null, surroundings, LeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null)),
+            new ObjectWithReason.LeftBehind(8, new InvisibleLeftBehindCheck(8, InvisibleObjectKind.XMarkers, 100f, null, surroundings, LeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null)),
             new ObjectWithReason.LinkedTo(9, 0),
             new ObjectWithReason.LinkedTo(10, 0),
             new ObjectWithReason.LinkedTo(11, 0),
         ];
 
         Assert.Equal(
-            "1 on changed terrain, 2 too close, 4 follow-up removals, 1 visible objects left behind, 1 invisible objects left behind, 3 linked to removed objects",
-            ReasonItems.Describe(objects, StartDecisions(), StepOutcome.Performed, StepOutcome.Performed, ReasonItems.ForRemovals));
-    }
-
-    [Fact]
-    public void LeftoversWhereAnAreaWasRestoredAreCountedUnderTheirOwnItemOnlyWhenThereAreAny()
-    {
-        ObjectWithReason[] objects = [new ObjectWithReason.LeftoverInRestoredArea(1), new ObjectWithReason.LeftoverInRestoredArea(2), new ObjectWithReason.LinkedTo(3, 1)];
-
-        Assert.Equal(
-            "0 too close, 0 follow-up removals, 0 invisible objects left behind, 1 linked to removed objects, 2 leftovers where the area was restored",
-            ReasonItems.Describe(objects, StartDecisions(), StepOutcome.SwitchedOff, StepOutcome.SwitchedOff, ReasonItems.ForRemovals));
+            "1 on changed terrain, 2 too close, 4 follow-up removals, 1 visible objects left behind, 0 objects in cleared areas, 1 invisible objects left behind, 3 linked to removed objects",
+            ReasonItems.Describe(objects, StartDecisions(), new SummarizedSteps(StepOutcome.Performed, StepOutcome.Performed, StepOutcome.Performed), ReasonItems.ForRemovals));
     }
 
     [Fact]
@@ -51,7 +41,7 @@ public sealed class ReasonItemsTests
 
         Assert.Equal(
             "0 too close, 1 follow-up, 0 invisible objects left behind, 1 linked",
-            ReasonItems.Describe(objects, StartDecisions(), StepOutcome.SwitchedOff, StepOutcome.SwitchedOff, ReasonItems.ForRestorations));
+            ReasonItems.Describe(objects, StartDecisions(), new SummarizedSteps(StepOutcome.SwitchedOff, StepOutcome.SwitchedOff, StepOutcome.SwitchedOff), ReasonItems.ForRestorations));
     }
 
     [Fact]
@@ -66,7 +56,7 @@ public sealed class ReasonItemsTests
 
         Assert.Equal(
             "0 too close, 0 follow-up removals, 0 invisible objects left behind, 1 linked to removed objects, 1 linked to restored objects",
-            ReasonItems.Describe(objects, decisions, StepOutcome.SwitchedOff, StepOutcome.SwitchedOff, ReasonItems.ForRemovals));
+            ReasonItems.Describe(objects, decisions, new SummarizedSteps(StepOutcome.SwitchedOff, StepOutcome.SwitchedOff, StepOutcome.SwitchedOff), ReasonItems.ForRemovals));
     }
 
     [Theory]
@@ -79,11 +69,12 @@ public sealed class ReasonItemsTests
         [
             new ObjectWithReason.TerrainChanged(0, new PluginName("Other.esp"), TerrainChangeKind.Height),
             new ObjectWithReason.VisibleLeftBehind(1, new VisibleLeftBehindCheck(1, null, surroundings, LeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null)),
+            new ObjectWithReason.InClearedArea(2, TestAreaShares.Of(AreaVerdict.Cleared)),
         ];
 
         Assert.Equal(
             "0 too close, 0 follow-up removals, 0 invisible objects left behind, 0 linked to removed objects",
-            ReasonItems.Describe(objects, StartDecisions(), notPerformed, notPerformed, ReasonItems.ForRemovals));
+            ReasonItems.Describe(objects, StartDecisions(), new SummarizedSteps(notPerformed, notPerformed, notPerformed), ReasonItems.ForRemovals));
     }
 
     [Fact]
@@ -91,7 +82,7 @@ public sealed class ReasonItemsTests
     {
         Assert.Equal(
             "0 too close, 0 follow-up removals, 0 invisible objects left behind, 0 linked to removed objects",
-            ReasonItems.Describe([], StartDecisions(), StepOutcome.SwitchedOff, StepOutcome.SwitchedOff, ReasonItems.ForRemovals));
+            ReasonItems.Describe([], StartDecisions(), new SummarizedSteps(StepOutcome.SwitchedOff, StepOutcome.SwitchedOff, StepOutcome.SwitchedOff), ReasonItems.ForRemovals));
     }
 
     [Fact]
@@ -105,7 +96,7 @@ public sealed class ReasonItemsTests
 
         Assert.Equal(
             "0 too close, 2 follow-up removals (1 of them first shrunk or turned), 0 invisible objects left behind, 0 linked to removed objects",
-            ReasonItems.Describe(objects, decisions, StepOutcome.SwitchedOff, StepOutcome.SwitchedOff, ReasonItems.ForRemovals));
+            ReasonItems.Describe(objects, decisions, new SummarizedSteps(StepOutcome.SwitchedOff, StepOutcome.SwitchedOff, StepOutcome.SwitchedOff), ReasonItems.ForRemovals));
     }
 
     private static RemovalDecisions StartDecisions() =>

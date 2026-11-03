@@ -10,11 +10,13 @@ namespace AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 /// <param name="RemovedAreas">Per direction, indexed by <see cref="DirectionSector"/>.</param>
 /// <param name="RestoredAreas">Per direction, indexed by <see cref="DirectionSector"/>.</param>
 /// <param name="States">Per direction, indexed by <see cref="DirectionSector"/>.</param>
+/// <param name="Objects">The boxes measured, each counted once however many directions it covers.</param>
 public sealed record SectorAreas(
     ImmutableArray<float> TotalAreas,
     ImmutableArray<float> RemovedAreas,
     ImmutableArray<float> RestoredAreas,
-    ImmutableArray<SectorState> States)
+    ImmutableArray<SectorState> States,
+    int Objects)
 {
     public int OccupiedCount => States.Count(state => state != SectorState.Empty);
 

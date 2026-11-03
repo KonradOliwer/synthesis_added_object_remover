@@ -44,7 +44,7 @@ public class UnexpectedErrorRunTests
         var clock = new AlsoRemoveRoundsEndClock(() => throw new PlantedUserDataException("also-remove broke"));
         var log = new RecordingLogSink { OnPrint = clock.OnPrint };
         var settings = SettingsVariants.Of(SettingsVariants.TouchWithLeftBehindAndMarkerMoves);
-        settings.Standard.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings { RemoveLeftoverVisibleObjects = false };
+        settings.Standard.LeftoverObjects = new LeftoverObjectSettings { RemoveBySurroundingDirections = false };
 
         var outcome = ((RunResult.Done)FixtureRun.Run(
             settings,
@@ -56,7 +56,7 @@ public class UnexpectedErrorRunTests
         Assert.NotEmpty(healthy.RestingObjects.Rounds);
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, outcome.RestingObjects.Outcome);
         Assert.Empty(outcome.RestingObjects.Rounds);
-        Assert.Equal([RoundKind.ChangedTerrain, RoundKind.TooClose, RoundKind.LeftBehind], outcome.Final.Rounds.Select(round => round.Kind));
+        Assert.Equal([RoundKind.ChangedTerrain, RoundKind.TooClose, RoundKind.InvisibleLeftBehind], outcome.Final.Rounds.Select(round => round.Kind));
         Assert.NotEmpty(outcome.Removals);
         Assert.Equal(outcome.Removals.Select(removal => removal.TargetIndex), outcome.Written.Removed.Select(id => id.Index));
         Assert.Equal(
@@ -119,8 +119,8 @@ public class UnexpectedErrorRunTests
 
         var outcome = RunWithBases(log, inner => bases = new FailingBaseFacts(inner));
 
-        Assert.Contains(healthy.LeftBehind.Evaluations, evaluation => evaluation.IsRemoved);
-        Assert.DoesNotContain(outcome.LeftBehind.Evaluations, evaluation => evaluation.IsRemoved);
+        Assert.Contains(healthy.InvisibleLeftBehind.Evaluations, evaluation => evaluation.IsRemoved);
+        Assert.DoesNotContain(outcome.InvisibleLeftBehind.Evaluations, evaluation => evaluation.IsRemoved);
         Assert.Equal(outcome.Removals.Select(removal => removal.TargetIndex), outcome.Written.Removed.Select(id => id.Index));
         Assert.Equal(
             $"  Unexpected error in the step for invisible objects left behind (MalformedRecordException: {FailingBaseFacts.FailureMessage}). "

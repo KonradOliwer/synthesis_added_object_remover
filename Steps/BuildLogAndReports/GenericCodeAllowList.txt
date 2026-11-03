@@ -14,8 +14,12 @@ LogSections.BuildNotPerformedBecauseEarlierLine | Report wording: the one line o
 LogSections.DescribeAlreadyRemoved | Report wording: the "of them were already removed on changed terrain" part of the too-close line; it takes only the count.
 LogSections.DescribeRestoredOfFound | Report wording: the "of them restored" part of a step's found line; it takes only the count.
 LogSections.AddRowsLine | Report wording: the "wrote N rows" line of a written report file (a CSV tool's table record, not a domain type).
+LogSections.AddEvaluationsLine | Report wording: the "wrote N evaluations" line of a step's written diagnostics file (a CSV tool's table record, not a domain type).
+LogSections.AddWrittenLine | Report wording: the line of a written report file, with what its rows are (a CSV tool's table record, not a domain type).
 LogSections.DescribePluginList | Report wording: prints where the game's plugin list was read from and how many listings it has (a plugin-facts type outside the domain list).
 LogSections.OnOff | Report wording: prints a setting's switch as on or off.
+LogSections.KeptWithTooFewObjectsAround | Report wording: the settings-line part naming the minimum of objects around; it takes only that number.
+LeftBehindOutcomeText.TooFewObjectsAround | Report wording: the objects kept by the minimum of objects around, named by that minimum; it takes only that number.
 LogSections.WhenAny | Report wording: one counted item of the write line, left out when its count is 0; it takes only the count and the words.
 LogSections.OnWith | Report wording: prints a setting's switch as off, or as on with the detail that matters when it is on.
 LogSections.TrustReasonLine | Report wording: one trust reason's line of described plugins, or no line when no plugin has that reason.

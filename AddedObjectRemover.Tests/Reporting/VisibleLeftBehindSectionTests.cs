@@ -19,17 +19,18 @@ public sealed class VisibleLeftBehindSectionTests
     private static readonly ReportContext Detailed = new(null!, null!, Detailed: true);
     private static readonly TimeSpan Elapsed = TimeSpan.FromSeconds(1.5);
     private static readonly TimeSpan RoundsTime = TimeSpan.FromSeconds(0.5);
+    private const int MinObjectsAround = 5;
 
     [Fact]
     public void TheSummaryCountsEveryOutcomeAndTheNormalLogShowsOnlyItAndTheKeptLines()
     {
         var (world, result, decisions) = Scene();
 
-        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Normal).Lines.ToList();
+        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), MinObjectsAround, Elapsed, Normal).Lines.ToList();
 
         Assert.Equal(
             "Visible objects left behind: 6 evaluated; removed 1 (1 surroundings removed); "
-            + "kept 5 (1 too few surrounding objects, 2 surroundings mostly kept, 1 protected type, 1 referenced).",
+            + "kept 5 (0 fewer than 5 of the cleaned mod's other objects around, 1 too few directions with objects, 2 surroundings mostly kept, 1 protected type, 1 referenced).",
             lines[0]);
         Assert.Equal(2, lines.Count);
         Assert.StartsWith("  Kept ", lines[1]);
@@ -40,11 +41,11 @@ public sealed class VisibleLeftBehindSectionTests
     {
         var (world, result, decisions) = Scene();
 
-        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Detailed).Lines.ToList();
+        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), MinObjectsAround, Elapsed, Detailed).Lines.ToList();
 
         Assert.Equal(
             "Visible objects left behind: 6 evaluated in 1.5s; removed 1 (1 surroundings removed); "
-            + "kept 5 (1 too few surrounding objects, 2 surroundings mostly kept, 1 protected type, 1 referenced).",
+            + "kept 5 (0 fewer than 5 of the cleaned mod's other objects around, 1 too few directions with objects, 2 surroundings mostly kept, 1 protected type, 1 referenced).",
             lines[0]);
         var detail = lines.Where(line => line.StartsWith("  Visible left behind: ", StringComparison.Ordinal)).ToList();
         Assert.Equal(4, detail.Count);
@@ -61,11 +62,25 @@ public sealed class VisibleLeftBehindSectionTests
     }
 
     [Fact]
+    public void AnObjectKeptByTheMinimumIsCountedUnderTheMinimumAndHasNoDetailedLine()
+    {
+        var (world, scene, decisions) = Scene();
+        var tooFew = new VisibleLeftBehindCheck(LinkedPartner, null, Areas(northCleared: true), LeftBehindOutcome.KeptTooFewObjectsAround, null);
+        var result = scene with { Evaluations = [.. scene.Evaluations, tooFew] };
+
+        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, [], MinObjectsAround, Elapsed, Detailed).Lines.ToList();
+
+        Assert.Contains("kept 6 (1 fewer than 5 of the cleaned mod's other objects around, 1 too few directions with objects, ", lines[0], StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            lines, line => line.StartsWith("  Visible left behind: ", StringComparison.Ordinal) && line.Contains(RecordNames.Describe(world.Targets[LinkedPartner]), StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void TheDetailedLogNamesTheRoundsThatJudgedAnObjectAndTheirOwnTimeBesideTheStepsTime()
     {
         var (world, result, decisions) = Scene();
 
-        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Detailed).Lines.ToList();
+        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), MinObjectsAround, Elapsed, Detailed).Lines.ToList();
 
         Assert.StartsWith("Visible objects left behind: 6 evaluated in 1.5s; ", lines[0]);
         Assert.Equal("Visible objects left behind: 1 rounds in 0.5s.", lines[1]);
@@ -77,7 +92,7 @@ public sealed class VisibleLeftBehindSectionTests
         var (world, scene, decisions) = Scene();
         var result = scene with { Rounds = [decisions.Rounds[^1], decisions.Rounds[^1], decisions.Rounds[^1]] };
 
-        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, [], Elapsed, Detailed).Lines.ToList();
+        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, [], MinObjectsAround, Elapsed, Detailed).Lines.ToList();
 
         Assert.Equal("Visible objects left behind: 3 rounds in 0.5s.", lines[1]);
     }
@@ -87,7 +102,7 @@ public sealed class VisibleLeftBehindSectionTests
     {
         var (world, result, decisions) = Scene();
 
-        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Normal).Lines.ToList();
+        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), MinObjectsAround, Elapsed, Normal).Lines.ToList();
 
         Assert.DoesNotContain(lines, line => line.Contains(" rounds in ", StringComparison.Ordinal));
     }
@@ -98,7 +113,7 @@ public sealed class VisibleLeftBehindSectionTests
         var (world, scene, decisions) = Scene();
         var result = scene with { Rounds = [], RoundsTime = TimeSpan.Zero };
 
-        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Detailed).Lines.ToList();
+        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), MinObjectsAround, Elapsed, Detailed).Lines.ToList();
 
         Assert.DoesNotContain(lines, line => line.Contains(" rounds in ", StringComparison.Ordinal));
     }
@@ -123,11 +138,11 @@ public sealed class VisibleLeftBehindSectionTests
             LinkedPartner, null, Areas(northCleared: false), LeftBehindOutcome.RemovedLinkedToRemoval, null);
         var result = scene with { Evaluations = [.. scene.Evaluations, linkedMember] };
 
-        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Detailed).Lines.ToList();
+        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), MinObjectsAround, Elapsed, Detailed).Lines.ToList();
 
         Assert.Equal(
             "Visible objects left behind: 7 evaluated in 1.5s; removed 2 (1 surroundings removed, 1 linked to a removed object); "
-            + "kept 5 (1 too few surrounding objects, 2 surroundings mostly kept, 1 protected type, 1 referenced).",
+            + "kept 5 (0 fewer than 5 of the cleaned mod's other objects around, 1 too few directions with objects, 2 surroundings mostly kept, 1 protected type, 1 referenced).",
             lines[0]);
         AssertLine(lines.Single(line => line.Contains(RecordNames.Describe(world.Targets[LinkedPartner]), StringComparison.Ordinal) && line.StartsWith("  Visible left behind", StringComparison.Ordinal)),
             world, linkedMember, null, "removed, linked to a removed object");
@@ -141,7 +156,7 @@ public sealed class VisibleLeftBehindSectionTests
             LinkedPartner, null, Areas(northCleared: false), LeftBehindOutcome.RemovedLinkedToRestoration, null);
         var result = scene with { Evaluations = [.. scene.Evaluations, linkedMember] };
 
-        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Detailed).Lines.ToList();
+        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), MinObjectsAround, Elapsed, Detailed).Lines.ToList();
 
         Assert.Contains("removed 2 (1 surroundings removed, 1 linked to a restored object); ", lines[0], StringComparison.Ordinal);
         AssertLine(lines.Single(line => line.Contains(RecordNames.Describe(world.Targets[LinkedPartner]), StringComparison.Ordinal) && line.StartsWith("  Visible left behind", StringComparison.Ordinal)),
@@ -156,11 +171,11 @@ public sealed class VisibleLeftBehindSectionTests
             LinkedPartner, VisibleObjectKind.Furniture, Areas(northCleared: true), LeftBehindOutcome.RestoredSurroundingsRemoved, null);
         var result = scene with { Evaluations = [.. scene.Evaluations, restored] };
 
-        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Detailed).Lines.ToList();
+        var lines = LogSections.BuildVisibleLeftBehindSection(world, result, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), MinObjectsAround, Elapsed, Detailed).Lines.ToList();
 
         Assert.Equal(
             "Visible objects left behind: 7 evaluated in 1.5s; removed 1 (1 surroundings removed); restored 1 (1 surroundings removed); "
-            + "kept 5 (1 too few surrounding objects, 2 surroundings mostly kept, 1 protected type, 1 referenced).",
+            + "kept 5 (0 fewer than 5 of the cleaned mod's other objects around, 1 too few directions with objects, 2 surroundings mostly kept, 1 protected type, 1 referenced).",
             lines[0]);
         AssertLine(lines.Single(line => line.StartsWith("  Visible left behind: ", StringComparison.Ordinal) && line.Contains(RecordNames.Describe(world.Targets[LinkedPartner]), StringComparison.Ordinal)),
             world, restored, "Furniture", "restored, surroundings removed");
@@ -174,9 +189,9 @@ public sealed class VisibleLeftBehindSectionTests
             LinkedPartner, null, Areas(northCleared: true), LeftBehindOutcome.RemovedSurroundingsRemovedAndRestored, null);
         var restoredWithRestored = removedWithRestored with { TargetIndex = NoClearedDirection, Decision = LeftBehindOutcome.RestoredSurroundingsRemovedAndRestored };
 
-        var plain = LogSections.BuildVisibleLeftBehindSection(world, scene, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Detailed).Lines.ToList();
+        var plain = LogSections.BuildVisibleLeftBehindSection(world, scene, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), MinObjectsAround, Elapsed, Detailed).Lines.ToList();
         var counted = LogSections.BuildVisibleLeftBehindSection(
-            world, scene with { Evaluations = [.. scene.Evaluations, removedWithRestored, restoredWithRestored] }, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), Elapsed, Detailed).Lines.ToList();
+            world, scene with { Evaluations = [.. scene.Evaluations, removedWithRestored, restoredWithRestored] }, RemovalList.KeptIn(decisions, decisions.Rounds[^1]), MinObjectsAround, Elapsed, Detailed).Lines.ToList();
 
         Assert.DoesNotContain("and restored", plain[0], StringComparison.Ordinal);
         Assert.Contains("removed 2 (1 surroundings removed, 1 surroundings removed and restored); restored 1 (1 surroundings removed and restored); ", counted[0], StringComparison.Ordinal);
@@ -257,7 +272,7 @@ public sealed class VisibleLeftBehindSectionTests
             new(ProtectedKind, VisibleObjectKind.Containers, Areas(northCleared: true), LeftBehindOutcome.KeptProtectedType, null),
             new(NearMiss, null, Areas(northCleared: false), LeftBehindOutcome.KeptSurroundingsMostlyKept, null),
             new(NoClearedDirection, null, new SectorAreaTally(50).Build(), LeftBehindOutcome.KeptSurroundingsMostlyKept, null),
-            new(TooFewObjects, null, new SectorAreaTally(50).Build(), LeftBehindOutcome.KeptTooFewSurroundingObjects, null),
+            new(TooFewObjects, null, new SectorAreaTally(50).Build(), LeftBehindOutcome.KeptTooFewOccupiedDirections, null),
         ];
         var protection = ObjectsToKeep.Build(
             [.. targets],

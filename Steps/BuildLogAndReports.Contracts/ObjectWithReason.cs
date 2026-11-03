@@ -1,5 +1,6 @@
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
@@ -32,11 +33,12 @@ public abstract record ObjectWithReason(int TargetIndex)
     /// <summary>A visible target object whose surrounding visible target objects were removed.</summary>
     public sealed record VisibleLeftBehind(int TargetIndex, VisibleLeftBehindCheck Evaluation) : ObjectWithReason(TargetIndex);
 
-    /// <summary>An invisible target object inside another mod's object or whose surrounding visible target objects were removed.</summary>
-    public sealed record LeftBehind(int TargetIndex, LeftBehindCheck Evaluation) : ObjectWithReason(TargetIndex);
+    /// <summary>One of the cleaned mod's objects in an area where almost nothing of its drawn objects still stands.</summary>
+    /// <param name="Area">The share standing there when the object was judged.</param>
+    public sealed record InClearedArea(int TargetIndex, AreaShare Area) : ObjectWithReason(TargetIndex);
 
-    /// <summary>A target object that still stood where an area was restored, with no kind or object to keep holding it.</summary>
-    public sealed record LeftoverInRestoredArea(int TargetIndex) : ObjectWithReason(TargetIndex);
+    /// <summary>An invisible target object inside another mod's object or whose surrounding visible target objects were removed.</summary>
+    public sealed record LeftBehind(int TargetIndex, InvisibleLeftBehindCheck Evaluation) : ObjectWithReason(TargetIndex);
 
     /// <summary>A member of the linked group of a target object that left its place, removed or restored.</summary>
     /// <param name="LinkedToTargetIndex">The member whose removal or restoration took the group along.</param>

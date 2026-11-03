@@ -22,6 +22,7 @@
     <ProjectReference Include="..\RemoveObjectsRestingOnRemovedOnes.Contracts\RemoveObjectsRestingOnRemovedOnes.Contracts.csproj" />
     <ProjectReference Include="..\OtherModsObjectsLeftWithoutSupport.Contracts\OtherModsObjectsLeftWithoutSupport.Contracts.csproj" />
     <ProjectReference Include="..\RemoveVisibleObjectsLeftBehind.Contracts\RemoveVisibleObjectsLeftBehind.Contracts.csproj" />
+    <ProjectReference Include="..\RemoveObjectsInClearedAreas.Contracts\RemoveObjectsInClearedAreas.Contracts.csproj" />
     <ProjectReference Include="..\RestoreWhereRemoved.Contracts\RestoreWhereRemoved.Contracts.csproj" />
     <ProjectReference Include="..\RemoveInvisibleObjectsLeftBehind.Contracts\RemoveInvisibleObjectsLeftBehind.Contracts.csproj" />
     <ProjectReference Include="..\MoveKeptMarkers.Contracts\MoveKeptMarkers.Contracts.csproj" />

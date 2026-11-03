@@ -1,3 +1,4 @@
+using System.Numerics;
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 
 namespace AddedObjectRemover;
@@ -41,7 +42,7 @@ internal static class SettingCorrections
     }
 
     /// <summary>For a setting with a lower limit only.</summary>
-    public static int AtLeast(int value, int minimum, string name, ICollection<SettingWarning> warnings)
+    public static T AtLeast<T>(T value, T minimum, string name, ICollection<SettingWarning> warnings) where T : struct, IComparisonOperators<T, T, bool>
     {
         if (value >= minimum) return value;
         warnings.Add(new SettingWarning(name, $"Warning: {name} {value} is below {minimum}; using {minimum}."));
@@ -58,17 +59,23 @@ internal static class SettingCorrections
         return defaultValue;
     }
 
+    /// <summary>For a value with a lower limit only: a value below it becomes the limit; a value that is not a number becomes the default.</summary>
+    public static float AtLeast(float value, float minimum, float defaultValue, string name, ICollection<SettingWarning> warnings) =>
+        float.IsNaN(value) ? DefaultForNotANumber(defaultValue, name, warnings) : AtLeast(value, minimum, name, warnings);
+
     /// <summary>Out of range values become the nearest valid value; a value that is not a number becomes the default.</summary>
     public static float Clamp(float value, float minimum, float maximum, float defaultValue, string name, ICollection<SettingWarning> warnings)
     {
-        if (float.IsNaN(value))
-        {
-            warnings.Add(new SettingWarning(name, $"Warning: {name} is not a valid number; using {defaultValue}."));
-            return defaultValue;
-        }
+        if (float.IsNaN(value)) return DefaultForNotANumber(defaultValue, name, warnings);
         if (value >= minimum && value <= maximum) return value;
         var clamped = Math.Clamp(value, minimum, maximum);
         warnings.Add(new SettingWarning(name, $"Warning: {name} {value} is outside {minimum}-{maximum}; using {clamped}."));
         return clamped;
+    }
+
+    private static float DefaultForNotANumber(float defaultValue, string name, ICollection<SettingWarning> warnings)
+    {
+        warnings.Add(new SettingWarning(name, $"Warning: {name} is not a valid number; using {defaultValue}."));
+        return defaultValue;
     }
 }

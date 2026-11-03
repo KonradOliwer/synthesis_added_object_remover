@@ -29,9 +29,8 @@ public class LeftBehindOrderDeterminismTests
 
     private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(Mod, "LeftoverOrderData", Table, Room));
 
-    private static readonly LeftBehindSettings Settings = new(
-        new LeftBehindSurroundings(LookAround: 100, MinOccupiedDirections: 4, DirectionClearedPercent: 50, ClearedDirectionsPercent: 60),
-        NeverRemove: new NeverRemovedInvisibleKinds(new HashSet<InvisibleObjectKind>()));
+    private static readonly InvisibleLeftBehindSettings Settings = new(
+        new LeftBehindSurroundings(LookAround: 100, MinOccupiedDirections: 4, DirectionClearedPercent: 50, ClearedDirectionsPercent: 60));
 
     [Fact]
     public void EvaluateMatchesForReversedAndShuffledWorkOrders()
@@ -61,7 +60,7 @@ public class LeftBehindOrderDeterminismTests
         }
     }
 
-    private static LeftBehindResult Evaluate(
+    private static InvisibleLeftBehindResult Evaluate(
         List<TargetObject> targets, List<OtherObject> rooms, ObjectCaches scene, List<int> removedTables, WorkOrder order)
     {
         var execution = new Execution(Threads);
@@ -69,7 +68,7 @@ public class LeftBehindOrderDeterminismTests
         var protection = ObjectsToKeep.Build(immutableTargets, [], TestTargets.References(targets.Count), TestBaseFacts.Unresolved);
         var decisions = TestSeededDecisions.Seed(protection, targets.Count, removedTables);
         var otherModObjects = scene.ObjectsThatCanCauseRemovals(Replacements.None(rooms.Count), NpcHandling.OnlyWhenStuckInsideTheObject);
-        return LeftBehindObjects.Find(
+        return InvisibleLeftBehindObjects.Find(
             new(
                 immutableTargets,
                 otherModObjects,
@@ -79,7 +78,9 @@ public class LeftBehindOrderDeterminismTests
                     Shapes,
                     bases: TestBaseFacts.Reader(new SkyrimMod(ModKey.FromNameAndExtension("Facts.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
                     visibleTargets: scene.IndexVisibleTargets),
-                VisibleLeftBehindObjects.CreateLeftBehindJudging(),
+                TestLeftBehind.KindsAlwaysKept(Shapes),
+                VisibleLeftBehindObjects.CreateSurroundingsJudging(),
+                VisibleLeftBehindObjects.CreateLeftBehindRoundJoin(),
                 order,
                 execution,
                 Settings)).Result;
@@ -88,7 +89,7 @@ public class LeftBehindOrderDeterminismTests
     private static Vector3 RandomPoint(Random random) =>
         new((float)random.NextDouble() * SceneExtent, (float)random.NextDouble() * SceneExtent, 5);
 
-    private static List<string> Describe(LeftBehindResult result) =>
+    private static List<string> Describe(InvisibleLeftBehindResult result) =>
         [.. result.Evaluations.Select(e =>
             $"{e.TargetIndex} {e.Kind} {e.Decision} {e.ContainingObject?.Id} {e.Radius} {e.Surroundings.OccupiedCount} {e.Surroundings.RemovedCount} {SectorAreasText.Describe(e.Surroundings)}")];
 }

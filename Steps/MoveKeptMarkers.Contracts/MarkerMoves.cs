@@ -14,8 +14,8 @@ public sealed record MarkerMoves(
     StepOutcome Outcome,
     ImmutableArray<MarkerMove> Moves,
     IReadOnlyList<MarkerMoveDetail> Details,
-    IReadOnlyList<LeftBehindCheck> LeftInPlace,
-    IReadOnlyList<LeftBehindCheck> LeftInDeletedCell,
+    IReadOnlyList<InvisibleLeftBehindCheck> LeftInPlace,
+    IReadOnlyList<InvisibleLeftBehindCheck> LeftInDeletedCell,
     float MaxDistance,
     PartFailure? Failure)
 {

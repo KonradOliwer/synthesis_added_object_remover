@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using System.Numerics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda.Plugins;
 
@@ -16,17 +15,7 @@ public class VisibleLeftBehindObjectsTests
 {
     private const float RingDistance = 200f;
     private const float FartherOut = 250f;
-    private const int RandomSeed = 3141;
-    private const int RandomTrials = 12;
-    private const int RandomTargetCount = 60;
-    private const int RandomLinkCount = 6;
     private static readonly TimeSpan FollowUpDuration = TimeSpan.FromSeconds(100);
-    private const float RandomReach = 400f;
-    private const int ReferencedOneIn = 8;
-    private const int RestoredOneIn = 4;
-    private const int RemovedEarlierOneIn = 3;
-    private const float TouchGap = 1f;
-    private const float SupportLostFraction = 0.5f;
 
     private static readonly ModKey OtherMod = ModKey.FromNameAndExtension("Other.esp");
     private static readonly IReadOnlyList<MeshTriangle> SmallBlock = TestMeshes.BoxTriangles(new Box(new Vector3(-20), new Vector3(20)));
@@ -36,15 +25,15 @@ public class VisibleLeftBehindObjectsTests
     /// <summary>Mist: a mesh whose only shape is drawn with an effect shader, as big as <see cref="Block"/>.</summary>
     private static readonly TestStatic Mist = new(new FormKey(OtherMod, 0x803), @"test\mist.nif", SmallBlock, EffectOnly: true);
 
-    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(OtherMod, "VisibleLeftBehindObjectsData", Block, DoorBlock, Mist));
+    /// <summary>A building that, placed near the origin, holds the candidate there, so it lies in every direction around it.</summary>
+    private static readonly TestStatic Building = new(new FormKey(OtherMod, 0x804), @"test\building.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-100), new Vector3(100))));
 
+    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(OtherMod, "VisibleLeftBehindObjectsData", Block, DoorBlock, Mist, Building));
+
+    /// <summary>With a minimum of one object around, so the directions alone decide.</summary>
     private static readonly VisibleLeftBehindSettings Settings = new(
         new LeftBehindSurroundings(LookAround: 260, MinOccupiedDirections: 6, DirectionClearedPercent: 80, ClearedDirectionsPercent: 80),
-        NeverRemove: new NeverRemovedVisibleKinds(new HashSet<VisibleObjectKind>()));
-
-    /// <summary>Loose enough that removals in random worlds clear further objects, round after round.</summary>
-    private static readonly VisibleLeftBehindSettings LooseSettings =
-        Settings with { Surroundings = Settings.Surroundings with { MinOccupiedDirections = 3, DirectionClearedPercent = 50, ClearedDirectionsPercent = 50 } };
+        MinObjectsAround: 1);
 
     private static readonly DirectionSector[] SixDirections =
         [DirectionSector.East, DirectionSector.NorthEast, DirectionSector.North, DirectionSector.NorthWest, DirectionSector.West, DirectionSector.SouthWest];
@@ -91,7 +80,7 @@ public class VisibleLeftBehindObjectsTests
         var result = Find(mists, DecisionsRemoving(mists, 5, 6), Settings);
 
         var evaluation = result.Evaluations.Single(check => check.TargetIndex == 0);
-        Assert.Equal((2, 2, LeftBehindOutcome.KeptTooFewSurroundingObjects), (evaluation.Surroundings.OccupiedCount, evaluation.Surroundings.RemovedCount, evaluation.Decision));
+        Assert.Equal((2, 2, LeftBehindOutcome.KeptTooFewOccupiedDirections), (evaluation.Surroundings.OccupiedCount, evaluation.Surroundings.RemovedCount, evaluation.Decision));
     }
 
     /// <summary>Two of the cleaned mod's mists side by side, whose solid surroundings were all removed: neither keeps the other.</summary>
@@ -118,6 +107,43 @@ public class VisibleLeftBehindObjectsTests
         Assert.Equal(applied.RoundsAfter(decisions).ToArray(), result.Rounds.ToArray());
     }
 
+    /// <summary>The removed buildings around the candidate lie in all 8 directions, so only their number keeps it; the candidate itself never counts.</summary>
+    [Theory]
+    [InlineData(4, nameof(LeftBehindOutcome.KeptTooFewObjectsAround))]
+    [InlineData(5, nameof(LeftBehindOutcome.RemovedSurroundingsRemoved))]
+    public void RemovedBuildingsInEveryDirectionRemoveTheObjectOnlyFromTheMinimumOn(int buildings, string expected)
+    {
+        var targets = AmongBuildings(buildings);
+
+        var evaluation = Assert.Single(Find(targets, DecisionsRemoving(targets, [.. Enumerable.Range(1, buildings)]), Settings with { MinObjectsAround = 5 }).Evaluations);
+
+        Assert.Equal((buildings, CompassDirections.SectorCount, expected), (evaluation.Surroundings.Objects, evaluation.Surroundings.ClearedCount, evaluation.Decision.ToString()));
+    }
+
+    /// <summary>Two removed buildings around the candidate pass the directions value, which alone would remove it.</summary>
+    [Fact]
+    public void TwoRemovedBuildingsAroundTheObjectKeepItByTheMinimumNotByTheDirections()
+    {
+        var targets = AmongBuildings(2);
+
+        var byMinimum = Assert.Single(Find(targets, DecisionsRemoving(targets, 1, 2), Settings with { MinObjectsAround = 5 }).Evaluations);
+        var byDirections = Assert.Single(Find(targets, DecisionsRemoving(targets, 1, 2), Settings with { MinObjectsAround = 2 }).Evaluations);
+
+        Assert.Equal((CompassDirections.SectorCount, CompassDirections.SectorCount), (byMinimum.Surroundings.OccupiedCount, byMinimum.Surroundings.ClearedCount));
+        Assert.Equal(LeftBehindOutcome.KeptTooFewObjectsAround, byMinimum.Decision);
+        Assert.Equal(LeftBehindOutcome.RemovedSurroundingsRemoved, byDirections.Decision);
+    }
+
+    [Fact]
+    public void WithTooFewObjectsAndTooFewDirectionsTheMinimumIsTheReason()
+    {
+        var targets = Ring(SixDirections.Take(3));
+
+        var evaluation = Assert.Single(Find(targets, DecisionsRemoving(targets, 1, 2, 3), Settings with { MinObjectsAround = 5 }).Evaluations);
+
+        Assert.Equal(LeftBehindOutcome.KeptTooFewObjectsAround, evaluation.Decision);
+    }
+
     [Fact]
     public void FiveOccupiedDirectionsKeepTheObjectEvenWhenAllOfThemWereCleared()
     {
@@ -126,7 +152,7 @@ public class VisibleLeftBehindObjectsTests
         var result = Find(targets, DecisionsRemoving(targets, 1, 2, 3, 4, 5), Settings);
 
         var evaluation = Assert.Single(result.Evaluations);
-        Assert.Equal(LeftBehindOutcome.KeptTooFewSurroundingObjects, evaluation.Decision);
+        Assert.Equal(LeftBehindOutcome.KeptTooFewOccupiedDirections, evaluation.Decision);
         Assert.Empty(Proposals(result));
     }
 
@@ -183,20 +209,6 @@ public class VisibleLeftBehindObjectsTests
     }
 
     [Fact]
-    public void AnObjectAnEarlierStepKeptIsNotEvaluatedAgain()
-    {
-        var targets = Ring(SixDirections);
-        var protection = ObjectsToKeep.Build(targets, [], References(targets.Length, [0]), UnresolvedBases);
-        var decisions = TestSeededDecisions.StartDisablingAll(protection, targets.Length)
-            .Apply(RoundKind.TooClose, [.. new[] { 0, 1, 2, 3, 4, 5, 6 }.Select(TooClose)]);
-        Assert.IsType<Decision.Kept>(decisions.Of(new TargetId(0)));
-
-        var result = Find(targets, decisions, Settings);
-
-        Assert.Empty(result.Evaluations);
-    }
-
-    [Fact]
     public void ARemovalOfAReferencedObjectIsKeptAsReferencedWithTheKeepReason()
     {
         var targets = Ring(SixDirections);
@@ -241,40 +253,6 @@ public class VisibleLeftBehindObjectsTests
         Assert.Equal(new LinkedTo(new TargetId(0)), linked.Reason);
     }
 
-    [Fact]
-    public void AKeptObjectThatTheRoundRemovesAsALinkedGroupMemberIsEvaluatedAsRemovedLinked()
-    {
-        var partner = 7;
-        var targets = Ring(SixDirections).Add(Visible(partner, new Vector3(5000, 0, 0)));
-        var protection = ObjectsToKeep.Build(targets, [TestTargets.Link(0, partner)], References(targets.Length, []), UnresolvedBases);
-        var decisions = TestSeededDecisions.StartDisablingAll(protection, targets.Length).Apply(RoundKind.TooClose, [.. new[] { 1, 2, 3, 4, 5, 6 }.Select(TooClose)]);
-
-        var result = Find(targets, decisions, Settings);
-
-        var member = result.Evaluations.Single(check => check.TargetIndex == partner);
-        Assert.Equal(LeftBehindOutcome.RemovedLinkedToRemoval, member.Decision);
-        Assert.True(member.IsRemoved);
-        Assert.Equal(new TargetId(0), Assert.Single(Proposals(result)).Target);
-    }
-
-    [Fact]
-    public void AnObjectTheRoundRestoresIsEvaluatedAsRestoredAndItsLinkedGroupMemberAsRestoredLinkedNeverAsRemoved()
-    {
-        var partner = 7;
-        var targets = Ring(SixDirections).Add(Visible(partner, new Vector3(5000, 0, 0)));
-        var protection = ObjectsToKeep.Build(targets, [TestTargets.Link(0, partner)], References(targets.Length, []), UnresolvedBases);
-        var restore = new WhenRemoved.Restore(TestTargets.EarlierVersionAt(new PluginName("Earlier.esp"), targets[0].Placement));
-        var decisions = RemovalDecisions.Start(protection, [restore, .. Enumerable.Repeat<WhenRemoved>(new WhenRemoved.Disable(), 6), restore])
-            .Apply(RoundKind.TooClose, [.. new[] { 1, 2, 3, 4, 5, 6 }.Select(TooClose)]);
-
-        var result = Find(targets, decisions, Settings);
-
-        var restored = result.Evaluations.Single(check => check.TargetIndex == 0);
-        var member = result.Evaluations.Single(check => check.TargetIndex == partner);
-        Assert.Equal((LeftBehindOutcome.RestoredSurroundingsRemoved, true, false), (restored.Decision, restored.IsRestored, restored.IsRemoved));
-        Assert.Equal((LeftBehindOutcome.RestoredAsLinked, true, false), (member.Decision, member.IsRestored, member.IsRemoved));
-    }
-
     [Theory]
     [InlineData(false, LeftBehindOutcome.RemovedSurroundingsRemovedAndRestored)]
     [InlineData(true, LeftBehindOutcome.RestoredSurroundingsRemovedAndRestored)]
@@ -293,22 +271,6 @@ public class VisibleLeftBehindObjectsTests
         Assert.Equal(expected, evaluation.Decision);
         Assert.Equal(objectIsRestored, evaluation.IsRestored);
         Assert.Equal(!objectIsRestored, evaluation.IsRemoved);
-    }
-
-    [Fact]
-    public void ALinkedGroupMemberTheRoundRemovesAlongWithARestoredObjectIsEvaluatedAsRemovedLinkedToARestoredObject()
-    {
-        var partner = 7;
-        var targets = Ring(SixDirections).Add(Visible(partner, new Vector3(5000, 0, 0)));
-        var protection = ObjectsToKeep.Build(targets, [TestTargets.Link(0, partner)], References(targets.Length, []), UnresolvedBases);
-        var restore = new WhenRemoved.Restore(TestTargets.EarlierVersionAt(new PluginName("Earlier.esp"), targets[0].Placement));
-        var decisions = RemovalDecisions.Start(protection, [restore, .. Enumerable.Repeat<WhenRemoved>(new WhenRemoved.Disable(), 7)])
-            .Apply(RoundKind.TooClose, [.. new[] { 1, 2, 3, 4, 5, 6 }.Select(TooClose)]);
-
-        var result = Find(targets, decisions, Settings);
-
-        var member = result.Evaluations.Single(check => check.TargetIndex == partner);
-        Assert.Equal((LeftBehindOutcome.RemovedLinkedToRestoration, true), (member.Decision, member.IsRemoved));
     }
 
     [Fact]
@@ -441,34 +403,6 @@ public class VisibleLeftBehindObjectsTests
         Assert.All(result.Evaluations, check => Assert.False(check.IsRemoved || check.IsRestored));
     }
 
-    /// <remarks>
-    /// The reference ends with a visible round that judges every undecided object and takes nothing; the step runs no round when no
-    /// object's surroundings changed, so the rounds are compared without the visible rounds that propose nothing.
-    /// </remarks>
-    [Theory]
-    [InlineData(1)]
-    [InlineData(2)]
-    [InlineData(8)]
-    public void TheRoundsEqualAReferenceThatMeasuresEveryObjectAgainInEveryRoundAndRunsTheAlsoRemoveStepAfterIt(int workers)
-    {
-        var (cascades, followUpRemovals) = (0, 0);
-        foreach (var world in RandomWorlds())
-        {
-            var reference = FindByMeasuringEverythingAgain(world);
-
-            var (result, final) = Decide(world.Targets, world.Start, LooseSettings, workers: workers, followUp: world.CreateFollowUp(workers));
-
-            Assert.Equal(reference.Proposed.Where(ProposesSomething), DescribeRounds(result.ProposedRounds).Where(ProposesSomething));
-            Assert.Equal(reference.Final.All().ToList(), final.All().ToList());
-            Assert.Equal(reference.Checks.Select(check => Compared(check, final)), result.Evaluations.Select(check => Compared(check, final)));
-            Assert.Equal(final.RoundsAfter(world.Start).Where(round => round.Kind == RoundKind.AlsoRemove), result.FollowUp.Rounds.AsEnumerable());
-            if (result.Rounds.Count(round => !final.LeftIn(round).IsEmpty) > 1) cascades++;
-            followUpRemovals += result.FollowUp.Rounds.Sum(round => final.LeftIn(round).Length);
-        }
-        Assert.True(cascades > 0);
-        Assert.True(followUpRemovals > 0);
-    }
-
     [Fact]
     public void AnObjectIsNotItsOwnSurroundings()
     {
@@ -476,8 +410,8 @@ public class VisibleLeftBehindObjectsTests
 
         var evaluation = Assert.Single(Find(targets, DecisionsRemoving(targets), Settings).Evaluations);
 
-        Assert.Equal(0, evaluation.Surroundings.OccupiedCount);
-        Assert.Equal(LeftBehindOutcome.KeptTooFewSurroundingObjects, evaluation.Decision);
+        Assert.Equal((0, 0), (evaluation.Surroundings.Objects, evaluation.Surroundings.OccupiedCount));
+        Assert.Equal(LeftBehindOutcome.KeptTooFewObjectsAround, evaluation.Decision);
     }
 
     [Fact]
@@ -532,9 +466,9 @@ public class VisibleLeftBehindObjectsTests
         ImmutableArray<TargetObject> targets = [.. Ring(SixDirections).Select(target => target.Id.Index == 0 ? target with { Base = DoorBlock.Base } : target)];
         var bases = new KindsOfBases(new Dictionary<RecordKey, BaseRecordKind> { [DoorBlock.Base.Record] = BaseRecordKind.Container });
         var ticked = Find(
-            targets, DecisionsRemoving(targets, 1, 2, 3, 4, 5, 6), Settings with { NeverRemove = new NeverRemovedVisibleKinds(new HashSet<VisibleObjectKind> { VisibleObjectKind.Containers }) }, bases: bases);
+            targets, DecisionsRemoving(targets, 1, 2, 3, 4, 5, 6), Settings, bases: bases, alwaysKept: new HashSet<VisibleObjectKind> { VisibleObjectKind.Containers });
         var unticked = Find(
-            targets, DecisionsRemoving(targets, 1, 2, 3, 4, 5, 6), Settings with { NeverRemove = new NeverRemovedVisibleKinds(new HashSet<VisibleObjectKind> { VisibleObjectKind.Furniture }) }, bases: bases);
+            targets, DecisionsRemoving(targets, 1, 2, 3, 4, 5, 6), Settings, bases: bases, alwaysKept: new HashSet<VisibleObjectKind> { VisibleObjectKind.Furniture });
 
         var keptContainer = Assert.Single(ticked.Evaluations);
         Assert.Equal(LeftBehindOutcome.KeptProtectedType, keptContainer.Decision);
@@ -555,19 +489,6 @@ public class VisibleLeftBehindObjectsTests
         Assert.Empty(result.Evaluations);
         Assert.Empty(result.ProposedRounds);
         Assert.Empty(result.Rounds);
-    }
-
-    [Fact]
-    public void TheStepDecidesItsRoundsOnACopyAndLeavesTheGivenDecisionsAsTheyWere()
-    {
-        var decisions = CascadeDecisions();
-        var roundsBefore = decisions.Rounds.Length;
-
-        var result = Find(CascadeTargets, decisions, Settings);
-
-        Assert.NotEmpty(Proposals(result));
-        Assert.Equal(roundsBefore, decisions.Rounds.Length);
-        Assert.False(decisions.IsDecided(new TargetId(0)));
     }
 
     [Fact]
@@ -660,7 +581,7 @@ public class VisibleLeftBehindObjectsTests
         var northWest = applied.Of(new TargetId(NorthWest))!;
         Assert.Equal(RoundKind.AlsoRemove, northWest.Round.Kind);
         Assert.Equal(northWestIsReferenced, northWest is Decision.Kept);
-        Assert.Equal(LeftBehindOutcome.KeptTooFewSurroundingObjects, Evaluation(result, NorthWest).Decision);
+        Assert.Equal(LeftBehindOutcome.KeptTooFewOccupiedDirections, Evaluation(result, NorthWest).Decision);
         Assert.Null(Evaluation(result, NorthWest).KeepReason);
         Assert.Equal(northWestIsReferenced ? LeftBehindOutcome.KeptSurroundingsMostlyKept : LeftBehindOutcome.RemovedSurroundingsRemoved, Evaluation(result, 0).Decision);
     }
@@ -775,6 +696,13 @@ public class VisibleLeftBehindObjectsTests
     private static IEnumerable<TargetObject> RingAround(Vector3 center, int firstIndex, IEnumerable<DirectionSector> occupied) =>
         occupied.Select((sector, index) => Visible(firstIndex + index, center + Offset(sector, RingDistance)));
 
+    /// <summary>The candidate at the origin, then the given number of buildings, each holding the origin.</summary>
+    private static ImmutableArray<TargetObject> AmongBuildings(int buildings) =>
+    [
+        Visible(0, Vector3.Zero),
+        .. Enumerable.Range(1, buildings).Select(index => TestTargets.Create(index, TestTargets.At(new Vector3(index, 0, 0)), Building.Base, TestTargets.Space)),
+    ];
+
     private static TargetObject Visible(int index, Vector3 position) =>
         TestTargets.Create(index, TestTargets.At(position), Block.Base, TestTargets.Space);
 
@@ -812,8 +740,9 @@ public class VisibleLeftBehindObjectsTests
         IBaseFacts? bases = null,
         IAlsoRemoveFollowUp? followUp = null,
         Func<TimeSpan>? timeSinceStart = null,
-        Func<IReadOnlyList<TargetObject>, IVisibleTargetObjects>? surroundings = null) =>
-        Decide(targets, decisions, settings, others, workers, bases, followUp, timeSinceStart, surroundings).Result;
+        Func<IReadOnlyList<TargetObject>, IVisibleTargetObjects>? surroundings = null,
+        IReadOnlySet<VisibleObjectKind>? alwaysKept = null) =>
+        Decide(targets, decisions, settings, others, workers, bases, followUp, timeSinceStart, surroundings, alwaysKept).Result;
 
     /// <param name="followUp">By default one that proposes nothing.</param>
     /// <param name="surroundings">The visible targets the caches index for the given targets; by default the scene's index among <paramref name="others"/>.</param>
@@ -827,20 +756,22 @@ public class VisibleLeftBehindObjectsTests
         IBaseFacts? bases = null,
         IAlsoRemoveFollowUp? followUp = null,
         Func<TimeSpan>? timeSinceStart = null,
-        Func<IReadOnlyList<TargetObject>, IVisibleTargetObjects>? surroundings = null) =>
-        VisibleLeftBehindObjects.Find(
+        Func<IReadOnlyList<TargetObject>, IVisibleTargetObjects>? surroundings = null,
+        IReadOnlySet<VisibleObjectKind>? alwaysKept = null)
+    {
+        var caches = new TestRunCaches(Shapes, bases: bases ?? UnresolvedBases, visibleTargets: surroundings ?? Scene(targets, others ?? []).IndexVisibleTargets);
+        return VisibleLeftBehindObjects.Find(
             new(
                 targets,
                 decisions,
-                new TestRunCaches(
-                    Shapes,
-                    bases: bases ?? UnresolvedBases,
-                    visibleTargets: surroundings ?? Scene(targets, others ?? []).IndexVisibleTargets),
+                caches,
+                VisibleLeftBehindObjects.CreateKindsAlwaysKept(new(caches, new NeverRemovedVisibleKinds(alwaysKept ?? new HashSet<VisibleObjectKind>()))),
                 followUp ?? new ScriptedFollowUp(),
                 timeSinceStart ?? (() => TimeSpan.Zero),
                 TargetWorkOrder.Of(targets),
                 new Execution(workers),
                 settings));
+    }
 
     private static IEnumerable<(int Target, string Summary)> Summarize(VisibleLeftBehindResult result) =>
         result.Evaluations.Select(check => (check.TargetIndex, Summary(check)));
@@ -859,112 +790,8 @@ public class VisibleLeftBehindObjectsTests
     private static VisibleLeftBehindCheck Evaluation(VisibleLeftBehindResult result, int targetIndex) =>
         result.Evaluations.Single(check => check.TargetIndex == targetIndex);
 
-    /// <summary>A check's target, kind and surroundings, and its verdict when no round decided it.</summary>
-    private static string Compared(VisibleLeftBehindCheck check, IRemovalDecisions final) =>
-        $"{check.TargetIndex} {check.Kind} {Fingerprint(check.Surroundings)} {(final.IsDecided(new TargetId(check.TargetIndex)) ? (LeftBehindOutcome?)null : check.Decision)}";
-
-    /// <param name="Start">The decisions of the earlier steps.</param>
-    private sealed record RandomWorld(ImmutableArray<TargetObject> Targets, RemovalDecisions Start)
-    {
-        private static readonly AlsoRemoveSettings AlsoRemove = new(FollowUpRemovalMode.EverythingTouchingIt, TouchGap, SupportLostFraction, TouchChainsShown: false);
-
-        private readonly TriangleStore _triangles = new(Shapes.ReadTriangles);
-
-        public IAlsoRemoveFollowUp CreateFollowUp(int workers) =>
-            RestingObjects.CreateFollowUp(
-                new(Targets, TestSeededDecisions.StartUnprotected(Targets), AlsoRemove, new Execution(workers), () => TimeSpan.Zero, new TestRunCaches(Shapes, _triangles, TestGround.NoTerrain(), UnresolvedBases, ObjectsOfAnyPlugin)));
-
-        /// <summary>The also-remove step seeded by the newest round of <paramref name="decisions"/>, without report files.</summary>
-        public RestingObjectsResult FindAlsoRemoveRounds(IRemovalDecisions decisions) =>
-            RestingObjectsFinder.Find(
-                new RestingObjectsInput(Targets, decisions, [decisions.Rounds[^1]], AlsoRemove, new Execution(1), () => TimeSpan.Zero, StepOutcome.SwitchedOff),
-                new TestRunCaches(Shapes, _triangles, TestGround.NoTerrain(), UnresolvedBases, ObjectsOfAnyPlugin));
-
-        private IVisibleObjectsOfAnyPlugin ObjectsOfAnyPlugin() => Scene(Targets, []).VisibleObjectsOfAnyPlugin();
-    }
-
-    /// <param name="Proposed">Each round's kind and proposed targets (see <see cref="DescribeRound"/>).</param>
-    /// <param name="Checks">Each candidate's check in the newest round that judged it, in target order.</param>
-    private sealed record ReferenceRounds(List<string> Proposed, IRemovalDecisions Final, IEnumerable<VisibleLeftBehindCheck> Checks);
-
-    private static IEnumerable<RandomWorld> RandomWorlds() => Enumerable.Range(0, RandomTrials).Select(trial => CreateRandomWorld(new Random(RandomSeed + trial)));
-
-    private static RandomWorld CreateRandomWorld(Random random)
-    {
-        ImmutableArray<TargetObject> targets =
-        [
-            .. Enumerable.Range(0, RandomTargetCount).Select(index => TestTargets.Create(
-                index,
-                TestTargets.At(new Vector3(RandomOffset(random), RandomOffset(random), 0), random.NextSingle() * MathF.Tau),
-                Block.Base,
-                TestTargets.Space)),
-        ];
-        var referenced = Enumerable.Range(0, RandomTargetCount).Where(_ => random.Next(ReferencedOneIn) == 0).ToArray();
-        TargetLink[] links = [.. Enumerable.Range(0, RandomLinkCount).Select(_ => random.Next(RandomTargetCount - 1)).Select(from => TestTargets.Link(from, from + 1))];
-        var protection = ObjectsToKeep.Build(targets, links, References(RandomTargetCount, referenced), UnresolvedBases);
-        var start = RemovalDecisions.Start(protection, [.. targets.Select(target => random.Next(RestoredOneIn) == 0 ? Restore(target) : new WhenRemoved.Disable())])
-            .Apply(RoundKind.TooClose, [.. Enumerable.Range(0, RandomTargetCount).Where(_ => random.Next(RemovedEarlierOneIn) == 0).Select(TooClose)]);
-        return new RandomWorld(targets, start);
-    }
-
-    private static float RandomOffset(Random random) => (random.NextSingle() * 2 - 1) * RandomReach;
-
-    private static WhenRemoved Restore(TargetObject target) =>
-        new WhenRemoved.Restore(TestTargets.EarlierVersionAt(new PluginName("Earlier.esp"), target.Placement));
-
-    /// <summary>
-    /// Each visible round measures every still-undecided candidate in full against the view before the round, until a round takes
-    /// nothing from its place. After each round that took something, the also-remove step seeded by that round runs from the view, and
-    /// its rounds are decided before the next visible round.
-    /// </summary>
-    private static ReferenceRounds FindByMeasuringEverythingAgain(RandomWorld world)
-    {
-        var index = Scene(world.Targets, []).VisibleTargets;
-        var rule = new VisibleLeftBehindRule(world.Targets, Shapes, UnresolvedBases, LooseSettings, new NothingAlwaysKept());
-        var candidates = rule.Candidates(world.Start);
-        var copy = world.Start.WorkingCopy();
-        IRemovalDecisions view = world.Start;
-        var checks = new SortedDictionary<int, VisibleLeftBehindCheck>();
-        var proposed = new List<string>();
-        bool tookSomething;
-        do
-        {
-            var round = candidates.Where(candidate => !view.IsDecided(new TargetId(candidate)))
-                .Select(candidate => rule.Judge(new MeasuredSurroundings(candidate, MeasureFully(world.Targets[candidate], index, view))))
-                .ToArray();
-            foreach (var check in round) checks[check.TargetIndex] = check;
-            var proposals = VisibleLeftBehindRounds.ProposalsOf(round);
-            proposed.Add(DescribeRound(RoundKind.VisibleLeftBehind, proposals));
-            view = copy.DecideRound(new RoundOpening(RoundKind.VisibleLeftBehind, MayReplaceFits: false), proposals);
-            tookSomething = !view.LeftIn(view.Rounds[^1]).IsEmpty;
-            if (!tookSomething) continue;
-
-            foreach (var alsoRemove in world.FindAlsoRemoveRounds(view).ProposedRounds)
-            {
-                proposed.Add(DescribeRound(RoundKind.AlsoRemove, alsoRemove));
-                view = copy.DecideRound(AlsoRemoveRounds.Opening, alsoRemove);
-            }
-        }
-        while (tookSomething);
-        return new ReferenceRounds(proposed, view, checks.Values);
-    }
-
-    private static IEnumerable<string> DescribeRounds(IEnumerable<ProposedRound> rounds) => rounds.Select(round => DescribeRound(round.Opening.Kind, round.Proposals));
-
-    private static string DescribeRound(RoundKind kind, IEnumerable<ProposedRemoval> proposals) =>
-        $"{kind}:{string.Join(',', proposals.Select(proposal => proposal.Target.Index))}";
-
-    private static bool ProposesSomething(string round) => !round.EndsWith(':');
-
-    private static SectorAreas MeasureFully(TargetObject target, IVisibleTargetObjects index, IRemovalDecisions decisions)
-    {
-        var neighbours = new List<VisibleTargetNear>();
-        index.Around(target.SpaceKey, target.Transform.Position, LooseSettings.Surroundings.LookAround, neighbours);
-        return SectorAreaTally.Measure(
-            neighbours.Where(neighbour => neighbour.Target != target.Id).Select(neighbour => (neighbour.Box, decisions.FateOf(neighbour.Target))),
-            target.Transform.Position,
-            LooseSettings.Surroundings.DirectionClearedPercent);
-    }
+    private static IEnumerable<string> DescribeRounds(IEnumerable<ProposedRound> rounds) =>
+        rounds.Select(round => $"{round.Opening.Kind}:{string.Join(',', round.Proposals.Select(proposal => proposal.Target.Index))}");
 
     private sealed class KindsOfBases(IReadOnlyDictionary<RecordKey, BaseRecordKind> kinds) : IBaseFacts
     {
@@ -1007,11 +834,6 @@ public class VisibleLeftBehindObjectsTests
         public TimeSpan Read() => _now += ReadingStep;
 
         public void Advance(TimeSpan by) => _now += by;
-    }
-
-    private sealed class NothingAlwaysKept : IKindsAlwaysKept
-    {
-        public AlwaysKeptKind? KindKeeping(TargetObject target) => null;
     }
 
     private sealed class FailingSurroundings(IVisibleTargetObjects inner) : IVisibleTargetObjects

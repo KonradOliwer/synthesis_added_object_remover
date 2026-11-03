@@ -11,14 +11,19 @@ internal static class TestLeftBehind
     private static readonly ModKey ReachRecords = ModKey.FromNameAndExtension("Reach.esp");
 
     /// <summary>A performed step that found nothing.</summary>
-    public static LeftBehindResult PerformedWithoutFindings { get; } = new(StepOutcome.Performed, [], [], Failure: null);
+    public static InvisibleLeftBehindResult PerformedWithoutFindings { get; } = new(StepOutcome.Performed, [], [], Failure: null);
+
+    /// <summary>The invisible kinds the settings always keep.</summary>
+    public static IKindsAlwaysKept KindsAlwaysKept(IBaseObjectShapes shapes, params InvisibleObjectKind[] kinds) =>
+        InvisibleLeftBehindObjects.CreateKindsAlwaysKept(new(shapes, new NeverRemovedInvisibleKinds(kinds.ToHashSet())));
 
     /// <param name="others">Other mods' objects of <see cref="TestTargets.Space"/>.</param>
-    public static LeftBehindRule CreateRule(
+    public static InvisibleLeftBehindRule CreateRule(
         IReadOnlyList<TargetObject> targets,
         IBaseObjectShapes shapes,
         IReadOnlyList<OtherObject> others,
-        LeftBehindSettings config)
+        InvisibleLeftBehindSettings config,
+        IKindsAlwaysKept? kindsAlwaysKept = null)
     {
         var scene = TestScenes.Create(targets, others, shapes);
         var order = TargetWorkOrder.Of(targets);
@@ -34,22 +39,24 @@ internal static class TestLeftBehind
                 order,
                 new Execution(Environment.ProcessorCount)),
             new ReachRule(TestBaseFacts.Reader(new SkyrimMod(ReachRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache())),
-            VisibleLeftBehindObjects.CreateLeftBehindJudging(),
+            VisibleLeftBehindObjects.CreateSurroundingsJudging(),
+            VisibleLeftBehindObjects.CreateLeftBehindRoundJoin(),
             config,
-            new InvisibleKindsAlwaysKept(shapes, config.NeverRemove.Kinds),
+            kindsAlwaysKept ?? KindsAlwaysKept(shapes),
             order);
     }
 
     /// <summary>The step over fresh removal decisions, so referenced objects are kept.</summary>
-    public static LeftBehindResult Find(
+    public static InvisibleLeftBehindResult Find(
         IReadOnlyList<TargetObject> targets,
         IBaseObjectShapes shapes,
         IReadOnlyList<OtherObject> others,
-        LeftBehindSettings config,
-        ObjectsToKeep protection)
+        InvisibleLeftBehindSettings config,
+        ObjectsToKeep protection,
+        IKindsAlwaysKept? kindsAlwaysKept = null)
     {
         var scene = TestScenes.Create(targets, others, shapes);
-        return LeftBehindObjects.Find(
+        return InvisibleLeftBehindObjects.Find(
             new(
                 [.. targets],
                 scene.ObjectsThatCanCauseRemovals(Replacements.None(others.Count), NpcHandling.OnlyWhenStuckInsideTheObject),
@@ -59,7 +66,9 @@ internal static class TestLeftBehind
                     shapes,
                     bases: TestBaseFacts.Reader(new SkyrimMod(ReachRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
                     visibleTargets: scene.IndexVisibleTargets),
-                VisibleLeftBehindObjects.CreateLeftBehindJudging(),
+                kindsAlwaysKept ?? KindsAlwaysKept(shapes),
+                VisibleLeftBehindObjects.CreateSurroundingsJudging(),
+                VisibleLeftBehindObjects.CreateLeftBehindRoundJoin(),
                 TargetWorkOrder.Of(targets),
                 new Execution(Environment.ProcessorCount),
                 config)).Result;

@@ -4,12 +4,10 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>Proposes removing visible target objects whose surrounding visible target objects were removed, and holds the surroundings rule both left-behind steps judge by. It references its contracts, the contracts of the steps and caches it reads, the contracts of the invisible left-behind step (whose judging interface it implements), Ids, PluginRecordFacts and the package-free tools it uses, and holds no packages.</Description>
+    <Description>Proposes removing visible target objects whose surrounding visible target objects were removed, and holds the surroundings rule both left-behind steps judge by. It references its contracts, the contracts of the steps and caches it reads, Ids, PluginRecordFacts and the package-free tools it uses, and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\RemoveVisibleObjectsLeftBehind.Contracts\RemoveVisibleObjectsLeftBehind.Contracts.csproj" />
-    <ProjectReference Include="..\RestoreWhereRemoved.Contracts\RestoreWhereRemoved.Contracts.csproj" />
-    <ProjectReference Include="..\RemoveInvisibleObjectsLeftBehind.Contracts\RemoveInvisibleObjectsLeftBehind.Contracts.csproj" />
     <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
     <ProjectReference Include="..\FindTargetObjectsToKeep.Contracts\FindTargetObjectsToKeep.Contracts.csproj" />

@@ -4,6 +4,7 @@ using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
@@ -29,7 +30,8 @@ public record StepResults(
     ChangedTerrainResult ChangedTerrain,
     RestingObjectsResult RestingObjects,
     VisibleLeftBehindResult VisibleLeftBehind,
-    LeftBehindResult LeftBehind,
+    ObjectsInClearedAreasResult ObjectsInClearedAreas,
+    InvisibleLeftBehindResult InvisibleLeftBehind,
     MarkerMoves MarkerMoves,
     OtherModsObjectsResult OtherModsObjects,
     IRemovalDecisions Final,

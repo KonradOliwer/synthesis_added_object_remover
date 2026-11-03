@@ -6,6 +6,7 @@ using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
@@ -20,7 +21,9 @@ namespace AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 /// <param name="ChangedObjects">What happens to another mod's object the cleaned mod changed when a removal step would remove it.</param>
 /// <param name="ChangedObjectCollision">How another mod's object the cleaned mod changed is checked for a clash, where the cleaned mod put it and where it stood before.</param>
 /// <param name="VisibleLeftBehind">Null when the left-behind visible objects step is off.</param>
-/// <param name="LeftBehind">Null when the left-behind invisible objects step is off.</param>
+/// <param name="ObjectsInClearedAreas">Null when the step for objects in cleared areas is off.</param>
+/// <param name="ObjectsInClearedAreasOff">Why the step for objects in cleared areas is off; null when it is on.</param>
+/// <param name="InvisibleLeftBehind">Null when the left-behind invisible objects step is off.</param>
 /// <param name="NeverRemovedVisibleKinds">Always set, also when the left-behind visible objects step is off.</param>
 /// <param name="NeverRemovedInvisibleKinds">Always set, also when the left-behind invisible objects step is off.</param>
 /// <param name="RestoreWhereRemoved">Always set; the step decides whether it runs.</param>
@@ -39,7 +42,9 @@ public sealed record RunSettings(
     AlsoRemoveSettings AlsoRemove,
     OtherModsObjectsSettings OtherModsObjects,
     VisibleLeftBehindSettings? VisibleLeftBehind,
-    LeftBehindSettings? LeftBehind,
+    ObjectsInClearedAreasSettings? ObjectsInClearedAreas,
+    ObjectsInClearedAreasOff? ObjectsInClearedAreasOff,
+    InvisibleLeftBehindSettings? InvisibleLeftBehind,
     NeverRemovedVisibleKinds NeverRemovedVisibleKinds,
     NeverRemovedInvisibleKinds NeverRemovedInvisibleKinds,
     WhereRemovedRestoreSettings RestoreWhereRemoved,

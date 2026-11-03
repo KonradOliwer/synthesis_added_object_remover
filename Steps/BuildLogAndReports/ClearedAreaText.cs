@@ -1,4 +1,4 @@
-using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
@@ -18,4 +18,10 @@ internal static class ClearedAreaText
             ? $"; {label}{TextFormat.Count(counted.Standing)} of {TextFormat.Count(counted.Objects, "object", "objects")} still {TextFormat.Agreeing(counted.Standing, "stands", "stand")} "
                 + $"({TextFormat.Fixed(counted.CountPercent, PercentDecimals)}% by count, {TextFormat.Fixed(counted.SizePercent, PercentDecimals)}% by size)"
             : string.Empty;
+
+    /// <summary>"in a cleared area: 2 of 140 of the cleaned mod's objects still stand (1.4%), 0.3% by size".</summary>
+    public static string Reason(AreaShare share) =>
+        $"in a cleared area: {TextFormat.Count(share.Standing)} of {TextFormat.Count(share.Objects)} of the cleaned mod's objects still "
+        + $"{TextFormat.Agreeing(share.Standing, "stands", "stand")} ({TextFormat.Fixed(share.CountPercent, PercentDecimals)}%), "
+        + $"{TextFormat.Fixed(share.SizePercent, PercentDecimals)}% by size";
 }

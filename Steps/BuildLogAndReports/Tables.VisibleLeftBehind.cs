@@ -11,6 +11,7 @@ internal static partial class Tables
     private static readonly ImmutableArray<string> VisibleLeftBehindHeader =
     [
         .. LeftBehindObjectHeader("visibleType"),
+        "objectsAround",
         .. SectorHeader(),
         "decision", "reason",
     ];
@@ -27,6 +28,7 @@ internal static partial class Tables
         CsvRow.Of(
         [
             .. LeftBehindObjectColumns(world.Targets[evaluation.TargetIndex], VisibleObjectKindText.KindNameOrEmpty(evaluation.Kind), world, bases),
+            Int(evaluation.Surroundings.Objects),
             .. SectorColumns(evaluation.Surroundings),
             Quote(LeftBehindOutcomeText.Verdict(evaluation)),
             Quote(LeftBehindOutcomeText.DescribeReason(evaluation)),

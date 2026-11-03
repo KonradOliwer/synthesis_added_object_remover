@@ -64,7 +64,7 @@ public sealed class PlacedObjectCollector
                 plan.Needs.Water,
                 HoldLocationKeyword,
                 plan.Needs.TerrainForChangedObjectsOnly,
-                OtherRecordChange.Tolerances,
+                ResavedPlacedParts.Tolerances,
                 plan.Needs.AreaRecordVersions),
             (winner, candidate) => StopsTheWalk(trust, world, plan, winner, candidate));
         return new PlacedObjectCollector(trust, world, plan, facts).Scan();

@@ -20,15 +20,16 @@ public sealed partial class LogAndReports
             decisions);
 
     /// <param name="decisions">The run's decisions with the follow-up rounds applied.</param>
+    /// <param name="pass">The follow-up of which removal step.</param>
     /// <remarks>
-    /// Prints nothing, not even an empty section, unless a pass started from a visible left-behind removal or the follow-ups were stopped.
+    /// Prints nothing, not even an empty section, unless a pass started from a removal of that step or the follow-ups were stopped.
     /// The follow-ups are no timed step of their own: the section's rounds line carries their time, so it has no step-time line.
     /// </remarks>
-    private ImmutableArray<LogSection> BuildFollowUpAfterVisibleLeftBehindSections(RestingObjectsResult alsoRemove, IRemovalDecisions decisions, CollectedObjects world) =>
-        LogSections.PrintsAfterVisibleLeftBehind(alsoRemove)
+    private ImmutableArray<LogSection> BuildFollowUpSections(LogSections.AlsoRemovePass pass, RestingObjectsResult alsoRemove, IRemovalDecisions decisions, CollectedObjects world) =>
+        LogSections.PrintsFollowUp(alsoRemove)
             ? BuildAlsoRemoveSections(
-                LogSections.BuildAlsoRemoveAfterVisibleLeftBehindSection(world, alsoRemove, decisions, _caches.Triangles.GetStats(), _context),
-                LogSections.AlsoRemovePass.AfterVisibleLeftBehind,
+                LogSections.BuildAlsoRemoveAfterStepSection(pass, world, alsoRemove, decisions, _caches.Triangles.GetStats(), _context),
+                pass,
                 alsoRemove,
                 decisions)
             : [];

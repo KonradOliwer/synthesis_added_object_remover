@@ -22,8 +22,7 @@ internal static partial class LogSections
         IReadOnlyList<ObjectWithReason> restorations,
         IRemovalDecisions final,
         PluginName target,
-        StepOutcome changedTerrain,
-        StepOutcome visibleLeftBehind) =>
+        SummarizedSteps steps) =>
         new(
             "restore-summary",
             restorations.Count == 0
@@ -31,6 +30,6 @@ internal static partial class LogSections
                 :
                 [
                     $"Restored {TextFormat.Count(restorations.Count)} {TargetOrigins.ChangedPhrase(target)} "
-                    + $"({ReasonItems.Describe(restorations, final, changedTerrain, visibleLeftBehind, ReasonItems.ForRestorations)}).",
+                    + $"({ReasonItems.Describe(restorations, final, steps, ReasonItems.ForRestorations)}).",
                 ]);
 }

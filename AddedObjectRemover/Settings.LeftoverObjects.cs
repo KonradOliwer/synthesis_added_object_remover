@@ -4,15 +4,21 @@ using Mutagen.Bethesda.Synthesis.Settings;
 
 namespace AddedObjectRemover;
 
-public class LeftoverVisibleObjectSettings : IVisibleLeftoverSettingsValues
+public class LeftoverObjectSettings : ILeftoverObjectsSettingsValues
 {
     [SynthesisOrder]
-    [SynthesisSettingName("Remove visible objects whose surroundings were removed")]
-    [SynthesisTooltip("Turns this removal on. Each round's removals are followed up as \"Also remove what rests on removed objects\" says, and the rounds repeat until nothing more is removed.")]
-    public bool RemoveLeftoverVisibleObjects { get; set; } = SettingDefaults.RemoveLeftoverVisibleObjects;
+    [SynthesisSettingName(SettingNames.MinObjectsAround)]
+    [SynthesisTooltip(
+        "Neither method removes an object unless at least this many of the cleaned mod's other objects, standing or removed, lie within that method's distance. The area method counts only drawn objects. 1-100.")]
+    public int MinObjectsAround { get; set; } = SettingDefaults.MinObjectsAround;
 
     [SynthesisOrder]
-    [SynthesisSettingName(SettingNames.SurroundingObjects)]
+    [SynthesisSettingName(SettingNames.DirectionMethod)]
+    [SynthesisTooltip("Turns the direction method on. Each round's removals are followed up as \"Also remove what rests on removed objects\" says, and the rounds repeat until nothing more is removed.")]
+    public bool RemoveBySurroundingDirections { get; set; } = SettingDefaults.RemoveBySurroundingDirections;
+
+    [SynthesisOrder]
+    [SynthesisSettingName(SettingNames.DirectionSurroundingObjects)]
     [SynthesisTooltip(
         "For each visible object, the cleaned mod's other visible objects around it (the cleaned mod's objects, including other mods' objects it changed) are sorted into 8 directions\n"
         + "(north, north-east, ...) and measured by the ground area they cover. Objects removed by the earlier steps, by this step's earlier rounds and by their follow-ups count as removed.\n"
@@ -20,15 +26,31 @@ public class LeftoverVisibleObjectSettings : IVisibleLeftoverSettingsValues
     public VisibleSurroundingObjectsSettings SurroundingObjects { get; set; } = new();
 
     [SynthesisOrder]
-    [SynthesisSettingName("Never remove these as visible objects left behind (ticked = kept)")]
+    [SynthesisSettingName(SettingNames.AreaMethod)]
     [SynthesisTooltip(
-        "Ticked kinds are kept by this step (unless linked to a removed object); unticked kinds can be removed by it. "
-        + "They are also kept when an area is restored, even while this step is switched off. The too-close and changed-terrain removals are not affected; \"Also remove what rests on removed objects\" can still remove a ticked kind.\n"
+        "Removes each object of the cleaned mod, visible or invisible, whose area holds almost nothing of the cleaned mod any more.\n"
+        + "Every object is judged once, on what the earlier steps removed; also off when a limit below is 100 or more.")]
+    public bool RemoveObjectsInClearedAreas { get; set; } = SettingDefaults.RemoveObjectsInClearedAreas;
+
+    [SynthesisOrder]
+    [SynthesisSettingName(SettingNames.AreaMethodClearedArea)]
+    [SynthesisTooltip(
+        "The area counts as cleared when at most these shares of the cleaned mod's drawn objects there still stand, by size and by number; both must be at most their limits.\n"
+        + "If the cleaned mod has no drawn object in the area, the area is not cleared.")]
+    public LeftoverClearedAreaSettings ClearedArea { get; set; } = new();
+
+    [SynthesisOrder]
+    [SynthesisSettingName(SettingNames.NeverRemoveAsLeftoverObjects)]
+    [SynthesisTooltip(
+        "Ticked kinds are kept by both methods (unless linked to a removed object); unticked kinds can be removed by them. "
+        + "Invisible kinds ticked under \"Invisible objects left behind\" are kept by the area method too.\n"
+        + "The too-close and changed-terrain removals are not affected; \"Also remove what rests on removed objects\" can still remove a ticked kind. "
         + "What \"Mod to clean up\" lists as always kept stays kept, ticked or not.")]
     public KeptVisibleObjectSettings AlwaysKeep { get; set; } = new();
 
-    ISurroundingObjectsSettingsValues IVisibleLeftoverSettingsValues.SurroundingObjects => SurroundingObjects ?? new();
-    IReadOnlyList<VisibleObjectKind> IVisibleLeftoverSettingsValues.NeverRemove => (AlwaysKeep ?? new()).Kinds();
+    ISurroundingObjectsSettingsValues ILeftoverObjectsSettingsValues.SurroundingObjects => SurroundingObjects ?? new();
+    IClearedAreaSettingsValues ILeftoverObjectsSettingsValues.ClearedArea => ClearedArea ?? new();
+    IReadOnlyList<VisibleObjectKind> ILeftoverObjectsSettingsValues.NeverRemove => (AlwaysKeep ?? new()).Kinds();
 }
 
 public class VisibleSurroundingObjectsSettings : ISurroundingObjectsSettingsValues
@@ -54,6 +76,29 @@ public class VisibleSurroundingObjectsSettings : ISurroundingObjectsSettingsValu
         "Counted only among the directions that have objects, not among all 8. Example: objects lie in 7 directions and 6 of them are cleared: "
         + "6 of 7 is 86%, so it is removed with 80 or less and kept with 90 or more. 10-100, in steps of 10.")]
     public int ClearedDirectionsPercent { get; set; } = SettingDefaults.VisibleClearedDirectionsPercent;
+}
+
+public class LeftoverClearedAreaSettings : IClearedAreaSettingsValues
+{
+    [SynthesisOrder]
+    [SynthesisSettingName(SettingNames.SearchRadius + SettingNames.GameUnitsSuffix)]
+    [SynthesisTooltip(
+        "The area is everything this far from the object in every direction, so it is twice this wide. In an interior, the whole interior is one area. 1024-16384.")]
+    public float SearchRadius { get; set; } = SettingDefaults.ClearedAreaSearchRadius;
+
+    [SynthesisOrder]
+    [SynthesisSettingName(SettingNames.MaxStandingSizePercent + SettingNames.PercentSuffix)]
+    [SynthesisTooltip(
+        "Each of the cleaned mod's drawn objects weighs by the volume of its box; effect-only objects such as fog add no size.\n"
+        + "Decimals are allowed; 100 or more turns the area method off.")]
+    public float MaxStandingSizePercent { get; set; } = SettingDefaults.ClearedAreaMaxStandingSizePercent;
+
+    [SynthesisOrder]
+    [SynthesisSettingName(SettingNames.MaxStandingCountPercent + SettingNames.PercentSuffix)]
+    [SynthesisTooltip(
+        "Each drawn object counts once, effect-only ones included.\n"
+        + "Decimals are allowed; 100 or more turns the area method off.")]
+    public float MaxStandingCountPercent { get; set; } = SettingDefaults.ClearedAreaMaxStandingCountPercent;
 }
 
 public class KeptVisibleObjectSettings

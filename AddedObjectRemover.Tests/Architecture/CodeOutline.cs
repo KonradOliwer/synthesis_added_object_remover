@@ -51,6 +51,12 @@ internal sealed class CodeOutline
         return members.Count == 1 ? members[0] : null;
     }
 
+    /// <summary>The member that holds the line; outside every member, the innermost type that does; outside both, "".</summary>
+    public string PlaceOfLine(int line) =>
+        OnlyMemberOfLine(line)?.Place
+        ?? spans.Where(span => span.Member is null && span.Covers(line)).MaxBy(span => span.Type.Length)?.Type
+        ?? "";
+
     private void ReadScope(string typePath)
     {
         while (position < tokens.Count && tokens[position].Text != "}") ReadDeclaration(typePath);

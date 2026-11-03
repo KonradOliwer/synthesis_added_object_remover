@@ -177,7 +177,7 @@ public sealed class RemovalRoundTripTests
             untrusted: [_second.Key.ToPluginName(), _cleaned.Key.ToPluginName()]);
 
     private static PlacedReadScope ScopeOf(FixtureMod cleaned) =>
-        new(cleaned.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: false, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword, TerrainReadsNeedAnOverride: false, OtherRecordChange.Tolerances, AreaRecordVersions: null);
+        new(cleaned.Key.ToPluginName(), Terrain: false, Navmeshes: false, TerrainVersions: false, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword, TerrainReadsNeedAnOverride: false, ResavedPlacedParts.Tolerances, AreaRecordVersions: null);
 
     private static RecordKey Key(PlacedObject record) => record.FormKey.ToRecordKey();
 }

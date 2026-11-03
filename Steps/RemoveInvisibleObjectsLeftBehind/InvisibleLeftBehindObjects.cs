@@ -6,12 +6,11 @@ using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
-using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
 
-public static class LeftBehindObjects
+public static class InvisibleLeftBehindObjects
 {
     /// <param name="OtherModObjects">The other-mod objects that can cause removals (the selection step's view).</param>
     /// <param name="OtherModsObjects">What became of the other mods' objects: no object sits inside one the run removes or pulls down any more.</param>
@@ -20,7 +19,9 @@ public static class LeftBehindObjects
     /// Index the visible target objects, removed or not, where the rounds measure them: a restored one where the cleaned mod put it;
     /// their base facts and shapes are read.
     /// </param>
-    /// <param name="Judging">Judges an object by its surroundings and joins a round's decision into its verdict.</param>
+    /// <param name="KindsAlwaysKept">The invisible kinds the settings list (see <see cref="CreateKindsAlwaysKept"/>).</param>
+    /// <param name="Judging">Judges an object by its surroundings.</param>
+    /// <param name="RoundJoin">Joins a round's decision into the verdict of its object.</param>
     /// <param name="Settings">Null when the step is switched off.</param>
     public sealed record Input(
         ImmutableArray<TargetObject> Targets,
@@ -28,23 +29,24 @@ public static class LeftBehindObjects
         OtherModsObjectsResult OtherModsObjects,
         IRunDecisions Decisions,
         IRunCaches Caches,
-        ILeftBehindJudging Judging,
+        IKindsAlwaysKept KindsAlwaysKept,
+        ISurroundingsJudging Judging,
+        ILeftBehindRoundJoin RoundJoin,
         WorkOrder Order,
         Execution Execution,
-        LeftBehindSettings? Settings);
+        InvisibleLeftBehindSettings? Settings);
 
-    /// <param name="Caches">Their shapes are read.</param>
-    /// <param name="NeverRemove">Honoured whether or not the step is switched off.</param>
-    public sealed record KindsInput(IRunCaches Caches, NeverRemovedInvisibleKinds NeverRemove);
+    /// <param name="Shapes">The kinds of the objects are read.</param>
+    /// <param name="NeverRemove">The kinds the step's settings list, also while the step is switched off.</param>
+    public sealed record KindsInput(IBaseObjectShapes Shapes, NeverRemovedInvisibleKinds NeverRemove);
 
-    /// <summary>The kinds of invisible objects this step's settings always keep (see <see cref="InvisibleKindsAlwaysKept"/>).</summary>
-    public static IKindsAlwaysKept CreateKindsAlwaysKept(KindsInput input) =>
-        new InvisibleKindsAlwaysKept(input.Caches.Shapes, input.NeverRemove.Kinds);
+    /// <summary>The invisible objects of the kinds the step's settings list (see <see cref="InvisibleKindsAlwaysKept"/>).</summary>
+    public static IKindsAlwaysKept CreateKindsAlwaysKept(KindsInput input) => new InvisibleKindsAlwaysKept(input.Shapes, input.NeverRemove.Kinds);
 
-    public static Decided<LeftBehindResult> Find(Input input)
+    public static Decided<InvisibleLeftBehindResult> Find(Input input)
     {
         var result = Evaluate(input);
-        return new Decided<LeftBehindResult>(result, input.Decisions.Apply(RoundKind.LeftBehind, result.Proposals));
+        return new Decided<InvisibleLeftBehindResult>(result, input.Decisions.Apply(RoundKind.InvisibleLeftBehind, result.Proposals));
     }
 
     /// <returns>
@@ -54,45 +56,46 @@ public static class LeftBehindObjects
     /// <see cref="StepOutcome.SwitchedOff"/>. An unexpected failure stops the step: <see cref="StepOutcome.StoppedByUnexpectedError"/>,
     /// with the failure and no proposals.
     /// </returns>
-    private static LeftBehindResult Evaluate(Input input)
+    private static InvisibleLeftBehindResult Evaluate(Input input)
     {
-        if (input.Settings is not { } settings) return LeftBehindResult.SwitchedOff;
+        if (input.Settings is not { } settings) return InvisibleLeftBehindResult.SwitchedOff;
 
         var (targets, shapes, order, execution) = (input.Targets, input.Caches.Shapes, input.Order, input.Execution);
         var takenAway = input.OtherModsObjects.TakenAway().Keys.ToHashSet();
         var surroundings = input.Caches.IndexVisibleTargets(input.Decisions.TargetsAsTheRoundsMeasureThem(targets));
         return Failures.Attempt(
             () => JoinVerdicts(
-                new LeftBehindRule(
+                new InvisibleLeftBehindRule(
                         targets,
                         shapes,
                         surroundings,
                         ContainingObjectFinder.Find(targets, shapes, input.OtherModObjects, takenAway, order, execution),
                         new ReachRule(input.Caches.Bases),
                         input.Judging,
+                        input.RoundJoin,
                         settings,
-                        CreateKindsAlwaysKept(new(input.Caches, settings.NeverRemove)),
+                        input.KindsAlwaysKept,
                         order)
                     .SelectRemovals(input.Decisions, execution),
                 input.Decisions,
-                input.Judging),
-            failure => new LeftBehindResult(StepOutcome.StoppedByUnexpectedError, [], [], PartFailure.OfWholePart(LeftBehindParts.LeftBehind, failure)));
+                input.RoundJoin),
+            failure => new InvisibleLeftBehindResult(StepOutcome.StoppedByUnexpectedError, [], [], PartFailure.OfWholePart(InvisibleLeftBehindParts.LeftBehind, failure)));
     }
 
     /// <returns>
     /// The result with the round decided on a copy of the decisions: an object the round kept is kept as referenced, and one it removed
     /// as a linked group member is removed as linked.
     /// </returns>
-    private static LeftBehindResult JoinVerdicts(LeftBehindResult evaluated, IRemovalDecisions decisions, ILeftBehindJudging judging)
+    private static InvisibleLeftBehindResult JoinVerdicts(InvisibleLeftBehindResult evaluated, IRemovalDecisions decisions, ILeftBehindRoundJoin roundJoin)
     {
-        var decided = decisions.DecideRoundOnCopy(RoundKind.LeftBehind, [.. evaluated.Proposals]);
+        var decided = decisions.DecideRoundOnCopy(RoundKind.InvisibleLeftBehind, [.. evaluated.Proposals]);
         Func<TargetId, Decision?> decisionOf = target => decided.GetValueOrDefault(target);
         return evaluated with
         {
             Evaluations =
             [
                 .. evaluated.Evaluations.Select(evaluation =>
-                    judging.JoinRoundDecision(evaluation, decisionOf(new TargetId(evaluation.TargetIndex)), decisionOf)),
+                    roundJoin.JoinRoundDecision(evaluation, decisionOf(new TargetId(evaluation.TargetIndex)), decisionOf)),
             ],
         };
     }

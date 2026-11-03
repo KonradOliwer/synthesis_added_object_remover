@@ -47,7 +47,9 @@ public static class SettingDefaults
     public const int DirectionThresholdPercent = 50;
     public const int ClearedDirectionsPercent = 60;
     public const int MinOccupiedDirections = 4;
-    public const bool RemoveLeftoverVisibleObjects = true;
+    public const int MinObjectsAround = 5;
+    public const bool RemoveBySurroundingDirections = true;
+    public const bool RemoveObjectsInClearedAreas = true;
     public const int VisibleMinOccupiedDirections = 6;
     public const int VisibleDirectionThresholdPercent = 80;
     public const int VisibleClearedDirectionsPercent = 80;
@@ -58,6 +60,5 @@ public static class SettingDefaults
     public const float ClearedAreaSearchRadius = 5000f;
     public const float ClearedAreaMaxStandingSizePercent = 1f;
     public const float ClearedAreaMaxStandingCountPercent = 5f;
-    public const ClearedAreaShares SharesThatMustPass = ClearedAreaShares.Both;
     public const float TerrainEdgeBlendDistanceInUnits = 256f;
 }

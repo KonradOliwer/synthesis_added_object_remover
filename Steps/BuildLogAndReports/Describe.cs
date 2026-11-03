@@ -126,9 +126,9 @@ internal static class Describe
             $"{TextFormat.Percent(support.LeftItsPlaceShare)} of its support {(support.RestoredShare > 0 ? "left its place or was pulled down" : "was removed or pulled down")} "
             + $"(mostly {OtherObject(support.MainSupporter)}, another mod's object left without support)",
         ObjectWithReason.VisibleLeftBehind { Evaluation: var evaluation } => $"visible, {LeftBehindOutcomeText.DescribeReason(evaluation)}",
+        ObjectWithReason.InClearedArea { Area: var area } => ClearedAreaText.Reason(area),
         ObjectWithReason.LeftBehind { Evaluation: var evaluation } => $"invisible, {LeftBehindReason(evaluation)}",
         ObjectWithReason.LinkedTo linked => $"linked to {FateOf(final, linked.LinkedToTargetIndex)} {RecordNames.Describe(world.Targets[linked.LinkedToTargetIndex])}",
-        ObjectWithReason.LeftoverInRestoredArea => RestoreWhereRemovedText.LeftoverReason,
         _ => throw new UnreachableException($"Unknown removal type {removal.GetType().Name}."),
     };
 
@@ -184,7 +184,7 @@ internal static class Describe
     }
 
     /// <summary>The reason, naming the other mod's object the invisible object sits inside, if any.</summary>
-    public static string LeftBehindReason(LeftBehindCheck evaluation) =>
+    public static string LeftBehindReason(InvisibleLeftBehindCheck evaluation) =>
         evaluation.ContainingObject is { } inside
             ? $"{LeftBehindOutcomeText.DescribeReason(evaluation)} (inside {OtherObject(inside)})"
             : LeftBehindOutcomeText.DescribeReason(evaluation);

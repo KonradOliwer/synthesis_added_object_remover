@@ -19,6 +19,9 @@ internal sealed partial record SourceFile(string Project, string Path, string Fu
     /// <summary>The text of every string literal as written between its quotes (interpolation holes included), comments excluded.</summary>
     public IReadOnlyList<string> StringLiterals { get; } = StringLiteralsOf(File.ReadAllText(FullPath));
 
+    /// <summary>The string literals of <see cref="StringLiterals"/> with the line each starts on.</summary>
+    public IReadOnlyList<(string Literal, int Line)> StringLiteralLines { get; } = StringLiteralLinesOf(File.ReadAllText(FullPath));
+
     public string Description => $"{Project}: {Path}";
 
     /// <summary>The file is one of the listed files, inside one of the listed folders, or in one of the listed projects.</summary>
@@ -33,13 +36,26 @@ internal sealed partial record SourceFile(string Project, string Path, string Fu
     public static string CodeOf(string text) =>
         CommentsAndLiteralsPattern().Replace(text, match => match.Value.StartsWith('/') ? "" : "\"\"");
 
-    public static IReadOnlyList<string> StringLiteralsOf(string text) =>
-    [
-        .. CommentsAndLiteralsPattern().Matches(text)
-            .Select(match => match.Value)
-            .Where(value => value[0] is '"' or '@' or '$')
-            .Select(value => value.TrimStart('$', '@')[1..^1]),
-    ];
+    public static IReadOnlyList<string> StringLiteralsOf(string text) => [.. StringLiteralLinesOf(text).Select(literal => literal.Literal)];
+
+    /// <summary>Each string literal as written between its quotes, with the line it starts on.</summary>
+    public static IReadOnlyList<(string Literal, int Line)> StringLiteralLinesOf(string text)
+    {
+        var literals = new List<(string Literal, int Line)>();
+        var line = 1;
+        var counted = 0;
+        foreach (Match match in CommentsAndLiteralsPattern().Matches(text))
+        {
+            line += text.AsSpan(counted, match.Index - counted).Count('\n');
+            counted = match.Index;
+            if (match.Value[0] is '"' or '@' or '$') literals.Add((match.Value.TrimStart('$', '@')[1..^1], line));
+        }
+        return literals;
+    }
+
+    /// <summary>Like <see cref="CodeOf"/>, but the line breaks of a removed comment or an emptied literal stay, so a line of the code is the same line of the source.</summary>
+    public static string CodeKeepingLinesOf(string text) =>
+        CommentsAndLiteralsPattern().Replace(text, match => (match.Value.StartsWith('/') ? "" : "\"\"") + new string('\n', match.Value.Count(character => character == '\n')));
 
     public static string CodeWithExpressionsOf(string text) =>
         CommentsAndLiteralsPattern().Replace(text, match => match.Value[0] switch

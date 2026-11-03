@@ -11,6 +11,7 @@ internal static partial class LogSections
     public const string VisibleLeftBehindStepName = "Visible objects left behind";
 
     /// <param name="kept">The objects the visible left-behind rounds held.</param>
+    /// <param name="minObjectsAround">The fewest objects around the step removes an object with.</param>
     /// <param name="elapsed">The whole step's time as the run measured it: the rounds, their also-remove follow-ups and the measuring before the first round.</param>
     /// <remarks>
     /// The summary comes first, then the detailed log's rounds line, its lines for the objects that have one (see <see cref="HasDetailedLine"/>)
@@ -20,6 +21,7 @@ internal static partial class LogSections
         CollectedObjects world,
         VisibleLeftBehindResult visibleLeftBehind,
         IEnumerable<KeptObject> kept,
+        int minObjectsAround,
         TimeSpan elapsed,
         ReportContext context)
     {
@@ -32,7 +34,7 @@ internal static partial class LogSections
                 BuildPerformedOrNotPerformedLine(
                     visibleLeftBehind.Outcome,
                     VisibleLeftBehindStepName,
-                    () => LeftBehindSummaryLine(VisibleLeftBehindStepName, visibleLeftBehind.Evaluations, judgesInsideOtherObjects: false, elapsed, context)),
+                    () => LeftBehindSummaryLine(VisibleLeftBehindStepName, visibleLeftBehind.Evaluations, judgesInsideOtherObjects: false, minObjectsAround, elapsed, context)),
                 .. VisibleRoundsLines(visibleLeftBehind, context),
                 .. evaluationLines,
                 .. BuildKeptLines(world, kept),
@@ -52,7 +54,7 @@ internal static partial class LogSections
     private static bool HasDetailedLine(VisibleLeftBehindCheck evaluation) => evaluation.Decision switch
     {
         LeftBehindOutcome.KeptSurroundingsMostlyKept => evaluation.Surroundings.ClearedCount > 0,
-        LeftBehindOutcome.KeptTooFewSurroundingObjects => false,
+        LeftBehindOutcome.KeptTooFewObjectsAround or LeftBehindOutcome.KeptTooFewOccupiedDirections => false,
         _ => true,
     };
 

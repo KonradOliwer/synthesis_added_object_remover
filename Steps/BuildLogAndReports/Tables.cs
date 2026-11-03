@@ -19,15 +19,18 @@ internal static partial class Tables
         var restingObjects = outcome.RestingObjects;
         if (restingObjects.DetailsHoldTouch) tables.AddRange(BuildTouchTables(outcome, ExplanationEvidence.Touch(restingObjects), alsoRemove.TouchGap, context));
         var afterVisibleLeftBehind = outcome.VisibleLeftBehind.FollowUp;
-        if (restingObjects.EvaluatedSupport || afterVisibleLeftBehind.EvaluatedSupport)
+        var afterClearedAreas = outcome.ObjectsInClearedAreas.FollowUp;
+        if (restingObjects.EvaluatedSupport || afterVisibleLeftBehind.EvaluatedSupport || afterClearedAreas.EvaluatedSupport)
         {
             var evaluations = SupportEvaluationRows.Join(restingObjects, outcome.Final)
-                .AddRange(SupportEvaluationRows.Join(afterVisibleLeftBehind, outcome.Final, iterationsBefore: restingObjects.Rounds.Length));
+                .AddRange(SupportEvaluationRows.Join(afterVisibleLeftBehind, outcome.Final, iterationsBefore: restingObjects.Rounds.Length))
+                .AddRange(SupportEvaluationRows.Join(afterClearedAreas, outcome.Final, iterationsBefore: restingObjects.Rounds.Length + afterVisibleLeftBehind.Rounds.Length));
             tables.Add(BuildSupportTable(outcome.Collected, evaluations, alsoRemove.SupportLostFraction, context));
         }
         if (restingObjects.DetailsHoldMeshOrigins) tables.Add(BuildMeshOriginsTable(ExplanationEvidence.MeshOrigins(restingObjects)));
         if (outcome.VisibleLeftBehind.Outcome != StepOutcome.SwitchedOff) tables.Add(BuildVisibleLeftBehindTable(outcome.Collected, outcome.VisibleLeftBehind.Evaluations, context));
-        if (outcome.LeftBehind.Outcome != StepOutcome.SwitchedOff) tables.Add(BuildLeftBehindTable(outcome.Collected, outcome.LeftBehind.Evaluations, outcome.MarkerMoves, context));
+        if (outcome.ObjectsInClearedAreas.Outcome != StepOutcome.SwitchedOff) tables.Add(BuildObjectsInClearedAreasTable(outcome.Collected, outcome.ObjectsInClearedAreas.Evaluations, context));
+        if (outcome.InvisibleLeftBehind.Outcome != StepOutcome.SwitchedOff) tables.Add(BuildLeftBehindTable(outcome.Collected, outcome.InvisibleLeftBehind.Evaluations, outcome.MarkerMoves, context));
         tables.Add(BuildRemovalsTable(outcome.Collected, outcome.Removals, outcome.Final, context));
         if (BuildRestoredTable(outcome.Collected, outcome.Restorations, outcome, context) is { } restored) tables.Add(restored);
         if (outcome.RestoreWhereRemoved.Outcome == StepOutcome.Performed) tables.AddRange(BuildRestoredWhereRemovedTables(outcome.Collected, outcome.RestoreWhereRemoved, context));

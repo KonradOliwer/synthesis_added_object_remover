@@ -35,7 +35,6 @@ public class CopiedCodeTests
         "Timed calls of two different steps: each builds its own step's input from its own earlier results and settings. They repeat the "
         + "Log.Timed call around them and the report lambda that prints the step's sections; that lambda cannot be one method, because "
         + "BuildStepSections is overloaded per result type and each lambda picks its own overload.";
-    private const string LeftBehindSettings = "LeftBehindSettingsBuilder.cs:LeftBehindSettingsBuilder.";
     private const string ParallelMapFile = "Tools/OrderIndependentParallelWork/ParallelMap.cs:ParallelMap.";
     private const string ParallelMapOverloads =
         "Overloads of the parallel map: each takes its own item order (index order, a permutation, a work order or a subset) and its own mix "
@@ -57,7 +56,10 @@ public class CopiedCodeTests
     {
         [CopyFamily.KeyOf([
             "Steps/FitClashingObjects/ClashingObjectFitter.cs:ClashingObjectFitter.Fit", "Steps/MoveKeptMarkers/MarkerMovePlanner.cs:MarkerMovePlanner.Plan",
+            "Steps/RemoveObjectsInClearedAreas/ObjectsInClearedAreas.cs:ObjectsInClearedAreas.Find",
             "Steps/RemoveVisibleObjectsLeftBehind/VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.Find"])] = RoundAddingEntries,
+        [CopyFamily.KeyOf([
+            OtherMods + "OtherModsObjects.cs:OtherModsObjects.Settle", "Steps/RemoveInvisibleObjectsLeftBehind/InvisibleLeftBehindObjects.cs:InvisibleLeftBehindObjects.Find"])] = RoundAddingEntries,
         [CopyFamily.KeyOf([CollisionBuilder + "CreateChangedTerrainSettings", CollisionBuilder + "CreateTooCloseSettings"])] = SettingChecks,
         [CopyFamily.KeyOf([CollisionBuilder + "CreateChangedTerrainSettings"])] = SettingChecks,
         [CopyFamily.KeyOf([Report + "RestoreCountLines.cs:RestoreCountLines.LeftToLaterPlugins"])] = RestoreCountFacts,
@@ -77,11 +79,8 @@ public class CopiedCodeTests
             "Steps/RemoveObjectsOnChangedTerrain/ChangedTerrainPlacementRule.cs:ChangedTerrainPlacementRule.Tries.Check",
             "Steps/RemoveTooCloseObjects/TooClosePlacementRule.cs:TooClosePlacementRule.Tries.Check"])] = PlacementRules,
         [CopyFamily.KeyOf([Runner + "RunMarkerMoves", Runner + "RunSelection"])] = StepCalls,
-        [CopyFamily.KeyOf([Runner + "RunAlsoRemove", Runner + "RunVisibleLeftBehind"])] = StepCalls,
-        [CopyFamily.KeyOf([Runner + "RunLeftBehind", Runner + "RunVisibleLeftBehind"])] = StepCalls,
-        [CopyFamily.KeyOf(["Run/RunSettingsValidation/" + LeftBehindSettings + "CreateInvisible", "Run/RunSettingsValidation/" + LeftBehindSettings + "CreateVisible"])] =
-            "Each builds a different settings record from a different settings group, values type and on-switch; the surroundings check they "
-            + "share is already one method.",
+        [CopyFamily.KeyOf([Runner + "RunAlsoRemove", Runner + "RunObjectsInClearedAreas", Runner + "RunVisibleLeftBehind"])] = StepCalls,
+        [CopyFamily.KeyOf([Runner + "RunInvisibleLeftBehind", Runner + "RunObjectsInClearedAreas", Runner + "RunVisibleLeftBehind"])] = StepCalls,
         [CopyFamily.KeyOf([ParallelMapFile + "Run", ParallelMapFile + "RunOver"])] = ParallelMapOverloads,
         [CopyFamily.KeyOf([ParallelMapFile + "Run"])] = ParallelMapOverloads,
         [CopyFamily.KeyOf([Records + "CellRecordParts.cs:CellRecordParts.FieldParts"])] =

@@ -10,15 +10,15 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 internal static partial class LogSections
 {
     /// <summary>The step's name, as the settings screen names its group.</summary>
-    private const string LeftBehindStepName = "Invisible objects left behind";
+    private const string InvisibleLeftBehindStepName ="Invisible objects left behind";
 
     public const string MarkerMovesName = "Moved kept markers";
 
     /// <param name="kept">The objects the left-behind round held.</param>
     /// <remarks>The summary comes first, then the per-object decisions and the kept lines.</remarks>
-    public static LogSection BuildLeftBehindSection(
+    public static LogSection BuildInvisibleLeftBehindSection(
         CollectedObjects world,
-        LeftBehindResult leftBehind,
+        InvisibleLeftBehindResult leftBehind,
         IEnumerable<KeptObject> kept,
         TimeSpan elapsed,
         ReportContext context)
@@ -28,9 +28,11 @@ internal static partial class LogSections
         List<string> lines =
         [
             BuildPerformedOrNotPerformedLine(
-                leftBehind.Outcome, LeftBehindStepName, () => LeftBehindSummaryLine(LeftBehindStepName, leftBehind.Evaluations, judgesInsideOtherObjects: true, elapsed, context)),
+                leftBehind.Outcome,
+                InvisibleLeftBehindStepName,
+                () => LeftBehindSummaryLine(InvisibleLeftBehindStepName,leftBehind.Evaluations, judgesInsideOtherObjects: true, minObjectsAround: null, elapsed, context)),
         ];
-        if (context.Detailed) lines.AddRange(leftBehind.Evaluations.Select(evaluation => LeftBehindOutcomeLine(world, evaluation)));
+        if (context.Detailed) lines.AddRange(leftBehind.Evaluations.Select(evaluation => InvisibleLeftBehindOutcomeLine(world, evaluation)));
         lines.AddRange(BuildKeptLines(world, kept));
         return new LogSection("leftovers", [.. lines]);
     }
@@ -81,14 +83,14 @@ internal static partial class LogSections
     {
         StepOutcome.Performed => MarkerMovesSummaryLine(markerMoves),
         StepOutcome.StoppedByUnexpectedError => BuildNotPerformedLine(MarkerMovesName),
-        StepOutcome.StoppedByEarlierFailure => BuildNotPerformedBecauseEarlierLine(MarkerMovesName, LeftBehindStepName),
+        StepOutcome.StoppedByEarlierFailure => BuildNotPerformedBecauseEarlierLine(MarkerMovesName, InvisibleLeftBehindStepName),
         _ => throw new UnreachableException($"Unexpected marker move outcome {markerMoves.Outcome}."),
     };
 
     private static string MarkerMovesSummaryLine(MarkerMoves markerMoves) =>
         $"Moved {TextFormat.Count(markerMoves.Moves.Length)} kept markers out of other mods' objects; {TextFormat.Count(markerMoves.LeftInPlace.Count + markerMoves.LeftInDeletedCell.Count)} left in place.";
 
-    private static string LeftBehindOutcomeLine(CollectedObjects world, LeftBehindCheck evaluation)
+    private static string InvisibleLeftBehindOutcomeLine(CollectedObjects world, InvisibleLeftBehindCheck evaluation)
     {
         var target = world.Targets[evaluation.TargetIndex];
         return $"  Left behind: {RecordNames.Describe(target)} ({ObjectVisibilityText.KindName(evaluation.Kind)}) in {Describe.Space(world, target.SpaceKey)}: "
@@ -101,8 +103,9 @@ internal static partial class LogSections
     /// Whether the step removes objects inside another mod's object: only then is that outcome listed when no object has it. The visible
     /// step never gives it.
     /// </param>
+    /// <param name="minObjectsAround">The fewest objects around that the step keeps by; null for a step without that minimum.</param>
     private static string LeftBehindSummaryLine(
-        string stepName, IEnumerable<LeftBehindVerdict> evaluations, bool judgesInsideOtherObjects, TimeSpan elapsed, ReportContext context) =>
+        string stepName, IEnumerable<LeftBehindVerdict> evaluations, bool judgesInsideOtherObjects, int? minObjectsAround, TimeSpan elapsed, ReportContext context) =>
         BuildOutcomeSummaryLine(
             stepName,
             [.. evaluations.Select(evaluation => evaluation.Decision)],
@@ -110,10 +113,16 @@ internal static partial class LogSections
             LeftBehindOutcomes.IsRestoration,
             outcome => IsRemovedAsLinked(outcome) || LeftBehindOutcomes.IsRestoration(outcome)
                 || outcome is LeftBehindOutcome.RemovedSurroundingsRemovedAndRestored or LeftBehindOutcome.KeptInDeletedCell
-                || (outcome is LeftBehindOutcome.RemovedInsideOtherObject && !judgesInsideOtherObjects),
-            LeftBehindOutcomeText.Describe,
+                || (outcome is LeftBehindOutcome.RemovedInsideOtherObject && !judgesInsideOtherObjects)
+                || (outcome is LeftBehindOutcome.KeptTooFewObjectsAround && minObjectsAround is null)
+                || IsAreaMethodOutcome(outcome),
+            outcome => minObjectsAround is { } minimum ? LeftBehindOutcomeText.Describe(outcome, minimum) : LeftBehindOutcomeText.Describe(outcome),
             elapsed,
             context);
+
+    /// <summary>The outcomes only the step for objects in cleared areas gives, which the direction steps never do.</summary>
+    private static bool IsAreaMethodOutcome(LeftBehindOutcome outcome) =>
+        outcome is LeftBehindOutcome.RemovedInClearedArea or LeftBehindOutcome.KeptAreaStillStands;
 
     /// <summary>The outcomes of an object disabled as a linked group member.</summary>
     private static bool IsRemovedAsLinked(LeftBehindOutcome outcome) =>

@@ -10,19 +10,15 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 /// </summary>
 internal static class OtherRecordChange
 {
-    /// <summary>Plugins that re-save a record round its floats, so a difference this small is no change. Base and presence are exact.</summary>
-    public static readonly PlacedPartTolerances Tolerances = new(Position: PlacedPartTolerances.ResavedPosition, Rotation: 0.0001f, Scale: 0.0001f);
-
     /// <summary>Ranks a change only the patch holds below every version index, so any real mod's change is named first.</summary>
     private const int PatchOnlyRank = -1;
 
-    /// <summary>The object properties, each as "the two versions differ": position, rotation, scale, base and presence.</summary>
+    /// <summary>The object properties, each as "the two versions differ": position, rotation, scale, base and presence; base and presence are exact.</summary>
     private static readonly ImmutableArray<Func<PlacedVersionFact, PlacedVersionFact, bool>> ObjectProperties =
     [
-        static (first, second) => Vectors.DiffersBeyond(
-            first.Placement.Position, second.Placement.Position, static (one, other) => Vector3.Abs(one - other), Tolerances.Position),
-        static (first, second) => Vectors.DiffersBeyond(first.Placement.EulerRotation, second.Placement.EulerRotation, Vectors.ShortestAngles, Tolerances.Rotation),
-        static (first, second) => MathF.Abs(ReferenceScale.Normalize(first.Scale) - ReferenceScale.Normalize(second.Scale)) > Tolerances.Scale,
+        static (first, second) => ResavedPlacedParts.PositionsDiffer(first.Placement.Position, second.Placement.Position),
+        static (first, second) => ResavedPlacedParts.RotationsDiffer(first.Placement.EulerRotation, second.Placement.EulerRotation),
+        static (first, second) => ResavedPlacedParts.ScalesDiffer(first.Scale, second.Scale),
         static (first, second) => first.Base != second.Base,
         static (first, second) => first.Placement.Presence != second.Placement.Presence,
     ];

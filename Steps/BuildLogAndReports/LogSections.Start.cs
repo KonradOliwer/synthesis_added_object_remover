@@ -7,6 +7,7 @@ using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
@@ -35,7 +36,8 @@ internal static partial class LogSections
             .. DescribeTrustReasons(settings.TargetAsTyped, settings.ModTrust.MaxOtherMastersOfRequiringMod, trust, plugins),
             .. DescribeCollision(settings.Collision),
             DescribeAlsoRemove(settings.AlsoRemove, settings.OtherModsObjects),
-            DescribeVisibleLeftBehind(settings.VisibleLeftBehind),
+            DescribeVisibleLeftBehind(settings),
+            DescribeObjectsInClearedAreas(settings.ObjectsInClearedAreas, settings.ObjectsInClearedAreasOff),
             DescribeLeftBehind(settings),
             DescribeRestoreWhereRemoved(settings.RestoreWhereRemoved),
             DescribeDetailedLogAndReports(settings.Reports),
@@ -153,20 +155,44 @@ internal static partial class LogSections
         + $"Remove when this much support is gone: {TextFormat.Percent(settings.SupportLostFraction)}; "
         + $"Other mods' objects left without support: {otherModsObjects.Handling}.";
 
-    private static string DescribeVisibleLeftBehind(VisibleLeftBehindSettings? visible) =>
-        visible is null
-            ? $"{VisibleLeftBehindStepName}: off."
-            : $"{DescribeLeftBehindStep(VisibleLeftBehindStepName, visible.Surroundings, "visible", visible.NeverRemove.Kinds.Order().Select(VisibleObjectKindText.KindName))}.";
+    private const string DirectionMethodLineName = "Objects left behind, direction method";
+
+    private static string DescribeVisibleLeftBehind(RunSettings settings) =>
+        settings.VisibleLeftBehind is not { } visible
+            ? $"{DirectionMethodLineName}: off."
+            : $"{DescribeLeftBehindStep(DirectionMethodLineName, visible.Surroundings, "objects", settings.NeverRemovedVisibleKinds.Kinds.Order().Select(VisibleObjectKindText.KindName))}; "
+                + $"{KeptWithTooFewObjectsAround(visible.MinObjectsAround)}.";
+
+    private const string AreaMethodLineName = "Objects left behind, area method";
+
+    /// <param name="off">Why the step is off; null when it is on.</param>
+    private static string DescribeObjectsInClearedAreas(ObjectsInClearedAreasSettings? settings, ObjectsInClearedAreasOff? off) =>
+        settings is { ClearedArea: var area }
+            ? $"{AreaMethodLineName}: radius {area.SearchRadius} units; "
+                + $"cleared when at most {area.MaxStandingSizePercent}% by size and {area.MaxStandingCountPercent}% by number still stand; "
+                + $"{KeptWithTooFewObjectsAround(settings.MinObjectsAround)}."
+            : $"{AreaMethodLineName}: {OffText(off ?? throw new UnreachableException("The step for objects in cleared areas has no settings and no reason it is off."))}";
+
+    private static string KeptWithTooFewObjectsAround(int minObjectsAround) => $"kept with {LeftBehindOutcomeText.TooFewObjectsAround(minObjectsAround)}";
+
+    private static string OffText(ObjectsInClearedAreasOff off) => off switch
+    {
+        ObjectsInClearedAreasOff.Switch => "off.",
+        ObjectsInClearedAreasOff.SizeLimit => "off (the size limit is 100% or more).",
+        ObjectsInClearedAreasOff.CountLimit => "off (the count limit is 100% or more).",
+        ObjectsInClearedAreasOff.BothLimits => "off (the size and count limits are 100% or more).",
+        _ => throw new UnreachableException($"Unknown reason {off} the step for objects in cleared areas is off."),
+    };
 
     /// <summary>The settings line of a left-behind step that is on, up to its own settings.</summary>
-    /// <param name="objectsKind">"visible" or "invisible", as the never-remove setting names the objects.</param>
+    /// <param name="objectsKind">"invisible objects" or "objects", as the never-remove setting names the objects.</param>
     private static string DescribeLeftBehindStep(string stepName, LeftBehindSurroundings surroundings, string objectsKind, IEnumerable<string> protectedKindNames) =>
         $"{stepName}: on; "
         + $"Look this far around it: {surroundings.LookAround} units; "
         + $"Decide only if at least this many of the 8 directions have objects: {surroundings.MinOccupiedDirections}; "
         + $"A direction is cleared when this much of it was removed: {surroundings.DirectionClearedPercent}%; "
         + $"Remove when this share of the directions with objects is cleared: {surroundings.ClearedDirectionsPercent}%; "
-        + $"Never remove these as {objectsKind} objects left behind: {TextLists.JoinOr(protectedKindNames, Describe.ListSeparator, Describe.NoEntries)}";
+        + $"Never remove these as {objectsKind} left behind: {TextLists.JoinOr(protectedKindNames, Describe.ListSeparator, Describe.NoEntries)}";
 
     private static string DescribeRestoreWhereRemoved(WhereRemovedRestoreSettings restore)
     {
@@ -177,16 +203,8 @@ internal static partial class LogSections
         var terrainEdges = restore.Terrain ? $"; terrain edges blended over {restore.TerrainEdgeBlendDistance} units" : string.Empty;
         return $"{group}: {string.Join(Describe.ListSeparator, RestoredKindNames(restore))}; "
             + $"an area {area.SearchRadius * 2} units wide counts as cleared when at most {area.MaxStandingSizePercent}% of the cleaned mod's objects there still stand by size "
-            + $"{SharesJoin(area.SharesThatMustPass)} at most {area.MaxStandingCountPercent}% by number{terrainEdges}.";
+            + $"and at most {area.MaxStandingCountPercent}% by number{terrainEdges}.";
     }
-
-    /// <summary>The word that joins the two limits: both must hold, or either is enough.</summary>
-    private static string SharesJoin(ClearedAreaShares shares) => shares switch
-    {
-        ClearedAreaShares.Both => "and",
-        ClearedAreaShares.Either => "or",
-        _ => throw new UnreachableException($"Unknown cleared-area shares {shares}."),
-    };
 
     private static IEnumerable<string> RestoredKindNames(WhereRemovedRestoreSettings restore)
     {
@@ -197,8 +215,8 @@ internal static partial class LogSections
     }
 
     private static string DescribeLeftBehind(RunSettings settings) =>
-        settings.LeftBehind is not { } leftovers
-            ? $"{LeftBehindStepName}: off."
-            : $"{DescribeLeftBehindStep(LeftBehindStepName, leftovers.Surroundings, "invisible", leftovers.NeverRemove.Kinds.Order().Select(ObjectVisibilityText.KindName))}; "
+        settings.InvisibleLeftBehind is not { } leftovers
+            ? $"{InvisibleLeftBehindStepName}: off."
+            : $"{DescribeLeftBehindStep(InvisibleLeftBehindStepName, leftovers.Surroundings, "invisible objects", settings.NeverRemovedInvisibleKinds.Kinds.Order().Select(ObjectVisibilityText.KindName))}; "
                 + $"Move kept markers out of other mods' objects: {OnOff(settings.MarkerMoves.Runs)}.";
 }

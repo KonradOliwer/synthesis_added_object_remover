@@ -28,7 +28,7 @@ public sealed class RestoreWhereRemovedReportTests
     private static readonly AreaShare StillStanding = new(Objects: 10, Standing: 4, Size: 1000, StandingSize: 250, AreaVerdict.StillStanding, CountPercent: 40, SizePercent: 25);
     private static readonly AreaShare NoObjects = new(Objects: 0, Standing: 0, Size: 0, StandingSize: 0, AreaVerdict.NoObjectsAround, CountPercent: 0, SizePercent: 0);
 
-    private static readonly RestoreWhereRemovedResult SwitchedOff = RestoreWhereRemovedResult.SwitchedOff(OtherModsObjectsResult.SwitchedOff);
+    private static readonly RestoreWhereRemovedResult SwitchedOff = RestoreWhereRemovedResult.SwitchedOff();
 
     private static string Space => $"worldspace {RecordLabels.Of(TestTargets.Space, "Tamriel")}";
 
@@ -529,104 +529,6 @@ public sealed class RestoreWhereRemovedReportTests
         Assert.Equal([ReportFileNames.RestoredWhereRemovedCellsFileName], tables.Select(table => table.FileName));
     }
 
-    // ---- the cleaned mod's objects still standing in restored areas
-
-    private const string LeftoversHeading = "Objects of the cleaned mod still standing in restored areas";
-    private const string LeftoverRemoved = "removed as a leftover where the area was restored";
-    private const int LeftoverTargets = 5;
-
-    private static readonly RestoredColumn LeftoverColumn = new(TestTargets.Space, new Vector2(1024, -2048));
-    private static readonly RestoredColumn InteriorColumn = new(TestTargets.Space, Centre: null);
-    private static readonly AlwaysKeptKind ContainersKept = new AlwaysKeptKind.Visible(VisibleObjectKind.Containers);
-    private static readonly AlwaysKeptKind XMarkersKept = new AlwaysKeptKind.Invisible(InvisibleObjectKind.XMarkers);
-
-    private static RestoreWhereRemovedResult WithLeftovers(params LeftoverJudged[] leftovers) =>
-        ObjectsOnly(Restored(Rock(0x912, PlacedParts.Position), Cleared)) with { Leftovers = [.. leftovers] };
-
-    private static LeftoverJudged Leftover(int target, KeepReason? keptAsObjectToKeep = null, AlwaysKeptKind? keptKind = null, RestoredColumn? column = null) =>
-        new(new TargetId(target), column ?? LeftoverColumn, keptAsObjectToKeep, keptKind);
-
-    private static LeftoverJudged[] OneOfEach() =>
-    [
-        Leftover(0),
-        Leftover(1, column: InteriorColumn),
-        Leftover(2, keptAsObjectToKeep: TestKeepReasons.Quest),
-        Leftover(3, keptKind: XMarkersKept),
-        Leftover(4, keptKind: ContainersKept),
-    ];
-
-    [Fact]
-    public void TheNormalLogCountsTheLeftoversRemovedAndTheOnesKeptPerReason()
-    {
-        var lines = Section(WithLeftovers(OneOfEach()), Normal).Lines;
-
-        Assert.Equal(
-            $"{LeftoversHeading}: 2 {LeftoverRemoved}, "
-            + "3 kept in a restored area (1 QUST record, 1 always kept kind: Containers, 1 always kept kind: Position markers (XMarker, XMarkerHeading)).",
-            lines[1]);
-        Assert.Equal(2, lines.Length);
-    }
-
-    [Fact]
-    public void ALeftoverIsNeverCountedUnderTheOtherOutcome()
-    {
-        var removedOnly = Section(WithLeftovers(Leftover(0)), Normal).Lines;
-        var keptOnly = Section(WithLeftovers(Leftover(2, keptAsObjectToKeep: TestKeepReasons.Quest)), Normal).Lines;
-
-        Assert.Equal($"{LeftoversHeading}: 1 {LeftoverRemoved}.", removedOnly[1]);
-        Assert.Equal($"{LeftoversHeading}: 1 kept in a restored area (1 QUST record).", keptOnly[1]);
-    }
-
-    [Fact]
-    public void NoLeftoverPrintsNoLineAndNoFile()
-    {
-        var none = WithLeftovers();
-
-        Assert.DoesNotContain(Section(none, Detailed).Lines, line => line.Contains("restored area", StringComparison.Ordinal));
-        Assert.DoesNotContain(Tables.BuildRestoredWhereRemovedTables(World(LeftoverTargets), none, Normal), table => table.FileName == ReportFileNames.RestoredWhereRemovedLeftoversFileName);
-    }
-
-    [Fact]
-    public void TheDetailedLogHasALinePerLeftoverWithItsAreaAndWhatBecameOfIt()
-    {
-        var lines = LogSections.BuildRestoreWhereRemovedSection(World(LeftoverTargets), WithLeftovers(OneOfEach()), Elapsed, Detailed).Lines;
-        string Object(int target) => RecordLabels.Of(TestTargets.Key(target), null);
-
-        Assert.Contains($"  {Object(0)} (base (none)) in {Space}, area around (1024, -2048): {LeftoverRemoved}", lines);
-        Assert.Contains($"  {Object(1)} (base (none)) in {Space}: {LeftoverRemoved}", lines);
-        Assert.Contains($"  {Object(2)} (base (none)) in {Space}, area around (1024, -2048): kept in a restored area: {TestKeepReasons.QuestDetail}", lines);
-        Assert.Contains($"  {Object(3)} (base (none)) in {Space}, area around (1024, -2048): kept in a restored area: always kept kind: Position markers (XMarker, XMarkerHeading)", lines);
-        Assert.Contains($"  {Object(4)} (base (none)) in {Space}, area around (1024, -2048): kept in a restored area: always kept kind: Containers", lines);
-    }
-
-    [Fact]
-    public void TheLeftoversFileHasARowPerLeftoverWithTheAreaItStoodInAndWhatBecameOfIt()
-    {
-        var table = Assert.Single(
-            Tables.BuildRestoredWhereRemovedTables(World(LeftoverTargets), WithLeftovers(OneOfEach()), Normal),
-            file => file.FileName == ReportFileNames.RestoredWhereRemovedLeftoversFileName);
-
-        var removed = Row(table, "formKey", TestTargets.Key(0).ToString());
-        var interior = Row(table, "formKey", TestTargets.Key(1).ToString());
-        var kept = Row(table, "formKey", TestTargets.Key(2).ToString());
-        Assert.Equal(("1024", "-2048", LeftoverRemoved), (Field(table, removed, "areaCentreX"), Field(table, removed, "areaCentreY"), Field(table, removed, "result")));
-        Assert.Equal(("", "", LeftoverRemoved), (Field(table, interior, "areaCentreX"), Field(table, interior, "areaCentreY"), Field(table, interior, "result")));
-        Assert.Equal($"kept in a restored area: {TestKeepReasons.QuestDetail}", Field(table, kept, "result"));
-        Assert.Equal(LeftoverTargets, table.Rows.Length);
-        Assert.Equal(Space, Field(table, removed, "space"));
-    }
-
-    [Fact]
-    public void ALeftoverRemovedByTheStepIsWordedAsOneInTheRemovalLists()
-    {
-        var world = World(LeftoverTargets);
-
-        var reason = RemovalList.Collision(new TargetId(0), new LeftoverInRestoredArea(), world);
-
-        Assert.Equal(new ObjectWithReason.LeftoverInRestoredArea(0), reason);
-        Assert.Equal("leftover where the area was restored", Describe.RemovalReason(world, reason, final: null!));
-    }
-
     // ---- the scene
 
     private static LogSection Section(RestoreWhereRemovedResult result, ReportContext context) =>
@@ -706,9 +608,7 @@ public sealed class RestoreWhereRemovedReportTests
                 WorldAfterRemoval: TimeSpan.FromSeconds(2.3),
                 GuardsSetUp: TimeSpan.FromSeconds(3.4),
                 Passes: TimeSpan.FromSeconds(4.5),
-                PlacedGuardsInPasses: TimeSpan.FromSeconds(5.6)),
-            Leftovers: [],
-            OtherModsObjects: OtherModsObjectsResult.SwitchedOff);
+                PlacedGuardsInPasses: TimeSpan.FromSeconds(5.6)));
 
     private static PlacedChangeJudged Restored(RecordChangedByCleanedMod change, AreaShare area) =>
         new(change, Never: null, area, WhereItIsNow: null, Refused: null, IsRestored: true, ChangeJudge.KindOf(change), KeptForArea: null, PlacedBack: null);

@@ -25,7 +25,7 @@ public sealed class EffectOnlyPiecesOfARemovedSiteRunTests
     private static Settings SettingsWithTheSiteSteps()
     {
         var settings = RestoreWhereRemovedRunTests.SettingsOf();
-        settings.Standard.LeftoverVisibleObjects.RemoveLeftoverVisibleObjects = true;
+        settings.Standard.LeftoverObjects.RemoveBySurroundingDirections = true;
         settings.Standard.FollowUpRemoval.Mode = FollowUpRemovalMode.EverythingTouchingIt;
         return settings;
     }

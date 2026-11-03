@@ -243,7 +243,7 @@ public class StepDeterminismTests
         return new ShapeZoneScene(targets, otherModObjects);
     }
 
-    private static LeftBehindResult SelectLeftBehind(
+    private static InvisibleLeftBehindResult SelectLeftBehind(
         List<TargetObject> targets, List<OtherObject> rooms, HashSet<int> removed, int threads) =>
         TestLeftBehind.CreateRule(targets, Shapes, rooms, CreateLeftBehindConfig())
             .SelectRemovals(
@@ -328,14 +328,13 @@ public class StepDeterminismTests
             .Select(evaluation => $"{evaluation.TargetIndex} {evaluation.Iteration} {evaluation.Removed} {evaluation.RemovedAsLinked} {evaluation.Held} {SupporterShares.TotalOf(evaluation.Shares, SupportCategory.RemovedTarget)}")
             .ToList();
 
-    private static List<string> DescribeEvaluations(LeftBehindResult leftBehind) =>
+    private static List<string> DescribeEvaluations(InvisibleLeftBehindResult leftBehind) =>
         leftBehind.Evaluations
             .Select(evaluation => $"{evaluation.TargetIndex} {evaluation.Decision} {evaluation.ContainingObject?.Key} {evaluation.Radius} {SectorAreasText.Describe(evaluation.Surroundings)}")
             .ToList();
 
-    private static LeftBehindSettings CreateLeftBehindConfig() => new(
-        new LeftBehindSurroundings(LookAround: 100, MinOccupiedDirections: 4, DirectionClearedPercent: 50, ClearedDirectionsPercent: 60),
-        NeverRemove: new NeverRemovedInvisibleKinds(new HashSet<InvisibleObjectKind>()));
+    private static InvisibleLeftBehindSettings CreateLeftBehindConfig() => new(
+        new LeftBehindSurroundings(LookAround: 100, MinOccupiedDirections: 4, DirectionClearedPercent: 50, ClearedDirectionsPercent: 60));
 
     private static TriangleStore NewCache() => new(Shapes.ReadTriangles);
 

@@ -66,19 +66,17 @@ internal static partial class LogSections
     private static int CountNotJudged(ReadCounts counts) => counts.TargetsOverriddenLater + counts.RemovedByOtherPlugins + counts.TargetsHiddenOrWithoutPlacement;
 
     /// <param name="final">The run's decisions, which tell the follow-up removals that were first shrunk or turned.</param>
-    /// <param name="changedTerrain">The changed-terrain step's outcome; the "on changed terrain" item only shows when the step was performed.</param>
-    /// <param name="visibleLeftBehind">The visible left-behind step's outcome; the "visible objects left behind" item only shows when the step was performed.</param>
+    /// <param name="steps">The outcomes of the steps whose items only show when the step was performed.</param>
     public static LogSection BuildRemovalSummarySection(
         CollectedObjects world,
         IReadOnlyList<ObjectWithReason> removals,
         IRemovalDecisions final,
         PluginName target,
-        StepOutcome changedTerrain,
-        StepOutcome visibleLeftBehind) =>
+        SummarizedSteps steps) =>
         new(
             "removal-summary",
             [
-                $"Removed {TextFormat.Count(removals.Count)} objects ({ReasonItems.Describe(removals, final, changedTerrain, visibleLeftBehind, ReasonItems.ForRemovals)})"
+                $"Removed {TextFormat.Count(removals.Count)} objects ({ReasonItems.Describe(removals, final, steps, ReasonItems.ForRemovals)})"
                 + $"{OwnAndChangedRemoved(world, removals, target)}.",
             ]);
 

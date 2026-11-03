@@ -3,9 +3,9 @@ using System.Text.RegularExpressions;
 namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
-/// The decision list's working copy is the way a step tries rounds without changing the shared list. Only the four steps
-/// that decide rounds (resting objects, other mods' objects left without support, and visible and invisible objects left
-/// behind) use it; the decision list's own projects define it.
+/// The decision list's working copy is the way a step tries rounds without changing the shared list. Only the five steps
+/// that decide rounds (resting objects, other mods' objects left without support, visible and invisible objects left
+/// behind, and objects in cleared areas) use it; the decision list's own projects define it.
 /// </summary>
 public class WorkingCopyUseTests
 {
@@ -13,7 +13,7 @@ public class WorkingCopyUseTests
     private static readonly string[] RoundDecidingSteps =
     [
         "Steps/RemoveObjectsRestingOnRemovedOnes", "Steps/OtherModsObjectsLeftWithoutSupport", "Steps/RemoveVisibleObjectsLeftBehind",
-        "Steps/RemoveInvisibleObjectsLeftBehind", "Steps/RestoreWhereRemoved",
+        "Steps/RemoveInvisibleObjectsLeftBehind", "Steps/RemoveObjectsInClearedAreas",
     ];
 
     [Fact]
@@ -43,7 +43,7 @@ public class WorkingCopyUseTests
         Assert.Equal(
             [
                 "OtherModsObjectsLeftWithoutSupport", "RemovalDecisionList", "RemovalDecisionList.Contracts", "RemoveInvisibleObjectsLeftBehind",
-                "RemoveObjectsRestingOnRemovedOnes", "RemoveVisibleObjectsLeftBehind", "RestoreWhereRemoved",
+                "RemoveObjectsInClearedAreas", "RemoveObjectsRestingOnRemovedOnes", "RemoveVisibleObjectsLeftBehind",
             ],
             uses);
     }

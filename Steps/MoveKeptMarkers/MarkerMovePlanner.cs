@@ -22,7 +22,7 @@ public static class MarkerMovePlanner
     /// <param name="Settings">Kept markers stay where they are, and the step is switched off, unless <see cref="MarkerMoveSettings.Runs"/>.</param>
     public sealed record Input(
         ImmutableArray<TargetObject> Targets,
-        LeftBehindResult LeftBehind,
+        InvisibleLeftBehindResult LeftBehind,
         IRunDecisions Decisions,
         OtherModsObjectsResult OtherModsObjects,
         IRunCaches Caches,
@@ -82,7 +82,7 @@ public static class MarkerMovePlanner
     }
 
     /// <returns>The kept evaluations that sit inside another mod's object, in target order.</returns>
-    internal static ImmutableArray<LeftBehindCheck> Candidates(LeftBehindResult leftBehind, IRemovalDecisions final) =>
+    internal static ImmutableArray<InvisibleLeftBehindCheck> Candidates(InvisibleLeftBehindResult leftBehind, IRemovalDecisions final) =>
     [
         .. leftBehind.Evaluations
             .Where(evaluation => evaluation.ContainingObject != null && !final.HasLeftItsPlace(new TargetId(evaluation.TargetIndex))),

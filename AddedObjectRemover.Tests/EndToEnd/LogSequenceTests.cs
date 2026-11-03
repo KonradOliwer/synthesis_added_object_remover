@@ -13,6 +13,15 @@ public class LogSequenceTests
     private const int Workers = 2;
     private const string ExpectedOutputSubfolder = "log-sequence";
 
+    /// <summary>
+    /// With the default minimum the scene's few objects around each candidate keep every visible one, so no saved log would show a
+    /// removal of the direction method, its rounds or its follow-up. One variant lowers it to 1 to pin them.
+    /// </summary>
+    private const int LowestMinObjectsAround = 1;
+
+    private static int MinObjectsAroundOf(FollowUpRemovalMode mode, Leftovers leftovers) =>
+        mode == FollowUpRemovalMode.Nothing && leftovers == Leftovers.Removed ? LowestMinObjectsAround : SettingDefaults.MinObjectsAround;
+
     public static TheoryData<FollowUpRemovalMode, Leftovers, bool> Switches()
     {
         var data = new TheoryData<FollowUpRemovalMode, Leftovers, bool>();
@@ -81,6 +90,7 @@ public class LogSequenceTests
         },
         ShrinkOrTurn = SettingsVariants.NothingShrunkOrTurned,
         FollowUpRemoval = new FollowUpRemovalSettings { Mode = mode },
+        LeftoverObjects = new LeftoverObjectSettings { MinObjectsAround = MinObjectsAroundOf(mode, leftovers) },
         LeftoverInvisibleObjects = new LeftoverInvisibleObjectSettings
         {
             RemoveLeftoverInvisibleObjects = leftovers != Leftovers.Kept,

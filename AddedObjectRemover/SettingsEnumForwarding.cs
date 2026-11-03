@@ -15,4 +15,3 @@ using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 [assembly: TypeForwardedTo(typeof(FollowUpRemovalMode))]
 [assembly: TypeForwardedTo(typeof(OtherModsObjectsHandling))]
 [assembly: TypeForwardedTo(typeof(RestoreMode))]
-[assembly: TypeForwardedTo(typeof(ClearedAreaShares))]

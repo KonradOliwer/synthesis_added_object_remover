@@ -154,7 +154,7 @@ public sealed class TablesTests : IDisposable
         tally.Add(DirectionSector.East, 100f, removed: true);
         tally.Add(DirectionSector.West, 40.5f, removed: false);
         var surroundings = tally.Build();
-        LeftBehindCheck[] evaluations =
+        InvisibleLeftBehindCheck[] evaluations =
         [
             new(3, InvisibleObjectKind.DoorMarkers, 250f, otherModObject, surroundings, LeftBehindOutcome.RemovedInsideOtherObject, KeepReason: null),
             new(1, InvisibleObjectKind.IdleMarkers, 100.5f, null, new SectorAreaTally(50).Build(), LeftBehindOutcome.KeptReferenced, QuestReason),
@@ -181,7 +181,7 @@ public sealed class TablesTests : IDisposable
         var tally = new SectorAreaTally(50);
         tally.Add(DirectionSector.East, 100f, BoxFate.Restored);
         tally.Add(DirectionSector.West, 40f, BoxFate.Removed);
-        LeftBehindCheck[] evaluations = [new(3, InvisibleObjectKind.IdleMarkers, 100f, null, tally.Build(), LeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null)];
+        InvisibleLeftBehindCheck[] evaluations = [new(3, InvisibleObjectKind.IdleMarkers, 100f, null, tally.Build(), LeftBehindOutcome.RemovedSurroundingsRemoved, KeepReason: null)];
 
         var table = Tables.BuildLeftBehindTable(world, evaluations, new MarkerMoves(StepOutcome.Performed, [], [], [], [], MarkerMoveLimits.MaxDistance, Failure: null), Context);
 
@@ -358,9 +358,9 @@ public sealed class TablesTests : IDisposable
     {
         var scene = TouchScene();
         var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouchingIt, TouchDistance, Threshold, TouchChainsShown: true);
-        var stopped = new LeftBehindResult(StepOutcome.StoppedByUnexpectedError, [], [], new PartFailure(LeftBehindParts.LeftBehind, "it broke", Subject: null));
+        var stopped = new InvisibleLeftBehindResult(StepOutcome.StoppedByUnexpectedError, [], [], new PartFailure(InvisibleLeftBehindParts.LeftBehind, "it broke", Subject: null));
 
-        var tables = BuildTables(WithDetails(scene.Outcome with { LeftBehind = stopped }, ReportFileDetails.SwitchedOff), settings);
+        var tables = BuildTables(WithDetails(scene.Outcome with { InvisibleLeftBehind = stopped }, ReportFileDetails.SwitchedOff), settings);
 
         Assert.Empty(tables.Single(table => table.FileName == ReportFileNames.LeftBehindFileName).Rows);
     }
@@ -374,7 +374,7 @@ public sealed class TablesTests : IDisposable
         {
             RestingObjects = scene.Outcome.RestingObjects with { Mode = settings.Mode, Rounds = [], Evidence = [] },
             VisibleLeftBehind = new VisibleLeftBehindResult(StepOutcome.Performed, [], [], [], TimeSpan.Zero, TestRestingObjects.SwitchedOff, Failure: null),
-            LeftBehind = TestLeftBehind.PerformedWithoutFindings,
+            InvisibleLeftBehind = TestLeftBehind.PerformedWithoutFindings,
         };
         var origins = new ReportFileDetails(
             StepOutcome.Performed, null, [new MeshOrigin("m.nif", [], 1, default, Vector3.Zero, MeshOriginPlace.Other)], Failure: null);
@@ -414,8 +414,8 @@ public sealed class TablesTests : IDisposable
             targets, Shapes, protection, terrainSeeds is null ? [0, 2] : [2], TouchDistance, threads: 2, collectDiagnostics: true, terrainSeeds);
         var world = CreateWorld(targets, out _);
         var decided = new StepResults(
-            world, protection, new RemovalRisks([], []), new ChangedObjectJudgingResult([], [], []), OldPlaceWorld: null, new ChangedTerrainResult([]), run.Result, TestVisibleLeftBehind.SwitchedOff, LeftBehindResult.SwitchedOff, MarkerMoves.SwitchedOff,
-            OtherModsObjectsResult.SwitchedOff, run.RemovalDecisions, RestoreWhereRemovedResult.SwitchedOff(OtherModsObjectsResult.SwitchedOff));
+            world, protection, new RemovalRisks([], []), new ChangedObjectJudgingResult([], [], []), OldPlaceWorld: null, new ChangedTerrainResult([]), run.Result, TestVisibleLeftBehind.SwitchedOff, TestClearedAreas.SwitchedOff, InvisibleLeftBehindResult.SwitchedOff, MarkerMoves.SwitchedOff,
+            OtherModsObjectsResult.SwitchedOff, run.RemovalDecisions, RestoreWhereRemovedResult.SwitchedOff());
         var removals = RemovalList.WithReasons(PatchWriter.ListRemovalsInWriteOrder(run.RemovalDecisions), run.RemovalDecisions, world, TestVisibleLeftBehind.SwitchedOff, TestLeftBehind.PerformedWithoutFindings).ToImmutableArray();
         var outcome = new RunOutcome(decided, removals, [], ManualPatchHints.FindManualPatchHints(decided, Shapes, removals), null!, default);
         return new Scene(outcome, run);

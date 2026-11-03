@@ -303,7 +303,7 @@ public class RunSettingsValidationTests
 
         var ready = BuildReady(settings);
 
-        Assert.Equal(expected, ready.Settings.LeftBehind!.Surroundings.MinOccupiedDirections);
+        Assert.Equal(expected, ready.Settings.InvisibleLeftBehind!.Surroundings.MinOccupiedDirections);
         Assert.Equal(configured != expected, ready.Warnings.Any(warning => warning.Message.Contains("directions have objects")));
     }
 
@@ -315,9 +315,9 @@ public class RunSettingsValidationTests
     public void TheVisibleMinimumOccupiedDirectionsAreLimitedToTheEightDirections(int configured, int expected)
     {
         var settings = SettingsFor();
-        settings.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings
+        settings.LeftoverObjects = new LeftoverObjectSettings
         {
-            RemoveLeftoverVisibleObjects = true,
+            RemoveBySurroundingDirections = true,
             SurroundingObjects = new VisibleSurroundingObjectsSettings { MinOccupiedDirections = configured },
         };
 
@@ -326,14 +326,14 @@ public class RunSettingsValidationTests
         Assert.Equal(expected, ready.Settings.VisibleLeftBehind!.Surroundings.MinOccupiedDirections);
         Assert.Equal(
             configured != expected,
-            ready.Warnings.Any(warning => warning.Message.StartsWith("Warning: Visible objects left behind > ", StringComparison.Ordinal) && warning.Message.Contains("directions have objects")));
+            ready.Warnings.Any(warning => warning.Message.StartsWith("Warning: Objects left behind > ", StringComparison.Ordinal) && warning.Message.Contains("directions have objects")));
     }
 
     [Fact]
     public void TheVisibleStepIsOnByDefaultWithItsOwnDefaultsAndNullWhenSwitchedOff()
     {
         var settings = SettingsFor();
-        settings.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings { RemoveLeftoverVisibleObjects = false };
+        settings.LeftoverObjects = new LeftoverObjectSettings { RemoveBySurroundingDirections = false };
 
         var off = BuildReady(settings);
         var on = BuildReady(SettingsFor());
@@ -341,7 +341,8 @@ public class RunSettingsValidationTests
         Assert.Null(off.Settings.VisibleLeftBehind);
         var visible = on.Settings.VisibleLeftBehind!;
         Assert.Equal(new LeftBehindSurroundings(1024f, 6, 80, 80), visible.Surroundings);
-        Assert.Empty(visible.NeverRemove.Kinds);
+        Assert.Equal(5, visible.MinObjectsAround);
+        Assert.Empty(on.Settings.NeverRemovedVisibleKinds.Kinds);
         Assert.Empty(on.Warnings);
     }
 
@@ -349,15 +350,15 @@ public class RunSettingsValidationTests
     public void InvalidVisibleSettingsAreReportedAndCorrectedEvenWhenTheStepIsOff()
     {
         var settings = SettingsFor();
-        settings.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings
+        settings.LeftoverObjects = new LeftoverObjectSettings
         {
-            RemoveLeftoverVisibleObjects = false,
+            RemoveBySurroundingDirections = false,
             SurroundingObjects = new VisibleSurroundingObjectsSettings { SearchRadius = 1f, DirectionThresholdPercent = 45, ClearedDirectionsPercent = 44 },
         };
 
         var messages = BuildReady(settings).Warnings.Select(warning => warning.Message).ToList();
 
-        const string group = "Warning: Visible objects left behind > When the cleaned mod's visible objects around it were removed > ";
+        const string group = "Warning: Objects left behind > Direction method: when the cleaned mod's visible objects around it were removed > ";
         Assert.Equal(3, messages.Count);
         Assert.StartsWith(group + "Look this far around it", messages[0]);
         Assert.StartsWith(group + "A direction is cleared when this much of it was removed 45 is not a multiple", messages[1]);
@@ -368,9 +369,9 @@ public class RunSettingsValidationTests
     public void TheTickedVisibleKindsAreTheOnesNeverRemoved()
     {
         var settings = SettingsFor();
-        settings.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings
+        settings.LeftoverObjects = new LeftoverObjectSettings
         {
-            RemoveLeftoverVisibleObjects = true,
+            RemoveBySurroundingDirections = true,
             AlwaysKeep = new KeptVisibleObjectSettings { Containers = true, Furniture = true, Activators = true },
         };
 
@@ -378,7 +379,97 @@ public class RunSettingsValidationTests
 
         Assert.Equal(
             [VisibleObjectKind.Containers, VisibleObjectKind.Furniture, VisibleObjectKind.Activators],
-            ready.Settings.VisibleLeftBehind!.NeverRemove.Kinds.Order());
+            ready.Settings.NeverRemovedVisibleKinds.Kinds.Order());
+    }
+
+    private const string AreaMethodGroup = "Objects left behind > Area method: when the area around it counts as cleared > ";
+
+    [Fact]
+    public void TheAreaMethodIsOnByDefaultWithTheRestoresDefaultArea()
+    {
+        var ready = BuildReady(SettingsFor());
+
+        Assert.Equal(
+            new ObjectsInClearedAreasSettings(new ClearedArea(5000f, MaxStandingSizePercent: 1, MaxStandingCountPercent: 5), MinObjectsAround: 5), ready.Settings.ObjectsInClearedAreas);
+        Assert.Null(ready.Settings.ObjectsInClearedAreasOff);
+        Assert.Empty(ready.Warnings);
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(101, 100)]
+    [InlineData(1, 1)]
+    [InlineData(100, 100)]
+    public void TheMinimumOfObjectsAroundIsLimitedTo1To100AndSharedByBothMethods(int configured, int expected)
+    {
+        var settings = SettingsFor();
+        settings.LeftoverObjects.MinObjectsAround = configured;
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal((expected, expected), (ready.Settings.VisibleLeftBehind!.MinObjectsAround, ready.Settings.ObjectsInClearedAreas!.MinObjectsAround));
+        var warnings = ready.Warnings.Select(warning => warning.Message).ToList();
+        Assert.Equal(
+            configured == expected ? [] : [$"Warning: Objects left behind > Fewest of the cleaned mod's other objects around it, for both methods {configured} is outside 1-100; using {expected}."],
+            warnings);
+    }
+
+    [Fact]
+    public void AnInvalidMinimumOfObjectsAroundIsReportedAlsoWithBothMethodsOff()
+    {
+        var settings = SettingsFor();
+        settings.LeftoverObjects = new LeftoverObjectSettings { MinObjectsAround = 0, RemoveBySurroundingDirections = false, RemoveObjectsInClearedAreas = false };
+
+        var ready = BuildReady(settings);
+
+        Assert.Single(ready.Warnings, warning => warning.Message.Contains("Fewest of the cleaned mod's other objects around it", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(100f, 5f, ObjectsInClearedAreasOff.SizeLimit)]
+    [InlineData(150f, 5f, ObjectsInClearedAreasOff.SizeLimit)]
+    [InlineData(1f, 100f, ObjectsInClearedAreasOff.CountLimit)]
+    [InlineData(1f, 150f, ObjectsInClearedAreasOff.CountLimit)]
+    [InlineData(100f, 100f, ObjectsInClearedAreasOff.BothLimits)]
+    public void ALimitOf100PercentOrMoreSwitchesTheAreaMethodOffWithoutAWarning(float sizeLimit, float countLimit, ObjectsInClearedAreasOff expected)
+    {
+        var settings = SettingsFor();
+        settings.LeftoverObjects.ClearedArea = new LeftoverClearedAreaSettings { MaxStandingSizePercent = sizeLimit, MaxStandingCountPercent = countLimit };
+
+        var ready = BuildReady(settings);
+
+        Assert.Null(ready.Settings.ObjectsInClearedAreas);
+        Assert.Equal(expected, ready.Settings.ObjectsInClearedAreasOff);
+        Assert.Empty(ready.Warnings);
+    }
+
+    [Fact]
+    public void TheAreaMethodSwitchOffSwitchesItOffEvenWithALimitOf100Percent()
+    {
+        var settings = SettingsFor();
+        settings.LeftoverObjects.RemoveObjectsInClearedAreas = false;
+        settings.LeftoverObjects.ClearedArea.MaxStandingCountPercent = 100f;
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal((null, ObjectsInClearedAreasOff.Switch), (ready.Settings.ObjectsInClearedAreas, ready.Settings.ObjectsInClearedAreasOff));
+    }
+
+    [Fact]
+    public void ANegativeAreaMethodLimitBecomes0WithAWarningAndAnOutOfRangeRadiusIsCorrected()
+    {
+        var settings = SettingsFor();
+        settings.LeftoverObjects.ClearedArea = new LeftoverClearedAreaSettings { SearchRadius = 20000f, MaxStandingSizePercent = -1f, MaxStandingCountPercent = 2.5f };
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(new ClearedArea(16384f, MaxStandingSizePercent: 0, MaxStandingCountPercent: 2.5), ready.Settings.ObjectsInClearedAreas!.ClearedArea);
+        Assert.Equal(
+            [
+                $"Warning: {AreaMethodGroup}Look this far around it 20000 is outside 1024-16384; using 16384.",
+                $"Warning: {AreaMethodGroup}Cleared when at most this share of their size still stands -1 is below 0; using 0.",
+            ],
+            ready.Warnings.Select(warning => warning.Message));
     }
 
     private const string RestoreGroup = "Restore what the cleaned mod changed where it was removed > ";
@@ -391,7 +482,7 @@ public class RunSettingsValidationTests
 
         var restore = ready.Settings.RestoreWhereRemoved!;
         Assert.Equal((true, true, true, true), (restore.OtherModsObjects, restore.Terrain, restore.Cells, restore.Navmeshes));
-        Assert.Equal(new ClearedArea(5000f, MaxStandingSizePercent: 1, MaxStandingCountPercent: 5, ClearedAreaShares.Both), restore.ClearedArea);
+        Assert.Equal(new ClearedArea(5000f, MaxStandingSizePercent: 1, MaxStandingCountPercent: 5), restore.ClearedArea);
         Assert.Equal(256f, restore.TerrainEdgeBlendDistance);
         Assert.Equal(
             (ready.Settings.Collision.ChangedTerrain.HeightTolerance, ready.Settings.Collision.ChangedTerrain.WaterHeightTolerance),
@@ -532,29 +623,6 @@ public class RunSettingsValidationTests
     }
 
     [Theory]
-    [InlineData(ClearedAreaShares.Both)]
-    [InlineData(ClearedAreaShares.Either)]
-    public void TheSharesThatMustPassAreKept(ClearedAreaShares shares)
-    {
-        var settings = SettingsFor();
-        settings.RestoreWhereRemoved.ClearedArea.SharesThatMustPass = shares;
-
-        Assert.Equal(shares, BuildReady(settings).Settings.RestoreWhereRemoved!.ClearedArea.SharesThatMustPass);
-    }
-
-    [Fact]
-    public void UndefinedSharesThatMustPassBecomeBothWithAWarning()
-    {
-        var settings = SettingsFor();
-        settings.RestoreWhereRemoved.ClearedArea.SharesThatMustPass = (ClearedAreaShares)99;
-
-        var ready = BuildReady(settings);
-
-        Assert.Equal(ClearedAreaShares.Both, ready.Settings.RestoreWhereRemoved!.ClearedArea.SharesThatMustPass);
-        Assert.Equal($"Warning: {ClearedAreaGroup}Shares that must be under their limit 99 is invalid; using Both.", Assert.Single(ready.Warnings).Message);
-    }
-
-    [Theory]
     [InlineData(-1f, 0f)]
     [InlineData(1025f, 1024f)]
     [InlineData(0f, 0f)]
@@ -582,7 +650,7 @@ public class RunSettingsValidationTests
         var ready = BuildReady(settings);
 
         var restore = ready.Settings.RestoreWhereRemoved!;
-        Assert.Equal((new ClearedArea(5000f, 1, 5, ClearedAreaShares.Both), 256f), (restore.ClearedArea, restore.TerrainEdgeBlendDistance));
+        Assert.Equal((new ClearedArea(5000f, 1, 5), 256f), (restore.ClearedArea, restore.TerrainEdgeBlendDistance));
         Assert.Equal(
             [
                 $"Warning: {ClearedAreaGroup}Look this far around the place is not a valid number; using 5000.",
@@ -598,7 +666,7 @@ public class RunSettingsValidationTests
     {
         var settings = SettingsFor();
         settings.RestoreWhereRemoved = AllRestoresOff();
-        settings.RestoreWhereRemoved.ClearedArea = new ClearedAreaSettings { SearchRadius = 1f, MaxStandingSizePercent = 101f, MaxStandingCountPercent = -1f, SharesThatMustPass = (ClearedAreaShares)7 };
+        settings.RestoreWhereRemoved.ClearedArea = new ClearedAreaSettings { SearchRadius = 1f, MaxStandingSizePercent = 101f, MaxStandingCountPercent = -1f };
         settings.RestoreWhereRemoved.TerrainEdgeBlendDistanceInUnits = 2000f;
 
         var ready = BuildReady(settings);
@@ -609,7 +677,6 @@ public class RunSettingsValidationTests
                 $"Warning: {ClearedAreaGroup}Look this far around the place 1 is outside 1024-16384; using 1024.",
                 $"Warning: {ClearedAreaGroup}Cleared when at most this share of their size still stands 101 is outside 0-100; using 100.",
                 $"Warning: {ClearedAreaGroup}Cleared when at most this share of their number still stands -1 is outside 0-100; using 0.",
-                $"Warning: {ClearedAreaGroup}Shares that must be under their limit 7 is invalid; using Both.",
                 $"Warning: {RestoreGroup}Blend terrain edges over 2000 is outside 0-1024; using 1024.",
             ],
             ready.Warnings.Select(warning => warning.Message));
@@ -1003,7 +1070,7 @@ public class RunSettingsValidationTests
         var settings = SettingsFor();
         settings.LeftoverInvisibleObjects.AlwaysKeep = new KeptInvisibleObjectSettings { Lights = true, SoundMarkers = true };
 
-        var neverRemove = BuildReady(settings).Settings.LeftBehind!.NeverRemove;
+        var neverRemove = BuildReady(settings).Settings.NeverRemovedInvisibleKinds;
 
         Assert.Equal(new[] { InvisibleObjectKind.Lights, InvisibleObjectKind.SoundMarkers }, neverRemove.Kinds.Order());
     }
@@ -1012,9 +1079,9 @@ public class RunSettingsValidationTests
     public void TickedAlwaysKeepKindsStandWhileTheLeftBehindStepsAreSwitchedOff()
     {
         var settings = SettingsFor();
-        settings.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings
+        settings.LeftoverObjects = new LeftoverObjectSettings
         {
-            RemoveLeftoverVisibleObjects = false,
+            RemoveBySurroundingDirections = false,
             AlwaysKeep = new KeptVisibleObjectSettings { Containers = true },
         };
         settings.LeftoverInvisibleObjects.RemoveLeftoverInvisibleObjects = false;
@@ -1023,7 +1090,7 @@ public class RunSettingsValidationTests
         var ready = BuildReady(settings).Settings;
 
         Assert.Null(ready.VisibleLeftBehind);
-        Assert.Null(ready.LeftBehind);
+        Assert.Null(ready.InvisibleLeftBehind);
         Assert.Equal([VisibleObjectKind.Containers], ready.NeverRemovedVisibleKinds.Kinds);
         Assert.Equal([InvisibleObjectKind.Lights], ready.NeverRemovedInvisibleKinds.Kinds);
     }
@@ -1031,7 +1098,7 @@ public class RunSettingsValidationTests
     [Fact]
     public void NothingIsKeptUntilAKindIsTicked()
     {
-        Assert.Empty(BuildReady(SettingsFor()).Settings.LeftBehind!.NeverRemove.Kinds);
+        Assert.Empty(BuildReady(SettingsFor()).Settings.NeverRemovedInvisibleKinds.Kinds);
     }
 
     [Fact]
@@ -1139,7 +1206,7 @@ public class RunSettingsValidationTests
         };
         var runSettings = BuildReady(settings).Settings;
         Assert.False(runSettings.MarkerMoves.Runs);
-        Assert.Null(runSettings.LeftBehind);
+        Assert.Null(runSettings.InvisibleLeftBehind);
     }
 
     [Fact]

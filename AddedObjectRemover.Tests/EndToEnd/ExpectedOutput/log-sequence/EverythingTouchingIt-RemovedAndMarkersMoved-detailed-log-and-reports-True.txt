@@ -16,7 +16,8 @@ Remove objects too close to other mods' objects: Margin by object size: on, 0.5 
 Remove objects on terrain changed by other mods: off.
 Shrink or turn objects to make them fit: off.
 Also remove what rests on removed objects: EverythingTouchingIt; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
-Visible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 6; A direction is cleared when this much of it was removed: 80%; Remove when this share of the directions with objects is cleared: 80%; Never remove these as visible objects left behind: none.
+Objects left behind, direction method: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 6; A direction is cleared when this much of it was removed: 80%; Remove when this share of the directions with objects is cleared: 80%; Never remove these as objects left behind: none; kept with fewer than 5 of the cleaned mod's other objects around.
+Objects left behind, area method: radius 5000 units; cleared when at most 1% by size and 5% by number still stand; kept with fewer than 5 of the cleaned mod's other objects around.
 Invisible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 4; A direction is cleared when this much of it was removed: 50%; Remove when this share of the directions with objects is cleared: 60%; Never remove these as invisible objects left behind: none; Move kept markers out of other mods' objects: on.
 Restore where the cleaned mod was removed: other mods' objects, terrain, cell settings, navmeshes; an area 10000 units wide counts as cleared when at most 1% of the cleaned mod's objects there still stand by size and at most 5% by number; terrain edges blended over 256 units.
 Detailed log and reports: on, report files go to <root>/Reports.
@@ -61,15 +62,20 @@ Also remove: 3 rounds in <time>.
 Linked groups: 0 more objects removed with the follow-up removals they are linked to.
 ## unexpectedErrors
 ## visible-leftovers
-Visible objects left behind: 10 evaluated in <time>; removed 0 (0 surroundings removed); kept 10 (10 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 0 referenced).
+Visible objects left behind: 10 evaluated in <time>; removed 0 (0 surroundings removed); kept 10 (10 fewer than 5 of the cleaned mod's other objects around, 0 too few directions with objects, 0 surroundings mostly kept, 0 protected type, 0 referenced).
 Visible objects left behind: 1 rounds in <time>.
 ## linked
 Linked groups: 0 more objects removed with the visible left-behind removals they are linked to.
 ## unexpectedErrors
+## cleared-areas
+Objects in cleared areas: judged 13 objects in <time>.
+## linked
+Linked groups: 0 more objects removed with the cleared-area removals they are linked to.
+## unexpectedErrors
 ## left-without-support-step
 ## unexpectedErrors
 ## leftovers
-Invisible objects left behind: 5 evaluated in <time>; removed 4 (2 inside another mod's object, 2 surroundings removed); kept 1 (0 too few surrounding objects, 0 surroundings mostly kept, 0 protected type, 1 referenced).
+Invisible objects left behind: 5 evaluated in <time>; removed 4 (2 inside another mod's object, 2 surroundings removed); kept 1 (0 too few directions with objects, 0 surroundings mostly kept, 0 protected type, 1 referenced).
   Left behind: T_MarkerInsideBuilding [00081B:Target.esp] (Position markers (XMarker, XMarkerHeading)) in interior AorInterior [000800:Skyrim.esm]: removed, inside another mod's object (inside R_InsideBuilding [000814:Rival.esp]); radius 1024, removed/total ground area East -, NorthEast -, North -, NorthWest -, West -, SouthWest -, South -, SouthEast -.
   Left behind: T_SoundInsideBuilding [00081C:Target.esp] (Sound sources) in interior AorInterior [000800:Skyrim.esm]: removed, inside another mod's object (inside R_InsideBuilding [000814:Rival.esp]); radius 1024, removed/total ground area East -, NorthEast -, North -, NorthWest -, West -, SouthWest -, South -, SouthEast -.
   Left behind: T_Light [00081D:Target.esp] (Lights without a model) in interior AorInterior [000800:Skyrim.esm]: removed, surroundings removed; radius 1024, removed/total ground area East 10000/10000, NorthEast 0/10000, North 10000/10000, NorthWest -, West 10000/10000, SouthWest -, South 10000/10000, SouthEast -.
@@ -127,7 +133,7 @@ Target.esp objects: 35 visible, 5 invisible (by kind: 2 Position markers (XMarke
 ## run-summary
 Objects of Target.esp: 42; already removed by earlier patchers in this group: 0; not judged (winning version from a later plugin, removed by a later plugin, deleted, start disabled, or without a valid position or rotation): 2; judged in this run: 40; removed in this run: 25.
 ## removal-summary
-Removed 25 objects (16 too close, 4 follow-up removals, 0 visible objects left behind, 4 invisible objects left behind, 1 linked to removed objects).
+Removed 25 objects (16 too close, 4 follow-up removals, 0 visible objects left behind, 0 objects in cleared areas, 4 invisible objects left behind, 1 linked to removed objects).
 ## kept-summary
 Kept 5 objects that would have been removed, because other records depend on them or because of their own script or location ref type.
   FormList record: 2
@@ -157,6 +163,7 @@ Kept objects that would have been removed, to check by hand: 3 of 40:
 ## written
 Touch diagnostics: wrote 5 edges, 17 components in <time> to <root>/Reports/edges.csv / <root>/Reports/components.csv.
 Visible objects left behind diagnostics: wrote 10 evaluations to <root>/Reports/leftover-visible-objects.csv.
+Objects in cleared areas diagnostics: wrote 13 evaluations to <root>/Reports/objects-in-cleared-areas.csv.
 Invisible objects left behind diagnostics: wrote 5 evaluations to <root>/Reports/leftover-invisible-objects.csv.
 Removals: wrote 25 rows to <root>/Reports/removals.csv.
 Removed markers and kept objects: wrote 3 rows to <root>/Reports/removed-markers-and-kept-objects.csv.

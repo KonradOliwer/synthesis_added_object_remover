@@ -7,6 +7,7 @@ using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
@@ -30,13 +31,15 @@ internal static class RunPartText
         [ReportFileParts.ReportFiles] = new("the report files", "Some or all of the report files are missing; the patch is not affected.", Subjects: null),
         [RestingObjectsParts.AlsoRemove] = new("the also-remove step", "The also-remove rounds did not complete, so objects resting on removed ones were not removed.", Subjects: null),
         [RestingObjectsParts.FollowUp] = new(
-            "the also-remove follow-ups of the visible objects left behind",
+            "the also-remove follow-ups of the objects left behind",
             "The follow-ups stopped there: the removals of the passes before stand, and objects resting on what the later rounds removed were not removed.",
             Subjects: null),
         [RestingObjectsParts.TouchChains] = new("the touch-chain search", "The chains of touching objects that the detailed log and the report files list are missing.", Subjects: null),
         [VisibleLeftBehindParts.VisibleLeftBehind] = new(
             "the step for visible objects left behind", "That step did not run, so visible objects whose surroundings were removed were not removed.", Subjects: null),
-        [LeftBehindParts.LeftBehind] = new("the step for invisible objects left behind", "That step did not run, so invisible objects whose surroundings were removed were not removed.", Subjects: null),
+        [ObjectsInClearedAreasParts.ObjectsInClearedAreas] = new(
+            "the step for objects in cleared areas", "That step did not run, so the cleaned mod's objects in cleared areas were not removed.", Subjects: null),
+        [InvisibleLeftBehindParts.LeftBehind] = new("the step for invisible objects left behind", "That step did not run, so invisible objects whose surroundings were removed were not removed.", Subjects: null),
         [MarkerMoveParts.MarkerMoves] = new("the marker moves", "No kept marker was moved, so markers inside other mods' objects stay where they are.", Subjects: null),
         [OtherModsObjectsParts.HeldUpTargets] = new(
             "finding the cleaned mod's objects other mods' objects rest on", "No object was kept because another mod's object rests on it.", Subjects: null),
@@ -53,7 +56,7 @@ internal static class RunPartText
         [SelectionParts.RemovalCauseSelection] = new("selecting the objects that can cause removals", "They were not used to remove the cleaned mod's objects.", SubjectKind.Object),
         [RestoreWhereRemovedParts.Step] = new(
             "the step that restores what the cleaned mod changed where it was removed",
-            "Nothing was restored by area and no leftover of the cleaned mod in a restored area was removed; the objects restored because they themselves were removed are written as decided.",
+            "Nothing was restored by area; the objects restored because they themselves were removed are written as decided.",
             Subjects: null),
         [RestoreWhereRemovedParts.ObjectCheck] = new(
             "checking objects the cleaned mod changed against what stays", "They stay as the cleaned mod changed them.", SubjectKind.Object),
@@ -82,8 +85,8 @@ internal static class RunPartText
             RoundKind.TooClose => "too-close",
             RoundKind.AlsoRemove => "follow-up",
             RoundKind.VisibleLeftBehind => "visible left-behind",
-            RoundKind.LeftBehind => "left-behind",
-            RoundKind.RestoredArea => "restored-area",
+            RoundKind.ClearedArea => "cleared-area",
+            RoundKind.InvisibleLeftBehind => "left-behind",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "The round kind has no linked-groups wording."),
         };
 

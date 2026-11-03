@@ -10,4 +10,4 @@ public sealed record VisibleLeftBehindCheck(
     VisibleObjectKind? Kind,
     SectorAreas Surroundings,
     LeftBehindOutcome Decision,
-    KeepReason? KeepReason) : LeftBehindVerdict(TargetIndex, Surroundings, Decision, KeepReason);
+    KeepReason? KeepReason) : LeftBehindVerdict(TargetIndex, Decision, KeepReason);

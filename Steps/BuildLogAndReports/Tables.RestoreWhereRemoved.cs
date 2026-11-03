@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using static AddedObjectRemover.CsvFormat;
 
@@ -21,9 +22,6 @@ internal static partial class Tables
         "result",
     ];
 
-    private static readonly ImmutableArray<string> RestoredWhereRemovedLeftoversHeader =
-        ["formKey", "editorId", "base", "space", "cellFormKey", "cellEditorId", "areaCentreX", "areaCentreY", "result"];
-
     private static readonly ImmutableArray<TerrainKeptReason> TerrainKeptReasons = [.. Enum.GetValues<TerrainKeptReason>()];
 
     private static readonly ImmutableArray<string> RestoredWhereRemovedCellsHeader =
@@ -34,10 +32,8 @@ internal static partial class Tables
         .. TerrainKeptReasons.Select(reason => "kept" + reason),
     ];
 
-    /// <summary>The three files of what the cleaned mod changed that goes back where it was removed and of its objects still standing there, each only when it has a row.</summary>
+    /// <summary>The two files of what the cleaned mod changed that goes back where it was removed, each only when it has a row.</summary>
     /// <remarks>
-    /// The leftovers file has a row per object of the cleaned mod that still stood in a restored area, in target order; an interior's
-    /// row has no area centre, because the interior is one area.
     /// The objects file has a row per placed record judged, in record key order. The cells file lists the cells in record key order,
     /// then each land's quarters that hold a change in the order of the lands' cells and of the quarters, followed by one row for the
     /// rest of the record when that is all of the land that could go back, then the navmeshes in record key order; a row for a terrain
@@ -54,31 +50,14 @@ internal static partial class Tables
             .. RestoredWhereRemovedLandRows(world, result.Lands),
             .. judged.Navmeshes.Select(navmesh => RestoredWhereRemovedNavmeshRow(world, navmesh, label)),
         ];
-        ImmutableArray<ImmutableArray<string>> leftovers = [.. result.Leftovers.Select(leftover => RestoredWhereRemovedLeftoverRow(world, leftover, context))];
         return
         [
             .. new[]
             {
                 CsvTable.WhenAnyRow(ReportFileNames.RestoredWhereRemovedObjectsFileName, RestoredWhereRemovedObjectsHeader, objects),
                 CsvTable.WhenAnyRow(ReportFileNames.RestoredWhereRemovedCellsFileName, RestoredWhereRemovedCellsHeader, cells),
-                CsvTable.WhenAnyRow(ReportFileNames.RestoredWhereRemovedLeftoversFileName, RestoredWhereRemovedLeftoversHeader, leftovers),
             }.OfType<CsvTable>(),
         ];
-    }
-
-    private static ImmutableArray<string> RestoredWhereRemovedLeftoverRow(CollectedObjects world, LeftoverJudged leftover, ReportContext context)
-    {
-        var target = world.Targets[leftover.Target.Index];
-        var space = world.Spaces[target.SpaceKey];
-        return CsvRow.Of(
-        [
-            .. RecordColumns(target, context),
-            Quote(Describe.Space(space)),
-            .. CellColumns(target, space),
-            OptionalText(leftover.Column.Centre is { } centre ? Number(centre.X) : null),
-            OptionalText(leftover.Column.Centre is { } centreRow ? Number(centreRow.Y) : null),
-            Quote(RestoreWhereRemovedText.Leftover(leftover)),
-        ]);
     }
 
     /// <param name="label">Names a record a guard found.</param>

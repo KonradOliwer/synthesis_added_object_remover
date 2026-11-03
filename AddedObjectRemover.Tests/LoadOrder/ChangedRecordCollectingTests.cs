@@ -528,7 +528,7 @@ public sealed class ChangedRecordCollectingTests
         var whereRemoved = new RestoreWhereRemovedResult(
             StepOutcome.Performed,
             [.. collected.ChangedRecords.Select(changed => new PlacedChangeJudged(changed, null, cleared, null, Refused: null, IsRestored: true, ChangeJudge.KindOf(changed), KeptForArea: null, PlacedBack: null))],
-            [], [], [], [], Passes: 1, DoorsLeftRemoved: [], Failures: [], RestoreWhereRemovedTimes.None, Leftovers: [], OtherModsObjectsResult.SwitchedOff);
+            [], [], [], [], Passes: 1, DoorsLeftRemoved: [], Failures: [], RestoreWhereRemovedTimes.None);
         var protection = ObjectsToKeep.Build(collected.Targets, [], TestTargets.References(collected.Targets.Length), TestBaseFacts.Unresolved);
         var final = RemovalDecisions.Start(protection, [.. collected.Targets.Select(_ => (WhenRemoved)new WhenRemoved.Disable())]);
         PatchWriter.Write(new(final, collected.Targets, OtherModsObjectsResult.SwitchedOff, whereRemoved, records, new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod, Program.PatchMarkerText)));

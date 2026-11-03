@@ -8,8 +8,8 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 internal static partial class LogSections
 {
     /// <summary>
-    /// Where the report files went, in the order touch, support, mesh origins, visible leftovers, invisible leftovers, removals, restored objects, objects and cells judged for restoring where the cleaned mod was removed,
-    /// the cleaned mod's objects still standing in restored areas, moved and fitted objects, other mods' objects left without support, hints. The mesh-origin summary
+    /// Where the report files went, in the order touch, support, mesh origins, visible leftovers, objects in cleared areas, invisible leftovers, removals, restored objects, objects and cells judged for restoring where the cleaned mod was removed,
+    /// moved and fitted objects, other mods' objects left without support, hints. The mesh-origin summary
     /// comes from the explanations, so it shows even when its file could not be written. Only written files have lines;
     /// when writing the files was stopped, the not-performed line comes first.
     /// </summary>
@@ -33,29 +33,31 @@ internal static partial class LogSections
         {
             lines.Add($"  Wrote {TextFormat.Count(meshOrigins.Rows)} mesh origins to {meshOrigins.Path}.");
         }
-        if (WrittenTables.Find(tables, ReportFileNames.VisibleLeftBehindFileName) is { } visibleLeftovers)
-        {
-            lines.Add($"{VisibleLeftBehindStepName} diagnostics: wrote {TextFormat.Count(visibleLeftovers.Rows)} evaluations to {visibleLeftovers.Path}.");
-        }
-        if (WrittenTables.Find(tables, ReportFileNames.LeftBehindFileName) is { } leftovers)
-        {
-            lines.Add($"{LeftBehindStepName} diagnostics: wrote {TextFormat.Count(leftovers.Rows)} evaluations to {leftovers.Path}.");
-        }
+        AddEvaluationsLine(lines, tables, ReportFileNames.VisibleLeftBehindFileName, VisibleLeftBehindStepName);
+        AddEvaluationsLine(lines, tables, ReportFileNames.ObjectsInClearedAreasFileName, ObjectsInClearedAreasStepName);
+        AddEvaluationsLine(lines, tables, ReportFileNames.LeftBehindFileName, InvisibleLeftBehindStepName);
         AddRowsLine(lines, tables, ReportFileNames.RemovalsFileName, "Removals");
         AddRowsLine(lines, tables, ReportFileNames.RestoredFileName, "Restored objects");
         AddRowsLine(lines, tables, ReportFileNames.RestoredWhereRemovedObjectsFileName, "Objects judged for restoring where the cleaned mod was removed");
         AddRowsLine(lines, tables, ReportFileNames.RestoredWhereRemovedCellsFileName, "Cells, terrain quarters and navmeshes judged for restoring where the cleaned mod was removed");
-        AddRowsLine(lines, tables, ReportFileNames.RestoredWhereRemovedLeftoversFileName, "Objects of the cleaned mod still standing in restored areas");
         AddRowsLine(lines, tables, ReportFileNames.FitsFileName, "Changed and fitted objects");
         AddRowsLine(lines, tables, ReportFileNames.LeftWithoutSupportFileName, LeftWithoutSupportName);
         AddRowsLine(lines, tables, ReportFileNames.HintsFileName, "Removed markers and kept objects");
         return new LogSection("written", [.. lines]);
     }
 
+    /// <summary>E.g. "Visible objects left behind diagnostics: wrote 3 evaluations to …", when the step's file was written.</summary>
+    private static void AddEvaluationsLine(List<string> lines, ImmutableArray<WrittenTable> tables, string fileName, string stepName) =>
+        AddWrittenLine(lines, tables, fileName, $"{stepName} diagnostics", "evaluations");
+
     /// <summary>E.g. "Removals: wrote 3 rows to …", when the file was written.</summary>
-    private static void AddRowsLine(List<string> lines, ImmutableArray<WrittenTable> tables, string fileName, string title)
+    private static void AddRowsLine(List<string> lines, ImmutableArray<WrittenTable> tables, string fileName, string title) =>
+        AddWrittenLine(lines, tables, fileName, title, "rows");
+
+    /// <param name="rowsName">What the file's rows are.</param>
+    private static void AddWrittenLine(List<string> lines, ImmutableArray<WrittenTable> tables, string fileName, string title, string rowsName)
     {
-        if (WrittenTables.Find(tables, fileName) is { } table) lines.Add($"{title}: wrote {TextFormat.Count(table.Rows)} rows to {table.Path}.");
+        if (WrittenTables.Find(tables, fileName) is { } table) lines.Add($"{title}: wrote {TextFormat.Count(table.Rows)} {rowsName} to {table.Path}.");
     }
 
     /// <remarks>The edges and components files share one line; it needs both, because a failed file has its own warning.</remarks>

@@ -24,9 +24,15 @@ public static class SettingNames
     public const string ChangedTerrain = "Remove objects on terrain changed by other mods";
     public const string ShrinkOrTurn = "Shrink or turn objects to make them fit";
     public const string AlsoRemove = "Also remove what rests on removed objects";
-    public const string VisibleLeftBehind = "Visible objects left behind";
+    public const string LeftoverObjects = "Objects left behind";
+    public const string MinObjectsAround = "Fewest of the cleaned mod's other objects around it, for both methods";
+    public const string DirectionMethod = "Direction method: remove visible objects whose surroundings were removed";
     public const string InvisibleLeftBehind = "Invisible objects left behind";
+    public const string DirectionSurroundingObjects = "Direction method: when the cleaned mod's visible objects around it were removed";
     public const string SurroundingObjects = "When the cleaned mod's visible objects around it were removed";
+    public const string AreaMethod = "Area method: remove objects in cleared areas";
+    public const string AreaMethodClearedArea = "Area method: when the area around it counts as cleared";
+    public const string NeverRemoveAsLeftoverObjects = "Never remove these as objects left behind (ticked = kept)";
     public const string RestoreWhereRemoved = "Restore what the cleaned mod changed where it was removed";
     public const string ClearedArea = "When an area counts as cleared";
     public const string MarginBySize = "Margin by object size";
@@ -54,7 +60,6 @@ public static class SettingNames
     public const string ClearedAreaRadius = "Look this far around the place";
     public const string MaxStandingSizePercent = "Cleared when at most this share of their size still stands";
     public const string MaxStandingCountPercent = "Cleared when at most this share of their number still stands";
-    public const string SharesThatMustPass = "Shares that must be under their limit";
     public const string EdgeBlendDistance = "Blend terrain edges over";
     public const string TrustedMods = "Trusted mods, and their masters";
     public const string OwnChangesMods = "Mods trusted for their own changes only";

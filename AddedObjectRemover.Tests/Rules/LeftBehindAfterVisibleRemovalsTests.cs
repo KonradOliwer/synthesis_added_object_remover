@@ -13,11 +13,12 @@ public class LeftBehindAfterVisibleRemovalsTests
 
     private static readonly ModKey OtherMod = ModKey.FromNameAndExtension("Other.esp");
     private static readonly TestStatic Block = new(new FormKey(OtherMod, 0x801), @"test\block.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20), new Vector3(20))));
-    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(OtherMod, "LeftBehindAfterVisibleRemovalsData", Block));
+    private static readonly TestStatic Building = new(new FormKey(OtherMod, 0x802), @"test\building.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-100), new Vector3(100))));
+    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(OtherMod, "LeftBehindAfterVisibleRemovalsData", Block, Building));
+    private static readonly BaseKey Light = TestVisibility.TaggedBase(ObjectVisibility.Invisible(InvisibleObjectKind.Lights));
 
-    private static readonly LeftBehindSettings Settings = new(
-        new LeftBehindSurroundings(LookAround: 1024, MinOccupiedDirections: 4, DirectionClearedPercent: 50, ClearedDirectionsPercent: 60),
-        NeverRemove: new NeverRemovedInvisibleKinds(new HashSet<InvisibleObjectKind>()));
+    private static readonly InvisibleLeftBehindSettings Settings = new(
+        new LeftBehindSurroundings(LookAround: 1024, MinOccupiedDirections: 4, DirectionClearedPercent: 50, ClearedDirectionsPercent: 60));
 
     private static readonly BaseKey XMarker = TestVisibility.TaggedBase(ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers));
 
@@ -52,23 +53,44 @@ public class LeftBehindAfterVisibleRemovalsTests
         Assert.Equal(LeftBehindOutcome.KeptSurroundingsMostlyKept, marker.Decision);
     }
 
+    /// <summary>"Objects left behind" keeps an object with fewer than its minimum of the cleaned mod's objects around; this step has no such minimum.</summary>
+    [Fact]
+    public void ALightInsideOneRemovedBuildingOfTheCleanedModIsStillRemoved()
+    {
+        ImmutableArray<TargetObject> targets =
+        [
+            TestTargets.Create(0, TestTargets.At(Vector3.Zero), Light, TestTargets.Space),
+            TestTargets.Create(1, TestTargets.At(Vector3.Zero), Building.Base, TestTargets.Space),
+        ];
+
+        var light = Assert.Single(Find(targets, StartDecisions(targets).Apply(RoundKind.VisibleLeftBehind, [Removed(1)])).Evaluations);
+
+        Assert.Equal((1, LeftBehindOutcome.RemovedSurroundingsRemoved), (light.Surroundings.Objects, light.Decision));
+    }
+
     private static ProposedRemoval Removed(int index) => new(new TargetId(index), new VisibleObjectSurroundingsRemoved());
 
-    private static RemovalDecisions StartDecisions() =>
-        TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(Targets, [], TestTargets.References(Targets.Length), TestBaseFacts.Unresolved), Targets.Length);
+    private static RemovalDecisions StartDecisions() => StartDecisions(Targets);
 
-    private static LeftBehindResult Find(IRunDecisions decisions)
+    private static RemovalDecisions StartDecisions(ImmutableArray<TargetObject> targets) =>
+        TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved), targets.Length);
+
+    private static InvisibleLeftBehindResult Find(IRunDecisions decisions) => Find(Targets, decisions);
+
+    private static InvisibleLeftBehindResult Find(ImmutableArray<TargetObject> targets, IRunDecisions decisions)
     {
-        var scene = TestScenes.Create(Targets, [], Shapes, supportOnlyObjects: []);
-        return LeftBehindObjects.Find(
+        var scene = TestScenes.Create(targets, [], Shapes, supportOnlyObjects: []);
+        return InvisibleLeftBehindObjects.Find(
             new(
-                Targets,
+                targets,
                 scene.ObjectsThatCanCauseRemovals(Replacements.None(0), NpcHandling.OnlyWhenStuckInsideTheObject),
                 OtherModsObjectsResult.SwitchedOff,
                 decisions,
                 new TestRunCaches(Shapes, bases: TestBaseFacts.Unresolved, visibleTargets: scene.IndexVisibleTargets),
-                VisibleLeftBehindObjects.CreateLeftBehindJudging(),
-                TargetWorkOrder.Of(Targets),
+                TestLeftBehind.KindsAlwaysKept(Shapes),
+                VisibleLeftBehindObjects.CreateSurroundingsJudging(),
+                VisibleLeftBehindObjects.CreateLeftBehindRoundJoin(),
+                TargetWorkOrder.Of(targets),
                 new Execution(Environment.ProcessorCount),
                 Settings)).Result;
     }

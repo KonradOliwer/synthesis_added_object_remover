@@ -7,12 +7,13 @@ using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
-using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
+using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
@@ -65,6 +66,14 @@ public static partial class StepRunner
         RestingObjects.CreateFollowUp(
             new(collected.Targets, decided, scope.Settings.AlsoRemove, scope.Settings.Execution, scope.Environment.TimeSinceStart, runCaches));
 
+    /// <summary>The visible kinds the settings always keep, read also while the visible step is switched off.</summary>
+    private static IKindsAlwaysKept CreateVisibleKindsAlwaysKept(RunScope scope, IRunCaches runCaches) =>
+        VisibleLeftBehindObjects.CreateKindsAlwaysKept(new(runCaches, scope.Settings.NeverRemovedVisibleKinds));
+
+    /// <summary>The invisible kinds the settings always keep, read also while the invisible step is switched off.</summary>
+    private static IKindsAlwaysKept CreateInvisibleKindsAlwaysKept(RunScope scope, IRunCaches runCaches) =>
+        InvisibleLeftBehindObjects.CreateKindsAlwaysKept(new(runCaches.Shapes, scope.Settings.NeverRemovedInvisibleKinds));
+
     private static IAlsoRemoveRoundsAfter CreateAlsoRemoveRoundsAfter(RunScope scope, IRunCaches runCaches) =>
         RestingObjects.CreateAlsoRemoveRoundsAfter(new(scope.Settings.AlsoRemove, scope.Settings.Execution, runCaches));
 
@@ -91,31 +100,26 @@ public static partial class StepRunner
             new(trust.AcceptedWorldWithoutCleanedMod, scope.Environment.Plugins, scope.Plugin, runCaches.Shapes, scope.Settings.ChangedObjectCollision.ChangedTerrain));
 
     /// <remarks>The restore's rules share the world caches, which record measurement failures under the part the step names.</remarks>
-    /// <param name="afterFits">The decisions with every fit.</param>
-    /// <param name="markerMoves">The decisions with every round and every move.</param>
+    /// <param name="final">The decisions with every round and every move.</param>
     private static WhereRemovedRestorer.Input CreateRestoreInput(
         RunScope scope,
         IRunCaches runCaches,
         ModTrustTable trust,
         OtherModsObjects.SupportJudging support,
         CollectedObjects collected,
-        IRemovalDecisions afterFits,
         OtherModsObjectsResult otherModsObjects,
-        Decided<MarkerMoves> markerMoves)
+        IRemovalDecisions final)
     {
         var worldCaches = CreateWorldCaches(scope, RemovalCauseSelector.MeasurementRules(scope.UnexpectedErrors, WhereRemovedRestorer.MeasurementFailurePart()));
         return new WhereRemovedRestorer.Input(
             new(collected, otherModsObjects),
-            markerMoves.Decisions,
+            final,
+            new LazyClearedAreas(() => ObjectsInClearedAreas.CreateClearedAreas(new(collected.Targets, collected.Spaces, final, runCaches, scope.Settings.RestoreWhereRemoved.ClearedArea))),
             new(
                 worldCaches,
                 TooCloseObjects.CreateTooCloseToWhatStaysRule(CreateWorldRuleInput(runCaches, worldCaches)),
                 OtherModsObjects.CreateHoldersOfObjectsThatStay(new(support, worldCaches)),
                 PatchWriter.CreateNavmeshCheck(scope.Plugin, scope.Environment.PatchWriting)),
-            new(
-                VisibleLeftBehindObjects.CreateKindsAlwaysKept(new(runCaches, scope.Settings.NeverRemovedVisibleKinds)),
-                LeftBehindObjects.CreateKindsAlwaysKept(new(runCaches, scope.Settings.NeverRemovedInvisibleKinds)),
-                OtherModsObjects.CreateSettlingAfterLeftovers(new(support, afterFits, scope.Settings.AlsoRemove, CreateAlsoRemoveRoundsAfter(scope, runCaches)))),
             new(runCaches, scope.Plugin, scope.Environment.Plugins, trust.CleanedMod),
             scope.Settings.Execution,
             scope.Settings.RestoreWhereRemoved,

@@ -1,12 +1,11 @@
 using System.Numerics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
-using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 
-namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+namespace AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 
-/// <summary>Judges an object left behind by its surroundings and joins the decision a round made into its verdict.</summary>
-public interface ILeftBehindJudging
+/// <summary>The direction rule: which objects are candidates, what their surroundings are and what the surroundings decide.</summary>
+public interface ISurroundingsJudging
 {
     /// <returns>The target indexes, ascending, of the targets of the step's kind that the decisions left undecided.</returns>
     int[] Candidates(IReadOnlyList<TargetObject> targets, IRemovalDecisions decisions, Func<TargetObject, bool> isOfTheStepsKind);
@@ -20,14 +19,4 @@ public interface ILeftBehindJudging
     /// instead of removed.
     /// </summary>
     LeftBehindOutcome Judge(SectorAreas surroundings, LeftBehindSurroundings rule, bool isInsideAnotherModsObject, bool isProtectedKind);
-
-    /// <summary>A removal proposal for each check the rules would remove.</summary>
-    IReadOnlyList<ProposedRemoval> ProposalsOf<TCheck>(IEnumerable<TCheck> checks, Func<TCheck, RemovalReason> reasonOf)
-        where TCheck : LeftBehindVerdict;
-
-    /// <summary>The check joined with what the step's round decided for its object.</summary>
-    /// <param name="decision">The round's decision for the object; null when the round decided nothing for it.</param>
-    /// <param name="decisionOf">What the round decided for a target; null for none.</param>
-    TCheck JoinRoundDecision<TCheck>(TCheck check, Decision? decision, Func<TargetId, Decision?> decisionOf)
-        where TCheck : LeftBehindVerdict;
 }

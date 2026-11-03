@@ -19,14 +19,21 @@ internal sealed class SectorAreaTally(int thresholdPercent)
     private static readonly ImmutableArray<int> GoneCategories = [RemovedCategory, RestoredCategory];
 
     private readonly DirectionAreaTally _tally = new(CategoryCount);
+    private int _objects;
 
     /// <param name="boxes">In ascending id order: that fixes the order of the float sums, so a share right at
     /// the threshold is decided the same way whatever the spatial index's layout.</param>
-    public static SectorAreas Measure(IEnumerable<(OrientedBox Box, BoxFate Fate)> boxes, Vector3 point, int directionClearedPercent) =>
-        new SectorAreaTally(directionClearedPercent).Judge(
-            DirectionAreaTally.Of(CategoryCount, boxes.Select(entry => (SectorFootprint.Of(point, entry.Box), CategoryOf(entry.Fate)))));
+    public static SectorAreas Measure(IEnumerable<(OrientedBox Box, BoxFate Fate)> boxes, Vector3 point, int directionClearedPercent)
+    {
+        (SectorFootprint Footprint, int? Category)[] footprints = [.. boxes.Select(entry => (SectorFootprint.Of(point, entry.Box), CategoryOf(entry.Fate)))];
+        return new SectorAreaTally(directionClearedPercent).Judge(DirectionAreaTally.Of(CategoryCount, footprints), footprints.Length);
+    }
 
-    public void Add(SectorFootprint footprint, BoxFate fate) => _tally.Add(footprint, CategoryOf(fate));
+    public void Add(SectorFootprint footprint, BoxFate fate)
+    {
+        _tally.Add(footprint, CategoryOf(fate));
+        _objects++;
+    }
 
     /// <summary>
     /// The areas of a tally that holds every box of this one, the boxes in <paramref name="goneInAscendingId"/> with their fates
@@ -34,9 +41,9 @@ internal sealed class SectorAreaTally(int thresholdPercent)
     /// <see cref="Measure"/> gives for the same boxes.
     /// </summary>
     public SectorAreas WithGone(IEnumerable<(SectorFootprint Footprint, BoxFate Fate)> goneInAscendingId) =>
-        Judge(_tally.WithCategories(goneInAscendingId.Select(gone => (gone.Footprint, CategoryOf(gone.Fate)))));
+        Judge(_tally.WithCategories(goneInAscendingId.Select(gone => (gone.Footprint, CategoryOf(gone.Fate)))), _objects);
 
-    public SectorAreas Build() => Judge(_tally.Build());
+    public SectorAreas Build() => Judge(_tally.Build(), _objects);
 
     private static int? CategoryOf(BoxFate fate) => fate switch
     {
@@ -45,12 +52,13 @@ internal sealed class SectorAreaTally(int thresholdPercent)
         _ => null,
     };
 
-    private SectorAreas Judge(DirectionAreas areas) =>
+    private SectorAreas Judge(DirectionAreas areas, int objects) =>
         new(
             areas.TotalAreas,
             areas.CategoryAreas[RemovedCategory],
             areas.CategoryAreas[RestoredCategory],
-            [.. CompassDirections.All.Select(sector => StateOf(areas, sector))]);
+            [.. CompassDirections.All.Select(sector => StateOf(areas, sector))],
+            objects);
 
     private SectorState StateOf(DirectionAreas areas, DirectionSector sector)
     {

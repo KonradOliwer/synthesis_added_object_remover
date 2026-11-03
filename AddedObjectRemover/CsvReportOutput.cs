@@ -15,6 +15,7 @@ internal sealed class CsvReportOutput : IReportOutput
         ReportFileNames.EdgesFileName,
         ReportFileNames.ComponentsFileName,
         ReportFileNames.VisibleLeftBehindFileName,
+        ReportFileNames.ObjectsInClearedAreasFileName,
         ReportFileNames.LeftBehindFileName,
         ReportFileNames.RemovalsFileName,
         ReportFileNames.RestoredFileName,
@@ -22,7 +23,6 @@ internal sealed class CsvReportOutput : IReportOutput
         ReportFileNames.LeftWithoutSupportFileName,
         ReportFileNames.RestoredWhereRemovedObjectsFileName,
         ReportFileNames.RestoredWhereRemovedCellsFileName,
-        ReportFileNames.RestoredWhereRemovedLeftoversFileName,
         ReportFileNames.HintsFileName,
     ];
 

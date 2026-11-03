@@ -24,7 +24,7 @@ internal static class LeftBehindVerdicts
     public static LeftBehindOutcome BySurroundings(SectorAreas areas, LeftBehindSurroundings rule) =>
         SectorRule.Decide(areas, rule.MinOccupiedDirections, rule.ClearedDirectionsPercent) switch
         {
-            SectorVerdict.TooFewOccupiedDirections => LeftBehindOutcome.KeptTooFewSurroundingObjects,
+            SectorVerdict.TooFewOccupiedDirections => LeftBehindOutcome.KeptTooFewOccupiedDirections,
             SectorVerdict.TooFewClearedDirections => LeftBehindOutcome.KeptSurroundingsMostlyKept,
             _ when areas.RestoredCount > 0 => LeftBehindOutcome.RemovedSurroundingsRemovedAndRestored,
             _ => LeftBehindOutcome.RemovedSurroundingsRemoved,
@@ -64,7 +64,7 @@ internal static class LeftBehindVerdicts
     }
 
     /// <summary>Protected kinds stay whatever the rules decided; referenced objects are kept by the removal decisions.</summary>
-    private static LeftBehindOutcome KeptWhenProtected(LeftBehindOutcome ruleDecision, bool isProtectedKind) =>
+    public static LeftBehindOutcome KeptWhenProtected(LeftBehindOutcome ruleDecision, bool isProtectedKind) =>
         LeftBehindOutcomes.IsRemoval(ruleDecision) && isProtectedKind ? LeftBehindOutcome.KeptProtectedType : ruleDecision;
 
     private static LeftBehindOutcome RemovedAsLinked(Decision decision, Func<TargetId, Decision?> decisionOf) =>

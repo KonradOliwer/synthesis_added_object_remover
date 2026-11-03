@@ -63,10 +63,12 @@ public static class SettingsValidator
         var collision = CollisionSettingsBuilder.CreateForCleanedMod(settings.Collision, warnings);
         var alsoRemove = AlsoRemoveSettingsBuilder.Create(settings.FollowUpRemoval, touchChainsShown: detailedLogAndReports, warnings);
         var otherModsObjects = AlsoRemoveSettingsBuilder.CreateForOtherModsObjects(settings.FollowUpRemoval, alsoRemove, warnings);
-        var neverRemovedVisible = LeftBehindSettingsBuilder.CreateNeverRemovedVisible(settings.LeftoverVisibleObjects);
+        var neverRemovedVisible = LeftBehindSettingsBuilder.CreateNeverRemovedVisible(settings.LeftoverObjects);
         var neverRemovedInvisible = LeftBehindSettingsBuilder.CreateNeverRemovedInvisible(settings.LeftoverInvisibleObjects);
-        var visibleLeftBehind = LeftBehindSettingsBuilder.CreateVisible(settings.LeftoverVisibleObjects, neverRemovedVisible, warnings);
-        var leftBehind = LeftBehindSettingsBuilder.CreateInvisible(settings.LeftoverInvisibleObjects, neverRemovedInvisible, warnings);
+        var minObjectsAround = LeftBehindSettingsBuilder.ValidateMinObjectsAround(settings.LeftoverObjects, warnings);
+        var visibleLeftBehind = LeftBehindSettingsBuilder.CreateVisible(settings.LeftoverObjects, minObjectsAround, warnings);
+        var objectsInClearedAreas = ClearedAreasSettingsBuilder.Create(settings.LeftoverObjects, minObjectsAround, warnings);
+        var leftBehind = LeftBehindSettingsBuilder.CreateInvisible(settings.LeftoverInvisibleObjects, warnings);
         var markerMoves = LeftBehindSettingsBuilder.CreateMarkerMoves(settings.LeftoverInvisibleObjects);
         var restoreWhereRemoved = RestoreSettingsBuilder.Create(settings.RestoreWhereRemoved, collision, changedCollision, warnings);
         var reports = detailedLogAndReports ? ReportFileSettingsBuilder.Create(reportsFolder, config.Source) : null;
@@ -84,6 +86,8 @@ public static class SettingsValidator
             alsoRemove,
             otherModsObjects,
             visibleLeftBehind,
+            objectsInClearedAreas.Settings,
+            objectsInClearedAreas.Off,
             leftBehind,
             neverRemovedVisible,
             neverRemovedInvisible,

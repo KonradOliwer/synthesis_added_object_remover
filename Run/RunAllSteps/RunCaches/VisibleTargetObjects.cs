@@ -45,7 +45,7 @@ internal sealed class VisibleTargetObjects : IVisibleTargetObjects
     /// <remarks>The grid buckets X and Y only, so a query at height 0 finds the whole column.</remarks>
     public void InColumn(RecordKey space, Vector2 point, float radius, List<VisibleTargetNear> into) =>
         CollectWithinRadius(
-            space, new Vector3(point, 0f), radius, (point, radius), static (box, state) => IsWithinHorizontally(box.Center, state.point, state.radius), into);
+            space, new Vector3(point, 0f), radius, (point, radius), static (box, state) => Vectors.IsWithinHorizontally(box.Center, state.point, state.radius), into);
 
     public bool AnyContains(RecordKey space, Vector3 point, Func<TargetId, bool> include, ObjectQueryScratch scratch)
     {
@@ -88,9 +88,6 @@ internal sealed class VisibleTargetObjects : IVisibleTargetObjects
             .ToArray();
         return new SpaceEntries(visible, boxes, GridCandidates.OfBoxes(boxes.Select(box => box.WorldAabb(0f)).ToArray()));
     }
-
-    private static bool IsWithinHorizontally(Vector3 center, Vector2 point, float radius) =>
-        Vector2.DistanceSquared(new Vector2(center.X, center.Y), point) <= radius * radius;
 
     /// <summary>The entries whose box may come within <paramref name="radius"/> of <paramref name="point"/>, ascending and distinct.</summary>
     private static List<int> FindCandidates(SpaceEntries entries, Vector3 point, float radius)

@@ -18,6 +18,8 @@ using AddedObjectRemover.Steps.RemovalDecisionList;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas;
+using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
@@ -37,9 +39,9 @@ public static partial class StepRunner
 {
     /// <summary>
     /// Runs the deciding steps in order: select the objects that can cause removals, find the objects to keep, fit clashing
-    /// objects, the removal rounds (changed terrain, too close, also remove, visible objects left behind, other mods' objects left
-    /// without support, invisible objects left behind), move the kept markers, and last restore what the cleaned mod changed where
-    /// it was removed.
+    /// objects, the removal rounds (changed terrain, too close, also remove, visible objects left behind, objects in cleared areas,
+    /// other mods' objects left without support, invisible objects left behind), move the kept markers, and last restore what the
+    /// cleaned mod changed where it was removed.
     /// </summary>
     /// <remarks>
     /// The runner holds no error boundary: each step catches only user-data failures inside the step, and any other error ends
@@ -59,10 +61,11 @@ public static partial class StepRunner
         var tooClose = RunTooClose(scope, collected, tooCloseWorld, groups, changedTerrain);
         var alsoRemove = RunAlsoRemove(scope, runCaches, collected, tooClose);
         var visibleLeftBehind = RunVisibleLeftBehind(scope, runCaches, collected, alsoRemove);
-        var otherMods = RunOtherModsObjects(scope, runCaches, collected, support, fitted.Decisions, visibleLeftBehind);
-        var leftBehind = RunLeftBehind(scope, runCaches, collected, selected.ObjectsThatCanCauseRemovals, otherMods);
+        var clearedAreas = RunObjectsInClearedAreas(scope, runCaches, collected, visibleLeftBehind);
+        var otherMods = RunOtherModsObjects(scope, runCaches, collected, support, fitted.Decisions, clearedAreas);
+        var leftBehind = RunInvisibleLeftBehind(scope, runCaches, collected, selected.ObjectsThatCanCauseRemovals, otherMods);
         var markerMoves = RunMarkerMoves(scope, runCaches, collected, otherMods.Result, leftBehind);
-        var whereRemoved = RunRestoreWhereRemoved(scope, runCaches, trust, support, collected, fitted.Decisions, otherMods.Result, markerMoves);
+        var whereRemoved = RunRestoreWhereRemoved(scope, runCaches, trust, support, collected, otherMods.Result, markerMoves.Decisions);
         return new StepResults(
             Collected: collected,
             ObjectsToKeep: kept.Kept.ObjectsToKeep,
@@ -72,11 +75,12 @@ public static partial class StepRunner
             ChangedTerrain: changedTerrain.Result,
             RestingObjects: alsoRemove.Result,
             VisibleLeftBehind: visibleLeftBehind.Result,
-            LeftBehind: leftBehind.Result,
+            ObjectsInClearedAreas: clearedAreas.Result,
+            InvisibleLeftBehind: leftBehind.Result,
             MarkerMoves: markerMoves.Result,
-            OtherModsObjects: whereRemoved.Result.OtherModsObjects,
-            Final: whereRemoved.Decisions,
-            RestoreWhereRemoved: whereRemoved.Result);
+            OtherModsObjects: otherMods.Result,
+            Final: markerMoves.Decisions,
+            RestoreWhereRemoved: whereRemoved);
     }
 
     private static SelectedObjects RunSelection(RunScope scope, IRunCaches runCaches, CollectedObjects collected) =>
@@ -185,6 +189,7 @@ public static partial class StepRunner
                     collected.Targets,
                     alsoRemove.Decisions,
                     runCaches,
+                    CreateVisibleKindsAlwaysKept(scope, runCaches),
                     CreateAlsoRemoveFollowUp(scope, runCaches, collected, alsoRemove.Decisions),
                     scope.Environment.TimeSinceStart,
                     collected.Order,
@@ -192,41 +197,62 @@ public static partial class StepRunner
                     scope.Settings.VisibleLeftBehind)),
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
 
+    private static Decided<ObjectsInClearedAreasResult> RunObjectsInClearedAreas(
+        RunScope scope, IRunCaches runCaches, CollectedObjects collected, Decided<VisibleLeftBehindResult> visibleLeftBehind) =>
+        scope.Environment.Log.Timed(
+            () => ObjectsInClearedAreas.Find(
+                new(
+                    collected.Targets,
+                    collected.Spaces,
+                    visibleLeftBehind.Decisions,
+                    runCaches,
+                    [CreateVisibleKindsAlwaysKept(scope, runCaches), CreateInvisibleKindsAlwaysKept(scope, runCaches)],
+                    VisibleLeftBehindObjects.CreateLeftBehindRoundJoin(),
+                    CreateAlsoRemoveFollowUp(scope, runCaches, collected, visibleLeftBehind.Decisions),
+                    scope.Environment.TimeSinceStart,
+                    collected.Order,
+                    scope.Settings.Execution,
+                    scope.Settings.ObjectsInClearedAreas)),
+            // The section prints the judging time only, so the whole step's time is not passed.
+            (phase, _) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected));
+
     private static Decided<OtherModsObjectsResult> RunOtherModsObjects(
         RunScope scope,
         IRunCaches runCaches,
         CollectedObjects collected,
         OtherModsObjects.SupportJudging support,
         IRemovalDecisions afterFits,
-        Decided<VisibleLeftBehindResult> visibleLeftBehind) =>
+        Decided<ObjectsInClearedAreasResult> clearedAreas) =>
         scope.Environment.Log.Timed(
             () => OtherModsObjects.Settle(
                 new(
                     support,
                     afterFits,
-                    visibleLeftBehind.Decisions,
+                    clearedAreas.Decisions,
                     scope.Settings.AlsoRemove,
                     CreateAlsoRemoveRoundsAfter(scope, runCaches))),
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
 
-    private static Decided<LeftBehindResult> RunLeftBehind(
+    private static Decided<InvisibleLeftBehindResult> RunInvisibleLeftBehind(
         RunScope scope,
         IRunCaches runCaches,
         CollectedObjects collected,
         IObjectsThatCanCauseRemovals objectsThatCanCauseRemovals,
         Decided<OtherModsObjectsResult> otherMods) =>
         scope.Environment.Log.Timed(
-            () => LeftBehindObjects.Find(
+            () => InvisibleLeftBehindObjects.Find(
                 new(
                     collected.Targets,
                     objectsThatCanCauseRemovals,
                     otherMods.Result,
                     otherMods.Decisions,
                     runCaches,
-                    VisibleLeftBehindObjects.CreateLeftBehindJudging(),
+                    CreateInvisibleKindsAlwaysKept(scope, runCaches),
+                    VisibleLeftBehindObjects.CreateSurroundingsJudging(),
+                    VisibleLeftBehindObjects.CreateLeftBehindRoundJoin(),
                     collected.Order,
                     scope.Settings.Execution,
-                    scope.Settings.LeftBehind)),
+                    scope.Settings.InvisibleLeftBehind)),
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
 
     private static Decided<MarkerMoves> RunMarkerMoves(
@@ -234,7 +260,7 @@ public static partial class StepRunner
         IRunCaches runCaches,
         CollectedObjects collected,
         OtherModsObjectsResult otherModsObjects,
-        Decided<LeftBehindResult> leftBehind) =>
+        Decided<InvisibleLeftBehindResult> leftBehind) =>
         scope.Environment.Log.Timed(
             () => MarkerMovePlanner.Plan(
                 new(
@@ -248,18 +274,16 @@ public static partial class StepRunner
                     scope.Settings.MarkerMoves)),
             (markerMoves, elapsed) => scope.Report.BuildStepSections(markerMoves.Result, collected, elapsed));
 
-    /// <param name="afterFits">The decisions with every fit.</param>
-    /// <param name="markerMoves">The decisions with every round and every move.</param>
-    private static Decided<RestoreWhereRemovedResult> RunRestoreWhereRemoved(
+    /// <param name="final">The decisions with every round and every move.</param>
+    private static RestoreWhereRemovedResult RunRestoreWhereRemoved(
         RunScope scope,
         IRunCaches runCaches,
         ModTrustTable trust,
         OtherModsObjects.SupportJudging support,
         CollectedObjects collected,
-        IRemovalDecisions afterFits,
         OtherModsObjectsResult otherModsObjects,
-        Decided<MarkerMoves> markerMoves) =>
+        IRemovalDecisions final) =>
         scope.Environment.Log.Timed(
-            () => WhereRemovedRestorer.Plan(CreateRestoreInput(scope, runCaches, trust, support, collected, afterFits, otherModsObjects, markerMoves)),
-            (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, collected, elapsed));
+            () => WhereRemovedRestorer.Plan(CreateRestoreInput(scope, runCaches, trust, support, collected, otherModsObjects, final)),
+            (result, elapsed) => scope.Report.BuildStepSections(result, collected, elapsed));
 }

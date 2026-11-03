@@ -37,7 +37,7 @@ internal static partial class Tables
 
     /// <param name="evaluations">Listed ordered by record key.</param>
     public static CsvTable BuildLeftBehindTable(
-        CollectedObjects world, IEnumerable<LeftBehindCheck> evaluations, MarkerMoves markerMoves, ReportContext context)
+        CollectedObjects world, IEnumerable<InvisibleLeftBehindCheck> evaluations, MarkerMoves markerMoves, ReportContext context)
     {
         var movesByTarget = PerIndexTable<ReportedMove>.From(ReportedMove.Of(markerMoves), reported => reported.Move.Target.Index);
         return BuildEvaluationTable(
@@ -52,7 +52,7 @@ internal static partial class Tables
         string fileName, ImmutableArray<string> header, CollectedObjects world, IEnumerable<(int TargetIndex, ImmutableArray<string> Row)> evaluations) =>
         new(fileName, header, [.. evaluations.OrderBy(evaluation => world.Targets[evaluation.TargetIndex].Key, RecordKeyTextOrder.Comparer).Select(evaluation => evaluation.Row)]);
 
-    private static ImmutableArray<string> LeftBehindRow(LeftBehindCheck evaluation, CollectedObjects world, IBaseFacts bases, ReportedMove? move)
+    private static ImmutableArray<string> LeftBehindRow(InvisibleLeftBehindCheck evaluation, CollectedObjects world, IBaseFacts bases, ReportedMove? move)
     {
         var inside = evaluation.ContainingObject;
         return CsvRow.Of(

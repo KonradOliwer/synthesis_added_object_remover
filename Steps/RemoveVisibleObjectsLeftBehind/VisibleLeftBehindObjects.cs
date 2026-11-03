@@ -5,6 +5,7 @@ using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
 
@@ -12,6 +13,14 @@ public static class VisibleLeftBehindObjects
 {
     /// <summary>The rules this step judges its objects by (see <see cref="LeftBehindJudging"/>).</summary>
     public static ILeftBehindJudging CreateLeftBehindJudging() => new LeftBehindJudging();
+
+    /// <param name="Caches">Their base facts and shapes are read.</param>
+    /// <param name="NeverRemove">Honoured whether or not the step is switched off.</param>
+    public sealed record KindsInput(IRunCaches Caches, NeverRemovedVisibleKinds NeverRemove);
+
+    /// <summary>The kinds of shown objects this step's settings always keep (see <see cref="VisibleKindsAlwaysKept"/>).</summary>
+    public static IKindsAlwaysKept CreateKindsAlwaysKept(KindsInput input) =>
+        new VisibleKindsAlwaysKept(input.Caches.Shapes, input.Caches.Bases, input.NeverRemove.Kinds);
 
     /// <param name="Decisions">The newest decisions, which the step's rounds and their follow-ups are added to.</param>
     /// <param name="Caches">Index the visible target objects where the rounds measure them; their base facts and shapes are read.</param>
@@ -52,18 +61,19 @@ public static class VisibleLeftBehindObjects
         var nothingFollowedUp = followUp.Summarize(decisions);
         if (input.Settings is not { } settings) return new VisibleLeftBehindResult(StepOutcome.SwitchedOff, [], [], [], TimeSpan.Zero, nothingFollowedUp, Failure: null);
 
-        var surroundings = input.Caches.IndexVisibleTargets(decisions.TargetsAsTheRoundsMeasureThem(input.Targets));
+        var surroundings = input.Caches.IndexShownTargets(decisions.TargetsAsTheRoundsMeasureThem(input.Targets));
         return Failures.Attempt(
             () => JoinVerdicts(DecideRounds(input, surroundings, settings), decisions, followUp),
             failure => new VisibleLeftBehindResult(
                 StepOutcome.StoppedByUnexpectedError, [], [], [], TimeSpan.Zero, nothingFollowedUp, PartFailure.OfWholePart(VisibleLeftBehindParts.VisibleLeftBehind, failure)));
     }
 
-    /// <param name="surroundings">The visible target objects, removed or not, where the rounds measure them: a restored one where the cleaned mod put it.</param>
+    /// <param name="surroundings">The shown target objects, removed or not, where the rounds measure them: a restored one where the cleaned mod put it.</param>
     private static VisibleLeftBehindRounds DecideRounds(Input input, IVisibleTargetObjects surroundings, VisibleLeftBehindSettings settings)
     {
         var (targets, decisions) = (input.Targets, input.Decisions);
-        var rule = new VisibleLeftBehindRule(targets, input.Caches.Shapes, input.Caches.Bases, settings);
+        var kindsAlwaysKept = CreateKindsAlwaysKept(new(input.Caches, settings.NeverRemove));
+        var rule = new VisibleLeftBehindRule(targets, input.Caches.Shapes, input.Caches.Bases, settings, kindsAlwaysKept);
         var candidatesSurroundings = VisibleObjectSurroundings.Measure(
             targets, rule.Candidates(decisions), surroundings, settings.Surroundings.LookAround, settings.Surroundings.DirectionClearedPercent, input.Order, input.Execution);
         return VisibleLeftBehindRounds.Decide(rule, candidatesSurroundings, input.FollowUp, input.TimeSinceStart, decisions);

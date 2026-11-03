@@ -580,6 +580,8 @@ public class ChangedObjectJudgingTests
 
         public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => throw new NotSupportedException();
 
+        public PluginName? ReadTerrainWinner(ExteriorCell cell) => throw new NotSupportedException();
+
         public WaterCopies ReadWaterCopies(ExteriorCell cell) => throw new NotSupportedException();
 
         public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => throw new NotSupportedException();

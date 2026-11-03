@@ -161,11 +161,12 @@ public sealed class RestoreLoopTests
             Others = [RockNow(0, RockNowPlace)],
             Lands = [],
             ReadHeights = cell => cell == new ExteriorCell(TestTargets.Space, 0, 0) ? new LandHeights(flat, raised) : new LandHeights(null, null),
+            TerrainWinner = LaterMod.ToPluginName(),
         };
 
         var rock = Assert.Single(Plan(scene).Objects);
 
-        Assert.Equal(restored ? null : new PlacedRefusal(PlacedGuard.OnGroundThatStaysChanged, By: null, Failure: null), rock.Refused);
+        Assert.Equal(restored ? null : new PlacedRefusal(PlacedGuard.OnGroundThatStaysChanged, By: null, Failure: null, LaterMod.ToPluginName()), rock.Refused);
     }
 
     /// <summary>A later mod's house stands in cell (−1, 0), on the raised ground; its box reaches the first points inside cell (0, 0).</summary>
@@ -283,6 +284,7 @@ public sealed class RestoreLoopTests
 
         Assert.Equal(restored ? null : PlacedGuard.OnGroundThatStaysChanged, rock.Refused?.Guard);
         Assert.Equal(restored ? null : RaisedLand().LandKey, rock.Refused?.By);
+        Assert.Equal(restored ? null : TestTargets.TargetName, rock.Refused?.Plugin);
     }
 
     /// <summary>
@@ -1148,7 +1150,8 @@ public sealed class RestoreLoopTests
             new ObjectsThatBlockActors(Shapes, new Dictionary<RecordKey, ReferenceFacts>()),
             new NavmeshIndex(_ => null),
             space => space,
-            AllOn.ChangedTerrain);
+            AllOn.ChangedTerrain,
+            _ => TestTargets.TargetName);
         var presence = FinalPresence.Of(collected, removedTargets.Select(target => target.Key).ToHashSet(), cleared);
         var guards = new PlacedGuards(world, inputs, reach, presence, new DoorLinkGuard(cleared, [], _ => null), new Execution(1));
         var plans = new OtherKindsAsPlanned(
@@ -1356,7 +1359,8 @@ public sealed class RestoreLoopTests
     {
         var removedTargets = RemovedTargets();
         ImmutableArray<TargetObject> targets = [.. removedTargets, .. scene.Standing.Select((position, index) => StandingTarget(removedTargets.Count + index, position))];
-        var collected = TestScenes.CreateWorld(targets, [.. scene.Others.Select((other, index) => other with { Id = new OtherId(index) })]) with
+        List<OtherObject> others = [.. scene.Others.Select((other, index) => other with { Id = new OtherId(index) })];
+        var collected = TestScenes.CreateWorld(targets, others) with
         {
             ChangedRecords = [.. scene.Rocks],
             ChangedCells = [.. scene.Cells],
@@ -1378,18 +1382,21 @@ public sealed class RestoreLoopTests
         var final = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved), targets.Length)
             .Apply(RoundKind.TooClose, [.. removedTargets.Select(target => new ProposedRemoval(target.Id, new TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);
         return new(
-            new(collected, final, OtherModsObjectsResult.SwitchedOff),
+            new(collected, OtherModsObjectsResult.SwitchedOff),
+            final,
             new(rules.WorldCaches, rules.TooCloseRule(tooClose), rules.HoldersOfObjectsThatStay, new TestNavmeshCheck(scene.FindFault)),
+            rules.Leftovers(targets, final, others),
             new(
                 new TestRunCaches(
                     scene.Shapes,
                     navmeshes: new NavmeshIndex(bucket => bucket.Grid is null && !winning.IsEmpty ? [.. winning] : null),
-                    visibleTargets: TestScenes.Create(targets, [], scene.Shapes).IndexVisibleTargets),
-                new TestLandPlugin(space => space, scene.ReadHeights),
+                    shownTargets: TestScenes.Create(targets, [], scene.Shapes).IndexShownTargets),
+                new TestLandPlugin(space => space, scene.ReadHeights, scene.TerrainWinner),
                 Plugins,
                 TestTargets.TargetName),
             new Execution(scene.Workers),
-            scene.Settings);
+            scene.Settings,
+            () => TimeSpan.Zero);
     }
 
     /// <summary>What the cleaned mod changed besides its own removed objects, and the other plugins' objects that stand now, numbered in this order.</summary>
@@ -1412,6 +1419,9 @@ public sealed class RestoreLoopTests
 
         /// <summary>The heights of a cell's LAND record below the cleaned mod and at the winner, for cells without a LAND fact.</summary>
         public Func<ExteriorCell, LandHeights> ReadHeights { get; init; } = _ => new LandHeights(null, null);
+
+        /// <summary>The plugin of every cell's winning LAND record: the cleaned mod, whose <see cref="RaisedLand"/> wins by default.</summary>
+        public PluginName TerrainWinner { get; init; } = TestTargets.TargetName;
 
         /// <summary>What the winning version of each primitive says about the reference itself.</summary>
         public Dictionary<RecordKey, ReferenceFacts> Primitives { get; init; } = new();

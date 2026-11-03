@@ -30,13 +30,15 @@ internal static class ReasonItems
     {
         List<ObjectWithReason> followUps = [.. objects.Where(IsFollowUp)];
         var linkedToRestored = wording.LinkedToRestored is null ? 0 : objects.OfType<ObjectWithReason.LinkedTo>().Count(entry => final.Of(new TargetId(entry.LinkedToTargetIndex)) is Decision.Restored);
+        var leftovers = Count<ObjectWithReason.LeftoverInRestoredArea>(objects);
         return $"{ItemWhenPerformed<ObjectWithReason.TerrainChanged>(objects, changedTerrain, "on changed terrain")}"
             + $"{TextFormat.Count(Count<ObjectWithReason.TooClose>(objects))} too close, "
             + $"{TextFormat.Count(followUps.Count)} {wording.FollowUp}{FirstShrunkOrTurned(followUps, final)}, "
             + $"{ItemWhenPerformed<ObjectWithReason.VisibleLeftBehind>(objects, visibleLeftBehind, "visible objects left behind")}"
             + $"{TextFormat.Count(Count<ObjectWithReason.LeftBehind>(objects))} invisible objects left behind, "
             + $"{TextFormat.Count(Count<ObjectWithReason.LinkedTo>(objects) - linkedToRestored)} {wording.Linked}"
-            + (linkedToRestored > 0 ? $", {TextFormat.Count(linkedToRestored)} {wording.LinkedToRestored}" : string.Empty);
+            + (linkedToRestored > 0 ? $", {TextFormat.Count(linkedToRestored)} {wording.LinkedToRestored}" : string.Empty)
+            + (leftovers > 0 ? $", {TextFormat.Count(leftovers)} leftovers where the area was restored" : string.Empty);
     }
 
     private static int Count<TObject>(IEnumerable<ObjectWithReason> objects) where TObject : ObjectWithReason => objects.Count(entry => entry is TObject);

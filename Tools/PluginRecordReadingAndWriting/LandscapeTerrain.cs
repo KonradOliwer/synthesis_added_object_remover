@@ -4,12 +4,14 @@ namespace AddedObjectRemover;
 
 /// <summary>The LAND records of the plugin worldspaces, the winning ones and optionally every plugin's own, decoded to height grids on request.</summary>
 /// <param name="landscapes">The winning LAND records by the cell of the worldspace that holds them.</param>
+/// <param name="winners">The plugin of each of <paramref name="landscapes"/>, by the same cell.</param>
 /// <param name="landWorldspaces">Plugin worldspace -> the worldspace whose LAND records it uses (itself, or a parent whose land data it uses).</param>
 /// <param name="versions">Every plugin's own LAND record by cell, highest priority first; null when the versions were not asked for.</param>
 /// <param name="layerNames">Spells the plugins of the texture keys when the versions' texture layers are decoded; null when the layers were not asked for.</param>
 /// <param name="landscapesBelow">The LAND record versions just below a plugin's, by cell; null when the LAND area record versions were not asked for.</param>
 internal sealed class LandscapeTerrain(
     IReadOnlyDictionary<ExteriorCell, ILandscapeGetter> landscapes,
+    IReadOnlyDictionary<ExteriorCell, PluginName> winners,
     IReadOnlyDictionary<RecordKey, RecordKey> landWorldspaces,
     IReadOnlyDictionary<ExteriorCell, List<LandscapeVersion>>? versions,
     PluginNames? layerNames,
@@ -26,6 +28,9 @@ internal sealed class LandscapeTerrain(
     /// <returns>Null where the cell has no LAND record, or a deleted or empty one.</returns>
     public float[]? ReadHeights(ExteriorCell cell) =>
         landscapes.TryGetValue(cell, out var landscape) ? LandHeightReader.Read(landscape) : null;
+
+    /// <returns>Null where no plugin has a LAND record for the cell.</returns>
+    public PluginName? ReadWinner(ExteriorCell cell) => winners.TryGetValue(cell, out var plugin) ? plugin : null;
 
     /// <returns>Null where no plugin below the given plugin has a LAND record for the cell, or it is deleted or empty.</returns>
     public float[]? ReadHeightsBelow(PluginName plugin, ExteriorCell cell)

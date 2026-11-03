@@ -133,6 +133,7 @@ public class StepWordingTests
         [("Steps/RestoreWhereRemoved/ClearedAreaJudge.cs", "The cleaned mod's own object {target} has the fate {fate}; only another plugin's object goes back.")] = BugMessage,
         [("Steps/RestoreWhereRemoved/ChangeJudge.cs", "The placed record {change.Key} goes back with {undo}, which is no restored kind.")] = BugMessage,
         [("Steps/RestoreWhereRemoved/PlacedGuards.cs", "The too-close rule gave the reason {other}.")] = BugMessage,
+        [("Steps/RestoreWhereRemoved/PlacedGuards.cs", "The ground of cell {changed.Cell} stays changed, but no LAND record of it wins.")] = BugMessage,
         [("Steps/RemoveVisibleObjectsLeftBehind/LeftBehindVerdicts.cs", "The left-behind rule did not propose to remove an object with the outcome {proposed}.")] = BugMessage,
         [("Steps/RemovalDecisionList/RemovalDecisions.cs", "Unknown entry {unknown} in the when-removed table.")] = BugMessage,
         [("Steps/RemoveObjectsRestingOnRemovedOnes/ExplanationFinder.cs", "Touch rounds with seeds ran for the report files without touch chains.")] = BugMessage,

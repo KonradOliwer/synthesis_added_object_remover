@@ -35,6 +35,16 @@ public sealed class ReasonItemsTests
     }
 
     [Fact]
+    public void LeftoversWhereAnAreaWasRestoredAreCountedUnderTheirOwnItemOnlyWhenThereAreAny()
+    {
+        ObjectWithReason[] objects = [new ObjectWithReason.LeftoverInRestoredArea(1), new ObjectWithReason.LeftoverInRestoredArea(2), new ObjectWithReason.LinkedTo(3, 1)];
+
+        Assert.Equal(
+            "0 too close, 0 follow-up removals, 0 invisible objects left behind, 1 linked to removed objects, 2 leftovers where the area was restored",
+            ReasonItems.Describe(objects, StartDecisions(), StepOutcome.SwitchedOff, StepOutcome.SwitchedOff, ReasonItems.ForRemovals));
+    }
+
+    [Fact]
     public void ARestoreSummaryNamesTheFollowUpAndLinkedItemsWithoutTheWordRemoved()
     {
         ObjectWithReason[] objects = [new ObjectWithReason.Touching(3, 0), new ObjectWithReason.LinkedTo(9, 0)];

@@ -103,6 +103,8 @@ internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records,
 
     public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => throw new NotSupportedException();
 
+    public PluginName? ReadTerrainWinner(ExteriorCell cell) => throw new NotSupportedException();
+
     public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new NotSupportedException();
 
     public WaterCopies ReadWaterCopies(ExteriorCell cell) => throw new NotSupportedException();

@@ -6,8 +6,8 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
 
 /// <summary>
-/// The visible target objects of each space as oriented boxes, indexed per space on first use.
-/// Whether a target is visible is asked of the base object shapes. Thread-safe.
+/// The visible target objects of each space as oriented boxes of what the game draws of them, indexed per space on first use.
+/// Which targets count is asked of their visibility from the base object shapes. Thread-safe.
 /// </summary>
 internal sealed class VisibleTargetObjects : IVisibleTargetObjects
 {
@@ -20,14 +20,15 @@ internal sealed class VisibleTargetObjects : IVisibleTargetObjects
     private readonly Dictionary<RecordKey, TargetId[]> _visibleBySpace;
     private readonly ComputedOncePerKey<RecordKey, SpaceEntries> _entries = new(Publication.BuiltOnce, EqualityComparer<RecordKey>.Default);
 
+    /// <param name="counts">Whether a target of this visibility is indexed.</param>
     public VisibleTargetObjects(
-        IReadOnlyList<TargetObject> targets, IBaseObjectShapes shapes, ObjectContainment containment, Execution execution)
+        IReadOnlyList<TargetObject> targets, IBaseObjectShapes shapes, ObjectContainment containment, Execution execution, Func<ObjectVisibility, bool> counts)
     {
         _targets = targets;
         _shapes = shapes;
         _containment = containment;
         var isVisible = ParallelMap.Run(
-            execution, targets.Count, index => shapes.VisibilityOf(targets[index]).IsVisible,
+            execution, targets.Count, index => counts(shapes.VisibilityOf(targets[index])),
             ParallelMap.AutomaticRangeSize);
         var visible = targets.Where((_, index) => isVisible[index]).ToList();
         var bySpace = visible.GroupBy(target => target.SpaceKey).ToList();
@@ -83,7 +84,7 @@ internal sealed class VisibleTargetObjects : IVisibleTargetObjects
     private SpaceEntries CreateEntries(TargetId[] visible)
     {
         var boxes = visible
-            .Select(id => OrientedBox.FromLocal(_shapes.Of(_targets[id.Index].Base).Box, _targets[id.Index].Transform))
+            .Select(id => OrientedBox.FromLocal(_shapes.Of(_targets[id.Index].Base).ShownBox, _targets[id.Index].Transform))
             .ToArray();
         return new SpaceEntries(visible, boxes, GridCandidates.OfBoxes(boxes.Select(box => box.WorldAabb(0f)).ToArray()));
     }

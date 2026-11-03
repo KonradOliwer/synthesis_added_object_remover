@@ -62,7 +62,7 @@ public static partial class StepRunner
         var otherMods = RunOtherModsObjects(scope, runCaches, collected, support, fitted.Decisions, visibleLeftBehind);
         var leftBehind = RunLeftBehind(scope, runCaches, collected, selected.ObjectsThatCanCauseRemovals, otherMods);
         var markerMoves = RunMarkerMoves(scope, runCaches, collected, otherMods.Result, leftBehind);
-        var whereRemoved = RunRestoreWhereRemoved(scope, runCaches, trust, support, collected, otherMods.Result, markerMoves.Decisions);
+        var whereRemoved = RunRestoreWhereRemoved(scope, runCaches, trust, support, collected, fitted.Decisions, otherMods.Result, markerMoves);
         return new StepResults(
             Collected: collected,
             ObjectsToKeep: kept.Kept.ObjectsToKeep,
@@ -74,9 +74,9 @@ public static partial class StepRunner
             VisibleLeftBehind: visibleLeftBehind.Result,
             LeftBehind: leftBehind.Result,
             MarkerMoves: markerMoves.Result,
-            OtherModsObjects: otherMods.Result,
-            Final: markerMoves.Decisions,
-            RestoreWhereRemoved: whereRemoved);
+            OtherModsObjects: whereRemoved.Result.OtherModsObjects,
+            Final: whereRemoved.Decisions,
+            RestoreWhereRemoved: whereRemoved.Result);
     }
 
     private static SelectedObjects RunSelection(RunScope scope, IRunCaches runCaches, CollectedObjects collected) =>
@@ -248,16 +248,18 @@ public static partial class StepRunner
                     scope.Settings.MarkerMoves)),
             (markerMoves, elapsed) => scope.Report.BuildStepSections(markerMoves.Result, collected, elapsed));
 
-    /// <param name="final">The decisions with every round and every move.</param>
-    private static RestoreWhereRemovedResult RunRestoreWhereRemoved(
+    /// <param name="afterFits">The decisions with every fit.</param>
+    /// <param name="markerMoves">The decisions with every round and every move.</param>
+    private static Decided<RestoreWhereRemovedResult> RunRestoreWhereRemoved(
         RunScope scope,
         IRunCaches runCaches,
         ModTrustTable trust,
         OtherModsObjects.SupportJudging support,
         CollectedObjects collected,
+        IRemovalDecisions afterFits,
         OtherModsObjectsResult otherModsObjects,
-        IRemovalDecisions final) =>
+        Decided<MarkerMoves> markerMoves) =>
         scope.Environment.Log.Timed(
-            () => WhereRemovedRestorer.Plan(CreateRestoreInput(scope, runCaches, trust, support, collected, otherModsObjects, final)),
-            (result, elapsed) => scope.Report.BuildStepSections(result, collected, elapsed));
+            () => WhereRemovedRestorer.Plan(CreateRestoreInput(scope, runCaches, trust, support, collected, afterFits, otherModsObjects, markerMoves)),
+            (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, collected, elapsed));
 }

@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
@@ -20,6 +21,43 @@ internal static class RestoreWhereRemovedText
     /// <summary>What became of a change, as the report files say it: "restored", or "kept: " and the reason.</summary>
     /// <param name="keptBecause">Why the change stays; null when it goes back.</param>
     public static string Result(string? keptBecause) => keptBecause is null ? "restored" : $"kept: {keptBecause}";
+
+    /// <summary>Why a leftover is on the removal lists.</summary>
+    public const string LeftoverReason = "leftover where the area was restored";
+
+    public const string LeftoverRemoved = "removed as a leftover where the area was restored";
+
+    public const string LeftoverKept = "kept in a restored area";
+
+    /// <summary>What became of a leftover, as the log and the leftovers file say it: removed, or kept and why.</summary>
+    public static string Leftover(LeftoverJudged leftover) =>
+        LeftoverKeptBecause(leftover) is { } because ? $"{LeftoverKept}: {because}" : LeftoverRemoved;
+
+    /// <returns>Why the leftover stays; null when it is removed.</returns>
+    public static string? LeftoverKeptBecause(LeftoverJudged leftover) => KeptText(leftover, KeepReasonText.Detail);
+
+    /// <summary>The group a count puts a kept leftover in.</summary>
+    public static string LeftoverKeptGroup(LeftoverJudged leftover) =>
+        KeptText(leftover, KeepReasonText.Category) ?? throw new UnreachableException("A leftover that is removed is in no group of kept ones.");
+
+    /// <param name="ofObjectToKeep">Words the keep reason of an object to keep.</param>
+    private static string? KeptText(LeftoverJudged leftover, Func<KeepReason, string> ofObjectToKeep) => leftover switch
+    {
+        { KeptAsObjectToKeep: { } reason } => ofObjectToKeep(reason),
+        { KeptKind: { } kind } => AlwaysKept(kind),
+        _ => null,
+    };
+
+    /// <summary>E.g. ", area around (1024, -2048)"; nothing for an interior, which is one area.</summary>
+    public static string Centre(RestoredColumn column) =>
+        column.Centre is { } centre ? $", area around ({TextFormat.Fixed(centre.X, 0)}, {TextFormat.Fixed(centre.Y, 0)})" : string.Empty;
+
+    private static string AlwaysKept(AlwaysKeptKind kind) => kind switch
+    {
+        AlwaysKeptKind.Visible visible => $"always kept kind: {VisibleObjectKindText.KindName(visible.Kind)}",
+        AlwaysKeptKind.Invisible invisible => $"always kept kind: {ObjectVisibilityText.KindName(invisible.Kind)}",
+        _ => throw new UnreachableException($"Unknown always kept kind {kind}."),
+    };
 
     /// <summary>What a placed record that went back is, in a count.</summary>
     public static string Kind(PlacedRestoreKind kind) => kind switch
@@ -80,12 +118,17 @@ internal static class RestoreWhereRemovedText
     /// <summary>The words for <see cref="NavmeshChangeJudged.NothingGoesBack"/>.</summary>
     public const string NothingGoesBack ="nothing of what the cleaned mod changed in it goes back";
 
-    /// <summary>Why a placed record stays although its area is cleared: the guard, with the record it found or the failure that stopped the check.</summary>
+    /// <summary>
+    /// Why a placed record stays although its area is cleared: the guard, with the record it found and the plugin that keeps the ground
+    /// changed, as in "on ground that stays changed (Later.esp)", or the failure that stopped the check.
+    /// </summary>
     /// <param name="label">Names a record.</param>
-    public static string Refusal(PlacedRefusal refusal, Func<RecordKey, string> label) =>
-        refusal.Failure is { } failure
-            ? $"the check stopped unexpectedly ({failure})"
-            : refusal.By is { } by ? $"{Guard(refusal.Guard)} ({label(by)})" : Guard(refusal.Guard);
+    public static string Refusal(PlacedRefusal refusal, Func<RecordKey, string> label)
+    {
+        if (refusal.Failure is { } failure) return $"the check stopped unexpectedly ({failure})";
+        var found = string.Join(Describe.ListSeparator, new[] { refusal.By is { } by ? label(by) : null, refusal.Plugin?.ToString() }.OfType<string>());
+        return found.Length > 0 ? $"{Guard(refusal.Guard)} ({found})" : Guard(refusal.Guard);
+    }
 
     /// <summary>The kind of refusal a count line groups placed records by.</summary>
     public static string RefusalKind(PlacedRefusal refusal) => refusal.Failure is null ? Guard(refusal.Guard) : "with a check that stopped unexpectedly";

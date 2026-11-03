@@ -16,6 +16,9 @@ public readonly record struct ObjectVisibility(InvisibleObjectKind? Kind, bool B
 
     public bool IsVisible => Kind == null && !BaseMissing && !EffectOnlyMesh;
 
+    /// <summary>The game draws the object: it is visible, or its mesh holds only effect shapes, which collide with nothing.</summary>
+    public bool IsShown => Kind == null && !BaseMissing;
+
     /// <summary>The object is a marker that actors or the map use (door, map, idle or furniture marker), so removing it can need a manual patch.</summary>
     public bool IsUsedByActorsOrMap =>
         Kind is InvisibleObjectKind.DoorMarkers or InvisibleObjectKind.MapMarkers or InvisibleObjectKind.IdleMarkers or InvisibleObjectKind.FurnitureMarkers;

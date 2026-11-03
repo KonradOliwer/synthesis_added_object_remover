@@ -58,8 +58,6 @@ public class CopiedCodeTests
         [CopyFamily.KeyOf([
             "Steps/FitClashingObjects/ClashingObjectFitter.cs:ClashingObjectFitter.Fit", "Steps/MoveKeptMarkers/MarkerMovePlanner.cs:MarkerMovePlanner.Plan",
             "Steps/RemoveVisibleObjectsLeftBehind/VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.Find"])] = RoundAddingEntries,
-        [CopyFamily.KeyOf([
-            OtherMods + "OtherModsObjects.cs:OtherModsObjects.Settle", "Steps/RemoveInvisibleObjectsLeftBehind/LeftBehindObjects.cs:LeftBehindObjects.Find"])] = RoundAddingEntries,
         [CopyFamily.KeyOf([CollisionBuilder + "CreateChangedTerrainSettings", CollisionBuilder + "CreateTooCloseSettings"])] = SettingChecks,
         [CopyFamily.KeyOf([CollisionBuilder + "CreateChangedTerrainSettings"])] = SettingChecks,
         [CopyFamily.KeyOf([Report + "RestoreCountLines.cs:RestoreCountLines.LeftToLaterPlugins"])] = RestoreCountFacts,

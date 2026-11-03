@@ -341,7 +341,7 @@ public class RunSettingsValidationTests
         Assert.Null(off.Settings.VisibleLeftBehind);
         var visible = on.Settings.VisibleLeftBehind!;
         Assert.Equal(new LeftBehindSurroundings(1024f, 6, 80, 80), visible.Surroundings);
-        Assert.Empty(visible.NeverRemove);
+        Assert.Empty(visible.NeverRemove.Kinds);
         Assert.Empty(on.Warnings);
     }
 
@@ -378,7 +378,7 @@ public class RunSettingsValidationTests
 
         Assert.Equal(
             [VisibleObjectKind.Containers, VisibleObjectKind.Furniture, VisibleObjectKind.Activators],
-            ready.Settings.VisibleLeftBehind!.NeverRemove.Order());
+            ready.Settings.VisibleLeftBehind!.NeverRemove.Kinds.Order());
     }
 
     private const string RestoreGroup = "Restore what the cleaned mod changed where it was removed > ";
@@ -993,13 +993,33 @@ public class RunSettingsValidationTests
 
         var neverRemove = BuildReady(settings).Settings.LeftBehind!.NeverRemove;
 
-        Assert.Equal(new[] { InvisibleObjectKind.Lights, InvisibleObjectKind.SoundMarkers }, neverRemove.Order());
+        Assert.Equal(new[] { InvisibleObjectKind.Lights, InvisibleObjectKind.SoundMarkers }, neverRemove.Kinds.Order());
+    }
+
+    [Fact]
+    public void TickedAlwaysKeepKindsStandWhileTheLeftBehindStepsAreSwitchedOff()
+    {
+        var settings = SettingsFor();
+        settings.LeftoverVisibleObjects = new LeftoverVisibleObjectSettings
+        {
+            RemoveLeftoverVisibleObjects = false,
+            AlwaysKeep = new KeptVisibleObjectSettings { Containers = true },
+        };
+        settings.LeftoverInvisibleObjects.RemoveLeftoverInvisibleObjects = false;
+        settings.LeftoverInvisibleObjects.AlwaysKeep = new KeptInvisibleObjectSettings { Lights = true };
+
+        var ready = BuildReady(settings).Settings;
+
+        Assert.Null(ready.VisibleLeftBehind);
+        Assert.Null(ready.LeftBehind);
+        Assert.Equal([VisibleObjectKind.Containers], ready.NeverRemovedVisibleKinds.Kinds);
+        Assert.Equal([InvisibleObjectKind.Lights], ready.NeverRemovedInvisibleKinds.Kinds);
     }
 
     [Fact]
     public void NothingIsKeptUntilAKindIsTicked()
     {
-        Assert.Empty(BuildReady(SettingsFor()).Settings.LeftBehind!.NeverRemove);
+        Assert.Empty(BuildReady(SettingsFor()).Settings.LeftBehind!.NeverRemove.Kinds);
     }
 
     [Fact]

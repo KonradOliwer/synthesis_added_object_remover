@@ -21,6 +21,8 @@ namespace AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 /// <param name="ChangedObjectCollision">How another mod's object the cleaned mod changed is checked for a clash, where the cleaned mod put it and where it stood before.</param>
 /// <param name="VisibleLeftBehind">Null when the left-behind visible objects step is off.</param>
 /// <param name="LeftBehind">Null when the left-behind invisible objects step is off.</param>
+/// <param name="NeverRemovedVisibleKinds">Always set, also when the left-behind visible objects step is off.</param>
+/// <param name="NeverRemovedInvisibleKinds">Always set, also when the left-behind invisible objects step is off.</param>
 /// <param name="RestoreWhereRemoved">Always set; the step decides whether it runs.</param>
 /// <param name="MarkerMoves">Always set; the step decides whether it runs.</param>
 /// <param name="Reports">Null when the detailed log and reports are off.</param>
@@ -38,6 +40,8 @@ public sealed record RunSettings(
     OtherModsObjectsSettings OtherModsObjects,
     VisibleLeftBehindSettings? VisibleLeftBehind,
     LeftBehindSettings? LeftBehind,
+    NeverRemovedVisibleKinds NeverRemovedVisibleKinds,
+    NeverRemovedInvisibleKinds NeverRemovedInvisibleKinds,
     WhereRemovedRestoreSettings RestoreWhereRemoved,
     MarkerMoveSettings MarkerMoves,
     ReportFileSettings? Reports,

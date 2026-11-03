@@ -17,7 +17,7 @@ public class LeftBehindAfterVisibleRemovalsTests
 
     private static readonly LeftBehindSettings Settings = new(
         new LeftBehindSurroundings(LookAround: 1024, MinOccupiedDirections: 4, DirectionClearedPercent: 50, ClearedDirectionsPercent: 60),
-        NeverRemove: new HashSet<InvisibleObjectKind>());
+        NeverRemove: new NeverRemovedInvisibleKinds(new HashSet<InvisibleObjectKind>()));
 
     private static readonly BaseKey XMarker = TestVisibility.TaggedBase(ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers));
 

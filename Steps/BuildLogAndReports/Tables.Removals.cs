@@ -29,6 +29,13 @@ internal static partial class Tables
             .ThenBy(removal => TargetOf(removal).Key, RecordKeyOrder.Comparer);
     }
 
+    /// <summary>The cell's form key and editor ID; an interior's cell is the space itself.</summary>
+    private static IEnumerable<string> CellColumns(TargetObject target, SpaceFact space) =>
+    [
+        Quote((target.Cell?.Key ?? space.Key).ToString()),
+        OptionalText(target.Cell is { } cell ? cell.EditorId : space.EditorId),
+    ];
+
     /// <summary>The columns of <see cref="RemovalsHeader"/>.</summary>
     private static IEnumerable<string> RemovedObjectColumns(CollectedObjects world, ObjectWithReason removal, IRemovalDecisions final, ReportContext context)
     {
@@ -42,8 +49,7 @@ internal static partial class Tables
             Quote(AreaText.Worldspace(space)),
             Quote(AreaText.Hold(target.Area)),
             Quote(AreaText.Place(target.Area, space)),
-            Quote((target.Cell?.Key ?? space.Key).ToString()),
-            OptionalText(target.Cell is { } cell ? cell.EditorId : space.EditorId),
+            .. CellColumns(target, space),
             OptionalText(grid is { } column ? Int(column.X) : null),
             OptionalText(grid is { } row ? Int(row.Y) : null),
             .. Numbers(target.Transform.Position),

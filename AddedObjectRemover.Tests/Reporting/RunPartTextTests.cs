@@ -29,7 +29,7 @@ public class RunPartTextTests
         { "LeftBehind", "  Unexpected error in the step for invisible objects left behind (InvalidOperationException: broke). That step did not run, so invisible objects whose surroundings were removed were not removed." },
         { "MarkerMoves", "  Unexpected error in the marker moves (InvalidOperationException: broke). No kept marker was moved, so markers inside other mods' objects stay where they are." },
         { "ReportFileDetails", "  Unexpected error in the report-file details (InvalidOperationException: broke). The touching pairs or mesh origins that the report files list are missing from them." },
-        { "Step", "  Unexpected error in the step that restores what the cleaned mod changed where it was removed (InvalidOperationException: broke). Nothing was restored by area; the objects restored because they themselves were removed are written as decided." },
+        { "Step", "  Unexpected error in the step that restores what the cleaned mod changed where it was removed (InvalidOperationException: broke). Nothing was restored by area and no leftover of the cleaned mod in a restored area was removed; the objects restored because they themselves were removed are written as decided." },
     };
 
     public static TheoryData<string, string> PerSubjectParts { get; } = new()

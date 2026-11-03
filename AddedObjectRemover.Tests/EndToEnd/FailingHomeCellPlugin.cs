@@ -26,6 +26,8 @@ internal sealed class FailingHomeCellPlugin(IPluginRecords inner) : IPluginRecor
 
     public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => inner.ReadTerrainBelow(plugin, cell);
 
+    public PluginName? ReadTerrainWinner(ExteriorCell cell) => inner.ReadTerrainWinner(cell);
+
     public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => inner.ReadTerrainVersions(cell);
 
     public WaterCopies ReadWaterCopies(ExteriorCell cell) => inner.ReadWaterCopies(cell);

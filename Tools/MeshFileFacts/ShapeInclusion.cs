@@ -30,4 +30,6 @@ public sealed record ShapeInclusion(
         name != null && name.Contains(EditorMarkerNamePart, StringComparison.OrdinalIgnoreCase);
 
     public ShapeInclusion WithHiddenIncluded() => this with { IncludeHidden = true };
+
+    public ShapeInclusion WithOnlyEffectShapesCounted() => this with { CountedKinds = new HashSet<MeshShapeKind> { MeshShapeKind.EffectShader } };
 }

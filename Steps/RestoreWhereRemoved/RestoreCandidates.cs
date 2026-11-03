@@ -22,15 +22,22 @@ internal sealed class RestoreCandidates(CollectedObjects collected, IRemovalDeci
     /// </summary>
     public ImmutableArray<RecordChangedByCleanedMod> PlacedRecords()
     {
-        var takenAway = otherModsObjects.Objects.Where(outcome => outcome.IsTakenAway).Select(outcome => outcome.Object.Key).ToHashSet();
-        var moved = final.Moves.Select(move => move.Target).ToHashSet();
+        var isCandidate = CreatePlacedCandidateTest();
         return
         [
             .. collected.ChangedRecords
-                .Where(change => change.Earlier.Undo != PlacedParts.None && !takenAway.Contains(change.Key) && IsUndecidedAndNotKept(change.Target, moved))
+                .Where(change => change.Earlier.Undo != PlacedParts.None && isCandidate(change))
                 .OrderBy(change => change.Key, RecordKeyOrder.Comparer)
                 .Select(DoorLinks.WithLinkGoingBack),
         ];
+    }
+
+    /// <summary>Whether a placed record is left as <see cref="PlacedRecords"/> picks them, apart from its undone parts.</summary>
+    public Func<RecordChangedByCleanedMod, bool> CreatePlacedCandidateTest()
+    {
+        var takenAway = otherModsObjects.Objects.Where(outcome => outcome.IsTakenAway).Select(outcome => outcome.Object.Key).ToHashSet();
+        var moved = final.Moves.Select(move => move.Target).ToHashSet();
+        return change => !takenAway.Contains(change.Key) && IsUndecidedAndNotKept(change.Target, moved);
     }
 
     /// <summary>The cell records with an undone part, in key order whatever order they come in.</summary>

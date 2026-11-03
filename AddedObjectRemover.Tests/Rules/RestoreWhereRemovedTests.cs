@@ -22,7 +22,9 @@ public sealed class RestoreWhereRemovedTests
     private static readonly TestStatic Block = new(new FormKey(ShapeMod, 0x801), @"test\restorearea\block.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20), new Vector3(20))));
     private static readonly TestStatic BigBlock = new(new FormKey(ShapeMod, 0x802), @"test\restorearea\bigblock.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-100), new Vector3(100))));
     private static readonly TestStatic Flat = new(new FormKey(ShapeMod, 0x803), @"test\restorearea\flat.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20, -20, 0), new Vector3(20, 20, 0))));
-    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(ShapeMod, "RestoreWhereRemovedData", Block, BigBlock, Flat));
+    /// <summary>Water spray: a mesh whose only shape is drawn with an effect shader, as big as <see cref="Block"/>.</summary>
+    private static readonly TestStatic Spray = new(new FormKey(ShapeMod, 0x804), @"test\restorearea\spray.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20), new Vector3(20))), EffectOnly: true);
+    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(ShapeMod, "RestoreWhereRemovedData", Block, BigBlock, Flat, Spray));
 
     private static readonly ModKey BaseGameMod = ModKey.FromNameAndExtension("Base.esm");
     private static readonly PluginName BaseGame = BaseGameMod.ToPluginName();
@@ -279,6 +281,18 @@ public sealed class RestoreWhereRemovedTests
         Assert.Equal((1, 0, AreaVerdict.Cleared), (judged.OldPlace!.Objects, judged.OldPlace.Standing, judged.OldPlace.Verdict));
     }
 
+    /// <summary>The cleaned mod's water spray, whose mesh holds only effect shapes, still stands next to its removed block.</summary>
+    [Fact]
+    public void AStandingObjectWhoseMeshHoldsOnlyEffectsKeepsItsAreaStillStandingBySizeOfItsEffects()
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0)), Own(1, new Vector3(-100, 0, 0), Spray)];
+
+        var judged = Assert.Single(Plan(targets, removed: [0], [ChangedRock(0x900, Vector3.Zero)]).Objects);
+
+        Assert.Equal((2, 1, BlockVolume, AreaVerdict.StillStanding), (judged.OldPlace!.Objects, judged.OldPlace.Standing, judged.OldPlace.StandingSize, judged.OldPlace.Verdict));
+        Assert.False(judged.IsRestored);
+    }
+
     /// <summary>The big block was kept shrunk to half its size, so it counts with an eighth of its volume.</summary>
     [Fact]
     public void AnObjectKeptShrunkCountsAtItsShrunkBox()
@@ -405,13 +419,17 @@ public sealed class RestoreWhereRemovedTests
         CellChangedByCleanedMod[] cells = [ChangedCell(ExteriorCellKey, (0, 0))];
 
         var rules = GuardRules(workers: 1);
+        var decisions = DecisionsRemoving(targets);
         var groupOff = RestoreLoopReuse.Plan(
             new(
-                new(TestScenes.CreateWorld(targets, []), DecisionsRemoving(targets), OtherModsObjectsResult.SwitchedOff),
+                new(TestScenes.CreateWorld(targets, []), OtherModsObjectsResult.SwitchedOff),
+                decisions,
                 new(rules.WorldCaches, rules.TooCloseRule(), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),
+                rules.Leftovers(targets, decisions),
                 new(CachesOf(targets), TestLandPlugin.Flat, Plugins, TestTargets.TargetName),
                 new Execution(1),
-                Settings with { OtherModsObjects = false, Terrain = false, Cells = false, Navmeshes = false }));
+                Settings with { OtherModsObjects = false, Terrain = false, Cells = false, Navmeshes = false },
+                () => TimeSpan.Zero));
         var objectsOff = Plan(targets, removed: [0], rocks, cells, Settings with { OtherModsObjects = false });
         var cellsOff = Plan(targets, removed: [0], rocks, cells, Settings with { Cells = false });
 
@@ -508,7 +526,7 @@ public sealed class RestoreWhereRemovedTests
     /// <param name="otherModsObjects">Switched off when null.</param>
     private static RestoreWhereRemovedResult Plan(
         ImmutableArray<TargetObject> targets,
-        IRemovalDecisions final,
+        IRunDecisions final,
         IEnumerable<RecordChangedByCleanedMod> records,
         IEnumerable<CellChangedByCleanedMod>? cells = null,
         WhereRemovedRestoreSettings? settings = null,
@@ -527,15 +545,18 @@ public sealed class RestoreWhereRemovedTests
         var rules = GuardRules(workers);
         return RestoreLoopReuse.Plan(
             new(
-                new(collected, final, otherModsObjects ?? OtherModsObjectsResult.SwitchedOff),
+                new(collected, otherModsObjects ?? OtherModsObjectsResult.SwitchedOff),
+                final,
                 new(worldCaches ?? rules.WorldCaches, rules.TooCloseRule(tooClose), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),
+                rules.Leftovers(targets, final),
                 new(CachesOf(targets), TestLandPlugin.Flat, Plugins, TestTargets.TargetName),
                 new Execution(workers),
-                settings ?? Settings));
+                settings ?? Settings,
+                () => TimeSpan.Zero));
     }
 
     private static TestRunCaches CachesOf(ImmutableArray<TargetObject> targets) =>
-        new(Shapes, navmeshes: NoNavmeshes, visibleTargets: TestScenes.Create(targets, [], Shapes).IndexVisibleTargets);
+        new(Shapes, navmeshes: NoNavmeshes, shownTargets: TestScenes.Create(targets, [], Shapes).IndexShownTargets);
 
     /// <summary>A too-close rule whose check stops unexpectedly.</summary>
     private sealed class StoppingRule : IPlacementRule

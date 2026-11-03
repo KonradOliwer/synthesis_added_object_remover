@@ -326,7 +326,7 @@ public sealed class RestoredObjectPatchTests : IDisposable
         var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved);
         var final = RemovalDecisions.Start(protection, [new WhenRemoved.Restore(moved.EarlierVersion!)]).Apply(RoundKind.TooClose, [new ProposedRemoval(moved.Id, Reason)]);
 
-        PatchWriter.Write(new(final, targets, OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff, reader, writing));
+        PatchWriter.Write(new(final, targets, OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff(OtherModsObjectsResult.SwitchedOff), reader, writing));
 
         return state.PatchMod;
     }

@@ -16,4 +16,5 @@ public static class ReportFileNames
     public const string LeftWithoutSupportFileName = "other-mods-objects-left-without-support.csv";
     public const string RestoredWhereRemovedObjectsFileName = "restored-where-removed-objects.csv";
     public const string RestoredWhereRemovedCellsFileName = "restored-where-removed-cells.csv";
+    public const string RestoredWhereRemovedLeftoversFileName = "restored-where-removed-leftovers.csv";
 }

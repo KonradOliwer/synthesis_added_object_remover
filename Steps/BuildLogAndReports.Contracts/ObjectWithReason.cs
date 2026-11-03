@@ -35,6 +35,9 @@ public abstract record ObjectWithReason(int TargetIndex)
     /// <summary>An invisible target object inside another mod's object or whose surrounding visible target objects were removed.</summary>
     public sealed record LeftBehind(int TargetIndex, LeftBehindCheck Evaluation) : ObjectWithReason(TargetIndex);
 
+    /// <summary>A target object that still stood where an area was restored, with no kind or object to keep holding it.</summary>
+    public sealed record LeftoverInRestoredArea(int TargetIndex) : ObjectWithReason(TargetIndex);
+
     /// <summary>A member of the linked group of a target object that left its place, removed or restored.</summary>
     /// <param name="LinkedToTargetIndex">The member whose removal or restoration took the group along.</param>
     public sealed record LinkedTo(int TargetIndex, int LinkedToTargetIndex) : ObjectWithReason(TargetIndex);

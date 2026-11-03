@@ -9,17 +9,18 @@ using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 
 /// <summary>
-/// Judges how much of the cleaned mod's own visible objects still stand in the area around a point: the objects whose box centre
-/// lies within the search radius horizontally, at any height; in an interior, every such object of the interior. Thread-safe; each
-/// area is measured once.
+/// Judges how much of the cleaned mod's own objects the game draws still stand in the area around a point: the objects whose box
+/// centre lies within the search radius horizontally, at any height; in an interior, every such object of the interior. An object
+/// whose mesh holds only effect shapes (water spray, a waterfall's skirt) counts by the box of those shapes. Thread-safe; each area is
+/// measured once.
 /// </summary>
 /// <param name="targets">Every target, by id; only the cleaned mod's own objects count.</param>
-/// <param name="visibleTargets">The visible targets where the rounds measure them, so a fitted object counts at its fitted box.</param>
+/// <param name="shownTargets">The shown targets where the rounds measure them, so a fitted object counts at its fitted box.</param>
 /// <param name="final">The decisions with every round.</param>
 /// <param name="spaces">Every space the scan read; a space not listed is measured as a worldspace.</param>
 internal sealed class ClearedAreaJudge(
     ImmutableArray<TargetObject> targets,
-    IVisibleTargetObjects visibleTargets,
+    IVisibleTargetObjects shownTargets,
     IRemovalDecisions final,
     IReadOnlyDictionary<RecordKey, SpaceFact> spaces,
     ClearedArea settings)
@@ -28,10 +29,18 @@ internal sealed class ClearedAreaJudge(
 
     public AreaShare Judge(RecordKey space, Vector3 point)
     {
-        // An interior is one area: an endless column at any point holds all of it.
-        var (center, radius) = IsInterior(space) ? (Vector2.Zero, float.PositiveInfinity) : (new Vector2(point.X, point.Y), settings.SearchRadius);
-        return _shares.Get((space, center), () => Measure(space, center, radius));
+        var column = ColumnAt(space, point);
+        var center = CentreOf(column);
+        return _shares.Get((space, center), () => Measure(space, center, RadiusOf(column)));
     }
+
+    /// <summary>The column the area around the point is measured in: its centre seen from above; none in an interior, which is one area.</summary>
+    public RestoredColumn ColumnAt(RecordKey space, Vector3 point) => new(space, IsInterior(space) ? null : new Vector2(point.X, point.Y));
+
+    /// <remarks>An interior is one area: an endless column at any point holds all of it.</remarks>
+    public float RadiusOf(RestoredColumn column) => column.Centre is null ? float.PositiveInfinity : settings.SearchRadius;
+
+    public static Vector2 CentreOf(RestoredColumn column) => column.Centre ?? Vector2.Zero;
 
     /// <summary>The areas of the spaces one terrain quarter is judged in, added up under the verdict they give together.</summary>
     public AreaShare Sum(IReadOnlyCollection<AreaShare> areas, AreaVerdict verdict) =>
@@ -43,7 +52,7 @@ internal sealed class ClearedAreaJudge(
     private AreaShare Measure(RecordKey space, Vector2 center, float radius)
     {
         var inColumn = new List<VisibleTargetNear>();
-        visibleTargets.InColumn(space, center, radius, inColumn);
+        shownTargets.InColumn(space, center, radius, inColumn);
         var (objects, standing, size, standingSize) = (0, 0, 0d, 0d);
         foreach (var counted in inColumn.Where(near => targets[near.Target.Index].Origin == TargetOrigin.CleanedMod))
         {

@@ -9,6 +9,7 @@ namespace AddedObjectRemover.Tests.Fixtures;
 /// <param name="visibleTargets">Answers <see cref="IndexVisibleTargets"/>.</param>
 /// <param name="objectsOfAnyPluginAsTheyStand">Answers <see cref="VisibleObjectsOfAnyPluginAsTheyStand"/>.</param>
 /// <param name="objects">Answers every object cache that no other parameter answers.</param>
+/// <param name="shownTargets">Answers <see cref="IndexShownTargets"/>.</param>
 internal sealed class TestRunCaches(
     IBaseObjectShapes shapes,
     ITriangleMeshes? triangles = null,
@@ -19,7 +20,8 @@ internal sealed class TestRunCaches(
     INavmeshes? navmeshes = null,
     Func<IReadOnlyList<TargetObject>, IVisibleTargetObjects>? visibleTargets = null,
     Func<IReadOnlyDictionary<OtherId, OtherObject?>, IVisibleObjectsOfAnyPlugin>? objectsOfAnyPluginAsTheyStand = null,
-    IObjectCaches? objects = null) : IRunCaches
+    IObjectCaches? objects = null,
+    Func<IReadOnlyList<TargetObject>, IVisibleTargetObjects>? shownTargets = null) : IRunCaches
 {
     private readonly ISurfaceSamples? _surfaces = surfaces ?? (triangles is null ? null : TestSurfaceSamples.Over(triangles));
 
@@ -51,6 +53,9 @@ internal sealed class TestRunCaches(
 
     public IVisibleTargetObjects IndexVisibleTargets(IReadOnlyList<TargetObject> targets) =>
         visibleTargets is null ? Objects.IndexVisibleTargets(targets) : visibleTargets(targets);
+
+    public IVisibleTargetObjects IndexShownTargets(IReadOnlyList<TargetObject> targets) =>
+        shownTargets is null ? Objects.IndexShownTargets(targets) : shownTargets(targets);
 
     public IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPlugin() => objectsOfAnyPlugin is null ? Objects.VisibleObjectsOfAnyPlugin() : objectsOfAnyPlugin();
 

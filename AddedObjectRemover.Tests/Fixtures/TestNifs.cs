@@ -32,6 +32,10 @@ internal static class TestNifs
         return shape;
     }
 
+    /// <summary>Draws the shape with an effect shader, as fog, light rays and water spray are drawn.</summary>
+    public static void AddEffectShader(NifFile nif, BSTriShape shape) =>
+        shape.ShaderPropertyRef = new NiBlockRef<BSShaderProperty>(nif.AddBlock(new BSEffectShaderProperty()));
+
     public static NiNode AddNode(NifFile nif, NiNode parent, string name, Vector3 translation)
     {
         var node = new NiNode

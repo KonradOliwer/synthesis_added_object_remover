@@ -68,7 +68,7 @@ public class RunnerRulesTests
         ["PlacedNpcIndex.cs: var placedNpcs = spaceObjects.Where(rules.IsPlacedNpc).ToArray();"] = CacheIndexBuild,
         ["PlacedNpcIndex.cs: var spawning = ParallelResults.IndicesWhere(placedBodies, body => body != null);"] = CacheIndexBuild,
         ["PlacedNpcIndex.cs: npc.Base is { } baseKey ? bodies.GetBodies(baseKey.Record) : null;"] = CacheIndexBuild,
-        ["ObjectCaches.cs: AreTheCollectedObjects(targets) ? VisibleTargets : _indexes.Get(targets, () => new VisibleTargetObjects(targets, _shapes, _containment, _execution));"] =
+        ["ObjectCaches.cs: AreTheCollectedObjects(targets) ? VisibleTargets : _indexes.Get(targets, () => new VisibleTargetObjects(targets, _shapes, _containment, _execution, IsVisible));"] =
             "The collected objects have their index from the start; any other list of objects gets an index built once.",
         ["ObjectCaches.cs: ReferenceEquals(first, second) || (first is not null && second is not null && first.SequenceEqual(second));"] =
             "Two lists of target objects are the same list when they hold the same objects in the same order.",
@@ -268,10 +268,10 @@ public class RunnerRulesTests
         var settings = SettingsOfRunSettings();
 
         Assert.Equal(
-            ["AlsoRemoveSettings", "ChangedObjectCollision", "ChangedObjectSettings", "CollisionSettings", "Execution", "LeftBehindSettings", "MarkerMoveSettings", "ModTrustSettings", "OtherModsObjectsSettings", "ReportFileSettings", "SelectionSettings", "VisibleLeftBehindSettings", "WhatToCollect", "WhereRemovedRestoreSettings"],
+            ["AlsoRemoveSettings", "ChangedObjectCollision", "ChangedObjectSettings", "CollisionSettings", "Execution", "LeftBehindSettings", "MarkerMoveSettings", "ModTrustSettings", "NeverRemovedInvisibleKinds", "NeverRemovedVisibleKinds", "OtherModsObjectsSettings", "ReportFileSettings", "SelectionSettings", "VisibleLeftBehindSettings", "WhatToCollect", "WhereRemovedRestoreSettings"],
             settings.RecordTypes.Order(StringComparer.Ordinal));
         Assert.Equal(
-            ["AlsoRemove", "ChangedObjectCollision", "ChangedObjects", "Collision", "Execution", "LeftBehind", "MarkerMoves", "ModTrust", "OtherModsObjects", "Read", "Reports", "RestoreWhereRemoved", "Selection", "VisibleLeftBehind"],
+            ["AlsoRemove", "ChangedObjectCollision", "ChangedObjects", "Collision", "Execution", "LeftBehind", "MarkerMoves", "ModTrust", "NeverRemovedInvisibleKinds", "NeverRemovedVisibleKinds", "OtherModsObjects", "Read", "Reports", "RestoreWhereRemoved", "Selection", "VisibleLeftBehind"],
             settings.RecordProperties.Order(StringComparer.Ordinal));
         Assert.Equal(
             ["DetailedLog", "OnlyWarnWhenRequiringModLoadsAfterPatch", "Target", "TargetAsTyped"],

@@ -156,7 +156,7 @@ internal static partial class LogSections
     private static string DescribeVisibleLeftBehind(VisibleLeftBehindSettings? visible) =>
         visible is null
             ? $"{VisibleLeftBehindStepName}: off."
-            : $"{DescribeLeftBehindStep(VisibleLeftBehindStepName, visible.Surroundings, "visible", visible.NeverRemove.Order().Select(VisibleObjectKindText.KindName))}.";
+            : $"{DescribeLeftBehindStep(VisibleLeftBehindStepName, visible.Surroundings, "visible", visible.NeverRemove.Kinds.Order().Select(VisibleObjectKindText.KindName))}.";
 
     /// <summary>The settings line of a left-behind step that is on, up to its own settings.</summary>
     /// <param name="objectsKind">"visible" or "invisible", as the never-remove setting names the objects.</param>
@@ -191,6 +191,6 @@ internal static partial class LogSections
     private static string DescribeLeftBehind(RunSettings settings) =>
         settings.LeftBehind is not { } leftovers
             ? $"{LeftBehindStepName}: off."
-            : $"{DescribeLeftBehindStep(LeftBehindStepName, leftovers.Surroundings, "invisible", leftovers.NeverRemove.Order().Select(ObjectVisibilityText.KindName))}; "
+            : $"{DescribeLeftBehindStep(LeftBehindStepName, leftovers.Surroundings, "invisible", leftovers.NeverRemove.Kinds.Order().Select(ObjectVisibilityText.KindName))}; "
                 + $"Move kept markers out of other mods' objects: {OnOff(settings.MarkerMoves.Runs)}.";
 }

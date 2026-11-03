@@ -38,4 +38,7 @@ public sealed record MeshBounds(
 {
     /// <summary>The failure as the run statistics count it; null when the mesh did not fail.</summary>
     public MeshFailureCategory? FailureCategory => FailureKind is { } kind ? new MeshFailureCategory(kind, FailureExceptionType) : null;
+
+    /// <summary>For an effect-only mesh, the bounds of its effect shapes in mesh-local space; null otherwise or when they hold no point.</summary>
+    public Box? EffectBox { get; init; }
 }

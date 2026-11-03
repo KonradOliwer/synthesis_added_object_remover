@@ -1,14 +1,22 @@
+using System.Collections.Frozen;
+using System.Collections.Immutable;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 
 namespace AddedObjectRemover.Tests.Fixtures;
 
 /// <summary>The rules the guards of restored placed records ask, over in-memory scenes, built the way the runner builds them.</summary>
 /// <param name="TooClose">The too-close rule with the given settings over a world and its caches, in which the given objects cause no removals.</param>
+/// <param name="Scene">What the rules were built over, which <see cref="Leftovers"/> reads again.</param>
 internal sealed record TestPlacedGuardRules(
     IObjectCachesOfWorlds WorldCaches,
     Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule> TooClose,
-    IHoldersOfObjectsThatStay HoldersOfObjectsThatStay)
+    IHoldersOfObjectsThatStay HoldersOfObjectsThatStay,
+    TestPlacedGuardRules.RulesScene Scene)
 {
+    /// <summary>The load order facts the rules read.</summary>
+    internal sealed record RulesScene(
+        IBaseObjectShapes Shapes, ModTrustTable Trust, LoadOrderPlugins Plugins, OtherModsObjectsSettings Support, ITerrainHeights Terrain, int Threads);
+
     /// <param name="support">The touch gap and lost share of the support test, which the holders test reads its touch gap from.</param>
     public static TestPlacedGuardRules Create(
         IBaseObjectShapes shapes, ModTrustTable trust, LoadOrderPlugins plugins, OtherModsObjectsSettings support, ITerrainHeights terrain, int threads)
@@ -25,7 +33,39 @@ internal sealed record TestPlacedGuardRules(
             OtherModsObjects.CreateHoldersOfObjectsThatStay(
                 new(
                     new([], runCaches, trust, plugins, support, RestingObjects.CreateSupportContacts(runCaches), new Execution(threads)),
-                    worldCaches)));
+                    worldCaches)),
+            new RulesScene(shapes, trust, plugins, support, terrain, threads));
+    }
+
+    /// <summary>
+    /// The rules of the leftovers in restored areas, built by the factories the runner uses: the kinds the given settings always keep
+    /// (none when null) and the step for other mods' objects left without support, settling with no follow-up removals.
+    /// </summary>
+    /// <param name="targets">Every target, where it stands before any decision.</param>
+    /// <param name="afterFits">The decisions with every fit.</param>
+    /// <param name="others">The other mods' objects the step for other mods' objects judges, numbered from 0 in this order.</param>
+    public WhereRemovedRestorer.LeftoverRules Leftovers(
+        ImmutableArray<TargetObject> targets,
+        IRemovalDecisions afterFits,
+        IReadOnlyList<OtherObject>? others = null,
+        IReadOnlySet<VisibleObjectKind>? visibleKinds = null,
+        IReadOnlySet<InvisibleObjectKind>? invisibleKinds = null)
+    {
+        var (shapes, support, threads) = (Scene.Shapes, Scene.Support, Scene.Threads);
+        var runCaches = new TestRunCaches(
+            shapes,
+            new TriangleStore(shapes.ReadTriangles),
+            Scene.Terrain,
+            TestBaseFacts.Unresolved,
+            objects: TestScenes.Create(targets, [], shapes, supportOnlyObjects: others, threads: threads));
+        var alsoRemove = new AlsoRemoveSettings(FollowUpRemovalMode.Nothing, support.TouchGap, support.SupportLostFraction, TouchChainsShown: false);
+        var judging = new OtherModsObjects.SupportJudging(
+            targets, runCaches, Scene.Trust, Scene.Plugins, support, RestingObjects.CreateSupportContacts(runCaches), new Execution(threads));
+        return new WhereRemovedRestorer.LeftoverRules(
+            VisibleLeftBehindObjects.CreateKindsAlwaysKept(new(runCaches, new(visibleKinds ?? FrozenSet<VisibleObjectKind>.Empty))),
+            LeftBehindObjects.CreateKindsAlwaysKept(new(runCaches, new(invisibleKinds ?? FrozenSet<InvisibleObjectKind>.Empty))),
+            OtherModsObjects.CreateSettlingAfterLeftovers(
+                new(judging, afterFits, alsoRemove, RestingObjects.CreateAlsoRemoveRoundsAfter(new(alsoRemove, new Execution(threads), runCaches)))));
     }
 
     /// <param name="tooClose">Builds the rule over a world and its caches; <see cref="TooClose"/> when null.</param>
@@ -57,7 +97,8 @@ internal sealed class TestNavmeshCheck(Func<NavmeshWriteTrial, NavmeshFault?> fi
 
 /// <summary>Plugin records that answer only the land questions of the restore step.</summary>
 /// <param name="readHeights">The heights of a cell's LAND record just below the cleaned mod's version and at the winning one.</param>
-internal sealed class TestLandPlugin(Func<RecordKey, RecordKey?> findLandWorldspace, Func<ExteriorCell, LandHeights> readHeights) : IPluginRecords
+/// <param name="terrainWinner">The plugin of every cell's winning LAND record; none when null.</param>
+internal sealed class TestLandPlugin(Func<RecordKey, RecordKey?> findLandWorldspace, Func<ExteriorCell, LandHeights> readHeights, PluginName? terrainWinner = null) : IPluginRecords
 {
     /// <summary>Every space uses its own land, and no cell has heights.</summary>
     public static TestLandPlugin Flat { get; } = new(space => space, _ => new LandHeights(null, null));
@@ -67,6 +108,8 @@ internal sealed class TestLandPlugin(Func<RecordKey, RecordKey?> findLandWorldsp
     public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => readHeights(cell).Earlier;
 
     public float[]? ReadTerrain(ExteriorCell cell) => readHeights(cell).Current;
+
+    public PluginName? ReadTerrainWinner(ExteriorCell cell) => terrainWinner;
 
     public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, VersionWalkStop stopsTheWalk) => throw new NotSupportedException();
 

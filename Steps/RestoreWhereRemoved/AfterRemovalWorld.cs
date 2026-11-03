@@ -7,7 +7,7 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 
 /// <summary>
 /// The world once every round and every move is done. Its causes are what a placed record that goes back can come too close to: the
-/// cleaned mod's objects that stand, where they stand last (fitted, moved or restored), then the objects that are a change in the
+/// targets that stand, where they stand last (fitted, moved or restored), then the objects that are a change in the
 /// world without the cleaned mod and those the patch pulled down, where they stand. Its support-only objects are every other object
 /// that stands. The other mods' objects the patch removed are left out. Every candidate that stands now is among them, where it
 /// stands now.
@@ -25,6 +25,10 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 /// the id of each is its position.
 /// </param>
 /// <param name="CopiesNow">The id among the other objects of <paramref name="World"/> of each of <paramref name="Now"/>.</param>
+/// <param name="RestoredCauses">
+/// The ids among the other-mod objects of <paramref name="World"/> of the targets a removal step restored to their earlier version,
+/// in id order. Like the candidates going back, they end where they stood before the cleaned mod.
+/// </param>
 internal sealed record AfterRemovalWorld(
     CollectedObjects World,
     ImmutableArray<OtherObject> Causes,
@@ -32,7 +36,8 @@ internal sealed record AfterRemovalWorld(
     ImmutableArray<TargetObject> CleanedModObjectsThatStand,
     ImmutableArray<int> StandingNow,
     ImmutableArray<TargetObject> Now,
-    ImmutableArray<OtherId> CopiesNow)
+    ImmutableArray<OtherId> CopiesNow,
+    ImmutableArray<OtherId> RestoredCauses)
 {
     /// <summary>The candidates, each as it goes back, by candidate index.</summary>
     public ImmutableArray<TargetObject> Restored => World.Targets;
@@ -63,6 +68,7 @@ internal sealed record AfterRemovalWorld(
         var nearCauses = causes.Where(other => inReach.Contains(other.Key)).ToList();
         var objects = nearCauses.Concat(supportOnly.Where(other => inReach.Contains(other.Key))).Select((other, index) => other with { Id = new OtherId(index) }).ToList();
         var idOf = objects.ToDictionary(other => other.Key, other => other.Id);
+        var restoredByRun = standingTargets.Where(target => final.Of(target.Id) is Decision.Restored).Select(target => target.Key).ToHashSet();
         var world = collected with
         {
             Targets = restored,
@@ -77,7 +83,8 @@ internal sealed record AfterRemovalWorld(
             [.. standingTargets.Where(target => target.Origin == TargetOrigin.CleanedMod)],
             standingNow,
             now,
-            [.. standingNow.Select(candidate => idOf[candidates[candidate].Key])]);
+            [.. standingNow.Select(candidate => idOf[candidates[candidate].Key])],
+            [.. nearCauses.Where(cause => restoredByRun.Contains(cause.Key)).Select(cause => idOf[cause.Key])]);
     }
 
     /// <summary>The keys of the objects within the guards' reach, and of every candidate's copy where it stands now.</summary>

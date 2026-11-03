@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
@@ -38,6 +39,7 @@ internal static partial class LogSections
             [
                 .. TextLists.Headed("Restored where the cleaned mod was removed", RestoreCountLines.Restored(judged), CountsSeparator),
                 .. TextLists.Headed("Left as the cleaned mod changed them", RestoreCountLines.LeftAsChanged(judged), AreasSeparator),
+                .. TextLists.Headed("Objects of the cleaned mod still standing in restored areas", RestoreCountLines.Leftovers(judged), CountsSeparator),
                 .. context.Detailed ? RestoreWhereRemovedDetailLines(world, judged, elapsed, context) : [],
             ]);
     }
@@ -61,9 +63,23 @@ internal static partial class LogSections
             .. judged.Result.Cells.Select(cell => RestoredCellLine(world, cell, label)),
             .. judged.Result.Lands.SelectMany(land => RestoredLandLines(world, land)),
             .. judged.Navmeshes.Select(navmesh => RestoredNavmeshLine(world, navmesh, label)),
+            .. judged.Result.Leftovers.Select(leftover => LeftoverLine(world, leftover, context)),
             $"{RestoreWhereRemovedName}: {TextFormat.Count(judged.Result.Passes, "pass", "passes")}{Describe.TimedSuffix(elapsed, context)}.",
+            .. RestoreWhereRemovedPartTimeLines(judged.Result.Times, context),
         ];
     }
+
+    private static IEnumerable<string> RestoreWhereRemovedPartTimeLines(RestoreWhereRemovedTimes times, ReportContext context) =>
+    [
+        .. PartTimeLine("areas judged and plans made", times.PlansMade, context),
+        .. PartTimeLine("world after removal", times.WorldAfterRemoval, context),
+        .. PartTimeLine("objects that stay and guards set up, with the first collision layer read", times.GuardsSetUp, context),
+        .. PartTimeLine("passes", times.Passes, context),
+        .. PartTimeLine("placed guards in the passes", times.PlacedGuardsInPasses, context),
+    ];
+
+    private static ImmutableArray<string> PartTimeLine(string part, TimeSpan time, ReportContext context) =>
+        StepTimeLines($"{RestoreWhereRemovedName}, {part}", time, context);
 
     /// <param name="label">Names a record a guard found.</param>
     private static string RestoredObjectLine(CollectedObjects world, PlacedChangeJudged judged, Func<RecordKey, string> label, ReportContext context)
@@ -94,6 +110,13 @@ internal static partial class LogSections
         judged.WhereItIsNow is null
             ? ClearedAreaText.After(judged.OldPlace)
             : ClearedAreaText.After(judged.OldPlace, "at its old place ") + ClearedAreaText.After(judged.WhereItIsNow, "where it stands now ");
+
+    private static string LeftoverLine(CollectedObjects world, LeftoverJudged leftover, ReportContext context)
+    {
+        var target = world.Targets[leftover.Target.Index];
+        return $"  {RecordNames.Describe(target)} (base {RecordNames.DescribeBase(context.Bases, target.Base)}) in {Describe.Space(world, leftover.Column.Space)}"
+            + $"{RestoreWhereRemovedText.Centre(leftover.Column)}: {RestoreWhereRemovedText.Leftover(leftover)}";
+    }
 
     /// <param name="label">Names the record that keeps the water level.</param>
     private static string RestoredCellLine(CollectedObjects world, CellChangeJudged judged, Func<RecordKey, string> label)

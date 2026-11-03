@@ -18,6 +18,7 @@ internal sealed class ObjectCaches : IObjectCaches
     private readonly IBaseObjectShapes _shapes;
     private readonly Execution _execution;
     private readonly ComputedOncePerKey<IReadOnlyList<TargetObject>, IVisibleTargetObjects> _indexes = new(Publication.BuiltOnce, SameTargets);
+    private readonly ComputedOncePerKey<IReadOnlyList<TargetObject>, IVisibleTargetObjects> _shownIndexes = new(Publication.BuiltOnce, SameTargets);
 
     private ObjectCaches(
         CollectedObjects world,
@@ -37,7 +38,7 @@ internal sealed class ObjectCaches : IObjectCaches
         PlacedNpcs = new PlacedNpcsBySpace(otherModObjects, bodies, placedNpcRules, execution);
         _objectsOfAnyPlugin = new ComputedOnce<PlacedSpaces>(
             () => new PlacedSpaces([.. world.OtherModAndSupportOnlyObjects], shapes, measurementRules.ObjectsOfAnyPlugin, _containment, execution));
-        VisibleTargets = new VisibleTargetObjects(world.Targets, shapes, _containment, execution);
+        VisibleTargets = new VisibleTargetObjects(world.Targets, shapes, _containment, execution, IsVisible);
     }
 
     /// <param name="measurementRules">How the other-mod and any-plugin object caches measure an object; the rules belong to the select step.</param>
@@ -61,7 +62,14 @@ internal sealed class ObjectCaches : IObjectCaches
     public IVisibleTargetObjects VisibleTargets { get; }
 
     public IVisibleTargetObjects IndexVisibleTargets(IReadOnlyList<TargetObject> targets) =>
-        AreTheCollectedObjects(targets) ? VisibleTargets : _indexes.Get(targets, () => new VisibleTargetObjects(targets, _shapes, _containment, _execution));
+        AreTheCollectedObjects(targets) ? VisibleTargets : _indexes.Get(targets, () => new VisibleTargetObjects(targets, _shapes, _containment, _execution, IsVisible));
+
+    public IVisibleTargetObjects IndexShownTargets(IReadOnlyList<TargetObject> targets) =>
+        _shownIndexes.Get(targets, () => new VisibleTargetObjects(targets, _shapes, _containment, _execution, IsShown));
+
+    private static bool IsVisible(ObjectVisibility visibility) => visibility.IsVisible;
+
+    private static bool IsShown(ObjectVisibility visibility) => visibility.IsShown;
 
     private bool AreTheCollectedObjects(IReadOnlyList<TargetObject> targets) => SameTargets.Equals(targets, _targets);
 

@@ -41,6 +41,8 @@ internal sealed class CachesOfTheRun(ILoadOrderCaches loadOrder, ObjectCaches ob
 
     public IVisibleTargetObjects IndexVisibleTargets(IReadOnlyList<TargetObject> targets) => objects.IndexVisibleTargets(targets);
 
+    public IVisibleTargetObjects IndexShownTargets(IReadOnlyList<TargetObject> targets) => objects.IndexShownTargets(targets);
+
     public IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPlugin() => objects.VisibleObjectsOfAnyPlugin();
 
     public IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPluginAsTheyStand(IReadOnlyDictionary<OtherId, OtherObject?> changed) =>

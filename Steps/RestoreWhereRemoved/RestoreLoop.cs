@@ -56,23 +56,26 @@ internal sealed record RestoreLoopInputs(
 /// </summary>
 /// <param name="placedGuards">Null when no placed record's areas let it go back.</param>
 /// <param name="terrainGuards">Null while the terrain is switched off.</param>
-internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? terrainGuards, RestoreLoopInputs inputs)
+/// <param name="clock">The run's clock, which times the placed guards' checks alone.</param>
+internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? terrainGuards, RestoreLoopInputs inputs, Func<TimeSpan> clock)
 {
-    /// <returns>The state once a pass changes nothing, and how many passes ran, that one included.</returns>
+    /// <returns>The state once a pass changes nothing, how many passes ran, that one included, and the time of the placed guards' checks in all of them.</returns>
     /// <remarks>
     /// Each pass that does not end adds a refused placed record, a refused navmesh group, a protected grid point or a kept water level,
     /// and none is ever taken back, so the passes are at most one more than the placed records, navmesh groups, grid points and water
     /// cells together.
     /// </remarks>
-    public (RestoreState Final, int Passes) Run(RestoreState start)
+    public (RestoreState Final, int Passes, TimeSpan PlacedGuardsTime) Run(RestoreState start)
     {
         var state = start;
         PassInput? previous = null;
+        var placedGuardsTime = TimeSpan.Zero;
         for (var passes = 1; ; passes++)
         {
             var before = ReadPassInput(state, previous);
-            var next = Pass(before, FindAddedSincePassBefore(before, previous));
-            if (next.Count == state.Count) return (state, passes);
+            var (next, passPlacedGuardsTime) = Pass(before, FindAddedSincePassBefore(before, previous));
+            placedGuardsTime += passPlacedGuardsTime;
+            if (next.Count == state.Count) return (state, passes, placedGuardsTime);
             state = next;
             previous = before;
         }
@@ -135,20 +138,20 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
             navmeshesRefused);
     }
 
-    private RestoreState Pass(PassInput before, AddedSincePassBefore added)
+    private (RestoreState State, TimeSpan PlacedGuardsTime) Pass(PassInput before, AddedSincePassBefore added)
     {
-        var (placed, causesLeftOut) = RefusePlaced(before);
-        return new(placed, RefuseNavmeshGroups(before, added), ProtectGround(before, added), KeepWater(before, added), causesLeftOut);
+        var (placed, causesLeftOut, placedGuardsTime) = RefusePlaced(before);
+        return (new RestoreState(placed, RefuseNavmeshGroups(before, added), ProtectGround(before, added), KeepWater(before, added), causesLeftOut), placedGuardsTime);
     }
 
-    /// <summary>The placed guards against the current plans, for the placed records still going back.</summary>
-    private (ImmutableArray<PlacedRefusal?> Placed, IReadOnlySet<OtherId>? CausesLeftOut) RefusePlaced(PassInput before)
+    /// <summary>The placed guards against the current plans, for the placed records still going back, with the time of their checks.</summary>
+    private (ImmutableArray<PlacedRefusal?> Placed, IReadOnlySet<OtherId>? CausesLeftOut, TimeSpan Time) RefusePlaced(PassInput before)
     {
         var state = before.State;
-        if (placedGuards is null) return (state.Placed, null);
+        if (placedGuards is null) return (state.Placed, null, TimeSpan.Zero);
         var plans = new OtherKindsAsPlanned(state.Terrain, state.Water, before.Navmeshes.ThatStayChanged, before.Navmeshes.GoingBack);
-        var checks = placedGuards.CheckGoingBack(before.PlacedGoingBack, plans, state.CausesLeftOut);
-        return ([.. state.Placed.Select((refusal, index) => refusal ?? checks.Found[index])], checks.CausesLeftOut);
+        var (checks, time) = Timed.Run(clock, () => placedGuards.CheckGoingBack(before.PlacedGoingBack, plans, state.CausesLeftOut));
+        return ([.. state.Placed.Select((refusal, index) => refusal ?? checks.Found[index])], checks.CausesLeftOut, time);
     }
 
     /// <summary>

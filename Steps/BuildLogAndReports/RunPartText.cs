@@ -53,7 +53,7 @@ internal static class RunPartText
         [SelectionParts.RemovalCauseSelection] = new("selecting the objects that can cause removals", "They were not used to remove the cleaned mod's objects.", SubjectKind.Object),
         [RestoreWhereRemovedParts.Step] = new(
             "the step that restores what the cleaned mod changed where it was removed",
-            "Nothing was restored by area; the objects restored because they themselves were removed are written as decided.",
+            "Nothing was restored by area and no leftover of the cleaned mod in a restored area was removed; the objects restored because they themselves were removed are written as decided.",
             Subjects: null),
         [RestoreWhereRemovedParts.ObjectCheck] = new(
             "checking objects the cleaned mod changed against what stays", "They stay as the cleaned mod changed them.", SubjectKind.Object),
@@ -83,6 +83,7 @@ internal static class RunPartText
             RoundKind.AlsoRemove => "follow-up",
             RoundKind.VisibleLeftBehind => "visible left-behind",
             RoundKind.LeftBehind => "left-behind",
+            RoundKind.RestoredArea => "restored-area",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "The round kind has no linked-groups wording."),
         };
 

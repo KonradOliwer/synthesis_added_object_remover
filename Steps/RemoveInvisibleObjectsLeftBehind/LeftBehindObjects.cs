@@ -1,10 +1,12 @@
 using System.Collections.Immutable;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
@@ -30,6 +32,14 @@ public static class LeftBehindObjects
         WorkOrder Order,
         Execution Execution,
         LeftBehindSettings? Settings);
+
+    /// <param name="Caches">Their shapes are read.</param>
+    /// <param name="NeverRemove">Honoured whether or not the step is switched off.</param>
+    public sealed record KindsInput(IRunCaches Caches, NeverRemovedInvisibleKinds NeverRemove);
+
+    /// <summary>The kinds of invisible objects this step's settings always keep (see <see cref="InvisibleKindsAlwaysKept"/>).</summary>
+    public static IKindsAlwaysKept CreateKindsAlwaysKept(KindsInput input) =>
+        new InvisibleKindsAlwaysKept(input.Caches.Shapes, input.NeverRemove.Kinds);
 
     public static Decided<LeftBehindResult> Find(Input input)
     {
@@ -61,6 +71,7 @@ public static class LeftBehindObjects
                         new ReachRule(input.Caches.Bases),
                         input.Judging,
                         settings,
+                        CreateKindsAlwaysKept(new(input.Caches, settings.NeverRemove)),
                         order)
                     .SelectRemovals(input.Decisions, execution),
                 input.Decisions,

@@ -5,7 +5,7 @@ using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 namespace AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
 /// <summary>The kind of step that decided a round; a fit round comes before the removal rounds.</summary>
-public enum RoundKind { Fit, ChangedTerrain, TooClose, AlsoRemove, VisibleLeftBehind, LeftBehind }
+public enum RoundKind { Fit, ChangedTerrain, TooClose, AlsoRemove, VisibleLeftBehind, LeftBehind, RestoredArea }
 
 /// <param name="Number">1 for the first round of a run, counting up.</param>
 public readonly record struct Round(int Number, RoundKind Kind);

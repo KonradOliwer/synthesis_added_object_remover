@@ -118,7 +118,7 @@ public sealed class BaseObjectShapes : IBaseObjectShapes
             }
             if (mesh.Status == MeshReadStatus.EffectOnly)
             {
-                return new MeasuredBase(BaseObjectRules.ClassifyEffectOnlyShape(facts), BoundsSource.EffectOnlyMesh, MeshGaveNoBounds: true);
+                return new MeasuredBase(BaseObjectRules.ClassifyEffectOnlyShape(facts, mesh.EffectBox), BoundsSource.EffectOnlyMesh, MeshGaveNoBounds: true);
             }
             meshWithoutGeometry = mesh.Status == MeshReadStatus.NoRenderGeometry;
             // A mesh with collision but nothing to render is an invisible wall or blocker; its collision is read all the same.

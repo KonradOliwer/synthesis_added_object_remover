@@ -309,6 +309,51 @@ public sealed class RestoreWhereRemovedGuardTests
         Assert.Equal(restored ? null : new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, crate.Key, Failure: null), judged.Refused);
     }
 
+    /// <summary>
+    /// The cleaned mod moved a base game crate too; a removal step put it back where it stood before, next to the rock's old place.
+    /// The two stood together there before the cleaned mod.
+    /// </summary>
+    [Fact]
+    public void AnObjectARemovalStepRestoredBesideTheOldPlaceRefusesNothing()
+    {
+        var crate = Own(1, new Vector3(-300, 300, 0)) with { Origin = TargetOrigin.Moved };
+        var scene = new Scene
+        {
+            Targets = [RemovedHouse(), crate],
+            Removed = [0, 1],
+            RestoredTo = new Dictionary<int, Vector3> { [1] = OldPlace + new Vector3(ZoneReach - 5f, 0, 0) },
+            Rocks = [Rock(0, OldPlace, PlaceNow)],
+            Others = [RockNow(0, PlaceNow)],
+        };
+
+        var judged = Assert.Single(Plan(scene).Objects);
+
+        Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
+    }
+
+    /// <summary>
+    /// The cleaned mod gave a base game crate another base; a removal step put it back with its earlier base, next to the rock's old
+    /// place. The two stood together there before the cleaned mod.
+    /// </summary>
+    [Fact]
+    public void AnObjectWhoseEarlierBaseARemovalStepRestoredBesideTheOldPlaceRefusesNothing()
+    {
+        var crate = Own(1, new Vector3(-300, 300, 0)) with { Origin = TargetOrigin.Replaced, Base = Lantern.Base };
+        var scene = new Scene
+        {
+            Targets = [RemovedHouse(), crate],
+            Removed = [0, 1],
+            RestoredTo = new Dictionary<int, Vector3> { [1] = OldPlace + new Vector3(ZoneReach - 5f, 0, 0) },
+            EarlierBases = new Dictionary<int, BaseKey> { [1] = Block.Base },
+            Rocks = [Rock(0, OldPlace, PlaceNow)],
+            Others = [RockNow(0, PlaceNow)],
+        };
+
+        var judged = Assert.Single(Plan(scene).Objects);
+
+        Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
+    }
+
     /// <summary>A pebble of the cleaned mod's run that stays, too small to keep the area from being cleared, lies next to the rock's old place.</summary>
     [Fact]
     public void AnObjectOfTheCleanedModThatStaysRefusesARockGoingBackNextToIt()
@@ -452,6 +497,13 @@ public sealed class RestoreWhereRemovedGuardTests
     {
         public List<TargetObject> Targets { get; init; } = [RemovedHouse()];
         public int[] Removed { get; init; } = [0];
+
+        /// <summary>The removed targets that go back to where they stood before the cleaned mod instead of being disabled, with that place.</summary>
+        public Dictionary<int, Vector3> RestoredTo { get; init; } = [];
+
+        /// <summary>The base a restored target had before the cleaned mod replaced it; the target's own base when not listed.</summary>
+        public Dictionary<int, BaseKey> EarlierBases { get; init; } = [];
+
         public List<RecordChangedByCleanedMod> Rocks { get; init; } = [];
 
         /// <summary>The other plugins' objects that stand now, numbered in this order.</summary>
@@ -530,30 +582,52 @@ public sealed class RestoreWhereRemovedGuardTests
     private static RestoreWhereRemovedResult Plan(Scene scene)
     {
         ImmutableArray<TargetObject> targets = [.. scene.Targets];
-        var collected = TestScenes.CreateWorld(targets, [.. scene.Others.Select((other, index) => other with { Id = new OtherId(index) })]) with
+        List<OtherObject> others = [.. scene.Others.Select((other, index) => other with { Id = new OtherId(index) })];
+        var collected = TestScenes.CreateWorld(targets, others) with
         {
             ChangedRecords = [.. scene.Rocks],
             ChangedNavmeshes = [.. scene.ChangedNavmeshes.Select(ChangedNavmesh)],
         };
         var rules = TestPlacedGuardRules.Create(Shapes, Trust, Plugins, Support, TestGround.NoTerrain(), scene.Workers);
         ImmutableArray<NavmeshWorldTriangle> navmesh = [.. scene.Navmesh];
+        var decisions = DecisionsRemoving(targets, scene.Removed, scene.RestoredTo, scene.EarlierBases);
         return RestoreLoopReuse.Plan(
             new(
-                new(collected, DecisionsRemoving(targets, scene.Removed), scene.OtherMods),
+                new(collected, scene.OtherMods),
+                decisions,
                 new(rules.WorldCaches, rules.TooCloseRule(), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),
+                rules.Leftovers(targets, decisions, others),
                 new(
                     new TestRunCaches(
                         Shapes,
                         navmeshes: new NavmeshIndex(bucket => bucket.Grid is null && !navmesh.IsEmpty ? [.. navmesh] : null),
-                        visibleTargets: TestScenes.Create(targets, [], Shapes).IndexVisibleTargets),
+                        shownTargets: TestScenes.Create(targets, [], Shapes).IndexShownTargets),
                     TestLandPlugin.Flat,
                     Plugins,
                     TestTargets.TargetName),
                 new Execution(scene.Workers),
-                Settings));
+                Settings,
+                () => TimeSpan.Zero));
     }
 
-    private static RemovalDecisions DecisionsRemoving(ImmutableArray<TargetObject> targets, int[] removed) =>
-        TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved), targets.Length)
+    /// <param name="restoredTo">The removed targets that go back to the given place instead of being disabled.</param>
+    /// <remarks>
+    /// Every target that is not removed is an object to keep (a record of the cleaned mod links to it), so it stays even where the area
+    /// is cleared and the restore step would otherwise remove it as a leftover.
+    /// </remarks>
+    private static RemovalDecisions DecisionsRemoving(
+        ImmutableArray<TargetObject> targets, int[] removed, IReadOnlyDictionary<int, Vector3> restoredTo, IReadOnlyDictionary<int, BaseKey> earlierBases) =>
+        RemovalDecisions.Start(
+                ObjectsToKeep.Build(
+                    targets,
+                    [],
+                    TestTargets.References(targets.Length, Enumerable.Range(0, targets.Length).Except(removed).ToDictionary(index => index, _ => TestKeepReasons.Quest)),
+                    TestBaseFacts.Unresolved),
+                [.. targets.Select((target, index) => WhenRemovedOf(restoredTo.TryGetValue(index, out var place) ? place : (Vector3?)null, earlierBases.TryGetValue(index, out var earlierBase) ? earlierBase : target.Base))])
             .Apply(RoundKind.TooClose, [.. removed.Select(index => new ProposedRemoval(new TargetId(index), new TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);
+
+    private static WhenRemoved WhenRemovedOf(Vector3? restoredTo, BaseKey? earlierBase) =>
+        restoredTo is { } place
+            ? new WhenRemoved.Restore(TestTargets.EarlierVersionAt(BaseGame, new EulerPlacement(place, Vector3.Zero, 1f), earlierBase))
+            : new WhenRemoved.Disable();
 }

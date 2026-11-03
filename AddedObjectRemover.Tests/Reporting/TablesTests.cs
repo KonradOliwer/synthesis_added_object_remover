@@ -415,7 +415,7 @@ public sealed class TablesTests : IDisposable
         var world = CreateWorld(targets, out _);
         var decided = new StepResults(
             world, protection, new RemovalRisks([], []), new ChangedObjectJudgingResult([], [], []), OldPlaceWorld: null, new ChangedTerrainResult([]), run.Result, TestVisibleLeftBehind.SwitchedOff, LeftBehindResult.SwitchedOff, MarkerMoves.SwitchedOff,
-            OtherModsObjectsResult.SwitchedOff, run.RemovalDecisions, RestoreWhereRemovedResult.SwitchedOff);
+            OtherModsObjectsResult.SwitchedOff, run.RemovalDecisions, RestoreWhereRemovedResult.SwitchedOff(OtherModsObjectsResult.SwitchedOff));
         var removals = RemovalList.WithReasons(PatchWriter.ListRemovalsInWriteOrder(run.RemovalDecisions), run.RemovalDecisions, world, TestVisibleLeftBehind.SwitchedOff, TestLeftBehind.PerformedWithoutFindings).ToImmutableArray();
         var outcome = new RunOutcome(decided, removals, [], ManualPatchHints.FindManualPatchHints(decided, Shapes, removals), null!, default);
         return new Scene(outcome, run);

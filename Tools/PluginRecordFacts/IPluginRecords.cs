@@ -14,7 +14,7 @@ public interface IRecordIndex;
 /// <summary>Whether a plugin's version is the lowest one kept of a record whose winning version comes from <paramref name="winner"/>.</summary>
 public delegate bool VersionWalkStop(PluginName winner, PluginName plugin);
 
-/// <summary>Reads the load order's plugin records. Not thread-safe, except <see cref="ReadHomeCellGrid"/>, <see cref="ReadTerrain"/>, <see cref="ReadTerrainBelow"/>, <see cref="ReadTerrainVersions"/>, <see cref="ReadWaterCopies"/>, <see cref="ReadTextureMaterialChain"/>, <see cref="FindLandWorldspace"/>, <see cref="ReadNavmeshes"/>, <see cref="NpcTraitsOf"/>, <see cref="TraitSupplierOf"/>, <see cref="LeveledEntriesOf"/> and <see cref="TryParsePluginName"/>.</summary>
+/// <summary>Reads the load order's plugin records. Not thread-safe, except <see cref="ReadHomeCellGrid"/>, <see cref="ReadTerrain"/>, <see cref="ReadTerrainWinner"/>, <see cref="ReadTerrainBelow"/>, <see cref="ReadTerrainVersions"/>, <see cref="ReadWaterCopies"/>, <see cref="ReadTextureMaterialChain"/>, <see cref="FindLandWorldspace"/>, <see cref="ReadNavmeshes"/>, <see cref="NpcTraitsOf"/>, <see cref="TraitSupplierOf"/>, <see cref="LeveledEntriesOf"/> and <see cref="TryParsePluginName"/>.</summary>
 public interface IPluginRecords
 {
     /// <summary>Walks every plugin's cells once; the records the later reads and the patch writing need are remembered until the reader is dropped.</summary>
@@ -49,6 +49,10 @@ public interface IPluginRecords
     /// <summary>The terrain heights of an exterior cell, row by row (<see cref="TerrainGrid.VerticesPerSide"/> per row); the placed records must have been read before.</summary>
     /// <returns>Null where the cell has no terrain (no, a deleted, or an empty land record).</returns>
     float[]? ReadTerrain(ExteriorCell cell);
+
+    /// <summary>The plugin of the winning LAND record of an exterior cell; the placed records must have been read before. Thread-safe.</summary>
+    /// <returns>Null where no plugin has a LAND record for the cell.</returns>
+    PluginName? ReadTerrainWinner(ExteriorCell cell);
 
     /// <summary>
     /// The terrain heights of an exterior cell's LAND record at its version just below the given plugin's, row by row; the placed

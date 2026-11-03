@@ -19,6 +19,9 @@ internal static class RestoreWhereRemovedWorlds
     /// <summary>A plugin that has the cleaned mod as a master.</summary>
     public const string PatchOfTheCleanedModPlugin = "VillagePatch.esp";
 
+    /// <summary>A plugin that has <see cref="PatchOfTheCleanedModPlugin"/> as a master, so it needs the cleaned mod only through it.</summary>
+    public const string AddOnOfThePatchPlugin = "VillageAddOn.esp";
+
     public const float BaseFogNear = 10f;
     public const float CleanedModFogNear = 20f;
     public const float CleanedModTurn = 1f;
@@ -41,6 +44,9 @@ internal static class RestoreWhereRemovedWorlds
     public static readonly Vector3 TableAt = At(6000, 0);
 
     private const float PadDistance = 75f;
+
+    /// <summary>How far the table stands from the rock's place, so that it reaches into the space the rock fills.</summary>
+    private const float TableOffset = 60f;
 
     /// <summary>A tiny object 5 units from the side of a crate: too close to it, yet far too small to count against clearing the area.</summary>
     private const float PebbleDistance = 60f;
@@ -85,7 +91,15 @@ internal static class RestoreWhereRemovedWorlds
     /// middle of the cell, which has a city pad beside it and is removed, and one in its north-east quarter, which stays. With a
     /// search radius of 1500 units, the other three quarters see only the removed crate and count as cleared.
     /// </summary>
-    public static IReadOnlyList<ISkyrimMod> CreateTerrain(string dataFolder)
+    public static IReadOnlyList<ISkyrimMod> CreateTerrain(string dataFolder) => CreateTerrain(dataFolder, withALoneObject: false);
+
+    /// <summary>
+    /// <see cref="CreateTerrain(string)"/> with a tiny object of the cleaned mod in the south-west quarter, which is cleared and goes
+    /// back: it is far too small to count against clearing the quarter, and it is the one leftover, in a cell of the exterior.
+    /// </summary>
+    public static IReadOnlyList<ISkyrimMod> CreateTerrainWithALoneObject(string dataFolder) => CreateTerrain(dataFolder, withALoneObject: true);
+
+    private static IReadOnlyList<ISkyrimMod> CreateTerrain(string dataFolder, bool withALoneObject)
     {
         FixtureMeshes.WriteAll(dataFolder);
         var (baseGame, target, city, _) = CreateMods();
@@ -98,6 +112,11 @@ internal static class RestoreWhereRemovedWorlds
         target.Exterior.Place("T_Middle", own, middle);
         city.Exterior.Place("C_Pad", city.AddModeledStatic("C_PadBase", FixtureMeshes.PadModel), middle + new Vector3(PadDistance, 0, 0));
         target.Exterior.Place("T_Standing", own, new Vector3(ExteriorGrid.CellSize * 3 / 4, ExteriorGrid.CellSize * 3 / 4, ground));
+        if (withALoneObject)
+        {
+            var pebbleBase = target.AddBoundsOnlyStatic("T_PebbleBase", new Box(new Vector3(-5, -5, 0), new Vector3(5, 5, 10)));
+            target.Exterior.Place("T_Pebble", pebbleBase, new Vector3(ExteriorGrid.CellSize / 4, ExteriorGrid.CellSize / 4, ground));
+        }
         return [baseGame.Mod, target.Mod, city.Mod];
     }
 
@@ -118,6 +137,27 @@ internal static class RestoreWhereRemovedWorlds
         target.Interior.PlaceCopyOf(baseGame.Interior.Place("B_Rock", crate, RockAt)).MajorRecordFlagsRaw |= InitiallyDisabled;
         patch.Interior.Place("P_Table", patch.AddModeledStatic("P_TableBase", FixtureMeshes.CrateModel), RockAt);
         return [baseGame.Mod, target.Mod, city.Mod, patch.Mod];
+    }
+
+    /// <summary>
+    /// The interior, where the cleaned mod has a crate with a city pad beside it, so its only object is removed, and disabled a rock of
+    /// the base game; an add-on of the patch of the cleaned mod, which needs the cleaned mod only through that patch, places a table
+    /// beside the rock's place. Expected: the rock stays disabled, too close to the table.
+    /// </summary>
+    public static IReadOnlyList<ISkyrimMod> CreateVillageWithATableOfAnotherModWhereARockStood(string dataFolder)
+    {
+        FixtureMeshes.WriteAll(dataFolder);
+        var (baseGame, target, city, spaces) = CreateMods();
+        var patch = new FixtureMod(PatchOfTheCleanedModPlugin, baseGame, target);
+        var addOn = new FixtureMod(AddOnOfThePatchPlugin, baseGame, patch);
+        spaces.AddOverridesTo(patch);
+        spaces.AddOverridesTo(addOn);
+        var crate = baseGame.AddModeledStatic("B_CrateBase", FixtureMeshes.CrateModel);
+        target.Interior.Place("T_Crate1", target.AddModeledStatic("T_CrateBase", FixtureMeshes.CrateModel), At(0, 0));
+        city.Interior.Place("C_PadT_Crate1", city.AddModeledStatic("C_PadBase", FixtureMeshes.PadModel), At(PadDistance, 0));
+        target.Interior.PlaceCopyOf(baseGame.Interior.Place("B_Rock", crate, RockAt)).MajorRecordFlagsRaw |= InitiallyDisabled;
+        addOn.Interior.Place("A_Table", addOn.AddModeledStatic("A_TableBase", FixtureMeshes.CrateModel), RockAt + new Vector3(TableOffset, 0, 0));
+        return [baseGame.Mod, target.Mod, city.Mod, patch.Mod, addOn.Mod];
     }
 
     private static (FixtureMod BaseGame, FixtureMod Target, FixtureMod City, FixtureSpaces Spaces) CreateMods()

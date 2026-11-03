@@ -7,6 +7,7 @@ using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
@@ -75,6 +76,7 @@ internal static class RemovalList
         VisibleObjectSurroundingsRemoved => new ObjectWithReason.VisibleLeftBehind(target.Index, checks.Visible.Get(target.Index)),
         InsideAnotherModsObject or SurroundingsRemoved => new ObjectWithReason.LeftBehind(target.Index, checks.Invisible.Get(target.Index)),
         LinkedTo linked => new ObjectWithReason.LinkedTo(target.Index, linked.To.Index),
+        LeftoverInRestoredArea => new ObjectWithReason.LeftoverInRestoredArea(target.Index),
         // Each step declares its own reasons, so the compiler cannot see that one is missing here.
         _ => throw new InvalidOperationException($"Unknown removal reason {reason}."),
     };

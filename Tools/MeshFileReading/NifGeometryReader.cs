@@ -87,7 +87,11 @@ internal sealed class NifGeometryReader
         var parentOf = BuildParentMap(blocks);
         var flags = AvObjectFlags.For(nif);
         var shapes = CollectWithRetry(blocks, parentOf, flags, root.Index, includeTriangles, inclusion);
-        return ToResult(shapes) with
+        var result = ToResult(shapes);
+        var measured = !includeTriangles && result.Status == MeshReadStatus.EffectOnly
+            ? WithEffectBounds(result, blocks, parentOf, flags, root.Index, inclusion)
+            : result;
+        return measured with
         {
             FooterRoot = root.DiffersFromLibraryRoot ? root : null,
             StripFieldsMissing = shapes.Stats.StripFieldsMissing > 0,
@@ -118,6 +122,17 @@ internal sealed class NifGeometryReader
                 shapes.Indices?.ToArray() ?? [],
                 shapes.PartFirstTriangles?.ToArray() ?? []));
         return NifReadResult.Succeeded(geometry, shapes.Stats.MismatchedStrips);
+    }
+
+    /// <summary>
+    /// The result with the bounds of the mesh's effect shapes, collected as <paramref name="inclusion"/> says but counting only effect
+    /// shapes; unchanged when they hold no valid point.
+    /// </summary>
+    private NifReadResult WithEffectBounds(
+        NifReadResult effectOnly, List<INiObject> blocks, Dictionary<int, int> parentOf, AvObjectFlags flags, int rootIndex, ShapeInclusion inclusion)
+    {
+        var effects = CollectWithRetry(blocks, parentOf, flags, rootIndex, includeTriangles: false, inclusion.WithOnlyEffectShapesCounted());
+        return effects.Bounds is { Any: true, Invalid: null } bounds ? effectOnly with { EffectBox = Box.FromCorners(bounds.Min, bounds.Max) } : effectOnly;
     }
 
     /// <summary>

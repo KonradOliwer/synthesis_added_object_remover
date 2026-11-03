@@ -28,6 +28,7 @@ internal sealed record PlacedChecks(PlacedRefusal?[] Found, IReadOnlySet<OtherId
 /// <param name="HoldersOfObjectsThatStay">The support test over the after-removal world, among the candidates that stand now.</param>
 /// <param name="FindLandWorldspace">A space → the worldspace whose land it uses; null for a space without land.</param>
 /// <param name="ChangedTerrain">The areas around an object whose ground the collision settings of the objects the cleaned mod changed look at.</param>
+/// <param name="FindTerrainWinner">The plugin of the winning LAND record of a cell; null where the cell has none.</param>
 internal sealed record PlacedGuardInputs(
     IObjectCaches Caches,
     Func<IEnumerable<OtherId>, IPlacementRule> TooClose,
@@ -36,13 +37,15 @@ internal sealed record PlacedGuardInputs(
     ObjectsThatBlockActors Blocking,
     INavmeshes Navmeshes,
     Func<RecordKey, RecordKey?> FindLandWorldspace,
-    ChangedTerrainSettings ChangedTerrain);
+    ChangedTerrainSettings ChangedTerrain,
+    Func<ExteriorCell, PluginName?> FindTerrainWinner);
 
 /// <summary>
 /// The guards of the placed records whose areas let them go back, each checked as it goes back, with only its undone parts taken
-/// from its earlier version. The candidates that go back together are never checked against each other: they stood together before
-/// the cleaned mod. A refused candidate stays where it stands now, among what stays; an object that ends removed in the final world
-/// (<see cref="FinalPresence"/>) causes nothing. Thread-safe.
+/// from its earlier version. The candidates that go back together, and the objects a removal step restored to their earlier version,
+/// are never checked against each other: they all end where they stood together before the cleaned mod. A refused candidate stays
+/// where it stands now, among what stays; an object that ends removed in the final world (<see cref="FinalPresence"/>) causes
+/// nothing. Thread-safe.
 /// </summary>
 internal sealed class PlacedGuards(
     AfterRemovalWorld world, PlacedGuardInputs inputs, GuardReach reach, FinalPresence presence, DoorLinkGuard doors, Execution execution)
@@ -107,10 +110,14 @@ internal sealed class PlacedGuards(
             ?? doors.Check(candidate, goingBack, plans.NavmeshesGoingBack, doorNavmeshFaults);
     }
 
-    /// <summary>The causes that cause no removals: the copies of the candidates going back, which move away, and those that end removed in the final world.</summary>
+    /// <summary>
+    /// The causes that cause no removals: the copies of the candidates going back, which move away, the objects a removal step
+    /// restored, and those that end removed in the final world.
+    /// </summary>
     private HashSet<OtherId> CausesLeftOut(IReadOnlySet<int> goingBack) =>
     [
         .. world.CauseCopiesNowOf(goingBack),
+        .. world.RestoredCauses,
         .. world.World.OtherModObjects.Where(cause => presence.EndsRemoved(cause.Key, goingBack.Contains)).Select(cause => cause.Id),
     ];
 
@@ -127,7 +134,7 @@ internal sealed class PlacedGuards(
     /// <summary>
     /// Ground that stays changed lies under the box or an area the changed terrain settings grow around it: ground the terrain plan
     /// keeps as the cleaned mod made it, or ground a later plugin changed. The plan's own blend does not count, so one refusal does
-    /// not spread through a cleared area by the slopes around the ground it keeps.
+    /// not spread through a cleared area by the slopes around the ground it keeps. The winning LAND record's plugin keeps it changed.
     /// </summary>
     private PlacedRefusal? CheckGround(TargetObject restored, TerrainUndoPlan terrain)
     {
@@ -136,7 +143,10 @@ internal sealed class PlacedGuards(
         var found = areas.Prepend(BoxOf(restored))
             .Select(area => terrain.GroundThatStaysChangedUnder(land, (new Vector2(area.Min.X, area.Min.Y), new Vector2(area.Max.X, area.Max.Y))))
             .FirstOrDefault(ground => ground is not null);
-        return found is { } changed ? new PlacedRefusal(PlacedGuard.OnGroundThatStaysChanged, changed.Land, Failure: null) : null;
+        if (found is not { } changed) return null;
+        var keptBy = inputs.FindTerrainWinner(changed.Cell)
+            ?? throw new UnreachableException($"The ground of cell {changed.Cell} stays changed, but no LAND record of it wins.");
+        return new PlacedRefusal(PlacedGuard.OnGroundThatStaysChanged, changed.Land, Failure: null, keptBy);
     }
 
     /// <summary>The box lies partly between a cell's water level before the cleaned mod and the one that stays.</summary>

@@ -36,6 +36,7 @@ internal static class TestLeftBehind
             new ReachRule(TestBaseFacts.Reader(new SkyrimMod(ReachRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache())),
             VisibleLeftBehindObjects.CreateLeftBehindJudging(),
             config,
+            new InvisibleKindsAlwaysKept(shapes, config.NeverRemove.Kinds),
             order);
     }
 

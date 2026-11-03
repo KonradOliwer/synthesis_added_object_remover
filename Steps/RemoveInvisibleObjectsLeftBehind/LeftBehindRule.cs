@@ -4,6 +4,7 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
 
@@ -23,6 +24,7 @@ internal sealed class LeftBehindRule(
     ReachRule reach,
     ILeftBehindJudging judging,
     LeftBehindSettings config,
+    IKindsAlwaysKept kindsAlwaysKept,
     WorkOrder order)
 {
     /// <param name="decisions">The decisions of the earlier steps: their removals count as cleared, and the objects they decided are not evaluated again.</param>
@@ -54,7 +56,7 @@ internal sealed class LeftBehindRule(
         var radius = GetEffectiveRadius(target);
         var containingObject = containingObjects.Of(targetIndex);
         var areas = MeasureSurroundings(target, radius, decisions, neighbours);
-        var decision = judging.Judge(areas, config.Surroundings, isInsideAnotherModsObject: containingObject != null, isProtectedKind: config.NeverRemove.Contains(kind));
+        var decision = judging.Judge(areas, config.Surroundings, isInsideAnotherModsObject: containingObject != null, isProtectedKind: kindsAlwaysKept.KindKeeping(target) != null);
         return new LeftBehindCheck(targetIndex, kind, radius, containingObject, areas, decision, KeepReason: null);
     }
 

@@ -81,14 +81,14 @@ public class SourcePlacementTests
     private static readonly string[] DecidingStepInputs =
     [
         "ChangedTerrainObjects.Input", "ClashingObjectFitter.Input", "LeftBehindObjects.Input", "MarkerMovePlanner.Input", "OtherModsObjects.Input",
-        "RestingObjects.Input", "TooCloseObjects.Input", "VisibleLeftBehindObjects.Input",
+        "RestingObjects.Input", "TooCloseObjects.Input", "VisibleLeftBehindObjects.Input", "WhereRemovedRestorer.Input",
     ];
 
     /// <summary>The step entry of each step that adds to the run's decisions, "Type.Method".</summary>
     private static readonly string[] DecidingStepEntries =
     [
         "ChangedTerrainObjects.Find", "ClashingObjectFitter.Fit", "LeftBehindObjects.Find", "MarkerMovePlanner.Plan", "OtherModsObjects.Settle",
-        "RestingObjects.Find", "TooCloseObjects.Find", "VisibleLeftBehindObjects.Find",
+        "RestingObjects.Find", "TooCloseObjects.Find", "VisibleLeftBehindObjects.Find", "WhereRemovedRestorer.Plan",
     ];
 
     private const string FailuresType = "Failures";

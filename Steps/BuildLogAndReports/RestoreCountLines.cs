@@ -90,6 +90,20 @@ internal static class RestoreCountLines
         }
     }
 
+    /// <summary>The cleaned mod's objects that still stood in a restored area: those removed, and those kept, per reason.</summary>
+    public static IEnumerable<string> Leftovers(RestoreJudgements judged)
+    {
+        var removed = judged.Result.Leftovers.Count(leftover => leftover.IsRemoved);
+        if (removed > 0) yield return $"{TextFormat.Count(removed)} {RestoreWhereRemovedText.LeftoverRemoved}";
+
+        var kept = judged.Result.Leftovers.Where(leftover => !leftover.IsRemoved).ToList();
+        if (kept.Count > 0)
+        {
+            var groups = KeyedGroups.Rank(KeyedGroups.CountBy(kept, RestoreWhereRemovedText.LeftoverKeptGroup, StringComparer.Ordinal), StringComparer.Ordinal);
+            yield return $"{TextFormat.Count(kept.Count)} {RestoreWhereRemovedText.LeftoverKept} ({string.Join(Describe.ListSeparator, TextLists.Counts(groups))})";
+        }
+    }
+
     private static IEnumerable<(NavmeshGuard Guard, int Members)> RefusedGroups(RestoreWhereRemovedResult result)
     {
         foreach (var group in result.NavmeshGroups)

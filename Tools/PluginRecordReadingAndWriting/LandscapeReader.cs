@@ -23,6 +23,7 @@ internal sealed class LandscapeReader
     private readonly LandRecordParts? _landParts;
 
     private readonly Dictionary<ExteriorCell, ILandscapeGetter> _landscapes = new();
+    private readonly Dictionary<ExteriorCell, PluginName> _landscapeWinners = new();
     private readonly Dictionary<ExteriorCell, ILandscapeGetter> _landscapesBelowNamedPlugin = new();
     private readonly Dictionary<ExteriorCell, List<LandscapeVersion>> _landscapeVersions = new();
     private readonly Dictionary<ExteriorCell, List<CellWaterCopy>> _cellWaterCopies = new();
@@ -79,7 +80,7 @@ internal sealed class LandscapeReader
     private void CollectLandscape(ICellGetter cell, ExteriorCell exteriorCell, PluginName plugin, bool belowNamedPlugin)
     {
         if (cell.Landscape is not { } landscape) return;
-        _landscapes.TryAdd(exteriorCell, landscape);
+        if (_landscapes.TryAdd(exteriorCell, landscape)) _landscapeWinners.Add(exteriorCell, plugin);
         if (belowNamedPlugin && ReadsLandVersions) _landscapesBelowNamedPlugin.TryAdd(exteriorCell, landscape);
         if (_scope.TerrainVersions) KeyedGroups.GetOrAddList(_landscapeVersions, exteriorCell).Add(new LandscapeVersion(plugin, landscape));
         if (_footprint.OverriddenLands.Count > 0 && _names.KeyOf(landscape.FormKey) is var landKey && _footprint.OverriddenLands.Contains(landKey))
@@ -102,6 +103,7 @@ internal sealed class LandscapeReader
 
     public LandscapeTerrain CreateTerrain() => new(
         _landscapes,
+        _landscapeWinners,
         _landWorldspaceOf,
         _scope.TerrainVersions ? _landscapeVersions : null,
         _scope.TerrainLayers ? _names : null,

@@ -13,7 +13,7 @@ public class WorkingCopyUseTests
     private static readonly string[] RoundDecidingSteps =
     [
         "Steps/RemoveObjectsRestingOnRemovedOnes", "Steps/OtherModsObjectsLeftWithoutSupport", "Steps/RemoveVisibleObjectsLeftBehind",
-        "Steps/RemoveInvisibleObjectsLeftBehind",
+        "Steps/RemoveInvisibleObjectsLeftBehind", "Steps/RestoreWhereRemoved",
     ];
 
     [Fact]
@@ -43,7 +43,7 @@ public class WorkingCopyUseTests
         Assert.Equal(
             [
                 "OtherModsObjectsLeftWithoutSupport", "RemovalDecisionList", "RemovalDecisionList.Contracts", "RemoveInvisibleObjectsLeftBehind",
-                "RemoveObjectsRestingOnRemovedOnes", "RemoveVisibleObjectsLeftBehind",
+                "RemoveObjectsRestingOnRemovedOnes", "RemoveVisibleObjectsLeftBehind", "RestoreWhereRemoved",
             ],
             uses);
     }

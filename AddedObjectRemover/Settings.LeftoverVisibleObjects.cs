@@ -23,7 +23,7 @@ public class LeftoverVisibleObjectSettings : IVisibleLeftoverSettingsValues
     [SynthesisSettingName("Never remove these as visible objects left behind (ticked = kept)")]
     [SynthesisTooltip(
         "Ticked kinds are kept by this step (unless linked to a removed object); unticked kinds can be removed by it. "
-        + "Only this left-behind step is affected, not the too-close or changed-terrain removals; \"Also remove what rests on removed objects\" can still remove a ticked kind.\n"
+        + "They are also kept when an area is restored, even while this step is switched off. The too-close and changed-terrain removals are not affected; \"Also remove what rests on removed objects\" can still remove a ticked kind.\n"
         + "What \"Mod to clean up\" lists as always kept stays kept, ticked or not.")]
     public KeptVisibleObjectSettings AlwaysKeep { get; set; } = new();
 

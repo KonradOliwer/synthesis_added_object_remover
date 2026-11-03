@@ -74,7 +74,7 @@ internal sealed class MeshFiles(
         var failure = result.Failure ?? throw new UnreachableException("A read that did not succeed carries its failure.");
         if (failure.Kind == MeshReadError.EffectOnly)
         {
-            return new MeshBounds(null, result.Status, meshSource, hasFooterRoot, FailureKind: null, FailureExceptionType: null, result.CollisionLayers);
+            return new MeshBounds(null, result.Status, meshSource, hasFooterRoot, FailureKind: null, FailureExceptionType: null, result.CollisionLayers) { EffectBox = result.EffectBox };
         }
 
         problems.Add(failure.Kind == MeshReadError.NotFound

@@ -73,6 +73,9 @@ public class LogicPublicTypesTests
         ["OtherModsObjects.CreateRestingRule"] = "The objects others rest on, other mods' objects included, which the fit step asks.",
         ["OtherModsObjects.CreateDropTest"] = "Whether a target object holds up another, which the also-remove step's resting rule asks.",
         ["OtherModsObjects.CreateHoldersOfObjectsThatStay"] = "The objects that move away and hold up an object that stays, which the restore step asks.",
+        ["OtherModsObjects.CreateSettlingAfterLeftovers"] = "The step for other mods' objects settled again once the leftovers in restored areas are removed, which the restore step asks.",
+        ["VisibleLeftBehindObjects.CreateKindsAlwaysKept"] = "The kinds of shown objects the visible left-behind settings always keep, which the restore step asks before it removes a leftover.",
+        ["LeftBehindObjects.CreateKindsAlwaysKept"] = "The kinds of invisible objects the left-behind settings always keep, which the restore step asks before it removes a leftover.",
         ["WhereRemovedRestorer.MeasurementFailurePart"] = "The part the measurement failures in the worlds of what stays are recorded under; the world caches the restore step and its rules share take it.",
         ["PatchWriter.CreateNavmeshCheck"] = "The navmesh check of a trial write, which the restore step asks.",
     };

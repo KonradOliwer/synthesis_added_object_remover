@@ -76,6 +76,13 @@ public interface IObjectCaches
     /// </summary>
     IVisibleTargetObjects IndexVisibleTargets(IReadOnlyList<TargetObject> targets);
 
+    /// <summary>
+    /// An index like <see cref="IndexVisibleTargets"/> that also holds the targets whose mesh holds only effect shapes, each by the box
+    /// of those shapes: what the game draws of the cleaned mod, for the rules that judge what of it still shows. Effect shapes collide
+    /// with nothing, so no collision rule reads it. Asked again with equal targets, the index built for them.
+    /// </summary>
+    IVisibleTargetObjects IndexShownTargets(IReadOnlyList<TargetObject> targets);
+
     /// <summary>The visible objects of <see cref="ObjectsOfAnyPlugin"/>; asking builds it.</summary>
     IVisibleObjectsOfAnyPlugin VisibleObjectsOfAnyPlugin();
 

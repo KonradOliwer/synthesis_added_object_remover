@@ -16,6 +16,7 @@ namespace AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 /// The base is an activator or an acoustic space. A primitive reference of such a base that stores no collision layer has the default
 /// layer of its kind (trigger, acoustic space), which does not stop characters.
 /// </param>
+/// <param name="EffectMeshBox">For an effect-only mesh, the bounds of its effect shapes; null otherwise or when they hold no point.</param>
 public sealed record BaseShape(
     Box Box,
     string? MeshPath,
@@ -24,8 +25,12 @@ public sealed record BaseShape(
     bool EffectOnlyMesh = false,
     bool InvisibleForLackOfGeometry = false,
     bool? CollisionBlocksMovement = null,
-    bool PrimitiveWithoutLayerIsWalkThrough = false)
+    bool PrimitiveWithoutLayerIsWalkThrough = false,
+    Box? EffectMeshBox = null)
 {
     /// <summary>A zero-size box at the origin: what a missing or unknown base measures as.</summary>
     public static readonly BaseShape Missing = new(Box.Zero, null, null, Resolved: false);
+
+    /// <summary>The box of what the game draws: the effect shapes' bounds for an effect-only mesh that has them, <see cref="Box"/> otherwise.</summary>
+    public Box ShownBox => EffectMeshBox ?? Box;
 }

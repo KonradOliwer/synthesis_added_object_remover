@@ -42,7 +42,8 @@ public enum PlacedGuard
 /// mod does not override.
 /// </param>
 /// <param name="Failure">Why the check stopped unexpectedly, which keeps the record too; null when it did not.</param>
-public sealed record PlacedRefusal(PlacedGuard Guard, RecordKey? By, string? Failure);
+/// <param name="Plugin">For ground that stays changed, the plugin of the winning LAND record that keeps it changed; null for any other guard.</param>
+public sealed record PlacedRefusal(PlacedGuard Guard, RecordKey? By, string? Failure, PluginName? Plugin = null);
 
 /// <summary>What a placed record's restore puts back, by the first of these its undone parts hold.</summary>
 public enum PlacedRestoreKind

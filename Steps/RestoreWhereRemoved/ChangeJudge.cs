@@ -32,8 +32,8 @@ internal sealed class ChangeJudge(
             return new PlacedChangeJudged(change, never, OldPlace: null, WhereItIsNow: null, Refused: null, IsRestored: false, kind, KeptForArea: null, placedBack);
         }
 
-        var oldPlace = areas.Judge(change.SpaceKey, change.Earlier.Placement.Position);
-        var whereItIsNow = change.Target is { } target ? areas.Judge(change.SpaceKey, targets[target.Index].Transform.Position) : null;
+        var oldPlace = areas.Judge(change.SpaceKey, OldPlaceOf(change));
+        var whereItIsNow = WhereItIsNowOf(change) is { } now ? areas.Judge(change.SpaceKey, now) : null;
         var keptForArea = VerdictKeeping(whereItIsNow is null ? [oldPlace.Verdict] : [oldPlace.Verdict, whereItIsNow.Verdict]);
         return new PlacedChangeJudged(change, Never: null, oldPlace, whereItIsNow, Refused: null, IsRestored: keptForArea is null, kind, keptForArea, placedBack);
     }
@@ -76,15 +76,11 @@ internal sealed class ChangeJudge(
     {
         if (NeverRestored(land.WinningMod, linkedFromCleanedMod: false, land.CellDeletedInAVersion) is { } never) return new LandAreasJudged(land, never, Quarters: []);
 
-        var spaces = spacesOnLand.GetValueOrDefault(land.Cell.WorldspaceKey, []);
+        var spaces = SpacesOn(land);
         return new LandAreasJudged(
             land,
             Never: null,
-            [
-                .. Enumerable.Range(0, TerrainQuadrants.Count)
-                    .Select(quarter => TerrainQuadrants.CentreOf(land.Cell.X, land.Cell.Y, quarter))
-                    .Select(centre => Quarter([.. spaces.Select(space => areas.Judge(space, new Vector3(centre, 0f)))])),
-            ]);
+            [.. Enumerable.Range(0, TerrainQuadrants.Count).Select(quarter => Quarter([.. spaces.Select(space => areas.Judge(space, QuarterCentreOf(land, quarter)))]))]);
     }
 
     /// <summary>
@@ -99,11 +95,49 @@ internal sealed class ChangeJudge(
             return new NavmeshChangeJudged(navmesh, never, Area: null, Undo: null, KeptForArea: null, NothingGoesBack: false);
         }
 
-        var shape = navmesh.Case == NavmeshCase.Deleted ? navmesh.Earlier : navmesh.Current;
-        if (shape is not { Vertices.IsEmpty: false } judged) return new NavmeshChangeJudged(navmesh, Never: null, Area: null, Undo: null, KeptForArea: null, NothingGoesBack: true);
-        var (min, max) = (judged.Vertices.Aggregate(Vector3.Min), judged.Vertices.Aggregate(Vector3.Max));
-        var area = areas.Judge(navmesh.SpaceKey, Vector3.Lerp(min, max, Halfway));
+        if (JudgedPointOf(navmesh) is not { } point) return new NavmeshChangeJudged(navmesh, Never: null, Area: null, Undo: null, KeptForArea: null, NothingGoesBack: true);
+        var area = areas.Judge(navmesh.SpaceKey, point);
         return new NavmeshChangeJudged(navmesh, Never: null, area, Undo: null, VerdictKeeping([area.Verdict]), NothingGoesBack: false);
+    }
+
+    /// <summary>The points a placed record whose areas let it go back was judged at; none for any other.</summary>
+    public IEnumerable<(RecordKey Space, Vector3 Point)> ClearedPoints(PlacedChangeJudged judged)
+    {
+        if (!judged.IsRestored) yield break;
+        var change = judged.Change;
+        yield return (change.SpaceKey, OldPlaceOf(change));
+        if (WhereItIsNowOf(change) is { } now) yield return (change.SpaceKey, now);
+    }
+
+    /// <summary>The point a cell record whose area lets it go back was judged at; none for any other.</summary>
+    public IEnumerable<(RecordKey Space, Vector3 Point)> ClearedPoints(CellChangeJudged judged) =>
+        judged.IsRestored ? [(judged.Change.SpaceKey, CentreOf(judged.Change))] : [];
+
+    /// <summary>The centres of the cleared quarters of a LAND record, in each space using its land.</summary>
+    public IEnumerable<(RecordKey Space, Vector3 Point)> ClearedPoints(LandAreasJudged judged) =>
+        Enumerable.Range(0, judged.Quarters.Length)
+            .Where(quarter => judged.Quarters[quarter].Verdict == AreaVerdict.Cleared)
+            .SelectMany(quarter => SpacesOn(judged.Change).Select(space => (space, QuarterCentreOf(judged.Change, quarter))));
+
+    /// <summary>The point a navmesh whose area is cleared was judged at; none for any other.</summary>
+    public IEnumerable<(RecordKey Space, Vector3 Point)> ClearedPoints(NavmeshChangeJudged judged) =>
+        judged is { Never: null, Area: not null, KeptForArea: null } && JudgedPointOf(judged.Change) is { } point ? [(judged.Change.SpaceKey, point)] : [];
+
+    private static Vector3 OldPlaceOf(RecordChangedByCleanedMod change) => change.Earlier.Placement.Position;
+
+    /// <returns>Null for a record that is no target.</returns>
+    private Vector3? WhereItIsNowOf(RecordChangedByCleanedMod change) => change.Target is { } target ? targets[target.Index].Transform.Position : null;
+
+    private ImmutableArray<RecordKey> SpacesOn(LandChangedByCleanedMod land) => spacesOnLand.GetValueOrDefault(land.Cell.WorldspaceKey, []);
+
+    private static Vector3 QuarterCentreOf(LandChangedByCleanedMod land, int quarter) => new(TerrainQuadrants.CentreOf(land.Cell.X, land.Cell.Y, quarter), 0f);
+
+    /// <returns>The centre of the navmesh's judged version's bounds; null when that version has no vertex.</returns>
+    private static Vector3? JudgedPointOf(NavmeshChangedByCleanedMod navmesh)
+    {
+        var shape = navmesh.Case == NavmeshCase.Deleted ? navmesh.Earlier : navmesh.Current;
+        if (shape is not { Vertices.IsEmpty: false } judged) return null;
+        return Vector3.Lerp(judged.Vertices.Aggregate(Vector3.Min), judged.Vertices.Aggregate(Vector3.Max), Halfway);
     }
 
     /// <summary>Cleared when no space says the cleaned mod's objects still stand and at least one says cleared.</summary>

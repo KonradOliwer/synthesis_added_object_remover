@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Skyrim;
 
@@ -11,7 +12,7 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 public class RestoreWhereRemovedRunTests
 {
     private const int Workers = 4;
-    private const float SmallSearchRadius = 1500f;
+    internal const float SmallSearchRadius = 1500f;
     private const string CellsFile = ReportFileNames.RestoredWhereRemovedCellsFileName;
 
     private static readonly int[] OtherWorkerCounts = [2, 8];
@@ -22,6 +23,33 @@ public class RestoreWhereRemovedRunTests
         var (_, run) = Run(SettingsOf(), RestoreWhereRemovedWorlds.CreateVillage);
 
         ExpectedOutputFiles.AssertMatches("restore-where-removed/Village", run.ToExpectedOutputLines());
+    }
+
+    /// <summary>The saved expected-output files drop the step-time lines, so the run's lines are read unmasked here.</summary>
+    [Fact]
+    public void TheDetailedLogTimesEachMainPartOfTheStepOnItsOwnStepTimeLine()
+    {
+        var log = new RecordingLogSink();
+        FixtureRun.Run(
+            SettingsOf(),
+            Workers,
+            log,
+            (dataFolder, release, listedPlugins) => new MeshFilesFactory(dataFolder, release, listedPlugins),
+            createLoadOrder: RestoreWhereRemovedWorlds.CreateVillage);
+
+        var parts = log.Sections
+            .SelectMany(section => section.Lines)
+            .Where(line => line.StartsWith("Step time: Restore where removed, ", StringComparison.Ordinal))
+            .Select(line => Regex.Match(line, @"^Step time: Restore where removed, (?<part>.+) in \d+\.\d+s\.$").Groups["part"].Value);
+        Assert.Equal(
+            [
+                "areas judged and plans made",
+                "world after removal",
+                "objects that stay and guards set up, with the first collision layer read",
+                "passes",
+                "placed guards in the passes",
+            ],
+            parts);
     }
 
     [Fact]
@@ -65,8 +93,14 @@ public class RestoreWhereRemovedRunTests
         Assert.StartsWith(nameof(MalformedRecordException), failure.Failure, StringComparison.Ordinal);
         Assert.Empty(outcome.RestoreWhereRemoved.Objects);
         Assert.NotEmpty(outcome.Removals);
-        Assert.Equal(healthy.Removals.Select(removal => removal.TargetIndex), outcome.Removals.Select(removal => removal.TargetIndex));
-        Assert.Equal(healthy.Written.Removed.Select(id => id.Index), outcome.Written.Removed.Select(id => id.Index));
+        var leftovers = healthy.Removals.OfType<ObjectWithReason.LeftoverInRestoredArea>().Select(removal => removal.TargetIndex).ToHashSet();
+        Assert.NotEmpty(leftovers);
+        Assert.Equal(
+            healthy.Removals.Where(removal => !leftovers.Contains(removal.TargetIndex)).Select(removal => removal.TargetIndex),
+            outcome.Removals.Select(removal => removal.TargetIndex));
+        Assert.Equal(
+            healthy.Written.Removed.Select(id => id.Index).Where(index => !leftovers.Contains(index)),
+            outcome.Written.Removed.Select(id => id.Index));
         Assert.Equal([failure], FailuresOf(outcome));
         AssertSameAsHealthy(healthy, outcome);
     }
@@ -134,6 +168,17 @@ public class RestoreWhereRemovedRunTests
         Assert.EndsWith($":{RestoreWhereRemovedWorlds.PatchOfTheCleanedModPlugin}])", rock, StringComparison.Ordinal);
         Assert.Contains(",kept: too close to objects that stay (", rock, StringComparison.Ordinal);
         Assert.DoesNotContain(run.Log, line => line.StartsWith("  Shown again: B_Rock", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AnObjectTheCleanedModDisabledStaysDisabledWhenAnObjectOfAnAddOnOfAPatchOfTheCleanedModStandsBesideIt()
+    {
+        var (_, run) = Run(SettingsOf(), RestoreWhereRemovedWorlds.CreateVillageWithATableOfAnotherModWhereARockStood);
+
+        ExpectedOutputFiles.AssertMatches("restore-where-removed/VillageWithATableOfAnotherMod", run.ToExpectedOutputLines());
+        var objects = Assert.Single(run.Reports, report => report.Name == ReportFileNames.RestoredWhereRemovedObjectsFileName);
+        var rock = Assert.Single(objects.Lines, line => line.Contains(",B_Rock,", StringComparison.Ordinal));
+        Assert.Contains(",kept: too close to objects that stay (A_Table ", rock, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -266,7 +311,7 @@ public class RestoreWhereRemovedRunTests
         }
     }
 
-    private static (RunOutcome Outcome, RunOutput Run) Run(Settings settings, Func<string, IReadOnlyList<ISkyrimMod>> createLoadOrder, int workers = Workers) =>
+    internal static (RunOutcome Outcome, RunOutput Run) Run(Settings settings, Func<string, IReadOnlyList<ISkyrimMod>> createLoadOrder, int workers = Workers) =>
         FixtureRun.Capture(settings, workers, createLoadOrder, earlierPatcherWrites: null, AreaPatchDump.Describe);
 
     private static Func<string, IReadOnlyList<ISkyrimMod>> NavmeshAndLand(NavmeshAndLandScenario scenario) =>
@@ -314,7 +359,7 @@ public class RestoreWhereRemovedRunTests
     }
 
     /// <summary>The cleaned mod's objects that stand too close to a city pad are removed; the left-behind step stays off so only the pads remove anything.</summary>
-    private static Settings SettingsOf(Action<RestoreWhereRemovedSettings>? changeRestore = null)
+    internal static Settings SettingsOf(Action<RestoreWhereRemovedSettings>? changeRestore = null)
     {
         var settings = new Settings
         {

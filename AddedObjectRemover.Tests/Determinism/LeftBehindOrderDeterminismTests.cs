@@ -31,7 +31,7 @@ public class LeftBehindOrderDeterminismTests
 
     private static readonly LeftBehindSettings Settings = new(
         new LeftBehindSurroundings(LookAround: 100, MinOccupiedDirections: 4, DirectionClearedPercent: 50, ClearedDirectionsPercent: 60),
-        NeverRemove: new HashSet<InvisibleObjectKind>());
+        NeverRemove: new NeverRemovedInvisibleKinds(new HashSet<InvisibleObjectKind>()));
 
     [Fact]
     public void EvaluateMatchesForReversedAndShuffledWorkOrders()

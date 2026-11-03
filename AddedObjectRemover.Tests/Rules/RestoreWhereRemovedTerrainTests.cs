@@ -605,15 +605,18 @@ public sealed class RestoreWhereRemovedTerrainTests
             .Apply(RoundKind.TooClose, [.. scene.Removals.Select(index => new ProposedRemoval(new TargetId(index), new TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);
         return RestoreLoopReuse.Plan(
             new(
-                new(collected, final, OtherModsObjectsResult.SwitchedOff),
+                new(collected, OtherModsObjectsResult.SwitchedOff),
+                final,
                 new(rules.WorldCaches, rules.TooCloseRule(), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),
+                rules.Leftovers(targets, final),
                 new(
-                    new TestRunCaches(Shapes, navmeshes: NoNavmeshes, visibleTargets: TestScenes.Create(targets, [], Shapes).IndexVisibleTargets),
+                    new TestRunCaches(Shapes, navmeshes: NoNavmeshes, shownTargets: TestScenes.Create(targets, [], Shapes).IndexShownTargets),
                     new TestLandPlugin(space => space == ChildSpace ? Space : space, _ => new LandHeights(null, null)),
                     Plugins,
                     TestTargets.TargetName),
                 new Execution(workers),
-                settings ?? Settings));
+                settings ?? Settings,
+                () => TimeSpan.Zero));
     }
 
     /// <summary>Target objects (each a block) with the ones removed, and the LAND facts, built up one by one.</summary>

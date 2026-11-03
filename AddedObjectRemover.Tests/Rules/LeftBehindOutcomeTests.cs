@@ -17,7 +17,7 @@ public class LeftBehindOutcomeTests
 
     private static LeftBehindSettings Config(int minOccupied = 4, int removedPercent = 60, params InvisibleObjectKind[] protectedKinds) => new(
         Rule(minOccupied, removedPercent),
-        NeverRemove: protectedKinds.ToHashSet());
+        NeverRemove: new NeverRemovedInvisibleKinds(protectedKinds.ToHashSet()));
 
     private static LeftBehindSurroundings Rule(int minOccupied = 4, int removedPercent = 60) =>
         new(LookAround: 1024, MinOccupiedDirections: minOccupied, DirectionClearedPercent: 50, ClearedDirectionsPercent: removedPercent);

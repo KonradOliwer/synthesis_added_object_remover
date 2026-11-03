@@ -35,11 +35,14 @@ internal static class BaseObjectRules
         _ => null,
     };
 
-    /// <summary>OBND box when present; a light whose model is only an effect (glow, light rays) stays a light.</summary>
-    internal static BaseShape ClassifyEffectOnlyShape(BaseFacts facts)
+    /// <summary>
+    /// OBND box when present, which the collision and terrain rules read; the effect shapes' bounds as what the game shows of it. A light
+    /// whose model is only an effect (glow, light rays) stays a light.
+    /// </summary>
+    internal static BaseShape ClassifyEffectOnlyShape(BaseFacts facts, Box? effectBox)
     {
         var kind = facts.Kind == BaseRecordKind.Light ? InvisibleObjectKind.Lights : (InvisibleObjectKind?)null;
-        return new BaseShape(facts.ObjectBounds ?? Box.Zero, null, kind, EffectOnlyMesh: true);
+        return new BaseShape(facts.ObjectBounds ?? Box.Zero, null, kind, EffectOnlyMesh: true, EffectMeshBox: effectBox);
     }
 
     /// <summary>Whether any of the mesh's collision layers stops characters; null when the mesh's collision was not read.</summary>

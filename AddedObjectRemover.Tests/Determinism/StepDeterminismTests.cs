@@ -335,7 +335,7 @@ public class StepDeterminismTests
 
     private static LeftBehindSettings CreateLeftBehindConfig() => new(
         new LeftBehindSurroundings(LookAround: 100, MinOccupiedDirections: 4, DirectionClearedPercent: 50, ClearedDirectionsPercent: 60),
-        NeverRemove: new HashSet<InvisibleObjectKind>());
+        NeverRemove: new NeverRemovedInvisibleKinds(new HashSet<InvisibleObjectKind>()));
 
     private static TriangleStore NewCache() => new(Shapes.ReadTriangles);
 

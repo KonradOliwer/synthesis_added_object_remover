@@ -1,6 +1,8 @@
 using System.Collections.Immutable;
 using System.Numerics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
+using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda.Plugins;
 
@@ -31,11 +33,14 @@ public class VisibleLeftBehindObjectsTests
     private static readonly TestStatic Block = new(new FormKey(OtherMod, 0x801), @"test\block.nif", SmallBlock);
     private static readonly TestStatic DoorBlock = new(new FormKey(OtherMod, 0x802), @"test\doorblock.nif", SmallBlock);
 
-    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(OtherMod, "VisibleLeftBehindObjectsData", Block, DoorBlock));
+    /// <summary>Water spray: a mesh whose only shape is drawn with an effect shader, as big as <see cref="Block"/>.</summary>
+    private static readonly TestStatic Spray = new(new FormKey(OtherMod, 0x803), @"test\spray.nif", SmallBlock, EffectOnly: true);
+
+    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(OtherMod, "VisibleLeftBehindObjectsData", Block, DoorBlock, Spray));
 
     private static readonly VisibleLeftBehindSettings Settings = new(
         new LeftBehindSurroundings(LookAround: 260, MinOccupiedDirections: 6, DirectionClearedPercent: 80, ClearedDirectionsPercent: 80),
-        NeverRemove: new HashSet<VisibleObjectKind>());
+        NeverRemove: new NeverRemovedVisibleKinds(new HashSet<VisibleObjectKind>()));
 
     /// <summary>Loose enough that removals in random worlds clear further objects, round after round.</summary>
     private static readonly VisibleLeftBehindSettings LooseSettings =
@@ -61,6 +66,32 @@ public class VisibleLeftBehindObjectsTests
         var proposal = Assert.Single(Proposals(result));
         Assert.Equal(new TargetId(0), proposal.Target);
         Assert.IsType<VisibleObjectSurroundingsRemoved>(proposal.Reason);
+    }
+
+    /// <summary>The cleaned mod's water spray, whose mesh holds only effect shapes, is left alone where its surroundings were removed.</summary>
+    [Fact]
+    public void AnObjectWhoseMeshHoldsOnlyEffectsIsRemovedWhenItsSurroundingsWereRemoved()
+    {
+        var targets = Ring(SixDirections).SetItem(0, SprayAt(0, Vector3.Zero));
+
+        var result = Find(targets, DecisionsRemoving(targets, 1, 2, 3, 4, 5, 6), Settings);
+
+        var evaluation = Assert.Single(result.Evaluations);
+        Assert.Equal((0, LeftBehindOutcome.RemovedSurroundingsRemoved), (evaluation.TargetIndex, evaluation.Decision));
+        Assert.Equal(new TargetId(0), Assert.Single(Proposals(result)).Target);
+    }
+
+    /// <summary>The cleaned mod's water sprays stand in four of the six directions around a block whose other neighbours were removed.</summary>
+    [Fact]
+    public void StandingObjectsWhoseMeshesHoldOnlyEffectsCountAsSurroundingsThatStay()
+    {
+        var targets = Ring(SixDirections);
+        var sprays = targets.Select(target => target.Id.Index is >= 1 and <= 4 ? SprayAt(target.Id.Index, target.Transform.Position) : target).ToImmutableArray();
+
+        var result = Find(sprays, DecisionsRemoving(sprays, 5, 6), Settings);
+
+        var evaluation = result.Evaluations.Single(check => check.TargetIndex == 0);
+        Assert.Equal((6, 2, LeftBehindOutcome.KeptSurroundingsMostlyKept), (evaluation.Surroundings.OccupiedCount, evaluation.Surroundings.RemovedCount, evaluation.Decision));
     }
 
     [Fact]
@@ -489,9 +520,9 @@ public class VisibleLeftBehindObjectsTests
         ImmutableArray<TargetObject> targets = [.. Ring(SixDirections).Select(target => target.Id.Index == 0 ? target with { Base = DoorBlock.Base } : target)];
         var bases = new KindsOfBases(new Dictionary<RecordKey, BaseRecordKind> { [DoorBlock.Base.Record] = BaseRecordKind.Container });
         var ticked = Find(
-            targets, DecisionsRemoving(targets, 1, 2, 3, 4, 5, 6), Settings with { NeverRemove = new HashSet<VisibleObjectKind> { VisibleObjectKind.Containers } }, bases: bases);
+            targets, DecisionsRemoving(targets, 1, 2, 3, 4, 5, 6), Settings with { NeverRemove = new NeverRemovedVisibleKinds(new HashSet<VisibleObjectKind> { VisibleObjectKind.Containers }) }, bases: bases);
         var unticked = Find(
-            targets, DecisionsRemoving(targets, 1, 2, 3, 4, 5, 6), Settings with { NeverRemove = new HashSet<VisibleObjectKind> { VisibleObjectKind.Furniture } }, bases: bases);
+            targets, DecisionsRemoving(targets, 1, 2, 3, 4, 5, 6), Settings with { NeverRemove = new NeverRemovedVisibleKinds(new HashSet<VisibleObjectKind> { VisibleObjectKind.Furniture }) }, bases: bases);
 
         var keptContainer = Assert.Single(ticked.Evaluations);
         Assert.Equal(LeftBehindOutcome.KeptProtectedType, keptContainer.Decision);
@@ -735,6 +766,9 @@ public class VisibleLeftBehindObjectsTests
     private static TargetObject Visible(int index, Vector3 position) =>
         TestTargets.Create(index, TestTargets.At(position), Block.Base, TestTargets.Space);
 
+    private static TargetObject SprayAt(int index, Vector3 position) =>
+        TestTargets.Create(index, TestTargets.At(position), Spray.Base, TestTargets.Space);
+
     /// <summary>East is 0 degrees and the directions go counter-clockwise, as in <see cref="DirectionSector"/>.</summary>
     private static Vector3 Offset(DirectionSector sector, float distance)
     {
@@ -770,7 +804,7 @@ public class VisibleLeftBehindObjectsTests
         Decide(targets, decisions, settings, others, workers, bases, followUp, timeSinceStart, surroundings).Result;
 
     /// <param name="followUp">By default one that proposes nothing.</param>
-    /// <param name="surroundings">The visible targets the caches index for the given targets; by default the scene's index among <paramref name="others"/>.</param>
+    /// <param name="surroundings">The shown targets the caches index for the given targets; by default the scene's index among <paramref name="others"/>.</param>
     /// <returns>The step's result, with its rounds added to <paramref name="decisions"/>.</returns>
     private static Decided<VisibleLeftBehindResult> Decide(
         ImmutableArray<TargetObject> targets,
@@ -789,7 +823,7 @@ public class VisibleLeftBehindObjectsTests
                 new TestRunCaches(
                     Shapes,
                     bases: bases ?? UnresolvedBases,
-                    visibleTargets: surroundings ?? Scene(targets, others ?? []).IndexVisibleTargets),
+                    shownTargets: surroundings ?? Scene(targets, others ?? []).IndexShownTargets),
                 followUp ?? new ScriptedFollowUp(),
                 timeSinceStart ?? (() => TimeSpan.Zero),
                 TargetWorkOrder.Of(targets),
@@ -874,7 +908,7 @@ public class VisibleLeftBehindObjectsTests
     private static ReferenceRounds FindByMeasuringEverythingAgain(RandomWorld world)
     {
         var index = Scene(world.Targets, []).VisibleTargets;
-        var rule = new VisibleLeftBehindRule(world.Targets, Shapes, UnresolvedBases, LooseSettings);
+        var rule = new VisibleLeftBehindRule(world.Targets, Shapes, UnresolvedBases, LooseSettings, new NothingAlwaysKept());
         var candidates = rule.Candidates(world.Start);
         var copy = world.Start.WorkingCopy();
         IRemovalDecisions view = world.Start;
@@ -961,6 +995,11 @@ public class VisibleLeftBehindObjectsTests
         public TimeSpan Read() => _now += ReadingStep;
 
         public void Advance(TimeSpan by) => _now += by;
+    }
+
+    private sealed class NothingAlwaysKept : IKindsAlwaysKept
+    {
+        public AlwaysKeptKind? KindKeeping(TargetObject target) => null;
     }
 
     private sealed class FailingSurroundings(IVisibleTargetObjects inner) : IVisibleTargetObjects

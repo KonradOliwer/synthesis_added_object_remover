@@ -1351,6 +1351,8 @@ public class ChangedTerrainObjectsTests
 
         public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => throw new NotSupportedException();
 
+        public PluginName? ReadTerrainWinner(ExteriorCell cell) => throw new NotSupportedException();
+
         public NavmeshWorldTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => throw new NotSupportedException();
 
         public NpcTraits? NpcTraitsOf(BaseKey npc) => throw new NotSupportedException();

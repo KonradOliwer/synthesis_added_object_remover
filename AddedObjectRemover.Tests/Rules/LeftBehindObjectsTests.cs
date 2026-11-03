@@ -24,7 +24,7 @@ public class LeftBehindObjectsTests
 
     private static readonly LeftBehindSettings Settings = new(
         new LeftBehindSurroundings(LookAround: 1024, MinOccupiedDirections: 4, DirectionClearedPercent: 50, ClearedDirectionsPercent: 60),
-        NeverRemove: new HashSet<InvisibleObjectKind>());
+        NeverRemove: new NeverRemovedInvisibleKinds(new HashSet<InvisibleObjectKind>()));
 
     private static readonly BaseKey XMarker = TestVisibility.TaggedBase(ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers));
 
@@ -273,7 +273,7 @@ public class LeftBehindObjectsTests
     /// <summary>The marker moves after the left-behind step kept every marker, over a navmesh square around the targets' space origin.</summary>
     private static Decided<MarkerMoves> DecideMoves(MarkerMoveSettings settings, Func<IVisibleObjectsOfAnyPlugin>? objectsOfAnyPlugin = null) =>
         DecideMoves(
-            Find(StartDecisions(), Settings with { NeverRemove = new HashSet<InvisibleObjectKind> { InvisibleObjectKind.XMarkers } }),
+            Find(StartDecisions(), Settings with { NeverRemove = new NeverRemovedInvisibleKinds(new HashSet<InvisibleObjectKind> { InvisibleObjectKind.XMarkers }) }),
             settings,
             objectsOfAnyPlugin,
             new Dictionary<RecordKey, List<CellNavmesh>> { [TestTargets.Space] = [new CellNavmesh(new RecordKey(TestTargets.TargetName, 0x400), (0, 0), SquareNavmesh(1000))] });
@@ -360,6 +360,8 @@ public class LeftBehindObjectsTests
         public float[]? ReadTerrain(ExteriorCell cell) => throw new NotSupportedException();
 
         public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => throw new NotSupportedException();
+
+        public PluginName? ReadTerrainWinner(ExteriorCell cell) => throw new NotSupportedException();
 
         public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new NotSupportedException();
 

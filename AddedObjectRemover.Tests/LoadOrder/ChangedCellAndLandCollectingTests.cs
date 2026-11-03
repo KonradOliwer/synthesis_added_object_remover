@@ -431,7 +431,7 @@ public sealed class ChangedCellAndLandCollectingTests
             var cleared = TestAreaShares.Quarter(AreaVerdict.Cleared);
             var land = new LandAreasJudged(ChangedLandOf(collected), Never: null, [cleared, cleared, cleared, cleared]);
             var judged = new TerrainUndoPlan([land], _ => new LandHeights(null, null), HeightTolerance, blendDistance: 0f).Judged();
-            return new RestoreWhereRemovedResult(StepOutcome.Performed, [], [], judged, [], [], Passes: 1, DoorsLeftRemoved: [], Failures: []);
+            return new RestoreWhereRemovedResult(StepOutcome.Performed, [], [], judged, [], [], Passes: 1, DoorsLeftRemoved: [], Failures: [], RestoreWhereRemovedTimes.None, Leftovers: [], OtherModsObjectsResult.SwitchedOff);
         });
 
         var written = Assert.Single(patch.EnumerateMajorRecords<ILandscapeGetter>());
@@ -588,7 +588,7 @@ public sealed class ChangedCellAndLandCollectingTests
             StepOutcome.Performed,
             [],
             [new CellChangeJudged(changed, [.. changed.Parts.Where(part => part.Outcome is PartOutcome.Undo)], null, cleared, WaterKeptBy: null, IsRestored: true, KeptForArea: null)],
-            [], [], [], Passes: 1, DoorsLeftRemoved: [], Failures: []);
+            [], [], [], Passes: 1, DoorsLeftRemoved: [], Failures: [], RestoreWhereRemovedTimes.None, Leftovers: [], OtherModsObjectsResult.SwitchedOff);
     });
 
     /// <summary>Collects, judges what goes back with the given judging and writes the patch.</summary>

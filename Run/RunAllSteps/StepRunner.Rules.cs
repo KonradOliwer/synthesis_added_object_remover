@@ -7,12 +7,15 @@ using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
+using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
+using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects;
+using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals;
@@ -88,25 +91,34 @@ public static partial class StepRunner
             new(trust.AcceptedWorldWithoutCleanedMod, scope.Environment.Plugins, scope.Plugin, runCaches.Shapes, scope.Settings.ChangedObjectCollision.ChangedTerrain));
 
     /// <remarks>The restore's rules share the world caches, which record measurement failures under the part the step names.</remarks>
+    /// <param name="afterFits">The decisions with every fit.</param>
+    /// <param name="markerMoves">The decisions with every round and every move.</param>
     private static WhereRemovedRestorer.Input CreateRestoreInput(
         RunScope scope,
         IRunCaches runCaches,
         ModTrustTable trust,
         OtherModsObjects.SupportJudging support,
         CollectedObjects collected,
+        IRemovalDecisions afterFits,
         OtherModsObjectsResult otherModsObjects,
-        IRemovalDecisions final)
+        Decided<MarkerMoves> markerMoves)
     {
         var worldCaches = CreateWorldCaches(scope, RemovalCauseSelector.MeasurementRules(scope.UnexpectedErrors, WhereRemovedRestorer.MeasurementFailurePart()));
         return new WhereRemovedRestorer.Input(
-            new(collected, final, otherModsObjects),
+            new(collected, otherModsObjects),
+            markerMoves.Decisions,
             new(
                 worldCaches,
                 TooCloseObjects.CreateTooCloseToWhatStaysRule(CreateWorldRuleInput(runCaches, worldCaches)),
                 OtherModsObjects.CreateHoldersOfObjectsThatStay(new(support, worldCaches)),
                 PatchWriter.CreateNavmeshCheck(scope.Plugin, scope.Environment.PatchWriting)),
+            new(
+                VisibleLeftBehindObjects.CreateKindsAlwaysKept(new(runCaches, scope.Settings.NeverRemovedVisibleKinds)),
+                LeftBehindObjects.CreateKindsAlwaysKept(new(runCaches, scope.Settings.NeverRemovedInvisibleKinds)),
+                OtherModsObjects.CreateSettlingAfterLeftovers(new(support, afterFits, scope.Settings.AlsoRemove, CreateAlsoRemoveRoundsAfter(scope, runCaches)))),
             new(runCaches, scope.Plugin, scope.Environment.Plugins, trust.CleanedMod),
             scope.Settings.Execution,
-            scope.Settings.RestoreWhereRemoved);
+            scope.Settings.RestoreWhereRemoved,
+            scope.Environment.TimeSinceStart);
     }
 }

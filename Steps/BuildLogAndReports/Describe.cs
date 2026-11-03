@@ -128,6 +128,7 @@ internal static class Describe
         ObjectWithReason.VisibleLeftBehind { Evaluation: var evaluation } => $"visible, {LeftBehindOutcomeText.DescribeReason(evaluation)}",
         ObjectWithReason.LeftBehind { Evaluation: var evaluation } => $"invisible, {LeftBehindReason(evaluation)}",
         ObjectWithReason.LinkedTo linked => $"linked to {FateOf(final, linked.LinkedToTargetIndex)} {RecordNames.Describe(world.Targets[linked.LinkedToTargetIndex])}",
+        ObjectWithReason.LeftoverInRestoredArea => RestoreWhereRemovedText.LeftoverReason,
         _ => throw new UnreachableException($"Unknown removal type {removal.GetType().Name}."),
     };
 

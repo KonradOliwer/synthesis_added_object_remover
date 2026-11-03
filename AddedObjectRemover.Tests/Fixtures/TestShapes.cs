@@ -13,7 +13,9 @@ namespace AddedObjectRemover.Tests.Fixtures;
 /// <param name="Collision">The layer of the mesh's collision rigid body; null for a mesh without collision.</param>
 /// <param name="Bounds">The record's object bounds, whole units; null for none set.</param>
 /// <param name="IsMarker">The record carries the engine's IsMarker flag.</param>
-internal sealed record TestStatic(FormKey FormKey, string Model, IReadOnlyList<MeshTriangle> Triangles, SkyrimLayer? Collision = null, Box? Bounds = null, bool IsMarker = false)
+/// <param name="EffectOnly">The mesh draws its triangles with an effect shader only, like water spray.</param>
+internal sealed record TestStatic(
+    FormKey FormKey, string Model, IReadOnlyList<MeshTriangle> Triangles, SkyrimLayer? Collision = null, Box? Bounds = null, bool IsMarker = false, bool EffectOnly = false)
 {
     public BaseKey Base => new(FormKey.ToRecordKey(), BaseLinkKind.PlaceableObject);
 }
@@ -46,7 +48,7 @@ internal static class TestShapes
         }
 
         var dataPath = Path.Combine(AppContext.BaseDirectory, dataFolderName);
-        foreach (var model in statics) WriteMesh(dataPath, model.Model, model.Triangles, model.Collision);
+        foreach (var model in statics) WriteMesh(dataPath, model.Model, model.Triangles, model.Collision, model.EffectOnly);
         return dataPath;
     }
 
@@ -75,10 +77,15 @@ internal static class TestShapes
 
     /// <summary>Writes a loose NIF of the triangles at the model path under the Data folder; without triangles it holds no shape to render.</summary>
     /// <param name="collision">The layer of a collision rigid body on the root node; null for none.</param>
-    public static void WriteMesh(string dataPath, string model, IReadOnlyList<MeshTriangle> triangles, SkyrimLayer? collision = null)
+    /// <param name="effectOnly">The shape is drawn with an effect shader.</param>
+    public static void WriteMesh(string dataPath, string model, IReadOnlyList<MeshTriangle> triangles, SkyrimLayer? collision = null, bool effectOnly = false)
     {
         var nif = TestNifs.CreateWithRoot();
-        if (triangles.Count > 0) TestNifs.AddShape(nif, TestNifs.Root(nif), triangles);
+        if (triangles.Count > 0)
+        {
+            var shape = TestNifs.AddShape(nif, TestNifs.Root(nif), triangles);
+            if (effectOnly) TestNifs.AddEffectShader(nif, shape);
+        }
         if (collision is { } layer) TestNifs.AddRigidBodyCollision(nif, TestNifs.Root(nif), layer);
         var meshPath = Path.Combine(dataPath, MeshFileSource.NormalizeMeshPath(model).Replace('\\', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(Path.GetDirectoryName(meshPath)!);

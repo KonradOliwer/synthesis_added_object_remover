@@ -221,7 +221,7 @@ public sealed class StartSetupTooCloseSectionsTests
         settings.RestoreWhereRemoved = new RestoreWhereRemovedSettings();
         Assert.Equal(
             "Restore where the cleaned mod was removed: other mods' objects, terrain, cell settings, navmeshes; "
-            + "an area 10000 units wide counts as cleared when at most 0.1% of the cleaned mod's objects there still stand, by size; "
+            + "an area 10000 units wide counts as cleared when at most 1% of the cleaned mod's objects there still stand by size and at most 5% by number; "
             + "terrain edges blended over 256 units.",
             RestoreLine());
 
@@ -229,11 +229,11 @@ public sealed class StartSetupTooCloseSectionsTests
         {
             RestoreOtherModsObjects = false,
             RestoreTerrain = false,
-            ClearedArea = new ClearedAreaSettings { SearchRadius = 2048f, MaxStandingPercent = 2.5f, Measure = ClearedAreaMeasure.ObjectCount },
+            ClearedArea = new ClearedAreaSettings { SearchRadius = 2048f, MaxStandingSizePercent = 2.5f, MaxStandingCountPercent = 10f, SharesThatMustPass = ClearedAreaShares.Either },
         };
         Assert.Equal(
             "Restore where the cleaned mod was removed: cell settings, navmeshes; "
-            + "an area 4096 units wide counts as cleared when at most 2.5% of the cleaned mod's objects there still stand, by count.",
+            + "an area 4096 units wide counts as cleared when at most 2.5% of the cleaned mod's objects there still stand by size or at most 10% by number.",
             RestoreLine());
     }
 

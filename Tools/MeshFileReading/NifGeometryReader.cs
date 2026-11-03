@@ -89,7 +89,7 @@ internal sealed class NifGeometryReader
         var shapes = CollectWithRetry(blocks, parentOf, flags, root.Index, includeTriangles, inclusion);
         var result = ToResult(shapes);
         var measured = !includeTriangles && result.Status == MeshReadStatus.EffectOnly
-            ? WithEffectBounds(result, blocks, parentOf, flags, root.Index, inclusion)
+            ? MeasureEffects(shapes.Stats.ToCounts(), blocks, parentOf, flags, root.Index, inclusion)
             : result;
         return measured with
         {
@@ -126,13 +126,17 @@ internal sealed class NifGeometryReader
 
     /// <summary>
     /// The result with the bounds of the mesh's effect shapes, collected as <paramref name="inclusion"/> says but counting only effect
-    /// shapes; unchanged when they hold no valid point.
+    /// shapes. Effect shapes that hold no point are drawn nowhere (unreachable, hidden, or under a marker node), so the mesh has no
+    /// render geometry, as a mesh of such solid shapes has none; effect shapes with invalid coordinates fail the read, as solid ones do.
     /// </summary>
-    private NifReadResult WithEffectBounds(
-        NifReadResult effectOnly, List<INiObject> blocks, Dictionary<int, int> parentOf, AvObjectFlags flags, int rootIndex, ShapeInclusion inclusion)
+    /// <param name="shapes">How the first pass, which left the effect shapes out, counted the mesh's shapes.</param>
+    private NifReadResult MeasureEffects(
+        ShapeCounts shapes, List<INiObject> blocks, Dictionary<int, int> parentOf, AvObjectFlags flags, int rootIndex, ShapeInclusion inclusion)
     {
         var effects = CollectWithRetry(blocks, parentOf, flags, rootIndex, includeTriangles: false, inclusion.WithOnlyEffectShapesCounted());
-        return effects.Bounds is { Any: true, Invalid: null } bounds ? effectOnly with { EffectBox = Box.FromCorners(bounds.Min, bounds.Max) } : effectOnly;
+        if (effects.Bounds.Invalid is { } fault) return NifReadResult.Failed(MeshReadFailure.InvalidCoordinates(fault));
+        if (!effects.Bounds.Any) return NifReadResult.WithoutRenderGeometry(shapes);
+        return NifReadResult.WithEffectsOnly(shapes) with { EffectBox = Box.FromCorners(effects.Bounds.Min, effects.Bounds.Max) };
     }
 
     /// <summary>

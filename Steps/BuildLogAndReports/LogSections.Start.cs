@@ -176,9 +176,17 @@ internal static partial class LogSections
         var area = restore.ClearedArea;
         var terrainEdges = restore.Terrain ? $"; terrain edges blended over {restore.TerrainEdgeBlendDistance} units" : string.Empty;
         return $"{group}: {string.Join(Describe.ListSeparator, RestoredKindNames(restore))}; "
-            + $"an area {area.SearchRadius * 2} units wide counts as cleared when at most {area.MaxStandingPercent}% of the cleaned mod's objects there still stand, "
-            + $"by {ClearedAreaText.MeasureName(area.Measure)}{terrainEdges}.";
+            + $"an area {area.SearchRadius * 2} units wide counts as cleared when at most {area.MaxStandingSizePercent}% of the cleaned mod's objects there still stand by size "
+            + $"{SharesJoin(area.SharesThatMustPass)} at most {area.MaxStandingCountPercent}% by number{terrainEdges}.";
     }
+
+    /// <summary>The word that joins the two limits: both must hold, or either is enough.</summary>
+    private static string SharesJoin(ClearedAreaShares shares) => shares switch
+    {
+        ClearedAreaShares.Both => "and",
+        ClearedAreaShares.Either => "or",
+        _ => throw new UnreachableException($"Unknown cleared-area shares {shares}."),
+    };
 
     private static IEnumerable<string> RestoredKindNames(WhereRemovedRestoreSettings restore)
     {

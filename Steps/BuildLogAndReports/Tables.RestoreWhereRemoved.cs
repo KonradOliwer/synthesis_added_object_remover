@@ -9,9 +9,9 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 internal static partial class Tables
 {
     /// <summary>The share of an area: objects, standing, size, standing size, standing percent and verdict.</summary>
-    private const int AreaColumnCount = 6;
+    private const int AreaColumnCount = 7;
 
-    private static readonly ImmutableArray<string> AreaHeader = ["objects", "standing", "size", "standingSize", "standingPercent", "verdict"];
+    private static readonly ImmutableArray<string> AreaHeader = ["objects", "standing", "size", "standingSize", "standingPercentByCount", "standingPercentBySize", "verdict"];
 
     private static readonly ImmutableArray<string> RestoredWhereRemovedObjectsHeader =
     [
@@ -231,7 +231,8 @@ internal static partial class Tables
                 Int(share.Standing),
                 Number(share.Size),
                 Number(share.StandingSize),
-                Number((float)share.StandingPercent),
+                Number((float)share.CountPercent),
+                Number((float)share.SizePercent),
                 Quote(share.Verdict.ToString()),
             ]);
 

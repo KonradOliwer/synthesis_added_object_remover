@@ -5,8 +5,10 @@ using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 /// <param name="SearchRadius">How far, horizontally, around a judged point the cleaned mod's objects count as its area.</param>
-/// <param name="MaxStandingPercent">The share of the area's weight, in percent (0.1 is a tenth of a percent), that may still stand for the area to count as cleared.</param>
-public sealed record ClearedArea(float SearchRadius, double MaxStandingPercent, ClearedAreaMeasure Measure);
+/// <param name="MaxStandingSizePercent">The share of the area's objects by size, in percent (0.1 is a tenth of a percent), that may still stand.</param>
+/// <param name="MaxStandingCountPercent">The share of the area's objects by number, in percent, that may still stand.</param>
+/// <param name="SharesThatMustPass">Whether both shares, or either, must be at most their limits for the area to count as cleared.</param>
+public sealed record ClearedArea(float SearchRadius, double MaxStandingSizePercent, double MaxStandingCountPercent, ClearedAreaShares SharesThatMustPass);
 
 /// <param name="OtherModsObjects">Whether other mods' placed objects the cleaned mod changed go back.</param>
 /// <param name="Terrain">Whether heights, vertex colours and ground textures go back.</param>

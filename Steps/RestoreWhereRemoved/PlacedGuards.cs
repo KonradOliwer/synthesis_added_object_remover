@@ -19,7 +19,7 @@ internal sealed record OtherKindsAsPlanned(
 
 /// <summary>What one pass of the placed guards found.</summary>
 /// <param name="Found">By candidate index; null for one that passes or no longer goes back.</param>
-/// <param name="CausesLeftOut">The causes the too-close rule left out in the pass, which the next pass compares with its own.</param>
+/// <param name="CausesLeftOut">The causes the too-close rules left out for every candidate in the pass, which the next pass compares with its own.</param>
 internal sealed record PlacedChecks(PlacedRefusal?[] Found, IReadOnlySet<OtherId> CausesLeftOut);
 
 /// <summary>What the placed guards read besides the after-removal world.</summary>
@@ -42,8 +42,9 @@ internal sealed record PlacedGuardInputs(
 
 /// <summary>
 /// The guards of the placed records whose areas let them go back, each checked as it goes back, with only its undone parts taken
-/// from its earlier version. The candidates that go back together, and the objects a removal step restored to their earlier version,
-/// are never checked against each other: they all end where they stood together before the cleaned mod. A refused candidate stays
+/// from its earlier version. The candidates that go back together are never checked against each other, and a candidate that goes
+/// back whole is not checked against the objects a removal step restored to their earlier version: they end where they stood together
+/// before the cleaned mod. A candidate that keeps a part a later plugin changed is checked against those objects. A refused candidate stays
 /// where it stands now, among what stays; an object that ends removed in the final world (<see cref="FinalPresence"/>) causes
 /// nothing. Thread-safe.
 /// </summary>
@@ -68,7 +69,8 @@ internal sealed class PlacedGuards(
     public PlacedChecks CheckGoingBack(IReadOnlySet<int> goingBack, OtherKindsAsPlanned plans, IReadOnlySet<OtherId>? causesLeftOutBefore)
     {
         var causesLeftOut = CausesLeftOut(goingBack);
-        var rule = inputs.TooClose(causesLeftOut.OrderBy(cause => cause.Index));
+        var rules = CreateTooCloseRules(causesLeftOut, goingBack);
+        // Covers the candidates that go back whole too: the restored causes they also leave out are the same in every pass.
         var checkTooClose = causesLeftOutBefore is null ? null : CandidatesReaching([.. causesLeftOutBefore.Except(causesLeftOut).OrderBy(cause => cause.Index)], goingBack);
         var holdingInvisible = _holdingInvisible.Value;
         var carrying = FindCandidatesCarryingObjectsThatStay(goingBack);
@@ -78,10 +80,32 @@ internal sealed class PlacedGuards(
             execution,
             world.Restored.Length,
             candidate => goingBack.Contains(candidate)
-                ? FirstRefusal(candidate, checkTooClose?.Contains(candidate) == false ? null : rule, goingBack, plans, staysChanged, holdingInvisible, carrying, doorNavmeshFaults)
+                ? FirstRefusal(candidate, checkTooClose?.Contains(candidate) == false ? null : rules.For(candidate), goingBack, plans, staysChanged, holdingInvisible, carrying, doorNavmeshFaults)
                 : null,
             ParallelMap.AutomaticRangeSize);
         return new PlacedChecks(found, causesLeftOut);
+    }
+
+    /// <summary>
+    /// The too-close rules of one pass: a candidate that goes back whole is not checked against the objects a removal step restored, as
+    /// they stood together before the cleaned mod; one that keeps a part a later plugin changed is. Each rule is made only when a
+    /// candidate going back needs it.
+    /// </summary>
+    /// <param name="causesLeftOut">The causes left out for every candidate.</param>
+    private TooCloseRules CreateTooCloseRules(HashSet<OtherId> causesLeftOut, IReadOnlySet<int> goingBack)
+    {
+        IPlacementRule? Create(IEnumerable<OtherId> leftOut, bool goBackWhole) =>
+            goingBack.Any(candidate => world.GoBackWhole[candidate] == goBackWhole) ? inputs.TooClose(leftOut.Distinct().OrderBy(cause => cause.Index)) : null;
+
+        return new TooCloseRules(world.GoBackWhole, Create(causesLeftOut.Concat(world.RestoredCauses), goBackWhole: true), Create(causesLeftOut, goBackWhole: false));
+    }
+
+    /// <param name="Whole">For the candidates that go back whole; null when none of them goes back.</param>
+    /// <param name="KeepingLaterParts">For the others; null when none of them goes back.</param>
+    private sealed record TooCloseRules(ImmutableArray<bool> GoBackWhole, IPlacementRule? Whole, IPlacementRule? KeepingLaterParts)
+    {
+        public IPlacementRule For(int candidate) =>
+            (GoBackWhole[candidate] ? Whole : KeepingLaterParts) ?? throw new UnreachableException($"No too-close rule was made for candidate {candidate}, which goes back.");
     }
 
     /// <param name="rule">Null when the too-close rule needs no check.</param>
@@ -110,14 +134,10 @@ internal sealed class PlacedGuards(
             ?? doors.Check(candidate, goingBack, plans.NavmeshesGoingBack, doorNavmeshFaults);
     }
 
-    /// <summary>
-    /// The causes that cause no removals: the copies of the candidates going back, which move away, the objects a removal step
-    /// restored, and those that end removed in the final world.
-    /// </summary>
+    /// <summary>The causes that cause no removals for any candidate: the copies of the candidates going back, which move away, and those that end removed in the final world.</summary>
     private HashSet<OtherId> CausesLeftOut(IReadOnlySet<int> goingBack) =>
     [
         .. world.CauseCopiesNowOf(goingBack),
-        .. world.RestoredCauses,
         .. world.World.OtherModObjects.Where(cause => presence.EndsRemoved(cause.Key, goingBack.Contains)).Select(cause => cause.Id),
     ];
 

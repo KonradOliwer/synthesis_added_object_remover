@@ -61,7 +61,7 @@ public sealed class RestoreLoopTests
         Terrain: true,
         Cells: true,
         Navmeshes: true,
-        new ClearedArea(SearchRadius: 1000f, MaxStandingPercent: 0.1, ClearedAreaMeasure.ObjectCount),
+        new ClearedArea(SearchRadius: 1000f, MaxStandingSizePercent: 0.1, MaxStandingCountPercent: 0.1, ClearedAreaShares.Both),
         TerrainEdgeBlendDistance: 0f,
         HeightChangeTolerance: 8f,
         WaterHeightChangeTolerance: 8f,

@@ -12,7 +12,7 @@ public enum MeshReadStatus
     /// <summary>The mesh parsed fine but has no visible render geometry (e.g. only editor-marker shapes).</summary>
     NoRenderGeometry,
 
-    /// <summary>The mesh's only render geometry uses effect shaders (fog, light rays, water spray, mist planes).</summary>
+    /// <summary>The mesh's only render geometry uses effect shaders (fog, light rays, embers, mist planes).</summary>
     EffectOnly,
 }
 
@@ -39,6 +39,6 @@ public sealed record MeshBounds(
     /// <summary>The failure as the run statistics count it; null when the mesh did not fail.</summary>
     public MeshFailureCategory? FailureCategory => FailureKind is { } kind ? new MeshFailureCategory(kind, FailureExceptionType) : null;
 
-    /// <summary>For an effect-only mesh, the bounds of its effect shapes in mesh-local space; null otherwise or when they hold no point.</summary>
+    /// <summary>For an effect-only mesh, the bounds of its effect shapes in mesh-local space; null otherwise.</summary>
     public Box? EffectBox { get; init; }
 }

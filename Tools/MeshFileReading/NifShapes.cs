@@ -106,7 +106,7 @@ internal static class NifShapes
 
     /// <summary>
     /// Whether the shape's shader property block is a BSEffectShaderProperty: effect surfaces (fog,
-    /// light rays, water spray, mist planes) that are drawn but are nothing solid.
+    /// light rays, embers, mist planes) that are drawn but are nothing solid.
     /// </summary>
     private static bool HasEffectShader(INiShape shape, List<INiObject> blocks)
     {

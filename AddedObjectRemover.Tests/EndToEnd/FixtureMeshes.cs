@@ -17,10 +17,15 @@ internal static class FixtureMeshes
     /// <summary>Two pillars with a gap between them, so the mesh does not fill its own bounding box.</summary>
     public const string TwinPillarsModel = "aor\\twinpillars.nif";
 
+    /// <summary>A flat box three crates wide, drawn only with an effect shader, as mist is drawn; written by <see cref="WriteMist"/>.</summary>
+    public const string MistModel = "aor\\mist.nif";
+
     public const float BuildingHeight = 300f;
     public const float PadHeight = 20f;
 
     private const float PadWidth = 40f;
+    private const float MistWidth = 3 * CrateSize;
+    private const float MistHeight = 30f;
     private const float BuildingWidth = 400f;
     private const float PillarWidth = 40f;
     private const float PillarHeight = 200f;
@@ -36,20 +41,28 @@ internal static class FixtureMeshes
 
     public static void WriteAll(string dataFolder)
     {
-        Write(dataFolder, CrateModel, CrateBox);
-        Write(dataFolder, PadModel, PadBox);
-        Write(dataFolder, BuildingModel, BuildingBox);
-        Write(dataFolder, TwinPillarsModel, EastPillar, WestPillar);
+        Write(dataFolder, CrateModel, effectOnly: false, CrateBox);
+        Write(dataFolder, PadModel, effectOnly: false, PadBox);
+        Write(dataFolder, BuildingModel, effectOnly: false, BuildingBox);
+        Write(dataFolder, TwinPillarsModel, effectOnly: false, EastPillar, WestPillar);
     }
+
+    /// <summary>Kept out of <see cref="WriteAll"/>, so the worlds without mist read no effect-only mesh.</summary>
+    public static void WriteMist(string dataFolder) => Write(dataFolder, MistModel, effectOnly: true, StandingBox(MistWidth, MistHeight, Vector3.Zero));
 
     private static Box StandingBox(float width, float height, Vector3 footCentre) =>
         new(footCentre + new Vector3(-width / 2, -width / 2, 0f), footCentre + new Vector3(width / 2, width / 2, height));
 
+    /// <param name="effectOnly">Every shape is drawn with an effect shader.</param>
     /// <param name="parts">One NIF shape per box.</param>
-    private static void Write(string dataFolder, string model, params Box[] parts)
+    private static void Write(string dataFolder, string model, bool effectOnly, params Box[] parts)
     {
         var nif = TestNifs.CreateWithRoot();
-        foreach (var part in parts) TestNifs.AddShape(nif, TestNifs.Root(nif), TestMeshes.BoxTriangles(part));
+        foreach (var part in parts)
+        {
+            var shape = TestNifs.AddShape(nif, TestNifs.Root(nif), TestMeshes.BoxTriangles(part));
+            if (effectOnly) TestNifs.AddEffectShader(nif, shape);
+        }
         var path = Path.Combine(dataFolder, MeshesFolder, model.Replace('\\', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllBytes(path, TestNifs.Save(nif));

@@ -68,8 +68,8 @@ public class RunnerRulesTests
         ["PlacedNpcIndex.cs: var placedNpcs = spaceObjects.Where(rules.IsPlacedNpc).ToArray();"] = CacheIndexBuild,
         ["PlacedNpcIndex.cs: var spawning = ParallelResults.IndicesWhere(placedBodies, body => body != null);"] = CacheIndexBuild,
         ["PlacedNpcIndex.cs: npc.Base is { } baseKey ? bodies.GetBodies(baseKey.Record) : null;"] = CacheIndexBuild,
-        ["ObjectCaches.cs: AreTheCollectedObjects(targets) ? VisibleTargets : _indexes.Get(targets, () => new VisibleTargetObjects(targets, _shapes, _containment, _execution, IsVisible));"] =
-            "The collected objects have their index from the start; any other list of objects gets an index built once.",
+        ["ObjectCaches.cs: AreTheCollectedObjects(targets) ? ofTheCollectedObjects() : built.Get(targets, () => new VisibleTargetObjects(targets, _shapes, _containment, _execution, counts));"] =
+            "The collected objects have their index of each visibility built once; any other list of objects gets an index built once.",
         ["ObjectCaches.cs: ReferenceEquals(first, second) || (first is not null && second is not null && first.SequenceEqual(second));"] =
             "Two lists of target objects are the same list when they hold the same objects in the same order.",
         ["LoadOrderCaches.cs: public int CountEffectOnlyMeshes() => MeshFiles.Bounds.Computed().Count(mesh => mesh.Status == MeshReadStatus.EffectOnly);"] = CacheStatistics,

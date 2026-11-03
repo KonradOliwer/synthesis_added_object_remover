@@ -59,16 +59,24 @@ public class ClearedAreaSettings : IClearedAreaSettingsValues
     public float SearchRadius { get; set; } = SettingDefaults.ClearedAreaSearchRadius;
 
     [SynthesisOrder]
-    [SynthesisSettingName(SettingNames.MaxStandingPercent + SettingNames.PercentSuffix)]
+    [SynthesisSettingName(SettingNames.MaxStandingSizePercent + SettingNames.PercentSuffix)]
     [SynthesisTooltip(
-        "The area counts as cleared when at most this share of the cleaned mod's visible objects in it is still standing, measured as set below.\n"
-        + "0.1 is a tenth of a percent; 0 means none may stand. Decimals are allowed. 0-100.")]
-    public float MaxStandingPercent { get; set; } = SettingDefaults.ClearedAreaMaxStandingPercent;
+        "The share of the cleaned mod's objects in the area that may still stand, weighed by size: each object by the volume of its box.\n"
+        + "Effect-only objects such as fog add no size. 0 means none may stand. Decimals are allowed. 0-100.")]
+    public float MaxStandingSizePercent { get; set; } = SettingDefaults.ClearedAreaMaxStandingSizePercent;
 
     [SynthesisOrder]
-    [SynthesisSettingName(SettingNames.Measure)]
+    [SynthesisSettingName(SettingNames.MaxStandingCountPercent + SettingNames.PercentSuffix)]
     [SynthesisTooltip(
-        "ObjectSize: each object counts by the volume of its box, so a house counts for more than a bucket.\n"
-        + "ObjectCount: each object counts once.")]
-    public ClearedAreaMeasure Measure { get; set; } = SettingDefaults.AreaMeasure;
+        "The share of the cleaned mod's objects in the area that may still stand, counted by number: each object once, effect-only ones included.\n"
+        + "0 means none may stand. Decimals are allowed. 0-100.")]
+    public float MaxStandingCountPercent { get; set; } = SettingDefaults.ClearedAreaMaxStandingCountPercent;
+
+    [SynthesisOrder]
+    [SynthesisSettingName(SettingNames.SharesThatMustPass)]
+    [SynthesisTooltip(
+        "Both: the area counts as cleared only when the share by size and the share by number are each at most their limit.\n"
+        + "Either: one of them is enough. Either clears more areas: a large removed piece can then clear an area where many small pieces still stand,\n"
+        + "and those pieces are removed as leftovers.")]
+    public ClearedAreaShares SharesThatMustPass { get; set; } = SettingDefaults.SharesThatMustPass;
 }

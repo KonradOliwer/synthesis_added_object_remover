@@ -70,11 +70,11 @@ public class TooCloseObjectsTests
     private static readonly TooCloseSettings SizeOnlyMeshZone =
         new(BySize: true, Multiplier: 0f, ByDistance: false, DistanceInUnits: 0f, ZoneShape.ObjectShape, NpcHandling.Never);
 
-    /// <summary>Water spray as big as the boulder: a mesh whose only shape is drawn with an effect shader.</summary>
-    private static readonly TestStatic Spray = new(new FormKey(Mod, 0x708), @"test\spray.nif", Boulder.Triangles, EffectOnly: true);
+    /// <summary>Fog as big as the boulder: a mesh whose only shape is drawn with an effect shader.</summary>
+    private static readonly TestStatic Fog = new(new FormKey(Mod, 0x708), @"test\fog.nif", Boulder.Triangles, EffectOnly: true);
 
     private static readonly SkyrimMod Records = CreateRecords();
-    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(Records, "ClashesData", Table, Boulder, CollidingBoulder, Fern, Unreadable, Spray));
+    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(Records, "ClashesData", Table, Boulder, CollidingBoulder, Fern, Unreadable, Fog));
 
     private sealed record TooCloseScene(List<TargetObject> Targets, List<OtherObject> OtherModObjects);
 
@@ -119,19 +119,19 @@ public class TooCloseObjectsTests
         Assert.All(scene.Targets, target => Assert.Equal(found.GetValueOrDefault(target.Id), CheckOnce(rule, target, target.Placement).Clash));
     }
 
-    /// <summary>The cleaned mod's water spray inside another mod's boulder, and another mod's water spray around the cleaned mod's table.</summary>
+    /// <summary>The cleaned mod's fog inside another mod's boulder, and another mod's fog around the cleaned mod's table.</summary>
     [Theory]
     [InlineData(ZoneShape.BoundingBox)]
     [InlineData(ZoneShape.ObjectShape)]
     public void AnObjectWhoseMeshHoldsOnlyEffectsIsNeverTooCloseAndMakesNothingTooClose(ZoneShape zone)
     {
         var settings = new TooCloseSettings(BySize: true, Multiplier, ByDistance: true, DistanceInUnits: Distance, zone, NpcHandling.Never);
-        var ownSpray = new TooCloseScene([TestTargets.Create(0, TestTargets.At(Vector3.Zero, 0f), Spray.Base, TestTargets.Space)], [TestShapes.Placed(Mod, 0, Boulder.Base, Vector3.Zero)]);
-        var otherSpray = new TooCloseScene([TestTargets.Create(0, TestTargets.At(Vector3.Zero, 0f), Table.Base, TestTargets.Space)], [TestShapes.Placed(Mod, 0, Spray.Base, Vector3.Zero)]);
-        var otherBoulder = otherSpray with { OtherModObjects = [TestShapes.Placed(Mod, 0, Boulder.Base, Vector3.Zero)] };
+        var ownFog = new TooCloseScene([TestTargets.Create(0, TestTargets.At(Vector3.Zero, 0f), Fog.Base, TestTargets.Space)], [TestShapes.Placed(Mod, 0, Boulder.Base, Vector3.Zero)]);
+        var otherFog = new TooCloseScene([TestTargets.Create(0, TestTargets.At(Vector3.Zero, 0f), Table.Base, TestTargets.Space)], [TestShapes.Placed(Mod, 0, Fog.Base, Vector3.Zero)]);
+        var otherBoulder = otherFog with { OtherModObjects = [TestShapes.Placed(Mod, 0, Boulder.Base, Vector3.Zero)] };
 
-        Assert.Empty(FindWithFacade(ownSpray, settings).Proposals);
-        Assert.Empty(FindWithFacade(otherSpray, settings).Proposals);
+        Assert.Empty(FindWithFacade(ownFog, settings).Proposals);
+        Assert.Empty(FindWithFacade(otherFog, settings).Proposals);
         Assert.NotEmpty(FindWithFacade(otherBoulder, settings).Proposals);
     }
 

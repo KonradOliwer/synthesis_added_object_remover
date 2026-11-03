@@ -132,6 +132,31 @@ public class NifReadingTests
         Assert.Equal(Crate, result.EffectBox);
     }
 
+    /// <summary>The game draws nothing under an editor marker node, so a mesh whose only effect shape lies there draws nothing at all.</summary>
+    [Fact]
+    public void AMeshWhoseOnlyEffectShapeIsUnderAnEditorMarkerHasNoRenderGeometry()
+    {
+        var nif = TestNifs.CreateWithRoot();
+        var marker = TestNifs.AddNode(nif, TestNifs.Root(nif), "EditorMarker", Vector3.Zero);
+        TestNifs.AddEffectShader(nif, TestNifs.AddShape(nif, marker, TestMeshes.BoxTriangles(Crate)));
+
+        var result = new NifGeometryReader().ReadGeometry(TestNifs.Save(nif), includeTriangles: false, BaseObjectShapes.SolidShapes);
+
+        Assert.Equal((MeshReadStatus.NoRenderGeometry, MeshReadError.NoRenderGeometry, (Box?)null), (result.Status, result.Failure!.Kind, result.EffectBox));
+    }
+
+    [Fact]
+    public void AnEffectShapeWithAVertexBeyondTheLimitFailsTheReadWithTheLimit()
+    {
+        var nif = TestNifs.CreateWithRoot();
+        TestNifs.AddEffectShader(nif, TestNifs.AddShape(nif, TestNifs.Root(nif), TestMeshes.BoxTriangles(new Box(Vector3.Zero, new Vector3(2e6f, 1, 1)))));
+
+        var result = new NifGeometryReader().ReadGeometry(TestNifs.Save(nif), includeTriangles: false, BaseObjectShapes.SolidShapes);
+
+        Assert.Equal(MeshReadStatus.Failed, result.Status);
+        Assert.Equal(MeshReadFailure.InvalidCoordinates(new CoordinateFault(NonFinite: false, BoundsAccumulator.MaxCoordinate)), result.Failure);
+    }
+
     [Fact]
     public void MatchingStripLengthsGiveTriangles()
     {

@@ -9,4 +9,7 @@ public static class SharePercent
 
     /// <param name="percent">A percentage that may be fractional, such as 0.1 for a tenth of a percent.</param>
     public static bool AtMost(double part, double whole, double percent) => part * Percent.PerWhole <= percent * whole;
+
+    /// <returns>The percent the part is of the whole; 0 when the whole is nothing.</returns>
+    public static double Of(double part, double whole) => whole > 0 ? part / whole * Percent.PerWhole : 0;
 }

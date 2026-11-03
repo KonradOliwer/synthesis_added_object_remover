@@ -27,7 +27,11 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 /// <param name="CopiesNow">The id among the other objects of <paramref name="World"/> of each of <paramref name="Now"/>.</param>
 /// <param name="RestoredCauses">
 /// The ids among the other-mod objects of <paramref name="World"/> of the targets a removal step restored to their earlier version,
-/// in id order. Like the candidates going back, they end where they stood before the cleaned mod.
+/// in id order. They end where they stood before the cleaned mod.
+/// </param>
+/// <param name="GoBackWhole">
+/// By candidate index: the candidate as it goes back is the same as with every part taken from its earlier version, so it ends as
+/// it stood before the cleaned mod; one that keeps a part a later plugin changed (placement, base, reference data) does not.
 /// </param>
 internal sealed record AfterRemovalWorld(
     CollectedObjects World,
@@ -37,8 +41,12 @@ internal sealed record AfterRemovalWorld(
     ImmutableArray<int> StandingNow,
     ImmutableArray<TargetObject> Now,
     ImmutableArray<OtherId> CopiesNow,
-    ImmutableArray<OtherId> RestoredCauses)
+    ImmutableArray<OtherId> RestoredCauses,
+    ImmutableArray<bool> GoBackWhole)
 {
+    /// <summary>Every part of a placed record, so a restore that undoes them all gives the earlier version.</summary>
+    private static readonly PlacedParts EveryPart = Enum.GetValues<PlacedParts>().Aggregate(PlacedParts.None, (parts, part) => parts | part);
+
     /// <summary>The candidates, each as it goes back, by candidate index.</summary>
     public ImmutableArray<TargetObject> Restored => World.Targets;
 
@@ -84,7 +92,8 @@ internal sealed record AfterRemovalWorld(
             standingNow,
             now,
             [.. standingNow.Select(candidate => idOf[candidates[candidate].Key])],
-            [.. nearCauses.Where(cause => restoredByRun.Contains(cause.Key)).Select(cause => idOf[cause.Key])]);
+            [.. nearCauses.Where(cause => restoredByRun.Contains(cause.Key)).Select(cause => idOf[cause.Key])],
+            [.. candidates.Select((change, index) => restored[index] == asItIsNow[index].RestoredAs(change.Earlier with { Undo = EveryPart }))]);
     }
 
     /// <summary>The keys of the objects within the guards' reach, and of every candidate's copy where it stands now.</summary>

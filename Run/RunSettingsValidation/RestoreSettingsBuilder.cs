@@ -12,13 +12,14 @@ internal static class RestoreSettingsBuilder
     internal const float MaxEdgeBlendDistance = 1024f;
 
     private const string ClearedAreaRadiusName = SettingPaths.ClearedAreaGroup + SettingNames.ClearedAreaRadius;
-    private const string MaxStandingPercentName = SettingPaths.ClearedAreaGroup + SettingNames.MaxStandingPercent;
-    private const string MeasureName = SettingPaths.ClearedAreaGroup + SettingNames.Measure;
+    private const string MaxStandingSizePercentName = SettingPaths.ClearedAreaGroup + SettingNames.MaxStandingSizePercent;
+    private const string MaxStandingCountPercentName = SettingPaths.ClearedAreaGroup + SettingNames.MaxStandingCountPercent;
+    private const string SharesThatMustPassName = SettingPaths.ClearedAreaGroup + SettingNames.SharesThatMustPass;
     private const string EdgeBlendDistanceName = SettingPaths.RestoreWhereRemovedGroup + SettingNames.EdgeBlendDistance;
 
     /// <summary>
     /// Built (and its settings validated) even when the group is off, so invalid values are always reported.
-    /// The percent is the decimal the user typed: the float setting 0.7 would otherwise widen to 0.69999998.
+    /// The percents are the decimals the user typed: the float setting 0.7 would otherwise widen to 0.69999998.
     /// </summary>
     /// <param name="cleanedModCollision">The collision settings of the cleaned mod's own objects, whose terrain tolerances the restore reuses.</param>
     /// <param name="changedCollision">The collision settings of the objects the cleaned mod changed, which judge a restored object against what stays.</param>
@@ -31,9 +32,11 @@ internal static class RestoreSettingsBuilder
         var area = values.ClearedArea;
         var searchRadius = Clamp(
             area.SearchRadius, MinClearedAreaRadius, MaxClearedAreaRadius, SettingDefaults.ClearedAreaSearchRadius, ClearedAreaRadiusName, warnings);
-        var maxStandingPercent = Clamp(
-            area.MaxStandingPercent, 0, Percent.PerWhole, SettingDefaults.ClearedAreaMaxStandingPercent, MaxStandingPercentName, warnings);
-        var measure = ValidateDefined(area.Measure, SettingDefaults.AreaMeasure, MeasureName, warnings);
+        var maxStandingSizePercent = Clamp(
+            area.MaxStandingSizePercent, 0, Percent.PerWhole, SettingDefaults.ClearedAreaMaxStandingSizePercent, MaxStandingSizePercentName, warnings);
+        var maxStandingCountPercent = Clamp(
+            area.MaxStandingCountPercent, 0, Percent.PerWhole, SettingDefaults.ClearedAreaMaxStandingCountPercent, MaxStandingCountPercentName, warnings);
+        var sharesThatMustPass = ValidateDefined(area.SharesThatMustPass, SettingDefaults.SharesThatMustPass, SharesThatMustPassName, warnings);
         var edgeBlendDistance = Clamp(
             values.TerrainEdgeBlendDistanceInUnits, 0, MaxEdgeBlendDistance, SettingDefaults.TerrainEdgeBlendDistanceInUnits, EdgeBlendDistanceName, warnings);
         return new WhereRemovedRestoreSettings(
@@ -41,7 +44,7 @@ internal static class RestoreSettingsBuilder
             values.RestoreTerrain,
             values.RestoreCells,
             values.RestoreNavmeshes,
-            new ClearedArea(searchRadius, (double)(decimal)maxStandingPercent, measure),
+            new ClearedArea(searchRadius, (double)(decimal)maxStandingSizePercent, (double)(decimal)maxStandingCountPercent, sharesThatMustPass),
             edgeBlendDistance,
             cleanedModCollision.ChangedTerrain.HeightTolerance,
             cleanedModCollision.ChangedTerrain.WaterHeightTolerance,

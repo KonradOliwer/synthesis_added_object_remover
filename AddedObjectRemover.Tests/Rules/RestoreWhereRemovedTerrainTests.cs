@@ -40,7 +40,7 @@ public sealed class RestoreWhereRemovedTerrainTests
         Terrain: true,
         Cells: false,
         Navmeshes: false,
-        new ClearedArea(SearchRadius: 1000f, MaxStandingPercent: 0.1, ClearedAreaMeasure.ObjectCount),
+        new ClearedArea(SearchRadius: 1000f, MaxStandingSizePercent: 0.1, MaxStandingCountPercent: 0.1, ClearedAreaShares.Both),
         TerrainEdgeBlendDistance: 0f,
         HeightTolerance,
         WaterHeightChangeTolerance: 8f,

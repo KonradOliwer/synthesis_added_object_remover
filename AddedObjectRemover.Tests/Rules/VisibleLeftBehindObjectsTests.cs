@@ -33,10 +33,10 @@ public class VisibleLeftBehindObjectsTests
     private static readonly TestStatic Block = new(new FormKey(OtherMod, 0x801), @"test\block.nif", SmallBlock);
     private static readonly TestStatic DoorBlock = new(new FormKey(OtherMod, 0x802), @"test\doorblock.nif", SmallBlock);
 
-    /// <summary>Water spray: a mesh whose only shape is drawn with an effect shader, as big as <see cref="Block"/>.</summary>
-    private static readonly TestStatic Spray = new(new FormKey(OtherMod, 0x803), @"test\spray.nif", SmallBlock, EffectOnly: true);
+    /// <summary>Mist: a mesh whose only shape is drawn with an effect shader, as big as <see cref="Block"/>.</summary>
+    private static readonly TestStatic Mist = new(new FormKey(OtherMod, 0x803), @"test\mist.nif", SmallBlock, EffectOnly: true);
 
-    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(OtherMod, "VisibleLeftBehindObjectsData", Block, DoorBlock, Spray));
+    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(OtherMod, "VisibleLeftBehindObjectsData", Block, DoorBlock, Mist));
 
     private static readonly VisibleLeftBehindSettings Settings = new(
         new LeftBehindSurroundings(LookAround: 260, MinOccupiedDirections: 6, DirectionClearedPercent: 80, ClearedDirectionsPercent: 80),
@@ -68,11 +68,11 @@ public class VisibleLeftBehindObjectsTests
         Assert.IsType<VisibleObjectSurroundingsRemoved>(proposal.Reason);
     }
 
-    /// <summary>The cleaned mod's water spray, whose mesh holds only effect shapes, is left alone where its surroundings were removed.</summary>
+    /// <summary>The cleaned mod's mist, whose mesh holds only effect shapes, stands alone where its surroundings were removed, so it is removed too.</summary>
     [Fact]
     public void AnObjectWhoseMeshHoldsOnlyEffectsIsRemovedWhenItsSurroundingsWereRemoved()
     {
-        var targets = Ring(SixDirections).SetItem(0, SprayAt(0, Vector3.Zero));
+        var targets = Ring(SixDirections).SetItem(0, MistAt(0, Vector3.Zero));
 
         var result = Find(targets, DecisionsRemoving(targets, 1, 2, 3, 4, 5, 6), Settings);
 
@@ -81,17 +81,29 @@ public class VisibleLeftBehindObjectsTests
         Assert.Equal(new TargetId(0), Assert.Single(Proposals(result)).Target);
     }
 
-    /// <summary>The cleaned mod's water sprays stand in four of the six directions around a block whose other neighbours were removed.</summary>
+    /// <summary>The cleaned mod's mists stand in four of the six directions around a block whose other neighbours were removed.</summary>
     [Fact]
-    public void StandingObjectsWhoseMeshesHoldOnlyEffectsCountAsSurroundingsThatStay()
+    public void StandingObjectsWhoseMeshesHoldOnlyEffectsAreNoSurroundings()
     {
         var targets = Ring(SixDirections);
-        var sprays = targets.Select(target => target.Id.Index is >= 1 and <= 4 ? SprayAt(target.Id.Index, target.Transform.Position) : target).ToImmutableArray();
+        var mists = targets.Select(target => target.Id.Index is >= 1 and <= 4 ? MistAt(target.Id.Index, target.Transform.Position) : target).ToImmutableArray();
 
-        var result = Find(sprays, DecisionsRemoving(sprays, 5, 6), Settings);
+        var result = Find(mists, DecisionsRemoving(mists, 5, 6), Settings);
 
         var evaluation = result.Evaluations.Single(check => check.TargetIndex == 0);
-        Assert.Equal((6, 2, LeftBehindOutcome.KeptSurroundingsMostlyKept), (evaluation.Surroundings.OccupiedCount, evaluation.Surroundings.RemovedCount, evaluation.Decision));
+        Assert.Equal((2, 2, LeftBehindOutcome.KeptTooFewSurroundingObjects), (evaluation.Surroundings.OccupiedCount, evaluation.Surroundings.RemovedCount, evaluation.Decision));
+    }
+
+    /// <summary>Two of the cleaned mod's mists side by side, whose solid surroundings were all removed: neither keeps the other.</summary>
+    [Fact]
+    public void ObjectsWhoseMeshesHoldOnlyEffectsDoNotKeepEachOther()
+    {
+        var ring = Ring(SixDirections).SetItem(0, MistAt(0, Vector3.Zero));
+        var targets = ring.Add(MistAt(ring.Length, new Vector3(1, 0, 0)));
+
+        var result = Find(targets, DecisionsRemoving(targets, 1, 2, 3, 4, 5, 6), Settings);
+
+        Assert.Equal([new TargetId(0), new TargetId(ring.Length)], Proposals(result).Select(proposal => proposal.Target).Order());
     }
 
     [Fact]
@@ -766,8 +778,8 @@ public class VisibleLeftBehindObjectsTests
     private static TargetObject Visible(int index, Vector3 position) =>
         TestTargets.Create(index, TestTargets.At(position), Block.Base, TestTargets.Space);
 
-    private static TargetObject SprayAt(int index, Vector3 position) =>
-        TestTargets.Create(index, TestTargets.At(position), Spray.Base, TestTargets.Space);
+    private static TargetObject MistAt(int index, Vector3 position) =>
+        TestTargets.Create(index, TestTargets.At(position), Mist.Base, TestTargets.Space);
 
     /// <summary>East is 0 degrees and the directions go counter-clockwise, as in <see cref="DirectionSector"/>.</summary>
     private static Vector3 Offset(DirectionSector sector, float distance)
@@ -804,7 +816,7 @@ public class VisibleLeftBehindObjectsTests
         Decide(targets, decisions, settings, others, workers, bases, followUp, timeSinceStart, surroundings).Result;
 
     /// <param name="followUp">By default one that proposes nothing.</param>
-    /// <param name="surroundings">The shown targets the caches index for the given targets; by default the scene's index among <paramref name="others"/>.</param>
+    /// <param name="surroundings">The visible targets the caches index for the given targets; by default the scene's index among <paramref name="others"/>.</param>
     /// <returns>The step's result, with its rounds added to <paramref name="decisions"/>.</returns>
     private static Decided<VisibleLeftBehindResult> Decide(
         ImmutableArray<TargetObject> targets,
@@ -823,7 +835,7 @@ public class VisibleLeftBehindObjectsTests
                 new TestRunCaches(
                     Shapes,
                     bases: bases ?? UnresolvedBases,
-                    shownTargets: surroundings ?? Scene(targets, others ?? []).IndexShownTargets),
+                    visibleTargets: surroundings ?? Scene(targets, others ?? []).IndexVisibleTargets),
                 followUp ?? new ScriptedFollowUp(),
                 timeSinceStart ?? (() => TimeSpan.Zero),
                 TargetWorkOrder.Of(targets),

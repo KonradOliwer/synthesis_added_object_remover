@@ -11,7 +11,7 @@ Shrink or turn objects to make them fit: Shrink down to: 80% of its size; Turn b
 Also remove what rests on removed objects: OnlyWhatLosesItsSupport; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
 Visible objects left behind: off.
 Invisible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 4; A direction is cleared when this much of it was removed: 50%; Remove when this share of the directions with objects is cleared: 60%; Never remove these as invisible objects left behind: none; Move kept markers out of other mods' objects: on.
-Restore where the cleaned mod was removed: other mods' objects, terrain, cell settings, navmeshes; an area 10000 units wide counts as cleared when at most 0.1% of the cleaned mod's objects there still stand, by size; terrain edges blended over 256 units.
+Restore where the cleaned mod was removed: other mods' objects, terrain, cell settings, navmeshes; an area 10000 units wide counts as cleared when at most 1% of the cleaned mod's objects there still stand by size and at most 34% by number; terrain edges blended over 256 units.
 Detailed log and reports: on, report files go to <root>/Reports.
 Only warn (don't stop) when a mod that requires the cleaned mod loads after the patch: off.
   Ignored other-mod object overridden by Target.esp: B_Lamp [00080D:Skyrim.esm] (winning override in CityMod.esp).
@@ -40,13 +40,13 @@ Restored where the cleaned mod was removed: 5 objects of other mods (3 shown aga
 Left as the cleaned mod changed them: 1 object (1 carrying an object that stays).
 Objects of the cleaned mod still standing in restored areas: 1 removed as a leftover where the area was restored.
 Left to later plugins in the changes judged: 1 part of 1 object (CityMod.esp 1), 1 part of 1 cell (CityMod.esp 1).
-  Shown again: B_Rock [00080A:Skyrim.esm] (base B_CrateBase [000809:Skyrim.esm]) in interior AorInterior [000800:Skyrim.esm]; 1 of 3 objects still stands (0.0% by size)
-  Shown again: B_Stump [00080B:Skyrim.esm] (base B_CrateBase [000809:Skyrim.esm]) in interior AorInterior [000800:Skyrim.esm] to (2000, 1000, 0); 1 of 3 objects still stands (0.0% by size)
-  Moved back: B_Mover [00080C:Skyrim.esm] (base B_CrateBase [000809:Skyrim.esm]) in interior AorInterior [000800:Skyrim.esm] to (3000, 0, 0); at its old place 1 of 3 objects still stands (0.0% by size); where it stands now 1 of 3 objects still stands (0.0% by size)
-  Turned or rescaled back: B_Lamp [00080D:Skyrim.esm] (base B_CrateBase [000809:Skyrim.esm]) in interior AorInterior [000800:Skyrim.esm]; 1 of 3 objects still stands (0.0% by size); left to later plugins: scale (CityMod.esp)
-  Shown again: B_Statue [00080E:Skyrim.esm] (base B_CrateBase [000809:Skyrim.esm]) in interior AorInterior [000800:Skyrim.esm]; 1 of 3 objects still stands (0.0% by size)
-  Kept as changed: B_Table [00080F:Skyrim.esm] (base B_CrateBase [000809:Skyrim.esm]) in interior AorInterior [000800:Skyrim.esm]: carrying an object that stays (C_Lantern [000803:CityMod.esp]); 1 of 3 objects still stands (0.0% by size)
-  Cell interior AorInterior [000800:Skyrim.esm]: lighting, location; 1 of 3 objects still stands (0.0% by size); left to later plugins: music (CityMod.esp)
+  Shown again: B_Rock [00080A:Skyrim.esm] (base B_CrateBase [000809:Skyrim.esm]) in interior AorInterior [000800:Skyrim.esm]; 1 of 3 objects still stands (33.3% by count, 0.0% by size)
+  Shown again: B_Stump [00080B:Skyrim.esm] (base B_CrateBase [000809:Skyrim.esm]) in interior AorInterior [000800:Skyrim.esm] to (2000, 1000, 0); 1 of 3 objects still stands (33.3% by count, 0.0% by size)
+  Moved back: B_Mover [00080C:Skyrim.esm] (base B_CrateBase [000809:Skyrim.esm]) in interior AorInterior [000800:Skyrim.esm] to (3000, 0, 0); at its old place 1 of 3 objects still stands (33.3% by count, 0.0% by size); where it stands now 1 of 3 objects still stands (33.3% by count, 0.0% by size)
+  Turned or rescaled back: B_Lamp [00080D:Skyrim.esm] (base B_CrateBase [000809:Skyrim.esm]) in interior AorInterior [000800:Skyrim.esm]; 1 of 3 objects still stands (33.3% by count, 0.0% by size); left to later plugins: scale (CityMod.esp)
+  Shown again: B_Statue [00080E:Skyrim.esm] (base B_CrateBase [000809:Skyrim.esm]) in interior AorInterior [000800:Skyrim.esm]; 1 of 3 objects still stands (33.3% by count, 0.0% by size)
+  Kept as changed: B_Table [00080F:Skyrim.esm] (base B_CrateBase [000809:Skyrim.esm]) in interior AorInterior [000800:Skyrim.esm]: carrying an object that stays (C_Lantern [000803:CityMod.esp]); 1 of 3 objects still stands (33.3% by count, 0.0% by size)
+  Cell interior AorInterior [000800:Skyrim.esm]: lighting, location; 1 of 3 objects still stands (33.3% by count, 0.0% by size); left to later plugins: music (CityMod.esp)
   T_Pebble [000804:Target.esp] (base T_PebbleBase [000803:Target.esp]) in interior AorInterior [000800:Skyrim.esm]: removed as a leftover where the area was restored
 Restore where removed: 2 passes in <time>.
 Wrote 9 overrides (3 removed, 6 to restore where the cleaned mod was removed) in <time>.
@@ -103,16 +103,16 @@ formKey,editorId,base,reason,worldspace,hold,place,cellFormKey,cellEditorId,grid
 ## report removed-markers-and-kept-objects.csv
 kind,formKey,editorId,space,cell,detail
 ## report restored-where-removed-cells.csv
-kind,space,gridX,gridY,cell,quarter,navmesh,undone,leftToLaterPlugins,objects,standing,size,standingSize,standingPercent,verdict,result,keptUnderObjectThatStays,keptUnderObjectKeptAsChanged,keptUnderObjectPlacedForTheGroundAsItIs,keptUnderNavmesh,keptTooSteepToStore,keptOnEdgeOfLandThatStays,keptEarlierEdgeHeightsDiffer,keptEdgeStoredOnDifferentSteps,keptNextToQuarterThatStays,keptWithoutHeightMap
-cell,interior AorInterior [000800:Skyrim.esm],,,000800:Skyrim.esm,,,"lighting, location",music (CityMod.esp),3,1,2001000,1000,0.04997501,Cleared,restored,,,,,,,,,,
+kind,space,gridX,gridY,cell,quarter,navmesh,undone,leftToLaterPlugins,objects,standing,size,standingSize,standingPercentByCount,standingPercentBySize,verdict,result,keptUnderObjectThatStays,keptUnderObjectKeptAsChanged,keptUnderObjectPlacedForTheGroundAsItIs,keptUnderNavmesh,keptTooSteepToStore,keptOnEdgeOfLandThatStays,keptEarlierEdgeHeightsDiffer,keptEdgeStoredOnDifferentSteps,keptNextToQuarterThatStays,keptWithoutHeightMap
+cell,interior AorInterior [000800:Skyrim.esm],,,000800:Skyrim.esm,,,"lighting, location",music (CityMod.esp),3,1,2001000,1000,33.333332,0.04997501,Cleared,restored,,,,,,,,,,
 ## report restored-where-removed-leftovers.csv
 formKey,editorId,base,space,cellFormKey,cellEditorId,areaCentreX,areaCentreY,result
 000804:Target.esp,T_Pebble,T_PebbleBase [000803:Target.esp],interior AorInterior [000800:Skyrim.esm],000800:Skyrim.esm,AorInterior,,,removed as a leftover where the area was restored
 ## report restored-where-removed-objects.csv
-formKey,editorId,base,space,cellFormKey,cellEditorId,winningMod,oldX,oldY,oldZ,undone,leftToLaterPlugins,objects,standing,size,standingSize,standingPercent,verdict,nowObjects,nowStanding,nowSize,nowStandingSize,nowStandingPercent,nowVerdict,result
-00080A:Skyrim.esm,B_Rock,B_CrateBase [000809:Skyrim.esm],interior AorInterior [000800:Skyrim.esm],000800:Skyrim.esm,AorInterior,Target.esp,2000,0,0,enable state,,3,1,2001000,1000,0.04997501,Cleared,,,,,,,restored
-00080B:Skyrim.esm,B_Stump,B_CrateBase [000809:Skyrim.esm],interior AorInterior [000800:Skyrim.esm],000800:Skyrim.esm,AorInterior,Target.esp,2000,1000,0,"position, rotation, enable state",,3,1,2001000,1000,0.04997501,Cleared,,,,,,,restored
-00080C:Skyrim.esm,B_Mover,B_CrateBase [000809:Skyrim.esm],interior AorInterior [000800:Skyrim.esm],000800:Skyrim.esm,AorInterior,Target.esp,3000,0,0,position,,3,1,2001000,1000,0.04997501,Cleared,3,1,2001000,1000,0.04997501,Cleared,restored
-00080D:Skyrim.esm,B_Lamp,B_CrateBase [000809:Skyrim.esm],interior AorInterior [000800:Skyrim.esm],000800:Skyrim.esm,AorInterior,CityMod.esp,4000,0,0,rotation,scale (CityMod.esp),3,1,2001000,1000,0.04997501,Cleared,,,,,,,restored
-00080E:Skyrim.esm,B_Statue,B_CrateBase [000809:Skyrim.esm],interior AorInterior [000800:Skyrim.esm],000800:Skyrim.esm,AorInterior,Target.esp,5000,0,0,enable state,,3,1,2001000,1000,0.04997501,Cleared,,,,,,,restored
-00080F:Skyrim.esm,B_Table,B_CrateBase [000809:Skyrim.esm],interior AorInterior [000800:Skyrim.esm],000800:Skyrim.esm,AorInterior,Target.esp,6000,0,0,scale,,3,1,2001000,1000,0.04997501,Cleared,,,,,,,kept: carrying an object that stays (C_Lantern [000803:CityMod.esp])
+formKey,editorId,base,space,cellFormKey,cellEditorId,winningMod,oldX,oldY,oldZ,undone,leftToLaterPlugins,objects,standing,size,standingSize,standingPercentByCount,standingPercentBySize,verdict,nowObjects,nowStanding,nowSize,nowStandingSize,nowStandingPercentByCount,nowStandingPercentBySize,nowVerdict,result
+00080A:Skyrim.esm,B_Rock,B_CrateBase [000809:Skyrim.esm],interior AorInterior [000800:Skyrim.esm],000800:Skyrim.esm,AorInterior,Target.esp,2000,0,0,enable state,,3,1,2001000,1000,33.333332,0.04997501,Cleared,,,,,,,,restored
+00080B:Skyrim.esm,B_Stump,B_CrateBase [000809:Skyrim.esm],interior AorInterior [000800:Skyrim.esm],000800:Skyrim.esm,AorInterior,Target.esp,2000,1000,0,"position, rotation, enable state",,3,1,2001000,1000,33.333332,0.04997501,Cleared,,,,,,,,restored
+00080C:Skyrim.esm,B_Mover,B_CrateBase [000809:Skyrim.esm],interior AorInterior [000800:Skyrim.esm],000800:Skyrim.esm,AorInterior,Target.esp,3000,0,0,position,,3,1,2001000,1000,33.333332,0.04997501,Cleared,3,1,2001000,1000,33.333332,0.04997501,Cleared,restored
+00080D:Skyrim.esm,B_Lamp,B_CrateBase [000809:Skyrim.esm],interior AorInterior [000800:Skyrim.esm],000800:Skyrim.esm,AorInterior,CityMod.esp,4000,0,0,rotation,scale (CityMod.esp),3,1,2001000,1000,33.333332,0.04997501,Cleared,,,,,,,,restored
+00080E:Skyrim.esm,B_Statue,B_CrateBase [000809:Skyrim.esm],interior AorInterior [000800:Skyrim.esm],000800:Skyrim.esm,AorInterior,Target.esp,5000,0,0,enable state,,3,1,2001000,1000,33.333332,0.04997501,Cleared,,,,,,,,restored
+00080F:Skyrim.esm,B_Table,B_CrateBase [000809:Skyrim.esm],interior AorInterior [000800:Skyrim.esm],000800:Skyrim.esm,AorInterior,Target.esp,6000,0,0,scale,,3,1,2001000,1000,33.333332,0.04997501,Cleared,,,,,,,,kept: carrying an object that stays (C_Lantern [000803:CityMod.esp])

@@ -13,6 +13,12 @@ public class RestoreWhereRemovedRunTests
 {
     private const int Workers = 4;
     internal const float SmallSearchRadius = 1500f;
+
+    /// <summary>
+    /// The small worlds hold only a few objects of the cleaned mod: one tiny object standing among two removed ones is a third of them
+    /// by number, just under this, while one standing beside one removed is a half and keeps its area.
+    /// </summary>
+    private const float OneInThreeMayStand = 34f;
     private const string CellsFile = ReportFileNames.RestoredWhereRemovedCellsFileName;
 
     private static readonly int[] OtherWorkerCounts = [2, 8];
@@ -358,7 +364,10 @@ public class RestoreWhereRemovedRunTests
         restore.RestoreNavmeshes = false;
     }
 
-    /// <summary>The cleaned mod's objects that stand too close to a city pad are removed; the left-behind step stays off so only the pads remove anything.</summary>
+    /// <summary>
+    /// The cleaned mod's objects that stand too close to a city pad are removed; the left-behind step stays off so only the pads remove
+    /// anything. An area counts as cleared with at most <see cref="OneInThreeMayStand"/> of the objects standing and the default share by size.
+    /// </summary>
     internal static Settings SettingsOf(Action<RestoreWhereRemovedSettings>? changeRestore = null)
     {
         var settings = new Settings
@@ -376,6 +385,7 @@ public class RestoreWhereRemovedRunTests
             },
             DetailedLogAndReports = true,
         }.WithTheCollisionOfTheCleanedModsObjects();
+        settings.Standard.RestoreWhereRemoved.ClearedArea.MaxStandingCountPercent = OneInThreeMayStand;
         changeRestore?.Invoke(settings.Standard.RestoreWhereRemoved);
         return settings;
     }

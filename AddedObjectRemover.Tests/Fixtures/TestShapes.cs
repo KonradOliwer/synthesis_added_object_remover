@@ -13,7 +13,7 @@ namespace AddedObjectRemover.Tests.Fixtures;
 /// <param name="Collision">The layer of the mesh's collision rigid body; null for a mesh without collision.</param>
 /// <param name="Bounds">The record's object bounds, whole units; null for none set.</param>
 /// <param name="IsMarker">The record carries the engine's IsMarker flag.</param>
-/// <param name="EffectOnly">The mesh draws its triangles with an effect shader only, like water spray.</param>
+/// <param name="EffectOnly">The mesh draws its triangles with an effect shader only, like fog.</param>
 internal sealed record TestStatic(
     FormKey FormKey, string Model, IReadOnlyList<MeshTriangle> Triangles, SkyrimLayer? Collision = null, Box? Bounds = null, bool IsMarker = false, bool EffectOnly = false)
 {

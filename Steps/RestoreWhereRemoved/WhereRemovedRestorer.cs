@@ -101,8 +101,9 @@ public static class WhereRemovedRestorer
     }
 
     /// <summary>
-    /// The candidates judged by the never-rules and their areas, the leftovers in the cleared areas removed, and every kind's plan
-    /// before the guards between the kinds, made with the leftovers gone.
+    /// The candidates judged by the never-rules and their areas on the removal steps' decisions, then the leftovers in the cleared areas
+    /// removed once, and every kind's plan before the guards between the kinds, made with the leftovers gone. The leftovers' removals
+    /// never feed back into the areas' verdicts.
     /// </summary>
     /// <returns>What the plans and the guards read, with the leftovers gone, and the plans.</returns>
     internal static (StepInputs Inputs, Plans Plans) BuildPlans(Input input)
@@ -121,7 +122,7 @@ public static class WhereRemovedRestorer
         var (collected, execution) = (input.Earlier.Collected, input.Execution);
         var spacesOnLand = LandInputs.SpacesOnLand(collected, inputs.FindLandWorldspace);
         var shownTargets = input.Reads.Caches.IndexShownTargets(final.TargetsAsTheRoundsMeasureThem(collected.Targets));
-        var areas = new ClearedAreaJudge(collected.Targets, shownTargets, final, collected.Spaces, settings.ClearedArea);
+        var areas = new ClearedAreaJudge(new AreaContents(collected.Targets, shownTargets, input.Reads.Caches.Shapes), final, collected.Spaces, settings.ClearedArea);
         var judge = new ChangeJudge(collected.Targets, areas, input.Reads.Plugins, spacesOnLand);
         var candidates = new RestoreCandidates(collected, final, inputs.OtherModsObjects);
         var placed = settings.OtherModsObjects ? candidates.PlacedRecords() : [];
@@ -137,7 +138,6 @@ public static class WhereRemovedRestorer
             ParallelMap.Run(execution, navmeshes.Count, index => judge.Navmesh(navmeshes[index]), ParallelMap.AutomaticRangeSize),
             judge,
             areas,
-            shownTargets,
             spacesOnLand);
     }
 
@@ -150,7 +150,7 @@ public static class WhereRemovedRestorer
             .Concat(verdicts.Cells.SelectMany(judged => judge.ClearedPoints(judged)))
             .Concat(verdicts.Lands.SelectMany(judged => judge.ClearedPoints(judged)))
             .Concat(verdicts.Navmeshes.SelectMany(judged => judge.ClearedPoints(judged)));
-        var found = new LeftoverFinder(targets, verdicts.ShownTargets, input.Reads.Caches.Shapes, verdicts.Areas, inputs.Final).StandingIn(clearedPoints);
+        var found = new LeftoverFinder(targets, input.Reads.Caches.Shapes, verdicts.Areas, inputs.Final).StandingIn(clearedPoints);
         return LeftoverRemoval.Remove(found, targets, inputs.Final, inputs.OtherModsObjects, input.Leftovers);
     }
 
@@ -330,7 +330,6 @@ public static class WhereRemovedRestorer
     /// <param name="Lands">Those records judged, when the terrain is restored; none otherwise.</param>
     /// <param name="ChangedNavmeshes">Every navmesh the cleaned mod changed or added, in key order, when navmeshes are restored; none otherwise.</param>
     /// <param name="Navmeshes">Those navmeshes judged, in the same order.</param>
-    /// <param name="ShownTargets">The shown targets where the rounds measure them, which the areas count.</param>
     private sealed record AreaVerdicts(
         PlacedChangeJudged[] Placed,
         ImmutableArray<CellChangeJudged> Cells,
@@ -340,7 +339,6 @@ public static class WhereRemovedRestorer
         NavmeshChangeJudged[] Navmeshes,
         ChangeJudge Judge,
         ClearedAreaJudge Areas,
-        IVisibleTargetObjects ShownTargets,
         Dictionary<RecordKey, ImmutableArray<RecordKey>> SpacesOnLand);
 
     /// <summary>The candidates judged and every kind's plan before the guards between the kinds.</summary>

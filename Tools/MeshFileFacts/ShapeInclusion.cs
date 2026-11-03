@@ -6,7 +6,7 @@ public enum MeshShapeKind
     /// <summary>Real render geometry.</summary>
     Solid,
 
-    /// <summary>Drawn with an effect shader (fog, light rays, water spray, mist planes): nothing solid.</summary>
+    /// <summary>Drawn with an effect shader (fog, light rays, embers, mist planes): nothing solid.</summary>
     EffectShader,
 
     /// <summary>Named like a Creation Kit editor marker.</summary>

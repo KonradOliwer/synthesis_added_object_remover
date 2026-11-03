@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 
 namespace AddedObjectRemover.Caches.BaseObjectShapeAndKind;
@@ -118,7 +119,8 @@ public sealed class BaseObjectShapes : IBaseObjectShapes
             }
             if (mesh.Status == MeshReadStatus.EffectOnly)
             {
-                return new MeasuredBase(BaseObjectRules.ClassifyEffectOnlyShape(facts, mesh.EffectBox), BoundsSource.EffectOnlyMesh, MeshGaveNoBounds: true);
+                var effectBox = mesh.EffectBox ?? throw new UnreachableException($"The effect-only mesh {meshPath} was read without the bounds of its effect shapes.");
+                return new MeasuredBase(BaseObjectRules.ClassifyEffectOnlyShape(facts, effectBox), BoundsSource.EffectOnlyMesh, MeshGaveNoBounds: true);
             }
             meshWithoutGeometry = mesh.Status == MeshReadStatus.NoRenderGeometry;
             // A mesh with collision but nothing to render is an invisible wall or blocker; its collision is read all the same.

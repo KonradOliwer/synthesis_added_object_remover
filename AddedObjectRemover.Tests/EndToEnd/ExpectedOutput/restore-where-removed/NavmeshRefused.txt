@@ -11,7 +11,7 @@ Shrink or turn objects to make them fit: Shrink down to: 80% of its size; Turn b
 Also remove what rests on removed objects: OnlyWhatLosesItsSupport; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
 Visible objects left behind: off.
 Invisible objects left behind: on; Look this far around it: 1024 units; Decide only if at least this many of the 8 directions have objects: 4; A direction is cleared when this much of it was removed: 50%; Remove when this share of the directions with objects is cleared: 60%; Never remove these as invisible objects left behind: none; Move kept markers out of other mods' objects: on.
-Restore where the cleaned mod was removed: other mods' objects, terrain, cell settings, navmeshes; an area 10000 units wide counts as cleared when at most 0.1% of the cleaned mod's objects there still stand, by size; terrain edges blended over 256 units.
+Restore where the cleaned mod was removed: other mods' objects, terrain, cell settings, navmeshes; an area 10000 units wide counts as cleared when at most 1% of the cleaned mod's objects there still stand by size and at most 34% by number; terrain edges blended over 256 units.
 Detailed log and reports: on, report files go to <root>/Reports.
 Only warn (don't stop) when a mod that requires the cleaned mod loads after the patch: off.
 Scanned 2 placed records in <time>: 1 Target.esp objects to check, 1 objects from other mods.
@@ -35,7 +35,7 @@ Linked groups: 0 more objects removed with the left-behind removals they are lin
 Moved 0 kept markers out of other mods' objects; 0 left in place.
 Left as the cleaned mod changed them: 1 navmesh (1 changed again by a later plugin, itself or a door linked to it).
 Left to later plugins in the changes judged: 1 navmesh.
-  Kept as changed: navmesh 000803:Skyrim.esm in worldspace 000800:Skyrim.esm, cell 000801:Skyrim.esm: changed again by a later plugin, itself or a door linked to it (000803:Skyrim.esm); 0 of 1 object still stand (0.0% by size)
+  Kept as changed: navmesh 000803:Skyrim.esm in worldspace 000800:Skyrim.esm, cell 000801:Skyrim.esm: changed again by a later plugin, itself or a door linked to it (000803:Skyrim.esm); 0 of 1 object still stand (0.0% by count, 0.0% by size)
 Restore where removed: 1 pass in <time>.
 Wrote 1 overrides (1 removed) in <time>.
   Removed T_Crate [000801:Target.esp] (base T_CrateBase [000800:Target.esp]) in worldspace 000800:Skyrim.esm, cell 000801:Skyrim.esm, place cell 6,7, hold unnamed area, grid 6,7; too close to C_Pad [000801:CityMod.esp], changed by CityMod.esp (new object)
@@ -70,5 +70,5 @@ formKey,editorId,base,reason,worldspace,hold,place,cellFormKey,cellEditorId,grid
 ## report removed-markers-and-kept-objects.csv
 kind,formKey,editorId,space,cell,detail
 ## report restored-where-removed-cells.csv
-kind,space,gridX,gridY,cell,quarter,navmesh,undone,leftToLaterPlugins,objects,standing,size,standingSize,standingPercent,verdict,result,keptUnderObjectThatStays,keptUnderObjectKeptAsChanged,keptUnderObjectPlacedForTheGroundAsItIs,keptUnderNavmesh,keptTooSteepToStore,keptOnEdgeOfLandThatStays,keptEarlierEdgeHeightsDiffer,keptEdgeStoredOnDifferentSteps,keptNextToQuarterThatStays,keptWithoutHeightMap
-navmesh,worldspace 000800:Skyrim.esm,,,000801:Skyrim.esm,,000803:Skyrim.esm,,shape (CityMod.esp),1,0,1000000,0,0,Cleared,"kept: changed again by a later plugin, itself or a door linked to it (000803:Skyrim.esm)",,,,,,,,,,
+kind,space,gridX,gridY,cell,quarter,navmesh,undone,leftToLaterPlugins,objects,standing,size,standingSize,standingPercentByCount,standingPercentBySize,verdict,result,keptUnderObjectThatStays,keptUnderObjectKeptAsChanged,keptUnderObjectPlacedForTheGroundAsItIs,keptUnderNavmesh,keptTooSteepToStore,keptOnEdgeOfLandThatStays,keptEarlierEdgeHeightsDiffer,keptEdgeStoredOnDifferentSteps,keptNextToQuarterThatStays,keptWithoutHeightMap
+navmesh,worldspace 000800:Skyrim.esm,,,000801:Skyrim.esm,,000803:Skyrim.esm,,shape (CityMod.esp),1,0,1000000,0,0,0,Cleared,"kept: changed again by a later plugin, itself or a door linked to it (000803:Skyrim.esm)",,,,,,,,,,

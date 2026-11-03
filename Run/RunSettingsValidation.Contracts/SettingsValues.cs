@@ -162,6 +162,7 @@ public interface IRestoreWhereRemovedSettingsValues
 public interface IClearedAreaSettingsValues
 {
     float SearchRadius { get; }
-    float MaxStandingPercent { get; }
-    ClearedAreaMeasure Measure { get; }
+    float MaxStandingSizePercent { get; }
+    float MaxStandingCountPercent { get; }
+    ClearedAreaShares SharesThatMustPass { get; }
 }

@@ -24,10 +24,9 @@ public sealed class RestoreWhereRemovedReportTests
     private static readonly PluginName Patch = new("Patch.esp");
     private static readonly RecordKey WaterObject = new(Later, 0x777);
 
-    private static readonly AreaShare Cleared = new(Objects: 214, Standing: 0, Size: 8_000_000, StandingSize: 0, AreaVerdict.Cleared, ClearedAreaMeasure.ObjectSize, StandingPercent: 0);
-    private static readonly AreaShare StillStanding = new(Objects: 10, Standing: 4, Size: 1000, StandingSize: 250, AreaVerdict.StillStanding, ClearedAreaMeasure.ObjectSize, StandingPercent: 25);
-    private static readonly AreaShare StillStandingByCount = StillStanding with { Measure = ClearedAreaMeasure.ObjectCount, StandingPercent = 40 };
-    private static readonly AreaShare NoObjects = new(Objects: 0, Standing: 0, Size: 0, StandingSize: 0, AreaVerdict.NoObjectsAround, ClearedAreaMeasure.ObjectCount, StandingPercent: 0);
+    private static readonly AreaShare Cleared = new(Objects: 214, Standing: 0, Size: 8_000_000, StandingSize: 0, AreaVerdict.Cleared, CountPercent: 0, SizePercent: 0);
+    private static readonly AreaShare StillStanding = new(Objects: 10, Standing: 4, Size: 1000, StandingSize: 250, AreaVerdict.StillStanding, CountPercent: 40, SizePercent: 25);
+    private static readonly AreaShare NoObjects = new(Objects: 0, Standing: 0, Size: 0, StandingSize: 0, AreaVerdict.NoObjectsAround, CountPercent: 0, SizePercent: 0);
 
     private static readonly RestoreWhereRemovedResult SwitchedOff = RestoreWhereRemovedResult.SwitchedOff(OtherModsObjectsResult.SwitchedOff);
 
@@ -127,7 +126,7 @@ public sealed class RestoreWhereRemovedReportTests
 
         var movedBack = Assert.Single(lines, line => line.StartsWith("  Moved back: ", StringComparison.Ordinal));
         Assert.Equal(
-            $"  Moved back: {RecordLabels.Of(Key(0x901), null)} (base (none)) in {Space} to (10, 20, 30); 0 of 214 objects still stand (0.0% by size); "
+            $"  Moved back: {RecordLabels.Of(Key(0x901), null)} (base (none)) in {Space} to (10, 20, 30); 0 of 214 objects still stand (0.0% by count, 0.0% by size); "
             + "left to later plugins: rotation (Later.esp)",
             movedBack);
         Assert.Contains(lines, line => line.StartsWith("  Shown again: ", StringComparison.Ordinal));
@@ -141,13 +140,13 @@ public sealed class RestoreWhereRemovedReportTests
         var lines = Section(Scene(), Detailed).Lines;
 
         Assert.Contains(
-            $"  Kept as changed: {RecordLabels.Of(Key(0x905), null)} (base (none)) in {Space}: too close to objects that stay ({Key(0x500)}); 0 of 214 objects still stand (0.0% by size)",
+            $"  Kept as changed: {RecordLabels.Of(Key(0x905), null)} (base (none)) in {Space}: too close to objects that stay ({Key(0x500)}); 0 of 214 objects still stand (0.0% by count, 0.0% by size)",
             lines);
         Assert.Contains(
-            $"  Kept as changed: {RecordLabels.Of(Key(0x906), null)} (base (none)) in {Space}: the check stopped unexpectedly (InvalidOperationException: broke); 0 of 214 objects still stand (0.0% by size)",
+            $"  Kept as changed: {RecordLabels.Of(Key(0x906), null)} (base (none)) in {Space}: the check stopped unexpectedly (InvalidOperationException: broke); 0 of 214 objects still stand (0.0% by count, 0.0% by size)",
             lines);
         Assert.Contains(
-            $"  Kept as changed: {RecordLabels.Of(Key(0x907), null)} (base (none)) in {Space}: the cleaned mod's objects still stand around it; 4 of 10 objects still stand (25.0% by size)",
+            $"  Kept as changed: {RecordLabels.Of(Key(0x907), null)} (base (none)) in {Space}: the cleaned mod's objects still stand around it; 4 of 10 objects still stand (40.0% by count, 25.0% by size)",
             lines);
         Assert.Contains(
             $"  Kept as changed: {RecordLabels.Of(Key(0x908), null)} (base (none)) in {Space}: the cleaned mod has no objects around it",
@@ -164,19 +163,19 @@ public sealed class RestoreWhereRemovedReportTests
 
         var line = Assert.Single(Section(both, Detailed).Lines, text => text.StartsWith("  Kept as changed", StringComparison.Ordinal));
 
-        Assert.EndsWith("; at its old place 0 of 214 objects still stand (0.0% by size); where it stands now 4 of 10 objects still stand (25.0% by size)", line);
+        Assert.EndsWith("; at its old place 0 of 214 objects still stand (0.0% by count, 0.0% by size); where it stands now 4 of 10 objects still stand (40.0% by count, 25.0% by size)", line);
     }
 
     [Fact]
     public void TheVerbAgreesWithOneObjectStillStanding()
     {
-        var one = StillStanding with { Objects = 1, Standing = 1, StandingPercent = 100 };
+        var one = StillStanding with { Objects = 1, Standing = 1, CountPercent = 100, SizePercent = 100 };
 
         var line = Assert.Single(
             Section(ObjectsOnly(KeptForArea(Rock(0x912, PlacedParts.Position), one, AreaVerdict.StillStanding)), Detailed).Lines,
             text => text.StartsWith("  Kept as changed", StringComparison.Ordinal));
 
-        Assert.EndsWith("; 1 of 1 object still stands (100.0% by size)", line);
+        Assert.EndsWith("; 1 of 1 object still stands (100.0% by count, 100.0% by size)", line);
     }
 
     /// <summary>The cell's winning version loads after the patch and only carries the cleaned mod's values, so no part is left to a later plugin.</summary>
@@ -212,27 +211,17 @@ public sealed class RestoreWhereRemovedReportTests
     }
 
     [Fact]
-    public void TheMeasureNamesThePercentOfTheCountWhenTheAreaIsWeighedByCount()
-    {
-        var line = Assert.Single(
-            Section(ObjectsOnly(KeptForArea(Rock(0x911, PlacedParts.Position), StillStandingByCount, AreaVerdict.StillStanding)), Detailed).Lines,
-            text => text.StartsWith("  Kept as changed", StringComparison.Ordinal));
-
-        Assert.EndsWith("4 of 10 objects still stand (40.0% by count)", line);
-    }
-
-    [Fact]
     public void TheDetailedLogHasALinePerCellWithTheSettingsThatWentBackAndTheWaterLevelItKept()
     {
         var lines = Section(Scene(), Detailed).Lines;
 
-        Assert.Contains($"  Cell {Space}, cell (1, 2): lighting, music; 0 of 214 objects still stand (0.0% by size)", lines);
+        Assert.Contains($"  Cell {Space}, cell (1, 2): lighting, music; 0 of 214 objects still stand (0.0% by count, 0.0% by size)", lines);
         Assert.Contains(
             $"  Cell {Space}, cell (3, 4): music; water level kept: {WaterObject} lies across the water line between the level before the cleaned mod and the one that stays; "
-            + "0 of 214 objects still stand (0.0% by size)",
+            + "0 of 214 objects still stand (0.0% by count, 0.0% by size)",
             lines);
         Assert.Contains(
-            $"  Kept as changed: cell {Space}, cell (5, 6): the cleaned mod's objects still stand around it; 4 of 10 objects still stand (25.0% by size); left to later plugins: music (Later.esp)",
+            $"  Kept as changed: cell {Space}, cell (5, 6): the cleaned mod's objects still stand around it; 4 of 10 objects still stand (40.0% by count, 25.0% by size); left to later plugins: music (Later.esp)",
             lines);
     }
 
@@ -242,10 +231,10 @@ public sealed class RestoreWhereRemovedReportTests
         var lines = Section(Scene(), Detailed).Lines;
 
         Assert.Contains(
-            $"  Terrain {Space}, cell (0, 0), south-west quarter: 2 heights, 1 vertex colour, ground textures; 1 height kept under objects that stay; 0 of 214 objects still stand (0.0% by size)",
+            $"  Terrain {Space}, cell (0, 0), south-west quarter: 2 heights, 1 vertex colour, ground textures; 1 height kept under objects that stay; 0 of 214 objects still stand (0.0% by count, 0.0% by size)",
             lines);
         Assert.Contains(
-            $"  Kept as changed: terrain {Space}, cell (0, 0), north-east quarter: the cleaned mod's objects still stand around it; 4 of 10 objects still stand (25.0% by size)",
+            $"  Kept as changed: terrain {Space}, cell (0, 0), north-east quarter: the cleaned mod's objects still stand around it; 4 of 10 objects still stand (40.0% by count, 25.0% by size)",
             lines);
         Assert.Equal(2, lines.Count(line => line.Contains("quarter:", StringComparison.Ordinal)));
     }
@@ -258,9 +247,9 @@ public sealed class RestoreWhereRemovedReportTests
         Assert.Contains($"  Navmesh {Key(0xA01)} in {Space}, cell {Key(0x600)}: restored together with 1 other navmesh", lines);
         Assert.Contains($"  Navmesh {Key(0xA02)} in {Space}, cell {Key(0x600)}: brought back together with 1 other navmesh", lines);
         Assert.Contains($"  Navmesh {Key(0xA03)} in {Space}, cell {Key(0x600)}: sunk under the world and cut off", lines);
-        Assert.Contains($"  Kept as changed: navmesh {Key(0xA04)} in {Space}, cell {Key(0x600)}: linked to navmeshes that stay ({Key(0xA09)}); 0 of 214 objects still stand (0.0% by size)", lines);
+        Assert.Contains($"  Kept as changed: navmesh {Key(0xA04)} in {Space}, cell {Key(0x600)}: linked to navmeshes that stay ({Key(0xA09)}); 0 of 214 objects still stand (0.0% by count, 0.0% by size)", lines);
         Assert.Contains(
-            $"  Kept as changed: navmesh {Key(0xA05)} in {Space}, cell {Key(0x600)}: the cleaned mod's objects still stand around it; 4 of 10 objects still stand (25.0% by size)", lines);
+            $"  Kept as changed: navmesh {Key(0xA05)} in {Space}, cell {Key(0x600)}: the cleaned mod's objects still stand around it; 4 of 10 objects still stand (40.0% by count, 25.0% by size)", lines);
     }
 
     [Theory]
@@ -346,27 +335,26 @@ public sealed class RestoreWhereRemovedReportTests
         Assert.All(table.Rows, row => Assert.Equal(table.Header.Length, row.Length));
         var moved = Row(table, "formKey", Key(0x901).ToString());
         Assert.Equal(
-            ("10", "20", "30", "position, rotation", "rotation (Later.esp)", "214", "0", "8000000", "0", "0", "Cleared", "restored"),
+            ("10", "20", "30", "position, rotation", "rotation (Later.esp)", "214", "0", "8000000", "0", "0", "0", "Cleared", "restored"),
             (Field(table, moved, "oldX"), Field(table, moved, "oldY"), Field(table, moved, "oldZ"), Field(table, moved, "undone"), Field(table, moved, "leftToLaterPlugins"),
-                Field(table, moved, "objects"), Field(table, moved, "standing"), Field(table, moved, "size"), Field(table, moved, "standingSize"), Field(table, moved, "standingPercent"),
-                Field(table, moved, "verdict"), Field(table, moved, "result")));
+                Field(table, moved, "objects"), Field(table, moved, "standing"), Field(table, moved, "size"), Field(table, moved, "standingSize"),
+                Field(table, moved, "standingPercentByCount"), Field(table, moved, "standingPercentBySize"), Field(table, moved, "verdict"), Field(table, moved, "result")));
         var standing = Row(table, "formKey", Key(0x907).ToString());
-        Assert.Equal(("10", "4", "25", "StillStanding", "kept: the cleaned mod's objects still stand around it"), (Field(table, standing, "objects"), Field(table, standing, "standing"), Field(table, standing, "standingPercent"), Field(table, standing, "verdict"), Field(table, standing, "result")));
+        Assert.Equal(
+            ("10", "4", "40", "25", "StillStanding", "kept: the cleaned mod's objects still stand around it"),
+            (Field(table, standing, "objects"), Field(table, standing, "standing"), Field(table, standing, "standingPercentByCount"), Field(table, standing, "standingPercentBySize"),
+                Field(table, standing, "verdict"), Field(table, standing, "result")));
     }
 
     [Fact]
-    public void TheObjectsFileLeavesTheAreaOfARecordThatNeverGoesBackEmptyAndGivesTheCountPercentWhenWeighedByCount()
+    public void TheObjectsFileLeavesTheAreaOfARecordThatNeverGoesBackEmpty()
     {
         var never = Row(ObjectsTable(), "formKey", Key(0x909).ToString());
-        var byCount = Assert.Single(
-            Tables.BuildRestoredWhereRemovedTables(World(), ObjectsOnly(KeptForArea(Rock(0x911, PlacedParts.Position), StillStandingByCount, AreaVerdict.StillStanding)), Normal),
-            file => file.FileName == ReportFileNames.RestoredWhereRemovedObjectsFileName);
         var objects = ObjectsTable();
 
         Assert.Equal(
             ("", "", "", "kept: a plugin that loads after the patch has the last word on it (Later.esp)"),
             (Field(objects, never, "objects"), Field(objects, never, "standing"), Field(objects, never, "verdict"), Field(objects, never, "result")));
-        Assert.Equal("40", Field(byCount, byCount.Rows[0], "standingPercent"));
     }
 
     [Fact]
@@ -450,7 +438,7 @@ public sealed class RestoreWhereRemovedReportTests
         var table = Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), scene, Normal));
 
         Assert.Contains(
-            $"  Terrain {Space}, cell (2, 0), south-west quarter: 1 height; 1 height kept on the line to a quarter of the cell whose area is not cleared; 0 of 214 objects still stand (0.0% by size)",
+            $"  Terrain {Space}, cell (2, 0), south-west quarter: 1 height; 1 height kept on the line to a quarter of the cell whose area is not cleared; 0 of 214 objects still stand (0.0% by count, 0.0% by size)",
             lines);
         Assert.Contains("Left as the cleaned mod changed them: terrain at 1 point (1 on the line to a quarter of the cell whose area is not cleared).", lines);
         var south = Row(table, "quarter", "south-west");

@@ -52,8 +52,9 @@ public static class SettingNames
     public const string DirectionThreshold = "A direction is cleared when this much of it was removed";
     public const string ClearedDirections = "Remove when this share of the directions with objects is cleared";
     public const string ClearedAreaRadius = "Look this far around the place";
-    public const string MaxStandingPercent = "Cleared when at most this share still stands";
-    public const string Measure = "Measure the share by";
+    public const string MaxStandingSizePercent = "Cleared when at most this share of their size still stands";
+    public const string MaxStandingCountPercent = "Cleared when at most this share of their number still stands";
+    public const string SharesThatMustPass = "Shares that must be under their limit";
     public const string EdgeBlendDistance = "Blend terrain edges over";
     public const string TrustedMods = "Trusted mods, and their masters";
     public const string OwnChangesMods = "Mods trusted for their own changes only";

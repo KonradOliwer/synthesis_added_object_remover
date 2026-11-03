@@ -10,6 +10,6 @@ Shrink or turn objects to make them fit: Shrink down to: 80% of its size; Turn b
 Also remove what rests on removed objects: Nothing; Gap that still counts as touching: 8 units; Remove when this much support is gone: 50 %; Other mods' objects left without support: PullObjectToTheGround.
 Visible objects left behind: off.
 Invisible objects left behind: off.
-Restore where the cleaned mod was removed: other mods' objects, terrain, cell settings, navmeshes; an area 10000 units wide counts as cleared when at most 0.1% of the cleaned mod's objects there still stand, by size; terrain edges blended over 256 units.
+Restore where the cleaned mod was removed: other mods' objects, terrain, cell settings, navmeshes; an area 10000 units wide counts as cleared when at most 1% of the cleaned mod's objects there still stand by size and at most 5% by number; terrain edges blended over 256 units.
 Detailed log and reports: off.
 Only warn (don't stop) when a mod that requires the cleaned mod loads after the patch: off.

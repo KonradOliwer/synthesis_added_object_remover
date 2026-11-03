@@ -56,7 +56,8 @@ public static class SettingDefaults
     public const bool RestoreCells = true;
     public const bool RestoreNavmeshes = true;
     public const float ClearedAreaSearchRadius = 5000f;
-    public const float ClearedAreaMaxStandingPercent = 0.1f;
-    public const ClearedAreaMeasure AreaMeasure = ClearedAreaMeasure.ObjectSize;
+    public const float ClearedAreaMaxStandingSizePercent = 1f;
+    public const float ClearedAreaMaxStandingCountPercent = 5f;
+    public const ClearedAreaShares SharesThatMustPass = ClearedAreaShares.Both;
     public const float TerrainEdgeBlendDistanceInUnits = 256f;
 }

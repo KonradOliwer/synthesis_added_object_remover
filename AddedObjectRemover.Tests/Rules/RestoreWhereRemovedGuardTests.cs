@@ -20,6 +20,12 @@ public sealed class RestoreWhereRemovedGuardTests
     private const float RockHalfSize = 20f;
     private const float TouchGap = 1f;
 
+    /// <summary>The default limit by size.</summary>
+    private const double MaxStandingSizePercent = 1;
+
+    /// <summary>By number a pebble that stays beside the removed house, one of two, may stand; two of three may not.</summary>
+    private const double MaxStandingCountPercent = 60;
+
     /// <summary>A collision layer number far beyond the layers the game defines, so no collision layer record carries it.</summary>
     private const uint NumberNoLayerHas = 9999;
 
@@ -28,6 +34,8 @@ public sealed class RestoreWhereRemovedGuardTests
 
     private static readonly ModKey ShapeMod = ModKey.FromNameAndExtension("RestoreGuardShapes.esp");
     private static readonly TestStatic Block = new(new FormKey(ShapeMod, 0x801), @"test\restoreguards\block.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-RockHalfSize), new Vector3(RockHalfSize))));
+    /// <summary>A rock twice as wide as <see cref="Block"/>.</summary>
+    private static readonly TestStatic Boulder = new(new FormKey(ShapeMod, 0x80A), @"test\restoreguards\boulder.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-2 * RockHalfSize), new Vector3(2 * RockHalfSize))));
     private static readonly TestStatic Lantern = new(new FormKey(ShapeMod, 0x802), @"test\restoreguards\lantern.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-3, -3, 0), new Vector3(3, 3, 6))));
     /// <summary>27 cubic units, under the share of the removed house's box that may still stand in a cleared area.</summary>
     private static readonly TestStatic Pebble = new(new FormKey(ShapeMod, 0x805), @"test\restoreguards\pebble.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-1.5f, -1.5f, 0), new Vector3(1.5f, 1.5f, 3))));
@@ -54,7 +62,7 @@ public sealed class RestoreWhereRemovedGuardTests
     private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(
         WithActivatorAndAcousticSpace(TestCollisionLayers.AddTo(new SkyrimMod(ShapeMod, SkyrimRelease.SkyrimSE))),
         "RestoreGuardData",
-        Block, Lantern, CollisionWall, EmptyMarker, Pebble, SmallBase, MarkerBase));
+        Block, Boulder, Lantern, CollisionWall, EmptyMarker, Pebble, SmallBase, MarkerBase));
     private static readonly BaseKey Marker = TestVisibility.TaggedBase(ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers));
 
     private static readonly ModKey BaseGameMod = ModKey.FromNameAndExtension("Base.esm");
@@ -71,7 +79,7 @@ public sealed class RestoreWhereRemovedGuardTests
         Terrain: false,
         Cells: false,
         Navmeshes: false,
-        new ClearedArea(SearchRadius, MaxStandingPercent: 0.1, ClearedAreaMeasure.ObjectSize),
+        new ClearedArea(SearchRadius, MaxStandingSizePercent, MaxStandingCountPercent, ClearedAreaShares.Both),
         TerrainEdgeBlendDistance: 0f,
         HeightChangeTolerance: 8f,
         WaterHeightChangeTolerance: 8f,
@@ -354,6 +362,98 @@ public sealed class RestoreWhereRemovedGuardTests
         Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
     }
 
+    /// <summary>
+    /// As <see cref="AnObjectARemovalStepRestoredBesideTheOldPlaceRefusesNothing"/>, but a later plugin made the rock larger, so it goes
+    /// back to its old place at that size: the rock and the crate never stood together like that, so the crate keeps the rock out.
+    /// </summary>
+    [Fact]
+    public void AnObjectARemovalStepRestoredRefusesARockThatKeepsTheSizeALaterPluginGaveIt()
+    {
+        const float LaterScale = 2f;
+        var crate = Own(1, new Vector3(-300, 300, 0)) with { Origin = TargetOrigin.Moved };
+        var moved = Rock(0, OldPlace, PlaceNow);
+        var rock = moved with
+        {
+            WhereItIsNow = new EulerPlacement(PlaceNow, Vector3.Zero, LaterScale),
+            Earlier = moved.Earlier with { LeftToLaterPlugins = ImmutableSortedDictionary<PlacedParts, PluginName>.Empty.Add(PlacedParts.Scale, Later) },
+        };
+        var scene = new Scene
+        {
+            Targets = [RemovedHouse(), crate],
+            Removed = [0, 1],
+            RestoredTo = new Dictionary<int, Vector3> { [1] = OldPlace + new Vector3(ZoneReach + 5f, 0, 0) },
+            Rocks = [rock],
+            Others = [RockNow(0, PlaceNow)],
+        };
+
+        var judged = Assert.Single(Plan(scene).Objects);
+
+        Assert.Equal(new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, crate.Key, Failure: null), judged.Refused);
+    }
+
+    /// <summary>
+    /// As <see cref="AnObjectARemovalStepRestoredRefusesARockThatKeepsTheSizeALaterPluginGaveIt"/>, but a later plugin gave the rock a
+    /// larger model, which it keeps where it goes back.
+    /// </summary>
+    [Fact]
+    public void AnObjectARemovalStepRestoredRefusesARockThatKeepsTheModelALaterPluginGaveIt()
+    {
+        var crate = Own(1, new Vector3(-300, 300, 0)) with { Origin = TargetOrigin.Moved };
+        var moved = Rock(0, OldPlace, PlaceNow);
+        var rock = moved with
+        {
+            BaseNow = Boulder.Base,
+            Earlier = moved.Earlier with { LeftToLaterPlugins = ImmutableSortedDictionary<PlacedParts, PluginName>.Empty.Add(PlacedParts.BaseAndData, Later) },
+        };
+        var scene = new Scene
+        {
+            Targets = [RemovedHouse(), crate],
+            Removed = [0, 1],
+            RestoredTo = new Dictionary<int, Vector3> { [1] = OldPlace + new Vector3(ZoneReach + 5f, 0, 0) },
+            Rocks = [rock],
+            Others = [RockNow(0, PlaceNow, Boulder.Base)],
+        };
+
+        var judged = Assert.Single(Plan(scene).Objects);
+
+        Assert.Equal(new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, crate.Key, Failure: null), judged.Refused);
+    }
+
+    /// <summary>Two pebbles of the cleaned mod stay beside the removed house: far under the limit by size, two of three by number.</summary>
+    [Fact]
+    public void TwoSmallPiecesThatStayKeepTheAreaByNumberAlone()
+    {
+        var scene = new Scene
+        {
+            Targets = [RemovedHouse(), PebbleAt(1, new Vector3(300, -300, 0)), PebbleAt(2, new Vector3(-300, -300, 0))],
+            Rocks = [Rock(0, OldPlace, PlaceNow)],
+            Others = [RockNow(0, PlaceNow)],
+        };
+
+        var judged = Assert.Single(Plan(scene).Objects);
+
+        Assert.Equal((false, AreaVerdict.StillStanding), (judged.IsRestored, judged.OldPlace!.Verdict));
+        Assert.True(judged.OldPlace.CountPercent > MaxStandingCountPercent && judged.OldPlace.SizePercent < MaxStandingSizePercent);
+    }
+
+    /// <summary>The house stays and two pebbles beside it were removed: one of three by number, nearly all by size.</summary>
+    [Fact]
+    public void OneLargePieceThatStaysKeepsTheAreaBySizeAlone()
+    {
+        var scene = new Scene
+        {
+            Targets = [RemovedHouse(), PebbleAt(1, new Vector3(300, -300, 0)), PebbleAt(2, new Vector3(-300, -300, 0))],
+            Removed = [1, 2],
+            Rocks = [Rock(0, OldPlace, PlaceNow)],
+            Others = [RockNow(0, PlaceNow)],
+        };
+
+        var judged = Assert.Single(Plan(scene).Objects);
+
+        Assert.Equal((false, AreaVerdict.StillStanding), (judged.IsRestored, judged.OldPlace!.Verdict));
+        Assert.True(judged.OldPlace.CountPercent < MaxStandingCountPercent && judged.OldPlace.SizePercent > MaxStandingSizePercent);
+    }
+
     /// <summary>A pebble of the cleaned mod's run that stays, too small to keep the area from being cleared, lies next to the rock's old place.</summary>
     [Fact]
     public void AnObjectOfTheCleanedModThatStaysRefusesARockGoingBackNextToIt()
@@ -522,6 +622,8 @@ public sealed class RestoreWhereRemovedGuardTests
     private static TargetObject RemovedHouse() => Own(0, new Vector3(200, 300, 0));
 
     private static TargetObject Own(int index, Vector3 position) => TestTargets.Create(index, TestTargets.At(position), Block.Base, TestTargets.Space);
+
+    private static TargetObject PebbleAt(int index, Vector3 position) => TestTargets.Create(index, TestTargets.At(position), Pebble.Base, TestTargets.Space);
 
     private static RecordKey RockKey(int index) => new FormKey(BaseGameMod, 0x900 + (uint)index).ToRecordKey();
 

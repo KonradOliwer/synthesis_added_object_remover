@@ -20,7 +20,7 @@ internal sealed record NifReadResult(
     /// <summary>The distinct layers of the collision rigid bodies, in ascending order; null when the file did not load or has no root node.</summary>
     public ImmutableArray<CollisionLayer>? CollisionLayers { get; init; }
 
-    /// <summary>For an effect-only mesh, the bounds of its effect shapes in root-node space; null otherwise or when they hold no point.</summary>
+    /// <summary>For an effect-only mesh read without its triangles, the bounds of its effect shapes in root-node space; null otherwise.</summary>
     public Box? EffectBox { get; init; }
 
     public static NifReadResult Succeeded(NifGeometry geometry, int mismatchedStrips) =>

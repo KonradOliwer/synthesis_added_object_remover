@@ -13,14 +13,14 @@ public enum AreaVerdict
     StillStanding,
 }
 
-/// <summary>The cleaned mod's visible objects in an area and how many of them still stand.</summary>
-/// <param name="Objects">The objects counted.</param>
+/// <summary>The cleaned mod's drawn objects in an area and how many of them still stand, by count and by size.</summary>
+/// <param name="Objects">The objects counted, effect-only ones included.</param>
 /// <param name="Standing">Those not removed.</param>
-/// <param name="Size">The box volume of the objects counted, in cubic game units.</param>
+/// <param name="Size">The box volume of the objects counted, in cubic game units; effect-only objects add nothing.</param>
 /// <param name="StandingSize">The box volume of those not removed.</param>
-/// <param name="Measure">What the share is weighed by: the setting's measure, or the count when the setting weighs by size and no object counted has a volume.</param>
-/// <param name="StandingPercent">The percent of the weight that still stands; 0 when the area holds no object.</param>
-public sealed record AreaShare(int Objects, int Standing, double Size, double StandingSize, AreaVerdict Verdict, ClearedAreaMeasure Measure, double StandingPercent);
+/// <param name="CountPercent">The percent of the objects that still stand; 0 when the area holds no object.</param>
+/// <param name="SizePercent">The percent of the size that still stands; 0 when the objects have no volume.</param>
+public sealed record AreaShare(int Objects, int Standing, double Size, double StandingSize, AreaVerdict Verdict, double CountPercent, double SizePercent);
 
 /// <summary>Why a change never goes back, whatever its area.</summary>
 public enum NeverRestoredReason

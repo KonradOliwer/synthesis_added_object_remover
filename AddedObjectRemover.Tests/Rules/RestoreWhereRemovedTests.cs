@@ -22,9 +22,12 @@ public sealed class RestoreWhereRemovedTests
     private static readonly TestStatic Block = new(new FormKey(ShapeMod, 0x801), @"test\restorearea\block.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20), new Vector3(20))));
     private static readonly TestStatic BigBlock = new(new FormKey(ShapeMod, 0x802), @"test\restorearea\bigblock.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-100), new Vector3(100))));
     private static readonly TestStatic Flat = new(new FormKey(ShapeMod, 0x803), @"test\restorearea\flat.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20, -20, 0), new Vector3(20, 20, 0))));
-    /// <summary>Water spray: a mesh whose only shape is drawn with an effect shader, as big as <see cref="Block"/>.</summary>
-    private static readonly TestStatic Spray = new(new FormKey(ShapeMod, 0x804), @"test\restorearea\spray.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20), new Vector3(20))), EffectOnly: true);
-    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(ShapeMod, "RestoreWhereRemovedData", Block, BigBlock, Flat, Spray));
+    /// <summary>A puff of fog: a mesh whose only shape is drawn with an effect shader, as big as <see cref="Block"/>.</summary>
+    private static readonly TestStatic Mist = new(new FormKey(ShapeMod, 0x804), @"test\restorearea\mist.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20), new Vector3(20))), EffectOnly: true);
+
+    /// <summary>A fog volume drawn only with an effect shader, far larger than every solid piece here.</summary>
+    private static readonly TestStatic Fog = new(new FormKey(ShapeMod, 0x805), @"test\restorearea\fog.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-800), new Vector3(800))), EffectOnly: true);
+    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(ShapeMod, "RestoreWhereRemovedData", Block, BigBlock, Flat, Mist, Fog));
 
     private static readonly ModKey BaseGameMod = ModKey.FromNameAndExtension("Base.esm");
     private static readonly PluginName BaseGame = BaseGameMod.ToPluginName();
@@ -38,7 +41,7 @@ public sealed class RestoreWhereRemovedTests
         Terrain: false,
         Cells: true,
         Navmeshes: false,
-        new ClearedArea(SearchRadius, TenthOfAPercent, ClearedAreaMeasure.ObjectSize),
+        new ClearedArea(SearchRadius, MaxStandingSizePercent: TenthOfAPercent, MaxStandingCountPercent: TenthOfAPercent, ClearedAreaShares.Both),
         TerrainEdgeBlendDistance: 0f,
         HeightChangeTolerance: 8f,
         WaterHeightChangeTolerance: 8f,
@@ -46,6 +49,13 @@ public sealed class RestoreWhereRemovedTests
         new ChangedTerrainSettings(
             On: false, TerrainCheckedObjects.VisibleObjectsOnTheGround, CountHeightChanges: false, 8f, CountTerrainTypeChanges: false, 0,
             CountWaterHeightChanges: false, 0f, CountWaterAddedOrRemoved: false, 0, AreaBySize: false, 0f, AreaByDistance: false, 0f));
+
+    private static readonly WhereRemovedRestoreSettings HalfMayStand =
+        Settings with { ClearedArea = new ClearedArea(SearchRadius, MaxStandingSizePercent: 50, MaxStandingCountPercent: 50, ClearedAreaShares.Both) };
+
+    /// <summary>The default limits, 1% by size and 5% by number, with either share enough.</summary>
+    private static readonly WhereRemovedRestoreSettings EitherAtTheDefaults =
+        Settings with { ClearedArea = new ClearedArea(SearchRadius, MaxStandingSizePercent: 1, MaxStandingCountPercent: 5, ClearedAreaShares.Either) };
 
     private static readonly RecordKey ExteriorCellKey = new(BaseGame, 0x500);
 
@@ -114,40 +124,109 @@ public sealed class RestoreWhereRemovedTests
         const int Side = 32;
         const float Spacing = 20f;
         ImmutableArray<TargetObject> targets = [.. Enumerable.Range(0, objects).Select(index => Own(index, new Vector3(index % Side * Spacing, index / Side * Spacing, 0)))];
-        var byCount = Settings with { ClearedArea = Settings.ClearedArea with { Measure = ClearedAreaMeasure.ObjectCount } };
 
-        var judged = Assert.Single(Plan(targets, removed: [.. Enumerable.Range(1, objects - 1)], [ChangedRock(0x900, Vector3.Zero)], settings: byCount).Objects);
+        var judged = Assert.Single(Plan(targets, removed: [.. Enumerable.Range(1, objects - 1)], [ChangedRock(0x900, Vector3.Zero)]).Objects);
 
         Assert.Equal((objects, 1, expected), (judged.OldPlace!.Objects, judged.OldPlace.Standing, judged.OldPlace.Verdict));
+        Assert.Equal(judged.OldPlace.CountPercent, judged.OldPlace.SizePercent, precision: 9);
     }
 
     /// <summary>A big object stands among three small removed ones: a quarter of them by count, nearly all by size.</summary>
-    [Theory]
-    [InlineData(ClearedAreaMeasure.ObjectCount, AreaVerdict.Cleared)]
-    [InlineData(ClearedAreaMeasure.ObjectSize, AreaVerdict.StillStanding)]
-    public void ByCountAndBySizeGiveDifferentVerdictsForOneBigObjectStandingAmongSmallRemovedOnes(ClearedAreaMeasure measure, AreaVerdict expected)
+    [Fact]
+    public void OneBigObjectStandingAmongSmallRemovedOnesKeepsItsAreaBySize()
     {
         ImmutableArray<TargetObject> targets =
         [
             Own(0, new Vector3(300, 0, 0), BigBlock), Own(1, new Vector3(0, 100, 0)), Own(2, new Vector3(-100, 0, 0)), Own(3, new Vector3(0, -100, 0)),
         ];
-        var halfMayStand = Settings with { ClearedArea = new ClearedArea(SearchRadius, MaxStandingPercent: 50, measure) };
 
-        var judged = Assert.Single(Plan(targets, removed: [1, 2, 3], [ChangedRock(0x900, Vector3.Zero)], settings: halfMayStand).Objects);
+        var judged = Assert.Single(Plan(targets, removed: [1, 2, 3], [ChangedRock(0x900, Vector3.Zero)], settings: HalfMayStand).Objects);
 
-        Assert.Equal(expected, judged.OldPlace!.Verdict);
+        Assert.Equal((AreaVerdict.StillStanding, 25d), (judged.OldPlace!.Verdict, judged.OldPlace.CountPercent));
         Assert.Equal((BigBlockVolume, BigBlockVolume + 3 * BlockVolume), (judged.OldPlace.StandingSize, judged.OldPlace.Size));
     }
 
-    /// <summary>Weighed by size, objects without a volume leave nothing to weigh, so the share is taken by count and says so.</summary>
+    /// <summary>A big object was removed among three small ones that stand: nearly nothing by size, three quarters by count.</summary>
     [Fact]
-    public void AnAreaWhoseObjectsHaveNoVolumeIsWeighedByCount()
+    public void SmallObjectsStandingBesideOneBigRemovedOneKeepTheirAreaByCount()
+    {
+        ImmutableArray<TargetObject> targets =
+        [
+            Own(0, new Vector3(300, 0, 0), BigBlock), Own(1, new Vector3(0, 100, 0)), Own(2, new Vector3(-100, 0, 0)), Own(3, new Vector3(0, -100, 0)),
+        ];
+
+        var judged = Assert.Single(Plan(targets, removed: [0], [ChangedRock(0x900, Vector3.Zero)], settings: HalfMayStand).Objects);
+
+        Assert.Equal((AreaVerdict.StillStanding, 75d), (judged.OldPlace!.Verdict, judged.OldPlace.CountPercent));
+        Assert.True(judged.OldPlace.SizePercent < 50);
+    }
+
+    /// <summary>
+    /// A big object was removed beside a small one that stands: half by number, under 1% by size. Either share is enough with
+    /// <see cref="ClearedAreaShares.Either"/>, so the area is cleared; with both needed it is not.
+    /// </summary>
+    [Theory]
+    [InlineData(ClearedAreaShares.Either, AreaVerdict.Cleared)]
+    [InlineData(ClearedAreaShares.Both, AreaVerdict.StillStanding)]
+    public void OneBigRemovedObjectBesideASmallStandingOneClearsTheAreaOnlyWhenEitherShareIsEnough(ClearedAreaShares shares, AreaVerdict expected)
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(300, 0, 0), BigBlock), Own(1, new Vector3(0, 100, 0))];
+        var settings = EitherAtTheDefaults with { ClearedArea = EitherAtTheDefaults.ClearedArea with { SharesThatMustPass = shares } };
+
+        var judged = Assert.Single(Plan(targets, removed: [0], [ChangedRock(0x900, Vector3.Zero)], settings: settings).Objects);
+
+        Assert.Equal((expected, 50d), (judged.OldPlace!.Verdict, judged.OldPlace.CountPercent));
+        Assert.True(judged.OldPlace.SizePercent < 1);
+    }
+
+    /// <summary>Effect objects have no size, so even when either share is enough their number alone decides: two of three still stand.</summary>
+    [Fact]
+    public void AnAreaOfOnlyEffectObjectsIsNotClearedByItsEmptySizeWhenEitherShareIsEnough()
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0), Fog), Own(1, new Vector3(-100, 0, 0), Fog), Own(2, new Vector3(0, 100, 0), Fog)];
+
+        var judged = Assert.Single(Plan(targets, removed: [0], [ChangedRock(0x900, Vector3.Zero)], settings: EitherAtTheDefaults).Objects);
+
+        Assert.Equal((0d, AreaVerdict.StillStanding), (judged.OldPlace!.Size, judged.OldPlace.Verdict));
+    }
+
+    /// <summary>Objects without a volume leave no size to weigh, so their count alone decides.</summary>
+    [Fact]
+    public void AnAreaWhoseObjectsHaveNoVolumeIsJudgedByCount()
     {
         ImmutableArray<TargetObject> targets = [Own(0, new Vector3(0, 100, 0), Flat), Own(1, new Vector3(0, -100, 0), Flat)];
 
         var judged = Assert.Single(Plan(targets, removed: [1], [ChangedRock(0x900, Vector3.Zero)]).Objects);
 
-        Assert.Equal((2, 0d, ClearedAreaMeasure.ObjectCount, 50d), (judged.OldPlace!.Objects, judged.OldPlace.Size, judged.OldPlace.Measure, judged.OldPlace.StandingPercent));
+        Assert.Equal((2, 0d, 50d, 0d, AreaVerdict.StillStanding), (judged.OldPlace!.Objects, judged.OldPlace.Size, judged.OldPlace.CountPercent, judged.OldPlace.SizePercent, judged.OldPlace.Verdict));
+    }
+
+    /// <summary>
+    /// A fog volume of the cleaned mod far larger than its other pieces was removed; three small pieces stand. The fog counts once and
+    /// adds no size, so the standing pieces keep the area by count and by size.
+    /// </summary>
+    [Fact]
+    public void ALargeRemovedEffectVolumeCountsOnceAndAddsNoSize()
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, Vector3.Zero, Fog), Own(1, new Vector3(0, 100, 0)), Own(2, new Vector3(-100, 0, 0)), Own(3, new Vector3(0, -100, 0))];
+
+        var judged = Assert.Single(Plan(targets, removed: [0], [ChangedRock(0x900, Vector3.Zero)]).Objects);
+
+        Assert.Equal((4, 3 * BlockVolume, 75d, 100d, AreaVerdict.StillStanding), (judged.OldPlace!.Objects, judged.OldPlace.Size, judged.OldPlace.CountPercent, judged.OldPlace.SizePercent, judged.OldPlace.Verdict));
+        Assert.False(judged.IsRestored);
+    }
+
+    /// <summary>The cleaned mod is made only of effect objects, so the area has no size and is judged by count alone.</summary>
+    [Theory]
+    [InlineData(new[] { 0, 1, 2 }, AreaVerdict.Cleared)]
+    [InlineData(new[] { 0, 1 }, AreaVerdict.StillStanding)]
+    public void AnAreaOfOnlyEffectObjectsIsJudgedByCount(int[] removed, AreaVerdict expected)
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0), Fog), Own(1, new Vector3(-100, 0, 0), Fog), Own(2, new Vector3(0, 100, 0), Fog)];
+
+        var judged = Assert.Single(Plan(targets, removed, [ChangedRock(0x900, Vector3.Zero)]).Objects);
+
+        Assert.Equal((3, 0d, expected), (judged.OldPlace!.Objects, judged.OldPlace.Size, judged.OldPlace.Verdict));
     }
 
     [Fact]
@@ -281,15 +360,17 @@ public sealed class RestoreWhereRemovedTests
         Assert.Equal((1, 0, AreaVerdict.Cleared), (judged.OldPlace!.Objects, judged.OldPlace.Standing, judged.OldPlace.Verdict));
     }
 
-    /// <summary>The cleaned mod's water spray, whose mesh holds only effect shapes, still stands next to its removed block.</summary>
+    /// <summary>The cleaned mod's mist, whose mesh holds only effect shapes, still stands next to its removed block.</summary>
     [Fact]
-    public void AStandingObjectWhoseMeshHoldsOnlyEffectsKeepsItsAreaStillStandingBySizeOfItsEffects()
+    public void AStandingObjectWhoseMeshHoldsOnlyEffectsKeepsItsAreaStillStandingByCountAndAddsNoSize()
     {
-        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0)), Own(1, new Vector3(-100, 0, 0), Spray)];
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0)), Own(1, new Vector3(-100, 0, 0), Mist)];
 
         var judged = Assert.Single(Plan(targets, removed: [0], [ChangedRock(0x900, Vector3.Zero)]).Objects);
 
-        Assert.Equal((2, 1, BlockVolume, AreaVerdict.StillStanding), (judged.OldPlace!.Objects, judged.OldPlace.Standing, judged.OldPlace.StandingSize, judged.OldPlace.Verdict));
+        Assert.Equal(
+            (2, 1, BlockVolume, 0d, AreaVerdict.StillStanding),
+            (judged.OldPlace!.Objects, judged.OldPlace.Standing, judged.OldPlace.Size, judged.OldPlace.StandingSize, judged.OldPlace.Verdict));
         Assert.False(judged.IsRestored);
     }
 

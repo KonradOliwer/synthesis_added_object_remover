@@ -14,6 +14,7 @@ internal sealed class ObjectCaches : IObjectCaches
 
     private readonly IReadOnlyList<TargetObject> _targets;
     private readonly ComputedOnce<PlacedSpaces> _objectsOfAnyPlugin;
+    private readonly ComputedOnce<IVisibleTargetObjects> _shownTargets;
     private readonly ObjectContainment _containment;
     private readonly IBaseObjectShapes _shapes;
     private readonly Execution _execution;
@@ -39,6 +40,7 @@ internal sealed class ObjectCaches : IObjectCaches
         _objectsOfAnyPlugin = new ComputedOnce<PlacedSpaces>(
             () => new PlacedSpaces([.. world.OtherModAndSupportOnlyObjects], shapes, measurementRules.ObjectsOfAnyPlugin, _containment, execution));
         VisibleTargets = new VisibleTargetObjects(world.Targets, shapes, _containment, execution, IsVisible);
+        _shownTargets = new ComputedOnce<IVisibleTargetObjects>(() => new VisibleTargetObjects(world.Targets, shapes, _containment, execution, IsShown));
     }
 
     /// <param name="measurementRules">How the other-mod and any-plugin object caches measure an object; the rules belong to the select step.</param>
@@ -61,11 +63,19 @@ internal sealed class ObjectCaches : IObjectCaches
 
     public IVisibleTargetObjects VisibleTargets { get; }
 
-    public IVisibleTargetObjects IndexVisibleTargets(IReadOnlyList<TargetObject> targets) =>
-        AreTheCollectedObjects(targets) ? VisibleTargets : _indexes.Get(targets, () => new VisibleTargetObjects(targets, _shapes, _containment, _execution, IsVisible));
+    public IVisibleTargetObjects IndexVisibleTargets(IReadOnlyList<TargetObject> targets) => Index(targets, () => VisibleTargets, _indexes, IsVisible);
 
-    public IVisibleTargetObjects IndexShownTargets(IReadOnlyList<TargetObject> targets) =>
-        _shownIndexes.Get(targets, () => new VisibleTargetObjects(targets, _shapes, _containment, _execution, IsShown));
+    public IVisibleTargetObjects IndexShownTargets(IReadOnlyList<TargetObject> targets) => Index(targets, () => _shownTargets.Value, _shownIndexes, IsShown);
+
+    /// <param name="ofTheCollectedObjects">The index of the collected objects of that visibility.</param>
+    /// <param name="built">The indexes built for other lists of that visibility.</param>
+    /// <param name="counts">Whether a target of this visibility is indexed.</param>
+    private IVisibleTargetObjects Index(
+        IReadOnlyList<TargetObject> targets,
+        Func<IVisibleTargetObjects> ofTheCollectedObjects,
+        ComputedOncePerKey<IReadOnlyList<TargetObject>, IVisibleTargetObjects> built,
+        Func<ObjectVisibility, bool> counts) =>
+        AreTheCollectedObjects(targets) ? ofTheCollectedObjects() : built.Get(targets, () => new VisibleTargetObjects(targets, _shapes, _containment, _execution, counts));
 
     private static bool IsVisible(ObjectVisibility visibility) => visibility.IsVisible;
 

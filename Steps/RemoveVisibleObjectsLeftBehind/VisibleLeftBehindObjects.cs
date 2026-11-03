@@ -61,14 +61,15 @@ public static class VisibleLeftBehindObjects
         var nothingFollowedUp = followUp.Summarize(decisions);
         if (input.Settings is not { } settings) return new VisibleLeftBehindResult(StepOutcome.SwitchedOff, [], [], [], TimeSpan.Zero, nothingFollowedUp, Failure: null);
 
-        var surroundings = input.Caches.IndexShownTargets(decisions.TargetsAsTheRoundsMeasureThem(input.Targets));
+        // Effect-only objects are judged but are no surroundings: effect pieces whose solid surroundings are gone would otherwise keep each other.
+        var surroundings = input.Caches.IndexVisibleTargets(decisions.TargetsAsTheRoundsMeasureThem(input.Targets));
         return Failures.Attempt(
             () => JoinVerdicts(DecideRounds(input, surroundings, settings), decisions, followUp),
             failure => new VisibleLeftBehindResult(
                 StepOutcome.StoppedByUnexpectedError, [], [], [], TimeSpan.Zero, nothingFollowedUp, PartFailure.OfWholePart(VisibleLeftBehindParts.VisibleLeftBehind, failure)));
     }
 
-    /// <param name="surroundings">The shown target objects, removed or not, where the rounds measure them: a restored one where the cleaned mod put it.</param>
+    /// <param name="surroundings">The visible target objects, removed or not, where the rounds measure them: a restored one where the cleaned mod put it.</param>
     private static VisibleLeftBehindRounds DecideRounds(Input input, IVisibleTargetObjects surroundings, VisibleLeftBehindSettings settings)
     {
         var (targets, decisions) = (input.Targets, input.Decisions);

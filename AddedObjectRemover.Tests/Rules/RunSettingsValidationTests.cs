@@ -391,7 +391,7 @@ public class RunSettingsValidationTests
 
         var restore = ready.Settings.RestoreWhereRemoved!;
         Assert.Equal((true, true, true, true), (restore.OtherModsObjects, restore.Terrain, restore.Cells, restore.Navmeshes));
-        Assert.Equal(new ClearedArea(5000f, 0.1, ClearedAreaMeasure.ObjectSize), restore.ClearedArea);
+        Assert.Equal(new ClearedArea(5000f, MaxStandingSizePercent: 1, MaxStandingCountPercent: 5, ClearedAreaShares.Both), restore.ClearedArea);
         Assert.Equal(256f, restore.TerrainEdgeBlendDistance);
         Assert.Equal(
             (ready.Settings.Collision.ChangedTerrain.HeightTolerance, ready.Settings.Collision.ChangedTerrain.WaterHeightTolerance),
@@ -495,18 +495,23 @@ public class RunSettingsValidationTests
     [InlineData(100.5f, 100.0)]
     [InlineData(0f, 0.0)]
     [InlineData(100f, 100.0)]
-    public void TheMaxStandingPercentIsLimitedTo0To100(float configured, double expected)
+    public void EachMaxStandingPercentIsLimitedTo0To100(float configured, double expected)
     {
         var settings = SettingsFor();
-        settings.RestoreWhereRemoved.ClearedArea.MaxStandingPercent = configured;
+        settings.RestoreWhereRemoved.ClearedArea.MaxStandingSizePercent = configured;
+        settings.RestoreWhereRemoved.ClearedArea.MaxStandingCountPercent = configured;
 
         var ready = BuildReady(settings);
 
-        Assert.Equal(expected, ready.Settings.RestoreWhereRemoved!.ClearedArea.MaxStandingPercent);
-        AssertOnlyWarning(
-            ready,
-            configured != expected,
-            $"Warning: {ClearedAreaGroup}Cleared when at most this share still stands {configured} is outside 0-100; using {expected}.");
+        var area = ready.Settings.RestoreWhereRemoved!.ClearedArea;
+        string[] warnings = configured == expected
+            ? []
+            : [
+                $"Warning: {ClearedAreaGroup}Cleared when at most this share of their size still stands {configured} is outside 0-100; using {expected}.",
+                $"Warning: {ClearedAreaGroup}Cleared when at most this share of their number still stands {configured} is outside 0-100; using {expected}.",
+            ];
+        Assert.Equal((expected, expected), (area.MaxStandingSizePercent, area.MaxStandingCountPercent));
+        Assert.Equal(warnings, ready.Warnings.Select(warning => warning.Message));
     }
 
     [Theory]
@@ -516,12 +521,37 @@ public class RunSettingsValidationTests
     public void ADecimalMaxStandingPercentIsKeptAsTyped(float configured, double expected)
     {
         var settings = SettingsFor();
-        settings.RestoreWhereRemoved.ClearedArea.MaxStandingPercent = configured;
+        settings.RestoreWhereRemoved.ClearedArea.MaxStandingSizePercent = configured;
+        settings.RestoreWhereRemoved.ClearedArea.MaxStandingCountPercent = configured;
 
         var ready = BuildReady(settings);
 
-        Assert.Equal(expected, ready.Settings.RestoreWhereRemoved!.ClearedArea.MaxStandingPercent);
+        var area = ready.Settings.RestoreWhereRemoved!.ClearedArea;
+        Assert.Equal((expected, expected), (area.MaxStandingSizePercent, area.MaxStandingCountPercent));
         Assert.Empty(ready.Warnings);
+    }
+
+    [Theory]
+    [InlineData(ClearedAreaShares.Both)]
+    [InlineData(ClearedAreaShares.Either)]
+    public void TheSharesThatMustPassAreKept(ClearedAreaShares shares)
+    {
+        var settings = SettingsFor();
+        settings.RestoreWhereRemoved.ClearedArea.SharesThatMustPass = shares;
+
+        Assert.Equal(shares, BuildReady(settings).Settings.RestoreWhereRemoved!.ClearedArea.SharesThatMustPass);
+    }
+
+    [Fact]
+    public void UndefinedSharesThatMustPassBecomeBothWithAWarning()
+    {
+        var settings = SettingsFor();
+        settings.RestoreWhereRemoved.ClearedArea.SharesThatMustPass = (ClearedAreaShares)99;
+
+        var ready = BuildReady(settings);
+
+        Assert.Equal(ClearedAreaShares.Both, ready.Settings.RestoreWhereRemoved!.ClearedArea.SharesThatMustPass);
+        Assert.Equal($"Warning: {ClearedAreaGroup}Shares that must be under their limit 99 is invalid; using Both.", Assert.Single(ready.Warnings).Message);
     }
 
     [Theory]
@@ -545,41 +575,22 @@ public class RunSettingsValidationTests
     {
         var settings = SettingsFor();
         settings.RestoreWhereRemoved.ClearedArea.SearchRadius = float.NaN;
-        settings.RestoreWhereRemoved.ClearedArea.MaxStandingPercent = float.NaN;
+        settings.RestoreWhereRemoved.ClearedArea.MaxStandingSizePercent = float.NaN;
+        settings.RestoreWhereRemoved.ClearedArea.MaxStandingCountPercent = float.NaN;
         settings.RestoreWhereRemoved.TerrainEdgeBlendDistanceInUnits = float.NaN;
 
         var ready = BuildReady(settings);
 
         var restore = ready.Settings.RestoreWhereRemoved!;
-        Assert.Equal((new ClearedArea(5000f, 0.1, ClearedAreaMeasure.ObjectSize), 256f), (restore.ClearedArea, restore.TerrainEdgeBlendDistance));
+        Assert.Equal((new ClearedArea(5000f, 1, 5, ClearedAreaShares.Both), 256f), (restore.ClearedArea, restore.TerrainEdgeBlendDistance));
         Assert.Equal(
             [
                 $"Warning: {ClearedAreaGroup}Look this far around the place is not a valid number; using 5000.",
-                $"Warning: {ClearedAreaGroup}Cleared when at most this share still stands is not a valid number; using 0.1.",
+                $"Warning: {ClearedAreaGroup}Cleared when at most this share of their size still stands is not a valid number; using 1.",
+                $"Warning: {ClearedAreaGroup}Cleared when at most this share of their number still stands is not a valid number; using 5.",
                 $"Warning: {RestoreGroup}Blend terrain edges over is not a valid number; using 256.",
             ],
             ready.Warnings.Select(warning => warning.Message));
-    }
-
-    [Fact]
-    public void AnUndefinedMeasureBecomesObjectSizeWithAWarning()
-    {
-        var settings = SettingsFor();
-        settings.RestoreWhereRemoved.ClearedArea.Measure = (ClearedAreaMeasure)99;
-
-        var ready = BuildReady(settings);
-
-        Assert.Equal(ClearedAreaMeasure.ObjectSize, ready.Settings.RestoreWhereRemoved!.ClearedArea.Measure);
-        Assert.Equal($"Warning: {ClearedAreaGroup}Measure the share by 99 is invalid; using ObjectSize.", Assert.Single(ready.Warnings).Message);
-    }
-
-    [Fact]
-    public void ObjectCountIsKept()
-    {
-        var settings = SettingsFor();
-        settings.RestoreWhereRemoved.ClearedArea.Measure = ClearedAreaMeasure.ObjectCount;
-
-        Assert.Equal(ClearedAreaMeasure.ObjectCount, BuildReady(settings).Settings.RestoreWhereRemoved!.ClearedArea.Measure);
     }
 
     [Fact]
@@ -587,7 +598,7 @@ public class RunSettingsValidationTests
     {
         var settings = SettingsFor();
         settings.RestoreWhereRemoved = AllRestoresOff();
-        settings.RestoreWhereRemoved.ClearedArea = new ClearedAreaSettings { SearchRadius = 1f, MaxStandingPercent = 101f, Measure = (ClearedAreaMeasure)7 };
+        settings.RestoreWhereRemoved.ClearedArea = new ClearedAreaSettings { SearchRadius = 1f, MaxStandingSizePercent = 101f, MaxStandingCountPercent = -1f, SharesThatMustPass = (ClearedAreaShares)7 };
         settings.RestoreWhereRemoved.TerrainEdgeBlendDistanceInUnits = 2000f;
 
         var ready = BuildReady(settings);
@@ -596,8 +607,9 @@ public class RunSettingsValidationTests
         Assert.Equal(
             [
                 $"Warning: {ClearedAreaGroup}Look this far around the place 1 is outside 1024-16384; using 1024.",
-                $"Warning: {ClearedAreaGroup}Cleared when at most this share still stands 101 is outside 0-100; using 100.",
-                $"Warning: {ClearedAreaGroup}Measure the share by 7 is invalid; using ObjectSize.",
+                $"Warning: {ClearedAreaGroup}Cleared when at most this share of their size still stands 101 is outside 0-100; using 100.",
+                $"Warning: {ClearedAreaGroup}Cleared when at most this share of their number still stands -1 is outside 0-100; using 0.",
+                $"Warning: {ClearedAreaGroup}Shares that must be under their limit 7 is invalid; using Both.",
                 $"Warning: {RestoreGroup}Blend terrain edges over 2000 is outside 0-1024; using 1024.",
             ],
             ready.Warnings.Select(warning => warning.Message));

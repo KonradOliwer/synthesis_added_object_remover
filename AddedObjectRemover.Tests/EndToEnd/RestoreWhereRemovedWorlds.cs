@@ -50,7 +50,13 @@ internal static class RestoreWhereRemovedWorlds
 
     /// <summary>A tiny object 5 units from the side of a crate: too close to it, yet far too small to count against clearing the area.</summary>
     private const float PebbleDistance = 60f;
+
+    /// <summary>How far east of the south-west quarter's centre the second crate stands, inside that quarter's area only.</summary>
+    private const float SecondCrateOffset = 300f;
     private const int InitiallyDisabled = (int)SkyrimMajorRecord.SkyrimMajorRecordFlag.InitiallyDisabled;
+    private const int SiteRows = 3;
+    private const int SiteColumns = 5;
+    private const int MiddleRow = 1;
     private const int Side = TerrainGrid.VerticesPerSide;
 
     /// <summary>
@@ -94,8 +100,9 @@ internal static class RestoreWhereRemovedWorlds
     public static IReadOnlyList<ISkyrimMod> CreateTerrain(string dataFolder) => CreateTerrain(dataFolder, withALoneObject: false);
 
     /// <summary>
-    /// <see cref="CreateTerrain(string)"/> with a tiny object of the cleaned mod in the south-west quarter, which is cleared and goes
-    /// back: it is far too small to count against clearing the quarter, and it is the one leftover, in a cell of the exterior.
+    /// <see cref="CreateTerrain(string)"/> with a tiny object of the cleaned mod in the south-west quarter, and a second crate there with
+    /// a city pad beside it, which is removed. The quarter is cleared and goes back: the tiny object is one of three by count and far too
+    /// small by size to keep it, and it is the one leftover, in a cell of the exterior.
     /// </summary>
     public static IReadOnlyList<ISkyrimMod> CreateTerrainWithALoneObject(string dataFolder) => CreateTerrain(dataFolder, withALoneObject: true);
 
@@ -115,7 +122,11 @@ internal static class RestoreWhereRemovedWorlds
         if (withALoneObject)
         {
             var pebbleBase = target.AddBoundsOnlyStatic("T_PebbleBase", new Box(new Vector3(-5, -5, 0), new Vector3(5, 5, 10)));
-            target.Exterior.Place("T_Pebble", pebbleBase, new Vector3(ExteriorGrid.CellSize / 4, ExteriorGrid.CellSize / 4, ground));
+            var quarterCentre = new Vector3(ExteriorGrid.CellSize / 4, ExteriorGrid.CellSize / 4, ground);
+            target.Exterior.Place("T_Pebble", pebbleBase, quarterCentre);
+            var second = quarterCentre + new Vector3(SecondCrateOffset, 0, 0);
+            target.Exterior.Place("T_Second", own, second);
+            city.Exterior.Place("C_SecondPad", city.AddModeledStatic("C_SecondPadBase", FixtureMeshes.PadModel), second + new Vector3(PadDistance, 0, 0));
         }
         return [baseGame.Mod, target.Mod, city.Mod];
     }
@@ -158,6 +169,44 @@ internal static class RestoreWhereRemovedWorlds
         target.Interior.PlaceCopyOf(baseGame.Interior.Place("B_Rock", crate, RockAt)).MajorRecordFlagsRaw |= InitiallyDisabled;
         addOn.Interior.Place("A_Table", addOn.AddModeledStatic("A_TableBase", FixtureMeshes.CrateModel), RockAt + new Vector3(TableOffset, 0, 0));
         return [baseGame.Mod, target.Mod, city.Mod, patch.Mod, addOn.Mod];
+    }
+
+    /// <summary>Where the base game's piece the cleaned mod disabled stands, beside the cleaned mod's site.</summary>
+    public static readonly Vector3 HiddenAt = At(100, 600);
+
+    /// <summary>Where the base game's piece the cleaned mod moved stood, and where it moved it.</summary>
+    public static readonly Vector3 MovedFrom = At(100, -600);
+    public static readonly Vector3 MovedTo = At(100, -1000);
+
+    /// <summary>
+    /// The interior, where the cleaned mod built a site of its own: crates side by side in three rows of five, which touch each other,
+    /// with a mist (a mesh drawn only with an effect shader, three crates wide) in place of the second and the fourth crate of the
+    /// middle row, so each mist covers the side of the other that faces it. A city pad stands beside the first crate of the first row,
+    /// so that crate is too close, and the crates touching it go with it; the mists then stand among removed crates and each other. The
+    /// cleaned mod also disabled a base-game crate and moved another out of the site.
+    /// </summary>
+    public static IReadOnlyList<ISkyrimMod> CreateSiteWithMists(string dataFolder)
+    {
+        FixtureMeshes.WriteAll(dataFolder);
+        FixtureMeshes.WriteMist(dataFolder);
+        var (baseGame, target, city, _) = CreateMods();
+        var (block, mist) = (target.AddModeledStatic("T_BlockBase", FixtureMeshes.CrateModel), target.AddModeledStatic("T_MistBase", FixtureMeshes.MistModel));
+        for (var row = 0; row < SiteRows; row++)
+        {
+            for (var column = 0; column < SiteColumns; column++)
+            {
+                var at = At((column - 1) * FixtureMeshes.CrateSize, (row - 1) * FixtureMeshes.CrateSize);
+                var isMist = row == MiddleRow && column % 2 == 1;
+                target.Interior.Place($"T_{(isMist ? "Mist" : "Block")}{row}{column}", isMist ? mist : block, at);
+            }
+        }
+
+        var corner = At(-FixtureMeshes.CrateSize, -FixtureMeshes.CrateSize);
+        city.Interior.Place("C_Pad", city.AddModeledStatic("C_PadBase", FixtureMeshes.PadModel), corner - new Vector3(PadDistance, 0, 0));
+        var crate = baseGame.AddModeledStatic("B_CrateBase", FixtureMeshes.CrateModel);
+        target.Interior.PlaceCopyOf(baseGame.Interior.Place("B_Hidden", crate, HiddenAt)).MajorRecordFlagsRaw |= InitiallyDisabled;
+        MoveCopy(target.Interior.PlaceCopyOf(baseGame.Interior.Place("B_Moved", crate, MovedFrom)), MovedTo);
+        return [baseGame.Mod, target.Mod, city.Mod];
     }
 
     private static (FixtureMod BaseGame, FixtureMod Target, FixtureMod City, FixtureSpaces Spaces) CreateMods()

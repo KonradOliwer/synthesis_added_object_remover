@@ -8,12 +8,18 @@ namespace AddedObjectRemover.Tests.Rules;
 /// <summary>
 /// The cleaned mod's objects still standing where an area is restored: removed in the leftovers' round unless a kind the left-behind
 /// steps always keep or an object to keep holds them, and the other mods' objects they held up settled again, over in-memory scenes.
-/// A small piece stands in a clearing a huge removed block cleared, so the area is cleared by the ordinary rule.
+/// A small piece or two stand in a clearing a huge removed block cleared: by size nearly nothing stands, and by count the scenes stay
+/// under <see cref="FewPiecesMayStand"/>, so the area is cleared by the ordinary rule.
 /// </summary>
 public sealed class RestoreWhereRemovedLeftoverTests
 {
     private const float SearchRadius = 1000f;
-    private const double TenthOfAPercent = 0.1;
+
+    /// <summary>Two of three of the cleaned mod's drawn objects may still stand by number; by size the default 1%.</summary>
+    private static readonly ClearedArea FewPiecesMayStand = new(SearchRadius, MaxStandingSizePercent: 1, MaxStandingCountPercent: 70, ClearedAreaShares.Both);
+
+    /// <summary>Any share may stand: for a scene whose many standing pieces only test how the leftovers are removed.</summary>
+    private static readonly ClearedArea EveryShareMayStand = new(SearchRadius, MaxStandingSizePercent: 100, MaxStandingCountPercent: 100, ClearedAreaShares.Both);
     private const float TableHeight = 40f;
     private const float LanternHeight = 6f;
     private const float TouchGap = 1f;
@@ -28,11 +34,11 @@ public sealed class RestoreWhereRemovedLeftoverTests
     private static readonly TestStatic HugeBlock = new(new FormKey(ShapeMod, 0x801), @"test\restoreleftovers\hugeblock.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-HugeHalfSize), new Vector3(HugeHalfSize))));
     private static readonly TestStatic WideBlock = new(new FormKey(ShapeMod, 0x802), @"test\restoreleftovers\wideblock.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-WideHalfSize), new Vector3(WideHalfSize))));
     private static readonly TestStatic Pebble = new(new FormKey(ShapeMod, 0x803), @"test\restoreleftovers\pebble.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-1.5f, -1.5f, 0), new Vector3(1.5f, 1.5f, 3))));
-    private static readonly TestStatic Spray = new(new FormKey(ShapeMod, 0x804), @"test\restoreleftovers\spray.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-1.5f, -1.5f, 0), new Vector3(1.5f, 1.5f, 3))), EffectOnly: true);
+    private static readonly TestStatic Mist = new(new FormKey(ShapeMod, 0x804), @"test\restoreleftovers\mist.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-1.5f, -1.5f, 0), new Vector3(1.5f, 1.5f, 3))), EffectOnly: true);
     private static readonly TestStatic Table = new(new FormKey(ShapeMod, 0x805), @"test\restoreleftovers\table.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20, -20, 0), new Vector3(20, 20, TableHeight))));
     private static readonly TestStatic Lantern = new(new FormKey(ShapeMod, 0x806), @"test\restoreleftovers\lantern.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-3, -3, 0), new Vector3(3, 3, LanternHeight))));
     private static readonly TestStatic Floor = new(new FormKey(ShapeMod, 0x807), @"test\restoreleftovers\floor.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-FloorHalfSize, -FloorHalfSize, -10), new Vector3(FloorHalfSize, FloorHalfSize, 0))));
-    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(ShapeMod, "RestoreLeftoverData", HugeBlock, WideBlock, Pebble, Spray, Table, Lantern, Floor));
+    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(ShapeMod, "RestoreLeftoverData", HugeBlock, WideBlock, Pebble, Mist, Table, Lantern, Floor));
 
     private static readonly BaseKey XMarker = TestVisibility.TaggedBase(ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers));
 
@@ -49,7 +55,7 @@ public sealed class RestoreWhereRemovedLeftoverTests
         Terrain: false,
         Cells: false,
         Navmeshes: false,
-        new ClearedArea(SearchRadius, TenthOfAPercent, ClearedAreaMeasure.ObjectSize),
+        FewPiecesMayStand,
         TerrainEdgeBlendDistance: 0f,
         HeightChangeTolerance: 8f,
         WaterHeightChangeTolerance: 8f,
@@ -68,7 +74,7 @@ public sealed class RestoreWhereRemovedLeftoverTests
     {
         var scene = new Scene
         {
-            Targets = [Own(0, HugeBlockPlace, HugeBlock), Own(1, new Vector3(100, 0, 0), Pebble), Own(2, new Vector3(0, 100, 0), Spray), OwnInvisible(3, new Vector3(-100, 0, 0), XMarker)],
+            Targets = [Own(0, HugeBlockPlace, HugeBlock), Own(1, new Vector3(100, 0, 0), Pebble), Own(2, new Vector3(0, 100, 0), Mist), OwnInvisible(3, new Vector3(-100, 0, 0), XMarker)],
             Removed = [0],
         };
 
@@ -80,12 +86,126 @@ public sealed class RestoreWhereRemovedLeftoverTests
         Assert.True(Assert.Single(result.Objects).IsRestored);
     }
 
+    /// <summary>
+    /// A second rock the cleaned mod moved stands where the huge block is out of its area, so only the pebble stands in its area. The
+    /// first rock's area takes the pebble away as a leftover, but the areas were judged before that removal and are not judged again,
+    /// so the second rock stays where the cleaned mod put it: removal never spreads from area to area.
+    /// </summary>
+    [Fact]
+    public void ALeftoverRemovedInOneAreaNeverClearsAnotherArea()
+    {
+        const float PebbleX = 800f;
+        const float SecondRockX = 1700f;
+        var pebble = new Vector3(PebbleX, 0, 0);
+        var secondRock = new Vector3(SecondRockX, 0, 0);
+        var scene = new Scene
+        {
+            Targets = [Own(0, HugeBlockPlace, HugeBlock), Own(1, pebble, Pebble)],
+            Removed = [0],
+            Changed = [ChangedRock(0x900, Vector3.Zero), ChangedRock(0x901, secondRock)],
+        };
+
+        var (result, decisions) = Plan(scene);
+
+        AssertRemovedAsLeftover(decisions, 1);
+        Assert.Equal([1], result.Leftovers.Select(leftover => leftover.Target.Index));
+        Assert.Equal([true, false], result.Objects.Select(judged => judged.IsRestored));
+        Assert.Equal((1, 1, AreaVerdict.StillStanding), (result.Objects[1].OldPlace!.Objects, result.Objects[1].OldPlace!.Standing, result.Objects[1].OldPlace!.Verdict));
+    }
+
+    /// <summary>
+    /// A forest of the cleaned mod: trees in a grid, those west of the change removed, those from it eastward standing. The change sits
+    /// on the border, so about half of its area still stands by number and by size: at the default limits the area is not cleared,
+    /// whether both shares or either must pass, and no standing tree is removed as a leftover.
+    /// </summary>
+    [Theory]
+    [InlineData(ClearedAreaShares.Both)]
+    [InlineData(ClearedAreaShares.Either)]
+    public void AChangeOnTheBorderOfARemovedClusterAndAStandingForestNeverTrimsTheForest(ClearedAreaShares shares)
+    {
+        const int Side = 19;
+        const float Spacing = 200f;
+        const float West = -1800f;
+        var places = Enumerable.Range(0, Side * Side).Select(index => new Vector3(West + index % Side * Spacing, West + index / Side * Spacing, 0)).ToList();
+        var scene = new Scene
+        {
+            Targets = [.. places.Select((place, index) => Own(index, place, Table))],
+            Removed = [.. places.Index().Where(entry => entry.Item.X < 0).Select(entry => entry.Index)],
+            ClearedArea = new ClearedArea(SearchRadius, MaxStandingSizePercent: 1, MaxStandingCountPercent: 5, shares),
+        };
+
+        var (result, decisions) = Plan(scene);
+
+        var judged = Assert.Single(result.Objects);
+        Assert.Equal((false, AreaVerdict.StillStanding), (judged.IsRestored, judged.OldPlace!.Verdict));
+        Assert.True(judged.OldPlace.CountPercent > 40 && judged.OldPlace.SizePercent > 40);
+        Assert.Empty(result.Leftovers);
+        Assert.All(places.Index().Where(entry => entry.Item.X >= 0), entry => Assert.False(decisions.IsRemoved(new TargetId(entry.Index))));
+    }
+
+    /// <summary>
+    /// A removed grove of the cleaned mod's trees, 100 units apart, with its standing forest east of it. The change lies so far west
+    /// that its area just reaches one tree at the forest's rim: one of about 315 trees, so the area is cleared at the default limits.
+    /// That rim tree's own area holds the forest beyond it, so it stays; a pebble standing beside the change, whose own area is the
+    /// removed grove, is a true leftover and goes.
+    /// </summary>
+    [Theory]
+    [InlineData(ClearedAreaShares.Both)]
+    [InlineData(ClearedAreaShares.Either)]
+    public void AClearedAreaThatReachesTheRimOfAStandingForestRemovesOnlyTheTrueLeftovers(ClearedAreaShares shares)
+    {
+        const float Spacing = 100f;
+        const float GroveWest = -1150f;
+        const float ForestWest = 950f;
+        const float ForestEast = 1950f;
+        const float North = 1000f;
+        var change = new Vector3(-45, 0, 0);
+        var rimTree = new Vector3(ForestWest, 0, 0);
+        var places = (from x in Steps(GroveWest, ForestEast, Spacing) from y in Steps(-North, North, Spacing) select new Vector3(x, y, 0)).ToList();
+        var pebble = places.Count;
+        var scene = new Scene
+        {
+            Targets = [.. places.Select((place, index) => Own(index, place, Table)), Own(pebble, change + new Vector3(0, 30, 0), Pebble)],
+            Removed = [.. places.Index().Where(entry => entry.Item.X < ForestWest).Select(entry => entry.Index)],
+            Changed = [ChangedRock(0x900, change)],
+            ClearedArea = new ClearedArea(SearchRadius, MaxStandingSizePercent: 1, MaxStandingCountPercent: 5, shares),
+        };
+
+        var (result, decisions) = Plan(scene);
+
+        Assert.Equal(AreaVerdict.Cleared, Assert.Single(result.Objects).OldPlace!.Verdict);
+        Assert.Equal([pebble], result.Leftovers.Select(leftover => leftover.Target.Index));
+        AssertRemovedAsLeftover(decisions, pebble);
+        Assert.False(decisions.IsRemoved(new TargetId(places.IndexOf(rimTree))));
+        Assert.All(places.Index().Where(entry => entry.Item.X >= ForestWest), entry => Assert.False(decisions.IsRemoved(new TargetId(entry.Index))));
+    }
+
+    /// <summary>A marker at the far side of a cleared column: no drawn object of the cleaned mod is in its own area, so nothing it could trim stands, and it goes.</summary>
+    [Fact]
+    public void AnInvisibleLeftoverWhoseOwnAreaHoldsNoDrawnObjectIsRemoved()
+    {
+        const float FarSide = -900f;
+        var scene = new Scene
+        {
+            Targets = [Own(0, HugeBlockPlace, HugeBlock), OwnInvisible(1, new Vector3(FarSide, 0, 0), XMarker)],
+            Removed = [0],
+        };
+
+        var (result, decisions) = Plan(scene);
+
+        Assert.Equal([1], result.Leftovers.Select(leftover => leftover.Target.Index));
+        AssertRemovedAsLeftover(decisions, 1);
+    }
+
+    private static IEnumerable<float> Steps(float from, float to, float step) =>
+        Enumerable.Range(0, (int)MathF.Round((to - from) / step) + 1).Select(index => from + index * step);
+
     [Fact]
     public void ALeftoverAmongTheObjectsToKeepIsKeptWithItsKeepReason()
     {
         var scene = new Scene
         {
-            Targets = [Own(0, HugeBlockPlace, HugeBlock), Own(1, new Vector3(100, 0, 0), Pebble), Own(2, new Vector3(0, 100, 0), Spray)],
+            Targets = [Own(0, HugeBlockPlace, HugeBlock), Own(1, new Vector3(100, 0, 0), Pebble), Own(2, new Vector3(0, 100, 0), Mist)],
             Removed = [0],
             KeepReasons = new Dictionary<int, KeepReason> { [1] = TestKeepReasons.Quest },
         };
@@ -169,6 +289,7 @@ public sealed class RestoreWhereRemovedLeftoverTests
             Targets = [Own(0, new Vector3(-700, 0, -BelowTheFloor * WideHalfSize), WideBlock), .. tables.Select((place, index) => Own(1 + index, place, Table))],
             Removed = [0],
             Others = [Placed(0, Floor, Vector3.Zero), .. tables.Select((place, index) => Placed(1 + index, Lantern, place + new Vector3(0, 0, TableHeight)))],
+            ClearedArea = EveryShareMayStand,
         };
 
         var one = Plan(scene with { Workers = 1 });
@@ -201,10 +322,10 @@ public sealed class RestoreWhereRemovedLeftoverTests
 
     private static OtherObject Placed(int index, TestStatic model, Vector3 position) => TestShapes.Placed(BaseGameMod, index, model.Base, position);
 
-    /// <summary>A rock of the base game that the cleaned mod moved from the origin, which goes back there.</summary>
-    private static RecordChangedByCleanedMod ChangedRock() =>
+    /// <summary>A rock of the base game that the cleaned mod moved from the given place, which goes back there.</summary>
+    private static RecordChangedByCleanedMod ChangedRock(uint id, Vector3 oldPlace) =>
         new(
-            new RecordKey(BaseGame, 0x900),
+            new RecordKey(BaseGame, id),
             EditorId: null,
             TestTargets.Space,
             new CellFact(TestTargets.Space, null),
@@ -213,7 +334,7 @@ public sealed class RestoreWhereRemovedLeftoverTests
             BaseNow: null,
             TestPlacedRecords.PlainReference,
             IsPersistent: false,
-            TestTargets.EarlierVersionAt(BaseGame, new EulerPlacement(Vector3.Zero, Vector3.Zero, 1f)),
+            TestTargets.EarlierVersionAt(BaseGame, new EulerPlacement(oldPlace, Vector3.Zero, 1f)),
             Target: null,
             LinkedFromCleanedMod: false,
             PresenceBefore: default);
@@ -225,7 +346,7 @@ public sealed class RestoreWhereRemovedLeftoverTests
     {
         ImmutableArray<TargetObject> targets = [.. scene.Targets];
         List<OtherObject> others = [.. scene.Others.Select((other, index) => other with { Id = new OtherId(index) })];
-        var collected = TestScenes.CreateWorld(targets, others) with { ChangedRecords = [ChangedRock()] };
+        var collected = TestScenes.CreateWorld(targets, others) with { ChangedRecords = [.. scene.Changed] };
         var support = new OtherModsObjectsSettings(scene.Handling, TouchGap, SupportLostFraction: 0.5f);
         var rules = TestPlacedGuardRules.Create(Shapes, Trust, Plugins, support, TestGround.NoTerrain(), scene.Workers);
         var decisions = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, scene.Links, TestTargets.References(targets.Length, scene.KeepReasons), TestBaseFacts.Unresolved), targets.Length)
@@ -242,7 +363,7 @@ public sealed class RestoreWhereRemovedLeftoverTests
                     Plugins,
                     TestTargets.TargetName),
                 new Execution(scene.Workers),
-                Settings,
+                Settings with { ClearedArea = scene.ClearedArea },
                 () => TimeSpan.Zero));
         return (decided.Result, decided.Decisions);
     }
@@ -253,6 +374,11 @@ public sealed class RestoreWhereRemovedLeftoverTests
         public List<TargetObject> Targets { get; init; } = [];
 
         public int[] Removed { get; init; } = [];
+
+        public ClearedArea ClearedArea { get; init; } = FewPiecesMayStand;
+
+        /// <summary>The other plugins' records the cleaned mod changed; by default one rock it moved from the origin.</summary>
+        public List<RecordChangedByCleanedMod> Changed { get; init; } = [ChangedRock(0x900, Vector3.Zero)];
 
         public TargetLink[] Links { get; init; } = [];
 

@@ -9,7 +9,7 @@ namespace AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
 
 /// <summary>
 /// The verdict on the target's visible objects whose surroundings, the target's other visible objects around them, were removed.
-/// An object whose mesh holds only effect shapes is drawn too, so it is judged and counts as surroundings like any visible object.
+/// An object whose mesh holds only effect shapes is drawn too, so it is judged, but it is no surroundings of other objects.
 /// The rule only judges; the removal decisions keep referenced objects and remove the linked groups of the removals.
 /// </summary>
 internal sealed class VisibleLeftBehindRule(

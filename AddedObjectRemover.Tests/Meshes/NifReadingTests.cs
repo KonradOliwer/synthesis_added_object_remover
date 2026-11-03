@@ -118,6 +118,21 @@ public class NifReadingTests
     }
 
     [Fact]
+    public void AnEffectOnlyMeshWithASkippedSolidShapeIsMeasuredByItsEffectShape()
+    {
+        var nif = TestNifs.CreateWithRoot();
+        var root = TestNifs.Root(nif);
+        TestNifs.AddEffectShader(nif, TestNifs.AddShape(nif, root, TestMeshes.BoxTriangles(Crate)));
+        var marker = TestNifs.AddNode(nif, root, "EditorMarker", Vector3.Zero);
+        TestNifs.AddShape(nif, marker, TestMeshes.BoxTriangles(new Box(Vector3.Zero, new Vector3(50, 50, 50))));
+
+        var result = new NifGeometryReader().ReadGeometry(TestNifs.Save(nif), includeTriangles: false, BaseObjectShapes.SolidShapes);
+
+        Assert.Equal(MeshReadStatus.EffectOnly, result.Status);
+        Assert.Equal(Crate, result.EffectBox);
+    }
+
+    [Fact]
     public void MatchingStripLengthsGiveTriangles()
     {
         var strips = CreateStrips(points: [0, 1, 2, 3], stripLengths: [4]);

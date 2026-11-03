@@ -175,6 +175,8 @@ internal sealed class NifShapeCollector
         {
             case MeshShapeKind.EditorMarker: _stats.EditorMarker++; break;
             case MeshShapeKind.EffectShader: _stats.EffectShader++; break;
+            // A pass leaving solid shapes out measures effect shapes only, so there is no skip reason to report.
+            case MeshShapeKind.Solid: break;
             default: throw new InvalidOperationException($"Shapes of kind {kind} cannot be left out of the geometry.");
         }
     }

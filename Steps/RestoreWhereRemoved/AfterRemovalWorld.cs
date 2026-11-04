@@ -151,6 +151,10 @@ internal sealed record AfterRemovalWorld(
     /// </summary>
     public IEnumerable<TargetObject> NowOfAllBut(IReadOnlySet<int> candidates) => Now.Where(standing => !candidates.Contains(StandingNow[standing.Id.Index]));
 
+    /// <summary>The given candidates that keep their shape where they stand now, where they stand, in candidate order.</summary>
+    public IEnumerable<TargetObject> NowOfThoseKeepingTheirShape(IReadOnlySet<int> candidates) =>
+        Now.Where(standing => StandingNow[standing.Id.Index] is var candidate && candidates.Contains(candidate) && KeepShapeWhereItStandsNow[candidate]);
+
     /// <summary>Each target that is not removed, as it stands with every fit and restore, then at the place a move put it.</summary>
     public static List<TargetObject> TargetsWhereTheyStandLast(ImmutableArray<TargetObject> targets, IRemovalDecisions final)
     {

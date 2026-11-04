@@ -50,7 +50,7 @@ internal sealed record RestoreLoopInputs(
 /// Repeats the guards between the kinds until nothing more changes: the placed records failing their guards against the current
 /// plans are refused, the navmesh groups failing the ground, object and water guards or the door guard with the doors as they end;
 /// the grid points under objects of other plugins placed for the ground as it is, under navmeshes on the ground as it is, under the
-/// targets that end present, under refused placed records that stand now and reach the ground and in cells no longer storable are
+/// targets and placed records going back in their present shape that end present, under refused placed records that stand now and reach the ground and in cells no longer storable are
 /// protected; and the water levels with something at their water line are kept. Every pass reads only the state before it and what
 /// the pass before it read.
 /// </summary>
@@ -99,7 +99,9 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
     private WhatStands ReadWhatStands(IReadOnlySet<int> placedGoingBack) =>
         new(
             inputs.Standing.ThatStay(placedGoingBack),
-            terrainGuards is null ? [] : [.. inputs.TargetsThatMayStay.Where(target => !EndsRemoved(target.Key, placedGoingBack))],
+            terrainGuards is null
+                ? []
+                : [.. inputs.TargetsThatMayStay.Concat(inputs.World.NowOfThoseKeepingTheirShape(placedGoingBack)).Where(placed => !EndsRemoved(placed.Key, placedGoingBack))],
             terrainGuards is null ? [] : [.. inputs.World.NowOfAllBut(placedGoingBack).Where(refused => !EndsRemoved(refused.Key, placedGoingBack))]);
 
     private NavmeshesAsPlanned ReadNavmeshesAsPlanned(RestoreState state) =>
@@ -175,7 +177,8 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
     }
 
     /// <summary>
-    /// The points under the targets that end present given the refusals so far and reach the ground, under refused placed records
+    /// The points under the targets and the placed records going back that keep their shape where they stand now, that end present
+    /// given the refusals so far and reach the ground, under refused placed records
     /// that stand now, where they stand and reach the ground, each of those only when it did not in the pass before; then under
     /// objects of other plugins placed for the ground as it is, under navmeshes on the ground as it is and in the cells no longer
     /// storable, each only when what it reads changed since the pass before, and each reason kept first.
@@ -187,7 +190,7 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
         if (terrainGuards is null) return state.Terrain;
         var terrain = state.Terrain;
         return terrain
-            .Protect(TerrainKeptReason.UnderObjectThatStays, inputs.Ground.UnderWhereTheyReachTheGround(added.Standing.TargetsThatStand, terrain.CurrentHeightsOf))
+            .Protect(TerrainKeptReason.UnderObjectThatStays, inputs.Ground.UnderWhereTheyReachTheGround(added.Standing.StandingInTheirPlace, terrain.CurrentHeightsOf))
             .Protect(TerrainKeptReason.UnderObjectKeptAsChanged, inputs.Ground.UnderWhereTheyReachTheGround(added.Standing.RefusedThatStand, terrain.CurrentHeightsOf))
             .Protect(
                 TerrainKeptReason.UnderObjectPlacedForTheGroundAsItIs,
@@ -220,9 +223,12 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
 
     /// <summary>What stands in the final world, given which placed records go back.</summary>
     /// <param name="ObjectsThatStay">In key order.</param>
-    /// <param name="TargetsThatStand">The targets that may stay and end present; none while the terrain is switched off.</param>
+    /// <param name="StandingInTheirPlace">
+    /// The targets that may stay and the placed records going back that keep their shape where they stand now, each where it stands,
+    /// that end present; none while the terrain is switched off.
+    /// </param>
     /// <param name="RefusedThatStand">The refused placed records that stand now and end present, where they stand; none while the terrain is switched off.</param>
-    private sealed record WhatStands(List<StandingBox> ObjectsThatStay, List<TargetObject> TargetsThatStand, List<TargetObject> RefusedThatStand)
+    private sealed record WhatStands(List<StandingBox> ObjectsThatStay, List<TargetObject> StandingInTheirPlace, List<TargetObject> RefusedThatStand)
     {
         public static WhatStands Nothing => new([], [], []);
 
@@ -231,11 +237,11 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
         {
             if (earlier is null) return this;
             var objects = earlier.ObjectsThatStay.ToHashSet();
-            var targets = earlier.TargetsThatStand.Select(target => target.Key).ToHashSet();
+            var inTheirPlace = earlier.StandingInTheirPlace.Select(placed => placed.Key).ToHashSet();
             var refused = earlier.RefusedThatStand.Select(candidate => candidate.Key).ToHashSet();
             return new(
                 [.. ObjectsThatStay.Where(box => !objects.Contains(box))],
-                [.. TargetsThatStand.Where(target => !targets.Contains(target.Key))],
+                [.. StandingInTheirPlace.Where(placed => !inTheirPlace.Contains(placed.Key))],
                 [.. RefusedThatStand.Where(candidate => !refused.Contains(candidate.Key))]);
         }
     }

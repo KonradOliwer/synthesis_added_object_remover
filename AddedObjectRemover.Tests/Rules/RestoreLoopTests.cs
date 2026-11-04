@@ -209,6 +209,32 @@ public sealed class RestoreLoopTests
     }
 
     /// <summary>
+    /// The cleaned mod moved the rock onto the ground it raised and gave it a sound radius; a later plugin keeps that position. Only
+    /// the radius goes back, so the rock stands where it is, and the ground under it stays raised while the rest of the cell goes back.
+    /// </summary>
+    [Fact]
+    public void TheGroundUnderAnObjectGoingBackInItsPresentShapeIsKept()
+    {
+        var moved = Rock(0, new Vector3(1500, 1500, RockHalfSize), RockNowPlace);
+        var rock = moved with
+        {
+            Earlier = moved.Earlier with
+            {
+                Undo = PlacedParts.BaseAndData,
+                Reference = TestPlacedRecords.PlainReference with { ReferenceRadius = 512f },
+                LeftToLaterPlugins = ImmutableSortedDictionary<PlacedParts, PluginName>.Empty.Add(PlacedParts.Position, LaterMod.ToPluginName()),
+            },
+        };
+
+        var result = Plan(new Scene { Rocks = [rock], Others = [RockNow(0, RockNowPlace)] });
+
+        Assert.Equal((true, null), (Assert.Single(result.Objects).IsRestored, Assert.Single(result.Objects).Refused));
+        var land = Assert.Single(result.Lands);
+        Assert.Equal((Raised, 0f), (land.FinalHeights![PointAt(27, 12)], land.FinalHeights[PointAt(12, 12)]));
+        Assert.Contains(land.Kept, kept => kept.Reason == TerrainKeptReason.UnderObjectThatStays && kept.Points.Contains(PointAt(27, 12)));
+    }
+
+    /// <summary>
     /// As <see cref="AnObjectWhosePositionALaterPluginKeepsIsNotRefusedForGroundChangedUnderIt"/>, but the cleaned mod tilted the rock
     /// or scaled it down, and that goes back around the kept position: the rock's box changes on the raised ground.
     /// </summary>

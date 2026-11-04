@@ -57,11 +57,11 @@ internal sealed class FullRecomputeRestoreLoop(PlacedGuards? placedGuards, Terra
     {
         var terrain = state.Terrain;
         if (terrainGuards is null) return terrain;
-        var targetsThatStand = inputs.TargetsThatMayStay.Where(target => !EndsRemoved(target.Key, placedGoingBack)).ToList();
+        var standingInTheirPlace = inputs.TargetsThatMayStay.Concat(inputs.World.NowOfThoseKeepingTheirShape(placedGoingBack)).Where(placed => !EndsRemoved(placed.Key, placedGoingBack)).ToList();
         var refusedThatStand = inputs.World.NowOfAllBut(placedGoingBack).Where(refused => !EndsRemoved(refused.Key, placedGoingBack)).ToList();
         var navmeshesAsTheyWillStand = state.Navmeshes?.AsTheyWillStand(inputs.Winning, trianglesGoingBack) ?? new NavmeshesAsTheyWillStand(inputs.Winning, _ => true, goingBack: null);
         return terrain
-            .Protect(TerrainKeptReason.UnderObjectThatStays, inputs.Ground.UnderWhereTheyReachTheGround(targetsThatStand, terrain.CurrentHeightsOf))
+            .Protect(TerrainKeptReason.UnderObjectThatStays, inputs.Ground.UnderWhereTheyReachTheGround(standingInTheirPlace,terrain.CurrentHeightsOf))
             .Protect(TerrainKeptReason.UnderObjectKeptAsChanged, inputs.Ground.UnderWhereTheyReachTheGround(refusedThatStand, terrain.CurrentHeightsOf))
             .Protect(TerrainKeptReason.UnderObjectPlacedForTheGroundAsItIs, terrainGuards.UnderObjectsPlacedForTheGroundAsItIs(terrain, placed => EndsRemoved(placed, placedGoingBack)))
             .Protect(TerrainKeptReason.UnderNavmesh, terrainGuards.UnderNavmeshesOnTheGroundAsItIs(terrain, navmeshesAsTheyWillStand))

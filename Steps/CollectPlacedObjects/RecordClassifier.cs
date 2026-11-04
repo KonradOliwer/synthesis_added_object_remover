@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
+using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 
@@ -31,7 +32,7 @@ internal readonly record struct Classification(RecordRole Role, ObjectChange? Ch
 }
 
 /// <summary>Gives a placed record its role in the run.</summary>
-internal sealed class RecordClassifier(ModTrustTable trust, AcceptedWorld world, WhatToCollect plan, PlacedRecordFacts facts)
+internal sealed class RecordClassifier(ModTrustTable trust, AcceptedWorld world, WhatToCollect plan, PlacedRecordFacts facts, IOtherRecordChange otherRecordChange)
 {
     /// <summary>The plugins of the load order by the name a clone marker hashes them to; a hash two of them share is left out.</summary>
     private readonly ImmutableDictionary<string, PluginName> _pluginsByHashedName = PluginsByHashedName([trust.Patch, .. trust.Plugins.Keys]);
@@ -47,7 +48,7 @@ internal sealed class RecordClassifier(ModTrustTable trust, AcceptedWorld world,
         if (HasBrokenCloneMarker(record)) return new(RecordRole.SupportOnlyCopy, null, null);
         if (IsCreatedByTarget(record)) return new(WinsInTargetOrPatch(record) ? RecordRole.Target : RecordRole.TargetOverriddenLater, null, null);
         if (facts.OverriddenRecords.Contains(record.Key)) return ClassifyOverriddenRecord(record);
-        var change = OtherRecordChange.Decide(record, world);
+        var change = otherRecordChange.Decide(record, world);
         return new(change is null ? RecordRole.OtherUnchanged : RecordRole.OtherChanged, change, null);
     }
 

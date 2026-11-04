@@ -1,19 +1,7 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Rules.RemovalRules.Contracts;
-using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
-
-/// <summary>The too-close rule a placed record going back is checked by, among what stays.</summary>
-public interface ITooCloseToWhatStaysRule
-{
-    /// <summary>
-    /// The rule over <paramref name="world"/>, a world of what stays whose candidates are its target objects, with its other objects
-    /// as causes except <paramref name="leftOut"/>.
-    /// </summary>
-    IPlacementRule Create(CollectedObjects world, IEnumerable<OtherId> leftOut, TooCloseSettings settings);
-}
 
 /// <summary>The test that finds the other mods' objects left without support, asked about objects that move away from where they stand now.</summary>
 public interface IHoldersOfObjectsThatStay

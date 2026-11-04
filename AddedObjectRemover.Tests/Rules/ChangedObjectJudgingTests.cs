@@ -467,16 +467,15 @@ public class ChangedObjectJudgingTests
         var visibleTargets = TestScenes.Create(collected.Targets, [], Shapes).VisibleTargets;
         var triangles = new TriangleStore(Shapes.ReadTriangles);
         return new OldPlaceRules(
-            target => TooCloseObjects.CreatePlacementRule(
+            target => TooCloseRules.CreatePlacementRule(
                 new(
-                    new(
-                        collected.Targets,
-                        visibleTargets,
-                        RemovalCauseSelector.SelectForOldPlace(oldPlace.OtherModObjects, world.OtherModObjects.Length, [ChangedObjectJudging.OldPlaceIdOf(target)], Zone.Npcs),
-                        oldPlace.PlacedNpcs,
-                        Shapes,
-                        triangles),
-                    Zone)),
+                    collected.Targets,
+                    visibleTargets,
+                    RemovalCauses.SelectForOldPlace(oldPlace.OtherModObjects, world.OtherModObjects.Length, [ChangedObjectJudging.OldPlaceIdOf(target)], Zone.Npcs),
+                    oldPlace.PlacedNpcs,
+                    Shapes,
+                    triangles),
+                Zone),
             ChangedTerrainObjects.CreatePlacementRule(
                 new(Mods.AcceptedWorldWithoutCleanedMod, LoadOrder, terrain ?? new TerrainRecords(), Shapes, terrain is null ? TerrainOff : Terrain())));
     }

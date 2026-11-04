@@ -1,3 +1,4 @@
+using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 
@@ -7,7 +8,8 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 /// Decides what the other plugins' objects would be, changed or not, in the accepted world without the cleaned mod, and, when every
 /// object is decided there, in the world before the cleaned mod.
 /// </summary>
-internal sealed class WorldWithoutCleanedMod(ModTrustTable trust, WhatToCollect plan, PlacedRecordFacts facts, ChangedAreaRecordCollector changedAreaRecords)
+internal sealed class WorldWithoutCleanedMod(
+    ModTrustTable trust, WhatToCollect plan, PlacedRecordFacts facts, ChangedAreaRecordCollector changedAreaRecords, IOtherRecordChange otherRecordChange)
 {
     /// <remarks>
     /// Only a changed object has an old place to judge, so a run without one decides nothing in the world without the cleaned mod,
@@ -32,8 +34,8 @@ internal sealed class WorldWithoutCleanedMod(ModTrustTable trust, WhatToCollect 
             var record = recordOf[objects[index].Key];
             objects[index] = objects[index] with
             {
-                ChangeWithoutCleanedMod = OtherRecordChange.Decide(record, trust.AcceptedWorldWithoutCleanedMod),
-                ChangeSinceBeforeCleanedMod = sinceBefore ? OtherRecordChange.Decide(record, trust.AcceptedWorldBeforeCleanedMod) : null,
+                ChangeWithoutCleanedMod = otherRecordChange.Decide(record, trust.AcceptedWorldWithoutCleanedMod),
+                ChangeSinceBeforeCleanedMod = sinceBefore ? otherRecordChange.Decide(record, trust.AcceptedWorldBeforeCleanedMod) : null,
             };
         }
     }

@@ -8,7 +8,7 @@ internal static class TestSceneViews
     public static INpcsThatCanSpawn NpcsThatCanSpawn(this IObjectCaches scene, Replacements replaced) => new NpcsThatCanSpawn(scene.PlacedNpcs, replaced);
 
     public static IObjectsThatCanCauseRemovals ObjectsThatCanCauseRemovals(this IObjectCaches scene, Replacements replaced, NpcHandling npcs) =>
-        new ObjectsThatCanCauseRemovals(scene.OtherModObjects, replaced, npcs);
+        new CausesView(scene.OtherModObjects, replaced, npcs);
 
     /// <summary>What the select step hands on: a view for each NPC handling.</summary>
     public static SelectedObjects Selected(this IObjectCaches scene, Replacements replaced, NpcHandling standardNpcs) =>

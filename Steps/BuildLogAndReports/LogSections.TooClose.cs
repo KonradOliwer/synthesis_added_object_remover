@@ -4,8 +4,9 @@ using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
+using AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
-using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
+using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
 

@@ -4,15 +4,15 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The target objects found too close to another mod's object, the step's removal reason, the work counts of that search, and the causes of other worlds its rules for those worlds ask. It references Ids, BaseObjectShapeAndKind.Contracts (for the NPC bodies), CollectPlacedObjects.Contracts, SelectObjectsThatCanCauseRemovals.Contracts, RemovalDecisionList.Contracts, BoxAndTransformMath, OrderIndependentParallelWork and UnexpectedFailureHandling (for its part key) and holds no packages.</Description>
+    <Description>The step's passes over the target objects found too close to another mod's object, and the other-mod objects it leaves out. It references Ids, BaseObjectShapeAndKind.Contracts (for the ways of being invisible), CollectPlacedObjects.Contracts, RemovalDecisionList.Contracts, ObjectsThatCanCauseRemovals.Contracts and TooCloseToOtherModsObjects.Contracts (the rule's findings, settings and NPC handling), OrderIndependentParallelWork and UnexpectedFailureHandling, and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
     <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
-    <ProjectReference Include="..\SelectObjectsThatCanCauseRemovals.Contracts\SelectObjectsThatCanCauseRemovals.Contracts.csproj" />
+    <ProjectReference Include="..\..\Rules\ObjectsThatCanCauseRemovals.Contracts\ObjectsThatCanCauseRemovals.Contracts.csproj" />
+    <ProjectReference Include="..\..\Rules\TooCloseToOtherModsObjects.Contracts\TooCloseToOtherModsObjects.Contracts.csproj" />
     <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
-    <ProjectReference Include="..\..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
     <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
     <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
   </ItemGroup>

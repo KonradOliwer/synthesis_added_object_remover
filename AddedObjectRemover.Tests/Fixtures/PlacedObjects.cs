@@ -7,5 +7,6 @@ internal static class PlacedObjects
         Collect(plugin, trust, trust.AcceptedWorld, plan);
 
     public static CollectedObjects Collect(IPluginRecords plugin, ModTrustTable trust, AcceptedWorld world, WhatToCollect plan) =>
-        PlacedObjectCollector.ReadNonPlacedLinks(PlacedObjectCollector.ScanPlacedRecords(plugin, trust, world, plan), plugin);
+        PlacedObjectCollector.ReadNonPlacedLinks(
+            PlacedObjectCollector.ScanPlacedRecords(plugin, trust, world, plan, RemovalCauses.CreateOtherRecordChange()), plugin);
 }

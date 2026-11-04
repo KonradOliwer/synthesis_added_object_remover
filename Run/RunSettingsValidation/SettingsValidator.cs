@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
+using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover;
 

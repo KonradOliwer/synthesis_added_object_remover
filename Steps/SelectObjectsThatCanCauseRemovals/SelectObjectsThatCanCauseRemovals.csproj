@@ -4,18 +4,17 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>Finds the other mods' objects that a target object replaces. It references its contracts, RemoveTooCloseObjects.Contracts (for the causes of other worlds it provides), BaseObjectShapeAndKind.Contracts, RunCaches.Contracts, CollectPlacedObjects.Contracts, Ids and the package-free tools it uses, and holds no packages.</Description>
+    <Description>Selects the other mods' objects that can cause removals in the run's world through the rule module ObjectsThatCanCauseRemovals, and owns how the object caches measure other mods' objects. It references its contracts, ObjectsThatCanCauseRemovals.Contracts (the rule it asks), BaseObjectShapeAndKind.Contracts, RunCaches.Contracts, CollectPlacedObjects.Contracts, Ids and the package-free tools it uses, and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\SelectObjectsThatCanCauseRemovals.Contracts\SelectObjectsThatCanCauseRemovals.Contracts.csproj" />
-    <ProjectReference Include="..\RemoveTooCloseObjects.Contracts\RemoveTooCloseObjects.Contracts.csproj" />
+    <ProjectReference Include="..\..\Rules\ObjectsThatCanCauseRemovals.Contracts\ObjectsThatCanCauseRemovals.Contracts.csproj" />
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
     <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
     <ProjectReference Include="..\..\Caches\RunCaches.Contracts\RunCaches.Contracts.csproj" />
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
     <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
     <ProjectReference Include="..\..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
-    <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />

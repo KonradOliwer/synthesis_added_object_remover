@@ -33,20 +33,19 @@ public class TooCloseByDistanceTests
             .ToList();
         var world = TestScenes.Create(targets, others, Shapes);
         var replacements = Replacements.None(others.Count);
-        return TooCloseObjects.Find(
+        return TestTooClose.Find(
             new(
-                new(
-                    targets,
-                    world.VisibleTargets,
-                    world.Selected(replacements, NpcHandling.Never),
-                    world.PlacedNpcs,
-                    Shapes,
-                    new TriangleStore(Shapes.ReadTriangles)),
-                TestScenes.CreateWorld(targets, others),
-                TargetWorkOrder.Of(targets),
-                new Execution(1),
-                [TestJudgedGroups.OfAll(targets, settings)],
-                TestSeededDecisions.StartUnprotected(targets))).Result.Passes.Single();
+                targets,
+                world.VisibleTargets,
+                world.Selected(replacements, NpcHandling.Never),
+                world.PlacedNpcs,
+                Shapes,
+                new TriangleStore(Shapes.ReadTriangles)),
+            TestScenes.CreateWorld(targets, others),
+            TargetWorkOrder.Of(targets),
+            new Execution(1),
+            [TestJudgedGroups.OfAll(targets, settings)],
+            TestSeededDecisions.StartUnprotected(targets)).Result.Passes.Single();
     }
 
     private static TooCloseSettings DistanceOnly(ZoneShape zone, float units) =>

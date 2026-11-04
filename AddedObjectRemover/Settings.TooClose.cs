@@ -1,5 +1,5 @@
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
-using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
+using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
 using Mutagen.Bethesda.Synthesis.Settings;
 
 namespace AddedObjectRemover;

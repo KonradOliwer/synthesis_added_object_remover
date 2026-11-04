@@ -6,7 +6,7 @@ using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
-using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
+using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
 

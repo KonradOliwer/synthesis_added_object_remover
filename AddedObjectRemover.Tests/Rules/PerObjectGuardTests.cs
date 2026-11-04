@@ -69,20 +69,19 @@ public class PerObjectGuardTests
 
     private static TooClosePass FindTooClose(
         List<TargetObject> targets, List<OtherObject> others, ObjectCaches world, IBaseObjectShapes shapes, int threads, Replacements replacements) =>
-        TooCloseObjects.Find(
+        TestTooClose.Find(
             new(
-                new(
-                    targets,
-                    world.VisibleTargets,
-                    world.Selected(replacements, NpcHandling.Never),
-                    world.PlacedNpcs,
-                    shapes,
-                    new TriangleStore(shapes.ReadTriangles)),
-                TestScenes.CreateWorld(targets, others),
-                TargetWorkOrder.Of(targets),
-                new Execution(threads),
-                [TestJudgedGroups.OfAll(targets, new TooCloseSettings(BySize: true, Multiplier, ByDistance: false, DistanceInUnits: 0f, ZoneShape.BoundingBox, NpcHandling.Never))],
-                TestSeededDecisions.StartUnprotected(targets)))
+                targets,
+                world.VisibleTargets,
+                world.Selected(replacements, NpcHandling.Never),
+                world.PlacedNpcs,
+                shapes,
+                new TriangleStore(shapes.ReadTriangles)),
+            TestScenes.CreateWorld(targets, others),
+            TargetWorkOrder.Of(targets),
+            new Execution(threads),
+            [TestJudgedGroups.OfAll(targets, new TooCloseSettings(BySize: true, Multiplier, ByDistance: false, DistanceInUnits: 0f, ZoneShape.BoundingBox, NpcHandling.Never))],
+            TestSeededDecisions.StartUnprotected(targets))
             .Result.Passes.Single();
 
     [Theory]

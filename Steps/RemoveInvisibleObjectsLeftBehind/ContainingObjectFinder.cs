@@ -2,7 +2,7 @@ using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
-using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
+using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
 

@@ -3,12 +3,12 @@ using System.Text.RegularExpressions;
 namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
-/// The tools are generic. A business type is any type declared in a project of a step, a cache or the run, and any
-/// type of Ids except the listed record-identity types.
+/// The tools are generic. A business type is any type declared in a project of a step, a rule module, a cache or the run, and
+/// any type of Ids except the listed record-identity types.
 /// </summary>
 public partial class ToolsNameNoBusinessTypeTests
 {
-    private static readonly string[] BusinessFolders = ["Steps", "Caches", "Run"];
+    private static readonly string[] BusinessFolders = ["Steps", "Rules", "Caches", "Run"];
     private const string IdsFolder = "Ids";
 
     /// <summary>The Ids types tools may name, each with why it is not business.</summary>

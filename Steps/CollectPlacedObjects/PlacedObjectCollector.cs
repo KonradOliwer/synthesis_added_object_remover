@@ -1,3 +1,4 @@
+using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 
@@ -6,7 +7,7 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 /// <summary>
 /// Turns the placed record facts into target objects (the target plugin's own and the other plugins' objects it changed,
 /// <see cref="ChangedObjectKind"/>), other mods' objects the game shows changed from their accepted values
-/// (<see cref="OtherRecordChange"/>), and support-only objects, with their roles, and joins the links into the target objects. Apart
+/// (the rule <see cref="IOtherRecordChange"/>), and support-only objects, with their roles, and joins the links into the target objects. Apart
 /// from these, it collects what a restore reads (<see cref="ChangedAreaRecordCollector"/>). A removed record
 /// (<see cref="RemovedForm"/>) is no object and its links are dropped. The facts are the final world, which
 /// includes what earlier patchers in this group wrote into the patch. The facts come in the order the plugins were read; the
@@ -27,32 +28,36 @@ public sealed class PlacedObjectCollector
     private readonly CollectedObjectsAssembler _assembler;
     private readonly GatheredObjects _gathered = new();
 
-    private PlacedObjectCollector(ModTrustTable trust, AcceptedWorld world, WhatToCollect plan, PlacedRecordFacts facts)
+    private PlacedObjectCollector(ModTrustTable trust, AcceptedWorld world, WhatToCollect plan, PlacedRecordFacts facts, IOtherRecordChange otherRecordChange)
     {
         _plan = plan;
         _facts = facts;
         _changedAreaRecords = new ChangedAreaRecordCollector(trust, facts);
-        _classifier = new RecordClassifier(trust, world, plan, facts);
+        _classifier = new RecordClassifier(trust, world, plan, facts, otherRecordChange);
         _counters = new ReadCounters(trust);
         _factory = new PlacedObjectFactory(plan, facts, TargetAreaNames.Of(facts.CellAreas), _changedAreaRecords);
-        _worldWithoutCleanedMod = new WorldWithoutCleanedMod(trust, plan, facts, _changedAreaRecords);
+        _worldWithoutCleanedMod = new WorldWithoutCleanedMod(trust, plan, facts, _changedAreaRecords, otherRecordChange);
         _assembler = new CollectedObjectsAssembler(trust, plan, facts, _changedAreaRecords, _classifier);
     }
 
     /// <param name="World">The accepted world the other mods' records are judged in.</param>
+    /// <param name="OtherRecordChange">The rule that decides whether another mod's placed record is changed.</param>
     /// <param name="TimeSinceStart">The run's clock, which times the two parts of the step.</param>
-    public sealed record Input(IPluginRecords Plugin, ModTrustTable Trust, AcceptedWorld World, WhatToCollect Plan, Func<TimeSpan> TimeSinceStart);
+    public sealed record Input(
+        IPluginRecords Plugin, ModTrustTable Trust, AcceptedWorld World, WhatToCollect Plan, IOtherRecordChange OtherRecordChange, Func<TimeSpan> TimeSinceStart);
 
     public static PlacedObjectsCollected Collect(Input input)
     {
-        var (scanned, scanTime) = Timed.Run(input.TimeSinceStart, () => ScanPlacedRecords(input.Plugin, input.Trust, input.World, input.Plan));
+        var (scanned, scanTime) = Timed.Run(
+            input.TimeSinceStart, () => ScanPlacedRecords(input.Plugin, input.Trust, input.World, input.Plan, input.OtherRecordChange));
         var (collected, linkReadTime) = Timed.Run(input.TimeSinceStart, () => ReadNonPlacedLinks(scanned, input.Plugin));
         return new PlacedObjectsCollected(collected, scanTime, linkReadTime);
     }
 
     /// <summary>The first part of the step: reads the placed records and sorts them into objects; <see cref="ReadNonPlacedLinks"/> finishes it.</summary>
     /// <param name="world">The accepted world the other mods' records are judged in.</param>
-    internal static ScannedPlacedRecords ScanPlacedRecords(IPluginRecords plugin, ModTrustTable trust, AcceptedWorld world, WhatToCollect plan)
+    internal static ScannedPlacedRecords ScanPlacedRecords(
+        IPluginRecords plugin, ModTrustTable trust, AcceptedWorld world, WhatToCollect plan, IOtherRecordChange otherRecordChange)
     {
         var facts = plugin.ReadPlacedRecords(
             new PlacedReadScope(
@@ -67,7 +72,7 @@ public sealed class PlacedObjectCollector
                 ResavedPlacedParts.Tolerances,
                 plan.Needs.AreaRecordVersions),
             (winner, candidate) => StopsTheWalk(trust, world, plan, winner, candidate));
-        return new PlacedObjectCollector(trust, world, plan, facts).Scan();
+        return new PlacedObjectCollector(trust, world, plan, facts, otherRecordChange).Scan();
     }
 
     /// <summary>

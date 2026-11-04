@@ -47,6 +47,8 @@ public class LogicPublicTypesTests
         ["RestoreWhereRemoved"] = "WhereRemovedRestorer",
         ["WriteThePatch"] = "PatchWriter",
         ["BuildLogAndReports"] = "LogAndReports",
+        ["ObjectsThatCanCauseRemovals"] = "RemovalCauses",
+        ["TooCloseToOtherModsObjects"] = "TooCloseRules",
     };
 
     /// <summary>
@@ -58,18 +60,15 @@ public class LogicPublicTypesTests
     {
         ["BaseObjectShapes.SolidShapes"] = "Which shapes of a mesh count for a base object's shape, which the mesh reader takes when the run opens it.",
         ["RemovalCauseSelector.MeasurementRules"] = "How the object caches measure other mods' objects; the caches take it when they are built.",
-        ["RemovalCauseSelector.CreateCausesOfWorlds"] = "The objects that can cause removals in worlds other than the run's, which the too-close step's rules for those worlds ask.",
         ["ChangedTerrainObjects.CreatePlacementRule"] = "The changed-terrain check of one placement, which the fit step and the judge step's old-place check ask.",
-        ["TooCloseObjects.CreateNpcCacheRules"] = "How the NPC body cache and the placed-NPC index work out an NPC's body; the caches take them when they are built.",
-        ["TooCloseObjects.CreatePlacementRule"] = "The too-close check of one placement, which the fit step asks.",
+        ["TooCloseRules.CreateNpcCacheRules"] = "How the NPC body cache and the placed-NPC index work out an NPC's body; the caches take them when they are built.",
+        ["TooCloseRules.CreatePlacementRule"] = "The too-close check of one placement, which the fit step asks.",
         ["VisibleLeftBehindObjects.CreateSurroundingsJudging"] = "The direction rule the visible step owns (candidates, surroundings, verdict), which the invisible left-behind step asks.",
         ["VisibleLeftBehindObjects.CreateLeftBehindRoundJoin"] = "The rules the visible step owns for joining a round's decisions into verdicts and proposals, which the invisible left-behind step and the step for objects in cleared areas ask.",
         ["VisibleLeftBehindObjects.CreateKindsAlwaysKept"] = "The visible kinds the step's settings always keep, which the step for objects in cleared areas asks, also while the visible step is off.",
         ["InvisibleLeftBehindObjects.CreateKindsAlwaysKept"] = "The invisible kinds the step's settings always keep, which the step for objects in cleared areas asks, also while the invisible step is off.",
         ["VisibleLeftBehindObjects.CreateNeighbours"] = "The neighbours the visible step measures around an object, which the restore's copy rule asks on the final decisions; none while the step is off.",
         ["InvisibleLeftBehindObjects.CreateNeighbours"] = "The neighbours the invisible step measures around an object, which the restore's copy rule asks on the final decisions; none while the step is off.",
-        ["TooCloseObjects.CreateOldPlaceTooCloseRule"] = "The too-close check of an earlier version at its old place, which the judge step asks.",
-        ["TooCloseObjects.CreateTooCloseToWhatStaysRule"] = "The too-close check of a placed record going back among what stays, which the restore step asks.",
         ["RestingObjects.SurfaceSamplesPerMesh"] = "How many points the support rule samples on a mesh's surface; the surface sample cache takes it when it is built.",
         ["RestingObjects.CreateFollowUp"] = "The also-remove rounds that follow up each round of the visible step and the round of the step for objects in cleared areas, which those steps ask.",
         ["RestingObjects.CreateRestingRule"] = "The target objects other target objects rest on, which the fit step asks through the other-mods rule.",
@@ -210,11 +209,15 @@ public class LogicPublicTypesTests
 
     private static IEnumerable<string> StepProjectNames() => LogicProjectNames().Where(IsStep);
 
-    /// <summary>A step's entry type is no object the run creates: it has no public constructor and no public method that returns it.</summary>
+    /// <summary>
+    /// A step's entry type is no object the run creates: it has no public constructor and no public method that returns it. A rule
+    /// module is no step: its entry type creates the rules its contracts declare.
+    /// </summary>
     private static bool IsStep(string project)
     {
         var entry = EntryTypeOf(project);
-        return entry.GetConstructors().Length == 0
+        return !Rules.IsRuleLogic(Rules.Find(project))
+            && entry.GetConstructors().Length == 0
             && !entry.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly).Any(method => method.ReturnType == entry);
     }
 

@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
+using AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 

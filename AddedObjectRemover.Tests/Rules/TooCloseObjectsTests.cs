@@ -508,20 +508,19 @@ public class TooCloseObjectsTests
     {
         var replacements = Replacements.None(scene.OtherModObjects.Count);
         var caches = CreateWorld(scene);
-        return TooCloseObjects.Find(
+        return TestTooClose.Find(
             new(
-                new(
-                    scene.Targets,
-                    caches.VisibleTargets,
-                    caches.Selected(replacements, NpcHandling.AlwaysLikeAnyObject),
-                    caches.PlacedNpcs,
-                    Shapes,
-                    triangles),
-                TestScenes.CreateWorld(scene.Targets, scene.OtherModObjects),
-                TargetWorkOrder.Of(scene.Targets),
-                new Execution(threads),
-                groups,
-                TestSeededDecisions.StartUnprotected(scene.Targets)));
+                scene.Targets,
+                caches.VisibleTargets,
+                caches.Selected(replacements, NpcHandling.AlwaysLikeAnyObject),
+                caches.PlacedNpcs,
+                Shapes,
+                triangles),
+            TestScenes.CreateWorld(scene.Targets, scene.OtherModObjects),
+            TargetWorkOrder.Of(scene.Targets),
+            new Execution(threads),
+            groups,
+            TestSeededDecisions.StartUnprotected(scene.Targets));
     }
 
     private static IEnumerable<int> TargetsWhere(TooCloseScene scene, Func<int, bool> includes) =>
@@ -557,8 +556,8 @@ public class TooCloseObjectsTests
     {
         var replacements = Replacements.None(scene.OtherModObjects.Count);
         var caches = CreateWorld(scene);
-        return TooCloseObjects.CreatePlacementRule(
-            new(new(scene.Targets, caches.VisibleTargets, caches.Selected(replacements, settings.Npcs), caches.PlacedNpcs, shapes, triangles), settings));
+        return TooCloseRules.CreatePlacementRule(
+            new(scene.Targets, caches.VisibleTargets, caches.Selected(replacements, settings.Npcs), caches.PlacedNpcs, shapes, triangles), settings);
     }
 
     private static PlacementCheck CheckOnce(IPlacementRule rule, TargetObject target, EulerPlacement placement)

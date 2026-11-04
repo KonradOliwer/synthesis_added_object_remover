@@ -3,14 +3,14 @@ using System.Reflection;
 namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
-/// The steps other than the report step, the caches, the ids and the runner hold no user-visible text either: all log wording
-/// belongs to the report step. Every member there that holds string literals with a phrase is listed here with its reason;
-/// the message of a thrown standard bug exception is never wording and is not looked at. A member is named by its type and
-/// its own name, so rewording a message changes nothing here.
+/// The steps other than the report step, the rule modules, the caches, the ids and the runner hold no user-visible text either:
+/// all log wording belongs to the report step. Every member there that holds string literals with a phrase is listed here with
+/// its reason; the message of a thrown standard bug exception is never wording and is not looked at. A member is named by its
+/// type and its own name, so rewording a message changes nothing here.
 /// </summary>
 public class StepWordingTests
 {
-    private static readonly string[] ScannedFolders = ["Steps", "Caches", "Ids", "Run"];
+    private static readonly string[] ScannedFolders = ["Steps", "Rules", "Caches", "Ids", "Run"];
     private static readonly string[] ReportFolders = ["Steps/BuildLogAndReports"];
 
     private const string SettingsWarning = "Settings validation words its own corrections of saved settings: the approved \"Warning: …\" lines and the setting names they print.";
@@ -78,7 +78,7 @@ public class StepWordingTests
     };
 
     [Fact]
-    public void TheStepsCachesIdsAndRunnerHoldNoUserVisibleText()
+    public void TheStepsRulesCachesIdsAndRunnerHoldNoUserVisibleText()
     {
         var found = SourceFile.All()
             .Where(file => file.IsIn(ScannedFolders) && !file.IsIn(ReportFolders))

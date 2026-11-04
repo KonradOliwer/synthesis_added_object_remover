@@ -15,13 +15,13 @@ internal sealed record TestPlacedGuardRules(
     {
         var triangles = new TriangleStore(shapes.ReadTriangles);
         var worldCaches = new TestObjectCachesOfWorlds(world => TestScenes.Index(world, shapes, threads));
-        var causes = RemovalCauseSelector.CreateCausesOfWorlds(worldCaches);
+        var causes = RemovalCauses.CreateCausesOfWorlds(worldCaches);
         var noWorld = TestScenes.Index(TestScenes.CreateWorld([], []), shapes, threads);
         var runCaches = new TestRunCaches(shapes, triangles, terrain, TestBaseFacts.Unresolved, objects: noWorld);
         return new TestPlacedGuardRules(
             worldCaches,
-            (world, caches, excluded, settings) => TooCloseObjects.CreatePlacementRule(
-                new(new(world.Targets, caches.VisibleTargets, causes.Of(world, excluded, settings.Npcs), caches.PlacedNpcs, shapes, triangles), settings)),
+            (world, caches, excluded, settings) => TooCloseRules.CreatePlacementRule(
+                new(world.Targets, caches.VisibleTargets, causes.Of(world, excluded, settings.Npcs), caches.PlacedNpcs, shapes, triangles), settings),
             OtherModsObjects.CreateHoldersOfObjectsThatStay(
                 new(
                     new([], runCaches, trust, plugins, support, RestingObjects.CreateSupportContacts(runCaches), new Execution(threads)),

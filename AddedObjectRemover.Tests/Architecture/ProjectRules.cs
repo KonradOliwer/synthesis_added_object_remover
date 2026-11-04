@@ -69,7 +69,7 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
     public static readonly IReadOnlyDictionary<string, string> StepResultReferences = new[]
     {
         Reads("the placed objects the scan collected", "CollectPlacedObjects.Contracts",
-            "SelectObjectsThatCanCauseRemovals.Contracts", "SelectObjectsThatCanCauseRemovals", "FindTargetObjectsToKeep",
+            "SelectObjectsThatCanCauseRemovals", "FindTargetObjectsToKeep",
             "RemovalDecisionList.Contracts", "RemovalDecisionList", "JudgeChangedObjects.Contracts", "JudgeChangedObjects",
             "FitClashingObjects", "RemoveObjectsOnChangedTerrain.Contracts", "RemoveObjectsOnChangedTerrain",
             "RemoveTooCloseObjects.Contracts", "RemoveTooCloseObjects", "RemoveObjectsRestingOnRemovedOnes.Contracts",
@@ -91,11 +91,6 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
             "RemoveVisibleObjectsLeftBehind", "RemoveObjectsInClearedAreas.Contracts", "RemoveObjectsInClearedAreas", "RestoreWhereRemoved",
             "RemoveInvisibleObjectsLeftBehind.Contracts", "RemoveInvisibleObjectsLeftBehind", "MoveKeptMarkers.Contracts",
             "MoveKeptMarkers", "WriteThePatch"),
-        Reads("the old-place rule the judge step declares, which it provides", "JudgeChangedObjects.Contracts", "RemoveTooCloseObjects"),
-        Reads("the objects that can cause removals", "SelectObjectsThatCanCauseRemovals.Contracts",
-            "RemoveTooCloseObjects.Contracts", "RemoveTooCloseObjects", "RemoveInvisibleObjectsLeftBehind"),
-        Reads("the too-close settings and zones the selection measures with", "RemoveTooCloseObjects.Contracts",
-            "SelectObjectsThatCanCauseRemovals", "RestoreWhereRemoved.Contracts", "RestoreWhereRemoved"),
         Reads("the resting rule of the fit step", "FitClashingObjects.Contracts",
             "RemoveObjectsRestingOnRemovedOnes", "OtherModsObjectsLeftWithoutSupport"),
         Reads("the follow-up settings and what the follow-up removed", "RemoveObjectsRestingOnRemovedOnes.Contracts",
@@ -108,7 +103,6 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
             "RemoveInvisibleObjectsLeftBehind.Contracts", "RemoveInvisibleObjectsLeftBehind"),
         Reads("the cleared areas", "RemoveObjectsInClearedAreas.Contracts", "RestoreWhereRemoved.Contracts", "RestoreWhereRemoved"),
         Reads("the changed-terrain settings and checks", "RemoveObjectsOnChangedTerrain.Contracts", "RestoreWhereRemoved.Contracts", "RestoreWhereRemoved"),
-        Reads("the too-close-to-what-stays rule it implements for the restore", "RestoreWhereRemoved.Contracts", "RemoveTooCloseObjects"),
         Reads("the holders-of-objects-that-stay search it implements for the restore", "RestoreWhereRemoved.Contracts", "OtherModsObjectsLeftWithoutSupport"),
         Reads("the restore's result it writes", "RestoreWhereRemoved.Contracts", "WriteThePatch"),
         Reads("the invisible objects left behind whose markers move", "RemoveInvisibleObjectsLeftBehind.Contracts", "MoveKeptMarkers.Contracts", "MoveKeptMarkers"),
@@ -152,6 +146,8 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
     public ProjectRule Find(string name) => Projects.Single(project => project.Name == name);
 
     public bool IsLogic(ProjectRule project) => LogicKinds.Contains(project.Kind);
+
+    public bool IsRuleLogic(ProjectRule project) => project.Kind == RuleLogicKind;
 
     public bool IsTool(ProjectRule project) => ToolKinds.Contains(project.Kind);
 

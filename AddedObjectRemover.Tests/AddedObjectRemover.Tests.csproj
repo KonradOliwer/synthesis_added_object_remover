@@ -60,6 +60,10 @@
     <Using Include="AddedObjectRemover.Steps.WriteThePatch" />
     <Using Include="AddedObjectRemover.Steps.WriteThePatch.Contracts" />
     <Using Include="AddedObjectRemover.Rules.RemovalRules.Contracts" />
+    <Using Include="AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals" />
+    <Using Include="AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts" />
+    <Using Include="AddedObjectRemover.Rules.TooCloseToOtherModsObjects" />
+    <Using Include="AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts" />
   </ItemGroup>
 
   <ItemGroup>
@@ -100,6 +104,10 @@
     <ProjectReference Include="..\Steps\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
     <ProjectReference Include="..\Steps\RemovalDecisionList\RemovalDecisionList.csproj" />
     <ProjectReference Include="..\Rules\RemovalRules.Contracts\RemovalRules.Contracts.csproj" />
+    <ProjectReference Include="..\Rules\ObjectsThatCanCauseRemovals.Contracts\ObjectsThatCanCauseRemovals.Contracts.csproj" />
+    <ProjectReference Include="..\Rules\ObjectsThatCanCauseRemovals\ObjectsThatCanCauseRemovals.csproj" />
+    <ProjectReference Include="..\Rules\TooCloseToOtherModsObjects.Contracts\TooCloseToOtherModsObjects.Contracts.csproj" />
+    <ProjectReference Include="..\Rules\TooCloseToOtherModsObjects\TooCloseToOtherModsObjects.csproj" />
     <ProjectReference Include="..\Steps\JudgeChangedObjects.Contracts\JudgeChangedObjects.Contracts.csproj" />
     <ProjectReference Include="..\Steps\JudgeChangedObjects\JudgeChangedObjects.csproj" />
     <ProjectReference Include="..\Steps\FitClashingObjects.Contracts\FitClashingObjects.Contracts.csproj" />

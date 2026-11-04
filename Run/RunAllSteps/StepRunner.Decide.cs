@@ -1,5 +1,9 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
+using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals;
+using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
+using AddedObjectRemover.Rules.TooCloseToOtherModsObjects;
+using AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts;
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
@@ -58,7 +62,7 @@ public static partial class StepRunner
         var groups = scope.Settings.CollisionGroupsOf(collected.Targets);
         var fitted = RunFit(scope, runCaches, trust, collected, tooCloseWorld, support, groups, kept, judged);
         var changedTerrain = RunChangedTerrain(scope, runCaches, trust, collected, groups, fitted);
-        var tooClose = RunTooClose(scope, collected, tooCloseWorld, groups, changedTerrain);
+        var tooClose = RunTooClose(scope, collected, tooCloseWorld, TooCloseRules.CreateSearches(tooCloseWorld), groups, changedTerrain);
         var alsoRemove = RunAlsoRemove(scope, runCaches, collected, tooClose);
         var visibleLeftBehind = RunVisibleLeftBehind(scope, runCaches, collected, alsoRemove);
         var clearedAreas = RunObjectsInClearedAreas(scope, runCaches, collected, visibleLeftBehind);
@@ -85,7 +89,8 @@ public static partial class StepRunner
 
     private static SelectedObjects RunSelection(RunScope scope, IRunCaches runCaches, CollectedObjects collected) =>
         scope.Environment.Log.Timed(
-            () => RemovalCauseSelector.Select(new(collected, runCaches.OtherModObjects, runCaches.Shapes, scope.Settings.Selection, scope.Settings.Execution)),
+            () => RemovalCauseSelector.Select(
+                new(collected, runCaches.OtherModObjects, RemovalCauses.CreateCausesOfTheRun(runCaches.Shapes, scope.Settings.Execution), scope.Settings.Selection)),
             (selected, elapsed) => scope.Report.BuildStepSections(selected.Replacements, collected, elapsed));
 
     /// <remarks>The step times its two parts through the run's clock, since they print one after the other.</remarks>
@@ -115,7 +120,7 @@ public static partial class StepRunner
         IRunCaches runCaches,
         ModTrustTable trust,
         CollectedObjects collected,
-        TooCloseObjects.TooCloseWorld tooCloseWorld,
+        TooCloseWorld tooCloseWorld,
         OtherModsObjects.SupportJudging support,
         ImmutableArray<CollisionGroup> groups,
         ObjectsToKeepFound kept,
@@ -160,12 +165,13 @@ public static partial class StepRunner
     private static Decided<TooCloseResult> RunTooClose(
         RunScope scope,
         CollectedObjects collected,
-        TooCloseObjects.TooCloseWorld tooCloseWorld,
+        TooCloseWorld tooCloseWorld,
+        ITooCloseSearches searches,
         ImmutableArray<CollisionGroup> groups,
         Decided<ChangedTerrainResult> changedTerrain) =>
         scope.Environment.Log.Timed(
             () => TooCloseObjects.Find(
-                new(tooCloseWorld, collected, collected.Order, scope.Settings.Execution, groups.Select(group => group.TooClose), changedTerrain.Decisions)),
+                new(tooCloseWorld, searches, collected, collected.Order, scope.Settings.Execution, groups.Select(group => group.TooClose), changedTerrain.Decisions)),
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
 
     private static Decided<RestingObjectsResult> RunAlsoRemove(RunScope scope, IRunCaches runCaches, CollectedObjects collected, Decided<TooCloseResult> tooClose) =>

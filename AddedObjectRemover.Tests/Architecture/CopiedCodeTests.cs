@@ -16,8 +16,6 @@ public class CopiedCodeTests
     private const string SettingChecks = "Setting-by-setting check lines; each reads another setting with its own default, limit and wording.";
     private const string PartKeyLines = "One entry per part key in the wording table; each entry names its own part and words its own consequence, so there is no logic to share.";
 
-    private const string PlacementRules = "The placement rule of two steps: each places the object and runs its own step's check, which returns its own result type; they share only the shape.";
-
     private const string ParallelCalls = "One call of the order-independent parallel map over a list with per-worker buffers; each asks its own question, so there is no logic to share.";
 
     private const string CollisionBuilder = "Run/RunSettingsValidation/CollisionSettingsBuilder.cs:CollisionSettingsBuilder.";
@@ -74,10 +72,7 @@ public class CopiedCodeTests
             ParallelCalls,
         [CopyFamily.KeyOf([Resting + "SupportContactFinder.cs:SupportContactFinder.FindContactsOfAll", OtherMods + "TargetsHoldingUpOtherModsObjects.cs:TargetsHoldingUpOtherModsObjects.Find"])] =
             ParallelCalls,
-        [CopyFamily.KeyOf([
-            "Steps/RemoveObjectsOnChangedTerrain/ChangedTerrainPlacementRule.cs:ChangedTerrainPlacementRule.Tries.Check",
-            "Steps/RemoveTooCloseObjects/TooClosePlacementRule.cs:TooClosePlacementRule.Tries.Check"])] = PlacementRules,
-        [CopyFamily.KeyOf([Runner + "RunMarkerMoves", Runner + "RunSelection"])] = StepCalls,
+        [CopyFamily.KeyOf([Runner + "RunChangedTerrain", Runner + "RunTooClose"])] = StepCalls,
         [CopyFamily.KeyOf([Runner + "RunAlsoRemove", Runner + "RunObjectsInClearedAreas", Runner + "RunVisibleLeftBehind"])] = StepCalls,
         [CopyFamily.KeyOf([Runner + "RunInvisibleLeftBehind", Runner + "RunObjectsInClearedAreas", Runner + "RunVisibleLeftBehind"])] = StepCalls,
         [CopyFamily.KeyOf([ParallelMapFile + "Run", ParallelMapFile + "RunOver"])] = ParallelMapOverloads,

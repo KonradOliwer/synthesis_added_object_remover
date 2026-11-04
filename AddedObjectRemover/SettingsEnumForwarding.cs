@@ -5,7 +5,7 @@ using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
-using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
+using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
 
 // The Synthesis settings screen looks up each enum setting's type only in this assembly (Assembly.GetType) and shows no
 // control when it is missing. The enums live in the contracts assemblies, so each one is forwarded from here.

@@ -1,6 +1,8 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
+using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals;
+using AddedObjectRemover.Rules.TooCloseToOtherModsObjects;
 using AddedObjectRemover.Run.RunAllSteps.Contracts;
 using AddedObjectRemover.Run.RunAllSteps.RunCaches;
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
@@ -11,7 +13,6 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
-using AddedObjectRemover.Steps.RemoveTooCloseObjects;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals;
 using AddedObjectRemover.Steps.WriteThePatch;
 using AddedObjectRemover.Steps.WriteThePatch.Contracts;
@@ -64,7 +65,7 @@ public static partial class StepRunner
         var reportFolder = PrepareReportFolder(settings, environment);
         var plugin = environment.PluginRecords.Open();
         var records = plugin.ReadRecordIndex();
-        var npcCacheRules = TooCloseObjects.CreateNpcCacheRules();
+        var npcCacheRules = TooCloseRules.CreateNpcCacheRules();
         var loadOrderCaches = LoadOrderCaches.Create(
             environment.MeshFiles,
             plugin,
@@ -127,7 +128,8 @@ public static partial class StepRunner
     /// <remarks>The step times its two parts through the run's clock, since they print one section.</remarks>
     private static CollectedObjects CollectPlacedObjects(RunScope scope, ModTrustTable trust)
     {
-        var collected = PlacedObjectCollector.Collect(new(scope.Plugin, trust, trust.AcceptedWorld, scope.Settings.Read, scope.Environment.TimeSinceStart));
+        var collected = PlacedObjectCollector.Collect(
+            new(scope.Plugin, trust, trust.AcceptedWorld, scope.Settings.Read, RemovalCauses.CreateOtherRecordChange(), scope.Environment.TimeSinceStart));
         Print(scope.Environment.Log, scope.Report.BuildStepSections(collected.Objects, collected.ScanTime, collected.LinkReadTime));
         return collected.Objects;
     }

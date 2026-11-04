@@ -1,6 +1,6 @@
 using AddedObjectRemover.Rules.RemovalRules.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
-using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
+using AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts;
 
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 

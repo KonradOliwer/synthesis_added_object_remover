@@ -1,6 +1,6 @@
 using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
-using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
+using AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts;
 
 namespace AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 

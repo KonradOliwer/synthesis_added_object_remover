@@ -6,7 +6,11 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
+using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals;
+using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
 using AddedObjectRemover.Rules.RemovalRules.Contracts;
+using AddedObjectRemover.Rules.TooCloseToOtherModsObjects;
+using AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts;
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
@@ -16,7 +20,6 @@ using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
-using AddedObjectRemover.Steps.RemoveTooCloseObjects;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved;
@@ -30,16 +33,16 @@ namespace AddedObjectRemover.Run.RunAllSteps;
 public static partial class StepRunner
 {
     /// <summary>The run's target objects among the objects that can cause removals.</summary>
-    private static TooCloseObjects.TooCloseWorld CreateTooCloseWorld(IRunCaches runCaches, CollectedObjects collected, SelectedObjects selected) =>
+    private static TooCloseWorld CreateTooCloseWorld(IRunCaches runCaches, CollectedObjects collected, SelectedObjects selected) =>
         new(collected.Targets, runCaches.VisibleTargets, selected, runCaches.PlacedNpcs, runCaches.Shapes, runCaches.Triangles);
 
     /// <summary>The fittable and the unfittable placement rule of each collision group.</summary>
     private static ImmutableArray<FitGroup> CreateFitGroups(
-        RunScope scope, IRunCaches runCaches, ModTrustTable trust, TooCloseObjects.TooCloseWorld tooCloseWorld, ImmutableArray<CollisionGroup> groups) =>
+        RunScope scope, IRunCaches runCaches, ModTrustTable trust, TooCloseWorld tooCloseWorld, ImmutableArray<CollisionGroup> groups) =>
     [
         .. groups.Select(group => new FitGroup(
             group.Fit,
-            Fittable: TooCloseObjects.CreatePlacementRule(new(tooCloseWorld, group.TooClose.Settings)),
+            Fittable: TooCloseRules.CreatePlacementRule(tooCloseWorld, group.TooClose.Settings),
             Unfittable: ChangedTerrainObjects.CreatePlacementRule(
                 new(trust.AcceptedWorld, scope.Environment.Plugins, scope.Plugin, runCaches.Shapes, group.ChangedTerrain.Settings)))),
     ];
@@ -86,15 +89,12 @@ public static partial class StepRunner
 
     private static ObjectCachesOfWorlds CreateWorldCaches(RunScope scope, ObjectMeasurementRules rules) => new(scope.LoadOrderCaches, rules, scope.Settings.Execution);
 
-    /// <summary>What the too-close checks in other worlds read: the run's caches, the caches of those worlds and the causes selected there.</summary>
-    private static TooCloseObjects.WorldRuleInput CreateWorldRuleInput(IRunCaches runCaches, IObjectCachesOfWorlds worldCaches) =>
-        new(runCaches, worldCaches, RemovalCauseSelector.CreateCausesOfWorlds(worldCaches));
-
     /// <summary>The run's target objects measured among the causes of the old-place world; its caches are built when the first earlier version is checked.</summary>
     private static IOldPlaceTooCloseRule CreateOldPlaceTooCloseRule(RunScope scope, IRunCaches runCaches, CollectedObjects collected)
     {
         var worldCaches = CreateWorldCaches(scope);
-        return TooCloseObjects.CreateOldPlaceTooCloseRule(new(collected.Targets, CreateWorldRuleInput(runCaches, worldCaches), scope.Settings.ChangedObjectCollision.TooClose));
+        return TooCloseRules.CreateOldPlaceTooCloseRule(
+            collected.Targets, runCaches, worldCaches, RemovalCauses.CreateCausesOfWorlds(worldCaches), scope.Settings.ChangedObjectCollision.TooClose);
     }
 
     private static IPlacementRule CreateOldPlaceChangedTerrainRule(RunScope scope, IRunCaches runCaches, ModTrustTable trust) =>
@@ -137,7 +137,7 @@ public static partial class StepRunner
             new LazyClearedAreas(() => ObjectsInClearedAreas.CreateClearedAreas(new(collected.Targets, collected.Spaces, final, runCaches, scope.Settings.RestoreWhereRemoved.ClearedArea))),
             new(
                 worldCaches,
-                TooCloseObjects.CreateTooCloseToWhatStaysRule(CreateWorldRuleInput(runCaches, worldCaches)),
+                TooCloseRules.CreateTooCloseToWhatStaysRule(runCaches, worldCaches, RemovalCauses.CreateCausesOfWorlds(worldCaches)),
                 OtherModsObjects.CreateHoldersOfObjectsThatStay(new(support, worldCaches)),
                 PatchWriter.CreateNavmeshCheck(scope.Plugin, scope.Environment.PatchWriting)),
             new(

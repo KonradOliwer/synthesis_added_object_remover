@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The settings and the result of restoring what the cleaned mod changed where its objects were removed, and the rules of other steps its guards ask. It references Ids, CollectPlacedObjects.Contracts (for the changes it judges), RemoveTooCloseObjects.Contracts and RemoveObjectsOnChangedTerrain.Contracts (for the collision settings it reuses), RemovalRules.Contracts (for the placement rule it asks), PluginRecordFacts (for the navmesh check) and RemoveObjectsInClearedAreas.Contracts (for the cleared-area settings and the shares the changes are judged by) and holds no packages.</Description>
+    <Description>The settings and the result of restoring what the cleaned mod changed where its objects were removed, and the rules of other steps its guards ask. It references Ids, CollectPlacedObjects.Contracts (for the changes it judges), TooCloseToOtherModsObjects.Contracts and RemoveObjectsOnChangedTerrain.Contracts (for the collision settings it reuses), RemovalRules.Contracts (for the placement rule it asks), PluginRecordFacts (for the navmesh check) and RemoveObjectsInClearedAreas.Contracts (for the cleared-area settings and the shares the changes are judged by) and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
@@ -12,7 +12,7 @@
     <ProjectReference Include="..\..\Rules\RemovalRules.Contracts\RemovalRules.Contracts.csproj" />
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
     <ProjectReference Include="..\RemoveObjectsOnChangedTerrain.Contracts\RemoveObjectsOnChangedTerrain.Contracts.csproj" />
-    <ProjectReference Include="..\RemoveTooCloseObjects.Contracts\RemoveTooCloseObjects.Contracts.csproj" />
+    <ProjectReference Include="..\..\Rules\TooCloseToOtherModsObjects.Contracts\TooCloseToOtherModsObjects.Contracts.csproj" />
     <ProjectReference Include="..\RemoveObjectsInClearedAreas.Contracts\RemoveObjectsInClearedAreas.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>

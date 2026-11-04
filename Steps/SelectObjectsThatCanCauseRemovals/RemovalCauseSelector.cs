@@ -1,51 +1,24 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
+using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals;
 
 /// <summary>
-/// From the other mods' objects, finds the ones a target object replaces and the ones that can cause removals.
-/// The measurement rules of the object caches belong to this step.
+/// From the other mods' objects, finds the ones a target object replaces and the ones that can cause removals, by the rule of
+/// which other mods' objects can cause removals. The measurement rules of the object caches belong to this step.
 /// </summary>
 public static class RemovalCauseSelector
 {
     private static readonly ObjectMeasurement Invisible = new(IsVisible: false, Center: default);
 
     /// <param name="OtherModObjects">The objects added by other mods.</param>
-    public sealed record Input(
-        CollectedObjects World, IOtherModObjectsBySpace OtherModObjects, IBaseObjectShapes Shapes, SelectionSettings Settings, Execution Execution);
+    /// <param name="Causes">The rule that selects the causes in the run's world.</param>
+    public sealed record Input(CollectedObjects World, IOtherModObjectsBySpace OtherModObjects, ICausesOfTheRun Causes, SelectionSettings Settings);
 
-    public static SelectedObjects Select(Input input)
-    {
-        var (world, otherModObjects) = (input.World, input.OtherModObjects);
-        var replacements = ReplacementMatcher.Find(
-            world.Targets, new OtherModObjectPositions(otherModObjects), world.OtherModObjects.Length, input.Shapes, world.Order, input.Execution);
-        return new SelectedObjects(replacements, ViewsOf(otherModObjects, replacements), input.Settings.Npcs);
-    }
-
-    /// <summary>The too-close step's question about worlds other than the run's (see <see cref="SelectForOldPlace"/>).</summary>
-    /// <param name="worldCaches">The object caches of the worlds asked about.</param>
-    public static ICausesOfWorlds CreateCausesOfWorlds(IObjectCachesOfWorlds worldCaches) => new CausesOfWorlds(worldCaches);
-
-    /// <summary>
-    /// The views for objects standing in another world than the run's: every object of <paramref name="otherModObjects"/> can cause
-    /// removals except <paramref name="excluded"/>, such as the versions of the records being checked that those objects replace.
-    /// </summary>
-    /// <param name="otherModObjects">The objects of the other world.</param>
-    /// <param name="otherModObjectCount">The number of objects in <paramref name="otherModObjects"/>.</param>
-    internal static SelectedObjects SelectForOldPlace(
-        IOtherModObjectsBySpace otherModObjects, int otherModObjectCount, IEnumerable<OtherId> excluded, NpcHandling npcs)
-    {
-        var replacements = Replacements.Excluding(otherModObjectCount, excluded);
-        return new SelectedObjects(replacements, ViewsOf(otherModObjects, replacements), npcs);
-    }
-
-    private static Dictionary<NpcHandling, IObjectsThatCanCauseRemovals> ViewsOf(IOtherModObjectsBySpace otherModObjects, Replacements replacements) =>
-        Enum.GetValues<NpcHandling>().ToDictionary(
-            npcs => npcs, npcs => (IObjectsThatCanCauseRemovals)new ObjectsThatCanCauseRemovals(otherModObjects, replacements, npcs));
+    public static SelectedObjects Select(Input input) => input.Causes.Select(input.World, input.OtherModObjects, input.Settings.Npcs);
 
     /// <summary>
     /// The other mods' objects count an object that cannot be measured as invisible, so it causes no removals; the failure is

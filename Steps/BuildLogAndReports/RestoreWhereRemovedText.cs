@@ -22,6 +22,14 @@ internal static class RestoreWhereRemovedText
     /// <param name="keptBecause">Why the change stays; null when it goes back.</param>
     public static string Result(string? keptBecause) => keptBecause is null ? "restored" : $"kept: {keptBecause}";
 
+    /// <summary>What became of a placed record, as the report files say it: as <see cref="Result(string?)"/>, or "restored with a copy at the cleaned mod's place".</summary>
+    /// <param name="keptBecause">Why the record stays; null when it goes back.</param>
+    /// <param name="withCopy">It goes back and the patch adds a copy of it where the cleaned mod placed it.</param>
+    public static string Result(string? keptBecause, bool withCopy) => withCopy ? $"{Result(keptBecause)} {WithCopy}" : Result(keptBecause);
+
+    /// <summary>The words for a record that goes back with a copy, after what was done to it.</summary>
+    public const string WithCopy = "with a copy at the cleaned mod's place";
+
     /// <summary>What a placed record that went back is, in a count.</summary>
     public static string Kind(PlacedRestoreKind kind) => kind switch
     {
@@ -69,7 +77,17 @@ internal static class RestoreWhereRemovedText
     };
 
     /// <summary>Why another mod's object the cleaned mod moved stays where the cleaned mod's standing content holds it, as in "the cleaned mod's standing content holds it and it may not be copied (persistent)".</summary>
-    public static string HeldByStandingObject(CloneRefusal refusal) => $"the cleaned mod's standing content holds it and it may not be copied ({CloneRefused(refusal)})";
+    public static string HeldByStandingObject(CloneJudged cloning) => $"the cleaned mod's standing content holds it and it may not be copied ({CopyRefused(cloning)})";
+
+    /// <summary>Why a copy is refused, with the failure of a check that stopped, as in "too close as the cleaned mod's object (the check stopped unexpectedly: ...)".</summary>
+    public static string CopyRefused(CloneJudged cloning)
+    {
+        var refusal = cloning.RefusedBy ?? throw new UnreachableException("A planned copy was given as a refused one.");
+        return cloning.Failure is { } failure ? $"{CloneRefused(refusal)} (the check stopped unexpectedly: {failure})" : CloneRefused(refusal);
+    }
+
+    /// <summary>The kind of a refusal whose check stopped unexpectedly, in a count.</summary>
+    public const string WithStoppedCheck = "with a check that stopped unexpectedly";
 
     /// <summary>Why another mod's object the cleaned mod moved may not be copied.</summary>
     public static string CloneRefused(CloneRefusal refusal) => refusal switch
@@ -80,12 +98,23 @@ internal static class RestoreWhereRemovedText
         CloneRefusal.HoldsMoreThanPlacement => "holds more than its placement",
         CloneRefusal.TooCloseAsCleanedModsObject => "too close as the cleaned mod's object",
         CloneRefusal.OnChangedTerrainAsCleanedModsObject => "on changed terrain as the cleaned mod's object",
+        CloneRefusal.ActorsWalkOnIt => "actors walk on it",
         _ => throw new UnreachableException($"Unknown copy refusal {refusal}."),
     };
 
-    /// <summary>Why a cell keeps its water level although the rest of it may go back; <paramref name="by"/> is the object or navmesh found.</summary>
+    /// <summary>Why a cell keeps its water level although the rest of it may go back; <paramref name="by"/> is the keeper <paramref name="reason"/> names.</summary>
     /// <param name="label">Names a record.</param>
-    public static string WaterKept(RecordKey by, Func<RecordKey, string> label) => $"{label(by)} lies across the water line between the level before the cleaned mod and the one that stays";
+    public static string WaterKept(WaterKeptReason reason, RecordKey by, Func<RecordKey, string> label) => reason switch
+    {
+        WaterKeptReason.AtWaterLine => $"{label(by)} lies across the water line between the level before the cleaned mod and the one that stays",
+        WaterKeptReason.AroundObjectThatStays => $"the changed-terrain check around {label(by)}, which stays, reaches the cell and counts water changes",
+        WaterKeptReason.AroundCopy => $"the changed-terrain check around the copy of {label(by)} reaches the cell and counts water changes",
+        _ => throw new UnreachableException($"Unknown water kept reason {reason}."),
+    };
+
+    /// <summary>The words for <see cref="LandQuarterOutcome.TexturesKeptForObjectThatStays"/>.</summary>
+    public const string TexturesKeptForObjectThatStays =
+        "the changed-terrain check around an object that stays or a copy the patch adds reaches its ground and counts terrain type changes";
 
     /// <summary>The words for <see cref="LandQuarterOutcome.ColoursSharedWithGroundThatStays"/>.</summary>
     public const string ColoursSharedWithGroundThatStays = "its vertex colours lie on a line shared with ground that stays";
@@ -116,7 +145,7 @@ internal static class RestoreWhereRemovedText
     }
 
     /// <summary>The kind of refusal a count line groups placed records by.</summary>
-    public static string RefusalKind(PlacedRefusal refusal) => refusal.Failure is null ? Guard(refusal.Guard) : "with a check that stopped unexpectedly";
+    public static string RefusalKind(PlacedRefusal refusal) => refusal.Failure is null ? Guard(refusal.Guard) : WithStoppedCheck;
 
     public static string Guard(PlacedGuard guard) => guard switch
     {

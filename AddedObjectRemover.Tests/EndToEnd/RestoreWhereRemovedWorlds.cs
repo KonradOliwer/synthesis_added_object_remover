@@ -241,6 +241,59 @@ internal static class RestoreWhereRemovedWorlds
         return ([baseGame.Mod, target.Mod, city.Mod], baseGame);
     }
 
+    /// <summary>Another mod whose camp is cleaned in a later step of the same group, in <see cref="CreateCampfireRingWithAnotherCamp"/>.</summary>
+    public const string OtherCampPlugin = "OtherCamp.esp";
+
+    /// <summary>In the exterior cell (0, 0): the cleaned mod's crate the city pad stands beside, its campfire, and the rock.</summary>
+    public static readonly Vector3 CampCrateAt = At(800, 800);
+    public static readonly Vector3 CampfireAt = At(1900, 800);
+    public static readonly Vector3 RingRockFrom = At(500, 2000);
+    public static readonly Vector3 RingRockTo = At(1750, 800);
+
+    /// <summary>The Has Distant LOD flag of a static, as a large landmark such as a bridge carries it.</summary>
+    private const int HasDistantLod = 0x8000;
+
+    /// <summary>
+    /// The exterior cell (0, 0), where the cleaned mod has a crate with a city pad beside it, which is removed, and a campfire 1100 units
+    /// east of it, which stays. It moved a base game rock from 1200 units north of the crate into a ring 150 units west of the campfire.
+    /// With a search radius of 1500 units the rock's old place sees only the removed crate, and its new place sees the campfire: the rock
+    /// goes back and the patch adds a copy where the campfire's ring holds it.
+    /// </summary>
+    public static IReadOnlyList<ISkyrimMod> CreateCampfireRing(string dataFolder) => BuildCampfireRing(dataFolder, rockHasDistantLod: false).LoadOrder;
+
+    /// <summary>
+    /// <see cref="CreateCampfireRing"/> with a rock whose base has distant LOD, as a large landmark such as a bridge has: it may not be
+    /// copied, so it stays at the campfire.
+    /// </summary>
+    public static IReadOnlyList<ISkyrimMod> CreateCampfireRingWithALandmark(string dataFolder) => BuildCampfireRing(dataFolder, rockHasDistantLod: true).LoadOrder;
+
+    /// <summary>
+    /// <see cref="CreateCampfireRing"/> with <see cref="OtherCampPlugin"/>, which loads after the city mod and places a tent 60 units
+    /// north of where the cleaned mod put the rock: too close to the rock's copy by the collision settings of any cleaned mod's objects.
+    /// </summary>
+    public static IReadOnlyList<ISkyrimMod> CreateCampfireRingWithAnotherCamp(string dataFolder)
+    {
+        var (loadOrder, baseGame, spaces) = BuildCampfireRing(dataFolder, rockHasDistantLod: false);
+        var otherCamp = new FixtureMod(OtherCampPlugin, baseGame);
+        spaces.AddOverridesTo(otherCamp);
+        otherCamp.Exterior.Place("O_Tent", otherCamp.AddModeledStatic("O_TentBase", FixtureMeshes.CrateModel), RingRockTo + new Vector3(0, 60, 0));
+        return [.. loadOrder, otherCamp.Mod];
+    }
+
+    private static (IReadOnlyList<ISkyrimMod> LoadOrder, FixtureMod BaseGame, FixtureSpaces Spaces) BuildCampfireRing(string dataFolder, bool rockHasDistantLod)
+    {
+        FixtureMeshes.WriteAll(dataFolder);
+        var (baseGame, target, city, spaces) = CreateMods();
+        var own = target.AddModeledStatic("T_CrateBase", FixtureMeshes.CrateModel);
+        target.Exterior.Place("T_CampCrate", own, CampCrateAt);
+        city.Exterior.Place("C_Pad", city.AddModeledStatic("C_PadBase", FixtureMeshes.PadModel), CampCrateAt + new Vector3(PadDistance, 0, 0));
+        target.Exterior.Place("T_Campfire", own, CampfireAt);
+        var rockBase = baseGame.AddModeledStatic("B_RingRockBase", FixtureMeshes.CrateModel);
+        if (rockHasDistantLod) baseGame.Mod.Statics.First(record => record.FormKey == rockBase).MajorRecordFlagsRaw |= HasDistantLod;
+        MoveCopy(target.Exterior.PlaceCopyOf(baseGame.Exterior.Place("B_RingRock", rockBase, RingRockFrom)), RingRockTo);
+        return ([baseGame.Mod, target.Mod, city.Mod], baseGame, spaces);
+    }
+
     private static (FixtureMod BaseGame, FixtureMod Target, FixtureMod City, FixtureSpaces Spaces) CreateMods()
     {
         var baseGame = new FixtureMod(BaseGamePlugin);

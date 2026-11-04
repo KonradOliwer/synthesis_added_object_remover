@@ -166,7 +166,7 @@ public class RestoreWhereRemovedRunTests
         ExpectedOutputFiles.AssertMatches("restore-where-removed/VillageWithAPatchOfTheCleanedMod", run.ToExpectedOutputLines());
         var objects = Assert.Single(run.Reports, report => report.Name == ReportFileNames.RestoredWhereRemovedObjectsFileName);
         var rock = Assert.Single(objects.Lines, line => line.Contains(",B_Rock,", StringComparison.Ordinal));
-        Assert.EndsWith($":{RestoreWhereRemovedWorlds.PatchOfTheCleanedModPlugin}])", rock, StringComparison.Ordinal);
+        Assert.EndsWith($":{RestoreWhereRemovedWorlds.PatchOfTheCleanedModPlugin}]),,", rock, StringComparison.Ordinal);
         Assert.Contains(",kept: too close to objects that stay (", rock, StringComparison.Ordinal);
         Assert.DoesNotContain(run.Log, line => line.StartsWith("  Shown again: B_Rock", StringComparison.Ordinal));
     }

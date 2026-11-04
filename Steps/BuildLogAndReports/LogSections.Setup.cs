@@ -46,11 +46,33 @@ internal static partial class LogSections
         {
             lines.Add($"  Ignored {TextFormat.Count(counts.OthersUnchanged)} objects of other mods that the game shows with their accepted values.");
         }
+        lines.AddRange(CopiesFromEarlierRuns(counts, target));
         if (context.Detailed) lines.AddRange(RecordedCounts(world));
         lines.AddRange(world.UnreadableRecords.Select(record =>
             $"Warning: could not read {record.RecordType} {RecordLabels.Of(record.Key, record.EditorId)}: {record.Problem}. "
             + "Its links were not all checked."));
+        lines.AddRange(BrokenCloneMarkerWarnings(world));
         return new LogSection("scan", lines.ToImmutable());
+    }
+
+    /// <summary>The copies earlier runs placed, for the cleaned mod and for other cleaned mods, each line only when there is one.</summary>
+    private static IEnumerable<string> CopiesFromEarlierRuns(ReadCounts counts, PluginName target) =>
+        new[]
+        {
+            (Count: counts.ClonesOfCleanedMod, Content: $"{target} content", Judged: $"they are judged as {target} objects"),
+            (Count: counts.ClonesOfOtherCleanedMods, Content: "the content of other cleaned mods", Judged: "they only support or hold other objects"),
+        }
+        .Where(copies => copies.Count > 0)
+        .Select(copies => $"  Copies an earlier run placed as {copies.Content}: {TextFormat.Count(copies.Count)}; {copies.Judged}.");
+
+    /// <summary>A warning per record of a patch whose EditorID starts like a copy's marker but is no valid one.</summary>
+    private static IEnumerable<string> BrokenCloneMarkerWarnings(CollectedObjects world)
+    {
+        if (world.BrokenCloneMarkers.IsEmpty) return [];
+        var label = RestoreOutcomes.LabelsIn(world);
+        return world.BrokenCloneMarkers.Select(key =>
+            $"Warning: {label(key)} in an Added Object Remover patch has an EditorID that starts like the marker of a copy but is no valid "
+            + "marker for the plugins in the load order. It is read as an ordinary object of the patch, not as a copy.");
     }
 
     /// <summary>

@@ -26,8 +26,8 @@ internal sealed class ChangeJudge(
 
     /// <remarks>
     /// A target the removal steps left undecided is judged both at its old place and where it stands, so a moved object is never taken
-    /// out of a village that stays. A moved object that the cleaned mod's standing objects hold as a left-behind neighbour, and that may
-    /// not be copied, stays where the cleaned mod put it.
+    /// out of a village that stays, unless a copy of it stays there. A moved object that the cleaned mod's standing objects hold as a
+    /// left-behind neighbour, and that may not be copied, stays where the cleaned mod put it.
     /// </remarks>
     public PlacedChangeJudged Placed(RecordChangedByCleanedMod change)
     {
@@ -45,13 +45,16 @@ internal sealed class ChangeJudge(
     }
 
     /// <summary>
-    /// The record its areas judged, with the copy rule's outcome: a refused copy of a neighbour of one of the cleaned mod's standing
-    /// objects keeps it where the cleaned mod put it; otherwise its areas decide whether it goes back.
+    /// The record its areas judged, with the copy rule's outcome: a planned copy lets it go back, since the copy keeps the cleaned
+    /// mod's content where it stands now whole; a refused copy of a neighbour of one of the cleaned mod's standing objects keeps it
+    /// where the cleaned mod put it; otherwise its areas decide whether it goes back.
     /// </summary>
-    /// <param name="judged">Judged by its areas, with no never-rule holding.</param>
+    /// <param name="judged">Judged by its areas, with no never-rule holding; the copy rule applies only where its old place is cleared.</param>
     public static PlacedChangeJudged WithCloning(PlacedChangeJudged judged, CloneJudged? cloning)
     {
-        var heldByStandingObject = cloning is { Need: CloneNeed.NeighbourOfStandingObject, RefusedBy: not null };
+        if (cloning is { RefusedBy: null }) return judged with { IsRestored = true, KeptForArea = null, Cloning = cloning };
+
+        var heldByStandingObject = cloning is { Need: CloneNeed.NeighbourOfStandingObject };
         AreaVerdict[] verdicts = judged.WhereItIsNow is { } now ? [judged.OldPlace!.Verdict, now.Verdict] : [judged.OldPlace!.Verdict];
         var keptForArea = heldByStandingObject ? null : VerdictKeeping(verdicts);
         return judged with { IsRestored = keptForArea is null && !heldByStandingObject, KeptForArea = keptForArea, Cloning = cloning };

@@ -24,12 +24,13 @@ internal static class LandOutcomes
             FinalHeights: null,
             CellEdgeHeights.Unknown,
             IsRestored: false,
-            ChangedQuarters(change, quarters: [], nothing, nothing, default, []),
+            ChangedQuarters(change, quarters: [], nothing, nothing, default, default, []),
             RestKeptForArea: null);
     }
 
     /// <summary>A LAND record no never-rule keeps, with what of it goes back.</summary>
     /// <param name="quarters">The four quarters by <see cref="TerrainQuadrants.IndexOf"/>.</param>
+    /// <param name="texturesKept">The quarters whose texture layers the cleaned mod last changed and that stay for an object that stays.</param>
     /// <param name="rest">Whether the rest of the record goes back.</param>
     public static LandChangeJudged Judged(
         LandChangedByCleanedMod change,
@@ -37,6 +38,7 @@ internal static class LandOutcomes
         PointSet heights,
         PointSet colours,
         QuarterSet textures,
+        QuarterSet texturesKept,
         bool rest,
         ImmutableArray<LandPointsKept> kept,
         float[]? finalHeights,
@@ -53,12 +55,18 @@ internal static class LandOutcomes
             finalHeights,
             beyond,
             IsRestored: !heights.IsEmpty || !colours.IsEmpty || !textures.IsEmpty || rest,
-            ChangedQuarters(change, quarters, heights, colours, textures, kept),
+            ChangedQuarters(change, quarters, heights, colours, textures, texturesKept, kept),
             change.UndoRest && !rest ? ChangeJudge.VerdictKeeping([.. quarters.Select(quarter => quarter.Verdict)]) : null);
 
     /// <param name="quarters">Empty when a never-rule keeps the land.</param>
     private static ImmutableArray<LandQuarterOutcome> ChangedQuarters(
-        LandChangedByCleanedMod change, ImmutableArray<LandQuarterJudged> quarters, PointSet heights, PointSet colours, QuarterSet textures, ImmutableArray<LandPointsKept> kept)
+        LandChangedByCleanedMod change,
+        ImmutableArray<LandQuarterJudged> quarters,
+        PointSet heights,
+        PointSet colours,
+        QuarterSet textures,
+        QuarterSet texturesKept,
+        ImmutableArray<LandPointsKept> kept)
     {
         var changedHeights = TerrainQuadrants.CountPerQuadrant(change.UndoPoints.Points);
         var changedColours = TerrainQuadrants.CountPerQuadrant(change.UndoColours.Points);
@@ -83,6 +91,8 @@ internal static class LandOutcomes
                         ? [.. keptPerQuarter.Where(entry => entry.Counts[facts.Quarter] > 0).Select(entry => new QuarterPointsKept(entry.Reason, entry.Counts[facts.Quarter]))]
                         : [];
                     var nothingGoesBack = !facts.Restored.Any;
+                    var cleared = facts.Judged is { Verdict: AreaVerdict.Cleared };
+                    var texturesKeptHere = cleared && texturesKept.Contains(facts.Quarter);
                     return new LandQuarterOutcome(
                         facts.Quarter,
                         facts.Judged?.Area,
@@ -91,7 +101,8 @@ internal static class LandOutcomes
                         facts.Later,
                         keptHere,
                         nothingGoesBack && facts.Judged is { Verdict: not AreaVerdict.Cleared } judged ? judged.Verdict : null,
-                        nothingGoesBack && facts.Judged is { Verdict: AreaVerdict.Cleared } && keptHere.IsEmpty);
+                        nothingGoesBack && cleared && keptHere.IsEmpty && !texturesKeptHere,
+                        texturesKeptHere);
                 }),
         ];
     }

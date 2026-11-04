@@ -107,13 +107,14 @@ public static partial class StepRunner
         InvisibleLeftBehindObjects.CreateNeighbours(new(collected.Targets, final, runCaches, scope.Settings.InvisibleLeftBehind)),
     ];
 
-    /// <summary>The too-close settings and the changed-terrain check the removal steps judge the cleaned mod's own objects with.</summary>
+    /// <summary>The too-close settings, the changed-terrain check and its settings the removal steps judge the cleaned mod's own objects with.</summary>
     private static CleanedModsObjectRules CreateCleanedModsObjectRules(RunScope scope, IRunCaches runCaches, ModTrustTable trust)
     {
         var own = scope.Settings.Collision;
         return new(
             own.TooClose,
-            ChangedTerrainObjects.CreatePlacementRule(new(trust.AcceptedWorld, scope.Environment.Plugins, scope.Plugin, runCaches.Shapes, own.ChangedTerrain)));
+            ChangedTerrainObjects.CreatePlacementRule(new(trust.AcceptedWorld, scope.Environment.Plugins, scope.Plugin, runCaches.Shapes, own.ChangedTerrain)),
+            own.ChangedTerrain);
     }
 
     /// <remarks>The restore's rules share the world caches, which record measurement failures under the part the step names.</remarks>

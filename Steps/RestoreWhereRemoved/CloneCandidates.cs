@@ -34,6 +34,9 @@ internal sealed class CloneCandidates(IRunCaches caches, IReadOnlySet<RecordKey>
     public static bool IsMovedObject(RecordChangedByCleanedMod change, IReadOnlyList<TargetObject> targets) =>
         change.Target is { } id && targets[id.Index].Origin == TargetOrigin.Moved && change.Earlier.Undo.HasFlag(PlacedParts.Position);
 
+    /// <summary>The copy of a moved object as a later step reads it: one of the cleaned mod's objects, where the object stands.</summary>
+    public static TargetObject AsClone(TargetObject standing) => standing with { Origin = TargetOrigin.CleanedMod, CloneOf = standing.Key };
+
     public bool HasClone(RecordChangedByCleanedMod change) => cloned.Contains(change.Key);
 
     public bool IsNeighbourOfStandingObject(TargetId target) => neighboursOfStandingObjects.Contains(target);

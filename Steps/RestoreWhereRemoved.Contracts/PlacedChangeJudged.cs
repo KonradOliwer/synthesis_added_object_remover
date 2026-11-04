@@ -101,8 +101,8 @@ public enum PlacedRestoreKind
 /// </param>
 /// <remarks>
 /// When it stays, exactly one of <paramref name="Never"/>, <paramref name="Refused"/>, <paramref name="KeptForArea"/> and a refused
-/// <paramref name="Cloning"/> of a <see cref="CloneNeed.NeighbourOfStandingObject"/> says why. A planned copy does not yet let the
-/// object go back: until the patch writes copies, it stays as its areas keep it.
+/// <paramref name="Cloning"/> of a <see cref="CloneNeed.NeighbourOfStandingObject"/> says why. A record with a planned copy goes back
+/// only together with that copy: <paramref name="IsRestored"/> with an unrefused <paramref name="Cloning"/> means the patch writes both.
 /// </remarks>
 public sealed record PlacedChangeJudged(
     RecordChangedByCleanedMod Change,

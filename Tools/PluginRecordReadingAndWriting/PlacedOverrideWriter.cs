@@ -5,16 +5,38 @@ namespace AddedObjectRemover;
 
 /// <summary>
 /// Gives the patch's override of a placed record, creating it on first use, and keeps it in one child list: it never holds
-/// the record twice. Not thread-safe.
+/// the record twice. Adds new records to the patch, each a copy of a record read. Not thread-safe.
 /// </summary>
 /// <param name="parts">The table a part is copied through.</param>
-internal sealed class PlacedOverrideWriter(CellOverrides cells, PlacedRecordParts parts)
+/// <param name="mod">The plugin written into, which hands out the FormKeys of the records added.</param>
+internal sealed class PlacedOverrideWriter(CellOverrides cells, PlacedRecordParts parts, ISkyrimMod mod)
 {
     /// <summary>Per overridden child list (by reference): its records by FormKey.</summary>
     private readonly Dictionary<object, Dictionary<FormKey, IPlaced>> _placedByList = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>The child list each record this writer moved now stands in.</summary>
     private readonly Dictionary<FormKey, (FormKey Cell, bool InPersistentList)> _listOfMoved = [];
+
+    private readonly List<FormKey> _added = [];
+
+    /// <summary>The FormKeys of the records this writer added, in the order it added them.</summary>
+    public IReadOnlyList<FormKey> Added => _added;
+
+    /// <summary>
+    /// Adds to the temporary children of the given cell a whole copy of <paramref name="record"/> with the given EditorID, under the
+    /// FormKey the plugin hands out for that EditorID: with a persistent allocator, such as Synthesis's, the same in every run.
+    /// </summary>
+    /// <param name="record">A placed object (REFR); the record itself is only read.</param>
+    public void AddClone(IPlacedGetter record, FormKey cellKey, string editorId)
+    {
+        var original = record as IPlacedObjectGetter ?? throw new ArgumentException($"Record {record.FormKey} is no placed object and cannot be copied.", nameof(record));
+        var key = mod.GetNextFormKey(editorId);
+        var clone = MutagenCalls.Read(() => original.Duplicate(key));
+        clone.EditorID = editorId;
+        var (list, byKey) = ChildListOf(cellKey, inPersistentList: false);
+        Add(list, byKey, clone);
+        _added.Add(key);
+    }
 
     /// <summary>
     /// Mirrors Mutagen's placed-record context: override the cell (without its children), then add a copy of the

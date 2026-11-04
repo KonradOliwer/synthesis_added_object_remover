@@ -18,7 +18,9 @@ internal static partial class LogSections
                 + WhenAny(written.Fitted, "shrunk or turned to fit")
                 + WhenAny(written.WrittenWhereRemoved, "to restore where the cleaned mod was removed")
                 + OtherModsObjectsWritten(written)
-                + $"){Describe.TimedSuffix(elapsed, context)}.",
+                + ")"
+                + CopiesAdded(written)
+                + $"{Describe.TimedSuffix(elapsed, context)}.",
         ];
         if (written.EnableParentsReplaced > 0)
         {
@@ -43,6 +45,12 @@ internal static partial class LogSections
         ];
         return parts.Count > 0 ? $"; other mods' objects: {string.Join(Describe.ListSeparator, parts)}" : string.Empty;
     }
+
+    /// <summary>" and added 2 new records (copies of other mods' objects that went back, at the cleaned mod's place)", or nothing when there are none.</summary>
+    private static string CopiesAdded(WriteSummary written) =>
+        written.Clones.IsEmpty
+            ? string.Empty
+            : $" and added {TextFormat.Count(written.Clones.Length, "new record", "new records")} (copies of other mods' objects that went back, at the cleaned mod's place)";
 
     public static LogSection BuildDoneSection(TimeSpan elapsed, ReportContext context) =>
         new("done", [$"Done{Describe.TimedSuffix(elapsed, context)}."]);

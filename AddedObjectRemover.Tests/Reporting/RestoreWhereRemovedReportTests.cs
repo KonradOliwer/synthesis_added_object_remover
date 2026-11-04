@@ -74,7 +74,7 @@ public sealed class RestoreWhereRemovedReportTests
         Assert.Empty(Section(nothing, Normal).Lines);
         Assert.Empty(Section(nothing, Detailed).Lines);
         Assert.Empty(LogSections.BuildRestoreWhereRemovedSummarySection(nothing).Lines);
-        Assert.Empty(Tables.BuildRestoredWhereRemovedTables(World(), nothing, Normal));
+        Assert.Empty(BuildTables(nothing, Normal));
     }
 
     [Fact]
@@ -186,7 +186,7 @@ public sealed class RestoreWhereRemovedReportTests
         var scene = Scene() with { Objects = [], Cells = [cell with { Change = cell.Change with { WinningMod = Later } }], Lands = [], Navmeshes = [], NavmeshGroups = [] };
 
         var line = Assert.Single(Section(scene, Detailed).Lines, text => text.StartsWith("  Kept as changed", StringComparison.Ordinal));
-        var table = Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), scene, Normal));
+        var table = Assert.Single(BuildTables(scene, Normal));
 
         Assert.Equal($"  Kept as changed: cell {Space}, cell (9, 9): a plugin that loads after the patch has the last word on it (Later.esp)", line);
         Assert.Equal("kept: a plugin that loads after the patch has the last word on it (Later.esp)", Field(table, Assert.Single(table.Rows), "result"));
@@ -281,6 +281,9 @@ public sealed class RestoreWhereRemovedReportTests
             .. Enum.GetValues<NavmeshUndo>().SelectMany(undo => new[] { RestoreWhereRemovedText.Undo(undo), RestoreWhereRemovedText.UndoVerb(undo) }),
             .. Enum.GetValues<PlacedRestoreKind>().SelectMany(kind => new[] { RestoreWhereRemovedText.Kind(kind), RestoreWhereRemovedText.KindVerb(kind) }),
             .. Enumerable.Range(0, 4).Select(RestoreWhereRemovedText.Quarter),
+            .. Enum.GetValues<CloneRefusal>().Select(RestoreWhereRemovedText.CloneRefused),
+            .. Enum.GetValues<WaterKeptReason>().Select(reason => RestoreWhereRemovedText.WaterKept(reason, Key(1), key => key.ToString())),
+            RestoreWhereRemovedText.TexturesKeptForObjectThatStays,
         ];
 
         Assert.All(texts, text => Assert.False(string.IsNullOrWhiteSpace(text)));
@@ -402,7 +405,7 @@ public sealed class RestoreWhereRemovedReportTests
     {
         var scene = Scene() with { Objects = [], Cells = [], Navmeshes = [], NavmeshGroups = [], Lands = [RestOnlyLand(aQuarterStillStands)] };
 
-        var table = Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), scene, Normal));
+        var table = Assert.Single(BuildTables(scene, Normal));
 
         var row = Assert.Single(table.Rows);
         Assert.Equal(
@@ -435,7 +438,7 @@ public sealed class RestoreWhereRemovedReportTests
         var scene = Scene() with { Objects = [], Cells = [], Navmeshes = [], NavmeshGroups = [], Lands = [LandNextToAQuarterThatStays()] };
 
         var lines = Section(scene, Detailed).Lines;
-        var table = Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), scene, Normal));
+        var table = Assert.Single(BuildTables(scene, Normal));
 
         Assert.Contains(
             $"  Terrain {Space}, cell (2, 0), south-west quarter: 1 height; 1 height kept on the line to a quarter of the cell whose area is not cleared; 0 of 214 objects still stand (0.0% by count, 0.0% by size)",
@@ -457,13 +460,14 @@ public sealed class RestoreWhereRemovedReportTests
             heights: PointSet.Of([]),
             land.Colours,
             land.Textures,
+            texturesKept: default,
             rest: false,
             kept: [],
             finalHeights: null,
             CellEdgeHeights.Unknown);
         var scene = Scene() with { Objects = [], Cells = [], Navmeshes = [], NavmeshGroups = [], Lands = [coloursOnly] };
 
-        var table = Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), scene, Normal));
+        var table = Assert.Single(BuildTables(scene, Normal));
 
         Assert.Equal("kept: its vertex colours lie on a line shared with ground that stays", Field(table, Row(table, "quarter", "south-west"), "result"));
     }
@@ -475,7 +479,7 @@ public sealed class RestoreWhereRemovedReportTests
         var refused = ObjectsOnly(Refused(Rock(0x914, PlacedParts.Position), Cleared, new PlacedRefusal(PlacedGuard.OnGroundThatStaysChanged, By: null, Failure: null, Later)));
 
         var line = Assert.Single(Section(refused, Detailed).Lines, text => text.StartsWith("  Kept as changed", StringComparison.Ordinal));
-        var table = Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), refused, Normal));
+        var table = Assert.Single(BuildTables(refused, Normal));
 
         Assert.Contains(": on ground that stays changed (Later.esp);", line, StringComparison.Ordinal);
         Assert.Equal("kept: on ground that stays changed (Later.esp)", Field(table, Assert.Single(table.Rows), "result"));
@@ -491,7 +495,7 @@ public sealed class RestoreWhereRemovedReportTests
         var refused = ObjectsOnly(Refused(Rock(0x915, PlacedParts.Position), Cleared, refusal));
 
         var line = Assert.Single(Section(refused, Detailed).Lines, text => text.StartsWith("  Kept as changed", StringComparison.Ordinal));
-        var table = Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), refused, Normal));
+        var table = Assert.Single(BuildTables(refused, Normal));
 
         Assert.Contains($": on ground that stays changed (Later.esp, {facts});", line, StringComparison.Ordinal);
         Assert.Equal($"kept: on ground that stays changed (Later.esp, {facts})", Field(table, Assert.Single(table.Rows), "result"));
@@ -532,7 +536,7 @@ public sealed class RestoreWhereRemovedReportTests
     {
         var large = Cleared with { Size = 123_456_789d, StandingSize = 12_345_678d };
 
-        var table = Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), ObjectsOnly(Restored(Rock(0x914, PlacedParts.Position), large)), Normal));
+        var table = Assert.Single(BuildTables(ObjectsOnly(Restored(Rock(0x914, PlacedParts.Position), large)), Normal));
 
         Assert.Equal(("123456789", "12345678"), (Field(table, table.Rows[0], "size"), Field(table, table.Rows[0], "standingSize")));
     }
@@ -556,21 +560,116 @@ public sealed class RestoreWhereRemovedReportTests
     {
         var onlyCells = Scene() with { Objects = [], Lands = [], Navmeshes = [], NavmeshGroups = [] };
 
-        var tables = Tables.BuildRestoredWhereRemovedTables(World(), onlyCells, Normal);
+        var tables = BuildTables(onlyCells, Normal);
 
         Assert.Equal([ReportFileNames.RestoredWhereRemovedCellsFileName], tables.Select(table => table.FileName));
     }
 
+    // ---- copies
+
+    [Fact]
+    public void TheNormalLogCountsTheObjectsPutBackWithACopyAndThoseKeptBecauseTheyMayNotBeCopiedPerReason()
+    {
+        var lines = Section(CopyScene(), Normal).Lines;
+
+        Assert.Equal(
+            string.Join('\n',
+                $"{Heading}: 1 object of other mods (1 moved back).",
+                "Other mods' objects put back, with a copy at the cleaned mod's place: 1.",
+                "Other mods' objects kept at the cleaned mod's place because they may not be copied: 3 (1 not plain scenery, 1 persistent, 1 with a check that stopped unexpectedly)."),
+            string.Join('\n', lines));
+    }
+
+    [Fact]
+    public void TheDetailedLogSaysWhichObjectGoesBackWithACopyAndWhyAnotherMayNotBeCopied()
+    {
+        var lines = Section(CopyScene(), Detailed).Lines;
+
+        Assert.Contains(
+            $"  Moved back: {RecordLabels.Of(Key(0x930), null)} (base (none)) in {Space} to (10, 20, 30), with a copy at the cleaned mod's place; 0 of 214 objects still stand (0.0% by count, 0.0% by size)",
+            lines);
+        Assert.Contains(
+            $"  Kept as changed: {RecordLabels.Of(Key(0x931), null)} (base (none)) in {Space}: the cleaned mod's standing content holds it and it may not be copied (persistent); 0 of 214 objects still stand (0.0% by count, 0.0% by size)",
+            lines);
+        Assert.Contains(lines, line => line.StartsWith($"  Kept as changed: {RecordLabels.Of(Key(0x932), null)} (base (none)) in {Space}: the cleaned mod's objects still stand around it; may not be copied: not plain scenery; at its old place", StringComparison.Ordinal));
+        Assert.Contains(lines, line => line.Contains("may not be copied: on changed terrain as the cleaned mod's object (the check stopped unexpectedly: InvalidOperationException: broke);", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void TheObjectsFileNamesTheCopyWrittenAndWhyARecordMayNotBeCopied()
+    {
+        var copy = new RecordKey(Patch, 0x800);
+
+        var table = Assert.Single(BuildTables(CopyScene(), Normal, new CloneWritten(Key(0x930), copy)));
+
+        var copied = Row(table, "formKey", Key(0x930).ToString());
+        Assert.Equal(("restored with a copy at the cleaned mod's place", copy.ToString(), ""), (Field(table, copied, "result"), Field(table, copied, "copyFormKey"), Field(table, copied, "copyRefusedBy")));
+        var held = Row(table, "formKey", Key(0x931).ToString());
+        Assert.Equal(("", "persistent"), (Field(table, held, "copyFormKey"), Field(table, held, "copyRefusedBy")));
+        Assert.Equal("not plain scenery", Field(table, Row(table, "formKey", Key(0x932).ToString()), "copyRefusedBy"));
+        Assert.All(table.Rows, row => Assert.Equal(table.Header.Length, row.Length));
+    }
+
+    /// <summary>A quarter whose heights go back while its textures stay for an object that stays says why the textures stay.</summary>
+    [Fact]
+    public void AQuarterWhoseHeightsGoBackWhileItsTexturesStayForAnObjectThatStaysSaysWhy()
+    {
+        var land = Land();
+        var texturesKept = LandOutcomes.Judged(
+            land.Change, land.Quarters, land.Heights, land.Colours, textures: QuarterSet.Of([]), texturesKept: QuarterSet.Of([0]), rest: false, land.Kept, finalHeights: null, CellEdgeHeights.Unknown);
+        var scene = Scene() with { Objects = [], Cells = [], Navmeshes = [], NavmeshGroups = [], Lands = [texturesKept] };
+
+        var line = Assert.Single(Section(scene, Detailed).Lines, text => text.Contains("south-west quarter:", StringComparison.Ordinal));
+
+        Assert.Equal(
+            $"  Terrain {Space}, cell (0, 0), south-west quarter: 2 heights, 1 vertex colour; 1 height kept under objects that stay; ground textures kept: "
+            + $"{RestoreWhereRemovedText.TexturesKeptForObjectThatStays}; 0 of 214 objects still stand (0.0% by count, 0.0% by size)",
+            line);
+    }
+
+    [Theory]
+    [InlineData(WaterKeptReason.AroundObjectThatStays, "the changed-terrain check around {0}, which stays, reaches the cell and counts water changes")]
+    [InlineData(WaterKeptReason.AroundCopy, "the changed-terrain check around the copy of {0} reaches the cell and counts water changes")]
+    public void ACellKeepingItsWaterLevelForTheChangedTerrainCheckAroundAnObjectNamesTheObject(WaterKeptReason reason, string wording)
+    {
+        var cell = Cell(3, 4, [CellPart.Music], Cleared, restored: true, waterKeptBy: WaterObject) with { WaterKeptFor = reason };
+        var scene = Scene() with { Objects = [], Cells = [cell], Lands = [], Navmeshes = [], NavmeshGroups = [] };
+
+        var lines = Section(scene, Detailed).Lines;
+
+        Assert.Contains($"  Cell {Space}, cell (3, 4): music; water level kept: {string.Format(wording, WaterObject)}; 0 of 214 objects still stand (0.0% by count, 0.0% by size)", lines);
+    }
+
     // ---- the scene
+
+    private static ImmutableArray<CsvTable> BuildTables(RestoreWhereRemovedResult result, ReportContext context, params CloneWritten[] clones) =>
+        Tables.BuildRestoredWhereRemovedTables(World(), result, [.. clones], context);
+
+    /// <summary>
+    /// Base game rocks the cleaned mod moved, whose old places are cleared: one goes back with a copy; one its standing content holds
+    /// may not be copied, being persistent; two stay for their areas because they may not be copied, one with a check that stopped.
+    /// </summary>
+    private static RestoreWhereRemovedResult CopyScene() =>
+        ObjectsOnly(
+            Restored(Rock(0x930, PlacedParts.Position), Cleared) with { Cloning = new CloneJudged(CloneNeed.AreaStillStands, RefusedBy: null) },
+            Restored(Rock(0x931, PlacedParts.Position), Cleared) with { IsRestored = false, Cloning = new CloneJudged(CloneNeed.NeighbourOfStandingObject, CloneRefusal.Persistent) },
+            KeptForArea(Rock(0x932, PlacedParts.Position), Cleared, AreaVerdict.StillStanding, now: StillStanding) with
+            {
+                Cloning = new CloneJudged(CloneNeed.AreaStillStands, CloneRefusal.NotPlainScenery),
+            },
+            KeptForArea(Rock(0x933, PlacedParts.Position), Cleared, AreaVerdict.StillStanding, now: StillStanding) with
+            {
+                Cloning = new CloneJudged(CloneNeed.AreaStillStands, CloneRefusal.OnChangedTerrainAsCleanedModsObject, "InvalidOperationException: broke"),
+            });
 
     private static LogSection Section(RestoreWhereRemovedResult result, ReportContext context) =>
         LogSections.BuildRestoreWhereRemovedSection(World(), result, Elapsed, context);
 
     private static CsvTable ObjectsTable() =>
-        Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), Scene(), Normal), file => file.FileName == ReportFileNames.RestoredWhereRemovedObjectsFileName);
+        Assert.Single(BuildTables(Scene(), Normal), file => file.FileName == ReportFileNames.RestoredWhereRemovedObjectsFileName);
 
     private static CsvTable CellsTable() =>
-        Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), Scene(), Normal), file => file.FileName == ReportFileNames.RestoredWhereRemovedCellsFileName);
+        Assert.Single(BuildTables(Scene(), Normal), file => file.FileName == ReportFileNames.RestoredWhereRemovedCellsFileName);
 
     private static ImmutableArray<string> Row(CsvTable table, string column, string value) =>
         table.Rows.Single(row => Field(table, row, column) == value);
@@ -724,6 +823,7 @@ public sealed class RestoreWhereRemovedReportTests
             PointSet.Of([0, HeightRowLength]),
             PointSet.Of([0]),
             QuarterSet.Of([0]),
+            texturesKept: default,
             rest: false,
             [new LandPointsKept(TerrainKeptReason.UnderObjectThatStays, PointSet.Of([1]))],
             finalHeights: null,
@@ -754,6 +854,7 @@ public sealed class RestoreWhereRemovedReportTests
             PointSet.Of([inside]),
             PointSet.Of([]),
             QuarterSet.Of([]),
+            texturesKept: default,
             rest: false,
             [new LandPointsKept(TerrainKeptReason.NextToQuarterThatStays, PointSet.Of([onTheLine]))],
             finalHeights: null,
@@ -779,6 +880,7 @@ public sealed class RestoreWhereRemovedReportTests
             PointSet.Of([]),
             PointSet.Of([]),
             QuarterSet.Of([]),
+            texturesKept: default,
             rest: !lastQuarterStillStands,
             [],
             finalHeights: null,

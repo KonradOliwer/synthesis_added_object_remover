@@ -61,7 +61,7 @@ public sealed class MalformedRecordCopyTests : IDisposable
     {
         var patch = new SkyrimMod(FixturePatcherState.PatchModKey, FixtureMod.Release);
         var loadOrder = new LoadOrder<IModListing<ISkyrimModGetter>>(new[] { _plugin }.Select(mod => new ModListing<ISkyrimModGetter>(mod, enabled: true)));
-        var writer = new PlacedOverrideWriter(new CellOverrides(new SynthesisWriteCache(loadOrder.ToMutableLinkCache<ISkyrimMod, ISkyrimModGetter>(patch)), patch), Parts);
+        var writer = new PlacedOverrideWriter(new CellOverrides(new SynthesisWriteCache(loadOrder.ToMutableLinkCache<ISkyrimMod, ISkyrimModGetter>(patch)), patch), Parts, patch);
 
         var failure = Assert.Throws<MalformedRecordException>(() => writer.GetOrAddOverride(_crate, _cell, inPersistentList: false));
 

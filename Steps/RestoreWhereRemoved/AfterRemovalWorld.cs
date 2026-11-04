@@ -10,7 +10,7 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 /// restored), then the objects of other plugins that are a change in the world without the cleaned mod and those the patch pulled
 /// down, where they stand. Its support-only objects are every other object that stands, such as one that stood there without the
 /// cleaned mod. The other mods' objects the patch removed are in neither. Every candidate that stands now is among them, where it
-/// stands now.
+/// stands now; that entry also stands for the clone of a candidate going back with one, since the clone stands there.
 /// </summary>
 /// <param name="World">
 /// A scan result the object caches index: the causes and support-only objects within the guards' reach (<see cref="GuardReach"/>),
@@ -207,6 +207,10 @@ internal sealed record AfterRemovalWorld(
     /// disabled or deleted stands nowhere, so it is not among them.
     /// </summary>
     public IEnumerable<TargetObject> NowOfAllBut(IReadOnlySet<int> candidates) => Now.Where(standing => !candidates.Contains(StandingNow[standing.Id.Index]));
+
+    /// <summary>The clones of the given candidates, each where its candidate stands now, as one of the cleaned mod's objects, in candidate order.</summary>
+    public IEnumerable<TargetObject> ClonesOf(IReadOnlySet<int> candidates) =>
+        Now.Where(standing => candidates.Contains(StandingNow[standing.Id.Index])).Select(CloneCandidates.AsClone);
 
     /// <summary>The given candidates that keep their shape where they stand now, where they stand, in candidate order.</summary>
     public IEnumerable<TargetObject> NowOfThoseKeepingTheirShape(IReadOnlySet<int> candidates) =>

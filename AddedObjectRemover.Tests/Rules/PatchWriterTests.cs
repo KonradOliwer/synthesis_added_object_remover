@@ -19,7 +19,7 @@ public sealed class PatchWriterTests
             .Apply(AlsoRemoveRounds.Opening, [Propose(1)]);
         var writing = new RecordingWriting();
 
-        var written = PatchWriter.Write(new(final, [.. targets], OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff(),new ReadPlugin(), writing));
+        var written = PatchWriter.Write(new(final, [.. targets], OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff(),new ReadPlugin(), writing, TestTargets.TargetName));
 
         Assert.Equal([0, 4, 1, 2], written.Removed.Select(id => id.Index));
         Assert.Equal(
@@ -37,7 +37,7 @@ public sealed class PatchWriterTests
         var plugin = new ReadPlugin();
         var writing = new RecordingWriting();
 
-        PatchWriter.Write(new(final, [.. targets], OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff(),plugin, writing));
+        PatchWriter.Write(new(final, [.. targets], OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff(),plugin, writing, TestTargets.TargetName));
 
         Assert.Same(plugin.Records, writing.Records);
     }
@@ -51,7 +51,7 @@ public sealed class PatchWriterTests
         var final = TestSeededDecisions.StartDisablingAll(protection, 2).Apply(RoundKind.TooClose, [Propose(0), Propose(1)]);
         var writing = new RecordingWriting();
 
-        PatchWriter.Write(new(final, [.. targets], OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff(),new ReadPlugin(), writing));
+        PatchWriter.Write(new(final, [.. targets], OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff(),new ReadPlugin(), writing, TestTargets.TargetName));
 
         Assert.Equal([targets[0].Key, targets[1].Key], writing.Orders.OfType<SetInitiallyDisabled>().Select(order => order.Record));
         var move = Assert.Single(writing.Orders.OfType<SetPosition>());
@@ -68,7 +68,7 @@ public sealed class PatchWriterTests
         var final = TestSeededDecisions.StartDisablingAll(protection, TargetCount).AddMoves([markerMove]);
         var writing = new RecordingWriting();
 
-        var written = PatchWriter.Write(new(final, [.. targets], OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff(),new ReadPlugin(), writing));
+        var written = PatchWriter.Write(new(final, [.. targets], OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff(),new ReadPlugin(), writing, TestTargets.TargetName));
 
         Assert.Equal<WriteOrder>([new SetPosition(targets[3].Key, new Vector3(1, 2, 3))], writing.Orders);
         Assert.Equal(1, written.Moved);
@@ -85,7 +85,7 @@ public sealed class PatchWriterTests
             .Apply(RoundKind.TooClose, [Propose(0)]);
         var writing = new RecordingWriting();
 
-        var written = PatchWriter.Write(new(final, [.. targets], OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff(),new ReadPlugin(), writing));
+        var written = PatchWriter.Write(new(final, [.. targets], OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff(),new ReadPlugin(), writing, TestTargets.TargetName));
 
         Assert.Equal<WriteOrder>([new SetPlacement(targets[0].Key, to.Position, to.Rotation, to.Scale)], writing.Orders);
         Assert.Equal((0, 1), (written.Removed.Length, written.Fitted));
@@ -113,7 +113,7 @@ public sealed class PatchWriterTests
             Failure: null);
         var writing = new RecordingWriting();
 
-        var written = PatchWriter.Write(new(final, [.. targets], settled, RestoreWhereRemovedResult.SwitchedOff(),new ReadPlugin(), writing));
+        var written = PatchWriter.Write(new(final, [.. targets], settled, RestoreWhereRemovedResult.SwitchedOff(),new ReadPlugin(), writing, TestTargets.TargetName));
 
         Assert.Equal<WriteOrder>(
             [
@@ -230,7 +230,7 @@ public sealed class PatchWriterTests
             .AddMoves([new MarkerMove(new TargetId(3), Vector3.Zero, Vector3.One)]);
         var writing = new RecordingWriting();
 
-        PatchWriter.Write(new(final, [.. targets], OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff(),new ReadPlugin(), writing));
+        PatchWriter.Write(new(final, [.. targets], OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff(),new ReadPlugin(), writing, TestTargets.TargetName));
 
         Assert.Equal<Type>(
             [typeof(SetInitiallyDisabled), typeof(SetPosition), typeof(SetPlacement), typeof(CopyEarlierPlacedParts), typeof(SetPosition)],
@@ -270,7 +270,7 @@ public sealed class PatchWriterTests
             RestoreWhereRemovedTimes.None);
         var writing = new RecordingWriting();
 
-        var written = PatchWriter.Write(new(final, [target], OtherModsObjectsResult.SwitchedOff, whereRemoved, new ReadPlugin(), writing));
+        var written = PatchWriter.Write(new(final, [target], OtherModsObjectsResult.SwitchedOff, whereRemoved, new ReadPlugin(), writing, TestTargets.TargetName));
 
         Assert.Equal((1, 2), (written.Restored.Length, written.WrittenWhereRemoved));
         Assert.Equal<WriteOrder>(
@@ -283,6 +283,46 @@ public sealed class PatchWriterTests
         var cellOrder = Assert.IsType<CopyEarlierCellParts>(Assert.Single(writing.Orders.Skip(3)));
         Assert.Equal(cell.Cell, cellOrder.Record);
         Assert.Equal([new CellPartName(CellPart.Music, null)], cellOrder.Parts.ToList());
+    }
+
+    /// <summary>
+    /// Three rocks went back with a copy planned: the first goes back with it; a guard refused the second and the third lost its copy,
+    /// so neither goes back nor gets a copy. The copy is written before every other order, so it copies the record before the restore
+    /// changes it, with its marker, and the summary names it with the key the writing gave it.
+    /// </summary>
+    [Fact]
+    public void ACopyIsWrittenOnlyForARecordThatGoesBackWithItBeforeEveryOtherOrder()
+    {
+        var target = TestTargets.Create(0, TestTargets.At(new Vector3(500, 0, 0)));
+        var protection = ObjectsToKeep.Build([target], [], TestTargets.References(1), TestBaseFacts.Unresolved);
+        var final = RemovalDecisions.Start(protection, [new WhenRemoved.Disable()]);
+        var (goesBack, refused, lost) = (ChangedRock(0x900), ChangedRock(0x901), ChangedRock(0x902));
+        var planned = new CloneJudged(CloneNeed.AreaStillStands, RefusedBy: null);
+        var cleared = TestAreaShares.Of(AreaVerdict.Cleared);
+        var cell = ChangedCell(TestTargets.SpaceKey(0x202));
+        var whereRemoved = new RestoreWhereRemovedResult(
+            StepOutcome.Performed,
+            [
+                new PlacedChangeJudged(goesBack, null, cleared, cleared, Refused: null, IsRestored: true, ChangeJudge.KindOf(goesBack), KeptForArea: null, PlacedBack: null, planned),
+                new PlacedChangeJudged(refused, null, cleared, cleared, new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, goesBack.Key, Failure: null), IsRestored: false, ChangeJudge.KindOf(refused), KeptForArea: null, PlacedBack: null, planned),
+                new PlacedChangeJudged(lost, null, cleared, cleared, Refused: null, IsRestored: false, ChangeJudge.KindOf(lost), AreaVerdict.StillStanding, PlacedBack: null, planned with { RefusedBy = CloneRefusal.ActorsWalkOnIt }),
+            ],
+            [new CellChangeJudged(cell, [cell.Parts[0]], null, cleared, WaterKeptBy: null, IsRestored: true, KeptForArea: null)],
+            [],
+            [],
+            [],
+            Passes: 1,
+            DoorsLeftRemoved: [],
+            Failures: [],
+            RestoreWhereRemovedTimes.None);
+        var writing = new RecordingWriting();
+
+        var written = PatchWriter.Write(new(final, [target], OtherModsObjectsResult.SwitchedOff, whereRemoved, new ReadPlugin(), writing, TestTargets.TargetName));
+
+        Assert.Equal<Type>([typeof(AddClone), typeof(PlaceInCell), typeof(CopyEarlierPlacedParts), typeof(CopyEarlierCellParts)], writing.Orders.Select(order => order.GetType()));
+        Assert.Equal(new AddClone(goesBack.Key, CloneMarker.Of(goesBack.Key, TestTargets.TargetName)), writing.Orders[0]);
+        Assert.Equal([new CloneWritten(goesBack.Key, new RecordKey(TestTargets.PatchName, FirstAddedId))], written.Clones.ToArray());
+        Assert.Equal(2, written.WrittenWhereRemoved);
     }
 
     private static RecordChangedByCleanedMod ChangedRock(uint id) =>
@@ -327,12 +367,14 @@ public sealed class PatchWriterTests
         var final = RemovalDecisions.Start(protection, [whenRemoved]).Apply(RoundKind.TooClose, [Propose(0)]);
         var writing = new RecordingWriting();
 
-        var written = PatchWriter.Write(new(final, [target], OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff(),new ReadPlugin(), writing));
+        var written = PatchWriter.Write(new(final, [target], OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff(),new ReadPlugin(), writing, TestTargets.TargetName));
 
         return (written, writing);
     }
 
     private static ProposedRemoval Propose(int index) => new(new TargetId(index), new TooClose(new OtherId(0), new TooCloseCause.ObjectSize()));
+
+    private const uint FirstAddedId = 0x800;
 
     private sealed class RecordingWriting : IPatchWriting
     {
@@ -342,10 +384,12 @@ public sealed class PatchWriterTests
 
         public void WritePatchMarker() => throw new NotSupportedException();
 
-        public void Write(IWritableRecords records, IReadOnlyList<WriteOrder> orders)
+        /// <returns>A new key in the patch for each copy ordered.</returns>
+        public ImmutableArray<RecordKey> Write(IWritableRecords records, IReadOnlyList<WriteOrder> orders)
         {
             Records = records;
             Orders.AddRange(orders);
+            return [.. orders.OfType<AddClone>().Select((_, index) => new RecordKey(TestTargets.PatchName, FirstAddedId + (uint)index))];
         }
 
         public INavmeshWorldView ReadFinalNavmeshes(IWritableRecords records) => throw new NotSupportedException();

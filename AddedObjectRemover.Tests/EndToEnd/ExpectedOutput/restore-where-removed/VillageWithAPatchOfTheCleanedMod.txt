@@ -76,5 +76,5 @@ formKey,editorId,base,reason,worldspace,hold,place,cellFormKey,cellEditorId,grid
 ## report removed-markers-and-kept-objects.csv
 kind,formKey,editorId,space,cell,detail
 ## report restored-where-removed-objects.csv
-formKey,editorId,base,space,cellFormKey,cellEditorId,winningMod,oldX,oldY,oldZ,undone,leftToLaterPlugins,objects,standing,size,standingSize,standingPercentByCount,standingPercentBySize,verdict,nowObjects,nowStanding,nowSize,nowStandingSize,nowStandingPercentByCount,nowStandingPercentBySize,nowVerdict,result
-000805:Skyrim.esm,B_Rock,B_CrateBase [000804:Skyrim.esm],interior AorInterior [000800:Skyrim.esm],000800:Skyrim.esm,AorInterior,Target.esp,2000,0,0,enable state,,1,0,1000000,0,0,0,Cleared,,,,,,,,kept: too close to objects that stay (P_Table [000801:VillagePatch.esp])
+formKey,editorId,base,space,cellFormKey,cellEditorId,winningMod,oldX,oldY,oldZ,undone,leftToLaterPlugins,objects,standing,size,standingSize,standingPercentByCount,standingPercentBySize,verdict,nowObjects,nowStanding,nowSize,nowStandingSize,nowStandingPercentByCount,nowStandingPercentBySize,nowVerdict,result,copyFormKey,copyRefusedBy
+000805:Skyrim.esm,B_Rock,B_CrateBase [000804:Skyrim.esm],interior AorInterior [000800:Skyrim.esm],000800:Skyrim.esm,AorInterior,Target.esp,2000,0,0,enable state,,1,0,1000000,0,0,0,Cleared,,,,,,,,kept: too close to objects that stay (P_Table [000801:VillagePatch.esp]),,

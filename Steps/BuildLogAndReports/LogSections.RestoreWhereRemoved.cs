@@ -40,7 +40,10 @@ internal static partial class LogSections
             RestoreWhereRemovedSectionId,
             [
                 .. TextLists.Headed("Restored where the cleaned mod was removed", RestoreCountLines.Restored(judged), CountsSeparator),
+                .. TextLists.Headed("Other mods' objects put back, with a copy at the cleaned mod's place", RestoreCountLines.RestoredWithCopy(judged), CountsSeparator),
                 .. TextLists.Headed("Left as the cleaned mod changed them", RestoreCountLines.LeftAsChanged(judged), AreasSeparator),
+                .. TextLists.Headed(
+                    "Other mods' objects kept at the cleaned mod's place because they may not be copied", RestoreCountLines.KeptBecauseNotCopied(judged), CountsSeparator),
                 .. context.Detailed ? RestoreWhereRemovedDetailLines(world, judged, elapsed, context) : [],
             ]);
     }
@@ -93,10 +96,15 @@ internal static partial class LogSections
         var record = ObjectText(world, change, context);
         var later = Tables.LeftToLaterPlugins(change.Earlier) is { } plugins ? $"; left to later plugins: {plugins}" : string.Empty;
         var areas = ObjectAreas(judged);
-        return RestoreOutcomes.KeptBecause(judged, label) is { } kept
-            ? $"  Kept as changed: {record}: {kept}{areas}{later}"
-            : $"  {RestoreWhereRemovedText.KindVerb(judged.Kind)}: {record}{WhereObjectGoesBack(change, context)}{areas}{later}";
+        if (RestoreOutcomes.KeptBecause(judged, label) is { } kept) return $"  Kept as changed: {record}: {kept}{CopyRefusedForArea(judged)}{areas}{later}";
+
+        var copy = RestoreOutcomes.GoesBackWithCopy(judged) ? $", {RestoreWhereRemovedText.WithCopy}" : string.Empty;
+        return $"  {RestoreWhereRemovedText.KindVerb(judged.Kind)}: {record}{WhereObjectGoesBack(change, context)}{copy}{areas}{later}";
     }
+
+    /// <summary>"; may not be copied: persistent" for a record its area keeps whose copy is refused; nothing otherwise, the held record's reason names it already.</summary>
+    private static string CopyRefusedForArea(PlacedChangeJudged judged) =>
+        RestoreOutcomes.RefusedCopy(judged) is { Need: CloneNeed.AreaStillStands } cloning ? $"; may not be copied: {RestoreWhereRemovedText.CopyRefused(cloning)}" : string.Empty;
 
     /// <summary>E.g. "Rock [key] (base Crate [key]) in worldspace Tamriel, cell (1, 2)".</summary>
     private static string ObjectText(CollectedObjects world, RecordChangedByCleanedMod change, ReportContext context)
@@ -151,7 +159,7 @@ internal static partial class LogSections
         if (RestoreOutcomes.KeptBecause(judged, label) is { } kept) return $"  Kept as changed: cell {place}: {kept}{area}{later}";
 
         var parts = string.Join(Describe.ListSeparator, RestoreOutcomes.UndoneParts(judged).Select(RestoreWhereRemovedText.PartOfCell));
-        var water = judged.WaterKeptBy is { } by ? $"; water level kept: {RestoreWhereRemovedText.WaterKept(by, label)}" : string.Empty;
+        var water = RestoreOutcomes.WhyWaterIsKept(judged, label) is { } why ? $"; water level kept: {why}" : string.Empty;
         return $"  Cell {place}: {parts}{water}{area}{later}";
     }
 
@@ -177,11 +185,15 @@ internal static partial class LogSections
         else if (RestoreOutcomes.HoldsOnlyTheRest(land)) yield return $"  Kept as changed: terrain {place}: {RestoreWhereRemovedText.RestOfLandRecord}: {RestoreOutcomes.KeptBecauseOfRest(land)}";
     }
 
-    /// <summary>E.g. "210 heights, ground textures; 14 heights kept under objects that stay".</summary>
+    /// <summary>
+    /// E.g. "210 heights; 14 heights kept under objects that stay; ground textures kept: the changed-terrain check around an object
+    /// that stays ...".
+    /// </summary>
     private static string RestoredTerrainPieces(LandQuarterOutcome quarter)
     {
         var kept = quarter.Kept.Select(entry => $"{RestoreWhereRemovedText.Heights(entry.Points)} kept {RestoreWhereRemovedText.TerrainKept(entry.Reason)}");
-        return string.Join(AreasSeparator, new[] { RestoreWhereRemovedText.Pieces(quarter.Restored) }.Concat(kept).Where(piece => piece.Length > 0));
+        var textures = quarter.TexturesKeptForObjectThatStays ? $"ground textures kept: {RestoreWhereRemovedText.TexturesKeptForObjectThatStays}" : string.Empty;
+        return string.Join(AreasSeparator, new[] { RestoreWhereRemovedText.Pieces(quarter.Restored) }.Concat(kept).Append(textures).Where(piece => piece.Length > 0));
     }
 
     /// <param name="label">Names a record a guard found.</param>

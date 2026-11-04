@@ -5,7 +5,7 @@ using Noggog;
 
 namespace AddedObjectRemover;
 
-/// <summary>Runs write orders of placed records as overrides in the patch; records are addressed by key. Not thread-safe.</summary>
+/// <summary>Runs write orders of placed records as overrides or new records in the patch; records are addressed by key. Not thread-safe.</summary>
 internal sealed class PlacedRecordWriter(PlacedOverrideWriter overrides, RecordHandles handles)
 {
     public void Write(WriteOrder order)
@@ -19,6 +19,9 @@ internal sealed class PlacedRecordWriter(PlacedOverrideWriter overrides, RecordH
                 break;
             case CopyEarlierPlacedParts copy:
                 overrides.CopyEarlierParts(handles.RecordOf(order.Record), handles.EarlierRecordOf(order.Record), copy.Parts, cellKey, location.InPersistentList);
+                break;
+            case AddClone clone:
+                overrides.AddClone(handles.RecordOf(order.Record), cellKey, clone.EditorId);
                 break;
             default:
                 Apply(overrides.GetOrAddOverride(handles.RecordOf(order.Record), cellKey, location.InPersistentList), order);

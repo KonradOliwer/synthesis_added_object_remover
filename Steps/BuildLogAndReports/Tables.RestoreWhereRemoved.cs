@@ -3,6 +3,7 @@ using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
+using AddedObjectRemover.Steps.WriteThePatch.Contracts;
 using static AddedObjectRemover.CsvFormat;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
@@ -19,7 +20,7 @@ internal static partial class Tables
         "formKey", "editorId", "base", "space", "cellFormKey", "cellEditorId", "winningMod", "oldX", "oldY", "oldZ", "undone", "leftToLaterPlugins",
         .. AreaHeader,
         .. AreaHeader.Select(column => "now" + char.ToUpperInvariant(column[0]) + column[1..]),
-        "result",
+        "result", "copyFormKey", "copyRefusedBy",
     ];
 
     private static readonly ImmutableArray<TerrainKeptReason> TerrainKeptReasons = [.. Enum.GetValues<TerrainKeptReason>()];
@@ -39,11 +40,13 @@ internal static partial class Tables
     /// rest of the record when that is all of the land that could go back, then the navmeshes in record key order; a row for a terrain
     /// quarter or for the rest of a land's record gives the cell's grid, one for a cell or a navmesh its record.
     /// </remarks>
-    public static ImmutableArray<CsvTable> BuildRestoredWhereRemovedTables(CollectedObjects world, RestoreWhereRemovedResult result, ReportContext context)
+    /// <param name="clones">The copies the patch added, which the objects file names by their original.</param>
+    public static ImmutableArray<CsvTable> BuildRestoredWhereRemovedTables(CollectedObjects world, RestoreWhereRemovedResult result, ImmutableArray<CloneWritten> clones, ReportContext context)
     {
         var judged = new RestoreJudgements(result);
         var label = RestoreOutcomes.LabelsIn(world);
-        ImmutableArray<ImmutableArray<string>> objects = [.. result.Objects.Select(change => RestoredWhereRemovedObjectRow(world, change, label, context))];
+        var copyOf = clones.ToDictionary(clone => clone.Original, clone => clone.Copy);
+        ImmutableArray<ImmutableArray<string>> objects = [.. result.Objects.Select(change => RestoredWhereRemovedObjectRow(world, change, copyOf, label, context))];
         ImmutableArray<ImmutableArray<string>> cells =
         [
             .. result.Cells.Select(cell => RestoredWhereRemovedCellRow(world, cell, label)),
@@ -60,11 +63,14 @@ internal static partial class Tables
         ];
     }
 
+    /// <param name="copyOf">The copy the patch added of each original that has one.</param>
     /// <param name="label">Names a record a guard found.</param>
     private static ImmutableArray<string> RestoredWhereRemovedObjectRow(
-        CollectedObjects world, PlacedChangeJudged judged, Func<RecordKey, string> label, ReportContext context)
+        CollectedObjects world, PlacedChangeJudged judged, IReadOnlyDictionary<RecordKey, RecordKey> copyOf, Func<RecordKey, string> label, ReportContext context)
     {
         var change = judged.Change;
+        var copy = copyOf.TryGetValue(change.Key, out var written) ? written.ToString() : null;
+        var refused = judged.Cloning is { RefusedBy: not null } cloning ? RestoreWhereRemovedText.CopyRefused(cloning) : null;
         return CsvRow.Of(
         [
             Quote(change.Key.ToString()),
@@ -79,7 +85,9 @@ internal static partial class Tables
             OptionalText(LeftToLaterPlugins(change.Earlier)),
             .. AreaColumns(judged.OldPlace),
             .. AreaColumns(judged.WhereItIsNow),
-            Quote(RestoreWhereRemovedText.Result(RestoreOutcomes.KeptBecause(judged, label))),
+            Quote(RestoreWhereRemovedText.Result(RestoreOutcomes.KeptBecause(judged, label), RestoreOutcomes.GoesBackWithCopy(judged))),
+            OptionalText(copy),
+            OptionalText(refused),
         ]);
     }
 

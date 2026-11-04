@@ -681,7 +681,7 @@ public sealed class ChangedCellAndLandCollectingTests
         var collected = PlacedObjects.Collect(records, TrustOf(laterNeedsCleanedMod), Plan);
         var protection = ObjectsToKeep.Build(collected.Targets, [], TestTargets.References(collected.Targets.Length), TestBaseFacts.Unresolved);
         var final = RemovalDecisions.Start(protection, [.. collected.Targets.Select(_ => (WhenRemoved)new WhenRemoved.Disable())]);
-        PatchWriter.Write(new(final, collected.Targets, OtherModsObjectsResult.SwitchedOff, judge(collected), records, new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod, Program.PatchMarkerText)));
+        PatchWriter.Write(new(final, collected.Targets, OtherModsObjectsResult.SwitchedOff, judge(collected), records, new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod, Program.PatchMarkerText), _cleaned.Key.ToPluginName()));
         return state.PatchMod;
     }
 

@@ -12,8 +12,9 @@ namespace AddedObjectRemover.Steps.WriteThePatch.Contracts;
 /// <param name="OtherModsObjectsPulledDown">Other mods' objects moved down onto what is below them.</param>
 /// <param name="WrittenWhereRemoved">
 /// The records written to restore what the cleaned mod changed where it was removed: placed records, cells, LAND records, navmeshes
-/// and the navmesh info map, each once.
+/// and the navmesh info map, each once. The copies added are not among them.
 /// </param>
+/// <param name="Clones">The copies added where an object that went back stood, in the record key order of the objects.</param>
 public sealed record WriteSummary(
     ImmutableArray<TargetId> Removed,
     ImmutableArray<TargetId> Restored,
@@ -22,4 +23,10 @@ public sealed record WriteSummary(
     int Fitted,
     int OtherModsObjectsRemoved,
     int OtherModsObjectsPulledDown,
-    int WrittenWhereRemoved);
+    int WrittenWhereRemoved,
+    ImmutableArray<CloneWritten> Clones);
+
+/// <summary>A copy the patch added of another mod's object that went back, where the object stood.</summary>
+/// <param name="Original">The object that went back.</param>
+/// <param name="Copy">The new record.</param>
+public sealed record CloneWritten(RecordKey Original, RecordKey Copy);

@@ -97,7 +97,7 @@ public static partial class StepRunner
 
         var runCaches = AddObjectCaches(scope, collected);
         var decided = Decide(scope, runCaches, trust, collected);
-        var written = WritePatch(scope, decided);
+        var written = WritePatch(scope, decided, trust.CleanedMod);
         return FinishReports(scope, decided, written);
     }
 
@@ -137,10 +137,10 @@ public static partial class StepRunner
             () => scope.LoadOrderCaches.AddObjectCaches(collected, CreateMeasurementRules(scope), scope.Settings.Execution),
             (_, elapsed) => scope.Report.BuildIndexSections(collected, elapsed));
 
-    private static WriteSummary WritePatch(RunScope scope, StepResults decided) =>
+    private static WriteSummary WritePatch(RunScope scope, StepResults decided, PluginName cleanedMod) =>
         scope.Environment.Log.Timed(
             () => PatchWriter.Write(
-                new(decided.Final, decided.Collected.Targets, decided.OtherModsObjects, decided.RestoreWhereRemoved, scope.Plugin, scope.Environment.PatchWriting)),
+                new(decided.Final, decided.Collected.Targets, decided.OtherModsObjects, decided.RestoreWhereRemoved, scope.Plugin, scope.Environment.PatchWriting, cleanedMod)),
             scope.Report.BuildStepSections);
 
     private static RunResult FinishReports(RunScope scope, StepResults decided, WriteSummary written)

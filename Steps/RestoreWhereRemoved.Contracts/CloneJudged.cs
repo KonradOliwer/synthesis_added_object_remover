@@ -36,6 +36,9 @@ public enum CloneRefusal
 
     /// <summary>As one of the cleaned mod's objects, the copy stands on terrain the changed-terrain step finds changed, by the settings of the cleaned mod's own objects.</summary>
     OnChangedTerrainAsCleanedModsObject,
+
+    /// <summary>A triangle of a navmesh the cleaned mod changed that stays changed has its centre inside the copy's box, so actors walk on it.</summary>
+    ActorsWalkOnIt,
 }
 
 /// <summary>

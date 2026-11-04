@@ -7,6 +7,9 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 /// <summary>A navmesh triangle in the cell record that holds its navmesh.</summary>
 internal sealed record NavmeshTriangleInCell(RecordKey Navmesh, RecordKey Cell, MeshTriangle Triangle);
 
+/// <summary>An area the changed-terrain step checks around an object that stays, with what keeps a water level the area reaches and why.</summary>
+internal sealed record WaterCheckArea(RecordKey Space, Box Area, RecordKey Keeper, WaterKeptReason Reason);
+
 /// <summary>The heights between a cell's water level before the cleaned mod and its winning one; a cell without water counts as water infinitely low.</summary>
 internal readonly record struct WaterLine(float Lower, float Upper)
 {
@@ -33,8 +36,10 @@ internal readonly record struct WaterLine(float Lower, float Upper)
 
 /// <summary>
 /// Whether the water level of each cell the cleaned mod last changed it in goes back. It goes back with the cell's other undone parts,
-/// unless an object or a navmesh that stays lies partly between the level before the cleaned mod and the cleaned mod's; then the
-/// cell keeps the cleaned mod's level, and its other parts still go back. Immutable: <see cref="KeepAtWaterLines"/> gives a new plan.
+/// unless an object or a navmesh that stays lies partly between the level before the cleaned mod and the cleaned mod's, or the
+/// changed-terrain step checks the cell's ground around an object that stays and counts water changes; then the cell keeps the cleaned
+/// mod's level, and its other parts still go back. Immutable: <see cref="KeepAtWaterLines"/> and <see cref="KeepAroundObjectsThatStay"/>
+/// give a new plan.
 /// </summary>
 /// <remarks>Everything runs in ascending key order on one thread, so the plan does not depend on the thread count.</remarks>
 internal sealed class WaterUndoPlan
@@ -52,8 +57,8 @@ internal sealed class WaterUndoPlan
 
     private readonly IReadOnlyDictionary<RecordKey, WaterLine> _lineOf;
 
-    /// <summary>Each cell whose water level stays, with the first object or navmesh found at its water line.</summary>
-    private readonly ImmutableDictionary<RecordKey, RecordKey> _kept;
+    /// <summary>Each cell whose water level stays, with what keeps it first and why.</summary>
+    private readonly ImmutableDictionary<RecordKey, (RecordKey By, WaterKeptReason Reason)> _kept;
 
     /// <param name="judged">The cells judged, in key order; none while the cells are switched off.</param>
     /// <param name="changed">Every cell record the cleaned mod changed, in key order.</param>
@@ -69,10 +74,10 @@ internal sealed class WaterUndoPlan
             .Select(moved => (moved.Cell, moved.Line!.Value))
             .ToLookup(moved => moved.Cell.SpaceKey);
         _lineOf = _waterLineMoved.SelectMany(cells => cells).ToDictionary(moved => moved.Cell.Cell, moved => moved.Line);
-        _kept = ImmutableDictionary<RecordKey, RecordKey>.Empty;
+        _kept = ImmutableDictionary<RecordKey, (RecordKey By, WaterKeptReason Reason)>.Empty;
     }
 
-    private WaterUndoPlan(WaterUndoPlan plan, ImmutableDictionary<RecordKey, RecordKey> kept)
+    private WaterUndoPlan(WaterUndoPlan plan, ImmutableDictionary<RecordKey, (RecordKey By, WaterKeptReason Reason)> kept)
     {
         _judged = plan._judged;
         _waterUndone = plan._waterUndone;
@@ -107,9 +112,28 @@ internal sealed class WaterUndoPlan
         var trianglesByCell = triangles.ToLookup(triangle => triangle.Cell);
         foreach (var cell in _judged.Select(judged => judged.Change).Where(cell => GoesBack(cell.Cell) && _lineOf.ContainsKey(cell.Cell)))
         {
-            if (FirstAtWaterLine(cell, _lineOf[cell.Cell], objectsByPlace, trianglesByCell[cell.Cell]) is { } by) kept.Add(cell.Cell, by);
+            if (FirstAtWaterLine(cell, _lineOf[cell.Cell], objectsByPlace, trianglesByCell[cell.Cell]) is { } by) kept.Add(cell.Cell, (by, WaterKeptReason.AtWaterLine));
         }
         return new WaterUndoPlan(this, kept.ToImmutable());
+    }
+
+    /// <summary>
+    /// The plan with every water level that would go back kept in the cells an area reaches: the changed-terrain step checks the ground
+    /// there around an object that stays and counts water changes. Each cell names the keeper of the first area in the order given.
+    /// </summary>
+    /// <param name="areas">The areas the step checks around each object that stays; read only when a water level would go back.</param>
+    public WaterUndoPlan KeepAroundObjectsThatStay(IEnumerable<WaterCheckArea> areas)
+    {
+        List<CellChangedByCleanedMod> goingBack = [.. _judged.Select(judged => judged.Change).Where(cell => GoesBack(cell.Cell))];
+        if (goingBack.Count == 0) return this;
+
+        var bySpace = areas.ToLookup(area => area.Space);
+        var kept = _kept.ToBuilder();
+        foreach (var cell in goingBack)
+        {
+            if (bySpace[cell.SpaceKey].FirstOrDefault(area => Covers(cell, area.Area)) is { } found) kept.Add(cell.Cell, (found.Keeper, found.Reason));
+        }
+        return kept.Count == _kept.Count ? this : new WaterUndoPlan(this, kept.ToImmutable());
     }
 
     /// <summary>The cells judged, each without its water level where that stays.</summary>
@@ -117,9 +141,9 @@ internal sealed class WaterUndoPlan
 
     private CellChangeJudged WithWaterKept(CellChangeJudged cell)
     {
-        if (!_kept.TryGetValue(cell.Change.Cell, out var by)) return cell;
+        if (!_kept.TryGetValue(cell.Change.Cell, out var kept)) return cell;
         ImmutableArray<PartChange> undone = [.. cell.Undone.Where(part => part.Name.Part != CellPart.WaterLevel)];
-        return cell with { Undone = undone, WaterKeptBy = by, IsRestored = !undone.IsEmpty };
+        return cell with { Undone = undone, WaterKeptBy = kept.By, IsRestored = !undone.IsEmpty, WaterKeptFor = kept.Reason };
     }
 
     private bool GoesBack(RecordKey cell) => _waterUndone.Contains(cell) && !_kept.ContainsKey(cell);

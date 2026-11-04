@@ -7,19 +7,27 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 
 /// <summary>What the guards between the kinds have refused, protected and kept so far. Each part only ever grows.</summary>
 /// <param name="Placed">The first refusal of each placed record whose areas let it go back, by its index among them; null for one that goes back.</param>
+/// <param name="Clones">
+/// The copy rule's outcome of each of those records, by the same index: null for one without a planned copy; one whose copy is lost
+/// carries the rule that lost it and no longer goes back. A record never has both a refusal and a lost copy.
+/// </param>
 /// <param name="Navmeshes">Null while the navmeshes are switched off.</param>
 /// <param name="Terrain">While the terrain is switched off, a plan in which nothing goes back.</param>
 /// <param name="CausesLeftOut">The causes the too-close rule left out in the pass that gave this state; null before the first pass.</param>
 internal sealed record RestoreState(
-    ImmutableArray<PlacedRefusal?> Placed, NavmeshUndoPlan? Navmeshes, TerrainUndoPlan Terrain, WaterUndoPlan Water, IReadOnlySet<OtherId>? CausesLeftOut)
+    ImmutableArray<PlacedRefusal?> Placed, ImmutableArray<CloneJudged?> Clones, NavmeshUndoPlan? Navmeshes, TerrainUndoPlan Terrain, WaterUndoPlan Water, IReadOnlySet<OtherId>? CausesLeftOut)
 {
-    /// <summary>The indexes of the placed records that go back.</summary>
-    public IReadOnlySet<int> PlacedGoingBack() => Enumerable.Range(0, Placed.Length).Where(index => Placed[index] is null).ToHashSet();
+    /// <summary>The indexes of the placed records that go back, with or without a copy.</summary>
+    public IReadOnlySet<int> PlacedGoingBack() => Enumerable.Range(0, Placed.Length).Where(index => Placed[index] is null && Clones[index] is not { RefusedBy: not null }).ToHashSet();
 
-    public int PlacedRefusedCount => Placed.Count(refusal => refusal is not null);
+    /// <summary>The indexes of the placed records that go back with a copy.</summary>
+    public IReadOnlySet<int> GoingBackWithClone() => Enumerable.Range(0, Placed.Length).Where(index => Placed[index] is null && Clones[index] is { RefusedBy: null }).ToHashSet();
 
-    /// <summary>How many refusals, protected points and kept water levels it holds; since none is taken back, an equal count means nothing changed.</summary>
-    public int Count => PlacedRefusedCount + (Navmeshes?.RefusedCount ?? 0) + Terrain.ProtectedCount + Water.KeptCount;
+    /// <summary>How many placed records no longer go back: those refused and those whose copy is lost.</summary>
+    public int PlacedStoppedCount => Placed.Count(refusal => refusal is not null) + Clones.Count(clone => clone is { RefusedBy: not null });
+
+    /// <summary>How many refusals, lost copies, protected points and kept water levels it holds; since none is taken back, an equal count means nothing changed.</summary>
+    public int Count => PlacedStoppedCount + (Navmeshes?.RefusedCount ?? 0) + Terrain.ProtectedCount + Terrain.TexturesKeptCount + Water.KeptCount;
 }
 
 /// <summary>What every pass of the loop reads that does not change between passes.</summary>
@@ -49,10 +57,12 @@ internal sealed record RestoreLoopInputs(
 
 /// <summary>
 /// Repeats the guards between the kinds until nothing more changes: the placed records failing their guards against the current
-/// plans are refused, the navmesh groups failing the ground, object and water guards or the door guard with the doors as they end;
+/// plans are refused, and those whose copy fails its rules (<see cref="CloneGuards"/>) stay, the navmesh groups failing the ground,
+/// object and water guards or the door guard with the doors as they end;
 /// the grid points under objects of other plugins placed for the ground as it is, under navmeshes on the ground as it is, under the
 /// targets and placed records going back in their present shape that end present, under refused placed records that stand now and reach the ground and in cells no longer storable are
-/// protected; and the water levels with something at their water line are kept. Every pass reads only the state before it and what
+/// protected; the quarter textures the changed-terrain step reads around the targets and copies that stand are kept; and the water
+/// levels with something at their water line, or that the step reads around a target or copy that stands, are kept. Every pass reads only the state before it and what
 /// the pass before it read.
 /// </summary>
 /// <param name="placedGuards">Null when no placed record's areas let it go back.</param>
@@ -90,20 +100,24 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
     private PassInput ReadPassInput(RestoreState state, PassInput? previous)
     {
         var placedGoingBack = state.PlacedGoingBack();
+        var withClone = state.GoingBackWithClone();
         return new PassInput(
             state,
             placedGoingBack,
-            PlacedRefusedSince(state, previous) ? ReadWhatStands(placedGoingBack) : previous.Standing,
+            withClone,
+            PlacedRefusedSince(state, previous) ? ReadWhatStands(placedGoingBack, withClone) : previous.Standing,
             NavmeshesRefusedSince(state, previous) ? ReadNavmeshesAsPlanned(state) : previous.Navmeshes);
     }
 
-    private WhatStands ReadWhatStands(IReadOnlySet<int> placedGoingBack) =>
+    /// <remarks>A clone always ends present, whatever becomes of its record: it is a new record no order of the run removes.</remarks>
+    private WhatStands ReadWhatStands(IReadOnlySet<int> placedGoingBack, IReadOnlySet<int> withClone) =>
         new(
-            inputs.Standing.ThatStay(placedGoingBack),
-            terrainGuards is null
-                ? []
-                : [.. inputs.TargetsThatMayStay.Concat(inputs.World.NowOfThoseKeepingTheirShape(placedGoingBack)).Where(placed => !EndsRemoved(placed.Key, placedGoingBack))],
-            terrainGuards is null ? [] : [.. inputs.World.NowOfAllBut(placedGoingBack).Where(refused => !EndsRemoved(refused.Key, placedGoingBack))]);
+            inputs.Standing.ThatStay(placedGoingBack, withClone),
+            [
+                .. inputs.TargetsThatMayStay.Concat(inputs.World.NowOfThoseKeepingTheirShape(placedGoingBack)).Where(placed => !EndsRemoved(placed.Key, placedGoingBack)),
+                .. inputs.World.ClonesOf(withClone),
+            ],
+            [.. inputs.World.NowOfAllBut(placedGoingBack).Where(refused => !EndsRemoved(refused.Key, placedGoingBack))]);
 
     private NavmeshesAsPlanned ReadNavmeshesAsPlanned(RestoreState state) =>
         new(
@@ -113,7 +127,7 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
 
     /// <returns>True in the first pass.</returns>
     private static bool PlacedRefusedSince(RestoreState state, [NotNullWhen(false)] PassInput? previous) =>
-        previous is null || state.PlacedRefusedCount != previous.State.PlacedRefusedCount;
+        previous is null || state.PlacedStoppedCount != previous.State.PlacedStoppedCount;
 
     /// <returns>True in the first pass.</returns>
     private static bool NavmeshesRefusedSince(RestoreState state, [NotNullWhen(false)] PassInput? previous) =>
@@ -143,18 +157,22 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
 
     private (RestoreState State, TimeSpan PlacedGuardsTime) Pass(PassInput before, AddedSincePassBefore added)
     {
-        var (placed, causesLeftOut, placedGuardsTime) = RefusePlaced(before);
-        return (new RestoreState(placed, RefuseNavmeshGroups(before, added), ProtectGround(before, added), KeepWater(before, added), causesLeftOut), placedGuardsTime);
+        var (placed, clones, causesLeftOut, placedGuardsTime) = RefusePlaced(before);
+        return (new RestoreState(placed, clones, RefuseNavmeshGroups(before, added), ProtectGround(before, added), KeepWater(before, added), causesLeftOut), placedGuardsTime);
     }
 
-    /// <summary>The placed guards against the current plans, for the placed records still going back, with the time of their checks.</summary>
-    private (ImmutableArray<PlacedRefusal?> Placed, IReadOnlySet<OtherId>? CausesLeftOut, TimeSpan Time) RefusePlaced(PassInput before)
+    /// <summary>
+    /// The placed guards and the copies' rules against the current plans, for the placed records still going back, with the time of
+    /// their checks.
+    /// </summary>
+    private (ImmutableArray<PlacedRefusal?> Placed, ImmutableArray<CloneJudged?> Clones, IReadOnlySet<OtherId>? CausesLeftOut, TimeSpan Time) RefusePlaced(PassInput before)
     {
         var state = before.State;
-        if (placedGuards is null) return (state.Placed, null, TimeSpan.Zero);
+        if (placedGuards is null) return (state.Placed, state.Clones, null, TimeSpan.Zero);
         var plans = new OtherKindsAsPlanned(state.Terrain, state.Water, before.Navmeshes.ThatStayChanged, before.Navmeshes.GoingBack);
-        var (checks, time) = Timed.Run(clock, () => placedGuards.CheckGoingBack(before.PlacedGoingBack, plans, state.CausesLeftOut));
-        return ([.. state.Placed.Select((refusal, index) => refusal ?? checks.Found[index])], checks.CausesLeftOut, time);
+        var (checks, time) = Timed.Run(clock, () => placedGuards.CheckGoingBack(before.PlacedGoingBack, before.WithClone, plans, state.CausesLeftOut));
+        var (placed, clones) = checks.AppliedTo(state);
+        return (placed, clones, checks.CausesLeftOut, time);
     }
 
     /// <summary>
@@ -205,7 +223,8 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
             .Protect(
                 TerrainKeptReason.UnderNavmesh,
                 added.GroundProtected || added.NavmeshesRefused ? terrainGuards.UnderNavmeshesOnTheGroundAsItIs(terrain, ReadNavmeshesAsTheyWillStand(before)) : [])
-            .Protect(TerrainKeptReason.TooSteepToStore, added.GroundProtected ? terrain.PointsOfCellsTooSteepToStore() : []);
+            .Protect(TerrainKeptReason.TooSteepToStore, added.GroundProtected ? terrain.PointsOfCellsTooSteepToStore() : [])
+            .KeepTextures(inputs.StepAreas.QuartersAround(added.Standing.ThatStand()));
     }
 
     /// <summary>The points under the first objects where they reach the ground, then in the areas the changed-terrain step checks around the second.</summary>
@@ -215,11 +234,17 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
     private NavmeshesAsTheyWillStand ReadNavmeshesAsTheyWillStand(PassInput before) =>
         before.State.Navmeshes?.AsTheyWillStand(inputs.Winning, before.Navmeshes.TrianglesGoingBack) ?? new NavmeshesAsTheyWillStand(inputs.Winning, _ => true, goingBack: null);
 
-    /// <summary>The water guard against the objects that stay and the triangles of the navmeshes that stay changed now and did not in the pass before.</summary>
-    private WaterUndoPlan KeepWater(PassInput before, AddedSincePassBefore added) =>
-        added.Standing.ObjectsThatStay.Count == 0 && added.NavmeshesThatStayChanged.Count == 0
+    /// <summary>
+    /// The water guard against the objects that stay and the triangles of the navmeshes that stay changed now and did not in the pass
+    /// before, then the water levels the changed-terrain step reads around the targets and copies that stand now and did not before.
+    /// </summary>
+    private WaterUndoPlan KeepWater(PassInput before, AddedSincePassBefore added)
+    {
+        var water = added.Standing.ObjectsThatStay.Count == 0 && added.NavmeshesThatStayChanged.Count == 0
             ? before.State.Water
             : before.State.Water.KeepAtWaterLines(added.Standing.ObjectsThatStay, TrianglesOf(added.NavmeshesThatStayChanged));
+        return water.KeepAroundObjectsThatStay(inputs.StepAreas.WaterAreasAround(added.Standing.ThatStand()));
+    }
 
     private List<NavmeshTriangleInCell> TrianglesOf(IReadOnlySet<RecordKey> navmeshes) =>
         navmeshes.Count == 0 ? [] : [.. inputs.ChangedNavmeshTriangles.Where(triangle => navmeshes.Contains(triangle.Navmesh))];
@@ -230,18 +255,22 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
     private ImmutableArray<RecordKey> NavmeshesThatStayChanged(RestoreState state) => state.Navmeshes?.NavmeshesThatStayChanged() ?? inputs.ChangedNavmeshes;
 
     /// <summary>What every guard of one pass reads of the state before it, computed once.</summary>
-    private sealed record PassInput(RestoreState State, IReadOnlySet<int> PlacedGoingBack, WhatStands Standing, NavmeshesAsPlanned Navmeshes);
+    /// <param name="WithClone">Those of <paramref name="PlacedGoingBack"/> that go back with a copy.</param>
+    private sealed record PassInput(RestoreState State, IReadOnlySet<int> PlacedGoingBack, IReadOnlySet<int> WithClone, WhatStands Standing, NavmeshesAsPlanned Navmeshes);
 
     /// <summary>What stands in the final world, given which placed records go back.</summary>
     /// <param name="ObjectsThatStay">In key order.</param>
     /// <param name="StandingInTheirPlace">
     /// The targets that may stay and the placed records going back that keep their shape where they stand now, each where it stands,
-    /// that end present; none while the terrain is switched off.
+    /// that end present, then the clones of the placed records going back with one.
     /// </param>
-    /// <param name="RefusedThatStand">The refused placed records that stand now and end present, where they stand; none while the terrain is switched off.</param>
+    /// <param name="RefusedThatStand">The refused placed records that stand now and end present, where they stand.</param>
     private sealed record WhatStands(List<StandingBox> ObjectsThatStay, List<TargetObject> StandingInTheirPlace, List<TargetObject> RefusedThatStand)
     {
         public static WhatStands Nothing => new([], [], []);
+
+        /// <summary>Those standing in their place, then the refused ones that stand.</summary>
+        public IEnumerable<TargetObject> ThatStand() => StandingInTheirPlace.Concat(RefusedThatStand);
 
         /// <returns>What stands here and not in <paramref name="earlier"/>, each in its order here; all of it when there is no earlier.</returns>
         public WhatStands FindStandingNotIn(WhatStands? earlier)

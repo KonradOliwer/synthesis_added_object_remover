@@ -44,6 +44,26 @@ internal static class RestoreCountLines
         }
     }
 
+    /// <summary>How many other mods' objects went back with a copy left where the cleaned mod placed them.</summary>
+    public static IEnumerable<string> RestoredWithCopy(RestoreJudgements judged)
+    {
+        var copied = judged.Result.Objects.Count(RestoreOutcomes.GoesBackWithCopy);
+        if (copied > 0) yield return TextFormat.Count(copied);
+    }
+
+    /// <summary>The other mods' objects the cleaned mod moved that stay where it placed them because they may not be copied, per reason.</summary>
+    public static IEnumerable<string> KeptBecauseNotCopied(RestoreJudgements judged)
+    {
+        var refused = judged.Result.Objects.Select(RestoreOutcomes.RefusedCopy).OfType<CloneJudged>().ToList();
+        if (refused.Count == 0) yield break;
+
+        var reasons = Enum.GetValues<CloneRefusal>()
+            .Select(reason => (Words: RestoreWhereRemovedText.CloneRefused(reason), Count: refused.Count(cloning => cloning.Failure is null && cloning.RefusedBy == reason)))
+            .Append((Words: RestoreWhereRemovedText.WithStoppedCheck, Count: refused.Count(cloning => cloning.Failure is not null)))
+            .Where(reason => reason.Count > 0);
+        yield return $"{TextFormat.Count(refused.Count)} ({TextLists.JoinCounts(reasons, reason => reason.Words, reason => reason.Count, Describe.ListSeparator)})";
+    }
+
     /// <summary>The count of the line that closes the log: the kinds of change that went back, without their breakdown.</summary>
     public static IEnumerable<string> RestoredInSummary(RestoreJudgements judged)
     {

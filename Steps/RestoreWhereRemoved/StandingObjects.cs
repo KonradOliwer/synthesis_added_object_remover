@@ -5,7 +5,8 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 /// <summary>
 /// The objects that stay in the final world and block actors (<see cref="ObjectsThatBlockActors"/>), as boxes: the after-removal
 /// world's objects that are a change there (another mod's object the game shows differently from its accepted values) but for the placed records that go back, and the placed records whose areas let
-/// them go back but a guard keeps, where they stand now. An object that ends removed in the final world (<see cref="FinalPresence"/>),
+/// them go back but a guard keeps, where they stand now, and the clones of those going back with one, where the record stands now.
+/// An object that ends removed in the final world (<see cref="FinalPresence"/>),
 /// such as a kept record the cleaned mod disabled or deleted, stands nowhere, so it is none of them.
 /// </summary>
 internal sealed class StandingObjects
@@ -26,16 +27,18 @@ internal sealed class StandingObjects
     }
 
     /// <param name="goingBack">The indexes of the placed records that go back among those whose areas let them.</param>
+    /// <param name="withClone">Those of them that go back with a clone, which stands where the record stands now, under the record's key.</param>
     /// <returns>In key order, each object once.</returns>
-    public List<StandingBox> ThatStay(IReadOnlySet<int> goingBack)
+    public List<StandingBox> ThatStay(IReadOnlySet<int> goingBack, IReadOnlySet<int> withClone)
     {
-        var moving = goingBack.Select(index => _world.Restored[index].Key).ToHashSet();
+        var moving = goingBack.Where(index => !withClone.Contains(index)).Select(index => _world.Restored[index].Key).ToHashSet();
+        var clones = withClone.Select(index => _world.Restored[index].Key).ToHashSet();
         var kept = _world.StandingNow.Select((candidate, position) => goingBack.Contains(candidate) ? null : _now[position]).OfType<StandingBox>();
         return
         [
             .. _changes.Where(standing => !moving.Contains(standing.Key)).Concat(kept)
                 .DistinctBy(standing => standing.Key)
-                .Where(standing => !_presence.EndsRemoved(standing.Key, goingBack.Contains))
+                .Where(standing => clones.Contains(standing.Key) || !_presence.EndsRemoved(standing.Key, goingBack.Contains))
                 .OrderBy(standing => standing.Key, RecordKeyOrder.Comparer),
         ];
     }

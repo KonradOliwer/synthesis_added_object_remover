@@ -438,6 +438,33 @@ public sealed class StartSetupTooCloseSectionsTests
     }
 
     [Fact]
+    public void Scan_CountsTheCopiesAnEarlierRunPlacedForEachKindOfCleanedMod()
+    {
+        var world = CreateWorld();
+        world = world with { Counts = world.Counts with { ClonesOfCleanedMod = 2, ClonesOfOtherCleanedMods = 1 } };
+
+        var lines = LogSections.BuildScanSection(world, Target.ToPluginName(), Elapsed, Normal).Lines;
+
+        Assert.Contains("  Copies an earlier run placed as Target.esp content: 2; they are judged as Target.esp objects.", lines);
+        Assert.Contains("  Copies an earlier run placed as the content of other cleaned mods: 1; they only support or hold other objects.", lines);
+        Assert.DoesNotContain(LogSections.BuildScanSection(CreateWorld(), Target.ToPluginName(), Elapsed, Normal).Lines, line => line.Contains("Copies", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Scan_WarnsOfEachRecordOfAPatchWithABrokenCopyMarker()
+    {
+        var broken = new RecordKey(new PluginName("Patch.esp"), 0x812);
+        var world = CreateWorld() with { BrokenCloneMarkers = [broken] };
+
+        var lines = LogSections.BuildScanSection(world, Target.ToPluginName(), Elapsed, Normal).Lines;
+
+        Assert.Equal(
+            $"Warning: {broken} in an Added Object Remover patch has an EditorID that starts like the marker of a copy but is no valid marker for the "
+            + "plugins in the load order. It is read as an ordinary object of the patch, not as a copy.",
+            lines[^1]);
+    }
+
+    [Fact]
     public void Threads_ArePrintedOnlyInTheDetailedLog()
     {
         var execution = new Execution(Workers);

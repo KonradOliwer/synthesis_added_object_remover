@@ -8,24 +8,27 @@ using AddedObjectRemover.Steps.WriteThePatch.Contracts;
 namespace AddedObjectRemover.Steps.WriteThePatch;
 
 /// <summary>
-/// Turns the final removal decisions, what became of other mods' objects and what goes back where the cleaned mod was removed into
-/// write orders and has the patch writing run them.
+/// Turns the final removal decisions, what became of other mods' objects and what goes back where the cleaned mod was removed, with
+/// the copies it leaves, into write orders and has the patch writing run them.
 /// </summary>
 public static class PatchWriter
 {
+    /// <param name="CleanedMod">The mod whose content the copies the restore adds belong to, which their EditorIDs name.</param>
     public sealed record Input(
         IRemovalDecisions Final,
         ImmutableArray<TargetObject> Targets,
         OtherModsObjectsResult OtherModsObjects,
         RestoreWhereRemovedResult WhereRemoved,
         IPluginRecords Plugin,
-        IPatchWriting Writing);
+        IPatchWriting Writing,
+        PluginName CleanedMod);
 
     public static WriteSummary Write(Input input)
     {
         var (final, targets, otherModsObjects, whereRemoved) = (input.Final, input.Targets, input.OtherModsObjects, input.WhereRemoved);
         var removed = ListRemovalsInWriteOrder(final);
-        var orders = new List<WriteOrder>();
+        var cloneOrders = CloneOrders(whereRemoved, input.CleanedMod);
+        List<WriteOrder> orders = [.. cloneOrders];
         var enableParentsReplaced = 0;
         foreach (var id in removed)
         {
@@ -51,11 +54,37 @@ public static class PatchWriter
         orders.AddRange(pulled);
 
         var records = input.Plugin.ReadWritableRecords();
-        input.Writing.Write(records, orders);
+        var added = input.Writing.Write(records, orders);
         NavmeshOutputCheck.ThrowOnFault(orders, whereRemoved.DoorsLeftRemoved.ToHashSet(), () => input.Writing.ReadFinalNavmeshes(records));
         return new WriteSummary(
-            removed, restored, moves.Count, enableParentsReplaced, fitted.Count, otherRemovals.Count, pulled.Count, whereRemovedOrders.Select(order => order.Record).Distinct().Count());
+            removed,
+            restored,
+            moves.Count,
+            enableParentsReplaced,
+            fitted.Count,
+            otherRemovals.Count,
+            pulled.Count,
+            whereRemovedOrders.Select(order => order.Record).Distinct().Count(),
+            ClonesWritten(cloneOrders, added));
     }
+
+    /// <summary>
+    /// A copy of each placed record that goes back with one, where it stands now, in record key order. They come before every other
+    /// order: when an earlier step of the group already holds the record in the patch, that is the record copied, and this write's
+    /// restore changes it in place. One whose guards refuse it is no restore, so it gets no copy either.
+    /// </summary>
+    private static List<AddClone> CloneOrders(RestoreWhereRemovedResult whereRemoved, PluginName cleanedMod) =>
+    [
+        .. whereRemoved.Objects
+            .Where(judged => judged is { IsRestored: true, Cloning.RefusedBy: null })
+            .Select(judged => new AddClone(judged.Change.Key, CloneMarker.Of(judged.Change.Key, cleanedMod))),
+    ];
+
+    /// <param name="added">The keys of every record the orders added, in order; the copies are the only records added.</param>
+    private static ImmutableArray<CloneWritten> ClonesWritten(List<AddClone> orders, ImmutableArray<RecordKey> added) =>
+        orders.Count == added.Length
+            ? [.. orders.Zip(added, (order, clone) => new CloneWritten(order.Record, clone))]
+            : throw new InvalidOperationException($"The patch writing added {added.Length} records for {orders.Count} copies.");
 
     /// <summary>The restore step's navmesh check, which has the patch writing try the write orders without writing them.</summary>
     public static INavmeshCheckIfWritten CreateNavmeshCheck(IPluginRecords plugin, IPatchWriting writing) => new NavmeshCheckIfWritten(plugin, writing);

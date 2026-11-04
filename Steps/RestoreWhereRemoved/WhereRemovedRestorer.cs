@@ -108,23 +108,14 @@ public static class WhereRemovedRestorer
         return new PlannedRestore(inputs, PlanKinds(inputs, JudgePlannedClones(inputs, JudgeAreas(inputs))));
     }
 
-    /// <summary>The verdicts with every planned copy judged as one of the cleaned mod's own objects.</summary>
+    /// <summary>The verdicts with every planned copy judged by the changed-terrain rule of the cleaned mod's own objects.</summary>
     private static AreaVerdicts JudgePlannedClones(StepInputs inputs, AreaVerdicts verdicts)
     {
-        var (input, judging) = (inputs.Input, inputs.Input.RemovalSteps);
-        var collected = input.Earlier.Collected;
-        List<RecordChangedByCleanedMod> goingBack = [.. verdicts.Placed.Where(change => change.IsRestored).Select(change => change.Change)];
-        var createTooClose = () => CloneTooCloseCheck.Of(
-            collected,
-            inputs.OtherModsObjects,
-            goingBack,
-            judging.Accepted,
-            input.Reads.CleanedMod,
-            inputs.Reach,
-            judging.CleanedModsObjects.TooClose,
-            input.Guards.TooClose.Create,
-            input.Execution);
-        return verdicts with { Placed = PlannedCloneChecks.Judge(verdicts.Placed, collected.Targets, createTooClose, judging.CleanedModsObjects.ChangedTerrain, input.Execution) };
+        var input = inputs.Input;
+        return verdicts with
+        {
+            Placed = PlannedCloneChecks.Judge(verdicts.Placed, input.Earlier.Collected.Targets, input.RemovalSteps.CleanedModsObjects.ChangedTerrain, input.Execution),
+        };
     }
 
     /// <summary>Every candidate judged by the never-rules and its areas; a kind whose switch is off has none.</summary>
@@ -155,15 +146,17 @@ public static class WhereRemovedRestorer
     {
         var (input, final) = (inputs.Input, inputs.Final);
         var (collected, settings) = (input.Earlier.Collected, input.Settings);
-        List<RecordChangedByCleanedMod> cleared = [.. verdicts.Placed.Where(change => change.IsRestored).Select(change => change.Change)];
+        var goingBack = verdicts.Placed.Where(change => change.IsRestored).ToList();
+        List<RecordChangedByCleanedMod> cleared = [.. goingBack.Select(change => change.Change)];
         var removedByRun = ObjectsOfTheRun.RemovedByRun(collected, final, inputs.OtherModsObjects);
         var presence = FinalPresence.Of(collected, removedByRun, cleared);
         var doors = new DoorLinks(collected.ChangedRecords, cleared);
         var ground = new GroundUnderObjects(input.Reads.Caches.Shapes, inputs.FindLandWorldspace);
         var landHeights = LandInputs.LandHeightsOf(collected, inputs.ReadLandHeights);
         var targetsThatMayStay = ObjectsOfTheRun.TargetsThatMayStay(collected, final, cleared);
+        var clones = goingBack.Where(change => change.Cloning is not null).Select(change => CloneCandidates.AsClone(collected.Targets[change.Change.Target!.Value.Index]));
         var terrain = settings.Terrain
-            ? PlanTerrain(verdicts.Lands, targetsThatMayStay, presence, ground, landHeights, settings)
+            ? PlanTerrain(verdicts.Lands, targetsThatMayStay, clones, presence, ground, landHeights, settings)
             : new TerrainUndoPlan([.. verdicts.LandsChanged.Select(land => new LandAreasJudged(land, Never: null, Quarters: []))], landHeights, settings.HeightChangeTolerance, settings.TerrainEdgeBlendDistance);
         var navmeshPlan = settings.Navmeshes ? PlanNavmeshes(inputs, verdicts, removedByRun, presence, doors) : null;
         var water = new WaterUndoPlan(verdicts.Cells, collected.ChangedCells, settings.WaterHeightChangeTolerance);
@@ -176,13 +169,13 @@ public static class WhereRemovedRestorer
             ground,
             landHeights,
             targetsThatMayStay,
-            new RestoreState([.. cleared.Select(_ => (PlacedRefusal?)null)], navmeshPlan, terrain, water, CausesLeftOut: null));
+            new RestoreState([.. cleared.Select(_ => (PlacedRefusal?)null)], [.. goingBack.Select(change => change.Cloning)], navmeshPlan, terrain, water, CausesLeftOut: null));
     }
 
     /// <summary>What every candidate became once the guards between the kinds change nothing more.</summary>
     internal static RestoreWhereRemovedResult ResultOf(Plans plans, RestoreState state, int passes, RestoreWhereRemovedTimes times, WhereRemovedRestoreSettings settings)
     {
-        var objects = PlacedJudgments.WithRefusals(plans.PlacedJudged, plans.Cleared, state.Placed);
+        var objects = PlacedJudgments.WithOutcomes(plans.PlacedJudged, plans.Cleared, state.Placed, state.Clones);
         return new RestoreWhereRemovedResult(
             StepOutcome.Performed,
             objects,
@@ -191,7 +184,7 @@ public static class WhereRemovedRestorer
             state.Navmeshes?.Navmeshes() ?? [],
             state.Navmeshes?.Groups() ?? [],
             passes,
-            plans.FinalPresence.DoorsEndingRemoved(index => state.Placed[index] is null),
+            plans.FinalPresence.DoorsEndingRemoved(state.PlacedGoingBack().Contains),
             PlacedJudgments.FailedChecks(objects),
             times);
     }
@@ -213,14 +206,16 @@ public static class WhereRemovedRestorer
     }
 
     /// <summary>
-    /// The LAND records with their quarters judged, planned with the ground under every target that stands where it stands last
-    /// protected where it reaches the ground. A target stands when it ends present with every placed record whose areas let it
-    /// go back going back; the loop protects the ground under the others once a refusal lets them stand.
+    /// The LAND records with their quarters judged, planned with the ground under every target that stands where it stands last and
+    /// every planned clone protected where it reaches the ground. A target stands when it ends present with every placed record
+    /// whose areas let it go back going back; the loop protects the ground under the others once a refusal lets them stand.
     /// </summary>
     /// <param name="judged">In the order of their cells.</param>
+    /// <param name="clones">The clones planned for the placed records whose areas let them go back, where those records stand now.</param>
     private static TerrainUndoPlan PlanTerrain(
         LandAreasJudged[] judged,
         IReadOnlyList<TargetObject> targetsThatMayStay,
+        IEnumerable<TargetObject> clones,
         FinalPresence presence,
         GroundUnderObjects ground,
         Func<ExteriorCell, LandHeights> landHeights,
@@ -229,7 +224,7 @@ public static class WhereRemovedRestorer
         var plan = new TerrainUndoPlan(judged, landHeights, settings.HeightChangeTolerance, settings.TerrainEdgeBlendDistance);
         if (judged.Length == 0) return plan;
 
-        var standing = targetsThatMayStay.Where(target => !presence.EndsRemoved(target.Key, _ => true));
+        var standing = targetsThatMayStay.Where(target => !presence.EndsRemoved(target.Key, _ => true)).Concat(clones);
         return plan.Protect(TerrainKeptReason.UnderObjectThatStays, ground.UnderWhereTheyReachTheGround(standing, plan.CurrentHeightsOf));
     }
 

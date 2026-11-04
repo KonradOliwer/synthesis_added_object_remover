@@ -11,9 +11,11 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 /// <param name="Never">Why it never goes back; null when it can.</param>
 /// <param name="Area">The area around the cell's centre, or the whole interior; null when <paramref name="Never"/> is set.</param>
 /// <param name="WaterKeptBy">
-/// The first object or navmesh found lying partly between the water level before the cleaned mod and the cleaned mod's, which keeps
-/// the cleaned mod's water level; null when the water level goes back or the cleaned mod is not the last to change it.
+/// What keeps the cleaned mod's water level, by <paramref name="WaterKeptFor"/>: the first object or navmesh found lying partly
+/// between the water level before the cleaned mod and the cleaned mod's, an object that stays, or the original of a copy; null when
+/// the water level goes back or the cleaned mod is not the last to change it.
 /// </param>
+/// <param name="WaterKeptFor">Why <paramref name="WaterKeptBy"/> keeps the water level; it means nothing while that is null.</param>
 /// <param name="IsRestored">Its undone parts go back: no never-rule holds, its area is cleared and some part is undone.</param>
 /// <param name="KeptForArea">When no never-rule holds and its area is not cleared, the area's verdict; null otherwise.</param>
 /// <remarks>
@@ -27,4 +29,24 @@ public sealed record CellChangeJudged(
     AreaShare? Area,
     RecordKey? WaterKeptBy,
     bool IsRestored,
-    AreaVerdict? KeptForArea);
+    AreaVerdict? KeptForArea,
+    WaterKeptReason WaterKeptFor = WaterKeptReason.AtWaterLine);
+
+/// <summary>Why a cell keeps the cleaned mod's water level although its other parts may go back.</summary>
+public enum WaterKeptReason
+{
+    /// <summary>An object or navmesh that stays lies partly between the level before the cleaned mod and the cleaned mod's.</summary>
+    AtWaterLine,
+
+    /// <summary>
+    /// The changed-terrain step checks the ground in the cell around an object that stays, with the settings of that object's own
+    /// collision group, and counts water changes.
+    /// </summary>
+    AroundObjectThatStays,
+
+    /// <summary>
+    /// The changed-terrain step checks the ground in the cell around a copy the patch adds, with the settings of the cleaned mod's own
+    /// objects, and counts water changes; the keeper named is the copy's original.
+    /// </summary>
+    AroundCopy,
+}

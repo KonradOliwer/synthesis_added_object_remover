@@ -38,12 +38,17 @@ public sealed record QuarterPointsKept(TerrainKeptReason Reason, int Points);
 /// <param name="Kept">In a cleared quarter, the points whose height stays per reason, in reason order; empty otherwise.</param>
 /// <param name="KeptForArea">When nothing of it goes back and no never-rule holds, the verdict of its area that is not cleared; null otherwise.</param>
 /// <param name="ColoursSharedWithGroundThatStays">
-/// Nothing of the cleared quarter goes back and it keeps no height: its only change, vertex colours, each lies on a line shared with
-/// a quarter or a neighbouring cell whose colour stays there.
+/// Nothing of the cleared quarter goes back, it keeps no height and no texture for an object that stays: its only change, vertex
+/// colours, each lies on a line shared with a quarter or a neighbouring cell whose colour stays there.
+/// </param>
+/// <param name="TexturesKeptForObjectThatStays">
+/// The cleared quarter keeps the texture layers the cleaned mod last changed: the changed-terrain step checks its ground around an
+/// object that stays or a copy the patch adds, with the settings it judges that object with, and counts terrain type changes.
 /// </param>
 /// <remarks>
-/// When nothing of it goes back, exactly one of the land's never-rule, <paramref name="KeptForArea"/>, <paramref name="Kept"/> and
-/// <paramref name="ColoursSharedWithGroundThatStays"/> says why.
+/// When nothing of it goes back, one of the land's never-rule, <paramref name="KeptForArea"/>, <paramref name="Kept"/>,
+/// <paramref name="TexturesKeptForObjectThatStays"/> and <paramref name="ColoursSharedWithGroundThatStays"/> says why; only
+/// <paramref name="Kept"/> and <paramref name="TexturesKeptForObjectThatStays"/> can both hold.
 /// </remarks>
 public sealed record LandQuarterOutcome(
     int Quarter,
@@ -53,7 +58,8 @@ public sealed record LandQuarterOutcome(
     TerrainPieces Later,
     ImmutableArray<QuarterPointsKept> Kept,
     AreaVerdict? KeptForArea,
-    bool ColoursSharedWithGroundThatStays);
+    bool ColoursSharedWithGroundThatStays,
+    bool TexturesKeptForObjectThatStays = false);
 
 /// <summary>Why a grid point whose height the cleaned mod last changed keeps that height although a quarter holding it is cleared.</summary>
 public enum TerrainKeptReason

@@ -18,7 +18,8 @@ internal readonly record struct GroundThatStaysChanged(ExteriorCell Cell, Record
 /// heights written. Which points go back is chosen by <see cref="TerrainPointSelection"/>, the records holding a point on a cell edge
 /// are checked by <see cref="TerrainEdgeChecks"/> and the heights written are solved by <see cref="TerrainHeightSolver"/>. A colour on
 /// a cell edge goes back in every record holding it or in none. A cell whose heights the height map cannot store keeps all of its
-/// own. Its outcome does not change: <see cref="Protect"/> gives a new plan.
+/// own. A quarter whose ground the changed-terrain step checks around an object that stays keeps its texture layers. Its outcome does not change:
+/// <see cref="Protect"/> and <see cref="KeepTextures"/> give a new plan.
 /// </summary>
 internal sealed partial class TerrainUndoPlan
 {
@@ -26,6 +27,9 @@ internal sealed partial class TerrainUndoPlan
 
     /// <summary>Each protected point with the first reason it was protected for.</summary>
     private readonly ImmutableDictionary<LandGridPoint, TerrainKeptReason> _protected;
+
+    /// <summary>The quarters whose texture layers stay for an object that stays: the changed-terrain step checks their ground around it.</summary>
+    private readonly ImmutableHashSet<(ExteriorCell Cell, int Quarter)> _texturesKept;
 
     /// <summary>The plan this one protects more points of, until this one's outcome is computed; null for the first plan.</summary>
     private TerrainUndoPlan? _before;
@@ -43,14 +47,20 @@ internal sealed partial class TerrainUndoPlan
     /// <param name="heightTolerance">Heights closer than this count as equal.</param>
     /// <param name="blendDistance">In game units; restored points closer than this to a point that keeps a change are blended into it.</param>
     public TerrainUndoPlan(IReadOnlyList<LandAreasJudged> lands, Func<ExteriorCell, LandHeights> readHeights, float heightTolerance, float blendDistance)
-        : this(new TerrainUndoLands(lands, readHeights, heightTolerance, (int)MathF.Floor(blendDistance / TerrainGrid.VertexSpacing)), ImmutableDictionary<LandGridPoint, TerrainKeptReason>.Empty, before: null)
+        : this(
+            new TerrainUndoLands(lands, readHeights, heightTolerance, (int)MathF.Floor(blendDistance / TerrainGrid.VertexSpacing)),
+            ImmutableDictionary<LandGridPoint, TerrainKeptReason>.Empty,
+            [],
+            before: null)
     {
     }
 
-    private TerrainUndoPlan(TerrainUndoLands lands, ImmutableDictionary<LandGridPoint, TerrainKeptReason> protectedPoints, TerrainUndoPlan? before)
+    private TerrainUndoPlan(
+        TerrainUndoLands lands, ImmutableDictionary<LandGridPoint, TerrainKeptReason> protectedPoints, ImmutableHashSet<(ExteriorCell Cell, int Quarter)> texturesKept, TerrainUndoPlan? before)
     {
         _lands = lands;
         _protected = protectedPoints;
+        _texturesKept = texturesKept;
         _before = before;
         _outcome = new ComputedOnce<Outcome>(Compute);
         _edges = new TerrainEdgeChecks(lands);
@@ -63,14 +73,27 @@ internal sealed partial class TerrainUndoPlan
     {
         var protectedPoints = _protected.ToBuilder();
         foreach (var point in points) protectedPoints.TryAdd(point, reason);
-        return new TerrainUndoPlan(_lands, protectedPoints.ToImmutable(), this);
+        return new TerrainUndoPlan(_lands, protectedPoints.ToImmutable(), _texturesKept, this);
+    }
+
+    /// <summary>The plan with the texture layers of the given quarters kept too, for objects that stay whose ground the changed-terrain step checks there.</summary>
+    public TerrainUndoPlan KeepTextures(IEnumerable<(ExteriorCell Cell, int Quarter)> quarters)
+    {
+        var kept = _texturesKept.Union(quarters.Where(quarter => _lands.ByCell.ContainsKey(quarter.Cell)));
+        return kept.Count == _texturesKept.Count ? this : new TerrainUndoPlan(_lands, _protected, kept, this);
     }
 
     /// <summary>How many grid points are protected.</summary>
     public int ProtectedCount => _protected.Count;
 
+    /// <summary>How many quarters keep their texture layers for an object that stays.</summary>
+    public int TexturesKeptCount => _texturesKept.Count;
+
     /// <summary>The winning heights of the cell's LAND record; null when the plan holds none or the winner has no height map.</summary>
     public float[]? CurrentHeightsOf(ExteriorCell cell) => _lands.ByCell.TryGetValue(cell, out var land) ? _lands.HeightsOf(land.Change).Current : null;
+
+    /// <summary>The ground of the cell in the world without the cleaned mod (<see cref="TerrainUndoLands.HeightsWithoutCleanedMod"/>); null when the plan holds no such heights.</summary>
+    public float[]? HeightsWithoutCleanedModOf(ExteriorCell cell) => _lands.HeightsWithoutCleanedMod.GetValueOrDefault(cell);
 
     /// <summary>The heights of the cell's LAND record once written, or its winning heights where none goes back; null when the plan holds none.</summary>
     public float[]? PlannedHeightsOf(ExteriorCell cell) => FinalHeightsOf(cell, _outcome.Value);
@@ -188,7 +211,8 @@ internal sealed partial class TerrainUndoPlan
         var candidates = _lands.Candidates[change.Cell];
         var heights = PointSet.Of(candidates.Points.Where(point => outcome.Restored.Contains(WorldGridPoint.Of(new LandGridPoint(change.Cell, point)))));
         var colours = PointSet.Of(_lands.ColourCandidates[change.Cell].Points.Where(point => _edges.ColourGoesBack(new LandGridPoint(change.Cell, point))));
-        var textures = QuarterSet.Of(change.UndoQuarters.Quarters.Where(quarter => land.Quarters[quarter].Verdict == AreaVerdict.Cleared));
+        var texturesKept = QuarterSet.Of(change.UndoQuarters.Quarters.Where(quarter => _texturesKept.Contains((change.Cell, quarter))));
+        var textures = QuarterSet.Of(change.UndoQuarters.Quarters.Where(quarter => land.Quarters[quarter].Verdict == AreaVerdict.Cleared && !texturesKept.Contains(quarter)));
         var rest = change.UndoRest && land.Quarters.All(quarter => quarter.Verdict == AreaVerdict.Cleared);
         var final = outcome.Final.GetValueOrDefault(change.Cell);
         return LandOutcomes.Judged(
@@ -197,6 +221,7 @@ internal sealed partial class TerrainUndoPlan
             heights,
             colours,
             textures,
+            texturesKept,
             rest,
             _points.KeptPoints(land, candidates, heights, outcome.TooSteep),
             final,

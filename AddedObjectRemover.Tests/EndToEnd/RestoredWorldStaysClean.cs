@@ -15,10 +15,14 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 /// by more than the height tolerance to a height farther from the object, or through the object to its other side. Ground moving
 /// toward the object, to its height or short of it, is the restore's aim (a plugin that loads without the cleaned mod placed its
 /// objects for the base game's ground, which the restore gives back). A
-/// value the patch restores exactly counts as unchanged for the rules, so floating and sinking are checked on their own.</item>
+/// value the patch restores exactly counts as unchanged for the rules, so floating and sinking are checked on their own. The copies
+/// the first patch added count as objects that stand where they stood.</item>
+/// <item>(d) every copy the first patch added is read back as one of the cleaned mod's objects, a copy of its original;</item>
+/// <item>(e) the second run adds no copy and puts back no original that went back with a copy;</item>
+/// <item>(f) the changed-terrain step finds no object on ground textures or water that it did not find there in the first run.</item>
 /// </list>
-/// The second run's own restore decisions are not judged. A second run that stops because the first removed every object of the
-/// cleaned mod judges nothing, so only (c) checks that scene.
+/// The second run's own restore decisions are not judged otherwise. A second run that stops because the first removed every object of
+/// the cleaned mod judges nothing, so only (c) checks that scene.
 /// </summary>
 internal static class RestoredWorldStaysClean
 {
@@ -27,8 +31,50 @@ internal static class RestoredWorldStaysClean
 
     private const int Side = TerrainGrid.VerticesPerSide;
 
-    /// <returns>Whether the second run judged the world, so (a) and (b) were checked; false when it stopped because nothing of the cleaned mod was left.</returns>
+    private const TerrainChangeKind TexturesAndWater =
+        TerrainChangeKind.TerrainType | TerrainChangeKind.WaterHeight | TerrainChangeKind.WaterAdded | TerrainChangeKind.WaterRemoved;
+
+    /// <returns>Whether the second run judged the world, so (a), (b), (d), (e) and (f) were checked; false when it stopped because nothing of the cleaned mod was left.</returns>
     public static bool Check(Settings settings, Func<string, IReadOnlyList<ISkyrimMod>> createLoadOrder, float heightTolerance)
+    {
+        var (first, mods, firstPatch, second) = RunTwice(settings, createLoadOrder, settings, createLoadOrder);
+        var judged = second is RunResult.Done;
+        if (second is RunResult.Done { Outcome: var outcome })
+        {
+            AssertNothingTakenAway(outcome);
+            AssertEveryCopyReadBackAsTheCleanedModsObject(first, outcome);
+            AssertNoCopyAddedAgain(first, outcome);
+            AssertNoNewObjectOnChangedTexturesOrWater(first, outcome);
+        }
+        else
+        {
+            Assert.Equal(StopKind.NoTargetObjects, ((RunResult.Stopped)second).Reason.Kind);
+        }
+        var moved = FindGroundMovedUnderWhatStands(first, mods, firstPatch, heightTolerance);
+        Assert.True(moved.Count == 0, $"The first patch moved the ground under: {string.Join("; ", moved)}");
+        return judged;
+    }
+
+    /// <summary>
+    /// Runs a scene, then a step for another cleaned mod in the same group, on a load order that may add that mod: the second step removes
+    /// nothing, and reads every copy the first patch added as a copy of another cleaned mod, which causes nothing.
+    /// </summary>
+    /// <returns>The copies the first patch added.</returns>
+    public static int CheckWithAnotherCleanedMod(
+        Settings settings, Func<string, IReadOnlyList<ISkyrimMod>> createLoadOrder, Settings secondSettings, Func<string, IReadOnlyList<ISkyrimMod>> createSecondLoadOrder)
+    {
+        var (first, _, _, second) = RunTwice(settings, createLoadOrder, secondSettings, createSecondLoadOrder);
+        var outcome = ((RunResult.Done)second).Outcome;
+
+        AssertNothingTakenAway(outcome);
+        Assert.Equal((0, first.Written.Clones.Length), (outcome.Collected.Counts.ClonesOfCleanedMod, outcome.Collected.Counts.ClonesOfOtherCleanedMods));
+        Assert.DoesNotContain(outcome.Collected.Targets, target => target.CloneOf is not null);
+        return first.Written.Clones.Length;
+    }
+
+    /// <summary>Runs the first settings, then the second with the first run's patch imported as the patch it adds to.</summary>
+    private static (RunOutcome First, IReadOnlyList<ISkyrimMod> Mods, ISkyrimModGetter FirstPatch, RunResult Second) RunTwice(
+        Settings settings, Func<string, IReadOnlyList<ISkyrimMod>> createLoadOrder, Settings secondSettings, Func<string, IReadOnlyList<ISkyrimMod>> createSecondLoadOrder)
     {
         var folder = Directory.CreateTempSubdirectory("aor-second-run-");
         try
@@ -45,14 +91,8 @@ internal static class RestoredWorldStaysClean
                     firstPatch = patch;
                     patch.WriteToBinary(firstPatchFile);
                 });
-            var second = FixtureRun.Attempt(settings, workers: 1, createLoadOrder, earlierPatchFile: firstPatchFile);
-
-            var judged = second is RunResult.Done;
-            if (second is RunResult.Done { Outcome: var outcome }) AssertNothingTakenAway(outcome);
-            else Assert.Equal(StopKind.NoTargetObjects, ((RunResult.Stopped)second).Reason.Kind);
-            var moved = FindGroundMovedUnderWhatStands(first, mods, firstPatch!, heightTolerance);
-            Assert.True(moved.Count == 0, $"The first patch moved the ground under: {string.Join("; ", moved)}");
-            return judged;
+            var second = FixtureRun.Attempt(secondSettings, workers: 1, createSecondLoadOrder, earlierPatchFile: firstPatchFile);
+            return (first, mods, firstPatch!, second);
         }
         finally
         {
@@ -60,13 +100,43 @@ internal static class RestoredWorldStaysClean
         }
     }
 
-    /// <summary>(a) and (b).</summary>
+    /// <summary>(a) and (b): nothing removed, fitted, moved or taken away.</summary>
     private static void AssertNothingTakenAway(RunOutcome second)
     {
         Assert.True(second.Removals.IsEmpty, $"The second run removed: {string.Join(", ", second.Removals.Select(removal => second.Collected.Targets[removal.TargetIndex].Key))}");
+        Assert.Equal((0, 0), (second.Written.Fitted, second.Written.Moved));
         var takenAway = second.OtherModsObjects.TakenAway();
         Assert.True(takenAway.Count == 0, $"The second run took away: {string.Join(", ", takenAway.Keys.Select(id => second.Collected.Other(id).Key))}");
     }
+
+    /// <summary>(d).</summary>
+    private static void AssertEveryCopyReadBackAsTheCleanedModsObject(RunOutcome first, RunOutcome second)
+    {
+        var copies = second.Collected.Targets.Where(target => target.CloneOf is not null).Select(target => (Copy: target.Key, Original: target.CloneOf!.Value, target.Origin));
+        Assert.Equal(
+            first.Written.Clones.Select(clone => (clone.Copy, clone.Original, Origin: TargetOrigin.CleanedMod)).OrderBy(copy => copy.Copy.ToString(), StringComparer.Ordinal),
+            copies.OrderBy(copy => copy.Copy.ToString(), StringComparer.Ordinal));
+        Assert.Equal(first.Written.Clones.Length, second.Collected.Counts.ClonesOfCleanedMod);
+    }
+
+    /// <summary>(e).</summary>
+    private static void AssertNoCopyAddedAgain(RunOutcome first, RunOutcome second)
+    {
+        Assert.Empty(second.Written.Clones);
+        var originals = first.Written.Clones.Select(clone => clone.Original).ToHashSet();
+        Assert.DoesNotContain(second.RestoreWhereRemoved.Objects, judged => judged.IsRestored && originals.Contains(judged.Change.Key));
+    }
+
+    /// <summary>(f).</summary>
+    private static void AssertNoNewObjectOnChangedTexturesOrWater(RunOutcome first, RunOutcome second)
+    {
+        var before = HitsOnTexturesOrWater(first).ToHashSet();
+        var found = HitsOnTexturesOrWater(second).Where(key => !before.Contains(key)).ToList();
+        Assert.True(found.Count == 0, $"The second run found on changed ground textures or water: {string.Join(", ", found)}");
+    }
+
+    private static IEnumerable<RecordKey> HitsOnTexturesOrWater(RunOutcome run) =>
+        run.ChangedTerrain.Passes.SelectMany(pass => pass.Hits).Where(hit => (hit.Kind & TexturesAndWater) != 0).Select(hit => run.Collected.Targets[hit.Target.Index].Key);
 
     /// <returns>One line for each object under which the ground moved, naming the point and both heights.</returns>
     private static List<string> FindGroundMovedUnderWhatStands(RunOutcome first, IReadOnlyList<ISkyrimMod> mods, ISkyrimModGetter patch, float heightTolerance)
@@ -120,7 +190,11 @@ internal static class RestoredWorldStaysClean
         var others = first.Collected.OtherModAndSupportOnlyObjects
             .Where(other => after.Contains(other.Key.Plugin) && !takenAway.ContainsKey(other.Id) && !restored.Contains(other.Key))
             .Select(other => (other.Key, other.SpaceKey, other.Position));
-        return targets.Concat(others);
+        var copyOf = first.Written.Clones.ToDictionary(clone => clone.Original, clone => clone.Copy);
+        var copies = first.RestoreWhereRemoved.Objects
+            .Where(judged => copyOf.ContainsKey(judged.Change.Key))
+            .Select(judged => (copyOf[judged.Change.Key], judged.Change.SpaceKey, judged.Change.WhereItIsNow!.Value.Position));
+        return targets.Concat(others).Concat(copies);
     }
 
     /// <summary>Each LAND record the patch writes, with the worldspace and grid of its cell.</summary>

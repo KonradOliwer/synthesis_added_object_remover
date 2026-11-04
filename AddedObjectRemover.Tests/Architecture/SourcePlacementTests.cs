@@ -122,12 +122,15 @@ public class SourcePlacementTests
             file => Regex.IsMatch(file.Code, @"\bLoadOrderImporter\b|\bLoadOrder\.Import\b"),
             ["Tools/PluginRecordReadingAndWriting/FinalWorldFactory.cs"]);
 
-    /// <summary>A writable mod is the patch: only the patch writing holds it as a value or overrides records into it.</summary>
+    /// <summary>A writable mod is the patch: only the patch writing holds it as a value, overrides records into it or adds records to it.</summary>
     [Fact]
     public void OnlyThePatchWritingOverridesRecordsIntoThePatch() =>
         PlacementCheck.AssertUsedOnlyIn(
             file => Regex.IsMatch(file.Code, @"\bGetOrAddAsOverride\b|\bI?SkyrimMod\??\s+[A-Za-z_]"),
-            ["Tools/PluginRecordReadingAndWriting/PatchWriting.cs", "Tools/PluginRecordReadingAndWriting/CellOverrides.cs", "Tools/PluginRecordReadingAndWriting/NavmeshMapWriter.cs"]);
+            [
+                "Tools/PluginRecordReadingAndWriting/PatchWriting.cs", "Tools/PluginRecordReadingAndWriting/CellOverrides.cs", "Tools/PluginRecordReadingAndWriting/NavmeshMapWriter.cs",
+                "Tools/PluginRecordReadingAndWriting/PlacedOverrideWriter.cs",
+            ]);
 
     /// <summary>
     /// Whether the game has a placed record is decided by the collector's presence rule, from the presence facts the reader takes

@@ -77,5 +77,11 @@ public sealed record WriteNavmeshMapEntries(RecordKey Record, ImmutableArray<Nav
 /// </param>
 public sealed record NavmeshEntryOrder(RecordKey Navmesh, PluginName From, float? FlattenAndDetachZ);
 
+/// <summary>
+/// Adds a new record to the patch: a whole copy of the record the game shows now with the given EditorID and a FormKey the patch
+/// hands out for that EditorID, in the temporary children of the cell it stands in now. The record itself is not written.
+/// </summary>
+public sealed record AddClone(RecordKey Record, string EditorId) : WriteOrder(Record);
+
 /// <param name="Opposite">The record's enable state is the opposite of the parent's.</param>
 public sealed record SetEnableParent(RecordKey Record, RecordKey Parent, bool Opposite) : WriteOrder(Record);

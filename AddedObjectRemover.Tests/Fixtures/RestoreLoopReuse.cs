@@ -27,7 +27,7 @@ internal static class RestoreLoopReuse
 
     private static string Describe(RestoreWhereRemovedResult result) => string.Join(
         Environment.NewLine,
-        result.Objects.Select(judged => $"{judged.Change.Key} {judged.Refused} {judged.IsRestored} {judged.Change.Earlier.Undo}")
+        result.Objects.Select(judged => $"{judged.Change.Key} {judged.Refused} {judged.IsRestored} {judged.Change.Earlier.Undo} {judged.Cloning}")
             .Concat(result.Cells.Select(cell => $"{cell.Change.Cell} {string.Join(",", cell.Undone.Select(part => part.Name))} {cell.WaterKeptBy} {cell.IsRestored}"))
             .Concat(result.Lands.Select(land =>
                 $"{land.Change.Cell} {string.Join(",", land.Heights.Points)} {string.Join(";", land.Kept.Select(kept => $"{kept.Reason}:{string.Join(",", kept.Points.Points)}"))} {string.Join(",", land.FinalHeights ?? [])}"))

@@ -516,7 +516,7 @@ public sealed class RestingObjectsEndSectionsTests
     public void Write_ShowsTheTimeOnlyInTheDetailedLogAndTheEnableParentLineAlways()
     {
         var written = new WriteSummary(
-            Removed: [.. Enumerable.Range(0, 5).Select(index => new TargetId(index))], Restored: [], Moved: 2, EnableParentsReplaced: 3, Fitted: 0, OtherModsObjectsRemoved: 0, OtherModsObjectsPulledDown: 0, WrittenWhereRemoved: 0);
+            Removed: [.. Enumerable.Range(0, 5).Select(index => new TargetId(index))], Restored: [], Moved: 2, EnableParentsReplaced: 3, Fitted: 0, OtherModsObjectsRemoved: 0, OtherModsObjectsPulledDown: 0, WrittenWhereRemoved: 0, Clones: []);
 
         Assert.Equal(
             [
@@ -530,13 +530,13 @@ public sealed class RestingObjectsEndSectionsTests
     [Fact]
     public void Write_OmitsTheEnableParentLineWhenNoneWasReplaced()
     {
-        Assert.Single(LogSections.BuildWriteSection(new WriteSummary([new TargetId(0)], [], 0, 0, 0, 0, 0, 0), Elapsed, Normal).Lines.ToList());
+        Assert.Single(LogSections.BuildWriteSection(new WriteSummary([new TargetId(0)], [], 0, 0, 0, 0, 0, 0, []), Elapsed, Normal).Lines.ToList());
     }
 
     [Fact]
     public void Write_CountsTheRestoredObjectsInTheTotalAndNamesThemAfterTheRemovedOnlyWhenThereAreAny()
     {
-        var withRestored = new WriteSummary([new TargetId(0)], Restored: [new TargetId(1), new TargetId(2)], Moved: 1, EnableParentsReplaced: 0, Fitted: 0, OtherModsObjectsRemoved: 0, OtherModsObjectsPulledDown: 0, WrittenWhereRemoved: 0);
+        var withRestored = new WriteSummary([new TargetId(0)], Restored: [new TargetId(1), new TargetId(2)], Moved: 1, EnableParentsReplaced: 0, Fitted: 0, OtherModsObjectsRemoved: 0, OtherModsObjectsPulledDown: 0, WrittenWhereRemoved: 0, Clones: []);
         var withoutRestored = withRestored with { Restored = [] };
 
         Assert.Equal("Wrote 4 overrides (1 removed, 2 restored, 1 kept markers moved).", LogSections.BuildWriteSection(withRestored, Elapsed, Normal).Lines[0]);
@@ -546,7 +546,7 @@ public sealed class RestingObjectsEndSectionsTests
     [Fact]
     public void Write_NamesTheOtherModsObjectsPulledDownAndRemovedOnlyWhenThereAreAny()
     {
-        var written = new WriteSummary([new TargetId(0)], Restored: [], Moved: 0, EnableParentsReplaced: 0, Fitted: 1, OtherModsObjectsRemoved: 2, OtherModsObjectsPulledDown: 3, WrittenWhereRemoved: 0);
+        var written = new WriteSummary([new TargetId(0)], Restored: [], Moved: 0, EnableParentsReplaced: 0, Fitted: 1, OtherModsObjectsRemoved: 2, OtherModsObjectsPulledDown: 3, WrittenWhereRemoved: 0, Clones: []);
 
         Assert.Equal(
             "Wrote 7 overrides (1 removed, 1 shrunk or turned to fit; other mods' objects: 3 pulled down, 2 removed).",
@@ -556,9 +556,22 @@ public sealed class RestingObjectsEndSectionsTests
     [Fact]
     public void Write_CountsTheRecordsWrittenToRestoreWhereTheCleanedModWasRemovedInTheTotal()
     {
-        var written = new WriteSummary([new TargetId(0)], Restored: [], Moved: 0, EnableParentsReplaced: 0, Fitted: 0, OtherModsObjectsRemoved: 0, OtherModsObjectsPulledDown: 0, WrittenWhereRemoved: 5);
+        var written = new WriteSummary([new TargetId(0)], Restored: [], Moved: 0, EnableParentsReplaced: 0, Fitted: 0, OtherModsObjectsRemoved: 0, OtherModsObjectsPulledDown: 0, WrittenWhereRemoved: 5, Clones: []);
 
         Assert.Equal("Wrote 6 overrides (1 removed, 5 to restore where the cleaned mod was removed).", LogSections.BuildWriteSection(written, Elapsed, Normal).Lines[0]);
+    }
+
+    [Fact]
+    public void Write_NamesTheCopiesAddedAsNewRecordsOutsideTheOverrides()
+    {
+        var original = new RecordKey(new PluginName("Base.esm"), 0x901);
+        var written = new WriteSummary(
+            [new TargetId(0)], Restored: [], Moved: 0, EnableParentsReplaced: 0, Fitted: 0, OtherModsObjectsRemoved: 0, OtherModsObjectsPulledDown: 0, WrittenWhereRemoved: 2,
+            Clones: [new CloneWritten(original, new RecordKey(new PluginName("Patch.esp"), 0x800))]);
+
+        Assert.Equal(
+            "Wrote 3 overrides (1 removed, 2 to restore where the cleaned mod was removed) and added 1 new record (copies of other mods' objects that went back, at the cleaned mod's place).",
+            LogSections.BuildWriteSection(written, Elapsed, Normal).Lines[0]);
     }
 
     [Fact]

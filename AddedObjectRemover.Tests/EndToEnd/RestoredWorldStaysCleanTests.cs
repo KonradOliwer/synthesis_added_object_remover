@@ -42,6 +42,9 @@ public sealed class RestoredWorldStaysCleanTests
         "SiteWithMists",
         "RowWithALoneCrate",
         "RowWithALoneCrateCarryingAPad",
+        "TerrainWithTheChangedTerrainStep",
+        "CampfireRing",
+        "CampfireRingWithALandmark",
     ];
 
     private static Dictionary<string, (Func<Settings> Settings, Func<string, IReadOnlyList<ISkyrimMod>> World)> CreateScenes()
@@ -53,11 +56,25 @@ public sealed class RestoredWorldStaysCleanTests
             ["VillageWithAPatchOfTheCleanedMod"] = (restoreOn, RestoreWhereRemovedWorlds.CreateVillageWithAPatchOfTheCleanedMod),
             ["VillageWithATableOfAnotherModWhereARockStood"] = (restoreOn, RestoreWhereRemovedWorlds.CreateVillageWithATableOfAnotherModWhereARockStood),
             ["Terrain"] = (RestoreWhereRemovedRunTests.TerrainSettings, RestoreWhereRemovedWorlds.CreateTerrain),
+            ["TerrainWithTheChangedTerrainStep"] = (WithTheChangedTerrainStep, RestoreWhereRemovedWorlds.CreateTerrain),
+            ["CampfireRing"] = (RestoreWhereRemovedRunTests.TerrainSettings, RestoreWhereRemovedWorlds.CreateCampfireRing),
+            ["CampfireRingWithALandmark"] = (RestoreWhereRemovedRunTests.TerrainSettings, RestoreWhereRemovedWorlds.CreateCampfireRingWithALandmark),
             ["SiteWithMists"] = (restoreOn, RestoreWhereRemovedWorlds.CreateSiteWithMists),
             ["RowWithALoneCrate"] = (restoreOn, RestoreWhereRemovedWorlds.CreateRowWithALoneCrate),
             ["RowWithALoneCrateCarryingAPad"] = (restoreOn, dataFolder => RestoreWhereRemovedWorlds.CreateRowWithALoneCrateCarryingAPad(dataFolder).LoadOrder),
         };
         foreach (var scenario in Enum.GetValues<NavmeshAndLandScenario>()) scenes.Add($"NavmeshAndLand.{scenario}", (restoreOn, dataFolder => NavmeshAndLandWorld.Create(dataFolder, scenario)));
         return scenes;
+    }
+
+    /// <summary>The terrain scene's settings with the changed-terrain step on, counting height, ground type and water changes, so (f) has hits to find.</summary>
+    private static Settings WithTheChangedTerrainStep()
+    {
+        var settings = RestoreWhereRemovedRunTests.TerrainSettings();
+        var terrain = settings.Standard.TerrainChange;
+        terrain.RemoveOnChangedTerrain = true;
+        terrain.CountTerrainTypeChanges = true;
+        terrain.CountWaterHeightChanges = true;
+        return settings;
     }
 }

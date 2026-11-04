@@ -83,10 +83,7 @@ public sealed class RestoreWhereRemovedGuardTests
         TerrainEdgeBlendDistance: 0f,
         HeightChangeTolerance: 8f,
         WaterHeightChangeTolerance: 8f,
-        new TooCloseSettings(BySize: false, Multiplier: 0f, ByDistance: true, DistanceInUnits: TooCloseDistance, ZoneShape.BoundingBox, NpcHandling.Never),
-        new ChangedTerrainSettings(
-            On: false, TerrainCheckedObjects.VisibleObjectsOnTheGround, CountHeightChanges: false, 8f, CountTerrainTypeChanges: false, 0,
-            CountWaterHeightChanges: false, 0f, CountWaterAddedOrRemoved: false, 0, AreaBySize: false, 0f, AreaByDistance: false, 0f));
+        new TooCloseSettings(BySize: false, Multiplier: 0f, ByDistance: true, DistanceInUnits: TooCloseDistance, ZoneShape.BoundingBox, NpcHandling.Never));
 
     private static readonly OtherModsObjectsSettings Support = new(OtherModsObjectsHandling.PullObjectToTheGround, TouchGap, SupportLostFraction: 0.5f);
 
@@ -601,6 +598,74 @@ public sealed class RestoreWhereRemovedGuardTests
         Assert.Equal(restored ? null : new PlacedRefusal(PlacedGuard.CarriesObjectThatStays, lantern.Key, Failure: null), judged.Refused);
     }
 
+    /// <summary>
+    /// A base game lantern no plugin changed stands on top of the rock where the cleaned mod put it; before the cleaned mod it stood
+    /// there without the rock. The rock goes back to its earlier shape and place, so both end as they stood then.
+    /// </summary>
+    [Fact]
+    public void ARockGoingBackToItsEarlierPlaceFromUnderAnObjectThatStoodThereBeforeTheCleanedModIsNotRefused()
+    {
+        var lantern = TestShapes.Placed(BaseGameMod, 5, Lantern.Base, PlaceNow + new Vector3(0, 0, RockHalfSize));
+        var scene = new Scene { Rocks = [Rock(0, OldPlace, PlaceNow)], Others = [lantern, RockNow(0, PlaceNow)] };
+
+        var judged = Assert.Single(Plan(scene).Objects);
+
+        Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
+    }
+
+    /// <summary>The cleaned mod moved a base game lantern onto the rock where it put the rock.</summary>
+    [Fact]
+    public void ARockGoingBackFromUnderAnObjectTheCleanedModMovedOntoItIsRefused()
+    {
+        var lantern = TestShapes.Placed(BaseGameMod, 5, Lantern.Base, PlaceNow + new Vector3(0, 0, RockHalfSize)) with { ChangeWithoutCleanedMod = new ObjectChange(TestTargets.TargetName, BaseGame) };
+        var scene = new Scene { Rocks = [Rock(0, OldPlace, PlaceNow)], Others = [lantern, RockNow(0, PlaceNow)] };
+
+        var judged = Assert.Single(Plan(scene).Objects);
+
+        Assert.Equal(new PlacedRefusal(PlacedGuard.CarriesObjectThatStays, lantern.Key, Failure: null), judged.Refused);
+    }
+
+    /// <summary>
+    /// A later mod that loads without the cleaned mod added a lantern on top of the rock where the cleaned mod put it, or moved a base
+    /// game lantern there. The world without the cleaned mod accepts the lantern, but it did not stand there before the cleaned mod.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ARockGoingBackFromUnderAnObjectALaterModAddedOrMovedOntoItIsRefused(bool added)
+    {
+        var onTop = PlaceNow + new Vector3(0, 0, RockHalfSize);
+        var lantern = added ? TestShapes.Placed(LaterMod, 5, Lantern.Base, onTop) : TestShapes.Placed(BaseGameMod, 5, Lantern.Base, onTop) with { WinningMod = Later };
+        var scene = new Scene { Rocks = [Rock(0, OldPlace, PlaceNow)], Others = [lantern, RockNow(0, PlaceNow)] };
+
+        var judged = Assert.Single(Plan(scene).Objects);
+
+        Assert.Equal(new PlacedRefusal(PlacedGuard.CarriesObjectThatStays, lantern.Key, Failure: null), judged.Refused);
+    }
+
+    /// <summary>
+    /// As <see cref="ARockGoingBackToItsEarlierPlaceFromUnderAnObjectThatStoodThereBeforeTheCleanedModIsNotRefused"/>, but a later
+    /// plugin scaled the rock up and the rock keeps that scale: it never stood like that before the cleaned mod, so the unchanged
+    /// lantern on it keeps it where it stands.
+    /// </summary>
+    [Fact]
+    public void ARockKeepingAShapeALaterPluginGaveItIsRefusedForAnUnchangedObjectOnIt()
+    {
+        const float LaterScale = 1.5f;
+        var moved = Rock(0, OldPlace, PlaceNow);
+        var rock = moved with
+        {
+            WhereItIsNow = new EulerPlacement(PlaceNow, Vector3.Zero, LaterScale),
+            Earlier = moved.Earlier with { LeftToLaterPlugins = ImmutableSortedDictionary<PlacedParts, PluginName>.Empty.Add(PlacedParts.Scale, Later) },
+        };
+        var lantern = TestShapes.Placed(BaseGameMod, 5, Lantern.Base, PlaceNow + new Vector3(0, 0, LaterScale * RockHalfSize));
+        var scene = new Scene { Rocks = [rock], Others = [lantern, RockNow(0, PlaceNow) with { Scale = LaterScale }] };
+
+        var judged = Assert.Single(Plan(scene).Objects);
+
+        Assert.Equal(new PlacedRefusal(PlacedGuard.CarriesObjectThatStays, lantern.Key, Failure: null), judged.Refused);
+    }
+
     /// <summary>Rock B lies on rock A where the cleaned mod put them; both go back, so nothing is left floating.</summary>
     [Fact]
     public void ARockRestingOnAnotherThatGoesBackTooKeepsNeither()
@@ -640,8 +705,8 @@ public sealed class RestoreWhereRemovedGuardTests
 
     /// <summary>
     /// Forty rocks in a row, each moved by the cleaned mod to a second row; some go back next to a later mod's crate, around a
-    /// marker of the cleaned mod, into a navmesh the cleaned mod added, or carry a lantern where they stand, and some were moved onto
-    /// the next rock's old place.
+    /// marker of the cleaned mod, into a navmesh the cleaned mod added, or carry a later mod's lantern or a base game lantern no plugin
+    /// changed where they stand, and some were moved onto the next rock's old place.
     /// </summary>
     private static Scene ManyRocks(int workers)
     {
@@ -659,6 +724,7 @@ public sealed class RestoreWhereRemovedGuardTests
             if (index % 4 == 1) others.Add(LaterObject(index, Block.Base, oldPlace + new Vector3(0, ZoneReach - 5f, 0)));
             if (index % 5 == 2) targets.Add(TestTargets.Create(targets.Count, TestTargets.At(oldPlace + new Vector3(5, 0, 0)), Marker, TestTargets.Space));
             if (index % 6 == 3) others.Add(LaterObject(Count + index, Lantern.Base, now + new Vector3(0, 0, RockHalfSize)));
+            if (index % 8 == 5) others.Add(TestShapes.Placed(BaseGameMod, 2 * Count + index, Lantern.Base, now + new Vector3(0, 0, RockHalfSize)));
         }
         return new Scene
         {

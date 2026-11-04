@@ -487,7 +487,7 @@ public class RunSettingsValidationTests
         Assert.Equal(
             (ready.Settings.Collision.ChangedTerrain.HeightTolerance, ready.Settings.Collision.ChangedTerrain.WaterHeightTolerance),
             (restore.HeightChangeTolerance, restore.WaterHeightChangeTolerance));
-        Assert.Equal((ready.Settings.ChangedObjectCollision.TooClose, ready.Settings.ChangedObjectCollision.ChangedTerrain), (restore.TooClose, restore.ChangedTerrain));
+        Assert.Equal(ready.Settings.ChangedObjectCollision.TooClose, restore.TooClose);
         Assert.Equal(
             new AreaRecordReads(new AreaPartTolerances(restore.HeightChangeTolerance, restore.WaterHeightChangeTolerance), Cells: true, Lands: true),
             ready.Settings.Read.Needs.AreaRecordVersions);
@@ -505,7 +505,6 @@ public class RunSettingsValidationTests
         var restore = BuildReady(settings).Settings.RestoreWhereRemoved!;
 
         Assert.Equal((30f, 40f), (restore.HeightChangeTolerance, restore.WaterHeightChangeTolerance));
-        Assert.Equal(50f, restore.ChangedTerrain.HeightTolerance);
     }
 
     [Theory]

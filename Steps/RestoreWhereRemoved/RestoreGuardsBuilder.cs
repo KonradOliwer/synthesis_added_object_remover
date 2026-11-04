@@ -54,11 +54,19 @@ internal static class RestoreGuardsBuilder
                 blocking,
                 runCaches.Navmeshes,
                 inputs.FindLandWorldspace,
-                inputs.Settings.ChangedTerrain,
-                input.Reads.Plugin.ReadTerrainWinner),
+                input.Reads.Plugin.ReadTerrainWinner,
+                LoadsBefore(input.Reads.Plugins, input.Reads.CleanedMod)),
             reach,
             plans.FinalPresence,
             new DoorLinkGuard(plans.Cleared, input.Earlier.Collected.ChangedNavmeshes, guards.NavmeshCheck.FindFaultIfWritten),
             input.Execution);
+    }
+
+    /// <summary>Whether a plugin of the load order loads before <paramref name="plugin"/>.</summary>
+    public static Func<PluginName, bool> LoadsBefore(LoadOrderPlugins plugins, PluginName plugin)
+    {
+        var positions = plugins.PositionsOfListed();
+        var position = positions.Of(plugin);
+        return other => positions.Of(other) < position;
     }
 }

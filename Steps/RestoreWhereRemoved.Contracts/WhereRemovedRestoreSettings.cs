@@ -1,6 +1,5 @@
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
-using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
@@ -14,7 +13,6 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 /// <param name="HeightChangeTolerance">The cleaned mod's changed-terrain height tolerance: heights closer than this count as equal.</param>
 /// <param name="WaterHeightChangeTolerance">The cleaned mod's changed-terrain water height tolerance.</param>
 /// <param name="TooClose">The too-close settings of the objects the cleaned mod changed, which judge a restored object against what stays.</param>
-/// <param name="ChangedTerrain">The changed-terrain settings of the objects the cleaned mod changed.</param>
 public sealed record WhereRemovedRestoreSettings(
     bool OtherModsObjects,
     bool Terrain,
@@ -24,8 +22,7 @@ public sealed record WhereRemovedRestoreSettings(
     float TerrainEdgeBlendDistance,
     float HeightChangeTolerance,
     float WaterHeightChangeTolerance,
-    TooCloseSettings TooClose,
-    ChangedTerrainSettings ChangedTerrain)
+    TooCloseSettings TooClose)
 {
     /// <summary>Whether any kind goes back; with all four switches off the step is switched off.</summary>
     public bool Runs => OtherModsObjects || Terrain || Cells || Navmeshes;

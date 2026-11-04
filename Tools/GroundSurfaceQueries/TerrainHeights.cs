@@ -57,9 +57,7 @@ public sealed class TerrainHeights(
         var fx = Math.Clamp(local.X - x0, 0f, 1f);
         var fy = Math.Clamp(local.Y - y0, 0f, 1f);
 
-        float At(int x, int y) => heights[y * TerrainGrid.VerticesPerSide + x];
-        var south = float.Lerp(At(x0, y0), At(x0 + 1, y0), fx);
-        var north = float.Lerp(At(x0, y0 + 1), At(x0 + 1, y0 + 1), fx);
-        return float.Lerp(south, north, fy);
+        var (southWest, southEast, northWest, northEast) = TerrainGrid.CornerHeights(heights, y0 * TerrainGrid.VerticesPerSide + x0);
+        return float.Lerp(float.Lerp(southWest, southEast, fx), float.Lerp(northWest, northEast, fx), fy);
     }
 }

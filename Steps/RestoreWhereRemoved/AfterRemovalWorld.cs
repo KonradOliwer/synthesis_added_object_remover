@@ -34,6 +34,11 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 /// version (<see cref="PlacedShape.IsSameAs"/>). One that keeps a placement, model or collision data a later plugin changed does not;
 /// a kept part that shapes nothing, such as the enable state, does not count.
 /// </param>
+/// <param name="KeepShapeWhereItStandsNow">
+/// By candidate index: the candidate stands now and as it goes back has the same shape where it stands as now
+/// (<see cref="PlacedShape.IsSameAs"/>), such as one that keeps the position a later plugin gave it and whose undone parts shape
+/// nothing.
+/// </param>
 internal sealed record AfterRemovalWorld(
     CollectedObjects World,
     ImmutableArray<OtherObject> Causes,
@@ -43,7 +48,8 @@ internal sealed record AfterRemovalWorld(
     ImmutableArray<TargetObject> Now,
     ImmutableArray<OtherId> CopiesNow,
     ImmutableArray<OtherId> CausesRestoredByRemovalSteps,
-    ImmutableArray<bool> EndInEarlierShapeAndPlace)
+    ImmutableArray<bool> EndInEarlierShapeAndPlace,
+    ImmutableArray<bool> KeepShapeWhereItStandsNow)
 {
     /// <summary>Every part of a placed record, so a restore that undoes them all gives the earlier version.</summary>
     private static readonly PlacedParts EveryPart = Enum.GetValues<PlacedParts>().Aggregate(PlacedParts.None, (parts, part) => parts | part);
@@ -94,8 +100,26 @@ internal sealed record AfterRemovalWorld(
             now,
             [.. standingNow.Select(candidate => idOf[candidates[candidate].Key])],
             [.. nearCauses.Where(cause => restoredByRemovalSteps.Contains(cause.Key)).Select(cause => idOf[cause.Key])],
-            [.. candidates.Select((change, index) => PlacedShape.Of(restored[index]).IsSameAs(PlacedShape.Of(asItIsNow[index].RestoredAs(change.Earlier with { Undo = EveryPart }))))]);
+            [.. candidates.Select((change, index) => PlacedShape.Of(restored[index]).IsSameAs(PlacedShape.Of(asItIsNow[index].RestoredAs(change.Earlier with { Undo = EveryPart }))))],
+            KeepShapeWhereTheyStandNow(restored, standingNow, now));
     }
+
+    /// <param name="standingNow">The candidate index of each candidate that stands now.</param>
+    /// <param name="now">Those candidates where they stand now, in the same order.</param>
+    private static ImmutableArray<bool> KeepShapeWhereTheyStandNow(ImmutableArray<TargetObject> restored, ImmutableArray<int> standingNow, ImmutableArray<TargetObject> now)
+    {
+        var shapeNow = standingNow.Zip(now).ToDictionary(entry => entry.First, entry => PlacedShape.Of(entry.Second));
+        return [.. restored.Select((candidate, index) => shapeNow.TryGetValue(index, out var shape) && PlacedShape.Of(candidate).IsSameAs(shape))];
+    }
+
+    /// <summary>
+    /// The ids among the other objects of <see cref="World"/> of the objects that stand as they stood before the cleaned mod: the
+    /// support-only objects whose winning version loads before it, and the causes a removal step restored to their earlier version.
+    /// A support-only object of a later plugin may be one that plugin added or moved for the world the cleaned mod made, so it is not
+    /// among them.
+    /// </summary>
+    public HashSet<OtherId> StandingAsBeforeTheCleanedMod(Func<PluginName, bool> loadsBeforeCleanedMod) =>
+        [.. World.SupportOnlyObjects.Where(other => loadsBeforeCleanedMod(other.WinningMod)).Select(other => other.Id), .. CausesRestoredByRemovalSteps];
 
     /// <summary>The keys of the objects within the guards' reach, and of every candidate's copy where it stands now.</summary>
     private static HashSet<RecordKey> InReach(

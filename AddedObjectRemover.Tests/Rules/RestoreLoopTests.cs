@@ -65,10 +65,7 @@ public sealed class RestoreLoopTests
         TerrainEdgeBlendDistance: 0f,
         HeightChangeTolerance: 8f,
         WaterHeightChangeTolerance: 8f,
-        new TooCloseSettings(BySize: false, Multiplier: 0f, ByDistance: true, DistanceInUnits: TooCloseDistance, ZoneShape.BoundingBox, NpcHandling.Never),
-        new ChangedTerrainSettings(
-            On: false, TerrainCheckedObjects.VisibleObjectsOnTheGround, CountHeightChanges: false, 8f, CountTerrainTypeChanges: false, 0,
-            CountWaterHeightChanges: false, 0f, CountWaterAddedOrRemoved: false, 0, AreaBySize: false, 0f, AreaByDistance: false, 0f));
+        new TooCloseSettings(BySize: false, Multiplier: 0f, ByDistance: true, DistanceInUnits: TooCloseDistance, ZoneShape.BoundingBox, NpcHandling.Never));
 
     private static readonly RecordKey WaterCell = new(BaseGame, 0x700);
     private static readonly RecordKey NavmeshCell = new(BaseGame, 0x701);
@@ -119,11 +116,11 @@ public sealed class RestoreLoopTests
 
     /// <summary>
     /// Rock A is refused next to a later mod's crate, so the ground under it where it stands now stays raised (grid rows 18 to 21) and
-    /// the ground up to two grid steps from there is blended. Rock B's old place lies on that blended ground, which goes back, so B
-    /// goes back too.
+    /// the ground up to two grid steps from there is blended. Rock B's old place lies on that blended ground, which the patch leaves
+    /// above the flat ground B stood on, so B would sink into it and is refused.
     /// </summary>
     [Fact]
-    public void TheBlendAroundGroundARefusedRockKeepsRefusesNoOtherRock()
+    public void ARockGoingBackOntoTheBlendAroundGroundARefusedRockKeepsIsRefused()
     {
         var aOldPlace = new Vector3(1500, 1500, RockHalfSize);
         var aNow = new Vector3(1500, 2500, Raised + RockHalfSize);
@@ -138,7 +135,7 @@ public sealed class RestoreLoopTests
 
         var result = Plan(scene);
 
-        Assert.Equal(new PlacedGuard?[] { PlacedGuard.TooCloseToWhatStays, null }, result.Objects.Select(judged => judged.Refused?.Guard));
+        Assert.Equal(new PlacedGuard?[] { PlacedGuard.TooCloseToWhatStays, PlacedGuard.OnGroundThatStaysChanged }, result.Objects.Select(judged => judged.Refused?.Guard));
         var land = Assert.Single(result.Lands);
         Assert.True(land.Heights.Contains(PointAt(12, 17)));
         Assert.NotEqual(0f, land.FinalHeights![PointAt(12, 17)]);
@@ -168,6 +165,122 @@ public sealed class RestoreLoopTests
 
         Assert.Equal(restored ? null : new PlacedRefusal(PlacedGuard.OnGroundThatStaysChanged, By: null, Failure: null, LaterMod.ToPluginName()), rock.Refused);
     }
+
+    /// <summary>A landscape mod after the cleaned mod lowered the flat ground of cell (0, 0) by 150 units, so the rock going back onto it would float.</summary>
+    [Fact]
+    public void ARockGoingBackOntoGroundALaterPluginLoweredIsRefused()
+    {
+        var rock = Assert.Single(Plan(GroundChangedLater(new Vector3(1500, 1500, RockHalfSize), earlier: 0f, final: -150f)).Objects);
+
+        Assert.Equal(new PlacedRefusal(PlacedGuard.OnGroundThatStaysChanged, By: null, Failure: null, LaterMod.ToPluginName()), rock.Refused);
+    }
+
+    /// <summary>
+    /// The rock goes back high over cell (0, 0), as a piece hanging over a cliff does; a landscape mod after the cleaned mod changed the
+    /// ground under it far below it, or far above it, so the rock neither sinks nor floats.
+    /// </summary>
+    [Theory]
+    [InlineData(0f, 150f)]
+    [InlineData(3000f, 2000f)]
+    public void ARockGoingBackAboveGroundALaterPluginChangedFarBelowItIsNotRefused(float earlier, float final)
+    {
+        var rock = Assert.Single(Plan(GroundChangedLater(new Vector3(1500, 1500, 1000f), earlier, final)).Objects);
+
+        Assert.Equal((true, null), (rock.IsRestored, rock.Refused));
+    }
+
+    private const float RaisedLater = 150f;
+
+    /// <summary>The rock where a later plugin moved it, on the ground it raised.</summary>
+    private static readonly Vector3 OnGroundRaisedLater = RockNowPlace with { Z = RaisedLater + RockHalfSize };
+
+    /// <summary>
+    /// The cleaned mod moved the rock and gave it a sound radius; a later plugin moved it again onto ground it raised, and the rock
+    /// keeps that position. Only the radius goes back, which shapes nothing, so the rock stays on the ground as it is.
+    /// </summary>
+    [Fact]
+    public void AnObjectWhosePositionALaterPluginKeepsIsNotRefusedForGroundChangedUnderIt()
+    {
+        var rock = RockKeepingALaterPosition(PlacedParts.BaseAndData, earlier => earlier with { Reference = TestPlacedRecords.PlainReference with { ReferenceRadius = 512f } });
+
+        var judged = Assert.Single(Plan(GroundChangedLater(OnGroundRaisedLater, earlier: 0f, final: RaisedLater) with { Rocks = [rock], Others = [RockNow(0, OnGroundRaisedLater)] }).Objects);
+
+        Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
+    }
+
+    /// <summary>
+    /// As <see cref="AnObjectWhosePositionALaterPluginKeepsIsNotRefusedForGroundChangedUnderIt"/>, but the cleaned mod tilted the rock
+    /// or scaled it down, and that goes back around the kept position: the rock's box changes on the raised ground.
+    /// </summary>
+    [Theory]
+    [InlineData(PlacedParts.Rotation)]
+    [InlineData(PlacedParts.Scale)]
+    public void AnObjectWhosePositionALaterPluginKeepsIsRefusedWhenATiltOrScaleGoesBackOnGroundChangedUnderIt(PlacedParts part)
+    {
+        var placementNow = part == PlacedParts.Rotation
+            ? new EulerPlacement(OnGroundRaisedLater, new Vector3(0.5f, 0, 0), 1f)
+            : new EulerPlacement(OnGroundRaisedLater - new Vector3(0, 0, RockHalfSize / 2), Vector3.Zero, 0.5f);
+        var rock = RockKeepingALaterPosition(part, earlier => earlier) with { WhereItIsNow = placementNow };
+        var copyNow = RockNow(0, placementNow.Position) with { Rotation = placementNow.Rotation, Scale = placementNow.Scale };
+
+        var judged = Assert.Single(Plan(GroundChangedLater(OnGroundRaisedLater, earlier: 0f, final: RaisedLater) with { Rocks = [rock], Others = [copyNow] }).Objects);
+
+        Assert.Equal(new PlacedRefusal(PlacedGuard.OnGroundThatStaysChanged, By: null, Failure: null, LaterMod.ToPluginName()), judged.Refused);
+    }
+
+    /// <summary>
+    /// A landscape mod after the cleaned mod raised the ground under a rock that stays in its place. The cleaned mod hid the rock, so
+    /// it is shown again there, or gave it another model, so its earlier one comes back: either way the rock as it ends meets the
+    /// raised ground differently from now, so it is checked.
+    /// </summary>
+    [Theory]
+    [InlineData(PlacedParts.Presence)]
+    [InlineData(PlacedParts.BaseAndData)]
+    public void AnObjectShownAgainOrGettingItsModelBackInItsPlaceIsCheckedForGroundChangedUnderIt(PlacedParts undo)
+    {
+        var place = RockNowPlace with { Z = RaisedLater };
+        var moved = Rock(0, place, place);
+        var rock = moved with { Earlier = moved.Earlier with { Undo = undo, Base = undo == PlacedParts.BaseAndData ? Tree.Base : moved.Earlier.Base } };
+        var scene = GroundChangedLater(place, earlier: 0f, final: RaisedLater) with
+        {
+            Rocks = [rock],
+            Others = undo == PlacedParts.Presence ? [] : [RockNow(0, place)],
+            Presence = undo == PlacedParts.Presence ? Disabled(rock.Key) : new(),
+        };
+
+        var judged = Assert.Single(Plan(scene).Objects);
+
+        Assert.Equal(new PlacedRefusal(PlacedGuard.OnGroundThatStaysChanged, By: null, Failure: null, LaterMod.ToPluginName()), judged.Refused);
+    }
+
+    /// <summary>A rock the cleaned mod moved and a later plugin moved again to <see cref="OnGroundRaisedLater"/>; only <paramref name="undo"/> goes back.</summary>
+    private static RecordChangedByCleanedMod RockKeepingALaterPosition(PlacedParts undo, Func<EarlierVersion, EarlierVersion> earlier)
+    {
+        var moved = Rock(0, new Vector3(1500, 1500, RockHalfSize), OnGroundRaisedLater);
+        return moved with
+        {
+            Earlier = earlier(moved.Earlier with
+            {
+                Undo = undo,
+                LeftToLaterPlugins = ImmutableSortedDictionary<PlacedParts, PluginName>.Empty.Add(PlacedParts.Position, LaterMod.ToPluginName()),
+            }),
+        };
+    }
+
+    /// <summary>
+    /// A landscape mod after the cleaned mod moved every point of cell (0, 0), whose LAND record the cleaned mod does not override, from
+    /// <paramref name="earlier"/> to <paramref name="final"/>; the cleaned mod moved the rock from <paramref name="oldPlace"/>.
+    /// </summary>
+    private static Scene GroundChangedLater(Vector3 oldPlace, float earlier, float final) => new()
+    {
+        Rocks = [Rock(0, oldPlace, RockNowPlace)],
+        Others = [RockNow(0, RockNowPlace)],
+        Lands = [],
+        ReadHeights = cell => cell == new ExteriorCell(TestTargets.Space, 0, 0)
+            ? new LandHeights([.. Enumerable.Repeat(earlier, TerrainGrid.VertexCount)], [.. Enumerable.Repeat(final, TerrainGrid.VertexCount)])
+            : new LandHeights(null, null),
+        TerrainWinner = LaterMod.ToPluginName(),
+    };
 
     /// <summary>A later mod's house stands in cell (−1, 0), on the raised ground; its box reaches the first points inside cell (0, 0).</summary>
     [Fact]
@@ -1150,8 +1263,8 @@ public sealed class RestoreLoopTests
             new ObjectsThatBlockActors(Shapes, new Dictionary<RecordKey, ReferenceFacts>()),
             new NavmeshIndex(_ => null),
             space => space,
-            AllOn.ChangedTerrain,
-            _ => TestTargets.TargetName);
+            _ => TestTargets.TargetName,
+            RestoreGuardsBuilder.LoadsBefore(Plugins, TestTargets.TargetName));
         var presence = FinalPresence.Of(collected, removedTargets.Select(target => target.Key).ToHashSet(), cleared);
         var guards = new PlacedGuards(world, inputs, reach, presence, new DoorLinkGuard(cleared, [], _ => null), new Execution(1));
         var plans = new OtherKindsAsPlanned(

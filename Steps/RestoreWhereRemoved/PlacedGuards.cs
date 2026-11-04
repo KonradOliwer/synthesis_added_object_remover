@@ -5,7 +5,6 @@ using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
-using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
@@ -27,8 +26,8 @@ internal sealed record PlacedChecks(PlacedRefusal?[] Found, IReadOnlySet<OtherId
 /// <param name="TooClose">The too-close rule over the after-removal world in which the given objects cause no removals.</param>
 /// <param name="HoldersOfObjectsThatStay">The support test over the after-removal world, among the candidates that stand now.</param>
 /// <param name="FindLandWorldspace">A space → the worldspace whose land it uses; null for a space without land.</param>
-/// <param name="ChangedTerrain">The areas around an object whose ground the collision settings of the objects the cleaned mod changed look at.</param>
 /// <param name="FindTerrainWinner">The plugin of the winning LAND record of a cell; null where the cell has none.</param>
+/// <param name="LoadsBeforeCleanedMod">Whether a plugin of the load order loads before the cleaned mod.</param>
 internal sealed record PlacedGuardInputs(
     IObjectCaches Caches,
     Func<IEnumerable<OtherId>, IPlacementRule> TooClose,
@@ -37,8 +36,8 @@ internal sealed record PlacedGuardInputs(
     ObjectsThatBlockActors Blocking,
     INavmeshes Navmeshes,
     Func<RecordKey, RecordKey?> FindLandWorldspace,
-    ChangedTerrainSettings ChangedTerrain,
-    Func<ExteriorCell, PluginName?> FindTerrainWinner);
+    Func<ExteriorCell, PluginName?> FindTerrainWinner,
+    Func<PluginName, bool> LoadsBeforeCleanedMod);
 
 /// <summary>
 /// The guards of the candidates, the placed records whose areas let them go back, each checked as it goes back, with only its undone
@@ -64,6 +63,9 @@ internal sealed class PlacedGuards(
 
     /// <summary>The box around each candidate as it goes back that holds every zone of the too-close rule.</summary>
     private readonly ComputedOnce<Box[]> _tooCloseReach = new(() => [.. world.Restored.Select(reach.TooCloseReachOf)]);
+
+    /// <summary>The objects that stand as they stood before the cleaned mod, the same in every pass.</summary>
+    private readonly ComputedOnce<HashSet<OtherId>> _standingAsBefore = new(() => world.StandingAsBeforeTheCleanedMod(inputs.LoadsBeforeCleanedMod));
 
     /// <summary>The first guard each candidate going back fails, with every other one of them going back too.</summary>
     /// <param name="goingBack">The indexes of the candidates still going back.</param>
@@ -130,7 +132,7 @@ internal sealed class PlacedGuards(
     {
         var restored = world.Restored[candidate];
         return (rule is null ? null : CheckTooClose(restored, rule))
-            ?? CheckGround(restored, plans.Terrain)
+            ?? CheckGround(candidate, plans.Terrain)
             ?? CheckWater(restored, plans.Water)
             ?? RefusalFound(PlacedGuard.HoldsInvisibleObjectThatStays, holdingInvisible, candidate)
             ?? CheckNavmeshes(restored, plans.NavmeshesThatStayChanged, staysChanged)
@@ -156,18 +158,19 @@ internal sealed class PlacedGuards(
     }
 
     /// <summary>
-    /// Ground that stays changed lies under the box or an area the changed terrain settings grow around it: ground the terrain plan
-    /// keeps as the cleaned mod made it, or ground a later plugin changed. The plan's own blend does not count, so one refusal does
-    /// not spread through a cleared area by the slopes around the ground it keeps. The winning LAND record's plugin keeps it changed.
+    /// Ground that stays changed lies under the box's footprint (the box around the object, seen from above), within the box's height
+    /// range: ground the terrain plan keeps as the cleaned mod made it, or ground a later plugin changed, each point at the height the
+    /// patch leaves there, blended or not. The winning LAND record's plugin keeps it changed. A candidate that keeps its shape where
+    /// it stands now, such as one that keeps a later plugin's position and whose undone parts shape nothing, is not checked: its
+    /// restore changes nothing between it and the ground.
     /// </summary>
-    private PlacedRefusal? CheckGround(TargetObject restored, TerrainUndoPlan terrain)
+    private PlacedRefusal? CheckGround(int candidate, TerrainUndoPlan terrain)
     {
-        if (inputs.FindLandWorldspace(restored.SpaceKey) is not { } land) return null;
-        var areas = inputs.ChangedTerrain.AreasAround(inputs.Shapes.Of(restored.Base).Box, restored.Transform);
-        var found = areas.Prepend(BoxOf(restored))
-            .Select(area => terrain.GroundThatStaysChangedUnder(land, (new Vector2(area.Min.X, area.Min.Y), new Vector2(area.Max.X, area.Max.Y))))
-            .FirstOrDefault(ground => ground is not null);
-        if (found is not { } changed) return null;
+        var restored = world.Restored[candidate];
+        if (world.KeepShapeWhereItStandsNow[candidate] || inputs.FindLandWorldspace(restored.SpaceKey) is not { } land) return null;
+        var box = BoxOf(restored);
+        var footprint = (new Vector2(box.Min.X, box.Min.Y), new Vector2(box.Max.X, box.Max.Y));
+        if (terrain.GroundThatStaysChangedUnder(land, footprint, (box.Min.Z, box.Max.Z)) is not { } changed) return null;
         var keptBy = inputs.FindTerrainWinner(changed.Cell)
             ?? throw new UnreachableException($"The ground of cell {changed.Cell} stays changed, but no LAND record of it wins.");
         return new PlacedRefusal(PlacedGuard.OnGroundThatStaysChanged, changed.Land, Failure: null, keptBy);
@@ -235,10 +238,31 @@ internal sealed class PlacedGuards(
         ];
     }
 
-    /// <summary>The candidates going back that an object that stays rests on where they stand now, each with the first such object.</summary>
+    /// <summary>
+    /// The candidates going back that an object that stays rests on where they stand now, each with the first such object. For a
+    /// candidate that ends in its earlier shape and place, an object that stands as it stood before the cleaned mod does not count:
+    /// both end as they stood then.
+    /// </summary>
     private Dictionary<int, RecordKey> FindCandidatesCarryingObjectsThatStay(IReadOnlySet<int> goingBack)
     {
-        var holders = inputs.HoldersOfObjectsThatStay.Find(holder => goingBack.Contains(world.StandingNow[holder.Index]), world.CopiesNowOf(goingBack).ToHashSet());
-        return holders.ToDictionary(entry => world.StandingNow[entry.Key.Index], entry => entry.Value.Key);
+        var copiesOfMoving = world.CopiesNowOf(goingBack).ToHashSet();
+        return FindCarrying(goingBack, copiesOfMoving, inEarlierShapeAndPlace: true, _standingAsBefore.Value.Contains)
+            .Concat(FindCarrying(goingBack, copiesOfMoving, inEarlierShapeAndPlace: false, _ => false))
+            .ToDictionary();
+    }
+
+    /// <summary>The candidates going back that do or do not end in their earlier shape and place and that an object that stays and is asked about rests on.</summary>
+    /// <param name="copiesOfMoving">The copies of every candidate going back, which neither rest nor hold up.</param>
+    private IEnumerable<KeyValuePair<int, RecordKey>> FindCarrying(
+        IReadOnlySet<int> goingBack, IReadOnlySet<OtherId> copiesOfMoving, bool inEarlierShapeAndPlace, Func<OtherId, bool> notAskedAbout)
+    {
+        bool MovesAway(TargetId holder)
+        {
+            var candidate = world.StandingNow[holder.Index];
+            return goingBack.Contains(candidate) && world.EndInEarlierShapeAndPlace[candidate] == inEarlierShapeAndPlace;
+        }
+
+        return inputs.HoldersOfObjectsThatStay.Find(MovesAway, copiesOfMoving, notAskedAbout)
+            .Select(entry => KeyValuePair.Create(world.StandingNow[entry.Key.Index], entry.Value.Key));
     }
 }

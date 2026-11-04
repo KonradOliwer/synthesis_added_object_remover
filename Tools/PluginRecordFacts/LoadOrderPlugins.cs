@@ -54,6 +54,9 @@ public sealed record LoadOrderPlugins(
 
     public PluginListing? Find(PluginName mod) => Listed.FirstOrDefault(listing => listing.Mod == mod);
 
+    /// <summary>The position of each listed plugin in <see cref="Listed"/>, the order the plugins load in.</summary>
+    public LoadOrderPositions PositionsOfListed() => new(Listed);
+
     /// <summary>Whether the plugin is listed after the patch in the game's plugin list, so its records beat what the patch writes.</summary>
     public bool LoadsAfterPatch(PluginName plugin) => plugin != PatchMod && Positions.Contains(plugin) && Positions.Of(plugin) > PatchPosition;
 

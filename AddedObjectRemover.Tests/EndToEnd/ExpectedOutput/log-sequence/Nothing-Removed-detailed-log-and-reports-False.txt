@@ -30,6 +30,8 @@ Found 19 of 40 Target.esp objects too close to other mods' objects.
 Visible objects left behind: 15 evaluated; removed 1 (1 surroundings removed); kept 14 (4 fewer than 1 of the cleaned mod's other objects around, 10 too few directions with objects, 0 surroundings mostly kept, 0 protected type, 0 referenced).
 ## linked
 ## unexpectedErrors
+## cleared-areas
+Objects in cleared areas: 0 removed; kept: 16 where the area still stands.
 ## linked
 ## unexpectedErrors
 ## left-without-support-step

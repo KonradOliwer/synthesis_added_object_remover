@@ -39,7 +39,6 @@ internal static class RestoreSettingsBuilder
             edgeBlendDistance,
             cleanedModCollision.ChangedTerrain.HeightTolerance,
             cleanedModCollision.ChangedTerrain.WaterHeightTolerance,
-            changedCollision.TooClose,
-            changedCollision.ChangedTerrain);
+            changedCollision.TooClose);
     }
 }

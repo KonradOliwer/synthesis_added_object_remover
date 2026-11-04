@@ -710,7 +710,13 @@ an object kept shrunk or turned counts at its new size.
   cleaned mod do not block an object that goes back to the shape it had before: its place, turn, size, model, map marker and, for a
   primitive, its box, collision layer and culling data. They all stood there together. They do block one that keeps any of these as a
   later plugin changed it, since the two never stood together like that. A kept part that does not shape the object, such as its
-  enable state, ownership or sound radius, does not count.
+  enable state, ownership or sound radius, does not count. The same holds for an object resting on one that goes back: one that no
+  plugin from the cleaned mod on changed does not block an object that goes back to the shape it had before.
+- Ground that stays changed counts only under the box around the object, seen from above, and only where the ground the patch
+  leaves there (blended edges included) rises into that box's height or drops away from it by more than *Count only height changes
+  larger than* of the cleaned mod's own *Remove objects on terrain changed by other mods* group. An object that keeps the shape and
+  place it has now, such as one that keeps a later plugin's position and whose restored parts shape nothing, is not checked against
+  the ground.
 - A door the cleaned mod moved, deleted or disabled goes back together with its navmesh link from before the cleaned mod. It keeps the
   cleaned mod's place and link when a later plugin changed the link again, or when that link would not match the navmeshes as they end:
   the navmesh it names must go back with it or already lead through the door there.

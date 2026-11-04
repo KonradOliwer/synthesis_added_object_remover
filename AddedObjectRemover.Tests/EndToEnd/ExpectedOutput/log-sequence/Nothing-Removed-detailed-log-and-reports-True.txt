@@ -45,6 +45,7 @@ Visible objects left behind: 2 rounds in <time>.
 Linked groups: 0 more objects removed with the visible left-behind removals they are linked to.
 ## unexpectedErrors
 ## cleared-areas
+Objects in cleared areas: 0 removed; kept: 16 where the area still stands.
 Objects in cleared areas: judged 16 objects in <time>.
 ## linked
 Linked groups: 0 more objects removed with the cleared-area removals they are linked to.

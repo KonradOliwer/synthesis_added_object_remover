@@ -9,7 +9,7 @@ internal sealed class TerrainPlugins(AcceptedWorld accepted, LoadOrderPlugins lo
     /// </summary>
     public const int PatchOnlyChange = -1;
 
-    private readonly LoadOrderPositions _positions = new(loadOrder.Listed);
+    private readonly LoadOrderPositions _positions = loadOrder.PositionsOfListed();
 
     /// <summary>How far the plugin's version of a land record, a cell or a worldspace is believed.</summary>
     public VersionTrust TrustOf(PluginName plugin) => accepted.TrustOf(plugin);

@@ -108,20 +108,19 @@ internal sealed partial class TerrainUndoPlan
     }
 
     /// <summary>
-    /// The first grid point, in the order of the grid under the rectangle seen from above, that the plan does not restore and whose
-    /// winning height lies more than the height tolerance from its height before the cleaned mod: ground the plan keeps as the
-    /// cleaned mod made it, or ground a later plugin changed. A point the plan restores never counts, blended or not. Null when there
-    /// is none.
+    /// The cell of the first terrain square, in the order of the squares under the footprint, where the ground under the footprint
+    /// stays changed: ground the plan keeps as the cleaned mod made it, or ground a later plugin changed, that rises into the height
+    /// range or drops away from it. Each point is judged at the height the patch leaves there: a point the plan restores at the height
+    /// it writes, blended or not. Null when there is none.
     /// </summary>
-    public GroundThatStaysChanged? GroundThatStaysChangedUnder(RecordKey landWorldspace, (Vector2 Min, Vector2 Max) area)
+    /// <param name="footprint">The rectangle a box covers, seen from above.</param>
+    /// <param name="heights">The lowest and highest height of the box.</param>
+    public GroundThatStaysChanged? GroundThatStaysChangedUnder(RecordKey landWorldspace, (Vector2 Min, Vector2 Max) footprint, (float Min, float Max) heights)
     {
-        foreach (var under in TerrainGrid.VerticesUnder(area))
+        foreach (var part in TerrainGrid.SquaresUnder(footprint))
         {
-            var cell = new ExteriorCell(landWorldspace, under.CellX, under.CellY);
-            if (under.VertexIndices.Any(point => StaysChangedAt(new LandGridPoint(cell, point))))
-            {
-                return new GroundThatStaysChanged(cell, _lands.ByCell.GetValueOrDefault(cell)?.Change.LandKey);
-            }
+            var cell = new ExteriorCell(landWorldspace, part.CellX, part.CellY);
+            if (StaysChangedIn(cell, part, heights)) return new GroundThatStaysChanged(cell, _lands.ByCell.GetValueOrDefault(cell)?.Change.LandKey);
         }
         return null;
     }
@@ -129,11 +128,41 @@ internal sealed partial class TerrainUndoPlan
     /// <summary>Each LAND record with what goes back, in the order given.</summary>
     public ImmutableArray<LandChangeJudged> Judged() => [.. _lands.All.Select(Judge)];
 
-    private bool StaysChangedAt(LandGridPoint point)
+    /// <summary>
+    /// Whether the ground under the part of the footprint in the square, before the cleaned mod and as it ends, changes by more than
+    /// the tolerance and comes within the tolerance of the height range. A grid next to a missing one has no height to compare, so
+    /// the square counts once a corner differs.
+    /// </summary>
+    /// <remarks>
+    /// The game draws each square as two triangles. Which diagonal it splits the square along is not known, so the part counts when
+    /// it does on either split. On each split the surface and its change are linear on each triangle, so their extremes over the
+    /// part lie at its bounding points; the part counts when one of them changes beyond the tolerance and the heights between the
+    /// earlier and final surface over them reach the range.
+    /// </remarks>
+    private bool StaysChangedIn(ExteriorCell cell, SquarePart part, (float Min, float Max) range)
     {
-        if (Restores(point)) return false;
-        var heights = _lands.ByCell.TryGetValue(point.Cell, out var land) ? land.Change.Heights : _lands.ReadHeights(point.Cell);
-        return heights is not null && HeightGridComparison.DiffersAt(heights.Earlier, heights.Current, point.Point, _lands.HeightTolerance);
+        var heights = _lands.ByCell.TryGetValue(cell, out var land) ? land.Change.Heights : _lands.ReadHeights(cell);
+        return heights switch
+        {
+            null => false,
+            { Earlier: { } earlier, Current: { } current } => Enum.GetValues<SquareSplit>().Any(split => StaysChangedOn(split, part, earlier, PlannedHeightsOf(cell) ?? current, range)),
+            _ => AnyCornerDiffers(cell, part, heights),
+        };
+    }
+
+    /// <summary>Whether a corner of the square that the plan does not restore differs, its cell having a height map in only one of the two versions.</summary>
+    private bool AnyCornerDiffers(ExteriorCell cell, SquarePart part, LandHeights heights) =>
+        TerrainGrid.CornersOf(part.FirstCorner).Any(point => !Restores(new LandGridPoint(cell, point)) && HeightGridComparison.DiffersAt(heights.Earlier, heights.Current, point, _lands.HeightTolerance));
+
+    private bool StaysChangedOn(SquareSplit split, SquarePart part, float[] earlier, float[] final, (float Min, float Max) range)
+    {
+        var surfaces = TerrainGrid.BoundingPointsOnTriangles(part, split)
+            .Select(point => (Earlier: TerrainGrid.HeightOnTriangles(earlier, part.FirstCorner, point, split), Final: TerrainGrid.HeightOnTriangles(final, part.FirstCorner, point, split)))
+            .ToList();
+        if (!surfaces.Any(surface => MathF.Abs(surface.Final - surface.Earlier) > _lands.HeightTolerance)) return false;
+        var low = surfaces.Min(surface => MathF.Min(surface.Earlier, surface.Final));
+        var high = surfaces.Max(surface => MathF.Max(surface.Earlier, surface.Final));
+        return low - _lands.HeightTolerance <= range.Max && high + _lands.HeightTolerance >= range.Min;
     }
 
     private LandChangeJudged Judge(LandAreasJudged land)

@@ -143,6 +143,5 @@ public sealed class ScanNeedsTests
             TerrainEdgeBlendDistance: 0f,
             HeightChangeTolerance: 8f,
             WaterHeightChangeTolerance: 4f,
-            new TooCloseSettings(BySize: false, Multiplier: 0f, ByDistance: true, DistanceInUnits: 10f, ZoneShape.BoundingBox, NpcHandling.Never),
-            Terrain(on: false, types: false, water: false));
+            new TooCloseSettings(BySize: false, Multiplier: 0f, ByDistance: true, DistanceInUnits: 10f, ZoneShape.BoundingBox, NpcHandling.Never));
 }

@@ -32,8 +32,9 @@ public interface IHoldersSearch
 {
     /// <param name="movesAway">Which of the objects standing now move away; the others stay, as their copies in the world.</param>
     /// <param name="copiesOfMoving">The copies of those that move away, which neither rest nor hold up.</param>
+    /// <param name="notAskedAbout">The objects that stay whose support is not asked about; they still hold up.</param>
     /// <returns>Each that moves away and holds up an object that stays, with the first such object in id order.</returns>
-    IReadOnlyDictionary<TargetId, OtherObject> Find(Func<TargetId, bool> movesAway, IReadOnlySet<OtherId> copiesOfMoving);
+    IReadOnlyDictionary<TargetId, OtherObject> Find(Func<TargetId, bool> movesAway, IReadOnlySet<OtherId> copiesOfMoving, Func<OtherId, bool> notAskedAbout);
 }
 
 /// <summary>The navmesh consistency check over the world that the patch's writes of a trial alone would leave.</summary>

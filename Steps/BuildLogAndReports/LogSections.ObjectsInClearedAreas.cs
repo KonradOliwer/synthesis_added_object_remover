@@ -27,26 +27,31 @@ internal static partial class LogSections
         return new(
             ObjectsInClearedAreasSectionId,
             [
-                .. ClearedAreasCountLines(found.Evaluations, minObjectsAround),
+                .. BuildClearedAreasCountLine(found.Evaluations, minObjectsAround),
                 .. context.Detailed ? [ClearedAreasJudgedLine(found)] : ImmutableArray<string>.Empty,
                 .. BuildKeptLines(world, kept),
             ]);
     }
 
     /// <summary>
-    /// "Objects in cleared areas: 412 removed (380 drawn, 32 invisible); kept: 5 of a kind always kept, 3 with fewer than 5 of the cleaned
-    /// mod's other objects around." The step judges no object to keep, so a kind always kept and the minimum are the reasons it keeps an
-    /// object it would otherwise remove.
+    /// The counts line, "Objects in cleared areas: 412 removed (380 drawn, 32 invisible); kept: 5 of a kind always kept, 3 with fewer
+    /// than 5 of the cleaned mod's other objects around, 7 where the area still stands.", or nothing when the step neither removed nor
+    /// kept an object. Every object the step judges is removed or kept for one of these three reasons, so the counts add up to the
+    /// objects judged.
     /// </summary>
-    private static ImmutableArray<string> ClearedAreasCountLines(IReadOnlyList<ClearedAreaCheck> evaluations, int minObjectsAround)
+    private static ImmutableArray<string> BuildClearedAreasCountLine(IReadOnlyList<ClearedAreaCheck> evaluations, int minObjectsAround)
     {
         var removed = evaluations.Where(evaluation => evaluation.IsRemoved).ToList();
         var invisible = removed.Count(evaluation => evaluation.Kind == ClearedAreaObjectKind.Invisible);
-        var keptCounts = new (int Count, string Reason)[]
+        var keptCounts = new (LeftBehindOutcome Decision, string Reason)[]
         {
-            (evaluations.Count(evaluation => evaluation.Decision == LeftBehindOutcome.KeptProtectedType), "of a kind always kept"),
-            (evaluations.Count(evaluation => evaluation.Decision == LeftBehindOutcome.KeptTooFewObjectsAround), $"with {LeftBehindOutcomeText.TooFewObjectsAround(minObjectsAround)}"),
-        }.Where(kept => kept.Count > 0).ToList();
+            (LeftBehindOutcome.KeptProtectedType, "of a kind always kept"),
+            (LeftBehindOutcome.KeptTooFewObjectsAround, $"with {LeftBehindOutcomeText.TooFewObjectsAround(minObjectsAround)}"),
+            (LeftBehindOutcome.KeptAreaStillStands, "where the area still stands"),
+        }
+            .Select(kept => (Count: evaluations.Count(evaluation => evaluation.Decision == kept.Decision), kept.Reason))
+            .Where(kept => kept.Count > 0)
+            .ToList();
         if (removed.Count == 0 && keptCounts.Count == 0) return [];
 
         var removedPart = removed.Count == 0

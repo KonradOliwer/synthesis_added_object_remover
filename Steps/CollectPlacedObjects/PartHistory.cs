@@ -71,7 +71,7 @@ internal static class PartHistory
     }
 
     /// <returns>The highest version above the cleaned mod's of a real plugin, no patch, that loads without the cleaned mod; null when there is none.</returns>
-    private static int? LastLoadingWithoutCleanedModAbove(IReadOnlyList<PluginName> plugins, int cleanedModIndex, ModTrustTable trust)
+    public static int? LastLoadingWithoutCleanedModAbove(IReadOnlyList<PluginName> plugins, int cleanedModIndex, ModTrustTable trust)
     {
         for (var index = plugins.Count - 1; index > cleanedModIndex; index--)
         {

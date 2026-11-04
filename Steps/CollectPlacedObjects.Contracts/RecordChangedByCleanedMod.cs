@@ -39,4 +39,11 @@ public sealed record RecordChangedByCleanedMod(
     PlacedPresence PresenceBefore,
     DoorLinkChange? DoorLink = null,
     bool InDeletedCell = false,
-    PluginName? PutThereBy = null);
+    PluginName? PutThereBy = null)
+{
+    /// <summary>Some part goes back to the earlier version.</summary>
+    public bool HasPartsToUndo => Earlier.Undo != PlacedParts.None;
+
+    /// <summary>Some part was changed again by a later plugin or the patch.</summary>
+    public bool HasPartsLeftToLaterPlugins => !Earlier.LeftToLaterPlugins.IsEmpty;
+}

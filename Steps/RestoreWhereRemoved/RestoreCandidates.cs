@@ -27,7 +27,7 @@ internal sealed class RestoreCandidates(CollectedObjects collected, IRemovalDeci
         return
         [
             .. collected.ChangedRecords
-                .Where(change => change.Earlier.Undo != PlacedParts.None && !takenAway.Contains(change.Key) && IsUndecidedAndNotKept(change.Target, moved))
+                .Where(change => change.HasPartsToUndo && !takenAway.Contains(change.Key) && IsUndecidedAndNotKept(change.Target, moved))
                 .OrderBy(change => change.Key, RecordKeyOrder.Comparer)
                 .Select(DoorLinks.WithLinkGoingBack),
         ];
@@ -37,8 +37,8 @@ internal sealed class RestoreCandidates(CollectedObjects collected, IRemovalDeci
     public ImmutableArray<CellCandidate> Cells() =>
     [
         .. collected.ChangedCells
+            .Where(change => change.HasPartsToUndo)
             .Select(change => new CellCandidate(change, [.. change.Parts.Where(part => part.Outcome is PartOutcome.Undo)]))
-            .Where(cell => !cell.Undone.IsEmpty)
             .OrderBy(cell => cell.Change.Cell, RecordKeyOrder.Comparer),
     ];
 
@@ -46,7 +46,7 @@ internal sealed class RestoreCandidates(CollectedObjects collected, IRemovalDeci
     public ImmutableArray<LandChangedByCleanedMod> Lands() =>
     [
         .. collected.ChangedLands
-            .Where(change => !change.UndoPoints.IsEmpty || !change.UndoColours.IsEmpty || !change.UndoQuarters.IsEmpty || change.UndoRest)
+            .Where(change => change.HasPartsToUndo)
             .OrderBy(change => change.Cell.WorldspaceKey, RecordKeyOrder.Comparer)
             .ThenBy(change => change.Cell.X)
             .ThenBy(change => change.Cell.Y),

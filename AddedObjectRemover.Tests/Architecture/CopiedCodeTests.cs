@@ -64,7 +64,6 @@ public class CopiedCodeTests
         [CopyFamily.KeyOf([CollisionBuilder + "CreateChangedTerrainSettings"])] = SettingChecks,
         [CopyFamily.KeyOf([Report + "RestoreCountLines.cs:RestoreCountLines.LeftToLaterPlugins"])] = RestoreCountFacts,
         [CopyFamily.KeyOf([Report + "RestoreCountLines.cs:RestoreCountLines.Restored"])] = RestoreCountFacts,
-        [CopyFamily.KeyOf([Report + "RestoreCountLines.cs:RestoreCountLines.KeptForArea"])] = RestoreCountFacts,
         [CopyFamily.KeyOf([RestoreOutcomesType + "KeptBecause"])] = KeptReasons,
         [CopyFamily.KeyOf([
             Report + "Tables.Fits.cs:Tables.FitsHeader", Report + "Tables.Support.cs:Tables.SupportHeader", Report + "Tables.Touch.cs:Tables.ComponentHeader",

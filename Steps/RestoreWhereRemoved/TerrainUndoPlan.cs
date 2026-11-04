@@ -9,9 +9,9 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 /// <summary>A world grid point whose height goes back, with its height now and once written, in game units.</summary>
 internal readonly record struct RestoredGridPoint(WorldGridPoint Point, float Current, float Planned);
 
-/// <summary>A grid point whose ground ends more than the height tolerance from its height before the cleaned mod.</summary>
-/// <param name="Land">The LAND record holding it; null for one the cleaned mod does not override.</param>
-internal readonly record struct GroundThatStaysChanged(ExteriorCell Cell, RecordKey? Land);
+/// <summary>A terrain square whose ground ends more than the height tolerance from the ground of the world without the cleaned mod.</summary>
+/// <param name="Land">The LAND record holding it, which the cleaned mod overrides.</param>
+internal readonly record struct GroundThatStaysChanged(ExteriorCell Cell, RecordKey Land, GroundGap Gap);
 
 /// <summary>
 /// Which heights, normals, vertex colours, quarter textures and rests of the LAND records the cleaned mod changed go back, and the
@@ -108,10 +108,11 @@ internal sealed partial class TerrainUndoPlan
     }
 
     /// <summary>
-    /// The cell of the first terrain square, in the order of the squares under the footprint, where the ground under the footprint
-    /// stays changed: ground the plan keeps as the cleaned mod made it, or ground a later plugin changed, that rises into the height
-    /// range or drops away from it. Each point is judged at the height the patch leaves there: a point the plan restores at the height
-    /// it writes, blended or not. Null when there is none.
+    /// The first terrain square, in the order of the squares under the footprint, where the ground under the footprint stays changed
+    /// through the cleaned mod: ground the plan keeps as the cleaned mod made it, in a LAND record the cleaned mod overrides, that
+    /// rises into the height range or drops away from it. The ground is compared with the world without the cleaned mod
+    /// (<see cref="TerrainUndoLands.HeightsWithoutCleanedMod"/>), so ground only an unrelated plugin changed never counts. Each point is judged at the
+    /// height the patch leaves there: a point the plan restores at the height it writes, blended or not. Null when there is none.
     /// </summary>
     /// <param name="footprint">The rectangle a box covers, seen from above.</param>
     /// <param name="heights">The lowest and highest height of the box.</param>
@@ -120,7 +121,7 @@ internal sealed partial class TerrainUndoPlan
         foreach (var part in TerrainGrid.SquaresUnder(footprint))
         {
             var cell = new ExteriorCell(landWorldspace, part.CellX, part.CellY);
-            if (StaysChangedIn(cell, part, heights)) return new GroundThatStaysChanged(cell, _lands.ByCell.GetValueOrDefault(cell)?.Change.LandKey);
+            if (GapWhereGroundStaysChanged(cell, part, heights) is { } gap) return new GroundThatStaysChanged(cell, _lands.ByCell[cell].Change.LandKey, gap);
         }
         return null;
     }
@@ -129,9 +130,9 @@ internal sealed partial class TerrainUndoPlan
     public ImmutableArray<LandChangeJudged> Judged() => [.. _lands.All.Select(Judge)];
 
     /// <summary>
-    /// Whether the ground under the part of the footprint in the square, before the cleaned mod and as it ends, changes by more than
-    /// the tolerance and comes within the tolerance of the height range. A grid next to a missing one has no height to compare, so
-    /// the square counts once a corner differs.
+    /// The gap when the ground under the part of the footprint in the square, in the world without the cleaned mod and as it ends,
+    /// differs by more than the tolerance and comes within the tolerance of the height range. A grid next to a missing one has no
+    /// height to compare, so the square counts once a corner of the cleaned mod's differs.
     /// </summary>
     /// <remarks>
     /// The game draws each square as two triangles. Which diagonal it splits the square along is not known, so the part counts when
@@ -139,30 +140,43 @@ internal sealed partial class TerrainUndoPlan
     /// part lie at its bounding points; the part counts when one of them changes beyond the tolerance and the heights between the
     /// earlier and final surface over them reach the range.
     /// </remarks>
-    private bool StaysChangedIn(ExteriorCell cell, SquarePart part, (float Min, float Max) range)
+    /// <returns>The gap, with the largest difference over the splits on which the part counts; null when the ground there does not stay changed.</returns>
+    private GroundGap? GapWhereGroundStaysChanged(ExteriorCell cell, SquarePart part, (float Min, float Max) range)
     {
-        var heights = _lands.ByCell.TryGetValue(cell, out var land) ? land.Change.Heights : _lands.ReadHeights(cell);
-        return heights switch
+        if (!_lands.ByCell.TryGetValue(cell, out var land) || land.Change.Heights is not { } heights) return null;
+
+        var tolerance = _lands.HeightTolerance;
+        if (heights is not { Earlier: not null, Current: { } current })
         {
-            null => false,
-            { Earlier: { } earlier, Current: { } current } => Enum.GetValues<SquareSplit>().Any(split => StaysChangedOn(split, part, earlier, PlannedHeightsOf(cell) ?? current, range)),
-            _ => AnyCornerDiffers(cell, part, heights),
-        };
+            return AnyCornerDiffers(cell, part, heights) ? new GroundGap(Largest: null, tolerance) : null;
+        }
+
+        var without = _lands.HeightsWithoutCleanedMod[cell];
+        var final = PlannedHeightsOf(cell) ?? current;
+        return Enum.GetValues<SquareSplit>().Select(split => LargestDifferenceWhereItStays(split, part, without, final, range)).Max() is { } largest
+            ? new GroundGap(largest, tolerance)
+            : null;
     }
 
-    /// <summary>Whether a corner of the square that the plan does not restore differs, its cell having a height map in only one of the two versions.</summary>
+    /// <summary>
+    /// Whether a corner of the square that the cleaned mod changed and the plan does not restore differs, its cell having a height map
+    /// in only one of the two versions. A corner the cleaned mod did not change is the ground of the world without the cleaned mod.
+    /// </summary>
     private bool AnyCornerDiffers(ExteriorCell cell, SquarePart part, LandHeights heights) =>
-        TerrainGrid.CornersOf(part.FirstCorner).Any(point => !Restores(new LandGridPoint(cell, point)) && HeightGridComparison.DiffersAt(heights.Earlier, heights.Current, point, _lands.HeightTolerance));
+        TerrainGrid.CornersOf(part.FirstCorner).Any(point =>
+            _lands.CleanedModShaped(cell, point) && !Restores(new LandGridPoint(cell, point)) && HeightGridComparison.DiffersAt(heights.Earlier, heights.Current, point, _lands.HeightTolerance));
 
-    private bool StaysChangedOn(SquareSplit split, SquarePart part, float[] earlier, float[] final, (float Min, float Max) range)
+    /// <returns>The largest difference between the surface of the world without the cleaned mod and the final surface over the part on the split when the part counts on it; null otherwise.</returns>
+    private float? LargestDifferenceWhereItStays(SquareSplit split, SquarePart part, float[] without, float[] final, (float Min, float Max) range)
     {
         var surfaces = TerrainGrid.BoundingPointsOnTriangles(part, split)
-            .Select(point => (Earlier: TerrainGrid.HeightOnTriangles(earlier, part.FirstCorner, point, split), Final: TerrainGrid.HeightOnTriangles(final, part.FirstCorner, point, split)))
+            .Select(point => (Earlier: TerrainGrid.HeightOnTriangles(without, part.FirstCorner, point, split), Final: TerrainGrid.HeightOnTriangles(final, part.FirstCorner, point, split)))
             .ToList();
-        if (!surfaces.Any(surface => MathF.Abs(surface.Final - surface.Earlier) > _lands.HeightTolerance)) return false;
+        var largest = surfaces.Max(surface => MathF.Abs(surface.Final - surface.Earlier));
+        if (largest <= _lands.HeightTolerance) return null;
         var low = surfaces.Min(surface => MathF.Min(surface.Earlier, surface.Final));
         var high = surfaces.Max(surface => MathF.Max(surface.Earlier, surface.Final));
-        return low - _lands.HeightTolerance <= range.Max && high + _lands.HeightTolerance >= range.Min;
+        return low - _lands.HeightTolerance <= range.Max && high + _lands.HeightTolerance >= range.Min ? largest : null;
     }
 
     private LandChangeJudged Judge(LandAreasJudged land)

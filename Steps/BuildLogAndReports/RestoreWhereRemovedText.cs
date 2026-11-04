@@ -83,14 +83,21 @@ internal static class RestoreWhereRemovedText
 
     /// <summary>
     /// Why a placed record stays although its area is cleared: the guard, with the record it found and the plugin that keeps the ground
-    /// changed, as in "on ground that stays changed (Later.esp)", or the failure that stopped the check.
+    /// changed with how far it lies from the earlier ground, as in "on ground that stays changed (Later.esp, differs from the
+    /// ground without the cleaned mod by up to 12.5 units, tolerance 2.0 units)", or the failure that stopped the check.
     /// </summary>
     /// <param name="label">Names a record.</param>
     public static string Refusal(PlacedRefusal refusal, Func<RecordKey, string> label)
     {
         if (refusal.Failure is { } failure) return $"the check stopped unexpectedly ({failure})";
-        var found = string.Join(Describe.ListSeparator, new[] { refusal.By is { } by ? label(by) : null, refusal.Plugin?.ToString() }.OfType<string>());
+        var found = string.Join(Describe.ListSeparator, new[] { refusal.By is { } by ? label(by) : null, refusal.Plugin?.ToString(), refusal.Gap is { } gap ? GapText(gap) : null }.OfType<string>());
         return found.Length > 0 ? $"{Guard(refusal.Guard)} ({found})" : Guard(refusal.Guard);
+    }
+
+    private static string GapText(GroundGap gap)
+    {
+        var tolerance = $"tolerance {TextFormat.Fixed(gap.Tolerance, 1)} units";
+        return gap.Largest is { } largest ? $"differs from the ground without the cleaned mod by up to {TextFormat.Fixed(largest, 1)} units{Describe.ListSeparator}{tolerance}" : tolerance;
     }
 
     /// <summary>The kind of refusal a count line groups placed records by.</summary>

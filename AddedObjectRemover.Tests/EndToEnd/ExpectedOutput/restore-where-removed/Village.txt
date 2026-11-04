@@ -42,11 +42,14 @@ Linked groups: 0 more objects removed with the left-behind removals they are lin
 Moved 0 kept markers out of other mods' objects; 0 left in place.
 Restored where the cleaned mod was removed: 3 objects of other mods (2 shown again, 1 moved back).
 Left as the cleaned mod changed them: 2 objects (1 too close to objects that stay, 1 carrying an object that stays).
+Kept by later plugins: 1 object, 1 cell.
   Shown again: B_Rock [00080A:Skyrim.esm] (base B_CrateBase [000809:Skyrim.esm]) in interior AorInterior [000800:Skyrim.esm]; 1 of 3 objects still stands (33.3% by count, 0.0% by size)
   Shown again: B_Stump [00080B:Skyrim.esm] (base B_CrateBase [000809:Skyrim.esm]) in interior AorInterior [000800:Skyrim.esm] to (2000, 1000, 0); 1 of 3 objects still stands (33.3% by count, 0.0% by size)
   Moved back: B_Mover [00080C:Skyrim.esm] (base B_CrateBase [000809:Skyrim.esm]) in interior AorInterior [000800:Skyrim.esm] to (3000, 0, 0); at its old place 1 of 3 objects still stands (33.3% by count, 0.0% by size); where it stands now 1 of 3 objects still stands (33.3% by count, 0.0% by size)
   Kept as changed: B_Statue [00080E:Skyrim.esm] (base B_CrateBase [000809:Skyrim.esm]) in interior AorInterior [000800:Skyrim.esm]: too close to objects that stay (T_Pebble [000804:Target.esp]); 1 of 3 objects still stands (33.3% by count, 0.0% by size)
   Kept as changed: B_Table [00080F:Skyrim.esm] (base B_CrateBase [000809:Skyrim.esm]) in interior AorInterior [000800:Skyrim.esm]: carrying an object that stays (C_Lantern [000803:CityMod.esp]); 1 of 3 objects still stands (33.3% by count, 0.0% by size)
+  Kept by later plugins: B_Lamp [00080D:Skyrim.esm] (base B_CrateBase [000809:Skyrim.esm]) in interior AorInterior [000800:Skyrim.esm]: rotation, scale (CityMod.esp)
+  Kept by later plugins: cell interior AorInterior [000800:Skyrim.esm]: lighting, music, location (CityMod.esp)
 Restore where removed: 2 passes in <time>.
 Wrote 5 overrides (2 removed, 3 to restore where the cleaned mod was removed) in <time>.
   Removed T_Crate1 [000801:Target.esp] (base T_CrateBase [000800:Target.esp]) in interior AorInterior [000800:Skyrim.esm], place AorInterior, hold B_Village; too close to C_PadT_Crate1 [000801:CityMod.esp], changed by CityMod.esp (new object)

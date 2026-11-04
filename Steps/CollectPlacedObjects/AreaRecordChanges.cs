@@ -42,12 +42,15 @@ internal sealed class AreaRecordChanges(
         var quarters = OutcomesOf(land, plugins, changed.Quarters.Quarters, quarter => parts => parts.Quarters.Contains(quarter));
         var rest = changed.Rest ? PartHistory.Of(land.Versions, plugins, trust, parts => parts.Rest) : new PartOutcome.Unchanged();
 
+        var pointsOfNeedingPlugins = PointSet.Of(points.Where(entry => entry.Outcome is PartOutcome.LeftToLaterPlugin later && trust.NeedsCleanedMod(later.Plugin)).Select(entry => entry.Index));
         var leftToLater = new LandLeftToLater(
             PointSet.Of(IndicesOf<PartOutcome.LeftToLaterPlugin>(points)),
             PointSet.Of(IndicesOf<PartOutcome.LeftToLaterPlugin>(colours)),
             QuarterSet.Of(IndicesOf<PartOutcome.LeftToLaterPlugin>(quarters)),
             rest is PartOutcome.LeftToLaterPlugin,
-            LastChangersInLoadOrder([.. points.Concat(colours).Concat(quarters).Select(entry => entry.Outcome), rest], plugins));
+            LastChangersInLoadOrder([.. points.Concat(colours).Concat(quarters).Select(entry => entry.Outcome), rest], plugins),
+            pointsOfNeedingPlugins,
+            pointsOfNeedingPlugins.IsEmpty ? null : HeightsOfPluginLoadingWithoutCleanedMod(land, plugins));
         var deleted = land.DeletedInAVersion;
         var undoPoints = PointSet.Of(deleted ? [] : IndicesOf<PartOutcome.Undo>(points));
         var undoColours = PointSet.Of(deleted ? [] : IndicesOf<PartOutcome.Undo>(colours));
@@ -59,6 +62,10 @@ internal sealed class AreaRecordChanges(
             ? null
             : new(land.Cell, land.Key, undoPoints, undoColours, undoQuarters, undoRest, leftToLater, land.WinningMod, land.Heights, land.CellDeletedInAVersion);
     }
+
+    /// <remarks>A part is left to a plugin that needs the cleaned mod only above a plugin that loads without it, so there is one.</remarks>
+    private float[]? HeightsOfPluginLoadingWithoutCleanedMod(LandRecordFact land, IReadOnlyList<PluginName> plugins) =>
+        land.HeightsBetween[PartHistory.LastLoadingWithoutCleanedModAbove(plugins, VersionComparison.NamedPluginIndex, trust)!.Value - VersionComparison.NamedPluginIndex];
 
     /// <returns>Null when no part goes back, was changed again or stays for its record format.</returns>
     /// <remarks>

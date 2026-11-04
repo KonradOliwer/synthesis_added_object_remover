@@ -30,6 +30,7 @@ public sealed class ChangedCellAndLandCollectingTests
     private readonly FixtureMod _base = new("Base.esm");
     private readonly FixtureMod _cleaned;
     private readonly FixtureMod _later;
+    private readonly FixtureMod _laterPatch;
     private readonly FormKey _worldspace;
     private readonly Cell _cell;
     private readonly Dictionary<ModKey, Worldspace> _worldspaceCopies = [];
@@ -39,6 +40,7 @@ public sealed class ChangedCellAndLandCollectingTests
     {
         _cleaned = new FixtureMod("Cleaned.esp", _base);
         _later = new FixtureMod("Later.esp", _base);
+        _laterPatch = new FixtureMod("LaterPatch.esp", _base);
         _worldspace = _base.NextKey();
         _cell = new Cell(_base.NextKey(), FixtureMod.Release)
         {
@@ -61,6 +63,8 @@ public sealed class ChangedCellAndLandCollectingTests
     private PluginName Cleaned => _cleaned.Key.ToPluginName();
 
     private PluginName Later => _later.Key.ToPluginName();
+
+    private PluginName LaterPatch => _laterPatch.Key.ToPluginName();
 
     public static TheoryData<CellPart> PartsChangedAlone() =>
         [.. Enum.GetValues<CellPart>().Where(part => part != CellPart.Region)];
@@ -295,6 +299,28 @@ public sealed class ChangedCellAndLandCollectingTests
         Assert.Equal((0f, 2 * UnitsPerHeightStep), (land.Heights!.Earlier![PointIndex(LastColumn, 10)], land.Heights.Current![PointIndex(LastColumn, 10)]));
         Assert.Equal((new ExteriorCell(_worldspace.ToRecordKey(), 0, 0), Patch), (land.Cell, land.WinningMod));
         Assert.True(land.UndoColours.IsEmpty && land.UndoQuarters.IsEmpty && !land.UndoRest);
+    }
+
+    /// <summary>
+    /// The cleaned mod raises two points. A plugin that loads without it raises the first again, and a plugin that needs the cleaned
+    /// mod above it raises it once more; the second the plugin that loads without it only carries over. Only the first is left to a
+    /// plugin that needs the cleaned mod, with the heights of the plugin that loads without it.
+    /// </summary>
+    [Fact]
+    public void APointKeptByAPluginNeedingTheCleanedModAboveOneLoadingWithoutItCarriesTheHeightsOfTheLatter()
+    {
+        var raised = LandCopyIn(_cleaned.Mod);
+        RaisePoint(raised, LastColumn, 10, steps: 2);
+        RaisePoint(raised, LastColumn, 12, steps: 2);
+        var withoutCleanedMod = LandCopyIn(_later.Mod, from: raised);
+        RaisePoint(withoutCleanedMod, LastColumn, 10, steps: 5);
+        RaisePoint(LandCopyIn(_laterPatch.Mod, from: withoutCleanedMod), LastColumn, 10, steps: 9);
+
+        var land = ChangedLandOf(Collect(laterPatchNeedsCleanedMod: true)).LeftToLater;
+
+        Assert.Equal([PointIndex(LastColumn, 10), PointIndex(LastColumn, 12)], land.Points.Points);
+        Assert.Equal([PointIndex(LastColumn, 10)], land.PointsOfPluginsNeedingTheCleanedMod.Points);
+        Assert.Equal(5 * UnitsPerHeightStep, land.HeightsOfPluginLoadingWithoutIt![PointIndex(LastColumn, 10)]);
     }
 
     /// <summary>
@@ -604,23 +630,34 @@ public sealed class ChangedCellAndLandCollectingTests
     /// <param name="writeIntoPatch">What an earlier patcher of the group wrote into the patch; nothing when null.</param>
     /// <param name="afterCollect">Reads the plugin records the collector read, before they are dropped.</param>
     /// <param name="laterNeedsCleanedMod">The later plugin cannot load without the cleaned mod, as a patch for it.</param>
+    /// <param name="laterPatchNeedsCleanedMod">The plugin after the later one cannot load without the cleaned mod.</param>
     private CollectedObjects Collect(
-        Action<ISkyrimMod>? writeIntoPatch = null, Action<IPluginRecords>? afterCollect = null, WhatToCollect? plan = null, int threads = 1, bool laterNeedsCleanedMod = false)
+        Action<ISkyrimMod>? writeIntoPatch = null,
+        Action<IPluginRecords>? afterCollect = null,
+        WhatToCollect? plan = null,
+        int threads = 1,
+        bool laterNeedsCleanedMod = false,
+        bool laterPatchNeedsCleanedMod = false)
     {
-        var state = FixturePatcherState.Create([_base.Mod, _cleaned.Mod, _later.Mod], Path.GetTempPath(), Path.GetTempPath());
+        var state = FixturePatcherState.Create([_base.Mod, _cleaned.Mod, _later.Mod, _laterPatch.Mod], Path.GetTempPath(), Path.GetTempPath());
         writeIntoPatch?.Invoke(state.PatchMod);
         using var world = FixturePatcherState.CreateFinalWorld(state);
         var records = new PluginRecordsFactory(world, threads).Open();
-        var collected = PlacedObjects.Collect(records, TrustOf(laterNeedsCleanedMod), plan ?? Plan);
+        var collected = PlacedObjects.Collect(records, TrustOf(laterNeedsCleanedMod, laterPatchNeedsCleanedMod), plan ?? Plan);
         afterCollect?.Invoke(records);
         return collected;
     }
 
-    /// <param name="laterNeedsCleanedMod">The later plugin cannot load without the cleaned mod, as a patch for it.</param>
-    private ModTrustTable TrustOf(bool laterNeedsCleanedMod) =>
-        laterNeedsCleanedMod
-            ? TestModTrust.Of(Cleaned, Patch, trusted: [BaseGame], untrusted: [], needingCleanedMod: [Later])
-            : TestModTrust.Of(Cleaned, Patch, trusted: [BaseGame, Later], untrusted: []);
+    private ModTrustTable TrustOf(bool laterNeedsCleanedMod, bool laterPatchNeedsCleanedMod = false)
+    {
+        (PluginName Plugin, bool Needs)[] laterPlugins = [(Later, laterNeedsCleanedMod), (LaterPatch, laterPatchNeedsCleanedMod)];
+        return TestModTrust.Of(
+            Cleaned,
+            Patch,
+            trusted: [BaseGame, .. laterPlugins.Where(later => !later.Needs).Select(later => later.Plugin)],
+            untrusted: [],
+            needingCleanedMod: [.. laterPlugins.Where(later => later.Needs).Select(later => later.Plugin)]);
+    }
 
     /// <summary>Collects, judges the base game's cell as lying in a cleared area and writes the patch.</summary>
     private ISkyrimModGetter RestoreTheChangedCell() => RestoreInPatch(collected =>
@@ -638,7 +675,7 @@ public sealed class ChangedCellAndLandCollectingTests
     /// <param name="laterNeedsCleanedMod">The later plugin cannot load without the cleaned mod, as a patch for it.</param>
     private ISkyrimModGetter RestoreInPatch(Func<CollectedObjects, RestoreWhereRemovedResult> judge, bool laterNeedsCleanedMod = false)
     {
-        var state = FixturePatcherState.Create([_base.Mod, _cleaned.Mod, _later.Mod], Path.GetTempPath(), Path.GetTempPath());
+        var state = FixturePatcherState.Create([_base.Mod, _cleaned.Mod, _later.Mod, _laterPatch.Mod], Path.GetTempPath(), Path.GetTempPath());
         using var world = FixturePatcherState.CreateFinalWorld(state);
         var records = new PluginRecordsFactory(world, 1).Open();
         var collected = PlacedObjects.Collect(records, TrustOf(laterNeedsCleanedMod), Plan);

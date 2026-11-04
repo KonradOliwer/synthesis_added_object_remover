@@ -112,7 +112,7 @@ internal static class RestoreCountLines
             yield return $"{TextFormat.Count(objectParts.Count, "part", "parts")} of {TextFormat.Count(objects, "object", "objects")} ({ByPlugin(objectParts.Select(part => part.Plugin))})";
         }
 
-        var terrain = TerrainLeftToLater(judged).ToList();
+        var terrain = TerrainLeftToLater(judged.Result.Lands.Select(land => land.Change.LeftToLater)).ToList();
         if (terrain.Count > 0) yield return $"terrain ({string.Join(Describe.ListSeparator, terrain)})";
 
         var cellParts = judged.Result.Cells
@@ -135,19 +135,36 @@ internal static class RestoreCountLines
     public static IEnumerable<string> KeptForArea(RestoreJudgements judged, AreaVerdict verdict)
     {
         var objects = judged.Result.Objects.Count(change => change.KeptForArea == verdict);
-        if (objects > 0) yield return TextFormat.Count(objects, "object", "objects");
-
         var cells = judged.Result.Cells.Count(cell => cell.KeptForArea == verdict);
-        if (cells > 0) yield return TextFormat.Count(cells, "cell", "cells");
-
         var quarters = judged.Result.Lands.Sum(land => land.ChangedQuarters.Count(quarter => quarter.KeptForArea == verdict));
-        if (quarters > 0) yield return $"terrain in {TextFormat.Count(quarters, "cell quarter", "cell quarters")}";
-
         var rests = judged.Result.Lands.Count(land => RestoreOutcomes.HoldsOnlyTheRest(land) && land.RestKeptForArea == verdict);
-        if (rests > 0) yield return $"the rest of {TextFormat.Count(rests, "land record", "land records")}";
-
         var navmeshes = judged.Navmeshes.Count(navmesh => navmesh.Judged.KeptForArea == verdict);
+        foreach (var counted in new KeptObjectsAndCells(objects, cells).Lines()) yield return counted;
+        if (quarters > 0) yield return $"terrain in {TextFormat.Count(quarters, "cell quarter", "cell quarters")}";
+        if (rests > 0) yield return $"the rest of {TextFormat.Count(rests, "land record", "land records")}";
         if (navmeshes > 0) yield return TextFormat.Count(navmeshes, "navmesh", "navmeshes");
+    }
+
+    /// <summary>
+    /// What stays because a later plugin, or the patch, changed every part of it again that the cleaned mod changed: objects, cells
+    /// and terrain, which are no candidates for a restore.
+    /// </summary>
+    public static IEnumerable<string> KeptByLaterPlugins(HeldByLaterPlugins held)
+    {
+        foreach (var counted in new KeptObjectsAndCells(held.Objects.Length, held.Cells.Length).Lines()) yield return counted;
+        if (!held.Lands.IsEmpty) yield return $"terrain in {TextFormat.Count(held.Lands.Length, "cell", "cells")}";
+    }
+
+    /// <summary>The objects and cells a kept line counts. A line that keeps either states both, so the kept lines read alike; a line that keeps neither states none.</summary>
+    private readonly record struct KeptObjectsAndCells(int Objects, int Cells)
+    {
+        public IEnumerable<string> Lines()
+        {
+            if (Objects + Cells == 0) yield break;
+
+            yield return TextFormat.Count(Objects, "object", "objects");
+            yield return TextFormat.Count(Cells, "cell", "cells");
+        }
     }
 
     /// <summary>What never goes back whatever its area: the count of changes per reason.</summary>
@@ -166,9 +183,10 @@ internal static class RestoreCountLines
         }
     }
 
-    private static IEnumerable<string> TerrainLeftToLater(RestoreJudgements judged)
+    /// <summary>E.g. "12 heights, 3 vertex colours"; empty when nothing is left to later plugins.</summary>
+    public static IEnumerable<string> TerrainLeftToLater(IEnumerable<LandLeftToLater> leftToLater)
     {
-        var later = judged.Result.Lands.Select(land => land.Change.LeftToLater).ToList();
+        var later = leftToLater.ToList();
         var heights = later.Sum(entry => entry.Points.Count);
         if (heights > 0) yield return RestoreWhereRemovedText.Heights(heights);
 

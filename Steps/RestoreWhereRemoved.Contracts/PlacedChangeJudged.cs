@@ -14,8 +14,8 @@ public enum PlacedGuard
     TooCloseToWhatStays,
 
     /// <summary>
-    /// Where it goes back to, ground that stays changed lies under it or the area around it: ground the terrain plan keeps as the
-    /// cleaned mod made it, or ground a later plugin changed.
+    /// Where it goes back to, ground that stays changed through the cleaned mod lies under it or the area around it: ground the
+    /// terrain plan keeps as the cleaned mod made it. Ground only an unrelated plugin changed does not count.
     /// </summary>
     OnGroundThatStaysChanged,
 
@@ -49,12 +49,17 @@ public enum PlacedGuard
 
 /// <summary>The first guard that keeps a placed record as the cleaned mod made it.</summary>
 /// <param name="By">
-/// The object, navmesh, LAND record or cell the guard found; null when the check stopped, or for ground of a LAND record the cleaned
-/// mod does not override.
+/// The object, navmesh, LAND record or cell the guard found; null when the check stopped, or for a guard that names none.
 /// </param>
 /// <param name="Failure">Why the check stopped unexpectedly, which keeps the record too; null when it did not.</param>
 /// <param name="Plugin">For ground that stays changed, the plugin of the winning LAND record that keeps it changed; null for any other guard.</param>
-public sealed record PlacedRefusal(PlacedGuard Guard, RecordKey? By, string? Failure, PluginName? Plugin = null);
+/// <param name="Gap">For ground that stays changed, how far it lies from the ground of the world without the cleaned mod; null for any other guard.</param>
+public sealed record PlacedRefusal(PlacedGuard Guard, RecordKey? By, string? Failure, PluginName? Plugin = null, GroundGap? Gap = null);
+
+/// <summary>How far ground that stays changed lies from the ground of the world without the cleaned mod.</summary>
+/// <param name="Largest">The largest height difference in game units over the square the guard found; null when a version has no height map to measure it by.</param>
+/// <param name="Tolerance">The height difference in game units that still counts as equal ground.</param>
+public sealed record GroundGap(float? Largest, float Tolerance);
 
 /// <summary>What a placed record's restore puts back, by the first of these its undone parts hold.</summary>
 public enum PlacedRestoreKind

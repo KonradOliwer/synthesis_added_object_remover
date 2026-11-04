@@ -181,9 +181,10 @@ internal sealed class PlacedGuards(
     }
 
     /// <summary>
-    /// Ground that stays changed lies under the box's footprint (the box around the object, seen from above), within the box's height
-    /// range: ground the terrain plan keeps as the cleaned mod made it, or ground a later plugin changed, each point at the height the
-    /// patch leaves there, blended or not. The winning LAND record's plugin keeps it changed. A candidate that keeps its shape where
+    /// Ground that stays changed through the cleaned mod lies under the box's footprint (the box around the object, seen from above),
+    /// within the box's height range: ground the terrain plan keeps as the cleaned mod made it, each point at the height the patch
+    /// leaves there, blended or not. Ground only an unrelated plugin changed does not count: the world without the cleaned mod has it
+    /// too. The winning LAND record's plugin is named as the one that keeps the ground. A candidate that keeps its shape where
     /// it stands now, such as one that keeps a later plugin's position and whose undone parts shape nothing, is not checked: its
     /// restore changes nothing between it and the ground.
     /// </summary>
@@ -196,7 +197,7 @@ internal sealed class PlacedGuards(
         if (terrain.GroundThatStaysChangedUnder(land, footprint, (box.Min.Z, box.Max.Z)) is not { } changed) return null;
         var keptBy = inputs.FindTerrainWinner(changed.Cell)
             ?? throw new UnreachableException($"The ground of cell {changed.Cell} stays changed, but no LAND record of it wins.");
-        return new PlacedRefusal(PlacedGuard.OnGroundThatStaysChanged, changed.Land, Failure: null, keptBy);
+        return new PlacedRefusal(PlacedGuard.OnGroundThatStaysChanged, changed.Land, Failure: null, keptBy, changed.Gap);
     }
 
     /// <summary>The box lies partly between a cell's water level before the cleaned mod and the one that stays.</summary>

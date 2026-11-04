@@ -15,6 +15,7 @@ internal static partial class LogSections
     private const string RestoreWhereRemovedSectionId = "restore-where-removed";
     private const string CountsSeparator = ", ";
     private const string AreasSeparator = "; ";
+    private const string KeptByLaterPluginsLabel = "Kept by later plugins";
 
     /// <summary>
     /// What went back and what stays where the cleaned mod was removed. The normal log has the counts; the detailed log adds the
@@ -50,11 +51,13 @@ internal static partial class LogSections
 
     private static IEnumerable<string> RestoreWhereRemovedDetailLines(CollectedObjects world, RestoreJudgements judged, TimeSpan elapsed, ReportContext context)
     {
-        if (judged.IsEmpty) return [];
+        var held = HeldByLaterPlugins.In(world);
+        if (judged.IsEmpty && held.IsEmpty) return [];
 
         var label = RestoreOutcomes.LabelsIn(world);
         return
         [
+            .. TextLists.Headed(KeptByLaterPluginsLabel, RestoreCountLines.KeptByLaterPlugins(held), CountsSeparator),
             .. TextLists.Headed("Left to later plugins in the changes judged", RestoreCountLines.LeftToLaterPlugins(judged), CountsSeparator),
             .. TextLists.Headed("Kept because the cleaned mod's objects still stand around them", RestoreCountLines.KeptForArea(judged, AreaVerdict.StillStanding), CountsSeparator),
             .. TextLists.Headed("Kept because the cleaned mod has no objects around them", RestoreCountLines.KeptForArea(judged, AreaVerdict.NoObjectsAround), CountsSeparator),
@@ -63,6 +66,9 @@ internal static partial class LogSections
             .. judged.Result.Cells.Select(cell => RestoredCellLine(world, cell, label)),
             .. judged.Result.Lands.SelectMany(land => RestoredLandLines(world, land)),
             .. judged.Navmeshes.Select(navmesh => RestoredNavmeshLine(world, navmesh, label)),
+            .. held.Objects.Select(change => HeldObjectLine(world, change, context)),
+            .. held.Cells.Select(cell => HeldCellLine(world, cell)),
+            .. held.Lands.Select(land => HeldLandLine(world, land)),
             $"{RestoreWhereRemovedName}: {TextFormat.Count(judged.Result.Passes, "pass", "passes")}{Describe.TimedSuffix(elapsed, context)}.",
             .. RestoreWhereRemovedPartTimeLines(judged.Result.Times, context),
         ];
@@ -84,13 +90,38 @@ internal static partial class LogSections
     private static string RestoredObjectLine(CollectedObjects world, PlacedChangeJudged judged, Func<RecordKey, string> label, ReportContext context)
     {
         var change = judged.Change;
-        var cell = change.Cell.Key == change.SpaceKey ? string.Empty : $", cell {Describe.Cell(change.Cell)}";
-        var record = $"{RecordLabels.Of(change.Key, change.EditorId)} (base {RecordNames.DescribeBase(context.Bases, change.BaseNow)}) in {Describe.Space(world, change.SpaceKey)}{cell}";
+        var record = ObjectText(world, change, context);
         var later = Tables.LeftToLaterPlugins(change.Earlier) is { } plugins ? $"; left to later plugins: {plugins}" : string.Empty;
         var areas = ObjectAreas(judged);
         return RestoreOutcomes.KeptBecause(judged, label) is { } kept
             ? $"  Kept as changed: {record}: {kept}{areas}{later}"
             : $"  {RestoreWhereRemovedText.KindVerb(judged.Kind)}: {record}{WhereObjectGoesBack(change, context)}{areas}{later}";
+    }
+
+    /// <summary>E.g. "Rock [key] (base Crate [key]) in worldspace Tamriel, cell (1, 2)".</summary>
+    private static string ObjectText(CollectedObjects world, RecordChangedByCleanedMod change, ReportContext context)
+    {
+        var cell = change.Cell.Key == change.SpaceKey ? string.Empty : $", cell {Describe.Cell(change.Cell)}";
+        return $"{RecordLabels.Of(change.Key, change.EditorId)} (base {RecordNames.DescribeBase(context.Bases, change.BaseNow)}) in {Describe.Space(world, change.SpaceKey)}{cell}";
+    }
+
+    /// <summary>E.g. "worldspace Tamriel, cell (1, 2)", or the interior itself.</summary>
+    private static string CellPlace(CollectedObjects world, CellChangedByCleanedMod change) =>
+        change.Grid is var (x, y) ? $"{Describe.Space(world, change.SpaceKey)}, cell ({x}, {y})" : Describe.Space(world, change.SpaceKey);
+
+    private static string LandPlace(CollectedObjects world, ExteriorCell cell) => $"{Describe.Space(world, cell.WorldspaceKey)}, cell ({cell.X}, {cell.Y})";
+
+    private static string HeldObjectLine(CollectedObjects world, RecordChangedByCleanedMod change, ReportContext context) =>
+        $"  {KeptByLaterPluginsLabel}: {ObjectText(world, change, context)}: {Tables.LeftToLaterPlugins(change.Earlier)}";
+
+    private static string HeldCellLine(CollectedObjects world, CellChangedByCleanedMod change) =>
+        $"  {KeptByLaterPluginsLabel}: cell {CellPlace(world, change)}: {Describe.PartsByPlugin(RestoreOutcomes.LeftToLaterPlugins(change))}";
+
+    private static string HeldLandLine(CollectedObjects world, LandChangedByCleanedMod land)
+    {
+        var place = LandPlace(world, land.Cell);
+        var parts = string.Join(Describe.ListSeparator, RestoreCountLines.TerrainLeftToLater([land.LeftToLater]));
+        return $"  {KeptByLaterPluginsLabel}: terrain {place}: {parts} ({string.Join(Describe.ListSeparator, land.LeftToLater.Plugins)})";
     }
 
     /// <summary>E.g. " to (10, 20, 30)", and " to base X" for a model that goes back.</summary>
@@ -114,7 +145,7 @@ internal static partial class LogSections
     private static string RestoredCellLine(CollectedObjects world, CellChangeJudged judged, Func<RecordKey, string> label)
     {
         var change = judged.Change;
-        var place = change.Grid is var (x, y) ? $"{Describe.Space(world, change.SpaceKey)}, cell ({x}, {y})" : Describe.Space(world, change.SpaceKey);
+        var place = CellPlace(world, change);
         var area = ClearedAreaText.After(judged.Area);
         var later = Describe.PartsByPlugin(RestoreOutcomes.LeftToLaterPlugins(change)) is { Length: > 0 } plugins ? $"; left to later plugins: {plugins}" : string.Empty;
         if (RestoreOutcomes.KeptBecause(judged, label) is { } kept) return $"  Kept as changed: cell {place}: {kept}{area}{later}";
@@ -127,7 +158,7 @@ internal static partial class LogSections
     private static IEnumerable<string> RestoredLandLines(CollectedObjects world, LandChangeJudged land)
     {
         var change = land.Change;
-        var place = $"{Describe.Space(world, change.Cell.WorldspaceKey)}, cell ({change.Cell.X}, {change.Cell.Y})";
+        var place = LandPlace(world, change.Cell);
         if (land.Never is { } never)
         {
             yield return $"  Kept as changed: terrain {place}: {RestoreWhereRemovedText.Never(never, change.WinningMod)}";

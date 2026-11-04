@@ -115,7 +115,7 @@ public sealed class RestoreWhereRemovedReportTests
 
         Assert.Contains("Left to later plugins in the changes judged: 2 parts of 2 objects (Later.esp 1, Patch.esp 1), 1 part of 1 cell (Later.esp 1).", lines);
         Assert.Contains("Kept because the cleaned mod's objects still stand around them: 1 object, 1 cell, terrain in 1 cell quarter, 1 navmesh.", lines);
-        Assert.Contains("Kept because the cleaned mod has no objects around them: 1 object.", lines);
+        Assert.Contains("Kept because the cleaned mod has no objects around them: 1 object, 0 cells.", lines);
         Assert.Contains("Not restored whatever the area around them: 2 changes (1 a plugin that loads after the patch has the last word on it, 1 a record of the cleaned mod links to it).", lines);
     }
 
@@ -481,6 +481,38 @@ public sealed class RestoreWhereRemovedReportTests
         Assert.Equal("kept: on ground that stays changed (Later.esp)", Field(table, Assert.Single(table.Rows), "result"));
     }
 
+    /// <summary>The refusal for ground that stays changed also says how far the ground is from the earlier ground and the tolerance used.</summary>
+    [Theory]
+    [InlineData(12.54f, "differs from the ground without the cleaned mod by up to 12.5 units, tolerance 8.0 units")]
+    [InlineData(null, "tolerance 8.0 units")]
+    public void AnObjectKeptOnGroundThatStaysChangedStatesTheLargestDifferenceAndTheTolerance(float? largest, string facts)
+    {
+        var refusal = new PlacedRefusal(PlacedGuard.OnGroundThatStaysChanged, By: null, Failure: null, Later, new GroundGap(largest, 8f));
+        var refused = ObjectsOnly(Refused(Rock(0x915, PlacedParts.Position), Cleared, refusal));
+
+        var line = Assert.Single(Section(refused, Detailed).Lines, text => text.StartsWith("  Kept as changed", StringComparison.Ordinal));
+        var table = Assert.Single(Tables.BuildRestoredWhereRemovedTables(World(), refused, Normal));
+
+        Assert.Contains($": on ground that stays changed (Later.esp, {facts});", line, StringComparison.Ordinal);
+        Assert.Equal($"kept: on ground that stays changed (Later.esp, {facts})", Field(table, Assert.Single(table.Rows), "result"));
+    }
+
+    /// <summary>An object whose every changed part a later plugin holds is no candidate for a restore, yet the detailed log counts and lists it.</summary>
+    [Fact]
+    public void AnObjectWhoseEveryChangedPartALaterPluginHoldsIsCountedAndListedInTheDetailedLogOnly()
+    {
+        var held = Rock(0x920, PlacedParts.None, later: new Dictionary<PlacedParts, PluginName> { [PlacedParts.Rotation] = Later });
+        var world = World() with { ChangedRecords = [held] };
+        var empty = ObjectsOnly();
+
+        var detailed = LogSections.BuildRestoreWhereRemovedSection(world, empty, Elapsed, Detailed).Lines;
+        var normal = LogSections.BuildRestoreWhereRemovedSection(world, empty, Elapsed, Normal).Lines;
+
+        Assert.Contains("Kept by later plugins: 1 object, 0 cells.", detailed);
+        Assert.Contains($"  Kept by later plugins: {RecordLabels.Of(Key(0x920), null)} (base (none)) in {Space}: rotation (Later.esp)", detailed);
+        Assert.DoesNotContain(normal, line => line.Contains("Kept by later plugins", StringComparison.Ordinal));
+    }
+
     /// <summary>A guard names the record it found by its editor ID when the world knows it.</summary>
     [Fact]
     public void AGuardNamesTheObjectItFoundByItsEditorId()
@@ -683,7 +715,7 @@ public sealed class RestoreWhereRemovedReportTests
             PointSet.Of([0]),
             QuarterSet.Of([0, 3]),
             UndoRest: false,
-            new LandLeftToLater(PointSet.Of([]), PointSet.Of([]), default, Rest: false, []),
+            new LandLeftToLater(PointSet.Of([]), PointSet.Of([]), default, Rest: false, [], PointSet.Of([])),
             TestTargets.TargetName,
             Heights: null);
         return LandOutcomes.Judged(
@@ -713,7 +745,7 @@ public sealed class RestoreWhereRemovedReportTests
             PointSet.Of([]),
             QuarterSet.Of([]),
             UndoRest: false,
-            new LandLeftToLater(PointSet.Of([]), PointSet.Of([]), default, Rest: false, []),
+            new LandLeftToLater(PointSet.Of([]), PointSet.Of([]), default, Rest: false, [], PointSet.Of([])),
             TestTargets.TargetName,
             Heights: null);
         return LandOutcomes.Judged(
@@ -738,7 +770,7 @@ public sealed class RestoreWhereRemovedReportTests
             PointSet.Of([]),
             QuarterSet.Of([]),
             UndoRest: true,
-            new LandLeftToLater(PointSet.Of([]), PointSet.Of([]), default, Rest: false, []),
+            new LandLeftToLater(PointSet.Of([]), PointSet.Of([]), default, Rest: false, [], PointSet.Of([])),
             TestTargets.TargetName,
             Heights: null);
         return LandOutcomes.Judged(

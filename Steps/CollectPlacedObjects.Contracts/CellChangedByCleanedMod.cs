@@ -28,7 +28,14 @@ public sealed record CellChangedByCleanedMod(
     PluginName WinningMod,
     CellWaterCopy EarlierWater,
     CellWaterCopy CurrentWater,
-    float? DefaultWaterLevel);
+    float? DefaultWaterLevel)
+{
+    /// <summary>Some part goes back.</summary>
+    public bool HasPartsToUndo => Parts.Any(part => part.Outcome is PartOutcome.Undo);
+
+    /// <summary>Some part was changed again by a later plugin or the patch.</summary>
+    public bool HasPartsLeftToLaterPlugins => Parts.Any(part => part.Outcome is PartOutcome.LeftToLaterPlugin);
+}
 
 /// <summary>One part of a cell record and what happens to it.</summary>
 public sealed record PartChange(CellPartName Name, PartOutcome Outcome);

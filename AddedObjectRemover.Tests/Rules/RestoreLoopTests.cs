@@ -140,6 +140,7 @@ public sealed class RestoreLoopTests
         var result = Plan(scene);
 
         Assert.Equal(new PlacedGuard?[] { PlacedGuard.TooCloseToWhatStays, PlacedGuard.OnGroundThatStaysChanged }, result.Objects.Select(judged => judged.Refused?.Guard));
+        Assert.True(result.Objects[1].Refused!.Gap!.Largest > result.Objects[1].Refused!.Gap!.Tolerance);
         var land = Assert.Single(result.Lands);
         Assert.True(land.Heights.Contains(PointAt(12, 17)));
         Assert.NotEqual(0f, land.FinalHeights![PointAt(12, 17)]);
@@ -147,12 +148,12 @@ public sealed class RestoreLoopTests
 
     /// <summary>
     /// A landscape mod after the cleaned mod raised the ground of cell (0, 0), whose LAND record the cleaned mod does not override, by
-    /// the given height at the rock's old place.
+    /// the given height at the rock's old place. The world without the cleaned mod has that ground too, so the rock goes back onto it.
     /// </summary>
     [Theory]
-    [InlineData(150f, false)]
-    [InlineData(4f, true)]
-    public void ARockGoingBackOntoGroundALaterPluginRaisedIsRefused(float raisedBy, bool restored)
+    [InlineData(150f)]
+    [InlineData(4f)]
+    public void ARockGoingBackOntoGroundOnlyAnUnrelatedPluginRaisedIsNotRefused(float raisedBy)
     {
         var flat = new float[TerrainGrid.VertexCount];
         var raised = Enumerable.Repeat(raisedBy, TerrainGrid.VertexCount).ToArray();
@@ -167,16 +168,16 @@ public sealed class RestoreLoopTests
 
         var rock = Assert.Single(Plan(scene).Objects);
 
-        Assert.Equal(restored ? null : new PlacedRefusal(PlacedGuard.OnGroundThatStaysChanged, By: null, Failure: null, LaterMod.ToPluginName()), rock.Refused);
+        Assert.Equal((true, null), (rock.IsRestored, rock.Refused));
     }
 
-    /// <summary>A landscape mod after the cleaned mod lowered the flat ground of cell (0, 0) by 150 units, so the rock going back onto it would float.</summary>
+    /// <summary>A landscape mod after the cleaned mod lowered the flat ground of cell (0, 0) by 150 units; the world without the cleaned mod has it lowered too.</summary>
     [Fact]
-    public void ARockGoingBackOntoGroundALaterPluginLoweredIsRefused()
+    public void ARockGoingBackOntoGroundOnlyAnUnrelatedPluginLoweredIsNotRefused()
     {
         var rock = Assert.Single(Plan(GroundChangedLater(new Vector3(1500, 1500, RockHalfSize), earlier: 0f, final: -150f)).Objects);
 
-        Assert.Equal(new PlacedRefusal(PlacedGuard.OnGroundThatStaysChanged, By: null, Failure: null, LaterMod.ToPluginName()), rock.Refused);
+        Assert.Equal((true, null), (rock.IsRestored, rock.Refused));
     }
 
     /// <summary>
@@ -278,12 +279,13 @@ public sealed class RestoreLoopTests
 
     /// <summary>
     /// As <see cref="AnObjectWhosePositionALaterPluginKeepsIsNotRefusedForGroundChangedUnderIt"/>, but the cleaned mod tilted the rock
-    /// or scaled it down, and that goes back around the kept position: the rock's box changes on the raised ground.
+    /// or scaled it down, and that goes back around the kept position: the rock's box changes on the raised ground, which an unrelated
+    /// plugin raised and the world without the cleaned mod has too.
     /// </summary>
     [Theory]
     [InlineData(PlacedParts.Rotation)]
     [InlineData(PlacedParts.Scale)]
-    public void AnObjectWhosePositionALaterPluginKeepsIsRefusedWhenATiltOrScaleGoesBackOnGroundChangedUnderIt(PlacedParts part)
+    public void AnObjectWhosePositionALaterPluginKeepsIsNotRefusedWhenATiltOrScaleGoesBackOnGroundAnUnrelatedPluginChanged(PlacedParts part)
     {
         var placementNow = part == PlacedParts.Rotation
             ? new EulerPlacement(OnGroundRaisedLater, new Vector3(0.5f, 0, 0), 1f)
@@ -293,18 +295,18 @@ public sealed class RestoreLoopTests
 
         var judged = Assert.Single(Plan(GroundChangedLater(OnGroundRaisedLater, earlier: 0f, final: RaisedLater) with { Rocks = [rock], Others = [copyNow] }).Objects);
 
-        Assert.Equal(new PlacedRefusal(PlacedGuard.OnGroundThatStaysChanged, By: null, Failure: null, LaterMod.ToPluginName()), judged.Refused);
+        Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
     }
 
     /// <summary>
     /// A landscape mod after the cleaned mod raised the ground under a rock that stays in its place. The cleaned mod hid the rock, so
-    /// it is shown again there, or gave it another model, so its earlier one comes back: either way the rock as it ends meets the
-    /// raised ground differently from now, so it is checked.
+    /// it is shown again there, or gave it another model, so its earlier one comes back: either way the rock as it ends is checked
+    /// against the ground of the world without the cleaned mod, which has the raised ground too, so it is not refused.
     /// </summary>
     [Theory]
     [InlineData(PlacedParts.Presence)]
     [InlineData(PlacedParts.BaseAndData)]
-    public void AnObjectShownAgainOrGettingItsModelBackInItsPlaceIsCheckedForGroundChangedUnderIt(PlacedParts undo)
+    public void AnObjectShownAgainOrGettingItsModelBackInItsPlaceIsNotRefusedForGroundOnlyAnUnrelatedPluginChanged(PlacedParts undo)
     {
         var place = RockNowPlace with { Z = RaisedLater };
         var moved = Rock(0, place, place);
@@ -318,7 +320,7 @@ public sealed class RestoreLoopTests
 
         var judged = Assert.Single(Plan(scene).Objects);
 
-        Assert.Equal(new PlacedRefusal(PlacedGuard.OnGroundThatStaysChanged, By: null, Failure: null, LaterMod.ToPluginName()), judged.Refused);
+        Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
     }
 
     /// <summary>A rock the cleaned mod moved and a later plugin moved again to <see cref="OnGroundRaisedLater"/>; only <paramref name="undo"/> goes back.</summary>
@@ -1447,7 +1449,7 @@ public sealed class RestoreLoopTests
             PointSet.Of([]),
             default,
             UndoRest: false,
-            new LandLeftToLater(PointSet.Of([]), PointSet.Of([]), default, Rest: false, []),
+            new LandLeftToLater(PointSet.Of([]), PointSet.Of([]), default, Rest: false, [], PointSet.Of([])),
             TestTargets.TargetName,
             new LandHeights([.. Enumerable.Repeat(0f, TerrainGrid.VertexCount)], [.. Enumerable.Repeat(Raised, TerrainGrid.VertexCount)]));
     }

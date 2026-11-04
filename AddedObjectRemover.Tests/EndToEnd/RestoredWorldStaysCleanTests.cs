@@ -45,6 +45,7 @@ public sealed class RestoredWorldStaysCleanTests
         "TerrainWithTheChangedTerrainStep",
         "CampfireRing",
         "CampfireRingWithALandmark",
+        "ClearedCampWithAKeptCampfire",
     ];
 
     private static Dictionary<string, (Func<Settings> Settings, Func<string, IReadOnlyList<ISkyrimMod>> World)> CreateScenes()
@@ -59,12 +60,21 @@ public sealed class RestoredWorldStaysCleanTests
             ["TerrainWithTheChangedTerrainStep"] = (WithTheChangedTerrainStep, RestoreWhereRemovedWorlds.CreateTerrain),
             ["CampfireRing"] = (RestoreWhereRemovedRunTests.TerrainSettings, RestoreWhereRemovedWorlds.CreateCampfireRing),
             ["CampfireRingWithALandmark"] = (RestoreWhereRemovedRunTests.TerrainSettings, RestoreWhereRemovedWorlds.CreateCampfireRingWithALandmark),
+            ["ClearedCampWithAKeptCampfire"] = (WithTheDirectionMethod, dataFolder => RestoreWhereRemovedWorlds.CreateClearedCampWithAKeptCampfire(dataFolder, persistentRock: false)),
             ["SiteWithMists"] = (restoreOn, RestoreWhereRemovedWorlds.CreateSiteWithMists),
             ["RowWithALoneCrate"] = (restoreOn, RestoreWhereRemovedWorlds.CreateRowWithALoneCrate),
             ["RowWithALoneCrateCarryingAPad"] = (restoreOn, dataFolder => RestoreWhereRemovedWorlds.CreateRowWithALoneCrateCarryingAPad(dataFolder).LoadOrder),
         };
         foreach (var scenario in Enum.GetValues<NavmeshAndLandScenario>()) scenes.Add($"NavmeshAndLand.{scenario}", (restoreOn, dataFolder => NavmeshAndLandWorld.Create(dataFolder, scenario)));
         return scenes;
+    }
+
+    /// <summary>The terrain scene's settings with the left-behind direction method on and the area method off.</summary>
+    internal static Settings WithTheDirectionMethod()
+    {
+        var settings = RestoreWhereRemovedRunTests.TerrainSettings();
+        settings.Standard.LeftoverObjects = new LeftoverObjectSettings { RemoveBySurroundingDirections = true, RemoveObjectsInClearedAreas = false };
+        return settings;
     }
 
     /// <summary>The terrain scene's settings with the changed-terrain step on, counting height, ground type and water changes, so (f) has hits to find.</summary>

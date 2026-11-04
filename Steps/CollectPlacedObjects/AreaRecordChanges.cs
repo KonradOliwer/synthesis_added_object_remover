@@ -60,7 +60,7 @@ internal sealed class AreaRecordChanges(
             && leftToLater.Points.IsEmpty && leftToLater.Colours.IsEmpty && leftToLater.Quarters.IsEmpty && !leftToLater.Rest;
         return isEmpty
             ? null
-            : new(land.Cell, land.Key, undoPoints, undoColours, undoQuarters, undoRest, leftToLater, land.WinningMod, land.Heights, land.CellDeletedInAVersion);
+            : new(land.Cell, land.Key, undoPoints, undoColours, undoQuarters, undoRest, leftToLater, land.WinningMod, land.Heights, land.CellDeletedInAVersion, plugins[VersionComparison.NamedPluginIndex - 1]);
     }
 
     /// <remarks>A part is left to a plugin that needs the cleaned mod only above a plugin that loads without it, so there is one.</remarks>

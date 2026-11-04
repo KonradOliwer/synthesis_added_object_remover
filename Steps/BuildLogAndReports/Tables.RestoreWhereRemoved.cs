@@ -105,7 +105,7 @@ internal static partial class Tables
             string.Join(Describe.ListSeparator, judged.Undone.Select(part => RestoreWhereRemovedText.PartOfCell(part.Name.Part)).Distinct()),
             Describe.PartsByPlugin(RestoreOutcomes.LeftToLaterPlugins(change)),
             judged.Area,
-            RestoreWhereRemovedText.Result(RestoreOutcomes.KeptBecause(judged, label)),
+            RestoreWhereRemovedText.Result(RestoreOutcomes.KeptBecause(judged, label), RestoreWhereRemovedText.WaterLevelPart, RestoreOutcomes.WhyWaterIsKept(judged, label)),
             keptPoints: null);
     }
 
@@ -139,7 +139,10 @@ internal static partial class Tables
             RestoreWhereRemovedText.Pieces(quarter.Changed),
             LaterTerrain(land.Change.LeftToLater, quarter),
             quarter.Area,
-            RestoreWhereRemovedText.Result(RestoreOutcomes.KeptBecause(land, quarter)),
+            RestoreWhereRemovedText.Result(
+                RestoreOutcomes.KeptBecause(land, quarter),
+                RestoreWhereRemovedText.GroundTexturesPart,
+                quarter.TexturesKeptForObjectThatStays ? RestoreWhereRemovedText.TexturesKeptForObjectThatStays : null),
             keptPoints: TerrainKeptReasons.Select(reason => quarter.Kept.Where(entry => entry.Reason == reason).Sum(entry => entry.Points)).ToImmutableArray());
 
     /// <param name="quarter">The quarter's name; null for the rest of the record.</param>

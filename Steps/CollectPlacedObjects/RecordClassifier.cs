@@ -5,7 +5,11 @@ using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 
 namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 
-internal enum RecordRole { Target, TargetOverriddenLater, Moved, Replaced, OverriddenByTarget, OtherUnchanged, OtherChanged, CloneOfOtherCleanedMod }
+/// <summary>
+/// A record's role in the run. <see cref="SupportOnlyCopy"/> is a clone of another cleaned mod's content or a patch record with a
+/// broken clone marker: it only supports.
+/// </summary>
+internal enum RecordRole { Target, TargetOverriddenLater, Moved, Replaced, OverriddenByTarget, OtherUnchanged, OtherChanged, SupportOnlyCopy }
 
 /// <param name="Change">Only for <see cref="RecordRole.OtherChanged"/>.</param>
 /// <param name="EarlierVersion">Only for <see cref="RecordRole.Moved"/> and <see cref="RecordRole.Replaced"/>.</param>
@@ -19,7 +23,7 @@ internal readonly record struct Classification(RecordRole Role, ObjectChange? Ch
         RecordRole.Moved => TargetOrigin.Moved,
         RecordRole.Replaced => TargetOrigin.Replaced,
         RecordRole.TargetOverriddenLater or RecordRole.OverriddenByTarget or RecordRole.OtherUnchanged or RecordRole.OtherChanged
-            or RecordRole.CloneOfOtherCleanedMod => null,
+            or RecordRole.SupportOnlyCopy => null,
         _ => throw new UnreachableException($"Unknown record role {Role}."),
     };
 
@@ -34,11 +38,13 @@ internal sealed class RecordClassifier(ModTrustTable trust, AcceptedWorld world,
 
     /// <summary>
     /// Clones first, then the creator: the target's own records, then the records the target overrides, then the rule decides once.
-    /// A clone of the cleaned mod's content is one of its own objects; a clone of another cleaned mod's content only supports.
+    /// A clone of the cleaned mod's content is one of its own objects; a clone of another cleaned mod's content only supports, and so
+    /// does a record with a broken marker, which is almost surely a clone whose EditorID was edited: no clone causes a removal.
     /// </summary>
     public Classification Classify(PlacedRecordFact record)
     {
         if (CloneMarkOf(record) is { } clone) return ClassifyClone(record, clone);
+        if (HasBrokenCloneMarker(record)) return new(RecordRole.SupportOnlyCopy, null, null);
         if (IsCreatedByTarget(record)) return new(WinsInTargetOrPatch(record) ? RecordRole.Target : RecordRole.TargetOverriddenLater, null, null);
         if (facts.OverriddenRecords.Contains(record.Key)) return ClassifyOverriddenRecord(record);
         var change = OtherRecordChange.Decide(record, world);
@@ -72,7 +78,7 @@ internal sealed class RecordClassifier(ModTrustTable trust, AcceptedWorld world,
     /// <remarks>A clone is judged as its own patch or this group's patch left it, like the cleaned mod's records (<see cref="WinsInTargetOrPatch"/>).</remarks>
     private Classification ClassifyClone(PlacedRecordFact record, CloneMark clone)
     {
-        if (clone.CleanedMod != trust.CleanedMod) return new(RecordRole.CloneOfOtherCleanedMod, null, null);
+        if (clone.CleanedMod != trust.CleanedMod) return new(RecordRole.SupportOnlyCopy, null, null);
         var wins = record.WinningMod == record.Key.Plugin || record.WinningMod == trust.Patch;
         return new(wins ? RecordRole.Target : RecordRole.TargetOverriddenLater, null, null, clone.Original);
     }

@@ -31,9 +31,9 @@ internal static class RestoreOutcomes
         if (judged.IsRestored) return null;
         if (judged.Never is { } never) return RestoreWhereRemovedText.Never(never, judged.Change.WinningMod);
         if (judged.Refused is { } refusal) return RestoreWhereRemovedText.Refusal(refusal, label);
-        if (judged.KeptForArea is { } verdict) return RestoreWhereRemovedText.Area(verdict);
-        return judged.Cloning is { Need: CloneNeed.NeighbourOfStandingObject, RefusedBy: not null } cloning
-            ? RestoreWhereRemovedText.HeldByStandingObject(cloning)
+        if (RefusedCopy(judged) is { } cloning) return RestoreWhereRemovedText.NotCopied(cloning);
+        return judged.KeptForArea is { } verdict
+            ? RestoreWhereRemovedText.Area(verdict)
             : throw new UnreachableException($"The placed record {judged.Change.Key} stays with no reason given.");
     }
 

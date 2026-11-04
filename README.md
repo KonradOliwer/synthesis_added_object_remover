@@ -730,16 +730,21 @@ an object kept shrunk or turned counts at its new size.
   the navmesh it names must go back with it or already lead through the door there.
 - Ground under an object that stays (the cleaned mod's, another plugin's that was placed for the ground as it is, or one that goes back
   but keeps its shape where it stands), under an object that was kept as the cleaned mod changed it, or under a navmesh lying on it;
-  for the cleaned mod's objects that stay and the copies the patch adds, also the ground *Remove objects on terrain changed by other
-  mods* checks around them, with the settings of their collision group (for a copy, those of the cleaned mod's own objects), so a later
-  run does not find it changed; where those settings count terrain type changes, the ground textures of the cell quarters it checks
-  there stay too; ground on a cell edge whose neighbouring cell's ground
+  around the objects a later run judges again where they stand (the cleaned mod's objects that stay, other mods' objects the cleaned
+  mod moved or replaced that stay where it put them, and the copies the patch adds), also the ground *Remove objects on terrain changed
+  by other mods* checks around them, with the settings of their collision group (for a copy, those of the cleaned mod's own objects),
+  where those settings count height changes, so a later run does not find it changed; where they count terrain type changes, the
+  ground textures of the cell quarters it checks there stay too, unless the textures before the cleaned mod are those of a plugin the
+  step trusts, which a later run accepts back; other mods' objects that go back are not judged again, so nothing is kept around
+  them; ground on a cell edge whose neighbouring cell's ground
   stays or held another height before the cleaned mod; ground on the line between a cleared quarter of a cell and a quarter whose area
   is not cleared; ground in a cell whose restored heights would be too steep to store (heights are stored in steps of 8 units); ground of
   a land record whose earlier or winning version holds no height map.
 - A cell's water level, when an object or navmesh stands across the line between the level that stays and the earlier one, or when
-  *Remove objects on terrain changed by other mods* checks the cell around one of the cleaned mod's objects that stay, or a copy the
-  patch adds, with settings that count water changes.
+  *Remove objects on terrain changed by other mods* would count it going back around one of the objects listed above, with settings
+  that count water changes: the water would cover or uncover at least *Remove only when this share of the ground got
+  covered/uncovered* of the ground it checks there. A level from before the cleaned mod that a plugin the step trusts holds goes back, since a later run accepts it.
+  Interior water always goes back: the step has no terrain to compare there.
 - A navmesh, together with every navmesh, map entry and door linked to it. Navmeshes go back as a group, only when all of them can go
   back consistently. A group stays when a later plugin changed one of its members or a door again, when a navmesh that stays is linked to
   it, when a door it names would not stand or would stay where the cleaned mod put it, when ground or an object that stays lies in it
@@ -749,14 +754,16 @@ an object kept shrunk or turned counts at its new size.
 **Objects the cleaned mod moved into its own layout.** When the cleaned mod moved another mod's object, for example a base-game rock
 into a ring around its campfire, and the object's earlier place is cleared while the cleaned mod's content around its new place still
 stands, the object goes back to its earlier place and the patch adds a copy of it at the cleaned mod's place. Both places then look as
-they should. Only plain scenery is copied: static objects and trees or bushes that cannot be harvested, with no script, link, owner,
-lock, location role, map marker or distant LOD, and nothing actors walk on. The copy must also pass the checks of the cleaned mod's own
+they should. Only plain scenery is copied: static objects and trees or bushes that cannot be harvested, not persistent, with no script,
+link, owner, lock, location role, map marker or distant LOD, and nothing actors walk on. The copy must also pass the checks of the cleaned mod's own
 objects (*Collision handling* and *Remove objects on terrain changed by other mods* with the settings of the cleaned mod's own objects)
 where it stands. Plants you can harvest, lights, containers and anything else stay where the cleaned mod put them; where the cleaned
 mod's area around the object stands only because one of its objects nearby still stands (measured by *Objects left behind*), such an
 object stays as the cleaned mod changed it. The copies are new records in the patch, listed in `restored-where-removed-objects.csv`
 with their FormKeys. A copy belongs to the cleaned mod's content: a later `Batch` step for the same mod judges it like the mod's own
-objects and removes it with them; a step for another mod only lets it hold or support other objects.
+objects and removes it with them; a step for another mod only lets it hold or support other objects. Later runs find the copies by
+their EditorIDs, which start with `AORClone_`: do not rename them. A patch record whose EditorID starts like that but is no valid
+copy name is listed with a warning in the log and only holds or supports other objects.
 
 **Terrain edges.** Where restored ground meets ground that stays as the cleaned mod changed it, the height is blended over *Blend terrain
 edges over* (counted in whole grid steps of 128 units), so no step or crack shows. A point on a cell edge goes back only when the cleaned mod changed it in

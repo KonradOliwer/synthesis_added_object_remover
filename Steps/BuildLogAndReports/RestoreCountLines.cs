@@ -154,7 +154,7 @@ internal static class RestoreCountLines
     /// </summary>
     public static IEnumerable<string> KeptForArea(RestoreJudgements judged, AreaVerdict verdict)
     {
-        var objects = judged.Result.Objects.Count(change => change.KeptForArea == verdict);
+        var objects = judged.Result.Objects.Count(change => change.KeptForArea == verdict && RestoreOutcomes.RefusedCopy(change) is null);
         var cells = judged.Result.Cells.Count(cell => cell.KeptForArea == verdict);
         var quarters = judged.Result.Lands.Sum(land => land.ChangedQuarters.Count(quarter => quarter.KeptForArea == verdict));
         var rests = judged.Result.Lands.Count(land => RestoreOutcomes.HoldsOnlyTheRest(land) && land.RestKeptForArea == verdict);

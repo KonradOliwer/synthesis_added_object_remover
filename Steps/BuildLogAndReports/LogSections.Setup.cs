@@ -72,7 +72,8 @@ internal static partial class LogSections
         var label = RestoreOutcomes.LabelsIn(world);
         return world.BrokenCloneMarkers.Select(key =>
             $"Warning: {label(key)} in an Added Object Remover patch has an EditorID that starts like the marker of a copy but is no valid "
-            + "marker for the plugins in the load order. It is read as an ordinary object of the patch, not as a copy.");
+            + "marker for the plugins in the load order. It is read as no copy and no object of any cleaned mod: it only holds or supports "
+            + "other objects and causes no removal.");
     }
 
     /// <summary>

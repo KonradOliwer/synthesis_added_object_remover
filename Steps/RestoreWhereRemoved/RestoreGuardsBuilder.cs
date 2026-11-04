@@ -21,6 +21,7 @@ internal static class RestoreGuardsBuilder
         var blocking = new ObjectsThatBlockActors(shapes, collected.WinningPrimitives);
         var changedTriangles = NavmeshInputs.ChangedNavmeshTriangles(collected);
         var landHeights = plans.LandHeights;
+        Func<PluginName, bool> isAccepted = plugin => input.RemovalSteps.Accepted.TrustOf(plugin) == VersionTrust.Full;
         var terrainGuards = settings.Terrain
             ? new TerrainGuards(() => ObjectsOfTheRun.OtherPluginsObjectsThatStay(world, collected, plans.Cleared), plans.Ground, plans.SpacesOnLand, cell => landHeights(cell).Current, settings.HeightChangeTolerance, input.Execution)
             : null;
@@ -32,7 +33,13 @@ internal static class RestoreGuardsBuilder
                 new StandingObjects(world, blocking, plans.FinalPresence),
                 plans.TargetsThatMayStay,
                 plans.Ground,
-                new TerrainStepAreas(shapes, inputs.FindLandWorldspace, TerrainSettingsByTarget(collected, input.RemovalSteps), input.RemovalSteps.CleanedModsObjects.ChangedTerrainSettings),
+                new TerrainStepAreas(
+                    shapes,
+                    inputs.FindLandWorldspace,
+                    TerrainSettingsByTarget(collected, input.RemovalSteps),
+                    input.RemovalSteps.CleanedModsObjects.ChangedTerrainSettings,
+                    cell => landHeights(cell).Current,
+                    isAccepted),
                 inputs.FindLandWorldspace,
                 (plan, cell) => landHeights(cell) with { Current = plan.PlannedHeightsOf(cell) ?? landHeights(cell).Current },
                 settings.HeightChangeTolerance,
@@ -40,7 +47,8 @@ internal static class RestoreGuardsBuilder
                 NavmeshInputs.EveryNavmeshWithChangedTriangles(collected),
                 changedTriangles,
                 plans.FinalPresence,
-                plans.Doors),
+                plans.Doors,
+                isAccepted),
             worldTime);
     }
 

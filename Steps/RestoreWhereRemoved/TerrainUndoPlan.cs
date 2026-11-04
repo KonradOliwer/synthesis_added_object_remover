@@ -92,6 +92,9 @@ internal sealed partial class TerrainUndoPlan
     /// <summary>The winning heights of the cell's LAND record; null when the plan holds none or the winner has no height map.</summary>
     public float[]? CurrentHeightsOf(ExteriorCell cell) => _lands.ByCell.TryGetValue(cell, out var land) ? _lands.HeightsOf(land.Change).Current : null;
 
+    /// <summary>The plugin of the cell's LAND record version just below the cleaned mod's; null when the plan holds no LAND record there or the plugin is not known.</summary>
+    public PluginName? EarlierPluginOf(ExteriorCell cell) => _lands.ByCell.TryGetValue(cell, out var land) ? land.Change.EarlierPlugin : null;
+
     /// <summary>The ground of the cell in the world without the cleaned mod (<see cref="TerrainUndoLands.HeightsWithoutCleanedMod"/>); null when the plan holds no such heights.</summary>
     public float[]? HeightsWithoutCleanedModOf(ExteriorCell cell) => _lands.HeightsWithoutCleanedMod.GetValueOrDefault(cell);
 

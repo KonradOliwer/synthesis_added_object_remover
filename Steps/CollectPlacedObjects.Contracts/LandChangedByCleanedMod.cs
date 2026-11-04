@@ -17,6 +17,7 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 /// normal and both hold the same heights, which are then read where needed.
 /// </param>
 /// <param name="CellDeletedInAVersion">A version read of the cell holding the LAND record deletes the cell.</param>
+/// <param name="EarlierPlugin">The plugin of the version just below the cleaned mod's, whose values go back; null when not read.</param>
 public sealed record LandChangedByCleanedMod(
     ExteriorCell Cell,
     RecordKey LandKey,
@@ -27,7 +28,8 @@ public sealed record LandChangedByCleanedMod(
     LandLeftToLater LeftToLater,
     PluginName WinningMod,
     LandHeights? Heights,
-    bool CellDeletedInAVersion = false)
+    bool CellDeletedInAVersion = false,
+    PluginName? EarlierPlugin = null)
 {
     /// <summary>Some height, colour, texture or the rest of the record goes back.</summary>
     public bool HasPartsToUndo => !UndoPoints.IsEmpty || !UndoColours.IsEmpty || !UndoQuarters.IsEmpty || UndoRest;

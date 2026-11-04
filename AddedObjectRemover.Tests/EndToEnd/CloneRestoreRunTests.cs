@@ -32,6 +32,24 @@ public sealed class CloneRestoreRunTests
         Assert.Equal(CloneMarker.Of(copy.Original, new PluginName(FixtureWorld.TargetName)), records[copy.Copy].EditorID);
     }
 
+    /// <summary>
+    /// In a cleared camp whose campfire another plugin keeps, the left-behind step measures the rock the cleaned mod moved beside the
+    /// campfire around it: the rock goes back with a copy left at the campfire; a persistent rock may not be copied and is held there.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ARockBesideTheKeptCampfireOfAClearedCampGoesBackWithACopyUnlessItMayNotBeCopied(bool persistentRock)
+    {
+        var outcome = FixtureRun.Execute(RestoredWorldStaysCleanTests.WithTheDirectionMethod(), workers: 1, dataFolder => RestoreWhereRemovedWorlds.CreateClearedCampWithAKeptCampfire(dataFolder, persistentRock));
+
+        var rock = Assert.Single(outcome.RestoreWhereRemoved.Objects);
+        Assert.Equal(
+            (!persistentRock, new CloneJudged(CloneNeed.NeighbourOfStandingObject, persistentRock ? CloneRefusal.Persistent : null)),
+            (rock.IsRestored, rock.Cloning));
+        Assert.Equal(persistentRock ? 0 : 1, outcome.Written.Clones.Length);
+    }
+
     /// <summary>A rock with distant LOD, as a bridge or another large landmark has, may not be copied: it stays in the ring and the patch adds nothing.</summary>
     [Fact]
     public void ALandmarkWithDistantLodMovedIntoTheRingIsNotCopiedAndStaysInTheRing()
@@ -46,29 +64,41 @@ public sealed class CloneRestoreRunTests
     }
 
     /// <summary>
-    /// Decision 23: a later step for the same cleaned mod, with a too-close distance that reaches the city pad, removes the campfire,
-    /// and judges the copy as the cleaned mod's object too: the copy is disabled in the patch with the campfire.
+    /// A later step for the same cleaned mod, with a too-close distance that reaches from the city pad to the campfire but not to the
+    /// copy east of it, removes the campfire; the copy, judged as the cleaned mod's content, is then left behind with its surroundings
+    /// removed and goes with it, disabled in the patch. The rock stays at its old place.
     /// </summary>
     [Fact]
-    public void AStricterLaterStepForTheSameCleanedModRemovesTheCopyWithTheCampfire()
+    public void AStricterLaterStepForTheSameCleanedModRemovesTheCampfireAndTheCopyGoesWithItAsLeftBehind()
     {
         var stricter = RestoreWhereRemovedRunTests.TerrainSettings();
         stricter.Standard.TooClose.ByDistance.DistanceInUnits = StricterTooCloseDistance;
+        stricter.Standard.LeftoverObjects = new LeftoverObjectSettings
+        {
+            MinObjectsAround = 1,
+            RemoveBySurroundingDirections = true,
+            SurroundingObjects = new VisibleSurroundingObjectsSettings { SearchRadius = LeftBehindSearchRadius, MinOccupiedDirections = 1, DirectionThresholdPercent = 10, ClearedDirectionsPercent = 10 },
+        };
         ISkyrimModGetter? secondPatch = null;
 
         var (first, second) = RunTwice(RestoreWhereRemovedRunTests.TerrainSettings(), stricter, patch => secondPatch = patch);
 
         var copy = Assert.Single(first.Written.Clones);
-        var removed = second.Written.Removed.Select(id => second.Collected[id].Key).ToHashSet();
-        Assert.Contains(copy.Copy, removed);
-        Assert.Contains(second.Collected.Targets, target => target.EditorId == "T_Campfire" && removed.Contains(target.Key));
-        var written = secondPatch!.EnumerateMajorRecords<IPlacedObjectGetter>().Single(record => record.FormKey.ToRecordKey() == copy.Copy);
-        Assert.NotEqual(0, written.MajorRecordFlagsRaw & InitiallyDisabled);
+        var reasons = second.Written.Removed.ToDictionary(id => second.Collected[id].EditorId ?? second.Collected[id].Key.ToString(), id => second.Final.Of(id) is Decision.Removed removed ? removed.Reason : null);
+        Assert.IsType<TooClose>(reasons["T_Campfire"]);
+        var copyReason = reasons[CloneMarker.Of(copy.Original, new PluginName(FixtureWorld.TargetName))];
+        Assert.True(copyReason is VisibleObjectSurroundingsRemoved or InClearedArea, $"The copy was removed for {copyReason}.");
+        var records = secondPatch!.EnumerateMajorRecords<IPlacedObjectGetter>().ToDictionary(record => record.FormKey.ToRecordKey());
+        Assert.NotEqual(0, records[copy.Copy].MajorRecordFlagsRaw & InitiallyDisabled);
+        Assert.Equal(RestoreWhereRemovedWorlds.RingRockFrom, PositionOf(records[copy.Original]));
     }
 
+    /// <summary>The direction method's search radius in the stricter step: it reaches from the copy to the campfire and the crate.</summary>
+    private const float LeftBehindSearchRadius = 1500f;
+
     /// <summary>
-    /// A later step of the group for another cleaned mod, whose tent stands beside the copy: the copy only holds or supports objects there,
-    /// so nothing of that mod is removed.
+    /// A later run for another cleaned mod, on a load order that adds that mod, whose tent stands beside the copy: the copy only holds or
+    /// supports objects there, so nothing of that mod is removed.
     /// </summary>
     [Fact]
     public void ALaterStepForAnotherCleanedModReadsTheCopyAsAnotherCleanedModsAndRemovesNothingBesideIt()

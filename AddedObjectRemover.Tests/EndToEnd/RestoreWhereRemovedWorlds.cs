@@ -248,14 +248,14 @@ internal static class RestoreWhereRemovedWorlds
     public static readonly Vector3 CampCrateAt = At(800, 800);
     public static readonly Vector3 CampfireAt = At(1900, 800);
     public static readonly Vector3 RingRockFrom = At(500, 2000);
-    public static readonly Vector3 RingRockTo = At(1750, 800);
+    public static readonly Vector3 RingRockTo = At(2050, 800);
 
     /// <summary>The Has Distant LOD flag of a static, as a large landmark such as a bridge carries it.</summary>
     private const int HasDistantLod = 0x8000;
 
     /// <summary>
     /// The exterior cell (0, 0), where the cleaned mod has a crate with a city pad beside it, which is removed, and a campfire 1100 units
-    /// east of it, which stays. It moved a base game rock from 1200 units north of the crate into a ring 150 units west of the campfire.
+    /// east of it, which stays. It moved a base game rock from 1200 units north of the crate into a ring 150 units east of the campfire.
     /// With a search radius of 1500 units the rock's old place sees only the removed crate, and its new place sees the campfire: the rock
     /// goes back and the patch adds a copy where the campfire's ring holds it.
     /// </summary>
@@ -278,6 +278,44 @@ internal static class RestoreWhereRemovedWorlds
         spaces.AddOverridesTo(otherCamp);
         otherCamp.Exterior.Place("O_Tent", otherCamp.AddModeledStatic("O_TentBase", FixtureMeshes.CrateModel), RingRockTo + new Vector3(0, 60, 0));
         return [.. loadOrder, otherCamp.Mod];
+    }
+
+    /// <summary>A plugin that needs the cleaned mod and lists its campfire in a form list, so no step removes the campfire.</summary>
+    public const string CampKeeperPlugin = "CampKeeper.esp";
+
+    /// <summary>In the exterior cell (0, 0): the kept campfire of the cleared camp, and where the rock stood and stands.</summary>
+    public static readonly Vector3 KeptCampfireAt = At(2000, 2000);
+    public static readonly Vector3 CampRockFrom = At(500, 300);
+    public static readonly Vector3 CampRockTo = At(2150, 2000);
+
+    /// <summary>
+    /// The exterior cell (0, 0), where the cleaned mod built a camp of three buildings around a campfire, each building with a city pad
+    /// inside it, and a fourth building far south-west, with a pad too: all buildings are removed. A plugin that needs the cleaned mod
+    /// lists the campfire in a form list, so it stays. The cleaned mod moved a base game rock from beside the fourth building to 150
+    /// units east of the campfire. Both the rock's old place and its new one count as cleared (the campfire is small beside the
+    /// buildings), and the left-behind step measures the rock around the campfire, which stands: the rock goes back with a copy left at
+    /// the campfire, unless <paramref name="persistentRock"/>, which may not be copied and is held there.
+    /// </summary>
+    public static IReadOnlyList<ISkyrimMod> CreateClearedCampWithAKeptCampfire(string dataFolder, bool persistentRock)
+    {
+        FixtureMeshes.WriteAll(dataFolder);
+        var (baseGame, target, city, spaces) = CreateMods();
+        var keeper = new FixtureMod(CampKeeperPlugin, baseGame, target);
+        spaces.AddOverridesTo(keeper);
+        var building = target.AddModeledStatic("T_BuildingBase", FixtureMeshes.BuildingModel);
+        var pad = city.AddModeledStatic("C_PadBase", FixtureMeshes.PadModel);
+        Vector3[] buildings = [At(1400, 2000), At(2600, 2000), At(2000, 1400), At(700, 700)];
+        foreach (var (at, index) in buildings.Select((at, index) => (at, index)))
+        {
+            target.Exterior.Place($"T_Building{index}", building, at);
+            city.Exterior.Place($"C_Pad{index}", pad, at + new Vector3(PadDistance, 0, 0));
+        }
+        var campfire = target.Exterior.Place("T_Campfire", target.AddModeledStatic("T_CampfireBase", FixtureMeshes.CrateModel), KeptCampfireAt);
+        keeper.AddFormList("K_KeepList").Items.Add(new FormLink<ISkyrimMajorRecordGetter>(campfire.FormKey));
+        var rock = baseGame.Exterior.Place("B_CampRock", baseGame.AddModeledStatic("B_CampRockBase", FixtureMeshes.CrateModel), CampRockFrom, persistent: persistentRock);
+        if (persistentRock) rock.MajorRecordFlagsRaw |= (int)PlacedObject.DefaultMajorFlag.Persistent;
+        MoveCopy(target.Exterior.PlaceCopyOf(rock, persistent: persistentRock), CampRockTo);
+        return [baseGame.Mod, target.Mod, city.Mod, keeper.Mod];
     }
 
     private static (IReadOnlyList<ISkyrimMod> LoadOrder, FixtureMod BaseGame, FixtureSpaces Spaces) BuildCampfireRing(string dataFolder, bool rockHasDistantLod)

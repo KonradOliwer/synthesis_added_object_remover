@@ -96,15 +96,11 @@ internal static partial class LogSections
         var record = ObjectText(world, change, context);
         var later = Tables.LeftToLaterPlugins(change.Earlier) is { } plugins ? $"; left to later plugins: {plugins}" : string.Empty;
         var areas = ObjectAreas(judged);
-        if (RestoreOutcomes.KeptBecause(judged, label) is { } kept) return $"  Kept as changed: {record}: {kept}{CopyRefusedForArea(judged)}{areas}{later}";
+        if (RestoreOutcomes.KeptBecause(judged, label) is { } kept) return $"  Kept as changed: {record}: {kept}{areas}{later}";
 
         var copy = RestoreOutcomes.GoesBackWithCopy(judged) ? $", {RestoreWhereRemovedText.WithCopy}" : string.Empty;
         return $"  {RestoreWhereRemovedText.KindVerb(judged.Kind)}: {record}{WhereObjectGoesBack(change, context)}{copy}{areas}{later}";
     }
-
-    /// <summary>"; may not be copied: persistent" for a record its area keeps whose copy is refused; nothing otherwise, the held record's reason names it already.</summary>
-    private static string CopyRefusedForArea(PlacedChangeJudged judged) =>
-        RestoreOutcomes.RefusedCopy(judged) is { Need: CloneNeed.AreaStillStands } cloning ? $"; may not be copied: {RestoreWhereRemovedText.CopyRefused(cloning)}" : string.Empty;
 
     /// <summary>E.g. "Rock [key] (base Crate [key]) in worldspace Tamriel, cell (1, 2)".</summary>
     private static string ObjectText(CollectedObjects world, RecordChangedByCleanedMod change, ReportContext context)
@@ -159,7 +155,7 @@ internal static partial class LogSections
         if (RestoreOutcomes.KeptBecause(judged, label) is { } kept) return $"  Kept as changed: cell {place}: {kept}{area}{later}";
 
         var parts = string.Join(Describe.ListSeparator, RestoreOutcomes.UndoneParts(judged).Select(RestoreWhereRemovedText.PartOfCell));
-        var water = RestoreOutcomes.WhyWaterIsKept(judged, label) is { } why ? $"; water level kept: {why}" : string.Empty;
+        var water = RestoreOutcomes.WhyWaterIsKept(judged, label) is { } why ? $"; {RestoreWhereRemovedText.WaterLevelPart} kept: {why}" : string.Empty;
         return $"  Cell {place}: {parts}{water}{area}{later}";
     }
 
@@ -192,7 +188,7 @@ internal static partial class LogSections
     private static string RestoredTerrainPieces(LandQuarterOutcome quarter)
     {
         var kept = quarter.Kept.Select(entry => $"{RestoreWhereRemovedText.Heights(entry.Points)} kept {RestoreWhereRemovedText.TerrainKept(entry.Reason)}");
-        var textures = quarter.TexturesKeptForObjectThatStays ? $"ground textures kept: {RestoreWhereRemovedText.TexturesKeptForObjectThatStays}" : string.Empty;
+        var textures = quarter.TexturesKeptForObjectThatStays ? $"{RestoreWhereRemovedText.GroundTexturesPart} kept: {RestoreWhereRemovedText.TexturesKeptForObjectThatStays}" : string.Empty;
         return string.Join(AreasSeparator, new[] { RestoreWhereRemovedText.Pieces(quarter.Restored) }.Concat(kept).Append(textures).Where(piece => piece.Length > 0));
     }
 

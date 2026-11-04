@@ -186,7 +186,7 @@ public sealed class PlacedObjectCollector
                 if (presence == ShownInGame.Present) _counters.CountOtherUnchanged();
                 else if (presence == ShownInGame.InvalidPlacement) _counters.CountOtherInvalidPlacement();
                 return true;
-            case RecordRole.CloneOfOtherCleanedMod:
+            case RecordRole.SupportOnlyCopy:
                 return true;
             default:
                 return false;

@@ -7,8 +7,26 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 /// <summary>A navmesh triangle in the cell record that holds its navmesh.</summary>
 internal sealed record NavmeshTriangleInCell(RecordKey Navmesh, RecordKey Cell, MeshTriangle Triangle);
 
-/// <summary>An area the changed-terrain step checks around an object that stays, with what keeps a water level the area reaches and why.</summary>
-internal sealed record WaterCheckArea(RecordKey Space, Box Area, RecordKey Keeper, WaterKeptReason Reason);
+/// <summary>A grid point of the land of an exterior cell at grid (<paramref name="X"/>, <paramref name="Y"/>), with its height as the ground ends.</summary>
+internal readonly record struct GroundPoint(int X, int Y, float Height);
+
+/// <summary>
+/// An area the changed-terrain step checks around an object that stays: the ground of its points, the share of them a water change
+/// must cover or uncover to count, and what keeps a water level for it and why.
+/// </summary>
+internal sealed record WaterCheckArea(RecordKey Space, ImmutableArray<GroundPoint> Ground, int MinCoverChangePercent, RecordKey Keeper, WaterKeptReason Reason)
+{
+    /// <summary>
+    /// Whether the step counts a move of the exterior cell's water line in the area: the points of the cell between the two levels
+    /// are at least the share of all the area's points.
+    /// </summary>
+    public bool CountsMoveOf(CellChangedByCleanedMod cell, WaterLine line)
+    {
+        if (cell.Grid is not var (x, y) || cell.SpaceKey != Space) return false;
+        var flipped = Ground.Count(point => point.X == x && point.Y == y && line.Crosses(point.Height, point.Height));
+        return flipped > 0 && SharePercent.AtLeast(flipped, Ground.Length, MinCoverChangePercent);
+    }
+}
 
 /// <summary>The heights between a cell's water level before the cleaned mod and its winning one; a cell without water counts as water infinitely low.</summary>
 internal readonly record struct WaterLine(float Lower, float Upper)
@@ -118,20 +136,28 @@ internal sealed class WaterUndoPlan
     }
 
     /// <summary>
-    /// The plan with every water level that would go back kept in the cells an area reaches: the changed-terrain step checks the ground
-    /// there around an object that stays and counts water changes. Each cell names the keeper of the first area in the order given.
+    /// The plan with every water level that would go back kept where the changed-terrain step, checking the ground around an object that
+    /// stays, would count its going back: the water line moves across enough of the area's ground. A level whose version below the
+    /// cleaned mod's the step accepts goes back, since a later run accepts it. Each cell names the keeper of the first area in the
+    /// order given.
     /// </summary>
     /// <param name="areas">The areas the step checks around each object that stays; read only when a water level would go back.</param>
-    public WaterUndoPlan KeepAroundObjectsThatStay(IEnumerable<WaterCheckArea> areas)
+    /// <param name="isAccepted">Whether the step accepts the values of a plugin's version whatever the others hold.</param>
+    public WaterUndoPlan KeepAroundObjectsThatStay(IEnumerable<WaterCheckArea> areas, Func<PluginName, bool> isAccepted)
     {
-        List<CellChangedByCleanedMod> goingBack = [.. _judged.Select(judged => judged.Change).Where(cell => GoesBack(cell.Cell))];
+        List<(CellChangedByCleanedMod Cell, WaterLine Line)> goingBack =
+        [
+            .. _judged.Select(judged => judged.Change)
+                .Where(cell => GoesBack(cell.Cell) && _lineOf.ContainsKey(cell.Cell) && !isAccepted(cell.EarlierWater.Plugin))
+                .Select(cell => (cell, _lineOf[cell.Cell])),
+        ];
         if (goingBack.Count == 0) return this;
 
         var bySpace = areas.ToLookup(area => area.Space);
         var kept = _kept.ToBuilder();
-        foreach (var cell in goingBack)
+        foreach (var (cell, line) in goingBack)
         {
-            if (bySpace[cell.SpaceKey].FirstOrDefault(area => Covers(cell, area.Area)) is { } found) kept.Add(cell.Cell, (found.Keeper, found.Reason));
+            if (bySpace[cell.SpaceKey].FirstOrDefault(area => area.CountsMoveOf(cell, line)) is { } found) kept.Add(cell.Cell, (found.Keeper, found.Reason));
         }
         return kept.Count == _kept.Count ? this : new WaterUndoPlan(this, kept.ToImmutable());
     }

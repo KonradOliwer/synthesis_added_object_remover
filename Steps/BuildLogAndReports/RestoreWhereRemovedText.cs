@@ -27,6 +27,16 @@ internal static class RestoreWhereRemovedText
     /// <param name="withCopy">It goes back and the patch adds a copy of it where the cleaned mod placed it.</param>
     public static string Result(string? keptBecause, bool withCopy) => withCopy ? $"{Result(keptBecause)} {WithCopy}" : Result(keptBecause);
 
+    /// <summary>What became of a change, as <see cref="Result(string?)"/>, with "; water level kept: ..." when a part of a change that goes back stays.</summary>
+    /// <param name="keptBecause">Why the change stays; null when it goes back.</param>
+    /// <param name="keptPart">The part that may stay although the rest goes back, as in "water level".</param>
+    /// <param name="partKeptBecause">Why that part stays; null when it goes back too.</param>
+    public static string Result(string? keptBecause, string keptPart, string? partKeptBecause) =>
+        keptBecause is null && partKeptBecause is not null ? $"{Result(null)}; {keptPart} kept: {partKeptBecause}" : Result(keptBecause);
+
+    public const string WaterLevelPart = "water level";
+    public const string GroundTexturesPart = "ground textures";
+
     /// <summary>The words for a record that goes back with a copy, after what was done to it.</summary>
     public const string WithCopy = "with a copy at the cleaned mod's place";
 
@@ -76,8 +86,17 @@ internal static class RestoreWhereRemovedText
         _ => throw new UnreachableException($"Unknown area verdict {verdict}."),
     };
 
-    /// <summary>Why another mod's object the cleaned mod moved stays where the cleaned mod's standing content holds it, as in "the cleaned mod's standing content holds it and it may not be copied (persistent)".</summary>
-    public static string HeldByStandingObject(CloneJudged cloning) => $"the cleaned mod's standing content holds it and it may not be copied ({CopyRefused(cloning)})";
+    /// <summary>
+    /// Why another mod's object the cleaned mod moved stays where the cleaned mod's content holds it, as in "the cleaned mod's
+    /// standing content holds it and it may not be copied (persistent)" or "the cleaned mod's objects still stand around it and it may
+    /// not be copied (not plain scenery)".
+    /// </summary>
+    public static string NotCopied(CloneJudged cloning) => cloning.Need switch
+    {
+        CloneNeed.AreaStillStands => $"the cleaned mod's objects still stand around it and it may not be copied ({CopyRefused(cloning)})",
+        CloneNeed.NeighbourOfStandingObject => $"the cleaned mod's standing content holds it and it may not be copied ({CopyRefused(cloning)})",
+        _ => throw new UnreachableException($"Unknown copy need {cloning.Need}."),
+    };
 
     /// <summary>Why a copy is refused, with the failure of a check that stopped, as in "too close as the cleaned mod's object (the check stopped unexpectedly: ...)".</summary>
     public static string CopyRefused(CloneJudged cloning)

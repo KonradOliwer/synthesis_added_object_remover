@@ -591,8 +591,9 @@ public sealed class RestoreWhereRemovedReportTests
         Assert.Contains(
             $"  Kept as changed: {RecordLabels.Of(Key(0x931), null)} (base (none)) in {Space}: the cleaned mod's standing content holds it and it may not be copied (persistent); 0 of 214 objects still stand (0.0% by count, 0.0% by size)",
             lines);
-        Assert.Contains(lines, line => line.StartsWith($"  Kept as changed: {RecordLabels.Of(Key(0x932), null)} (base (none)) in {Space}: the cleaned mod's objects still stand around it; may not be copied: not plain scenery; at its old place", StringComparison.Ordinal));
-        Assert.Contains(lines, line => line.Contains("may not be copied: on changed terrain as the cleaned mod's object (the check stopped unexpectedly: InvalidOperationException: broke);", StringComparison.Ordinal));
+        Assert.Contains(lines, line => line.StartsWith($"  Kept as changed: {RecordLabels.Of(Key(0x932), null)} (base (none)) in {Space}: the cleaned mod's objects still stand around it and it may not be copied (not plain scenery); at its old place", StringComparison.Ordinal));
+        Assert.Contains(lines, line => line.Contains("it may not be copied (on changed terrain as the cleaned mod's object (the check stopped unexpectedly: InvalidOperationException: broke));", StringComparison.Ordinal));
+        Assert.DoesNotContain(lines, line => line.StartsWith("Kept because the cleaned mod's objects still stand around them", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -625,6 +626,22 @@ public sealed class RestoreWhereRemovedReportTests
             $"  Terrain {Space}, cell (0, 0), south-west quarter: 2 heights, 1 vertex colour; 1 height kept under objects that stay; ground textures kept: "
             + $"{RestoreWhereRemovedText.TexturesKeptForObjectThatStays}; 0 of 214 objects still stand (0.0% by count, 0.0% by size)",
             line);
+    }
+
+    [Fact]
+    public void TheCellsFileNamesTheTexturesAndTheWaterLevelThatStayInAQuarterOrCellThatGoesBack()
+    {
+        var land = Land();
+        var texturesKept = LandOutcomes.Judged(
+            land.Change, land.Quarters, land.Heights, land.Colours, textures: QuarterSet.Of([]), texturesKept: QuarterSet.Of([0]), rest: false, land.Kept, finalHeights: null, CellEdgeHeights.Unknown);
+        var scene = Scene() with { Objects = [], Navmeshes = [], NavmeshGroups = [], Lands = [texturesKept] };
+
+        var table = Assert.Single(BuildTables(scene, Normal), file => file.FileName == ReportFileNames.RestoredWhereRemovedCellsFileName);
+
+        Assert.Equal($"restored; ground textures kept: {RestoreWhereRemovedText.TexturesKeptForObjectThatStays}", Field(table, Row(table, "quarter", "south-west"), "result"));
+        Assert.Equal(
+            $"restored; water level kept: {WaterObject} lies across the water line between the level before the cleaned mod and the one that stays",
+            Field(table, Row(table, "gridX", "3"), "result"));
     }
 
     [Theory]

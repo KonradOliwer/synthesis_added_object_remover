@@ -58,27 +58,57 @@ internal sealed class CloneTooCloseCheck(
         return new CloneTooCloseCheck(others, causes, world, presence, reach, settings, createRule, execution);
     }
 
-    /// <param name="clones">The copies where they stand, as the cleaned mod's objects, with their position as id.</param>
+    /// <summary>The world of the first check, which every later check reuses; null before it.</summary>
+    /// <remarks>
+    /// The world's caches live as long as the run, so one world serves every pass: it holds the copies of the first check and every
+    /// object that can be a cause within their reach, and each check leaves out what is no cause then. Copies only get lost between
+    /// passes, so the first check's copies and their reach hold those of every later one.
+    /// </remarks>
+    private CheckedWorld? _checked;
+
+    private readonly Lock _building = new();
+
+    /// <param name="clones">The copies where they stand, as the cleaned mod's objects, with their original as <see cref="TargetObject.CloneOf"/>.</param>
     /// <param name="goingBack">The indexes of the candidates going back.</param>
-    /// <returns>The check of each copy, by its position.</returns>
+    /// <returns>The check of each copy, in the order given.</returns>
     public PlacementCheck[] Check(IReadOnlyList<TargetObject> clones, IReadOnlySet<int> goingBack)
     {
-        var reachOf = clones.Select(clone => (clone.SpaceKey, Box: reach.TooCloseReachOf(clone, settings))).ToList();
+        var checkedWorld = WorldFor(clones);
+        var causes = CausesOnceBack(goingBack).ToHashSet();
+        var leftOut = checkedWorld.Causes.Where(entry => !causes.Contains(entry.Cause)).Select(entry => entry.Id);
+        var rule = createRule(checkedWorld.World, leftOut, settings);
+        return ParallelMap.Run(execution, clones.Count, position => rule.CheckWhereItStands(checkedWorld.TargetOf(clones[position])), ParallelMap.AutomaticRangeSize);
+    }
+
+    /// <summary>The world of the first check; a later check's copies must be among its copies.</summary>
+    private CheckedWorld WorldFor(IReadOnlyList<TargetObject> clones)
+    {
+        lock (_building)
+        {
+            _checked ??= BuildWorld(clones);
+            return _checked;
+        }
+    }
+
+    /// <summary>The copies, with their position as id, and every object that can be a cause within their too-close reach, with its position among them as id.</summary>
+    private CheckedWorld BuildWorld(IReadOnlyList<TargetObject> clones)
+    {
+        TargetObject[] targets = [.. clones.Select((clone, position) => clone with { Id = new TargetId(position) })];
+        var reachOf = targets.Select(clone => (clone.SpaceKey, Box: reach.TooCloseReachOf(clone, settings))).ToList();
         List<OtherObject> near =
         [
-            .. CausesOnceBack(goingBack)
-                .Where(cause => cause.IsPlacedNpc || reachOf.Any(clone => clone.SpaceKey == cause.SpaceKey && clone.Box.Overlaps(reach.BoundsOf(cause))))
-                .Select((cause, index) => cause with { Id = new OtherId(index) }),
+            .. others.Concat(candidateCauses.OfType<OtherObject>())
+                .Where(cause => cause.IsPlacedNpc || reachOf.Any(clone => clone.SpaceKey == cause.SpaceKey && clone.Box.Overlaps(reach.BoundsOf(cause)))),
         ];
+        var causes = near.Select((cause, index) => (Cause: cause, Id: new OtherId(index))).ToList();
         var checkedWorld = world.World with
         {
-            Targets = [.. clones],
-            OtherModObjects = [.. near],
+            Targets = [.. targets],
+            OtherModObjects = [.. causes.Select(entry => entry.Cause with { Id = entry.Id })],
             SupportOnlyObjects = [],
-            Order = new WorkOrder([.. Enumerable.Range(0, clones.Count)]),
+            Order = new WorkOrder([.. Enumerable.Range(0, targets.Length)]),
         };
-        var rule = createRule(checkedWorld, [], settings);
-        return ParallelMap.Run(execution, clones.Count, position => rule.CheckWhereItStands(clones[position]), ParallelMap.AutomaticRangeSize);
+        return new CheckedWorld(checkedWorld, causes, targets.ToDictionary(target => target.CloneOf!.Value));
     }
 
     /// <summary>The causes once the given candidates go back, in the order of the class remarks.</summary>
@@ -91,5 +121,16 @@ internal sealed class CloneTooCloseCheck(
                 .Where(candidate => !presence.EndsRemoved(world.Restored[candidate].Key, goingBack.Contains))
                 .Select(candidate => candidateCauses[candidate])
                 .OfType<OtherObject>());
+    }
+
+    /// <param name="Causes">Every object of <paramref name="World"/> that can be a cause, as read, with its id there.</param>
+    /// <param name="TargetsByOriginal">The copies of <paramref name="World"/> by their original.</param>
+    private sealed record CheckedWorld(CollectedObjects World, List<(OtherObject Cause, OtherId Id)> Causes, Dictionary<RecordKey, TargetObject> TargetsByOriginal)
+    {
+        /// <summary>The world's copy of the given copy.</summary>
+        public TargetObject TargetOf(TargetObject clone) =>
+            TargetsByOriginal.TryGetValue(clone.CloneOf!.Value, out var target)
+                ? target
+                : throw new InvalidOperationException($"The copy of {clone.CloneOf} is checked although the first check had no copy of it.");
     }
 }

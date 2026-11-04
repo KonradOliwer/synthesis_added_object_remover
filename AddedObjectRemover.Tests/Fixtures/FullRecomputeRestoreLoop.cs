@@ -29,18 +29,17 @@ internal sealed class FullRecomputeRestoreLoop(PlacedGuards? placedGuards, Terra
         var trianglesGoingBack = navmeshes?.IndexOfTrianglesGoingBack() ?? new NavmeshIndex(_ => null);
         var thatStayChanged = navmeshes?.NavmeshesThatStayChanged() ?? inputs.ChangedNavmeshes;
         var (placed, clones, causesLeftOut) = RefusePlaced(state, placedGoingBack, withClone, thatStayChanged);
-        List<TargetObject> standingInTheirPlace =
-        [
-            .. inputs.TargetsThatMayStay.Concat(inputs.World.NowOfThoseKeepingTheirShape(placedGoingBack)).Where(placed => !EndsRemoved(placed.Key, placedGoingBack)),
-            .. inputs.World.ClonesOf(withClone),
-        ];
+        List<TargetObject> targets = [.. inputs.TargetsThatMayStay.Where(placed => !EndsRemoved(placed.Key, placedGoingBack))];
+        List<TargetObject> copies = [.. inputs.World.ClonesOf(withClone)];
+        List<TargetObject> standingInTheirPlace = [.. targets, .. inputs.World.NowOfThoseKeepingTheirShape(placedGoingBack).Where(placed => !EndsRemoved(placed.Key, placedGoingBack)), .. copies];
         var refusedThatStand = inputs.World.NowOfAllBut(placedGoingBack).Where(refused => !EndsRemoved(refused.Key, placedGoingBack)).ToList();
+        List<TargetObject> judged = [.. targets, .. copies, .. refusedThatStand];
         return new(
             placed,
             clones,
             RefuseNavmeshGroups(state, placedGoingBack, standing, trianglesGoingBack),
-            ProtectGround(state, placedGoingBack, standingInTheirPlace, refusedThatStand, trianglesGoingBack),
-            state.Water.KeepAtWaterLines(standing, TrianglesOf(thatStayChanged)).KeepAroundObjectsThatStay(inputs.StepAreas.WaterAreasAround(standingInTheirPlace.Concat(refusedThatStand))),
+            ProtectGround(state, placedGoingBack, standingInTheirPlace, [.. targets, .. copies], refusedThatStand, trianglesGoingBack),
+            state.Water.KeepAtWaterLines(standing, TrianglesOf(thatStayChanged)).KeepAroundObjectsThatStay(inputs.StepAreas.WaterAreasAround(judged, state.Terrain), inputs.IsAccepted),
             causesLeftOut);
     }
 
@@ -63,20 +62,25 @@ internal sealed class FullRecomputeRestoreLoop(PlacedGuards? placedGuards, Terra
             .RefuseOnDoors(new DoorsAsTheyEnd(inputs.FinalPresence, inputs.Doors, placedGoingBack.Contains));
 
     private TerrainUndoPlan ProtectGround(
-        RestoreState state, IReadOnlySet<int> placedGoingBack, List<TargetObject> standingInTheirPlace, List<TargetObject> refusedThatStand, NavmeshIndex trianglesGoingBack)
+        RestoreState state,
+        IReadOnlySet<int> placedGoingBack,
+        List<TargetObject> standingInTheirPlace,
+        List<TargetObject> judgedInTheirPlace,
+        List<TargetObject> refusedThatStand,
+        NavmeshIndex trianglesGoingBack)
     {
         var terrain = state.Terrain;
         if (terrainGuards is null) return terrain;
         var navmeshesAsTheyWillStand = state.Navmeshes?.AsTheyWillStand(inputs.Winning, trianglesGoingBack) ?? new NavmeshesAsTheyWillStand(inputs.Winning, _ => true, goingBack: null);
         return terrain
             .Protect(TerrainKeptReason.UnderObjectThatStays, inputs.Ground.UnderWhereTheyReachTheGround(standingInTheirPlace, terrain.CurrentHeightsOf))
-            .Protect(TerrainKeptReason.UnderObjectThatStays, inputs.StepAreas.Under(standingInTheirPlace, terrain))
+            .Protect(TerrainKeptReason.UnderObjectThatStays, inputs.StepAreas.Under(judgedInTheirPlace, terrain))
             .Protect(TerrainKeptReason.UnderObjectKeptAsChanged, inputs.Ground.UnderWhereTheyReachTheGround(refusedThatStand, terrain.CurrentHeightsOf))
             .Protect(TerrainKeptReason.UnderObjectKeptAsChanged, inputs.StepAreas.Under(refusedThatStand, terrain))
             .Protect(TerrainKeptReason.UnderObjectPlacedForTheGroundAsItIs, terrainGuards.UnderObjectsPlacedForTheGroundAsItIs(terrain, placed => EndsRemoved(placed, placedGoingBack)))
             .Protect(TerrainKeptReason.UnderNavmesh, terrainGuards.UnderNavmeshesOnTheGroundAsItIs(terrain, navmeshesAsTheyWillStand))
             .Protect(TerrainKeptReason.TooSteepToStore, terrain.PointsOfCellsTooSteepToStore())
-            .KeepTextures(inputs.StepAreas.QuartersAround(standingInTheirPlace.Concat(refusedThatStand)));
+            .KeepTextures(inputs.StepAreas.QuartersAround(judgedInTheirPlace.Concat(refusedThatStand), terrain));
     }
 
     private List<NavmeshTriangleInCell> TrianglesOf(ImmutableArray<RecordKey> navmeshes) =>

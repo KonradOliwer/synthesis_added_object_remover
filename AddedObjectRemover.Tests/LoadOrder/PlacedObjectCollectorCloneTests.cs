@@ -73,16 +73,16 @@ public class PlacedObjectCollectorCloneTests
     }
 
     [Fact]
-    public void ABrokenMarkerInAPatchIsNotedAndTheRecordIsClassifiedAsWithoutIt()
+    public void ABrokenMarkerInAPatchIsNotedAndTheRecordOnlySupportsLikeAnotherCleanedModsClone()
     {
         var broken = TestPlacedRecords.Create(new RecordKey(TestTargets.PatchName, 0x801), TestTargets.PatchName, Vector3.One) with { EditorId = "AORClone_broken" };
-        var plain = broken with { EditorId = "PlainRef" };
 
         var collected = Collect(broken);
 
         Assert.Equal(broken.Key, Assert.Single(collected.BrokenCloneMarkers));
-        Assert.Equal(Collect(plain).OtherModObjects.Select(other => (other.Key, other.Change)), collected.OtherModObjects.Select(other => (other.Key, other.Change)));
+        Assert.DoesNotContain(collected.OtherModObjects, other => other.Key == broken.Key);
         Assert.DoesNotContain(collected.Targets, target => target.Key == broken.Key);
+        Assert.Null(Assert.Single(collected.SupportOnlyObjects, other => other.Key == broken.Key).Change);
     }
 
     [Fact]

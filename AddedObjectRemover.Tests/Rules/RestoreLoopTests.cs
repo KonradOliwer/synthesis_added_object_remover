@@ -265,48 +265,73 @@ public sealed class RestoreLoopTests
     /// <summary>
     /// As above, and the cleaned mod also painted every quarter of cell (0, 0). When the step judging the object that stays counts
     /// terrain type changes, the cleared south-east quarter its area reaches keeps its textures, so a later run finds no type changed
-    /// there; otherwise they go back. The south-west quarter, out of reach, goes back either way.
+    /// there; otherwise they go back. The south-west quarter, out of reach, goes back either way. Textures whose version below the
+    /// cleaned mod's is the base game's, which the step accepts, go back too: a later run accepts them.
     /// </summary>
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void TheTexturesTheChangedTerrainStepChecksAroundAnObjectThatStaysAreKeptWhenItCountsTypeChanges(bool countsTypes)
+    [InlineData(true, false, true)]
+    [InlineData(false, false, false)]
+    [InlineData(true, true, false)]
+    public void TheTexturesTheChangedTerrainStepChecksAroundAnObjectThatStaysAreKeptWhenItCountsTypeChangesUnlessItAcceptsTheEarlierOnes(
+        bool countsTypes, bool earlierFromTheBaseGame, bool kept)
     {
         var scene = new Scene
         {
             Standing = [new Vector3(ExteriorGrid.CellSize + 1100f, QuarterCentre, Raised)],
             StandingTerrainCheck = TerrainCheckReaching(TerrainCheckDistance) with { CountTerrainTypeChanges = countsTypes },
-            Lands = [RaisedLand() with { UndoQuarters = QuarterSet.Of([0, 1, 2, 3]) }],
+            Lands = [RaisedLand() with { UndoQuarters = QuarterSet.Of([0, 1, 2, 3]), EarlierPlugin = earlierFromTheBaseGame ? BaseGame : LaterMod.ToPluginName() }],
         };
 
         var land = Assert.Single(Plan(scene).Lands);
 
-        Assert.Equal((!countsTypes, true), (land.Textures.Contains(1), land.Textures.Contains(0)));
-        Assert.Equal(countsTypes, Assert.Single(land.ChangedQuarters, quarter => quarter.Quarter == 1).TexturesKeptForObjectThatStays);
+        Assert.Equal((!kept, true), (land.Textures.Contains(1), land.Textures.Contains(0)));
+        Assert.Equal(kept, Assert.Single(land.ChangedQuarters, quarter => quarter.Quarter == 1).TexturesKeptForObjectThatStays);
     }
 
     /// <summary>
-    /// The object that stays in cell (1, 0), with the water level of cell (0, 0) the cleaned mod changed, which nothing stands across.
-    /// When the step judging the object counts water changes, its area reaches cell (0, 0), so the water level stays for the object.
+    /// The object that stays in cell (1, 0), with the water level of cell (0, 0) the cleaned mod changed from an untrusted plugin's
+    /// level, which nothing stands across. When the step judging the object counts water changes (and no height changes, so the ground
+    /// there goes back), its area reaches cell (0, 0), where the water line would move across that ground, so the water level stays for
+    /// the object. An earlier level of the base game, which the step accepts, goes back: a later run accepts it.
     /// </summary>
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void TheWaterLevelTheChangedTerrainStepChecksAroundAnObjectThatStaysIsKeptWhenItCountsWaterChanges(bool countsWater)
+    [InlineData(true, false, true)]
+    [InlineData(false, false, false)]
+    [InlineData(true, true, false)]
+    public void TheWaterLevelTheChangedTerrainStepCountsAroundAnObjectThatStaysIsKeptUnlessItAcceptsTheEarlierLevel(bool countsWater, bool earlierFromTheBaseGame, bool kept)
     {
         var scene = new Scene
         {
             Standing = [new Vector3(ExteriorGrid.CellSize + 1100f, QuarterCentre, Raised)],
-            StandingTerrainCheck = TerrainCheckReaching(TerrainCheckDistance) with { CountWaterHeightChanges = countsWater },
-            Cells = [ChangedWater()],
+            StandingTerrainCheck = TerrainCheckReaching(TerrainCheckDistance) with { CountHeightChanges = false, CountWaterHeightChanges = countsWater },
+            Cells = [earlierFromTheBaseGame ? ChangedWater() : ChangedUntrustedWater()],
         };
 
         var cell = Assert.Single(Plan(scene).Cells);
 
         Assert.Equal(
-            countsWater ? (FirstStandingTargetKey(), WaterKeptReason.AroundObjectThatStays) : (null, WaterKeptReason.AtWaterLine),
+            kept ? (FirstStandingTargetKey(), WaterKeptReason.AroundObjectThatStays) : (null, WaterKeptReason.AtWaterLine),
             (cell.WaterKeptBy, cell.WaterKeptFor));
         Assert.True(cell.IsRestored);
+    }
+
+    /// <summary>
+    /// As above, counting water changes with the untrusted earlier level, and height changes too: the raised ground the step reads
+    /// around the object stays, above both levels, so the water line moves across no ground there and the level goes back.
+    /// </summary>
+    [Fact]
+    public void AWaterLevelWhoseLineMovesAcrossNoGroundTheStepReadsGoesBack()
+    {
+        var scene = new Scene
+        {
+            Standing = [new Vector3(ExteriorGrid.CellSize + 1100f, QuarterCentre, Raised)],
+            StandingTerrainCheck = TerrainCheckReaching(TerrainCheckDistance) with { CountWaterHeightChanges = true },
+            Cells = [ChangedUntrustedWater()],
+        };
+
+        var cell = Assert.Single(Plan(scene).Cells);
+
+        Assert.Equal(((RecordKey?)null, true), (cell.WaterKeptBy, cell.Undone.Any(part => part.Name.Part == CellPart.WaterLevel)));
     }
 
     /// <summary>
@@ -354,15 +379,16 @@ public sealed class RestoreLoopTests
     }
 
     /// <summary>
-    /// As above, with the water level of cell (0, 0) the cleaned mod changed, which nothing stands across. When the cleaned mod's own
-    /// changed-terrain check counts water changes, its area around the copy reaches the cell, so the water level stays for the copy.
+    /// As above, with the water level of cell (0, 0) the cleaned mod changed from an untrusted plugin's level, which nothing stands
+    /// across. When the cleaned mod's own changed-terrain check counts water changes and no height changes, the water line would move
+    /// across the ground that goes back in its area around the copy, so the water level stays for the copy.
     /// </summary>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public void TheWaterLevelWhereTheCleanedModsOwnTerrainCheckLooksAroundACopyIsKeptWhenItCountsWaterChanges(bool countsWater)
     {
-        var scene = CopyScene(TerrainCheckReaching(TerrainCheckDistance) with { CountWaterHeightChanges = countsWater }) with { Cells = [ChangedWater()] };
+        var scene = CopyScene(TerrainCheckReaching(TerrainCheckDistance) with { CountHeightChanges = false, CountWaterHeightChanges = countsWater }) with { Cells = [ChangedUntrustedWater()] };
 
         var result = Plan(scene);
 
@@ -378,6 +404,31 @@ public sealed class RestoreLoopTests
     /// </summary>
     [Fact]
     public void ACopyLostInALaterPassKeepsItsRockForItsArea()
+    {
+        var result = Plan(CopyOnAMovedNavmesh());
+
+        var judged = Assert.Single(result.Objects);
+        Assert.Equal(new CloneJudged(CloneNeed.AreaStillStands, CloneRefusal.ActorsWalkOnIt), judged.Cloning);
+        Assert.Equal((false, (AreaVerdict?)AreaVerdict.StillStanding), (judged.IsRestored, judged.KeptForArea));
+        Assert.Equal(NavmeshGuard.Ground, Assert.Single(result.NavmeshGroups).Refused?.Guard);
+        Assert.True(result.Passes >= 3);
+    }
+
+    /// <summary>The scene above runs three passes or more, yet the copies are checked too close in one world, built once.</summary>
+    [Fact]
+    public void TheCopiesAreCheckedTooCloseInOneWorldWhateverThePassCount()
+    {
+        var worlds = new ConcurrentQueue<CollectedObjects>();
+
+        var result = Plan(CopyOnAMovedNavmesh() with { CheckedWorlds = worlds });
+
+        Assert.True(result.Passes >= 3);
+        Assert.Single(worlds.Where(world => world.Targets.Any(target => target.CloneOf is not null)).Distinct(ReferenceEqualityComparer.Instance));
+        Assert.True(worlds.Count(world => world.Targets.Any(target => target.CloneOf is not null)) >= 2);
+    }
+
+    /// <summary>The copy scene with the copy on a triangle of the navmesh the cleaned mod moved, and the house of a later mod.</summary>
+    private static Scene CopyOnAMovedNavmesh()
     {
         var copyPlace = new Vector3(2600, 2600, Raised + RockHalfSize);
         var navmesh = MovedNavmesh() with
@@ -395,19 +446,11 @@ public sealed class RestoreLoopTests
                 [],
                 MapEntry: null),
         };
-        var scene = CopyScene(cleanedModsTerrainCheck: null, copyPlace, oldPlace: new Vector3(1500, 1500, 500)) with
+        return CopyScene(cleanedModsTerrainCheck: null, copyPlace, oldPlace: new Vector3(1500, 1500, 500)) with
         {
             Others = [LaterObject(10, House.Base, HousePlace)],
             Navmeshes = [navmesh],
         };
-
-        var result = Plan(scene);
-
-        var judged = Assert.Single(result.Objects);
-        Assert.Equal(new CloneJudged(CloneNeed.AreaStillStands, CloneRefusal.ActorsWalkOnIt), judged.Cloning);
-        Assert.Equal((false, (AreaVerdict?)AreaVerdict.StillStanding), (judged.IsRestored, judged.KeptForArea));
-        Assert.Equal(NavmeshGuard.Ground, Assert.Single(result.NavmeshGroups).Refused?.Guard);
-        Assert.True(result.Passes >= 3);
     }
 
     /// <summary>
@@ -1640,6 +1683,10 @@ public sealed class RestoreLoopTests
         new CellWaterCopy(TestTargets.TargetName, HasWater: true, CleanedModsWater),
         DefaultWaterLevel: null);
 
+    /// <summary><see cref="ChangedWater"/> with the earlier level from a plugin the changed-terrain step does not accept.</summary>
+    private static CellChangedByCleanedMod ChangedUntrustedWater() =>
+        ChangedWater() with { EarlierWater = new CellWaterCopy(LaterMod.ToPluginName(), HasWater: true, EarlierWater) };
+
     /// <summary>
     /// The cell, whose music and water level the cleaned mod changed: before it the cell used the worldspace's default water height 0,
     /// and the cleaned mod stores 0 as the cell's own height, so the level stays the same.
@@ -1750,7 +1797,7 @@ public sealed class RestoreLoopTests
         TestShapes.Placed(LaterMod, index, model, position) with { ChangeWithoutCleanedMod = new ObjectChange(LaterMod.ToPluginName(), AcceptedFrom: null) };
 
     /// <summary>The step's result, after proving for the scene that taking over the pass before's work in the loop changes nothing; the checks counted are the real run's.</summary>
-    private static RestoreWhereRemovedResult Plan(Scene scene) => RestoreLoopReuse.Plan(InputOf(scene), InputOf(scene with { TooCloseChecks = null }));
+    private static RestoreWhereRemovedResult Plan(Scene scene) => RestoreLoopReuse.Plan(InputOf(scene), InputOf(scene with { TooCloseChecks = null, CheckedWorlds = null }));
 
     private static WhereRemovedRestorer.Input InputOf(Scene scene)
     {
@@ -1773,9 +1820,16 @@ public sealed class RestoreLoopTests
             WinningPrimitives = scene.Primitives,
         };
         var rules = TestPlacedGuardRules.Create(scene.Shapes, Trust, Plugins, Support, TestGround.NoTerrain(), scene.Workers);
-        Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule> tooClose = scene.TooCloseChecks is { } checks
+        Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule> counted = scene.TooCloseChecks is { } checks
             ? (world, caches, excluded, settings) => new CountingRule(rules.TooClose(world, caches, excluded, settings), checks)
             : rules.TooClose;
+        Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule> tooClose = scene.CheckedWorlds is { } worlds
+            ? (world, caches, excluded, settings) =>
+            {
+                worlds.Enqueue(world);
+                return counted(world, caches, excluded, settings);
+            }
+            : counted;
         ImmutableArray<NavmeshWorldTriangle> winning =
         [
             .. scene.Navmeshes.SelectMany(navmesh => Enumerable.Range(0, navmesh.Winner.Triangles.Length)
@@ -1791,7 +1845,9 @@ public sealed class RestoreLoopTests
             shownTargets: TestScenes.Create(targets, [], scene.Shapes).IndexShownTargets);
         var groups = TestTargetGroups.None with
         {
-            Accepted = new AcceptedWorld(TestTargets.PatchName, ImmutableDictionary<PluginName, VersionTrust>.Empty.Add(BaseGame, VersionTrust.Full).Add(TestTargets.TargetName, VersionTrust.Full)),
+            Accepted = new AcceptedWorld(
+                TestTargets.PatchName,
+                ImmutableDictionary<PluginName, VersionTrust>.Empty.Add(BaseGame, VersionTrust.Full).Add(TestTargets.TargetName, VersionTrust.Full).Add(LaterMod.ToPluginName(), VersionTrust.None)),
             CleanedModsObjects = TestTargetGroups.None.CleanedModsObjects with { ChangedTerrainSettings = scene.CleanedModsTerrainCheck ?? TestTargetGroups.ChangedTerrainOff },
         };
         return new(
@@ -1863,6 +1919,9 @@ public sealed class RestoreLoopTests
 
         /// <summary>When set, collects every placed record the too-close rule checks, once per check.</summary>
         public ConcurrentQueue<RecordKey>? TooCloseChecks { get; init; }
+
+        /// <summary>When set, collects the world of every too-close rule built, once per rule.</summary>
+        public ConcurrentQueue<CollectedObjects>? CheckedWorlds { get; init; }
 
         public WhereRemovedRestoreSettings Settings { get; init; } = AllOn;
         public int Workers { get; init; } = 1;

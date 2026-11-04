@@ -1,4 +1,5 @@
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Rules.RemovalRules.Contracts;
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveTooCloseObjects;

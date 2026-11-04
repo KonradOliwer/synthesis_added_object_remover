@@ -975,7 +975,7 @@ public sealed class RestoreWhereRemovedGuardTests
             Shapes,
             navmeshes: new NavmeshIndex(bucket => bucket.Grid is null && !navmesh.IsEmpty ? [.. navmesh] : null),
             shownTargets: TestScenes.Create(targets, [], Shapes).IndexShownTargets);
-        return RestoreLoopReuse.Plan(
+        return WhereRemovedRestorer.Plan(
             new(
                 new(collected, scene.OtherMods),
                 decisions,

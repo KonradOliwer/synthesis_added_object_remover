@@ -1,4 +1,4 @@
-using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
+using AddedObjectRemover.Rules.RemovalRules.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 

@@ -1,4 +1,4 @@
-using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
+using AddedObjectRemover.Rules.RemovalRules.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
 namespace AddedObjectRemover.Steps.FitClashingObjects.Contracts;

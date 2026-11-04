@@ -522,7 +522,7 @@ public sealed class NavmeshUndoPlanTests
             .Where(record => stands?.Invoke(record) == false)
             .ToHashSet();
         var doors = new DoorLinks(collected.ChangedRecords, []);
-        var doorsAsTheyEnd = new DoorsAsTheyEnd(FinalPresence.Of(collected, removedByRun, []), doors, _ => true);
+        var doorsAsTheyEnd = new DoorsAsTheyEnd(new PresenceInPass(FinalPresence.Of(collected, removedByRun, []), _ => true), doors);
         var plan = new NavmeshUndoPlan(
             judged,
             sunk => new NavmeshGroupGuards(changed, sunk, changedRecords, removedByRun.Contains, doors, doorsAsTheyEnd, plugins, Cleaned),

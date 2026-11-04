@@ -1191,19 +1191,7 @@ public sealed class RestoreLoopTests
         Assert.Contains(Plan(scene).Objects, judged => judged.Refused is not null);
     }
 
-    /// <summary>
-    /// Every plan of this class and of the other restore step tests is made again with each pass recomputing everything instead of
-    /// taking over the pass before's work (<see cref="RestoreLoopReuse"/>); here over a scene that takes several passes and holds a
-    /// navmesh, a house, a tree, a rock and a water cell.
-    /// </summary>
-    [Fact]
-    public void TakingOverThePassBeforesWorkEndsInTheSameStateAsRecomputingEverythingInEveryPass()
-    {
-        var result = Plan(SceneOfSeveralPasses());
-
-        Assert.InRange(result.Passes, 3, int.MaxValue);
-    }
-
+    /// <summary>A scene that takes several passes and holds a navmesh, a house, a tree, a rock and a water cell.</summary>
     private static Scene SceneOfSeveralPasses() => RockInTheNavmeshTakenBack() with
     {
         Others = [.. RockInTheNavmeshTakenBack().Others, TestShapes.Placed(BaseGameMod, 11, Tree.Base, new Vector3(3000, 1000, 0)), LaterObject(12, Block.Base, new Vector3(CellCentre + 300, CellCentre, 0))],
@@ -1796,8 +1784,7 @@ public sealed class RestoreLoopTests
     private static OtherObject LaterObject(int index, BaseKey model, Vector3 position) =>
         TestShapes.Placed(LaterMod, index, model, position) with { ChangeWithoutCleanedMod = new ObjectChange(LaterMod.ToPluginName(), AcceptedFrom: null) };
 
-    /// <summary>The step's result, after proving for the scene that taking over the pass before's work in the loop changes nothing; the checks counted are the real run's.</summary>
-    private static RestoreWhereRemovedResult Plan(Scene scene) => RestoreLoopReuse.Plan(InputOf(scene), InputOf(scene with { TooCloseChecks = null, CheckedWorlds = null }));
+    private static RestoreWhereRemovedResult Plan(Scene scene) => WhereRemovedRestorer.Plan(InputOf(scene));
 
     private static WhereRemovedRestorer.Input InputOf(Scene scene)
     {

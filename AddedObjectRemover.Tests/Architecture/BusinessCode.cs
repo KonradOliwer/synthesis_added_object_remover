@@ -4,8 +4,8 @@ using System.Runtime.CompilerServices;
 namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
-/// The built types and source files of the business modules: the steps, the decision list, the base-object shapes
-/// and the settings validation, each with its contracts. A module is found by its project in the project table.
+/// The built types and source files of the business modules: the steps, the shared rules, the decision list, the base-object
+/// shapes and the settings validation, each with its contracts. A module is found by its project in the project table.
 /// </summary>
 internal static class BusinessCode
 {
@@ -17,9 +17,12 @@ internal static class BusinessCode
 
     private static readonly ProjectRules Rules = ProjectRules.Load();
 
-    private static readonly string[] DomainFolderRoots = ["Steps/", "Caches/", "Run/"];
+    private static readonly string[] DomainFolderRoots = ["Steps/", "Rules/", "Caches/", "Run/"];
 
-    /// <summary>Module folders outside Steps; every project under Steps is a business module.</summary>
+    /// <summary>Every project under these folders is a business module.</summary>
+    private static readonly string[] BusinessFolderRoots = ["Steps/", "Rules/"];
+
+    /// <summary>Module folders outside <see cref="BusinessFolderRoots"/>.</summary>
     private static readonly string[] BusinessModuleFoldersOutsideSteps = ["Caches/BaseObjectShapeAndKind", "Run/RunSettingsValidation", "Run/RunSettingsReading"];
 
     private static readonly Lazy<HashSet<string>> BusinessProjects = new(ReadBusinessProjects);
@@ -48,7 +51,7 @@ internal static class BusinessCode
     /// <summary>The folder of the module that owns the type, such as "Steps/WriteThePatch"; a contracts project belongs to its logic module's folder.</summary>
     public static string ModuleFolder(Type type) => ModuleFolderOf(Rules.Find(AssemblyName(type)).Folder);
 
-    /// <summary>A type of Ids, or of any contracts project of a step, a cache or the run, or one of Report's own internal types.</summary>
+    /// <summary>A type of Ids, or of any contracts project of a step, a rule, a cache or the run, or one of Report's own internal types.</summary>
     public static bool IsDomainType(Type type)
     {
         var assemblyName = AssemblyName(type);
@@ -109,6 +112,6 @@ internal static class BusinessCode
             .ToHashSet();
 
     private static bool IsBusinessFolder(string projectFolder) =>
-        projectFolder.StartsWith("Steps/", StringComparison.Ordinal)
+        BusinessFolderRoots.Any(root => projectFolder.StartsWith(root, StringComparison.Ordinal))
             || BusinessModuleFoldersOutsideSteps.Contains(ModuleFolderOf(projectFolder));
 }

@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
@@ -64,8 +63,8 @@ internal sealed record RestoreLoopInputs(
 /// the grid points under objects of other plugins placed for the ground as it is, under navmeshes on the ground as it is, under the
 /// targets and placed records going back in their present shape that end present, under refused placed records that stand now and reach the ground and in cells no longer storable are
 /// protected; the quarter textures the changed-terrain step reads around the targets and copies that stand are kept; and the water
-/// levels with something at their water line, or that the step reads around a target or copy that stands, are kept. Every pass reads only the state before it and what
-/// the pass before it read.
+/// levels with something at their water line, or that the step reads around a target or copy that stands, are kept. Every pass reads
+/// only the state before it and checks everything again.
 /// </summary>
 /// <param name="placedGuards">Null when no placed record's areas let it go back.</param>
 /// <param name="terrainGuards">Null while the terrain is switched off.</param>
@@ -81,46 +80,34 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
     public (RestoreState Final, int Passes, TimeSpan PlacedGuardsTime) Run(RestoreState start)
     {
         var state = start;
-        PassInput? previous = null;
         var placedGuardsTime = TimeSpan.Zero;
         for (var passes = 1; ; passes++)
         {
-            var before = ReadPassInput(state, previous);
-            var (next, passPlacedGuardsTime) = Pass(before, FindAddedSincePassBefore(before, previous));
+            var (next, passPlacedGuardsTime) = Pass(ReadPassInput(state));
             placedGuardsTime += passPlacedGuardsTime;
             if (next.Count == state.Count) return (state, passes, placedGuardsTime);
             state = next;
-            previous = before;
         }
     }
 
-    /// <param name="previous">What the pass before read; null in the first pass.</param>
-    /// <remarks>
-    /// What stands follows only from the placed records going back and the navmeshes as planned only from the refused navmesh groups,
-    /// so each is the pass before's while no placed record, or no navmesh group, was refused since.
-    /// </remarks>
-    private PassInput ReadPassInput(RestoreState state, PassInput? previous)
+    private PassInput ReadPassInput(RestoreState state)
     {
         var placedGoingBack = state.PlacedGoingBack();
         var withClone = state.GoingBackWithClone();
-        return new PassInput(
-            state,
-            placedGoingBack,
-            withClone,
-            PlacedRefusedSince(state, previous) ? ReadWhatStands(placedGoingBack, withClone) : previous.Standing,
-            NavmeshesRefusedSince(state, previous) ? ReadNavmeshesAsPlanned(state) : previous.Navmeshes);
+        var presence = new PresenceInPass(inputs.FinalPresence, placedGoingBack.Contains);
+        return new PassInput(state, placedGoingBack, withClone, presence, ReadWhatStands(placedGoingBack, withClone, presence), ReadNavmeshesAsPlanned(state));
     }
 
     /// <remarks>A clone always ends present, whatever becomes of its record: it is a new record no order of the run removes.</remarks>
-    private WhatStands ReadWhatStands(IReadOnlySet<int> placedGoingBack, IReadOnlySet<int> withClone)
+    private WhatStands ReadWhatStands(IReadOnlySet<int> placedGoingBack, IReadOnlySet<int> withClone, PresenceInPass presence)
     {
-        List<TargetObject> targets = [.. inputs.TargetsThatMayStay.Where(placed => !EndsRemoved(placed.Key, placedGoingBack))];
+        List<TargetObject> targets = [.. inputs.TargetsThatMayStay.Where(placed => !presence.EndsRemoved(placed.Key))];
         var clones = inputs.World.ClonesOf(withClone).ToList();
         return new(
-            inputs.Standing.ThatStay(placedGoingBack, withClone),
-            [.. targets, .. inputs.World.NowOfThoseKeepingTheirShape(placedGoingBack).Where(placed => !EndsRemoved(placed.Key, placedGoingBack)), .. clones],
+            inputs.Standing.ThatStay(placedGoingBack, withClone, presence),
+            [.. targets, .. inputs.World.NowOfThoseKeepingTheirShape(placedGoingBack).Where(placed => !presence.EndsRemoved(placed.Key)), .. clones],
             [.. targets, .. clones],
-            [.. inputs.World.NowOfAllBut(placedGoingBack).Where(refused => !EndsRemoved(refused.Key, placedGoingBack))]);
+            [.. inputs.World.NowOfAllBut(placedGoingBack).Where(refused => !presence.EndsRemoved(refused.Key))]);
     }
 
     private NavmeshesAsPlanned ReadNavmeshesAsPlanned(RestoreState state) =>
@@ -129,40 +116,10 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
             state.Navmeshes?.IndexOfTrianglesGoingBack() ?? new NavmeshIndex(_ => null),
             state.Navmeshes?.MembersGoingBack() ?? new HashSet<RecordKey>());
 
-    /// <returns>True in the first pass.</returns>
-    private static bool PlacedRefusedSince(RestoreState state, [NotNullWhen(false)] PassInput? previous) =>
-        previous is null || state.PlacedStoppedCount != previous.State.PlacedStoppedCount;
-
-    /// <returns>True in the first pass.</returns>
-    private static bool NavmeshesRefusedSince(RestoreState state, [NotNullWhen(false)] PassInput? previous) =>
-        previous is null || state.Navmeshes?.RefusedCount != previous.State.Navmeshes?.RefusedCount;
-
-    /// <returns>True in the first pass.</returns>
-    private static bool GroundProtectedSince(RestoreState state, PassInput? previous) =>
-        previous is null || state.Terrain.ProtectedCount != previous.State.Terrain.ProtectedCount;
-
-    /// <summary>
-    /// What the pass reads that the pass before did not, in the pass's order, and which plans changed since; everything in the first
-    /// pass. Only this can refuse, protect or keep more: the navmesh groups and water cells going back only shrink, each check the pass
-    /// before made reads only its own group, cell or object and what both passes read, and the ground guard of the navmeshes reads
-    /// only the protected points.
-    /// </summary>
-    private static AddedSincePassBefore FindAddedSincePassBefore(PassInput before, PassInput? previous)
-    {
-        var placedRefused = PlacedRefusedSince(before.State, previous);
-        var navmeshesRefused = NavmeshesRefusedSince(before.State, previous);
-        return new(
-            placedRefused ? before.Standing.FindStandingNotIn(previous?.Standing) : WhatStands.Nothing,
-            navmeshesRefused ? before.Navmeshes.FindStayingChangedNotIn(previous?.Navmeshes) : new HashSet<RecordKey>(),
-            GroundProtectedSince(before.State, previous),
-            placedRefused,
-            navmeshesRefused);
-    }
-
-    private (RestoreState State, TimeSpan PlacedGuardsTime) Pass(PassInput before, AddedSincePassBefore added)
+    private (RestoreState State, TimeSpan PlacedGuardsTime) Pass(PassInput before)
     {
         var (placed, clones, causesLeftOut, placedGuardsTime) = RefusePlaced(before);
-        return (new RestoreState(placed, clones, RefuseNavmeshGroups(before, added), ProtectGround(before, added), KeepWater(before, added), causesLeftOut), placedGuardsTime);
+        return (new RestoreState(placed, clones, RefuseNavmeshGroups(before), ProtectGround(before), KeepWater(before), causesLeftOut), placedGuardsTime);
     }
 
     /// <summary>
@@ -180,55 +137,38 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
     }
 
     /// <summary>
-    /// The ground guard against the current terrain plan when it changed since the pass before, the object guard against the objects
-    /// that stay now and did not before, and the water guard and the door guard with the doors as they end against the current plans,
-    /// for the groups still going back.
+    /// The ground guard against the current terrain plan, the object guard against the objects that stay, and the water guard and the
+    /// door guard with the doors as they end against the current plans, for the groups still going back.
     /// </summary>
-    private NavmeshUndoPlan? RefuseNavmeshGroups(PassInput before, AddedSincePassBefore added)
+    private NavmeshUndoPlan? RefuseNavmeshGroups(PassInput before)
     {
         var state = before.State;
-        if (state.Navmeshes is not { } navmeshes) return null;
-        var onGround = added.GroundProtected
-            ? navmeshes.RefuseOnGround(inputs.FindLandWorldspace, cell => inputs.GroundBeforeAndAfter(state.Terrain, cell), inputs.HeightTolerance)
-            : navmeshes;
-        var onObjects = added.Standing.ObjectsThatStay.Count == 0
-            ? onGround
-            : onGround.RefuseOnObjects(added.Standing.ObjectsThatStay, before.Navmeshes.TrianglesGoingBack);
-        return onObjects
+        return state.Navmeshes?
+            .RefuseOnGround(inputs.FindLandWorldspace, cell => inputs.GroundBeforeAndAfter(state.Terrain, cell), inputs.HeightTolerance)
+            .RefuseOnObjects(before.Standing.ObjectsThatStay, before.Navmeshes.TrianglesGoingBack)
             .RefuseOnWater(state.Water.EndsAsBefore)
-            .RefuseOnDoors(new DoorsAsTheyEnd(inputs.FinalPresence, inputs.Doors, before.PlacedGoingBack.Contains));
+            .RefuseOnDoors(new DoorsAsTheyEnd(before.PassPresence, inputs.Doors));
     }
 
     /// <summary>
     /// The points under the targets and the placed records going back that keep their shape where they stand now, that end present
     /// given the refusals so far and reach the ground, and in the areas the changed-terrain step checks around the targets and copies
-    /// among them (<see cref="TerrainStepAreas"/>), under refused placed records
-    /// that stand now, where they stand and reach the ground, each of those only when it did not in the pass before; then under
-    /// objects of other plugins placed for the ground as it is, under navmeshes on the ground as it is and in the cells no longer
-    /// storable, each only when what it reads changed since the pass before, and each reason kept first.
+    /// among them (<see cref="TerrainStepAreas"/>), under refused placed records that stand now, where they stand and reach the ground;
+    /// then under objects of other plugins placed for the ground as it is, under navmeshes on the ground as it is and in the cells no
+    /// longer storable, each reason kept first.
     /// </summary>
-    /// <remarks>
-    /// The points under an object do not depend on the plan, so one that stood in the pass before has all of them protected already.
-    /// The areas the changed-terrain step checks around a target do, through the planned heights, so they are read again for every
-    /// object that stands whenever the plan protects more, and so are the quarters whose textures stay in them.
-    /// </remarks>
-    private TerrainUndoPlan ProtectGround(PassInput before, AddedSincePassBefore added)
+    private TerrainUndoPlan ProtectGround(PassInput before)
     {
-        var state = before.State;
-        if (terrainGuards is null) return state.Terrain;
-        var terrain = state.Terrain;
-        var stepAreasFor = added.GroundProtected ? before.Standing : added.Standing;
+        var terrain = before.State.Terrain;
+        if (terrainGuards is null) return terrain;
+        var standing = before.Standing;
         return terrain
-            .Protect(TerrainKeptReason.UnderObjectThatStays, UnderAndAround(added.Standing.StandingInTheirPlace, stepAreasFor.JudgedInTheirPlace, terrain))
-            .Protect(TerrainKeptReason.UnderObjectKeptAsChanged, UnderAndAround(added.Standing.RefusedThatStand, stepAreasFor.RefusedThatStand, terrain))
-            .Protect(
-                TerrainKeptReason.UnderObjectPlacedForTheGroundAsItIs,
-                added.GroundProtected || added.PlacedRefused ? terrainGuards.UnderObjectsPlacedForTheGroundAsItIs(terrain, placed => EndsRemoved(placed, before.PlacedGoingBack)) : [])
-            .Protect(
-                TerrainKeptReason.UnderNavmesh,
-                added.GroundProtected || added.NavmeshesRefused ? terrainGuards.UnderNavmeshesOnTheGroundAsItIs(terrain, ReadNavmeshesAsTheyWillStand(before)) : [])
-            .Protect(TerrainKeptReason.TooSteepToStore, added.GroundProtected ? terrain.PointsOfCellsTooSteepToStore() : [])
-            .KeepTextures(inputs.StepAreas.QuartersAround(stepAreasFor.Judged(), terrain));
+            .Protect(TerrainKeptReason.UnderObjectThatStays, UnderAndAround(standing.StandingInTheirPlace, standing.JudgedInTheirPlace, terrain))
+            .Protect(TerrainKeptReason.UnderObjectKeptAsChanged, UnderAndAround(standing.RefusedThatStand, standing.RefusedThatStand, terrain))
+            .Protect(TerrainKeptReason.UnderObjectPlacedForTheGroundAsItIs, terrainGuards.UnderObjectsPlacedForTheGroundAsItIs(terrain, before.PassPresence.EndsRemoved))
+            .Protect(TerrainKeptReason.UnderNavmesh, terrainGuards.UnderNavmeshesOnTheGroundAsItIs(terrain, ReadNavmeshesAsTheyWillStand(before)))
+            .Protect(TerrainKeptReason.TooSteepToStore, terrain.PointsOfCellsTooSteepToStore())
+            .KeepTextures(inputs.StepAreas.QuartersAround(standing.Judged(), terrain));
     }
 
     /// <summary>The points under the first objects where they reach the ground, then in the areas the changed-terrain step checks around the second.</summary>
@@ -239,30 +179,28 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
         before.State.Navmeshes?.AsTheyWillStand(inputs.Winning, before.Navmeshes.TrianglesGoingBack) ?? new NavmeshesAsTheyWillStand(inputs.Winning, _ => true, goingBack: null);
 
     /// <summary>
-    /// The water guard against the objects that stay and the triangles of the navmeshes that stay changed now and did not in the pass
-    /// before, then the water levels the changed-terrain step counts around the targets and copies that stand now and did not before,
-    /// or around all of them when the terrain plan protects more, since the ground it reads under the water lines then changed.
+    /// The water guard against the objects that stay and the triangles of the navmeshes that stay changed, then the water levels the
+    /// changed-terrain step counts around the targets and copies that stand.
     /// </summary>
-    private WaterUndoPlan KeepWater(PassInput before, AddedSincePassBefore added)
+    private WaterUndoPlan KeepWater(PassInput before) =>
+        before.State.Water
+            .KeepAtWaterLines(before.Standing.ObjectsThatStay, TrianglesOf(before.Navmeshes.ThatStayChanged))
+            .KeepAroundObjectsThatStay(inputs.StepAreas.WaterAreasAround(before.Standing.Judged(), before.State.Terrain), inputs.IsAccepted);
+
+    private List<NavmeshTriangleInCell> TrianglesOf(ImmutableArray<RecordKey> navmeshes)
     {
-        var water = added.Standing.ObjectsThatStay.Count == 0 && added.NavmeshesThatStayChanged.Count == 0
-            ? before.State.Water
-            : before.State.Water.KeepAtWaterLines(added.Standing.ObjectsThatStay, TrianglesOf(added.NavmeshesThatStayChanged));
-        var stepAreasFor = added.GroundProtected ? before.Standing : added.Standing;
-        return water.KeepAroundObjectsThatStay(inputs.StepAreas.WaterAreasAround(stepAreasFor.Judged(), before.State.Terrain), inputs.IsAccepted);
+        var stayChanged = navmeshes.ToHashSet();
+        return [.. inputs.ChangedNavmeshTriangles.Where(triangle => stayChanged.Contains(triangle.Navmesh))];
     }
-
-    private List<NavmeshTriangleInCell> TrianglesOf(IReadOnlySet<RecordKey> navmeshes) =>
-        navmeshes.Count == 0 ? [] : [.. inputs.ChangedNavmeshTriangles.Where(triangle => navmeshes.Contains(triangle.Navmesh))];
-
-    private bool EndsRemoved(RecordKey placed, IReadOnlySet<int> placedGoingBack) => inputs.FinalPresence.EndsRemoved(placed, placedGoingBack.Contains);
 
     /// <summary>A navmesh whose switch is off stays changed.</summary>
     private ImmutableArray<RecordKey> NavmeshesThatStayChanged(RestoreState state) => state.Navmeshes?.NavmeshesThatStayChanged() ?? inputs.ChangedNavmeshes;
 
     /// <summary>What every guard of one pass reads of the state before it, computed once.</summary>
     /// <param name="WithClone">Those of <paramref name="PlacedGoingBack"/> that go back with a copy.</param>
-    private sealed record PassInput(RestoreState State, IReadOnlySet<int> PlacedGoingBack, IReadOnlySet<int> WithClone, WhatStands Standing, NavmeshesAsPlanned Navmeshes);
+    /// <param name="PassPresence">Whether a placed record ends removed with <paramref name="PlacedGoingBack"/> going back.</param>
+    private sealed record PassInput(
+        RestoreState State, IReadOnlySet<int> PlacedGoingBack, IReadOnlySet<int> WithClone, PresenceInPass PassPresence, WhatStands Standing, NavmeshesAsPlanned Navmeshes);
 
     /// <summary>What stands in the final world, given which placed records go back.</summary>
     /// <param name="ObjectsThatStay">In key order.</param>
@@ -277,41 +215,12 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
     /// <param name="RefusedThatStand">The refused placed records that stand now and end present, where they stand.</param>
     private sealed record WhatStands(List<StandingBox> ObjectsThatStay, List<TargetObject> StandingInTheirPlace, List<TargetObject> JudgedInTheirPlace, List<TargetObject> RefusedThatStand)
     {
-        public static WhatStands Nothing => new([], [], [], []);
-
         /// <summary>The objects a later run judges where they stand: those judged in their place, then the refused ones that stand.</summary>
         public IEnumerable<TargetObject> Judged() => JudgedInTheirPlace.Concat(RefusedThatStand);
-
-        /// <returns>What stands here and not in <paramref name="earlier"/>, each in its order here; all of it when there is no earlier.</returns>
-        public WhatStands FindStandingNotIn(WhatStands? earlier)
-        {
-            if (earlier is null) return this;
-            var objects = earlier.ObjectsThatStay.ToHashSet();
-            var inTheirPlace = earlier.StandingInTheirPlace.Select(placed => placed.Key).ToHashSet();
-            var refused = earlier.RefusedThatStand.Select(candidate => candidate.Key).ToHashSet();
-            return new(
-                [.. ObjectsThatStay.Where(box => !objects.Contains(box))],
-                [.. StandingInTheirPlace.Where(placed => !inTheirPlace.Contains(placed.Key))],
-                [.. JudgedInTheirPlace.Where(placed => !inTheirPlace.Contains(placed.Key))],
-                [.. RefusedThatStand.Where(candidate => !refused.Contains(candidate.Key))]);
-        }
     }
 
     /// <summary>The navmeshes as planned, given which navmesh groups are refused.</summary>
     /// <param name="TrianglesGoingBack">The earlier triangles of the navmesh groups going back; none while the navmeshes are switched off.</param>
     /// <param name="GoingBack">The members of the navmesh groups going back; none while the navmeshes are switched off.</param>
-    private sealed record NavmeshesAsPlanned(ImmutableArray<RecordKey> ThatStayChanged, NavmeshIndex TrianglesGoingBack, IReadOnlySet<RecordKey> GoingBack)
-    {
-        /// <returns>The navmeshes that stay changed here and not in <paramref name="earlier"/>; all of them when there is no earlier.</returns>
-        public IReadOnlySet<RecordKey> FindStayingChangedNotIn(NavmeshesAsPlanned? earlier) =>
-            earlier is null ? ThatStayChanged.ToHashSet() : ThatStayChanged.Except(earlier.ThatStayChanged).ToHashSet();
-    }
-
-    /// <summary>What the pass reads that the pass before did not, and which plans changed since.</summary>
-    /// <param name="Standing">What stands now and did not in the pass before, each in its order now.</param>
-    /// <param name="GroundProtected">The terrain plan protects more points than the pass before's.</param>
-    /// <param name="PlacedRefused">More placed records are refused than in the pass before.</param>
-    /// <param name="NavmeshesRefused">More navmesh groups are refused than in the pass before.</param>
-    private sealed record AddedSincePassBefore(
-        WhatStands Standing, IReadOnlySet<RecordKey> NavmeshesThatStayChanged, bool GroundProtected, bool PlacedRefused, bool NavmeshesRefused);
+    private sealed record NavmeshesAsPlanned(ImmutableArray<RecordKey> ThatStayChanged, NavmeshIndex TrianglesGoingBack, IReadOnlySet<RecordKey> GoingBack);
 }

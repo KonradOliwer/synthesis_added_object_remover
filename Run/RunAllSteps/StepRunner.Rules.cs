@@ -6,6 +6,7 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
+using AddedObjectRemover.Rules.RemovalRules.Contracts;
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;

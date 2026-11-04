@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>Decides which changes the cleaned mod made to other mods' objects, cells, terrain and navmeshes go back where it was removed from a wide area, keeping every part a later plugin changed and everything that stays. It removes nothing and does not write. It references its contracts, the contracts of the steps and caches it reads, Ids, PluginRecordFacts and the package-free tools it uses, and holds no packages.</Description>
+    <Description>Decides which changes the cleaned mod made to other mods' objects, cells, terrain and navmeshes go back where it was removed from a wide area, keeping every part a later plugin changed and everything that stays. It removes nothing and does not write. It references its contracts, the contracts of the steps and caches it reads, the rule contracts it asks, Ids, PluginRecordFacts and the package-free tools it uses, and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\RestoreWhereRemoved.Contracts\RestoreWhereRemoved.Contracts.csproj" />
@@ -12,7 +12,7 @@
     <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
     <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
-    <ProjectReference Include="..\JudgeChangedObjects.Contracts\JudgeChangedObjects.Contracts.csproj" />
+    <ProjectReference Include="..\..\Rules\RemovalRules.Contracts\RemovalRules.Contracts.csproj" />
     <ProjectReference Include="..\OtherModsObjectsLeftWithoutSupport.Contracts\OtherModsObjectsLeftWithoutSupport.Contracts.csproj" />
     <ProjectReference Include="..\RemoveTooCloseObjects.Contracts\RemoveTooCloseObjects.Contracts.csproj" />
     <ProjectReference Include="..\RemoveObjectsOnChangedTerrain.Contracts\RemoveObjectsOnChangedTerrain.Contracts.csproj" />

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AddedObjectRemover</RootNamespace>
+    <Description>The check shapes several removal rules share: the placement rule a removal step provides and the judge, the fit and the restore ask, its tries and their check. It references BoxAndTransformMath (for the placement), TimingAndDisposal (to dispose of the checks after the one where the object stands), CollectPlacedObjects.Contracts (the target object a rule is asked about) and RemovalDecisionList.Contracts (the removal reason a clash is worded as), and holds no packages.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Steps\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
+    <ProjectReference Include="..\..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
+    <ProjectReference Include="..\..\Tools\TimingAndDisposal\TimingAndDisposal.csproj" />
+  </ItemGroup>
+</Project>

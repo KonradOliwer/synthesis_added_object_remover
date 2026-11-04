@@ -77,6 +77,57 @@ public class ProjectRulesTests
     }
 
     [Fact]
+    public void RulesReferenceOnlyToolsIdsCachesRulesAndTheWorldData() =>
+        Assert.Empty(Rules.FindRulesReferencingOtherThanToolsIdsCachesRulesAndTheWorldData());
+
+    [Fact]
+    public void ARuleReferenceToAnythingButToolsIdsCachesRulesAndTheWorldDataIsReported()
+    {
+        var bad = Table(
+            new ProjectRule("Rule", "U", "Rules/Rule", ["Rule.Contracts", "Other.Rule.Contracts", "Tool", "Ids", "RunCaches.Contracts", "CollectPlacedObjects.Contracts", "Step.Contracts", "Step"], []),
+            new ProjectRule("Rule.Contracts", "C", "Rules/Rule.Contracts", ["Step.Contracts", "RemovalDecisionList.Contracts"], []),
+            new ProjectRule("Other.Rule.Contracts", "C", "Rules/Other.Rule.Contracts", [], []),
+            new ProjectRule("Tool", "T", "Tools/Tool", [], []),
+            new ProjectRule("Ids", "K", "Ids", [], []),
+            new ProjectRule("RunCaches.Contracts", "Q", "Caches/RunCaches.Contracts", [], []),
+            new ProjectRule("CollectPlacedObjects.Contracts", "C", "Steps/CollectPlacedObjects.Contracts", [], []),
+            new ProjectRule("RemovalDecisionList.Contracts", "C", "Steps/RemovalDecisionList.Contracts", [], []),
+            new ProjectRule("Step.Contracts", "C", "Steps/Step.Contracts", [], []),
+            new ProjectRule("Step", "L", "Steps/Step", [], []));
+
+        Assert.Equal(["Rule -> Step.Contracts", "Rule -> Step", "Rule.Contracts -> Step.Contracts"], bad.FindRulesReferencingOtherThanToolsIdsCachesRulesAndTheWorldData());
+    }
+
+    [Fact]
+    public void StepsReferenceOtherStepsOnlyForTheirResults()
+    {
+        Assert.Empty(Rules.FindStepsReferencingOtherStepsWithoutReason());
+        Assert.Empty(Rules.FindListedStepResultReferencesThatDoNotExist());
+    }
+
+    [Fact]
+    public void AStepReferenceToAnotherStepsContractsWithoutAListedReasonIsReported()
+    {
+        var bad = Table(
+            new ProjectRule("Step", "L", "Steps/Step", ["Step.Contracts", "Other.Contracts", "Rule.Contracts"], []),
+            new ProjectRule("Step.Contracts", "C", "Steps/Step.Contracts", ["Other.Contracts"], []),
+            new ProjectRule("Other.Contracts", "C", "Steps/Other.Contracts", [], []),
+            new ProjectRule("Rule.Contracts", "C", "Rules/Rule.Contracts", [], []));
+
+        Assert.Equal(["Step -> Other.Contracts", "Step.Contracts -> Other.Contracts"], bad.FindStepsReferencingOtherStepsWithoutReason());
+    }
+
+    [Fact]
+    public void AListedStepResultReferenceThatIsGoneIsReported()
+    {
+        var listed = ProjectRules.StepResultReferences.Keys.First();
+        var projectName = listed[..listed.IndexOf(' ')];
+        var bad = Table(new ProjectRule(projectName, "L", $"Steps/{projectName}", [], []));
+
+        Assert.Contains(listed, bad.FindListedStepResultReferencesThatDoNotExist());
+    }
+
+    [Fact]
     public void ToolsReferenceOnlyToolsAndIds() =>
         Assert.Empty(Rules.FindToolsReferencingNonTools());
 
@@ -141,6 +192,10 @@ public class ProjectRulesTests
             new ProjectRule("Good.Contracts", "C", "Steps/Good.Contracts", [], []),
             new ProjectRule("Marked.Contracts", "L", "Steps/Marked.Contracts", [], []),
             new ProjectRule("Marked", "C", "Steps/Marked", [], []),
+            new ProjectRule("Rule", "U", "Rules/Rule", [], []),
+            new ProjectRule("Rule.Contracts", "C", "Rules/Rule.Contracts", [], []),
+            new ProjectRule("StepLikeRule", "L", "Rules/StepLikeRule", [], []),
+            new ProjectRule("RuleLike.Contracts", "U", "Rules/RuleLike.Contracts", [], []),
             new ProjectRule("Cache", "L", "Caches/Cache", [], []),
             new ProjectRule("Catalog.Contracts", "Q", "Caches/Catalog.Contracts", [], []),
             new ProjectRule("Other.Contracts", "V", "Caches/Other.Contracts", [], []),
@@ -160,6 +215,8 @@ public class ProjectRulesTests
             [
                 "Marked.Contracts (Steps/Marked.Contracts) is kind L; its folder and name allow only C",
                 "Marked (Steps/Marked) is kind C; its folder and name allow only L",
+                "StepLikeRule (Rules/StepLikeRule) is kind L; its folder and name allow only U",
+                "RuleLike.Contracts (Rules/RuleLike.Contracts) is kind U; its folder and name allow only C",
                 "Cache (Caches/Cache) is kind L; its folder and name allow only B",
                 "Other.Contracts (Caches/Other.Contracts) is kind V; its folder and name allow only C or Q",
                 "Misplaced (Tools/Misplaced) is kind L; its folder and name allow only A or T",

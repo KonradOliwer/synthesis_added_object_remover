@@ -1,7 +1,7 @@
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
-namespace AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
+namespace AddedObjectRemover.Rules.RemovalRules.Contracts;
 
 /// <summary>A removal step's rule asked about a given object standing at given placements, its own or shrunk or turned ones.</summary>
 public interface IPlacementRule

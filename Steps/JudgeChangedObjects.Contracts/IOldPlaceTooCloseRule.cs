@@ -1,3 +1,4 @@
+using AddedObjectRemover.Rules.RemovalRules.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
 namespace AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;

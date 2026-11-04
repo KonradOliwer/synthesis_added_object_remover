@@ -62,6 +62,7 @@
     { "name": "RemoveInvisibleObjectsLeftBehind", "kind": "L", "packages": [] },
     { "name": "MoveKeptMarkers.Contracts", "kind": "C", "packages": [] },
     { "name": "MoveKeptMarkers", "kind": "L", "packages": [] },
+    { "name": "RemovalRules.Contracts", "kind": "C", "packages": [] },
     { "name": "WriteThePatch.Contracts", "kind": "C", "packages": [] },
     { "name": "WriteThePatch", "kind": "L", "packages": [] },
     { "name": "BuildLogAndReports.Contracts", "kind": "C", "packages": [] },

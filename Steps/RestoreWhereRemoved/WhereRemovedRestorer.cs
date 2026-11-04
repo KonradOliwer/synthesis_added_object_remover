@@ -102,7 +102,7 @@ public static class WhereRemovedRestorer
     }
 
     /// <summary>The candidates judged by the never-rules and their areas on the removal steps' decisions, and every kind's plan before the guards between the kinds.</summary>
-    internal static PlannedRestore BuildPlans(Input input)
+    private static PlannedRestore BuildPlans(Input input)
     {
         var inputs = new StepInputs(input);
         return new PlannedRestore(inputs, PlanKinds(inputs, JudgePlannedClones(inputs, JudgeAreas(inputs))));
@@ -173,7 +173,7 @@ public static class WhereRemovedRestorer
     }
 
     /// <summary>What every candidate became once the guards between the kinds change nothing more.</summary>
-    internal static RestoreWhereRemovedResult ResultOf(Plans plans, RestoreState state, int passes, RestoreWhereRemovedTimes times, WhereRemovedRestoreSettings settings)
+    private static RestoreWhereRemovedResult ResultOf(Plans plans, RestoreState state, int passes, RestoreWhereRemovedTimes times, WhereRemovedRestoreSettings settings)
     {
         var objects = PlacedJudgments.WithOutcomes(plans.PlacedJudged, plans.Cleared, state.Placed, state.Clones);
         return new RestoreWhereRemovedResult(
@@ -198,7 +198,7 @@ public static class WhereRemovedRestorer
         var (collected, reads) = (inputs.Input.Earlier.Collected, inputs.Input.Reads);
         var byKey = verdicts.ChangedNavmeshes.ToDictionary(navmesh => navmesh.Navmesh);
         var records = collected.ChangedRecords.ToDictionary(record => record.Key);
-        var doorsIfAllGoBack = new DoorsAsTheyEnd(presence, doors, _ => true);
+        var doorsIfAllGoBack = new DoorsAsTheyEnd(new PresenceInPass(presence, _ => true), doors);
         return new NavmeshUndoPlan(
             verdicts.Navmeshes,
             sunk => new NavmeshGroupGuards(byKey, sunk, records, removedByRun.Contains, doors, doorsIfAllGoBack, reads.Plugins, reads.CleanedMod),

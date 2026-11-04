@@ -30,7 +30,7 @@ internal static class RestoreGuardsBuilder
             terrainGuards,
             new RestoreLoopInputs(
                 world,
-                new StandingObjects(world, blocking, plans.FinalPresence),
+                new StandingObjects(world, blocking),
                 plans.TargetsThatMayStay,
                 plans.Ground,
                 new TerrainStepAreas(

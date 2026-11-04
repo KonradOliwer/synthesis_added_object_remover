@@ -495,7 +495,7 @@ public sealed class RestoreWhereRemovedTests
         var world = TestScenes.CreateWorld(targets, []);
         var caches = CachesOf(targets);
         var allOff = Settings with { OtherModsObjects = false, Terrain = false, Cells = false, Navmeshes = false };
-        var groupOff = RestoreLoopReuse.Plan(
+        var groupOff = WhereRemovedRestorer.Plan(
             new(
                 new(world, OtherModsObjectsResult.SwitchedOff),
                 decisions,
@@ -997,7 +997,7 @@ public sealed class RestoreWhereRemovedTests
         var rules = GuardRules(workers);
         var caches = CachesOf(targets, bases);
         var restore = settings ?? Settings;
-        return RestoreLoopReuse.Plan(
+        return WhereRemovedRestorer.Plan(
             new(
                 new(collected, otherModsObjects ?? OtherModsObjectsResult.SwitchedOff),
                 final,

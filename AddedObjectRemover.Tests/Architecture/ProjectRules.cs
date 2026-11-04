@@ -24,7 +24,7 @@ internal sealed record ProjectRule(string Name, string Kind, string Folder, IRea
 /// <summary>
 /// The rows of ProjectRules.json whose project is in the solution, each with the folder and the references (to projects
 /// with a row) its csproj has. Kinds: K shared ids, A and T tools, C contracts, Q cache catalog, E entry, X test,
-/// R runner, L logic, B cache builder, V settings validation.
+/// R runner, L step logic, U rule logic, B cache builder, V settings validation.
 /// </summary>
 internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IReadOnlyList<ProjectRule> Projects)
 {
@@ -38,22 +38,95 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
     private const string CacheCatalogKind = "Q";
     private const string StepLogicKind = "L";
     private const string CacheBuilderKind = "B";
+    private const string RuleLogicKind = "U";
     private const string IdsFolder = "Ids";
     private const string ToolsFolderPrefix = "Tools/";
     private const string StepsFolderPrefix = "Steps/";
+    private const string RulesFolderPrefix = "Rules/";
     private const string CachesFolderPrefix = "Caches/";
     private const string RunFolderPrefix = "Run/";
     private const string ContractsNameSuffix = ".Contracts";
     private const string TestsNameSuffix = ".Tests";
     private const string RunCachesContractsName = "RunCaches.Contracts";
 
-    public static readonly IReadOnlyList<string> LogicKinds = [StepLogicKind, CacheBuilderKind];
+    public static readonly IReadOnlyList<string> LogicKinds = [StepLogicKind, CacheBuilderKind, RuleLogicKind];
 
     /// <summary>The logic projects that may reference the run's contracts, with the reason.</summary>
     public static readonly IReadOnlyDictionary<string, string> LogicReferencesToRunContracts = new Dictionary<string, string>
     {
         ["BuildLogAndReports -> RunSettingsValidation.Contracts"] = "the log prints the run's settings and the batch request, which these contracts define",
     };
+
+    /// <summary>The step contracts that describe the world a rule judges, which every rule project may reference, with the reason.</summary>
+    public static readonly IReadOnlyDictionary<string, string> RuleWorldDataReferences = new Dictionary<string, string>
+    {
+        ["CollectPlacedObjects.Contracts"] = "the placed objects, record versions and restored parts a rule judges",
+        ["RemovalDecisionList.Contracts"] = "the decisions the follow-up rule works on, and the removal reasons a finding is worded as",
+        ["IdentifyTheMods.Contracts"] = "the trust table the other-mods support rules read",
+    };
+
+    /// <summary>The step projects that may reference another step's contracts, with the result of that step they read.</summary>
+    public static readonly IReadOnlyDictionary<string, string> StepResultReferences = new[]
+    {
+        Reads("the placed objects the scan collected", "CollectPlacedObjects.Contracts",
+            "SelectObjectsThatCanCauseRemovals.Contracts", "SelectObjectsThatCanCauseRemovals", "FindTargetObjectsToKeep",
+            "RemovalDecisionList.Contracts", "RemovalDecisionList", "JudgeChangedObjects.Contracts", "JudgeChangedObjects",
+            "FitClashingObjects", "RemoveObjectsOnChangedTerrain.Contracts", "RemoveObjectsOnChangedTerrain",
+            "RemoveTooCloseObjects.Contracts", "RemoveTooCloseObjects", "RemoveObjectsRestingOnRemovedOnes.Contracts",
+            "RemoveObjectsRestingOnRemovedOnes", "OtherModsObjectsLeftWithoutSupport.Contracts", "OtherModsObjectsLeftWithoutSupport",
+            "RemoveVisibleObjectsLeftBehind.Contracts", "RemoveVisibleObjectsLeftBehind", "RemoveObjectsInClearedAreas",
+            "RestoreWhereRemoved.Contracts", "RestoreWhereRemoved", "RemoveInvisibleObjectsLeftBehind.Contracts",
+            "RemoveInvisibleObjectsLeftBehind", "MoveKeptMarkers.Contracts", "MoveKeptMarkers", "WriteThePatch"),
+        Reads("the trust table of the identified mods", "IdentifyTheMods.Contracts",
+            "CollectPlacedObjects", "OtherModsObjectsLeftWithoutSupport"),
+        Reads("the targets the keep step keeps", "FindTargetObjectsToKeep.Contracts",
+            "RemovalDecisionList.Contracts", "RemovalDecisionList", "FitClashingObjects", "RemoveObjectsRestingOnRemovedOnes.Contracts",
+            "RemoveObjectsRestingOnRemovedOnes", "OtherModsObjectsLeftWithoutSupport", "RemoveVisibleObjectsLeftBehind.Contracts",
+            "RemoveVisibleObjectsLeftBehind", "RemoveObjectsInClearedAreas.Contracts", "RemoveInvisibleObjectsLeftBehind.Contracts"),
+        Reads("the run's removal decisions", "RemovalDecisionList.Contracts",
+            "JudgeChangedObjects.Contracts", "JudgeChangedObjects", "FitClashingObjects.Contracts", "FitClashingObjects",
+            "RemoveObjectsOnChangedTerrain.Contracts", "RemoveObjectsOnChangedTerrain", "RemoveTooCloseObjects.Contracts",
+            "RemoveTooCloseObjects", "RemoveObjectsRestingOnRemovedOnes.Contracts", "RemoveObjectsRestingOnRemovedOnes",
+            "OtherModsObjectsLeftWithoutSupport.Contracts", "OtherModsObjectsLeftWithoutSupport", "RemoveVisibleObjectsLeftBehind.Contracts",
+            "RemoveVisibleObjectsLeftBehind", "RemoveObjectsInClearedAreas.Contracts", "RemoveObjectsInClearedAreas", "RestoreWhereRemoved",
+            "RemoveInvisibleObjectsLeftBehind.Contracts", "RemoveInvisibleObjectsLeftBehind", "MoveKeptMarkers.Contracts",
+            "MoveKeptMarkers", "WriteThePatch"),
+        Reads("the old-place rule the judge step declares, which it provides", "JudgeChangedObjects.Contracts", "RemoveTooCloseObjects"),
+        Reads("the objects that can cause removals", "SelectObjectsThatCanCauseRemovals.Contracts",
+            "RemoveTooCloseObjects.Contracts", "RemoveTooCloseObjects", "RemoveInvisibleObjectsLeftBehind"),
+        Reads("the too-close settings and zones the selection measures with", "RemoveTooCloseObjects.Contracts",
+            "SelectObjectsThatCanCauseRemovals", "RestoreWhereRemoved.Contracts", "RestoreWhereRemoved"),
+        Reads("the resting rule of the fit step", "FitClashingObjects.Contracts",
+            "RemoveObjectsRestingOnRemovedOnes", "OtherModsObjectsLeftWithoutSupport"),
+        Reads("the follow-up settings and what the follow-up removed", "RemoveObjectsRestingOnRemovedOnes.Contracts",
+            "OtherModsObjectsLeftWithoutSupport.Contracts", "OtherModsObjectsLeftWithoutSupport", "RemoveVisibleObjectsLeftBehind.Contracts",
+            "RemoveVisibleObjectsLeftBehind", "RemoveObjectsInClearedAreas.Contracts", "RemoveObjectsInClearedAreas"),
+        Reads("what became of other mods' objects", "OtherModsObjectsLeftWithoutSupport.Contracts",
+            "RemoveObjectsRestingOnRemovedOnes", "RestoreWhereRemoved", "RemoveInvisibleObjectsLeftBehind", "MoveKeptMarkers", "WriteThePatch"),
+        Reads("the left-behind toolkit and the visible objects left behind", "RemoveVisibleObjectsLeftBehind.Contracts",
+            "RemoveObjectsInClearedAreas.Contracts", "RemoveObjectsInClearedAreas", "RestoreWhereRemoved",
+            "RemoveInvisibleObjectsLeftBehind.Contracts", "RemoveInvisibleObjectsLeftBehind"),
+        Reads("the cleared areas", "RemoveObjectsInClearedAreas.Contracts", "RestoreWhereRemoved.Contracts", "RestoreWhereRemoved"),
+        Reads("the changed-terrain settings and checks", "RemoveObjectsOnChangedTerrain.Contracts", "RestoreWhereRemoved.Contracts", "RestoreWhereRemoved"),
+        Reads("the too-close-to-what-stays rule it implements for the restore", "RestoreWhereRemoved.Contracts", "RemoveTooCloseObjects"),
+        Reads("the holders-of-objects-that-stay search it implements for the restore", "RestoreWhereRemoved.Contracts", "OtherModsObjectsLeftWithoutSupport"),
+        Reads("the restore's result it writes", "RestoreWhereRemoved.Contracts", "WriteThePatch"),
+        Reads("the invisible objects left behind whose markers move", "RemoveInvisibleObjectsLeftBehind.Contracts", "MoveKeptMarkers.Contracts", "MoveKeptMarkers"),
+        Reads("the step results it logs and reports",
+            ["CollectPlacedObjects.Contracts", "FindTargetObjectsToKeep.Contracts", "FitClashingObjects.Contracts", "MoveKeptMarkers.Contracts", "OtherModsObjectsLeftWithoutSupport.Contracts", "RemovalDecisionList.Contracts",
+             "RemoveInvisibleObjectsLeftBehind.Contracts", "RemoveObjectsInClearedAreas.Contracts", "RemoveObjectsOnChangedTerrain.Contracts",
+             "RemoveObjectsRestingOnRemovedOnes.Contracts", "RemoveTooCloseObjects.Contracts", "RemoveVisibleObjectsLeftBehind.Contracts",
+             "RestoreWhereRemoved.Contracts", "SelectObjectsThatCanCauseRemovals.Contracts", "WriteThePatch.Contracts"],
+            "BuildLogAndReports.Contracts", "BuildLogAndReports"),
+        Reads("the step results its report contracts describe", "JudgeChangedObjects.Contracts", "BuildLogAndReports.Contracts"),
+        Reads("the trust table it logs", "IdentifyTheMods.Contracts", "BuildLogAndReports"),
+    }.SelectMany(entries => entries).ToDictionary(entry => entry.Key, entry => entry.Value);
+
+    private static IEnumerable<KeyValuePair<string, string>> Reads(string reason, string stepContracts, params string[] readers) =>
+        Reads(reason, [stepContracts], readers);
+
+    private static IEnumerable<KeyValuePair<string, string>> Reads(string reason, IReadOnlyList<string> stepContracts, params string[] readers) =>
+        readers.SelectMany(reader => stepContracts.Select(contracts => KeyValuePair.Create($"{reader} -> {contracts}", reason)));
 
     public static readonly IReadOnlyList<string> ToolKinds = ["A", "T"];
 
@@ -89,6 +162,15 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
     private static bool IsStepContracts(ProjectRule project) =>
         project.Kind == ContractsKind && InFolder(project, StepsFolderPrefix);
 
+    private static bool IsStep(ProjectRule project) => InFolder(project, StepsFolderPrefix);
+
+    private static bool IsRule(ProjectRule project) => InFolder(project, RulesFolderPrefix);
+
+    private static bool IsRuleContracts(ProjectRule project) => project.Kind == ContractsKind && IsRule(project);
+
+    private static string StepName(string projectName) =>
+        projectName.EndsWith(ContractsNameSuffix, StringComparison.Ordinal) ? projectName[..^ContractsNameSuffix.Length] : projectName;
+
     private bool IsCacheContracts(ProjectRule project) => IsContracts(project) && InFolder(project, CachesFolderPrefix);
 
     private bool IsRunContracts(ProjectRule project) => IsContracts(project) && InFolder(project, RunFolderPrefix);
@@ -119,6 +201,23 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
     public IReadOnlyList<string> FindListedLogicReferencesToRunContractsThatDoNotExist() =>
         LogicReferencesToRunContracts.Keys.Except(FindReferences(IsLogic, IsRunContracts)).ToList();
 
+    public IReadOnlyList<string> FindRulesReferencingOtherThanToolsIdsCachesRulesAndTheWorldData() =>
+        FindReferences(IsRule, project => !IsTool(project) && !IsIds(project) && !IsCacheContracts(project) && !IsRuleContracts(project) && !RuleWorldDataReferences.ContainsKey(project.Name));
+
+    public IReadOnlyList<string> FindStepsReferencingOtherStepsWithoutReason() =>
+        FindStepReferencesToOtherStepsContracts().Except(StepResultReferences.Keys).ToList();
+
+    public IReadOnlyList<string> FindListedStepResultReferencesThatDoNotExist() =>
+        StepResultReferences.Keys.Except(FindStepReferencesToOtherStepsContracts()).ToList();
+
+    private List<string> FindStepReferencesToOtherStepsContracts() =>
+        Projects
+            .Where(IsStep)
+            .SelectMany(project => project.References
+                .Where(reference => IsStepContracts(Find(reference)) && StepName(reference) != StepName(project.Name))
+                .Select(reference => $"{project.Name} -> {reference}"))
+            .ToList();
+
     public IReadOnlyList<string> FindToolsReferencingNonTools() =>
         FindReferences(IsTool, project => !IsTool(project) && !IsIds(project));
 
@@ -137,7 +236,8 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
             .ToList();
 
     /// <summary>
-    /// Ids: K. Tools: T or A. Under Steps: C for a contracts project, otherwise L. Under Caches: C or Q for a contracts project, otherwise B.
+    /// Ids: K. Tools: T or A. Under Steps: C for a contracts project, otherwise L. Under Rules: C for a contracts project, otherwise U.
+    /// Under Caches: C or Q for a contracts project, otherwise B.
     /// Under Run: C for a contracts project, otherwise V or R. Outside those folders: X for the tests, otherwise E for the entry.
     /// </summary>
     private static IReadOnlyList<string> KindsThatFit(ProjectRule project)
@@ -146,6 +246,7 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
         if (project.Folder == IdsFolder) return [IdsKind];
         if (InFolder(project, ToolsFolderPrefix)) return ToolKinds;
         if (InFolder(project, StepsFolderPrefix)) return isContracts ? [ContractsKind] : [StepLogicKind];
+        if (InFolder(project, RulesFolderPrefix)) return isContracts ? [ContractsKind] : [RuleLogicKind];
         if (InFolder(project, CachesFolderPrefix)) return isContracts ? ContractsKinds : [CacheBuilderKind];
         if (InFolder(project, RunFolderPrefix)) return isContracts ? [ContractsKind] : [ValidationKind, RunnerKind];
         if (project.Folder.Contains('/')) return [];

@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
+using AddedObjectRemover.Rules.RemovalRules.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 

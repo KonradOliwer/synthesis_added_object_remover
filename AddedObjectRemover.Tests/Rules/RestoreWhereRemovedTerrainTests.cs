@@ -812,7 +812,7 @@ public sealed class RestoreWhereRemovedTerrainTests
             .Apply(RoundKind.TooClose, [.. scene.Removals.Select(index => new ProposedRemoval(new TargetId(index), new TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);
         var caches = new TestRunCaches(Shapes, navmeshes: NoNavmeshes, shownTargets: TestScenes.Create(targets, [], Shapes).IndexShownTargets);
         var restore = settings ?? Settings;
-        return RestoreLoopReuse.Plan(
+        return WhereRemovedRestorer.Plan(
             new(
                 new(collected, OtherModsObjectsResult.SwitchedOff),
                 final,

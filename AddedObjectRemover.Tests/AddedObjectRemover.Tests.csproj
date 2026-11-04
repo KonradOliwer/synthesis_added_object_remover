@@ -59,6 +59,7 @@
     <Using Include="AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts" />
     <Using Include="AddedObjectRemover.Steps.WriteThePatch" />
     <Using Include="AddedObjectRemover.Steps.WriteThePatch.Contracts" />
+    <Using Include="AddedObjectRemover.Rules.RemovalRules.Contracts" />
   </ItemGroup>
 
   <ItemGroup>
@@ -98,6 +99,7 @@
     <ProjectReference Include="..\Steps\FindTargetObjectsToKeep\FindTargetObjectsToKeep.csproj" />
     <ProjectReference Include="..\Steps\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
     <ProjectReference Include="..\Steps\RemovalDecisionList\RemovalDecisionList.csproj" />
+    <ProjectReference Include="..\Rules\RemovalRules.Contracts\RemovalRules.Contracts.csproj" />
     <ProjectReference Include="..\Steps\JudgeChangedObjects.Contracts\JudgeChangedObjects.Contracts.csproj" />
     <ProjectReference Include="..\Steps\JudgeChangedObjects\JudgeChangedObjects.csproj" />
     <ProjectReference Include="..\Steps\FitClashingObjects.Contracts\FitClashingObjects.Contracts.csproj" />

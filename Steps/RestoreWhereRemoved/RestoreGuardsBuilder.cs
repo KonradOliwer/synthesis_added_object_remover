@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
+using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
 
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 

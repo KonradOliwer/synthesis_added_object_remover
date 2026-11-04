@@ -21,6 +21,7 @@
     <ProjectReference Include="..\..\Steps\SelectObjectsThatCanCauseRemovals.Contracts\SelectObjectsThatCanCauseRemovals.Contracts.csproj" />
     <ProjectReference Include="..\..\Rules\ObjectsThatCanCauseRemovals.Contracts\ObjectsThatCanCauseRemovals.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\RemoveObjectsOnChangedTerrain.Contracts\RemoveObjectsOnChangedTerrain.Contracts.csproj" />
+    <ProjectReference Include="..\..\Rules\TerrainChangedByOtherMods.Contracts\TerrainChangedByOtherMods.Contracts.csproj" />
     <ProjectReference Include="..\..\Rules\TooCloseToOtherModsObjects.Contracts\TooCloseToOtherModsObjects.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\FitClashingObjects.Contracts\FitClashingObjects.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\RemoveObjectsRestingOnRemovedOnes.Contracts\RemoveObjectsRestingOnRemovedOnes.Contracts.csproj" />

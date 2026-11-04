@@ -85,7 +85,7 @@ public sealed class ScanNeedsTests
     [InlineData(true, false, true, true, false, true)]
     [InlineData(false, true, true, false, false, false)]
     public void ChangedTerrainReadsTheTerrainOnlyWhenOnAndTheLayersAndWaterOnlyWhenCounted(bool on, bool types, bool water, bool versions, bool layers, bool waterRead) =>
-        Assert.Equal(new ScanNeeds(TerrainVersions: versions, TerrainLayers: layers, Water: waterRead), Terrain(on, types, water).Needs);
+        Assert.Equal(new ScanNeeds(TerrainVersions: versions, TerrainLayers: layers, Water: waterRead), ChangedTerrainScanNeeds.Of(Terrain(on, types, water)));
 
     [Theory]
     [InlineData(false, false, false)]
@@ -94,7 +94,7 @@ public sealed class ScanNeedsTests
     [InlineData(false, true, true)]
     public void TheTerrainIsReadForTheChangedObjectsOnlyWhenOnlyTheirTerrainCheckIsOn(bool cleanedMod, bool changedObjects, bool changedObjectsOnly)
     {
-        var needs = ChangedTerrainSettings.NeedsOfBoth(Terrain(cleanedMod, types: false, water: false), Terrain(changedObjects, types: false, water: false));
+        var needs = ChangedTerrainScanNeeds.OfBoth(Terrain(cleanedMod, types: false, water: false), Terrain(changedObjects, types: false, water: false));
 
         Assert.Equal(new ScanNeeds(TerrainVersions: cleanedMod || changedObjects, TerrainForChangedObjectsOnly: changedObjectsOnly), needs);
     }

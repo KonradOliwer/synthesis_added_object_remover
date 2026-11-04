@@ -4,11 +4,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The settings and the result of the changed-terrain step: the target objects proposed for removal because another mod changed the terrain under them, and the step's removal reason. It references Ids, BoxAndTransformMath (for the areas the settings grow around an object), CollectPlacedObjects.Contracts (for what the step needs read), RemovalDecisionList.Contracts and UnexpectedFailureHandling (for its part key) and holds no packages.</Description>
+    <Description>The result of the changed-terrain step and what it needs the scan to read: the target objects proposed for removal because another mod changed the terrain under them, per set of settings. It references Ids, TerrainChangedByOtherMods.Contracts (the rule's settings and findings), CollectPlacedObjects.Contracts (for what the step needs read), RemovalDecisionList.Contracts and UnexpectedFailureHandling (for its passes and failures) and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
-    <ProjectReference Include="..\..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
+    <ProjectReference Include="..\..\Rules\TerrainChangedByOtherMods.Contracts\TerrainChangedByOtherMods.Contracts.csproj" />
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
     <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
     <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />

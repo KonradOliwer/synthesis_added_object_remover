@@ -1,6 +1,6 @@
-using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
+using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
 
-namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
+namespace AddedObjectRemover.Rules.TerrainChangedByOtherMods;
 
 /// <summary>
 /// Builds a cell's accepted terrain, each vertex's height and terrain type from its own accepted version, and compares the version

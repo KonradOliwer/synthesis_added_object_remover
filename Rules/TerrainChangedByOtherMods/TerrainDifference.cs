@@ -1,6 +1,6 @@
-using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
+using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
 
-namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
+namespace AddedObjectRemover.Rules.TerrainChangedByOtherMods;
 
 /// <summary>A plugin's terrain version of a cell, decoded per vertex for the comparison.</summary>
 /// <param name="Heights">Null where the record is deleted or has no height map.</param>

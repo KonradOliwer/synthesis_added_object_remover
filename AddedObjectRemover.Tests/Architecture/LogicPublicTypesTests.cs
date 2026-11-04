@@ -49,6 +49,7 @@ public class LogicPublicTypesTests
         ["BuildLogAndReports"] = "LogAndReports",
         ["ObjectsThatCanCauseRemovals"] = "RemovalCauses",
         ["TooCloseToOtherModsObjects"] = "TooCloseRules",
+        ["TerrainChangedByOtherMods"] = "ChangedTerrainRules",
     };
 
     /// <summary>
@@ -60,7 +61,7 @@ public class LogicPublicTypesTests
     {
         ["BaseObjectShapes.SolidShapes"] = "Which shapes of a mesh count for a base object's shape, which the mesh reader takes when the run opens it.",
         ["RemovalCauseSelector.MeasurementRules"] = "How the object caches measure other mods' objects; the caches take it when they are built.",
-        ["ChangedTerrainObjects.CreatePlacementRule"] = "The changed-terrain check of one placement, which the fit step and the judge step's old-place check ask.",
+        ["ChangedTerrainRules.CreatePlacementRule"] = "The changed-terrain check of one placement, which the fit step, the judge step's old-place check and the restore's copy check ask.",
         ["TooCloseRules.CreateNpcCacheRules"] = "How the NPC body cache and the placed-NPC index work out an NPC's body; the caches take them when they are built.",
         ["TooCloseRules.CreatePlacementRule"] = "The too-close check of one placement, which the fit step asks.",
         ["VisibleLeftBehindObjects.CreateSurroundingsJudging"] = "The direction rule the visible step owns (candidates, surroundings, verdict), which the invisible left-behind step asks.",

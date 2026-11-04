@@ -15,7 +15,7 @@
     <ProjectReference Include="..\..\Rules\RemovalRules.Contracts\RemovalRules.Contracts.csproj" />
     <ProjectReference Include="..\OtherModsObjectsLeftWithoutSupport.Contracts\OtherModsObjectsLeftWithoutSupport.Contracts.csproj" />
     <ProjectReference Include="..\..\Rules\TooCloseToOtherModsObjects.Contracts\TooCloseToOtherModsObjects.Contracts.csproj" />
-    <ProjectReference Include="..\RemoveObjectsOnChangedTerrain.Contracts\RemoveObjectsOnChangedTerrain.Contracts.csproj" />
+    <ProjectReference Include="..\..\Rules\TerrainChangedByOtherMods.Contracts\TerrainChangedByOtherMods.Contracts.csproj" />
     <ProjectReference Include="..\RemoveVisibleObjectsLeftBehind.Contracts\RemoveVisibleObjectsLeftBehind.Contracts.csproj" />
     <ProjectReference Include="..\..\Tools\IndexGraphQueries\IndexGraphQueries.csproj" />
     <ProjectReference Include="..\..\Caches\RunCaches.Contracts\RunCaches.Contracts.csproj" />

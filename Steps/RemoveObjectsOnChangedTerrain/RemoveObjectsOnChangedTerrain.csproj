@@ -4,23 +4,17 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>Finds the target objects on terrain that another mod changed, compared vertex by vertex with the accepted terrain (each height and terrain type from the highest version trusted for it) and cell by cell with the accepted water (its flag, own height and worldspace default each from the highest version trusted for it), and proposes their removal. It references its contracts, the contracts of the steps and caches it reads, the rule contracts it provides a rule to, Ids, PluginRecordFacts and the package-free tools it uses, and holds no packages.</Description>
+    <Description>Runs the changed-terrain rule once for each distinct set of settings over the target objects judged with it, and proposes the removal of the objects it finds on terrain another mod changed. It references its contracts, TerrainChangedByOtherMods.Contracts (the rule it asks), the contracts of the steps it reads, Ids and the package-free tools it uses, and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\RemoveObjectsOnChangedTerrain.Contracts\RemoveObjectsOnChangedTerrain.Contracts.csproj" />
+    <ProjectReference Include="..\..\Rules\TerrainChangedByOtherMods.Contracts\TerrainChangedByOtherMods.Contracts.csproj" />
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
     <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
-    <ProjectReference Include="..\..\Rules\RemovalRules.Contracts\RemovalRules.Contracts.csproj" />
-    <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
-    <ProjectReference Include="..\..\Caches\RunCaches.Contracts\RunCaches.Contracts.csproj" />
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
-    <ProjectReference Include="..\..\Tools\PluginRecordFacts\PluginRecordFacts.csproj" />
     <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
-    <ProjectReference Include="..\..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
-    <ProjectReference Include="..\..\Tools\GroundSurfaceQueries\GroundSurfaceQueries.csproj" />
     <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
-    <ProjectReference Include="..\..\Tools\ComputedOnceLookups\ComputedOnceLookups.csproj" />
-    <ProjectReference Include="..\..\Tools\NumericRanges\NumericRanges.csproj" />  </ItemGroup>
+  </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />
   </ItemGroup>

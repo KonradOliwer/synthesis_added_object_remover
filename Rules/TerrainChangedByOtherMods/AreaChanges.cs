@@ -1,6 +1,6 @@
-using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
+using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
 
-namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
+namespace AddedObjectRemover.Rules.TerrainChangedByOtherMods;
 
 /// <summary>The counted changes at the vertices of one check area, and which plugin each removal by height, terrain type or water names.</summary>
 /// <param name="Vertices">

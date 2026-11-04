@@ -67,6 +67,8 @@
     { "name": "ObjectsThatCanCauseRemovals", "kind": "U", "packages": [] },
     { "name": "TooCloseToOtherModsObjects.Contracts", "kind": "C", "packages": [] },
     { "name": "TooCloseToOtherModsObjects", "kind": "U", "packages": [] },
+    { "name": "TerrainChangedByOtherMods.Contracts", "kind": "C", "packages": [] },
+    { "name": "TerrainChangedByOtherMods", "kind": "U", "packages": [] },
     { "name": "WriteThePatch.Contracts", "kind": "C", "packages": [] },
     { "name": "WriteThePatch", "kind": "L", "packages": [] },
     { "name": "BuildLogAndReports.Contracts", "kind": "C", "packages": [] },

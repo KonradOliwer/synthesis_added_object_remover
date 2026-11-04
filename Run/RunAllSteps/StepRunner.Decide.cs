@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals;
 using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
+using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
 using AddedObjectRemover.Rules.TooCloseToOtherModsObjects;
 using AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts;
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
@@ -61,7 +62,7 @@ public static partial class StepRunner
         var judged = RunChangedObjectJudging(scope, runCaches, trust, collected);
         var groups = scope.Settings.CollisionGroupsOf(collected.Targets);
         var fitted = RunFit(scope, runCaches, trust, collected, tooCloseWorld, support, groups, kept, judged);
-        var changedTerrain = RunChangedTerrain(scope, runCaches, trust, collected, groups, fitted);
+        var changedTerrain = RunChangedTerrain(scope, collected, CreateChangedTerrainChecks(scope, runCaches, trust, collected), groups, fitted);
         var tooClose = RunTooClose(scope, collected, tooCloseWorld, TooCloseRules.CreateSearches(tooCloseWorld), groups, changedTerrain);
         var alsoRemove = RunAlsoRemove(scope, runCaches, collected, tooClose);
         var visibleLeftBehind = RunVisibleLeftBehind(scope, runCaches, collected, alsoRemove);
@@ -144,22 +145,12 @@ public static partial class StepRunner
 
     private static Decided<ChangedTerrainResult> RunChangedTerrain(
         RunScope scope,
-        IRunCaches runCaches,
-        ModTrustTable trust,
         CollectedObjects collected,
+        IChangedTerrainChecks checks,
         ImmutableArray<CollisionGroup> groups,
         Decided<FitResult> fitted) =>
         scope.Environment.Log.Timed(
-            () => ChangedTerrainObjects.Find(
-                new(
-                    collected,
-                    fitted.Decisions,
-                    trust.AcceptedWorld,
-                    scope.Environment.Plugins,
-                    scope.Plugin,
-                    runCaches.Shapes,
-                    scope.Settings.Execution,
-                    groups.Select(group => group.ChangedTerrain))),
+            () => ChangedTerrainObjects.Find(new(collected, fitted.Decisions, checks, scope.Settings.Execution, groups.Select(group => group.ChangedTerrain))),
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
 
     private static Decided<TooCloseResult> RunTooClose(

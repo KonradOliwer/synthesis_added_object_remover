@@ -15,7 +15,7 @@ namespace AddedObjectRemover.Rules.TooCloseToOtherModsObjects;
 /// </summary>
 public static class TooCloseRules
 {
-    /// <summary>The NPC cache rules, which the NPC body cache and the placed-NPC index apply (see <see cref="NpcCacheRules"/>).</summary>
+    /// <summary>The rules that work out an NPC's body and whether a placed record is an NPC (see <see cref="NpcCacheRules"/>).</summary>
     public static (NpcBodyRules Bodies, PlacedNpcRules PlacedNpcs) CreateNpcCacheRules() => (NpcCacheRules.Bodies, NpcCacheRules.PlacedNpcs);
 
     /// <summary>The searches over all of the world's target objects, one for each set of settings asked.</summary>
@@ -34,6 +34,7 @@ public static class TooCloseRules
     /// <param name="caches">The run's caches: the shapes and the triangles, and the index of the run's target objects.</param>
     /// <param name="worldCaches">The object caches of the old-place worlds, built when the first earlier version is checked.</param>
     /// <param name="causes">The objects that can cause removals in those worlds, selected among <paramref name="worldCaches"/>.</param>
+    /// <param name="settings">The too-close settings the earlier versions are measured with.</param>
     public static IOldPlaceTooCloseRule CreateOldPlaceTooCloseRule(
         IReadOnlyList<TargetObject> targets, IRunCaches caches, IObjectCachesOfWorlds worldCaches, ICausesOfWorlds causes, TooCloseSettings settings) =>
         new OldPlaceTooCloseRule(targets, new OtherWorlds(caches, worldCaches, causes), settings);

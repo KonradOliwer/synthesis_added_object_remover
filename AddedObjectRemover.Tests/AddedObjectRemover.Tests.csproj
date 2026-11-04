@@ -64,6 +64,8 @@
     <Using Include="AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts" />
     <Using Include="AddedObjectRemover.Rules.TooCloseToOtherModsObjects" />
     <Using Include="AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts" />
+    <Using Include="AddedObjectRemover.Rules.TerrainChangedByOtherMods" />
+    <Using Include="AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts" />
   </ItemGroup>
 
   <ItemGroup>
@@ -108,6 +110,8 @@
     <ProjectReference Include="..\Rules\ObjectsThatCanCauseRemovals\ObjectsThatCanCauseRemovals.csproj" />
     <ProjectReference Include="..\Rules\TooCloseToOtherModsObjects.Contracts\TooCloseToOtherModsObjects.Contracts.csproj" />
     <ProjectReference Include="..\Rules\TooCloseToOtherModsObjects\TooCloseToOtherModsObjects.csproj" />
+    <ProjectReference Include="..\Rules\TerrainChangedByOtherMods.Contracts\TerrainChangedByOtherMods.Contracts.csproj" />
+    <ProjectReference Include="..\Rules\TerrainChangedByOtherMods\TerrainChangedByOtherMods.csproj" />
     <ProjectReference Include="..\Steps\JudgeChangedObjects.Contracts\JudgeChangedObjects.Contracts.csproj" />
     <ProjectReference Include="..\Steps\JudgeChangedObjects\JudgeChangedObjects.csproj" />
     <ProjectReference Include="..\Steps\FitClashingObjects.Contracts\FitClashingObjects.Contracts.csproj" />

@@ -1,9 +1,9 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
+using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 
-namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
+namespace AddedObjectRemover.Rules.TerrainChangedByOtherMods;
 
 /// <summary>The outcome of checking one target object.</summary>
 /// <param name="WithoutTerrain">The object would be checked but has no terrain to compare.</param>
@@ -16,14 +16,14 @@ internal readonly record struct ObjectCheck(ObjectOnChangedTerrain? Hit, bool Wi
 }
 
 /// <summary>
-/// Checks whether another mod changed the terrain around a target object. Each cell's versions are compared once per step call
+/// Checks whether another mod changed the terrain around a target object. Each cell's versions are compared once per check
 /// and each object's check depends only on that comparison, so the result does not depend on the thread count. Thread-safe.
 /// </summary>
 /// <remarks>
 /// The land and the water of a cell are compared apart: a child worldspace can use its parent's land, which is then compared once
 /// for both, while the water fields belong to each worldspace's own cell.
 /// </remarks>
-internal sealed class ObjectTerrainCheck(IPluginRecords records, IBaseObjectShapes shapes, TerrainPlugins plugins, ChangedTerrainSettings settings)
+internal sealed class ObjectTerrainCheck(ITerrainView view, IBaseObjectShapes shapes, TerrainPlugins plugins, ChangedTerrainSettings settings)
 {
     /// <summary>By land cell: the cell in the worldspace whose land it uses.</summary>
     private readonly ComputedOncePerKey<ExteriorCell, CellTerrain?> _landCells = new(Publication.BuiltOnce, EqualityComparer<ExteriorCell>.Default);
@@ -32,7 +32,7 @@ internal sealed class ObjectTerrainCheck(IPluginRecords records, IBaseObjectShap
     private readonly ComputedOncePerKey<ExteriorCell, CellWaterChange?> _waterCells = new(Publication.BuiltOnce, EqualityComparer<ExteriorCell>.Default);
 
     private readonly CheckArea _area = new(shapes, settings);
-    private readonly CellTerrainComparison _terrain = new(plugins, new TerrainTypes(records), settings);
+    private readonly CellTerrainComparison _terrain = new(plugins, new TerrainTypes(view), settings);
 
     /// <summary>Null when no water change is counted; the water is then not read.</summary>
     private readonly CellWaterComparison? _water = settings.CountsWaterChanges ? new CellWaterComparison(plugins, settings) : null;
@@ -55,10 +55,10 @@ internal sealed class ObjectTerrainCheck(IPluginRecords records, IBaseObjectShap
 
     private bool IsCovered(TargetObject target) => settings.Checks(shapes.VisibilityOf(target).IsVisible);
 
-    /// <remarks>The first area that holds a change gives the finding, as the first removal zone that finds an object does in the too-close step.</remarks>
+    /// <remarks>The first area that holds a change gives the finding, as the first removal zone that finds an object does in the too-close rule.</remarks>
     private ObjectCheck CompareTerrain(TargetObject target)
     {
-        if (records.FindLandWorldspace(target.SpaceKey) is not { } landWorldspace) return ObjectCheck.NoTerrain;
+        if (view.FindLandWorldspace(target.SpaceKey) is not { } landWorldspace) return ObjectCheck.NoTerrain;
         var anyAreaHasTerrain = false;
         foreach (var area in _area.Around(target))
         {
@@ -83,11 +83,11 @@ internal sealed class ObjectTerrainCheck(IPluginRecords records, IBaseObjectShap
         return cells;
     }
 
-    private CellTerrain? CompareLand(ExteriorCell landCell) => _landCells.Get(landCell, () => _terrain.Compare(records.ReadTerrainVersions(landCell)));
+    private CellTerrain? CompareLand(ExteriorCell landCell) => _landCells.Get(landCell, () => _terrain.Compare(view.ReadTerrainVersions(landCell)));
 
     /// <returns>Null when no water change is counted.</returns>
     private CellWaterChange? CompareWater(ExteriorCell cell) =>
-        _water is { } water ? _waterCells.Get(cell, () => water.Compare(records.ReadWaterCopies(cell))) : null;
+        _water is { } water ? _waterCells.Get(cell, () => water.Compare(view.ReadWaterCopies(cell))) : null;
 
     /// <summary>The heights at the cells' vertices in one version of the ground: as accepted or as the game shows them (the winner).</summary>
     /// <remarks>A version without heights adds no heights.</remarks>

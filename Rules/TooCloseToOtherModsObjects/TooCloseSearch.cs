@@ -18,7 +18,7 @@ internal readonly record struct TargetCheck(ZoneHit? TooCloseTo, string? Failure
 /// BoundingBox removal zone: finds visible target objects whose grown local box (grown by a multiple of
 /// its size or by a distance in game units, see <see cref="ZoneGrowth.GrownScaledBox"/>) contains the bounds center of
 /// some other-mod object that can cause removals. Other mods' placed NPCs follow the
-/// <see cref="NpcTooCloseRule"/>. Invisible targets are left to the leftover invisible objects step.
+/// <see cref="NpcTooCloseRule"/>. Invisible targets are not searched.
 /// </summary>
 internal static class TooCloseSearch
 {

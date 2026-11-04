@@ -1,4 +1,4 @@
-namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
+namespace AddedObjectRemover.Rules.TerrainChangedByOtherMods;
 
 /// <summary>What each plugin is to the terrain and the water: how far its versions are believed in the accepted world, and where it loads.</summary>
 internal sealed class TerrainPlugins(AcceptedWorld accepted, LoadOrderPlugins loadOrder)

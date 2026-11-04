@@ -1,4 +1,6 @@
-namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
+using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
+
+namespace AddedObjectRemover.Rules.TerrainChangedByOtherMods;
 
 /// <summary>A kind of ground: the root material of a landscape texture, the game's default terrain, or unknown.</summary>
 /// <param name="Material">The root material; null for the default terrain and for unknown.</param>
@@ -21,8 +23,8 @@ internal readonly record struct TerrainType(RecordKey? Material, bool IsUnknown)
     }
 }
 
-/// <summary>The terrain type at each vertex of a terrain version. Each texture's type is read once per step call. Thread-safe.</summary>
-internal sealed class TerrainTypes(IPluginRecords records)
+/// <summary>The terrain type at each vertex of a terrain version. Each texture's type is read once per check. Thread-safe.</summary>
+internal sealed class TerrainTypes(ITerrainView view)
 {
     private readonly ComputedOncePerKey<RecordKey, TerrainType> _textures = new(Publication.BuiltOnce, EqualityComparer<RecordKey>.Default);
 
@@ -94,5 +96,5 @@ internal sealed class TerrainTypes(IPluginRecords records)
 
     /// <remarks>A material and its children are one type, so a mod's own material made a child of grass is still grass.</remarks>
     private TerrainType RootMaterialOf(RecordKey texture) =>
-        records.ReadTextureMaterialChain(texture) is [.. , var root] ? new TerrainType(root, IsUnknown: false) : TerrainType.Unknown;
+        view.ReadTextureMaterialChain(texture) is [.. , var root] ? new TerrainType(root, IsUnknown: false) : TerrainType.Unknown;
 }

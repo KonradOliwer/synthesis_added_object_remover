@@ -195,7 +195,12 @@ public class ChangedTerrainObjectsTests
     private static Decided<ChangedTerrainResult> Decide(
         CollectedObjects world, AcceptedWorld accepted, IPluginRecords plugin, int threads, params ObjectsJudgedWith<ChangedTerrainSettings>[] groups) =>
         ChangedTerrainObjects.Find(
-            new(world, TestSeededDecisions.StartUnprotected(world.Targets), accepted, LoadOrder, plugin, new BoxShapes(), new Execution(threads), groups));
+            new(
+                world,
+                TestSeededDecisions.StartUnprotected(world.Targets),
+                ChangedTerrainRules.CreateChecks(world.Targets, accepted, LoadOrder, ChangedTerrainRules.ViewOfLoadOrder(plugin), new BoxShapes()),
+                new Execution(threads),
+                groups));
 
     [Fact]
     public void GroupsWithDifferentSettingsRunOnceEachOverTheirOwnObjects()
@@ -376,7 +381,7 @@ public class ChangedTerrainObjectsTests
     public void AHeightThePatchPutsBackToALowerTrustedVersionsIsAcceptedFromThatVersion()
     {
         var comparison = new CellTerrainComparison(
-            new TerrainPlugins(Mods.AcceptedWorld, LoadOrder), new TerrainTypes(new TerrainPlugin(new Dictionary<ExteriorCell, TerrainVersion[]>())), Settings());
+            new TerrainPlugins(Mods.AcceptedWorld, LoadOrder), new TerrainTypes(ChangedTerrainRules.ViewOfLoadOrder(new TerrainPlugin(new Dictionary<ExteriorCell, TerrainVersion[]>()))), Settings());
         TerrainVersion[] versions = [Flat(Target), RaisedAt(TrustedMod, Near), Flat(Patch)];
 
         var terrain = comparison.Compare(versions);
@@ -461,7 +466,7 @@ public class ChangedTerrainObjectsTests
     public void TheAcceptedHeightsTakeEachVertexFromItsOwnAcceptedVersion()
     {
         var comparison = new CellTerrainComparison(
-            new TerrainPlugins(Mods.AcceptedWorld, LoadOrder), new TerrainTypes(new TerrainPlugin(new Dictionary<ExteriorCell, TerrainVersion[]>())), Settings());
+            new TerrainPlugins(Mods.AcceptedWorld, LoadOrder), new TerrainTypes(ChangedTerrainRules.ViewOfLoadOrder(new TerrainPlugin(new Dictionary<ExteriorCell, TerrainVersion[]>()))), Settings());
 
         var terrain = comparison.Compare([Flat(Target), RaisedAt(Other, Near), OwnChangesRaisingBeside]);
 

@@ -151,6 +151,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TooCloseToOtherModsObjects.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TooCloseToOtherModsObjects", "Rules\TooCloseToOtherModsObjects\TooCloseToOtherModsObjects.csproj", "{B1020005-6A11-4B22-8C33-0D4E5F6071D5}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TerrainChangedByOtherMods.Contracts", "Rules\TerrainChangedByOtherMods.Contracts\TerrainChangedByOtherMods.Contracts.csproj", "{B1020006-6A11-4B22-8C33-0D4E5F6071D6}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TerrainChangedByOtherMods", "Rules\TerrainChangedByOtherMods\TerrainChangedByOtherMods.csproj", "{B1020007-6A11-4B22-8C33-0D4E5F6071D7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -1049,6 +1053,30 @@ Global
 		{B1020005-6A11-4B22-8C33-0D4E5F6071D5}.Release|x64.Build.0 = Release|Any CPU
 		{B1020005-6A11-4B22-8C33-0D4E5F6071D5}.Release|x86.ActiveCfg = Release|Any CPU
 		{B1020005-6A11-4B22-8C33-0D4E5F6071D5}.Release|x86.Build.0 = Release|Any CPU
+		{B1020006-6A11-4B22-8C33-0D4E5F6071D6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B1020006-6A11-4B22-8C33-0D4E5F6071D6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B1020006-6A11-4B22-8C33-0D4E5F6071D6}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B1020006-6A11-4B22-8C33-0D4E5F6071D6}.Debug|x64.Build.0 = Debug|Any CPU
+		{B1020006-6A11-4B22-8C33-0D4E5F6071D6}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B1020006-6A11-4B22-8C33-0D4E5F6071D6}.Debug|x86.Build.0 = Debug|Any CPU
+		{B1020006-6A11-4B22-8C33-0D4E5F6071D6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B1020006-6A11-4B22-8C33-0D4E5F6071D6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B1020006-6A11-4B22-8C33-0D4E5F6071D6}.Release|x64.ActiveCfg = Release|Any CPU
+		{B1020006-6A11-4B22-8C33-0D4E5F6071D6}.Release|x64.Build.0 = Release|Any CPU
+		{B1020006-6A11-4B22-8C33-0D4E5F6071D6}.Release|x86.ActiveCfg = Release|Any CPU
+		{B1020006-6A11-4B22-8C33-0D4E5F6071D6}.Release|x86.Build.0 = Release|Any CPU
+		{B1020007-6A11-4B22-8C33-0D4E5F6071D7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B1020007-6A11-4B22-8C33-0D4E5F6071D7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B1020007-6A11-4B22-8C33-0D4E5F6071D7}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B1020007-6A11-4B22-8C33-0D4E5F6071D7}.Debug|x64.Build.0 = Debug|Any CPU
+		{B1020007-6A11-4B22-8C33-0D4E5F6071D7}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B1020007-6A11-4B22-8C33-0D4E5F6071D7}.Debug|x86.Build.0 = Debug|Any CPU
+		{B1020007-6A11-4B22-8C33-0D4E5F6071D7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B1020007-6A11-4B22-8C33-0D4E5F6071D7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B1020007-6A11-4B22-8C33-0D4E5F6071D7}.Release|x64.ActiveCfg = Release|Any CPU
+		{B1020007-6A11-4B22-8C33-0D4E5F6071D7}.Release|x64.Build.0 = Release|Any CPU
+		{B1020007-6A11-4B22-8C33-0D4E5F6071D7}.Release|x86.ActiveCfg = Release|Any CPU
+		{B1020007-6A11-4B22-8C33-0D4E5F6071D7}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

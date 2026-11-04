@@ -9,6 +9,8 @@ using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals;
 using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
 using AddedObjectRemover.Rules.RemovalRules.Contracts;
+using AddedObjectRemover.Rules.TerrainChangedByOtherMods;
+using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
 using AddedObjectRemover.Rules.TooCloseToOtherModsObjects;
 using AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts;
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
@@ -16,7 +18,6 @@ using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas;
-using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
@@ -43,9 +44,16 @@ public static partial class StepRunner
         .. groups.Select(group => new FitGroup(
             group.Fit,
             Fittable: TooCloseRules.CreatePlacementRule(tooCloseWorld, group.TooClose.Settings),
-            Unfittable: ChangedTerrainObjects.CreatePlacementRule(
-                new(trust.AcceptedWorld, scope.Environment.Plugins, scope.Plugin, runCaches.Shapes, group.ChangedTerrain.Settings)))),
+            Unfittable: ChangedTerrainRules.CreatePlacementRule(
+                trust.AcceptedWorld, scope.Environment.Plugins, CreateTerrainView(scope), runCaches.Shapes, group.ChangedTerrain.Settings))),
     ];
+
+    /// <summary>The changed-terrain checks over the run's target objects in the world the cleaned mod's objects are judged in.</summary>
+    private static IChangedTerrainChecks CreateChangedTerrainChecks(RunScope scope, IRunCaches runCaches, ModTrustTable trust, CollectedObjects collected) =>
+        ChangedTerrainRules.CreateChecks(collected.Targets, trust.AcceptedWorld, scope.Environment.Plugins, CreateTerrainView(scope), runCaches.Shapes);
+
+    /// <summary>The terrain and water of the load order the changed-terrain rule judges.</summary>
+    private static ITerrainView CreateTerrainView(RunScope scope) => ChangedTerrainRules.ViewOfLoadOrder(scope.Plugin);
 
     /// <summary>The objects others rest on: target objects and other mods' objects alike.</summary>
     private static IRestingRule CreateFitRestingRule(
@@ -98,8 +106,8 @@ public static partial class StepRunner
     }
 
     private static IPlacementRule CreateOldPlaceChangedTerrainRule(RunScope scope, IRunCaches runCaches, ModTrustTable trust) =>
-        ChangedTerrainObjects.CreatePlacementRule(
-            new(trust.AcceptedWorldWithoutCleanedMod, scope.Environment.Plugins, scope.Plugin, runCaches.Shapes, scope.Settings.ChangedObjectCollision.ChangedTerrain));
+        ChangedTerrainRules.CreatePlacementRule(
+            trust.AcceptedWorldWithoutCleanedMod, scope.Environment.Plugins, CreateTerrainView(scope), runCaches.Shapes, scope.Settings.ChangedObjectCollision.ChangedTerrain);
 
     /// <summary>The neighbours of each left-behind step, measured on <paramref name="final"/>; a step that is switched off measures none.</summary>
     private static ImmutableArray<ILeftBehindNeighbours> CreateLeftBehindNeighbours(RunScope scope, IRunCaches runCaches, CollectedObjects collected, IRemovalDecisions final) =>
@@ -114,7 +122,7 @@ public static partial class StepRunner
         var own = scope.Settings.Collision;
         return new(
             own.TooClose,
-            ChangedTerrainObjects.CreatePlacementRule(new(trust.AcceptedWorld, scope.Environment.Plugins, scope.Plugin, runCaches.Shapes, own.ChangedTerrain)),
+            ChangedTerrainRules.CreatePlacementRule(trust.AcceptedWorld, scope.Environment.Plugins, CreateTerrainView(scope), runCaches.Shapes, own.ChangedTerrain),
             own.ChangedTerrain);
     }
 

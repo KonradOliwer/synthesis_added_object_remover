@@ -476,8 +476,12 @@ public class ChangedObjectJudgingTests
                     Shapes,
                     triangles),
                 Zone),
-            ChangedTerrainObjects.CreatePlacementRule(
-                new(Mods.AcceptedWorldWithoutCleanedMod, LoadOrder, terrain ?? new TerrainRecords(), Shapes, terrain is null ? TerrainOff : Terrain())));
+            ChangedTerrainRules.CreatePlacementRule(
+                Mods.AcceptedWorldWithoutCleanedMod,
+                LoadOrder,
+                ChangedTerrainRules.ViewOfLoadOrder(terrain ?? new TerrainRecords()),
+                Shapes,
+                terrain is null ? TerrainOff : Terrain()));
     }
 
     /// <summary>Rules that fail the test when asked: the mode decides without a check.</summary>

@@ -1,13 +1,12 @@
 using System.Collections.Immutable;
-using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
-namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
+namespace AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
 
 /// <summary>
 /// The terrain area of an object is checked by each area that is on, size area first; the object is found when any of them
-/// holds a change, as the too-close step combines its two removal zones.
+/// holds a change, as the too-close rule combines its two removal zones.
 /// </summary>
-/// <param name="On">Whether the user switched the step on; <see cref="Runs"/> says whether it can find anything.</param>
+/// <param name="On">Whether the user switched the check on; <see cref="Runs"/> says whether it can find anything.</param>
 /// <param name="CountHeightChanges">Whether a change of terrain height counts as a change.</param>
 /// <param name="HeightTolerance">A height change up to this many game units is ignored; 0 counts every change.</param>
 /// <param name="CountTerrainTypeChanges">Whether a change of terrain type counts as a change; a different texture of the same type does not.</param>
@@ -53,11 +52,11 @@ public sealed record ChangedTerrainSettings(
     public ImmutableArray<Box> AreasAround(Box local, PlacedTransform transform) =>
         Boxes.GrownWorldAabbs(local, transform, AreaBySize ? AreaMultiplier : null, AreaByDistance ? AreaDistanceInUnits : null);
 
-    /// <summary>Whether the step checks an object that is visible or not.</summary>
+    /// <summary>Whether the rule checks an object that is visible or not.</summary>
     public bool Checks(bool isVisible) => Objects == TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes || isVisible;
 
     /// <summary>
-    /// Whether the step checks an area around an object it checks: every area, or with <see cref="TerrainCheckedObjects.VisibleObjectsOnTheGround"/>
+    /// Whether the rule checks an area around an object it checks: every area, or with <see cref="TerrainCheckedObjects.VisibleObjectsOnTheGround"/>
     /// one whose height range overlaps the ground at its vertices in either of two versions of the ground; a version without heights
     /// does not.
     /// </summary>
@@ -73,18 +72,6 @@ public sealed record ChangedTerrainSettings(
     /// <summary>On, and it counts a change in at least one area; otherwise it could find nothing, so it reads no terrain and proposes nothing.</summary>
     public bool Runs => On && CountsAChange && HasAnArea;
 
-    /// <summary>The settings with the switch as the step runs, so two groups that both find nothing are equal whatever their switch.</summary>
+    /// <summary>The settings with the switch as the rule runs, so two groups that both find nothing are equal whatever their switch.</summary>
     public ChangedTerrainSettings AsRun => this with { On = Runs };
-
-    /// <summary>Every plugin's terrain is read only when the step runs, its texture layers only when it counts terrain types, and its water only when it counts a water change.</summary>
-    public ScanNeeds Needs => new(TerrainVersions: Runs, TerrainLayers: Runs && CountTerrainTypeChanges, Water: Runs && CountsWaterChanges);
-
-    /// <summary>
-    /// When only the changed objects' check is on, the scan reads terrain only if the cleaned mod overrides a record of another plugin;
-    /// whether an override is a changed object is known only after the scan.
-    /// </summary>
-    /// <param name="cleanedMod">The settings of the cleaned mod's own objects.</param>
-    /// <param name="changedObjects">The settings of the objects the cleaned mod changed.</param>
-    public static ScanNeeds NeedsOfBoth(ChangedTerrainSettings cleanedMod, ChangedTerrainSettings changedObjects) =>
-        ScanNeeds.UnionOf(cleanedMod.Needs, changedObjects.Needs) with { TerrainForChangedObjectsOnly = !cleanedMod.Runs && changedObjects.Runs };
 }

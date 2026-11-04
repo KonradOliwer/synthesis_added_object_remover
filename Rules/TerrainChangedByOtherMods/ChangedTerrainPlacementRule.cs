@@ -1,10 +1,11 @@
-using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Rules.RemovalRules.Contracts;
+using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
+using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
-namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
+namespace AddedObjectRemover.Rules.TerrainChangedByOtherMods;
 
-/// <summary>The changed-terrain check of one target object at given placements; each check is the step's own.</summary>
-/// <param name="check">Null when the step is off: it finds nothing.</param>
+/// <summary>The changed-terrain check of one target object at given placements.</summary>
+/// <param name="check">Null when the settings could find nothing: it finds nothing.</param>
 internal sealed class ChangedTerrainPlacementRule(ObjectTerrainCheck? check) : IPlacementRule
 {
     public IPlacementTries StartTries(TargetObject target) => new Tries(target, check);
@@ -15,7 +16,7 @@ internal sealed class ChangedTerrainPlacementRule(ObjectTerrainCheck? check) : I
         {
             if (check is null) return default;
             var found = check.Check(target.PlacedAt(placement));
-            return new PlacementCheck(found.Hit is { } hit ? ChangedTerrainObjects.ReasonOf(hit) : null, found.Failure);
+            return new PlacementCheck(found.Hit is { } hit ? new TerrainChanged(hit.ChangedBy, hit.Kind) : null, found.Failure);
         }
 
         public void Dispose()

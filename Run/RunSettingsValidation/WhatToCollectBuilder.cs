@@ -4,6 +4,7 @@ using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
+using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
 
 namespace AddedObjectRemover;
 
@@ -25,7 +26,7 @@ internal static class WhatToCollectBuilder
             ScanNeeds.UnionOf(
                 markerMoves.Needs,
                 reports?.Needs,
-                ChangedTerrainSettings.NeedsOfBoth(cleanedModTerrain, changedObjectsTerrain),
+                ChangedTerrainScanNeeds.OfBoth(cleanedModTerrain, changedObjectsTerrain),
                 changedObjects.NeedsWhenReplacedObjectsAre(processReplaced),
                 restoreWhereRemoved.Needs),
             movedDistance,

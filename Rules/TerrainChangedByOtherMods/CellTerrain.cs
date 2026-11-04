@@ -1,6 +1,6 @@
-using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
+using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
 
-namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
+namespace AddedObjectRemover.Rules.TerrainChangedByOtherMods;
 
 /// <summary>What the decisions need from one land cell's terrain versions, kept instead of the decoded versions.</summary>
 /// <param name="AcceptedHeights">

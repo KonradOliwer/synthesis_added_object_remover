@@ -157,10 +157,10 @@ public class SourcePlacementTests
 
     /// <summary>The accepted-value rule is applied only where the properties it decides are compared: placed objects and terrain.</summary>
     [Fact]
-    public void OnlyTheCollectorTheCauseRuleAndTheTerrainStepApplyTheAcceptedValueRule() =>
+    public void OnlyTheCollectorTheCauseRuleAndTheTerrainRuleApplyTheAcceptedValueRule() =>
         PlacementCheck.AssertUsedOnlyIn(
             file => Regex.IsMatch(file.Code, @"\bAcceptedVersions\.Decide\b"),
-            ["Steps/CollectPlacedObjects", "Rules/ObjectsThatCanCauseRemovals", "Steps/RemoveObjectsOnChangedTerrain"]);
+            ["Steps/CollectPlacedObjects", "Rules/ObjectsThatCanCauseRemovals", "Rules/TerrainChangedByOtherMods"]);
 
     [Fact]
     public void NiflyIsUsedOnlyInTheMeshReading() =>

@@ -102,7 +102,6 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
             "RemoveObjectsInClearedAreas.Contracts", "RemoveObjectsInClearedAreas", "RestoreWhereRemoved",
             "RemoveInvisibleObjectsLeftBehind.Contracts", "RemoveInvisibleObjectsLeftBehind"),
         Reads("the cleared areas", "RemoveObjectsInClearedAreas.Contracts", "RestoreWhereRemoved.Contracts", "RestoreWhereRemoved"),
-        Reads("the changed-terrain settings and checks", "RemoveObjectsOnChangedTerrain.Contracts", "RestoreWhereRemoved.Contracts", "RestoreWhereRemoved"),
         Reads("the holders-of-objects-that-stay search it implements for the restore", "RestoreWhereRemoved.Contracts", "OtherModsObjectsLeftWithoutSupport"),
         Reads("the restore's result it writes", "RestoreWhereRemoved.Contracts", "WriteThePatch"),
         Reads("the invisible objects left behind whose markers move", "RemoveInvisibleObjectsLeftBehind.Contracts", "MoveKeptMarkers.Contracts", "MoveKeptMarkers"),

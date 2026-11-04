@@ -5,7 +5,7 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
-using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 

@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
 

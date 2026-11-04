@@ -4,11 +4,12 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>Decides which target objects must never be removed and groups the target objects that link to each other. It references its contracts, CollectPlacedObjects.Contracts, Ids, PluginRecordFacts and the package-free tools it uses, and holds no packages.</Description>
+    <Description>Decides which target objects must never be removed and groups the target objects that link to each other. It references its contracts, CollectPlacedObjects.Contracts, ObjectsRestingOnRemovedOnes.Contracts (the search for the target objects other mods' objects rest on, which it asks), Ids, PluginRecordFacts and the package-free tools it uses, and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\FindTargetObjectsToKeep.Contracts\FindTargetObjectsToKeep.Contracts.csproj" />
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
+    <ProjectReference Include="..\..\Rules\ObjectsRestingOnRemovedOnes.Contracts\ObjectsRestingOnRemovedOnes.Contracts.csproj" />
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
     <ProjectReference Include="..\..\Tools\PluginRecordFacts\PluginRecordFacts.csproj" />
     <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />

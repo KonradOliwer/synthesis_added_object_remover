@@ -6,6 +6,8 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals;
 using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
 using AddedObjectRemover.Rules.RemovalRules.Contracts;
@@ -14,12 +16,8 @@ using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
 using AddedObjectRemover.Rules.TooCloseToOtherModsObjects;
 using AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts;
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
-using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport;
-using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas;
-using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
-using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
@@ -57,27 +55,35 @@ public static partial class StepRunner
 
     /// <summary>The objects others rest on: target objects and other mods' objects alike.</summary>
     private static IRestingRule CreateFitRestingRule(
-        RunScope scope, IRunCaches runCaches, CollectedObjects collected, OtherModsObjects.SupportJudging support, HeldUpTargets heldUp)
+        RunScope scope, IRunCaches runCaches, CollectedObjects collected, SupportJudging support, HeldUpTargets heldUp)
     {
-        var drops = OtherModsObjects.CreateDropTest(new(support, scope.Settings.AlsoRemove));
-        var targetObjects = RestingObjects.CreateRestingRule(new(collected.Targets, scope.Settings.AlsoRemove, drops, scope.Settings.Execution, runCaches));
-        return OtherModsObjects.CreateRestingRule(new(support, targetObjects, heldUp));
+        var drops = RestingObjectsRules.CreateDropTest(support, scope.Settings.AlsoRemove);
+        var targetObjects = RestingObjectsRules.CreateTargetObjectsRestingRule(collected.Targets, scope.Settings.AlsoRemove, drops, scope.Settings.Execution, runCaches);
+        return RestingObjectsRules.CreateAnyObjectRestingRule(support, targetObjects, heldUp);
     }
 
-    /// <summary>What every part of the step for other mods' objects and every rule it provides read.</summary>
-    private static OtherModsObjects.SupportJudging CreateSupportJudging(RunScope scope, IRunCaches runCaches, ModTrustTable trust, CollectedObjects collected) =>
+    /// <summary>What every part of the other-mods support rule and every rule it provides read.</summary>
+    private static SupportJudging CreateSupportJudging(RunScope scope, IRunCaches runCaches, ModTrustTable trust, CollectedObjects collected) =>
         new(
             collected.Targets,
             runCaches,
             trust,
             scope.Environment.Plugins,
             scope.Settings.OtherModsObjects,
-            RestingObjects.CreateSupportContacts(runCaches),
+            RestingObjectsRules.CreateSupportContacts(runCaches),
             scope.Settings.Execution);
 
     private static IAlsoRemoveFollowUp CreateAlsoRemoveFollowUp(RunScope scope, IRunCaches runCaches, CollectedObjects collected, IRemovalDecisions decided) =>
-        RestingObjects.CreateFollowUp(
-            new(collected.Targets, decided, scope.Settings.AlsoRemove, scope.Settings.Execution, scope.Environment.TimeSinceStart, runCaches));
+        RestingObjectsRules.CreateFollowUp(
+            collected.Targets, decided, scope.Settings.AlsoRemove, scope.Settings.Execution, scope.Environment.TimeSinceStart, runCaches);
+
+    /// <summary>The also-remove rounds seeded by earlier rounds, with the report-file details when report files are written.</summary>
+    private static IRestingObjectsRounds CreateRestingObjectsRounds(RunScope scope, IRunCaches runCaches) =>
+        RestingObjectsRules.CreateRounds(scope.Settings.AlsoRemove, scope.Settings.Execution, scope.Environment.TimeSinceStart, scope.ReportFolder.Outcome, runCaches);
+
+    /// <summary>What becomes of the other mods' objects left without support, with the also-remove rounds after its own.</summary>
+    private static ILeftWithoutSupportRounds CreateLeftWithoutSupportRounds(RunScope scope, IRunCaches runCaches, SupportJudging support) =>
+        RestingObjectsRules.CreateLeftWithoutSupportRounds(support, scope.Settings.AlsoRemove, CreateAlsoRemoveRoundsAfter(scope, runCaches));
 
     /// <summary>The visible kinds the settings always keep, read also while the visible step is switched off.</summary>
     private static IKindsAlwaysKept CreateVisibleKindsAlwaysKept(RunScope scope, IRunCaches runCaches) =>
@@ -88,7 +94,7 @@ public static partial class StepRunner
         InvisibleLeftBehindObjects.CreateKindsAlwaysKept(new(runCaches.Shapes, scope.Settings.NeverRemovedInvisibleKinds));
 
     private static IAlsoRemoveRoundsAfter CreateAlsoRemoveRoundsAfter(RunScope scope, IRunCaches runCaches) =>
-        RestingObjects.CreateAlsoRemoveRoundsAfter(new(scope.Settings.AlsoRemove, scope.Settings.Execution, runCaches));
+        RestingObjectsRules.CreateAlsoRemoveRoundsAfter(scope.Settings.AlsoRemove, scope.Settings.Execution, runCaches);
 
     private static ObjectMeasurementRules CreateMeasurementRules(RunScope scope) => RemovalCauseSelector.MeasurementRules(scope.UnexpectedErrors);
 
@@ -132,7 +138,7 @@ public static partial class StepRunner
         RunScope scope,
         IRunCaches runCaches,
         ModTrustTable trust,
-        OtherModsObjects.SupportJudging support,
+        SupportJudging support,
         CollectedObjects collected,
         ImmutableArray<CollisionGroup> groups,
         OtherModsObjectsResult otherModsObjects,
@@ -146,7 +152,7 @@ public static partial class StepRunner
             new(
                 worldCaches,
                 TooCloseRules.CreateTooCloseToWhatStaysRule(runCaches, worldCaches, RemovalCauses.CreateCausesOfWorlds(worldCaches)),
-                OtherModsObjects.CreateHoldersOfObjectsThatStay(new(support, worldCaches)),
+                RestingObjectsRules.CreateHoldersOfObjectsThatStay(support, worldCaches),
                 PatchWriter.CreateNavmeshCheck(scope.Plugin, scope.Environment.PatchWriting)),
             new(
                 [.. groups.Select(group => group.ChangedTerrain)],

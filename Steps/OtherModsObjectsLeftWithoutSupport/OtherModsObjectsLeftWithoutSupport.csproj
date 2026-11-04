@@ -4,28 +4,12 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>Judges other mods' objects resting on target objects: keeps the target objects they rest on, or removes or pulls down those left without support with the target objects that go with them. Its support test also answers the keep, resting, fit and restore steps. It holds no packages.</Description>
+    <Description>The step for other mods' objects left without support: once the also-remove rounds are decided, it asks the ObjectsRestingOnRemovedOnes rule what becomes of those objects and adds its rounds to the run's decisions. It references the rule's contracts (the rounds and their result), RemovalDecisionList.Contracts (the run's decisions) and Ids, and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\OtherModsObjectsLeftWithoutSupport.Contracts\OtherModsObjectsLeftWithoutSupport.Contracts.csproj" />
-    <ProjectReference Include="..\RemoveObjectsRestingOnRemovedOnes.Contracts\RemoveObjectsRestingOnRemovedOnes.Contracts.csproj" />
-    <ProjectReference Include="..\RestoreWhereRemoved.Contracts\RestoreWhereRemoved.Contracts.csproj" />
-    <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
-    <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
-    <ProjectReference Include="..\FindTargetObjectsToKeep.Contracts\FindTargetObjectsToKeep.Contracts.csproj" />
+    <ProjectReference Include="..\..\Rules\ObjectsRestingOnRemovedOnes.Contracts\ObjectsRestingOnRemovedOnes.Contracts.csproj" />
     <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
-    <ProjectReference Include="..\FitClashingObjects.Contracts\FitClashingObjects.Contracts.csproj" />
-    <ProjectReference Include="..\IdentifyTheMods.Contracts\IdentifyTheMods.Contracts.csproj" />
-    <ProjectReference Include="..\..\Caches\RunCaches.Contracts\RunCaches.Contracts.csproj" />
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
-    <ProjectReference Include="..\..\Tools\PluginRecordFacts\PluginRecordFacts.csproj" />
-    <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
-    <ProjectReference Include="..\..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
-    <ProjectReference Include="..\..\Tools\TriangleMeshTests\TriangleMeshTests.csproj" />
-    <ProjectReference Include="..\..\Tools\BoxSpatialIndex\BoxSpatialIndex.csproj" />
-    <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
-    <ProjectReference Include="..\..\Tools\GroundSurfaceQueries\GroundSurfaceQueries.csproj" />
-    <ProjectReference Include="..\..\Tools\ComputedOnceLookups\ComputedOnceLookups.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />

@@ -1,7 +1,6 @@
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
-using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
-using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
 

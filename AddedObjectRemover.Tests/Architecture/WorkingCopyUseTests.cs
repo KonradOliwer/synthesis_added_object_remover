@@ -3,24 +3,24 @@ using System.Text.RegularExpressions;
 namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
-/// The decision list's working copy is the way a step tries rounds without changing the shared list. Only the five steps
-/// that decide rounds (resting objects, other mods' objects left without support, visible and invisible objects left
-/// behind, and objects in cleared areas) use it; the decision list's own projects define it.
+/// The decision list's working copy is the way a step tries rounds without changing the shared list. Only the code that
+/// decides rounds (the rule module of objects resting on removed ones and of other mods' objects left without support, and
+/// the steps for visible and invisible objects left behind and for objects in cleared areas) uses it; the decision list's
+/// own projects define it.
 /// </summary>
 public class WorkingCopyUseTests
 {
     private static readonly string[] DecisionListProjects = ["RemovalDecisionList", "RemovalDecisionList.Contracts"];
-    private static readonly string[] RoundDecidingSteps =
+    private static readonly string[] RoundDecidingCode =
     [
-        "Steps/RemoveObjectsRestingOnRemovedOnes", "Steps/OtherModsObjectsLeftWithoutSupport", "Steps/RemoveVisibleObjectsLeftBehind",
-        "Steps/RemoveInvisibleObjectsLeftBehind", "Steps/RemoveObjectsInClearedAreas",
+        "Rules/ObjectsRestingOnRemovedOnes", "Steps/RemoveVisibleObjectsLeftBehind", "Steps/RemoveInvisibleObjectsLeftBehind", "Steps/RemoveObjectsInClearedAreas",
     ];
 
     [Fact]
     public void OnlyTheRoundDecidingStepsUseTheWorkingCopyOrDecideRounds()
     {
         var users = SourceFile.All()
-            .Where(file => !file.IsIn(DecisionListProjects) && !file.IsIn(RoundDecidingSteps))
+            .Where(file => !file.IsIn(DecisionListProjects) && !file.IsIn(RoundDecidingCode))
             .SelectMany(file => FindUses(file.Code).Select(use => $"{file.Description}: {use}"))
             .Order(StringComparer.Ordinal)
             .ToList();
@@ -42,8 +42,8 @@ public class WorkingCopyUseTests
 
         Assert.Equal(
             [
-                "OtherModsObjectsLeftWithoutSupport", "RemovalDecisionList", "RemovalDecisionList.Contracts", "RemoveInvisibleObjectsLeftBehind",
-                "RemoveObjectsInClearedAreas", "RemoveObjectsRestingOnRemovedOnes", "RemoveVisibleObjectsLeftBehind",
+                "ObjectsRestingOnRemovedOnes", "RemovalDecisionList", "RemovalDecisionList.Contracts", "RemoveInvisibleObjectsLeftBehind",
+                "RemoveObjectsInClearedAreas", "RemoveVisibleObjectsLeftBehind",
             ],
             uses);
     }

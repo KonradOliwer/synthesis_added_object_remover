@@ -1,6 +1,5 @@
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
-using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
-using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using static AddedObjectRemover.SettingCorrections;
 
 namespace AddedObjectRemover;

@@ -13,7 +13,7 @@
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
     <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
     <ProjectReference Include="..\..\Rules\RemovalRules.Contracts\RemovalRules.Contracts.csproj" />
-    <ProjectReference Include="..\OtherModsObjectsLeftWithoutSupport.Contracts\OtherModsObjectsLeftWithoutSupport.Contracts.csproj" />
+    <ProjectReference Include="..\..\Rules\ObjectsRestingOnRemovedOnes.Contracts\ObjectsRestingOnRemovedOnes.Contracts.csproj" />
     <ProjectReference Include="..\..\Rules\TooCloseToOtherModsObjects.Contracts\TooCloseToOtherModsObjects.Contracts.csproj" />
     <ProjectReference Include="..\..\Rules\TerrainChangedByOtherMods.Contracts\TerrainChangedByOtherMods.Contracts.csproj" />
     <ProjectReference Include="..\RemoveVisibleObjectsLeftBehind.Contracts\RemoveVisibleObjectsLeftBehind.Contracts.csproj" />

@@ -169,7 +169,7 @@ public class SupportShortcutTests
     }
 
     private static ISupportContacts CreateSurfaceContacts(Scene scene) =>
-        RestingObjects.CreateSupportContacts(
+        RestingObjectsRules.CreateSupportContacts(
             new TestRunCaches(Shapes, scene.Triangles, scene.Terrain, TestBaseFacts.Unresolved, () => throw new InvalidOperationException("The support rule reads no objects of any plugin.")));
 
     private static StandingObject StandingOf(OtherObject other)

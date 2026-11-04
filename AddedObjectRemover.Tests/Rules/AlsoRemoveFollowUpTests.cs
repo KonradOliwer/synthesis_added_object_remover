@@ -458,14 +458,13 @@ public class AlsoRemoveFollowUpTests
         public RemovalDecisions Seed(IReadOnlyList<int> seeds) => TestSeededDecisions.Seed(_protection, _targets.Count, seeds);
 
         public IAlsoRemoveFollowUp CreateFollowUp(Func<TimeSpan> clock) =>
-            RestingObjects.CreateFollowUp(
-                new(
-                    [.. _targets],
-                    TestSeededDecisions.StartDisablingAll(_protection, _targets.Count),
-                    _settings,
-                    _execution,
-                    clock,
-                    new TestRunCaches(_shapes, _triangles, TestGround.NoTerrain(), TestBaseFacts.Unresolved, () => _objectsOfAnyPlugin, Surfaces)));
+            RestingObjectsRules.CreateFollowUp(
+                [.. _targets],
+                TestSeededDecisions.StartDisablingAll(_protection, _targets.Count),
+                _settings,
+                _execution,
+                clock,
+                new TestRunCaches(_shapes, _triangles, TestGround.NoTerrain(), TestBaseFacts.Unresolved, () => _objectsOfAnyPlugin, Surfaces));
 
         /// <summary>The also-remove step seeded by the newest round of <paramref name="decisions"/>, without report files.</summary>
         public RestingObjectsResult Find(RemovalDecisions decisions) =>

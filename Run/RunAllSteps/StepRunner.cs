@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes;
 using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals;
 using AddedObjectRemover.Rules.TooCloseToOtherModsObjects;
 using AddedObjectRemover.Run.RunAllSteps.Contracts;
@@ -12,7 +13,6 @@ using AddedObjectRemover.Steps.CollectPlacedObjects;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
-using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals;
 using AddedObjectRemover.Steps.WriteThePatch;
 using AddedObjectRemover.Steps.WriteThePatch.Contracts;
@@ -73,7 +73,7 @@ public static partial class StepRunner
             () => environment.Bases.ReadCollisionLayers(records),
             npcCacheRules.Bodies,
             npcCacheRules.PlacedNpcs,
-            RestingObjects.SurfaceSamplesPerMesh());
+            RestingObjectsRules.SurfaceSamplesPerMesh());
         var report = new LogAndReports(settings, reportFolder, loadOrderCaches, unexpectedErrors);
         return new RunScope(settings, source, environment, plugin, loadOrderCaches, unexpectedErrors, report, reportFolder);
     }

@@ -22,10 +22,9 @@ internal sealed record TestPlacedGuardRules(
             worldCaches,
             (world, caches, excluded, settings) => TooCloseRules.CreatePlacementRule(
                 new(world.Targets, caches.VisibleTargets, causes.Of(world, excluded, settings.Npcs), caches.PlacedNpcs, shapes, triangles), settings),
-            OtherModsObjects.CreateHoldersOfObjectsThatStay(
-                new(
-                    new([], runCaches, trust, plugins, support, RestingObjects.CreateSupportContacts(runCaches), new Execution(threads)),
-                    worldCaches)));
+            RestingObjectsRules.CreateHoldersOfObjectsThatStay(
+                new([], runCaches, trust, plugins, support, RestingObjectsRules.CreateSupportContacts(runCaches), new Execution(threads)),
+                worldCaches));
     }
 
     /// <param name="tooClose">Builds the rule over a world and its caches; <see cref="TooClose"/> when null.</param>

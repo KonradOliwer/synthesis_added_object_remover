@@ -296,7 +296,10 @@ public class RestingObjectsRunTests
     private static Decided<RestingObjectsResult> Decide(
         Probe probe, FollowUpRemovalMode mode, RemovalDecisions afterTooClose, bool touchChainsShown = false, StepOutcome reportFiles = StepOutcome.Performed) =>
         RestingObjects.Find(
-            new([.. Targets], afterTooClose, Settings(mode, touchChainsShown, reportFiles), new Execution(1), probe.ReadClock, reportFiles, CreateCaches(probe)));
+            new(
+                [.. Targets],
+                afterTooClose,
+                RestingObjectsRules.CreateRounds(Settings(mode, touchChainsShown, reportFiles), new Execution(1), probe.ReadClock, reportFiles, CreateCaches(probe))));
 
     /// <summary>The step's rounds and details seeded by the removals of <paramref name="seedRounds"/> alone; nothing is added to <paramref name="decisions"/>.</summary>
     private static RestingObjectsResult RunSeededBy(

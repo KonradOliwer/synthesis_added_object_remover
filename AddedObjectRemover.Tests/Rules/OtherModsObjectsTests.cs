@@ -842,8 +842,9 @@ public class OtherModsObjectsTests
         var caches = TestScenes.CreateWithSupportOnlyObjects(scene.Targets, scene.Others, Shapes, scene.Threads);
         var decided = decide(RemovalDecisions.Start(scene.CreateProtection(), scene.CreateWhenRemoved()));
         var triangles = new TriangleStore(Shapes.ReadTriangles);
-        var alsoRemoveRounds = RestingObjects.CreateAlsoRemoveRoundsAfter(new(scene.AlsoRemoveSettings, new Execution(scene.Threads), CreateRunCaches(scene, caches, triangles)));
-        return OtherModsObjects.Settle(new(CreateInput(scene, caches, triangles), decided, decided, scene.AlsoRemoveSettings, alsoRemoveRounds));
+        var alsoRemoveRounds = RestingObjectsRules.CreateAlsoRemoveRoundsAfter(scene.AlsoRemoveSettings, new Execution(scene.Threads), CreateRunCaches(scene, caches, triangles));
+        var rounds = RestingObjectsRules.CreateLeftWithoutSupportRounds(CreateInput(scene, caches, triangles), scene.AlsoRemoveSettings, alsoRemoveRounds);
+        return OtherModsObjects.Settle(new(rounds, decided, decided));
     }
 
     private static HeldUpTargets FindHeldUp(
@@ -854,10 +855,10 @@ public class OtherModsObjectsTests
     {
         var caches = TestScenes.CreateWithSupportOnlyObjects(scene.Targets, scene.Others, Shapes);
         var triangles = new TriangleStore(Shapes.ReadTriangles);
-        return OtherModsObjects.CreateHeldUpTargetsSearch(CreateInput(scene, caches, triangles)).Find();
+        return RestingObjectsRules.CreateHeldUpTargetsSearch(CreateInput(scene, caches, triangles)).Find();
     }
 
-    private static OtherModsObjects.SupportJudging CreateInput(Scene scene, IObjectCaches caches, TriangleStore triangles)
+    private static SupportJudging CreateInput(Scene scene, IObjectCaches caches, TriangleStore triangles)
     {
         var runCaches = CreateRunCaches(scene, caches, triangles);
         return new(
@@ -866,7 +867,7 @@ public class OtherModsObjectsTests
             Trust,
             Plugins,
             scene.OtherModsSettings,
-            RestingObjects.CreateSupportContacts(runCaches),
+            RestingObjectsRules.CreateSupportContacts(runCaches),
             new Execution(scene.Threads));
     }
 
@@ -885,12 +886,11 @@ public class OtherModsObjectsTests
         var triangles = new TriangleStore(Shapes.ReadTriangles);
         var execution = new Execution(scene.Threads);
         var input = CreateInput(scene, caches, triangles);
-        var drops = OtherModsObjects.CreateDropTest(new(input, scene.AlsoRemoveSettings));
-        var rule = OtherModsObjects.CreateRestingRule(
-            new(
-                input,
-                RestingObjects.CreateRestingRule(new([.. scene.Targets], scene.AlsoRemoveSettings, drops, execution, CreateRunCaches(scene, caches, triangles))),
-                heldUp));
+        var drops = RestingObjectsRules.CreateDropTest(input, scene.AlsoRemoveSettings);
+        var rule = RestingObjectsRules.CreateAnyObjectRestingRule(
+            input,
+            RestingObjectsRules.CreateTargetObjectsRestingRule([.. scene.Targets], scene.AlsoRemoveSettings, drops, execution, CreateRunCaches(scene, caches, triangles)),
+            heldUp);
         return [.. rule.FindObjectsOthersRestOn([.. asked])];
     }
 

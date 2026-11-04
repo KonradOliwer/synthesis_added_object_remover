@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AddedObjectRemover</RootNamespace>
+    <Description>The rules of objects resting on removed ones and of other mods' objects left without support: their settings, removal reasons and part keys, what the also-remove rounds removed and the chains and support shares behind each removal, what became of each other mod's object, the contact points and weighted surface samples of the support rule, what the support judging reads, and the rules and rounds the module offers (the resting rule, the drop test, the held-up search, the holders of objects that stay, the follow-up and the rounds after a removal). It references Ids, CollectPlacedObjects.Contracts (the placed objects it judges), RemovalDecisionList.Contracts (the decisions the rounds work on and the reasons they are worded as), IdentifyTheMods.Contracts (the trust table the support judging reads), FindTargetObjectsToKeep.Contracts (the held-up targets the held-up search returns, which the keep reasons carry), RunCaches.Contracts (the caches the support judging reads), PluginRecordFacts (the load order the support judging reads), BoxAndTransformMath, OrderIndependentParallelWork and UnexpectedFailureHandling, and holds no packages.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
+    <ProjectReference Include="..\..\Steps\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\IdentifyTheMods.Contracts\IdentifyTheMods.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\FindTargetObjectsToKeep.Contracts\FindTargetObjectsToKeep.Contracts.csproj" />
+    <ProjectReference Include="..\..\Caches\RunCaches.Contracts\RunCaches.Contracts.csproj" />
+    <ProjectReference Include="..\..\Tools\PluginRecordFacts\PluginRecordFacts.csproj" />
+    <ProjectReference Include="..\..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
+    <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
+    <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AddedObjectRemover.Tests" />
+  </ItemGroup>
+</Project>

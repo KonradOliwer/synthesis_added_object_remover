@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AddedObjectRemover</RootNamespace>
+    <Description>The rules of objects resting on removed ones and of other mods' objects left without support: support contacts and weights, touch chains, the resting and touch rules, the also-remove rounds that repeat until nothing more goes, the drop test and landing, the support world, the held-up targets and the holders of objects that stay, the keep, remove or pull-down decision for other mods' objects and its rounds, and the report-file details that read the rounds' internals. It references its contracts, CollectPlacedObjects.Contracts, RemovalDecisionList.Contracts and IdentifyTheMods.Contracts (the placed objects, decisions and trust it judges with), FindTargetObjectsToKeep.Contracts (the held-up targets it finds), BaseObjectShapeAndKind.Contracts and RunCaches.Contracts (the shapes, triangles, surface samples and terrain it measures), Ids, PluginRecordFacts and the package-free tools it uses, and holds no packages.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ObjectsRestingOnRemovedOnes.Contracts\ObjectsRestingOnRemovedOnes.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\IdentifyTheMods.Contracts\IdentifyTheMods.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\FindTargetObjectsToKeep.Contracts\FindTargetObjectsToKeep.Contracts.csproj" />
+    <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
+    <ProjectReference Include="..\..\Caches\RunCaches.Contracts\RunCaches.Contracts.csproj" />
+    <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
+    <ProjectReference Include="..\..\Tools\PluginRecordFacts\PluginRecordFacts.csproj" />
+    <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
+    <ProjectReference Include="..\..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
+    <ProjectReference Include="..\..\Tools\TriangleMeshTests\TriangleMeshTests.csproj" />
+    <ProjectReference Include="..\..\Tools\BoxSpatialIndex\BoxSpatialIndex.csproj" />
+    <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
+    <ProjectReference Include="..\..\Tools\TimingAndDisposal\TimingAndDisposal.csproj" />
+    <ProjectReference Include="..\..\Tools\KeyedGroupingInInputOrder\KeyedGroupingInInputOrder.csproj" />
+    <ProjectReference Include="..\..\Tools\DenseIdTables\DenseIdTables.csproj" />
+    <ProjectReference Include="..\..\Tools\IndexGraphQueries\IndexGraphQueries.csproj" />
+    <ProjectReference Include="..\..\Tools\ComputedOnceLookups\ComputedOnceLookups.csproj" />
+    <ProjectReference Include="..\..\Tools\GroundSurfaceQueries\GroundSurfaceQueries.csproj" />
+    <ProjectReference Include="..\..\Tools\NumericRanges\NumericRanges.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AddedObjectRemover.Tests" />
+  </ItemGroup>
+</Project>

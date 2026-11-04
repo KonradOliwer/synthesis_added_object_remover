@@ -50,6 +50,7 @@ public class LogicPublicTypesTests
         ["ObjectsThatCanCauseRemovals"] = "RemovalCauses",
         ["TooCloseToOtherModsObjects"] = "TooCloseRules",
         ["TerrainChangedByOtherMods"] = "ChangedTerrainRules",
+        ["ObjectsRestingOnRemovedOnes"] = "RestingObjectsRules",
     };
 
     /// <summary>
@@ -70,15 +71,7 @@ public class LogicPublicTypesTests
         ["InvisibleLeftBehindObjects.CreateKindsAlwaysKept"] = "The invisible kinds the step's settings always keep, which the step for objects in cleared areas asks, also while the invisible step is off.",
         ["VisibleLeftBehindObjects.CreateNeighbours"] = "The neighbours the visible step measures around an object, which the restore's copy rule asks on the final decisions; none while the step is off.",
         ["InvisibleLeftBehindObjects.CreateNeighbours"] = "The neighbours the invisible step measures around an object, which the restore's copy rule asks on the final decisions; none while the step is off.",
-        ["RestingObjects.SurfaceSamplesPerMesh"] = "How many points the support rule samples on a mesh's surface; the surface sample cache takes it when it is built.",
-        ["RestingObjects.CreateFollowUp"] = "The also-remove rounds that follow up each round of the visible step and the round of the step for objects in cleared areas, which those steps ask.",
-        ["RestingObjects.CreateRestingRule"] = "The target objects other target objects rest on, which the fit step asks through the other-mods rule.",
-        ["RestingObjects.CreateAlsoRemoveRoundsAfter"] = "The also-remove rounds the step for other mods' objects asks after its own rounds.",
-        ["RestingObjects.CreateSupportContacts"] = "The support rule the step for other mods' objects measures with.",
-        ["OtherModsObjects.CreateHeldUpTargetsSearch"] = "The target objects other mods' objects rest on, which the keep step asks.",
-        ["OtherModsObjects.CreateRestingRule"] = "The objects others rest on, other mods' objects included, which the fit step asks.",
-        ["OtherModsObjects.CreateDropTest"] = "Whether a target object holds up another, which the also-remove step's resting rule asks.",
-        ["OtherModsObjects.CreateHoldersOfObjectsThatStay"] = "The objects that move away and hold up an object that stays, which the restore step asks.",
+        ["RestingObjectsRules.SurfaceSamplesPerMesh"] = "How many points the support rule samples on a mesh's surface; the surface sample cache takes it when it is built.",
         ["ObjectsInClearedAreas.CreateClearedAreas"] = "How much of the cleaned mod's drawn objects still stand around a point, which the restore step asks on the final decisions.",
         ["WhereRemovedRestorer.MeasurementFailurePart"] = "The part the measurement failures in the worlds of what stays are recorded under; the world caches the restore step and its rules share take it.",
         ["PatchWriter.CreateNavmeshCheck"] = "The navmesh check of a trial write, which the restore step asks.",

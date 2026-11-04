@@ -20,8 +20,7 @@ public class CopiedCodeTests
 
     private const string CollisionBuilder = "Run/RunSettingsValidation/CollisionSettingsBuilder.cs:CollisionSettingsBuilder.";
     private const string Report = "Steps/BuildLogAndReports/";
-    private const string Resting = "Steps/RemoveObjectsRestingOnRemovedOnes/";
-    private const string OtherMods = "Steps/OtherModsObjectsLeftWithoutSupport/";
+    private const string RestingRules = "Rules/ObjectsRestingOnRemovedOnes/";
 
     private const string RoundAddingEntries =
         "Entries of the deciding steps: each runs its step and returns its own result with the run's decisions after its own kind of "
@@ -56,8 +55,6 @@ public class CopiedCodeTests
             "Steps/FitClashingObjects/ClashingObjectFitter.cs:ClashingObjectFitter.Fit", "Steps/MoveKeptMarkers/MarkerMovePlanner.cs:MarkerMovePlanner.Plan",
             "Steps/RemoveObjectsInClearedAreas/ObjectsInClearedAreas.cs:ObjectsInClearedAreas.Find",
             "Steps/RemoveVisibleObjectsLeftBehind/VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.Find"])] = RoundAddingEntries,
-        [CopyFamily.KeyOf([
-            OtherMods + "OtherModsObjects.cs:OtherModsObjects.Settle", "Steps/RemoveInvisibleObjectsLeftBehind/InvisibleLeftBehindObjects.cs:InvisibleLeftBehindObjects.Find"])] = RoundAddingEntries,
         [CopyFamily.KeyOf([CollisionBuilder + "CreateChangedTerrainSettings", CollisionBuilder + "CreateTooCloseSettings"])] = SettingChecks,
         [CopyFamily.KeyOf([CollisionBuilder + "CreateChangedTerrainSettings"])] = SettingChecks,
         [CopyFamily.KeyOf([Report + "RestoreCountLines.cs:RestoreCountLines.LeftToLaterPlugins"])] = RestoreCountFacts,
@@ -68,9 +65,9 @@ public class CopiedCodeTests
             Report + "Tables.Touch.cs:Tables.EdgeHeader"])] = CsvColumnNames,
         [CopyFamily.KeyOf([Report + "Tables.Support.cs:Tables.SupportHeader", Report + "Tables.Touch.cs:Tables.ComponentHeader"])] = CsvColumnNames,
         [CopyFamily.KeyOf([Report + "RunPartText.cs:RunPartText.Wordings"])] = PartKeyLines,
-        [CopyFamily.KeyOf(["Steps/MoveKeptMarkers/KeptMarkerMover.cs:KeptMarkerMover.Move", OtherMods + "TargetsHoldingUpOtherModsObjects.cs:TargetsHoldingUpOtherModsObjects.Find"])] =
+        [CopyFamily.KeyOf(["Steps/MoveKeptMarkers/KeptMarkerMover.cs:KeptMarkerMover.Move", RestingRules + "TargetsHoldingUpOtherModsObjects.cs:TargetsHoldingUpOtherModsObjects.Find"])] =
             ParallelCalls,
-        [CopyFamily.KeyOf([Resting + "SupportContactFinder.cs:SupportContactFinder.FindContactsOfAll", OtherMods + "TargetsHoldingUpOtherModsObjects.cs:TargetsHoldingUpOtherModsObjects.Find"])] =
+        [CopyFamily.KeyOf([RestingRules + "SupportContactFinder.cs:SupportContactFinder.FindContactsOfAll", RestingRules + "TargetsHoldingUpOtherModsObjects.cs:TargetsHoldingUpOtherModsObjects.Find"])] =
             ParallelCalls,
         [CopyFamily.KeyOf([Runner + "RunChangedTerrain", Runner + "RunTooClose"])] = StepCalls,
         [CopyFamily.KeyOf([Runner + "RunAlsoRemove", Runner + "RunObjectsInClearedAreas", Runner + "RunVisibleLeftBehind"])] = StepCalls,

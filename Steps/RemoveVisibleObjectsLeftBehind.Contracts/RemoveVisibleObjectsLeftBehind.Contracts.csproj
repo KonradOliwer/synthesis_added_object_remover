@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The visible target objects checked for being left behind, with the kind only this step names, the settings of that check, the step's removal reason, and the also-remove follow-up the step asks; and the left-behind data the invisible step shares, since that step judges by this step's surroundings rule: the outcomes and their verdict on one checked object, the surroundings settings, the ground area per direction around an object, the judging interface and the always-kept-kinds rule both steps implement. It references BaseObjectShapeAndKind.Contracts and CollectPlacedObjects.Contracts (for the kinds and targets), BoxAndTransformMath (for the directions), RemovalDecisionList.Contracts, FindTargetObjectsToKeep.Contracts, RemoveObjectsRestingOnRemovedOnes.Contracts (for the follow-up result) and UnexpectedFailureHandling (for its part key) and holds no packages.</Description>
+    <Description>The visible target objects checked for being left behind, with the kind only this step names, the settings of that check, the step's removal reason, and the also-remove follow-up the step asks; and the left-behind data the invisible step shares, since that step judges by this step's surroundings rule: the outcomes and their verdict on one checked object, the surroundings settings, the ground area per direction around an object, the judging interface and the always-kept-kinds rule both steps implement. It references BaseObjectShapeAndKind.Contracts and CollectPlacedObjects.Contracts (for the kinds and targets), BoxAndTransformMath (for the directions), RemovalDecisionList.Contracts, FindTargetObjectsToKeep.Contracts, ObjectsRestingOnRemovedOnes.Contracts (for the follow-up result) and UnexpectedFailureHandling (for its part key) and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
@@ -12,7 +12,7 @@
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
     <ProjectReference Include="..\FindTargetObjectsToKeep.Contracts\FindTargetObjectsToKeep.Contracts.csproj" />
     <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
-    <ProjectReference Include="..\RemoveObjectsRestingOnRemovedOnes.Contracts\RemoveObjectsRestingOnRemovedOnes.Contracts.csproj" />
+    <ProjectReference Include="..\..\Rules\ObjectsRestingOnRemovedOnes.Contracts\ObjectsRestingOnRemovedOnes.Contracts.csproj" />
     <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
   </ItemGroup>
   <ItemGroup>

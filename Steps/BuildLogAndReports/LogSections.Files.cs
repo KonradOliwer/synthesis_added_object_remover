@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
-using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;

@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
-using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 
 namespace AddedObjectRemover.Tests.Rules;
 

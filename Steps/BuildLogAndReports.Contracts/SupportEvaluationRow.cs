@@ -1,4 +1,4 @@
-using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 

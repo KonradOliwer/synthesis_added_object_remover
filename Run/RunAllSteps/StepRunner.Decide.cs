@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals;
 using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
 using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
@@ -18,7 +20,6 @@ using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport;
-using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
@@ -28,7 +29,6 @@ using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes;
-using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
@@ -95,10 +95,10 @@ public static partial class StepRunner
             (selected, elapsed) => scope.Report.BuildStepSections(selected.Replacements, collected, elapsed));
 
     /// <remarks>The step times its two parts through the run's clock, since they print one after the other.</remarks>
-    private static ObjectsToKeepFound RunKeepCheck(RunScope scope, IRunCaches runCaches, CollectedObjects collected, OtherModsObjects.SupportJudging support)
+    private static ObjectsToKeepFound RunKeepCheck(RunScope scope, IRunCaches runCaches, CollectedObjects collected, SupportJudging support)
     {
         var found = ObjectsToKeepFinder.Find(
-            new(collected.Targets, collected.Links, runCaches.Bases, OtherModsObjects.CreateHeldUpTargetsSearch(support), scope.Environment.TimeSinceStart));
+            new(collected.Targets, collected.Links, runCaches.Bases, RestingObjectsRules.CreateHeldUpTargetsSearch(support), scope.Environment.TimeSinceStart));
         Print(scope.Environment.Log, scope.Report.BuildStepSections(found));
         return found;
     }
@@ -122,7 +122,7 @@ public static partial class StepRunner
         ModTrustTable trust,
         CollectedObjects collected,
         TooCloseWorld tooCloseWorld,
-        OtherModsObjects.SupportJudging support,
+        SupportJudging support,
         ImmutableArray<CollisionGroup> groups,
         ObjectsToKeepFound kept,
         ChangedObjectsJudged judged) =>
@@ -167,15 +167,7 @@ public static partial class StepRunner
 
     private static Decided<RestingObjectsResult> RunAlsoRemove(RunScope scope, IRunCaches runCaches, CollectedObjects collected, Decided<TooCloseResult> tooClose) =>
         scope.Environment.Log.Timed(
-            () => RestingObjects.Find(
-                new(
-                    collected.Targets,
-                    tooClose.Decisions,
-                    scope.Settings.AlsoRemove,
-                    scope.Settings.Execution,
-                    scope.Environment.TimeSinceStart,
-                    scope.ReportFolder.Outcome,
-                    runCaches)),
+            () => RestingObjects.Find(new(collected.Targets, tooClose.Decisions, CreateRestingObjectsRounds(scope, runCaches))),
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
 
     private static Decided<VisibleLeftBehindResult> RunVisibleLeftBehind(
@@ -217,17 +209,11 @@ public static partial class StepRunner
         RunScope scope,
         IRunCaches runCaches,
         CollectedObjects collected,
-        OtherModsObjects.SupportJudging support,
+        SupportJudging support,
         IRemovalDecisions afterFits,
         Decided<ObjectsInClearedAreasResult> clearedAreas) =>
         scope.Environment.Log.Timed(
-            () => OtherModsObjects.Settle(
-                new(
-                    support,
-                    afterFits,
-                    clearedAreas.Decisions,
-                    scope.Settings.AlsoRemove,
-                    CreateAlsoRemoveRoundsAfter(scope, runCaches))),
+            () => OtherModsObjects.Settle(new(CreateLeftWithoutSupportRounds(scope, runCaches, support), afterFits, clearedAreas.Decisions)),
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
 
     private static Decided<InvisibleLeftBehindResult> RunInvisibleLeftBehind(
@@ -276,7 +262,7 @@ public static partial class StepRunner
         RunScope scope,
         IRunCaches runCaches,
         ModTrustTable trust,
-        OtherModsObjects.SupportJudging support,
+        SupportJudging support,
         CollectedObjects collected,
         ImmutableArray<CollisionGroup> groups,
         OtherModsObjectsResult otherModsObjects,

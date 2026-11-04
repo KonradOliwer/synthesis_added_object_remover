@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using static AddedObjectRemover.CsvFormat;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;

@@ -1,6 +1,6 @@
 using System.Numerics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
-using AddedObjectRemover.Steps.RemoveObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;

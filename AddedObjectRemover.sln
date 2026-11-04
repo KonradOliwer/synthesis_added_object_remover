@@ -63,8 +63,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RemovalDecisionList.Contrac
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RemoveTooCloseObjects.Contracts", "Steps\RemoveTooCloseObjects.Contracts\RemoveTooCloseObjects.Contracts.csproj", "{A101001B-6A11-4B22-8C33-0D4E5F6071AB}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RemoveObjectsRestingOnRemovedOnes.Contracts", "Steps\RemoveObjectsRestingOnRemovedOnes.Contracts\RemoveObjectsRestingOnRemovedOnes.Contracts.csproj", "{A101001C-6A11-4B22-8C33-0D4E5F6071AC}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RemoveInvisibleObjectsLeftBehind.Contracts", "Steps\RemoveInvisibleObjectsLeftBehind.Contracts\RemoveInvisibleObjectsLeftBehind.Contracts.csproj", "{A101001D-6A11-4B22-8C33-0D4E5F6071AD}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MoveKeptMarkers.Contracts", "Steps\MoveKeptMarkers.Contracts\MoveKeptMarkers.Contracts.csproj", "{A101001E-6A11-4B22-8C33-0D4E5F6071AE}"
@@ -131,8 +129,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RestoreWhereRemoved.Contrac
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RestoreWhereRemoved", "Steps\RestoreWhereRemoved\RestoreWhereRemoved.csproj", "{A101003A-6A11-4B22-8C33-0D4E5F6071CA}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OtherModsObjectsLeftWithoutSupport.Contracts", "Steps\OtherModsObjectsLeftWithoutSupport.Contracts\OtherModsObjectsLeftWithoutSupport.Contracts.csproj", "{A101003B-6A11-4B22-8C33-0D4E5F6071CB}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OtherModsObjectsLeftWithoutSupport", "Steps\OtherModsObjectsLeftWithoutSupport\OtherModsObjectsLeftWithoutSupport.csproj", "{A101003C-6A11-4B22-8C33-0D4E5F6071CC}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TimingAndDisposal", "Tools\TimingAndDisposal\TimingAndDisposal.csproj", "{A1010061-6A11-4B22-8C33-0D4E5F607261}"
@@ -154,6 +150,10 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TerrainChangedByOtherMods.Contracts", "Rules\TerrainChangedByOtherMods.Contracts\TerrainChangedByOtherMods.Contracts.csproj", "{B1020006-6A11-4B22-8C33-0D4E5F6071D6}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TerrainChangedByOtherMods", "Rules\TerrainChangedByOtherMods\TerrainChangedByOtherMods.csproj", "{B1020007-6A11-4B22-8C33-0D4E5F6071D7}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ObjectsRestingOnRemovedOnes.Contracts", "Rules\ObjectsRestingOnRemovedOnes.Contracts\ObjectsRestingOnRemovedOnes.Contracts.csproj", "{B1020008-6A11-4B22-8C33-0D4E5F6071D8}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ObjectsRestingOnRemovedOnes", "Rules\ObjectsRestingOnRemovedOnes\ObjectsRestingOnRemovedOnes.csproj", "{B1020009-6A11-4B22-8C33-0D4E5F6071D9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -549,18 +549,6 @@ Global
 		{A101001B-6A11-4B22-8C33-0D4E5F6071AB}.Release|x64.Build.0 = Release|Any CPU
 		{A101001B-6A11-4B22-8C33-0D4E5F6071AB}.Release|x86.ActiveCfg = Release|Any CPU
 		{A101001B-6A11-4B22-8C33-0D4E5F6071AB}.Release|x86.Build.0 = Release|Any CPU
-		{A101001C-6A11-4B22-8C33-0D4E5F6071AC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{A101001C-6A11-4B22-8C33-0D4E5F6071AC}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{A101001C-6A11-4B22-8C33-0D4E5F6071AC}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{A101001C-6A11-4B22-8C33-0D4E5F6071AC}.Debug|x64.Build.0 = Debug|Any CPU
-		{A101001C-6A11-4B22-8C33-0D4E5F6071AC}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{A101001C-6A11-4B22-8C33-0D4E5F6071AC}.Debug|x86.Build.0 = Debug|Any CPU
-		{A101001C-6A11-4B22-8C33-0D4E5F6071AC}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{A101001C-6A11-4B22-8C33-0D4E5F6071AC}.Release|Any CPU.Build.0 = Release|Any CPU
-		{A101001C-6A11-4B22-8C33-0D4E5F6071AC}.Release|x64.ActiveCfg = Release|Any CPU
-		{A101001C-6A11-4B22-8C33-0D4E5F6071AC}.Release|x64.Build.0 = Release|Any CPU
-		{A101001C-6A11-4B22-8C33-0D4E5F6071AC}.Release|x86.ActiveCfg = Release|Any CPU
-		{A101001C-6A11-4B22-8C33-0D4E5F6071AC}.Release|x86.Build.0 = Release|Any CPU
 		{A101001D-6A11-4B22-8C33-0D4E5F6071AD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{A101001D-6A11-4B22-8C33-0D4E5F6071AD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A101001D-6A11-4B22-8C33-0D4E5F6071AD}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -933,18 +921,6 @@ Global
 		{A101003A-6A11-4B22-8C33-0D4E5F6071CA}.Release|x64.Build.0 = Release|Any CPU
 		{A101003A-6A11-4B22-8C33-0D4E5F6071CA}.Release|x86.ActiveCfg = Release|Any CPU
 		{A101003A-6A11-4B22-8C33-0D4E5F6071CA}.Release|x86.Build.0 = Release|Any CPU
-		{A101003B-6A11-4B22-8C33-0D4E5F6071CB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{A101003B-6A11-4B22-8C33-0D4E5F6071CB}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{A101003B-6A11-4B22-8C33-0D4E5F6071CB}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{A101003B-6A11-4B22-8C33-0D4E5F6071CB}.Debug|x64.Build.0 = Debug|Any CPU
-		{A101003B-6A11-4B22-8C33-0D4E5F6071CB}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{A101003B-6A11-4B22-8C33-0D4E5F6071CB}.Debug|x86.Build.0 = Debug|Any CPU
-		{A101003B-6A11-4B22-8C33-0D4E5F6071CB}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{A101003B-6A11-4B22-8C33-0D4E5F6071CB}.Release|Any CPU.Build.0 = Release|Any CPU
-		{A101003B-6A11-4B22-8C33-0D4E5F6071CB}.Release|x64.ActiveCfg = Release|Any CPU
-		{A101003B-6A11-4B22-8C33-0D4E5F6071CB}.Release|x64.Build.0 = Release|Any CPU
-		{A101003B-6A11-4B22-8C33-0D4E5F6071CB}.Release|x86.ActiveCfg = Release|Any CPU
-		{A101003B-6A11-4B22-8C33-0D4E5F6071CB}.Release|x86.Build.0 = Release|Any CPU
 		{A101003C-6A11-4B22-8C33-0D4E5F6071CC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{A101003C-6A11-4B22-8C33-0D4E5F6071CC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A101003C-6A11-4B22-8C33-0D4E5F6071CC}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -1077,6 +1053,30 @@ Global
 		{B1020007-6A11-4B22-8C33-0D4E5F6071D7}.Release|x64.Build.0 = Release|Any CPU
 		{B1020007-6A11-4B22-8C33-0D4E5F6071D7}.Release|x86.ActiveCfg = Release|Any CPU
 		{B1020007-6A11-4B22-8C33-0D4E5F6071D7}.Release|x86.Build.0 = Release|Any CPU
+		{B1020008-6A11-4B22-8C33-0D4E5F6071D8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B1020008-6A11-4B22-8C33-0D4E5F6071D8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B1020008-6A11-4B22-8C33-0D4E5F6071D8}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B1020008-6A11-4B22-8C33-0D4E5F6071D8}.Debug|x64.Build.0 = Debug|Any CPU
+		{B1020008-6A11-4B22-8C33-0D4E5F6071D8}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B1020008-6A11-4B22-8C33-0D4E5F6071D8}.Debug|x86.Build.0 = Debug|Any CPU
+		{B1020008-6A11-4B22-8C33-0D4E5F6071D8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B1020008-6A11-4B22-8C33-0D4E5F6071D8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B1020008-6A11-4B22-8C33-0D4E5F6071D8}.Release|x64.ActiveCfg = Release|Any CPU
+		{B1020008-6A11-4B22-8C33-0D4E5F6071D8}.Release|x64.Build.0 = Release|Any CPU
+		{B1020008-6A11-4B22-8C33-0D4E5F6071D8}.Release|x86.ActiveCfg = Release|Any CPU
+		{B1020008-6A11-4B22-8C33-0D4E5F6071D8}.Release|x86.Build.0 = Release|Any CPU
+		{B1020009-6A11-4B22-8C33-0D4E5F6071D9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B1020009-6A11-4B22-8C33-0D4E5F6071D9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B1020009-6A11-4B22-8C33-0D4E5F6071D9}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B1020009-6A11-4B22-8C33-0D4E5F6071D9}.Debug|x64.Build.0 = Debug|Any CPU
+		{B1020009-6A11-4B22-8C33-0D4E5F6071D9}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B1020009-6A11-4B22-8C33-0D4E5F6071D9}.Debug|x86.Build.0 = Debug|Any CPU
+		{B1020009-6A11-4B22-8C33-0D4E5F6071D9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B1020009-6A11-4B22-8C33-0D4E5F6071D9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B1020009-6A11-4B22-8C33-0D4E5F6071D9}.Release|x64.ActiveCfg = Release|Any CPU
+		{B1020009-6A11-4B22-8C33-0D4E5F6071D9}.Release|x64.Build.0 = Release|Any CPU
+		{B1020009-6A11-4B22-8C33-0D4E5F6071D9}.Release|x86.ActiveCfg = Release|Any CPU
+		{B1020009-6A11-4B22-8C33-0D4E5F6071D9}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

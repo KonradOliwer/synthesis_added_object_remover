@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The settings of trying clashing objects shrunk or turned where they stand, the rule the step asks (the also-remove step's resting rule), the fits found, and the step's part keys. It references Ids, RemovalRules.Contracts (for the placement rule it asks), NumericRanges, RemovalDecisionList.Contracts and UnexpectedFailureHandling (for its part key) and holds no packages.</Description>
+    <Description>The settings of trying clashing objects shrunk or turned where they stand, the fits found, and the step's part keys. It references Ids, RemovalRules.Contracts (for the placement rule it asks), NumericRanges, RemovalDecisionList.Contracts and UnexpectedFailureHandling (for its part key) and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />

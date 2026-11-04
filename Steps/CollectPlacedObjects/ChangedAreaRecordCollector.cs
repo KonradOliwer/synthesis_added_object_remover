@@ -24,7 +24,7 @@ internal sealed class ChangedAreaRecordCollector
         _trust = trust;
         _facts = facts;
         _areaRecordChanges = new AreaRecordChanges(
-            trust.Patch,
+            trust,
             facts.Records.Where(record => record.PartDifferences is not null).ToDictionary(record => record.Key, record => record.PartDifferences!),
             NavmeshReplacements.Of(facts.ChangedNavmeshes));
     }
@@ -58,7 +58,7 @@ internal sealed class ChangedAreaRecordCollector
     {
         var differences = record.PartDifferences
             ?? throw new UnreachableException($"The reader compared no parts of the record {record.Key}, which the cleaned mod overrides.");
-        var changes = PlacedPartChanges.Of(differences, _trust.Patch);
+        var changes = PlacedPartChanges.Of(differences, _trust);
         var removedLater = record.Versions
             .Skip(ChangedObjectKind.CleanedModIndexOf(record, _trust.CleanedMod) + 1)
             .Any(version => RemovedForm.IsRemoved(version.Placement.Presence));
@@ -124,7 +124,17 @@ internal sealed class ChangedAreaRecordCollector
             LinkedFromCleanedMod: false,
             RemovedForm.PresenceOf(earlier.Placement.Presence, isWinningTarget: false),
             _facts.OverriddenDoorLinks.TryGetValue(record.Key, out var door) ? _areaRecordChanges.DoorOf(door) : null,
-            IsInDeletedCell(record, earlier));
+            IsInDeletedCell(record, earlier),
+            PluginThatPutItThere(record));
+    }
+
+    /// <returns>The winning plugin when it is no patch and its position or base differs from the cleaned mod's, so it, not the cleaned mod, put the object where it stands; null otherwise.</returns>
+    private PluginName? PluginThatPutItThere(PlacedRecordFact record)
+    {
+        if (record.WinningMod == _trust.CleanedMod || _trust.IsAnyGroupsPatch(record.WinningMod)) return null;
+        var cleanedModsVersion = record.Versions[ChangedObjectKind.CleanedModIndexOf(record, _trust.CleanedMod)];
+        var differs = ResavedPlacedParts.PositionsDiffer(cleanedModsVersion.Placement.Position, record.Placement.Position) || cleanedModsVersion.Base != record.Base;
+        return differs ? record.WinningMod : null;
     }
 
     /// <summary>A version read deletes the cell holding the record's winning version or the one holding the given version.</summary>
@@ -145,7 +155,7 @@ internal sealed class ChangedAreaRecordCollector
         var outcome = PartHistory.Of(
             [.. versions.Select(version => version.Plugin)],
             ChangedObjectKind.CleanedModIndexOf(record, _trust.CleanedMod),
-            _trust.Patch,
+            _trust,
             (lower, higher) => versions[lower].IsPersistent != versions[higher].IsPersistent);
         return outcome is PartOutcome.Undo;
     }

@@ -319,7 +319,7 @@ such as a sound or a marker, sitting inside another mod's object. If it fits whe
 If it is too close to another mod's object and *Attempt resizing before removal* is on for it, it is shrunk or turned there when that makes it fit
 (see *Shrink or turn objects to make them fit*). Otherwise, when a step would remove it, *When it would be removed* decides: it is put back where
 it stood before the cleaned mod, with or without a check at the old place, or removed (see *Restored objects of other mods*).
-Objects resting on a changed object that was restored or removed are handled like objects resting on any removed object. A changed object that a plugin after the cleaned mod changes again is left to that plugin and not checked. An object
+Objects resting on a changed object that was restored or removed are handled like objects resting on any removed object. A changed object whose position (or, for a replaced object, model) a plugin after the cleaned mod sets is left to that plugin and not checked; a plugin that loads without the cleaned mod sets the value it holds, even the cleaned mod's own, while a plugin that needs the cleaned mod (a patch for it) does not, so the object is still checked as the cleaned mod's change (see *What always stays as the cleaned mod made it, whatever the area*). An object
 that the cleaned mod moved into another worldspace or interior than the one it stood in is not checked either. Objects the cleaned mod's objects or other records are linked to are kept, as for the cleaned
 mod's own objects (see *What is always kept*); a changed object linked to another object of the cleaned mod is never shrunk or turned.
 
@@ -688,9 +688,13 @@ and nothing is restored. The share counts what stands once every removal is done
 an object kept shrunk or turned counts at its new size.
 
 **What always stays as the cleaned mod made it, whatever the area:**
-- A part of a record that a later plugin, or the patch, changed again after the cleaned mod. Carrying a value over unchanged is not a
-  change, so a later plugin that only repeats the cleaned mod's value does not keep it; a later plugin that sets the cleaned mod's value back
-  does. For each change judged (one that has a part going back where its area is cleared), the detailed log and
+- A part of a record that a later plugin, or the patch, changed again after the cleaned mod. A later plugin that loads without the
+  cleaned mod (it does not have it as a master) was made against the version before it, so when it holds the cleaned mod's value it set
+  that value itself and keeps it. A plugin that needs the cleaned mod (a patch for it) keeps nothing: what it carries over or changes in
+  a part the cleaned mod changed goes back where the area is cleared, unless a plugin that loads without the cleaned mod changed that
+  part below it. The patch only repeating the cleaned mod's value does not keep it either, and neither does the Added Object Remover
+  patch of another group (recognised by its marker) that copied it. The same rule decides which of other mods'
+  objects count as moved or replaced by the cleaned mod (see *Objects of other mods that the cleaned mod changed*). For each change judged (one that has a part going back where its area is cleared), the detailed log and
   `restored-where-removed-*.csv` name the later plugin for each part left to it; a change whose every part a later plugin changed again
   is not listed there.
 - A record a later plugin removes, and a record whose winning version comes from a plugin loading after the patch.
@@ -705,13 +709,16 @@ an object kept shrunk or turned counts at its new size.
   down, other mods' objects the cleaned mod changed that stay changed, and the objects that would cause removals without the cleaned
   mod, such as those of mods that require it, with the *Collision handling* margins), with an invisible object of the cleaned mod that
   stays inside it, on ground that stays changed (by the cleaned mod or a later plugin; the reason names the plugin whose land record
-  keeps it changed), at a water line that stays, inside a navmesh that stays as the cleaned mod changed it, or with an object that stays
-  resting on it. Objects that go back together never block each other. Objects another step restored to where they stood before the
-  cleaned mod do not block an object that goes back to the shape it had before: its place, turn, size, model, map marker and, for a
+  keeps it changed), at a water line that stays, inside a navmesh that stays as the cleaned mod changed it, with an object that stays
+  resting on it, or resting where it goes back on an object that does not end there (one the patch removes or pulls down, or another
+  object that stays as the cleaned mod changed it). An object that could cause removals once back (it keeps a value of a mod that is
+  not trusted) also stays when one of the cleaned mod's objects that stay would be too close to it by the margins of that object's
+  own collision group. Objects that go back together never block each other. Objects another step restored to where they stood before
+  the cleaned mod do not block an object that goes back to the shape it had before: its place, turn, size, model, map marker and, for a
   primitive, its box, collision layer and culling data. They all stood there together. They do block one that keeps any of these as a
   later plugin changed it, since the two never stood together like that. A kept part that does not shape the object, such as its
   enable state, ownership or sound radius, does not count. The same holds for an object resting on one that goes back: one that no
-  plugin from the cleaned mod on changed does not block an object that goes back to the shape it had before.
+  plugin from the cleaned mod on changed (a plugin that only saves it again with the same values changes nothing) does not block an object that goes back to the shape it had before.
 - Ground that stays changed counts only under the box around the object, seen from above, and only where the ground the patch
   leaves there (blended edges included) rises into that box's height or drops away from it by more than *Count only height changes
   larger than* of the cleaned mod's own *Remove objects on terrain changed by other mods* group. An object that keeps the shape and
@@ -720,8 +727,10 @@ an object kept shrunk or turned counts at its new size.
 - A door the cleaned mod moved, deleted or disabled goes back together with its navmesh link from before the cleaned mod. It keeps the
   cleaned mod's place and link when a later plugin changed the link again, or when that link would not match the navmeshes as they end:
   the navmesh it names must go back with it or already lead through the door there.
-- Ground under an object that stays (the cleaned mod's, or another plugin's that was placed for the ground as it is), under an object
-  that was kept as the cleaned mod changed it, or under a navmesh lying on it; ground on a cell edge whose neighbouring cell's ground
+- Ground under an object that stays (the cleaned mod's, another plugin's that was placed for the ground as it is, or one that goes back
+  but keeps its shape where it stands), under an object that was kept as the cleaned mod changed it, or under a navmesh lying on it;
+  for the cleaned mod's objects that stay, also the ground *Remove objects on terrain changed by other mods* checks around them, with
+  the settings of their collision group, so a later run does not find it changed; ground on a cell edge whose neighbouring cell's ground
   stays or held another height before the cleaned mod; ground on the line between a cleared quarter of a cell and a quarter whose area
   is not cleared; ground in a cell whose restored heights would be too steep to store (heights are stored in steps of 8 units); ground of
   a land record whose earlier or winning version holds no height map.

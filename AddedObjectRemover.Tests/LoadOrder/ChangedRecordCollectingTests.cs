@@ -27,15 +27,18 @@ public sealed class ChangedRecordCollectingTests
     private readonly FixtureMod _base = new("Base.esm");
     private readonly FixtureMod _cleaned;
     private readonly FixtureMod _later;
+    private readonly FixtureMod _below;
     private readonly Worldspace _worldspace;
     private readonly Cell _cell;
     private readonly PlacedObject _rock;
     private readonly Dictionary<ModKey, Cell> _cellCopies = [];
+    private bool _belowLoadsBelowTheCleanedMod;
 
     public ChangedRecordCollectingTests()
     {
         _cleaned = new FixtureMod("Cleaned.esp", _base);
         _later = new FixtureMod("Later.esp", _base);
+        _below = new FixtureMod("Below.esp", _base);
         _cell = new Cell(_base.NextKey(), FixtureMod.Release) { Grid = new CellGrid { Point = new P2Int(0, 0) } };
         _worldspace = new Worldspace(_base.NextKey(), FixtureMod.Release);
         _worldspace.AddCell(_cell);
@@ -47,17 +50,98 @@ public sealed class ChangedRecordCollectingTests
 
     private RecordKey Rock => _rock.FormKey.ToRecordKey();
 
+    /// <summary>A later plugin that needs the cleaned mod carries its move over: the move goes back to the version below the cleaned mod.</summary>
     [Fact]
-    public void AMoveALaterPluginOnlyCarriesOverGoesBackToTheVersionBelowTheCleanedMod()
+    public void AMoveAPluginThatNeedsTheCleanedModCarriesOverGoesBackToTheVersionBelowTheCleanedMod()
+    {
+        Override(_later.Mod, MoveInCleanedMod());
+
+        var collected = Collect(Trust(laterTrusted: false, laterNeedsCleanedMod: true));
+
+        var changed = ChangedRecordOf(collected);
+        Assert.Equal(PlacedParts.Position, changed.Earlier.Undo);
+        Assert.Empty(changed.Earlier.LeftToLaterPlugins);
+        Assert.Equal((_base.Key.ToPluginName(), Placed), (changed.Earlier.Plugin, changed.Earlier.Placement.Position));
+        Assert.Equal((_later.Key.ToPluginName(), (Vector3?)Moved), (changed.WinningMod, changed.WhereItIsNow?.Position));
+        Assert.Equal(TargetOrigin.Moved, Assert.Single(collected.Targets, target => target.Key == Rock).Origin);
+    }
+
+    /// <summary>
+    /// A patch of another group loads between the base game and the cleaned mod and holds a position of its own; this group's patch
+    /// moves the rock again. Leaving the patches out for the second look must not shift the cleaned mod's version: the rock is still
+    /// judged as moved by the cleaned mod, from the other group's patch's place.
+    /// </summary>
+    [Fact]
+    public void AMoveIsStillJudgedAsMovedWhenAnotherGroupsPatchLoadsBelowTheCleanedMod()
+    {
+        _belowLoadsBelowTheCleanedMod = true;
+        Override(_below.Mod, _rock).Placement!.Position = ToP3Float(new Vector3(300, 200, 0));
+        var moved = MoveInCleanedMod();
+        var trust = TestModTrust.Of(_cleaned.Key.ToPluginName(), Patch, trusted: [_base.Key.ToPluginName()], untrusted: [_later.Key.ToPluginName()], otherGroupPatches: [_below.Key.ToPluginName()]);
+
+        var collected = Collect(trust, patch => Override(patch, moved).Placement!.Position = ToP3Float(MovedAgain));
+
+        var target = Assert.Single(collected.Targets, target => target.Key == Rock);
+        Assert.Equal((TargetOrigin.Moved, _below.Key.ToPluginName()), (target.Origin, target.EarlierVersion!.Plugin));
+    }
+
+    /// <summary>The winning plugin is named as the one that put the object where it stands, unless it is the cleaned mod or the patch.</summary>
+    [Fact]
+    public void TheWinnerWhosePlaceDiffersFromTheCleanedModsIsNamedAsTheOneThatPutTheObjectThere()
+    {
+        Override(_later.Mod, MoveInCleanedMod()).Placement!.Position = ToP3Float(MovedAgain);
+
+        Assert.Equal(_later.Key.ToPluginName(), ChangedRecordOf(Collect(Trust(laterTrusted: false, laterNeedsCleanedMod: true))).PutThereBy);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NoOneIsNamedWhenTheWinnerOnlyHoldsTheCleanedModsPlaceOrIsAPatchOfAGroup(bool winnerIsAnotherGroupsPatchThatMovedItAgain)
+    {
+        var copy = Override(_later.Mod, MoveInCleanedMod());
+        if (winnerIsAnotherGroupsPatchThatMovedItAgain) copy.Placement!.Position = ToP3Float(MovedAgain);
+
+        var trust = Trust(laterTrusted: false, laterNeedsCleanedMod: !winnerIsAnotherGroupsPatchThatMovedItAgain, laterIsOtherGroupsPatch: winnerIsAnotherGroupsPatchThatMovedItAgain);
+
+        Assert.Null(ChangedRecordOf(Collect(trust)).PutThereBy);
+    }
+
+    /// <summary>The patch of another group copied the cleaned mod's move: it carried it over, so the position goes back and the removal steps judge the rock as moved.</summary>
+    [Fact]
+    public void AMoveAnotherGroupsPatchCopiedGoesBackAndIsJudgedAsMoved()
+    {
+        Override(_later.Mod, MoveInCleanedMod());
+
+        var target = Assert.Single(Collect(Trust(laterTrusted: false, laterIsOtherGroupsPatch: true)).Targets, target => target.Key == Rock);
+
+        Assert.Equal((TargetOrigin.Moved, PlacedParts.Position), (target.Origin, target.EarlierVersion!.Undo));
+    }
+
+    /// <summary>
+    /// A later plugin that loads without the cleaned mod was made against the base game's version, so holding the cleaned mod's
+    /// position it set that position itself: the position is left to it.
+    /// </summary>
+    [Fact]
+    public void AMoveALaterPluginThatLoadsWithoutTheCleanedModHoldsIsLeftToThatPlugin()
     {
         Override(_later.Mod, MoveInCleanedMod());
 
         var changed = ChangedRecordOf(Collect(Trust(laterTrusted: false)));
 
-        Assert.Equal(PlacedParts.Position, changed.Earlier.Undo);
-        Assert.Empty(changed.Earlier.LeftToLaterPlugins);
-        Assert.Equal((_base.Key.ToPluginName(), Placed), (changed.Earlier.Plugin, changed.Earlier.Placement.Position));
-        Assert.Equal((_later.Key.ToPluginName(), (Vector3?)Moved), (changed.WinningMod, changed.WhereItIsNow?.Position));
+        Assert.Equal(PlacedParts.None, changed.Earlier.Undo);
+        Assert.Equal([KeyValuePair.Create(PlacedParts.Position, _later.Key.ToPluginName())], changed.Earlier.LeftToLaterPlugins);
+    }
+
+    /// <summary>A later plugin that needs the cleaned mod moves the rock again: its move keeps nothing, so the position goes back.</summary>
+    [Fact]
+    public void AMoveAPluginThatNeedsTheCleanedModMakesAgainGoesBack()
+    {
+        Override(_later.Mod, MoveInCleanedMod()).Placement!.Position = ToP3Float(MovedAgain);
+
+        var changed = ChangedRecordOf(Collect(Trust(laterTrusted: false, laterNeedsCleanedMod: true)));
+
+        Assert.Equal((PlacedParts.Position, 0), (changed.Earlier.Undo, changed.Earlier.LeftToLaterPlugins.Count));
     }
 
     [Fact]
@@ -69,6 +153,29 @@ public sealed class ChangedRecordCollectingTests
 
         Assert.Equal(PlacedParts.None, changed.Earlier.Undo);
         Assert.Equal([KeyValuePair.Create(PlacedParts.Position, _later.Key.ToPluginName())], changed.Earlier.LeftToLaterPlugins);
+    }
+
+    /// <summary>
+    /// A trusted later plugin re-saves one base game lantern with the same values and moves another. Both are accepted in the world
+    /// without the cleaned mod; only the moved one is changed since before the cleaned mod, which the scan reads below the later plugin.
+    /// </summary>
+    [Fact]
+    public void AnObjectALaterPluginOnlyReSavesStandsAsBeforeTheCleanedModAndOneItMovesDoesNot()
+    {
+        MoveInCleanedMod();
+        var resaved = PlaceLever();
+        var moved = PlaceLever();
+        Override(_later.Mod, resaved);
+        Override(_later.Mod, moved).Placement!.Position = ToP3Float(MovedAgain);
+        var plan = Plan with { Needs = Plan.Needs with { JudgeOldPlaces = true, DecideEveryObjectWithoutCleanedMod = true } };
+        var baseGame = _base.Key.ToPluginName();
+        var trust = TestModTrust.Of(_cleaned.Key.ToPluginName(), Patch, trusted: [baseGame, _later.Key.ToPluginName()], untrusted: [], loadingBefore: [baseGame]);
+
+        var supportOnly = Collect(trust, writeIntoPatch: null, records => records, plan).SupportOnlyObjects.ToDictionary(other => other.Key);
+
+        Assert.Equal(
+            ((ObjectChange?)null, (ObjectChange?)new ObjectChange(_later.Key.ToPluginName(), baseGame)),
+            (supportOnly[resaved.FormKey.ToRecordKey()].ChangeSinceBeforeCleanedMod, supportOnly[moved.FormKey.ToRecordKey()].ChangeSinceBeforeCleanedMod));
     }
 
     /// <summary>The cleaned mod moves and turns the rock; the later plugin moves it again, and the patch turns it again.</summary>
@@ -87,13 +194,16 @@ public sealed class ChangedRecordCollectingTests
             changed.Earlier.LeftToLaterPlugins);
     }
 
-    /// <summary>The later plugin carries the move over and disables the rock: a record removed after the cleaned mod gets nothing back.</summary>
+    /// <summary>
+    /// The later plugin, a patch for the cleaned mod, carries the move over and disables the rock: a record removed after the cleaned
+    /// mod gets nothing back.
+    /// </summary>
     [Fact]
     public void NothingGoesBackInARecordALaterPluginDisables()
     {
         Override(_later.Mod, MoveInCleanedMod()).MajorRecordFlagsRaw |= (int)SkyrimMajorRecord.SkyrimMajorRecordFlag.InitiallyDisabled;
 
-        Assert.DoesNotContain(Collect(Trust(laterTrusted: false)).ChangedRecords, changed => changed.Key == Rock);
+        Assert.DoesNotContain(Collect(Trust(laterTrusted: false, laterNeedsCleanedMod: true)).ChangedRecords, changed => changed.Key == Rock);
     }
 
     /// <summary>The cleaned mod moves the rock, and disables it too or not; disabled, its winning version stands nowhere now.</summary>
@@ -202,20 +312,23 @@ public sealed class ChangedRecordCollectingTests
 
     /// <summary>
     /// The cleaned mod moves the rock and takes away its enable parent; the later plugin carries both and makes the rock persistent,
-    /// for example to fill a quest alias. The Persistent flag stays the later plugin's.
+    /// for example to fill a quest alias. When it loads without the cleaned mod, it set all three itself and keeps them. When it needs
+    /// the cleaned mod, what it carries over keeps nothing, so the position and the presence go back; the Persistent flag the cleaned
+    /// mod never changed stays as the later plugin set it.
     /// </summary>
-    [Fact]
-    public void APersistentFlagALaterPluginSetDoesNotGoBackWithThePresence()
+    [Theory]
+    [InlineData(false, PlacedParts.None, false)]
+    [InlineData(true, PlacedParts.Position | PlacedParts.Presence, false)]
+    public void APersistentFlagALaterPluginSetDoesNotGoBackWithThePresence(bool laterNeedsCleanedMod, PlacedParts undo, bool persistenceGoesBack)
     {
         _rock.EnableParent = FixtureScenery.EnableParentOf(PlaceLever());
         var moved = MoveInCleanedMod();
         moved.EnableParent = null;
         Override(_later.Mod, moved, persistent: true);
 
-        var changed = ChangedRecordOf(Collect(Trust(laterTrusted: false)));
+        var changed = ChangedRecordOf(Collect(Trust(laterTrusted: false, laterNeedsCleanedMod)));
 
-        Assert.Equal(PlacedParts.Position | PlacedParts.Presence, changed.Earlier.Undo);
-        Assert.False(changed.Earlier.PersistenceGoesBack);
+        Assert.Equal((undo, persistenceGoesBack), (changed.Earlier.Undo, changed.Earlier.PersistenceGoesBack));
     }
 
     [Fact]
@@ -339,18 +452,19 @@ public sealed class ChangedRecordCollectingTests
     }
 
     /// <summary>
-    /// The fully trusted later plugin decides the record, so the rock is no moved object, as without the changed-record facts; the walk
-    /// still reads past it down to the base game, and its carried-over move is no change.
+    /// The fully trusted later plugin, which loads without the cleaned mod, holds the cleaned mod's position: it set that position, so
+    /// the rock is no moved object and its position is left to it; the walk still reads past it down to the base game.
     /// </summary>
     [Fact]
-    public void AFullyTrustedLaterPluginCarryingTheMoveLeavesThePositionToGoBackAndTheTargetsAsTheyWere()
+    public void AFullyTrustedLaterPluginHoldingTheMoveKeepsThePositionAndTheTargetsAsTheyWere()
     {
         Override(_later.Mod, MoveInCleanedMod());
 
         var collected = Collect(Trust(laterTrusted: true));
 
         var changed = ChangedRecordOf(collected);
-        Assert.Equal((PlacedParts.Position, (TargetId?)null), (changed.Earlier.Undo, changed.Target));
+        Assert.Equal((PlacedParts.None, (TargetId?)null), (changed.Earlier.Undo, changed.Target));
+        Assert.Equal((_base.Key.ToPluginName(), Placed), (changed.Earlier.Plugin, changed.Earlier.Placement.Position));
         Assert.DoesNotContain(collected.Targets, target => target.Key == Rock);
     }
 
@@ -511,7 +625,7 @@ public sealed class ChangedRecordCollectingTests
     private CollectedObjects Collect(
         ModTrustTable trust, Action<ISkyrimMod>? writeIntoPatch, Func<IPluginRecords, IPluginRecords> wrapRecords, WhatToCollect? plan = null)
     {
-        var state = FixturePatcherState.Create([_base.Mod, _cleaned.Mod, _later.Mod], Path.GetTempPath(), Path.GetTempPath());
+        var state = FixturePatcherState.Create(_belowLoadsBelowTheCleanedMod ? [_base.Mod, _below.Mod, _cleaned.Mod, _later.Mod] : [_base.Mod, _cleaned.Mod, _later.Mod], Path.GetTempPath(), Path.GetTempPath());
         writeIntoPatch?.Invoke(state.PatchMod);
         using var world = FixturePatcherState.CreateFinalWorld(state);
         return PlacedObjects.Collect(wrapRecords(new PluginRecordsFactory(world, Environment.ProcessorCount).Open()), trust, plan ?? Plan);
@@ -535,11 +649,16 @@ public sealed class ChangedRecordCollectingTests
         return (collected, state.PatchMod);
     }
 
-    private ModTrustTable Trust(bool laterTrusted)
+    /// <param name="laterNeedsCleanedMod">The later plugin cannot load without the cleaned mod, as a patch for it; it then counts as trusted for it.</param>
+    /// <param name="laterIsOtherGroupsPatch">The later plugin is the patch of another group, recognised by its marker.</param>
+    private ModTrustTable Trust(bool laterTrusted, bool laterNeedsCleanedMod = false, bool laterIsOtherGroupsPatch = false)
     {
         var baseGame = _base.Key.ToPluginName();
         var later = _later.Key.ToPluginName();
-        return TestModTrust.Of(_cleaned.Key.ToPluginName(), Patch, trusted: laterTrusted ? [baseGame, later] : [baseGame], untrusted: laterTrusted ? [] : [later]);
+        if (laterIsOtherGroupsPatch) return TestModTrust.Of(_cleaned.Key.ToPluginName(), Patch, trusted: [baseGame], untrusted: [], otherGroupPatches: [later]);
+        return laterNeedsCleanedMod
+            ? TestModTrust.Of(_cleaned.Key.ToPluginName(), Patch, trusted: [baseGame], untrusted: [], needingCleanedMod: [later])
+            : TestModTrust.Of(_cleaned.Key.ToPluginName(), Patch, trusted: laterTrusted ? [baseGame, later] : [baseGame], untrusted: laterTrusted ? [] : [later]);
     }
 
     private RecordChangedByCleanedMod ChangedRecordOf(CollectedObjects collected) => Assert.Single(collected.ChangedRecords, changed => changed.Key == Rock);

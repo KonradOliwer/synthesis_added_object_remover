@@ -227,29 +227,105 @@ public class RestoreWhereRemovedRunTests
         ExpectedOutputFiles.AssertMatches("restore-where-removed/NavmeshRefused", run.ToExpectedOutputLines());
     }
 
-    [Fact]
-    public void ALandTheCleanedModRaisedInACellOffTheDiagonalGoesBackInItsQuartersExceptWhereALaterPluginRaisedItAgain()
-    {
-        var (_, run) = Run(SettingsOf(), NavmeshAndLand(NavmeshAndLandScenario.LandRaisedWithABlockRaisedAgainByTheCityMod));
-
-        ExpectedOutputFiles.AssertMatches("restore-where-removed/TerrainOffTheDiagonal", run.ToExpectedOutputLines());
-        AssertEveryQuarterGoesBackAndTheNorthEastLeaves(run, "25 heights (CityMod.esp)");
-        Assert.Contains(" 0 0 0 0 0 ", LandRow(run, 16), StringComparison.Ordinal);
-        Assert.Contains(" 96 96 96 96 96 ", LandRow(run, 24), StringComparison.Ordinal);
-    }
-
     /// <summary>
-    /// The city mod's block is wider than it is tall and lies off the diagonal of the land's points, so a swap of columns and rows in
-    /// the quarters or in the points that go back would move the heights written.
+    /// An earlier patcher of the group wrote the cleaned mod's raised land with a square block of points raised again, so the block is
+    /// the patch's own change: the block stays, and every other point of the cell goes back to the base game's height.
     /// </summary>
     [Fact]
-    public void ALandBlockALaterPluginRaisedAgainOffThePointDiagonalStaysWhereItLiesAndTheRestOfItsQuarterGoesBack()
-    {
-        var (_, run) = Run(SettingsOf(), NavmeshAndLand(NavmeshAndLandScenario.LandRaisedWithANarrowBlockOffThePointDiagonalRaisedAgainByTheCityMod));
+    public void ALandAnEarlierPatcherRaisedASquareBlockOfAgainGoesBackExceptThatBlock() =>
+        AssertEveryPointIsBackExceptTheBlock(NavmeshAndLandWorld.SquareBlock, "restore-where-removed/TerrainBlockOnTheDiagonal");
 
-        AssertEveryQuarterGoesBackAndTheNorthEastLeaves(run, "12 heights (CityMod.esp)");
-        Assert.Contains(" 0 24 40 96 96 96 96 40 24 0 ", LandRow(run, 24), StringComparison.Ordinal);
-        Assert.DoesNotContain(" 96 ", LandRow(run, 16), StringComparison.Ordinal);
+    /// <summary>
+    /// As <see cref="ALandAnEarlierPatcherRaisedASquareBlockOfAgainGoesBackExceptThatBlock"/>, with a block wider than it is tall whose
+    /// columns are none of its rows: swapping the columns and rows when the land is written moves the block.
+    /// </summary>
+    [Fact]
+    public void ALandAnEarlierPatcherRaisedANarrowBlockOffThePointDiagonalOfAgainGoesBackExceptThatBlock() =>
+        AssertEveryPointIsBackExceptTheBlock(NavmeshAndLandWorld.NarrowBlock, "restore-where-removed/TerrainOffTheDiagonal");
+
+    /// <summary>Checks the run's output against the saved file, then the land point by point against the base game's land and the earlier patcher's block.</summary>
+    private static void AssertEveryPointIsBackExceptTheBlock(NavmeshAndLandWorld.PointBlock block, string savedOutput)
+    {
+        IReadOnlyList<ISkyrimMod> mods = [];
+        float[] withBlock = [];
+        float[] written = [];
+        var (_, run) = FixtureRun.Capture(
+            SettingsOf(),
+            Workers,
+            dataFolder => mods = NavmeshAndLand(NavmeshAndLandScenario.LandRaised)(dataFolder),
+            state =>
+            {
+                NavmeshAndLandWorld.RaiseBlockInPatch(state, mods, block);
+                withBlock = HeightsOfTheLand(state.PatchMod);
+            },
+            patch =>
+            {
+                written = HeightsOfTheLand(patch);
+                return AreaPatchDump.Describe(patch);
+            });
+
+        ExpectedOutputFiles.AssertMatches(savedOutput, run.ToExpectedOutputLines());
+        AssertEveryPointIsBack(HeightsOfTheLand(mods[0]), written, block, withBlock);
+    }
+
+    private const int LandSide = TerrainGrid.VerticesPerSide;
+    private const float HeightTolerance = 0.01f;
+
+    /// <summary>The terrain edges are blended over 256 units, two points; the points one farther out are as the rule alone leaves them.</summary>
+    private const int PointsOutsideTheBlend = 3;
+
+    /// <summary>
+    /// The heights are written row by row: a point of the kept block holds the earlier patcher's height, a point that the blend reaches
+    /// lies between that and the base game's, and every other point inside the cell edge holds the base game's height. The cell edge
+    /// keeps the cleaned mod's heights where the neighbouring cell is not restored, which other terrain tests cover.
+    /// </summary>
+    /// <param name="block">The block the earlier patcher raised and the patch keeps; none when nothing is kept.</param>
+    private static void AssertEveryPointIsBack(float[] baseGame, float[] written, NavmeshAndLandWorld.PointBlock? block, float[] withBlock)
+    {
+        Assert.Equal(baseGame.Length, written.Length);
+        var wrong = Enumerable.Range(0, baseGame.Length).Where(point => !IsAsExpected(point)).ToList();
+        Assert.True(wrong.Count == 0, $"Points (column, row) not as expected: {string.Join("; ", wrong.Take(8).Select(point => $"{point % LandSide},{point / LandSide}"))}");
+
+        bool IsAsExpected(int point)
+        {
+            var (column, row) = (point % LandSide, point / LandSide);
+            var distanceToBlock = block?.DistanceTo(column, row) ?? int.MaxValue;
+            if (distanceToBlock == 0) return Same(written[point], withBlock[point]);
+            if (Math.Min(Math.Min(column, row), Math.Min(LandSide - 1 - column, LandSide - 1 - row)) < PointsOutsideTheBlend) return true;
+            if (distanceToBlock >= PointsOutsideTheBlend) return Same(written[point], baseGame[point]);
+            return written[point] >= Math.Min(baseGame[point], withBlock[point]) - HeightTolerance && written[point] <= Math.Max(baseGame[point], withBlock[point]) + HeightTolerance;
+        }
+    }
+
+    private static bool Same(float one, float other) => MathF.Abs(one - other) <= HeightTolerance;
+
+    private static float[] HeightsOfTheLand(ISkyrimModGetter mod) => LandHeightReader.Read(mod.EnumerateMajorRecords<ILandscapeGetter>().Single())!;
+
+    /// <summary>The city mod needs the cleaned mod, copies its raised land and raises a block again: nothing of that is kept, so the whole land goes back, the block included.</summary>
+    [Fact]
+    public void ALandACityPluginThatNeedsTheCleanedModRaisedABlockOfAgainGoesBackWhole()
+    {
+        IReadOnlyList<ISkyrimMod> mods = [];
+        float[] written = [];
+        var (_, run) = FixtureRun.Capture(
+            SettingsOf(),
+            Workers,
+            dataFolder => mods = NavmeshAndLand(NavmeshAndLandScenario.LandRaisedWithABlockRaisedAgainByACityModThatNeedsTheCleanedMod)(dataFolder),
+            earlierPatcherWrites: null,
+            patch =>
+            {
+                if (patch.EnumerateMajorRecords<ILandscapeGetter>().Any()) written = HeightsOfTheLand(patch);
+                return AreaPatchDump.Describe(patch);
+            });
+
+        ExpectedOutputFiles.AssertMatches("restore-where-removed/TerrainOfAPluginThatNeedsTheCleanedMod", run.ToExpectedOutputLines());
+        AssertEveryPointIsBack(HeightsOfTheLand(mods[0]), written, block: null, withBlock: []);
+    }
+
+    private static void AssertNoQuarterIsJudgedAndNoLandIsWritten(RunOutput run)
+    {
+        Assert.DoesNotContain(run.Reports.Where(report => report.Name == CellsFile).SelectMany(ReportRows.Of), row => row["kind"] == "quarter");
+        Assert.DoesNotContain(run.Patch, line => line.StartsWith("land ", StringComparison.Ordinal));
     }
 
     /// <summary>The city mod changed every point of the land again, so a later plugin has the last word on all of it: no quarter is judged and no land is written.</summary>
@@ -259,8 +335,7 @@ public class RestoreWhereRemovedRunTests
         var (outcome, run) = Run(SettingsOf(), NavmeshAndLand(NavmeshAndLandScenario.LandRaisedFurtherEverywhereByTheCityMod));
 
         Assert.NotEmpty(outcome.Collected.ChangedLands);
-        Assert.DoesNotContain(run.Reports.Where(report => report.Name == CellsFile).SelectMany(ReportRows.Of), row => row["kind"] == "quarter");
-        Assert.DoesNotContain(run.Patch, line => line.StartsWith("land ", StringComparison.Ordinal));
+        AssertNoQuarterIsJudgedAndNoLandIsWritten(run);
     }
 
     [Fact]
@@ -301,7 +376,7 @@ public class RestoreWhereRemovedRunTests
             (SettingsOf(), RestoreWhereRemovedWorlds.CreateVillageWithAPatchOfTheCleanedMod),
             (TerrainSettings(), RestoreWhereRemovedWorlds.CreateTerrain),
             (SettingsOf(), NavmeshAndLand(NavmeshAndLandScenario.Replaced)),
-            (SettingsOf(), NavmeshAndLand(NavmeshAndLandScenario.LandRaisedWithABlockRaisedAgainByTheCityMod)),
+            (SettingsOf(), NavmeshAndLand(NavmeshAndLandScenario.LandRaisedWithABlockRaisedAgainByACityModThatNeedsTheCleanedMod)),
             (SettingsOf(), NavmeshAndLand(NavmeshAndLandScenario.EditedWithAnUnlinkedOneEditedAgainByTheCityMod)),
         ];
 
@@ -321,20 +396,6 @@ public class RestoreWhereRemovedRunTests
     private static List<Dictionary<string, string>> RowsOf(RunOutput run, string fileName) =>
         ReportRows.Of(Assert.Single(run.Reports, report => report.Name == fileName));
 
-    /// <summary>
-    /// The cell's four quarters, south-west, south-east, north-west and north-east in that order, are cleared and go back; only the
-    /// north-east one leaves heights to later plugins.
-    /// </summary>
-    private static void AssertEveryQuarterGoesBackAndTheNorthEastLeaves(RunOutput run, string leftToLaterPlugins)
-    {
-        var quarters = RowsOf(run, CellsFile).Where(row => row["kind"] == "quarter").ToList();
-        Assert.Equal(["south-west", "south-east", "north-west", "north-east"], quarters.Select(quarter => quarter["quarter"]));
-        Assert.All(quarters, quarter => Assert.Equal(("Cleared", "restored"), (quarter["verdict"], quarter["result"])));
-        Assert.Equal(["", "", "", leftToLaterPlugins], quarters.Select(quarter => quarter["leftToLaterPlugins"]));
-    }
-
-    /// <summary>The patch's line of the land's heights in the row, one of those <see cref="AreaPatchDump"/> shows.</summary>
-    private static string LandRow(RunOutput run, int row) => Assert.Single(run.Patch, line => line.Contains($" row {row}: ", StringComparison.Ordinal));
 
     /// <returns>By navmesh key, every vertex, every triangle with its edges and flags, and every edge link of each navmesh.</returns>
     private static Dictionary<string, string> GeometryByKey(ISkyrimModGetter mod) =>
@@ -349,7 +410,7 @@ public class RestoreWhereRemovedRunTests
                 string.Join("; ", data.Triangles.Select(triangle => $"{triangle.Vertices} {triangle.EdgeLink_0_1} {triangle.EdgeLink_1_2} {triangle.EdgeLink_2_0} {triangle.Flags}")),
                 string.Join("; ", data.EdgeLinks.Select(link => $"{link.Mesh.FormKey} {link.TriangleIndex}")));
 
-    private static Settings TerrainSettings() => SettingsOf(restore => restore.ClearedArea.SearchRadius = SmallSearchRadius);
+    internal static Settings TerrainSettings() => SettingsOf(restore => restore.ClearedArea.SearchRadius = SmallSearchRadius);
 
     private static void SwitchEverythingOff(RestoreWhereRemovedSettings restore)
     {

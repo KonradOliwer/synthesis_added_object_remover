@@ -53,6 +53,19 @@ public sealed record ChangedTerrainSettings(
     public ImmutableArray<Box> AreasAround(Box local, PlacedTransform transform) =>
         Boxes.GrownWorldAabbs(local, transform, AreaBySize ? AreaMultiplier : null, AreaByDistance ? AreaDistanceInUnits : null);
 
+    /// <summary>Whether the step checks an object that is visible or not.</summary>
+    public bool Checks(bool isVisible) => Objects == TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes || isVisible;
+
+    /// <summary>
+    /// Whether the step checks an area around an object it checks: every area, or with <see cref="TerrainCheckedObjects.VisibleObjectsOnTheGround"/>
+    /// one whose height range overlaps the ground at its vertices in either of two versions of the ground; a version without heights
+    /// does not.
+    /// </summary>
+    /// <param name="heightsOne">The heights at the area's vertices in one version of the ground.</param>
+    /// <param name="heightsOther">The heights at the same vertices in the other version.</param>
+    public bool ChecksArea(Box area, IEnumerable<float> heightsOne, IEnumerable<float> heightsOther) =>
+        Objects != TerrainCheckedObjects.VisibleObjectsOnTheGround || area.HeightRangeOverlaps(heightsOne) || area.HeightRangeOverlaps(heightsOther);
+
     public bool CountsAChange => CountHeightChanges || CountTerrainTypeChanges || CountsWaterChanges;
 
     public bool HasAnArea => AreaBySize || AreaByDistance;

@@ -40,9 +40,13 @@ public sealed class RestoreLoopTests
     private static readonly TestStatic MarkerBase = new(
         new FormKey(ShapeMod, 0x805), @"test\restoreloop\markerbase.nif", [], Collision: null, new Box(new Vector3(-2), new Vector3(2)), IsMarker: true);
 
+    /// <summary>A mist: a mesh drawn only with an effect shader, which blocks no one.</summary>
+    private static readonly TestStatic Mist = new(
+        new FormKey(ShapeMod, 0x806), @"test\restoreloop\mist.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-RockHalfSize), new Vector3(RockHalfSize))), EffectOnly: true);
+
     private const string ShapeDataFolder = "RestoreLoopData";
 
-    private static readonly TestStatic[] Statics = [Block, House, Tree, CollisionWall, MarkerBase];
+    private static readonly TestStatic[] Statics = [Block, House, Tree, CollisionWall, MarkerBase, Mist];
 
     private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(
         TestCollisionLayers.AddTo(new SkyrimMod(ShapeMod, SkyrimRelease.SkyrimSE)), ShapeDataFolder, Statics));
@@ -235,6 +239,44 @@ public sealed class RestoreLoopTests
     }
 
     /// <summary>
+    /// An object the cleaned mod moved stands in cell (1, 0), far enough from cell (0, 0) to leave its areas cleared. The
+    /// changed-terrain step checks the ground 1500 units around it, which reaches the raised ground of cell (0, 0): that ground stays
+    /// raised, so a later run finds no ground changed under it. When the step does not judge it, the ground there goes back.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void TheGroundTheChangedTerrainStepChecksAroundAnObjectThatStaysIsKept(bool judgedByTheStep)
+    {
+        var settings = new ChangedTerrainSettings(
+            On: true,
+            TerrainCheckedObjects.VisibleObjectsOnTheGround,
+            CountHeightChanges: true,
+            HeightTolerance: 8f,
+            CountTerrainTypeChanges: false,
+            MinTerrainTypeChangePercent: 0,
+            CountWaterHeightChanges: false,
+            WaterHeightTolerance: 8f,
+            CountWaterAddedOrRemoved: false,
+            MinWaterCoverChangePercent: 0,
+            AreaBySize: false,
+            AreaMultiplier: 0f,
+            AreaByDistance: true,
+            AreaDistanceInUnits: 1500f);
+        var scene = new Scene
+        {
+            Standing = [new Vector3(ExteriorGrid.CellSize + 1100f, QuarterCentre, Raised)],
+            StandingTerrainCheck = judgedByTheStep ? settings : null,
+        };
+
+        var land = Assert.Single(Plan(scene).Lands);
+
+        Assert.Equal(judgedByTheStep ? Raised : 0f, land.FinalHeights![PointAt(31, 8)]);
+        Assert.Equal(judgedByTheStep, land.Kept.Any(kept => kept.Reason == TerrainKeptReason.UnderObjectThatStays && kept.Points.Contains(PointAt(31, 8))));
+        Assert.Equal(0f, land.FinalHeights[PointAt(12, 8)]);
+    }
+
+    /// <summary>
     /// As <see cref="AnObjectWhosePositionALaterPluginKeepsIsNotRefusedForGroundChangedUnderIt"/>, but the cleaned mod tilted the rock
     /// or scaled it down, and that goes back around the kept position: the rock's box changes on the raised ground.
     /// </summary>
@@ -370,6 +412,44 @@ public sealed class RestoreLoopTests
 
         var rock = Assert.Single(result.Objects);
         Assert.Equal((new PlacedRefusal(PlacedGuard.StandsInChangedNavmesh, NavmeshKey, Failure: null), false), (rock.Refused, rock.IsRestored));
+    }
+
+    /// <summary>
+    /// A mist of the cleaned mod that stays stands across the line between the water level before the cleaned mod and its lower one.
+    /// It blocks no one and is no other mod's, so the water still goes back and the mist then stands out of it.
+    /// </summary>
+    [Fact]
+    public void AStandingMistOfTheCleanedModAtTheWaterLineKeepsNoWaterLevel()
+    {
+        var scene = new Scene { Standing = [new Vector3(CellCentre + 300, CellCentre, 0)], StandingModel = Mist.Base, Lands = [], Cells = [ChangedWater()] };
+
+        var cell = Assert.Single(Plan(scene).Cells);
+
+        Assert.Equal(((RecordKey?)null, true), (cell.WaterKeptBy, cell.IsRestored));
+    }
+
+    /// <summary>
+    /// Two base game rocks the cleaned mod moved go back to old places 30 units apart; the first keeps a turn a later plugin gave it,
+    /// so the two overlap once back. The restore does not clean anything between other mods' objects: both go back.
+    /// </summary>
+    [Fact]
+    public void TwoRocksGoingBackThatOverlapOnceBackBothGoBack()
+    {
+        var first = Rock(0, new Vector3(1500, 1500, RockHalfSize), RockNowPlace);
+        var turned = first with
+        {
+            WhereItIsNow = new EulerPlacement(RockNowPlace, new Vector3(0, 0, 0.5f), 1f),
+            Earlier = first.Earlier with { LeftToLaterPlugins = ImmutableSortedDictionary<PlacedParts, PluginName>.Empty.Add(PlacedParts.Rotation, LaterMod.ToPluginName()) },
+        };
+        var secondNow = RockNowPlace + new Vector3(0, 500, 0);
+        var scene = new Scene
+        {
+            Rocks = [turned, Rock(1, new Vector3(1530, 1500, RockHalfSize), secondNow)],
+            Others = [RockNow(0, RockNowPlace) with { Rotation = new Vector3(0, 0, 0.5f) }, RockNow(1, secondNow)],
+            Lands = [],
+        };
+
+        Assert.All(Plan(scene).Objects, judged => Assert.Equal((true, null), (judged.IsRestored, judged.Refused)));
     }
 
     /// <summary>A later mod's crate stands between the water level before the cleaned mod and the cleaned mod's lower one, or far above both.</summary>
@@ -1284,13 +1364,15 @@ public sealed class RestoreLoopTests
         var inputs = new PlacedGuardInputs(
             caches,
             excluded => rules.TooClose(world.World, caches, excluded, AllOn.TooClose),
+            GroupTooCloseGuard.Of(
+                world, cleared, [], TestTargetGroups.None, reach, TestTargets.TargetName, (checkedWorld, excluded, settings) => rules.TooClose(checkedWorld, rules.WorldCaches.Of(checkedWorld), excluded, settings), new Execution(1)),
             rules.HoldersOfObjectsThatStay.Over(world.World, world.Now),
+            rules.HoldersOfObjectsThatStay.Over(world.GoingBackWorld, world.Holders),
             Shapes,
             new ObjectsThatBlockActors(Shapes, new Dictionary<RecordKey, ReferenceFacts>()),
             new NavmeshIndex(_ => null),
             space => space,
-            _ => TestTargets.TargetName,
-            RestoreGuardsBuilder.LoadsBefore(Plugins, TestTargets.TargetName));
+            _ => TestTargets.TargetName);
         var presence = FinalPresence.Of(collected, removedTargets.Select(target => target.Key).ToHashSet(), cleared);
         var guards = new PlacedGuards(world, inputs, reach, presence, new DoorLinkGuard(cleared, [], _ => null), new Execution(1));
         var plans = new OtherKindsAsPlanned(
@@ -1497,7 +1579,7 @@ public sealed class RestoreLoopTests
     private static WhereRemovedRestorer.Input InputOf(Scene scene)
     {
         var removedTargets = RemovedTargets();
-        ImmutableArray<TargetObject> targets = [.. removedTargets, .. scene.Standing.Select((position, index) => StandingTarget(removedTargets.Count + index, position))];
+        ImmutableArray<TargetObject> targets = [.. removedTargets, .. scene.Standing.Select((position, index) => StandingTarget(removedTargets.Count + index, position) with { Base = scene.StandingModel })];
         List<OtherObject> others = [.. scene.Others.Select((other, index) => other with { Id = new OtherId(index) })];
         var collected = TestScenes.CreateWorld(targets, others) with
         {
@@ -1529,6 +1611,12 @@ public sealed class RestoreLoopTests
             final,
             TestClearedAreas.Of(collected, final, caches, scene.Settings),
             new(rules.WorldCaches, rules.TooCloseRule(tooClose), rules.HoldersOfObjectsThatStay, new TestNavmeshCheck(scene.FindFault)),
+            scene.StandingTerrainCheck is { } terrainCheck
+                ? TestTargetGroups.None with
+                {
+                    ChangedTerrain = [new ObjectsJudgedWith<ChangedTerrainSettings>([.. Enumerable.Range(removedTargets.Count, scene.Standing.Count).Select(index => new TargetId(index))], terrainCheck)],
+                }
+                : TestTargetGroups.None,
             new(
                 caches,
                 new TestLandPlugin(space => space, scene.ReadHeights, scene.TerrainWinner),
@@ -1546,6 +1634,13 @@ public sealed class RestoreLoopTests
 
         /// <summary>The places of base game objects the cleaned mod moved that no round removes, numbered after the removed objects.</summary>
         public List<Vector3> Standing { get; init; } = [];
+
+        /// <summary>The base of the objects of <see cref="Standing"/>.</summary>
+        public BaseKey StandingModel { get; init; } = Block.Base;
+
+        /// <summary>The changed-terrain step's settings the objects of <see cref="Standing"/> are judged with; none judges them when null.</summary>
+        public ChangedTerrainSettings? StandingTerrainCheck { get; init; }
+
         public List<OtherObject> Others { get; init; } = [];
         public List<LandChangedByCleanedMod> Lands { get; init; } = [RaisedLand()];
         public List<CellChangedByCleanedMod> Cells { get; init; } = [];

@@ -20,8 +20,7 @@ internal sealed class GroundUnderObjects(IBaseObjectShapes shapes, Func<RecordKe
         if (findLandWorldspace(placed.SpaceKey) is not { } land) return [];
         var box = GrownBoxOf(placed.Base, placed.Transform);
         var points = PointsUnder(land, box).ToList();
-        var heights = points.Select(point => heightsOf(point.Cell)?[point.Point]).OfType<float>().ToList();
-        return heights.Count > 0 && heights.Min() <= box.Max.Z && heights.Max() >= box.Min.Z ? points : [];
+        return box.HeightRangeOverlaps(LandGridPoint.HeightsAt(points, heightsOf)) ? points : [];
     }
 
     /// <summary>The points under each of the objects, as <see cref="UnderWhereItReachesTheGround"/> finds them.</summary>
@@ -36,6 +35,7 @@ internal sealed class GroundUnderObjects(IBaseObjectShapes shapes, Func<RecordKe
 
     private Box GrownBoxOf(BaseKey? model, PlacedTransform transform) => BaseBoxes.Of(shapes, model, transform).WorldAabb(TerrainGrid.VertexSpacing);
 
-    private static IEnumerable<LandGridPoint> PointsUnder(RecordKey land, Box box) =>
+    /// <summary>The points of the worldspace's land under the box, seen from above.</summary>
+    public static IEnumerable<LandGridPoint> PointsUnder(RecordKey land, Box box) =>
         TerrainGrid.VerticesUnder(box).SelectMany(under => under.VertexIndices.Select(point => new LandGridPoint(new ExteriorCell(land, under.CellX, under.CellY), point)));
 }

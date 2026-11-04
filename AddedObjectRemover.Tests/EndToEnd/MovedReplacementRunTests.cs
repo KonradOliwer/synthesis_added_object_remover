@@ -215,6 +215,33 @@ public class MovedReplacementRunTests
             Assert.Single(log.Sections.Single(section => section.Id == "changed-objects").Lines));
     }
 
+    /// <summary>The city mod needs the cleaned mod and holds the crate at the cleaned mod's place or moves it again; the detailed line names the plugin whose place the crate stands at.</summary>
+    [Theory]
+    [InlineData(false, FixtureWorld.TargetName)]
+    [InlineData(true, CityPlugin)]
+    public void TheDetailedLineNamesThePluginWhosePlaceTheKeptObjectStandsAt(bool cityMovesItAgain, string namedPlugin)
+    {
+        var settings = CrateSettings();
+        settings.DetailedLogAndReports = true;
+
+        var (_, run) = FixtureRun.Capture(settings, Workers, dataFolder => CreateCrateWorldCopiedByACityPluginThatNeedsTheCleanedMod(dataFolder, cityMovesItAgain));
+
+        Assert.Contains(run.Log, line => line.StartsWith($"  Kept where {namedPlugin} put it: B_Crate ", StringComparison.Ordinal));
+    }
+
+    /// <summary>The crate world with the city mod having the cleaned mod as a master and a copy of the moved crate, moved again or not.</summary>
+    private static IReadOnlyList<ISkyrimMod> CreateCrateWorldCopiedByACityPluginThatNeedsTheCleanedMod(string dataFolder, bool moveAgain)
+    {
+        var world = CreateWorld(dataFolder);
+        var crate = world.BaseGame.Interior.Place("B_Crate", world.BaseGame.AddModeledStatic("B_CrateBase", FixtureMeshes.CrateModel), Original);
+        var moved = world.Target.Interior.PlaceCopyOf(crate);
+        MoveCopy(moved, MovedTo);
+        world.City.Mod.ModHeader.MasterReferences.Add(new MasterReference { Master = world.Target.Key });
+        var copy = world.City.Interior.PlaceCopyOf(moved);
+        if (moveAgain) MoveCopy(copy, MovedTo + new Vector3(0, 500, 0));
+        return world.LoadOrder;
+    }
+
     [Fact]
     public void ARunWithoutChangedObjectsPrintsNoChangedObjectsLine()
     {

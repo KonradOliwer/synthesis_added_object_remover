@@ -726,6 +726,7 @@ public sealed class RestoreWhereRemovedTerrainTests
                 final,
                 TestClearedAreas.Of(collected, final, caches, restore),
                 new(rules.WorldCaches, rules.TooCloseRule(), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),
+                TestTargetGroups.None,
                 new(
                     caches,
                     new TestLandPlugin(space => space == ChildSpace ? Space : space, _ => new LandHeights(null, null)),

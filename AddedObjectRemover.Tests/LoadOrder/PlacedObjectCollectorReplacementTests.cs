@@ -264,21 +264,23 @@ public class PlacedObjectCollectorReplacementTests
 
     /// <summary>
     /// The answer must not depend on how far the scan walked below the cleaned mod's version, which depends on whether the old
-    /// places are judged. A trusted plugin between the cleaned mod's version and the winner decides the record, as a later plugin does.
+    /// places are judged. A trusted plugin between the cleaned mod's version and the winner holds the target plugin's position: one
+    /// that loads without the target plugin set that position and decides the record, as a later plugin does; one that needs the
+    /// target plugin keeps nothing, so the record is judged where the patch puts it.
     /// </summary>
     [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(false, true)]
     [InlineData(true, true)]
-    public void ATrustedPluginBetweenTheTargetPluginAndThePatchLeavesTheRecordUnjudgedWhetherOrNotItNeedsTheTargetPlugin(bool judgeOldPlaces, bool needsTarget)
+    public void ATrustedPluginBetweenTheTargetPluginAndThePatchLeavesTheRecordUnjudgedOnlyWhenItLoadsWithoutTheTargetPlugin(bool judgeOldPlaces, bool needsTarget)
     {
         var between = needsTarget ? NeedsTarget : TrustedPatchOfAnotherMod;
         var plan = Plan with { Needs = new ScanNeeds(JudgeOldPlaces: judgeOldPlaces) };
 
         var collected = Collect(plan, Tree, At(BaseGame, Placed), At(Target, Moved), At(between, Moved), At(Patch, Moved * 2));
 
-        Assert.DoesNotContain(collected.Targets, target => target.Key == Tree);
+        Assert.Equal(needsTarget, collected.Targets.Any(target => target.Key == Tree));
     }
 
     [Theory]

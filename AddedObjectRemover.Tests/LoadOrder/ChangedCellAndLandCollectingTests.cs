@@ -77,12 +77,20 @@ public sealed class ChangedCellAndLandCollectingTests
         Assert.Equal((_worldspace.ToRecordKey(), (0, 0), Cleaned, false), (changed.SpaceKey, changed.Grid!.Value, changed.WinningMod, changed.LinkedFromCleanedMod));
     }
 
-    [Fact]
-    public void ACellPartALaterPluginOnlyCarriesOverGoesBack()
+    /// <summary>
+    /// The later plugin carries the cleaned mod's music over. One that needs the cleaned mod keeps nothing, so the music goes back; one
+    /// that loads without it was made against the base game's cell, so it set that music itself.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ACellPartALaterPluginCarriesOverGoesBackOnlyWhenThatPluginNeedsTheCleanedMod(bool laterNeedsCleanedMod)
     {
         Change(CellCopyIn(_later.Mod, from: ChangedInCleanedMod(CellPart.Music)), CellPart.Music);
 
-        Assert.Equal([Part(CellPart.Music, new PartOutcome.Undo())], ChangedCellOf(Collect()).Parts.ToList());
+        Assert.Equal(
+            [Part(CellPart.Music, laterNeedsCleanedMod ? new PartOutcome.Undo() : new PartOutcome.LeftToLaterPlugin(Later))],
+            ChangedCellOf(Collect(laterNeedsCleanedMod: laterNeedsCleanedMod)).Parts.ToList());
     }
 
     [Fact]
@@ -95,33 +103,34 @@ public sealed class ChangedCellAndLandCollectingTests
         Assert.Equal([Part(CellPart.Music, new PartOutcome.LeftToLaterPlugin(Patch))], changed.Parts.ToList());
     }
 
-    /// <summary>The cleaned mod lists two more regions; the later plugin takes the second out again.</summary>
+    /// <summary>The cleaned mod lists two more regions; an earlier patcher of the group takes the second out again.</summary>
     [Fact]
-    public void ARegionALaterPluginChangesAgainIsLeftToItWhileTheOtherRegionGoesBack()
+    public void ARegionThePatchChangesAgainIsLeftToItWhileTheOtherRegionGoesBack()
     {
         var withRegions = CellCopyIn(_cleaned.Mod);
         withRegions.Regions = [new FormLink<IRegionGetter>(FirstRegion), new FormLink<IRegionGetter>(SecondRegion)];
-        CellCopyIn(_later.Mod, from: withRegions).Regions!.RemoveAt(1);
 
         Assert.Equal(
             [
                 Part(CellPart.Region, new PartOutcome.Undo(), FirstRegion.ToRecordKey()),
-                Part(CellPart.Region, new PartOutcome.LeftToLaterPlugin(Later), SecondRegion.ToRecordKey()),
+                Part(CellPart.Region, new PartOutcome.LeftToLaterPlugin(Patch), SecondRegion.ToRecordKey()),
             ],
-            ChangedCellOf(Collect()).Parts.ToList());
+            ChangedCellOf(Collect(patch => CellCopyIn(patch, from: withRegions).Regions!.RemoveAt(1))).Parts.ToList());
     }
 
-    /// <summary>The cleaned mod changes the music and the lock list (in the rest); the later plugin carries both and sets another flag of the rest.</summary>
+    /// <summary>
+    /// The cleaned mod changes the music and the lock list (in the rest); an earlier patcher of the group carries both and sets another
+    /// flag of the rest.
+    /// </summary>
     [Fact]
     public void ALaterChangeInTheRestLeavesTheWholeRestToThatPluginWhileOtherPartsGoBack()
     {
         var changedInCleanedMod = ChangedInCleanedMod(CellPart.Music);
         Change(changedInCleanedMod, CellPart.RestOfCell);
-        CellCopyIn(_later.Mod, from: changedInCleanedMod).Flags |= (Cell.Flag)0x1000;
 
         Assert.Equal(
-            [Part(CellPart.Music, new PartOutcome.Undo()), Part(CellPart.RestOfCell, new PartOutcome.LeftToLaterPlugin(Later))],
-            ChangedCellOf(Collect()).Parts.ToList());
+            [Part(CellPart.Music, new PartOutcome.Undo()), Part(CellPart.RestOfCell, new PartOutcome.LeftToLaterPlugin(Patch))],
+            ChangedCellOf(Collect(patch => CellCopyIn(patch, from: changedInCleanedMod).Flags |= (Cell.Flag)0x1000)).Parts.ToList());
     }
 
     [Fact]
@@ -266,26 +275,44 @@ public sealed class ChangedCellAndLandCollectingTests
     }
 
     /// <summary>
-    /// The cleaned mod raises one point beyond the tolerance, one within it and a third that the later plugin raises again; the later
-    /// plugin carries the rest.
+    /// The cleaned mod raises one point beyond the tolerance, one within it and a third that a later plugin that needs the cleaned mod
+    /// carries over and an earlier patcher of the group raises again; the patch carries the rest.
     /// </summary>
     [Fact]
-    public void EachPointRaisedBeyondTheToleranceGoesBackUnlessALaterPluginRaisedItAgain()
+    public void EachPointRaisedBeyondTheToleranceGoesBackUnlessThePatchRaisedItAgain()
     {
         var raised = LandCopyIn(_cleaned.Mod);
         RaisePoint(raised, LastColumn, 10, steps: 2);
         RaisePoint(raised, LastColumn, 11, steps: 1);
         RaisePoint(raised, LastColumn, 12, steps: 2);
-        RaisePoint(LandCopyIn(_later.Mod, from: raised), LastColumn, 12, steps: 4);
+        var carried = LandCopyIn(_later.Mod, from: raised);
 
-        var land = ChangedLandOf(Collect());
+        var land = ChangedLandOf(Collect(patch => RaisePoint(LandCopyIn(patch, from: carried), LastColumn, 12, steps: 4), laterNeedsCleanedMod: true));
 
         Assert.Equal([PointIndex(LastColumn, 10)], land.UndoPoints.Points);
         Assert.Equal([PointIndex(LastColumn, 12)], land.LeftToLater.Points.Points);
-        Assert.Equal([Later], land.LeftToLater.Plugins.ToList());
+        Assert.Equal([Patch], land.LeftToLater.Plugins.ToList());
         Assert.Equal((0f, 2 * UnitsPerHeightStep), (land.Heights!.Earlier![PointIndex(LastColumn, 10)], land.Heights.Current![PointIndex(LastColumn, 10)]));
-        Assert.Equal((new ExteriorCell(_worldspace.ToRecordKey(), 0, 0), Later), (land.Cell, land.WinningMod));
+        Assert.Equal((new ExteriorCell(_worldspace.ToRecordKey(), 0, 0), Patch), (land.Cell, land.WinningMod));
         Assert.True(land.UndoColours.IsEmpty && land.UndoQuarters.IsEmpty && !land.UndoRest);
+    }
+
+    /// <summary>
+    /// The cleaned mod raises a point; a later plugin that loads without it holds that height. It was made against the base game's
+    /// land, so it set the height itself, and the point is left to it.
+    /// </summary>
+    [Fact]
+    public void APointALaterPluginThatLoadsWithoutTheCleanedModHoldsIsLeftToThatPlugin()
+    {
+        var raised = LandCopyIn(_cleaned.Mod);
+        RaisePoint(raised, LastColumn, 10, steps: 2);
+        LandCopyIn(_later.Mod, from: raised);
+
+        var land = ChangedLandOf(Collect());
+
+        Assert.True(land.UndoPoints.IsEmpty);
+        Assert.Equal([PointIndex(LastColumn, 10)], land.LeftToLater.Points.Points);
+        Assert.Equal([Later], land.LeftToLater.Plugins.ToList());
     }
 
     [Fact]
@@ -334,25 +361,27 @@ public sealed class ChangedCellAndLandCollectingTests
         Assert.Null(ChangedLandOf(Collect()).Heights);
     }
 
-    /// <summary>The cleaned mod paints the top right and the bottom left quarters; the later plugin carries both and repaints the bottom left one.</summary>
+    /// <summary>The cleaned mod paints the top right and the bottom left quarters; an earlier patcher of the group carries both and repaints the bottom left one.</summary>
     [Fact]
-    public void AQuarterTheCleanedModPaintedGoesBackUnlessALaterPluginRepaintedIt()
+    public void AQuarterTheCleanedModPaintedGoesBackUnlessThePatchRepaintedIt()
     {
         var painted = LandCopyIn(_cleaned.Mod);
         painted.Layers.Add(AlphaLayer(Quadrant.TopRight, layerNumber: 1));
         painted.Layers.Add(AlphaLayer(Quadrant.BottomLeft, layerNumber: 1));
-        var repainted = LandCopyIn(_later.Mod, from: painted);
-        repainted.Layers.RemoveAll(layer => layer.Header!.Quadrant == Quadrant.BottomLeft);
-        repainted.Layers.Add(AlphaLayer(Quadrant.BottomLeft, layerNumber: 2));
 
-        var land = ChangedLandOf(Collect());
+        var land = ChangedLandOf(Collect(patch =>
+        {
+            var repainted = LandCopyIn(patch, from: painted);
+            repainted.Layers.RemoveAll(layer => layer.Header!.Quadrant == Quadrant.BottomLeft);
+            repainted.Layers.Add(AlphaLayer(Quadrant.BottomLeft, layerNumber: 2));
+        }));
 
         Assert.Equal([TerrainQuadrants.IndexOf(1, 1)], land.UndoQuarters.Quarters);
         Assert.Equal([TerrainQuadrants.IndexOf(0, 0)], land.LeftToLater.Quarters.Quarters);
         Assert.True(land.UndoPoints.IsEmpty && !land.UndoRest);
     }
 
-    /// <summary>The later plugin carries the raised point and deletes the land, so no part is left to it either.</summary>
+    /// <summary>The later plugin, a patch for the cleaned mod, carries the raised point and deletes the land, so no part is left to it either.</summary>
     [Fact]
     public void ALandALaterPluginDeletesGivesNoChangedLand()
     {
@@ -360,10 +389,13 @@ public sealed class ChangedCellAndLandCollectingTests
         RaisePoint(raised, LastColumn, 10, steps: 2);
         LandCopyIn(_later.Mod, from: raised).IsDeleted = true;
 
-        Assert.DoesNotContain(Collect().ChangedLands, land => land.LandKey == LandKey);
+        Assert.DoesNotContain(Collect(laterNeedsCleanedMod: true).ChangedLands, land => land.LandKey == LandKey);
     }
 
-    /// <summary>The cleaned mod raises two points; the later plugin raises the second again and deletes the land.</summary>
+    /// <summary>
+    /// The cleaned mod raises two points; the later plugin, which loads without it, holds the first, raises the second again and
+    /// deletes the land: both points are its own.
+    /// </summary>
     [Fact]
     public void NothingGoesBackInALandALaterPluginDeletesWhileItsOwnChangesAreLeftToIt()
     {
@@ -377,7 +409,7 @@ public sealed class ChangedCellAndLandCollectingTests
         var land = ChangedLandOf(Collect());
 
         Assert.True(land.UndoPoints.IsEmpty && land.UndoColours.IsEmpty && land.UndoQuarters.IsEmpty && !land.UndoRest);
-        Assert.Equal([PointIndex(LastColumn, 12)], land.LeftToLater.Points.Points);
+        Assert.Equal([PointIndex(LastColumn, 10), PointIndex(LastColumn, 12)], land.LeftToLater.Points.Points);
     }
 
     [Fact]
@@ -397,13 +429,16 @@ public sealed class ChangedCellAndLandCollectingTests
         Assert.Equal((0f, 2 * UnitsPerHeightStep), (LandHeightReader.Read(handles.LandOf(LandKey).Earlier)![point], LandHeightReader.Read(handles.LandOf(LandKey).Winner)![point]));
     }
 
-    /// <summary>The cleaned mod changes the music and the location; the later plugin carries the music over and changes the location again.</summary>
+    /// <summary>
+    /// The cleaned mod changes the music and the location; the later plugin, made against the base game's cell, keeps the base game's
+    /// music and changes the location again.
+    /// </summary>
     [Fact]
     public void ARestoredCellGetsBackOnlyItsUndonePartsWhileThePartLeftToALaterPluginKeepsItsValue()
     {
         var changed = ChangedInCleanedMod(CellPart.Music);
         Change(changed, CellPart.Location);
-        CellCopyIn(_later.Mod, from: changed).Location.SetTo(OtherRecord(11));
+        CellCopyIn(_later.Mod).Location.SetTo(OtherRecord(11));
 
         var patch = RestoreTheChangedCell();
 
@@ -413,11 +448,11 @@ public sealed class ChangedCellAndLandCollectingTests
     }
 
     /// <summary>
-    /// The cleaned mod raises two inner points and recolours one; the later plugin raises the second point again. The whole cell is
-    /// cleared, so the plan's heights and colour are written into the patch.
+    /// The cleaned mod raises two inner points and recolours one; the later plugin, which needs the cleaned mod, carries them and raises
+    /// the second point again. Its changes keep nothing, so the base game's heights and colour are written back. The whole cell is cleared.
     /// </summary>
     [Fact]
-    public void ARestoredLandGetsItsEarlierHeightAndColourBackWhileAPointALaterPluginRaisedAgainKeepsItsHeight()
+    public void ARestoredLandGetsItsEarlierHeightsAndColourBackWhereAPluginThatNeedsTheCleanedModCarriedOrRaisedThem()
     {
         var (restored, raisedAgain) = (PointIndex(10, 10), PointIndex(20, 10));
         var raised = LandCopyIn(_cleaned.Mod);
@@ -426,17 +461,19 @@ public sealed class ChangedCellAndLandCollectingTests
         raised.VertexColors![5, 6] = new P3UInt8(9, 8, 7);
         RaiseInnerPoint(LandCopyIn(_later.Mod, from: raised), 20, 10, steps: 4);
 
-        var patch = RestoreInPatch(collected =>
-        {
-            var cleared = TestAreaShares.Quarter(AreaVerdict.Cleared);
-            var land = new LandAreasJudged(ChangedLandOf(collected), Never: null, [cleared, cleared, cleared, cleared]);
-            var judged = new TerrainUndoPlan([land], _ => new LandHeights(null, null), HeightTolerance, blendDistance: 0f).Judged();
-            return new RestoreWhereRemovedResult(StepOutcome.Performed, [], [], judged, [], [], Passes: 1, DoorsLeftRemoved: [], Failures: [], RestoreWhereRemovedTimes.None);
-        });
+        var patch = RestoreInPatch(
+            collected =>
+            {
+                var cleared = TestAreaShares.Quarter(AreaVerdict.Cleared);
+                var land = new LandAreasJudged(ChangedLandOf(collected), Never: null, [cleared, cleared, cleared, cleared]);
+                var judged = new TerrainUndoPlan([land], _ => new LandHeights(null, null), HeightTolerance, blendDistance: 0f).Judged();
+                return new RestoreWhereRemovedResult(StepOutcome.Performed, [], [], judged, [], [], Passes: 1, DoorsLeftRemoved: [], Failures: [], RestoreWhereRemovedTimes.None);
+            },
+            laterNeedsCleanedMod: true);
 
         var written = Assert.Single(patch.EnumerateMajorRecords<ILandscapeGetter>());
         var heights = LandHeightReader.Read(written)!;
-        Assert.Equal((0f, 4 * UnitsPerHeightStep), (heights[restored], heights[raisedAgain]));
+        Assert.Equal((0f, 0f), (heights[restored], heights[raisedAgain]));
         Assert.Equal(new P3UInt8(0, 0, 0), written.VertexColors![5, 6]);
     }
 
@@ -566,18 +603,24 @@ public sealed class ChangedCellAndLandCollectingTests
 
     /// <param name="writeIntoPatch">What an earlier patcher of the group wrote into the patch; nothing when null.</param>
     /// <param name="afterCollect">Reads the plugin records the collector read, before they are dropped.</param>
+    /// <param name="laterNeedsCleanedMod">The later plugin cannot load without the cleaned mod, as a patch for it.</param>
     private CollectedObjects Collect(
-        Action<ISkyrimMod>? writeIntoPatch = null, Action<IPluginRecords>? afterCollect = null, WhatToCollect? plan = null, int threads = 1)
+        Action<ISkyrimMod>? writeIntoPatch = null, Action<IPluginRecords>? afterCollect = null, WhatToCollect? plan = null, int threads = 1, bool laterNeedsCleanedMod = false)
     {
         var state = FixturePatcherState.Create([_base.Mod, _cleaned.Mod, _later.Mod], Path.GetTempPath(), Path.GetTempPath());
         writeIntoPatch?.Invoke(state.PatchMod);
         using var world = FixturePatcherState.CreateFinalWorld(state);
         var records = new PluginRecordsFactory(world, threads).Open();
-        var trust = TestModTrust.Of(Cleaned, Patch, trusted: [BaseGame, Later], untrusted: []);
-        var collected = PlacedObjects.Collect(records, trust, plan ?? Plan);
+        var collected = PlacedObjects.Collect(records, TrustOf(laterNeedsCleanedMod), plan ?? Plan);
         afterCollect?.Invoke(records);
         return collected;
     }
+
+    /// <param name="laterNeedsCleanedMod">The later plugin cannot load without the cleaned mod, as a patch for it.</param>
+    private ModTrustTable TrustOf(bool laterNeedsCleanedMod) =>
+        laterNeedsCleanedMod
+            ? TestModTrust.Of(Cleaned, Patch, trusted: [BaseGame], untrusted: [], needingCleanedMod: [Later])
+            : TestModTrust.Of(Cleaned, Patch, trusted: [BaseGame, Later], untrusted: []);
 
     /// <summary>Collects, judges the base game's cell as lying in a cleared area and writes the patch.</summary>
     private ISkyrimModGetter RestoreTheChangedCell() => RestoreInPatch(collected =>
@@ -592,12 +635,13 @@ public sealed class ChangedCellAndLandCollectingTests
     });
 
     /// <summary>Collects, judges what goes back with the given judging and writes the patch.</summary>
-    private ISkyrimModGetter RestoreInPatch(Func<CollectedObjects, RestoreWhereRemovedResult> judge)
+    /// <param name="laterNeedsCleanedMod">The later plugin cannot load without the cleaned mod, as a patch for it.</param>
+    private ISkyrimModGetter RestoreInPatch(Func<CollectedObjects, RestoreWhereRemovedResult> judge, bool laterNeedsCleanedMod = false)
     {
         var state = FixturePatcherState.Create([_base.Mod, _cleaned.Mod, _later.Mod], Path.GetTempPath(), Path.GetTempPath());
         using var world = FixturePatcherState.CreateFinalWorld(state);
         var records = new PluginRecordsFactory(world, 1).Open();
-        var collected = PlacedObjects.Collect(records, TestModTrust.Of(Cleaned, Patch, trusted: [BaseGame, Later], untrusted: []), Plan);
+        var collected = PlacedObjects.Collect(records, TrustOf(laterNeedsCleanedMod), Plan);
         var protection = ObjectsToKeep.Build(collected.Targets, [], TestTargets.References(collected.Targets.Length), TestBaseFacts.Unresolved);
         var final = RemovalDecisions.Start(protection, [.. collected.Targets.Select(_ => (WhenRemoved)new WhenRemoved.Disable())]);
         PatchWriter.Write(new(final, collected.Targets, OtherModsObjectsResult.SwitchedOff, judge(collected), records, new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod, Program.PatchMarkerText)));

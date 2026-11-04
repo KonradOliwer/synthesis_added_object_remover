@@ -8,8 +8,8 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 /// <summary>
 /// How far the placed guards that read the object caches look around a placed record going back, so an object beyond that cannot
 /// change their answers: the too-close rule within the zones its settings grow around the record as it goes back, and the test of
-/// what rests on the record within the touch gap around it where it stands now and around each object found resting on it.
-/// Seen from above, at any height. Thread-safe.
+/// what rests on what within the touch gap around the record where it stands now and as it goes back, and around each object found
+/// resting on it where it stands now. Seen from above, at any height. Thread-safe.
 /// </summary>
 /// <param name="touchGap">The largest gap between two surfaces that the test of what rests on what counts as touching.</param>
 internal sealed class GuardReach(IBaseObjectShapes shapes, TooCloseSettings tooClose, float touchGap)
@@ -19,34 +19,40 @@ internal sealed class GuardReach(IBaseObjectShapes shapes, TooCloseSettings tooC
 
     /// <summary>
     /// Whether each object can meet a guard: within the too-close reach of a candidate as it goes back, within the touch reach of a
-    /// candidate where it stands now or of an object within that, or a placed NPC, whose body the rules for NPCs measure on their own.
+    /// candidate as it goes back, of one where it stands now or of an object within the latter, or a placed NPC, whose body the rules
+    /// for NPCs measure on their own.
     /// </summary>
     /// <param name="restored">The candidates, each as it goes back.</param>
     /// <param name="now">The candidates that stand now, where they stand.</param>
     /// <returns>By the position of the object.</returns>
-    public bool[] InReach(IReadOnlyList<OtherObject> objects, IEnumerable<TargetObject> restored, IEnumerable<TargetObject> now)
+    public bool[] InReach(IReadOnlyList<OtherObject> objects, IReadOnlyList<TargetObject> restored, IEnumerable<TargetObject> now)
     {
         var tooCloseReach = new ColumnBoxes(restored.Select(candidate => (candidate.SpaceKey, TooCloseReachOf(candidate))));
-        var touchReach = new ColumnBoxes(now.Select(candidate => (candidate.SpaceKey, TouchReachOf(candidate.Base, candidate.Transform))));
-        if (tooCloseReach.IsEmpty && touchReach.IsEmpty) return new bool[objects.Count];
+        var touchReachNow = new ColumnBoxes(now.Select(candidate => (candidate.SpaceKey, TouchReachOf(candidate.Base, candidate.Transform))));
+        var touchReachGoingBack = new ColumnBoxes(restored.Select(candidate => (candidate.SpaceKey, TouchReachOf(candidate.Base, candidate.Transform))));
+        if (restored.Count == 0 && touchReachNow.IsEmpty) return new bool[objects.Count];
         var bounds = objects.Select(BoundsOf).ToArray();
         var restingReach = new ColumnBoxes(
-            objects.Zip(bounds).Where(placed => touchReach.Overlaps(placed.First.SpaceKey, placed.Second)).Select(placed => (placed.First.SpaceKey, TouchReachOf(placed.First.Base, placed.First.Transform))));
+            objects.Zip(bounds).Where(placed => touchReachNow.Overlaps(placed.First.SpaceKey, placed.Second)).Select(placed => (placed.First.SpaceKey, TouchReachOf(placed.First.Base, placed.First.Transform))));
         return
         [
             .. objects.Zip(bounds).Select(placed =>
                 placed.First.IsPlacedNpc
                 || tooCloseReach.Overlaps(placed.First.SpaceKey, placed.Second)
-                || touchReach.Overlaps(placed.First.SpaceKey, placed.Second)
+                || touchReachGoingBack.Overlaps(placed.First.SpaceKey, placed.Second)
+                || touchReachNow.Overlaps(placed.First.SpaceKey, placed.Second)
                 || restingReach.Overlaps(placed.First.SpaceKey, placed.Second)),
         ];
     }
 
     /// <summary>The box around the record as it goes back holding every zone the too-close rule grows around it: the sphere around each zone that is on.</summary>
-    public Box TooCloseReachOf(TargetObject restored)
+    public Box TooCloseReachOf(TargetObject restored) => TooCloseReachOf(restored, tooClose);
+
+    /// <summary>The box around the object holding every zone the too-close rule grows around it with the given settings.</summary>
+    public Box TooCloseReachOf(TargetObject placed, TooCloseSettings settings)
     {
-        var box = BaseBoxes.Of(shapes, restored.Base, restored.Transform);
-        var radius = TooCloseZoneReach.ReachRadius(tooClose, box.HalfExtents) + Slack;
+        var box = BaseBoxes.Of(shapes, placed.Base, placed.Transform);
+        var radius = TooCloseZoneReach.ReachRadius(settings, box.HalfExtents) + Slack;
         return new Box(box.Center - new Vector3(radius), box.Center + new Vector3(radius));
     }
 

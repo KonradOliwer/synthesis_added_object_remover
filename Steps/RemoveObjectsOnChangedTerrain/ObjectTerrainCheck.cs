@@ -53,8 +53,7 @@ internal sealed class ObjectTerrainCheck(IPluginRecords records, IBaseObjectShap
         }
     }
 
-    private bool IsCovered(TargetObject target) =>
-        settings.Objects == TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes || shapes.VisibilityOf(target).IsVisible;
+    private bool IsCovered(TargetObject target) => settings.Checks(shapes.VisibilityOf(target).IsVisible);
 
     /// <remarks>The first area that holds a change gives the finding, as the first removal zone that finds an object does in the too-close step.</remarks>
     private ObjectCheck CompareTerrain(TargetObject target)
@@ -66,7 +65,7 @@ internal sealed class ObjectTerrainCheck(IPluginRecords records, IBaseObjectShap
             var cells = CellsUnder(target.SpaceKey, landWorldspace, area);
             if (cells.Count == 0) continue;
             anyAreaHasTerrain = true;
-            if (settings.Objects == TerrainCheckedObjects.VisibleObjectsOnTheGround && !ReachesTheGround(area, cells)) continue;
+            if (!settings.ChecksArea(area, HeightsAt(cells, static terrain => terrain.AcceptedHeights), HeightsAt(cells, static terrain => terrain.WinnerHeights))) continue;
             if (FindChange(target, cells) is { } hit) return new ObjectCheck(hit, WithoutTerrain: false, Failure: null);
         }
         return anyAreaHasTerrain ? ObjectCheck.NothingFound : ObjectCheck.NoTerrain;
@@ -90,21 +89,10 @@ internal sealed class ObjectTerrainCheck(IPluginRecords records, IBaseObjectShap
     private CellWaterChange? CompareWater(ExteriorCell cell) =>
         _water is { } water ? _waterCells.Get(cell, () => water.Compare(records.ReadWaterCopies(cell))) : null;
 
-    /// <summary>Whether the area's height range overlaps the heights at its vertices, as accepted or as the game shows them (the winner).</summary>
-    private bool ReachesTheGround(Box area, List<CheckedCell> cells) =>
-        OverlapsHeights(area, cells, static terrain => terrain.AcceptedHeights) || OverlapsHeights(area, cells, static terrain => terrain.WinnerHeights);
-
+    /// <summary>The heights at the cells' vertices in one version of the ground: as accepted or as the game shows them (the winner).</summary>
     /// <remarks>A version without heights adds no heights.</remarks>
-    private bool OverlapsHeights(Box area, List<CheckedCell> cells, Func<CellTerrain, float[]?> heightsOf)
-    {
-        var (any, lowest, highest) = (false, float.MaxValue, float.MinValue);
-        foreach (var cell in cells)
-        {
-            if (heightsOf(cell.Terrain) is not { } heights) continue;
-            foreach (var vertex in cell.Vertices)(any, lowest, highest) = (true, MathF.Min(lowest, heights[vertex]), MathF.Max(highest, heights[vertex]));
-        }
-        return any && lowest <= area.Max.Z && highest >= area.Min.Z;
-    }
+    private static IEnumerable<float> HeightsAt(List<CheckedCell> cells, Func<CellTerrain, float[]?> heightsOf) =>
+        cells.SelectMany(cell => heightsOf(cell.Terrain) is { } heights ? cell.Vertices.Select(vertex => heights[vertex]) : []);
 
     /// <summary>
     /// The counted changes of the area: a height change at any vertex, a terrain type change at enough of its vertices, and a

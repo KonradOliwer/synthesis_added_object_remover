@@ -157,17 +157,29 @@ public sealed class ChangedNavmeshCollectingTests
         Assert.Equal(NavmeshCase.Added, Assert.Single(collected.ChangedNavmeshes, navmesh => navmesh.Navmesh == added.ToRecordKey()).Case);
     }
 
+    /// <summary>A later plugin that needs the cleaned mod carries its map entry over: the entry goes back.</summary>
     [Fact]
-    public void TheMapEntryTheCleanedModChangesGoesBackWhenALaterPluginOnlyCarriesItOver()
+    public void TheMapEntryTheCleanedModChangesGoesBackWhenAPluginThatNeedsItOnlyCarriesItOver()
     {
         NavmeshCopyIn(_cleaned.Mod);
         MapIn(_cleaned.Mod).MapInfos.Add(Entry(_navmesh.FormKey, pointX: Size));
         MapIn(_later.Mod).MapInfos.Add(Entry(_navmesh.FormKey, pointX: Size));
 
-        var changed = ChangedNavmeshOf(Collect());
+        var changed = ChangedNavmeshOf(Collect(laterNeedsCleanedMod: true));
 
         Assert.Equal(((PartOutcome)new PartOutcome.Undo(), (PartOutcome)new PartOutcome.Unchanged()), (changed.MapEntry, changed.Geometry));
         Assert.Equal((BaseGame, Cleaned), (changed.Earlier!.MapEntry!.Plugin, changed.Current.MapEntry!.Plugin));
+    }
+
+    /// <summary>A later plugin that loads without the cleaned mod holds its map entry: it set that entry, which is left to it.</summary>
+    [Fact]
+    public void TheMapEntryALaterPluginThatLoadsWithoutTheCleanedModHoldsIsLeftToIt()
+    {
+        NavmeshCopyIn(_cleaned.Mod);
+        MapIn(_cleaned.Mod).MapInfos.Add(Entry(_navmesh.FormKey, pointX: Size));
+        MapIn(_later.Mod).MapInfos.Add(Entry(_navmesh.FormKey, pointX: Size));
+
+        Assert.Equal(new PartOutcome.LeftToLaterPlugin(Later), ChangedNavmeshOf(Collect()).MapEntry);
     }
 
     [Fact]
@@ -192,7 +204,10 @@ public sealed class ChangedNavmeshCollectingTests
         Assert.Equal((null, BaseGame, Later), (changed.LaterWinner, changed.Winner.MapEntry?.Plugin, changed.WinningMapEntry?.Plugin));
     }
 
-    /// <summary>The cleaned mod disables the door its navmesh names, and a later plugin carries the disable forward, so no part of the door goes back.</summary>
+    /// <summary>
+    /// The cleaned mod disables the door its navmesh names, and a later plugin, a patch for it, carries the disable forward, so no part
+    /// of the door goes back.
+    /// </summary>
     [Fact]
     public void ADoorALaterPluginKeepsDisabledIsRemovedInTheWinningPresenceWithoutAChangedRecordFact()
     {
@@ -204,7 +219,7 @@ public sealed class ChangedNavmeshCollectingTests
             CellCopyIn(mod, _cell).Temporary.Add(door);
         }
 
-        var collected = Collect();
+        var collected = Collect(laterNeedsCleanedMod: true);
 
         Assert.Equal(new PlacedPresence(Removed: true, Parent: null, OppositeOfParent: false), collected.WinningPresence[_door.FormKey.ToRecordKey()]);
         Assert.DoesNotContain(collected.ChangedRecords, record => record.Key == _door.FormKey.ToRecordKey());
@@ -273,6 +288,7 @@ public sealed class ChangedNavmeshCollectingTests
         Assert.Throws<KeyNotFoundException>(() => handles.NavmeshOf(NeighbourKey));
     }
 
+    /// <summary>A later plugin, a patch for the cleaned mod, carries the raised navmesh and deletes it.</summary>
     [Fact]
     public void NothingGoesBackInANavmeshALaterPluginDeletes()
     {
@@ -280,7 +296,7 @@ public sealed class ChangedNavmeshCollectingTests
         Raise(raised);
         NavmeshCopyIn(_later.Mod, from: raised).IsDeleted = true;
 
-        Assert.Empty(Collect().ChangedNavmeshes);
+        Assert.Empty(Collect(laterNeedsCleanedMod: true).ChangedNavmeshes);
     }
 
     /// <summary>The door is linked from both sides, a second door names the navmesh only from its own link, a third only in the map entry.</summary>
@@ -579,14 +595,17 @@ public sealed class ChangedNavmeshCollectingTests
 
     /// <param name="writeIntoPatch">What an earlier patcher of the group wrote into the patch; nothing when null.</param>
     /// <param name="afterCollect">Reads the plugin records the collector read, before they are dropped.</param>
+    /// <param name="laterNeedsCleanedMod">The later plugin cannot load without the cleaned mod, as a patch for it.</param>
     private CollectedObjects Collect(
-        Action<ISkyrimMod>? writeIntoPatch = null, Action<IPluginRecords>? afterCollect = null, WhatToCollect? plan = null, int threads = 1)
+        Action<ISkyrimMod>? writeIntoPatch = null, Action<IPluginRecords>? afterCollect = null, WhatToCollect? plan = null, int threads = 1, bool laterNeedsCleanedMod = false)
     {
         var state = FixturePatcherState.Create([_base.Mod, _cleaned.Mod, _later.Mod], Path.GetTempPath(), Path.GetTempPath());
         writeIntoPatch?.Invoke(state.PatchMod);
         using var world = FixturePatcherState.CreateFinalWorld(state);
         var records = new PluginRecordsFactory(world, threads).Open();
-        var trust = TestModTrust.Of(Cleaned, Patch, trusted: [BaseGame, Later], untrusted: []);
+        var trust = laterNeedsCleanedMod
+            ? TestModTrust.Of(Cleaned, Patch, trusted: [BaseGame], untrusted: [], needingCleanedMod: [Later])
+            : TestModTrust.Of(Cleaned, Patch, trusted: [BaseGame, Later], untrusted: []);
         var collected = PlacedObjects.Collect(records, trust, plan ?? Plan);
         afterCollect?.Invoke(records);
         return collected;

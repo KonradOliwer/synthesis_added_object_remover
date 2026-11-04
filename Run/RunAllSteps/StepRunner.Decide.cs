@@ -65,7 +65,7 @@ public static partial class StepRunner
         var otherMods = RunOtherModsObjects(scope, runCaches, collected, support, fitted.Decisions, clearedAreas);
         var leftBehind = RunInvisibleLeftBehind(scope, runCaches, collected, selected.ObjectsThatCanCauseRemovals, otherMods);
         var markerMoves = RunMarkerMoves(scope, runCaches, collected, otherMods.Result, leftBehind);
-        var whereRemoved = RunRestoreWhereRemoved(scope, runCaches, trust, support, collected, otherMods.Result, markerMoves.Decisions);
+        var whereRemoved = RunRestoreWhereRemoved(scope, runCaches, trust, support, collected, groups, otherMods.Result, markerMoves.Decisions);
         return new StepResults(
             Collected: collected,
             ObjectsToKeep: kept.Kept.ObjectsToKeep,
@@ -281,9 +281,10 @@ public static partial class StepRunner
         ModTrustTable trust,
         OtherModsObjects.SupportJudging support,
         CollectedObjects collected,
+        ImmutableArray<CollisionGroup> groups,
         OtherModsObjectsResult otherModsObjects,
         IRemovalDecisions final) =>
         scope.Environment.Log.Timed(
-            () => WhereRemovedRestorer.Plan(CreateRestoreInput(scope, runCaches, trust, support, collected, otherModsObjects, final)),
+            () => WhereRemovedRestorer.Plan(CreateRestoreInput(scope, runCaches, trust, support, collected, groups, otherModsObjects, final)),
             (result, elapsed) => scope.Report.BuildStepSections(result, collected, elapsed));
 }

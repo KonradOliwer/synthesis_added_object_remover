@@ -61,8 +61,10 @@ internal sealed class FullRecomputeRestoreLoop(PlacedGuards? placedGuards, Terra
         var refusedThatStand = inputs.World.NowOfAllBut(placedGoingBack).Where(refused => !EndsRemoved(refused.Key, placedGoingBack)).ToList();
         var navmeshesAsTheyWillStand = state.Navmeshes?.AsTheyWillStand(inputs.Winning, trianglesGoingBack) ?? new NavmeshesAsTheyWillStand(inputs.Winning, _ => true, goingBack: null);
         return terrain
-            .Protect(TerrainKeptReason.UnderObjectThatStays, inputs.Ground.UnderWhereTheyReachTheGround(standingInTheirPlace,terrain.CurrentHeightsOf))
+            .Protect(TerrainKeptReason.UnderObjectThatStays, inputs.Ground.UnderWhereTheyReachTheGround(standingInTheirPlace, terrain.CurrentHeightsOf))
+            .Protect(TerrainKeptReason.UnderObjectThatStays, inputs.StepAreas.Under(standingInTheirPlace, terrain))
             .Protect(TerrainKeptReason.UnderObjectKeptAsChanged, inputs.Ground.UnderWhereTheyReachTheGround(refusedThatStand, terrain.CurrentHeightsOf))
+            .Protect(TerrainKeptReason.UnderObjectKeptAsChanged, inputs.StepAreas.Under(refusedThatStand, terrain))
             .Protect(TerrainKeptReason.UnderObjectPlacedForTheGroundAsItIs, terrainGuards.UnderObjectsPlacedForTheGroundAsItIs(terrain, placed => EndsRemoved(placed, placedGoingBack)))
             .Protect(TerrainKeptReason.UnderNavmesh, terrainGuards.UnderNavmeshesOnTheGroundAsItIs(terrain, navmeshesAsTheyWillStand))
             .Protect(TerrainKeptReason.TooSteepToStore, terrain.PointsOfCellsTooSteepToStore());

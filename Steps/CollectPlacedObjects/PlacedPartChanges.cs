@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 
 namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 
@@ -20,8 +21,8 @@ internal readonly record struct PlacedPartChanges(
     private static readonly ImmutableArray<PlacedParts> JudgedParts =
         [.. Enum.GetValues<PlacedParts>().Where(part => part is not PlacedParts.None and not PlacedParts.NavDoorLink)];
 
-    /// <param name="patch">The patch, whose version holds what earlier patchers of the group wrote.</param>
-    public static PlacedPartChanges Of(PlacedPartDifferences differences, PluginName patch)
+    /// <param name="trust">Names the patch, whose version holds what earlier patchers of the group wrote, and the plugins that need the cleaned mod.</param>
+    public static PlacedPartChanges Of(PlacedPartDifferences differences, ModTrustTable trust)
     {
         var plugins = PartHistory.PluginsOf(differences.Versions);
         var undo = PlacedParts.None;
@@ -29,7 +30,7 @@ internal readonly record struct PlacedPartChanges(
         var leftToLater = ImmutableSortedDictionary.CreateBuilder<PlacedParts, PluginName>();
         foreach (var part in JudgedParts)
         {
-            switch (PartHistory.Of(differences.Versions, plugins, patch, parts => parts.HasFlag(part)))
+            switch (PartHistory.Of(differences.Versions, plugins, trust, parts => parts.HasFlag(part)))
             {
                 case PartOutcome.Undo when !differences.LowestNotCopyable.HasFlag(part):
                     undo |= part;
@@ -46,6 +47,6 @@ internal readonly record struct PlacedPartChanges(
     }
 
     /// <summary>What the cleaned mod last changed in the navmesh link of a door it overrides.</summary>
-    public static PartOutcome NavDoorLinkOf(PlacedPartDifferences differences, PluginName patch) =>
-        PartHistory.Of(differences.Versions, PartHistory.PluginsOf(differences.Versions), patch, parts => parts.HasFlag(PlacedParts.NavDoorLink));
+    public static PartOutcome NavDoorLinkOf(PlacedPartDifferences differences, ModTrustTable trust) =>
+        PartHistory.Of(differences.Versions, PartHistory.PluginsOf(differences.Versions), trust, parts => parts.HasFlag(PlacedParts.NavDoorLink));
 }

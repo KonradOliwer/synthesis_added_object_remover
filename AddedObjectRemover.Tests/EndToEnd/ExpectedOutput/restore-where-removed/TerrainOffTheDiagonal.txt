@@ -38,11 +38,11 @@ Linked groups: 0 more objects removed with the left-behind removals they are lin
 Moved 0 kept markers out of other mods' objects; 0 left in place.
 Restored where the cleaned mod was removed: terrain in 4 cell quarters of 1 cell.
 Left as the cleaned mod changed them: terrain at 128 points (128 on a cell edge whose neighbouring ground stays).
-Left to later plugins in the changes judged: terrain (25 heights).
+Left to later plugins in the changes judged: terrain (12 heights).
   Terrain worldspace 000800:Skyrim.esm, cell (6, 7), south-west quarter: 256 heights; 33 heights kept on a cell edge whose neighbouring ground stays; 0 of 1 object still stand (0.0% by count, 0.0% by size)
   Terrain worldspace 000800:Skyrim.esm, cell (6, 7), south-east quarter: 256 heights; 33 heights kept on a cell edge whose neighbouring ground stays; 0 of 1 object still stand (0.0% by count, 0.0% by size)
   Terrain worldspace 000800:Skyrim.esm, cell (6, 7), north-west quarter: 256 heights; 33 heights kept on a cell edge whose neighbouring ground stays; 0 of 1 object still stand (0.0% by count, 0.0% by size)
-  Terrain worldspace 000800:Skyrim.esm, cell (6, 7), north-east quarter: 231 heights; 33 heights kept on a cell edge whose neighbouring ground stays; 0 of 1 object still stand (0.0% by count, 0.0% by size)
+  Terrain worldspace 000800:Skyrim.esm, cell (6, 7), north-east quarter: 244 heights; 33 heights kept on a cell edge whose neighbouring ground stays; 0 of 1 object still stand (0.0% by count, 0.0% by size)
 Restore where removed: 1 pass in <time>.
 Wrote 2 overrides (1 removed, 1 to restore where the cleaned mod was removed) in <time>.
   Removed T_Crate [000801:Target.esp] (base T_CrateBase [000800:Target.esp]) in worldspace 000800:Skyrim.esm, cell 000801:Skyrim.esm, place cell 6,7, hold unnamed area, grid 6,7; too close to C_Pad [000801:CityMod.esp], changed by CityMod.esp (new object)
@@ -69,7 +69,7 @@ cell 000801:Skyrim.esm: music none, location none, fog near none
 land 000802:Skyrim.esm row 0: 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64
 land 000802:Skyrim.esm row 8: 64 40 24 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 24 40 64
 land 000802:Skyrim.esm row 16: 64 40 24 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 24 40 64
-land 000802:Skyrim.esm row 24: 64 40 24 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 24 40 96 96 96 96 96 40 24 0 0 0 24 40 64
+land 000802:Skyrim.esm row 24: 64 40 24 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 24 40 96 96 96 96 40 24 0 0 0 0 24 40 64
 land 000802:Skyrim.esm row 32: 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64 64
 ## report anchoring.csv
 iteration,formKey,editorId,base,modelPath,space,contactPoints,totalWeight,removedCleanedModShare,restoredShare,keptCleanedModShare,otherModShare,terrainShare,threshold,decision,topSupporters
@@ -90,4 +90,4 @@ kind,space,gridX,gridY,cell,quarter,navmesh,undone,leftToLaterPlugins,objects,st
 quarter,worldspace 000800:Skyrim.esm,6,7,,south-west,,289 heights,,1,0,1000000,0,0,0,Cleared,restored,0,0,0,0,0,33,0,0,0,0
 quarter,worldspace 000800:Skyrim.esm,6,7,,south-east,,289 heights,,1,0,1000000,0,0,0,Cleared,restored,0,0,0,0,0,33,0,0,0,0
 quarter,worldspace 000800:Skyrim.esm,6,7,,north-west,,289 heights,,1,0,1000000,0,0,0,Cleared,restored,0,0,0,0,0,33,0,0,0,0
-quarter,worldspace 000800:Skyrim.esm,6,7,,north-east,,264 heights,25 heights (CityMod.esp),1,0,1000000,0,0,0,Cleared,restored,0,0,0,0,0,33,0,0,0,0
+quarter,worldspace 000800:Skyrim.esm,6,7,,north-east,,277 heights,12 heights (AddedObjectRemover.esp),1,0,1000000,0,0,0,Cleared,restored,0,0,0,0,0,33,0,0,0,0

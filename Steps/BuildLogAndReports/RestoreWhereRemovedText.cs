@@ -104,6 +104,7 @@ internal static class RestoreWhereRemovedText
         PlacedGuard.HoldsInvisibleObjectThatStays => "holding an invisible object of the cleaned mod that stays",
         PlacedGuard.StandsInChangedNavmesh => "in a navmesh that stays as the cleaned mod changed it",
         PlacedGuard.CarriesObjectThatStays => "carrying an object that stays",
+        PlacedGuard.RestsOnWhatDoesNotStay => "resting on an object that does not stay",
         PlacedGuard.DoorLinkChangedLater => "with a navmesh door link a later plugin changed again",
         PlacedGuard.DoorLinkDoesNotMatch => "with a navmesh door link that would not match the navmeshes as they end",
         _ => throw new UnreachableException($"Unknown placed guard {guard}."),

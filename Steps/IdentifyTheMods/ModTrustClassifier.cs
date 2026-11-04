@@ -29,7 +29,15 @@ public static class ModTrustClassifier
         var automaticRules = AutomaticRules.Of(plugins, settings, listings, undecidedRequiringMods, otherMasterCounts);
         var decisions = known.ToImmutableDictionary(plugin => plugin, plugin => fixedDecisions[plugin] ?? automaticRules.Decide(plugin));
         return BuildTable(
-            settings.Target, plugins.PatchMod, decisions, requiringMods, NeedingMods(plugins, settings.Target), otherMasterCounts, alwaysTrusted.CleanedModMasters);
+            settings.Target,
+            plugins.PatchMod,
+            decisions,
+            requiringMods,
+            NeedingMods(plugins, settings.Target),
+            otherMasterCounts,
+            alwaysTrusted.CleanedModMasters,
+            ListedBefore(plugins, settings.Target),
+            CarryingPatchMarker(plugins));
     }
 
     private static ModTrustTable BuildTable(
@@ -39,7 +47,9 @@ public static class ModTrustClassifier
         ImmutableHashSet<PluginName> requiringMods,
         ImmutableHashSet<PluginName> needingMods,
         IReadOnlyDictionary<PluginName, int> otherMasterCounts,
-        ImmutableHashSet<PluginName> cleanedModMasters)
+        ImmutableHashSet<PluginName> cleanedModMasters,
+        ImmutableHashSet<PluginName> listedBefore,
+        ImmutableHashSet<PluginName> patchMarked)
     {
         var trust = decisions.ToImmutableDictionary(
             entry => entry.Key,
@@ -49,9 +59,22 @@ public static class ModTrustClassifier
                 requiringMods.Contains(entry.Key),
                 otherMasterCounts[entry.Key],
                 cleanedModMasters.Contains(entry.Key),
-                needingMods.Contains(entry.Key)));
+                needingMods.Contains(entry.Key),
+                listedBefore.Contains(entry.Key),
+                patchMarked.Contains(entry.Key)));
         return new ModTrustTable(cleanedMod, patch, trust, trust.Values.Count(entry => entry.Reason == TrustReason.LoadsBeforeCleanedMod));
     }
+
+    /// <remarks>
+    /// The order of the versions the scan reads, not the game's plugin list that <see cref="LoadingBefore"/> reads for the trust
+    /// rule: this fact says which versions of a record lie below the cleaned mod's.
+    /// </remarks>
+    private static ImmutableHashSet<PluginName> ListedBefore(LoadOrderPlugins plugins, PluginName cleanedMod) =>
+        PluginsBefore(plugins, plugins.PositionsOfListed(), cleanedMod);
+
+    /// <returns>The listed plugins that lie before the cleaned mod in the given order.</returns>
+    private static ImmutableHashSet<PluginName> PluginsBefore(LoadOrderPlugins plugins, LoadOrderPositions order, PluginName cleanedMod) =>
+        [.. plugins.Listed.Select(listing => listing.Mod).Where(plugin => order.IsBefore(plugin, cleanedMod))];
 
     /// <remarks>A plugin listed twice keeps its first listing.</remarks>
     private static IReadOnlyDictionary<PluginName, PluginListing> ListingsByPlugin(LoadOrderPlugins plugins)
@@ -96,14 +119,9 @@ public static class ModTrustClassifier
     private static ImmutableHashSet<PluginName> CarryingPatchMarker(LoadOrderPlugins plugins) =>
         [.. plugins.Listed.Where(listing => listing.CarriesPatchMarker).Select(listing => listing.Mod)];
 
-    /// <remarks>A plugin that is not in the game's plugin list does not load before the cleaned mod.</remarks>
-    private static ImmutableHashSet<PluginName> LoadingBefore(LoadOrderPlugins plugins, PluginName cleanedMod)
-    {
-        var cleanedModPosition = plugins.Positions.Of(cleanedMod);
-        return [.. plugins.Listed
-            .Select(listing => listing.Mod)
-            .Where(plugin => plugins.Positions.Contains(plugin) && plugins.Positions.Of(plugin) < cleanedModPosition)];
-    }
+    /// <remarks>The game's plugin list decides, as the user sees it; a plugin that is not in it does not load before the cleaned mod.</remarks>
+    private static ImmutableHashSet<PluginName> LoadingBefore(LoadOrderPlugins plugins, PluginName cleanedMod) =>
+        PluginsBefore(plugins, plugins.Positions, cleanedMod);
 
     /// <summary>The cleaned mod and the patch cannot be listed: such entries are left out, so the patch's masters never become trusted through a list.</summary>
     private static ImmutableHashSet<PluginName> UsableEntries(ImmutableArray<PluginName> entries, PluginName cleanedMod, PluginName patch) =>

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 
 namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 
@@ -7,11 +8,11 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 /// What the cleaned mod last changed in the cell, LAND and navmesh records of other plugins it changed, part by part
 /// (<see cref="PartHistory"/>), from how their parts differ across the versions read.
 /// </summary>
-/// <param name="patch">The patch, whose version holds what earlier patchers of the group wrote.</param>
+/// <param name="trust">Names the patch, whose version holds what earlier patchers of the group wrote, and the plugins that need the cleaned mod.</param>
 /// <param name="placedDifferences">How the parts of each placed record the cleaned mod overrides differ across its versions, by key.</param>
 /// <param name="navmeshReplacements">The replacements of each deleted navmesh that has some (<see cref="NavmeshReplacements"/>), by key.</param>
 internal sealed class AreaRecordChanges(
-    PluginName patch, IReadOnlyDictionary<RecordKey, PlacedPartDifferences> placedDifferences, IReadOnlyDictionary<RecordKey, ImmutableArray<RecordKey>> navmeshReplacements)
+    ModTrustTable trust, IReadOnlyDictionary<RecordKey, PlacedPartDifferences> placedDifferences, IReadOnlyDictionary<RecordKey, ImmutableArray<RecordKey>> navmeshReplacements)
 {
     /// <returns>
     /// Null when no part is listed: every part that is not <see cref="PartOutcome.Unchanged"/> is, in the order of the cell's part
@@ -22,7 +23,7 @@ internal sealed class AreaRecordChanges(
         ImmutableArray<PartChange> parts =
         [
             .. cell.Parts
-                .Select(part => new PartChange(part.Name, PartHistory.Of(part.Differences, patch)))
+                .Select(part => new PartChange(part.Name, PartHistory.Of(part.Differences, trust)))
                 .Where(change => change.Outcome is PartOutcome.LeftToLaterPlugin || (!cell.DeletedInAVersion && change.Outcome is not PartOutcome.Unchanged)),
         ];
         return parts.IsEmpty
@@ -39,7 +40,7 @@ internal sealed class AreaRecordChanges(
         var points = OutcomesOf(land, plugins, changed.Points.Points, point => parts => parts.Points.Contains(point));
         var colours = OutcomesOf(land, plugins, changed.Colours.Points, point => parts => parts.Colours.Contains(point));
         var quarters = OutcomesOf(land, plugins, changed.Quarters.Quarters, quarter => parts => parts.Quarters.Contains(quarter));
-        var rest = changed.Rest ? PartHistory.Of(land.Versions, plugins, patch, parts => parts.Rest) : new PartOutcome.Unchanged();
+        var rest = changed.Rest ? PartHistory.Of(land.Versions, plugins, trust, parts => parts.Rest) : new PartOutcome.Unchanged();
 
         var leftToLater = new LandLeftToLater(
             PointSet.Of(IndicesOf<PartOutcome.LeftToLaterPlugin>(points)),
@@ -66,9 +67,9 @@ internal sealed class AreaRecordChanges(
     /// </remarks>
     public NavmeshChangedByCleanedMod? NavmeshOf(NavmeshRecordFact navmesh)
     {
-        var geometry = WhatGoesBack(navmesh, PartHistory.Of(navmesh.Geometry, patch));
-        var presence = WhatGoesBack(navmesh, PartHistory.Of(navmesh.Presence, patch));
-        var mapEntry = WhatGoesBack(navmesh, navmesh.MapEntry is { } entry ? PartHistory.Of(entry, patch) : new PartOutcome.Unchanged());
+        var geometry = WhatGoesBack(navmesh, PartHistory.Of(navmesh.Geometry, trust));
+        var presence = WhatGoesBack(navmesh, PartHistory.Of(navmesh.Presence, trust));
+        var mapEntry = WhatGoesBack(navmesh, navmesh.MapEntry is { } entry ? PartHistory.Of(entry, trust) : new PartOutcome.Unchanged());
         PartOutcome[] outcomes = [geometry, presence, mapEntry];
         if (outcomes.All(outcome => outcome is PartOutcome.Unchanged)) return null;
         return new(
@@ -95,7 +96,7 @@ internal sealed class AreaRecordChanges(
     /// <summary>The door's navmesh link with what the cleaned mod last changed in it; unchanged for a door it does not override.</summary>
     public DoorLinkChange DoorOf(NavDoorLinkVersions door) => new(
         door.Door,
-        placedDifferences.TryGetValue(door.Door, out var differences) ? PlacedPartChanges.NavDoorLinkOf(differences, patch) : new PartOutcome.Unchanged(),
+        placedDifferences.TryGetValue(door.Door, out var differences) ? PlacedPartChanges.NavDoorLinkOf(differences, trust) : new PartOutcome.Unchanged(),
         door.Earlier,
         door.Current,
         door.InDeletedCell);
@@ -106,7 +107,7 @@ internal sealed class AreaRecordChanges(
     /// <param name="includes">For each index, whether a set of parts includes the part at that index.</param>
     private List<(int Index, PartOutcome Outcome)> OutcomesOf(
         LandRecordFact land, IReadOnlyList<PluginName> plugins, IEnumerable<int> indices, Func<int, Func<LandParts, bool>> includes) =>
-        [.. indices.Select(index => (index, PartHistory.Of(land.Versions, plugins, patch, includes(index))))];
+        [.. indices.Select(index => (index, PartHistory.Of(land.Versions, plugins, trust, includes(index))))];
 
     private static IEnumerable<int> IndicesOf<TOutcome>(IEnumerable<(int Index, PartOutcome Outcome)> outcomes)
         where TOutcome : PartOutcome =>

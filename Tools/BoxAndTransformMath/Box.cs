@@ -34,6 +34,14 @@ public readonly record struct Box(Vector3 Min, Vector3 Max)
         && Min.Y <= other.Max.Y && other.Min.Y <= Max.Y
         && Min.Z <= other.Max.Z && other.Min.Z <= Max.Z;
 
+    /// <summary>Whether the box's height range overlaps the range from the lowest to the highest of the heights (touching counts); false for none.</summary>
+    public bool HeightRangeOverlaps(IEnumerable<float> heights)
+    {
+        var (any, lowest, highest) = (false, float.MaxValue, float.MinValue);
+        foreach (var height in heights) (any, lowest, highest) = (true, MathF.Min(lowest, height), MathF.Max(highest, height));
+        return any && lowest <= Max.Z && highest >= Min.Z;
+    }
+
     /// <summary>This box grown by <paramref name="padding"/> on every side.</summary>
     public Box Grown(float padding) => new(Min - new Vector3(padding), Max + new Vector3(padding));
 

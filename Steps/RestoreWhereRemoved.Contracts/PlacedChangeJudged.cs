@@ -6,7 +6,11 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 /// <summary>What keeps a placed record whose area is cleared as the cleaned mod made it.</summary>
 public enum PlacedGuard
 {
-    /// <summary>Where it goes back to, it comes too close to an object that stays, by the collision settings of the objects the cleaned mod changed.</summary>
+    /// <summary>
+    /// Where it goes back to, it comes too close to an object that stays, by the collision settings of the objects the cleaned mod
+    /// changed; or, when it can cause removals once back, a target that stays comes too close to it by the settings of that target's
+    /// own collision group.
+    /// </summary>
     TooCloseToWhatStays,
 
     /// <summary>
@@ -26,6 +30,12 @@ public enum PlacedGuard
 
     /// <summary>An object that stays rests on it where it stands now, and would float once it goes back.</summary>
     CarriesObjectThatStays,
+
+    /// <summary>
+    /// Where it goes back to, it rests on an object that does not end there: another placed record that stays as the cleaned mod
+    /// changed it or ends removed, or another mod's object the patch removes or pulls down. It would float once it goes back.
+    /// </summary>
+    RestsOnWhatDoesNotStay,
 
     /// <summary>It is a door whose navmesh link goes back with it, and a later plugin changed that link again.</summary>
     DoorLinkChangedLater,

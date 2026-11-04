@@ -149,6 +149,13 @@ public readonly record struct OtherObject(
     /// <summary>The cell the winning version stands in, when the final world deletes it; the patch writes nothing for the object then.</summary>
     public DeletedCell? CellDeleted { get; init; }
 
+    /// <summary>
+    /// How the game shows it differently from the values accepted in the world before the cleaned mod, where only the plugins that
+    /// load before it are believed; a later plugin's re-save with the same values is no change there. Null when it stands as it stood
+    /// then, and always when the scan did not decide every object in the world without the cleaned mod.
+    /// </summary>
+    public ObjectChange? ChangeSinceBeforeCleanedMod { get; init; }
+
     public PlacedTransform Transform => new(Position, Mat3.FromEuler(Rotation), Scale);
 
     /// <summary>A placed NPC or creature (ACHR), the only placed type whose base link is an NPC.</summary>

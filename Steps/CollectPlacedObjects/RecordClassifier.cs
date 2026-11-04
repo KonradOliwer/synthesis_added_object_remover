@@ -39,7 +39,7 @@ internal sealed class RecordClassifier(ModTrustTable trust, AcceptedWorld world,
 
     private Classification ClassifyOverriddenRecord(PlacedRecordFact record)
     {
-        var changed = ChangedObjectKind.Of(record, trust.CleanedMod, world, plan.MovedDistance);
+        var changed = ChangedObjectKind.Of(record, trust, plan.MovedDistance);
         return changed switch
         {
             { Origin: TargetOrigin.Moved } => new(RecordRole.Moved, null, changed.Value.EarlierVersion),

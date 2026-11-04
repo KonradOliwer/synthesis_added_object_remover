@@ -4,6 +4,7 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
@@ -32,8 +33,16 @@ public static class WhereRemovedRestorer
     /// <param name="Plugin">Where the land a space uses and the heights and winning plugin of a cell's LAND record are read.</param>
     public sealed record LoadOrderReads(IRunCaches Caches, IPluginRecords Plugin, LoadOrderPlugins Plugins, PluginName CleanedMod);
 
+    /// <summary>What the removal steps judge each target with: the settings of its collision group, and the world they accept.</summary>
+    /// <param name="ChangedTerrain">The changed-terrain step's settings of each group, with the targets it judges with them.</param>
+    /// <param name="TooClose">The too-close step's settings of each group, with the targets it judges with them.</param>
+    /// <param name="Accepted">The world the removal steps judge other mods' objects in, which tells which objects can cause removals.</param>
+    public sealed record RemovalStepJudging(
+        ImmutableArray<ObjectsJudgedWith<ChangedTerrainSettings>> ChangedTerrain, ImmutableArray<ObjectsJudgedWith<TooCloseSettings>> TooClose, AcceptedWorld Accepted);
+
     /// <param name="Decisions">The decisions with every round and every move.</param>
     /// <param name="ClearedAreas">Judges the area around a change on <paramref name="Decisions"/> with the step's cleared-area settings.</param>
+    /// <param name="RemovalSteps">What the removal steps judge each target with, which the guards judge what stays with.</param>
     /// <param name="Settings">The step is switched off when none of its kinds is on.</param>
     /// <param name="TimeSinceStart">The run's clock, which times the parts of the step.</param>
     public sealed record Input(
@@ -41,6 +50,7 @@ public static class WhereRemovedRestorer
         IRemovalDecisions Decisions,
         IClearedAreas ClearedAreas,
         GuardRules Guards,
+        RemovalStepJudging RemovalSteps,
         LoadOrderReads Reads,
         Execution Execution,
         WhereRemovedRestoreSettings Settings,

@@ -41,6 +41,7 @@ internal static partial class LogSections
         var byOutcome = changed.ToLookup(changedObject => FitOutcomes.ChangedObjectOutcomeOf(final, restoredWhereRemoved, changedObject.Id));
         int CountOf(ChangedObjectOutcome outcome) => byOutcome[outcome].Count();
         var restoredLater = CountOf(ChangedObjectOutcome.KeptThenRestoredWhereRemoved);
+        var putThereBy = world.ChangedRecords.Where(record => record is { Target: not null, PutThereBy: not null }).ToDictionary(record => record.Target!.Value, record => record.PutThereBy!.Value);
         return new LogSection(
             "changed-objects",
             [
@@ -53,7 +54,7 @@ internal static partial class LogSections
                 + $"removed: {TextFormat.Count(CountOf(ChangedObjectOutcome.Removed))}.",
                 .. context.Detailed
                     ? Enum.GetValues<ChangedObjectOutcome>().SelectMany(outcome => byOutcome[outcome].Select(changedObject =>
-                        FittedObjectLine(OutcomeText(outcome, target, final, changedObject), world, final, changedObject)))
+                        FittedObjectLine(OutcomeText(outcome, PutThereBy(changedObject, putThereBy, target), target, final, changedObject), world, final, changedObject)))
                     : [],
             ]);
     }
@@ -73,10 +74,14 @@ internal static partial class LogSections
 
     private const string RestoredWhereRemovedPhrase = "restored where the cleaned mod was removed";
 
-    private static string OutcomeText(ChangedObjectOutcome outcome, PluginName target, IRemovalDecisions final, TargetObject changedObject) => outcome switch
+    /// <summary>The plugin that put the object where it stands: the winning plugin when it is neither the cleaned mod nor the patch.</summary>
+    private static PluginName PutThereBy(TargetObject changedObject, IReadOnlyDictionary<TargetId, PluginName> putThereBy, PluginName cleanedMod) =>
+        putThereBy.TryGetValue(changedObject.Id, out var winner) ? winner : cleanedMod;
+
+    private static string OutcomeText(ChangedObjectOutcome outcome, PluginName putBy, PluginName target, IRemovalDecisions final, TargetObject changedObject) => outcome switch
     {
-        ChangedObjectOutcome.KeptWherePut => $"Kept where {target} put it",
-        ChangedObjectOutcome.KeptThenRestoredWhereRemoved => $"Kept where {target} put it, then {RestoredWhereRemovedPhrase}",
+        ChangedObjectOutcome.KeptWherePut => $"Kept where {putBy} put it",
+        ChangedObjectOutcome.KeptThenRestoredWhereRemoved => $"Kept where {putBy} put it, then {RestoredWhereRemovedPhrase}",
         ChangedObjectOutcome.KeptShrunkOrTurned => "Kept there, shrunk or turned",
         ChangedObjectOutcome.Restored => RestoredText(((Decision.Restored)final.Of(changedObject.Id)!).EarlierVersion, target),
         ChangedObjectOutcome.Removed => "Removed",

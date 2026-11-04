@@ -19,6 +19,10 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 /// part of <see cref="EarlierVersion.Undo"/>.
 /// </param>
 /// <param name="InDeletedCell">A version read deletes the cell holding its winning version or the one holding its earlier version.</param>
+/// <param name="PutThereBy">
+/// The winning plugin when it is no patch (this group's or another's) and its position or base differs from the cleaned mod's, so it
+/// put the object where it stands; null when the cleaned mod's place stands.
+/// </param>
 public sealed record RecordChangedByCleanedMod(
     RecordKey Key,
     string? EditorId,
@@ -34,4 +38,5 @@ public sealed record RecordChangedByCleanedMod(
     bool LinkedFromCleanedMod,
     PlacedPresence PresenceBefore,
     DoorLinkChange? DoorLink = null,
-    bool InDeletedCell = false);
+    bool InDeletedCell = false,
+    PluginName? PutThereBy = null);

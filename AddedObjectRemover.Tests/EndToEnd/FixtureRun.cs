@@ -10,8 +10,16 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 internal static class FixtureRun
 {
     /// <param name="createLoadOrder">Builds the listed mods, lowest priority first, and writes their meshes under the Data folder; none for the fixture world.</param>
-    public static RunOutcome Execute(Settings settings, int workers,Func<string, IReadOnlyList<ISkyrimMod>>? createLoadOrder = null) =>
-        ((RunResult.Done)Run(settings, workers, new SilentLogSink(), DefaultMeshFiles, createLoadOrder: createLoadOrder)).Outcome;
+    /// <param name="inspectPatch">Reads the patch once the run is over.</param>
+    /// <param name="earlierPatchFile">The output file of the patcher before this run in the group, imported as the patch it adds to; none when the patch starts empty.</param>
+    public static RunOutcome Execute(
+        Settings settings, int workers, Func<string, IReadOnlyList<ISkyrimMod>>? createLoadOrder = null, Action<ISkyrimModGetter>? inspectPatch = null, string? earlierPatchFile = null) =>
+        ((RunResult.Done)Attempt(settings, workers, createLoadOrder, inspectPatch, earlierPatchFile)).Outcome;
+
+    /// <summary>As <see cref="Execute"/>, for a run that may stop before it decides anything.</summary>
+    public static RunResult Attempt(
+        Settings settings, int workers, Func<string, IReadOnlyList<ISkyrimMod>>? createLoadOrder = null, Action<ISkyrimModGetter>? inspectPatch = null, string? earlierPatchFile = null) =>
+        Run(settings, workers, new SilentLogSink(), DefaultMeshFiles, createLoadOrder: createLoadOrder, inspectPatch: inspectPatch, earlierPatchFile: earlierPatchFile);
 
     /// <param name="openMeshFiles">Creates the mesh reader's factory from the Data folder, the game release and the listed plugins.</param>
     /// <param name="wrapPlugin">Wraps the plugin records the run reads; none when the run reads them as they are.</param>
@@ -22,6 +30,7 @@ internal static class FixtureRun
     /// <param name="inspectPatch">Reads the patch once the run is over.</param>
     /// <param name="inspectRunFolder">Reads the folder the run's output and reports folder are in once the run is over; the report folder is in it.</param>
     /// <param name="earlierPatcherWrites">What an earlier patcher of the group wrote into the patch before the run starts; none when the patch starts empty.</param>
+    /// <param name="earlierPatchFile">The output file of the patcher before this run in the group, imported as the patch it adds to; none when the patch starts empty.</param>
     public static RunResult Run(
         Settings settings,
         int workers,
@@ -34,7 +43,8 @@ internal static class FixtureRun
         int? patchPosition = null,
         Action<ISkyrimModGetter>? inspectPatch = null,
         Action<string>? inspectRunFolder = null,
-        Action<IPatcherState<ISkyrimMod, ISkyrimModGetter>>? earlierPatcherWrites = null)
+        Action<IPatcherState<ISkyrimMod, ISkyrimModGetter>>? earlierPatcherWrites = null,
+        string? earlierPatchFile = null)
     {
         var root = Directory.CreateTempSubdirectory("aor-run-");
         try
@@ -42,8 +52,10 @@ internal static class FixtureRun
             var dataFolder = Directory.CreateDirectory(Path.Combine(root.FullName, "Data")).FullName;
             var listedMods = createLoadOrder is null ? FixtureWorld.Create(dataFolder).LoadOrder : createLoadOrder(dataFolder);
             var abovePatch = patchPosition ?? listedMods.Count;
-            var state = FixturePatcherState.Create(
-                [.. listedMods.Take(abovePatch)], dataFolder, Path.Combine(root.FullName, FixturePatcherState.PatchModKey.FileName));
+            var outputPath = Path.Combine(root.FullName, FixturePatcherState.PatchModKey.FileName);
+            var state = earlierPatchFile is null
+                ? FixturePatcherState.Create([.. listedMods.Take(abovePatch)], dataFolder, outputPath)
+                : FixturePatcherState.CreateAfterEarlierPatcher([.. listedMods.Take(abovePatch)], dataFolder, outputPath, earlierPatchFile);
             earlierPatcherWrites?.Invoke(state);
             using var world = FixturePatcherState.CreateFinalWorld(state, [.. listedMods.Skip(abovePatch)]);
             var pluginRecords = new PluginRecordsFactory(world, workers);

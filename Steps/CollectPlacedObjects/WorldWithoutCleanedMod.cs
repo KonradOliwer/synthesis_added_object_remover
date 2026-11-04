@@ -3,7 +3,10 @@ using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 
 namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 
-/// <summary>Decides what the other plugins' objects would be, changed or not, in the accepted world without the cleaned mod.</summary>
+/// <summary>
+/// Decides what the other plugins' objects would be, changed or not, in the accepted world without the cleaned mod, and, when every
+/// object is decided there, in the world before the cleaned mod.
+/// </summary>
 internal sealed class WorldWithoutCleanedMod(ModTrustTable trust, WhatToCollect plan, PlacedRecordFacts facts, ChangedAreaRecordCollector changedAreaRecords)
 {
     /// <remarks>
@@ -17,16 +20,21 @@ internal sealed class WorldWithoutCleanedMod(ModTrustTable trust, WhatToCollect 
         if (!everyObject && gathered.Targets.All(target => target.Origin == TargetOrigin.CleanedMod)) return;
 
         var recordOf = facts.Records.ToDictionary(record => record.Key);
-        DecideChanges(gathered.OtherModObjects, recordOf);
-        DecideChanges(gathered.SupportOnlyObjects, recordOf);
+        DecideChanges(gathered.OtherModObjects, recordOf, everyObject);
+        DecideChanges(gathered.SupportOnlyObjects, recordOf, everyObject);
     }
 
-    private void DecideChanges(List<OtherObject> objects, IReadOnlyDictionary<RecordKey, PlacedRecordFact> recordOf)
+    /// <param name="sinceBefore">Whether to decide the objects in the world before the cleaned mod too.</param>
+    private void DecideChanges(List<OtherObject> objects, IReadOnlyDictionary<RecordKey, PlacedRecordFact> recordOf, bool sinceBefore)
     {
         for (var index = 0; index < objects.Count; index++)
         {
-            var change = OtherRecordChange.Decide(recordOf[objects[index].Key], trust.AcceptedWorldWithoutCleanedMod);
-            objects[index] = objects[index] with { ChangeWithoutCleanedMod = change };
+            var record = recordOf[objects[index].Key];
+            objects[index] = objects[index] with
+            {
+                ChangeWithoutCleanedMod = OtherRecordChange.Decide(record, trust.AcceptedWorldWithoutCleanedMod),
+                ChangeSinceBeforeCleanedMod = sinceBefore ? OtherRecordChange.Decide(record, trust.AcceptedWorldBeforeCleanedMod) : null,
+            };
         }
     }
 }

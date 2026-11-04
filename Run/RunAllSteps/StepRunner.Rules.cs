@@ -107,6 +107,7 @@ public static partial class StepRunner
         ModTrustTable trust,
         OtherModsObjects.SupportJudging support,
         CollectedObjects collected,
+        ImmutableArray<CollisionGroup> groups,
         OtherModsObjectsResult otherModsObjects,
         IRemovalDecisions final)
     {
@@ -120,6 +121,7 @@ public static partial class StepRunner
                 TooCloseObjects.CreateTooCloseToWhatStaysRule(CreateWorldRuleInput(runCaches, worldCaches)),
                 OtherModsObjects.CreateHoldersOfObjectsThatStay(new(support, worldCaches)),
                 PatchWriter.CreateNavmeshCheck(scope.Plugin, scope.Environment.PatchWriting)),
+            new([.. groups.Select(group => group.ChangedTerrain)], [.. groups.Select(group => group.TooClose)], trust.AcceptedWorld),
             new(runCaches, scope.Plugin, scope.Environment.Plugins, trust.CleanedMod),
             scope.Settings.Execution,
             scope.Settings.RestoreWhereRemoved,

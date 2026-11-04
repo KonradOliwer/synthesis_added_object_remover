@@ -37,6 +37,7 @@ internal sealed record RestoreLoopInputs(
     StandingObjects Standing,
     IReadOnlyList<TargetObject> TargetsThatMayStay,
     GroundUnderObjects Ground,
+    TerrainStepAreas StepAreas,
     Func<RecordKey, RecordKey?> FindLandWorldspace,
     Func<TerrainUndoPlan, ExteriorCell, LandHeights> GroundBeforeAndAfter,
     float HeightTolerance,
@@ -178,20 +179,26 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
 
     /// <summary>
     /// The points under the targets and the placed records going back that keep their shape where they stand now, that end present
-    /// given the refusals so far and reach the ground, under refused placed records
+    /// given the refusals so far and reach the ground, and in the areas the changed-terrain step checks around those that are targets
+    /// (<see cref="TerrainStepAreas"/>), under refused placed records
     /// that stand now, where they stand and reach the ground, each of those only when it did not in the pass before; then under
     /// objects of other plugins placed for the ground as it is, under navmeshes on the ground as it is and in the cells no longer
     /// storable, each only when what it reads changed since the pass before, and each reason kept first.
     /// </summary>
-    /// <remarks>An object's points do not depend on the plan, so one that stood in the pass before has all of them protected already.</remarks>
+    /// <remarks>
+    /// The points under an object do not depend on the plan, so one that stood in the pass before has all of them protected already.
+    /// The areas the changed-terrain step checks around a target do, through the planned heights, so they are read again for every
+    /// object that stands whenever the plan protects more.
+    /// </remarks>
     private TerrainUndoPlan ProtectGround(PassInput before, AddedSincePassBefore added)
     {
         var state = before.State;
         if (terrainGuards is null) return state.Terrain;
         var terrain = state.Terrain;
+        var stepAreasFor = added.GroundProtected ? before.Standing : added.Standing;
         return terrain
-            .Protect(TerrainKeptReason.UnderObjectThatStays, inputs.Ground.UnderWhereTheyReachTheGround(added.Standing.StandingInTheirPlace, terrain.CurrentHeightsOf))
-            .Protect(TerrainKeptReason.UnderObjectKeptAsChanged, inputs.Ground.UnderWhereTheyReachTheGround(added.Standing.RefusedThatStand, terrain.CurrentHeightsOf))
+            .Protect(TerrainKeptReason.UnderObjectThatStays, UnderAndAround(added.Standing.StandingInTheirPlace, stepAreasFor.StandingInTheirPlace, terrain))
+            .Protect(TerrainKeptReason.UnderObjectKeptAsChanged, UnderAndAround(added.Standing.RefusedThatStand, stepAreasFor.RefusedThatStand, terrain))
             .Protect(
                 TerrainKeptReason.UnderObjectPlacedForTheGroundAsItIs,
                 added.GroundProtected || added.PlacedRefused ? terrainGuards.UnderObjectsPlacedForTheGroundAsItIs(terrain, placed => EndsRemoved(placed, before.PlacedGoingBack)) : [])
@@ -200,6 +207,10 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
                 added.GroundProtected || added.NavmeshesRefused ? terrainGuards.UnderNavmeshesOnTheGroundAsItIs(terrain, ReadNavmeshesAsTheyWillStand(before)) : [])
             .Protect(TerrainKeptReason.TooSteepToStore, added.GroundProtected ? terrain.PointsOfCellsTooSteepToStore() : []);
     }
+
+    /// <summary>The points under the first objects where they reach the ground, then in the areas the changed-terrain step checks around the second.</summary>
+    private IEnumerable<LandGridPoint> UnderAndAround(IEnumerable<TargetObject> under, IEnumerable<TargetObject> around, TerrainUndoPlan terrain) =>
+        inputs.Ground.UnderWhereTheyReachTheGround(under, terrain.CurrentHeightsOf).Concat(inputs.StepAreas.Under(around, terrain));
 
     private NavmeshesAsTheyWillStand ReadNavmeshesAsTheyWillStand(PassInput before) =>
         before.State.Navmeshes?.AsTheyWillStand(inputs.Winning, before.Navmeshes.TrianglesGoingBack) ?? new NavmeshesAsTheyWillStand(inputs.Winning, _ => true, goingBack: null);

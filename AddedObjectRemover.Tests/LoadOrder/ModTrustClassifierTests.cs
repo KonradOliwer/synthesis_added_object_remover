@@ -307,6 +307,19 @@ public class ModTrustClassifierTests
         Assert.Equal(0, table.LoadsBeforeCleanedModCount);
     }
 
+    /// <summary>The world before the cleaned mod believes the plugins that load before it, whatever the load-before rule says, and no other.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void TheWorldBeforeTheCleanedModBelievesOnlyThePluginsLoadingBeforeIt(bool trustLoadingBefore)
+    {
+        var world = ClassifyInOrder(Settings(trustLoadingBefore: trustLoadingBefore), LoadOrderAroundTheCleanedMod()).AcceptedWorldBeforeCleanedMod;
+
+        Assert.Equal(
+            [VersionTrust.Full, VersionTrust.Full, VersionTrust.Full, VersionTrust.None, VersionTrust.None],
+            new[] { Skyrim, CreationClub, CityModMaster, CleanedMod, CityMod }.Select(world.TrustOf));
+    }
+
     [Fact]
     public void APluginCarryingThePatchMarkerIsSkippedByBothAutomaticRules()
     {
@@ -425,6 +438,19 @@ public class ModTrustClassifierTests
         Assert.Equal(
             [VersionTrust.Full, VersionTrust.Full, VersionTrust.OwnEdits, VersionTrust.None, VersionTrust.Transparent],
             [world.TrustOf(Skyrim), world.TrustOf(CityMod), world.TrustOf(CityModMaster), world.TrustOf(Birds), world.TrustOf(Patch)]);
+    }
+
+    [Fact]
+    public void AnotherGroupsPatchIsTransparentInTheWorldWithoutTheCleanedModAndCountsAsAPatchOfAGroup()
+    {
+        var table = Classify(
+            Settings(trusted: [CityMod]),
+            Listing(CityMod, Skyrim),
+            MarkedListing(Birds, Skyrim));
+        var world = table.AcceptedWorldWithoutCleanedMod;
+
+        Assert.Equal([VersionTrust.Full, VersionTrust.Transparent, VersionTrust.None], [world.TrustOf(CityMod), world.TrustOf(Birds), world.TrustOf(CleanedMod)]);
+        Assert.Equal([false, true, true], [table.IsAnyGroupsPatch(CityMod), table.IsAnyGroupsPatch(Birds), table.IsAnyGroupsPatch(Patch)]);
     }
 
     private static PluginListing[] LoadOrderAroundTheCleanedMod() =>

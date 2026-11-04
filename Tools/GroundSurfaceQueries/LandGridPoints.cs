@@ -8,8 +8,12 @@ public readonly record struct LandGridPoint(ExteriorCell Cell, int Point)
 {
     /// <summary>The lowest height at the points; a point of a cell whose heights are not known does not count, and at least one must be known.</summary>
     /// <param name="heightsOf">A cell's heights by grid point index; null when not known.</param>
-    public static float LowestHeight(IEnumerable<LandGridPoint> points, Func<ExteriorCell, float[]?> heightsOf) =>
-        points.Select(point => heightsOf(point.Cell)?[point.Point]).OfType<float>().Min();
+    public static float LowestHeight(IEnumerable<LandGridPoint> points, Func<ExteriorCell, float[]?> heightsOf) => HeightsAt(points, heightsOf).Min();
+
+    /// <summary>The heights at the points, in their order; a point of a cell whose heights are not known has none.</summary>
+    /// <param name="heightsOf">A cell's heights by grid point index; null when not known.</param>
+    public static IEnumerable<float> HeightsAt(IEnumerable<LandGridPoint> points, Func<ExteriorCell, float[]?> heightsOf) =>
+        points.Select(point => heightsOf(point.Cell)?[point.Point]).OfType<float>();
 }
 
 /// <summary>A grid point of a worldspace's land, counted in grid steps from the world origin.</summary>

@@ -108,8 +108,7 @@ internal static partial class LogSections
     private static OtherGroupPatchFact FactAbout(PluginName plugin, PluginName cleanedMod, ModTrustTable trust, LoadOrderPlugins plugins)
     {
         if (trust.Plugins[plugin].RequiresCleanedMod) return OtherGroupPatchFact.Requires;
-        var positions = plugins.Positions;
-        return positions.Contains(plugin) && positions.Of(plugin) < positions.Of(cleanedMod) ? OtherGroupPatchFact.LoadsBefore : OtherGroupPatchFact.MasterOfRequiringMod;
+        return plugins.Positions.IsBefore(plugin, cleanedMod) ? OtherGroupPatchFact.LoadsBefore : OtherGroupPatchFact.MasterOfRequiringMod;
     }
 
     private static ImmutableArray<string> DescribeLoadingBefore(PluginName cleanedMod, ModTrustTable trust) =>

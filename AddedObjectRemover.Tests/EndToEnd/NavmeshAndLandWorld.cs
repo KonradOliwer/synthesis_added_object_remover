@@ -1,6 +1,8 @@
 using System.Numerics;
 using Mutagen.Bethesda.Plugins;
+using Mutagen.Bethesda.Plugins.Records;
 using Mutagen.Bethesda.Skyrim;
+using Mutagen.Bethesda.Synthesis;
 using Noggog;
 
 namespace AddedObjectRemover.Tests.EndToEnd;
@@ -39,18 +41,19 @@ internal enum NavmeshAndLandScenario
     EditedWithAnUnlinkedOneEditedAgainByTheCityMod,
 
     /// <summary>
-    /// It raised the whole land of the cell; the city mod raised a square block of points in the north-east quarter again, away from
-    /// every quarter line.
+    /// It raised the whole land of the cell. No later plugin touches the land; a test lets an earlier patcher of the group raise a
+    /// block of points again (<see cref="NavmeshAndLandWorld.RaiseBlockInPatch"/>), which is the one way a land is left partly restored.
     /// </summary>
-    LandRaisedWithABlockRaisedAgainByTheCityMod,
+    LandRaised,
 
     /// <summary>
-    /// As <see cref="LandRaisedWithABlockRaisedAgainByTheCityMod"/>, with a block wider than it is tall whose columns are none of its
-    /// rows, so it lies off the diagonal of the points and swapping the columns and rows moves it.
+    /// It raised the whole land of the cell; the city mod, which cannot load without the cleaned mod, copied that land and raised a
+    /// square block of points again. The pad that gets the crate removed belongs to another plugin, because nothing of a mod that
+    /// needs the cleaned mod removes the cleaned mod's objects.
     /// </summary>
-    LandRaisedWithANarrowBlockOffThePointDiagonalRaisedAgainByTheCityMod,
+    LandRaisedWithABlockRaisedAgainByACityModThatNeedsTheCleanedMod,
 
-    /// <summary>It raised the whole land of the cell; the city mod raised the whole land further.</summary>
+    /// <summary>It raised the whole land of the cell; the city mod, which loads without it, raised the whole land further.</summary>
     LandRaisedFurtherEverywhereByTheCityMod,
 }
 
@@ -64,6 +67,7 @@ internal sealed class NavmeshAndLandWorld
 {
     public const string BaseGamePlugin = "Skyrim.esm";
     public const string CityPlugin = "CityMod.esp";
+    private const string PadPlugin = "PadMod.esp";
 
     private const float Size = 100f;
     private const int CellX = 6;
@@ -86,10 +90,13 @@ internal sealed class NavmeshAndLandWorld
     private const sbyte CityBlockRiseSteps = 4;
 
     /// <summary>The square block of land points the city mod raises, inside the north-east quarter (points 17 to 32), clear of the lines between quarters.</summary>
-    private static readonly PointBlock SquareBlock = new(FirstColumn: 20, LastColumn: 24, FirstRow: 20, LastRow: 24);
+    public static readonly PointBlock SquareBlock = new(FirstColumn: 20, LastColumn: 24, FirstRow: 20, LastRow: 24);
 
-    /// <summary>A narrow block in the north-east quarter whose columns are none of its rows.</summary>
-    private static readonly PointBlock NarrowBlock = new(FirstColumn: 20, LastColumn: 23, FirstRow: 24, LastRow: 26);
+    /// <summary>
+    /// A narrow block in the north-east quarter whose columns are none of its rows, so it lies off the diagonal of the points and
+    /// swapping the columns and rows when the land rows are written moves it.
+    /// </summary>
+    public static readonly PointBlock NarrowBlock = new(FirstColumn: 20, LastColumn: 23, FirstRow: 24, LastRow: 26);
 
     private static readonly Vector3 Origin = new(CellX * ExteriorGrid.CellSize, CellY * ExteriorGrid.CellSize, 0f);
 
@@ -129,8 +136,10 @@ internal sealed class NavmeshAndLandWorld
     {
         FixtureMeshes.WriteAll(dataFolder);
         var world = new NavmeshAndLandWorld();
+        var cityModNeedsTheCleanedMod = scenario == NavmeshAndLandScenario.LandRaisedWithABlockRaisedAgainByACityModThatNeedsTheCleanedMod;
+        var padMod = cityModNeedsTheCleanedMod ? new FixtureMod(PadPlugin, world._baseGame) : world._city;
         if (scenario == NavmeshAndLandScenario.DeletedWhereItsOnlyObjectStartsDisabled) world.PlaceADisabledCrateHereAndTheCrateWithItsPadInAnInterior();
-        else world.PlaceTheCleanedModsCrateWithACityPadBesideIt();
+        else world.PlaceTheCleanedModsCrateWithAPadBesideIt(padMod);
         switch (scenario)
         {
             case NavmeshAndLandScenario.DeletedWithoutReplacement or NavmeshAndLandScenario.DeletedWhereItsOnlyObjectStartsDisabled: world.DeleteWest(); break;
@@ -138,20 +147,24 @@ internal sealed class NavmeshAndLandWorld
             case NavmeshAndLandScenario.Replaced: world.ReplaceWest(world.AddDoorToWest()); break;
             case NavmeshAndLandScenario.EditedAgainByTheCityMod: world.EditWestInBothMods(); break;
             case NavmeshAndLandScenario.EditedWithAnUnlinkedOneEditedAgainByTheCityMod: world.EditWestAndAnUnlinkedNavmeshAndEditTheUnlinkedOneAgainInTheCityMod(); break;
-            case NavmeshAndLandScenario.LandRaisedWithABlockRaisedAgainByTheCityMod: RaiseBlock(world.RaiseTheLandInBothMods(), SquareBlock); break;
-            case NavmeshAndLandScenario.LandRaisedWithANarrowBlockOffThePointDiagonalRaisedAgainByTheCityMod: RaiseBlock(world.RaiseTheLandInBothMods(), NarrowBlock); break;
+            case NavmeshAndLandScenario.LandRaised: world.RaiseTheLandInTheCleanedMod(); break;
+            case NavmeshAndLandScenario.LandRaisedWithABlockRaisedAgainByACityModThatNeedsTheCleanedMod:
+                world.MakeTheCityModNeedTheCleanedMod();
+                RaiseBlock(world.RaiseTheLandInBothMods(), SquareBlock);
+                break;
             case NavmeshAndLandScenario.LandRaisedFurtherEverywhereByTheCityMod: world.RaiseTheLandInBothMods().VertexHeightMap!.Offset += CityBlockRiseSteps; break;
             default: throw new ArgumentOutOfRangeException(nameof(scenario), scenario, "No such scenario.");
         }
 
-        return [world._baseGame.Mod, world._target.Mod, world._city.Mod];
+        return padMod == world._city ? [world._baseGame.Mod, world._target.Mod, world._city.Mod] : [world._baseGame.Mod, world._target.Mod, world._city.Mod, padMod.Mod];
     }
 
-    private void PlaceTheCleanedModsCrateWithACityPadBesideIt()
+    /// <param name="padMod">The plugin that places the pad: the city mod, or another plugin when the city mod needs the cleaned mod and so cannot remove anything of it.</param>
+    private void PlaceTheCleanedModsCrateWithAPadBesideIt(FixtureMod padMod)
     {
         var crate = Origin + new Vector3(CrateOffset, CrateOffset, 0f);
         new FixtureCell(_target, CellCopyIn(_target.Mod)).Place("T_Crate", _target.AddModeledStatic("T_CrateBase", FixtureMeshes.CrateModel), crate);
-        new FixtureCell(_city, CellCopyIn(_city.Mod)).Place("C_Pad", _city.AddModeledStatic("C_PadBase", FixtureMeshes.PadModel), crate + new Vector3(PadDistance, 0f, 0f));
+        new FixtureCell(padMod, CellCopyIn(padMod.Mod)).Place("C_Pad", padMod.AddModeledStatic("C_PadBase", FixtureMeshes.PadModel), crate + new Vector3(PadDistance, 0f, 0f));
     }
 
     private void PlaceADisabledCrateHereAndTheCrateWithItsPadInAnInterior()
@@ -243,18 +256,33 @@ internal sealed class NavmeshAndLandWorld
         return navmesh;
     }
 
-    /// <returns>The city mod's land: a copy of the cleaned mod's, which is raised over the whole cell.</returns>
-    private Landscape RaiseTheLandInBothMods()
+    private void MakeTheCityModNeedTheCleanedMod() => _city.Mod.ModHeader.MasterReferences.Add(new MasterReference { Master = _target.Key });
+
+    private Landscape RaiseTheLandInTheCleanedMod()
     {
         var cleaned = LandCopyIn(_target.Mod);
         cleaned.VertexHeightMap!.Offset = RaisedLandSteps;
-        var city = (Landscape)cleaned.DeepCopy();
+        return cleaned;
+    }
+
+    /// <returns>The city mod's land: a copy of the cleaned mod's, which is raised over the whole cell.</returns>
+    private Landscape RaiseTheLandInBothMods()
+    {
+        var city = (Landscape)RaiseTheLandInTheCleanedMod().DeepCopy();
         CellCopyIn(_city.Mod).Landscape = city;
         return city;
     }
 
+    /// <summary>What an earlier patcher of the group wrote: the winning land of the cell (the cleaned mod's) with the block raised again.</summary>
+    /// <param name="loadOrder">The mods <see cref="Create"/> returned.</param>
+    public static void RaiseBlockInPatch(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, IReadOnlyList<ISkyrimMod> loadOrder, PointBlock block)
+    {
+        var land = loadOrder[0].EnumerateMajorRecords<ILandscapeGetter>().Single().FormKey;
+        RaiseBlock(state.LinkCache.ResolveContext<ILandscape, ILandscapeGetter>(land).GetOrAddAsOverride(state.PatchMod), block);
+    }
+
     /// <summary>Raises the block's points by <see cref="CityBlockRiseSteps"/>; the height map stores each point as a step from the one before it in its row.</summary>
-    private static void RaiseBlock(Landscape land, PointBlock block)
+    private static void RaiseBlock(ILandscape land, PointBlock block)
     {
         var steps = land.VertexHeightMap!.HeightMap;
         for (var row = block.FirstRow; row <= block.LastRow; row++)
@@ -397,5 +425,10 @@ internal sealed class NavmeshAndLandWorld
     }
 
     /// <summary>A block of land points, each bound inclusive.</summary>
-    private readonly record struct PointBlock(int FirstColumn, int LastColumn, int FirstRow, int LastRow);
+    public readonly record struct PointBlock(int FirstColumn, int LastColumn, int FirstRow, int LastRow)
+    {
+        /// <returns>How many points the point is from the block, counting a diagonal step as one; zero inside it.</returns>
+        public int DistanceTo(int column, int row) =>
+            Math.Max(0, Math.Max(Math.Max(FirstColumn - column, column - LastColumn), Math.Max(FirstRow - row, row - LastRow)));
+    }
 }

@@ -1,3 +1,6 @@
+using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
+
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 
 /// <summary>The guards between the kinds, with what the loop reads, and the time of building the after-removal world.</summary>
@@ -27,6 +30,7 @@ internal static class RestoreGuardsBuilder
                 new StandingObjects(world, blocking, plans.FinalPresence),
                 plans.TargetsThatMayStay,
                 plans.Ground,
+                new TerrainStepAreas(shapes, inputs.FindLandWorldspace, TerrainSettingsByTarget(collected, input.RemovalSteps)),
                 inputs.FindLandWorldspace,
                 (plan, cell) => landHeights(cell) with { Current = plan.PlannedHeightsOf(cell) ?? landHeights(cell).Current },
                 settings.HeightChangeTolerance,
@@ -49,24 +53,21 @@ internal static class RestoreGuardsBuilder
             new PlacedGuardInputs(
                 caches,
                 leftOut => guards.TooClose.Create(world.World, leftOut, tooCloseSettings),
+                GroupTooCloseGuard.Of(world, plans.Cleared, plans.TargetsThatMayStay, input.RemovalSteps, reach, input.Reads.CleanedMod, guards.TooClose.Create, input.Execution),
                 guards.HoldersOfObjectsThatStay.Over(world.World, world.Now),
+                guards.HoldersOfObjectsThatStay.Over(world.GoingBackWorld, world.Holders),
                 runCaches.Shapes,
                 blocking,
                 runCaches.Navmeshes,
                 inputs.FindLandWorldspace,
-                input.Reads.Plugin.ReadTerrainWinner,
-                LoadsBefore(input.Reads.Plugins, input.Reads.CleanedMod)),
+                input.Reads.Plugin.ReadTerrainWinner),
             reach,
             plans.FinalPresence,
             new DoorLinkGuard(plans.Cleared, input.Earlier.Collected.ChangedNavmeshes, guards.NavmeshCheck.FindFaultIfWritten),
             input.Execution);
     }
 
-    /// <summary>Whether a plugin of the load order loads before <paramref name="plugin"/>.</summary>
-    public static Func<PluginName, bool> LoadsBefore(LoadOrderPlugins plugins, PluginName plugin)
-    {
-        var positions = plugins.PositionsOfListed();
-        var position = positions.Of(plugin);
-        return other => positions.Of(other) < position;
-    }
+    /// <summary>The changed-terrain settings each target is judged with, by its key.</summary>
+    private static Dictionary<RecordKey, ChangedTerrainSettings> TerrainSettingsByTarget(CollectedObjects collected, WhereRemovedRestorer.RemovalStepJudging groups) =>
+        groups.ChangedTerrain.SelectMany(group => group.Objects.Select(target => KeyValuePair.Create(collected.Targets[target.Index].Key, group.Settings))).ToDictionary();
 }

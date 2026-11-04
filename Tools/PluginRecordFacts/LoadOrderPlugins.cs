@@ -88,4 +88,7 @@ public sealed class LoadOrderPositions
 
     /// <returns>A higher position for a plugin loading later; the last position of a plugin listed twice.</returns>
     public int Of(PluginName plugin) => _positions[plugin];
+
+    /// <summary>Whether the plugin is in the list before the other one, which must be in it; a plugin that is not in the list is before none.</summary>
+    public bool IsBefore(PluginName plugin, PluginName other) => Contains(plugin) && Of(plugin) < Of(other);
 }

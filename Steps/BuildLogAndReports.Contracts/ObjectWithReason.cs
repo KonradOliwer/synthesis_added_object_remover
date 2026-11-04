@@ -3,6 +3,7 @@ using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
 using AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports.Contracts;

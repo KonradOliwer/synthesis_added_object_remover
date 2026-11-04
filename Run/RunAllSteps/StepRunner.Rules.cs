@@ -6,6 +6,8 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 using AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals;
@@ -17,10 +19,6 @@ using AddedObjectRemover.Rules.TooCloseToOtherModsObjects;
 using AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts;
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
-using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas;
-using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
-using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
-using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals;
@@ -87,11 +85,15 @@ public static partial class StepRunner
 
     /// <summary>The visible kinds the settings always keep, read also while the visible step is switched off.</summary>
     private static IKindsAlwaysKept CreateVisibleKindsAlwaysKept(RunScope scope, IRunCaches runCaches) =>
-        VisibleLeftBehindObjects.CreateKindsAlwaysKept(new(runCaches, scope.Settings.NeverRemovedVisibleKinds));
+        LeftBehindRules.CreateVisibleKindsAlwaysKept(runCaches, scope.Settings.NeverRemovedVisibleKinds);
 
     /// <summary>The invisible kinds the settings always keep, read also while the invisible step is switched off.</summary>
     private static IKindsAlwaysKept CreateInvisibleKindsAlwaysKept(RunScope scope, IRunCaches runCaches) =>
-        InvisibleLeftBehindObjects.CreateKindsAlwaysKept(new(runCaches.Shapes, scope.Settings.NeverRemovedInvisibleKinds));
+        LeftBehindRules.CreateInvisibleKindsAlwaysKept(runCaches.Shapes, scope.Settings.NeverRemovedInvisibleKinds);
+
+    /// <summary>How much of the cleaned mod's drawn objects still stand around a point, judged on given decisions.</summary>
+    private static IClearedAreasJudging CreateClearedAreasJudging(IRunCaches runCaches, CollectedObjects collected) =>
+        LeftBehindRules.CreateClearedAreasJudging(collected.Targets, collected.Spaces, runCaches);
 
     private static IAlsoRemoveRoundsAfter CreateAlsoRemoveRoundsAfter(RunScope scope, IRunCaches runCaches) =>
         RestingObjectsRules.CreateAlsoRemoveRoundsAfter(scope.Settings.AlsoRemove, scope.Settings.Execution, runCaches);
@@ -118,8 +120,8 @@ public static partial class StepRunner
     /// <summary>The neighbours of each left-behind step, measured on <paramref name="final"/>; a step that is switched off measures none.</summary>
     private static ImmutableArray<ILeftBehindNeighbours> CreateLeftBehindNeighbours(RunScope scope, IRunCaches runCaches, CollectedObjects collected, IRemovalDecisions final) =>
     [
-        VisibleLeftBehindObjects.CreateNeighbours(new(collected.Targets, final, runCaches, scope.Settings.VisibleLeftBehind)),
-        InvisibleLeftBehindObjects.CreateNeighbours(new(collected.Targets, final, runCaches, scope.Settings.InvisibleLeftBehind)),
+        LeftBehindRules.CreateVisibleNeighbours(collected.Targets, final, runCaches, scope.Settings.VisibleLeftBehind),
+        LeftBehindRules.CreateInvisibleNeighbours(collected.Targets, final, runCaches, scope.Settings.InvisibleLeftBehind),
     ];
 
     /// <summary>The too-close settings, the changed-terrain check and its settings the removal steps judge the cleaned mod's own objects with.</summary>
@@ -148,7 +150,7 @@ public static partial class StepRunner
         return new WhereRemovedRestorer.Input(
             new(collected, otherModsObjects),
             final,
-            new LazyClearedAreas(() => ObjectsInClearedAreas.CreateClearedAreas(new(collected.Targets, collected.Spaces, final, runCaches, scope.Settings.RestoreWhereRemoved.ClearedArea))),
+            new LazyClearedAreas(() => CreateClearedAreasJudging(runCaches, collected).JudgedOn(final, scope.Settings.RestoreWhereRemoved.ClearedArea)),
             new(
                 worldCaches,
                 TooCloseRules.CreateTooCloseToWhatStaysRule(runCaches, worldCaches, RemovalCauses.CreateCausesOfWorlds(worldCaches)),

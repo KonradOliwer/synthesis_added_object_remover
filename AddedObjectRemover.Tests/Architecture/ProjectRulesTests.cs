@@ -5,7 +5,7 @@ public class ProjectRulesTests
     private static readonly ProjectRules Rules = ProjectRules.Load();
 
     /// <summary>The number of entries of <see cref="ProjectRules.StepResultReferences"/> today.</summary>
-    private const int MostStepResultReferences = 88;
+    private const int MostStepResultReferences = 81;
 
     [Fact]
     public void LogicProjectsReferenceNoLogic() =>

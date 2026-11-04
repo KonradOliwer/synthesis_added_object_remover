@@ -1,5 +1,6 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
@@ -16,12 +17,13 @@ internal sealed class VisibleLeftBehindRule(
     IBaseObjectShapes shapes,
     IBaseFacts bases,
     VisibleLeftBehindSettings config,
-    IKindsAlwaysKept kindsAlwaysKept)
+    IKindsAlwaysKept kindsAlwaysKept,
+    ISurroundingsJudging judging)
 {
     /// <param name="decisions">The decisions of the earlier steps: the objects they decided are not judged again.</param>
     /// <returns>Target indexes of the shown targets <paramref name="decisions"/> left undecided, ascending.</returns>
     public int[] Candidates(IRemovalDecisions decisions) =>
-        LeftBehindVerdicts.Candidates(targets, decisions, target => shapes.VisibilityOf(target).IsShown);
+        judging.Candidates(targets, decisions, target => shapes.VisibilityOf(target).IsShown);
 
     public VisibleLeftBehindCheck Judge(MeasuredSurroundings measured)
     {
@@ -35,5 +37,5 @@ internal sealed class VisibleLeftBehindRule(
     private LeftBehindOutcome Decide(SectorAreas surroundings, bool isProtectedKind) =>
         surroundings.Objects < config.MinObjectsAround
             ? LeftBehindOutcome.KeptTooFewObjectsAround
-            : LeftBehindVerdicts.Judge(surroundings, config.Surroundings, isInsideAnotherModsObject: false, isProtectedKind);
+            : judging.Judge(surroundings, config.Surroundings, isInsideAnotherModsObject: false, isProtectedKind);
 }

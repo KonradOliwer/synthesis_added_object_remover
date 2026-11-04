@@ -68,19 +68,21 @@ public class LeftBehindOrderDeterminismTests
         var protection = ObjectsToKeep.Build(immutableTargets, [], TestTargets.References(targets.Count), TestBaseFacts.Unresolved);
         var decisions = TestSeededDecisions.Seed(protection, targets.Count, removedTables);
         var otherModObjects = scene.ObjectsThatCanCauseRemovals(Replacements.None(rooms.Count), NpcHandling.OnlyWhenStuckInsideTheObject);
+        var caches = new TestRunCaches(
+            Shapes,
+            bases: TestBaseFacts.Reader(new SkyrimMod(ModKey.FromNameAndExtension("Facts.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
+            visibleTargets: scene.IndexVisibleTargets);
         return InvisibleLeftBehindObjects.Find(
             new(
                 immutableTargets,
                 otherModObjects,
                 OtherModsObjectsResult.SwitchedOff,
                 decisions,
-                new TestRunCaches(
-                    Shapes,
-                    bases: TestBaseFacts.Reader(new SkyrimMod(ModKey.FromNameAndExtension("Facts.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
-                    visibleTargets: scene.IndexVisibleTargets),
+                caches,
                 TestLeftBehind.KindsAlwaysKept(Shapes),
-                VisibleLeftBehindObjects.CreateSurroundingsJudging(),
-                VisibleLeftBehindObjects.CreateLeftBehindRoundJoin(),
+                LeftBehindRules.CreateInvisibleObjectReach(caches.Bases),
+                LeftBehindRules.CreateSurroundingsJudging(),
+                LeftBehindRules.CreateLeftBehindRoundJoin(),
                 order,
                 execution,
                 Settings)).Result;

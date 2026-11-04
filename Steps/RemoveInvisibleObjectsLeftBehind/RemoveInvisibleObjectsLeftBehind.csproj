@@ -4,11 +4,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>Proposes removing invisible target objects that sit inside another mod's object or whose surroundings were removed. It references its contracts, the contracts of the steps and caches it reads, ObjectsRestingOnRemovedOnes.Contracts (what became of other mods' objects), Ids, PluginRecordFacts and the package-free tools it uses, and holds no packages.</Description>
+    <Description>Proposes removing invisible target objects that sit inside another mod's object or whose surroundings were removed. It references its contracts, the contracts of the steps and caches it reads, ObjectsLeftBehind.Contracts (the surroundings rule, reach, round join and kinds always kept it asks), ObjectsThatCanCauseRemovals.Contracts (the other mods' objects an object can sit inside), ObjectsRestingOnRemovedOnes.Contracts (what became of other mods' objects), Ids, PluginRecordFacts and the package-free tools it uses, and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\RemoveInvisibleObjectsLeftBehind.Contracts\RemoveInvisibleObjectsLeftBehind.Contracts.csproj" />
-    <ProjectReference Include="..\RemoveVisibleObjectsLeftBehind.Contracts\RemoveVisibleObjectsLeftBehind.Contracts.csproj" />
+    <ProjectReference Include="..\..\Rules\ObjectsLeftBehind.Contracts\ObjectsLeftBehind.Contracts.csproj" />
     <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
     <ProjectReference Include="..\..\Rules\ObjectsThatCanCauseRemovals.Contracts\ObjectsThatCanCauseRemovals.Contracts.csproj" />

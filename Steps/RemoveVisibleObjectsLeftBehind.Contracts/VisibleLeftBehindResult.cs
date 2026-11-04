@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
-using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 

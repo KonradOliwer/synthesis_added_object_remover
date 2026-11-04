@@ -69,6 +69,8 @@
     { "name": "TerrainChangedByOtherMods", "kind": "U", "packages": [] },
     { "name": "ObjectsRestingOnRemovedOnes.Contracts", "kind": "C", "packages": [] },
     { "name": "ObjectsRestingOnRemovedOnes", "kind": "U", "packages": [] },
+    { "name": "ObjectsLeftBehind.Contracts", "kind": "C", "packages": [] },
+    { "name": "ObjectsLeftBehind", "kind": "U", "packages": [] },
     { "name": "WriteThePatch.Contracts", "kind": "C", "packages": [] },
     { "name": "WriteThePatch", "kind": "L", "packages": [] },
     { "name": "BuildLogAndReports.Contracts", "kind": "C", "packages": [] },

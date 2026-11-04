@@ -2,6 +2,7 @@ using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;

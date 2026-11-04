@@ -39,6 +39,8 @@
     <ProjectReference Include="..\..\Steps\RemoveTooCloseObjects\RemoveTooCloseObjects.csproj" />
     <ProjectReference Include="..\..\Rules\ObjectsRestingOnRemovedOnes.Contracts\ObjectsRestingOnRemovedOnes.Contracts.csproj" />
     <ProjectReference Include="..\..\Rules\ObjectsRestingOnRemovedOnes\ObjectsRestingOnRemovedOnes.csproj" />
+    <ProjectReference Include="..\..\Rules\ObjectsLeftBehind.Contracts\ObjectsLeftBehind.Contracts.csproj" />
+    <ProjectReference Include="..\..\Rules\ObjectsLeftBehind\ObjectsLeftBehind.csproj" />
     <ProjectReference Include="..\..\Steps\RemoveObjectsRestingOnRemovedOnes\RemoveObjectsRestingOnRemovedOnes.csproj" />
     <ProjectReference Include="..\..\Steps\OtherModsObjectsLeftWithoutSupport\OtherModsObjectsLeftWithoutSupport.csproj" />
     <ProjectReference Include="..\..\Steps\RemoveVisibleObjectsLeftBehind.Contracts\RemoveVisibleObjectsLeftBehind.Contracts.csproj" />

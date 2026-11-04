@@ -4,10 +4,10 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>How much of the cleaned mod's drawn objects still stand in an area, the rule that judges it, which the restore step asks too, and the objects of the cleaned mod checked for standing in a cleared area, with the settings of that check and the step's removal reason. It references RemoveVisibleObjectsLeftBehind.Contracts (for the verdict and outcome the left-behind steps share), ObjectsRestingOnRemovedOnes.Contracts (for the follow-up's result), RemovalDecisionList.Contracts, FindTargetObjectsToKeep.Contracts, Ids and UnexpectedFailureHandling (for its part key) and holds no packages.</Description>
+    <Description>The objects of the cleaned mod checked for standing in a cleared area, with the settings of that check, the step's removal reason and its result. It references ObjectsLeftBehind.Contracts (for the verdict, outcome, area share and area settings the left-behind methods share), ObjectsRestingOnRemovedOnes.Contracts (for the follow-up's result), RemovalDecisionList.Contracts, FindTargetObjectsToKeep.Contracts, Ids and UnexpectedFailureHandling (for its part key) and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\RemoveVisibleObjectsLeftBehind.Contracts\RemoveVisibleObjectsLeftBehind.Contracts.csproj" />
+    <ProjectReference Include="..\..\Rules\ObjectsLeftBehind.Contracts\ObjectsLeftBehind.Contracts.csproj" />
     <ProjectReference Include="..\..\Rules\ObjectsRestingOnRemovedOnes.Contracts\ObjectsRestingOnRemovedOnes.Contracts.csproj" />
     <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
     <ProjectReference Include="..\FindTargetObjectsToKeep.Contracts\FindTargetObjectsToKeep.Contracts.csproj" />

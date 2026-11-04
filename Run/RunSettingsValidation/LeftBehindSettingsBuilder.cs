@@ -1,6 +1,7 @@
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using static AddedObjectRemover.SettingCorrections;
 

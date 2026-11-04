@@ -88,8 +88,9 @@ public class LeftBehindAfterVisibleRemovalsTests
                 decisions,
                 new TestRunCaches(Shapes, bases: TestBaseFacts.Unresolved, visibleTargets: scene.IndexVisibleTargets),
                 TestLeftBehind.KindsAlwaysKept(Shapes),
-                VisibleLeftBehindObjects.CreateSurroundingsJudging(),
-                VisibleLeftBehindObjects.CreateLeftBehindRoundJoin(),
+                LeftBehindRules.CreateInvisibleObjectReach(TestBaseFacts.Unresolved),
+                LeftBehindRules.CreateSurroundingsJudging(),
+                LeftBehindRules.CreateLeftBehindRoundJoin(),
                 TargetWorkOrder.Of(targets),
                 new Execution(Environment.ProcessorCount),
                 Settings)).Result;

@@ -1,5 +1,5 @@
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 

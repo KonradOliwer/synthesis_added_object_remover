@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using static AddedObjectRemover.CsvFormat;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;

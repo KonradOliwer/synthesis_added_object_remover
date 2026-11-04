@@ -16,6 +16,7 @@ using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;

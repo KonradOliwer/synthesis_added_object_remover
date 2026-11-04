@@ -1,4 +1,5 @@
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using static AddedObjectRemover.SettingCorrections;
 

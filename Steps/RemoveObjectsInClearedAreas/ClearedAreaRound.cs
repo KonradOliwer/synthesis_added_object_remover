@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
-using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsInClearedAreas;
 

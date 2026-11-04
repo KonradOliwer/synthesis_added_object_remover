@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
 

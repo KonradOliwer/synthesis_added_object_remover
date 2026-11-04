@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
-using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved;

@@ -1,3 +1,4 @@
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;

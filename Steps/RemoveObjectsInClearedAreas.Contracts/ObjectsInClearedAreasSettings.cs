@@ -1,3 +1,5 @@
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
+
 namespace AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 
 /// <param name="ClearedArea">When the area around one of the cleaned mod's objects counts as cleared, so the object is removed.</param>

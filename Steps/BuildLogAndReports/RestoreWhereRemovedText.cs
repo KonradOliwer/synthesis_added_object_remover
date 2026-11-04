@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 

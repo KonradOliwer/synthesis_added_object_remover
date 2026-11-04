@@ -329,19 +329,21 @@ public class LeftBehindObjectsTests
     {
         var scene = CreateScene();
         Func<IReadOnlyList<TargetObject>, IVisibleTargetObjects> indexTargets = surroundings is null ? scene.IndexVisibleTargets : _ => surroundings(scene);
+        var caches = new TestRunCaches(
+            Shapes,
+            bases: TestBaseFacts.Reader(new SkyrimMod(ModKey.FromNameAndExtension("Reach.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
+            visibleTargets: indexTargets);
         return InvisibleLeftBehindObjects.Find(
             new(
                 Targets,
                 scene.ObjectsThatCanCauseRemovals(Replacements.None(Others.Length), NpcHandling.OnlyWhenStuckInsideTheObject),
                 otherMods ?? OtherModsObjectsResult.SwitchedOff,
                 decisions,
-                new TestRunCaches(
-                    Shapes,
-                    bases: TestBaseFacts.Reader(new SkyrimMod(ModKey.FromNameAndExtension("Reach.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
-                    visibleTargets: indexTargets),
+                caches,
                 kindsAlwaysKept ?? TestLeftBehind.KindsAlwaysKept(Shapes),
-                VisibleLeftBehindObjects.CreateSurroundingsJudging(),
-                VisibleLeftBehindObjects.CreateLeftBehindRoundJoin(),
+                LeftBehindRules.CreateInvisibleObjectReach(caches.Bases),
+                LeftBehindRules.CreateSurroundingsJudging(),
+                LeftBehindRules.CreateLeftBehindRoundJoin(),
                 TargetWorkOrder.Of(Targets),
                 new Execution(Environment.ProcessorCount),
                 settings));

@@ -7,6 +7,7 @@ using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 

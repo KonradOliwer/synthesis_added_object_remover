@@ -1,9 +1,9 @@
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
-using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
 
@@ -17,7 +17,7 @@ internal sealed class InvisibleLeftBehindRule(
     IBaseObjectShapes shapes,
     IVisibleTargetObjects surroundings,
     ContainingObjects containingObjects,
-    ReachRule reach,
+    IInvisibleObjectReach reach,
     ISurroundingsJudging judging,
     ILeftBehindRoundJoin roundJoin,
     InvisibleLeftBehindSettings config,

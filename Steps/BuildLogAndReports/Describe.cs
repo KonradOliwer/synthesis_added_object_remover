@@ -3,6 +3,7 @@ using System.Diagnostics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;

@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AddedObjectRemover</RootNamespace>
+    <Description>The rules of objects left behind that the left-behind methods share: the verdicts and their joining with a round's decisions, the ground area per direction and the direction rule, the surroundings measured across rounds, the neighbours of visible and invisible objects and the reach of an invisible one, the kinds always kept, and how much of the cleaned mod's drawn objects still stand in an area. It references its contracts, CollectPlacedObjects.Contracts and RemovalDecisionList.Contracts (the placed objects and decisions it judges), FindTargetObjectsToKeep.Contracts (the keep reasons a verdict carries), BaseObjectShapeAndKind.Contracts and RunCaches.Contracts (the shapes, base facts and indexes it reads), Ids, PluginRecordFacts and the package-free tools it uses, and holds no packages.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ObjectsLeftBehind.Contracts\ObjectsLeftBehind.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\FindTargetObjectsToKeep.Contracts\FindTargetObjectsToKeep.Contracts.csproj" />
+    <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
+    <ProjectReference Include="..\..\Caches\RunCaches.Contracts\RunCaches.Contracts.csproj" />
+    <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
+    <ProjectReference Include="..\..\Tools\PluginRecordFacts\PluginRecordFacts.csproj" />
+    <ProjectReference Include="..\..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
+    <ProjectReference Include="..\..\Tools\CompassSectorAreas\CompassSectorAreas.csproj" />
+    <ProjectReference Include="..\..\Tools\ComputedOnceLookups\ComputedOnceLookups.csproj" />
+    <ProjectReference Include="..\..\Tools\IndexGraphQueries\IndexGraphQueries.csproj" />
+    <ProjectReference Include="..\..\Tools\NumericRanges\NumericRanges.csproj" />
+    <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AddedObjectRemover.Tests" />
+  </ItemGroup>
+</Project>

@@ -51,6 +51,7 @@ public class LogicPublicTypesTests
         ["TooCloseToOtherModsObjects"] = "TooCloseRules",
         ["TerrainChangedByOtherMods"] = "ChangedTerrainRules",
         ["ObjectsRestingOnRemovedOnes"] = "RestingObjectsRules",
+        ["ObjectsLeftBehind"] = "LeftBehindRules",
     };
 
     /// <summary>
@@ -65,14 +66,7 @@ public class LogicPublicTypesTests
         ["ChangedTerrainRules.CreatePlacementRule"] = "The changed-terrain check of one placement, which the fit step, the judge step's old-place check and the restore's copy check ask.",
         ["TooCloseRules.CreateNpcCacheRules"] = "How the NPC body cache and the placed-NPC index work out an NPC's body; the caches take them when they are built.",
         ["TooCloseRules.CreatePlacementRule"] = "The too-close check of one placement, which the fit step asks.",
-        ["VisibleLeftBehindObjects.CreateSurroundingsJudging"] = "The direction rule the visible step owns (candidates, surroundings, verdict), which the invisible left-behind step asks.",
-        ["VisibleLeftBehindObjects.CreateLeftBehindRoundJoin"] = "The rules the visible step owns for joining a round's decisions into verdicts and proposals, which the invisible left-behind step and the step for objects in cleared areas ask.",
-        ["VisibleLeftBehindObjects.CreateKindsAlwaysKept"] = "The visible kinds the step's settings always keep, which the step for objects in cleared areas asks, also while the visible step is off.",
-        ["InvisibleLeftBehindObjects.CreateKindsAlwaysKept"] = "The invisible kinds the step's settings always keep, which the step for objects in cleared areas asks, also while the invisible step is off.",
-        ["VisibleLeftBehindObjects.CreateNeighbours"] = "The neighbours the visible step measures around an object, which the restore's copy rule asks on the final decisions; none while the step is off.",
-        ["InvisibleLeftBehindObjects.CreateNeighbours"] = "The neighbours the invisible step measures around an object, which the restore's copy rule asks on the final decisions; none while the step is off.",
         ["RestingObjectsRules.SurfaceSamplesPerMesh"] = "How many points the support rule samples on a mesh's surface; the surface sample cache takes it when it is built.",
-        ["ObjectsInClearedAreas.CreateClearedAreas"] = "How much of the cleaned mod's drawn objects still stand around a point, which the restore step asks on the final decisions.",
         ["WhereRemovedRestorer.MeasurementFailurePart"] = "The part the measurement failures in the worlds of what stays are recorded under; the world caches the restore step and its rules share take it.",
         ["PatchWriter.CreateNavmeshCheck"] = "The navmesh check of a trial write, which the restore step asks.",
     };

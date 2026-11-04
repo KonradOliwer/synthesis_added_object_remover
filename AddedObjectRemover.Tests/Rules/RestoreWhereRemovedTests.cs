@@ -772,8 +772,8 @@ public sealed class RestoreWhereRemovedTests
         List<TargetId> visible = [new TargetId(99)];
         List<TargetId> invisible = [new TargetId(99)];
 
-        VisibleLeftBehindObjects.CreateNeighbours(new(targets, decisions, caches, Settings: null)).Around(targets[1], visible);
-        InvisibleLeftBehindObjects.CreateNeighbours(new(targets, decisions, caches, Settings: null)).Around(targets[1], invisible);
+        LeftBehindRules.CreateVisibleNeighbours(targets, decisions, caches, settings: null).Around(targets[1], visible);
+        LeftBehindRules.CreateInvisibleNeighbours(targets, decisions, caches, settings: null).Around(targets[1], invisible);
 
         Assert.Equal((0, 0), (visible.Count, invisible.Count));
     }
@@ -786,8 +786,8 @@ public sealed class RestoreWhereRemovedTests
         var targets = CampScene(TestTargets.Create(5, TestTargets.At(Camp + new Vector3(-60, 0, 0)), marker, TestTargets.Space));
         var decisions = DecisionsRemoving(targets);
         var caches = CachesOf(targets, PlainScenery);
-        var visibleStep = VisibleLeftBehindObjects.CreateNeighbours(new(targets, decisions, caches, LookAround));
-        var invisibleStep = InvisibleLeftBehindObjects.CreateNeighbours(new(targets, decisions, caches, new InvisibleLeftBehindSettings(LookAround.Surroundings)));
+        var visibleStep = LeftBehindRules.CreateVisibleNeighbours(targets, decisions, caches, LookAround);
+        var invisibleStep = LeftBehindRules.CreateInvisibleNeighbours(targets, decisions, caches, new InvisibleLeftBehindSettings(LookAround.Surroundings));
 
         Assert.Equal([2, 3, 4], NeighbourIndexes(visibleStep, targets[1]));
         Assert.Empty(NeighbourIndexes(visibleStep, targets[5]));
@@ -1008,7 +1008,7 @@ public sealed class RestoreWhereRemovedTests
                     Accepted = new AcceptedWorld(
                         TestTargets.PatchName,
                         ImmutableDictionary<PluginName, VersionTrust>.Empty.Add(BaseGame, VersionTrust.Full).Add(TestTargets.TargetName, VersionTrust.Full).Add(Later, laterTrust)),
-                    LeftBehindNeighbours = [VisibleLeftBehindObjects.CreateNeighbours(new(targets, final, caches, visibleLeftBehind))],
+                    LeftBehindNeighbours = [LeftBehindRules.CreateVisibleNeighbours(targets, final, caches, visibleLeftBehind)],
                     CleanedModsObjects = cleanedModsObjects ?? TestTargetGroups.None.CleanedModsObjects,
                 },
                 new(caches, TestLandPlugin.Flat, Plugins, TestTargets.TargetName),

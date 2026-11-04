@@ -1,10 +1,10 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
-using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsInClearedAreas;
 
@@ -21,7 +21,7 @@ namespace AddedObjectRemover.Steps.RemoveObjectsInClearedAreas;
 internal sealed class ClearedAreaRule(
     ImmutableArray<TargetObject> measured,
     IBaseObjectShapes shapes,
-    ClearedAreaJudge areas,
+    IClearedAreas areas,
     IReadOnlyList<IKindsAlwaysKept> kindsAlwaysKept,
     ILeftBehindRoundJoin roundJoin,
     int minObjectsAround)

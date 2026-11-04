@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
-using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
@@ -23,7 +24,8 @@ namespace AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
 internal sealed class VisibleLeftBehindRounds
 {
     private readonly VisibleLeftBehindRule _rule;
-    private readonly VisibleObjectSurroundings _surroundings;
+    private readonly ISurroundingsAcrossRounds _surroundings;
+    private readonly ILeftBehindRoundJoin _roundJoin;
     private readonly IAlsoRemoveFollowUp _followUp;
     private readonly Func<TimeSpan> _timeSinceStart;
     private readonly IRemovalDecisionsCopy _copy;
@@ -38,13 +40,15 @@ internal sealed class VisibleLeftBehindRounds
 
     private VisibleLeftBehindRounds(
         VisibleLeftBehindRule rule,
-        VisibleObjectSurroundings surroundings,
+        ISurroundingsAcrossRounds surroundings,
+        ILeftBehindRoundJoin roundJoin,
         IAlsoRemoveFollowUp followUp,
         Func<TimeSpan> timeSinceStart,
         IRemovalDecisions decisions)
     {
         _rule = rule;
         _surroundings = surroundings;
+        _roundJoin = roundJoin;
         _followUp = followUp;
         _timeSinceStart = timeSinceStart;
         _copy = decisions.WorkingCopy();
@@ -69,12 +73,13 @@ internal sealed class VisibleLeftBehindRounds
     /// <param name="decisions">The decisions of the earlier steps; the copy starts from them.</param>
     public static VisibleLeftBehindRounds Decide(
         VisibleLeftBehindRule rule,
-        VisibleObjectSurroundings surroundings,
+        ISurroundingsAcrossRounds surroundings,
+        ILeftBehindRoundJoin roundJoin,
         IAlsoRemoveFollowUp followUp,
         Func<TimeSpan> timeSinceStart,
         IRemovalDecisions decisions)
     {
-        var rounds = new VisibleLeftBehindRounds(rule, surroundings, followUp, timeSinceStart, decisions);
+        var rounds = new VisibleLeftBehindRounds(rule, surroundings, roundJoin, followUp, timeSinceStart, decisions);
         while (rounds.DecideNextVisibleRound()) rounds.FollowUpNewestRound();
         return rounds;
     }
@@ -99,8 +104,8 @@ internal sealed class VisibleLeftBehindRounds
     }
 
     /// <summary>A removal proposal for each object the rule would remove.</summary>
-    internal static IReadOnlyList<ProposedRemoval> ProposalsOf(IEnumerable<VisibleLeftBehindCheck> checks) =>
-        LeftBehindVerdicts.ProposalsOf(checks, _ => new VisibleObjectSurroundingsRemoved());
+    private IReadOnlyList<ProposedRemoval> ProposalsOf(IEnumerable<VisibleLeftBehindCheck> checks) =>
+        _roundJoin.ProposalsOf(checks, _ => new VisibleObjectSurroundingsRemoved());
 
     /// <remarks>A failed follow-up proposes nothing, so the visible rounds go on alone.</remarks>
     private void FollowUpNewestRound()

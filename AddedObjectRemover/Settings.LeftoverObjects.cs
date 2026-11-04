@@ -1,5 +1,5 @@
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
-using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using Mutagen.Bethesda.Synthesis.Settings;
 
 namespace AddedObjectRemover;

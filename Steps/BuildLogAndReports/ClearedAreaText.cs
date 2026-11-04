@@ -1,3 +1,4 @@
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;

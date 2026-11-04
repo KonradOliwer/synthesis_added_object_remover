@@ -13,5 +13,5 @@ internal static class TestClearedAreas
 
     public static IClearedAreas Of(
         ImmutableArray<TargetObject> targets, IReadOnlyDictionary<RecordKey, SpaceFact> spaces, IRemovalDecisions decisions, IRunCaches caches, ClearedArea settings) =>
-        ObjectsInClearedAreas.CreateClearedAreas(new(targets, spaces, decisions, caches, settings));
+        LeftBehindRules.CreateClearedAreasJudging(targets, spaces, caches).JudgedOn(decisions, settings);
 }

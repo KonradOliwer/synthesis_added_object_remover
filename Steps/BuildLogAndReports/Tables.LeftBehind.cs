@@ -3,6 +3,7 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using static AddedObjectRemover.CsvFormat;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;

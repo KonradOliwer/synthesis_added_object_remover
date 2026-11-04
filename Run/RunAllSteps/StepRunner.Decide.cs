@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals;
@@ -179,6 +180,8 @@ public static partial class StepRunner
                     alsoRemove.Decisions,
                     runCaches,
                     CreateVisibleKindsAlwaysKept(scope, runCaches),
+                    LeftBehindRules.CreateSurroundingsJudging(),
+                    LeftBehindRules.CreateLeftBehindRoundJoin(),
                     CreateAlsoRemoveFollowUp(scope, runCaches, collected, alsoRemove.Decisions),
                     scope.Environment.TimeSinceStart,
                     collected.Order,
@@ -192,11 +195,11 @@ public static partial class StepRunner
             () => ObjectsInClearedAreas.Find(
                 new(
                     collected.Targets,
-                    collected.Spaces,
                     visibleLeftBehind.Decisions,
                     runCaches,
+                    CreateClearedAreasJudging(runCaches, collected),
                     [CreateVisibleKindsAlwaysKept(scope, runCaches), CreateInvisibleKindsAlwaysKept(scope, runCaches)],
-                    VisibleLeftBehindObjects.CreateLeftBehindRoundJoin(),
+                    LeftBehindRules.CreateLeftBehindRoundJoin(),
                     CreateAlsoRemoveFollowUp(scope, runCaches, collected, visibleLeftBehind.Decisions),
                     scope.Environment.TimeSinceStart,
                     collected.Order,
@@ -231,8 +234,9 @@ public static partial class StepRunner
                     otherMods.Decisions,
                     runCaches,
                     CreateInvisibleKindsAlwaysKept(scope, runCaches),
-                    VisibleLeftBehindObjects.CreateSurroundingsJudging(),
-                    VisibleLeftBehindObjects.CreateLeftBehindRoundJoin(),
+                    LeftBehindRules.CreateInvisibleObjectReach(runCaches.Bases),
+                    LeftBehindRules.CreateSurroundingsJudging(),
+                    LeftBehindRules.CreateLeftBehindRoundJoin(),
                     collected.Order,
                     scope.Settings.Execution,
                     scope.Settings.InvisibleLeftBehind)),

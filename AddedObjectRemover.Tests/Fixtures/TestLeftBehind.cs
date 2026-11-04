@@ -15,7 +15,9 @@ internal static class TestLeftBehind
 
     /// <summary>The invisible kinds the settings always keep.</summary>
     public static IKindsAlwaysKept KindsAlwaysKept(IBaseObjectShapes shapes, params InvisibleObjectKind[] kinds) =>
-        InvisibleLeftBehindObjects.CreateKindsAlwaysKept(new(shapes, new NeverRemovedInvisibleKinds(kinds.ToHashSet())));
+        LeftBehindRules.CreateInvisibleKindsAlwaysKept(shapes, new NeverRemovedInvisibleKinds(kinds.ToHashSet()));
+
+    private static IBaseFacts ReachBases() => TestBaseFacts.Reader(new SkyrimMod(ReachRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache());
 
     /// <param name="others">Other mods' objects of <see cref="TestTargets.Space"/>.</param>
     public static InvisibleLeftBehindRule CreateRule(
@@ -38,9 +40,9 @@ internal static class TestLeftBehind
                 new HashSet<OtherId>(),
                 order,
                 new Execution(Environment.ProcessorCount)),
-            new ReachRule(TestBaseFacts.Reader(new SkyrimMod(ReachRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache())),
-            VisibleLeftBehindObjects.CreateSurroundingsJudging(),
-            VisibleLeftBehindObjects.CreateLeftBehindRoundJoin(),
+            LeftBehindRules.CreateInvisibleObjectReach(ReachBases()),
+            LeftBehindRules.CreateSurroundingsJudging(),
+            LeftBehindRules.CreateLeftBehindRoundJoin(),
             config,
             kindsAlwaysKept ?? KindsAlwaysKept(shapes),
             order);
@@ -64,11 +66,12 @@ internal static class TestLeftBehind
                 TestSeededDecisions.StartDisablingAll(protection, targets.Count),
                 new TestRunCaches(
                     shapes,
-                    bases: TestBaseFacts.Reader(new SkyrimMod(ReachRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),
+                    bases: ReachBases(),
                     visibleTargets: scene.IndexVisibleTargets),
                 kindsAlwaysKept ?? KindsAlwaysKept(shapes),
-                VisibleLeftBehindObjects.CreateSurroundingsJudging(),
-                VisibleLeftBehindObjects.CreateLeftBehindRoundJoin(),
+                LeftBehindRules.CreateInvisibleObjectReach(ReachBases()),
+                LeftBehindRules.CreateSurroundingsJudging(),
+                LeftBehindRules.CreateLeftBehindRoundJoin(),
                 TargetWorkOrder.Of(targets),
                 new Execution(Environment.ProcessorCount),
                 config)).Result;

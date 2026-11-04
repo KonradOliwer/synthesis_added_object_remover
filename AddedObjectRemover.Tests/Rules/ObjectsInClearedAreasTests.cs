@@ -221,7 +221,7 @@ public sealed class ObjectsInClearedAreasTests
     public void AnInvisibleObjectOfAKindTheInvisibleStepAlwaysKeepsIsKeptAlsoWithThatStepOff()
     {
         ImmutableArray<TargetObject> targets = [.. Cluster(20), Invisible(20, Vector3.Zero)];
-        var invisibleKinds = InvisibleLeftBehindObjects.CreateKindsAlwaysKept(new(Shapes, new NeverRemovedInvisibleKinds(new HashSet<InvisibleObjectKind> { InvisibleObjectKind.XMarkers })));
+        var invisibleKinds = LeftBehindRules.CreateInvisibleKindsAlwaysKept(Shapes, new NeverRemovedInvisibleKinds(new HashSet<InvisibleObjectKind> { InvisibleObjectKind.XMarkers }));
 
         var evaluation = Assert.Single(Find(targets, DecisionsRemoving(targets, [.. Enumerable.Range(0, 20)]), AtTheDefaults, kinds: [invisibleKinds]).Evaluations);
 
@@ -407,19 +407,22 @@ public sealed class ObjectsInClearedAreasTests
         ObjectsInClearedAreasSettings? settings,
         IReadOnlyDictionary<RecordKey, SpaceFact>? spaces = null,
         IReadOnlyList<IKindsAlwaysKept>? kinds = null,
-        int workers = 1) =>
-        new(
+        int workers = 1)
+    {
+        var caches = CachesOf(targets);
+        return new(
             targets,
-            spaces ?? new Dictionary<RecordKey, SpaceFact>(),
             decisions,
-            CachesOf(targets),
+            caches,
+            LeftBehindRules.CreateClearedAreasJudging(targets, spaces ?? new Dictionary<RecordKey, SpaceFact>(), caches),
             kinds ?? [],
-            VisibleLeftBehindObjects.CreateLeftBehindRoundJoin(),
+            LeftBehindRules.CreateLeftBehindRoundJoin(),
             new NoFollowUp(),
             () => TimeSpan.Zero,
             TargetWorkOrder.Of(targets),
             new Execution(workers),
             settings);
+    }
 
     private static TestRunCaches CachesOf(ImmutableArray<TargetObject> targets) =>
         new(Shapes, shownTargets: TestScenes.Create(targets, [], Shapes).IndexShownTargets);

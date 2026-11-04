@@ -1,5 +1,5 @@
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
-using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts;
 
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;

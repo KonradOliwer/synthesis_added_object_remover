@@ -1,12 +1,11 @@
 using System.Collections.Immutable;
-using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
-using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
+using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
-using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
-using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
 
@@ -19,7 +18,8 @@ public static class InvisibleLeftBehindObjects
     /// Index the visible target objects, removed or not, where the rounds measure them: a restored one where the cleaned mod put it;
     /// their base facts and shapes are read.
     /// </param>
-    /// <param name="KindsAlwaysKept">The invisible kinds the settings list (see <see cref="CreateKindsAlwaysKept"/>).</param>
+    /// <param name="KindsAlwaysKept">The invisible kinds the settings list.</param>
+    /// <param name="Reach">How far an invisible object acts.</param>
     /// <param name="Judging">Judges an object by its surroundings.</param>
     /// <param name="RoundJoin">Joins a round's decision into the verdict of its object.</param>
     /// <param name="Settings">Null when the step is switched off.</param>
@@ -30,35 +30,12 @@ public static class InvisibleLeftBehindObjects
         IRunDecisions Decisions,
         IRunCaches Caches,
         IKindsAlwaysKept KindsAlwaysKept,
+        IInvisibleObjectReach Reach,
         ISurroundingsJudging Judging,
         ILeftBehindRoundJoin RoundJoin,
         WorkOrder Order,
         Execution Execution,
         InvisibleLeftBehindSettings? Settings);
-
-    /// <param name="Decisions">The decisions the neighbours stand in: each visible target where their rounds measure it.</param>
-    /// <param name="Caches">Index the visible target objects; their base facts and shapes are read.</param>
-    /// <param name="Settings">Null when the step is switched off.</param>
-    public sealed record NeighboursInput(ImmutableArray<TargetObject> Targets, IRemovalDecisions Decisions, IRunCaches Caches, InvisibleLeftBehindSettings? Settings);
-
-    /// <summary>
-    /// The neighbours the step measures around an invisible target with its look-around distance and reach (see
-    /// <see cref="InvisibleNeighbours"/>); none while the step is switched off.
-    /// </summary>
-    public static ILeftBehindNeighbours CreateNeighbours(NeighboursInput input) =>
-        new InvisibleNeighbours(
-            input.Caches.Shapes,
-            new ReachRule(input.Caches.Bases),
-            input.Settings is { } settings
-                ? (input.Caches.IndexVisibleTargets(input.Decisions.TargetsAsTheRoundsMeasureThem(input.Targets)), settings.Surroundings.LookAround)
-                : null);
-
-    /// <param name="Shapes">The kinds of the objects are read.</param>
-    /// <param name="NeverRemove">The kinds the step's settings list, also while the step is switched off.</param>
-    public sealed record KindsInput(IBaseObjectShapes Shapes, NeverRemovedInvisibleKinds NeverRemove);
-
-    /// <summary>The invisible objects of the kinds the step's settings list (see <see cref="InvisibleKindsAlwaysKept"/>).</summary>
-    public static IKindsAlwaysKept CreateKindsAlwaysKept(KindsInput input) => new InvisibleKindsAlwaysKept(input.Shapes, input.NeverRemove.Kinds);
 
     public static Decided<InvisibleLeftBehindResult> Find(Input input)
     {
@@ -87,7 +64,7 @@ public static class InvisibleLeftBehindObjects
                         shapes,
                         surroundings,
                         ContainingObjectFinder.Find(targets, shapes, input.OtherModObjects, takenAway, order, execution),
-                        new ReachRule(input.Caches.Bases),
+                        input.Reach,
                         input.Judging,
                         input.RoundJoin,
                         settings,

@@ -29,5 +29,18 @@ public sealed record PlacedPartDifferences(ImmutableArray<VersionDifferences<Pla
 /// <param name="PrimitiveBounds">The reference's primitive box, full sizes as the version exposes them; null when it is not a primitive.</param>
 /// <param name="CollisionLayer">The layer number of the reference's own collision layer (XTRI); null when it stores none.</param>
 /// <param name="IsCullingVolume">The reference carries room, portal or multibound data (XRMR/XLRM, XPOD, XMBP): it only culls, it has no collision.</param>
+/// <param name="HoldsOnlyPlacement">
+/// The reference is a placed object (REFR) that stores nothing but its EditorID, base, placement and scale besides its record header
+/// and flags: no script, link, owner, lock, location, room, water, light or other data.
+/// </param>
+/// <param name="IsVisibleWhenDistant">The reference's Visible When Distant flag is set.</param>
 public readonly record struct ReferenceFacts(
-    bool IsTeleportDoor, bool IsPrimitive, bool HasMapMarker, float? ReferenceRadius, Vector3? PrimitiveBounds, uint? CollisionLayer, bool IsCullingVolume);
+    bool IsTeleportDoor,
+    bool IsPrimitive,
+    bool HasMapMarker,
+    float? ReferenceRadius,
+    Vector3? PrimitiveBounds,
+    uint? CollisionLayer,
+    bool IsCullingVolume,
+    bool HoldsOnlyPlacement,
+    bool IsVisibleWhenDistant);

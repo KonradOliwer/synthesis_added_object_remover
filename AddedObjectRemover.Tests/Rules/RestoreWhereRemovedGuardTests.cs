@@ -988,7 +988,9 @@ public sealed class RestoreWhereRemovedGuardTests
                         : [],
                     new AcceptedWorld(
                         TestTargets.PatchName,
-                        ImmutableDictionary<PluginName, VersionTrust>.Empty.Add(BaseGame, VersionTrust.Full).Add(TestTargets.TargetName, VersionTrust.Full).Add(Later, scene.LaterTrust))),
+                        ImmutableDictionary<PluginName, VersionTrust>.Empty.Add(BaseGame, VersionTrust.Full).Add(TestTargets.TargetName, VersionTrust.Full).Add(Later, scene.LaterTrust)),
+                    LeftBehindNeighbours: [],
+                    TestTargetGroups.None.CleanedModsObjects),
                 new(
                     caches,
                     TestLandPlugin.Flat,

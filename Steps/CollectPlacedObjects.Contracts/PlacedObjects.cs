@@ -44,6 +44,12 @@ public sealed record TargetObject(
     /// <summary>The cell the winning version stands in, when the final world deletes it; the patch writes nothing for the object then.</summary>
     public DeletedCell? CellDeleted { get; init; }
 
+    /// <summary>
+    /// For a clone an earlier run added to an Added Object Remover patch (<see cref="CloneMarker"/>): the object it copies. Null for
+    /// every other target. A clone is one of the cleaned mod's own objects (<see cref="TargetOrigin.CleanedMod"/>).
+    /// </summary>
+    public RecordKey? CloneOf { get; init; }
+
     /// <summary>The placement as the winning version stores it, the scale normalized.</summary>
     public EulerPlacement Placement => new(Transform.Position, Rotation, Transform.Scale);
 
@@ -82,7 +88,7 @@ public sealed record TargetObject(
 /// <summary>Where a target object comes from. <see cref="CleanedMod"/> is the only origin of the target plugin's own objects.</summary>
 public enum TargetOrigin
 {
-    /// <summary>An object the target plugin creates.</summary>
+    /// <summary>An object the target plugin creates, or a clone of its content an earlier run added (<see cref="TargetObject.CloneOf"/>).</summary>
     CleanedMod,
 
     /// <summary>Another plugin's object that the target plugin overrides and moves.</summary>

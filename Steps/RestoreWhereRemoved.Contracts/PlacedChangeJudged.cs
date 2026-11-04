@@ -95,7 +95,15 @@ public enum PlacedRestoreKind
 /// For a record that is a target object, the placement the patch writes when it goes back, as the cleaned mod placed the object:
 /// each of position, rotation and scale from the earlier version only when it goes back; null otherwise.
 /// </param>
-/// <remarks>When it stays, exactly one of <paramref name="Never"/>, <paramref name="Refused"/> and <paramref name="KeptForArea"/> says why.</remarks>
+/// <param name="Cloning">
+/// For another mod's object the cleaned mod moved whose old place goes back while the cleaned mod's content where it stands now
+/// holds it, and that has no copy yet: whether a copy is planned there, and why not. Null for every other record.
+/// </param>
+/// <remarks>
+/// When it stays, exactly one of <paramref name="Never"/>, <paramref name="Refused"/>, <paramref name="KeptForArea"/> and a refused
+/// <paramref name="Cloning"/> of a <see cref="CloneNeed.NeighbourOfStandingObject"/> says why. A planned copy does not yet let the
+/// object go back: until the patch writes copies, it stays as its areas keep it.
+/// </remarks>
 public sealed record PlacedChangeJudged(
     RecordChangedByCleanedMod Change,
     NeverRestoredReason? Never,
@@ -105,4 +113,5 @@ public sealed record PlacedChangeJudged(
     bool IsRestored,
     PlacedRestoreKind Kind,
     AreaVerdict? KeptForArea,
-    EulerPlacement? PlacedBack);
+    EulerPlacement? PlacedBack,
+    CloneJudged? Cloning = null);

@@ -68,6 +68,21 @@ internal static class RestoreWhereRemovedText
         _ => throw new UnreachableException($"Unknown area verdict {verdict}."),
     };
 
+    /// <summary>Why another mod's object the cleaned mod moved stays where the cleaned mod's standing content holds it, as in "the cleaned mod's standing content holds it and it may not be copied (persistent)".</summary>
+    public static string HeldByStandingObject(CloneRefusal refusal) => $"the cleaned mod's standing content holds it and it may not be copied ({CloneRefused(refusal)})";
+
+    /// <summary>Why another mod's object the cleaned mod moved may not be copied.</summary>
+    public static string CloneRefused(CloneRefusal refusal) => refusal switch
+    {
+        CloneRefusal.NotPlainScenery => "not plain scenery",
+        CloneRefusal.HasDistantLod => "has distant LOD",
+        CloneRefusal.Persistent => "persistent",
+        CloneRefusal.HoldsMoreThanPlacement => "holds more than its placement",
+        CloneRefusal.TooCloseAsCleanedModsObject => "too close as the cleaned mod's object",
+        CloneRefusal.OnChangedTerrainAsCleanedModsObject => "on changed terrain as the cleaned mod's object",
+        _ => throw new UnreachableException($"Unknown copy refusal {refusal}."),
+    };
+
     /// <summary>Why a cell keeps its water level although the rest of it may go back; <paramref name="by"/> is the object or navmesh found.</summary>
     /// <param name="label">Names a record.</param>
     public static string WaterKept(RecordKey by, Func<RecordKey, string> label) => $"{label(by)} lies across the water line between the level before the cleaned mod and the one that stays";

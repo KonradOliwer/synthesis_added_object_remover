@@ -123,6 +123,62 @@ public class BaseFactsReaderTests
     }
 
     [Fact]
+    public void StaticsMoveableStaticsAndTreesWithoutAnIngredientArePlainScenery()
+    {
+        Assert.True(Read<IStaticGetter>(_mod.Statics.AddNew()).IsPlainScenery);
+        Assert.True(Read<IMoveableStaticGetter>(_mod.MoveableStatics.AddNew()).IsPlainScenery);
+        Assert.True(Read<ITreeGetter>(_mod.Trees.AddNew()).IsPlainScenery);
+    }
+
+    [Fact]
+    public void AHarvestableTreeAFloraALightAContainerAndAMarkerAreNoPlainScenery()
+    {
+        var ingredient = _mod.Ingredients.AddNew();
+        var harvestable = _mod.Trees.AddNew();
+        harvestable.Ingredient.SetTo(ingredient.FormKey);
+        var marker = _mod.Statics.AddNew();
+        marker.MajorFlags = Static.MajorFlag.IsMarker;
+
+        Assert.False(Read<ITreeGetter>(harvestable).IsPlainScenery);
+        Assert.False(Read<IFloraGetter>(_mod.Florae.AddNew()).IsPlainScenery);
+        Assert.False(Read<ILightGetter>(_mod.Lights.AddNew()).IsPlainScenery);
+        Assert.False(Read<IContainerGetter>(_mod.Containers.AddNew()).IsPlainScenery);
+        Assert.False(Read<IStaticGetter>(marker).IsPlainScenery);
+    }
+
+    [Fact]
+    public void AScriptedTreeADestructibleMoveableStaticAndAMoveableStaticWithALoopingSoundAreNoPlainScenery()
+    {
+        var scripted = _mod.Trees.AddNew();
+        scripted.VirtualMachineAdapter = new VirtualMachineAdapter { Scripts = [new ScriptEntry { Name = "TreeScript" }] };
+        var destructible = _mod.MoveableStatics.AddNew();
+        destructible.Destructible = new Destructible();
+        var sounding = _mod.MoveableStatics.AddNew();
+        sounding.LoopingSound.SetTo(_mod.SoundDescriptors.AddNew().FormKey);
+
+        Assert.False(Read<ITreeGetter>(scripted).IsPlainScenery);
+        Assert.False(Read<IMoveableStaticGetter>(destructible).IsPlainScenery);
+        Assert.False(Read<IMoveableStaticGetter>(sounding).IsPlainScenery);
+    }
+
+    [Fact]
+    public void AStaticWithLodModelsOrTheDistantLodFlagHasDistantLod()
+    {
+        var withModels = _mod.Statics.AddNew();
+        withModels.Lod = new Lod { Level0 = @"lod\rock_lod_0.nif" };
+        var flagged = _mod.Statics.AddNew();
+        flagged.MajorFlags = Static.MajorFlag.HasDistantLOD;
+        var flaggedMoveable = _mod.MoveableStatics.AddNew();
+        flaggedMoveable.MajorFlags = MoveableStatic.MajorFlag.HasDistantLOD;
+
+        Assert.True(Read<IStaticGetter>(withModels).HasDistantLod);
+        Assert.True(Read<IStaticGetter>(flagged).HasDistantLod);
+        Assert.True(Read<IMoveableStaticGetter>(flaggedMoveable).HasDistantLod);
+        Assert.False(Read<IStaticGetter>(_mod.Statics.AddNew()).HasDistantLod);
+        Assert.False(Read<ITreeGetter>(_mod.Trees.AddNew()).HasDistantLod);
+    }
+
+    [Fact]
     public void AnActivatorGivesTheNamesOfItsScripts()
     {
         var activator = _mod.Activators.AddNew();

@@ -509,6 +509,6 @@ public sealed class TablesTests : IDisposable
     {
         public BaseFacts Of(BaseKey baseKey) => baseKey.Record == unresolved.ToRecordKey()
             ? BaseFacts.Unresolved(baseKey.Record)
-            : new BaseFacts(baseKey.Record, true, BaseRecordKind.Static, "Static", $"Base{baseKey.Record.Id:X}", null, null, null, ImmutableArray<string>.Empty, null, null, null);
+            : new BaseFacts(baseKey.Record, true, BaseRecordKind.Static, "Static", $"Base{baseKey.Record.Id:X}", null, null, null, ImmutableArray<string>.Empty, null, null, null, IsPlainScenery: true, HasDistantLod: false);
     }
 }

@@ -636,7 +636,7 @@ public class RemovalDecisionsTests
     public void AWholeRecordRestoreStandsWithTheReferenceFactsOfTheEarlierVersionAndAPlacementOnlyRestoreKeepsTheCleanedModsOwn()
     {
         var target = TestTargets.Create(0, TestTargets.At(Vector3.Zero));
-        var reference = new ReferenceFacts(IsTeleportDoor: true, IsPrimitive: true, HasMapMarker: true, ReferenceRadius: 8f, PrimitiveBounds: new Vector3(1, 2, 3), CollisionLayer: 12, IsCullingVolume: true);
+        var reference = new ReferenceFacts(IsTeleportDoor: true, IsPrimitive: true, HasMapMarker: true, ReferenceRadius: 8f, PrimitiveBounds: new Vector3(1, 2, 3), CollisionLayer: 12, IsCullingVolume: true, HoldsOnlyPlacement: false, IsVisibleWhenDistant: false);
 
         var wholeRecord = target.RestoredAs(Earlier with { Undo = Earlier.Undo | PlacedParts.BaseAndData, Reference = reference });
         var placementOnly = target.RestoredAs(Earlier with { Reference = reference });

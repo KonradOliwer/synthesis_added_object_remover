@@ -537,6 +537,267 @@ public sealed class RestoreWhereRemovedTests
         Assert.Contains(one.Objects, judged => !judged.IsRestored);
     }
 
+    /// <summary>A base-game rock the cleaned mod moved from a cleared place into the ring around its campfire, whose camp still stands.</summary>
+    [Fact]
+    public void AMovedRockAroundAStandingCampfireGetsACopyPlanned()
+    {
+        var judged = Assert.Single(Plan(CampScene(), removed: [0], [MovedRock()], bases: PlainScenery).Objects);
+
+        Assert.Equal(new CloneJudged(CloneNeed.AreaStillStands, RefusedBy: null), judged.Cloning);
+        Assert.Equal((false, (AreaVerdict?)AreaVerdict.StillStanding), (judged.IsRestored, judged.KeptForArea));
+    }
+
+    /// <summary>The camp is cleared but its campfire stands, and the visible left-behind step measures the rock around it.</summary>
+    [Fact]
+    public void AMovedRockBesideTheStandingCampfireOfAClearedCampGoesBackWithACopyPlanned()
+    {
+        var judged = Assert.Single(Plan(CampScene(), removed: [0, 3, 4], [MovedRock()], settings: HalfMayStand, bases: PlainScenery, visibleLeftBehind: LookAround).Objects);
+
+        Assert.Equal(AreaVerdict.Cleared, judged.WhereItIsNow!.Verdict);
+        Assert.Equal(new CloneJudged(CloneNeed.NeighbourOfStandingObject, RefusedBy: null), judged.Cloning);
+        Assert.True(judged.IsRestored);
+    }
+
+    /// <summary>The same cleared camp without the left-behind step, or with the campfire removed too: nothing holds the rock, so it goes back as before.</summary>
+    [Theory]
+    [InlineData(false, new[] { 0, 3, 4 })]
+    [InlineData(true, new[] { 0, 1, 3, 4 })]
+    public void AMovedRockThatNoStandingObjectHoldsGoesBackWithoutACopy(bool leftBehindOn, int[] removed)
+    {
+        var judged = Assert.Single(Plan(CampScene(), removed, [MovedRock()], settings: HalfMayStand, bases: PlainScenery, visibleLeftBehind: leftBehindOn ? LookAround : null).Objects);
+
+        Assert.Equal(((CloneJudged?)null, true), (judged.Cloning, judged.IsRestored));
+    }
+
+    /// <summary>The campfire of the cleared camp holds the rock, but the rock may not be copied, so it stays where the cleaned mod put it.</summary>
+    [Fact]
+    public void AMovedRockTheStandingCampfireHoldsThatMayNotBeCopiedStays()
+    {
+        var judged = Assert.Single(Plan(CampScene(), removed: [0, 3, 4], [MovedRock()], settings: HalfMayStand, bases: TestBaseFacts.Unresolved, visibleLeftBehind: LookAround).Objects);
+
+        Assert.Equal(new CloneJudged(CloneNeed.NeighbourOfStandingObject, CloneRefusal.NotPlainScenery), judged.Cloning);
+        Assert.Equal((false, (AreaVerdict?)null, (PlacedRefusal?)null), (judged.IsRestored, judged.KeptForArea, judged.Refused));
+        Assert.Equal(
+            "the cleaned mod's standing content holds it and it may not be copied (not plain scenery)",
+            RestoreOutcomes.KeptBecause(judged, key => key.ToString()));
+    }
+
+    public static TheoryData<string, CloneRefusal> RefusedCopies => new()
+    {
+        { "not plain scenery, such as a door", CloneRefusal.NotPlainScenery },
+        { "base not in the load order", CloneRefusal.NotPlainScenery },
+        { "base with distant LOD", CloneRefusal.HasDistantLod },
+        { "visible when distant", CloneRefusal.HasDistantLod },
+        { "persistent", CloneRefusal.Persistent },
+        { "scripted, linked or with an enable parent", CloneRefusal.HoldsMoreThanPlacement },
+    };
+
+    [Theory]
+    [MemberData(nameof(RefusedCopies))]
+    public void AMovedRockAroundAStandingCampfireThatMayNotBeCopiedIsKeptForItsArea(string rock, CloneRefusal expected)
+    {
+        var (change, bases) = rock switch
+        {
+            "not plain scenery, such as a door" => (MovedRock(), new SceneryBases(Plain: false, DistantLod: false)),
+            "base not in the load order" => (MovedRock(), TestBaseFacts.Unresolved),
+            "base with distant LOD" => (MovedRock(), new SceneryBases(Plain: true, DistantLod: true)),
+            "visible when distant" => (MovedRock() with { ReferenceNow = TestPlacedRecords.PlainReference with { IsVisibleWhenDistant = true } }, PlainScenery),
+            "persistent" => (MovedRock() with { IsPersistent = true }, PlainScenery),
+            _ => (MovedRock() with { ReferenceNow = TestPlacedRecords.PlainReference with { HoldsOnlyPlacement = false } }, PlainScenery),
+        };
+
+        var judged = Assert.Single(Plan(CampScene(), removed: [0], [change], bases: bases).Objects);
+
+        Assert.Equal(new CloneJudged(CloneNeed.AreaStillStands, expected), judged.Cloning);
+        Assert.Equal((false, (AreaVerdict?)AreaVerdict.StillStanding), (judged.IsRestored, judged.KeptForArea));
+    }
+
+    public static TheoryData<string> RocksWithoutCopyRule => ["base swap in place", "turned only", "rescaled only", "position held by a later plugin", "copy exists", "linked from the cleaned mod", "old place stands"];
+
+    [Theory]
+    [MemberData(nameof(RocksWithoutCopyRule))]
+    public void TheCopyRuleDoesNotApplyToARockThatWasNotMovedOrWhoseOldPlaceStaysOrThatHasACopy(string rock)
+    {
+        var rockKey = MovedRock().Key;
+        var (targets, change, removed) = rock switch
+        {
+            "base swap in place" => (CampScene(TargetOrigin.Replaced), MovedRock() with { Earlier = MovedRock().Earlier with { Undo = PlacedParts.BaseAndData | PlacedParts.Position } }, new[] { 0 }),
+            "turned only" => (CampScene(), MovedRock(undo: PlacedParts.Rotation), new[] { 0 }),
+            "rescaled only" => (CampScene(), MovedRock(undo: PlacedParts.Scale), new[] { 0 }),
+            "position held by a later plugin" => (CampScene(), MovedRock(undo: PlacedParts.BaseAndData), new[] { 0 }),
+            "copy exists" => (CampScene(Own(5, new Vector3(-3000, 0, 0)) with { CloneOf = rockKey }), MovedRock(), new[] { 0 }),
+            "linked from the cleaned mod" => (CampScene(), MovedRock() with { LinkedFromCleanedMod = true }, new[] { 0 }),
+            _ => (CampScene(), MovedRock(), Array.Empty<int>()),
+        };
+
+        var judged = Assert.Single(Plan(targets, removed, [change], bases: PlainScenery).Objects);
+
+        Assert.Null(judged.Cloning);
+    }
+
+    /// <summary>
+    /// A later mod's block stands 60 units from the centre of the rock beside the standing campfire. A zone reaches the rock's half size,
+    /// 20 units, plus the too-close distance: 30 units by the moved-object settings, 70 or 50 by the cleaned mod's own, which judge the copy.
+    /// </summary>
+    [Theory]
+    [InlineData(50f, true)]
+    [InlineData(30f, false)]
+    public void ACopyTooCloseToALaterModsObjectByTheCleanedModsOwnSettingsIsRefused(float ownDistance, bool refused)
+    {
+        var judged = Assert.Single(Plan(CampScene(), removed: [0], [MovedRock()], bases: PlainScenery, others: [LaterBlock(Camp + new Vector3(-60, 0, 0))], cleanedModsObjects: OwnTooClose(ownDistance)).Objects);
+
+        Assert.Equal(new CloneJudged(CloneNeed.AreaStillStands, refused ? CloneRefusal.TooCloseAsCleanedModsObject : null), judged.Cloning);
+        Assert.Equal((false, (AreaVerdict?)AreaVerdict.StillStanding), (judged.IsRestored, judged.KeptForArea));
+    }
+
+    /// <summary>In the cleared camp, the copy the standing campfire needs is too close to a later mod's block by the cleaned mod's own settings, so the rock stays.</summary>
+    [Fact]
+    public void AMovedRockTheStandingCampfireHoldsWhoseCopyIsTooCloseAsTheCleanedModsObjectStays()
+    {
+        var judged = Assert.Single(
+            Plan(CampScene(), removed: [0, 3, 4], [MovedRock()], settings: HalfMayStand, bases: PlainScenery, visibleLeftBehind: LookAround, others: [LaterBlock(Camp + new Vector3(-60, 0, 0))], cleanedModsObjects: OwnTooClose(50f)).Objects);
+
+        Assert.Equal(new CloneJudged(CloneNeed.NeighbourOfStandingObject, CloneRefusal.TooCloseAsCleanedModsObject), judged.Cloning);
+        Assert.Equal((false, (AreaVerdict?)null, (PlacedRefusal?)null), (judged.IsRestored, judged.KeptForArea, judged.Refused));
+        Assert.Equal(
+            "the cleaned mod's standing content holds it and it may not be copied (too close as the cleaned mod's object)",
+            RestoreOutcomes.KeptBecause(judged, key => key.ToString()));
+    }
+
+    /// <summary>
+    /// In the cleared camp a second rock goes back to 60 units from the copy's centre and keeps a scale Later.esp set. When the removal steps do
+    /// not believe Later.esp, that rock can cause removals once back, so the copy is too close to it; when they believe it, it is not.
+    /// </summary>
+    [Theory]
+    [InlineData(VersionTrust.None, true)]
+    [InlineData(VersionTrust.Full, false)]
+    public void ACopyTooCloseToARockThatCanCauseRemovalsOnceBackIsRefused(VersionTrust laterTrust, bool refused)
+    {
+        var second = ChangedRock(0x901, Camp + new Vector3(-60, 0, 0));
+        var keepingScale = second with { BaseNow = Block.Base, Earlier = second.Earlier with { LeftToLaterPlugins = ImmutableSortedDictionary<PlacedParts, PluginName>.Empty.Add(PlacedParts.Scale, Later) } };
+
+        var result = Plan(
+            CampScene(), DecisionsRemoving(CampScene(), 0, 3, 4), [MovedRock(), keepingScale], settings: HalfMayStand, bases: PlainScenery, visibleLeftBehind: LookAround,
+            cleanedModsObjects: OwnTooClose(50f), laterTrust: laterTrust);
+
+        Assert.Equal(new CloneJudged(CloneNeed.NeighbourOfStandingObject, refused ? CloneRefusal.TooCloseAsCleanedModsObject : null), result.Objects[0].Cloning);
+    }
+
+    /// <summary>The cleaned mod's own changed-terrain check is asked about the copy, as the cleaned mod's object where the rock stands now; a finding or a stopped check refuses it.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ACopyTheCleanedModsOwnChangedTerrainCheckFindsOrStopsOnIsRefused(bool stops)
+    {
+        var terrain = new RecordingRule(stops ? new PlacementCheck(Clash: null, Failure: "InvalidOperationException: broke") : new PlacementCheck(new TooClose(new OtherId(0), new TooCloseCause.ObjectSize()), Failure: null));
+
+        var result = Plan(CampScene(), removed: [0], [MovedRock()], bases: PlainScenery, cleanedModsObjects: new(TestTargetGroups.TooCloseOff, terrain));
+
+        var judged = Assert.Single(result.Objects);
+        Assert.Equal(new CloneJudged(CloneNeed.AreaStillStands, CloneRefusal.OnChangedTerrainAsCleanedModsObject, stops ? "InvalidOperationException: broke" : null), judged.Cloning);
+        Assert.Equal([(Camp, TargetOrigin.CleanedMod, (RecordKey?)MovedRock().Key)], terrain.Checked.Select(asked => (asked.Transform.Position, asked.Origin, asked.CloneOf)).Distinct());
+        Assert.Equal(stops ? [(RestoreWhereRemovedParts.ObjectCheck, "InvalidOperationException: broke")] : [], result.Failures.Select(failure => (failure.Part, failure.Failure)));
+    }
+
+    [Fact]
+    public void ALeftBehindStepThatIsSwitchedOffMeasuresNoNeighbours()
+    {
+        var targets = CampScene();
+        var decisions = DecisionsRemoving(targets);
+        var caches = CachesOf(targets);
+        List<TargetId> visible = [new TargetId(99)];
+        List<TargetId> invisible = [new TargetId(99)];
+
+        VisibleLeftBehindObjects.CreateNeighbours(new(targets, decisions, caches, Settings: null)).Around(targets[1], visible);
+        InvisibleLeftBehindObjects.CreateNeighbours(new(targets, decisions, caches, Settings: null)).Around(targets[1], invisible);
+
+        Assert.Equal((0, 0), (visible.Count, invisible.Count));
+    }
+
+    /// <summary>The visible step measures the visible targets around a visible one; the invisible step those around an invisible one, each only around its own kind.</summary>
+    [Fact]
+    public void EachLeftBehindStepMeasuresTheVisibleTargetsAroundAnObjectOfItsKind()
+    {
+        var marker = TestVisibility.TaggedBase(ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers));
+        var targets = CampScene(TestTargets.Create(5, TestTargets.At(Camp + new Vector3(-60, 0, 0)), marker, TestTargets.Space));
+        var decisions = DecisionsRemoving(targets);
+        var caches = CachesOf(targets, PlainScenery);
+        var visibleStep = VisibleLeftBehindObjects.CreateNeighbours(new(targets, decisions, caches, LookAround));
+        var invisibleStep = InvisibleLeftBehindObjects.CreateNeighbours(new(targets, decisions, caches, new InvisibleLeftBehindSettings(LookAround.Surroundings)));
+
+        Assert.Equal([2, 3, 4], NeighbourIndexes(visibleStep, targets[1]));
+        Assert.Empty(NeighbourIndexes(visibleStep, targets[5]));
+        Assert.Equal([1, 2, 3, 4], NeighbourIndexes(invisibleStep, targets[5]));
+        Assert.Empty(NeighbourIndexes(invisibleStep, targets[1]));
+    }
+
+    private static int[] NeighbourIndexes(ILeftBehindNeighbours step, TargetObject target)
+    {
+        List<TargetId> neighbours = [];
+        step.Around(target, neighbours);
+        return [.. neighbours.Select(neighbour => neighbour.Index)];
+    }
+
+    private static readonly Vector3 Camp = new(5000, 0, 0);
+
+    private static readonly IBaseFacts PlainScenery = new SceneryBases(Plain: true, DistantLod: false);
+
+    private static readonly VisibleLeftBehindSettings LookAround =
+        new(new LeftBehindSurroundings(LookAround: 200f, MinOccupiedDirections: 1, DirectionClearedPercent: 50, ClearedDirectionsPercent: 50), MinObjectsAround: 1);
+
+    /// <summary>
+    /// The cleaned mod's object 0 near the rock's old place; at the camp its campfire 1 beside the rock 2 it moved there, and its
+    /// objects 3 and 4 farther out; then <paramref name="more"/>.
+    /// </summary>
+    private static ImmutableArray<TargetObject> CampScene(params TargetObject[] more) => CampScene(TargetOrigin.Moved, more);
+
+    private static ImmutableArray<TargetObject> CampScene(TargetOrigin rockOrigin, params TargetObject[] more) =>
+    [
+        Own(0, new Vector3(100, 0, 0)),
+        Own(1, Camp + new Vector3(60, 0, 0)),
+        Own(2, Camp) with { Origin = rockOrigin },
+        Own(3, Camp + new Vector3(0, 150, 0)),
+        Own(4, Camp + new Vector3(0, -150, 0)),
+        .. more,
+    ];
+
+    /// <summary>The rock of <see cref="CampScene(TargetObject[])"/>, which goes back to the old place at the origin.</summary>
+    private static RecordChangedByCleanedMod MovedRock(PlacedParts undo = PlacedParts.Position) => ChangedRock(0x900, Vector3.Zero, target: new TargetId(2), undo: undo);
+
+    /// <summary>A block of Later.esp that stands now; its record is a change in the world without the cleaned mod.</summary>
+    private static OtherObject LaterBlock(Vector3 position) =>
+        TestShapes.Placed(ModKey.FromNameAndExtension("Later.esp"), 0, Block.Base, position) with { ChangeWithoutCleanedMod = new ObjectChange(Later, AcceptedFrom: null) };
+
+    /// <summary>The cleaned mod's own objects judged too close within <paramref name="distance"/> units, with a changed-terrain check that finds nothing.</summary>
+    private static CleanedModsObjectRules OwnTooClose(float distance) =>
+        TestTargetGroups.None.CleanedModsObjects with { TooClose = Settings.TooClose with { DistanceInUnits = distance } };
+
+    /// <summary>A rule that answers every check the same way and keeps each object it was asked about.</summary>
+    private sealed class RecordingRule(PlacementCheck answer) : IPlacementRule
+    {
+        public List<TargetObject> Checked { get; } = [];
+
+        public IPlacementTries StartTries(TargetObject target)
+        {
+            lock (Checked) Checked.Add(target);
+            return new Tries(answer);
+        }
+
+        private sealed class Tries(PlacementCheck answer) : IPlacementTries
+        {
+            public PlacementCheck Check(EulerPlacement placement) => answer;
+
+            public void Dispose()
+            {
+            }
+        }
+    }
+
+    private sealed class SceneryBases(bool Plain, bool DistantLod) : IBaseFacts
+    {
+        public BaseFacts Of(BaseKey baseKey) => BaseFacts.Unresolved(baseKey.Record) with { Resolved = true, IsPlainScenery = Plain, HasDistantLod = DistantLod };
+    }
+
     private static string Describe(PlacedChangeJudged judged) => $"{judged.Change.Key} {judged.Never} {judged.OldPlace} {judged.WhereItIsNow} {judged.Refused} {judged.IsRestored}";
 
     private static string Describe(CellChangeJudged judged) => $"{judged.Change.Cell} {string.Join(", ", judged.Undone)} {judged.Never} {judged.Area} {judged.IsRestored}";
@@ -596,8 +857,14 @@ public sealed class RestoreWhereRemovedTests
         IEnumerable<CellChangedByCleanedMod>? cells = null,
         WhereRemovedRestoreSettings? settings = null,
         IReadOnlyDictionary<RecordKey, SpaceFact>? spaces = null,
-        int workers = 1) =>
-        Plan(targets, DecisionsRemoving(targets, removed), records, cells, settings, spaces, workers);
+        int workers = 1,
+        IBaseFacts? bases = null,
+        VisibleLeftBehindSettings? visibleLeftBehind = null,
+        IEnumerable<OtherObject>? others = null,
+        CleanedModsObjectRules? cleanedModsObjects = null) =>
+        Plan(
+            targets, DecisionsRemoving(targets, removed), records, cells, settings, spaces, workers, bases: bases, visibleLeftBehind: visibleLeftBehind, others: others,
+            cleanedModsObjects: cleanedModsObjects);
 
     /// <param name="otherModsObjects">Switched off when null.</param>
     private static RestoreWhereRemovedResult Plan(
@@ -610,16 +877,21 @@ public sealed class RestoreWhereRemovedTests
         int workers = 1,
         OtherModsObjectsResult? otherModsObjects = null,
         IObjectCachesOfWorlds? worldCaches = null,
-        Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule>? tooClose = null)
+        Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule>? tooClose = null,
+        IBaseFacts? bases = null,
+        VisibleLeftBehindSettings? visibleLeftBehind = null,
+        IEnumerable<OtherObject>? others = null,
+        CleanedModsObjectRules? cleanedModsObjects = null,
+        VersionTrust laterTrust = VersionTrust.None)
     {
-        var collected = TestScenes.CreateWorld(targets, []) with
+        var collected = TestScenes.CreateWorld(targets, [.. (others ?? []).Select((other, index) => other with { Id = new OtherId(index) })]) with
         {
             ChangedRecords = [.. records],
             ChangedCells = [.. cells ?? []],
             Spaces = spaces ?? new Dictionary<RecordKey, SpaceFact>(),
         };
         var rules = GuardRules(workers);
-        var caches = CachesOf(targets);
+        var caches = CachesOf(targets, bases);
         var restore = settings ?? Settings;
         return RestoreLoopReuse.Plan(
             new(
@@ -627,15 +899,25 @@ public sealed class RestoreWhereRemovedTests
                 final,
                 TestClearedAreas.Of(collected, final, caches, restore),
                 new(worldCaches ?? rules.WorldCaches, rules.TooCloseRule(tooClose), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),
-                TestTargetGroups.None,
+                TestTargetGroups.None with
+                {
+                    Accepted = new AcceptedWorld(
+                        TestTargets.PatchName,
+                        ImmutableDictionary<PluginName, VersionTrust>.Empty.Add(BaseGame, VersionTrust.Full).Add(TestTargets.TargetName, VersionTrust.Full).Add(Later, laterTrust)),
+                    LeftBehindNeighbours = [VisibleLeftBehindObjects.CreateNeighbours(new(targets, final, caches, visibleLeftBehind))],
+                    CleanedModsObjects = cleanedModsObjects ?? TestTargetGroups.None.CleanedModsObjects,
+                },
                 new(caches, TestLandPlugin.Flat, Plugins, TestTargets.TargetName),
                 new Execution(workers),
                 restore,
                 () => TimeSpan.Zero));
     }
 
-    private static TestRunCaches CachesOf(ImmutableArray<TargetObject> targets) =>
-        new(Shapes, navmeshes: NoNavmeshes, shownTargets: TestScenes.Create(targets, [], Shapes).IndexShownTargets);
+    private static TestRunCaches CachesOf(ImmutableArray<TargetObject> targets, IBaseFacts? bases = null)
+    {
+        var objects = TestScenes.Create(targets, [], Shapes);
+        return new(Shapes, bases: bases ?? TestBaseFacts.Unresolved, navmeshes: NoNavmeshes, visibleTargets: objects.IndexVisibleTargets, shownTargets: objects.IndexShownTargets);
+    }
 
     /// <summary>A too-close rule whose check stops unexpectedly.</summary>
     private sealed class StoppingRule : IPlacementRule

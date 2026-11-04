@@ -36,6 +36,23 @@ public static class InvisibleLeftBehindObjects
         Execution Execution,
         InvisibleLeftBehindSettings? Settings);
 
+    /// <param name="Decisions">The decisions the neighbours stand in: each visible target where their rounds measure it.</param>
+    /// <param name="Caches">Index the visible target objects; their base facts and shapes are read.</param>
+    /// <param name="Settings">Null when the step is switched off.</param>
+    public sealed record NeighboursInput(ImmutableArray<TargetObject> Targets, IRemovalDecisions Decisions, IRunCaches Caches, InvisibleLeftBehindSettings? Settings);
+
+    /// <summary>
+    /// The neighbours the step measures around an invisible target with its look-around distance and reach (see
+    /// <see cref="InvisibleNeighbours"/>); none while the step is switched off.
+    /// </summary>
+    public static ILeftBehindNeighbours CreateNeighbours(NeighboursInput input) =>
+        new InvisibleNeighbours(
+            input.Caches.Shapes,
+            new ReachRule(input.Caches.Bases),
+            input.Settings is { } settings
+                ? (input.Caches.IndexVisibleTargets(input.Decisions.TargetsAsTheRoundsMeasureThem(input.Targets)), settings.Surroundings.LookAround)
+                : null);
+
     /// <param name="Shapes">The kinds of the objects are read.</param>
     /// <param name="NeverRemove">The kinds the step's settings list, also while the step is switched off.</param>
     public sealed record KindsInput(IBaseObjectShapes Shapes, NeverRemovedInvisibleKinds NeverRemove);

@@ -33,6 +33,36 @@ internal static class PlacedRecordExtensions
         record is IPlacedObjectGetter placed
         && (placed.IsMultiBoundPrimitive || placed.LinkedRooms is { Count: > 0 } || placed.Portals is { Count: > 0 } || placed.RoomPortal is not null);
 
+    /// <summary>
+    /// Every field of a placed object but the record header, flags, EditorID, base, placement and scale. Turned on by default, so a
+    /// field a later Mutagen version adds is compared too.
+    /// </summary>
+    private static readonly PlacedObject.TranslationMask EverythingButPlacement = new(defaultOn: true)
+    {
+        FormKey = false,
+        VersionControl = false,
+        FormVersion = false,
+        Version2 = false,
+        MajorRecordFlagsRaw = false,
+        SkyrimMajorRecordFlags = false,
+        EditorID = false,
+        Base = false,
+        Placement = false,
+        Scale = false,
+    };
+
+    /// <summary>A placed object that holds no field; only read, so every reader shares it.</summary>
+    /// <remarks>The release sets only the record header's form version, which <see cref="EverythingButPlacement"/> leaves out.</remarks>
+    private static readonly IPlacedObjectGetter Empty = new PlacedObject(FormKey.Null, SkyrimRelease.SkyrimSE);
+
+    /// <summary>Compares the record with a placed object that holds no field, on every field but those it may hold.</summary>
+    public static bool HoldsOnlyPlacement(this IPlacedGetter record) =>
+        record is IPlacedObjectGetter placed && placed.Equals(Empty, EverythingButPlacement);
+
+    /// <remarks>The bit means Visible When Distant for statics, trees, containers and items; no plain-scenery base uses it otherwise.</remarks>
+    public static bool IsVisibleWhenDistant(this IPlacedGetter record) =>
+        (record.MajorRecordFlagsRaw & (int)PlacedObject.StaticMajorFlag.VisibleWhenDistant) != 0;
+
     /// <returns>Null also when the enable parent's reference is null: the game then has no parent to follow.</returns>
     public static IEnableParentGetter? GetEnableParent(this IPlacedGetter record) =>
         record.EnableParent is { Reference.IsNull: false } parent ? parent : null;

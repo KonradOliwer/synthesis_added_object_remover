@@ -451,7 +451,7 @@ public class PlacedRecordFactReadingTests
         var versions = ReadVersions(placed, TestVersionWalks.NoStop, later);
 
         Assert.Equal(
-            [TestPlacedRecords.PlainReference, TestPlacedRecords.PlainReference with { HasMapMarker = true, IsTeleportDoor = true }],
+            [TestPlacedRecords.PlainReference, TestPlacedRecords.PlainReference with { HasMapMarker = true, IsTeleportDoor = true, HoldsOnlyPlacement = false }],
             versions.Select(version => version.Reference));
     }
 

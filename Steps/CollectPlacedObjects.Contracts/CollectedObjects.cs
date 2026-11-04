@@ -65,6 +65,12 @@ public sealed record CollectedObjects(
     /// <summary>What the winning version of each primitive placed record of the target spaces says about the reference itself.</summary>
     public IReadOnlyDictionary<RecordKey, ReferenceFacts> WinningPrimitives { get; init; } = new Dictionary<RecordKey, ReferenceFacts>();
 
+    /// <summary>
+    /// The placed records of an Added Object Remover patch whose EditorID starts like a clone marker but is none (<see cref="CloneMarker"/>),
+    /// in the order found; each is classified like any other record.
+    /// </summary>
+    public ImmutableArray<RecordKey> BrokenCloneMarkers { get; init; } = [];
+
     public TargetObject this[TargetId id] => Targets[id.Index];
 
     /// <summary>The spaces holding a target object.</summary>

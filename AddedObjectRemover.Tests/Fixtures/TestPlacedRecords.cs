@@ -6,7 +6,7 @@ namespace AddedObjectRemover.Tests.Fixtures;
 internal static class TestPlacedRecords
 {
     /// <summary>A reference that is no teleport door, primitive or map marker and has no radius.</summary>
-    public static readonly ReferenceFacts PlainReference = new(IsTeleportDoor: false, IsPrimitive: false, HasMapMarker: false, ReferenceRadius: null, PrimitiveBounds: null, CollisionLayer: null, IsCullingVolume: false);
+    public static readonly ReferenceFacts PlainReference = new(IsTeleportDoor: false, IsPrimitive: false, HasMapMarker: false, ReferenceRadius: null, PrimitiveBounds: null, CollisionLayer: null, IsCullingVolume: false, HoldsOnlyPlacement: true, IsVisibleWhenDistant: false);
 
     public static PlacedRecordFact Create(RecordKey key, PluginName winningMod, Vector3 position, BaseKey? baseKey = null)
     {

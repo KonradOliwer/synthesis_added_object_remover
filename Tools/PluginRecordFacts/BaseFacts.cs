@@ -17,6 +17,11 @@ public enum MarkerFlagKind { XMarker, FurnitureMarker, DoorMarker, OtherMarker }
 /// <param name="NamedByScript">The first quest or scene that a script on the base names, for any record type; null when none does.</param>
 /// <param name="LightRadius">A light's radius when above zero.</param>
 /// <param name="SoundMaxDistance">A sound marker's maximum hearing distance when above zero.</param>
+/// <param name="IsPlainScenery">
+/// A static (STAT) that is no marker, a moveable static (MSTT) or a tree or bush that cannot be harvested (a TREE without an
+/// ingredient): scenery whose identity and state the game never uses.
+/// </param>
+/// <param name="HasDistantLod">The base's Has Distant LOD flag is set, or a static names LOD models.</param>
 public sealed record BaseFacts(
     RecordKey Record,
     bool Resolved,
@@ -29,10 +34,12 @@ public sealed record BaseFacts(
     ImmutableArray<string> ScriptNames,
     ScriptNamedRecord? NamedByScript,
     float? LightRadius,
-    float? SoundMaxDistance)
+    float? SoundMaxDistance,
+    bool IsPlainScenery,
+    bool HasDistantLod)
 {
     public static BaseFacts Unresolved(RecordKey record) =>
-        new(record, false, BaseRecordKind.Other, null, null, null, null, null, ImmutableArray<string>.Empty, null, null, null);
+        new(record, false, BaseRecordKind.Other, null, null, null, null, null, ImmutableArray<string>.Empty, null, null, null, IsPlainScenery: false, HasDistantLod: false);
 }
 
 /// <summary>Opens the base-facts reader of one run, so no run reuses what another run read.</summary>

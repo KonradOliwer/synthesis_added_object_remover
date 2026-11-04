@@ -61,8 +61,29 @@ internal sealed class BaseFactsReader(ILinkCache linkCache, KnownPluginNames kno
             stored.Scripts is { } scripts ? [.. scripts] : ImmutableArray<string>.Empty,
             ScriptPropertyReader.FindQuestOrScene(stored.Adapter, linkCache, _names),
             stored.LightRadius is > 0 ? stored.LightRadius : null,
-            stored.HearingDistance);
+            stored.HearingDistance,
+            MutagenCalls.Read(() => IsPlainScenery(record, stored.Adapter)),
+            MutagenCalls.Read(() => HasDistantLod(record)));
     }
+
+    /// <remarks>A script, destruction data or a looping sound gives the object a state or a source that a copy would double.</remarks>
+    private static bool IsPlainScenery(IMajorRecordGetter record, IAVirtualMachineAdapterGetter? adapter) =>
+        adapter is not { Scripts.Count: > 0 }
+        && record switch
+        {
+            IStaticGetter => MarkerFlagOf(record) is null,
+            IMoveableStaticGetter moveable => moveable.Destructible is null && moveable.LoopingSound.IsNull,
+            ITreeGetter tree => tree.Ingredient.IsNull,
+            _ => false,
+        };
+
+    /// <remarks>Static, moveable static and tree use the same bit for Has Distant LOD.</remarks>
+    private static bool HasDistantLod(IMajorRecordGetter record) => record switch
+    {
+        IStaticGetter { Lod: not null } => true,
+        IStaticGetter or IMoveableStaticGetter or ITreeGetter => (record.MajorRecordFlagsRaw & (int)Static.MajorFlag.HasDistantLOD) != 0,
+        _ => false,
+    };
 
     private static Type LinkTypeOf(BaseLinkKind kind) => kind switch
     {

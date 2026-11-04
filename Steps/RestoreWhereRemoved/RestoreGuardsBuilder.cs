@@ -14,7 +14,7 @@ internal static class RestoreGuardsBuilder
     {
         var input = inputs.Input;
         var (collected, settings, shapes) = (input.Earlier.Collected, inputs.Settings, input.Reads.Caches.Shapes);
-        var reach = new GuardReach(shapes, settings.TooClose, input.Guards.HoldersOfObjectsThatStay.TouchGap);
+        var reach = inputs.Reach;
         var (world, worldTime) = Timed.Run(
             input.TimeSinceStart, () => AfterRemovalWorld.Of(collected, inputs.Final, inputs.OtherModsObjects, input.Reads.CleanedMod, plans.Cleared, reach));
         var blocking = new ObjectsThatBlockActors(shapes, collected.WinningPrimitives);

@@ -33,6 +33,10 @@ public class RunnerRulesTests
             "The old-place check takes the too-close rule built with the too-close settings of the changed objects; the step builds the rule.",
         ["StepRunner.Rules.cs: ChangedObjectCollision.ChangedTerrain"] =
             "The old-place check takes the changed-terrain rule built with the changed-terrain settings of the changed objects; the step builds the rule.",
+        ["StepRunner.Rules.cs: Collision.TooClose"] =
+            "The restore judges a planned copy with the too-close settings of the cleaned mod's own objects; the step builds the rule.",
+        ["StepRunner.Rules.cs: Collision.ChangedTerrain"] =
+            "The restore takes the changed-terrain rule built with the changed-terrain settings of the cleaned mod's own objects; the step builds the rule.",
         ["StepRunner.Rules.cs: RestoreWhereRemoved.ClearedArea"] =
             "The restore takes the cleared-area rule built with its own cleared-area settings; the step for objects in cleared areas builds the rule.",
     };

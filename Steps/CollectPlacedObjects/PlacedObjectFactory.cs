@@ -7,7 +7,8 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 internal sealed class PlacedObjectFactory(
     WhatToCollect plan, PlacedRecordFacts facts, TargetAreaNames areaNames, ChangedAreaRecordCollector changedAreaRecords)
 {
-    public TargetObject CreateTarget(PlacedRecordFact record, TargetOrigin origin, PlacedVersionFact? earlierVersion)
+    /// <param name="cloneOf">The object a clone copies; null for every other record.</param>
+    public TargetObject CreateTarget(PlacedRecordFact record, TargetOrigin origin, PlacedVersionFact? earlierVersion, RecordKey? cloneOf)
     {
         var (position, rotation) = PlacementOf(record);
         return new TargetObject(
@@ -35,6 +36,7 @@ internal sealed class PlacedObjectFactory(
             EarlierVersion: earlierVersion is { } earlier ? changedAreaRecords.CreateEarlierVersion(record, earlier) : null)
         {
             CellDeleted = changedAreaRecords.DeletedInFinalWorld(record.Cell),
+            CloneOf = cloneOf,
         };
     }
 

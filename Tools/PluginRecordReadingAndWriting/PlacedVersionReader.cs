@@ -87,7 +87,9 @@ internal sealed class PlacedVersionReader(PluginName namedPlugin, PluginNames na
             record.GetReferenceRadius(),
             record.GetPrimitiveBounds(),
             record.GetCollisionLayer(),
-            record.IsCullingVolume()));
+            record.IsCullingVolume(),
+            record.HoldsOnlyPlacement(),
+            record.IsVisibleWhenDistant()));
 
     /// <summary>The fact with its versions, lowest first, and how their parts differ when the read's plugin overrides it.</summary>
     public PlacedRecordFact WithVersions(PlacedRecordFact fact) => fact with

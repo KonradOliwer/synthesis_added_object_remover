@@ -19,4 +19,11 @@ public sealed record ReadCounts(
     int OthersOverriddenByTarget,
     int OthersUnchanged,
     int OtherInvalidPlacements,
-    int NavmeshCount);
+    int NavmeshCount)
+{
+    /// <summary>Clones an earlier run added to an Added Object Remover patch as the cleaned mod's content, whatever their final version.</summary>
+    public int ClonesOfCleanedMod { get; init; }
+
+    /// <summary>Clones an earlier run added to an Added Object Remover patch as the content of other cleaned mods, whatever their final version.</summary>
+    public int ClonesOfOtherCleanedMods { get; init; }
+}

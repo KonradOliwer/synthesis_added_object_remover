@@ -16,15 +16,18 @@ internal static class PlacedJudgments
         return [.. judged.Select(change => refusalOf.TryGetValue(change.Change.Key, out var refused) ? change with { Refused = refused, IsRestored = false } : change)];
     }
 
-    /// <summary>The placed records whose check stopped, which stay as the cleaned mod changed them, in the order of <paramref name="objects"/>.</summary>
+    /// <summary>
+    /// The placed records whose guard check stopped, which stay as the cleaned mod changed them, and those whose copy's check stopped,
+    /// which get no copy, in the order of <paramref name="objects"/>.
+    /// </summary>
     public static ImmutableArray<PartFailure> FailedChecks(ImmutableArray<PlacedChangeJudged> objects) =>
     [
         .. objects
-            .Select((judged, position) => (Judged: judged, Position: position))
-            .Where(entry => entry.Judged.Refused?.Failure is not null)
+            .Select((judged, position) => (Judged: judged, Position: position, Failure: judged.Refused?.Failure ?? judged.Cloning?.Failure))
+            .Where(entry => entry.Failure is not null)
             .Select(entry => new PartFailure(
                 RestoreWhereRemovedParts.ObjectCheck,
-                entry.Judged.Refused!.Failure,
+                entry.Failure!,
                 new FailureSubject(entry.Judged.Change.Key.ToString(), entry.Judged.Change.EditorId, entry.Position))),
     ];
 }

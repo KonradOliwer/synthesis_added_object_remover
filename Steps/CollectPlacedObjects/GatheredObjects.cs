@@ -14,4 +14,6 @@ internal sealed class GatheredObjects
     public List<OverriddenOtherRecord> OverriddenOthers { get; } = [];
 
     public List<RecordKey> RemovedRecords { get; } = [];
+
+    public List<RecordKey> BrokenCloneMarkers { get; } = [];
 }

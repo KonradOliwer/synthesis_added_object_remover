@@ -5,6 +5,29 @@ namespace AddedObjectRemover.Tests.Fixtures;
 /// <summary>What the removal steps judge each target with, as the restore step reads it, for scenes that do not run those steps.</summary>
 internal static class TestTargetGroups
 {
-    /// <summary>No target is judged by any group, so no plugin's trust is asked.</summary>
-    public static WhereRemovedRestorer.RemovalStepJudging None => new([], [], new AcceptedWorld(TestTargets.PatchName, ImmutableDictionary<PluginName, VersionTrust>.Empty));
+    /// <summary>
+    /// No target is judged by any group, so no plugin's trust is asked, no left-behind step measures neighbours, and the cleaned mod's
+    /// own objects are judged by a too-close step that is off and a changed-terrain check that finds nothing.
+    /// </summary>
+    public static WhereRemovedRestorer.RemovalStepJudging None =>
+        new([], [], new AcceptedWorld(TestTargets.PatchName, ImmutableDictionary<PluginName, VersionTrust>.Empty), [], new(TooCloseOff, FindsNothing.Rule));
+
+    public static TooCloseSettings TooCloseOff { get; } = new(BySize: false, Multiplier: 0f, ByDistance: false, DistanceInUnits: 0f, ZoneShape.BoundingBox, NpcHandling.Never);
+
+    /// <summary>A placement rule that finds every placement free.</summary>
+    private sealed class FindsNothing : IPlacementRule
+    {
+        public static FindsNothing Rule { get; } = new();
+
+        public IPlacementTries StartTries(TargetObject target) => new Tries();
+
+        private sealed class Tries : IPlacementTries
+        {
+            public PlacementCheck Check(EulerPlacement placement) => default;
+
+            public void Dispose()
+            {
+            }
+        }
+    }
 }

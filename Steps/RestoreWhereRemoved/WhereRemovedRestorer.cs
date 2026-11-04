@@ -6,6 +6,7 @@ using AddedObjectRemover.Steps.OtherModsObjectsLeftWithoutSupport.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
+using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
@@ -37,8 +38,14 @@ public static class WhereRemovedRestorer
     /// <param name="ChangedTerrain">The changed-terrain step's settings of each group, with the targets it judges with them.</param>
     /// <param name="TooClose">The too-close step's settings of each group, with the targets it judges with them.</param>
     /// <param name="Accepted">The world the removal steps judge other mods' objects in, which tells which objects can cause removals.</param>
+    /// <param name="LeftBehindNeighbours">The neighbours each left-behind step measures on <see cref="Input.Decisions"/>; a step that is switched off measures none.</param>
+    /// <param name="CleanedModsObjects">What the removal steps judge the cleaned mod's own objects with, which a planned copy is judged with.</param>
     public sealed record RemovalStepJudging(
-        ImmutableArray<ObjectsJudgedWith<ChangedTerrainSettings>> ChangedTerrain, ImmutableArray<ObjectsJudgedWith<TooCloseSettings>> TooClose, AcceptedWorld Accepted);
+        ImmutableArray<ObjectsJudgedWith<ChangedTerrainSettings>> ChangedTerrain,
+        ImmutableArray<ObjectsJudgedWith<TooCloseSettings>> TooClose,
+        AcceptedWorld Accepted,
+        ImmutableArray<ILeftBehindNeighbours> LeftBehindNeighbours,
+        CleanedModsObjectRules CleanedModsObjects);
 
     /// <param name="Decisions">The decisions with every round and every move.</param>
     /// <param name="ClearedAreas">Judges the area around a change on <paramref name="Decisions"/> with the step's cleared-area settings.</param>
@@ -98,7 +105,26 @@ public static class WhereRemovedRestorer
     internal static PlannedRestore BuildPlans(Input input)
     {
         var inputs = new StepInputs(input);
-        return new PlannedRestore(inputs, PlanKinds(inputs, JudgeAreas(inputs)));
+        return new PlannedRestore(inputs, PlanKinds(inputs, JudgePlannedClones(inputs, JudgeAreas(inputs))));
+    }
+
+    /// <summary>The verdicts with every planned copy judged as one of the cleaned mod's own objects.</summary>
+    private static AreaVerdicts JudgePlannedClones(StepInputs inputs, AreaVerdicts verdicts)
+    {
+        var (input, judging) = (inputs.Input, inputs.Input.RemovalSteps);
+        var collected = input.Earlier.Collected;
+        List<RecordChangedByCleanedMod> goingBack = [.. verdicts.Placed.Where(change => change.IsRestored).Select(change => change.Change)];
+        var createTooClose = () => CloneTooCloseCheck.Of(
+            collected,
+            inputs.OtherModsObjects,
+            goingBack,
+            judging.Accepted,
+            input.Reads.CleanedMod,
+            inputs.Reach,
+            judging.CleanedModsObjects.TooClose,
+            input.Guards.TooClose.Create,
+            input.Execution);
+        return verdicts with { Placed = PlannedCloneChecks.Judge(verdicts.Placed, collected.Targets, createTooClose, judging.CleanedModsObjects.ChangedTerrain, input.Execution) };
     }
 
     /// <summary>Every candidate judged by the never-rules and its areas; a kind whose switch is off has none.</summary>
@@ -107,9 +133,10 @@ public static class WhereRemovedRestorer
         var (input, settings, final) = (inputs.Input, inputs.Settings, inputs.Final);
         var (collected, execution) = (input.Earlier.Collected, input.Execution);
         var spacesOnLand = LandInputs.SpacesOnLand(collected, inputs.FindLandWorldspace);
-        var judge = new ChangeJudge(collected.Targets, input.ClearedAreas, input.Reads.Plugins, spacesOnLand);
         var candidates = new RestoreCandidates(collected, final, inputs.OtherModsObjects);
         var placed = settings.OtherModsObjects ? candidates.PlacedRecords() : [];
+        var clones = CloneCandidates.Of(collected, final, input.RemovalSteps.LeftBehindNeighbours, input.Reads.Caches, execution, placed);
+        var judge = new ChangeJudge(collected.Targets, input.ClearedAreas, input.Reads.Plugins, spacesOnLand, clones);
         var cells = settings.Cells ? candidates.Cells() : [];
         var lands = candidates.Lands();
         var navmeshes = settings.Navmeshes ? collected.ChangedNavmeshes.OrderBy(navmesh => navmesh.Navmesh, RecordKeyOrder.Comparer).ToList() : [];
@@ -216,6 +243,9 @@ public static class WhereRemovedRestorer
 
         /// <summary>What became of other mods' objects left without support under <see cref="Final"/>.</summary>
         public OtherModsObjectsResult OtherModsObjects => Input.Earlier.OtherModsObjects;
+
+        /// <summary>How far the placed guards that read the object caches look.</summary>
+        public GuardReach Reach { get; } = new(Input.Reads.Caches.Shapes, Input.Settings.TooClose, Input.Guards.HoldersOfObjectsThatStay.TouchGap);
 
         /// <returns>The worldspace whose land the space uses; null for a space without land.</returns>
         public RecordKey? FindLandWorldspace(RecordKey space) => Input.Reads.Plugin.FindLandWorldspace(space);

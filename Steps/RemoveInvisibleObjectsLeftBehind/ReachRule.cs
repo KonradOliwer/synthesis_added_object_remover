@@ -10,6 +10,9 @@ namespace AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind;
 /// </summary>
 internal sealed class ReachRule(IBaseFacts bases)
 {
+    /// <summary>How far the step looks around the target: its reach when shorter than the look-around distance.</summary>
+    public float RadiusAround(TargetObject target, float lookAround) => GetReach(target) is { } ownReach ? MathF.Min(lookAround, ownReach) : lookAround;
+
     /// <summary>Null when neither the reference nor its base defines a reach.</summary>
     public float? GetReach(TargetObject target) =>
         GetReferenceReach(target.ReferenceRadius, target.PrimitiveBounds) ?? GetBaseReach(target.Base);

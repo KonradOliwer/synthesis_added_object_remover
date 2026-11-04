@@ -115,7 +115,7 @@ public class BaseClassificationTests
     }
 
     private static BaseFacts Facts(uint id, BaseRecordKind kind) =>
-        new(new FormKey(Mod, id).ToRecordKey(), Resolved: true, kind, kind.ToString(), null, null, null, null, ImmutableArray<string>.Empty, null, null, null);
+        new(new FormKey(Mod, id).ToRecordKey(), Resolved: true, kind, kind.ToString(), null, null, null, null, ImmutableArray<string>.Empty, null, null, null, IsPlainScenery: false, HasDistantLod: false);
 
     private static IBaseObjectShapes CreateShapes()
     {

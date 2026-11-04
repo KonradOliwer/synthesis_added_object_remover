@@ -43,6 +43,7 @@ internal sealed class CollectedObjectsAssembler(
         {
             WinningPresence = WinningPresenceOfTargetSpaces(),
             WinningPrimitives = WinningPrimitivesOfTargetSpaces(),
+            BrokenCloneMarkers = [.. gathered.BrokenCloneMarkers],
         };
         return ChangedAreaRecordCollector.MarkLinked(objects, linked);
     }

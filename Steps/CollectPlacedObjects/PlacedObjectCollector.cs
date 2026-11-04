@@ -123,16 +123,24 @@ public sealed class PlacedObjectCollector
     private void Collect(PlacedRecordFact record)
     {
         if (_classifier.IsCreatedByTarget(record)) _counters.CountCleanedModObject();
+        CountOrNoteCloneMarker(record);
         _changedAreaRecords.Collect(record);
         if (RemovedForm.IsRemoved(record.Placement.Presence)) CountRemovedRecord(record);
         else CollectByRole(record);
+    }
+
+    /// <summary>Counts every clone an earlier run placed, whatever its final version, and notes a broken marker, which is user data.</summary>
+    private void CountOrNoteCloneMarker(PlacedRecordFact record)
+    {
+        if (_classifier.CloneMarkOf(record) is { } clone) _counters.CountClone(clone.CleanedMod);
+        else if (_classifier.HasBrokenCloneMarker(record)) _gathered.BrokenCloneMarkers.Add(record.Key);
     }
 
     /// <summary>The record's final version is removed in the game, so it is no object of any kind and its links keep nothing.</summary>
     private void CountRemovedRecord(PlacedRecordFact record)
     {
         _gathered.RemovedRecords.Add(record.Key);
-        if (_classifier.IsCreatedByTarget(record)) _counters.CountRemovedTargetRecord(record.WinningMod);
+        if (_classifier.IsCleanedModsObject(record)) _counters.CountRemovedTargetRecord(record.WinningMod);
     }
 
     /// <remarks>
@@ -158,7 +166,7 @@ public sealed class PlacedObjectCollector
             return;
         }
 
-        if (classification.Origin is { } origin) _gathered.Targets.Add(_factory.CreateTarget(record, origin, classification.EarlierVersion));
+        if (classification.Origin is { } origin) _gathered.Targets.Add(_factory.CreateTarget(record, origin, classification.EarlierVersion, classification.CloneOf));
         else _gathered.OtherModObjects.Add(_factory.CreateOtherObject(record, classification.Change));
     }
 
@@ -177,6 +185,8 @@ public sealed class PlacedObjectCollector
             case RecordRole.OtherUnchanged:
                 if (presence == ShownInGame.Present) _counters.CountOtherUnchanged();
                 else if (presence == ShownInGame.InvalidPlacement) _counters.CountOtherInvalidPlacement();
+                return true;
+            case RecordRole.CloneOfOtherCleanedMod:
                 return true;
             default:
                 return false;

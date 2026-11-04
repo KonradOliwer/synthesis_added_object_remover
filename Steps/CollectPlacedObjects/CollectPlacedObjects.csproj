@@ -16,6 +16,7 @@
     <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
     <ProjectReference Include="..\..\Tools\TimingAndDisposal\TimingAndDisposal.csproj" />
     <ProjectReference Include="..\..\Tools\DenseIdTables\DenseIdTables.csproj" />
+    <ProjectReference Include="..\..\Tools\KeyedGroupingInInputOrder\KeyedGroupingInInputOrder.csproj" />
     <ProjectReference Include="..\..\Tools\TriangleMeshTests\TriangleMeshTests.csproj" />
   </ItemGroup>
   <ItemGroup>

@@ -147,9 +147,8 @@ internal sealed class VisibleObjectSurroundings
             TargetObject candidate, IVisibleTargetObjects index, float lookAround, int directionClearedPercent, List<VisibleTargetNear> scratch)
         {
             var point = candidate.Transform.Position;
-            index.Around(candidate.SpaceKey, point, lookAround, scratch);
             // The neighbours come in ascending target id, which fixes the order of the float sums.
-            VisibleTargetNear[] neighbours = [.. scratch.Where(neighbour => neighbour.Target != candidate.Id)];
+            var neighbours = VisibleNeighbours.Measure(candidate, index, lookAround, scratch);
             SectorFootprint[] footprints = [.. neighbours.Select(neighbour => SectorFootprint.Of(point, neighbour.Box))];
             var allStanding = new SectorAreaTally(directionClearedPercent);
             foreach (var footprint in footprints) allStanding.Add(footprint, BoxFate.Stands);

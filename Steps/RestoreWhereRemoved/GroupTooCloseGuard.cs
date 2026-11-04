@@ -102,7 +102,7 @@ internal sealed class GroupTooCloseGuard(
     /// Whether the candidate, once back, ends with a part only a version the removal steps do not fully believe holds: a part a later
     /// plugin that is not believed for its own changes left, or a part going back to an earlier version they do not fully believe.
     /// </summary>
-    private static bool StaysACause(RecordChangedByCleanedMod change, AcceptedWorld accepted) =>
+    public static bool StaysACause(RecordChangedByCleanedMod change, AcceptedWorld accepted) =>
         change.Earlier.LeftToLaterPlugins.Values.Any(plugin => accepted.TrustOf(plugin) is not (VersionTrust.Full or VersionTrust.OwnEdits))
         || (change.Earlier.Undo != PlacedParts.None && accepted.TrustOf(change.Earlier.Plugin) != VersionTrust.Full);
 }

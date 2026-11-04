@@ -50,17 +50,11 @@ internal sealed class InvisibleLeftBehindRule(
     {
         var target = targets[targetIndex];
         var kind = shapes.VisibilityOf(target).Kind!.Value;
-        var radius = GetEffectiveRadius(target);
+        var radius = reach.RadiusAround(target, config.Surroundings.LookAround);
         var containingObject = containingObjects.Of(targetIndex);
         var areas = MeasureSurroundings(target, radius, decisions, neighbours);
         var decision = judging.Judge(areas, config.Surroundings, isInsideAnotherModsObject: containingObject != null, isProtectedKind: kindsAlwaysKept.KindKeeping(target) != null);
         return new InvisibleLeftBehindCheck(targetIndex, kind, radius, containingObject, areas, decision, KeepReason: null);
-    }
-
-    private float GetEffectiveRadius(TargetObject target)
-    {
-        var lookAround = config.Surroundings.LookAround;
-        return reach.GetReach(target) is { } ownReach ? MathF.Min(lookAround, ownReach) : lookAround;
     }
 
     private SectorAreas MeasureSurroundings(

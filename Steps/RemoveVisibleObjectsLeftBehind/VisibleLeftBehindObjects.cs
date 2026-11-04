@@ -23,6 +23,22 @@ public static class VisibleLeftBehindObjects
     public static IKindsAlwaysKept CreateKindsAlwaysKept(KindsInput input) =>
         new VisibleKindsAlwaysKept(input.Caches.Shapes, input.Caches.Bases, input.NeverRemove.Kinds);
 
+    /// <param name="Decisions">The decisions the neighbours stand in: each visible target where their rounds measure it.</param>
+    /// <param name="Caches">Index the visible target objects; their shapes are read.</param>
+    /// <param name="Settings">Null when the step is switched off.</param>
+    public sealed record NeighboursInput(ImmutableArray<TargetObject> Targets, IRemovalDecisions Decisions, IRunCaches Caches, VisibleLeftBehindSettings? Settings);
+
+    /// <summary>
+    /// The neighbours the step measures around a shown target with its look-around distance (see <see cref="VisibleNeighbours"/>);
+    /// none while the step is switched off.
+    /// </summary>
+    public static ILeftBehindNeighbours CreateNeighbours(NeighboursInput input) =>
+        new VisibleNeighbours(
+            input.Caches.Shapes,
+            input.Settings is { } settings
+                ? (input.Caches.IndexVisibleTargets(input.Decisions.TargetsAsTheRoundsMeasureThem(input.Targets)), settings.Surroundings.LookAround)
+                : null);
+
     /// <param name="Decisions">The newest decisions, which the step's rounds and their follow-ups are added to.</param>
     /// <param name="Caches">Index the visible target objects where the rounds measure them; their base facts and shapes are read.</param>
     /// <param name="KindsAlwaysKept">The visible kinds the settings list (see <see cref="CreateKindsAlwaysKept"/>).</param>

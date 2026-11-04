@@ -19,6 +19,7 @@ using AddedObjectRemover.Steps.RemoveTooCloseObjects;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved;
+using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 using AddedObjectRemover.Steps.WriteThePatch;
@@ -99,6 +100,22 @@ public static partial class StepRunner
         ChangedTerrainObjects.CreatePlacementRule(
             new(trust.AcceptedWorldWithoutCleanedMod, scope.Environment.Plugins, scope.Plugin, runCaches.Shapes, scope.Settings.ChangedObjectCollision.ChangedTerrain));
 
+    /// <summary>The neighbours of each left-behind step, measured on <paramref name="final"/>; a step that is switched off measures none.</summary>
+    private static ImmutableArray<ILeftBehindNeighbours> CreateLeftBehindNeighbours(RunScope scope, IRunCaches runCaches, CollectedObjects collected, IRemovalDecisions final) =>
+    [
+        VisibleLeftBehindObjects.CreateNeighbours(new(collected.Targets, final, runCaches, scope.Settings.VisibleLeftBehind)),
+        InvisibleLeftBehindObjects.CreateNeighbours(new(collected.Targets, final, runCaches, scope.Settings.InvisibleLeftBehind)),
+    ];
+
+    /// <summary>The too-close settings and the changed-terrain check the removal steps judge the cleaned mod's own objects with.</summary>
+    private static CleanedModsObjectRules CreateCleanedModsObjectRules(RunScope scope, IRunCaches runCaches, ModTrustTable trust)
+    {
+        var own = scope.Settings.Collision;
+        return new(
+            own.TooClose,
+            ChangedTerrainObjects.CreatePlacementRule(new(trust.AcceptedWorld, scope.Environment.Plugins, scope.Plugin, runCaches.Shapes, own.ChangedTerrain)));
+    }
+
     /// <remarks>The restore's rules share the world caches, which record measurement failures under the part the step names.</remarks>
     /// <param name="final">The decisions with every round and every move.</param>
     private static WhereRemovedRestorer.Input CreateRestoreInput(
@@ -121,7 +138,12 @@ public static partial class StepRunner
                 TooCloseObjects.CreateTooCloseToWhatStaysRule(CreateWorldRuleInput(runCaches, worldCaches)),
                 OtherModsObjects.CreateHoldersOfObjectsThatStay(new(support, worldCaches)),
                 PatchWriter.CreateNavmeshCheck(scope.Plugin, scope.Environment.PatchWriting)),
-            new([.. groups.Select(group => group.ChangedTerrain)], [.. groups.Select(group => group.TooClose)], trust.AcceptedWorld),
+            new(
+                [.. groups.Select(group => group.ChangedTerrain)],
+                [.. groups.Select(group => group.TooClose)],
+                trust.AcceptedWorld,
+                CreateLeftBehindNeighbours(scope, runCaches, collected, final),
+                CreateCleanedModsObjectRules(scope, runCaches, trust)),
             new(runCaches, scope.Plugin, scope.Environment.Plugins, trust.CleanedMod),
             scope.Settings.Execution,
             scope.Settings.RestoreWhereRemoved,

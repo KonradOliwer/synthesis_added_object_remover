@@ -14,8 +14,17 @@ internal sealed class ReadCounters(ModTrustTable trust)
     private int _othersOverriddenByTarget;
     private int _othersUnchanged;
     private int _otherInvalidPlacements;
+    private int _clonesOfCleanedMod;
+    private int _clonesOfOtherCleanedMods;
 
     public void CountCleanedModObject() => _cleanedModObjects++;
+
+    /// <param name="cleanedMod">The cleaned mod whose content the clone belongs to.</param>
+    public void CountClone(PluginName cleanedMod)
+    {
+        if (cleanedMod == trust.CleanedMod) _clonesOfCleanedMod++;
+        else _clonesOfOtherCleanedMods++;
+    }
 
     public void CountTargetOverriddenLater() => _targetsOverriddenLater++;
 
@@ -46,5 +55,9 @@ internal sealed class ReadCounters(ModTrustTable trust)
             _othersOverriddenByTarget,
             _othersUnchanged,
             _otherInvalidPlacements,
-            facts.NavmeshCount);
+            facts.NavmeshCount)
+        {
+            ClonesOfCleanedMod = _clonesOfCleanedMod,
+            ClonesOfOtherCleanedMods = _clonesOfOtherCleanedMods,
+        };
 }

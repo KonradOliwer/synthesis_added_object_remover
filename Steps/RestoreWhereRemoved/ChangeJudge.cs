@@ -15,12 +15,20 @@ internal sealed record LandAreasJudged(LandChangedByCleanedMod Change, NeverRest
 /// <summary>Judges whether a candidate's undone parts go back: the never-rules first, then its area. Thread-safe.</summary>
 /// <param name="spacesOnLand">Per worldspace holding land, the spaces holding a target whose ground it is, in key order.</param>
 internal sealed class ChangeJudge(
-    ImmutableArray<TargetObject> targets, IClearedAreas areas, LoadOrderPlugins plugins, IReadOnlyDictionary<RecordKey, ImmutableArray<RecordKey>> spacesOnLand)
+    ImmutableArray<TargetObject> targets,
+    IClearedAreas areas,
+    LoadOrderPlugins plugins,
+    IReadOnlyDictionary<RecordKey, ImmutableArray<RecordKey>> spacesOnLand,
+    CloneCandidates clones)
 {
     /// <summary>Judged points are centres: a cell's lies half a cell from its corner, bounds' halfway between their corners.</summary>
     private const float Halfway = 0.5f;
 
-    /// <remarks>A target the removal steps left undecided is judged both at its old place and where it stands, so a moved object is never taken out of a village that stays.</remarks>
+    /// <remarks>
+    /// A target the removal steps left undecided is judged both at its old place and where it stands, so a moved object is never taken
+    /// out of a village that stays. A moved object that the cleaned mod's standing objects hold as a left-behind neighbour, and that may
+    /// not be copied, stays where the cleaned mod put it.
+    /// </remarks>
     public PlacedChangeJudged Placed(RecordChangedByCleanedMod change)
     {
         var kind = KindOf(change);
@@ -32,8 +40,39 @@ internal sealed class ChangeJudge(
 
         var oldPlace = areas.Judge(change.SpaceKey, OldPlaceOf(change));
         var whereItIsNow = WhereItIsNowOf(change) is { } now ? areas.Judge(change.SpaceKey, now) : null;
-        var keptForArea = VerdictKeeping(whereItIsNow is null ? [oldPlace.Verdict] : [oldPlace.Verdict, whereItIsNow.Verdict]);
-        return new PlacedChangeJudged(change, Never: null, oldPlace, whereItIsNow, Refused: null, IsRestored: keptForArea is null, kind, keptForArea, placedBack);
+        var judged = new PlacedChangeJudged(change, Never: null, oldPlace, whereItIsNow, Refused: null, IsRestored: false, kind, KeptForArea: null, placedBack);
+        return WithCloning(judged, CloneOf(change, oldPlace.Verdict, whereItIsNow?.Verdict));
+    }
+
+    /// <summary>
+    /// The record its areas judged, with the copy rule's outcome: a refused copy of a neighbour of one of the cleaned mod's standing
+    /// objects keeps it where the cleaned mod put it; otherwise its areas decide whether it goes back.
+    /// </summary>
+    /// <param name="judged">Judged by its areas, with no never-rule holding.</param>
+    public static PlacedChangeJudged WithCloning(PlacedChangeJudged judged, CloneJudged? cloning)
+    {
+        var heldByStandingObject = cloning is { Need: CloneNeed.NeighbourOfStandingObject, RefusedBy: not null };
+        AreaVerdict[] verdicts = judged.WhereItIsNow is { } now ? [judged.OldPlace!.Verdict, now.Verdict] : [judged.OldPlace!.Verdict];
+        var keptForArea = heldByStandingObject ? null : VerdictKeeping(verdicts);
+        return judged with { IsRestored = keptForArea is null && !heldByStandingObject, KeptForArea = keptForArea, Cloning = cloning };
+    }
+
+    /// <summary>
+    /// The copy rule, for another mod's object the cleaned mod moved that has no copy yet and whose old place is cleared: it is needed
+    /// where it stands now when the cleaned mod's objects still stand in that area, or when that area does not keep it but a
+    /// left-behind step measures it around one of the cleaned mod's standing objects.
+    /// </summary>
+    /// <param name="now">Null for a record that is no target.</param>
+    /// <returns>Null when the rule does not apply.</returns>
+    private CloneJudged? CloneOf(RecordChangedByCleanedMod change, AreaVerdict oldPlace, AreaVerdict? now)
+    {
+        if (now is not { } verdictNow || oldPlace != AreaVerdict.Cleared || !CloneCandidates.IsMovedObject(change, targets) || clones.HasClone(change)) return null;
+
+        var target = change.Target!.Value;
+        CloneNeed? need = verdictNow == AreaVerdict.StillStanding ? CloneNeed.AreaStillStands
+            : clones.IsNeighbourOfStandingObject(target) ? CloneNeed.NeighbourOfStandingObject
+            : null;
+        return need is { } needed ? new CloneJudged(needed, clones.RefusalOf(change, targets[target.Index])) : null;
     }
 
     /// <summary>What a placed record's restore puts back, by the first of its undone parts in the order of <see cref="PlacedRestoreKind"/>.</summary>

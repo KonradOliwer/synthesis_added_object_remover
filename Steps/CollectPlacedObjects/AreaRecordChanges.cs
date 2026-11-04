@@ -65,7 +65,7 @@ internal sealed class AreaRecordChanges(
 
     /// <remarks>A part is left to a plugin that needs the cleaned mod only above a plugin that loads without it, so there is one.</remarks>
     private float[]? HeightsOfPluginLoadingWithoutCleanedMod(LandRecordFact land, IReadOnlyList<PluginName> plugins) =>
-        land.HeightsBetween[PartHistory.LastLoadingWithoutCleanedModAbove(plugins, VersionComparison.NamedPluginIndex, trust)!.Value - VersionComparison.NamedPluginIndex];
+        land.HeightsOfVersion(PartHistory.LastLoadingWithoutCleanedModAbove(plugins, VersionComparison.NamedPluginIndex, trust)!.Value);
 
     /// <returns>Null when no part goes back, was changed again or stays for its record format.</returns>
     /// <remarks>

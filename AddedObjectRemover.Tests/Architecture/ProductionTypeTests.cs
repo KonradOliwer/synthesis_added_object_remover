@@ -60,6 +60,7 @@ public class ProductionTypeTests
         ["Replacements"] = "read-only lookup of the replaced other-mod objects",
         ["ObjectQueryScratch"] = "per-worker buffers for the object queries",
         ["ResavedPlacedParts"] = "rules over contract values: the rounding of plugins that re-save a placed record, which the collect step compares versions with and the restore step compares where an object ends",
+        ["CloneMarker"] = "the one format of a clone's EditorID, which the restore step writes and the collect step reads",
     };
 
     /// <summary>
@@ -159,6 +160,14 @@ public class ProductionTypeTests
         ["Decision.FollowedARestoredMember"] = "single-expression rule over its own reason and the decision of the group member it names",
         ["TerrainPieces.Any"] = "single-expression value derived from its own fields",
         ["ReferenceScale.Normalize"] = "the one rule of a placed reference's scale",
+        ["CloneMarker.Read"] = "reads an EditorID as a clone marker, telling a broken marker from an ordinary EditorID",
+        ["CloneMarker.MarkOf"] = "parses a clone marker exactly as CloneMarker.Of writes it",
+        ["CloneMarkerReading.IsBroken"] = "single-expression value derived from its own fields",
+        ["CloneMarker.HexOf"] = "the marker's spelling of a plugin name",
+        ["CloneMarker.NameOf"] = "reads the marker's spelling of a plugin name back",
+        ["CloneMarker.HashedNameOf"] = "the marker's short spelling of a plugin name, which the scan matches the load order against",
+        ["CloneMarker.Of"] = "writes the marker, spelling the names out or hashing them when that is too long",
+        ["CloneMarker.LowerCaseBytesOf"] = "the bytes both spellings of a plugin name are made from",
         ["ResavedPlacedParts.PositionsDiffer"] = "the one rule of a re-saved position, shared by the collect step and the restore step",
         ["ResavedPlacedParts.RotationsDiffer"] = "the one rule of a re-saved rotation, shared by the collect step and the restore step",
         ["ResavedPlacedParts.ScalesDiffer"] = "the one rule of a re-saved scale, shared by the collect step and the restore step",

@@ -66,6 +66,8 @@ public class LogicPublicTypesTests
         ["VisibleLeftBehindObjects.CreateLeftBehindRoundJoin"] = "The rules the visible step owns for joining a round's decisions into verdicts and proposals, which the invisible left-behind step and the step for objects in cleared areas ask.",
         ["VisibleLeftBehindObjects.CreateKindsAlwaysKept"] = "The visible kinds the step's settings always keep, which the step for objects in cleared areas asks, also while the visible step is off.",
         ["InvisibleLeftBehindObjects.CreateKindsAlwaysKept"] = "The invisible kinds the step's settings always keep, which the step for objects in cleared areas asks, also while the invisible step is off.",
+        ["VisibleLeftBehindObjects.CreateNeighbours"] = "The neighbours the visible step measures around an object, which the restore's copy rule asks on the final decisions; none while the step is off.",
+        ["InvisibleLeftBehindObjects.CreateNeighbours"] = "The neighbours the invisible step measures around an object, which the restore's copy rule asks on the final decisions; none while the step is off.",
         ["TooCloseObjects.CreateOldPlaceTooCloseRule"] = "The too-close check of an earlier version at its old place, which the judge step asks.",
         ["TooCloseObjects.CreateTooCloseToWhatStaysRule"] = "The too-close check of a placed record going back among what stays, which the restore step asks.",
         ["RestingObjects.SurfaceSamplesPerMesh"] = "How many points the support rule samples on a mesh's surface; the surface sample cache takes it when it is built.",

@@ -101,7 +101,7 @@ public static class WhereRemovedRestorer
     }
 
     /// <summary>The candidates judged by the never-rules and their areas on the removal steps' decisions, and every kind's plan before the guards between the kinds.</summary>
-    private static PlannedRestore BuildPlans(Input input)
+    internal static PlannedRestore BuildPlans(Input input)
     {
         var inputs = new StepInputs(input);
         return new PlannedRestore(inputs, PlanKinds(inputs, JudgePlannedClones(inputs, JudgeAreas(inputs))));
@@ -168,7 +168,7 @@ public static class WhereRemovedRestorer
             ground,
             landHeights,
             targetsThatMayStay,
-            new RestoreState([.. cleared.Select(_ => (PlacedRefusal?)null)], [.. goingBack.Select(change => change.Cloning)], navmeshPlan, terrain, water, CausesLeftOut: null));
+            new RestoreState([.. cleared.Select(_ => (PlacedRefusal?)null)], [.. goingBack.Select(change => change.Cloning)], navmeshPlan, terrain, water));
     }
 
     /// <summary>What every candidate became once the guards between the kinds change nothing more.</summary>
@@ -239,7 +239,7 @@ public static class WhereRemovedRestorer
         public OtherModsObjectsResult OtherModsObjects => Input.Earlier.OtherModsObjects;
 
         /// <summary>How far the placed guards that read the object caches look.</summary>
-        public GuardReach Reach { get; } = new(Input.Reads.Caches.Shapes, Input.Settings.TooClose, Input.Guards.HoldersOfObjectsThatStay.TouchGap);
+        public GuardReach Reach { get; } = new(Input.Reads.Caches.Shapes, Input.Guards.TooClose, Input.Settings.TooClose, Input.Guards.HoldersOfObjectsThatStay.TouchGap);
 
         /// <returns>The worldspace whose land the space uses; null for a space without land.</returns>
         public RecordKey? FindLandWorldspace(RecordKey space) => Input.Reads.Plugin.FindLandWorldspace(space);

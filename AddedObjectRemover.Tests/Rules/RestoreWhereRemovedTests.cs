@@ -58,7 +58,7 @@ public sealed class RestoreWhereRemovedTests
 
     private static readonly INavmeshes NoNavmeshes = TestGround.Navmeshes(new Dictionary<RecordKey, List<CellNavmesh>>());
 
-    private static readonly GuardReach Reach = new(Shapes, Settings.TooClose, touchGap: 1f);
+    private static readonly GuardReach Reach = new(Shapes, GuardRules(workers: 1).TooCloseToWhatStays, Settings.TooClose, touchGap: 1f);
 
     [Fact]
     public void AChangeWhoseAreaIsClearedOfTheCleanedModsObjectsGoesBack()
@@ -665,13 +665,14 @@ public sealed class RestoreWhereRemovedTests
     }
 
     /// <summary>
-    /// In the cleared camp a second rock goes back to 60 units from the copy's centre and keeps a scale Later.esp set. When the removal steps do
-    /// not believe Later.esp, that rock can cause removals once back, so the copy is too close to it; when they believe it, it is not.
+    /// In the cleared camp a second rock goes back to 60 units from the copy's centre and keeps a scale Later.esp set. Whether or not
+    /// the removal steps believe Later.esp, the next patcher reads the rock the patch put back as support only, never as a cause, so
+    /// the copy stays.
     /// </summary>
     [Theory]
-    [InlineData(VersionTrust.None, true)]
-    [InlineData(VersionTrust.Full, false)]
-    public void ACopyTooCloseToARockThatCanCauseRemovalsOnceBackIsRefused(VersionTrust laterTrust, bool refused)
+    [InlineData(VersionTrust.None)]
+    [InlineData(VersionTrust.Full)]
+    public void ACopyBesideARockGoingBackStaysWhateverTheTrustOfThePartsTheRockKeeps(VersionTrust laterTrust)
     {
         var second = ChangedRock(0x901, Camp + new Vector3(-60, 0, 0));
         var keepingScale = second with { BaseNow = Block.Base, Earlier = second.Earlier with { LeftToLaterPlugins = ImmutableSortedDictionary<PlacedParts, PluginName>.Empty.Add(PlacedParts.Scale, Later) } };
@@ -680,7 +681,7 @@ public sealed class RestoreWhereRemovedTests
             CampScene(), DecisionsRemoving(CampScene(), 0, 3, 4), [MovedRock(), keepingScale], settings: HalfMayStand, bases: PlainScenery, visibleLeftBehind: LookAround,
             cleanedModsObjects: OwnTooClose(50f), laterTrust: laterTrust);
 
-        Assert.Equal(new CloneJudged(CloneNeed.NeighbourOfStandingObject, refused ? CloneRefusal.TooCloseAsCleanedModsObject : null), result.Objects[0].Cloning);
+        Assert.Equal(new CloneJudged(CloneNeed.NeighbourOfStandingObject, RefusedBy: null), result.Objects[0].Cloning);
     }
 
     /// <summary>The cleaned mod's own changed-terrain check is asked about the copy, as the cleaned mod's object where the rock stands now; a finding or a stopped check refuses it.</summary>
@@ -701,14 +702,13 @@ public sealed class RestoreWhereRemovedTests
 
     /// <summary>
     /// In the cleared camp rock A goes back with a copy the standing campfire needs. Rock B, which the cleaned mod moved into a second
-    /// camp that still stands, goes back with a copy too, to 60 units from A's copy, and keeps a scale Later.esp set. When the removal
-    /// steps do not believe Later.esp, B can cause removals once back, so A's copy is too close to it and A stays; when they believe
-    /// it, both go back with their copies.
+    /// camp that still stands, goes back with a copy too, to 60 units from A's copy, and keeps a scale Later.esp set. Whether or not
+    /// the removal steps believe Later.esp, the next patcher reads B as support only, so both go back with their copies.
     /// </summary>
     [Theory]
-    [InlineData(VersionTrust.None, true)]
-    [InlineData(VersionTrust.Full, false)]
-    public void ARockGoingBackWithACopyForItsStandingAreaIsACauseForAnotherCopy(VersionTrust laterTrust, bool refused)
+    [InlineData(VersionTrust.None)]
+    [InlineData(VersionTrust.Full)]
+    public void ARockGoingBackWithACopyIsNoCauseForAnotherCopy(VersionTrust laterTrust)
     {
         var secondCamp = new Vector3(5000, 5000, 0);
         var secondRockKey = new RecordKey(BaseGame, 0x902);
@@ -724,9 +724,7 @@ public sealed class RestoreWhereRemovedTests
             targets, DecisionsRemoving(targets, 0, 3, 4), [MovedRock(), keepingScale], settings: HalfMayStand, bases: PlainScenery, visibleLeftBehind: LookAround,
             cleanedModsObjects: OwnTooClose(50f), laterTrust: laterTrust);
 
-        Assert.Equal(
-            (new CloneJudged(CloneNeed.NeighbourOfStandingObject, refused ? CloneRefusal.TooCloseAsCleanedModsObject : null), !refused),
-            (result.Objects[0].Cloning, result.Objects[0].IsRestored));
+        Assert.Equal((new CloneJudged(CloneNeed.NeighbourOfStandingObject, RefusedBy: null), true), (result.Objects[0].Cloning, result.Objects[0].IsRestored));
         Assert.Equal((new CloneJudged(CloneNeed.AreaStillStands, RefusedBy: null), true), (result.Objects[1].Cloning, result.Objects[1].IsRestored));
     }
 

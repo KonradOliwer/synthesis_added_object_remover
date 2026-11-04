@@ -20,8 +20,7 @@ internal sealed record OtherKindsAsPlanned(
 /// <summary>What one pass of the placed guards found.</summary>
 /// <param name="Found">By candidate index; null for one that passes or no longer goes back.</param>
 /// <param name="ClonesLost">The candidates going back with a copy whose copy fails its rules, by candidate index.</param>
-/// <param name="CausesLeftOut">The causes the too-close rules left out for every candidate in the pass, which the next pass compares with its own.</param>
-internal sealed record PlacedChecks(PlacedRefusal?[] Found, IReadOnlyDictionary<int, CloneLoss> ClonesLost, IReadOnlySet<OtherId> CausesLeftOut)
+internal sealed record PlacedChecks(PlacedRefusal?[] Found, IReadOnlyDictionary<int, CloneLoss> ClonesLost)
 {
     /// <summary>The state's refusals and copy outcomes with what the pass found; a candidate a guard refuses keeps its copy's outcome as it was.</summary>
     public (ImmutableArray<PlacedRefusal?> Placed, ImmutableArray<CloneJudged?> Clones) AppliedTo(RestoreState state)
@@ -36,7 +35,7 @@ internal sealed record PlacedChecks(PlacedRefusal?[] Found, IReadOnlyDictionary<
 /// <summary>What the placed guards read besides the after-removal world.</summary>
 /// <param name="Caches">The object caches over the after-removal world.</param>
 /// <param name="TooClose">The too-close rule over the after-removal world in which the given objects cause no removals.</param>
-/// <param name="TooCloseByGroup">The too-close check of the targets that stay with their own groups' settings.</param>
+/// <param name="Standing">The too-close check of the cleaned mod's objects that stand, as the next patcher makes it.</param>
 /// <param name="HoldersOfObjectsThatStay">The support test over the after-removal world, among the candidates that stand now.</param>
 /// <param name="HoldersOfWhatGoesBack">
 /// The support test over <see cref="AfterRemovalWorld.GoingBackWorld"/>, among <see cref="AfterRemovalWorld.Holders"/>.
@@ -47,7 +46,7 @@ internal sealed record PlacedChecks(PlacedRefusal?[] Found, IReadOnlyDictionary<
 internal sealed record PlacedGuardInputs(
     IObjectCaches Caches,
     Func<IEnumerable<OtherId>, IPlacementRule> TooClose,
-    GroupTooCloseGuard TooCloseByGroup,
+    StandingTooCloseChecks Standing,
     IHoldersSearch HoldersOfObjectsThatStay,
     IHoldersSearch HoldersOfWhatGoesBack,
     IBaseObjectShapes Shapes,
@@ -60,20 +59,12 @@ internal sealed record PlacedGuardInputs(
 /// <summary>
 /// The guards of the candidates, the placed records whose areas let them go back, each checked as it goes back, with only its undone
 /// parts taken from its earlier version. The too-close guard checks a candidate against the causes of <see cref="AfterRemovalWorld"/>,
-/// a refused candidate among them where it stands now, less the causes left out:
-/// <list type="bullet">
-/// <item>for every candidate, the candidates going back, which move away, and every cause that ends removed in the final world
-/// (<see cref="FinalPresence"/>);</item>
-/// <item>for a candidate that ends in its earlier shape and place (<see cref="AfterRemovalWorld.EndInEarlierShapeAndPlace"/>), also the
-/// causes a removal step restored, since the two stood together like that before the cleaned mod. A candidate that keeps a shaping part
-/// a later plugin changed never stood beside them like that, so they block it.</item>
-/// </list>
-/// A candidate going back with a clone leaves the clone where it stands now: that entry stays among the causes, keeps carrying what
-/// rests on it and holds up what goes back onto it.
+/// a refused candidate among them where it stands now, less the candidates going back, which move away, and every cause that ends
+/// removed in the final world (<see cref="FinalPresence"/>). A candidate going back with a clone leaves the clone where it stands now:
+/// that entry stays among the causes, keeps carrying what rests on it and holds up what goes back onto it.
 /// Thread-safe.
 /// </summary>
-internal sealed class PlacedGuards(
-    AfterRemovalWorld world, PlacedGuardInputs inputs, GuardReach reach, FinalPresence presence, DoorLinkGuard doors, Execution execution)
+internal sealed class PlacedGuards(AfterRemovalWorld world, PlacedGuardInputs inputs, DoorLinkGuard doors, Execution execution)
 {
     /// <summary>The invisible-object guard for every candidate: which other candidates go back does not change which invisible object a candidate holds.</summary>
     private readonly ComputedOnce<Dictionary<int, RecordKey>> _holdingInvisible = new(() => FindCandidatesHoldingInvisibleObjects(world, inputs.Caches, inputs.Shapes, execution));
@@ -81,78 +72,45 @@ internal sealed class PlacedGuards(
     /// <summary>The door rule's consistency checks, made once, one after another.</summary>
     private readonly ComputedOnce<IReadOnlyDictionary<RecordKey, NavmeshFault?>> _doorNavmeshFaults = new(doors.CheckEachNavmeshWithItsDoors);
 
-    /// <summary>The box around each candidate as it goes back that holds every zone of the too-close rule.</summary>
-    private readonly ComputedOnce<Box[]> _tooCloseReach = new(() => [.. world.Restored.Select(reach.TooCloseReachOf)]);
-
     /// <summary>The objects that stand as they stood before the cleaned mod, the same in every pass.</summary>
     private readonly ComputedOnce<HashSet<OtherId>> _standingAsBefore = new(() => world.StandingAsBeforeTheCleanedMod());
 
-    /// <summary>The first guard each candidate going back fails, and the copies that fail their rules, with every other one of them going back too.</summary>
+    /// <summary>
+    /// The first guard each candidate going back fails, and the copies that fail their rules, with every other one of them going back
+    /// too. A copy too close to a cause is lost before one actors walk on.
+    /// </summary>
     /// <param name="goingBack">The indexes of the candidates still going back.</param>
     /// <param name="withClone">Those of them going back with a clone.</param>
-    /// <param name="causesLeftOutBefore">
-    /// What the pass before left out of the causes; null in the first pass. The too-close rule checks again only the candidates
-    /// that a cause no longer left out can reach: a candidate it passed before passes again otherwise.
-    /// </param>
-    public PlacedChecks CheckGoingBack(IReadOnlySet<int> goingBack, IReadOnlySet<int> withClone, OtherKindsAsPlanned plans, IReadOnlySet<OtherId>? causesLeftOutBefore)
+    /// <param name="pass">Whether a placed record ends removed with <paramref name="goingBack"/> going back.</param>
+    public PlacedChecks CheckGoingBack(IReadOnlySet<int> goingBack, IReadOnlySet<int> withClone, OtherKindsAsPlanned plans, PresenceInPass pass)
     {
         var leaving = goingBack.Where(candidate => !withClone.Contains(candidate)).ToHashSet();
-        var causesLeftOut = CausesLeftOut(goingBack, leaving);
-        var rules = CreateTooCloseRules(causesLeftOut, goingBack);
-        // Covers the candidates that end in their earlier shape and place too: the causes restored by removal steps they also leave out are the same in every pass.
-        var checkTooClose = causesLeftOutBefore is null ? null : CandidatesReaching([.. causesLeftOutBefore.Except(causesLeftOut).OrderBy(cause => cause.Index)], goingBack);
+        var tooClose = inputs.TooClose(CausesLeftOut(leaving, pass).OrderBy(cause => cause.Index));
         var holdingInvisible = _holdingInvisible.Value;
-        var tooCloseByGroup = inputs.TooCloseByGroup.Find(candidate => EndsWhereItGoesBack(candidate, goingBack));
+        var standing = inputs.Standing.Check(goingBack, withClone, pass);
         var carrying = FindCandidatesCarryingObjectsThatStay(leaving);
-        var resting = FindCandidatesRestingOnWhatDoesNotStay(goingBack, leaving);
+        var resting = FindCandidatesRestingOnWhatDoesNotStay(goingBack, leaving, pass);
         var doorNavmeshFaults = _doorNavmeshFaults.Value;
         var staysChanged = plans.NavmeshesThatStayChanged.ToHashSet();
         var found = ParallelMap.Run(
             execution,
             world.Restored.Length,
             candidate => goingBack.Contains(candidate)
-                ? FirstRefusal(
-                    candidate,
-                    checkTooClose?.Contains(candidate) == false ? null : rules.For(candidate),
-                    goingBack,
-                    plans,
-                    staysChanged,
-                    new(tooCloseByGroup, holdingInvisible, carrying, resting),
-                    doorNavmeshFaults)
+                ? FirstRefusal(candidate, tooClose, goingBack, plans, staysChanged, new(standing.Refused, holdingInvisible, carrying, resting), doorNavmeshFaults)
                 : null,
             ParallelMap.AutomaticRangeSize);
-        return new PlacedChecks(found, inputs.Clones.FindLost(goingBack, withClone, staysChanged), causesLeftOut);
+        var lost = standing.CopiesLost.ToDictionary();
+        foreach (var (candidate, loss) in inputs.Clones.FindLost(withClone, staysChanged)) lost.TryAdd(candidate, loss);
+        return new PlacedChecks(found, lost);
     }
 
-    /// <summary>The too-close rules of one pass, each made only when a candidate going back needs it.</summary>
-    /// <param name="causesLeftOut">The causes left out for every candidate.</param>
-    private TooCloseRules CreateTooCloseRules(HashSet<OtherId> causesLeftOut, IReadOnlySet<int> goingBack)
-    {
-        IPlacementRule? Create(IEnumerable<OtherId> leftOut, bool inEarlierShapeAndPlace) =>
-            goingBack.Any(candidate => world.EndInEarlierShapeAndPlace[candidate] == inEarlierShapeAndPlace) ? inputs.TooClose(leftOut.Distinct().OrderBy(cause => cause.Index)) : null;
-
-        return new TooCloseRules(
-            world.EndInEarlierShapeAndPlace,
-            Create(causesLeftOut.Concat(world.CausesRestoredByRemovalSteps), inEarlierShapeAndPlace: true),
-            Create(causesLeftOut, inEarlierShapeAndPlace: false));
-    }
-
-    /// <param name="InEarlierShapeAndPlace">For the candidates that end in their earlier shape and place; null when none of them goes back.</param>
-    /// <param name="InOtherShapeOrPlace">For the others; null when none of them goes back.</param>
-    private sealed record TooCloseRules(ImmutableArray<bool> EndInEarlierShapeAndPlace, IPlacementRule? InEarlierShapeAndPlace, IPlacementRule? InOtherShapeOrPlace)
-    {
-        public IPlacementRule For(int candidate) =>
-            (EndInEarlierShapeAndPlace[candidate] ? InEarlierShapeAndPlace : InOtherShapeOrPlace) ?? throw new UnreachableException($"No too-close rule was made for candidate {candidate}, which goes back.");
-    }
-
-    /// <param name="rule">Null when the too-close rule needs no check.</param>
     /// <param name="goingBack">The indexes of the candidates still going back.</param>
     /// <param name="staysChanged">The navmeshes that stay changed.</param>
     /// <param name="found">What the guards that judge every candidate together found.</param>
     /// <param name="doorNavmeshFaults">What the door rule's consistency checks found, by navmesh.</param>
     private PlacedRefusal? FirstRefusal(
         int candidate,
-        IPlacementRule? rule,
+        IPlacementRule tooClose,
         IReadOnlySet<int> goingBack,
         OtherKindsAsPlanned plans,
         IReadOnlySet<RecordKey> staysChanged,
@@ -160,8 +118,8 @@ internal sealed class PlacedGuards(
         IReadOnlyDictionary<RecordKey, NavmeshFault?> doorNavmeshFaults)
     {
         var restored = world.Restored[candidate];
-        return (rule is null ? null : CheckTooClose(restored, rule))
-            ?? found.TooCloseByGroup.GetValueOrDefault(candidate)
+        return CheckTooClose(restored, tooClose)
+            ?? found.TooCloseForStanding.GetValueOrDefault(candidate)
             ?? CheckGround(candidate, plans.Terrain)
             ?? CheckWater(restored, plans.Water)
             ?? RefusalFound(PlacedGuard.HoldsInvisibleObjectThatStays, found.HoldingInvisible, candidate)
@@ -171,33 +129,23 @@ internal sealed class PlacedGuards(
             ?? doors.Check(candidate, goingBack, plans.NavmeshesGoingBack, doorNavmeshFaults);
     }
 
-    /// <param name="TooCloseByGroup">The candidates a target that stays comes too close to by its own group's settings, each with the first refusal.</param>
+    /// <param name="TooCloseForStanding">The candidates whose going back makes one of the cleaned mod's standing objects too close, each with the first refusal.</param>
     /// <param name="HoldingInvisible">The candidates holding an invisible object of the cleaned mod, each with the first one.</param>
     /// <param name="Carrying">The candidates an object that stays rests on, each with the first one.</param>
     /// <param name="Resting">The candidates that rest where they go back on an object that does not end there, each with the first one.</param>
     private sealed record FoundTogether(
-        IReadOnlyDictionary<int, PlacedRefusal> TooCloseByGroup,
+        IReadOnlyDictionary<int, PlacedRefusal> TooCloseForStanding,
         IReadOnlyDictionary<int, RecordKey> HoldingInvisible,
         IReadOnlyDictionary<int, RecordKey> Carrying,
         IReadOnlyDictionary<int, RecordKey> Resting);
 
-    /// <summary>The causes left out for every candidate: the copies of the candidates that leave where they stand now, and those that end removed.</summary>
+    /// <summary>The causes left out: the copies of the candidates that leave where they stand now, and those that end removed.</summary>
     /// <param name="leaving">The candidates going back without a clone.</param>
-    private HashSet<OtherId> CausesLeftOut(IReadOnlySet<int> goingBack, IReadOnlySet<int> leaving) =>
+    private HashSet<OtherId> CausesLeftOut(IReadOnlySet<int> leaving, PresenceInPass pass) =>
     [
         .. world.CauseCopiesNowOf(leaving),
-        .. world.World.OtherModObjects.Where(cause => presence.EndsRemoved(cause.Key, goingBack.Contains)).Select(cause => cause.Id),
+        .. world.World.OtherModObjects.Where(cause => pass.EndsRemoved(cause.Key)).Select(cause => cause.Id),
     ];
-
-    /// <summary>The candidates going back that one of the causes can reach; every one of them when a cause is a placed NPC, whose body is measured on its own.</summary>
-    private HashSet<int> CandidatesReaching(List<OtherId> causes, IReadOnlySet<int> goingBack)
-    {
-        var objects = causes.Select(cause => world.World.OtherModObjects[cause.Index]).ToList();
-        if (objects.Any(other => other.IsPlacedNpc)) return [.. goingBack];
-        var bounds = objects.Select(other => (other.SpaceKey, Box: reach.BoundsOf(other))).ToList();
-        var tooCloseReach = _tooCloseReach.Value;
-        return [.. goingBack.Where(candidate => bounds.Any(cause => cause.SpaceKey == world.Restored[candidate].SpaceKey && cause.Box.Overlaps(tooCloseReach[candidate])))];
-    }
 
     /// <summary>
     /// Ground that stays changed through the cleaned mod lies under the box's footprint (the box around the object, seen from above),
@@ -313,22 +261,22 @@ internal sealed class PlacedGuards(
     /// </summary>
     /// <remarks>The copies of the candidates leaving where they stand now are gone from that place.</remarks>
     /// <param name="leaving">The candidates going back without a clone.</param>
-    private Dictionary<int, RecordKey> FindCandidatesRestingOnWhatDoesNotStay(IReadOnlySet<int> goingBack, IReadOnlySet<int> leaving)
+    private Dictionary<int, RecordKey> FindCandidatesRestingOnWhatDoesNotStay(IReadOnlySet<int> goingBack, IReadOnlySet<int> leaving, PresenceInPass pass)
     {
         var candidates = world.Restored.Length;
         var candidateOfCopy = Enumerable.Range(0, candidates).ToDictionary(world.RestoredCopyOf);
         HashSet<OtherId> copiesGone =
-            [.. world.CopiesNowOf(leaving), .. Enumerable.Range(0, candidates).Where(candidate => !EndsWhereItGoesBack(candidate, goingBack)).Select(world.RestoredCopyOf)];
+            [.. world.CopiesNowOf(leaving), .. Enumerable.Range(0, candidates).Where(candidate => !EndsWhereItGoesBack(candidate, goingBack, pass)).Select(world.RestoredCopyOf)];
         var held = inputs.HoldersOfWhatGoesBack.Find(
-            holder => holder.Index >= candidates || !EndsWhereItGoesBack(holder.Index, goingBack),
+            holder => holder.Index >= candidates || !EndsWhereItGoesBack(holder.Index, goingBack, pass),
             copiesGone,
-            id => !candidateOfCopy.TryGetValue(id, out var candidate) || !EndsWhereItGoesBack(candidate, goingBack));
+            id => !candidateOfCopy.TryGetValue(id, out var candidate) || !EndsWhereItGoesBack(candidate, goingBack, pass));
         var first = new Dictionary<int, RecordKey>();
         foreach (var (holder, other) in held.OrderBy(entry => entry.Key.Index)) first.TryAdd(candidateOfCopy[other.Id], world.Holders[holder.Index].Key);
         return first;
     }
 
     /// <summary>The candidate goes back and is present in the final world there.</summary>
-    private bool EndsWhereItGoesBack(int candidate, IReadOnlySet<int> goingBack) =>
-        goingBack.Contains(candidate) && !presence.EndsRemoved(world.Restored[candidate].Key, goingBack.Contains);
+    private bool EndsWhereItGoesBack(int candidate, IReadOnlySet<int> goingBack, PresenceInPass pass) =>
+        goingBack.Contains(candidate) && !pass.EndsRemoved(world.Restored[candidate].Key);
 }

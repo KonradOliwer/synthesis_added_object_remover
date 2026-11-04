@@ -387,10 +387,11 @@ public sealed class RestoreWhereRemovedGuardTests
 
     /// <summary>
     /// As <see cref="AnObjectARemovalStepRestoredBesideTheOldPlaceRefusesNothing"/>, but a later plugin made the rock larger, so it goes
-    /// back to its old place at that size: the rock and the crate never stood together like that, so the crate keeps the rock out.
+    /// back to its old place at that size. The next patcher reads the crate a removal step put back as support only, never as a cause,
+    /// so it keeps no rock out, whatever shape the rock keeps.
     /// </summary>
     [Fact]
-    public void AnObjectARemovalStepRestoredRefusesARockThatKeepsTheSizeALaterPluginGaveIt()
+    public void AnObjectARemovalStepRestoredRefusesNoRockThatKeepsTheSizeALaterPluginGaveIt()
     {
         const float LaterScale = 2f;
         var moved = Rock(0, OldPlace, PlaceNow);
@@ -403,15 +404,15 @@ public sealed class RestoreWhereRemovedGuardTests
 
         var judged = Assert.Single(Plan(scene).Objects);
 
-        Assert.Equal(new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, MovedCrate().Key, Failure: null), judged.Refused);
+        Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
     }
 
     /// <summary>
-    /// As <see cref="AnObjectARemovalStepRestoredRefusesARockThatKeepsTheSizeALaterPluginGaveIt"/>, but a later plugin gave the rock a
+    /// As <see cref="AnObjectARemovalStepRestoredRefusesNoRockThatKeepsTheSizeALaterPluginGaveIt"/>, but a later plugin gave the rock a
     /// larger model, which it keeps where it goes back.
     /// </summary>
     [Fact]
-    public void AnObjectARemovalStepRestoredRefusesARockThatKeepsTheModelALaterPluginGaveIt()
+    public void AnObjectARemovalStepRestoredRefusesNoRockThatKeepsTheModelALaterPluginGaveIt()
     {
         var moved = Rock(0, OldPlace, PlaceNow);
         var rock = moved with
@@ -423,7 +424,7 @@ public sealed class RestoreWhereRemovedGuardTests
 
         var judged = Assert.Single(Plan(scene).Objects);
 
-        Assert.Equal(new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, MovedCrate().Key, Failure: null), judged.Refused);
+        Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
     }
 
     /// <summary>
@@ -449,21 +450,21 @@ public sealed class RestoreWhereRemovedGuardTests
     public enum LaterShapeChange { Rotation, Scale, PrimitiveBounds, CollisionLayer }
 
     /// <summary>
-    /// As <see cref="AnObjectARemovalStepRestoredBesideTheOldPlaceRefusesNothing"/>, but a later plugin changed a part that shapes the
-    /// rock, by just more than the rounding of plugins that re-save a record, and the rock keeps it: the crate keeps the rock out.
+    /// As <see cref="AnObjectARemovalStepRestoredRefusesNoRockThatKeepsTheSizeALaterPluginGaveIt"/>, but a later plugin changed another
+    /// part that shapes the rock, by just more than the rounding of plugins that re-save a record, and the rock keeps it.
     /// </summary>
     [Theory]
     [InlineData(LaterShapeChange.Rotation)]
     [InlineData(LaterShapeChange.Scale)]
     [InlineData(LaterShapeChange.PrimitiveBounds)]
     [InlineData(LaterShapeChange.CollisionLayer)]
-    public void AnObjectARemovalStepRestoredRefusesARockThatKeepsAShapeALaterPluginGaveIt(LaterShapeChange change)
+    public void AnObjectARemovalStepRestoredRefusesNoRockThatKeepsAShapeALaterPluginGaveIt(LaterShapeChange change)
     {
         var scene = RestoredCrateBesideRock(RockKeeping(change));
 
         var judged = Assert.Single(Plan(scene).Objects);
 
-        Assert.Equal(new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, MovedCrate().Key, Failure: null), judged.Refused);
+        Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
     }
 
     /// <summary>The rock as it goes back to its old place, keeping the change a later plugin made, just beyond the rounding.</summary>
@@ -557,15 +558,14 @@ public sealed class RestoreWhereRemovedGuardTests
 
     /// <summary>
     /// A pebble of the cleaned mod stays 70 units from the rock's old place, beyond the zones of the changed objects' settings. Its own
-    /// collision group checks 100 units around it. The rock keeps a scale Later.esp set: when the removal steps do not believe Later.esp,
-    /// the rock back at its old place is an object that can cause removals, so a later run would find the pebble too close to it and
-    /// the rock is refused; when they believe it, or no group judges the pebble, the rock goes back.
+    /// collision group may check 100 units around it. The rock keeps a scale Later.esp set. Whether or not the removal steps believe
+    /// Later.esp, the next patcher reads the rock the patch put back as support only, never as a cause, so the rock goes back.
     /// </summary>
     [Theory]
-    [InlineData(true, VersionTrust.None, false)]
-    [InlineData(true, VersionTrust.Full, true)]
-    [InlineData(false, VersionTrust.None, true)]
-    public void ARockThatCanCauseRemovalsOnceBackIsRefusedNextToAnObjectOfTheCleanedModWhoseOwnGroupFindsItTooClose(bool groupJudgesThePebble, VersionTrust laterTrust, bool restored)
+    [InlineData(true, VersionTrust.None)]
+    [InlineData(true, VersionTrust.Full)]
+    [InlineData(false, VersionTrust.None)]
+    public void ARockGoingBackIsNoCauseForAnObjectOfTheCleanedModWhoseOwnGroupReachesIt(bool groupJudgesThePebble, VersionTrust laterTrust)
     {
         var pebble = PebbleAt(1, OldPlace + new Vector3(ZoneReach + 40f, 0, 0));
         var moved = Rock(0, OldPlace, PlaceNow);
@@ -581,7 +581,7 @@ public sealed class RestoreWhereRemovedGuardTests
 
         var judged = Assert.Single(Plan(scene).Objects);
 
-        Assert.Equal(restored ? null : new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, pebble.Key, Failure: null), judged.Refused);
+        Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
     }
 
     /// <summary>A pebble of the cleaned mod's run that stays lies on the rock where the cleaned mod put it.</summary>

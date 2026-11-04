@@ -19,7 +19,9 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 /// the first patch added count as objects that stand where they stood.</item>
 /// <item>(d) every copy the first patch added is read back as one of the cleaned mod's objects, a copy of its original;</item>
 /// <item>(e) the second run adds no copy and puts back no original that went back with a copy;</item>
-/// <item>(f) the changed-terrain step finds no object on ground textures or water that it did not find there in the first run.</item>
+/// <item>(f) the changed-terrain step finds no object on ground textures or water that it did not find there in the first run;</item>
+/// <item>(g) every placed record the first run put back is read back as support only: neither a target nor an object that can
+/// cause removals.</item>
 /// </list>
 /// The second run's own restore decisions are not judged otherwise. A second run that stops because the first removed every object of
 /// the cleaned mod judges nothing, so only (c) checks that scene.
@@ -34,7 +36,7 @@ internal static class RestoredWorldStaysClean
     private const TerrainChangeKind TexturesAndWater =
         TerrainChangeKind.TerrainType | TerrainChangeKind.WaterHeight | TerrainChangeKind.WaterAdded | TerrainChangeKind.WaterRemoved;
 
-    /// <returns>Whether the second run judged the world, so (a), (b), (d), (e) and (f) were checked; false when it stopped because nothing of the cleaned mod was left.</returns>
+    /// <returns>Whether the second run judged the world, so (a), (b), (d), (e), (f) and (g) were checked; false when it stopped because nothing of the cleaned mod was left.</returns>
     public static bool Check(Settings settings, Func<string, IReadOnlyList<ISkyrimMod>> createLoadOrder, float heightTolerance)
     {
         var (first, mods, firstPatch, second) = RunTwice(settings, createLoadOrder, settings, createLoadOrder);
@@ -45,6 +47,7 @@ internal static class RestoredWorldStaysClean
             AssertEveryCopyReadBackAsTheCleanedModsObject(first, outcome);
             AssertNoCopyAddedAgain(first, outcome);
             AssertNoNewObjectOnChangedTexturesOrWater(first, outcome);
+            AssertEveryRecordThatWentBackReadAsSupportOnly(first, outcome);
         }
         else
         {
@@ -125,6 +128,14 @@ internal static class RestoredWorldStaysClean
         Assert.Empty(second.Written.Clones);
         var originals = first.Written.Clones.Select(clone => clone.Original).ToHashSet();
         Assert.DoesNotContain(second.RestoreWhereRemoved.Objects, judged => judged.IsRestored && originals.Contains(judged.Change.Key));
+    }
+
+    /// <summary>(g).</summary>
+    private static void AssertEveryRecordThatWentBackReadAsSupportOnly(RunOutcome first, RunOutcome second)
+    {
+        var judgedAgain = second.Collected.Targets.Select(target => target.Key).Concat(second.Collected.OtherModObjects.Select(other => other.Key)).ToHashSet();
+        var read = first.RestoreWhereRemoved.Objects.Where(judged => judged.IsRestored && judgedAgain.Contains(judged.Change.Key)).Select(judged => judged.Change.Key).ToList();
+        Assert.True(read.Count == 0, $"The second run reads as a target or a cause what the first run put back: {string.Join(", ", read)}");
     }
 
     /// <summary>(f).</summary>

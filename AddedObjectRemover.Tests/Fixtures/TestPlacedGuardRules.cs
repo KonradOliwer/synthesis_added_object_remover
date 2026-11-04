@@ -1,12 +1,15 @@
+using System.Collections.Immutable;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 
 namespace AddedObjectRemover.Tests.Fixtures;
 
 /// <summary>The rules the guards of restored placed records ask, over in-memory scenes, built the way the runner builds them.</summary>
 /// <param name="TooClose">The too-close rule with the given settings over a world and its caches, in which the given objects cause no removals.</param>
+/// <param name="TooCloseToWhatStays">The run's too-close rule over the worlds of <paramref name="WorldCaches"/>.</param>
 internal sealed record TestPlacedGuardRules(
     IObjectCachesOfWorlds WorldCaches,
     Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule> TooClose,
+    ITooCloseToWhatStaysRule TooCloseToWhatStays,
     IHoldersOfObjectsThatStay HoldersOfObjectsThatStay)
 {
     /// <param name="support">The touch gap and lost share of the support test, which the holders test reads its touch gap from.</param>
@@ -22,14 +25,15 @@ internal sealed record TestPlacedGuardRules(
             worldCaches,
             (world, caches, excluded, settings) => TooCloseRules.CreatePlacementRule(
                 new(world.Targets, caches.VisibleTargets, causes.Of(world, excluded, settings.Npcs), caches.PlacedNpcs, shapes, triangles), settings),
+            TooCloseRules.CreateTooCloseToWhatStaysRule(runCaches, worldCaches, causes),
             RestingObjectsRules.CreateHoldersOfObjectsThatStay(
                 new([], runCaches, trust, plugins, support, RestingObjectsRules.CreateSupportContacts(runCaches), new Execution(threads)),
                 worldCaches));
     }
 
-    /// <param name="tooClose">Builds the rule over a world and its caches; <see cref="TooClose"/> when null.</param>
+    /// <param name="tooClose">Builds the rule over a world and its caches; the run's rule when null.</param>
     public ITooCloseToWhatStaysRule TooCloseRule(Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule>? tooClose = null) =>
-        new TestTooCloseToWhatStays(WorldCaches, tooClose ?? TooClose);
+        tooClose is null ? TooCloseToWhatStays : new TestTooCloseToWhatStays(WorldCaches, tooClose, TooCloseToWhatStays);
 }
 
 /// <summary>The object caches of in-memory worlds, each built on its first ask, as the run builds them.</summary>
@@ -40,11 +44,28 @@ internal sealed class TestObjectCachesOfWorlds(Func<CollectedObjects, IObjectCac
     public IObjectCaches Of(CollectedObjects world) => _built.Get(world, () => index(world));
 }
 
-/// <summary>A too-close rule over a world of what stays, built over the world's caches.</summary>
+/// <summary>
+/// A too-close rule over a world of what stays, built over the world's caches, which also finds every clash; the reach questions go
+/// to the run's rule.
+/// </summary>
 internal sealed class TestTooCloseToWhatStays(
-    IObjectCachesOfWorlds worldCaches, Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule> create) : ITooCloseToWhatStaysRule
+    IObjectCachesOfWorlds worldCaches, Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule> create, ITooCloseToWhatStaysRule run)
+    : ITooCloseToWhatStaysRule
 {
     public IPlacementRule Create(CollectedObjects world, IEnumerable<OtherId> leftOut, TooCloseSettings settings) => create(world, worldCaches.Of(world), leftOut, settings);
+
+    public TooCloseClashes FindEveryClash(CollectedObjects world, IEnumerable<OtherId> leftOut, TooCloseSettings settings, TargetObject target) =>
+        TooCloseRules.FindEveryClash(excluded => Create(world, excluded, settings), leftOut, target);
+
+    public Box ZoneReachOf(TargetObject placed, TooCloseSettings settings) => run.ZoneReachOf(placed, settings);
+
+    public Box BoundsOf(OtherObject other) => run.BoundsOf(other);
+
+    public ImmutableArray<int> FindObjectsReaching(IReadOnlyList<(TargetObject Object, TooCloseSettings Settings)> objects, IReadOnlyList<OtherObject> others) =>
+        run.FindObjectsReaching(objects, others);
+
+    public ImmutableArray<int> FindOthersReached(IReadOnlyList<(TargetObject Object, TooCloseSettings Settings)> objects, IReadOnlyList<OtherObject> others) =>
+        run.FindOthersReached(objects, others);
 }
 
 internal sealed class TestNavmeshCheck(Func<NavmeshWriteTrial, NavmeshFault?> findFault) : INavmeshCheckIfWritten

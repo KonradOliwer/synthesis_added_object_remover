@@ -1040,6 +1040,173 @@ public sealed class RestoreLoopTests
     private static RecordChangedByCleanedMod WithPresenceRestoredToDisabled(RecordChangedByCleanedMod rock) =>
         rock with { Earlier = rock.Earlier with { Undo = PlacedParts.Position | PlacedParts.Presence }, PresenceBefore = new PlacedPresence(Removed: true, Parent: null, OppositeOfParent: false) };
 
+    private const string StoppedCheck = "InvalidOperationException: broke";
+
+    /// <summary>A target of the cleaned mod's run that stays, judged by the too-close step, away from the rocks' old places.</summary>
+    private static readonly Vector3 StandingPlace = new(3000, 3000, RockHalfSize);
+
+    private static readonly Vector3 RockAOldPlace = new(1500, 1500, RockHalfSize);
+    private static readonly Vector3 RockANow = new(1500, 2500, Raised + RockHalfSize);
+    private static readonly Vector3 RockBOldPlace = new(1500, 3800, RockHalfSize);
+    private static readonly Vector3 RockBNow = new(500, 3500, Raised + RockHalfSize);
+
+    /// <summary>A later mod's object set to the opposite of its enable parent, at the given place.</summary>
+    private static (OtherObject Object, KeyValuePair<RecordKey, PlacedPresence> Presence) OppositeOf(RecordKey parent, int index, Vector3 position)
+    {
+        var placed = LaterObject(index, Block.Base, position);
+        return (placed, KeyValuePair.Create(placed.Key, new PlacedPresence(Removed: false, parent, OppositeOfParent: true)));
+    }
+
+    /// <summary>
+    /// A later mod's object X is the opposite of rock A, which the base game disabled and the cleaned mod enabled: A's restore disables
+    /// it again, so X stands then, beside a target that stays and that the too-close step judges. The next patcher would remove the
+    /// target, so A is refused, naming the target, and X stays disabled. When another later object already stands too close to the
+    /// target, the target is removed anyway and A goes back.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ARockWhoseRestoreEnablesAnObjectTooCloseToATargetThatStaysIsRefused(bool alreadyTooClose)
+    {
+        var rock = WithPresenceRestoredToDisabled(Rock(0, RockAOldPlace, RockANow));
+        var x = OppositeOf(rock.Key, 11, StandingPlace + new Vector3(25, 0, 0));
+        var scene = new Scene
+        {
+            Rocks = [rock],
+            Others = [RockNow(0, RockANow), x.Object, .. alreadyTooClose ? [LaterObject(12, Block.Base, StandingPlace - new Vector3(25, 0, 0))] : new List<OtherObject>()],
+            Standing = [StandingPlace],
+            StandingTooClose = AllOn.TooClose,
+            Lands = [],
+            Presence = new Dictionary<RecordKey, PlacedPresence>([x.Presence]),
+        };
+
+        var judged = Assert.Single(Plan(scene).Objects);
+
+        Assert.Equal(alreadyTooClose ? null : new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, FirstStandingTargetKey(), Failure: null), judged.Refused);
+    }
+
+    /// <summary>
+    /// As <see cref="ARockWhoseRestoreEnablesAnObjectTooCloseToATargetThatStaysIsRefused"/>, but X is the opposite of rock A, which
+    /// follows rock B, and both A's and B's restores disable them: X stands when either goes back, so leaving out one alone does not
+    /// remove it. Both are refused, one pass after the other.
+    /// </summary>
+    [Fact]
+    public void RocksThatEachEnableAnObjectTooCloseToATargetThatStaysAreAllRefused()
+    {
+        var rockB = WithPresenceRestoredToDisabled(Rock(1, RockBOldPlace, RockBNow));
+        var rockA = WithPresenceRestoredToDisabled(Rock(0, RockAOldPlace, RockANow));
+        var x = OppositeOf(rockA.Key, 11, StandingPlace + new Vector3(25, 0, 0));
+        var scene = new Scene
+        {
+            Rocks = [rockA, rockB],
+            Others = [RockNow(0, RockANow), RockNow(1, RockBNow), x.Object],
+            Standing = [StandingPlace],
+            StandingTooClose = AllOn.TooClose,
+            Lands = [],
+            Presence = new Dictionary<RecordKey, PlacedPresence>([x.Presence, KeyValuePair.Create(rockA.Key, new PlacedPresence(Removed: false, rockB.Key, OppositeOfParent: false))]),
+        };
+
+        var result = Plan(scene);
+
+        Assert.All(result.Objects, judged => Assert.Equal(new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, FirstStandingTargetKey(), Failure: null), judged.Refused));
+        Assert.Equal(2, result.Objects.Length);
+    }
+
+    /// <summary>
+    /// Rock A's restore enables X beside the target that stays, and rock B's restore enables Y far from it. The target's too-close
+    /// check stops, with nothing going back too: A, whose X lies within the target's zones, is refused with the failure; B goes back.
+    /// </summary>
+    [Fact]
+    public void AStoppedCheckOfATargetThatStaysRefusesOnlyTheRocksEnablingObjectsWithinItsReach()
+    {
+        var rockA = WithPresenceRestoredToDisabled(Rock(0, RockAOldPlace, RockANow));
+        var rockB = WithPresenceRestoredToDisabled(Rock(1, RockBOldPlace, RockBNow));
+        var x = OppositeOf(rockA.Key, 11, StandingPlace + new Vector3(25, 0, 0));
+        var y = OppositeOf(rockB.Key, 12, new Vector3(3000, 500, RockHalfSize));
+        var scene = new Scene
+        {
+            Rocks = [rockA, rockB],
+            Others = [RockNow(0, RockANow), RockNow(1, RockBNow), x.Object, y.Object],
+            Standing = [StandingPlace],
+            StandingTooClose = AllOn.TooClose,
+            TooCloseStopsFor = FirstStandingTargetKey(),
+            Lands = [],
+            Presence = new Dictionary<RecordKey, PlacedPresence>([x.Presence, y.Presence]),
+        };
+
+        var result = Plan(scene);
+
+        Assert.Equal(
+            [new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, By: null, StoppedCheck), null],
+            result.Objects.OrderBy(judged => judged.Change.Key, RecordKeyOrder.Comparer).Select(judged => judged.Refused));
+    }
+
+    /// <summary>One more pass from the loop's end state adds nothing: the end state is a fixed point.</summary>
+    [Fact]
+    public void OneMorePassFromTheEndStateAddsNothing()
+    {
+        var planned = WhereRemovedRestorer.BuildPlans(InputOf(SceneOfSeveralPasses()));
+        var guards = RestoreGuardsBuilder.Build(planned.Inputs, planned.Plans);
+        var loop = new RestoreLoop(guards.Placed, guards.Terrain, guards.LoopInputs, () => TimeSpan.Zero);
+
+        var (final, passes, _) = loop.Run(planned.Plans.Start);
+        var (again, passesAgain, _) = loop.Run(final);
+
+        Assert.True(passes > 1);
+        Assert.Equal((1, final.Count), (passesAgain, again.Count));
+        Assert.Equal(final.Placed, again.Placed);
+        Assert.Equal(final.Clones, again.Clones);
+    }
+
+    /// <summary>A rock of the cleaned mod at <see cref="StandingPlace"/>, judged in a world of later mods' objects.</summary>
+    private static (TestPlacedGuardRules Rules, CollectedObjects World, TargetObject Target) RuleWorld(params Vector3[] others)
+    {
+        var target = StandingTarget(0, StandingPlace);
+        var world = TestScenes.CreateWorld([target], [.. others.Select((position, index) => LaterObject(index, Block.Base, position) with { Id = new OtherId(index) })]);
+        return (TestPlacedGuardRules.Create(Shapes, Trust, Plugins, Support, TestGround.NoTerrain(), threads: 1), world, target);
+    }
+
+    [Fact]
+    public void TheEveryClashQueryFindsEveryCauseTheObjectIsTooCloseToButThoseLeftOut()
+    {
+        var (rules, world, target) = RuleWorld(StandingPlace + new Vector3(25, 0, 0), StandingPlace + new Vector3(500, 0, 0), StandingPlace - new Vector3(25, 0, 0));
+        var rule = rules.TooCloseToWhatStays;
+
+        Assert.Equal(new TooCloseClashes([new OtherId(0), new OtherId(2)], Failure: null), rule.FindEveryClash(world, [], AllOn.TooClose, target), TooCloseClashesComparer);
+        Assert.Equal(new TooCloseClashes([new OtherId(2)], Failure: null), rule.FindEveryClash(world, [new OtherId(0)], AllOn.TooClose, target), TooCloseClashesComparer);
+    }
+
+    [Fact]
+    public void TheEveryClashQueryNamesTheFailureOfACheckThatStops()
+    {
+        var (rules, world, target) = RuleWorld(StandingPlace + new Vector3(25, 0, 0));
+        var rule = rules.TooCloseRule((checkedWorld, caches, excluded, settings) => new StoppingForRule(rules.TooClose(checkedWorld, caches, excluded, settings), target.Key));
+
+        Assert.Equal(new TooCloseClashes([], StoppedCheck), rule.FindEveryClash(world, [], AllOn.TooClose, target), TooCloseClashesComparer);
+    }
+
+    /// <summary>The zone reach holds the distance zone around the box, and the reach queries find what it overlaps, and every placed NPC.</summary>
+    [Fact]
+    public void TheReachQueriesFindWhatTheZonesReach()
+    {
+        var (rules, world, target) = RuleWorld(StandingPlace + new Vector3(25, 0, 0), StandingPlace + new Vector3(500, 0, 0));
+        var rule = rules.TooCloseToWhatStays;
+        var far = StandingTarget(1, StandingPlace + new Vector3(0, 2000, 0));
+        var npc = world.OtherModObjects[1] with { Base = Block.Base with { Kind = BaseLinkKind.Npc } };
+
+        var reach = rule.ZoneReachOf(target, AllOn.TooClose);
+
+        Assert.True(reach.Contains(StandingPlace + new Vector3(RockHalfSize + TooCloseDistance)) && reach.Contains(StandingPlace - new Vector3(RockHalfSize + TooCloseDistance)));
+        Assert.False(reach.Contains(StandingPlace + new Vector3(500, 0, 0)));
+        Assert.Equal([0], rule.FindObjectsReaching([(target, AllOn.TooClose), (far, AllOn.TooClose)], [world.OtherModObjects[0]]).ToList());
+        Assert.Equal([0, 1], rule.FindObjectsReaching([(target, AllOn.TooClose), (far, AllOn.TooClose)], [npc]).ToList());
+        Assert.Equal([0], rule.FindOthersReached([(target, AllOn.TooClose)], [.. world.OtherModObjects]).ToList());
+        Assert.Equal([0, 1], rule.FindOthersReached([(target, AllOn.TooClose)], [world.OtherModObjects[0], npc]).ToList());
+    }
+
+    private static readonly IEqualityComparer<TooCloseClashes> TooCloseClashesComparer =
+        EqualityComparer<TooCloseClashes>.Create((one, other) => one!.Others.SequenceEqual(other!.Others) && one.Failure == other.Failure);
+
     /// <summary>The winning presence of a record enabled with a parent, which a base game plugin's disable keeps disabled when <paramref name="parentDisabled"/>.</summary>
     private static Dictionary<RecordKey, PlacedPresence> FollowingAParent(RecordKey record, bool parentDisabled, bool oppositeOfParent = false)
     {
@@ -1477,29 +1644,26 @@ public sealed class RestoreLoopTests
 
     /// <summary>
     /// Rock C is refused next to a later mod's crate, so it stays where it stands now, next to rock D's old place, and refuses D in the
-    /// pass after. The too-close rule checks D again in that pass, but not rock E far away, which nothing new can reach.
+    /// pass after. Rock E far away goes back.
     /// </summary>
     [Fact]
-    public void TheTooCloseRuleChecksAgainOnlyTheRecordsACauseNoLongerLeftOutCanReach()
+    public void ARockRefusedInOnePassRefusesTheRockWhoseOldPlaceItStandsBesideInTheNext()
     {
         var cOldPlace = new Vector3(1500, 1500, RockHalfSize);
         var cNow = new Vector3(1500, 2500, Raised + RockHalfSize);
         var dOldPlace = cNow + new Vector3(RockHalfSize + TooCloseDistance - 5f, 0, 0);
         var eOldPlace = new Vector3(3000, 3000, RockHalfSize);
-        var checks = new ConcurrentQueue<RecordKey>();
         var scene = new Scene
         {
             Rocks = [Rock(0, cOldPlace, cNow), Rock(1, dOldPlace, new Vector3(2500, 500, Raised)), Rock(2, eOldPlace, new Vector3(3200, 3000, Raised))],
             Others = [.. CrateBesideTheRock(cOldPlace, present: true), RockNow(0, cNow), RockNow(1, new Vector3(2500, 500, Raised)), RockNow(2, new Vector3(3200, 3000, Raised))],
             Lands = [],
-            TooCloseChecks = checks,
         };
 
         var result = Plan(scene);
 
         Assert.Equal(new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, scene.Rocks[0].Key, Failure: null), result.Objects[1].Refused);
         Assert.Null(result.Objects[2].Refused);
-        Assert.Equal((2, 1), (checks.Count(key => key == scene.Rocks[1].Key), checks.Count(key => key == scene.Rocks[2].Key)));
     }
 
     /// <summary>With no ground going back, the objects of other plugins are neither listed nor indexed for the ground placed for them.</summary>
@@ -1545,8 +1709,8 @@ public sealed class RestoreLoopTests
         List<OtherObject> farAway = [.. Enumerable.Range(0, 50).Select(index => LaterObject(4000 + index, Block.Base, new Vector3(8000 + 50 * index, 6000, RockHalfSize)))];
         var everything = scene with { Others = [.. scene.Others, .. carried, .. farAway] };
 
-        var (withinReach, indexedWithinReach) = CheckPlacedRecords(everything, new GuardReach(Shapes, AllOn.TooClose, Support.TouchGap));
-        var (overEverything, indexedEverywhere) = CheckPlacedRecords(everything, new GuardReach(Shapes, AllOn.TooClose with { DistanceInUnits = Everywhere }, Everywhere));
+        var (withinReach, indexedWithinReach) = CheckPlacedRecords(everything, AllOn.TooClose, Support.TouchGap);
+        var (overEverything, indexedEverywhere) = CheckPlacedRecords(everything, AllOn.TooClose with { DistanceInUnits = Everywhere }, Everywhere);
 
         Assert.Equal(overEverything, withinReach);
         Assert.Contains(withinReach, refusal => refusal?.Guard == PlacedGuard.TooCloseToWhatStays);
@@ -1555,7 +1719,9 @@ public sealed class RestoreLoopTests
     }
 
     /// <summary>The first pass of the placed guards over every rock of the scene going back, and how many objects their caches index.</summary>
-    private static (List<PlacedRefusal?> Found, int Indexed) CheckPlacedRecords(Scene scene, GuardReach reach)
+    /// <param name="reachSettings">The too-close settings that set how far the guards look.</param>
+    /// <param name="touchGap">The touch gap that sets how far the guards look.</param>
+    private static (List<PlacedRefusal?> Found, int Indexed) CheckPlacedRecords(Scene scene, TooCloseSettings reachSettings, float touchGap)
     {
         var removedTargets = RemovedTargets();
         ImmutableArray<TargetObject> targets = [.. removedTargets];
@@ -1563,15 +1729,16 @@ public sealed class RestoreLoopTests
         var final = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved), targets.Length)
             .Apply(RoundKind.TooClose, [.. removedTargets.Select(target => new ProposedRemoval(target.Id, new TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);
         List<RecordChangedByCleanedMod> cleared = [.. scene.Rocks.OrderBy(rock => rock.Key, RecordKeyOrder.Comparer)];
-        var world = AfterRemovalWorld.Of(collected, final, OtherModsObjectsResult.SwitchedOff, TestTargets.TargetName, cleared, reach);
         var rules = TestPlacedGuardRules.Create(Shapes, Trust, Plugins, Support, TestGround.NoTerrain(), threads: 1);
+        var reach = new GuardReach(Shapes, rules.TooCloseToWhatStays, reachSettings, touchGap);
+        var world = AfterRemovalWorld.Of(collected, final, OtherModsObjectsResult.SwitchedOff, TestTargets.TargetName, cleared, reach);
         var caches = rules.WorldCaches.Of(world.World);
         var blocking = new ObjectsThatBlockActors(Shapes, new Dictionary<RecordKey, ReferenceFacts>());
+        var presence = FinalPresence.Of(collected, removedTargets.Select(target => target.Key).ToHashSet(), cleared);
         var inputs = new PlacedGuardInputs(
             caches,
             excluded => rules.TooClose(world.World, caches, excluded, AllOn.TooClose),
-            GroupTooCloseGuard.Of(
-                world, cleared, [], TestTargetGroups.None, reach, TestTargets.TargetName, (checkedWorld, excluded, settings) => rules.TooClose(checkedWorld, rules.WorldCaches.Of(checkedWorld), excluded, settings), new Execution(1)),
+            StandingTooCloseChecks.Of(collected, OtherModsObjectsResult.SwitchedOff, world, cleared, [], new HashSet<int>(), TestTargetGroups.None, presence, rules.TooCloseToWhatStays, new Execution(1)),
             rules.HoldersOfObjectsThatStay.Over(world.World, world.Now),
             rules.HoldersOfObjectsThatStay.Over(world.GoingBackWorld, world.Holders),
             Shapes,
@@ -1579,15 +1746,15 @@ public sealed class RestoreLoopTests
             new NavmeshIndex(_ => null),
             space => space,
             _ => TestTargets.TargetName,
-            CloneGuards.Of(world, () => throw new InvalidOperationException("No copy is planned."), blocking, [], [], new Execution(1)));
-        var presence = FinalPresence.Of(collected, removedTargets.Select(target => target.Key).ToHashSet(), cleared);
-        var guards = new PlacedGuards(world, inputs, reach, presence, new DoorLinkGuard(cleared, [], _ => null), new Execution(1));
+            CloneGuards.Of(world, blocking, [], [], new Execution(1)));
+        var guards = new PlacedGuards(world, inputs, new DoorLinkGuard(cleared, [], _ => null), new Execution(1));
         var plans = new OtherKindsAsPlanned(
             new TerrainUndoPlan([], _ => new LandHeights(null, null), AllOn.HeightChangeTolerance, AllOn.TerrainEdgeBlendDistance),
             new WaterUndoPlan([], [], AllOn.WaterHeightChangeTolerance),
             [],
             new HashSet<RecordKey>());
-        var found = guards.CheckGoingBack(Enumerable.Range(0, cleared.Count).ToHashSet(), new HashSet<int>(), plans, causesLeftOutBefore: null).Found;
+        var goingBack = Enumerable.Range(0, cleared.Count).ToHashSet();
+        var found = guards.CheckGoingBack(goingBack, new HashSet<int>(), plans, new PresenceInPass(presence, goingBack.Contains)).Found;
         return ([.. found], world.World.OtherModAndSupportOnlyObjects.Count());
     }
 
@@ -1807,16 +1974,16 @@ public sealed class RestoreLoopTests
             WinningPrimitives = scene.Primitives,
         };
         var rules = TestPlacedGuardRules.Create(scene.Shapes, Trust, Plugins, Support, TestGround.NoTerrain(), scene.Workers);
-        Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule> counted = scene.TooCloseChecks is { } checks
-            ? (world, caches, excluded, settings) => new CountingRule(rules.TooClose(world, caches, excluded, settings), checks)
-            : rules.TooClose;
-        Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule> tooClose = scene.CheckedWorlds is { } worlds
-            ? (world, caches, excluded, settings) =>
+        Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule>? tooClose = (scene.CheckedWorlds, scene.TooCloseStopsFor) switch
+        {
+            ({ } worlds, _) => (world, caches, excluded, settings) =>
             {
                 worlds.Enqueue(world);
-                return counted(world, caches, excluded, settings);
-            }
-            : counted;
+                return rules.TooClose(world, caches, excluded, settings);
+            },
+            (_, { } stopsFor) => (world, caches, excluded, settings) => new StoppingForRule(rules.TooClose(world, caches, excluded, settings), stopsFor),
+            _ => null,
+        };
         ImmutableArray<NavmeshWorldTriangle> winning =
         [
             .. scene.Navmeshes.SelectMany(navmesh => Enumerable.Range(0, navmesh.Winner.Triangles.Length)
@@ -1836,6 +2003,9 @@ public sealed class RestoreLoopTests
                 TestTargets.PatchName,
                 ImmutableDictionary<PluginName, VersionTrust>.Empty.Add(BaseGame, VersionTrust.Full).Add(TestTargets.TargetName, VersionTrust.Full).Add(LaterMod.ToPluginName(), VersionTrust.None)),
             CleanedModsObjects = TestTargetGroups.None.CleanedModsObjects with { ChangedTerrainSettings = scene.CleanedModsTerrainCheck ?? TestTargetGroups.ChangedTerrainOff },
+            TooClose = scene.StandingTooClose is { } standingTooClose
+                ? [new ObjectsJudgedWith<TooCloseSettings>([.. Enumerable.Range(removedTargets.Count, scene.Standing.Count).Select(index => new TargetId(index))], standingTooClose)]
+                : TestTargetGroups.None.TooClose,
         };
         return new(
             new(collected, OtherModsObjectsResult.SwitchedOff),
@@ -1904,8 +2074,11 @@ public sealed class RestoreLoopTests
         /// <summary>The consistency check's first fault over what the trial's writes alone would leave; none by default.</summary>
         public Func<NavmeshWriteTrial, NavmeshFault?> FindFault { get; init; } = _ => null;
 
-        /// <summary>When set, collects every placed record the too-close rule checks, once per check.</summary>
-        public ConcurrentQueue<RecordKey>? TooCloseChecks { get; init; }
+        /// <summary>The too-close step's settings the objects of <see cref="Standing"/> are judged with; none judges them when null.</summary>
+        public TooCloseSettings? StandingTooClose { get; init; }
+
+        /// <summary>When set, every too-close check of the placed record with this key stops unexpectedly.</summary>
+        public RecordKey? TooCloseStopsFor { get; init; }
 
         /// <summary>When set, collects the world of every too-close rule built, once per rule.</summary>
         public ConcurrentQueue<CollectedObjects>? CheckedWorlds { get; init; }
@@ -1917,13 +2090,18 @@ public sealed class RestoreLoopTests
         public IBaseObjectShapes Shapes { get; init; } = RestoreLoopTests.Shapes;
     }
 
-    /// <summary>A too-close rule that notes each record it checks.</summary>
-    private sealed class CountingRule(IPlacementRule rule, ConcurrentQueue<RecordKey> checks) : IPlacementRule
+    /// <summary>A too-close rule whose checks of the placed record with the given key stop unexpectedly.</summary>
+    private sealed class StoppingForRule(IPlacementRule rule, RecordKey stopsFor) : IPlacementRule
     {
-        public IPlacementTries StartTries(TargetObject target)
+        public IPlacementTries StartTries(TargetObject target) => target.Key == stopsFor ? new Stopping() : rule.StartTries(target);
+
+        private sealed class Stopping : IPlacementTries
         {
-            checks.Enqueue(target.Key);
-            return rule.StartTries(target);
+            public PlacementCheck Check(EulerPlacement placement) => new(Clash: null, StoppedCheck);
+
+            public void Dispose()
+            {
+            }
         }
     }
 }

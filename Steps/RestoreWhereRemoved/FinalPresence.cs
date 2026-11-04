@@ -37,6 +37,20 @@ internal sealed class FinalPresence(
     /// <param name="goesBack">Whether the placed record at an index among those whose areas let them go back goes back.</param>
     public ImmutableArray<RecordKey> DoorsEndingRemoved(Func<int, bool> goesBack) => [.. doors.Where(door => EndsRemoved(door, goesBack))];
 
+    /// <summary>
+    /// The placed records going back whose restore brings back their presence, among the record and its enable-parent chain as it
+    /// ends, by their index among those whose areas let them go back, in chain order.
+    /// </summary>
+    /// <param name="goesBack">Whether the placed record at an index among those whose areas let them go back goes back.</param>
+    public IEnumerable<int> CandidatesRestoringPresenceOnChainOf(RecordKey placed, Func<int, bool> goesBack)
+    {
+        HashSet<RecordKey> followed = [];
+        for (RecordKey? record = placed; record is { } current && followed.Add(current); record = FinalVersionOf(current, goesBack).Parent)
+        {
+            if (changedRecords.TryGetValue(current, out var change) && PresenceGoesBack(change, goesBack)) yield return candidates[current];
+        }
+    }
+
     /// <param name="followed">The records whose enable parent the walk has followed so far; null before it follows the first.</param>
     private bool EndsRemoved(RecordKey placed, Func<int, bool> goesBack, HashSet<RecordKey>? followed)
     {

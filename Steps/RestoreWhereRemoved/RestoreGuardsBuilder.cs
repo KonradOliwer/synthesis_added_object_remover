@@ -26,7 +26,7 @@ internal static class RestoreGuardsBuilder
             ? new TerrainGuards(() => ObjectsOfTheRun.OtherPluginsObjectsThatStay(world, collected, plans.Cleared), plans.Ground, plans.SpacesOnLand, cell => landHeights(cell).Current, settings.HeightChangeTolerance, input.Execution)
             : null;
         return new RestoreGuardsBuilt(
-            plans.Cleared.Count == 0 ? null : BuildPlaced(inputs, plans, world, reach, blocking, changedTriangles),
+            plans.Cleared.Count == 0 ? null : BuildPlaced(inputs, plans, world, blocking, changedTriangles),
             terrainGuards,
             new RestoreLoopInputs(
                 world,
@@ -57,11 +57,10 @@ internal static class RestoreGuardsBuilder
         WhereRemovedRestorer.StepInputs inputs,
         WhereRemovedRestorer.Plans plans,
         AfterRemovalWorld world,
-        GuardReach reach,
         ObjectsThatBlockActors blocking,
         ImmutableArray<NavmeshTriangleInCell> changedTriangles)
     {
-        var (input, guards, runCaches) = (inputs.Input, inputs.Input.Guards, inputs.Input.Reads.Caches);
+        var (input, guards, runCaches, collected) = (inputs.Input, inputs.Input.Guards, inputs.Input.Reads.Caches, inputs.Input.Earlier.Collected);
         var caches = guards.WorldCaches.Of(world.World);
         var tooCloseSettings = inputs.Settings.TooClose;
         return new PlacedGuards(
@@ -69,7 +68,17 @@ internal static class RestoreGuardsBuilder
             new PlacedGuardInputs(
                 caches,
                 leftOut => guards.TooClose.Create(world.World, leftOut, tooCloseSettings),
-                GroupTooCloseGuard.Of(world, plans.Cleared, plans.TargetsThatMayStay, input.RemovalSteps, reach, input.Reads.CleanedMod, guards.TooClose.Create, input.Execution),
+                StandingTooCloseChecks.Of(
+                    collected,
+                    inputs.OtherModsObjects,
+                    world,
+                    plans.Cleared,
+                    plans.TargetsThatMayStay,
+                    plans.Start.GoingBackWithClone(),
+                    input.RemovalSteps,
+                    plans.FinalPresence,
+                    guards.TooClose,
+                    input.Execution),
                 guards.HoldersOfObjectsThatStay.Over(world.World, world.Now),
                 guards.HoldersOfObjectsThatStay.Over(world.GoingBackWorld, world.Holders),
                 runCaches.Shapes,
@@ -77,37 +86,9 @@ internal static class RestoreGuardsBuilder
                 runCaches.Navmeshes,
                 inputs.FindLandWorldspace,
                 input.Reads.Plugin.ReadTerrainWinner,
-                BuildCloneGuards(inputs, plans, world, reach, blocking, changedTriangles)),
-            reach,
-            plans.FinalPresence,
-            new DoorLinkGuard(plans.Cleared, input.Earlier.Collected.ChangedNavmeshes, guards.NavmeshCheck.FindFaultIfWritten),
+                CloneGuards.Of(world, blocking, collected.ChangedNavmeshes, changedTriangles, input.Execution)),
+            new DoorLinkGuard(plans.Cleared, collected.ChangedNavmeshes, guards.NavmeshCheck.FindFaultIfWritten),
             input.Execution);
-    }
-
-    private static CloneGuards BuildCloneGuards(
-        WhereRemovedRestorer.StepInputs inputs,
-        WhereRemovedRestorer.Plans plans,
-        AfterRemovalWorld world,
-        GuardReach reach,
-        ObjectsThatBlockActors blocking,
-        ImmutableArray<NavmeshTriangleInCell> changedTriangles)
-    {
-        var (input, collected) = (inputs.Input, inputs.Input.Earlier.Collected);
-        var judging = input.RemovalSteps;
-        var tooClose = () => CloneTooCloseCheck.Of(
-            collected,
-            inputs.Final,
-            inputs.OtherModsObjects,
-            world,
-            plans.Cleared,
-            judging.Accepted,
-            input.Reads.CleanedMod,
-            plans.FinalPresence,
-            reach,
-            judging.CleanedModsObjects.TooClose,
-            input.Guards.TooClose.Create,
-            input.Execution);
-        return CloneGuards.Of(world, tooClose, blocking, collected.ChangedNavmeshes, changedTriangles, input.Execution);
     }
 
     /// <summary>The changed-terrain settings each target is judged with, by its key.</summary>

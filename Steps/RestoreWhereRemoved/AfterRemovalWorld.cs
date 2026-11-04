@@ -6,10 +6,11 @@ using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 
 /// <summary>
-/// The world once every round and every move is done. Its causes are the targets that stand, where they stand last (fitted, moved or
-/// restored), then the objects of other plugins that are a change in the world without the cleaned mod and those the patch pulled
-/// down, where they stand. Its support-only objects are every other object that stands, such as one that stood there without the
-/// cleaned mod. The other mods' objects the patch removed are in neither. Every candidate that stands now is among them, where it
+/// The world once every round and every move is done. Its causes are the targets that stand, where they stand last (fitted or
+/// moved), then the objects of other plugins that are a change in the world without the cleaned mod and those the patch pulled
+/// down, where they stand. Its support-only objects are the targets a removal step restored to their earlier version, which the
+/// next patcher reads as unchanged, then every other object that stands, such as one that stood there without the cleaned mod. The
+/// other mods' objects the patch removed are in neither. Every candidate that stands now is among them, where it
 /// stands now; that entry also stands for the clone of a candidate going back with one, since the clone stands there.
 /// </summary>
 /// <param name="World">
@@ -17,7 +18,7 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 /// as other-mod and support-only objects, and the candidates, each as it goes back, with the candidate's index as its id.
 /// </param>
 /// <param name="Causes">Every cause, in the order above.</param>
-/// <param name="SupportOnly">Every support-only object, in id order of the scan.</param>
+/// <param name="SupportOnly">Every support-only object, in the order above, each kind in its own order.</param>
 /// <param name="CleanedModObjectsThatStand">The cleaned mod's own objects that stand, where they stand last, in target order.</param>
 /// <param name="StandingNow">The candidate index of each candidate that stands now, ascending.</param>
 /// <param name="Now">
@@ -25,10 +26,6 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 /// the id of each is its position.
 /// </param>
 /// <param name="CopiesNow">The id among the other objects of <paramref name="World"/> of each of <paramref name="Now"/>.</param>
-/// <param name="CausesRestoredByRemovalSteps">
-/// The ids among the other-mod objects of <paramref name="World"/> of the targets a removal step restored to their earlier version,
-/// in id order.
-/// </param>
 /// <param name="EndInEarlierShapeAndPlace">
 /// By candidate index: the candidate as it goes back has the same shape where it stands as with every part taken from its earlier
 /// version (<see cref="PlacedShape.IsSameAs"/>). One that keeps a placement, model or collision data a later plugin changed does not;
@@ -56,7 +53,6 @@ internal sealed record AfterRemovalWorld(
     ImmutableArray<int> StandingNow,
     ImmutableArray<TargetObject> Now,
     ImmutableArray<OtherId> CopiesNow,
-    ImmutableArray<OtherId> CausesRestoredByRemovalSteps,
     ImmutableArray<bool> EndInEarlierShapeAndPlace,
     ImmutableArray<bool> KeepShapeWhereItStandsNow,
     CollectedObjects GoingBackWorld,
@@ -81,8 +77,14 @@ internal sealed record AfterRemovalWorld(
         var standingTargets = TargetsWhereTheyStandLast(collected.Targets, final);
         var takenAway = otherModsObjects.TakenAway();
         var others = OtherObjectsThatStand(collected, takenAway);
-        ImmutableArray<OtherObject> causes = [.. standingTargets.Select(target => target.AsOtherObject(default, cleanedMod)).Concat(others.Where(other => IsChange(other, takenAway)))];
-        ImmutableArray<OtherObject> supportOnly = [.. others.Where(other => !IsChange(other, takenAway))];
+        var restoredByRemovalSteps = standingTargets.Where(target => final.Of(target.Id) is Decision.Restored).Select(target => target.Key).ToHashSet();
+        ImmutableArray<OtherObject> causes =
+            [.. standingTargets.Where(target => !restoredByRemovalSteps.Contains(target.Key)).Select(target => target.AsOtherObject(default, cleanedMod)).Concat(others.Where(other => IsChange(other, takenAway)))];
+        ImmutableArray<OtherObject> supportOnly =
+        [
+            .. standingTargets.Where(target => restoredByRemovalSteps.Contains(target.Key)).Select(target => AsUnchanged(target, cleanedMod)),
+            .. others.Where(other => !IsChange(other, takenAway)),
+        ];
         var standingKeys = causes.Concat(supportOnly).Select(other => other.Key).ToHashSet();
         var asItIsNow = candidates.Select((change, index) => AsItIsNow(change, new TargetId(index), collected.Targets)).ToList();
         ImmutableArray<TargetObject> restored = [.. candidates.Select((change, index) => asItIsNow[index].RestoredAs(change.Earlier))];
@@ -94,7 +96,6 @@ internal sealed record AfterRemovalWorld(
         var nearCauses = causes.Where(other => inReach.Contains(other.Key)).ToList();
         var objects = nearCauses.Concat(supportOnly.Where(other => inReach.Contains(other.Key))).Select((other, index) => other with { Id = new OtherId(index) }).ToList();
         var idOf = objects.ToDictionary(other => other.Key, other => other.Id);
-        var restoredByRemovalSteps = standingTargets.Where(target => final.Of(target.Id) is Decision.Restored).Select(target => target.Key).ToHashSet();
         var world = collected with
         {
             Targets = restored,
@@ -115,7 +116,6 @@ internal sealed record AfterRemovalWorld(
             standingNow,
             now,
             [.. standingNow.Select(candidate => idOf[candidates[candidate].Key])],
-            [.. nearCauses.Where(cause => restoredByRemovalSteps.Contains(cause.Key)).Select(cause => idOf[cause.Key])],
             [.. candidates.Select((change, index) => PlacedShape.Of(restored[index]).IsSameAs(PlacedShape.Of(asItIsNow[index].RestoredAs(change.Earlier with { Undo = EveryPart }))))],
             KeepShapeWhereTheyStandNow(restored, standingNow, now),
             goingBackWorld,
@@ -172,11 +172,15 @@ internal sealed record AfterRemovalWorld(
     /// <summary>
     /// The ids among the other objects of <see cref="World"/> of the objects that stand as they stood before the cleaned mod: the
     /// support-only objects no plugin changed since then, property by property (<see cref="OtherObject.ChangeSinceBeforeCleanedMod"/>),
-    /// and the causes a removal step restored to their earlier version. One a later plugin only re-saved is among them; one a later
-    /// plugin added or moved, maybe for the world the cleaned mod made, is not.
+    /// the targets a removal step restored to their earlier version among them. One a later plugin only re-saved is among them; one a
+    /// later plugin added or moved, maybe for the world the cleaned mod made, is not.
     /// </summary>
     public HashSet<OtherId> StandingAsBeforeTheCleanedMod() =>
-        [.. World.SupportOnlyObjects.Where(other => other.ChangeSinceBeforeCleanedMod is null).Select(other => other.Id), .. CausesRestoredByRemovalSteps];
+        [.. World.SupportOnlyObjects.Where(other => other.ChangeSinceBeforeCleanedMod is null).Select(other => other.Id)];
+
+    /// <summary>A target a removal step restored to its earlier version, as an object that is no change since before the cleaned mod.</summary>
+    private static OtherObject AsUnchanged(TargetObject restored, PluginName cleanedMod) =>
+        restored.AsOtherObject(default, cleanedMod) with { ChangeWithoutCleanedMod = null, ChangeSinceBeforeCleanedMod = null };
 
     /// <summary>The keys of the objects within the guards' reach, and of every candidate's copy where it stands now.</summary>
     private static HashSet<RecordKey> InReach(

@@ -12,9 +12,8 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 /// </param>
 /// <param name="Navmeshes">Null while the navmeshes are switched off.</param>
 /// <param name="Terrain">While the terrain is switched off, a plan in which nothing goes back.</param>
-/// <param name="CausesLeftOut">The causes the too-close rule left out in the pass that gave this state; null before the first pass.</param>
 internal sealed record RestoreState(
-    ImmutableArray<PlacedRefusal?> Placed, ImmutableArray<CloneJudged?> Clones, NavmeshUndoPlan? Navmeshes, TerrainUndoPlan Terrain, WaterUndoPlan Water, IReadOnlySet<OtherId>? CausesLeftOut)
+    ImmutableArray<PlacedRefusal?> Placed, ImmutableArray<CloneJudged?> Clones, NavmeshUndoPlan? Navmeshes, TerrainUndoPlan Terrain, WaterUndoPlan Water)
 {
     /// <summary>The indexes of the placed records that go back, with or without a copy.</summary>
     public IReadOnlySet<int> PlacedGoingBack() => Enumerable.Range(0, Placed.Length).Where(index => Placed[index] is null && Clones[index] is not { RefusedBy: not null }).ToHashSet();
@@ -118,22 +117,22 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
 
     private (RestoreState State, TimeSpan PlacedGuardsTime) Pass(PassInput before)
     {
-        var (placed, clones, causesLeftOut, placedGuardsTime) = RefusePlaced(before);
-        return (new RestoreState(placed, clones, RefuseNavmeshGroups(before), ProtectGround(before), KeepWater(before), causesLeftOut), placedGuardsTime);
+        var (placed, clones, placedGuardsTime) = RefusePlaced(before);
+        return (new RestoreState(placed, clones, RefuseNavmeshGroups(before), ProtectGround(before), KeepWater(before)), placedGuardsTime);
     }
 
     /// <summary>
     /// The placed guards and the copies' rules against the current plans, for the placed records still going back, with the time of
     /// their checks.
     /// </summary>
-    private (ImmutableArray<PlacedRefusal?> Placed, ImmutableArray<CloneJudged?> Clones, IReadOnlySet<OtherId>? CausesLeftOut, TimeSpan Time) RefusePlaced(PassInput before)
+    private (ImmutableArray<PlacedRefusal?> Placed, ImmutableArray<CloneJudged?> Clones, TimeSpan Time) RefusePlaced(PassInput before)
     {
         var state = before.State;
-        if (placedGuards is null) return (state.Placed, state.Clones, null, TimeSpan.Zero);
+        if (placedGuards is null) return (state.Placed, state.Clones, TimeSpan.Zero);
         var plans = new OtherKindsAsPlanned(state.Terrain, state.Water, before.Navmeshes.ThatStayChanged, before.Navmeshes.GoingBack);
-        var (checks, time) = Timed.Run(clock, () => placedGuards.CheckGoingBack(before.PlacedGoingBack, before.WithClone, plans, state.CausesLeftOut));
+        var (checks, time) = Timed.Run(clock, () => placedGuards.CheckGoingBack(before.PlacedGoingBack, before.WithClone, plans, before.PassPresence));
         var (placed, clones) = checks.AppliedTo(state);
-        return (placed, clones, checks.CausesLeftOut, time);
+        return (placed, clones, time);
     }
 
     /// <summary>

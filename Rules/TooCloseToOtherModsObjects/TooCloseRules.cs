@@ -46,6 +46,25 @@ public static class TooCloseRules
     public static ITooCloseToWhatStaysRule CreateTooCloseToWhatStaysRule(IRunCaches caches, IObjectCachesOfWorlds worldCaches, ICausesOfWorlds causes) =>
         new TooCloseToWhatStaysRule(new OtherWorlds(caches, worldCaches, causes));
 
+    /// <summary>
+    /// Every cause but <paramref name="leftOut"/> that the target object, where it stands, is too close to, by the rules
+    /// <paramref name="createRule"/> makes with the given causes left out. A check names the lowest cause it finds, so each cause found
+    /// is left out of the next check until none is found or a check stops.
+    /// </summary>
+    public static TooCloseClashes FindEveryClash(Func<IEnumerable<OtherId>, IPlacementRule> createRule, IEnumerable<OtherId> leftOut, TargetObject target)
+    {
+        HashSet<OtherId> excluded = [.. leftOut];
+        List<OtherId> found = [];
+        while (true)
+        {
+            var check = createRule(excluded.OrderBy(cause => cause.Index)).CheckWhereItStands(target);
+            if (check.Failure is not null || check.Clash is null) return new TooCloseClashes([.. found.OrderBy(cause => cause.Index)], check.Failure);
+            var other = check.Clash is TooClose clash ? clash.Other : throw new UnreachableException($"The too-close rule gave the reason {check.Clash}.");
+            found.Add(other);
+            excluded.Add(other);
+        }
+    }
+
     /// <summary>The NPCs that can spawn in the world: its placed NPCs but those its replacements replace.</summary>
     private static NpcsThatCanSpawn NpcsOf(TooCloseWorld world) => new(world.PlacedNpcs, world.Selected.Replacements);
 

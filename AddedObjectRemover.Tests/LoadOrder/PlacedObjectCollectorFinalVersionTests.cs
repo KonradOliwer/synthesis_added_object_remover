@@ -6,7 +6,7 @@ namespace AddedObjectRemover.Tests.LoadOrder;
 
 /// <summary>
 /// The collector decides by the creator first, then by the final version: a target record the target plugin or the patch wins
-/// is judged where it is now, one another plugin wins is overridden later; the patch holds what earlier patchers in the group
+/// is judged where it is now, one another plugin wins, or one a third plugin's version lies under the patch's, is overridden later; the patch holds what earlier patchers in the group
 /// wrote, so their moves and removals are read like any other version.
 /// </summary>
 public class PlacedObjectCollectorFinalVersionTests
@@ -29,6 +29,43 @@ public class PlacedObjectCollectorFinalVersionTests
 
         Assert.Equal(NewPlace, Assert.Single(collected.Targets, target => target.Key == moved.Key).Transform.Position);
         Assert.Equal(0, collected.Counts.TargetsOverriddenLater);
+    }
+
+    [Fact]
+    public void ATargetRecordThePatchWinsOverTheCleanedModsVersionIsJudgedAtTheNewPlace()
+    {
+        var moved = WithVersions(TargetRecord(1, Winner.Patch, NewPlace), TestTargets.TargetName, TestTargets.PatchName);
+
+        var collected = Collect([TargetRecord(0, Winner.Target, Vector3.Zero), moved]);
+
+        Assert.Equal(NewPlace, Assert.Single(collected.Targets, target => target.Key == moved.Key).Transform.Position);
+        Assert.Equal(0, collected.Counts.TargetsOverriddenLater);
+    }
+
+    /// <summary>A third plugin chose the state; the patch only carries it, so the record is left to that plugin.</summary>
+    [Fact]
+    public void ATargetRecordThePatchWinsOverAThirdPluginsVersionIsOverriddenLater()
+    {
+        var carried = WithVersions(TargetRecord(1, Winner.Patch, NewPlace), TestTargets.TargetName, LaterPlugin, TestTargets.PatchName);
+
+        var collected = Collect([TargetRecord(0, Winner.Target, Vector3.Zero), carried]);
+
+        Assert.DoesNotContain(collected.Targets, target => target.Key == carried.Key);
+        Assert.Equal(1, collected.Counts.TargetsOverriddenLater);
+    }
+
+    /// <summary>Another group's patch is a third plugin too: its state is not this patcher's to judge.</summary>
+    [Fact]
+    public void ATargetRecordThePatchWinsOverAnotherGroupsPatchIsOverriddenLater()
+    {
+        var otherGroupsPatch = new PluginName("OtherGroup - Patch.esp");
+        var mods = TestModTrust.Of(TestTargets.TargetName, TestTargets.PatchName, trusted: [], untrusted: [], otherGroupPatches: [otherGroupsPatch]);
+        var carried = WithVersions(TargetRecord(1, Winner.Patch, NewPlace), TestTargets.TargetName, otherGroupsPatch, TestTargets.PatchName);
+
+        var collected = PlacedObjects.Collect(new FixedFactsPlugin([TargetRecord(0, Winner.Target, Vector3.Zero), carried]), mods, Plan);
+
+        Assert.DoesNotContain(collected.Targets, target => target.Key == carried.Key);
+        Assert.Equal(1, collected.Counts.TargetsOverriddenLater);
     }
 
     [Fact]
@@ -107,6 +144,10 @@ public class PlacedObjectCollectorFinalVersionTests
 
     private static PlacedRecordFact TargetRecord(int index, Winner winner, Vector3 position) =>
         TestPlacedRecords.Create(TestTargets.Key(index), PluginOf(winner), position);
+
+    /// <summary>The record with one version per plugin, lowest first, each placed as the record's winner is.</summary>
+    private static PlacedRecordFact WithVersions(PlacedRecordFact record, params PluginName[] plugins) =>
+        record with { Versions = [.. plugins.Select(plugin => TestPlacedRecords.Version(plugin, record.Placement, baseKey: null))] };
 
     private static PluginName PluginOf(Winner winner) => winner switch
     {

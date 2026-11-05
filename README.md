@@ -451,7 +451,7 @@ checked either; an object such a patcher changed in the patch is checked as an o
 Objects of untrusted mods, of never trusted mods, of mods trusted for their own changes only, and of plugins that are trusted
 only because a trusted mod has them as a master (and that are not masters of the cleaned mod) are ignored: whatever this
 setting is, they neither keep the cleaned mod's object nor are removed or pulled down. Placed NPCs and creatures, markers and
-other invisible objects, effect meshes (fog, light rays) and the cleaned mod's own objects that a later plugin overrides are
+other invisible objects, effect meshes (fog, light rays) and the cleaned mod's own objects that a later plugin overrides (an earlier patcher's copy of such an object in the patch included) are
 never checked. Any object that stays, of any plugin, and the terrain still count as the ground an object is pulled down onto.
 
 **When an object rests on another** and when it is left without support:
@@ -802,7 +802,7 @@ synthesis_added_object_remover\
     configs\<config>.json    the settings for one mod
 ```
 
-The patcher never creates or changes these files. The `Example mod` folder in the repository is a ready example (a group file and two configs) to copy into Mod Organizer 2.
+The patcher never creates or changes these files. The `Example mod` folder in the repository is a ready example (the group file `cleaned_mods` and the configs `SomeMod` and `OtherMod`) to copy into Mod Organizer 2. The mod names in it are invented: set `CleanedMod` in each config to the mod you want cleaned up, and rename the files to match.
 
 Names in the group file and the group file name are plain file names, not paths; `.json` is added when missing, and names are matched without regard to case.
 
@@ -831,7 +831,7 @@ To find the key names, copy them from the entries inside `Standard` in the patch
 
 **Order is priority.** The configs run in the listed order, and each one reads what the earlier ones wrote from the patch itself, as it reads any other plugin. A later config treats the objects an earlier one removed as gone, and the markers an earlier one moved as standing at their new position. An object that only clashed with something an earlier config removed is therefore kept.
 
-**Same result as several copies of the patcher.** Adding this patcher several times to one Synthesis group, each copy in `Standard` mode with the settings of one config and in the order of the group file, gives the same patch as one `Batch` run of those configs, and for each mod the same log lines (apart from the lines that open a config's section) and the same report files. Such a chain may also clean up the same mod twice; the second copy then starts from what the first one wrote, like any later config.
+**Same result as several copies of the patcher.** Adding this patcher several times to one Synthesis group, each copy in `Standard` mode with the settings of one config and in the order of the group file, gives the same patch as one `Batch` run of those configs, and for each mod the same log lines (apart from the lines that open a config's section) and the same report files. When a patcher fails, Synthesis stops the whole run: the copies after it do not run, and the group's patch is not put into the output folder, so a chain with a failing copy leaves no patch there (the earlier copies' files stay in Synthesis's working folder only). A `Batch` with a failing config likewise writes no patch (see *What stops the whole run*). The equality above holds for runs where nothing fails. Such a chain may also clean up the same mod twice; the second copy then starts from what the first one wrote, like any later config.
 
 **What stops the whole run.** Before anything is written, the patcher reads the group file and every config and checks them against your plugin list. If any of these is wrong, the run stops with a message that names the file and the problem, and no patch is written:
 - no group file name is set, or a name is a path or has characters a file name cannot have;
@@ -844,7 +844,7 @@ To find the key names, copy them from the entries inside `Standard` in the patch
 - the plugin list cannot be read (see *How to use*);
 - two configs clean up the same mod.
 
-A config that stops fails the whole batch. Its message names the config file, then gives the same sentence as the Standard stop and ends with *Nothing was run and no patch was written.*, for example *Config file X.json: CleanedMod.esp is disabled. Nothing was run and no patch was written.* A config that sets no mod to clean up reads *Config file <path> sets no mod to clean up (CleanedMod). Nothing was run and no patch was written.* The other messages of this list also end with *Nothing was run and no patch was written.*
+A config that stops fails the whole batch: no later config runs and no patch is written. Its message names the config file, then gives the same sentence as the Standard stop and ends with *Nothing was run and no patch was written.*, for example *Config file X.json: CleanedMod.esp is disabled. Nothing was run and no patch was written.* A config that sets no mod to clean up reads *Config file <path> sets no mod to clean up (CleanedMod). Nothing was run and no patch was written.* The other messages of this list also end with *Nothing was run and no patch was written.*
 
 **What does not stop the run.**
 - A key the patcher does not know is ignored and listed in the log, so a misspelling is easy to find.
@@ -1036,7 +1036,9 @@ With *Detailed log and reports* on, CSV files (UTF-8, comma-separated, header in
 - Object size comes from the mesh, or its Object Bounds when the mesh can't be read, which can
   differ slightly from what you see in game.
 - The cleaned mod's objects that a later-loading plugin changes are left alone, even if they still clip with
-  something in game. Those an earlier patcher in the same group changed in the patch are checked as that patcher left them.
+  something in game. This holds when an earlier patcher in the same group copied such an object into the patch: the later plugin's
+  version is the last one other than the patch's, so the object is left to it. Objects the cleaned mod still wins and an earlier
+  patcher changed in the patch are checked as that patcher left them.
 - The cleaned mod's effect-only objects (such as fog, light rays or water spray) collide with nothing: they are never too close to
   anything, are never found resting on anything and hold nothing up. They are visible all the same, so the direction method of *Objects left behind*
   judges them (by their solid surroundings only), and they count when an area is judged cleared, by number only. An area that holds

@@ -4,7 +4,7 @@ namespace AddedObjectRemover.Tests.Rules;
 
 public sealed class ExampleModTests
 {
-    private const string ExampleGroupName = "Landscape mods conflicts remover";
+    private const string ExampleGroupName = "cleaned_mods";
 
     [Fact]
     public void TheExampleModLoadsBothConfigsInOrderListingEverySettingWithoutUnknownKeys()
@@ -14,8 +14,8 @@ public sealed class ExampleModTests
         var read = Program.ReadConfigs(settings, ExampleModFolder());
 
         var configs = Assert.IsType<ConfigsRead.Ready>(read).Configs;
-        Assert.Equal(["Ulvenwald", "Nature of the Wild Lands"], configs.Select(config => Assert.IsType<SettingsSource.ConfigFile>(config.Source).Name));
-        Assert.Equal(["Ulvenwald.esp", "Nature of the Wild Lands.esp"], configs.Select(config => config.Settings.CleanedMod?.ToString()));
+        Assert.Equal(["SomeMod", "OtherMod"], configs.Select(config => Assert.IsType<SettingsSource.ConfigFile>(config.Source).Name));
+        Assert.Equal(["SomeMod.esp", "OtherMod.esp"], configs.Select(config => config.Settings.CleanedMod?.ToString()));
         Assert.All(configs, config => Assert.Empty(Assert.IsType<SettingsSource.ConfigFile>(config.Source).Notes.UnknownKeys));
         Assert.All(configs, config => Assert.Empty(Assert.IsType<SettingsSource.ConfigFile>(config.Source).Notes.NotInFile));
     }

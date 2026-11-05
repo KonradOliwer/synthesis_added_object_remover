@@ -95,6 +95,15 @@ internal sealed class RecordClassifier(ModTrustTable trust, AcceptedWorld world,
         };
     }
 
-    /// <remarks>The patch's version holds what earlier patchers in this group wrote, so a target record it wins is judged as the patch left it.</remarks>
-    private bool WinsInTargetOrPatch(PlacedRecordFact record) => record.WinningMod == trust.CleanedMod || record.WinningMod == trust.Patch;
+    /// <remarks>
+    /// The patch's version holds what earlier patchers in this group wrote, so a target record it wins is judged as the patch left it,
+    /// unless the highest version other than the patch's is a third plugin's (another group's patch included): that plugin chose the record's state and the patch only
+    /// carries it. Earlier steps of this patcher write only records the cleaned mod wins, so their moves are always judged.
+    /// </remarks>
+    private bool WinsInTargetOrPatch(PlacedRecordFact record) =>
+        record.WinningMod == trust.CleanedMod || (record.WinningMod == trust.Patch && !IsHeldByThirdPluginBelowThePatch(record));
+
+    private bool IsHeldByThirdPluginBelowThePatch(PlacedRecordFact record) =>
+        record.Versions.Where(version => version.Plugin != trust.Patch).Select(version => (PluginName?)version.Plugin).LastOrDefault() is { } plugin
+        && plugin != trust.CleanedMod;
 }

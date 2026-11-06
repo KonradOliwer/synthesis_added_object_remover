@@ -26,7 +26,39 @@ public sealed class FollowUpOfGoingBackTests
     private static readonly TestStatic Pebble = new(new FormKey(ShapeMod, 0x803), @"test\followupleaving\pebble.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-1.5f, -1.5f, 0), new Vector3(1.5f, 1.5f, 3))));
     /// <summary>Another model of a block's shape and size.</summary>
     private static readonly TestStatic Boulder = new(new FormKey(ShapeMod, 0x804), @"test\followupleaving\boulder.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-HalfSize), new Vector3(HalfSize))));
-    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(ShapeMod, "FollowUpLeavingData", Block, Lantern, Pebble, Boulder));
+    /// <summary>How far a plate's top lies above its bottom: twice the touch gap, so what rests on a plate floats once it is gone.</summary>
+    private const float PlateThickness = 2f;
+
+    private const float BowlHalfWidth = 25f;
+    private const float BowlFloor = 4f;
+
+    /// <summary>
+    /// A bowl's width, as thin as <see cref="PlateThickness"/>, its bottom where a block's is: a bowl on it touches it with more than half
+    /// of what it touches when a block rests on its floor.
+    /// </summary>
+    private static readonly TestStatic Plate = new(
+        new FormKey(ShapeMod, 0x805),
+        @"test\followupleaving\plate.nif",
+        TestMeshes.BoxTriangles(new Box(new Vector3(-BowlHalfWidth, -BowlHalfWidth, -HalfSize), new Vector3(BowlHalfWidth, BowlHalfWidth, -HalfSize + PlateThickness))));
+
+    /// <summary>
+    /// Where the post of a bowl starts along x and y: a block in the middle of the bowl is this far beyond its own corner, within the
+    /// touch gap along each axis, so the post lies in its contact area, and farther than the gap diagonally, so the post never touches it.
+    /// </summary>
+    private const float PostFrom = HalfSize + 0.8f;
+
+    private const float PostHeight = 10f;
+
+    /// <summary>A floor with its bottom where a block's is and a post on one corner, which rises beside a block resting on the floor.</summary>
+    private static readonly TestStatic Bowl = new(
+        new FormKey(ShapeMod, 0x806),
+        @"test\followupleaving\bowl.nif",
+        [
+            .. TestMeshes.BoxTriangles(new Box(new Vector3(-BowlHalfWidth, -BowlHalfWidth, -HalfSize), new Vector3(BowlHalfWidth, BowlHalfWidth, -HalfSize + BowlFloor))),
+            .. TestMeshes.BoxTriangles(new Box(new Vector3(PostFrom, PostFrom, -HalfSize + BowlFloor), new Vector3(BowlHalfWidth, BowlHalfWidth, -HalfSize + BowlFloor + PostHeight))),
+        ]);
+
+    private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(ShapeMod, "FollowUpLeavingData", Block, Lantern, Pebble, Boulder, Plate, Bowl));
 
     /// <summary>A base the game shows, whose record and mesh the shapes do not know, like a marker without a model.</summary>
     private static readonly BaseKey WithoutMesh = TestVisibility.TaggedBase(ObjectVisibility.Visible);
@@ -545,6 +577,69 @@ public sealed class FollowUpOfGoingBackTests
     }
 
     /// <summary>
+    /// The same stack with the middle rock of an unrelated mod: it would float where it goes back and may not be changed there, so it
+    /// stays where the cleaned mod moved it. The top rock, which rested on it where both arrive, is judged again without it there and is
+    /// pulled down onto the ground.
+    /// </summary>
+    [Fact]
+    public void AnArrivalWhoseSupportStaysWhereItStandsNowIsJudgedAgainWithoutIt()
+    {
+        var scene = new Scene
+        {
+            SecondRockAt = RockNow + new Vector3(0, 0, Top), SecondRockMod = LaterMod, ThirdRockAt = RockNow + new Vector3(0, 0, 2 * Top),
+        };
+
+        var checks = scene.Check(goingBack: [SecondRockCandidate, ThirdRockCandidate]);
+
+        var pulled = Assert.Single(checks.Written.Others).Outcome;
+        Assert.Equal((RockKey(2, BaseGameMod), OtherModsObjectFate.PulledDown), (pulled.Object.Key, pulled.Fate));
+        Assert.Equal(HalfSize, pulled.NewPosition.Z, tolerance: 0.5f);
+        Assert.Equal([SecondRockCandidate], checks.ArrivingWhereTheyDoNotFit.Keys);
+    }
+
+    /// <summary>
+    /// 1000 units north a bowl stood on a plate with a rock on its floor; the cleaned mod moved all three, still stacked. The plate
+    /// stays, so the bowl, going back, floats twice the touch gap above the ground and is pulled down by that much. The bowl's post still
+    /// lies in the rock's contact area once it landed, so the rock reads the same supporter, only lower: it is judged again and pulled
+    /// down onto the floor too.
+    /// </summary>
+    [Fact]
+    public void AnArrivalWhoseSupporterLandsALittleLowerIsJudgedAgain()
+    {
+        var bowlNow = RockNow + new Vector3(0, 0, PlateThickness);
+        var scene = new Scene
+        {
+            RockBase = Plate.Base, SecondRockAt = bowlNow, SecondRockBase = Bowl.Base, ThirdRockAt = bowlNow + new Vector3(0, 0, BowlFloor),
+        };
+
+        var checks = scene.Check(goingBack: [SecondRockCandidate, ThirdRockCandidate]);
+
+        var pulled = checks.Written.Others.Select(other => other.Outcome).ToList();
+        Assert.Equal([(RockKey(1, BaseGameMod), OtherModsObjectFate.PulledDown), (RockKey(2, BaseGameMod), OtherModsObjectFate.PulledDown)], pulled.Select(outcome => (outcome.Object.Key, outcome.Fate)));
+        Assert.Equal(bowlNow.Z - PlateThickness, pulled[0].NewPosition.Z, tolerance: 0.5f);
+        Assert.Equal(bowlNow.Z - PlateThickness + BowlFloor, pulled[1].NewPosition.Z, tolerance: 0.5f);
+        Assert.Empty(checks.ArrivingWhereTheyDoNotFit);
+    }
+
+    /// <summary>Stacks of three rocks like the one above side by side, some of their rocks of an unrelated mod: the same with one worker as with eight.</summary>
+    [Fact]
+    public void ArrivalsThatDoNotFitAreTheSameWhateverTheNumberOfWorkers()
+    {
+        var stacks = ManyStacks();
+        HashSet<int> goingBack = [.. Enumerable.Range(0, stacks.Rocks.Count).Where(rock => rock % StackHeight != 0)];
+
+        var one = stacks.CheckOneAfterAnother(threads: 1, oneFollowUpForAll: true, [goingBack])[0];
+        var eight = stacks.CheckOneAfterAnother(threads: 8, oneFollowUpForAll: true, [goingBack])[0];
+
+        Assert.Equal(one.Written.Others.Select(other => other.Outcome), eight.Written.Others.Select(other => other.Outcome));
+        Assert.Equal(WrittenOthers(one), WrittenOthers(eight));
+        Assert.Equal(one.ArrivingWhereTheyDoNotFit.Keys, eight.ArrivingWhereTheyDoNotFit.Keys);
+        Assert.Equal(one.ArrivingWhereTheyDoNotFit.Values, eight.ArrivingWhereTheyDoNotFit.Values);
+        Assert.NotEmpty(one.Written.Others);
+        Assert.NotEmpty(one.ArrivingWhereTheyDoNotFit);
+    }
+
+    /// <summary>
     /// Before the cleaned mod the second rock lay on a rock that an unrelated mod has since moved away: nothing stands under the second
     /// rock's old place without the cleaned mod either. The second rock goes back as it stood then, and nothing is refused, pulled down
     /// or removed for the unrelated mod's change (decision 33).
@@ -951,6 +1046,31 @@ public sealed class FollowUpOfGoingBackTests
         return new ManyRockScene(rocks, others, pebbles);
     }
 
+    private const int StackHeight = 3;
+
+    /// <summary>
+    /// Eight stacks of three rocks the cleaned mod moved, still stacked, from 1000 units north: bottom, middle and top, in that index
+    /// order. Every fourth middle rock, from the second stack on, and every third top rock are of an unrelated mod.
+    /// </summary>
+    private static ManyRockScene ManyStacks()
+    {
+        const int Count = 8;
+        List<RecordChangedByCleanedMod> rocks = [];
+        List<OtherObject> others = [];
+        for (var stack = 0; stack < Count; stack++)
+        {
+            for (var level = 0; level < StackHeight; level++)
+            {
+                var index = stack * StackHeight + level;
+                var mod = (level == 1 && stack % 4 == 1) || (level == 2 && stack % 3 == 0) ? LaterMod : BaseGameMod;
+                var now = new Vector3(100 + stack * 200, 3000, HalfSize + level * Top);
+                rocks.Add(Rock(index, now, mod));
+                others.Add(RockObject(index, now, mod));
+            }
+        }
+        return new ManyRockScene(rocks, others, []);
+    }
+
     /// <summary>Rocks of the base game the cleaned mod moved, and objects resting on them.</summary>
     private sealed record ManyRockScene(List<RecordChangedByCleanedMod> Rocks, List<OtherObject> Others, List<Vector3> Pebbles)
     {
@@ -982,6 +1102,7 @@ public sealed class FollowUpOfGoingBackTests
         public Vector3 CrateAt { get; init; } = CrateNow;
         public Vector3 SecondRockAt { get; init; } = SecondRockNow;
         public ModKey SecondRockMod { get; init; } = BaseGameMod;
+        public BaseKey SecondRockBase { get; init; } = Block.Base;
 
         /// <summary>Where the cleaned mod put a third rock, the fourth candidate, moved from 1000 units north; none when null.</summary>
         public Vector3? ThirdRockAt { get; init; }
@@ -1020,7 +1141,7 @@ public sealed class FollowUpOfGoingBackTests
         public List<OtherObject> Objects() =>
         [
             .. (RockHidden ? Array.Empty<OtherObject>() : [Rock()]).Concat(Others)
-                .Concat(SecondRockHidden ? Array.Empty<OtherObject>() : [RockObject(1, SecondRockAt, SecondRockMod)])
+                .Concat(SecondRockHidden ? Array.Empty<OtherObject>() : [RockObject(1, SecondRockAt, SecondRockMod) with { Base = SecondRockBase }])
                 .Concat(ThirdRockAt is { } third ? [RockObject(2, third, ThirdRockMod)] : Array.Empty<OtherObject>())
                 .Select((other, index) => other with { Id = new OtherId(index) }),
         ];
@@ -1110,7 +1231,7 @@ public sealed class FollowUpOfGoingBackTests
             if (SecondRockBaseBack is { } earlierBase) earlier = earlier with { Base = earlierBase, Undo = earlier.Undo | PlacedParts.BaseAndData };
             if (SecondRockHidden) earlier = earlier with { Undo = earlier.Undo | PlacedParts.Presence };
             if (SecondRockMarkerBack) earlier = earlier with { Reference = earlier.Reference with { HasMapMarker = true }, Undo = earlier.Undo | PlacedParts.BaseAndData };
-            return change with { Earlier = earlier };
+            return change with { Earlier = earlier, BaseNow = SecondRockBase };
         }
 
         private RecordChangedByCleanedMod HiddenOrNot(int candidate, RecordChangedByCleanedMod change) =>

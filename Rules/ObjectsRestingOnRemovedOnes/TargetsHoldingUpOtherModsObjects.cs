@@ -21,7 +21,7 @@ internal sealed class TargetsHoldingUpOtherModsObjects(
     public Dictionary<TargetId, OtherObject> Find(IEnumerable<TargetObject> nearTargets, Func<OtherId, bool> isLeftOut)
     {
         var resting = near.FindTouchingAny([.. nearTargets.Select(rules.SupportingBoxOf).OfType<BoxInSpace>()], isLeftOut);
-        var holders = ParallelMap.Run(execution, resting.Count, () => new OtherObjectQueries(), (k, queries) => FindTargetsHoldingUp(resting[k], queries), ParallelMap.AutomaticRangeSize);
+        var holders = ParallelMap.RunOnEach(execution, resting, () => new OtherObjectQueries(), FindTargetsHoldingUp);
         var found = new Dictionary<TargetId, OtherObject>();
         foreach (var (other, holdersOfOther) in resting.Zip(holders))
         {

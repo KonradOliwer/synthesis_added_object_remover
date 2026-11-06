@@ -22,12 +22,7 @@ internal sealed class SupportContactFinder(
     /// <param name="candidates">Indexes of target objects with a mesh.</param>
     /// <returns>One per candidate, in the given order.</returns>
     public FoundContacts[] FindContactsOfAll(IReadOnlyList<int> candidates, Execution execution) =>
-        ParallelMap.Run(
-            execution,
-            candidates.Count,
-            () => new ObjectQueryScratch(),
-            (k, scratch) => FindContacts(candidates[k], scratch),
-            ParallelMap.AutomaticRangeSize);
+        ParallelMap.RunOnEach(execution, candidates, () => new ObjectQueryScratch(), FindContacts);
 
     /// <param name="candidate">Index of a target object with a mesh.</param>
     /// <param name="scratch">The calling thread's buffers.</param>

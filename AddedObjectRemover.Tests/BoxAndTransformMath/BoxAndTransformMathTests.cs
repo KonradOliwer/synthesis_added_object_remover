@@ -5,6 +5,22 @@ namespace AddedObjectRemover.Tests.BoxAndTransformMath;
 
 public class BoxAndTransformMathTests
 {
+    /// <summary>
+    /// Equal numbers are the same to the bit; a zero of the other sign, though equal, is not, and neither is a rotation with its last
+    /// entry one bit larger.
+    /// </summary>
+    [Fact]
+    public void TransformsAreTheSameToTheBitOnlyWhenEveryNumberIs()
+    {
+        var transform = PlacedTransform.Upright(new Vector3(1, 0, 3), 0.5f, 1f);
+        var r = transform.Rotation;
+        var lastEntryOneBitLarger = new Mat3(r.M11, r.M12, r.M13, r.M21, r.M22, r.M23, r.M31, r.M32, MathF.BitIncrement(r.M33));
+
+        Assert.True(transform.IsSameToTheBitAs(PlacedTransform.Upright(new Vector3(1, 0, 3), 0.5f, 1f)));
+        Assert.False(transform.IsSameToTheBitAs(transform with { Position = new Vector3(1, -0f, 3) }));
+        Assert.False(transform.IsSameToTheBitAs(transform with { Rotation = lastEntryOneBitLarger }));
+    }
+
     [Fact]
     public void InsetMovesEverySideInward()
     {

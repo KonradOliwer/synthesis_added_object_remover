@@ -13,6 +13,18 @@ public readonly record struct PlacedTransform(Vector3 Position, Mat3 Rotation, f
 
     /// <summary>World -> mesh-local, the inverse of <see cref="ToWorld"/>.</summary>
     public Vector3 ToLocal(Vector3 world) => Rotation.TransformTransposed(world - Position) / Scale;
+
+    /// <summary>Whether every number of both is the same to the bit, so any computation gives the same result with either.</summary>
+    public bool IsSameToTheBitAs(PlacedTransform other)
+    {
+        var (rotation, otherRotation) = (Rotation, other.Rotation);
+        return Same(Position.X, other.Position.X) && Same(Position.Y, other.Position.Y) && Same(Position.Z, other.Position.Z) && Same(Scale, other.Scale)
+            && Same(rotation.M11, otherRotation.M11) && Same(rotation.M12, otherRotation.M12) && Same(rotation.M13, otherRotation.M13)
+            && Same(rotation.M21, otherRotation.M21) && Same(rotation.M22, otherRotation.M22) && Same(rotation.M23, otherRotation.M23)
+            && Same(rotation.M31, otherRotation.M31) && Same(rotation.M32, otherRotation.M32) && Same(rotation.M33, otherRotation.M33);
+    }
+
+    private static bool Same(float first, float second) => BitConverter.SingleToInt32Bits(first) == BitConverter.SingleToInt32Bits(second);
 }
 
 /// <summary>

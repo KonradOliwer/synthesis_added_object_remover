@@ -16,11 +16,8 @@ public class CopiedCodeTests
     private const string SettingChecks = "Setting-by-setting check lines; each reads another setting with its own default, limit and wording.";
     private const string PartKeyLines = "One entry per part key in the wording table; each entry names its own part and words its own consequence, so there is no logic to share.";
 
-    private const string ParallelCalls = "One call of the order-independent parallel map over a list with per-worker buffers; each asks its own question, so there is no logic to share.";
-
     private const string CollisionBuilder = "Run/RunSettingsValidation/CollisionSettingsBuilder.cs:CollisionSettingsBuilder.";
     private const string Report = "Steps/BuildLogAndReports/";
-    private const string RestingRules = "Rules/ObjectsRestingOnRemovedOnes/";
 
     private const string RoundAddingEntries =
         "Entries of the deciding steps: each runs its step and returns its own result with the run's decisions after its own kind of "
@@ -65,10 +62,6 @@ public class CopiedCodeTests
             Report + "Tables.Touch.cs:Tables.EdgeHeader"])] = CsvColumnNames,
         [CopyFamily.KeyOf([Report + "Tables.Support.cs:Tables.SupportHeader", Report + "Tables.Touch.cs:Tables.ComponentHeader"])] = CsvColumnNames,
         [CopyFamily.KeyOf([Report + "RunPartText.cs:RunPartText.Wordings"])] = PartKeyLines,
-        [CopyFamily.KeyOf(["Steps/MoveKeptMarkers/KeptMarkerMover.cs:KeptMarkerMover.Move", RestingRules + "TargetsHoldingUpOtherModsObjects.cs:TargetsHoldingUpOtherModsObjects.Find"])] =
-            ParallelCalls,
-        [CopyFamily.KeyOf([RestingRules + "SupportContactFinder.cs:SupportContactFinder.FindContactsOfAll", RestingRules + "TargetsHoldingUpOtherModsObjects.cs:TargetsHoldingUpOtherModsObjects.Find"])] =
-            ParallelCalls,
         [CopyFamily.KeyOf([Runner + "RunChangedTerrain", Runner + "RunTooClose"])] = StepCalls,
         [CopyFamily.KeyOf([Runner + "RunAlsoRemove", Runner + "RunObjectsInClearedAreas", Runner + "RunVisibleLeftBehind"])] = StepCalls,
         [CopyFamily.KeyOf([Runner + "RunInvisibleLeftBehind", Runner + "RunObjectsInClearedAreas", Runner + "RunVisibleLeftBehind"])] = StepCalls,

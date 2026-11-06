@@ -33,7 +33,7 @@ internal sealed class DropFinder(ISupportContacts surfaces, ITriangleMeshes cach
 
         var bounds = faller.Box.WorldAabb(0f);
         var lowestReach = points.Min(point => point.Z) - touchGap - RoundingMargin;
-        return FindSupportersBelow(faller, bounds, world, queries)
+        return FindSupportersBelow(faller, world, queries)
             .Any(supporter => HoldsUpAnyPoint(points, bounds.Center.Z, lowestReach, supporter, queries.Query.Triangles));
     }
 
@@ -46,7 +46,7 @@ internal sealed class DropFinder(ISupportContacts surfaces, ITriangleMeshes cach
         var bounds = faller.Box.WorldAabb(0f);
         var points = SampleSurfaceInWorld(faller);
         var below = FindDistancesToTerrain(world.Terrain, faller.Space, points);
-        foreach (var supporter in FindSupportersBelow(faller, bounds, world, queries))
+        foreach (var supporter in FindSupportersBelow(faller, world, queries))
         {
             ShortenToMesh(points, bounds.Center.Z, supporter, below, queries.Query.Triangles);
         }
@@ -56,10 +56,10 @@ internal sealed class DropFinder(ISupportContacts surfaces, ITriangleMeshes cach
 
     private Vector3[] SampleSurfaceInWorld(StandingObject faller) => [.. surfaces.SampleSurface(faller.MeshPath).Points.Select(faller.Transform.ToWorld)];
 
-    /// <summary>The supporters within the object's bounds reaching down by the pull limit.</summary>
-    /// <param name="bounds">The object's world bounds.</param>
-    private static List<MeshSupporter> FindSupportersBelow(StandingObject faller, Box bounds, SupportWorld world, OtherObjectQueries queries)
+    /// <summary>The supporters in the world its drop is measured to: those within its bounds reaching down by the pull limit.</summary>
+    public static List<MeshSupporter> FindSupportersBelow(StandingObject faller, SupportWorld world, OtherObjectQueries queries)
     {
+        var bounds = faller.Box.WorldAabb(0f);
         var columnBelow = bounds with { Min = bounds.Min with { Z = bounds.Min.Z - OtherModsObjectsLimits.MaxPullDistance } };
         return world.FindSupporters(faller.Space, columnBelow, faller.Self, queries);
     }

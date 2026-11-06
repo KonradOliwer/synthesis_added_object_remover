@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
@@ -35,7 +36,8 @@ internal sealed class ArrivalsThatDoNotFit(
     SupportLoss loss,
     GroundChangeUnder ground,
     DropFinder drops,
-    OtherModsObjectsSettings settings)
+    OtherModsObjectsSettings settings,
+    Execution execution)
 {
     private readonly LosingSupportFates _fates = new(rules, drops, settings);
 
@@ -54,17 +56,40 @@ internal sealed class ArrivalsThatDoNotFit(
     /// <summary>Why an arrival does not fit, with the share of its support it lost when it loses its support.</summary>
     private readonly record struct Failing(int Index, ArrivalMisfit Misfit, float LostShare);
 
+    /// <summary>What the judging measures of each arrival once, before any is settled.</summary>
+    /// <param name="WeightsBefore">The weight of its surface touching anything in the world in which every object that could leave did.</param>
+    /// <param name="PlaceMisfits">What its place itself does not fit; null when nothing.</param>
+    /// <param name="LowestFirst">The arrivals' indexes, lowest bottom first, then by index.</param>
+    private sealed record Measured(float[] WeightsBefore, ArrivalMisfit?[] PlaceMisfits, ImmutableArray<int> LowestFirst);
+
+    /// <summary>An arrival's lost share in a world after as some arrivals settled it, with the supporters it read there.</summary>
+    /// <remarks>
+    /// Every such world stands on the same ground, so in a later one that gives the arrival the same supporters its lost share is the
+    /// same (<see cref="SupportLoss.FindSupportersRead"/>): only the arrivals near what a settled one changed are measured again.
+    /// </remarks>
+    private sealed record LostShareIn(SupportersRead Read, float? LostShare);
+
     /// <returns>Each arrival that does not fit, in the order given.</returns>
-    /// <remarks>One after another: only the candidates of one pass arrive.</remarks>
     public ImmutableArray<ArrivingWhereItDoesNotFit> Find(IReadOnlyList<Arrival> arrivals)
     {
-        var queries = new OtherObjectQueries();
-        List<float> weightsBefore = [.. arrivals.Select(arrival => support.FindContacts(arrival.Standing, everyoneLeft, queries).TotalWeight)];
-        List<ArrivalMisfit?> placeMisfits = [.. arrivals.Select(arrival => PlaceMisfitOf(arrival.Standing))];
+        var measured = Measure(arrivals);
+        var lostShares = new LostShareIn?[arrivals.Count];
         var progress = new Progress(new Dictionary<OtherId, PlacedTransform?>(afterChanges), arrivingInAnotherShape.ToDictionary(other => other.Id), [], []);
-        while (LowestFailing(arrivals, weightsBefore, placeMisfits, progress, queries) is { } failing) Settle(arrivals[failing.Index], failing, progress, queries);
+        var queries = new OtherObjectQueries();
+        while (true)
+        {
+            var world = WorldOf(progress);
+            if (LowestFailing(arrivals, measured, lostShares, progress, world) is not { } failing) break;
+            Settle(arrivals[failing.Index], failing, world, progress, queries);
+        }
         return [.. progress.Settled.OrderBy(entry => entry.Key).Select(entry => entry.Value).OfType<ArrivingWhereItDoesNotFit>()];
     }
+
+    private Measured Measure(IReadOnlyList<Arrival> arrivals) =>
+        new(
+            MeasureEach([.. Enumerable.Range(0, arrivals.Count)], (index, queries) => support.FindContacts(arrivals[index].Standing, everyoneLeft, queries).TotalWeight),
+            [.. arrivals.Select(arrival => PlaceMisfitOf(arrival.Standing))],
+            [.. Enumerable.Range(0, arrivals.Count).OrderBy(index => arrivals[index].Standing.Box.WorldAabb(0f).Min.Z).ThenBy(index => index)]);
 
     /// <summary>What the place itself does not fit, whatever stands around it: a water line that stays moved, then ground rising into it.</summary>
     private ArrivalMisfit? PlaceMisfitOf(StandingObject standing)
@@ -79,26 +104,51 @@ internal sealed class ArrivalsThatDoNotFit(
         space == line.Space && box.Min.Z < line.Upper && box.Max.Z > line.Lower && (line.Grid is not { } grid || ExteriorGrid.ReachesInto(box, grid));
 
     /// <returns>The arrival not yet settled with the lowest bottom, then the lowest index, that does not fit; null when none fails.</returns>
-    private Failing? LowestFailing(
-        IReadOnlyList<Arrival> arrivals, List<float> weightsBefore, List<ArrivalMisfit?> placeMisfits, Progress progress, OtherObjectQueries queries)
+    /// <remarks>
+    /// Only the arrivals below the lowest whose place does not fit can be the lowest failing, so only their support is measured; when
+    /// none of them loses its support, that one is the lowest failing.
+    /// </remarks>
+    /// <param name="world">The world after as the arrivals settled so far leave it.</param>
+    private Failing? LowestFailing(IReadOnlyList<Arrival> arrivals, Measured measured, LostShareIn?[] lostShares, Progress progress, SupportWorld world)
     {
-        var world = WorldOf(progress);
-        return Enumerable.Range(0, arrivals.Count)
-            .Where(index => !progress.Settled.ContainsKey(index))
-            .OrderBy(index => arrivals[index].Standing.Box.WorldAabb(0f).Min.Z)
-            .ThenBy(index => index)
-            .Select(index => placeMisfits[index] is { } misfit
-                ? new Failing(index, misfit, LostShare: 0f)
-                : loss.FindLostShare(arrivals[index].Standing, weightsBefore[index], everyoneLeft, world, queries) is { } lostShare
-                    ? new Failing(index, ArrivalMisfit.LosesSupport, lostShare)
-                    : (Failing?)null)
-            .FirstOrDefault(failing => failing is not null);
+        List<int> unsettled = [.. measured.LowestFirst.Where(index => !progress.Settled.ContainsKey(index))];
+        List<int> judged = [.. unsettled.TakeWhile(index => measured.PlaceMisfits[index] is null)];
+        var shares = MeasureLostShares(arrivals, measured.WeightsBefore, judged, world, lostShares);
+        for (var k = 0; k < judged.Count; k++)
+        {
+            if (shares[k] is { } share) return new Failing(judged[k], ArrivalMisfit.LosesSupport, share);
+        }
+        if (judged.Count == unsettled.Count) return null;
+        var misfitting = unsettled[judged.Count];
+        return new Failing(misfitting, measured.PlaceMisfits[misfitting] ?? throw new UnreachableException($"Arrival {misfitting} stopped the judged ones but fits its place."), LostShare: 0f);
     }
 
-    private SupportWorld WorldOf(Progress progress) =>
-        after.With(progress.Changed).Without(progress.TargetsOut).WithAdded([.. progress.InAnotherShape.Values.Where(rules.CanHoldUp).OrderBy(other => other.Id.Index)]);
+    /// <summary>
+    /// Brings the lost share of each arrival of <paramref name="judged"/> up to <paramref name="world"/>, measuring it again only when
+    /// the arrival reads other supporters there than where it was measured last.
+    /// </summary>
+    /// <returns>Share k is that of arrival <paramref name="judged"/>[k] in <paramref name="world"/>.</returns>
+    private List<float?> MeasureLostShares(IReadOnlyList<Arrival> arrivals, float[] weightsBefore, List<int> judged, SupportWorld world, LostShareIn?[] lostShares)
+    {
+        var reads = MeasureEach(judged, (index, queries) => loss.FindSupportersRead(arrivals[index].Standing, world, queries));
+        List<(int Index, SupportersRead Read)> changed = [.. judged.Zip(reads).Where(entry => lostShares[entry.First] is not { } known || !known.Read.IsSameAs(entry.Second))];
+        var found = MeasureEach(
+            [.. changed.Select(entry => entry.Index)], (index, queries) => loss.FindLostShare(arrivals[index].Standing, weightsBefore[index], everyoneLeft, world, queries));
+        for (var k = 0; k < changed.Count; k++) lostShares[changed[k].Index] = new LostShareIn(changed[k].Read, found[k]);
+        return [.. judged.Select(index => lostShares[index] is { } known ? known.LostShare : throw new UnreachableException($"Arrival {index} was judged but not measured."))];
+    }
 
-    private void Settle(Arrival arrival, Failing failing, Progress progress, OtherObjectQueries queries)
+    /// <returns>Result k is the measure of arrival <paramref name="indexes"/>[k].</returns>
+    private T[] MeasureEach<T>(IReadOnlyList<int> indexes, Func<int, OtherObjectQueries, T> measure) =>
+        ParallelMap.RunOnEach(execution, indexes, () => new OtherObjectQueries(), measure);
+
+    private SupportWorld WorldOf(Progress progress) =>
+        after.With(progress.Changed)
+            .Without(progress.TargetsOut)
+            .WithAdded([.. progress.InAnotherShape.Values.Where(rules.CanHoldUp).OrderBy(other => other.Id.Index)]);
+
+    /// <param name="world">The world after as the arrivals settled before this one leave it.</param>
+    private void Settle(Arrival arrival, Failing failing, SupportWorld world, Progress progress, OtherObjectQueries queries)
     {
         if (failing.Misfit != ArrivalMisfit.LosesSupport
             || arrival.Other is not { } other
@@ -109,7 +159,7 @@ internal sealed class ArrivalsThatDoNotFit(
             return;
         }
         var outcome = _fates.FateBeforePulling(other, failing.LostShare)
-            ?? _fates.FateOfPull(other, failing.LostShare, drops.FindDrop(arrival.Standing, WorldOf(progress), queries));
+            ?? _fates.FateOfPull(other, failing.LostShare, drops.FindDrop(arrival.Standing, world, queries));
         if (outcome.Fate == OtherModsObjectFate.LeftStillTouching)
         {
             progress.Settled.Add(failing.Index, null);

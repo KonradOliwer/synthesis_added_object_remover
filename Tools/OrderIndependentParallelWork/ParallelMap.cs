@@ -96,6 +96,11 @@ public static class ParallelMap
     public static TOut[] Run<TOut>(Execution execution, int count, Func<int, TOut> body, int rangeSize) =>
         Map<object?, TOut>(execution, count, static position => position, static () => null, (item, _) => body(item), rangeSize, finish: static _ => { });
 
+    /// <summary>Runs <paramref name="body"/> on each of <paramref name="items"/>, of similar cost, started in list order.</summary>
+    /// <returns>Result k is body(items[k], scratch), whatever the order or the number of workers.</returns>
+    public static TOut[] RunOnEach<TItem, TScratch, TOut>(Execution execution, IReadOnlyList<TItem> items, Func<TScratch> newScratch, Func<TItem, TScratch, TOut> body) =>
+        Run(execution, items.Count, newScratch, (k, scratch) => body(items[k], scratch), AutomaticRangeSize);
+
     /// <summary>Runs <paramref name="body"/> for the given subset of item indexes, started in the work order's rank.</summary>
     /// <returns>Result p is body(indices[p], scratch), whatever the order or the number of workers.</returns>
     public static TOut[] RunOver<TScratch, TOut>(

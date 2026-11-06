@@ -46,6 +46,18 @@ public class ParallelMapTests
         Assert.Equal(new Work(ItemCount, Enumerable.Range(0, ItemCount).Sum(item => (long)item)), work);
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(8)]
+    public void RunOnEachGivesEachItemsResultAtItsPlace(int workers)
+    {
+        List<int> items = [.. Shuffled(ItemCount)];
+
+        var results = ParallelMap.RunOnEach(Workers(workers), items, () => new CountingScratch(), (item, _) => Square(item));
+
+        Assert.Equal(items.Select(Square), results);
+    }
+
     [Fact]
     public void OneWorkerReusesOneScratchForAllItems()
     {

@@ -118,7 +118,8 @@ internal sealed class FollowUpOfObjectsLeaving(SupportJudging judging, AlsoRemov
                 SupportJudgingParts.CreateSupportLoss(judging),
                 SupportJudgingParts.CreateGroundChange(judging),
                 SupportJudgingParts.CreateDropFinder(judging, judging.Settings.TouchGap),
-                judging.Settings)
+                judging.Settings,
+                judging.Execution)
             .Find(arrivals);
     }
 

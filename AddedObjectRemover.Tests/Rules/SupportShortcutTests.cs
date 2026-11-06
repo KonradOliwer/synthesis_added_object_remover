@@ -124,6 +124,50 @@ public class SupportShortcutTests
         }
     }
 
+    /// <summary>
+    /// The moved objects of a world are found through the cells their bounds reach: from an area inside one cell, a block moved there
+    /// and a block moved across the border from the cell before are found, in id order, and a block moved two cells farther is not.
+    /// The blocks are 40 units wide.
+    /// </summary>
+    [Fact]
+    public void MovedObjectsAreFoundFromEveryCellTheirBoundsReach()
+    {
+        var scene = new Scene([], [Lantern(InTheTerrainCell), Block(1), Block(2), Block(3)], TestGround.FlatAtZero());
+        var world = scene.World.With(new Dictionary<OtherId, PlacedTransform?>
+        {
+            [new OtherId(1)] = MovedAlongX(Block(1), ExteriorGrid.CellSize + 30),
+            [new OtherId(2)] = MovedAlongX(Block(2), 3 * ExteriorGrid.CellSize),
+            [new OtherId(3)] = MovedAlongX(Block(3), ExteriorGrid.CellSize - 5),
+        });
+        var area = new Box(new Vector3(ExteriorGrid.CellSize + 4, -5, 0), new Vector3(ExteriorGrid.CellSize + 24, 5, 5));
+
+        var found = world.FindSupporters(scene.Others[0].SpaceKey, area, Supporter.Placed(new OtherId(0)), new OtherObjectQueries());
+
+        Assert.Equal([Supporter.Placed(new OtherId(1)), Supporter.Placed(new OtherId(3))], found.Select(supporter => supporter.Supporter));
+    }
+
+    /// <summary>
+    /// From an area across a cell border: a block moved wholly into the cell after it and one moved wholly into the cell before it are
+    /// found in id order, though the cell before lists the higher id first, and a block at the same place in another worldspace is not.
+    /// </summary>
+    [Fact]
+    public void MovedObjectsAreFoundAcrossACellBorderInIdOrderAndOnlyInTheSpaceAsked()
+    {
+        var elsewhere = Block(3) with { SpaceKey = new FormKey(OtherMod, 0x999).ToRecordKey() };
+        var scene = new Scene([], [Lantern(InTheTerrainCell), Block(1), Block(2), elsewhere], TestGround.FlatAtZero());
+        var world = scene.World.With(new Dictionary<OtherId, PlacedTransform?>
+        {
+            [new OtherId(1)] = MovedAlongX(Block(1), ExteriorGrid.CellSize + 25),
+            [new OtherId(2)] = MovedAlongX(Block(2), ExteriorGrid.CellSize - 25),
+            [new OtherId(3)] = MovedAlongX(elsewhere, ExteriorGrid.CellSize + 25),
+        });
+        var area = new Box(new Vector3(ExteriorGrid.CellSize - 10, -5, 0), new Vector3(ExteriorGrid.CellSize + 10, 5, 5));
+
+        var found = world.FindSupporters(scene.Others[0].SpaceKey, area, Supporter.Placed(new OtherId(0)), new OtherObjectQueries());
+
+        Assert.Equal([Supporter.Placed(new OtherId(1)), Supporter.Placed(new OtherId(2))], found.Select(supporter => supporter.Supporter));
+    }
+
     /// <summary>The objects of one scene, the triangles of their meshes and the world they make.</summary>
     private sealed record Scene(List<TargetObject> Targets, List<OtherObject> Others, ITerrainHeights Terrain)
     {
@@ -179,6 +223,8 @@ public class SupportShortcutTests
     }
 
     private static Vector3 Up(float height) => new(0, 0, height);
+
+    private static PlacedTransform MovedAlongX(OtherObject other, float x) => other.Transform with { Position = new Vector3(x, 0, 0) };
 
     private static OtherObject Lantern(Vector3 position) => TestShapes.Placed(OtherMod, 0, LanternModel.Base, position);
 

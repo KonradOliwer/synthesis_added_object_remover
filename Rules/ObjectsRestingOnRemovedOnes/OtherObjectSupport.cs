@@ -18,9 +18,13 @@ internal sealed class OtherObjectSupport(ISupportContacts contacts, float touchG
     public SupportHits FindHits(StandingObject standing, SupportWorld world, OtherObjectQueries queries)
     {
         var samples = contacts.SampleSurface(standing.MeshPath);
-        var supporters = world.FindSupporters(standing.Space, standing.Box.WorldAabb(touchGap), standing.Self, queries);
+        var supporters = FindSupporters(standing, world, queries);
         return new SupportHits(contacts.FindHits(samples.Points, standing.Space, standing.Transform, supporters, world.Terrain, touchGap, queries.Query.Triangles), samples.Weights);
     }
+
+    /// <summary>The supporters in the world its contacts are found among: those within the touch gap of its bounds.</summary>
+    public List<MeshSupporter> FindSupporters(StandingObject standing, SupportWorld world, OtherObjectQueries queries) =>
+        world.FindSupporters(standing.Space, standing.Box.WorldAabb(touchGap), standing.Self, queries);
 
     public CandidateContacts ContactsOf(SupportHits hits) => contacts.SplitWeightsAmongSupporters(hits.BySupporter, hits.Weights);
 

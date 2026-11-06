@@ -82,7 +82,7 @@ internal sealed class LeftWithoutSupport(
     {
         var candidates = near.FindTouchingAny(frontier, isLeftOut: id => progress.Decided.ContainsKey(id) || progress.Changed.ContainsKey(id));
         FindMissingWeightsBefore(candidates);
-        var world = final.With(new Dictionary<OtherId, PlacedTransform?>(progress.Changed));
+        var world = WorldOf(progress);
         var lostShares = ParallelMap.Run(
             execution,
             candidates.Count,
@@ -144,13 +144,15 @@ internal sealed class LeftWithoutSupport(
     /// <summary>One at a time, lowest bottom first, then by id; each against the world the ones before it left.</summary>
     private void PullDownLowestFirst(Progress progress)
     {
-        var world = final.With(progress.Changed);
         var queries = new OtherObjectQueries();
         foreach (var (other, lostShare) in progress.ToPull.OrderBy(entry => BottomOf(entry.Object)).ThenBy(entry => entry.Object.Id.Index))
         {
-            PullDown(_fates.FateOfPull(other, lostShare, drops.FindDrop(rules.StandingOf(other), world, queries)), progress);
+            PullDown(_fates.FateOfPull(other, lostShare, drops.FindDrop(rules.StandingOf(other), WorldOf(progress), queries)), progress);
         }
     }
+
+    /// <summary>The world after with the objects as <paramref name="progress"/> has changed them so far.</summary>
+    private SupportWorld WorldOf(Progress progress) => final.With(progress.Changed);
 
     private float BottomOf(OtherObject other) => rules.BoxOf(other, other.Transform).WorldAabb(0f).Min.Z;
 

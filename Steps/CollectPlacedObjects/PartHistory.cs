@@ -14,7 +14,8 @@ internal static class PartHistory
     /// <remarks>
     /// A real plugin that sets the cleaned mod's value back changed the part itself, so the part is left to it. A patch of any group
     /// (this group's patch or another group's, recognised by its marker) holding the cleaned mod's value is an earlier patcher's
-    /// restore to the version below its own cleaned mod, so the part is undone.
+    /// restore to the version below its own cleaned mod, so the part is undone. A patch holding the value of the version just below the
+    /// cleaned mod's already gave that value back, so nothing is left to undo: the part is unchanged.
     /// A plugin that loads without the cleaned mod was made against the version below it, so one that holds the cleaned mod's value
     /// set that value itself, and the part is left to it. A plugin that needs the cleaned mod would not load without it, so its change
     /// keeps nothing: the part is undone, or left to a plugin that loads without the cleaned mod and holds the value it ends with. When
@@ -27,6 +28,7 @@ internal static class PartHistory
         var lastChanger = LastChangerAbove(plugins.Count, cleanedModIndex, differs);
         var lastLoadingWithout = LastLoadingWithoutCleanedModAbove(plugins, cleanedModIndex, trust);
         if (lastChanger is not { } changer) return LeftToOrUndone(plugins, lastLoadingWithout);
+        if (trust.IsAnyGroupsPatch(plugins[changer]) && !differs(cleanedModIndex - 1, changer)) return new PartOutcome.Unchanged();
         if (trust.IsAnyGroupsPatch(plugins[changer]) && !differs(cleanedModIndex, changer)) return new PartOutcome.Undo();
         if (trust.NeedsCleanedMod(plugins[changer]) && !(lastLoadingWithout < changer)) return LeftToOrUndone(plugins, lastLoadingWithout);
         return new PartOutcome.LeftToLaterPlugin(plugins[changer]);
@@ -71,7 +73,7 @@ internal static class PartHistory
     }
 
     /// <returns>The highest version above the cleaned mod's of a real plugin, no patch, that loads without the cleaned mod; null when there is none.</returns>
-    public static int? LastLoadingWithoutCleanedModAbove(IReadOnlyList<PluginName> plugins, int cleanedModIndex, ModTrustTable trust)
+    private static int? LastLoadingWithoutCleanedModAbove(IReadOnlyList<PluginName> plugins, int cleanedModIndex, ModTrustTable trust)
     {
         for (var index = plugins.Count - 1; index > cleanedModIndex; index--)
         {

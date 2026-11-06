@@ -30,20 +30,23 @@ public sealed record WhereRemovedRestoreSettings(
     /// <summary>
     /// Nothing when the step is off. Otherwise the navmeshes are always read. Other mods' objects that go back are judged at their old
     /// places and against every object that exists because of the cleaned mod, which is told from the world without the cleaned mod.
+    /// Ground going back up is judged against the objects shown otherwise than before the cleaned mod, which is told from the world
+    /// before it.
     /// </summary>
     public ScanNeeds Needs => Runs
         ? new ScanNeeds(
             Navmesh: true,
             JudgeOldPlaces: OtherModsObjects,
             DecideEveryObjectWithoutCleanedMod: OtherModsObjects,
+            DecideEveryObjectBeforeCleanedMod: Terrain,
             AreaRecordVersions: ReadAreaRecords())
         : new ScanNeeds();
 
     /// <summary>
-    /// A kind whose switch is off stays as the cleaned mod made it, so it is still read when the guards of a kind that is on look at
-    /// it: restored objects and navmeshes are kept off ground and out of water lines that stay changed, while the terrain guards look
-    /// at no cell and the cell guards at no ground. Every kind's guards look at the navmeshes that stay changed, so those are always
-    /// read.
+    /// A kind whose switch is off stays as the cleaned mod made it, so it is still read when the checks of a kind that is on look at
+    /// it: an object going back is refused where ground or a water level the cleaned mod made stays, and a navmesh is kept out of water
+    /// lines that stay changed, while the terrain checks look at no cell and the cell checks at no ground. Every kind's checks look at
+    /// the navmeshes that stay changed, so those are always read.
     /// </summary>
     private AreaRecordReads ReadAreaRecords() => new(
         new AreaPartTolerances(HeightChangeTolerance, WaterHeightChangeTolerance),

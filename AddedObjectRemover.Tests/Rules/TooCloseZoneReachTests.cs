@@ -2,7 +2,7 @@ using System.Numerics;
 
 namespace AddedObjectRemover.Tests.Rules;
 
-/// <summary>The reach the restore guards with must contain every zone the too-close step grows, whatever the object's size, scale and the zone's growth.</summary>
+/// <summary>The reach the restore guards with must contain every zone the too-close rule grows, whatever the object's size, scale and the zone's growth.</summary>
 public class TooCloseZoneReachTests
 {
     private const float RoundingTolerance = 1e-3f;

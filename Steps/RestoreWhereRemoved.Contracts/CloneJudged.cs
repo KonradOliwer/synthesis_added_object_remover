@@ -34,11 +34,17 @@ public enum CloneRefusal
     /// </summary>
     TooCloseAsCleanedModsObject,
 
-    /// <summary>As one of the cleaned mod's objects, the copy stands on terrain the changed-terrain step finds changed, by the settings of the cleaned mod's own objects.</summary>
+    /// <summary>As one of the cleaned mod's objects, the copy stands on terrain the changed-terrain rule finds changed, by the settings of the cleaned mod's own objects.</summary>
     OnChangedTerrainAsCleanedModsObject,
 
     /// <summary>A triangle of a navmesh the cleaned mod changed that stays changed has its centre inside the copy's box, so actors walk on it.</summary>
     ActorsWalkOnIt,
+
+    /// <summary>
+    /// The follow-up of the placed records leaving takes along the object the copy stands for, as the cleaned mod's own
+    /// objects are taken along, so the copy would stand where nothing holds it.
+    /// </summary>
+    TakenAwayByFollowUp,
 }
 
 /// <summary>

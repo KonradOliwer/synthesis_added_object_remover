@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Mutagen.Bethesda.Plugins;
+using Mutagen.Bethesda.Plugins.Records;
 using Mutagen.Bethesda.Skyrim;
 
 namespace AddedObjectRemover.Tests.EndToEnd;
@@ -78,6 +79,85 @@ public class RestoreWhereRemovedRunTests
 
         ExpectedOutputFiles.AssertMatches("restore-where-removed/Terrain", run.ToExpectedOutputLines());
     }
+
+    /// <summary>
+    /// Only terrain goes back, and the cleaned mod changed no placed record of another plugin. A trusted plugin's shrine stands on the
+    /// ground the cleaned mod lowered, in a cleared quarter: the ground going back up would bury it, so the ground under it stays
+    /// lowered while the rest of the quarter goes back up.
+    /// </summary>
+    [Fact]
+    public void InATerrainOnlyRunTheGroundUnderATrustedShrinePlacedOnTheLoweredGroundStaysLowered()
+    {
+        var settings = SettingsOf(restore =>
+        {
+            restore.ClearedArea.SearchRadius = SmallSearchRadius;
+            restore.RestoreOtherModsObjects = false;
+            restore.RestoreCells = false;
+            restore.RestoreNavmeshes = false;
+        });
+        settings.Standard.Trust.TrustedModsAndTheirMasters = [ModKey.FromNameAndExtension(RestoreWhereRemovedWorlds.ShrinePlugin)];
+
+        var (outcome, _) = Run(settings, RestoreWhereRemovedWorlds.CreateLoweredTerrainWithAShrine);
+
+        Assert.Empty(outcome.Collected.ChangedRecords);
+        var shrine = Assert.Single(outcome.Collected.SupportOnlyObjects, other => other.WinningMod == new PluginName(RestoreWhereRemovedWorlds.ShrinePlugin));
+        Assert.NotNull(shrine.ChangeSinceBeforeCleanedMod);
+        var land = Assert.Single(outcome.RestoreWhereRemoved.Lands);
+        var underShrine = LandPoint(ShrineVertex, ShrineVertex);
+        Assert.Contains(land.Kept, kept => kept.Reason == TerrainKeptReason.UnderOtherModsObject && kept.Points.Contains(underShrine));
+        Assert.Equal(RestoreWhereRemovedWorlds.BaseLandSteps * RestoreWhereRemovedWorlds.UnitsPerLandStep, land.FinalHeights![underShrine], HeightTolerance);
+        Assert.Equal(RestoreWhereRemovedWorlds.CleanedModLandSteps * RestoreWhereRemovedWorlds.UnitsPerLandStep, land.FinalHeights[LandPoint(4, 4)], HeightTolerance);
+    }
+
+    /// <summary>
+    /// The cleaned mod's rock stands on the ground it raised. A trusted plugin that requires the cleaned mod moved the rock, and an
+    /// earlier patcher of the group copied it into the patch, so the rock is left to that plugin. Around the south-west quarter's
+    /// centre the cleaned mod's only other object, the crate in the middle of the cell, is removed. The rock counts as standing there,
+    /// and with half of the objects allowed to stand the quarter is cleared: its ground goes back down, except under the rock.
+    /// </summary>
+    [Fact]
+    public void AnObjectOfTheCleanedModALaterPluginHoldsCountsAsStandingAndKeepsTheGroundUnderIt()
+    {
+        var rock = default(FormKey);
+        var settings = SettingsOf(restore =>
+        {
+            restore.ClearedArea.SearchRadius = SmallSearchRadius;
+            restore.ClearedArea.MaxStandingCountPercent = MoreThanHalfMayStand;
+            restore.ClearedArea.MaxStandingSizePercent = MoreThanHalfMayStand;
+        });
+
+        var (outcome, run) = FixtureRun.Capture(
+            settings,
+            Workers,
+            dataFolder => RestoreWhereRemovedWorlds.CreateRaisedTerrainWithARockALaterPluginMoved(dataFolder, found => rock = found),
+            state => state.LinkCache.ResolveContext<IPlacedObject, IPlacedObjectGetter>(rock).GetOrAddAsOverride(state.PatchMod),
+            AreaPatchDump.Describe);
+
+        var overridden = Assert.Single(outcome.Collected.CleanedModsObjectsOverriddenLater);
+        Assert.Equal((rock.ToRecordKey(), RestoreWhereRemovedWorlds.MovedRockAt), (overridden.Key, overridden.Transform.Position));
+        Assert.Contains("disabled False", Assert.Single(run.Patch, line => line.StartsWith($"{rock} in ", StringComparison.Ordinal)), StringComparison.Ordinal);
+        var land = Assert.Single(outcome.RestoreWhereRemoved.Lands);
+        var southWest = land.Quarters[TerrainQuadrants.IndexOf(0, 0)].Area;
+        Assert.Equal((2, 1, AreaVerdict.Cleared), (southWest.Objects, southWest.Standing, southWest.Verdict));
+        var underRock = LandPoint(RockColumn, RockRow);
+        Assert.Contains(land.Kept, kept => kept.Reason == TerrainKeptReason.UnderObjectThatStays && kept.Points.Contains(underRock));
+        Assert.Equal(RestoreWhereRemovedWorlds.CleanedModLandSteps * RestoreWhereRemovedWorlds.UnitsPerLandStep, land.FinalHeights![underRock], HeightTolerance);
+        Assert.Equal(RestoreWhereRemovedWorlds.BaseLandSteps * RestoreWhereRemovedWorlds.UnitsPerLandStep, land.FinalHeights[LandPoint(4, 4)], HeightTolerance);
+    }
+
+    /// <summary>One of the cleaned mod's objects standing beside one removed is a half of them by number and by size, just under this.</summary>
+    private const float MoreThanHalfMayStand = 60f;
+
+    /// <summary>The land grid column under the rock's place.</summary>
+    private static readonly int RockColumn = (int)(RestoreWhereRemovedWorlds.MovedRockAt.X / TerrainGrid.VertexSpacing);
+
+    /// <summary>The land grid row under the rock's place.</summary>
+    private static readonly int RockRow = (int)(RestoreWhereRemovedWorlds.MovedRockAt.Y / TerrainGrid.VertexSpacing);
+
+    /// <summary>The land grid column and row of the shrine's place.</summary>
+    private static readonly int ShrineVertex = (int)(RestoreWhereRemovedWorlds.ShrineAt.X / TerrainGrid.VertexSpacing);
+
+    private static int LandPoint(int column, int row) => row * LandSide + column;
 
     [Fact]
     public void AMalformedRecordTheRestoreStepReadsStopsOnlyThatStepAndTheOtherStepsAndTheirWritesStay()
@@ -412,7 +492,7 @@ public class RestoreWhereRemovedRunTests
 
     internal static Settings TerrainSettings() => SettingsOf(restore => restore.ClearedArea.SearchRadius = SmallSearchRadius);
 
-    private static void SwitchEverythingOff(RestoreWhereRemovedSettings restore)
+    internal static void SwitchEverythingOff(RestoreWhereRemovedSettings restore)
     {
         restore.RestoreOtherModsObjects = false;
         restore.RestoreTerrain = false;

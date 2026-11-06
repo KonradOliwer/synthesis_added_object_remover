@@ -1,3 +1,6 @@
+using System.Collections.Immutable;
+using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+
 namespace AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
 
 /// <summary>The terrain and water the changed-terrain rule judges, as the next patcher reads them. Thread-safe.</summary>
@@ -9,6 +12,13 @@ public interface ITerrainView
 
     /// <summary>Every plugin's own water fields of an exterior cell and of the worldspace that supplies its default water.</summary>
     WaterCopies ReadWaterCopies(ExteriorCell cell);
+
+    /// <summary>
+    /// The parts given back of the LAND record the cell holds and of the cell record whose water it is, as earlier runs gave them back
+    /// and, in a view of a restore's plan, as the plan gives them back.
+    /// </summary>
+    /// <param name="cell">A cell of the worldspace that holds the LAND record, or of the worldspace whose water the cell record holds.</param>
+    ImmutableArray<RestoredPart> ReadRestoredParts(ExteriorCell cell);
 
     /// <summary>The material records of a landscape texture, from its own material up through each parent to the root.</summary>
     /// <returns>Empty where the texture or its material link does not resolve.</returns>

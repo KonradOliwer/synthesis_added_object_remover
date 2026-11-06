@@ -450,7 +450,8 @@ public sealed class TablesTests : IDisposable
             HasMapMarker: false,
             Change: new ObjectChange(new PluginName("Other.esp"), AcceptedFrom: null),
             Roles: ReferenceRoles.None,
-            ChangeWithoutCleanedMod: null);
+            ChangeWithoutCleanedMod: null,
+            WinningModPastPatches: new PluginName("Other.esp"));
         return new CollectedObjects(
             [.. targets],
             [otherModObject],

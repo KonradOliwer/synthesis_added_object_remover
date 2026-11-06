@@ -48,8 +48,14 @@ public static partial class StepRunner
     private static IChangedTerrainChecks CreateChangedTerrainChecks(RunScope scope, IRunCaches runCaches, ModTrustTable trust, CollectedObjects collected) =>
         ChangedTerrainRules.CreateChecks(collected.Targets, trust.AcceptedWorld, scope.Environment.Plugins, CreateTerrainView(scope), runCaches.Shapes);
 
-    /// <summary>The terrain and water of the load order the changed-terrain rule judges.</summary>
-    private static ITerrainView CreateTerrainView(RunScope scope) => ChangedTerrainRules.ViewOfLoadOrder(scope.Plugin);
+    /// <summary>The terrain and water of the load order the changed-terrain rule judges, with the parts earlier runs gave back.</summary>
+    private static ITerrainView CreateTerrainView(RunScope scope) => ChangedTerrainRules.ViewOfLoadOrder(scope.Plugin, scope.RestoredBefore);
+
+    /// <summary>
+    /// The terrain and water of the load order as the world without the cleaned mod is judged: no part an earlier run gave back
+    /// counts there, since its value may be the cleaned mod's own.
+    /// </summary>
+    private static ITerrainView CreateTerrainViewWithoutRestoredParts(RunScope scope) => ChangedTerrainRules.ViewOfLoadOrder(scope.Plugin, restored: []);
 
     /// <summary>The objects others rest on: target objects and other mods' objects alike.</summary>
     private static IRestingRule CreateFitRestingRule(
@@ -92,8 +98,9 @@ public static partial class StepRunner
         LeftBehindRules.CreateInvisibleKindsAlwaysKept(runCaches.Shapes, scope.Settings.NeverRemovedInvisibleKinds);
 
     /// <summary>How much of the cleaned mod's drawn objects still stand around a point, judged on given decisions.</summary>
-    private static IClearedAreasJudging CreateClearedAreasJudging(IRunCaches runCaches, CollectedObjects collected) =>
-        LeftBehindRules.CreateClearedAreasJudging(collected.Targets, collected.Spaces, runCaches);
+    /// <param name="overriddenLater">The cleaned mod's objects later plugins hold that count as standing.</param>
+    private static IClearedAreasJudging CreateClearedAreasJudging(IRunCaches runCaches, CollectedObjects collected, ImmutableArray<TargetObject> overriddenLater) =>
+        LeftBehindRules.CreateClearedAreasJudging(collected.Targets, overriddenLater, collected.Spaces, runCaches);
 
     private static IAlsoRemoveRoundsAfter CreateAlsoRemoveRoundsAfter(RunScope scope, IRunCaches runCaches) =>
         RestingObjectsRules.CreateAlsoRemoveRoundsAfter(scope.Settings.AlsoRemove, scope.Settings.Execution, runCaches);
@@ -115,7 +122,7 @@ public static partial class StepRunner
 
     private static IPlacementRule CreateOldPlaceChangedTerrainRule(RunScope scope, IRunCaches runCaches, ModTrustTable trust) =>
         ChangedTerrainRules.CreatePlacementRule(
-            trust.AcceptedWorldWithoutCleanedMod, scope.Environment.Plugins, CreateTerrainView(scope), runCaches.Shapes, scope.Settings.ChangedObjectCollision.ChangedTerrain);
+            trust.AcceptedWorldWithoutCleanedMod, scope.Environment.Plugins, CreateTerrainViewWithoutRestoredParts(scope), runCaches.Shapes, scope.Settings.ChangedObjectCollision.ChangedTerrain);
 
     /// <summary>The neighbours of each left-behind step, measured on <paramref name="final"/>; a step that is switched off measures none.</summary>
     private static ImmutableArray<ILeftBehindNeighbours> CreateLeftBehindNeighbours(RunScope scope, IRunCaches runCaches, CollectedObjects collected, IRemovalDecisions final) =>
@@ -124,17 +131,13 @@ public static partial class StepRunner
         LeftBehindRules.CreateInvisibleNeighbours(collected.Targets, final, runCaches, scope.Settings.InvisibleLeftBehind),
     ];
 
-    /// <summary>The too-close settings, the changed-terrain check and its settings the removal steps judge the cleaned mod's own objects with.</summary>
-    private static CleanedModsObjectRules CreateCleanedModsObjectRules(RunScope scope, IRunCaches runCaches, ModTrustTable trust)
-    {
-        var own = scope.Settings.Collision;
-        return new(
-            own.TooClose,
-            ChangedTerrainRules.CreatePlacementRule(trust.AcceptedWorld, scope.Environment.Plugins, CreateTerrainView(scope), runCaches.Shapes, own.ChangedTerrain),
-            own.ChangedTerrain);
-    }
+    /// <summary>The too-close and changed-terrain settings the removal steps judge the cleaned mod's own objects with.</summary>
+    private static CleanedModsObjectRules CreateCleanedModsObjectRules(RunScope scope) => new(scope.Settings.Collision.TooClose, scope.Settings.Collision.ChangedTerrain);
 
-    /// <remarks>The restore's rules share the world caches, which record measurement failures under the part the step names.</remarks>
+    /// <summary>The changed-terrain rule in the world the cleaned mod's objects are judged in, over any view of the terrain.</summary>
+    private static IChangedTerrainJudging CreateChangedTerrainJudging(RunScope scope, IRunCaches runCaches, ModTrustTable trust) =>
+        ChangedTerrainRules.CreateJudging(trust.AcceptedWorld, scope.Environment.Plugins, CreateTerrainView(scope), runCaches.Shapes);
+
     /// <param name="final">The decisions with every round and every move.</param>
     private static WhereRemovedRestorer.Input CreateRestoreInput(
         RunScope scope,
@@ -144,27 +147,43 @@ public static partial class StepRunner
         CollectedObjects collected,
         ImmutableArray<CollisionGroup> groups,
         OtherModsObjectsResult otherModsObjects,
-        IRemovalDecisions final)
-    {
-        var worldCaches = CreateWorldCaches(scope, RemovalCauseSelector.MeasurementRules(scope.UnexpectedErrors, WhereRemovedRestorer.MeasurementFailurePart()));
-        return new WhereRemovedRestorer.Input(
+        IRemovalDecisions final) =>
+        new(
             new(collected, otherModsObjects),
             final,
-            new LazyClearedAreas(() => CreateClearedAreasJudging(runCaches, collected).JudgedOn(final, scope.Settings.RestoreWhereRemoved.ClearedArea)),
-            new(
-                worldCaches,
-                TooCloseRules.CreateTooCloseToWhatStaysRule(runCaches, worldCaches, RemovalCauses.CreateCausesOfWorlds(worldCaches)),
-                RestingObjectsRules.CreateHoldersOfObjectsThatStay(support, worldCaches),
-                PatchWriter.CreateNavmeshCheck(scope.Plugin, scope.Environment.PatchWriting)),
-            new(
-                [.. groups.Select(group => group.ChangedTerrain)],
-                [.. groups.Select(group => group.TooClose)],
-                trust.AcceptedWorld,
-                CreateLeftBehindNeighbours(scope, runCaches, collected, final),
-                CreateCleanedModsObjectRules(scope, runCaches, trust)),
+            new LazyClearedAreas(() => CreateClearedAreasJudging(runCaches, collected, collected.CleanedModsObjectsOverriddenLater).JudgedOn(final, scope.Settings.RestoreWhereRemoved.ClearedArea)),
+            CreateRestoreGuardRules(scope, runCaches, support),
+            CreateRemovalStepJudging(scope, runCaches, trust, collected, groups, final),
             new(runCaches, scope.Plugin, scope.Environment.Plugins, trust.CleanedMod),
             scope.Settings.Execution,
             scope.Settings.RestoreWhereRemoved,
             scope.Environment.TimeSinceStart);
+
+    /// <remarks>The too-close rule's world caches record measurement failures under the part the restore names.</remarks>
+    private static WhereRemovedRestorer.GuardRules CreateRestoreGuardRules(RunScope scope, IRunCaches runCaches, SupportJudging support)
+    {
+        var worldCaches = CreateWorldCaches(scope, RemovalCauseSelector.MeasurementRules(scope.UnexpectedErrors, WhereRemovedRestorer.MeasurementFailurePart()));
+        return new(
+            TooCloseRules.CreateTooCloseToWhatStaysRule(runCaches, worldCaches, RemovalCauses.CreateCausesOfWorlds(worldCaches)),
+            RestingObjectsRules.CreateFollowUpOfObjectsLeaving(support, scope.Settings.AlsoRemove, CreateAlsoRemoveRoundsAfter(scope, runCaches)),
+            support.Settings.TouchGap,
+            PatchWriter.CreateNavmeshCheck(scope.Plugin, scope.Environment.PatchWriting));
     }
+
+    /// <summary>What the removal steps judge each target with, as the restore judges the cleaned mod's objects that stand.</summary>
+    /// <param name="final">The decisions with every round and every move.</param>
+    private static WhereRemovedRestorer.RemovalStepJudging CreateRemovalStepJudging(
+        RunScope scope, IRunCaches runCaches, ModTrustTable trust, CollectedObjects collected, ImmutableArray<CollisionGroup> groups, IRemovalDecisions final) =>
+        new(
+            SettingsByObject(groups.Select(group => group.ChangedTerrain)),
+            SettingsByObject(groups.Select(group => group.TooClose)),
+            trust.AcceptedWorld,
+            CreateLeftBehindNeighbours(scope, runCaches, collected, final),
+            CreateCleanedModsObjectRules(scope),
+            CreateChangedTerrainJudging(scope, runCaches, trust));
+
+    /// <summary>The settings each object of the groups is judged with; an object stands in one group only.</summary>
+    private static ImmutableDictionary<TargetId, TSettings> SettingsByObject<TSettings>(IEnumerable<ObjectsJudgedWith<TSettings>> groups)
+        where TSettings : notnull =>
+        KeyedGroups.ValueByItem(groups, group => group.Objects, group => group.Settings);
 }

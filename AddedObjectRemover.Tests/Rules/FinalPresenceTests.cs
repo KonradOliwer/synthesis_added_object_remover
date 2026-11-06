@@ -154,6 +154,7 @@ public sealed class FinalPresenceTests
             TestTargets.Space,
             new CellFact(TestTargets.Space, null),
             TestTargets.TargetName,
+            WinningModPastPatches: TestTargets.TargetName,
             WhereItIsNow: null,
             BaseNow: null,
             TestPlacedRecords.PlainReference,

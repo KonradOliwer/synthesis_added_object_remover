@@ -494,6 +494,7 @@ public sealed class SharedReportingTests
         var reasons = ProductionSources.Assemblies()
             .SelectMany(assembly => assembly.GetTypes())
             .Where(type => type.IsSubclassOf(typeof(RemovalReason)) && !type.IsAbstract)
+            .Where(type => type != typeof(GoingBackWhereRemoved)) // decided only on the restore's working copies, never in the run's decisions
             .ToList();
 
         // A left-behind reason reaches its step's check, which a collision does not carry.
@@ -561,5 +562,6 @@ public sealed class SharedReportingTests
             HasMapMarker: false,
             Change: new ObjectChange(new PluginName("Other.esp"), AcceptedFrom: null),
             Roles: ReferenceRoles.None,
-            ChangeWithoutCleanedMod: null);
+            ChangeWithoutCleanedMod: null,
+            WinningModPastPatches: new PluginName("Other.esp"));
 }

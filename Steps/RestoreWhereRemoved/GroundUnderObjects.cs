@@ -27,15 +27,12 @@ internal sealed class GroundUnderObjects(IBaseObjectShapes shapes, Func<RecordKe
     public IEnumerable<LandGridPoint> UnderWhereTheyReachTheGround(IEnumerable<TargetObject> placed, Func<ExteriorCell, float[]?> heightsOf) =>
         placed.SelectMany(each => UnderWhereItReachesTheGround(each, heightsOf));
 
-    /// <summary>The lowest point of the object's box, not grown.</summary>
-    public float BottomOf(OtherObject placed) => BaseBoxes.Of(shapes, placed.Base, placed.Transform).WorldAabb(0f).Min.Z;
-
     private IEnumerable<LandGridPoint> Under(RecordKey spaceKey, BaseKey? model, PlacedTransform transform) =>
         findLandWorldspace(spaceKey) is { } land ? PointsUnder(land, GrownBoxOf(model, transform)) : [];
 
     private Box GrownBoxOf(BaseKey? model, PlacedTransform transform) => BaseBoxes.Of(shapes, model, transform).WorldAabb(TerrainGrid.VertexSpacing);
 
     /// <summary>The points of the worldspace's land under the box, seen from above.</summary>
-    public static IEnumerable<LandGridPoint> PointsUnder(RecordKey land, Box box) =>
+    private static IEnumerable<LandGridPoint> PointsUnder(RecordKey land, Box box) =>
         TerrainGrid.VerticesUnder(box).SelectMany(under => under.VertexIndices.Select(point => new LandGridPoint(new ExteriorCell(land, under.CellX, under.CellY), point)));
 }

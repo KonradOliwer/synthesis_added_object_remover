@@ -580,6 +580,49 @@ public class RemovalDecisionsTests
         Assert.False(start.IsDecided(Id(10)));
     }
 
+    /// <summary>Target 1 is linked to 0 and 2; the table would disable it. Going back records exactly it, as its own earlier version.</summary>
+    [Fact]
+    public void GoingBackRecordsEachTargetAsItsOwnEarlierVersionWithoutTheTableOrItsLinkedGroup()
+    {
+        var start = Start().Apply(RoundKind.TooClose, [Propose(8, TooClose)]);
+        var reason = new GoingBackWhereRemoved();
+
+        var decided = start.WorkingCopy().RecordGoingBack([new GoingBack(Id(1), reason, Earlier)]);
+
+        var round = decided.Rounds[^1];
+        Assert.Equal(RoundKind.Restore, round.Kind);
+        Assert.Equal(new Decision.Restored(round, reason, Earlier), decided.Of(Id(1)));
+        Assert.Equal(Ids(1), decided.LeftIn(round).ToArray());
+        Assert.Equal((false, false), (decided.IsDecided(Id(0)), decided.IsDecided(Id(2))));
+        Assert.False(start.IsDecided(Id(1)));
+    }
+
+    /// <summary>An earlier version that stands nowhere takes the target out of the world: going back records it as removed.</summary>
+    [Fact]
+    public void GoingBackToAVersionThatStandsNowhereRecordsTheTargetAsRemoved()
+    {
+        var reason = new GoingBackWhereRemoved();
+
+        var decided = Start().Apply(RoundKind.TooClose, []).WorkingCopy().RecordGoingBack([new GoingBack(Id(1), reason, To: null)]);
+
+        var round = decided.Rounds[^1];
+        Assert.Equal(new Decision.Removed(round, reason), decided.Of(Id(1)));
+        Assert.True(decided.IsRemoved(Id(1)));
+        Assert.Equal(Ids(1), decided.LeftIn(round).ToArray());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GoingBackOfADecidedOrProtectedTargetIsABug(bool decidedBefore)
+    {
+        var start = decidedBefore
+            ? Start().Apply(RoundKind.TooClose, [Propose(8, TooClose)])
+            : Start(new Dictionary<int, KeepReason> { [8] = QuestReason }).Apply(RoundKind.TooClose, []);
+
+        Assert.Throws<InvalidOperationException>(() => start.WorkingCopy().RecordGoingBack([new GoingBack(Id(8), new GoingBackWhereRemoved(), Earlier)]));
+    }
+
     [Fact]
     public void ARestoredObjectSeedsTheRoundLoopLikeARemovedOne()
     {

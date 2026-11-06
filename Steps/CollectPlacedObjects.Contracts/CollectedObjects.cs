@@ -71,6 +71,13 @@ public sealed record CollectedObjects(
     /// </summary>
     public ImmutableArray<RecordKey> BrokenCloneMarkers { get; init; } = [];
 
+    /// <summary>
+    /// The cleaned mod's objects a later plugin holds (records it created, or clones of its content, whose winner past the patches is
+    /// another plugin than the one that created them), shown where they stand, in <see cref="RecordKeyOrder"/>; their ids name nothing.
+    /// They are none of <see cref="Targets"/>, and each also stands among <see cref="SupportOnlyObjects"/>.
+    /// </summary>
+    public ImmutableArray<TargetObject> CleanedModsObjectsOverriddenLater { get; init; } = [];
+
     public TargetObject this[TargetId id] => Targets[id.Index];
 
     /// <summary>The spaces holding a target object.</summary>

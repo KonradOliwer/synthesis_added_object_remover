@@ -15,4 +15,8 @@ public static class ExteriorGrid
             for (var y = CellIndex(box.Min.Y); y <= CellIndex(box.Max.Y); y++) yield return (x, y);
         }
     }
+
+    /// <summary>Whether the box's footprint seen from above reaches into the cell's square, more than touching its edge.</summary>
+    public static bool ReachesInto(Box box, (int X, int Y) cell) =>
+        cell.X * CellSize < box.Max.X && (cell.X + 1) * CellSize > box.Min.X && cell.Y * CellSize < box.Max.Y && (cell.Y + 1) * CellSize > box.Min.Y;
 }

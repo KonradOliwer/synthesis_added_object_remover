@@ -21,7 +21,7 @@ internal sealed partial class TerrainUndoPlan
     private Work StartAfresh()
     {
         var restored = new HashSet<WorldGridPoint>();
-        foreach (var land in _lands.All)
+        foreach (var land in _lands.Planned)
         {
             foreach (var point in _lands.Candidates[land.Change.Cell].Points)
             {
@@ -30,7 +30,7 @@ internal sealed partial class TerrainUndoPlan
             }
         }
         var final = new Dictionary<ExteriorCell, float[]>();
-        var cells = _lands.All.Select(land => land.Change.Cell).ToHashSet();
+        var cells = _lands.Planned.Select(land => land.Change.Cell).ToHashSet();
         foreach (var cell in cells) _heights.UpdateFinalHeights(cell, restored, final);
         return new Work(restored, final, cells);
     }

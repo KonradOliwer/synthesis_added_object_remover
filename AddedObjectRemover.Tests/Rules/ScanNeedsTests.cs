@@ -19,10 +19,13 @@ public sealed class ScanNeedsTests
         var union = ScanNeeds.UnionOf(
             new ScanNeeds(Navmesh: true, TerrainVersions: true),
             new ScanNeeds(OtherModDetails: true, TerrainLayers: true, Water: true),
-            new ScanNeeds(TerrainForChangedObjectsOnly: true, JudgeOldPlaces: true, DecideEveryObjectWithoutCleanedMod: true, AreaRecordVersions: AreaReads));
+            new ScanNeeds(TerrainForChangedObjectsOnly: true, JudgeOldPlaces: true, DecideEveryObjectWithoutCleanedMod: true, AreaRecordVersions: AreaReads),
+            new ScanNeeds(DecideEveryObjectBeforeCleanedMod: true));
 
         Assert.Equal(
-            new ScanNeeds(true, true, true, true, true, TerrainForChangedObjectsOnly: true, JudgeOldPlaces: true, DecideEveryObjectWithoutCleanedMod: true, AreaRecordVersions: AreaReads),
+            new ScanNeeds(
+                true, true, true, true, true, TerrainForChangedObjectsOnly: true, JudgeOldPlaces: true, DecideEveryObjectWithoutCleanedMod: true,
+                DecideEveryObjectBeforeCleanedMod: true, AreaRecordVersions: AreaReads),
             union);
     }
 
@@ -124,6 +127,7 @@ public sealed class ScanNeedsTests
                 Navmesh: true,
                 JudgeOldPlaces: judgesOldPlaces,
                 DecideEveryObjectWithoutCleanedMod: judgesOldPlaces,
+                DecideEveryObjectBeforeCleanedMod: terrain,
                 AreaRecordVersions: new AreaRecordReads(new AreaPartTolerances(8f, 4f), cellsRead || otherModsObjects, landsRead || otherModsObjects)),
             needs);
     }

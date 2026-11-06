@@ -22,9 +22,9 @@ public class TerrainVersionTests
 
     private static LandscapeTerrain Terrain(bool versionsRead, params LandscapeVersion[] highestPriorityFirst) => new(
         new Dictionary<ExteriorCell, ILandscapeGetter>(),
-        new Dictionary<ExteriorCell, PluginName>(),
         new Dictionary<RecordKey, RecordKey>(),
         versionsRead ? new Dictionary<ExteriorCell, List<LandscapeVersion>> { [Cell] = [.. highestPriorityFirst] } : null,
+        landCells: new Dictionary<RecordKey, ExteriorCell>(),
         layerNames: null,
         landscapesBelow: null);
 

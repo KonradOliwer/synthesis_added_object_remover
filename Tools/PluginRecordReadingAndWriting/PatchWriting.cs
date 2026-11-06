@@ -23,6 +23,9 @@ public sealed class PatchWriting(SynthesisWriteCache synthesis, ISkyrimMod patch
 
     public void WritePatchMarker() => patchMod.ModHeader.Description = PatchMarker.AddTo(patchMod.ModHeader.Description, patchMarker);
 
+    /// <summary>Whether the patch's header description holds the patch marker now; read before this patcher writes its own.</summary>
+    public bool CarriesPatchMarker() => PatchMarker.IsIn(patchMod.ModHeader.Description, patchMarker);
+
     /// <remarks>The writers share one set of cell overrides, so a cell is overridden once, whichever writer asks first.</remarks>
     /// <returns>The keys of the records the orders added, in the order of their orders.</returns>
     private ImmutableArray<RecordKey> WriteInto(ISkyrimMod mod, IWritableRecords records, IReadOnlyList<WriteOrder> orders)

@@ -13,6 +13,14 @@ public interface IRemovalDecisionsCopy
     IRemovalDecisions DecideRound(RoundOpening opening, IReadOnlyList<ProposedRemoval> proposals);
 
     /// <summary>
+    /// Opens one <see cref="RoundKind.Restore"/> round that records each entry as restored to its own earlier version, or as removed
+    /// when that version stands nowhere, in target order, without the when-removed table, the protection and the linked groups. A
+    /// decided or protected target is a bug.
+    /// </summary>
+    /// <returns>The copy's view with the new round, which leaves in exactly the given targets.</returns>
+    IRemovalDecisions RecordGoingBack(IReadOnlyList<GoingBack> goingBack);
+
+    /// <summary>
     /// Decides rounds on the copy, each opened as <paramref name="opening"/> says and proposed from the objects the newest round
     /// removed (the seeds start the first), until a round removes nothing.
     /// </summary>

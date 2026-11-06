@@ -179,6 +179,36 @@ public class ChangedTerrainObjectsTests
         Assert.True(decided.Decisions.IsRemoved(new TargetId(0)));
     }
 
+    [Fact]
+    public void AFindingNamesTheVerticesWhoseChangeCounted()
+    {
+        var hit = Assert.Single(FindInCell(Flat(Target), RaisedAt(Other, Near)).Hits);
+
+        var counted = Assert.Single(hit.Area);
+        Assert.Equal((Cell, Cell, true), (counted.LandCell, counted.WaterCell, counted.WaterFlipped.IsEmpty));
+        Assert.Equal([Near], counted.HeightVertices.AsEnumerable());
+        Assert.Empty(counted.TypeVertices);
+    }
+
+    /// <summary>
+    /// Of an object at <see cref="Spot"/>, one in the next cell east and one at the spot whose settings are off, only the first reads
+    /// the land of the cell the spot lies in.
+    /// </summary>
+    [Fact]
+    public void TheObjectsReadingACellAreThoseWhoseCheckedAreasReachIt()
+    {
+        var view = ChangedTerrainRules.ViewOfLoadOrder(new TerrainPlugin(new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(Target)] }), restored: []);
+        var rule =ChangedTerrainRules.CreateJudging(Mods.AcceptedWorld, LoadOrder, view, new BoxShapes());
+        (TargetObject, ChangedTerrainSettings)[] objects =
+        [
+            (Placed(0, Rock), Settings()),
+            (Placed(1, Rock, Spot + new Vector3(ExteriorGrid.CellSize, 0, 0)), Settings()),
+            (Placed(2, Rock), Settings() with { On = false }),
+        ];
+
+        Assert.Equal([0], rule.FindObjectsReading(objects, new HashSet<ExteriorCell> { Cell }).AsEnumerable());
+    }
+
     /// <summary>Every object stands at <see cref="Spot"/>, over terrain that Other.esp raised by <see cref="Raised"/>.</summary>
     private static ChangedTerrainResult FindGroups(int threads, params ObjectsJudgedWith<ChangedTerrainSettings>[] groups)
     {
@@ -194,11 +224,16 @@ public class ChangedTerrainObjectsTests
     /// <summary>The step over the world's targets, none of them kept, decided before.</summary>
     private static Decided<ChangedTerrainResult> Decide(
         CollectedObjects world, AcceptedWorld accepted, IPluginRecords plugin, int threads, params ObjectsJudgedWith<ChangedTerrainSettings>[] groups) =>
+        DecideAfterEarlierRuns(world, accepted, plugin, [], threads, groups);
+
+    /// <param name="restored">The parts earlier runs gave back.</param>
+    private static Decided<ChangedTerrainResult> DecideAfterEarlierRuns(
+        CollectedObjects world, AcceptedWorld accepted, IPluginRecords plugin, ImmutableArray<RestoredPart> restored, int threads, params ObjectsJudgedWith<ChangedTerrainSettings>[] groups) =>
         ChangedTerrainObjects.Find(
             new(
                 world,
                 TestSeededDecisions.StartUnprotected(world.Targets),
-                ChangedTerrainRules.CreateChecks(world.Targets, accepted, LoadOrder, ChangedTerrainRules.ViewOfLoadOrder(plugin), new BoxShapes()),
+                ChangedTerrainRules.CreateChecks(world.Targets, accepted, LoadOrder, ChangedTerrainRules.ViewOfLoadOrder(plugin, restored), new BoxShapes()),
                 new Execution(threads),
                 groups));
 
@@ -250,9 +285,15 @@ public class ChangedTerrainObjectsTests
         var one = FindGroups(1, groups);
         var many = FindGroups(4, groups);
 
-        Assert.Equal(one.Passes.Select(pass => pass.Hits.ToList()), many.Passes.Select(pass => pass.Hits.ToList()));
+        Assert.Equal(one.Passes.Select(pass => pass.Hits.Select(Describe).ToList()), many.Passes.Select(pass => pass.Hits.Select(Describe).ToList()));
         Assert.Equal(one.Proposals.AsEnumerable(), many.Proposals.AsEnumerable());
     }
+
+    /// <summary>A finding with its evidence spelled out, so two findings compare by value.</summary>
+    private static string Describe(ObjectOnChangedTerrain hit) =>
+        $"{hit.Target} {hit.ChangedBy} {hit.Kind} " + string.Join(
+            "; ",
+            hit.Area.Select(cell => $"{cell.LandCell} {cell.WaterCell} [{string.Join(",", cell.HeightVertices)}] [{string.Join(",", cell.TypeVertices)}] {!cell.WaterFlipped.IsEmpty}"));
 
     [Fact]
     public void AChangeOutsideTheCheckAreaCountsForNothing() =>
@@ -380,16 +421,162 @@ public class ChangedTerrainObjectsTests
     [Fact]
     public void AHeightThePatchPutsBackToALowerTrustedVersionsIsAcceptedFromThatVersion()
     {
-        var comparison = new CellTerrainComparison(
-            new TerrainPlugins(Mods.AcceptedWorld, LoadOrder), new TerrainTypes(ChangedTerrainRules.ViewOfLoadOrder(new TerrainPlugin(new Dictionary<ExteriorCell, TerrainVersion[]>()))), Settings());
         TerrainVersion[] versions = [Flat(Target), RaisedAt(TrustedMod, Near), Flat(Patch)];
 
-        var terrain = comparison.Compare(versions);
+        var terrain = Comparison().Compare(versions, []);
 
         Assert.Equal(Ground, terrain!.AcceptedHeights![Near]);
         Assert.Null(terrain.Changes);
         Assert.Empty(FindInCell(versions).Proposals);
     }
+
+    /// <summary>
+    /// An earlier run gave the patch the other mod's heights back: as long as the patch still holds them, the height is the world
+    /// without that run's cleaned mod, not a change, whatever the other mod's trust here.
+    /// </summary>
+    [Theory]
+    [InlineData(Raised, false)]
+    [InlineData(2 * Raised, true)]
+    public void AHeightThePatchWasGivenBackIsAcceptedWhileThePatchStillHoldsIt(float patchHeight, bool removed)
+    {
+        var plugin = new TerrainPlugin(
+            new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(Target), RaisedAt(Other, Near), RaisedAt(Later, Near, 3 * Raised), RaisedAt(Patch, Near, patchHeight)] },
+            cellsOfRecords: new Dictionary<RecordKey, ExteriorCell> { [EarlierRunsLand] = Cell });
+
+        var result = FindAfterEarlierRuns(plugin, [GivenBack(EarlierRunsLand, new RestoredPartName.LandHeights(PointSet.Of([Near])), Other)]);
+
+        ProposedRemoval[] expected = removed ? [Removal(0, changedBy: null)] : [];
+        Assert.Equal(expected, result.Proposals.AsEnumerable());
+    }
+
+    /// <summary>
+    /// The other mod's hill at <see cref="Near"/>, which the patch carries as a copy of the winning version, is accepted only when the
+    /// earlier run gave that point back; heights it gave back elsewhere in the same LAND record accept nothing here.
+    /// </summary>
+    [Theory]
+    [InlineData(Near, false)]
+    [InlineData(Far, true)]
+    public void AHeightThePatchHoldsIsAcceptedOnlyAtThePointsAnEarlierRunGaveBack(int givenBackPoint, bool removed)
+    {
+        var plugin = new TerrainPlugin(
+            new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(Target), RaisedAt(Other, Near), RaisedAt(Patch, Near)] },
+            cellsOfRecords: new Dictionary<RecordKey, ExteriorCell> { [EarlierRunsLand] = Cell });
+
+        var result = FindAfterEarlierRuns(plugin, [GivenBack(EarlierRunsLand, new RestoredPartName.LandHeights(PointSet.Of([givenBackPoint])), Other)]);
+
+        ProposedRemoval[] expected = removed ? [Removal(0, Other)] : [];
+        Assert.Equal(expected, result.Proposals.AsEnumerable());
+    }
+
+    /// <summary>
+    /// A height an earlier run gave back from the plugin this run cleans up is that plugin's own value, which this run trusts in full,
+    /// so the given-back part changes no outcome, whether the patch still holds it or not.
+    /// </summary>
+    [Theory]
+    [InlineData(Raised)]
+    [InlineData(3 * Raised)]
+    public void AHeightGivenBackFromThePluginThisRunCleansUpChangesNoOutcome(float patchHeight)
+    {
+        var plugin = new TerrainPlugin(
+            new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(BaseGame), RaisedAt(Target, Near), RaisedAt(Later, Near, 2 * Raised), RaisedAt(Patch, Near, patchHeight)] },
+            cellsOfRecords: new Dictionary<RecordKey, ExteriorCell> { [EarlierRunsLand] = Cell });
+
+        var withThePart = FindAfterEarlierRuns(plugin, [GivenBack(EarlierRunsLand, new RestoredPartName.LandHeights(PointSet.Of([Near])), Target)]);
+
+        Assert.Equal(FindAfterEarlierRuns(plugin, []).Proposals.AsEnumerable(), withThePart.Proposals.AsEnumerable());
+    }
+
+    /// <summary>At the cell's first and last grid point, the edge points a LAND record shares with its neighbours, a height is accepted only where the earlier run gave it back.</summary>
+    [Theory]
+    [InlineData(0, 0, false)]
+    [InlineData(0, VertexCount - 1, true)]
+    [InlineData(VertexCount - 1, VertexCount - 1, false)]
+    [InlineData(VertexCount - 1, 0, true)]
+    public void AHeightThePatchHoldsAtAnEdgePointIsAcceptedOnlyWhereAnEarlierRunGaveItBack(int raisedPoint, int givenBackPoint, bool changed)
+    {
+        var restored = new[] { GivenBack(EarlierRunsLand, new RestoredPartName.LandHeights(PointSet.Of([givenBackPoint])), Other) };
+
+        var terrain = Comparison().Compare([Flat(Target), RaisedAt(Other, raisedPoint), RaisedAt(Patch, raisedPoint)], restored);
+
+        Assert.Equal(changed, terrain!.Changes?[raisedPoint].HeightChanger is not null);
+    }
+
+    /// <summary>
+    /// An earlier run gave back every height of a LAND record no trusted plugin has: a given-back value counts only where some version
+    /// is trusted, so no point becomes checked, and the ground stays taken as the game shows it, with only the cell's water compared.
+    /// </summary>
+    [Fact]
+    public void HeightsGivenBackInACellNoTrustedPluginHasLeaveItsGroundAsShown()
+    {
+        var restored = new[] { GivenBack(EarlierRunsLand, new RestoredPartName.LandHeights(PointSet.Of(Enumerable.Range(0, VertexCount))), Other) };
+
+        var terrain = Comparison().Compare([Flat(Other), Flat(Patch)], restored);
+
+        Assert.True(terrain!.ShownOnly);
+    }
+
+    /// <summary>
+    /// The earlier run cleaned up the later mod and gave the patch the other mod's layers of the quarter under the object back. The
+    /// patch's road there, the other mod's, is accepted only where the later mod had changed the ground type, so the restore changed it
+    /// back; where the later mod changed another part of the quarter only, the road is the other mod's change.
+    /// </summary>
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void AGroundTypeThePatchHoldsIsAcceptedOnlyWhereTheEarlierRunChangedIt(bool laterChangedTheObjectsVertices, bool removed)
+    {
+        var road = RoadAtWideSpot(ChangesAtTypeShare);
+        var plugin = new TerrainPlugin(
+            new Dictionary<ExteriorCell, TerrainVersion[]>
+            {
+                [Cell] =
+                [
+                    FlatPainted(Target, Painted(Grass)),
+                    FlatPainted(Other, road),
+                    FlatPainted(Later, laterChangedTheObjectsVertices ? Painted(Grass) : RoadAtWideSpotAndQuarterCorner(ChangesAtTypeShare)),
+                    FlatPainted(Patch, road),
+                ],
+            },
+            Materials,
+            cellsOfRecords: new Dictionary<RecordKey, ExteriorCell> { [EarlierRunsLand] = Cell });
+        var quarter = new RestoredPartName.LandTextureQuarter(TerrainQuadrants.IndexOf(0, 0));
+
+        var result = FindAfterEarlierRuns(plugin, [new RestoredPart(Later, EarlierRunsLand, quarter, Other)], WideSpot);
+
+        ProposedRemoval[] expected = removed ? [Removal(0, Other, TerrainChangeKind.TerrainType)] : [];
+        Assert.Equal(expected, result.Proposals.AsEnumerable());
+    }
+
+    /// <summary>The cell's water an earlier run gave back from an untrusted mod counts as the world without that run's cleaned mod.</summary>
+    [Fact]
+    public void AWaterLevelThePatchWasGivenBackIsAcceptedWhileThePatchStillHoldsIt()
+    {
+        var water = new WaterCopies([new(Target, HasWater: true, -50f), new(Other, HasWater: true, 50f), new(Later, HasWater: true, -100f), new(Patch, HasWater: true, 50f)], []);
+        var plugin = new TerrainPlugin(
+            new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(Target)] },
+            water: new Dictionary<ExteriorCell, WaterCopies> { [Cell] = water },
+            cellsOfRecords: new Dictionary<RecordKey, ExteriorCell> { [EarlierRunsCell] = Cell });
+        var waterLevel = new RestoredPartName.Cell(new CellPartName(CellPart.WaterLevel, Region: null));
+
+        Assert.NotEmpty(FindAfterEarlierRuns(plugin, []).Proposals);
+        Assert.Empty(FindAfterEarlierRuns(plugin, [GivenBack(EarlierRunsCell, waterLevel, Other)]).Proposals);
+    }
+
+    private static ChangedTerrainPass FindAfterEarlierRuns(TerrainPlugin plugin, ImmutableArray<RestoredPart> restored) => FindAfterEarlierRuns(plugin, restored, Spot);
+
+    private static ChangedTerrainPass FindAfterEarlierRuns(TerrainPlugin plugin, ImmutableArray<RestoredPart> restored, Vector3 position)
+    {
+        var world = TestScenes.CreateWorld([Placed(0, Rock, position)], []);
+        return DecideAfterEarlierRuns(world, Mods.AcceptedWorld, plugin, restored, threads: 1, TestJudgedGroups.OfAll(world.Targets, Settings())).Result.Passes.Single();
+    }
+
+    private static readonly RecordKey EarlierRunsLand = new(BaseGame, 0x900);
+    private static readonly RecordKey EarlierRunsCell = new(BaseGame, 0x901);
+
+    private static RestoredPart GivenBack(RecordKey record, RestoredPartName part, PluginName source) => new(new PluginName("EarlierCleaned.esp"), record, part, source);
+
+    private static CellTerrainComparison Comparison() =>
+        new(new TerrainPlugins(Mods.AcceptedWorld, LoadOrder), new TerrainTypes(ChangedTerrainRules.ViewOfLoadOrder(new TerrainPlugin(new Dictionary<ExteriorCell, TerrainVersion[]>()), restored: [])), Settings());
 
     [Fact]
     public void TheLastLoadingChangingModIsNamedOverEveryCellTheAreaCrosses()
@@ -456,6 +643,29 @@ public class ChangedTerrainObjectsTests
         Assert.Equal((1, 0), (result.CellsCompared, result.ObjectsWithoutTerrain));
     }
 
+    private const float Deep = -1000f;
+
+    /// <summary>
+    /// The other mod's flat land is the cell's first; OwnChanges.esp sinks the vertex beside the object's deep below it, so only that
+    /// vertex is checked, and the later mod raises it a little. The object stands on the unchecked ground or hangs at the sunk vertex.
+    /// </summary>
+    [Theory]
+    [InlineData(Ground, TerrainCheckedObjects.VisibleObjectsOnTheGround, false)]
+    [InlineData(Ground, TerrainCheckedObjects.VisibleObjectsAtAnyHeight, true)]
+    [InlineData(Deep, TerrainCheckedObjects.VisibleObjectsOnTheGround, true)]
+    public void OnlyTheCheckedVerticesDecideWhetherAnObjectReachesTheGround(float objectHeight, TerrainCheckedObjects objects, bool removed)
+    {
+        var terrain = new Dictionary<ExteriorCell, TerrainVersion[]>
+        {
+            [Cell] = [Flat(Other), RaisedAt(OwnChanges, Beside, Deep), RaisedAt(Later, Beside, Deep + Raised)],
+        };
+
+        var result = Find(terrain, Settings(objects), threads: 1, Placed(0, Rock, Spot with { Z = objectHeight }));
+
+        ProposedRemoval[] expected = removed ? [Removal(0, Later)] : [];
+        Assert.Equal(expected, result.Proposals.AsEnumerable());
+    }
+
     /// <summary>
     /// OwnChanges.esp keeps the other mod's raise at the object's vertex and raises the vertex beside it. Over the target's flat land
     /// the object's vertex is accepted from the target and the one beside it from OwnChanges.esp, a terrain no single version holds.
@@ -465,10 +675,7 @@ public class ChangedTerrainObjectsTests
     [Fact]
     public void TheAcceptedHeightsTakeEachVertexFromItsOwnAcceptedVersion()
     {
-        var comparison = new CellTerrainComparison(
-            new TerrainPlugins(Mods.AcceptedWorld, LoadOrder), new TerrainTypes(ChangedTerrainRules.ViewOfLoadOrder(new TerrainPlugin(new Dictionary<ExteriorCell, TerrainVersion[]>()))), Settings());
-
-        var terrain = comparison.Compare([Flat(Target), RaisedAt(Other, Near), OwnChangesRaisingBeside]);
+        var terrain = Comparison().Compare([Flat(Target), RaisedAt(Other, Near), OwnChangesRaisingBeside], []);
 
         Assert.Equal((Ground, Raised), (terrain!.AcceptedHeights![Near], terrain.AcceptedHeights[Beside]));
     }
@@ -668,7 +875,7 @@ public class ChangedTerrainObjectsTests
 
         var result = Find(PaintedCell(FlatPainted(Target, Painted(Grass)), heightOnly, shownByOwnChanges), Settings());
 
-        Assert.Equal([new ObjectOnChangedTerrain(new TargetId(0), Other, TerrainChangeKind.Height)], result.Hits.AsEnumerable());
+        Assert.Equal([(new TargetId(0), (PluginName?)Other, TerrainChangeKind.Height)], result.Hits.Select(hit => (hit.Target, hit.ChangedBy, hit.Kind)));
         Assert.Equal([Removal(0, Other, TerrainChangeKind.Height)], result.Proposals.AsEnumerable());
     }
 
@@ -731,6 +938,45 @@ public class ChangedTerrainObjectsTests
     {
         var plugin = PaintedCell(
             FlatPainted(Other, Painted(Grass)), FlatPainted(OwnChanges, RoadAtWideSpot(FewerChanges)), FlatPainted(Later, Painted(Grass)));
+
+        Assert.Equal(
+            [Removal(0, Later, TerrainChangeKind.TerrainType)],
+            Find(plugin, Settings(), threads: 1, Placed(0, Rock, WideSpot)).Proposals.AsEnumerable());
+    }
+
+    /// <summary>
+    /// The other mod adds the land at the ground; OwnChanges.esp paves all of it, so every vertex has an accepted terrain type and none
+    /// an accepted height. The later mod sinks the land deep and paints it back: the shown height, which stands in for the accepted
+    /// one, decides whether the object reaches the ground.
+    /// </summary>
+    [Theory]
+    [InlineData(Ground, false)]
+    [InlineData(Deep, true)]
+    public void AtAVertexWithAnAcceptedTypeButNoAcceptedHeightTheShownHeightDecidesTheReach(float objectHeight, bool removed)
+    {
+        var plugin = PaintedCell(
+            FlatPainted(Other, Painted(Grass)),
+            FlatPainted(OwnChanges, Painted(Road)),
+            new TerrainVersion(Later, Heights(Deep), Painted(Grass)));
+
+        var result = Find(plugin, Settings(), threads: 1, Placed(0, Rock, Spot with { Z = objectHeight }));
+
+        ProposedRemoval[] expected = removed ? [Removal(0, Later, TerrainChangeKind.TerrainType)] : [];
+        Assert.Equal(expected, result.Proposals.AsEnumerable());
+    }
+
+    /// <summary>
+    /// The other mod adds the land; OwnChanges.esp raises the whole cell, so every vertex has an accepted height, and paves two of the
+    /// sixteen vertices of the area, the only ones with an accepted terrain type. The later mod paints them back: the share is two of
+    /// two, not two of sixteen.
+    /// </summary>
+    [Fact]
+    public void VerticesWithoutAnAcceptedTerrainTypeAreLeftOutOfTheTypeShare()
+    {
+        var plugin = PaintedCell(
+            FlatPainted(Other, Painted(Grass)),
+            new TerrainVersion(OwnChanges, Heights(Raised), RoadAtWideSpot(FewerChanges)),
+            new TerrainVersion(Later, Heights(Raised), Painted(Grass)));
 
         Assert.Equal(
             [Removal(0, Later, TerrainChangeKind.TerrainType)],
@@ -805,10 +1051,16 @@ public class ChangedTerrainObjectsTests
                 .Proposals);
 
     /// <summary>Grass everywhere, with road painted over the first <paramref name="count"/> vertices of the area of an object at <see cref="WideSpot"/>.</summary>
-    private static TerrainLayers RoadAtWideSpot(int count)
+    private static TerrainLayers RoadAtWideSpot(int count) => RoadInFirstQuarter(WideSpotVertices.Take(count));
+
+    /// <summary>As <see cref="RoadAtWideSpot"/>, with road also at the bottom left corner of the quarter, outside the area.</summary>
+    private static TerrainLayers RoadAtWideSpotAndQuarterCorner(int count) => RoadInFirstQuarter([.. WideSpotVertices.Take(count), (0, 0)]);
+
+    /// <summary>Grass everywhere, with road painted over the given vertices of the bottom left quarter.</summary>
+    private static TerrainLayers RoadInFirstQuarter(IEnumerable<(int Column, int Row)> vertices)
     {
         var opacities = new float[TerrainQuadrants.VertexCount];
-        foreach (var (column, row) in WideSpotVertices.Take(count)) opacities[row * TerrainQuadrants.VerticesPerSide + column] = FullOpacity;
+        foreach (var (column, row) in vertices) opacities[row * TerrainQuadrants.VerticesPerSide + column] = FullOpacity;
         var quadrants = Painted(Grass).Quadrants;
         quadrants[TerrainQuadrants.IndexOf(0, 0)] = new QuadrantLayers(Grass, [new TerrainAlphaLayer(Road, LayerNumber: 0, opacities)]);
         return new TerrainLayers(quadrants);
@@ -1028,6 +1280,23 @@ public class ChangedTerrainObjectsTests
         Assert.Equal(removed, result.Proposals.Any());
     }
 
+    /// <summary>
+    /// The other mod adds the land deep down; OwnChanges.esp raises it high, except at the given number of vertices of the area, which
+    /// the raised water covers. Every vertex has an accepted height and none an accepted terrain type, and all stay in the total.
+    /// </summary>
+    [Theory]
+    [InlineData(CoverChangesAtShare - 1, false)]
+    [InlineData(CoverChangesAtShare, true)]
+    public void VerticesWithAnAcceptedHeightButNoAcceptedTerrainTypeStayInTheWaterShare(int covered, bool removed)
+    {
+        var low = WideSpotVertices.Take(covered).Select(vertex => (vertex.Row * TerrainGrid.VerticesPerSide + vertex.Column, Ground));
+        TerrainVersion[] land = [new(Other, Heights(Deep), Layers: null), new(OwnChanges, Heights(High, [.. low]), Layers: null)];
+
+        var result = FindWithWater(land, [Water(Target, BelowTheGround), Water(Later, AboveTheGround)], position: WideSpot);
+
+        Assert.Equal(removed, result.Proposals.Any());
+    }
+
     [Fact]
     public void LandLoweredUnderUnchangedWaterIsAHeightChangeOnly() =>
         Assert.Equal(
@@ -1130,6 +1399,143 @@ public class ChangedTerrainObjectsTests
         Assert.Empty(result.Proposals);
         Assert.Empty(result.Failures);
         Assert.Equal((1, 0), (result.CellsCompared, result.ObjectsWithoutTerrain));
+    }
+
+    /// <summary>
+    /// Only the other mod has the cell's land, so no vertex is checked, but the target has the cell's water: the water is compared over
+    /// the ground as the game shows it. An object on that ground reaches it; one high above it reaches it only at any height.
+    /// </summary>
+    [Theory]
+    [InlineData(TerrainCheckedObjects.VisibleObjectsOnTheGround, Ground, true)]
+    [InlineData(TerrainCheckedObjects.VisibleObjectsAtAnyHeight, Ground, true)]
+    [InlineData(TerrainCheckedObjects.VisibleObjectsOnTheGround, 1000f, false)]
+    [InlineData(TerrainCheckedObjects.VisibleObjectsAtAnyHeight, 1000f, true)]
+    public void WaterIsComparedInACellWhoseLandOnlyUntrustedModsHave(TerrainCheckedObjects objects, float objectHeight, bool removed)
+    {
+        var result = FindWithWater([Flat(Other)], [Water(Target, null), Water(Later, AboveTheGround)], Settings(objects), Spot with { Z = objectHeight });
+
+        ProposedRemoval[] expected = removed ? [Removal(0, Later, TerrainChangeKind.WaterAdded)] : [];
+        Assert.Equal(expected, result.Proposals.AsEnumerable());
+        Assert.Equal((0, 1, 0), (result.CellsCompared, result.CellsComparedForWaterOnly, result.ObjectsWithoutTerrain));
+    }
+
+    /// <summary>
+    /// The evidence of a water finding names the points the water covered, over the shown ground (only an untrusted mod has the land)
+    /// and over accepted ground alike, so that a restore that would change those heights keeps them.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AWaterFindingNamesThePointsItCovered(bool landAccepted)
+    {
+        var hit = Assert.Single(FindWithWater([Flat(landAccepted ? Target : Other)], [Water(Target, null), Water(Later, AboveTheGround)]).Hits);
+
+        var counted = Assert.Single(hit.Area);
+        Assert.NotEmpty(counted.WaterFlipped);
+        Assert.Contains(Near, counted.WaterFlipped);
+        Assert.Equal(counted.WaterFlipped.Order(), counted.WaterFlipped);
+    }
+
+    /// <summary>
+    /// The object's area crosses a cell edge. It hangs 300 units up, high above the west cell's ground, which the target has and the
+    /// other mod raises a little; it reaches only the east cell's ground, whose land only the other mod has and whose water the target
+    /// has. The east cell's points decide the reach only for its own water: the raise in the west counts only at any height, and a
+    /// water change in the east counts on its own.
+    /// </summary>
+    [Theory]
+    [InlineData(TerrainCheckedObjects.VisibleObjectsOnTheGround, false, null)]
+    [InlineData(TerrainCheckedObjects.VisibleObjectsAtAnyHeight, false, TerrainChangeKind.Height)]
+    [InlineData(TerrainCheckedObjects.VisibleObjectsOnTheGround, true, TerrainChangeKind.WaterHeight)]
+    public void PointsOfACellCheckedForWaterOnlyDecideTheReachOnlyForItsOwnWater(TerrainCheckedObjects objects, bool eastWaterRaised, TerrainChangeKind? kind)
+    {
+        const float Hanging = 300f;
+        var east = new ExteriorCell(Worldspace, 1, 0);
+        var westRaised = 8 * TerrainGrid.VerticesPerSide + TerrainGrid.SquaresPerSide;
+        CellWaterCopy[] eastWater = eastWaterRaised ? [Water(Target, BelowTheGround), Water(Later, Hanging + AboveTheGround)] : [Water(Target, BelowTheGround)];
+        var plugin = new TerrainPlugin(
+            new Dictionary<ExteriorCell, TerrainVersion[]>
+            {
+                [Cell] = [Flat(Target), RaisedAt(Other, westRaised)],
+                [east] = [new TerrainVersion(Other, Heights(Hanging), Layers: null)],
+            },
+            water: new Dictionary<ExteriorCell, WaterCopies> { [east] = new(eastWater, BaseGameWorldspace) });
+
+        var result = Find(plugin, Settings(objects), threads: 1, Placed(0, Rock, new Vector3(ExteriorGrid.CellSize, Spot.Y, Hanging)));
+
+        ProposedRemoval[] expected = kind is { } changed ? [Removal(0, changed == TerrainChangeKind.Height ? Other : Later, changed)] : [];
+        Assert.Equal(expected, result.Proposals.AsEnumerable());
+    }
+
+    [Fact]
+    public void WithNoWaterSwitchOnACellWithoutCheckedLandIsNotChecked()
+    {
+        var result = FindWithWater([Flat(Other)], [Water(Target, null), Water(Later, AboveTheGround)], Settings(waterHeights: false, waterAddedOrRemoved: false));
+
+        Assert.Empty(result.Proposals);
+        Assert.Equal((0, 0, 1), (result.CellsCompared, result.CellsComparedForWaterOnly, result.ObjectsWithoutTerrain));
+    }
+
+    /// <summary>The cell has no land record at all, only trusted water that a later mod adds: it is not checked.</summary>
+    [Fact]
+    public void ACellWithoutALandRecordIsNotCheckedForWater()
+    {
+        var result = FindWithWater([], [Water(Target, null), Water(Later, AboveTheGround)]);
+
+        Assert.Empty(result.Proposals);
+        Assert.Equal((0, 0, 1), (result.CellsCompared, result.CellsComparedForWaterOnly, result.ObjectsWithoutTerrain));
+    }
+
+    [Fact]
+    public void ACellWhoseLandAndWaterOnlyUntrustedModsHaveIsNotChecked()
+    {
+        var result = FindWithWater([Flat(Other)], [Water(Other, BelowTheGround), Water(Later, AboveTheGround)]);
+
+        Assert.Empty(result.Proposals);
+        Assert.Equal((0, 1), (result.CellsCompared, result.ObjectsWithoutTerrain));
+    }
+
+    /// <summary>The only land record of the cell holds no heights, so there is no ground to compare the water over.</summary>
+    [Fact]
+    public void ACellWhoseOnlyLandHoldsNoHeightsIsNotCheckedForWater()
+    {
+        var result = FindWithWater([new TerrainVersion(Other, Heights: null, Layers: null)], [Water(Target, null), Water(Later, AboveTheGround)]);
+
+        Assert.Empty(result.Proposals);
+        Assert.Equal((0, 1), (result.CellsCompared, result.ObjectsWithoutTerrain));
+    }
+
+    /// <summary>
+    /// Only untrusted mods have the cell's land; the later mod lowers it under the target's unchanged water. The ground is taken as
+    /// shown, so the point flips through no water change and the land change is not compared.
+    /// </summary>
+    [Fact]
+    public void InACellWhoseLandOnlyUntrustedModsHaveOnlyTheWaterCanCoverAPoint()
+    {
+        var result = FindWithWater([new TerrainVersion(Other, Heights(High), Layers: null), Flat(Later)], [Water(Target, AboveTheGround)]);
+
+        Assert.Empty(result.Proposals);
+        Assert.Equal((0, 0), (result.CellsCompared, result.ObjectsWithoutTerrain));
+    }
+
+    /// <summary>
+    /// The object's area crosses a cell edge, six vertices on each side. The raised water covers the six in the west cell, whose land
+    /// the target has; the east cell's land, which only the other mod has, stays dry, and its six vertices count in the total.
+    /// </summary>
+    [Theory]
+    [InlineData(50, true)]
+    [InlineData(75, false)]
+    public void TheWaterShareCountsTheVerticesOfACellWhoseLandOnlyUntrustedModsHave(int waterPercent, bool removed)
+    {
+        var east = new ExteriorCell(Worldspace, 1, 0);
+        CellWaterCopy[] raisedWater = [Water(Target, BelowTheGround), Water(Later, AboveTheGround)];
+        var plugin = new TerrainPlugin(
+            new Dictionary<ExteriorCell, TerrainVersion[]> { [Cell] = [Flat(Target)], [east] = [new TerrainVersion(Other, Heights(High), Layers: null)] },
+            water: new Dictionary<ExteriorCell, WaterCopies> { [Cell] = new(raisedWater, BaseGameWorldspace), [east] = new(raisedWater, BaseGameWorldspace) });
+
+        var result = Find(plugin, Settings(waterPercent: waterPercent), threads: 1, Placed(0, Rock, new Vector3(ExteriorGrid.CellSize, Spot.Y, 0)));
+
+        Assert.Equal(removed, result.Proposals.Any());
+        Assert.Equal(1, result.CellsCompared);
     }
 
     /// <summary>The accepted cell has no water, so its worldspace's default is not needed, though no trusted plugin has the worldspace.</summary>
@@ -1317,8 +1723,11 @@ public class ChangedTerrainObjectsTests
     private sealed class TerrainPlugin(
         IReadOnlyDictionary<ExteriorCell, TerrainVersion[]> terrain,
         IReadOnlyDictionary<RecordKey, RecordKey[]>? materials = null,
-        IReadOnlyDictionary<ExteriorCell, WaterCopies>? water = null) : IPluginRecords
+        IReadOnlyDictionary<ExteriorCell, WaterCopies>? water = null,
+        IReadOnlyDictionary<RecordKey, ExteriorCell>? cellsOfRecords = null) : IPluginRecords
     {
+        public ExteriorCell? FindExteriorCell(RecordKey landOrCell) => cellsOfRecords?.TryGetValue(landOrCell, out var cell) == true ? cell : null;
+
         private int _materialReads;
         private int _waterReads;
 
@@ -1355,8 +1764,6 @@ public class ChangedTerrainObjectsTests
         public float[]? ReadTerrain(ExteriorCell cell) => throw new NotSupportedException();
 
         public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => throw new NotSupportedException();
-
-        public PluginName? ReadTerrainWinner(ExteriorCell cell) => throw new NotSupportedException();
 
         public NavmeshWorldTriangle[]? ReadNavmeshes(NavmeshBucket bucket) => throw new NotSupportedException();
 

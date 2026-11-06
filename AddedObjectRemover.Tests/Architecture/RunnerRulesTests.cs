@@ -12,9 +12,10 @@ namespace AddedObjectRemover.Tests.Architecture;
 /// checked on the source text (comments and literals removed) of the runner and the run caches: it reads no member of a settings
 /// record, it has no condition (comparison, negation or loop included) of its own, and it holds no error boundary. A new settings
 /// read, condition or error boundary fails here. It calls every listed rule provider.
-/// It also carries nothing from one run to the next, so chained Standard runs equal one Batch run: the only state that
-/// crosses runs is what the patch writing writes into the patch. The runner holds no field, its loop over the requests hands
-/// each run only its request and the environment, every member of the environment is listed with why no run changes it,
+/// It also carries nothing from one run to the next but the restored parts, so chained Standard runs equal one Batch run: the
+/// state that crosses runs is what the patch writing writes into the patch, and the list of restored parts, which a chain hands on
+/// in the restored parts file. The runner holds no field, its loop over the requests hands each run only its request, the
+/// environment and the restored parts known so far, every member of the environment is listed with why no run changes it,
 /// nothing the environment shares holds what a run opens, no production type keeps static state a run can change, and each run's link cache is built when that run opens its plugin
 /// records, so it is dropped with them.
 /// </summary>
@@ -119,13 +120,17 @@ public class RunnerRulesTests
         ["Log"] = "Only prints; no run reads it back.",
         ["ReportOutput"] = "Writes each run's report files into that run's folder; no run reads them back.",
         ["TimeSinceStart"] = "Reads the clock; the times go into log lines only.",
+        ["RestoredPartsFile"] = "Read once before the first run and written once after the last; no run reads or writes it.",
     };
 
     /// <summary>What a run opens for itself and drops when it ends; nothing the environment shares may hold one.</summary>
     private static readonly Type[] OpenedPerRun = [typeof(IPluginRecords), typeof(IRecordIndex), typeof(IBaseFacts), typeof(IMeshFiles), typeof(ILinkCache)];
 
-    /// <summary>The names the loop over the requests may use besides its own request: the environment and the results it collects.</summary>
-    private static readonly string[] RequestLoopNames = ["Add", "PatchOneRun", "environment", "results"];
+    /// <summary>
+    /// The names the loop over the requests may use besides its own request: the environment, the results it collects, and the
+    /// restored parts each run hands to the next.
+    /// </summary>
+    private static readonly string[] RequestLoopNames = ["Add", "PatchOneRun", "environment", "results", "var", "ended", "Result", "Restored", "restored"];
 
     private static readonly Regex UsingDirective = new(@"^\s*using\s+[\w.]+\s*;", RegexOptions.Multiline);
 
@@ -386,7 +391,7 @@ public class RunnerRulesTests
     }
 
     [Fact]
-    public void TheRequestLoopHandsEachRunOnlyItsRequestAndTheEnvironment()
+    public void TheRequestLoopHandsEachRunOnlyItsRequestTheEnvironmentAndTheRestoredParts()
     {
         var loop = Assert.Single(FindRequestLoops(SourceFile.All().Single(file => file.Path == StepRunnerFile).Code));
 
@@ -394,7 +399,7 @@ public class RunnerRulesTests
 
         Assert.True(
             notAllowed.Count == 0,
-            $"The loop over the requests hands a run more than its request and the environment:{Environment.NewLine}{string.Join(Environment.NewLine, notAllowed)}");
+            $"The loop over the requests hands a run more than its request, the environment and the restored parts:{Environment.NewLine}{string.Join(Environment.NewLine, notAllowed)}");
     }
 
     [Fact]

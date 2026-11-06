@@ -289,7 +289,7 @@ public class PlacedRecordFactReadingTests
     {
         var (placed, middle, later) = AddRecordWithTwoOverrides();
 
-        var versions = ReadVersions(placed, (_, plugin) => plugin == new PluginName(stoppingPlugin), middle, later);
+        var versions = ReadVersions(placed, (_, plugin, _) => plugin == new PluginName(stoppingPlugin), middle, later);
 
         Assert.Equal(expected.Select(name => new PluginName(name)), versions.Select(version => version.Plugin));
     }
@@ -300,7 +300,7 @@ public class PlacedRecordFactReadingTests
     {
         var (placed, middle, later) = AddRecordWithTwoOverrides();
 
-        var versions = ReadVersions(placed, (winner, plugin) => winner != new PluginName(LaterPlugin) && plugin == new PluginName(MiddlePlugin), middle, later);
+        var versions = ReadVersions(placed, (winner, plugin, _) => winner != new PluginName(LaterPlugin) && plugin == new PluginName(MiddlePlugin), middle, later);
 
         Assert.Equal(
             [new PluginName(TargetPlugin), new PluginName(MiddlePlugin), new PluginName(LaterPlugin)],
@@ -462,7 +462,7 @@ public class PlacedRecordFactReadingTests
         var (placed, createdWorld) = CreateWorldWithOverridesAroundThePatch();
         using var world = createdWorld;
 
-        var facts = ReadWith(new PluginRecordsFactory(world, Environment.ProcessorCount).Open(), (_, plugin) => plugin == new PluginName(AbovePlugin));
+        var facts = ReadWith(new PluginRecordsFactory(world, Environment.ProcessorCount).Open(), (_, plugin, _) => plugin == new PluginName(AbovePlugin));
 
         Assert.Equal(
             [new PluginName(AbovePlugin), FixturePatcherState.PatchModKey.ToPluginName(), new PluginName(BelowPlugin)],

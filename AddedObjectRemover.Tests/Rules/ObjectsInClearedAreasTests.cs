@@ -414,7 +414,7 @@ public sealed class ObjectsInClearedAreasTests
             targets,
             decisions,
             caches,
-            LeftBehindRules.CreateClearedAreasJudging(targets, spaces ?? new Dictionary<RecordKey, SpaceFact>(), caches),
+            LeftBehindRules.CreateClearedAreasJudging(targets, overriddenLater: [], spaces ?? new Dictionary<RecordKey, SpaceFact>(), caches),
             kinds ?? [],
             LeftBehindRules.CreateLeftBehindRoundJoin(),
             new NoFollowUp(),

@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Numerics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
@@ -9,16 +8,12 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 /// <summary>A world grid point whose height goes back, with its height now and once written, in game units.</summary>
 internal readonly record struct RestoredGridPoint(WorldGridPoint Point, float Current, float Planned);
 
-/// <summary>A terrain square whose ground ends more than the height tolerance from the ground of the world without the cleaned mod.</summary>
-/// <param name="Land">The LAND record holding it, which the cleaned mod overrides.</param>
-internal readonly record struct GroundThatStaysChanged(ExteriorCell Cell, RecordKey Land, GroundGap Gap);
-
 /// <summary>
 /// Which heights, normals, vertex colours, quarter textures and rests of the LAND records the cleaned mod changed go back, and the
 /// heights written. Which points go back is chosen by <see cref="TerrainPointSelection"/>, the records holding a point on a cell edge
 /// are checked by <see cref="TerrainEdgeChecks"/> and the heights written are solved by <see cref="TerrainHeightSolver"/>. A colour on
 /// a cell edge goes back in every record holding it or in none. A cell whose heights the height map cannot store keeps all of its
-/// own. A quarter whose ground the changed-terrain step checks around an object that stays keeps its texture layers. Its outcome does not change:
+/// own. A quarter whose textures going back the changed-terrain rule counts for an object that stays keeps its texture layers. Its outcome does not change:
 /// <see cref="Protect"/> and <see cref="KeepTextures"/> give a new plan.
 /// </summary>
 internal sealed partial class TerrainUndoPlan
@@ -28,7 +23,7 @@ internal sealed partial class TerrainUndoPlan
     /// <summary>Each protected point with the first reason it was protected for.</summary>
     private readonly ImmutableDictionary<LandGridPoint, TerrainKeptReason> _protected;
 
-    /// <summary>The quarters whose texture layers stay for an object that stays: the changed-terrain step checks their ground around it.</summary>
+    /// <summary>The quarters whose texture layers stay for an object that stays: the changed-terrain rule counts their going back.</summary>
     private readonly ImmutableHashSet<(ExteriorCell Cell, int Quarter)> _texturesKept;
 
     /// <summary>The plan this one protects more points of, until this one's outcome is computed; null for the first plan.</summary>
@@ -76,7 +71,7 @@ internal sealed partial class TerrainUndoPlan
         return new TerrainUndoPlan(_lands, protectedPoints.ToImmutable(), _texturesKept, this);
     }
 
-    /// <summary>The plan with the texture layers of the given quarters kept too, for objects that stay whose ground the changed-terrain step checks there.</summary>
+    /// <summary>The plan with the texture layers of the given quarters kept too, for objects that stay for which the changed-terrain rule counts their going back.</summary>
     public TerrainUndoPlan KeepTextures(IEnumerable<(ExteriorCell Cell, int Quarter)> quarters)
     {
         var kept = _texturesKept.Union(quarters.Where(quarter => _lands.ByCell.ContainsKey(quarter.Cell)));
@@ -92,17 +87,11 @@ internal sealed partial class TerrainUndoPlan
     /// <summary>The winning heights of the cell's LAND record; null when the plan holds none or the winner has no height map.</summary>
     public float[]? CurrentHeightsOf(ExteriorCell cell) => _lands.ByCell.TryGetValue(cell, out var land) ? _lands.HeightsOf(land.Change).Current : null;
 
-    /// <summary>The plugin of the cell's LAND record version just below the cleaned mod's; null when the plan holds no LAND record there or the plugin is not known.</summary>
-    public PluginName? EarlierPluginOf(ExteriorCell cell) => _lands.ByCell.TryGetValue(cell, out var land) ? land.Change.EarlierPlugin : null;
-
-    /// <summary>The ground of the cell in the world without the cleaned mod (<see cref="TerrainUndoLands.HeightsWithoutCleanedMod"/>); null when the plan holds no such heights.</summary>
-    public float[]? HeightsWithoutCleanedModOf(ExteriorCell cell) => _lands.HeightsWithoutCleanedMod.GetValueOrDefault(cell);
-
     /// <summary>The heights of the cell's LAND record once written, or its winning heights where none goes back; null when the plan holds none.</summary>
     public float[]? PlannedHeightsOf(ExteriorCell cell) => FinalHeightsOf(cell, _outcome.Value);
 
-    /// <summary>Whether the point's height goes back.</summary>
-    public bool Restores(LandGridPoint point) => _outcome.Value.Restored.Contains(WorldGridPoint.Of(point));
+    /// <summary>A cell's heights before the cleaned mod, and as the plan ends them where it plans the cell, else as they are.</summary>
+    public LandHeights GroundBeforeAndAfter(ExteriorCell cell, LandHeights ground) => ground with { Current = PlannedHeightsOf(cell) ?? ground.Current };
 
     /// <summary>The cells of the LAND records with a point whose height goes back, in no particular order.</summary>
     public IEnumerable<ExteriorCell> CellsWithRestoredPoints() => _outcome.Value.Final.Keys;
@@ -111,7 +100,7 @@ internal sealed partial class TerrainUndoPlan
     public IEnumerable<RestoredGridPoint> RestoredPoints()
     {
         var outcome = _outcome.Value;
-        return _lands.All
+        return _lands.Planned
             .SelectMany(land => _lands.Candidates[land.Change.Cell].Points.Select(point => WorldGridPoint.Of(new LandGridPoint(land.Change.Cell, point))))
             .Where(outcome.Restored.Contains)
             .Distinct()
@@ -129,81 +118,12 @@ internal sealed partial class TerrainUndoPlan
     public IEnumerable<LandGridPoint> PointsOfCellsTooSteepToStore()
     {
         var tooSteep = _outcome.Value.TooSteep;
-        return _lands.All.Where(land => tooSteep.Contains(land.Change.Cell))
+        return _lands.Planned.Where(land => tooSteep.Contains(land.Change.Cell))
             .SelectMany(land => _lands.Candidates[land.Change.Cell].Points.Select(point => new LandGridPoint(land.Change.Cell, point)));
-    }
-
-    /// <summary>
-    /// The first terrain square, in the order of the squares under the footprint, where the ground under the footprint stays changed
-    /// through the cleaned mod: ground the plan keeps as the cleaned mod made it, in a LAND record the cleaned mod overrides, that
-    /// rises into the height range or drops away from it. The ground is compared with the world without the cleaned mod
-    /// (<see cref="TerrainUndoLands.HeightsWithoutCleanedMod"/>), so ground only an unrelated plugin changed never counts. Each point is judged at the
-    /// height the patch leaves there: a point the plan restores at the height it writes, blended or not. Null when there is none.
-    /// </summary>
-    /// <param name="footprint">The rectangle a box covers, seen from above.</param>
-    /// <param name="heights">The lowest and highest height of the box.</param>
-    public GroundThatStaysChanged? GroundThatStaysChangedUnder(RecordKey landWorldspace, (Vector2 Min, Vector2 Max) footprint, (float Min, float Max) heights)
-    {
-        foreach (var part in TerrainGrid.SquaresUnder(footprint))
-        {
-            var cell = new ExteriorCell(landWorldspace, part.CellX, part.CellY);
-            if (GapWhereGroundStaysChanged(cell, part, heights) is { } gap) return new GroundThatStaysChanged(cell, _lands.ByCell[cell].Change.LandKey, gap);
-        }
-        return null;
     }
 
     /// <summary>Each LAND record with what goes back, in the order given.</summary>
     public ImmutableArray<LandChangeJudged> Judged() => [.. _lands.All.Select(Judge)];
-
-    /// <summary>
-    /// The gap when the ground under the part of the footprint in the square, in the world without the cleaned mod and as it ends,
-    /// differs by more than the tolerance and comes within the tolerance of the height range. A grid next to a missing one has no
-    /// height to compare, so the square counts once a corner of the cleaned mod's differs.
-    /// </summary>
-    /// <remarks>
-    /// The game draws each square as two triangles. Which diagonal it splits the square along is not known, so the part counts when
-    /// it does on either split. On each split the surface and its change are linear on each triangle, so their extremes over the
-    /// part lie at its bounding points; the part counts when one of them changes beyond the tolerance and the heights between the
-    /// earlier and final surface over them reach the range.
-    /// </remarks>
-    /// <returns>The gap, with the largest difference over the splits on which the part counts; null when the ground there does not stay changed.</returns>
-    private GroundGap? GapWhereGroundStaysChanged(ExteriorCell cell, SquarePart part, (float Min, float Max) range)
-    {
-        if (!_lands.ByCell.TryGetValue(cell, out var land) || land.Change.Heights is not { } heights) return null;
-
-        var tolerance = _lands.HeightTolerance;
-        if (heights is not { Earlier: not null, Current: { } current })
-        {
-            return AnyCornerDiffers(cell, part, heights) ? new GroundGap(Largest: null, tolerance) : null;
-        }
-
-        var without = _lands.HeightsWithoutCleanedMod[cell];
-        var final = PlannedHeightsOf(cell) ?? current;
-        return Enum.GetValues<SquareSplit>().Select(split => LargestDifferenceWhereItStays(split, part, without, final, range)).Max() is { } largest
-            ? new GroundGap(largest, tolerance)
-            : null;
-    }
-
-    /// <summary>
-    /// Whether a corner of the square that the cleaned mod changed and the plan does not restore differs, its cell having a height map
-    /// in only one of the two versions. A corner the cleaned mod did not change is the ground of the world without the cleaned mod.
-    /// </summary>
-    private bool AnyCornerDiffers(ExteriorCell cell, SquarePart part, LandHeights heights) =>
-        TerrainGrid.CornersOf(part.FirstCorner).Any(point =>
-            _lands.CleanedModShaped(cell, point) && !Restores(new LandGridPoint(cell, point)) && HeightGridComparison.DiffersAt(heights.Earlier, heights.Current, point, _lands.HeightTolerance));
-
-    /// <returns>The largest difference between the surface of the world without the cleaned mod and the final surface over the part on the split when the part counts on it; null otherwise.</returns>
-    private float? LargestDifferenceWhereItStays(SquareSplit split, SquarePart part, float[] without, float[] final, (float Min, float Max) range)
-    {
-        var surfaces = TerrainGrid.BoundingPointsOnTriangles(part, split)
-            .Select(point => (Earlier: TerrainGrid.HeightOnTriangles(without, part.FirstCorner, point, split), Final: TerrainGrid.HeightOnTriangles(final, part.FirstCorner, point, split)))
-            .ToList();
-        var largest = surfaces.Max(surface => MathF.Abs(surface.Final - surface.Earlier));
-        if (largest <= _lands.HeightTolerance) return null;
-        var low = surfaces.Min(surface => MathF.Min(surface.Earlier, surface.Final));
-        var high = surfaces.Max(surface => MathF.Max(surface.Earlier, surface.Final));
-        return low - _lands.HeightTolerance <= range.Max && high + _lands.HeightTolerance >= range.Min ? largest : null;
-    }
 
     private LandChangeJudged Judge(LandAreasJudged land)
     {

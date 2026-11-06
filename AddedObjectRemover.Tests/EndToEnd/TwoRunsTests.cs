@@ -198,7 +198,8 @@ public sealed class TwoRunsTests : IDisposable
             bases,
             new ConsoleLogSink(),
             new CsvReportOutput(),
-            () => TimeSpan.Zero);
+            () => TimeSpan.Zero,
+            new NoRestoredPartsFile());
 
     private sealed class RecordingPluginRecordsFactory(IPluginRecordsFactory inner) : IPluginRecordsFactory
     {

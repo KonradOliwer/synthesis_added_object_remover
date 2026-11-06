@@ -19,8 +19,13 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 /// </param>
 /// <param name="DecideEveryObjectWithoutCleanedMod">
 /// With <paramref name="JudgeOldPlaces"/>, every other-mod and support-only object is decided in the world without the cleaned mod
-/// even when the scan finds no changed object: other mods' objects that go back where the cleaned mod was removed are checked
-/// against every object that exists because of the cleaned mod.
+/// even when the scan finds no changed object, as long as the cleaned mod changed some placed record of another plugin: other mods'
+/// objects that go back where the cleaned mod was removed are checked against every object that exists because of the cleaned mod.
+/// </param>
+/// <param name="DecideEveryObjectBeforeCleanedMod">
+/// Every other-mod and support-only object is decided in the world before the cleaned mod when the cleaned mod changed some LAND
+/// record of another plugin: the walk goes below every plugin that loads after the cleaned mod, down to the versions that world
+/// believes.
 /// </param>
 /// <param name="AreaRecordVersions">
 /// Null unless restoring where the cleaned mod's objects were removed is on. On, the cell and LAND records of other plugins the
@@ -36,6 +41,7 @@ public sealed record ScanNeeds(
     bool TerrainForChangedObjectsOnly = false,
     bool JudgeOldPlaces = false,
     bool DecideEveryObjectWithoutCleanedMod = false,
+    bool DecideEveryObjectBeforeCleanedMod = false,
     AreaRecordReads? AreaRecordVersions = null)
 {
     /// <param name="needs">The needs of each step that is on; a step that is off gives null or nothing.</param>
@@ -43,14 +49,12 @@ public sealed record ScanNeeds(
         needs.ToArray().OfType<ScanNeeds>().Aggregate(new ScanNeeds(), (union, step) => union.Union(step));
 
     private ScanNeeds Union(ScanNeeds other) => new(
-        Navmesh || other.Navmesh,
-        OtherModDetails || other.OtherModDetails,
-        TerrainVersions || other.TerrainVersions,
-        TerrainLayers || other.TerrainLayers,
-        Water || other.Water,
+        Navmesh || other.Navmesh, OtherModDetails || other.OtherModDetails,
+        TerrainVersions || other.TerrainVersions, TerrainLayers || other.TerrainLayers, Water || other.Water,
         TerrainForChangedObjectsOnly || other.TerrainForChangedObjectsOnly,
         JudgeOldPlaces || other.JudgeOldPlaces,
         DecideEveryObjectWithoutCleanedMod || other.DecideEveryObjectWithoutCleanedMod,
+        DecideEveryObjectBeforeCleanedMod || other.DecideEveryObjectBeforeCleanedMod,
         UnionOfAreaRecordVersions(other.AreaRecordVersions));
 
     /// <summary>The tolerances of two reads cannot be merged, so only one step may ask for them.</summary>

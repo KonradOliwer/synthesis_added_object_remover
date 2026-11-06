@@ -14,12 +14,14 @@ internal sealed record LandAreasJudged(LandChangedByCleanedMod Change, NeverRest
 
 /// <summary>Judges whether a candidate's undone parts go back: the never-rules first, then its area. Thread-safe.</summary>
 /// <param name="spacesOnLand">Per worldspace holding land, the spaces holding a target whose ground it is, in key order.</param>
+/// <param name="sharingAGrid">The cell records and LAND records that share their grid with another record of their kind (<see cref="SharedGrids"/>).</param>
 internal sealed class ChangeJudge(
     ImmutableArray<TargetObject> targets,
     IClearedAreas areas,
     LoadOrderPlugins plugins,
     IReadOnlyDictionary<RecordKey, ImmutableArray<RecordKey>> spacesOnLand,
-    CloneCandidates clones)
+    CloneCandidates clones,
+    IReadOnlySet<RecordKey> sharingAGrid)
 {
     /// <summary>Judged points are centres: a cell's lies half a cell from its corner, bounds' halfway between their corners.</summary>
     private const float Halfway = 0.5f;
@@ -93,7 +95,7 @@ internal sealed class ChangeJudge(
     public CellChangeJudged Cell(CellCandidate cell)
     {
         var change = cell.Change;
-        if (NeverRestored(change.WinningMod, change.LinkedFromCleanedMod, inDeletedCell: false) is { } never)
+        if ((NeverRestored(change.WinningMod, change.LinkedFromCleanedMod, inDeletedCell: false) ?? SharingAGrid(change.Cell)) is { } never)
         {
             return new CellChangeJudged(change, cell.Undone, never, Area: null, WaterKeptBy: null, IsRestored: false, KeptForArea: null);
         }
@@ -115,7 +117,10 @@ internal sealed class ChangeJudge(
 
     public LandAreasJudged Land(LandChangedByCleanedMod land)
     {
-        if (NeverRestored(land.WinningMod, linkedFromCleanedMod: false, land.CellDeletedInAVersion) is { } never) return new LandAreasJudged(land, never, Quarters: []);
+        if ((NeverRestored(land.WinningMod, linkedFromCleanedMod: false, land.CellDeletedInAVersion) ?? SharingAGrid(land.LandKey)) is { } never)
+        {
+            return new LandAreasJudged(land, never, Quarters: []);
+        }
 
         var spaces = SpacesOn(land);
         return new LandAreasJudged(
@@ -165,6 +170,9 @@ internal sealed class ChangeJudge(
         var verdict = FirstPresent(verdicts, AreaVerdict.StillStanding, AreaVerdict.Cleared) ?? AreaVerdict.NoObjectsAround;
         return new LandQuarterJudged(areas.Sum(spaces, verdict));
     }
+
+    /// <returns><see cref="NeverRestoredReason.SharesItsGrid"/> for a cell or LAND record sharing its grid; null otherwise.</returns>
+    private NeverRestoredReason? SharingAGrid(RecordKey record) => sharingAGrid.Contains(record) ? NeverRestoredReason.SharesItsGrid : null;
 
     /// <param name="inDeletedCell">A version read deletes a cell the record would be written into.</param>
     /// <returns>The first never-rule that holds; null when none does.</returns>

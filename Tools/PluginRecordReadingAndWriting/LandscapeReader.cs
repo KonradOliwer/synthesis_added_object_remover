@@ -23,10 +23,15 @@ internal sealed class LandscapeReader
     private readonly LandRecordParts? _landParts;
 
     private readonly Dictionary<ExteriorCell, ILandscapeGetter> _landscapes = new();
-    private readonly Dictionary<ExteriorCell, PluginName> _landscapeWinners = new();
     private readonly Dictionary<ExteriorCell, ILandscapeGetter> _landscapesBelowNamedPlugin = new();
     private readonly Dictionary<ExteriorCell, List<LandscapeVersion>> _landscapeVersions = new();
     private readonly Dictionary<ExteriorCell, List<CellWaterCopy>> _cellWaterCopies = new();
+
+    /// <summary>With the terrain versions asked for, the cell of each LAND record read.</summary>
+    private readonly Dictionary<RecordKey, ExteriorCell> _landCells = new();
+
+    /// <summary>With the water asked for, the cell of each cell record whose water is read.</summary>
+    private readonly Dictionary<RecordKey, ExteriorCell> _waterCells = new();
 
     /// <summary>With the area record versions asked for, the cells of the land worldspaces that some plugin's version deletes.</summary>
     private readonly HashSet<ExteriorCell> _deletedLandCells = new();
@@ -69,7 +74,7 @@ internal sealed class LandscapeReader
         if (ExteriorCellOf(cell, cellKey, space) is not { } exteriorCell) return;
         if (_landParts is not null && cell.IsDeleted && _landWorldspaces.Contains(space.Key)) _deletedLandCells.Add(exteriorCell);
         if (_landWorldspaces.Contains(space.Key)) CollectLandscape(cell, exteriorCell, plugin, belowNamedPlugin);
-        if (_scope.Water && _waterWorldspaceOf.ContainsKey(space.Key)) CollectCellWater(cell, exteriorCell, plugin);
+        if (_scope.Water && _waterWorldspaceOf.ContainsKey(space.Key)) CollectCellWater(cell, cellKey, exteriorCell, plugin);
     }
 
     /// <remarks>
@@ -80,9 +85,13 @@ internal sealed class LandscapeReader
     private void CollectLandscape(ICellGetter cell, ExteriorCell exteriorCell, PluginName plugin, bool belowNamedPlugin)
     {
         if (cell.Landscape is not { } landscape) return;
-        if (_landscapes.TryAdd(exteriorCell, landscape)) _landscapeWinners.Add(exteriorCell, plugin);
+        _landscapes.TryAdd(exteriorCell, landscape);
         if (belowNamedPlugin && ReadsLandVersions) _landscapesBelowNamedPlugin.TryAdd(exteriorCell, landscape);
-        if (_scope.TerrainVersions) KeyedGroups.GetOrAddList(_landscapeVersions, exteriorCell).Add(new LandscapeVersion(plugin, landscape));
+        if (_scope.TerrainVersions)
+        {
+            KeyedGroups.GetOrAddList(_landscapeVersions, exteriorCell).Add(new LandscapeVersion(plugin, landscape));
+            _landCells.TryAdd(_names.KeyOf(landscape.FormKey), exteriorCell);
+        }
         if (_footprint.OverriddenLands.Count > 0 && _names.KeyOf(landscape.FormKey) is var landKey && _footprint.OverriddenLands.Contains(landKey))
         {
             _landWalk.Keep(landKey, plugin, landscape, exteriorCell);
@@ -94,8 +103,11 @@ internal sealed class LandscapeReader
     /// of the worldspace whose land they use. Every plugin's copy of the cell is kept, with or without land, in the order found;
     /// like the land, two cells at one grid in one plugin are both kept.
     /// </remarks>
-    private void CollectCellWater(ICellGetter cell, ExteriorCell exteriorCell, PluginName plugin) =>
+    private void CollectCellWater(ICellGetter cell, RecordKey cellKey, ExteriorCell exteriorCell, PluginName plugin)
+    {
         KeyedGroups.GetOrAddList(_cellWaterCopies, exteriorCell).Add(WaterLevel.ReadCopy(plugin, cell));
+        _waterCells.TryAdd(cellKey, exteriorCell);
+    }
 
     /// <returns>Null for a worldspace's persistent cell and any other cell without a grid.</returns>
     private static ExteriorCell? ExteriorCellOf(ICellGetter cell, RecordKey cellKey, SpaceFact space) =>
@@ -103,13 +115,13 @@ internal sealed class LandscapeReader
 
     public LandscapeTerrain CreateTerrain() => new(
         _landscapes,
-        _landscapeWinners,
         _landWorldspaceOf,
         _scope.TerrainVersions ? _landscapeVersions : null,
+        _landCells,
         _scope.TerrainLayers ? _names : null,
         ReadsLandVersions ? new LandscapesBelow(_scope.Plugin, _landscapesBelowNamedPlugin) : null);
 
-    public CellWater CreateWater() => new(_scope.Water ? _cellWaterCopies : null, CollectWorldspaceWater(), _waterWorldspaceOf);
+    public CellWater CreateWater() => new(_scope.Water ? _cellWaterCopies : null, _waterCells, CollectWorldspaceWater(), _waterWorldspaceOf);
 
     /// <summary>Every plugin's own default water height of each worldspace that supplies water, in load order, when the water is asked for.</summary>
     private Dictionary<RecordKey, List<WorldspaceWaterCopy>> CollectWorldspaceWater()

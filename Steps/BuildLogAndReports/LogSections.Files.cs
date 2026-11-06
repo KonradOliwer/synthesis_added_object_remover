@@ -40,6 +40,7 @@ internal static partial class LogSections
         AddRowsLine(lines, tables, ReportFileNames.RestoredFileName, "Restored objects");
         AddRowsLine(lines, tables, ReportFileNames.RestoredWhereRemovedObjectsFileName, "Objects judged for restoring where the cleaned mod was removed");
         AddRowsLine(lines, tables, ReportFileNames.RestoredWhereRemovedCellsFileName, "Cells, terrain quarters and navmeshes judged for restoring where the cleaned mod was removed");
+        AddRowsLine(lines, tables, ReportFileNames.RestoredWhereRemovedFollowUpFileName, FollowUpLabel);
         AddRowsLine(lines, tables, ReportFileNames.FitsFileName, "Changed and fitted objects");
         AddRowsLine(lines, tables, ReportFileNames.LeftWithoutSupportFileName, LeftWithoutSupportName);
         AddRowsLine(lines, tables, ReportFileNames.HintsFileName, "Removed markers and kept objects");

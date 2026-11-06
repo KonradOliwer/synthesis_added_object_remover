@@ -6,6 +6,7 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 /// </summary>
 /// <param name="SpaceKey">The worldspace or interior of the winning version; the earlier version stands in the same one.</param>
 /// <param name="Cell">The cell whose child list holds the winning version; for an interior it is the space itself.</param>
+/// <param name="WinningModPastPatches">The plugin whose version wins past the patches, as for another mod's object (<see cref="OtherObject.WinningModPastPatches"/>).</param>
 /// <param name="WhereItIsNow">The winning version's placement, the scale normalized; null when it has no position or rotation.</param>
 /// <param name="BaseNow">The winning version's base object; null when its base link is empty.</param>
 /// <param name="ReferenceNow">What the winning version says about the reference itself.</param>
@@ -20,8 +21,8 @@ namespace AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 /// </param>
 /// <param name="InDeletedCell">A version read deletes the cell holding its winning version or the one holding its earlier version.</param>
 /// <param name="PutThereBy">
-/// The winning plugin when it is no patch (this group's or another's) and its position or base differs from the cleaned mod's, so it
-/// put the object where it stands; null when the cleaned mod's place stands.
+/// The winner past the patches (<paramref name="WinningModPastPatches"/>) when it is not the cleaned mod and its position or base
+/// differs from the cleaned mod's, so it put the object where it stands; null when the cleaned mod's place stands.
 /// </param>
 public sealed record RecordChangedByCleanedMod(
     RecordKey Key,
@@ -29,6 +30,7 @@ public sealed record RecordChangedByCleanedMod(
     RecordKey SpaceKey,
     CellFact Cell,
     PluginName WinningMod,
+    PluginName WinningModPastPatches,
     EulerPlacement? WhereItIsNow,
     BaseKey? BaseNow,
     ReferenceFacts ReferenceNow,
@@ -43,6 +45,14 @@ public sealed record RecordChangedByCleanedMod(
 {
     /// <summary>Some part goes back to the earlier version.</summary>
     public bool HasPartsToUndo => Earlier.Undo != PlacedParts.None;
+
+    /// <summary>The cleaned mod changed whether the game has the record, and its version just below the cleaned mod's is removed.</summary>
+    /// <remarks>Its enable parent is not followed.</remarks>
+    public bool RemovedBeforeTheCleanedMod => Earlier.Undo.HasFlag(PlacedParts.Presence) && PresenceBefore.Removed;
+
+    /// <summary>The cleaned mod changed whether the game has the record, and its version just below the cleaned mod's is not removed.</summary>
+    /// <remarks>Its enable parent is not followed.</remarks>
+    public bool PresentBeforeTheCleanedMod => Earlier.Undo.HasFlag(PlacedParts.Presence) && !PresenceBefore.Removed;
 
     /// <summary>Some part was changed again by a later plugin or the patch.</summary>
     public bool HasPartsLeftToLaterPlugins => !Earlier.LeftToLaterPlugins.IsEmpty;

@@ -45,6 +45,7 @@ public static class ChangedTerrainObjects
             [.. found.Hits.Select(hit => new ProposedRemoval(hit.Target, new TerrainChanged(hit.ChangedBy, hit.Kind)))],
             found.Failures,
             found.CellsCompared,
+            found.CellsComparedForWaterOnly,
             found.ObjectsWithoutTerrain);
     }
 }

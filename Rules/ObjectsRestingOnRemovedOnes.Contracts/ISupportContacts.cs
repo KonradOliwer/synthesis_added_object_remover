@@ -13,10 +13,11 @@ public interface ISupportContacts
     WeightedSurfaceSamples SampleSurface(string meshPath);
 
     /// <param name="points">Samples of the placed mesh's surface, in its local frame.</param>
+    /// <param name="terrain">The ground of the world the mesh is judged in.</param>
     /// <param name="scratch">Reused buffer for triangle queries.</param>
     /// <returns>One per mesh supporter, in the given order, then one for the terrain when the space has terrain.</returns>
     List<SupporterHits> FindHits(
-        ImmutableArray<Vector3> points, RecordKey space, PlacedTransform transform, IEnumerable<MeshSupporter> supporters, float touchDistance, List<int> scratch);
+        ImmutableArray<Vector3> points, RecordKey space, PlacedTransform transform, IEnumerable<MeshSupporter> supporters, ITerrainHeights terrain, float touchDistance, List<int> scratch);
 
     CandidateContacts SplitWeightsAmongSupporters(IReadOnlyList<SupporterHits> hitsBySupporter, ImmutableArray<float> weights);
 

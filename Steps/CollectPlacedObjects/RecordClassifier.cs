@@ -76,11 +76,14 @@ internal sealed class RecordClassifier(ModTrustTable trust, AcceptedWorld world,
         return distinct.Where(plugin => !shared.Contains(CloneMarker.HashedNameOf(plugin))).ToImmutableDictionary(CloneMarker.HashedNameOf);
     }
 
-    /// <remarks>A clone is judged as its own patch or this group's patch left it, like the cleaned mod's records (<see cref="WinsInTargetOrPatch"/>).</remarks>
+    /// <remarks>
+    /// A clone is judged where the patch that created it, or a patch that only carries its state, left it, like the cleaned mod's
+    /// records (<see cref="WinsInTargetOrPatch"/>): it is left to the plugin that is the winner past the patches when that is another.
+    /// </remarks>
     private Classification ClassifyClone(PlacedRecordFact record, CloneMark clone)
     {
         if (clone.CleanedMod != trust.CleanedMod) return new(RecordRole.SupportOnlyCopy, null, null);
-        var wins = record.WinningMod == record.Key.Plugin || record.WinningMod == trust.Patch;
+        var wins = WinnerPastPatches.Of(record, trust) == record.Key.Plugin;
         return new(wins ? RecordRole.Target : RecordRole.TargetOverriddenLater, null, null, clone.Original);
     }
 
@@ -97,13 +100,8 @@ internal sealed class RecordClassifier(ModTrustTable trust, AcceptedWorld world,
 
     /// <remarks>
     /// The patch's version holds what earlier patchers in this group wrote, so a target record it wins is judged as the patch left it,
-    /// unless the highest version other than the patch's is a third plugin's (another group's patch included): that plugin chose the record's state and the patch only
-    /// carries it. Earlier steps of this patcher write only records the cleaned mod wins, so their moves are always judged.
+    /// unless the winner past the patches (<see cref="WinnerPastPatches"/>) is a third plugin: that plugin chose the record's state and
+    /// the patch only carries it. Earlier steps of this patcher write only records the cleaned mod wins, so their moves are always judged.
     /// </remarks>
-    private bool WinsInTargetOrPatch(PlacedRecordFact record) =>
-        record.WinningMod == trust.CleanedMod || (record.WinningMod == trust.Patch && !IsHeldByThirdPluginBelowThePatch(record));
-
-    private bool IsHeldByThirdPluginBelowThePatch(PlacedRecordFact record) =>
-        record.Versions.Where(version => version.Plugin != trust.Patch).Select(version => (PluginName?)version.Plugin).LastOrDefault() is { } plugin
-        && plugin != trust.CleanedMod;
+    private bool WinsInTargetOrPatch(PlacedRecordFact record) => WinnerPastPatches.Of(record, trust) == trust.CleanedMod;
 }

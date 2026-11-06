@@ -52,7 +52,7 @@ public class CellWaterTests
 
     [Fact]
     public void TheCopiesMustHaveBeenAskedFor() =>
-        Assert.Throws<InvalidOperationException>(() => new CellWater(null, new Dictionary<RecordKey, List<WorldspaceWaterCopy>>(), new Dictionary<RecordKey, RecordKey>()).ReadCopies(WaterCell));
+        Assert.Throws<InvalidOperationException>(() => new CellWater(null, new Dictionary<RecordKey, ExteriorCell>(), new Dictionary<RecordKey, List<WorldspaceWaterCopy>>(), new Dictionary<RecordKey, RecordKey>()).ReadCopies(WaterCell));
 
     [Fact]
     public void AWorldspaceUsingItsParentsWaterDataReadsTheParentsCopies()
@@ -60,6 +60,7 @@ public class CellWaterTests
         var child = TestTargets.SpaceKey(0x300);
         var water = new CellWater(
             new Dictionary<ExteriorCell, List<CellWaterCopy>>(),
+            new Dictionary<RecordKey, ExteriorCell>(),
             new Dictionary<RecordKey, List<WorldspaceWaterCopy>> { [Worldspace] = [WithDefault] },
             new Dictionary<RecordKey, RecordKey> { [child] = Worldspace });
 
@@ -72,6 +73,7 @@ public class CellWaterTests
     /// <summary>The copies in the order the reader finds them: the cell copies highest priority first, the worldspace copies in load order.</summary>
     private static CellWater Water(CellWaterCopy[] cellCopies, WorldspaceWaterCopy[] worldspaceCopies) => new(
         new Dictionary<ExteriorCell, List<CellWaterCopy>> { [WaterCell] = [.. cellCopies.Reverse()] },
+        new Dictionary<RecordKey, ExteriorCell>(),
         new Dictionary<RecordKey, List<WorldspaceWaterCopy>> { [Worldspace] = [.. worldspaceCopies] },
         new Dictionary<RecordKey, RecordKey> { [Worldspace] = Worldspace });
 }

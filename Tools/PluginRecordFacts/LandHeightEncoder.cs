@@ -40,6 +40,29 @@ public static class LandHeightEncoder
 
     public static bool CanStore(IReadOnlyList<float> heights) => Encode(heights) is not null;
 
+    /// <summary>The heights the stored height map gives back, row by row from the bottom, x fastest, in game units.</summary>
+    public static float[] Decode(LandHeightSteps stored)
+    {
+        var heights = new float[TerrainGrid.VertexCount];
+        var rowStart = stored.Offset;
+        for (var y = 0; y < TerrainGrid.VerticesPerSide; y++)
+        {
+            rowStart += stored.Steps[y * TerrainGrid.VerticesPerSide];
+            var value = rowStart;
+            heights[y * TerrainGrid.VerticesPerSide] = value * TerrainGrid.UnitsPerHeightStep;
+            for (var x = 1; x < TerrainGrid.VerticesPerSide; x++)
+            {
+                value += stored.Steps[y * TerrainGrid.VerticesPerSide + x];
+                heights[y * TerrainGrid.VerticesPerSide + x] = value * TerrainGrid.UnitsPerHeightStep;
+            }
+        }
+        return heights;
+    }
+
+    /// <summary>The heights a record storing <paramref name="heights"/> holds once written and read back.</summary>
+    /// <returns>Null when the heights cannot be stored.</returns>
+    public static float[]? Stored(IReadOnlyList<float> heights) => Encode(heights) is { } stored ? Decode(stored) : null;
+
     /// <summary>
     /// The height a whole number of steps from <paramref name="storedHeight"/> nearest to <paramref name="height"/>, a half step
     /// rounding up. A record storing <paramref name="storedHeight"/> stores it exactly, and so does every record whose stored heights

@@ -11,7 +11,8 @@ namespace AddedObjectRemover.Rules.ObjectsLeftBehind;
 /// Judges how much of the cleaned mod's own objects the game draws still stand in the area around a point: the objects whose box
 /// centre lies within the search radius horizontally, at any height; in an interior, every such object of the interior. The share
 /// standing by count and the share standing by size each have a limit; both must be at most it.
-/// An object whose mesh holds only effect shapes (fog, light rays) counts in the count and adds nothing to the size. Thread-safe; each
+/// An object whose mesh holds only effect shapes (fog, light rays) counts in the count and adds nothing to the size. One of the cleaned
+/// mod's objects a later plugin holds, when the contents count them, always stands. Thread-safe; each
 /// area is measured once.
 /// </summary>
 /// <param name="contents">The cleaned mod's own objects in each column, over the shown targets where the rounds measure them, so a fitted object counts at its fitted box.</param>
@@ -53,7 +54,7 @@ internal sealed class ClearedAreaJudge(
         {
             objects++;
             size += counted.Volume;
-            if (!Stands(counted.Target)) continue;
+            if (!counted.IsOverriddenLater && !Stands(counted.Target)) continue;
             standing++;
             standingSize += counted.Volume;
         }

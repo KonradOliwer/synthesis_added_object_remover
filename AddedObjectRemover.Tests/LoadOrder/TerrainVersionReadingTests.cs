@@ -25,6 +25,7 @@ public class TerrainVersionReadingTests
     private readonly FormKey _worldspace;
     private readonly FormKey _cell;
     private readonly Cell _targetCell;
+    private readonly FormKey _baseLand;
 
     public TerrainVersionReadingTests()
     {
@@ -33,7 +34,7 @@ public class TerrainVersionReadingTests
         _late = new FixtureMod("Late.esp", _base);
         _worldspace = _base.NextKey();
         _cell = _base.NextKey();
-        AddCell(_base, BaseOffset);
+        _baseLand = AddCell(_base, BaseOffset).Landscape!.FormKey;
         _targetCell = AddCell(_target, TargetOffset);
         AddCell(_noLand, landOffset: null);
         AddCell(_late, LateOffset);
@@ -119,6 +120,24 @@ public class TerrainVersionReadingTests
         Assert.Equal(
             [_base.Key.ToPluginName(), _target.Key.ToPluginName(), _late.Key.ToPluginName()],
             plugin.ReadTerrainVersions(ExteriorCell).Select(version => version.Plugin));
+    }
+
+    /// <summary>
+    /// A part given back of the parent's LAND record, which the child worldspace uses, is found at the land cell a terrain check of the
+    /// child asks for; a part of the child's own cell record is found at the child's cell, where its water is read.
+    /// </summary>
+    [Fact]
+    public void AGivenBackPartIsFoundAtTheLandCellForALandRecordAndAtItsOwnCellForACellRecord()
+    {
+        var child = AddChildWithTargetCell(WorldspaceParent.Flag.UseLandData | WorldspaceParent.Flag.UseWaterData, childDefaultWater: ChildBaseWater);
+        var childCell = _target.Mod.Worldspaces.RecordCache[child].SubCells.Single().Items.Single().Items.Single().FormKey;
+        var plugin = OpenPlugin();
+        plugin.ReadPlacedRecords(WaterScope(), TestVersionWalks.NoStop);
+
+        Assert.Equal(ExteriorCell, plugin.FindExteriorCell(_baseLand.ToRecordKey()));
+        Assert.Equal(new ExteriorCell(child.ToRecordKey(), 0, 0), plugin.FindExteriorCell(childCell.ToRecordKey()));
+        Assert.Equal(ExteriorCell, plugin.FindExteriorCell(_cell.ToRecordKey()));
+        Assert.Null(plugin.FindExteriorCell(_targetCell.Temporary.Single().FormKey.ToRecordKey()));
     }
 
     /// <summary>The late plugin's second cell at the grid is found after its first, so the first, which the game shows, is last.</summary>

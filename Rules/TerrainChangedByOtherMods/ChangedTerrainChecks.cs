@@ -20,6 +20,7 @@ internal sealed class ChangedTerrainChecks(IReadOnlyList<TargetObject> targets, 
             [.. checks.Select(objectCheck => objectCheck.Hit).OfType<ObjectOnChangedTerrain>()],
             FailuresOf(indexes, checks),
             check.CellsCompared(),
+            check.CellsComparedForWaterOnly(),
             checks.Count(objectCheck => objectCheck.WithoutTerrain));
     }
 

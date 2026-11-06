@@ -1,4 +1,5 @@
 using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
+using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
 namespace AddedObjectRemover.Rules.TerrainChangedByOtherMods;
 
@@ -22,37 +23,44 @@ internal sealed class CellWaterComparison(TerrainPlugins plugins, ChangedTerrain
     private const int FlagProperty = 0;
     private const int OwnLevelProperty = 1;
 
+    private static readonly RestoredPartName WaterLevelPart = new RestoredPartName.Cell(new CellPartName(CellPart.WaterLevel, Region: null));
+
     /// <returns>
-    /// Null when the cell's water is not checked, because a part it is made of has no accepted version or no version at all, or
+    /// Not checked when a part the cell's water is made of has no accepted version or no version at all; checked without a change
     /// when the water the game shows differs from the accepted water by no counted change.
     /// </returns>
-    public CellWaterChange? Compare(WaterCopies copies)
+    /// <param name="restored">The parts given back of the cell's records; only the water of its cell record is read.</param>
+    public WaterComparison Compare(WaterCopies copies, IReadOnlyCollection<RestoredPart> restored)
     {
-        var parts = DecideParts(copies);
+        var parts = DecideParts(copies, restored);
         if (Combine(copies, parts, static part => part.Acceptance.Accepted) is not { } accepted
             || Combine(copies, parts, static part => part.Shown) is not { } shown)
         {
-            return null;
+            return WaterComparison.NotChecked;
         }
 
         var kind = FindChangeBetween(accepted.Level, shown.Level);
-        return IsCounted(kind) ? new CellWaterChange(accepted.Level, shown.Level, FindChanger(parts, shown), kind) : null;
+        return new WaterComparison(IsChecked: true, IsCounted(kind) ? new CellWaterChange(accepted.Level, shown.Level, FindChanger(parts, shown), kind) : null);
     }
 
+    /// <remarks>The flag and the own level are given back as one part of the cell record; the default level is no part of it.</remarks>
     /// <returns>The flag, the own level and the default level, in that order.</returns>
-    private WaterPart[] DecideParts(WaterCopies copies)
+    private WaterPart[] DecideParts(WaterCopies copies, IReadOnlyCollection<RestoredPart> restored)
     {
         PluginName[] cellPlugins = [.. copies.Cell.Select(static copy => copy.Plugin)];
         PluginName[] worldspacePlugins = [.. copies.Worldspace.Select(static copy => copy.Plugin)];
+        var givenBack = AcceptedVersions.GivenBackFrom(cellPlugins, plugins.Patch, RestoredPartsByRecord.SourcesOf(restored, WaterLevelPart));
         var cell = AcceptedVersions.Decide(
             TrustsOf(cellPlugins),
             [
                 (one, other) => copies.Cell[one].HasWater != copies.Cell[other].HasWater,
                 (one, other) => LevelsDiffer(copies.Cell[one].OwnLevel, copies.Cell[other].OwnLevel),
-            ]);
+            ],
+            [givenBack, givenBack]);
         var worldspace = AcceptedVersions.Decide(
             TrustsOf(worldspacePlugins),
-            [(one, other) => LevelsDiffer(copies.Worldspace[one].DefaultLevel, copies.Worldspace[other].DefaultLevel)]);
+            [(one, other) => LevelsDiffer(copies.Worldspace[one].DefaultLevel, copies.Worldspace[other].DefaultLevel)],
+            givenBackFrom: null);
         return [new(cellPlugins, cell[FlagProperty]), new(cellPlugins, cell[OwnLevelProperty]), new(worldspacePlugins, worldspace.Single())];
     }
 

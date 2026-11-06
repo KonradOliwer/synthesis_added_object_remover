@@ -86,8 +86,8 @@ formKey,editorId,base,reason,worldspace,hold,place,cellFormKey,cellEditorId,grid
 ## report removed-markers-and-kept-objects.csv
 kind,formKey,editorId,space,cell,detail
 ## report restored-where-removed-cells.csv
-kind,space,gridX,gridY,cell,quarter,navmesh,undone,leftToLaterPlugins,objects,standing,size,standingSize,standingPercentByCount,standingPercentBySize,verdict,result,keptUnderObjectThatStays,keptUnderObjectKeptAsChanged,keptUnderObjectPlacedForTheGroundAsItIs,keptUnderNavmesh,keptTooSteepToStore,keptOnEdgeOfLandThatStays,keptEarlierEdgeHeightsDiffer,keptEdgeStoredOnDifferentSteps,keptNextToQuarterThatStays,keptWithoutHeightMap
-quarter,worldspace 000800:Skyrim.esm,6,7,,south-west,,289 heights,,1,0,1000000,0,0,0,Cleared,restored,0,0,0,0,0,33,0,0,0,0
-quarter,worldspace 000800:Skyrim.esm,6,7,,south-east,,289 heights,,1,0,1000000,0,0,0,Cleared,restored,0,0,0,0,0,33,0,0,0,0
-quarter,worldspace 000800:Skyrim.esm,6,7,,north-west,,289 heights,,1,0,1000000,0,0,0,Cleared,restored,0,0,0,0,0,33,0,0,0,0
-quarter,worldspace 000800:Skyrim.esm,6,7,,north-east,,264 heights,25 heights (AddedObjectRemover.esp),1,0,1000000,0,0,0,Cleared,restored,0,0,0,0,0,33,0,0,0,0
+kind,space,gridX,gridY,cell,quarter,navmesh,undone,leftToLaterPlugins,objects,standing,size,standingSize,standingPercentByCount,standingPercentBySize,verdict,result,keptUnderObjectThatStays,keptUnderObjectKeptAsChanged,keptForChangedTerrainCheck,keptUnderOtherModsObject,keptUnderNavmesh,keptTooSteepToStore,keptOnEdgeOfLandThatStays,keptEarlierEdgeHeightsDiffer,keptEdgeStoredOnDifferentSteps,keptNextToQuarterThatStays,keptWithoutHeightMap
+quarter,worldspace 000800:Skyrim.esm,6,7,,south-west,,289 heights,,1,0,1000000,0,0,0,Cleared,restored,0,0,0,0,0,0,33,0,0,0,0
+quarter,worldspace 000800:Skyrim.esm,6,7,,south-east,,289 heights,,1,0,1000000,0,0,0,Cleared,restored,0,0,0,0,0,0,33,0,0,0,0
+quarter,worldspace 000800:Skyrim.esm,6,7,,north-west,,289 heights,,1,0,1000000,0,0,0,Cleared,restored,0,0,0,0,0,0,33,0,0,0,0
+quarter,worldspace 000800:Skyrim.esm,6,7,,north-east,,264 heights,25 heights (AddedObjectRemover.esp),1,0,1000000,0,0,0,Cleared,restored,0,0,0,0,0,0,33,0,0,0,0

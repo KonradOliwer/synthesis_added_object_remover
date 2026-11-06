@@ -24,7 +24,8 @@ public enum VersionTrust
 
 /// <param name="Accepted">
 /// The index of the highest version trusted for the property; when only a transparent version holds the final value, the highest
-/// trusted version holding it, if one does. Null when no version is trusted.
+/// trusted version holding it, if one does; the final version when it still holds a value it was given back and some version is
+/// trusted. Null when no version is trusted.
 /// </param>
 /// <param name="Changed">The final version's value differs from the accepted one, or there is no accepted version.</param>
 /// <param name="Changing">
@@ -45,21 +46,46 @@ public static class AcceptedVersions
     /// Per property, whether the values of two versions differ beyond the property's tolerance. It is false for two equal
     /// indices.
     /// </param>
+    /// <param name="givenBackFrom">
+    /// Per property, in the order of <paramref name="differsByProperty"/>, the versions whose values the final version was given back
+    /// (<see cref="GivenBackFrom"/>); null when the final version was given back nothing.
+    /// </param>
     /// <returns>One result per property, in the order of <paramref name="differsByProperty"/>.</returns>
     public static PropertyAcceptance[] Decide(
-        IReadOnlyList<VersionTrust> trusts, IReadOnlyList<Func<int, int, bool>> differsByProperty) =>
-        [.. differsByProperty.Select(differs => DecideProperty(trusts, differs))];
+        IReadOnlyList<VersionTrust> trusts,
+        IReadOnlyList<Func<int, int, bool>> differsByProperty,
+        IReadOnlyList<IReadOnlyCollection<int>>? givenBackFrom) =>
+        [.. differsByProperty.Select((differs, property) => DecideProperty(trusts, differs, givenBackFrom?[property] ?? []))];
+
+    /// <summary>
+    /// The versions below the final one whose plugins are <paramref name="sources"/>, when the final version is the patch's: an earlier
+    /// run gave the patch their values back.
+    /// </summary>
+    /// <param name="plugins">The plugin of each version, lowest first; the last entry is the final version.</param>
+    /// <returns>Empty when the final version is not the patch's.</returns>
+    public static int[] GivenBackFrom(IReadOnlyList<PluginName> plugins, PluginName patch, IReadOnlyCollection<PluginName> sources) =>
+        plugins.Count > 0 && plugins[^1] == patch
+            ? [.. Enumerable.Range(0, plugins.Count - 1).Where(index => sources.Contains(plugins[index]))]
+            : [];
 
     /// <remarks>
     /// A final value only a transparent version holds is what an earlier patcher of the group wrote into the patch. When it equals
     /// a trusted version's value, the base game's included, that patcher put a trusted value back, so it is accepted from that
-    /// version. A real plugin that sets a lower trusted version's value back still changes the property.
+    /// version. A real plugin that sets a lower trusted version's value back still changes the property. A final value that still
+    /// equals a value it was given back is accepted as the final version's own, whatever the trust of the version it came from: it is
+    /// part of the world without the mod whose change it replaced. A property no version is trusted for stays unchecked.
     /// </remarks>
-    private static PropertyAcceptance DecideProperty(IReadOnlyList<VersionTrust> trusts, Func<int, int, bool> differs)
+    private static PropertyAcceptance DecideProperty(IReadOnlyList<VersionTrust> trusts, Func<int, int, bool> differs, IReadOnlyCollection<int> givenBackFrom)
     {
         var acceptance = CompareWithHighestAccepted(trusts, differs);
-        return IsHeldOnlyByTransparentVersion(acceptance) && FindHighestAcceptedHoldingFinalValue(trusts, differs) is { } holding
-            ? new PropertyAcceptance(holding, Changed: false, Changing: null)
+        if (IsHeldOnlyByTransparentVersion(acceptance) && FindHighestAcceptedHoldingFinalValue(trusts, differs) is { } holding)
+        {
+            return new PropertyAcceptance(holding, Changed: false, Changing: null);
+        }
+
+        var finalIndex = trusts.Count - 1;
+        return acceptance is { Changed: true, Accepted: not null } && givenBackFrom.Any(index => !differs(index, finalIndex))
+            ? new PropertyAcceptance(finalIndex, Changed: false, Changing: null)
             : acceptance;
     }
 

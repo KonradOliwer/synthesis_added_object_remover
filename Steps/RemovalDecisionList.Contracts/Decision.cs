@@ -4,8 +4,11 @@ using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 
 namespace AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
-/// <summary>The kind of step that decided a round; a fit round comes before the removal rounds.</summary>
-public enum RoundKind { Fit, ChangedTerrain, TooClose, AlsoRemove, VisibleLeftBehind, ClearedArea, InvisibleLeftBehind }
+/// <summary>
+/// The kind of step that decided a round; a fit round comes before the removal rounds. A restore round exists only on the restore
+/// step's working copies, never in the run's decisions.
+/// </summary>
+public enum RoundKind { Fit, ChangedTerrain, TooClose, AlsoRemove, VisibleLeftBehind, ClearedArea, InvisibleLeftBehind, Restore }
 
 /// <param name="Number">1 for the first round of a run, counting up.</param>
 public readonly record struct Round(int Number, RoundKind Kind);
@@ -52,6 +55,10 @@ public abstract record Decision(Round Round, RemovalReason Reason)
     /// <param name="To">Its placement now.</param>
     public sealed record Fitted(Round Round, RemovalReason Reason, EulerPlacement To) : Decision(Round, Reason);
 }
+
+/// <summary>A target object the restore step puts back to an earlier version, for a working copy to record.</summary>
+/// <param name="To">The version it goes back to; null when that version stands nowhere (disabled or deleted), so it leaves the world.</param>
+public readonly record struct GoingBack(TargetId Target, RemovalReason Reason, EarlierVersion? To);
 
 /// <summary>A step's proposal to remove one target object.</summary>
 public readonly record struct ProposedRemoval(TargetId Target, RemovalReason Reason);

@@ -89,6 +89,7 @@ internal sealed record ProjectRules(IReadOnlyList<string> EntryOnlyProjects, IRe
             "RemoveInvisibleObjectsLeftBehind.Contracts", "RemoveInvisibleObjectsLeftBehind", "MoveKeptMarkers.Contracts",
             "MoveKeptMarkers", "WriteThePatch"),
         Reads("the restore's result it writes", "RestoreWhereRemoved.Contracts", "WriteThePatch"),
+        Reads("the restored parts it lists of what it wrote", "CollectPlacedObjects.Contracts", "WriteThePatch.Contracts"),
         Reads("the invisible objects left behind whose markers move", "RemoveInvisibleObjectsLeftBehind.Contracts", "MoveKeptMarkers.Contracts", "MoveKeptMarkers"),
         Reads("the step results it logs and reports",
             ["CollectPlacedObjects.Contracts", "FindTargetObjectsToKeep.Contracts", "FitClashingObjects.Contracts", "MoveKeptMarkers.Contracts", "RemovalDecisionList.Contracts",

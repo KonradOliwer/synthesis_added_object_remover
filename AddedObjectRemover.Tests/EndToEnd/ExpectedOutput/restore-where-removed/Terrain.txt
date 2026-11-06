@@ -37,13 +37,13 @@ Invisible objects left behind: 0 evaluated in <time>; removed 0 (0 inside anothe
 Linked groups: 0 more objects removed with the left-behind removals they are linked to.
 Moved 0 kept markers out of other mods' objects; 0 left in place.
 Restored where the cleaned mod was removed: terrain in 3 cell quarters of 1 cell.
-Left as the cleaned mod changed them: terrain at 139 points (11 under objects of other plugins placed for the ground as it is, 95 on a cell edge whose neighbouring ground stays, 33 on the line to a quarter of the cell whose area is not cleared).
+Left as the cleaned mod changed them: terrain at 128 points (95 on a cell edge whose neighbouring ground stays, 33 on the line to a quarter of the cell whose area is not cleared).
 Kept because the cleaned mod's objects still stand around them: terrain in 1 cell quarter.
-  Terrain worldspace AorWorld [000801:Skyrim.esm], cell (0, 0), south-west quarter: 250 heights; 5 heights kept under objects of other plugins placed for the ground as it is; 33 heights kept on a cell edge whose neighbouring ground stays; 1 height kept on the line to a quarter of the cell whose area is not cleared; 0 of 1 object still stand (0.0% by count, 0.0% by size)
-  Terrain worldspace AorWorld [000801:Skyrim.esm], cell (0, 0), south-east quarter: 234 heights; 6 heights kept under objects of other plugins placed for the ground as it is; 32 heights kept on a cell edge whose neighbouring ground stays; 17 heights kept on the line to a quarter of the cell whose area is not cleared; 0 of 1 object still stand (0.0% by count, 0.0% by size)
-  Terrain worldspace AorWorld [000801:Skyrim.esm], cell (0, 0), north-west quarter: 237 heights; 3 heights kept under objects of other plugins placed for the ground as it is; 32 heights kept on a cell edge whose neighbouring ground stays; 17 heights kept on the line to a quarter of the cell whose area is not cleared; 0 of 1 object still stand (0.0% by count, 0.0% by size)
+  Terrain worldspace AorWorld [000801:Skyrim.esm], cell (0, 0), south-west quarter: 255 heights; 33 heights kept on a cell edge whose neighbouring ground stays; 1 height kept on the line to a quarter of the cell whose area is not cleared; 0 of 1 object still stand (0.0% by count, 0.0% by size)
+  Terrain worldspace AorWorld [000801:Skyrim.esm], cell (0, 0), south-east quarter: 240 heights; 32 heights kept on a cell edge whose neighbouring ground stays; 17 heights kept on the line to a quarter of the cell whose area is not cleared; 0 of 1 object still stand (0.0% by count, 0.0% by size)
+  Terrain worldspace AorWorld [000801:Skyrim.esm], cell (0, 0), north-west quarter: 240 heights; 32 heights kept on a cell edge whose neighbouring ground stays; 17 heights kept on the line to a quarter of the cell whose area is not cleared; 0 of 1 object still stand (0.0% by count, 0.0% by size)
   Kept as changed: terrain worldspace AorWorld [000801:Skyrim.esm], cell (0, 0), north-east quarter: the cleaned mod's objects still stand around it; 1 of 2 objects still stands (50.0% by count, 50.0% by size)
-Restore where removed: 2 passes in <time>.
+Restore where removed: 1 pass in <time>.
 Wrote 2 overrides (1 removed, 1 to restore where the cleaned mod was removed) in <time>.
   Removed T_Middle [000801:Target.esp] (base T_CrateBase [000800:Target.esp]) in worldspace AorWorld [000801:Skyrim.esm], cell AorExterior [000802:Skyrim.esm], place AorExterior, hold unnamed area, grid 0,0; too close to C_Pad [000801:CityMod.esp], changed by CityMod.esp (new object)
 Bounds: 2 bases from NIF, 0 NIF misses, 0 from OBND, 0 without bounds. Meshes: 2 read, 0 effect-only, 0 failed (2 loose, 0 from 0 archives), 0 with a footer root other than their first node.
@@ -68,7 +68,7 @@ Removed markers and kept objects: wrote 0 rows to <root>/Reports/removed-markers
 cell 000802:Skyrim.esm: music none, location none, fog near none
 land 000803:Skyrim.esm row 0: 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192
 land 000803:Skyrim.esm row 8: 192 168 152 128 128 128 128 128 128 128 128 128 128 128 128 128 128 128 128 128 128 128 128 128 128 128 128 128 128 128 152 168 192
-land 000803:Skyrim.esm row 16: 192 168 152 128 128 128 128 128 128 128 128 128 128 152 168 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192
+land 000803:Skyrim.esm row 16: 192 168 152 128 128 128 128 128 128 128 128 128 128 128 152 168 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192
 land 000803:Skyrim.esm row 24: 192 168 152 128 128 128 128 128 128 128 128 128 128 128 152 168 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192
 land 000803:Skyrim.esm row 32: 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192 192
 ## report anchoring.csv
@@ -87,8 +87,8 @@ formKey,editorId,base,reason,worldspace,hold,place,cellFormKey,cellEditorId,grid
 ## report removed-markers-and-kept-objects.csv
 kind,formKey,editorId,space,cell,detail
 ## report restored-where-removed-cells.csv
-kind,space,gridX,gridY,cell,quarter,navmesh,undone,leftToLaterPlugins,objects,standing,size,standingSize,standingPercentByCount,standingPercentBySize,verdict,result,keptUnderObjectThatStays,keptUnderObjectKeptAsChanged,keptUnderObjectPlacedForTheGroundAsItIs,keptUnderNavmesh,keptTooSteepToStore,keptOnEdgeOfLandThatStays,keptEarlierEdgeHeightsDiffer,keptEdgeStoredOnDifferentSteps,keptNextToQuarterThatStays,keptWithoutHeightMap
-quarter,worldspace AorWorld [000801:Skyrim.esm],0,0,,south-west,,289 heights,,1,0,1000000,0,0,0,Cleared,restored,0,0,5,0,0,33,0,0,1,0
-quarter,worldspace AorWorld [000801:Skyrim.esm],0,0,,south-east,,289 heights,,1,0,1000000,0,0,0,Cleared,restored,0,0,6,0,0,32,0,0,17,0
-quarter,worldspace AorWorld [000801:Skyrim.esm],0,0,,north-west,,289 heights,,1,0,1000000,0,0,0,Cleared,restored,0,0,3,0,0,32,0,0,17,0
-quarter,worldspace AorWorld [000801:Skyrim.esm],0,0,,north-east,,289 heights,,2,1,2000000,1000000,50,50,StillStanding,kept: the cleaned mod's objects still stand around it,0,0,0,0,0,0,0,0,0,0
+kind,space,gridX,gridY,cell,quarter,navmesh,undone,leftToLaterPlugins,objects,standing,size,standingSize,standingPercentByCount,standingPercentBySize,verdict,result,keptUnderObjectThatStays,keptUnderObjectKeptAsChanged,keptForChangedTerrainCheck,keptUnderOtherModsObject,keptUnderNavmesh,keptTooSteepToStore,keptOnEdgeOfLandThatStays,keptEarlierEdgeHeightsDiffer,keptEdgeStoredOnDifferentSteps,keptNextToQuarterThatStays,keptWithoutHeightMap
+quarter,worldspace AorWorld [000801:Skyrim.esm],0,0,,south-west,,289 heights,,1,0,1000000,0,0,0,Cleared,restored,0,0,0,0,0,0,33,0,0,1,0
+quarter,worldspace AorWorld [000801:Skyrim.esm],0,0,,south-east,,289 heights,,1,0,1000000,0,0,0,Cleared,restored,0,0,0,0,0,0,32,0,0,17,0
+quarter,worldspace AorWorld [000801:Skyrim.esm],0,0,,north-west,,289 heights,,1,0,1000000,0,0,0,Cleared,restored,0,0,0,0,0,0,32,0,0,17,0
+quarter,worldspace AorWorld [000801:Skyrim.esm],0,0,,north-east,,289 heights,,2,1,2000000,1000000,50,50,StillStanding,kept: the cleaned mod's objects still stand around it,0,0,0,0,0,0,0,0,0,0,0

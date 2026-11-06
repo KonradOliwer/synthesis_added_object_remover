@@ -13,6 +13,7 @@ internal sealed class SupportContactFinder(
     TargetMeshPaths meshPaths,
     SupporterFinder supporterFinder,
     SurfaceContacts surfaces,
+    ITerrainHeights terrain,
     float touchGap)
 {
     /// <param name="ZeroWeight">Set when the contacts have contact points but no support weight.</param>
@@ -34,7 +35,7 @@ internal sealed class SupportContactFinder(
     {
         var target = targets[candidate];
         var samples = surfaces.SampleSurface(meshPaths.Get(candidate));
-        var hits = surfaces.FindHits(samples.Points, target.SpaceKey, target.Transform, supporterFinder.FindMeshSupporters(candidate, scratch), touchGap, scratch.Triangles);
+        var hits = surfaces.FindHits(samples.Points, target.SpaceKey, target.Transform, supporterFinder.FindMeshSupporters(candidate, scratch), terrain, touchGap, scratch.Triangles);
         var contacts = SupportContactWeights.SplitWeightsAmongSupporters(hits, samples.Weights);
         return new FoundContacts(contacts, ZeroWeightDiagnosis.Of(candidate, meshPaths.Get(candidate), samples, hits, contacts));
     }

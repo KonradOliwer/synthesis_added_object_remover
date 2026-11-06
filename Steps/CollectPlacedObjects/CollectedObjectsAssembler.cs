@@ -44,6 +44,7 @@ internal sealed class CollectedObjectsAssembler(
             WinningPresence = WinningPresenceOfTargetSpaces(),
             WinningPrimitives = WinningPrimitivesOfTargetSpaces(),
             BrokenCloneMarkers = [.. gathered.BrokenCloneMarkers],
+            CleanedModsObjectsOverriddenLater = [.. gathered.CleanedModsObjectsOverriddenLater.OrderBy(overridden => overridden.Key, RecordKeyOrder.Comparer)],
         };
         return ChangedAreaRecordCollector.MarkLinked(objects, linked);
     }

@@ -29,7 +29,10 @@ internal sealed class ObjectTerrainCheck(ITerrainView view, IBaseObjectShapes sh
     private readonly ComputedOncePerKey<ExteriorCell, CellTerrain?> _landCells = new(Publication.BuiltOnce, EqualityComparer<ExteriorCell>.Default);
 
     /// <summary>By the cell in the object's own worldspace.</summary>
-    private readonly ComputedOncePerKey<ExteriorCell, CellWaterChange?> _waterCells = new(Publication.BuiltOnce, EqualityComparer<ExteriorCell>.Default);
+    private readonly ComputedOncePerKey<ExteriorCell, WaterComparison> _waterCells = new(Publication.BuiltOnce, EqualityComparer<ExteriorCell>.Default);
+
+    /// <summary>The cells, in the object's own worldspace, without checked land whose water was compared over the shown ground.</summary>
+    private readonly ComputedOncePerKey<ExteriorCell, bool> _waterOnlyCells = new(Publication.BuiltOnce, EqualityComparer<ExteriorCell>.Default);
 
     private readonly CheckArea _area = new(shapes, settings);
     private readonly CellTerrainComparison _terrain = new(plugins, new TerrainTypes(view), settings);
@@ -38,7 +41,10 @@ internal sealed class ObjectTerrainCheck(ITerrainView view, IBaseObjectShapes sh
     private readonly CellWaterComparison? _water = settings.CountsWaterChanges ? new CellWaterComparison(plugins, settings) : null;
 
     /// <summary>The land cells read so far that have an accepted terrain.</summary>
-    public int CellsCompared() => _landCells.Contents().Count(cell => cell != null);
+    public int CellsCompared() => _landCells.Contents().Count(cell => cell is { ShownOnly: false });
+
+    /// <summary>The cells read so far without checked land whose water was compared.</summary>
+    public int CellsComparedForWaterOnly() => _waterOnlyCells.Contents().Count;
 
     /// <remarks>An object whose check fails is not removed; the failure is returned with the object.</remarks>
     public ObjectCheck Check(TargetObject target)
@@ -53,7 +59,7 @@ internal sealed class ObjectTerrainCheck(ITerrainView view, IBaseObjectShapes sh
         }
     }
 
-    private bool IsCovered(TargetObject target) => settings.Checks(shapes.VisibilityOf(target).IsVisible);
+    private bool IsCovered(TargetObject target) => _area.Covers(target);
 
     /// <remarks>The first area that holds a change gives the finding, as the first removal zone that finds an object does in the too-close rule.</remarks>
     private ObjectCheck CompareTerrain(TargetObject target)
@@ -65,34 +71,58 @@ internal sealed class ObjectTerrainCheck(ITerrainView view, IBaseObjectShapes sh
             var cells = CellsUnder(target.SpaceKey, landWorldspace, area);
             if (cells.Count == 0) continue;
             anyAreaHasTerrain = true;
-            if (!settings.ChecksArea(area, HeightsAt(cells, static terrain => terrain.AcceptedHeights), HeightsAt(cells, static terrain => terrain.WinnerHeights))) continue;
-            if (FindChange(target, cells) is { } hit) return new ObjectCheck(hit, WithoutTerrain: false, Failure: null);
+            var reach = ReachOf(area, cells);
+            if (!reach.Any) continue;
+            if (FindChange(target, cells, reach) is { } hit) return new ObjectCheck(hit, WithoutTerrain: false, Failure: null);
         }
         return anyAreaHasTerrain ? ObjectCheck.NothingFound : ObjectCheck.NoTerrain;
     }
 
-    /// <summary>The cells under the area that have an accepted terrain; a cell no trusted plugin has a land record of is not checked.</summary>
+    /// <summary>
+    /// The cells under the area that have checked land, and those without it whose water is checked, compared over the ground as the
+    /// game shows it; a cell without checked land is included only when its water is checked.
+    /// </summary>
     private List<CheckedCell> CellsUnder(RecordKey space, RecordKey landWorldspace, Box area)
     {
         var cells = new List<CheckedCell>();
         foreach (var under in _area.VerticesUnder(area))
         {
             var cell = new ExteriorCell(space, under.CellX, under.CellY);
-            if (CompareLand(cell with { WorldspaceKey = landWorldspace }) is { } terrain) cells.Add(new CheckedCell(terrain, CompareWater(cell), under.VertexIndices));
+            var landCell = cell with { WorldspaceKey = landWorldspace };
+            if (CompareLand(landCell) is not { } terrain) continue;
+            var water = CompareWater(cell);
+            if (terrain.ShownOnly && !water.IsChecked) continue;
+            if (terrain.ShownOnly) _waterOnlyCells.Get(cell, static () => true);
+            cells.Add(new CheckedCell(landCell, cell, terrain, water.Change, under.VertexIndices));
         }
         return cells;
     }
 
-    private CellTerrain? CompareLand(ExteriorCell landCell) => _landCells.Get(landCell, () => _terrain.Compare(view.ReadTerrainVersions(landCell)));
+    /// <summary>Whether the object reaches the ground of the cells with checked land, else which of the cells without it it reaches.</summary>
+    private AreaReach ReachOf(Box area, List<CheckedCell> cells)
+    {
+        if (ReachesGround(area, cells.Where(static cell => !cell.Terrain.ShownOnly))) return new AreaReach(Land: true, []);
+        return new AreaReach(Land: false, [.. cells.Where(cell => cell.Terrain.ShownOnly && ReachesGround(area, [cell])).Select(static cell => cell.WaterCell)]);
+    }
 
-    /// <returns>Null when no water change is counted.</returns>
-    private CellWaterChange? CompareWater(ExteriorCell cell) =>
-        _water is { } water ? _waterCells.Get(cell, () => water.Compare(view.ReadWaterCopies(cell))) : null;
+    private bool ReachesGround(Box area, IEnumerable<CheckedCell> cells)
+    {
+        List<CheckedCell> reached = [.. cells];
+        return _area.ChecksArea(area, HeightsAt(reached, static terrain => terrain.AcceptedHeights), HeightsAt(reached, static terrain => terrain.WinnerHeights));
+    }
 
-    /// <summary>The heights at the cells' vertices in one version of the ground: as accepted or as the game shows them (the winner).</summary>
+    private CellTerrain? CompareLand(ExteriorCell landCell) => _landCells.Get(landCell, () => _terrain.Compare(view.ReadTerrainVersions(landCell), view.ReadRestoredParts(landCell)));
+
+    /// <returns>Not checked when no water change is counted.</returns>
+    private WaterComparison CompareWater(ExteriorCell cell) =>
+        _water is { } water ? _waterCells.Get(cell, () => water.Compare(view.ReadWaterCopies(cell), view.ReadRestoredParts(cell))) : WaterComparison.NotChecked;
+
+    /// <summary>
+    /// The heights at the cells' checked vertices in one version of the ground: as accepted or as the game shows them (the winner).
+    /// </summary>
     /// <remarks>A version without heights adds no heights.</remarks>
     private static IEnumerable<float> HeightsAt(List<CheckedCell> cells, Func<CellTerrain, float[]?> heightsOf) =>
-        cells.SelectMany(cell => heightsOf(cell.Terrain) is { } heights ? cell.Vertices.Select(vertex => heights[vertex]) : []);
+        cells.SelectMany(cell => heightsOf(cell.Terrain) is { } heights ? cell.Vertices.Where(cell.Terrain.IsCheckedAt).Select(vertex => heights[vertex]) : []);
 
     /// <summary>
     /// The counted changes of the area: a height change at any vertex, a terrain type change at enough of its vertices, and a
@@ -100,9 +130,9 @@ internal sealed class ObjectTerrainCheck(ITerrainView view, IBaseObjectShapes sh
     /// of the real mods the counted changes name, and none when only the patch holds them (an earlier patcher of the group made them).
     /// </summary>
     /// <returns>Null when no change of the area counts.</returns>
-    private ObjectOnChangedTerrain? FindChange(TargetObject target, List<CheckedCell> cells)
+    private ObjectOnChangedTerrain? FindChange(TargetObject target, List<CheckedCell> cells, AreaReach reach)
     {
-        var changes = AreaChanges.Count(cells);
+        var changes = AreaChanges.Count(cells, reach);
         var heightChanger = changes.HeightChanger;
         var typeChanger = changes.TypeChanger(settings.MinTerrainTypeChangePercent);
         var waterChanger = changes.WaterChanger(settings.MinWaterCoverChangePercent);
@@ -110,6 +140,7 @@ internal sealed class ObjectTerrainCheck(ITerrainView view, IBaseObjectShapes sh
         var kind = (heightChanger != null ? TerrainChangeKind.Height : TerrainChangeKind.None)
             | (typeChanger != null ? TerrainChangeKind.TerrainType : TerrainChangeKind.None)
             | (waterChanger != null ? changes.WaterKinds : TerrainChangeKind.None);
-        return new ObjectOnChangedTerrain(target.Id, plugins.ChangerAt(changer), kind);
+        var evidence = AreaChanges.CountedCells(cells, reach, heightChanger != null, typeChanger != null, waterChanger != null);
+        return new ObjectOnChangedTerrain(target.Id, plugins.ChangerAt(changer), kind, evidence);
     }
 }

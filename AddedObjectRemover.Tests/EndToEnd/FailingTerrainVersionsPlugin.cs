@@ -26,11 +26,11 @@ internal sealed class FailingTerrainVersionsPlugin(IPluginRecords inner) : IPlug
 
     public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => inner.ReadTerrainBelow(plugin, cell);
 
-    public PluginName? ReadTerrainWinner(ExteriorCell cell) => inner.ReadTerrainWinner(cell);
-
     public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new PlantedUserDataException(FailureMessage);
 
     public WaterCopies ReadWaterCopies(ExteriorCell cell) => inner.ReadWaterCopies(cell);
+
+    public ExteriorCell? FindExteriorCell(RecordKey landOrCell) => inner.FindExteriorCell(landOrCell);
 
     public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => inner.ReadTextureMaterialChain(texture);
 

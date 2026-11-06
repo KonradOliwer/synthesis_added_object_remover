@@ -21,6 +21,9 @@ public sealed record ModTrustTable(
     /// </summary>
     public bool IsAnyGroupsPatch(PluginName plugin) => IsPatch(plugin) || Plugins.TryGetValue(plugin, out var trust) && trust.CarriesPatchMarker;
 
+    /// <summary>Whether the plugin loads after the patch, so what it holds beats what the patch writes; false for the patch and an unknown plugin.</summary>
+    public bool LoadsAfterPatch(PluginName plugin) => Plugins.TryGetValue(plugin, out var trust) && trust.LoadsAfterPatch;
+
     /// <summary>
     /// Whether a rule names the plugin itself as trusted: listed, requiring the cleaned mod, or loading before it. Not the base game,
     /// the cleaned mod, a plugin trusted only as a master, one trusted for its own changes only, an untrusted one, the patch or an
@@ -29,6 +32,13 @@ public sealed record ModTrustTable(
     public bool IsTrustedItself(PluginName plugin) =>
         Plugins.TryGetValue(plugin, out var trust)
         && trust is { Trust: ModTrust.Trusted, Reason: TrustReason.Listed or TrustReason.RequiringMod or TrustReason.LoadsBeforeCleanedMod };
+
+    /// <summary>
+    /// Whether everything the plugin contains is accepted: the base game, the cleaned mod and its masters, a listed trusted mod, a
+    /// mod requiring the cleaned mod or loading before it that its switch trusts, and every master of those, unless listed as never
+    /// trusted. Not a plugin trusted for its own changes only, an untrusted one, the patch or an unknown one.
+    /// </summary>
+    public bool IsTrustedInFull(PluginName plugin) => Plugins.TryGetValue(plugin, out var trust) && trust.Trust == ModTrust.Trusted;
 
     /// <summary>Whether the plugin is one of the game's own (Skyrim.esm, Update.esm and the three DLCs), a master of the cleaned mod or not.</summary>
     public bool IsBaseGame(PluginName plugin) => Plugins.TryGetValue(plugin, out var trust) && trust.Reason == TrustReason.BaseGame;
@@ -85,6 +95,7 @@ public sealed record ModTrustTable(
 /// <param name="NeedsCleanedMod">Whether the plugin cannot load without the cleaned mod: it has it as a master, directly or through another plugin that needs it.</param>
 /// <param name="LoadsBeforeCleanedMod">Whether the plugin loads before the cleaned mod in the load order the run reads, whatever rule trusts it.</param>
 /// <param name="CarriesPatchMarker">Whether the plugin is an Added Object Remover patch of another group, recognised by its marker.</param>
+/// <param name="LoadsAfterPatch">Whether the plugin loads after the patch in the game's plugin list, so what it holds beats what the patch writes.</param>
 public sealed record PluginTrust(
     ModTrust Trust,
     TrustReason? Reason,
@@ -93,4 +104,5 @@ public sealed record PluginTrust(
     bool IsMasterOfCleanedMod,
     bool NeedsCleanedMod,
     bool LoadsBeforeCleanedMod,
-    bool CarriesPatchMarker);
+    bool CarriesPatchMarker,
+    bool LoadsAfterPatch);

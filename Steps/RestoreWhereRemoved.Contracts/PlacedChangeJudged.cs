@@ -7,35 +7,52 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 public enum PlacedGuard
 {
     /// <summary>
-    /// Where it goes back to, it comes too close to an object that stays, by the collision settings of the objects the cleaned mod
-    /// changed; or, when it can cause removals once back, a target that stays comes too close to it by the settings of that target's
-    /// own collision group.
+    /// Where it goes back to, it comes too close to an object that stays, or its going back makes an object stand that an object of
+    /// the cleaned mod that stays, or a copy, is too close to, by the collision settings of the objects the cleaned mod changed. An
+    /// object going back is never a cause, and an object a removal step restored to its earlier version is support only, so it never
+    /// blocks.
     /// </summary>
     TooCloseToWhatStays,
-
-    /// <summary>
-    /// Where it goes back to, ground that stays changed through the cleaned mod lies under it or the area around it: ground the
-    /// terrain plan keeps as the cleaned mod made it. Ground only an unrelated plugin changed does not count.
-    /// </summary>
-    OnGroundThatStaysChanged,
-
-    /// <summary>Where it goes back to, it lies partly between a cell's water level before the cleaned mod and the one that stays.</summary>
-    AtWaterLineThatStaysChanged,
-
-    /// <summary>Where it goes back to, it holds an invisible object of the cleaned mod that stays.</summary>
-    HoldsInvisibleObjectThatStays,
 
     /// <summary>Where it goes back to, it stands in a navmesh that stays as the cleaned mod made it, so actors would walk into it.</summary>
     StandsInChangedNavmesh,
 
-    /// <summary>An object that stays rests on it where it stands now, and would float once it goes back.</summary>
-    CarriesObjectThatStays,
+    /// <summary>
+    /// With KeepSupportingObject: leaving where it stands now, it leaves an object of a mod trusted in full, or of a master of one,
+    /// without support, directly or through what goes with it: the object named.
+    /// </summary>
+    HoldsUpOtherModsObject,
 
     /// <summary>
-    /// Where it goes back to, it rests on an object that does not end there: another placed record that stays as the cleaned mod
-    /// changed it or ends removed, or another mod's object the patch removes or pulls down. It would float once it goes back.
+    /// Where it goes back to, it would lose its support, since what it rested on there, an object or the ground, stays as the cleaned mod
+    /// made it or goes with the follow-up, and it may not be pulled down or removed there: the cleaned mod moved it far enough to count among its targets, or it
+    /// is not of a plugin trusted in full, or the handling of objects left without support or its references keep it.
     /// </summary>
-    RestsOnWhatDoesNotStay,
+    ArrivesWithoutSupport,
+
+    /// <summary>
+    /// Where it goes back to, ground that stays as the cleaned mod made it, or that the restore blends towards such ground, rises into it,
+    /// which the ground before the cleaned mod did not.
+    /// </summary>
+    ArrivesInGround,
+
+    /// <summary>
+    /// Where it goes back to, it lies partly between a cell's water level before the cleaned mod and the cleaned mod's level, which stays.
+    /// </summary>
+    ArrivesAtWaterLine,
+
+    /// <summary>
+    /// Where it goes back to, it would lose its support and be pulled down, and the place it would land on fails a guard of a place: too
+    /// close or navmesh. It carries what that guard found.
+    /// </summary>
+    WouldNotFitWherePulledDown,
+
+    /// <summary>
+    /// Its going back makes the follow-up restore an object the cleaned mod changed (the object named) to its earlier version, and that
+    /// version would not fit where it goes back to: it would lose its support there, end in ground or at a water line that stays as the
+    /// cleaned mod made it, or fail a guard there.
+    /// </summary>
+    TakesAlongObjectThatWouldNotFit,
 
     /// <summary>It is a door whose navmesh link goes back with it, and a later plugin changed that link again.</summary>
     DoorLinkChangedLater,
@@ -52,14 +69,7 @@ public enum PlacedGuard
 /// The object, navmesh, LAND record or cell the guard found; null when the check stopped, or for a guard that names none.
 /// </param>
 /// <param name="Failure">Why the check stopped unexpectedly, which keeps the record too; null when it did not.</param>
-/// <param name="Plugin">For ground that stays changed, the plugin of the winning LAND record that keeps it changed; null for any other guard.</param>
-/// <param name="Gap">For ground that stays changed, how far it lies from the ground of the world without the cleaned mod; null for any other guard.</param>
-public sealed record PlacedRefusal(PlacedGuard Guard, RecordKey? By, string? Failure, PluginName? Plugin = null, GroundGap? Gap = null);
-
-/// <summary>How far ground that stays changed lies from the ground of the world without the cleaned mod.</summary>
-/// <param name="Largest">The largest height difference in game units over the square the guard found; null when a version has no height map to measure it by.</param>
-/// <param name="Tolerance">The height difference in game units that still counts as equal ground.</param>
-public sealed record GroundGap(float? Largest, float Tolerance);
+public sealed record PlacedRefusal(PlacedGuard Guard, RecordKey? By, string? Failure);
 
 /// <summary>What a placed record's restore puts back, by the first of these its undone parts hold.</summary>
 public enum PlacedRestoreKind

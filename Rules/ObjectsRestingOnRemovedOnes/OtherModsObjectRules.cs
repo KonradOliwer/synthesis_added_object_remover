@@ -20,9 +20,19 @@ internal sealed class OtherModsObjectRules(ModTrustTable trust, LoadOrderPlugins
     /// plugin, as everywhere else. Only visible objects are judged: an invisible object or marker rests on nothing in game.
     /// </summary>
     public bool IsJudged(OtherObject other) =>
-        other.Key.Plugin != trust.CleanedMod
-        && CanRest(other)
-        && (BelongsToJudgedPlugin(other.Key.Plugin) || BelongsToJudgedPlugin(other.WinningMod));
+        IsAnotherPluginsObjectThatCanRest(other) && (BelongsToJudgedPlugin(other.Key.Plugin) || BelongsToJudgedPlugin(other.WinningMod));
+
+    /// <summary>
+    /// Judged in the follow-up of objects leaving outside the removal rounds: an object that can rest on others, created by a plugin
+    /// trusted in full other than the cleaned mod (a plugin trusted only as a master of another one too), whose winning version past
+    /// the patches is of such a plugin or of the cleaned mod. A value a later plugin holds is that plugin's choice, so an object an
+    /// untrusted plugin created or set where it stands is left as it is. The cleaned mod's own objects follow as target objects, except
+    /// those a later plugin holds: they are left to that plugin, and the ground under them stays.
+    /// </summary>
+    public bool IsJudgedWhenObjectsLeave(OtherObject other) =>
+        IsAnotherPluginsObjectThatCanRest(other) && trust.IsTrustedInFull(other.Key.Plugin) && trust.IsTrustedInFull(other.WinningModPastPatches);
+
+    private bool IsAnotherPluginsObjectThatCanRest(OtherObject other) => other.Key.Plugin != trust.CleanedMod && CanRest(other);
 
     /// <summary>An object that can rest on another, whichever plugin it belongs to: one with a solid mesh, not a placed NPC or creature.</summary>
     public bool CanRest(OtherObject other)
@@ -47,8 +57,11 @@ internal sealed class OtherModsObjectRules(ModTrustTable trust, LoadOrderPlugins
     public OrientedBox BoxOf(TargetObject target) => OrientedBox.FromLocal(shapes.Of(target.Base).Box, target.Transform);
 
     /// <param name="other">A judged object, where it stands.</param>
-    public StandingObject StandingOf(OtherObject other) =>
-        new(other.SpaceKey, other.Transform, MeshPathOf(other), BoxOf(other, other.Transform), Supporter.Placed(other.Id));
+    public StandingObject StandingOf(OtherObject other) => StandingOf(other, other.Transform);
+
+    /// <param name="other">An object that can rest, placed at <paramref name="at"/>.</param>
+    public StandingObject StandingOf(OtherObject other, PlacedTransform at) =>
+        new(other.SpaceKey, at, MeshPathOf(other), BoxOf(other, at), Supporter.Placed(other.Id));
 
     /// <param name="target">A visible target object with a mesh, where it stands.</param>
     public StandingObject StandingOf(TargetObject target) =>
@@ -57,6 +70,10 @@ internal sealed class OtherModsObjectRules(ModTrustTable trust, LoadOrderPlugins
     /// <summary>Where a target object that can hold up others stands: a visible one with a mesh; null for any other.</summary>
     public BoxInSpace? SupportingBoxOf(TargetObject target) =>
         shapes.VisibilityOf(target).IsVisible && shapes.Of(target.Base).MeshPath is not null ? new BoxInSpace(target.SpaceKey, BoxOf(target)) : null;
+
+    /// <summary>Whether an object of any plugin can hold up others: a visible one with a mesh.</summary>
+    public bool CanHoldUp(OtherObject other) =>
+        shapes.VisibilityOf(other).IsVisible && shapes.Of(other.Base).MeshPath is not null;
 
     /// <summary>A plugin listed after the patch beats what the patch writes, so the patch cannot change its records.</summary>
     public bool PatchCanChange(OtherObject other) => !plugins.LoadsAfterPatch(other.WinningMod);

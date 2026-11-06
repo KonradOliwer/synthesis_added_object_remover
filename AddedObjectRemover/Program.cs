@@ -63,8 +63,18 @@ public static class Program
         var pluginRecords = new PluginRecordsFactory(world, workers);
         var requests = ValidateRequests(state, settings, configs, world, pluginRecords, workers);
         var patchWriting = new PatchWriting(new SynthesisWriteCache(state.LinkCache), state.PatchMod, PatchMarkerText);
-        StepRunner.PatchLoadOrder(requests, CreateEnvironment(state, world, pluginRecords, patchWriting, totalTimer));
+        var restoredParts = CreateRestoredPartsFile(state, settings.Mode, patchWriting);
+        StepRunner.PatchLoadOrder(requests, CreateEnvironment(state, world, pluginRecords, patchWriting, restoredParts, totalTimer));
     }
+
+    /// <remarks>
+    /// Only a Standard run inside Synthesis, where the patcher before it in the group is named, keeps a file; the marker is read
+    /// before the runs write their own.
+    /// </remarks>
+    private static IRestoredPartsFile CreateRestoredPartsFile(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, PatchMode mode, PatchWriting patchWriting) =>
+        mode == PatchMode.Standard && state.SourcePath is { } sourcePatch
+            ? new RestoredPartsFile(sourcePatch.Path, state.OutputPath.Path, patchWriting.CarriesPatchMarker())
+            : new NoRestoredPartsFile();
 
     private static FinalWorld OpenFinalWorld(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, FilePath? pluginsFile)
     {
@@ -95,7 +105,12 @@ public static class Program
             workers));
 
     private static RunEnvironment CreateEnvironment(
-        IPatcherState<ISkyrimMod, ISkyrimModGetter> state, FinalWorld world, PluginRecordsFactory pluginRecords, PatchWriting patchWriting, Stopwatch totalTimer) =>
+        IPatcherState<ISkyrimMod, ISkyrimModGetter> state,
+        FinalWorld world,
+        PluginRecordsFactory pluginRecords,
+        PatchWriting patchWriting,
+        IRestoredPartsFile restoredParts,
+        Stopwatch totalTimer) =>
         new(
             world.Plugins,
             pluginRecords,
@@ -104,7 +119,8 @@ public static class Program
             new BaseFactsFactory(world.Plugins.Mods),
             new ConsoleLogSink(),
             new CsvReportOutput(),
-            () => totalTimer.Elapsed);
+            () => totalTimer.Elapsed,
+            restoredParts);
 
     /// <summary>
     /// A folder in the patcher's own data folder in Synthesis ("Data\&lt;profile&gt;\&lt;patcher name&gt;"), which lasts between runs

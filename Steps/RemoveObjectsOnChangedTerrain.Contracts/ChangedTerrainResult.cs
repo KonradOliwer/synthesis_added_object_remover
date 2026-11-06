@@ -14,7 +14,11 @@ namespace AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 /// The exterior cells whose terrain versions were compared with their accepted terrain, each land cell once, even when a child
 /// worldspace uses it too.
 /// </param>
-/// <param name="ObjectsWithoutTerrain">The objects the pass would check that have no terrain to compare: in an interior, in a worldspace without terrain, or over cells no trusted plugin has a land record of.</param>
+/// <param name="CellsComparedForWaterOnly">The exterior cells without checked land whose water was compared over the ground the game shows.</param>
+/// <param name="ObjectsWithoutTerrain">
+/// The objects the pass would check that have no terrain to compare: in an interior, in a worldspace without terrain, or over cells
+/// with neither checked land nor checked water.
+/// </param>
 public sealed record ChangedTerrainPass(
     ImmutableArray<TargetId> Objects,
     StepOutcome Outcome,
@@ -22,10 +26,11 @@ public sealed record ChangedTerrainPass(
     ImmutableArray<ProposedRemoval> Proposals,
     ImmutableArray<PartFailure> Failures,
     int CellsCompared,
+    int CellsComparedForWaterOnly,
     int ObjectsWithoutTerrain) : IJudgedPass
 {
     public static ChangedTerrainPass SwitchedOff(ImmutableArray<TargetId> objects) =>
-        new(objects, StepOutcome.SwitchedOff, [], [], [], CellsCompared: 0, ObjectsWithoutTerrain: 0);
+        new(objects, StepOutcome.SwitchedOff, [], [], [], CellsCompared: 0, CellsComparedForWaterOnly: 0, ObjectsWithoutTerrain: 0);
 }
 
 /// <summary>The target objects on terrain that another mod changed.</summary>

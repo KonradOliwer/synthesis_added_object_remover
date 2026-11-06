@@ -4,5 +4,5 @@ namespace AddedObjectRemover.Tests.Fixtures;
 internal static class TestVersionWalks
 {
     /// <summary>No plugin stops the walk, so every version of a record is kept.</summary>
-    public static readonly VersionWalkStop NoStop = (_, _) => false;
+    public static readonly VersionWalkStop NoStop = (_, _, _) => false;
 }

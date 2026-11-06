@@ -37,7 +37,8 @@ public static class ModTrustClassifier
             otherMasterCounts,
             alwaysTrusted.CleanedModMasters,
             ListedBefore(plugins, settings.Target),
-            CarryingPatchMarker(plugins));
+            CarryingPatchMarker(plugins),
+            [.. known.Where(plugins.LoadsAfterPatch)]);
     }
 
     private static ModTrustTable BuildTable(
@@ -49,7 +50,8 @@ public static class ModTrustClassifier
         IReadOnlyDictionary<PluginName, int> otherMasterCounts,
         ImmutableHashSet<PluginName> cleanedModMasters,
         ImmutableHashSet<PluginName> listedBefore,
-        ImmutableHashSet<PluginName> patchMarked)
+        ImmutableHashSet<PluginName> patchMarked,
+        ImmutableHashSet<PluginName> loadingAfterPatch)
     {
         var trust = decisions.ToImmutableDictionary(
             entry => entry.Key,
@@ -61,7 +63,8 @@ public static class ModTrustClassifier
                 cleanedModMasters.Contains(entry.Key),
                 needingMods.Contains(entry.Key),
                 listedBefore.Contains(entry.Key),
-                patchMarked.Contains(entry.Key)));
+                patchMarked.Contains(entry.Key),
+                loadingAfterPatch.Contains(entry.Key)));
         return new ModTrustTable(cleanedMod, patch, trust, trust.Values.Count(entry => entry.Reason == TrustReason.LoadsBeforeCleanedMod));
     }
 

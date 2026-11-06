@@ -20,11 +20,4 @@ internal static class ObjectsOfTheRun
         var goingBack = cleared.Select(change => change.Key).ToHashSet();
         return [.. AfterRemovalWorld.TargetsWhereTheyStandLast(collected.Targets, final).Where(target => !goingBack.Contains(target.Key))];
     }
-
-    /// <summary>The objects of other plugins that stay where they stand: the after-removal world's but the targets and the placed records whose areas let them go back.</summary>
-    public static List<OtherObject> OtherPluginsObjectsThatStay(AfterRemovalWorld world, CollectedObjects collected, List<RecordChangedByCleanedMod> cleared)
-    {
-        var leftOut = collected.Targets.Select(target => target.Key).Concat(cleared.Select(change => change.Key)).ToHashSet();
-        return [.. world.Causes.Concat(world.SupportOnly).Where(other => !leftOut.Contains(other.Key)).OrderBy(other => other.Key, RecordKeyOrder.Comparer)];
-    }
 }

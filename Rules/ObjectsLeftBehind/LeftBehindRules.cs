@@ -55,11 +55,12 @@ public static class LeftBehindRules
 
     /// <summary>How much of the cleaned mod's drawn objects still stand around a point, judged on given decisions (see <see cref="ClearedAreasJudging"/>).</summary>
     /// <param name="targets">Every target, by id.</param>
+    /// <param name="overriddenLater">The cleaned mod's objects later plugins hold, which the areas count as standing.</param>
     /// <param name="spaces">Every space the scan read.</param>
     /// <param name="caches">Index the shown targets where the rounds measure them; their shapes are read.</param>
     public static IClearedAreasJudging CreateClearedAreasJudging(
-        ImmutableArray<TargetObject> targets, IReadOnlyDictionary<RecordKey, SpaceFact> spaces, IRunCaches caches) =>
-        new ClearedAreasJudging(targets, spaces, caches);
+        ImmutableArray<TargetObject> targets, ImmutableArray<TargetObject> overriddenLater, IReadOnlyDictionary<RecordKey, SpaceFact> spaces, IRunCaches caches) =>
+        new ClearedAreasJudging(targets, overriddenLater, spaces, caches);
 
     private static (IVisibleTargetObjects Index, float LookAround)? SurroundingsIndex(
         ImmutableArray<TargetObject> targets, IRemovalDecisions decisions, IRunCaches caches, LeftBehindSurroundings? surroundings) =>

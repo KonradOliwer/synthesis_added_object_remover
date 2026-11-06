@@ -325,6 +325,251 @@ public sealed class PatchWriterTests
         Assert.Equal(2, written.WrittenWhereRemoved);
     }
 
+    /// <summary>
+    /// The parts given back are one per part, each with the plugin whose value it took: the parts of a target a removal step puts
+    /// back and of a rock that goes back, by their undone flags; a cell's undone part, from the version below the cleaned mod; a
+    /// LAND record's heights (only when some height goes back) and each texture quarter. A rock that stays gives none.
+    /// </summary>
+    [Fact]
+    public void EachRecordThatGoesBackGivesOnePartPerPartWithThePluginItsValueCameFrom()
+    {
+        var target = TestTargets.Create(0, TestTargets.At(new Vector3(500, 0, 0)));
+        var protection = ObjectsToKeep.Build([target], [], TestTargets.References(1), TestBaseFacts.Unresolved);
+        var targetBefore = EarlierAt(target.Placement) with { Plugin = new PluginName("Between.esp"), Undo = PlacedParts.Position };
+        var final = RemovalDecisions.Start(protection, [new WhenRemoved.Restore(targetBefore)]).Apply(RoundKind.TooClose, [Propose(0)]);
+        var rock = ChangedRock(0x900) with { Earlier = EarlierAt(new EulerPlacement(Vector3.Zero, Vector3.Zero, 1f)) with { Undo = PlacedParts.Rotation | PlacedParts.Presence } };
+        var stays = ChangedRock(0x901);
+        var cell = ChangedCell(TestTargets.SpaceKey(0x202));
+        var raised = ChangedLand(0x300);
+        var painted = ChangedLand(0x301);
+        var cleared = TestAreaShares.Of(AreaVerdict.Cleared);
+        var whereRemoved = new RestoreWhereRemovedResult(
+            StepOutcome.Performed,
+            [
+                new PlacedChangeJudged(rock, null, cleared, null, Refused: null, IsRestored: true, ChangeJudge.KindOf(rock), KeptForArea: null, PlacedBack: null),
+                new PlacedChangeJudged(stays, null, cleared, null, Refused: null, IsRestored: false, ChangeJudge.KindOf(stays), AreaVerdict.StillStanding, PlacedBack: null),
+            ],
+            [new CellChangeJudged(cell, [cell.Parts[0]], null, cleared, WaterKeptBy: null, IsRestored: true, KeptForArea: null)],
+            [JudgedLand(raised, PointSet.Of([0, 1]), QuarterSet.Of([3, 0])), JudgedLand(painted, PointSet.Of([]), QuarterSet.Of([2]))],
+            [],
+            [],
+            Passes: 1,
+            DoorsLeftRemoved: [],
+            Failures: [],
+            RestoreWhereRemovedTimes.None);
+
+        var written = PatchWriter.Write(new(final, [target], OtherModsObjectsResult.SwitchedOff, whereRemoved, new ReadPlugin(), new RecordingWriting(), TestTargets.TargetName));
+
+        var cleanedMod = TestTargets.TargetName;
+        var below = new PluginName("Below.esp");
+        Assert.Equal<RestoredPart>(
+            new RestoredPart[]
+            {
+                new(cleanedMod, target.Key, new RestoredPartName.Placed(PlacedParts.Position), new PluginName("Between.esp")),
+                new(cleanedMod, rock.Key, new RestoredPartName.Placed(PlacedParts.Rotation), new PluginName("Earlier.esp")),
+                new(cleanedMod, rock.Key, new RestoredPartName.Placed(PlacedParts.Presence), new PluginName("Earlier.esp")),
+                new(cleanedMod, cell.Cell, new RestoredPartName.Cell(new CellPartName(CellPart.Music, null)), new PluginName("Base.esm")),
+                new(cleanedMod, raised.LandKey, new RestoredPartName.LandHeights(PointSet.Of([0, 1])), below),
+                new(cleanedMod, raised.LandKey, new RestoredPartName.LandTextureQuarter(0), below),
+                new(cleanedMod, raised.LandKey, new RestoredPartName.LandTextureQuarter(3), below),
+                new(cleanedMod, painted.LandKey, new RestoredPartName.LandTextureQuarter(2), below),
+            }.OrderBy(part => part.Record, RecordKeyOrder.Comparer),
+            written.RestoredParts);
+    }
+
+    /// <summary>A door whose navmesh link goes back with its position gives both parts: the scan compares the link as a part of the door.</summary>
+    [Fact]
+    public void ADoorWhoseLinkGoesBackWithItsPositionGivesBothParts()
+    {
+        var target = TestTargets.Create(0, TestTargets.At(new Vector3(500, 0, 0)));
+        var protection = ObjectsToKeep.Build([target], [], TestTargets.References(1), TestBaseFacts.Unresolved);
+        var final = RemovalDecisions.Start(protection, [new WhenRemoved.Disable()]);
+        var door = ChangedRock(0x900) with { Earlier = ChangedRock(0x900).Earlier with { Undo = PlacedParts.Position | PlacedParts.NavDoorLink } };
+        var whereRemoved = RestoreWhereRemovedResult.SwitchedOff() with
+        {
+            Outcome = StepOutcome.Performed,
+            Objects = [new PlacedChangeJudged(door, null, TestAreaShares.Of(AreaVerdict.Cleared), null, Refused: null, IsRestored: true, ChangeJudge.KindOf(door), KeptForArea: null, PlacedBack: null)],
+        };
+
+        var written = PatchWriter.Write(new(final, [target], OtherModsObjectsResult.SwitchedOff, whereRemoved, new ReadPlugin(), new RecordingWriting(), TestTargets.TargetName));
+
+        Assert.Equal<RestoredPart>(
+            [
+                new(TestTargets.TargetName, door.Key, new RestoredPartName.Placed(PlacedParts.Position), new PluginName("Earlier.esp")),
+                new(TestTargets.TargetName, door.Key, new RestoredPartName.Placed(PlacedParts.NavDoorLink), new PluginName("Earlier.esp")),
+            ],
+            written.RestoredParts);
+    }
+
+    /// <summary>
+    /// The restore's follow-up puts one target back, removes another and pulls down another mod's object: only the target put back
+    /// gives parts, from the version it goes back to.
+    /// </summary>
+    [Fact]
+    public void OnlyATargetTheFollowUpOfTheRestorePutsBackGivesParts()
+    {
+        var targets = TestTargets.CreateMany(2);
+        var final = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(2), TestBaseFacts.Unresolved), 2);
+        var pulled = TestShapes.Placed(ModKey.FromNameAndExtension("Other.esp"), 0, default, new Vector3(4, 5, 60));
+        var rock = ChangedRock(0x900);
+        var earlier = EarlierAt(new EulerPlacement(new Vector3(9, 9, 9), Vector3.Zero, 1f)) with { Undo = PlacedParts.Position | PlacedParts.Rotation };
+        var whereRemoved = RestoreWhereRemovedResult.SwitchedOff() with
+        {
+            FollowUp = new RestoreFollowUp(
+                [new FollowUpTarget(new TargetId(0), RestoredTo: null, [rock.Key]), new FollowUpTarget(new TargetId(1), earlier, [rock.Key])],
+                [new FollowUpOtherObject(new OtherModsObjectOutcome(pulled with { Position = new Vector3(4, 5, 10) }, OtherModsObjectFate.PulledDown, LostShare: 1f, Drop: 50f, ReferenceRoles.None), [rock.Key])]),
+        };
+
+        var written = PatchWriter.Write(new(final, [.. targets], OtherModsObjectsResult.SwitchedOff, whereRemoved, new ReadPlugin(), new RecordingWriting(), TestTargets.TargetName));
+
+        Assert.Equal<RestoredPart>(
+            [
+                new(TestTargets.TargetName, targets[1].Key, new RestoredPartName.Placed(PlacedParts.Position), new PluginName("Earlier.esp")),
+                new(TestTargets.TargetName, targets[1].Key, new RestoredPartName.Placed(PlacedParts.Rotation), new PluginName("Earlier.esp")),
+            ],
+            written.RestoredParts);
+    }
+
+    /// <summary>
+    /// A cell whose water level the restore keeps gives only the parts that go back, and a LAND record gives only the heights of the
+    /// points that go back, not of those it keeps.
+    /// </summary>
+    [Fact]
+    public void AKeptWaterLevelAndKeptGroundGiveNoPart()
+    {
+        var targets = TestTargets.CreateMany(1);
+        var final = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(1), TestBaseFacts.Unresolved), 1);
+        var changed = ChangedCell(TestTargets.SpaceKey(0x202));
+        var cell = changed with { Parts = [changed.Parts[0], new PartChange(new CellPartName(CellPart.WaterLevel, null), new PartOutcome.Undo())] };
+        var land = ChangedLand(0x300);
+        var cleared = TestAreaShares.Of(AreaVerdict.Cleared);
+        var keeper = new RecordKey(new PluginName("Base.esm"), 0x901);
+        var whereRemoved = RestoreWhereRemovedResult.SwitchedOff() with
+        {
+            Outcome = StepOutcome.Performed,
+            Cells = [new CellChangeJudged(cell, [cell.Parts[0]], null, cleared, WaterKeptBy: keeper, IsRestored: true, KeptForArea: null, WaterKeptReason.ForChangedTerrainCheck)],
+            Lands = [JudgedLand(land, PointSet.Of([0]), QuarterSet.Of([])) with { Kept = [new LandPointsKept(TerrainKeptReason.ForChangedTerrainCheck, PointSet.Of([1, 2]))] }],
+        };
+
+        var written = PatchWriter.Write(new(final, [.. targets], OtherModsObjectsResult.SwitchedOff, whereRemoved, new ReadPlugin(), new RecordingWriting(), TestTargets.TargetName));
+
+        Assert.Equal<RestoredPart>(
+            new RestoredPart[]
+            {
+                new(TestTargets.TargetName, cell.Cell, new RestoredPartName.Cell(new CellPartName(CellPart.Music, null)), new PluginName("Base.esm")),
+                new(TestTargets.TargetName, land.LandKey, new RestoredPartName.LandHeights(PointSet.Of([0])), new PluginName("Below.esp")),
+            }.OrderBy(part => part.Record, RecordKeyOrder.Comparer),
+            written.RestoredParts);
+    }
+
+    /// <summary>
+    /// The follow-up of the restore removes one target object and restores another, removes one other mod's object, pulls down one the
+    /// run already pulled down, from where the run left it, and leaves one as it is. Its orders come after the run's own, so the
+    /// restore's pull-down is written after the run's and wins.
+    /// </summary>
+    [Fact]
+    public void TheFollowUpOfTheRestoreIsWrittenAfterTheRunsOwnOrders()
+    {
+        var targets = TestTargets.CreateMany(2);
+        var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(2), TestBaseFacts.Unresolved);
+        var final = TestSeededDecisions.StartDisablingAll(protection, 2);
+        var other = ModKey.FromNameAndExtension("Other.esp");
+        var pulledByRun = TestShapes.Placed(other, 1, default, new Vector3(4, 5, 60));
+        var removed = TestShapes.Placed(other, 0, default, new Vector3(1, 2, 3));
+        var left = TestShapes.Placed(other, 2, default, new Vector3(7, 8, 9));
+        var settled = new OtherModsObjectsResult(
+            StepOutcome.Performed,
+            [new OtherModsObjectOutcome(pulledByRun, OtherModsObjectFate.PulledDown, LostShare: 1f, Drop: 50f, ReferenceRoles.None)],
+            Rounds: [],
+            ProposedRounds: [],
+            Failure: null);
+        var rock = ChangedRock(0x900);
+        var earlier = EarlierAt(new EulerPlacement(new Vector3(9, 9, 9), Vector3.Zero, 1f));
+        var whereRemoved = RestoreWhereRemovedResult.SwitchedOff() with
+        {
+            FollowUp = new RestoreFollowUp(
+                [new FollowUpTarget(new TargetId(0), RestoredTo: null, [rock.Key]), new FollowUpTarget(new TargetId(1), earlier, [rock.Key])],
+                [
+                    new FollowUpOtherObject(new OtherModsObjectOutcome(removed, OtherModsObjectFate.Removed, LostShare: 1f, Drop: 0f, ReferenceRoles.None), [rock.Key]),
+                    new FollowUpOtherObject(
+                        new OtherModsObjectOutcome(pulledByRun with { Position = new Vector3(4, 5, 10) }, OtherModsObjectFate.PulledDown, LostShare: 1f, Drop: 5f, ReferenceRoles.None),
+                        [rock.Key]),
+                    new FollowUpOtherObject(new OtherModsObjectOutcome(left, OtherModsObjectFate.LeftWonAfterPatch, LostShare: 1f, Drop: 0f, ReferenceRoles.None), [rock.Key]),
+                ]),
+        };
+        var writing = new RecordingWriting();
+
+        PatchWriter.Write(new(final, [.. targets], settled, whereRemoved, new ReadPlugin(), writing, TestTargets.TargetName));
+
+        Assert.Equal<WriteOrder>(
+            [
+                new SetPosition(pulledByRun.Key, new Vector3(4, 5, 10)),
+                new SetInitiallyDisabled(targets[0].Key),
+                new SetPosition(targets[0].Key, targets[0].Transform.Position with { Z = -30000f }),
+                new CopyEarlierPlacedParts(targets[1].Key, earlier.Undo),
+                new SetInitiallyDisabled(removed.Key),
+                new SetPosition(removed.Key, new Vector3(1, 2, -30000f)),
+                new SetPosition(pulledByRun.Key, new Vector3(4, 5, 5)),
+            ],
+            writing.Orders);
+    }
+
+    /// <summary>
+    /// A rock goes back to its earlier place, where it would float, and the follow-up pulls it down or removes it there. The rock's
+    /// restore is written first, then the follow-up's order for the same record, which wins.
+    /// </summary>
+    [Theory]
+    [InlineData(OtherModsObjectFate.PulledDown)]
+    [InlineData(OtherModsObjectFate.RemovedNothingBelow)]
+    public void ACandidateTheFollowUpTakesAwayWhereItGoesBackIsWrittenAfterItsRestore(OtherModsObjectFate fate)
+    {
+        var targets = TestTargets.CreateMany(1);
+        var final = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(1), TestBaseFacts.Unresolved), 1);
+        var rock = ChangedRock(0x900);
+        var arrived = TestShapes.Placed(ModKey.FromNameAndExtension("Base.esm"), 0, default, new Vector3(3, 4, 50)) with { Key = rock.Key };
+        var drop = fate == OtherModsObjectFate.PulledDown ? 30f : 0f;
+        var cleared = TestAreaShares.Of(AreaVerdict.Cleared);
+        var whereRemoved = new RestoreWhereRemovedResult(
+            StepOutcome.Performed,
+            [new PlacedChangeJudged(rock, null, cleared, cleared, Refused: null, IsRestored: true, ChangeJudge.KindOf(rock), KeptForArea: null, PlacedBack: null)],
+            [],
+            [],
+            [],
+            [],
+            Passes: 1,
+            DoorsLeftRemoved: [],
+            Failures: [],
+            RestoreWhereRemovedTimes.None)
+        {
+            FollowUp = new RestoreFollowUp([], [new FollowUpOtherObject(new OtherModsObjectOutcome(arrived, fate, LostShare: 1f, drop, ReferenceRoles.None), [rock.Key])]),
+        };
+        var writing = new RecordingWriting();
+
+        PatchWriter.Write(new(final, [.. targets], OtherModsObjectsResult.SwitchedOff, whereRemoved, new ReadPlugin(), writing, TestTargets.TargetName));
+
+        Assert.Equal<WriteOrder>(
+            fate == OtherModsObjectFate.PulledDown
+                ? [new CopyEarlierPlacedParts(rock.Key, rock.Earlier.Undo), new SetPosition(rock.Key, new Vector3(3, 4, 20))]
+                : [new CopyEarlierPlacedParts(rock.Key, rock.Earlier.Undo), new SetInitiallyDisabled(rock.Key), new SetPosition(rock.Key, new Vector3(3, 4, -30000f))],
+            writing.Orders.Where(order => order.Record == rock.Key && order is not PlaceInCell));
+    }
+
+    private static LandChangedByCleanedMod ChangedLand(uint id) =>
+        new(
+            new ExteriorCell(TestTargets.Space, 0, 0),
+            new RecordKey(new PluginName("Base.esm"), id),
+            PointSet.Of([]),
+            PointSet.Of([]),
+            QuarterSet.Of([]),
+            UndoRest: false,
+            new LandLeftToLater(PointSet.Of([]), PointSet.Of([]), QuarterSet.Of([]), Rest: false, []),
+            TestTargets.TargetName,
+            Heights: null,
+            EarlierPlugin: new PluginName("Below.esp"));
+
+    private static LandChangeJudged JudgedLand(LandChangedByCleanedMod land, PointSet heights, QuarterSet textures) =>
+        new(land, Never: null, Quarters: [], heights, PointSet.Of([]), textures, Rest: false, Kept: [], FinalHeights: null, new CellEdgeHeights(null, null, null, null), IsRestored: true, ChangedQuarters: [], RestKeptForArea: null);
+
     private static RecordChangedByCleanedMod ChangedRock(uint id) =>
         new(
             new RecordKey(new PluginName("Base.esm"), id),
@@ -332,6 +577,7 @@ public sealed class PatchWriterTests
             TestTargets.Space,
             new CellFact(TestTargets.SpaceKey(0x200), null),
             TestTargets.TargetName,
+            WinningModPastPatches: TestTargets.TargetName,
             WhereItIsNow: null,
             BaseNow: null,
             TestPlacedRecords.PlainReference,
@@ -392,10 +638,28 @@ public sealed class PatchWriterTests
             return [.. orders.OfType<AddClone>().Select((_, index) => new RecordKey(TestTargets.PatchName, FirstAddedId + (uint)index))];
         }
 
-        public INavmeshWorldView ReadFinalNavmeshes(IWritableRecords records) => throw new NotSupportedException();
+        /// <summary>A world without navmeshes and doors, so a door link written names no navmesh to check.</summary>
+        public INavmeshWorldView ReadFinalNavmeshes(IWritableRecords records) => new WorldWithoutNavmeshes();
 
         public TResult ReadNavmeshesIfWritten<TResult>(IWritableRecords records, IReadOnlyList<WriteOrder> orders, Func<INavmeshWorldView, TResult> read) =>
             throw new NotSupportedException();
+    }
+
+    private sealed class WorldWithoutNavmeshes : INavmeshWorldView
+    {
+        public IEnumerable<ImmutableArray<RecordKey>> PreferredPathSets => [];
+
+        public NavmeshView? NavmeshOf(RecordKey navmesh) => null;
+
+        public bool Exists(RecordKey navmesh) => false;
+
+        public NavmeshEntryView? EntryOf(RecordKey navmesh) => null;
+
+        public DoorView? DoorOf(RecordKey door) => null;
+
+        public IEnumerable<RecordKey> NavmeshesLinkingTo(RecordKey navmesh) => [];
+
+        public IEnumerable<RecordKey> DoorsLinkingTo(RecordKey navmesh) => [];
     }
 
     private sealed class NoRecords : IWritableRecords;
@@ -421,11 +685,11 @@ public sealed class PatchWriterTests
 
         public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => throw new NotSupportedException();
 
-        public PluginName? ReadTerrainWinner(ExteriorCell cell) => throw new NotSupportedException();
-
         public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new NotSupportedException();
 
         public WaterCopies ReadWaterCopies(ExteriorCell cell) => throw new NotSupportedException();
+
+        public ExteriorCell? FindExteriorCell(RecordKey landOrCell) => throw new NotSupportedException();
         public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => throw new NotSupportedException();
 
         public RecordKey? FindLandWorldspace(RecordKey space) => throw new NotSupportedException();

@@ -12,9 +12,13 @@ public interface IPluginRecordsFactory
 public interface IRecordIndex;
 
 /// <summary>Whether a plugin's version is the lowest one kept of a record whose winning version comes from <paramref name="winner"/>.</summary>
-public delegate bool VersionWalkStop(PluginName winner, PluginName plugin);
+/// <param name="readPluginOverridesLand">
+/// Whether the read's plugin (<see cref="PlacedReadScope.Plugin"/>) overrides a LAND record of another plugin whose land a plugin
+/// space uses; known before the walk, and only when the LAND versions are asked for (<see cref="AreaRecordReads.Lands"/>).
+/// </param>
+public delegate bool VersionWalkStop(PluginName winner, PluginName plugin, bool readPluginOverridesLand);
 
-/// <summary>Reads the load order's plugin records. Not thread-safe, except <see cref="ReadHomeCellGrid"/>, <see cref="ReadTerrain"/>, <see cref="ReadTerrainWinner"/>, <see cref="ReadTerrainBelow"/>, <see cref="ReadTerrainVersions"/>, <see cref="ReadWaterCopies"/>, <see cref="ReadTextureMaterialChain"/>, <see cref="FindLandWorldspace"/>, <see cref="ReadNavmeshes"/>, <see cref="NpcTraitsOf"/>, <see cref="TraitSupplierOf"/>, <see cref="LeveledEntriesOf"/> and <see cref="TryParsePluginName"/>.</summary>
+/// <summary>Reads the load order's plugin records. Not thread-safe, except <see cref="ReadHomeCellGrid"/>, <see cref="ReadTerrain"/>,<see cref="ReadTerrainBelow"/>, <see cref="ReadTerrainVersions"/>, <see cref="ReadWaterCopies"/>, <see cref="ReadTextureMaterialChain"/>, <see cref="FindLandWorldspace"/>, <see cref="ReadNavmeshes"/>, <see cref="NpcTraitsOf"/>, <see cref="TraitSupplierOf"/>, <see cref="LeveledEntriesOf"/> and <see cref="TryParsePluginName"/>.</summary>
 public interface IPluginRecords
 {
     /// <summary>Walks every plugin's cells once; the records the later reads and the patch writing need are remembered until the reader is dropped.</summary>
@@ -50,10 +54,6 @@ public interface IPluginRecords
     /// <returns>Null where the cell has no terrain (no, a deleted, or an empty land record).</returns>
     float[]? ReadTerrain(ExteriorCell cell);
 
-    /// <summary>The plugin of the winning LAND record of an exterior cell; the placed records must have been read before. Thread-safe.</summary>
-    /// <returns>Null where no plugin has a LAND record for the cell.</returns>
-    PluginName? ReadTerrainWinner(ExteriorCell cell);
-
     /// <summary>
     /// The terrain heights of an exterior cell's LAND record at its version just below the given plugin's, row by row; the placed
     /// records must have been read before around that plugin (<see cref="PlacedReadScope.Plugin"/>), with the LAND area record
@@ -72,6 +72,13 @@ public interface IPluginRecords
     /// must have been read before, with the water asked for. Thread-safe.
     /// </summary>
     WaterCopies ReadWaterCopies(ExteriorCell cell);
+
+    /// <summary>
+    /// The exterior cell of a LAND record whose terrain versions were read (in the worldspace that holds it), or of a cell record whose
+    /// water was read (in its own worldspace); the placed records must have been read before. Thread-safe.
+    /// </summary>
+    /// <returns>Null where the record is neither.</returns>
+    ExteriorCell? FindExteriorCell(RecordKey landOrCell);
 
     /// <summary>The material records of a landscape texture, from its own material up through each parent to the root, in the winning records. Thread-safe.</summary>
     /// <returns>Empty where the texture or its material link does not resolve; a parent loop ends the chain at the first repeat.</returns>

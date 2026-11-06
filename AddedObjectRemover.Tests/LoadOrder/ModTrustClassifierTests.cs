@@ -453,6 +453,17 @@ public class ModTrustClassifierTests
         Assert.Equal([false, true, true], [table.IsAnyGroupsPatch(CityMod), table.IsAnyGroupsPatch(Birds), table.IsAnyGroupsPatch(Patch)]);
     }
 
+    /// <summary>The table tells which plugins load after the patch from the plugin list: another group's patch listed after it does, one before it does not.</summary>
+    [Fact]
+    public void APluginListedAfterThePatchLoadsAfterIt()
+    {
+        var table = ClassifyInOrder(
+            Settings(),
+            [.. CleanedModAndMasters, MarkedListing(OtherGroupPatch, Skyrim), Listing(Patch), MarkedListing(Birds, Skyrim)]);
+
+        Assert.Equal([false, true, false], [table.LoadsAfterPatch(OtherGroupPatch), table.LoadsAfterPatch(Birds), table.LoadsAfterPatch(CleanedMod)]);
+    }
+
     private static PluginListing[] LoadOrderAroundTheCleanedMod() =>
     [
         Listing(Skyrim),

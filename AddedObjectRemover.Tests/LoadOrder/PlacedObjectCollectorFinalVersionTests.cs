@@ -54,18 +54,46 @@ public class PlacedObjectCollectorFinalVersionTests
         Assert.Equal(1, collected.Counts.TargetsOverriddenLater);
     }
 
-    /// <summary>Another group's patch is a third plugin too: its state is not this patcher's to judge.</summary>
-    [Fact]
-    public void ATargetRecordThePatchWinsOverAnotherGroupsPatchIsOverriddenLater()
+    /// <summary>
+    /// Another group's patch that only copied the cleaned mod's version is passed over, so the cleaned mod's state is judged; one that
+    /// moved the record chose its state, like a third plugin, so the record is left to it.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ATargetRecordThePatchWinsOverAnotherGroupsPatchIsATargetUnlessThatPatchChangedIt(bool otherGroupsPatchMovedIt)
     {
         var otherGroupsPatch = new PluginName("OtherGroup - Patch.esp");
         var mods = TestModTrust.Of(TestTargets.TargetName, TestTargets.PatchName, trusted: [], untrusted: [], otherGroupPatches: [otherGroupsPatch]);
-        var carried = WithVersions(TargetRecord(1, Winner.Patch, NewPlace), TestTargets.TargetName, otherGroupsPatch, TestTargets.PatchName);
+        var record = TargetRecord(1, Winner.Patch, NewPlace);
+        var cleanedModsPlacement = otherGroupsPatchMovedIt ? record.Placement with { Position = Vector3.Zero } : record.Placement;
+        var carried = record with
+        {
+            Versions =
+            [
+                TestPlacedRecords.Version(TestTargets.TargetName, cleanedModsPlacement, baseKey: null),
+                TestPlacedRecords.Version(otherGroupsPatch, record.Placement, baseKey: null),
+                TestPlacedRecords.Version(TestTargets.PatchName, record.Placement, baseKey: null),
+            ],
+        };
 
         var collected = PlacedObjects.Collect(new FixedFactsPlugin([TargetRecord(0, Winner.Target, Vector3.Zero), carried]), mods, Plan);
 
-        Assert.DoesNotContain(collected.Targets, target => target.Key == carried.Key);
-        Assert.Equal(1, collected.Counts.TargetsOverriddenLater);
+        Assert.Equal(!otherGroupsPatchMovedIt, collected.Targets.Any(target => target.Key == carried.Key));
+        Assert.Equal(otherGroupsPatchMovedIt ? 1 : 0, collected.Counts.TargetsOverriddenLater);
+    }
+
+    /// <summary>The restore counts a record left to a later plugin with the cleaned mod's objects that stay, where the game shows it.</summary>
+    [Fact]
+    public void ATargetRecordOverriddenLaterIsCollectedAsOneOfTheCleanedModsObjectsWhereTheGameShowsIt()
+    {
+        var carried = WithVersions(TargetRecord(1, Winner.Patch, NewPlace), TestTargets.TargetName, LaterPlugin, TestTargets.PatchName);
+
+        var collected = Collect([TargetRecord(0, Winner.Target, Vector3.Zero), carried]);
+
+        var overridden = Assert.Single(collected.CleanedModsObjectsOverriddenLater);
+        Assert.Equal((carried.Key, NewPlace, TargetOrigin.CleanedMod), (overridden.Key, overridden.Transform.Position, overridden.Origin));
+        Assert.Contains(collected.SupportOnlyObjects, other => other.Key == carried.Key);
     }
 
     [Fact]

@@ -48,3 +48,4 @@ RestoreWhereRemovedText.Fault | Report wording: one navmesh consistency fault as
 RestoreWhereRemovedText.FaultKind | Report wording: how a navmesh breaks a consistency rule (a tool's fault kind).
 RestoreWhereRemovedText.Quarter | Report wording: the name of one quarter of a cell's terrain by its number.
 RestoreWhereRemovedText.Result | Report wording: "restored", or "kept: " and the reason; it takes only the reason's text.
+RestoreWhereRemovedText.Place | Report wording: prints a place in whole units (a tool's vector type).

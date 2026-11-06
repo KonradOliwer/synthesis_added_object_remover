@@ -1058,7 +1058,8 @@ public sealed class StartSetupTooCloseSectionsTests
             HasMapMarker: false,
             new ObjectChange(Other.ToPluginName(), AcceptedFrom: null),
             ReferenceRoles.None,
-            ChangeWithoutCleanedMod: null);
+            ChangeWithoutCleanedMod: null,
+            WinningModPastPatches: Other.ToPluginName());
 
     private static StandardSettings SettingsFor() => new() { CleanedMod = Target };
 

@@ -22,9 +22,6 @@ public sealed class RestoreWhereRemovedTerrainTests
     private const float GridStep = TerrainGrid.VertexSpacing;
     private const float Step = TerrainGrid.UnitsPerHeightStep;
 
-    /// <summary>A height range every change of the ground reaches.</summary>
-    private static readonly (float Min, float Max) EveryHeight = (float.NegativeInfinity, float.PositiveInfinity);
-
     private static readonly ModKey ShapeMod = ModKey.FromNameAndExtension("RestoreTerrainShapes.esp");
     private static readonly TestStatic Block = new(new FormKey(ShapeMod, 0x801), @"test\restoreterrain\block.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-20), new Vector3(20))));
     private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(ShapeMod, "RestoreWhereRemovedTerrainData", Block));
@@ -36,7 +33,6 @@ public sealed class RestoreWhereRemovedTerrainTests
         new KnownPluginNames(PluginList), TestTargets.PatchName, [.. PluginList.Select(plugin => new PluginListing(plugin, true, []))], PluginList, []);
 
     private static readonly RecordKey Space = TestTargets.Space;
-    private static readonly ExteriorCell KeptCell = new(Space, 1, 0);
     private static readonly RecordKey ChildSpace = TestTargets.SpaceKey(0x101);
 
     private static readonly WhereRemovedRestoreSettings Settings = new(
@@ -266,7 +262,7 @@ public sealed class RestoreWhereRemovedTerrainTests
         var land = RaisedEverywhere() with
         {
             UndoPoints = PointSet.Of(RaisedEverywhere().UndoPoints.Points.Where(point => point != raisedAgain)),
-            LeftToLater = new LandLeftToLater(PointSet.Of([raisedAgain]), PointSet.Of([]), default, Rest: false, [Later], PointSet.Of([])),
+            LeftToLater = new LandLeftToLater(PointSet.Of([raisedAgain]), PointSet.Of([]), default, Rest: false, [Later]),
             Heights = new LandHeights(Heights((_, _) => 0f), Heights((x, y) => x == 10 && y == 10 ? 5 * Raised : Raised)),
         };
 
@@ -311,7 +307,7 @@ public sealed class RestoreWhereRemovedTerrainTests
         var land = RaisedEverywhere() with
         {
             UndoPoints = PointSet.Of(RaisedEverywhere().UndoPoints.Points.Where(point => point != raisedAgain)),
-            LeftToLater = new LandLeftToLater(PointSet.Of([raisedAgain]), PointSet.Of([]), default, Rest: false, [Later], PointSet.Of([])),
+            LeftToLater = new LandLeftToLater(PointSet.Of([raisedAgain]), PointSet.Of([]), default, Rest: false, [Later]),
             Heights = new LandHeights(Heights((_, _) => 0f), Heights((x, y) => x == 10 && y == 10 ? 2 * Raised : Raised)),
         };
 
@@ -341,242 +337,18 @@ public sealed class RestoreWhereRemovedTerrainTests
         Assert.False(land.Heights.Contains(PointAt(5, 5)));
     }
 
-    /// <summary>
-    /// A placed record a guard keeps stands on a protected point, whose ground stays raised; the points one and two steps from it go
-    /// back blended into it, and another point goes back whole. A box standing on the flat ground before the cleaned mod is judged
-    /// against the ground the patch leaves: on the protected point and on the blend it would sink, where the ground goes back whole it
-    /// stands as before. An area around a point reaches the squares on either side of it.
-    /// </summary>
-    [Theory]
-    [InlineData(10, true)]
-    [InlineData(12, true)]
-    [InlineData(20, false)]
-    public void GroundStaysChangedUnderAProtectedPointAndTheBlendAroundItButNotWhereItGoesBackWhole(int x, bool staysChanged)
+    /// <summary>A protected point keeps its raised height; the points one and two steps from it go back blended into it, and another point goes back whole.</summary>
+    [Fact]
+    public void AProtectedPointKeepsItsHeightAndThePointsAroundItGoBackBlendedIntoIt()
     {
         var cell = new ExteriorCell(Space, 0, 0);
         var plan = PlanOf(2 * GridStep, RaisedEverywhere()).Protect(TerrainKeptReason.UnderObjectKeptAsChanged, [new LandGridPoint(cell, PointAt(10, 10))]);
 
-        var found = plan.GroundThatStaysChangedUnder(Space, AreaAround(x, 10), (0f, 2 * HeightTolerance));
+        var heights = plan.PlannedHeightsOf(cell)!;
 
-        Assert.Equal((OnSteps(Raised * 2 / 3), OnSteps(Raised / 3)), (plan.PlannedHeightsOf(cell)![PointAt(11, 10)], plan.PlannedHeightsOf(cell)![PointAt(12, 10)]));
-        Assert.Equal(staysChanged ? (cell, RaisedEverywhere().LandKey) : null, found is { } ground ? (ground.Cell, ground.Land) : ((ExteriorCell, RecordKey?)?)null);
-    }
-
-    /// <summary>
-    /// The cleaned mod moved the ground of cell (1, 0) from one height to another and it stays so, under a box from 1000 to 1100 units
-    /// high: the change counts only where the heights between the two come within the tolerance of the box.
-    /// </summary>
-    [Theory]
-    [InlineData(0f, 500f, false)]
-    [InlineData(5000f, 3000f, false)]
-    [InlineData(0f, 1000f - HeightTolerance - 0.5f, false)]
-    [InlineData(0f, 1000f - HeightTolerance, true)]
-    [InlineData(5000f, 1100f + HeightTolerance, true)]
-    [InlineData(5000f, 1100f + HeightTolerance + 0.5f, false)]
-    [InlineData(1050f, 0f, true)]
-    [InlineData(0f, 5000f, true)]
-    public void GroundStaysChangedUnderABoxOnlyWhereItsChangeReachesTheBoxHeights(float earlier, float final, bool staysChanged)
-    {
-        var plan = PlanKeepingCellOneAsTheCleanedModChangedIt((_, _) => earlier, (_, _) => final);
-
-        var found = plan.GroundThatStaysChangedUnder(Space, AreaAround(Side + 10, 10), (1000f, 1100f));
-
-        Assert.Equal(staysChanged ? KeptCell : null, found?.Cell);
-    }
-
-    /// <summary>
-    /// Cell (1, 0) slopes 400 units across each grid step; the cleaned mod raised it by 50 units and it stays so. A box 40 units high
-    /// stands in the middle of one square, where the slope passes through it: each corner of the square lies far above or below the
-    /// box, but the ground between them rises into it.
-    /// </summary>
-    [Fact]
-    public void GroundStaysChangedUnderASmallBoxOnASteepSlopeBetweenGridPoints()
-    {
-        const float Slope = 400f;
-        var plan = PlanKeepingCellOneAsTheCleanedModChangedIt((x, _) => (x - 10.5f) * Slope, (x, _) => (x - 10.5f) * Slope + 50f);
-        var middle = new Vector2((TerrainGrid.SquaresPerSide + 10.5f) * GridStep, 10.5f * GridStep);
-
-        var found = plan.GroundThatStaysChangedUnder(Space, (middle - new Vector2(5), middle + new Vector2(5)), (-20f, 20f));
-
-        Assert.Equal(KeptCell, found?.Cell);
-    }
-
-    /// <summary>
-    /// The cleaned mod raised only the north-east corner of one square of cell (1, 0), and it stays so: by 30 units on flat ground, or
-    /// by 20 on a slope rising 400 units to the north. A box 12.8 units across stands at the square's far corner, where the ground
-    /// under it moves less than the tolerance, or under the raised corner.
-    /// </summary>
-    [Theory]
-    [InlineData(false, false, false)]
-    [InlineData(true, false, false)]
-    [InlineData(false, true, true)]
-    [InlineData(true, true, true)]
-    public void GroundStaysChangedUnderABoxOnlyWhereTheGroundUnderItsFootprintChanges(bool slope, bool underTheRaisedCorner, bool staysChanged)
-    {
-        const float SlopeRise = 400f;
-        const int SquareX = 10;
-        const int SquareY = 10;
-        var raisedBy = slope ? 20f : 30f;
-        float Earlier(int _, int y) => slope ? (y - SquareY) * SlopeRise : 0f;
-        float Final(int x, int y) => Earlier(x, y) + (x == SquareX + 1 && y == SquareY + 1 ? raisedBy : 0f);
-        var plan = PlanKeepingCellOneAsTheCleanedModChangedIt(Earlier, Final);
-        var inSquare = underTheRaisedCorner ? 0.9f : 0f;
-        var southWest = new Vector2(TerrainGrid.SquaresPerSide + SquareX + inSquare, SquareY + inSquare) * GridStep;
-        var groundUnder = slope && underTheRaisedCorner ? SlopeRise : 0f;
-
-        var found = plan.GroundThatStaysChangedUnder(Space, (southWest, southWest + new Vector2(0.1f * GridStep)), (groundUnder - 20f, groundUnder + 30f));
-
-        Assert.Equal(staysChanged ? KeptCell : null, found?.Cell);
-    }
-
-    /// <summary>
-    /// The cleaned mod raised one corner of a flat square of cell (1, 0) by 30 units and it stays so; a small box stands at the
-    /// square's centre. Split along the diagonal through the raised corner, the ground at the centre
-    /// rises by half of it; split along the other diagonal, it barely moves. Which split the game uses is not known, so the box is
-    /// refused on either: the north-east corner only the south-west to north-east split shows, the south-east corner only the other.
-    /// </summary>
-    [Theory]
-    [InlineData(1, 1)]
-    [InlineData(1, 0)]
-    public void GroundStaysChangedUnderABoxWhereEitherTriangleSplitShowsTheChange(int cornerX, int cornerY)
-    {
-        const int SquareX = 10;
-        const int SquareY = 10;
-        float Final(int x, int y) => x == SquareX + cornerX && y == SquareY + cornerY ? 30f : 0f;
-        var plan = PlanKeepingCellOneAsTheCleanedModChangedIt((_, _) => 0f, Final);
-        var centre = new Vector2(TerrainGrid.SquaresPerSide + SquareX + 0.5f, SquareY + 0.5f) * GridStep;
-        var halfWidth = new Vector2(0.05f * GridStep);
-
-        var found = plan.GroundThatStaysChangedUnder(Space, (centre - halfWidth, centre + halfWidth), (0f, 2 * HeightTolerance));
-
-        Assert.Equal(KeptCell, found?.Cell);
-    }
-
-    /// <summary>The cleaned mod raised the ground of cell (1, 0) by 150 units and it stays so: the gap is the largest difference and the tolerance.</summary>
-    [Fact]
-    public void GroundTheCleanedModChangedAndStaysChangedReportsHowFarItIsFromTheEarlierGround()
-    {
-        var plan = PlanKeepingCellOneAsTheCleanedModChangedIt((_, _) => 0f, (_, _) => 150f);
-
-        var found = plan.GroundThatStaysChangedUnder(Space, AreaAround(Side + 10, 10), EveryHeight);
-
-        Assert.Equal((KeptCell, new GroundGap(150f, HeightTolerance)), (found!.Value.Cell, found.Value.Gap));
-        Assert.Null(plan.GroundThatStaysChangedUnder(Space, AreaAround(-10, 10), EveryHeight));
-    }
-
-    /// <summary>A later plugin the cleaned mod does not need raised the ground of cell (1, 0), whose LAND record the cleaned mod does not override, by 150 units.</summary>
-    [Fact]
-    public void GroundOnlyALaterPluginChangedInALandTheCleanedModDoesNotOverrideDoesNotStayChanged()
-    {
-        var raisedLater = new ExteriorCell(Space, 1, 0);
-        var plan = new TerrainUndoPlan(
-            [AllCleared(RaisedEverywhere())],
-            cell => cell == raisedLater ? new LandHeights(Heights((_, _) => 0f), Heights((_, _) => 150f)) : new LandHeights(null, null),
-            HeightTolerance,
-            blendDistance: 0f);
-
-        Assert.Null(plan.GroundThatStaysChangedUnder(Space, AreaAround(Side + 10, 10), EveryHeight));
-    }
-
-    /// <summary>The cleaned mod overrides cell (1, 0) but changed no height of it; a later plugin raised all of it by 150 units.</summary>
-    [Fact]
-    public void GroundOnlyALaterPluginChangedInALandTheCleanedModOverridesDoesNotStayChanged()
-    {
-        var plan = new TerrainUndoPlan(
-            [AllCleared(RaisedEverywhere()), AllCleared(LandAt(1, 0, Unchanged() with { Heights = new LandHeights(Heights((_, _) => 0f), Heights((_, _) => 150f)) }))],
-            _ => new LandHeights(null, null),
-            HeightTolerance,
-            blendDistance: 0f);
-
-        Assert.Null(plan.GroundThatStaysChangedUnder(Space, AreaAround(Side + 10, 10), EveryHeight));
-    }
-
-    /// <summary>
-    /// Load order: the cleaned mod raised cell (1, 0), a plugin that loads without it edited the same LAND, and a patch that needs both
-    /// wins with all the heights. The last changer needs the cleaned mod, so the cleaned mod's shaping stays in the ground; a last
-    /// changer that loads without it would be the unrelated plugin's own choice. The world without the cleaned mod shows the heights of
-    /// the plugin that loads without it (earlier ground 0): the gap is measured from them, from the earlier ground when that plugin
-    /// has no height map.
-    /// </summary>
-    [Theory]
-    [InlineData(true, null, 150f, 150f)]
-    [InlineData(false, null, 150f, null)]
-    [InlineData(true, 40f, 46f, null)]
-    [InlineData(true, -30f, 5f, 35f)]
-    [InlineData(false, -30f, 5f, null)]
-    public void GroundAPluginNeedingTheCleanedModKeepsStaysChangedByTheGapFromThePluginLoadingWithoutIt(
-        bool lastChangerNeedsTheCleanedMod, float? loadingWithoutHeight, float final, float? largestGap)
-    {
-        var all = PointsWhere((_, _) => true);
-        var kept = LandAt(1, 0, Unchanged() with
-        {
-            Heights = new LandHeights(Heights((_, _) => 0f), Heights((_, _) => final)),
-            LeftToLater = new LandLeftToLater(
-                all,
-                PointSet.Of([]),
-                default,
-                Rest: false,
-                [Later],
-                lastChangerNeedsTheCleanedMod ? all : PointSet.Of([]),
-                lastChangerNeedsTheCleanedMod && loadingWithoutHeight is { } height ? Heights((_, _) => height) : null),
-        });
-        var plan = new TerrainUndoPlan([AllCleared(RaisedEverywhere()), AllCleared(kept)], _ => new LandHeights(null, null), HeightTolerance, blendDistance: 0f);
-
-        var found = plan.GroundThatStaysChangedUnder(Space, AreaAround(Side + 10, 10), EveryHeight);
-
-        Assert.Equal(largestGap is { } gap ? (KeptCell, new GroundGap(gap, HeightTolerance)) : null, found is { } ground ? (ground.Cell, ground.Gap) : ((ExteriorCell, GroundGap)?)null);
-    }
-
-    /// <summary>
-    /// One land record the cleaned mod overrides holds ground it raised on the west half, which stays, and ground an unrelated later
-    /// plugin raised on the east half: only a box over the west half is on ground that stays changed through the cleaned mod.
-    /// </summary>
-    [Theory]
-    [InlineData(10, true)]
-    [InlineData(25, false)]
-    public void GroundTheCleanedModChangedCountsButGroundALaterPluginChangedInTheSameLandRecordDoesNot(int x, bool staysChanged)
-    {
-        var west = PointsWhere((pointX, _) => pointX < 20);
-        var kept = LandAt(1, 0, Unchanged() with
-        {
-            UndoPoints = west,
-            Heights = new LandHeights(Heights((_, _) => 0f), Heights((_, _) => 150f)),
-            LeftToLater = new LandLeftToLater(PointsWhere((pointX, _) => pointX >= 20), PointSet.Of([]), default, Rest: false, [Later], PointSet.Of([])),
-        });
-        var plan = new TerrainUndoPlan([AllCleared(RaisedEverywhere()), AllCleared(kept)], _ => new LandHeights(null, null), HeightTolerance, blendDistance: 0f)
-            .Protect(TerrainKeptReason.UnderObjectKeptAsChanged, west.Points.Select(point => new LandGridPoint(KeptCell, point)));
-
-        var found = plan.GroundThatStaysChangedUnder(Space, AreaAround(Side + x, 10), EveryHeight);
-
-        Assert.Equal(staysChanged ? KeptCell : null, found?.Cell);
-    }
-
-    /// <summary>Cell (1, 0) has a height map only in its winning version: a corner counts when the cleaned mod shaped it, not when a later plugin added the map.</summary>
-    [Theory]
-    [InlineData(true, true)]
-    [InlineData(false, false)]
-    public void WithoutAnEarlierHeightMapGroundCountsOnlyWhereTheCleanedModShapedIt(bool cleanedModShaped, bool staysChanged)
-    {
-        var all = PointsWhere((_, _) => true);
-        var kept = LandAt(1, 0, Unchanged() with
-        {
-            UndoPoints = cleanedModShaped ? all : PointSet.Of([]),
-            Heights = new LandHeights(null, Heights((_, _) => 150f)),
-            LeftToLater = new LandLeftToLater(cleanedModShaped ? PointSet.Of([]) : all, PointSet.Of([]), default, Rest: false, [Later], PointSet.Of([])),
-        });
-        var plan = new TerrainUndoPlan([AllCleared(RaisedEverywhere()), AllCleared(kept)], _ => new LandHeights(null, null), HeightTolerance, blendDistance: 0f);
-
-        var found = plan.GroundThatStaysChangedUnder(Space, AreaAround(Side + 10, 10), EveryHeight);
-
-        Assert.Equal(staysChanged ? KeptCell : null, found?.Cell);
-    }
-
-    /// <summary>The cleaned mod raised every point of cell (1, 0) from the earlier to the final heights, and every point stays as it made it.</summary>
-    private static TerrainUndoPlan PlanKeepingCellOneAsTheCleanedModChangedIt(Func<int, int, float> earlier, Func<int, int, float> final)
-    {
-        var kept = LandAt(1, 0, Unchanged() with { UndoPoints = PointsWhere((_, _) => true), Heights = new LandHeights(Heights(earlier), Heights(final)) });
-        return new TerrainUndoPlan([AllCleared(RaisedEverywhere()), AllCleared(kept)], _ => new LandHeights(null, null), HeightTolerance, blendDistance: 0f)
-            .Protect(TerrainKeptReason.UnderObjectKeptAsChanged, Enumerable.Range(0, TerrainGrid.VertexCount).Select(point => new LandGridPoint(KeptCell, point)));
+        Assert.Equal(
+            (Raised, OnSteps(Raised * 2 / 3), OnSteps(Raised / 3), 0f),
+            (heights[PointAt(10, 10)], heights[PointAt(11, 10)], heights[PointAt(12, 10)], heights[PointAt(20, 10)]));
     }
 
     /// <summary>The cleaned mod only recoloured cell (1, 0), so its fact carries no heights; they are read when the plan needs them.</summary>
@@ -746,9 +518,6 @@ public sealed class RestoreWhereRemovedTerrainTests
     /// <summary>The height on the 8-unit steps nearest to it, a half step rounding up: the steps of a record whose first point lies a whole number of steps up.</summary>
     private static float OnSteps(float height) => Step * MathF.Floor(height / Step + 0.5f);
 
-    /// <summary>A small square around the world grid point (x, y), seen from above.</summary>
-    private static (Vector2 Min, Vector2 Max) AreaAround(int x, int y) => (new Vector2(x * GridStep - 1, y * GridStep - 1), new Vector2(x * GridStep + 1, y * GridStep + 1));
-
     private static LandChangedByCleanedMod LandAt(int x, int y, LandChangedByCleanedMod land) =>
         land with { Cell = new ExteriorCell(Space, x, y), LandKey = new RecordKey(BaseGame, (uint)(0x700 + (x + 8) * 16 + y + 8)) };
 
@@ -789,9 +558,10 @@ public sealed class RestoreWhereRemovedTerrainTests
         PointSet.Of([]),
         default,
         UndoRest: false,
-        new LandLeftToLater(PointSet.Of([]), PointSet.Of([]), default, Rest: false, [], PointSet.Of([])),
+        new LandLeftToLater(PointSet.Of([]), PointSet.Of([]), default, Rest: false, []),
         TestTargets.TargetName,
-        new LandHeights(Heights((_, _) => 0f), Heights((_, _) => 0f)));
+        new LandHeights(Heights((_, _) => 0f), Heights((_, _) => 0f)),
+        EarlierPlugin: BaseGame);
 
     /// <summary>The cleaned mod raised every point of the base game's flat ground.</summary>
     private static LandChangedByCleanedMod RaisedEverywhere(float by = Raised) =>
@@ -810,14 +580,14 @@ public sealed class RestoreWhereRemovedTerrainTests
             workers);
         var final = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved), targets.Length)
             .Apply(RoundKind.TooClose, [.. scene.Removals.Select(index => new ProposedRemoval(new TargetId(index), new TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);
-        var caches = new TestRunCaches(Shapes, navmeshes: NoNavmeshes, shownTargets: TestScenes.Create(targets, [], Shapes).IndexShownTargets);
+        var caches = new TestRunCaches(Shapes, terrain: TestGround.NoTerrain(), navmeshes: NoNavmeshes, shownTargets: TestScenes.Create(targets, [], Shapes).IndexShownTargets);
         var restore = settings ?? Settings;
         return WhereRemovedRestorer.Plan(
             new(
                 new(collected, OtherModsObjectsResult.SwitchedOff),
                 final,
                 TestClearedAreas.Of(collected, final, caches, restore),
-                new(rules.WorldCaches, rules.TooCloseRule(), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),
+                rules.Over(collected),
                 TestTargetGroups.None,
                 new(
                     caches,

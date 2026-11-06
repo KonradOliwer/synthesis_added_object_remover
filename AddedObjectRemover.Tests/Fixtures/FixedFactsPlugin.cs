@@ -67,7 +67,7 @@ internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records,
         var targetIndex = versions.TakeWhile(version => version.Plugin != target).Count();
         var isJudged = overridden.Contains(record.Key) && targetIndex > 0 && targetIndex < versions.Length;
         var lowestKept = isJudged ? targetIndex - 1 : versions.Length - 1;
-        while (lowestKept > 0 && !stopsTheWalk(versions[^1].Plugin, versions[lowestKept].Plugin)) lowestKept--;
+        while (lowestKept > 0 && !stopsTheWalk(versions[^1].Plugin, versions[lowestKept].Plugin, readPluginOverridesLand: false)) lowestKept--;
         return record with
         {
             Versions = versions.RemoveRange(0, lowestKept),
@@ -103,11 +103,11 @@ internal sealed class FixedFactsPlugin(ImmutableArray<PlacedRecordFact> records,
 
     public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => throw new NotSupportedException();
 
-    public PluginName? ReadTerrainWinner(ExteriorCell cell) => throw new NotSupportedException();
-
     public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new NotSupportedException();
 
     public WaterCopies ReadWaterCopies(ExteriorCell cell) => throw new NotSupportedException();
+
+    public ExteriorCell? FindExteriorCell(RecordKey landOrCell) => throw new NotSupportedException();
     public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => throw new NotSupportedException();
 
     public RecordKey? FindLandWorldspace(RecordKey space) => throw new NotSupportedException();

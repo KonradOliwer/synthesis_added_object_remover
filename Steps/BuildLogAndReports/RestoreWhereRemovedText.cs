@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Numerics;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
@@ -41,6 +43,29 @@ internal static class RestoreWhereRemovedText
     /// <summary>The words for a record that goes back with a copy, after what was done to it.</summary>
     public const string WithCopy = "with a copy at the cleaned mod's place";
 
+    private const string ByFollowUp = "by the follow-up of what went back";
+
+    /// <summary>
+    /// What the follow-up of what went back then does to a placed record that went back: "then pulled down to (10, 20, 5) by the
+    /// follow-up of what went back", or "then removed by the follow-up of what went back".
+    /// </summary>
+    public static string ThenFollowedUp(OtherModsObjectOutcome outcome) =>
+        outcome.IsRemoved ? $"then {FollowedUpVerb(outcome)} {ByFollowUp}" : $"then {FollowedUpVerb(outcome)} to {Place(outcome.NewPosition)} {ByFollowUp}";
+
+    /// <summary>E.g. "2 of them then pulled down by the follow-up of what went back", after a count of placed records that went back.</summary>
+    public static string ThenFollowedUpCount(OtherModsObjectOutcome outcome, int count) => $"{TextFormat.Count(count)} of them then {FollowedUpVerb(outcome)} {ByFollowUp}";
+
+    private static string FollowedUpVerb(OtherModsObjectOutcome outcome) => outcome switch
+    {
+        { IsRemoved: true } => "removed",
+        { Fate: OtherModsObjectFate.PulledDown } => "pulled down",
+        _ => throw new UnreachableException($"The follow-up of what went back left {outcome.Object.Key} {outcome.Fate} after it went back."),
+    };
+
+    /// <summary>E.g. "(10, 20, 5)", in whole units.</summary>
+    public static string Place(Vector3 position) =>
+        $"({string.Join(Describe.ListSeparator, new[] { position.X, position.Y, position.Z }.Select(value => TextFormat.Fixed(value, 0)))})";
+
     /// <summary>What a placed record that went back is, in a count.</summary>
     public static string Kind(PlacedRestoreKind kind) => kind switch
     {
@@ -71,6 +96,7 @@ internal static class RestoreWhereRemovedText
         NeverRestoredReason.WinnerLoadsAfterPatch => "a plugin that loads after the patch has the last word on it",
         NeverRestoredReason.LinkedFromCleanedMod => "a record of the cleaned mod links to it",
         NeverRestoredReason.InDeletedCell => "a plugin deletes the cell it would be written into",
+        NeverRestoredReason.SharesItsGrid => "another record the cleaned mod changed lies at the same grid, so which one the game shows is not known",
         _ => throw new UnreachableException($"Unknown reason {reason} for a change that never goes back."),
     };
 
@@ -119,6 +145,7 @@ internal static class RestoreWhereRemovedText
         CloneRefusal.TooCloseAsCleanedModsObject => "too close as the cleaned mod's object",
         CloneRefusal.OnChangedTerrainAsCleanedModsObject => "on changed terrain as the cleaned mod's object",
         CloneRefusal.ActorsWalkOnIt => "actors walk on it",
+        CloneRefusal.TakenAwayByFollowUp => "the follow-up of what goes back takes away the object it stands for",
         _ => throw new UnreachableException($"Unknown copy refusal {refusal}."),
     };
 
@@ -126,15 +153,16 @@ internal static class RestoreWhereRemovedText
     /// <param name="label">Names a record.</param>
     public static string WaterKept(WaterKeptReason reason, RecordKey by, Func<RecordKey, string> label) => reason switch
     {
-        WaterKeptReason.AtWaterLine => $"{label(by)} lies across the water line between the level before the cleaned mod and the one that stays",
-        WaterKeptReason.AroundObjectThatStays => $"the changed-terrain check around {label(by)}, which stays, reaches the cell and counts water changes",
-        WaterKeptReason.AroundCopy => $"the changed-terrain check around the copy of {label(by)} reaches the cell and counts water changes",
+        WaterKeptReason.NavmeshAtWaterLine => $"{label(by)} lies across the water line between the level before the cleaned mod and the one that stays",
+        WaterKeptReason.ObjectAtWaterLine =>
+            $"{label(by)}, which stays where the cleaned mod put it or leaves a copy there, lies across the water line between the level before the cleaned mod and the one that stays",
+        WaterKeptReason.ForChangedTerrainCheck => $"the changed-terrain check of {label(by)} or of its copy would count the level going back, or stopped there",
         _ => throw new UnreachableException($"Unknown water kept reason {reason}."),
     };
 
     /// <summary>The words for <see cref="LandQuarterOutcome.TexturesKeptForObjectThatStays"/>.</summary>
     public const string TexturesKeptForObjectThatStays =
-        "the changed-terrain check around an object that stays or a copy the patch adds reaches its ground and counts terrain type changes";
+        "the changed-terrain check of an object that stays or a copy the patch adds would count their going back, or stopped there";
 
     /// <summary>The words for <see cref="LandQuarterOutcome.ColoursSharedWithGroundThatStays"/>.</summary>
     public const string ColoursSharedWithGroundThatStays = "its vertex colours lie on a line shared with ground that stays";
@@ -146,22 +174,14 @@ internal static class RestoreWhereRemovedText
     public const string NothingGoesBack ="nothing of what the cleaned mod changed in it goes back";
 
     /// <summary>
-    /// Why a placed record stays although its area is cleared: the guard, with the record it found and the plugin that keeps the ground
-    /// changed with how far it lies from the earlier ground, as in "on ground that stays changed (Later.esp, differs from the
-    /// ground without the cleaned mod by up to 12.5 units, tolerance 2.0 units)", or the failure that stopped the check.
+    /// Why a placed record stays although its area is cleared: the guard, with the record it found in brackets, or the failure that
+    /// stopped the check.
     /// </summary>
     /// <param name="label">Names a record.</param>
     public static string Refusal(PlacedRefusal refusal, Func<RecordKey, string> label)
     {
         if (refusal.Failure is { } failure) return $"the check stopped unexpectedly ({failure})";
-        var found = string.Join(Describe.ListSeparator, new[] { refusal.By is { } by ? label(by) : null, refusal.Plugin?.ToString(), refusal.Gap is { } gap ? GapText(gap) : null }.OfType<string>());
-        return found.Length > 0 ? $"{Guard(refusal.Guard)} ({found})" : Guard(refusal.Guard);
-    }
-
-    private static string GapText(GroundGap gap)
-    {
-        var tolerance = $"tolerance {TextFormat.Fixed(gap.Tolerance, 1)} units";
-        return gap.Largest is { } largest ? $"differs from the ground without the cleaned mod by up to {TextFormat.Fixed(largest, 1)} units{Describe.ListSeparator}{tolerance}" : tolerance;
+        return refusal.By is { } by ? $"{Guard(refusal.Guard)} ({label(by)})" : Guard(refusal.Guard);
     }
 
     /// <summary>The kind of refusal a count line groups placed records by.</summary>
@@ -170,12 +190,13 @@ internal static class RestoreWhereRemovedText
     public static string Guard(PlacedGuard guard) => guard switch
     {
         PlacedGuard.TooCloseToWhatStays => "too close to objects that stay",
-        PlacedGuard.OnGroundThatStaysChanged => "on ground that stays changed",
-        PlacedGuard.AtWaterLineThatStaysChanged => "at a water line that stays as the cleaned mod changed it",
-        PlacedGuard.HoldsInvisibleObjectThatStays => "holding an invisible object of the cleaned mod that stays",
         PlacedGuard.StandsInChangedNavmesh => "in a navmesh that stays as the cleaned mod changed it",
-        PlacedGuard.CarriesObjectThatStays => "carrying an object that stays",
-        PlacedGuard.RestsOnWhatDoesNotStay => "resting on an object that does not stay",
+        PlacedGuard.HoldsUpOtherModsObject => "holding up an object of a trusted mod that would be left without support",
+        PlacedGuard.ArrivesWithoutSupport => "without support where it would go back to",
+        PlacedGuard.ArrivesInGround => "in ground that stays as the cleaned mod made it where it would go back to",
+        PlacedGuard.ArrivesAtWaterLine => "at a water line that stays as the cleaned mod made it where it would go back to",
+        PlacedGuard.WouldNotFitWherePulledDown => "without support where it would go back to and would not fit where it would be pulled down to",
+        PlacedGuard.TakesAlongObjectThatWouldNotFit => "taking back an object the cleaned mod moved that would not fit where it goes back to",
         PlacedGuard.DoorLinkChangedLater => "with a navmesh door link a later plugin changed again",
         PlacedGuard.DoorLinkDoesNotMatch => "with a navmesh door link that would not match the navmeshes as they end",
         _ => throw new UnreachableException($"Unknown placed guard {guard}."),
@@ -185,7 +206,9 @@ internal static class RestoreWhereRemovedText
     {
         TerrainKeptReason.UnderObjectThatStays => "under objects that stay",
         TerrainKeptReason.UnderObjectKeptAsChanged => "under objects kept as the cleaned mod changed them",
-        TerrainKeptReason.UnderObjectPlacedForTheGroundAsItIs => "under objects of other plugins placed for the ground as it is",
+        TerrainKeptReason.ForChangedTerrainCheck => "where the changed-terrain check of an object that stays or a copy the patch adds would count their going back, or stopped",
+        TerrainKeptReason.UnderOtherModsObject =>
+            "under objects of trusted mods the ground going back would leave without support, pull down too close to what stays or bury",
         TerrainKeptReason.UnderNavmesh => "under navmeshes that lie on the ground as it is",
         TerrainKeptReason.TooSteepToStore => "too steep to store",
         TerrainKeptReason.OnEdgeOfLandThatStays => "on a cell edge whose neighbouring ground stays",

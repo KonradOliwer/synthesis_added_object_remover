@@ -59,6 +59,28 @@ public class PlacedObjectCollectorCloneTests
         Assert.Equal((1, 1), (collected.Counts.TargetsOverriddenLater, collected.Counts.ClonesOfCleanedMod));
     }
 
+    /// <summary>
+    /// A clone another group's patch created, which this group's patch carries: judged where it stands, unless a later plugin moved it
+    /// below this group's patch; then that plugin is the winner past the patches and the clone is left to it, like the cleaned mod's
+    /// own records.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ACloneThisGroupsPatchCarriesIsLeftToALaterPluginThatMovedItBelowThePatch(bool laterPluginMovedIt)
+    {
+        var clone = Clone(OtherGroupPatch, TestTargets.TargetName);
+        PlacedVersionFact[] below = laterPluginMovedIt
+            ? [clone.Winner, clone.Winner with { Plugin = LaterMod, Placement = clone.Placement with { Position = new Vector3(50, 1, 1) } }]
+            : [clone.Winner];
+        var carried = clone with { Versions = [.. below, below[^1] with { Plugin = TestTargets.PatchName }] };
+
+        var collected = Collect(carried);
+
+        Assert.Equal(!laterPluginMovedIt, collected.Targets.Any(target => target.Key == clone.Key));
+        Assert.Equal(laterPluginMovedIt, collected.CleanedModsObjectsOverriddenLater.Any(overridden => overridden.Key == clone.Key));
+    }
+
     [Fact]
     public void AMarkerInAPluginThatIsNoPatchIsAnOrdinaryEditorId()
     {

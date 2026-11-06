@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Numerics;
 
 namespace AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
@@ -23,4 +25,22 @@ public static class ResavedPlacedParts
 
     /// <summary>A missing scale is the same as 1 (<see cref="ReferenceScale.Normalize"/>).</summary>
     public static bool ScalesDiffer(float? one, float? other) => MathF.Abs(ReferenceScale.Normalize(one) - ReferenceScale.Normalize(other)) > Tolerances.Scale;
+
+    /// <summary>The object properties, each as the part a restore gives back: position, rotation, scale, base and presence.</summary>
+    public static readonly ImmutableArray<PlacedParts> ObjectProperties = [PlacedParts.Position, PlacedParts.Rotation, PlacedParts.Scale, PlacedParts.BaseAndData, PlacedParts.Presence];
+
+    /// <summary>Whether two versions differ in one of the <see cref="ObjectProperties"/>; base and presence are exact.</summary>
+    public static bool ObjectPropertyDiffers(PlacedParts property, PlacedVersionFact one, PlacedVersionFact other) =>
+        property switch
+        {
+            PlacedParts.Position => PositionsDiffer(one.Placement.Position, other.Placement.Position),
+            PlacedParts.Rotation => RotationsDiffer(one.Placement.EulerRotation, other.Placement.EulerRotation),
+            PlacedParts.Scale => ScalesDiffer(one.Scale, other.Scale),
+            PlacedParts.BaseAndData => one.Base != other.Base,
+            PlacedParts.Presence => one.Placement.Presence != other.Placement.Presence,
+            _ => throw new UnreachableException($"{property} is no object property."),
+        };
+
+    /// <summary>Whether two versions differ in any of the <see cref="ObjectProperties"/>: a version that differs in none only copies the other.</summary>
+    public static bool ObjectPropertiesDiffer(PlacedVersionFact one, PlacedVersionFact other) => ObjectProperties.Any(property => ObjectPropertyDiffers(property, one, other));
 }

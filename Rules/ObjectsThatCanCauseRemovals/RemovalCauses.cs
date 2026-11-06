@@ -1,6 +1,8 @@
+using System.Collections.Immutable;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
+using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
 namespace AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals;
 
@@ -8,7 +10,8 @@ namespace AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals;
 public static class RemovalCauses
 {
     /// <summary>Whether another mod's placed record is changed.</summary>
-    public static IOtherRecordChange CreateOtherRecordChange() => new OtherRecordChange();
+    /// <param name="restored">The parts earlier runs gave back, which the patch's version holds as accepted while it keeps their values.</param>
+    public static IOtherRecordChange CreateOtherRecordChange(ImmutableArray<RestoredPart> restored) => new OtherRecordChange(new RestoredPartsByRecord(restored));
 
     /// <summary>The objects that can cause removals in the run's world.</summary>
     public static ICausesOfTheRun CreateCausesOfTheRun(IBaseObjectShapes shapes, Execution execution) => new CausesOfTheRun(shapes, execution);

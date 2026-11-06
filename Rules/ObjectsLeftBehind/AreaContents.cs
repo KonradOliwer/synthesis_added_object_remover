@@ -9,7 +9,8 @@ namespace AddedObjectRemover.Rules.ObjectsLeftBehind;
 
 /// <summary>One of the cleaned mod's objects an area counts.</summary>
 /// <param name="Volume">What it adds to the area's size: its box volume; nothing for an object whose mesh holds only effect shapes.</param>
-internal readonly record struct CountedObject(TargetId Target, double Volume);
+/// <param name="IsOverriddenLater">One of the cleaned mod's objects a later plugin holds, which no decision removes.</param>
+internal readonly record struct CountedObject(TargetId Target, double Volume, bool IsOverriddenLater);
 
 /// <summary>
 /// The cleaned mod's own objects the game draws in a column an area is measured in: those whose box centre lies within the radius
@@ -19,6 +20,9 @@ internal sealed class AreaContents
 {
     private readonly IVisibleTargetObjects _shownTargets;
 
+    /// <summary>The number of targets; the cleaned mod's objects later plugins hold have the ids after theirs.</summary>
+    private readonly int _targetCount;
+
     /// <summary>How each target weighs in an area, by target index.</summary>
     private readonly Weight[] _weights;
 
@@ -26,12 +30,14 @@ internal sealed class AreaContents
     private readonly Vector3?[] _boxCentres;
 
     /// <param name="targets">Every target, by id.</param>
-    /// <param name="shownTargets">The shown targets where the rounds measure them.</param>
-    public AreaContents(ImmutableArray<TargetObject> targets, IVisibleTargetObjects shownTargets, IBaseObjectShapes shapes)
+    /// <param name="overriddenLater">The cleaned mod's objects later plugins hold, by id, after the targets.</param>
+    /// <param name="shownTargets">The shown targets where the rounds measure them, then the shown objects of <paramref name="overriddenLater"/>.</param>
+    public AreaContents(ImmutableArray<TargetObject> targets, ImmutableArray<TargetObject> overriddenLater, IVisibleTargetObjects shownTargets, IBaseObjectShapes shapes)
     {
         _shownTargets = shownTargets;
-        _weights = [.. targets.Select(target => WeightOf(target, shapes))];
-        _boxCentres = BoxCentresOf(targets.Length, shownTargets);
+        _targetCount = targets.Length;
+        _weights = [.. targets.Concat(overriddenLater).Select(target => WeightOf(target, shapes))];
+        _boxCentres = BoxCentresOf(_weights.Length, shownTargets);
     }
 
     /// <returns>The cleaned mod's own drawn objects in the column, in ascending id.</returns>
@@ -43,7 +49,7 @@ internal sealed class AreaContents
         {
             var weight = _weights[near.Target.Index];
             if (weight == Weight.NotCounted) continue;
-            yield return new CountedObject(near.Target, weight == Weight.ByCountOnly ? 0d : near.Box.Volume);
+            yield return new CountedObject(near.Target, weight == Weight.ByCountOnly ? 0d : near.Box.Volume, IsOverriddenLater: near.Target.Index >= _targetCount);
         }
     }
 

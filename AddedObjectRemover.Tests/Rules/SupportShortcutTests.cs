@@ -81,7 +81,7 @@ public class SupportShortcutTests
     public void RestsAnswersAsTheWholeDrop(DropScene name, bool rests)
     {
         var scene = CreateDropScene(name);
-        var drops = new DropFinder(CreateSurfaceContacts(scene), scene.Triangles, scene.Terrain, TouchGap);
+        var drops = new DropFinder(CreateSurfaceContacts(scene), scene.Triangles, TouchGap);
         var standing = StandingOf(scene.Others[0]);
         var queries = new OtherObjectQueries();
 
@@ -129,12 +129,12 @@ public class SupportShortcutTests
     {
         public TriangleStore Triangles { get; } = new(Shapes.ReadTriangles);
 
-        public SupportWorld World { get; } = CreateWorld(Targets, Others);
+        public SupportWorld World { get; } = CreateWorld(Targets, Others, Terrain);
 
-        private static SupportWorld CreateWorld(List<TargetObject> targets, List<OtherObject> others)
+        private static SupportWorld CreateWorld(List<TargetObject> targets, List<OtherObject> others, ITerrainHeights terrain)
         {
             var caches = TestScenes.CreateWithSupportOnlyObjects(targets, others, Shapes);
-            return new SupportWorld(targets, caches.VisibleTargets, _ => true, caches.VisibleObjectsOfAnyPlugin(), SupportWorld.NoChanges, Shapes);
+            return new SupportWorld(targets, caches.VisibleTargets, _ => true, caches.VisibleObjectsOfAnyPlugin(), SupportWorld.NoChanges, Shapes, terrain);
         }
     }
 

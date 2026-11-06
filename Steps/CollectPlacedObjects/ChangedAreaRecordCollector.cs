@@ -115,6 +115,7 @@ internal sealed class ChangedAreaRecordCollector
             record.Space.Key,
             record.Cell,
             record.WinningMod,
+            WinnerPastPatches.Of(record, _trust),
             record.Placement is { Position: { } position, EulerRotation: { } rotation } ? new EulerPlacement(position, rotation, ReferenceScale.Normalize(record.Scale)) : null,
             record.Base,
             record.Winner.Reference,
@@ -128,13 +129,18 @@ internal sealed class ChangedAreaRecordCollector
             PluginThatPutItThere(record));
     }
 
-    /// <returns>The winning plugin when it is no patch and its position or base differs from the cleaned mod's, so it, not the cleaned mod, put the object where it stands; null otherwise.</returns>
+    /// <returns>
+    /// The winner past the patches (<see cref="WinnerPastPatches"/>) when it is not the cleaned mod and its version's position or base
+    /// differs from the cleaned mod's, so it, not the cleaned mod, put the object where it stands; null otherwise.
+    /// </returns>
     private PluginName? PluginThatPutItThere(PlacedRecordFact record)
     {
-        if (record.WinningMod == _trust.CleanedMod || _trust.IsAnyGroupsPatch(record.WinningMod)) return null;
+        var winner = WinnerPastPatches.Of(record, _trust);
+        if (winner == _trust.CleanedMod) return null;
         var cleanedModsVersion = record.Versions[ChangedObjectKind.CleanedModIndexOf(record, _trust.CleanedMod)];
-        var differs = ResavedPlacedParts.PositionsDiffer(cleanedModsVersion.Placement.Position, record.Placement.Position) || cleanedModsVersion.Base != record.Base;
-        return differs ? record.WinningMod : null;
+        var winnersVersion = record.Versions.Last(version => version.Plugin == winner);
+        var differs = ResavedPlacedParts.PositionsDiffer(cleanedModsVersion.Placement.Position, winnersVersion.Placement.Position) || cleanedModsVersion.Base != winnersVersion.Base;
+        return differs ? winner : null;
     }
 
     /// <summary>A version read deletes the cell holding the record's winning version or the one holding the given version.</summary>

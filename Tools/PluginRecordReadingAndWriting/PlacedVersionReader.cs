@@ -70,7 +70,8 @@ internal sealed class PlacedVersionReader(PluginName namedPlugin, PluginNames na
     }
 
     /// <summary>A record the read's plugin overrides is walked on, whatever the plugin, until its version just below the read's plugin's is read.</summary>
-    private bool StopsTheWalk(RecordKey key, PluginName winner, PluginName plugin) => _stopsTheWalk(winner, plugin) && !_versionsToCompare.ContainsKey(key);
+    private bool StopsTheWalk(RecordKey key, PluginName winner, PluginName plugin) =>
+        _stopsTheWalk(winner, plugin, _footprint.OverriddenLands.Count > 0) && !_versionsToCompare.ContainsKey(key);
 
     public PlacedVersionFact ReadVersion(IPlacedGetter record, ScannedCell cell) => new(
         cell.Plugin,

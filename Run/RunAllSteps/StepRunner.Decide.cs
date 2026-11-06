@@ -197,7 +197,7 @@ public static partial class StepRunner
                     collected.Targets,
                     visibleLeftBehind.Decisions,
                     runCaches,
-                    CreateClearedAreasJudging(runCaches, collected),
+                    CreateClearedAreasJudging(runCaches, collected, overriddenLater: []),
                     [CreateVisibleKindsAlwaysKept(scope, runCaches), CreateInvisibleKindsAlwaysKept(scope, runCaches)],
                     LeftBehindRules.CreateLeftBehindRoundJoin(),
                     CreateAlsoRemoveFollowUp(scope, runCaches, collected, visibleLeftBehind.Decisions),

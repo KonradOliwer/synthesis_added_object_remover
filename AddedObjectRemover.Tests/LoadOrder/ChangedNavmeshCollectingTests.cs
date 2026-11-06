@@ -145,6 +145,22 @@ public sealed class ChangedNavmeshCollectingTests
         Assert.Null(addedFact.Earlier);
     }
 
+    /// <summary>
+    /// An earlier patcher of the group wrote its own version of a navmesh the cleaned mod added, as a run that sank it does: every
+    /// part of it goes back, not left to the patch.
+    /// </summary>
+    [Fact]
+    public void ANavmeshTheCleanedModAddedThatThePatchChangedGoesBack()
+    {
+        var added = AddNavmeshOfTheCleanedMod(minX: Size);
+        var cleanedModsVersion = CellCopyIn(_cleaned.Mod, _cell).NavigationMeshes.Single(navmesh => navmesh.FormKey == added);
+
+        var collected = Collect(writeIntoPatch: patch => Raise(NavmeshCopyIn(patch, from: cleanedModsVersion)));
+
+        var addedFact = Assert.Single(collected.ChangedNavmeshes, navmesh => navmesh.Navmesh == added.ToRecordKey());
+        Assert.Equal((NavmeshCase.Added, (PartOutcome)new PartOutcome.Undo(), (PartOutcome)new PartOutcome.Undo()), (addedFact.Case, addedFact.Geometry, addedFact.Presence));
+    }
+
     [Fact]
     public void ANavmeshAddedBesideADeletedOneLeavesTheDeletionWithoutReplacement()
     {

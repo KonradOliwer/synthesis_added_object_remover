@@ -11,7 +11,7 @@ internal sealed record SupportSearch(TouchSearch Search, SupportContactFinder Co
     {
         var search = TouchSearch.Create(reads.Targets, excluded: [], reads.Shapes, reads.Triangles, touchGap, reads.Exec);
         var supporterFinder = new SupporterFinder(reads.Targets, search, askObjectsOfAnyPlugin(), reads.Shapes, touchGap);
-        var contacts = new SupportContactFinder(reads.Targets, search.MeshPaths, supporterFinder, new SurfaceContacts(reads.Terrain, search.Cache, reads.Surfaces), touchGap);
+        var contacts = new SupportContactFinder(reads.Targets, search.MeshPaths, supporterFinder, new SurfaceContacts(search.Cache, reads.Surfaces), reads.Terrain, touchGap);
         return new SupportSearch(search, contacts);
     }
 }

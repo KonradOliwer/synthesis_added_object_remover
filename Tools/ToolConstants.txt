@@ -115,3 +115,4 @@ TerrainQuadrants.Size | game format | A texture quadrant is half a cell wide.
 TerrainQuadrants.HalfWay | math | A quadrant's centre lies half its width from its corner.
 PlacedPartTolerances.ResavedPosition | budget | Plugins that re-save a record round its floats; positions and vertices this close on every axis coincide.
 MeshTriangle.CornerCount | math | A triangle has 3 corners and 3 edges.
+Files.TemporaryNameEnding | internal | The ending of the temporary file a text is written to before it takes the file's place.

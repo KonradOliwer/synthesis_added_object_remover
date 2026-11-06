@@ -107,9 +107,12 @@ public sealed class ChangedCellAndLandCollectingTests
         Assert.Equal([Part(CellPart.Music, new PartOutcome.LeftToLaterPlugin(Patch))], changed.Parts.ToList());
     }
 
-    /// <summary>The cleaned mod lists two more regions; an earlier patcher of the group takes the second out again.</summary>
+    /// <summary>
+    /// The cleaned mod lists two more regions; an earlier patcher of the group takes the second out again, as it was before the cleaned
+    /// mod, so nothing is left to undo there while the first goes back.
+    /// </summary>
     [Fact]
-    public void ARegionThePatchChangesAgainIsLeftToItWhileTheOtherRegionGoesBack()
+    public void ARegionThePatchAlreadyGaveBackIsUnchangedWhileTheOtherRegionGoesBack()
     {
         var withRegions = CellCopyIn(_cleaned.Mod);
         withRegions.Regions = [new FormLink<IRegionGetter>(FirstRegion), new FormLink<IRegionGetter>(SecondRegion)];
@@ -117,7 +120,6 @@ public sealed class ChangedCellAndLandCollectingTests
         Assert.Equal(
             [
                 Part(CellPart.Region, new PartOutcome.Undo(), FirstRegion.ToRecordKey()),
-                Part(CellPart.Region, new PartOutcome.LeftToLaterPlugin(Patch), SecondRegion.ToRecordKey()),
             ],
             ChangedCellOf(Collect(patch => CellCopyIn(patch, from: withRegions).Regions!.RemoveAt(1))).Parts.ToList());
     }
@@ -299,28 +301,6 @@ public sealed class ChangedCellAndLandCollectingTests
         Assert.Equal((0f, 2 * UnitsPerHeightStep), (land.Heights!.Earlier![PointIndex(LastColumn, 10)], land.Heights.Current![PointIndex(LastColumn, 10)]));
         Assert.Equal((new ExteriorCell(_worldspace.ToRecordKey(), 0, 0), Patch), (land.Cell, land.WinningMod));
         Assert.True(land.UndoColours.IsEmpty && land.UndoQuarters.IsEmpty && !land.UndoRest);
-    }
-
-    /// <summary>
-    /// The cleaned mod raises two points. A plugin that loads without it raises the first again, and a plugin that needs the cleaned
-    /// mod above it raises it once more; the second the plugin that loads without it only carries over. Only the first is left to a
-    /// plugin that needs the cleaned mod, with the heights of the plugin that loads without it.
-    /// </summary>
-    [Fact]
-    public void APointKeptByAPluginNeedingTheCleanedModAboveOneLoadingWithoutItCarriesTheHeightsOfTheLatter()
-    {
-        var raised = LandCopyIn(_cleaned.Mod);
-        RaisePoint(raised, LastColumn, 10, steps: 2);
-        RaisePoint(raised, LastColumn, 12, steps: 2);
-        var withoutCleanedMod = LandCopyIn(_later.Mod, from: raised);
-        RaisePoint(withoutCleanedMod, LastColumn, 10, steps: 5);
-        RaisePoint(LandCopyIn(_laterPatch.Mod, from: withoutCleanedMod), LastColumn, 10, steps: 9);
-
-        var land = ChangedLandOf(Collect(laterPatchNeedsCleanedMod: true)).LeftToLater;
-
-        Assert.Equal([PointIndex(LastColumn, 10), PointIndex(LastColumn, 12)], land.Points.Points);
-        Assert.Equal([PointIndex(LastColumn, 10)], land.PointsOfPluginsNeedingTheCleanedMod.Points);
-        Assert.Equal(5 * UnitsPerHeightStep, land.HeightsOfPluginLoadingWithoutIt![PointIndex(LastColumn, 10)]);
     }
 
     /// <summary>
@@ -630,27 +610,25 @@ public sealed class ChangedCellAndLandCollectingTests
     /// <param name="writeIntoPatch">What an earlier patcher of the group wrote into the patch; nothing when null.</param>
     /// <param name="afterCollect">Reads the plugin records the collector read, before they are dropped.</param>
     /// <param name="laterNeedsCleanedMod">The later plugin cannot load without the cleaned mod, as a patch for it.</param>
-    /// <param name="laterPatchNeedsCleanedMod">The plugin after the later one cannot load without the cleaned mod.</param>
     private CollectedObjects Collect(
         Action<ISkyrimMod>? writeIntoPatch = null,
         Action<IPluginRecords>? afterCollect = null,
         WhatToCollect? plan = null,
         int threads = 1,
-        bool laterNeedsCleanedMod = false,
-        bool laterPatchNeedsCleanedMod = false)
+        bool laterNeedsCleanedMod = false)
     {
         var state = FixturePatcherState.Create([_base.Mod, _cleaned.Mod, _later.Mod, _laterPatch.Mod], Path.GetTempPath(), Path.GetTempPath());
         writeIntoPatch?.Invoke(state.PatchMod);
         using var world = FixturePatcherState.CreateFinalWorld(state);
         var records = new PluginRecordsFactory(world, threads).Open();
-        var collected = PlacedObjects.Collect(records, TrustOf(laterNeedsCleanedMod, laterPatchNeedsCleanedMod), plan ?? Plan);
+        var collected = PlacedObjects.Collect(records, TrustOf(laterNeedsCleanedMod), plan ?? Plan);
         afterCollect?.Invoke(records);
         return collected;
     }
 
-    private ModTrustTable TrustOf(bool laterNeedsCleanedMod, bool laterPatchNeedsCleanedMod = false)
+    private ModTrustTable TrustOf(bool laterNeedsCleanedMod)
     {
-        (PluginName Plugin, bool Needs)[] laterPlugins = [(Later, laterNeedsCleanedMod), (LaterPatch, laterPatchNeedsCleanedMod)];
+        (PluginName Plugin, bool Needs)[] laterPlugins = [(Later, laterNeedsCleanedMod), (LaterPatch, false)];
         return TestModTrust.Of(
             Cleaned,
             Patch,

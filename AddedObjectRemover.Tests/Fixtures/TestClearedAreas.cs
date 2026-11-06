@@ -9,9 +9,9 @@ internal static class TestClearedAreas
     public static ObjectsInClearedAreasResult SwitchedOff { get; } = new(StepOutcome.SwitchedOff, [], [], TimeSpan.Zero, TestRestingObjects.SwitchedOff, Failure: null);
 
     public static IClearedAreas Of(CollectedObjects collected, IRemovalDecisions decisions, IRunCaches caches, WhereRemovedRestoreSettings settings) =>
-        Of(collected.Targets, collected.Spaces, decisions, caches, settings.ClearedArea);
+        LeftBehindRules.CreateClearedAreasJudging(collected.Targets, collected.CleanedModsObjectsOverriddenLater, collected.Spaces, caches).JudgedOn(decisions, settings.ClearedArea);
 
     public static IClearedAreas Of(
         ImmutableArray<TargetObject> targets, IReadOnlyDictionary<RecordKey, SpaceFact> spaces, IRemovalDecisions decisions, IRunCaches caches, ClearedArea settings) =>
-        LeftBehindRules.CreateClearedAreasJudging(targets, spaces, caches).JudgedOn(decisions, settings);
+        LeftBehindRules.CreateClearedAreasJudging(targets, overriddenLater: [], spaces, caches).JudgedOn(decisions, settings);
 }

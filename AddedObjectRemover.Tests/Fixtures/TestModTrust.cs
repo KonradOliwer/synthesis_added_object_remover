@@ -14,6 +14,7 @@ internal static class TestModTrust
     /// <param name="needingCleanedMod">Plugins that cannot load without the cleaned mod, trusted for it as the rule for mods that require it trusts them.</param>
     /// <param name="otherGroupPatches">Added Object Remover patches of other groups, recognised by their marker.</param>
     /// <param name="loadingBefore">The plugins that load before the cleaned mod; by default the base game and the cleaned mod's masters.</param>
+    /// <param name="loadingAfterPatch">The plugins that load after the patch; none by default.</param>
     public static ModTrustTable Of(
         PluginName cleanedMod,
         PluginName patch,
@@ -27,8 +28,10 @@ internal static class TestModTrust
         IEnumerable<PluginName>? neverTrusted = null,
         IEnumerable<PluginName>? needingCleanedMod = null,
         IEnumerable<PluginName>? loadingBefore = null,
-        IEnumerable<PluginName>? otherGroupPatches = null)
+        IEnumerable<PluginName>? otherGroupPatches = null,
+        IEnumerable<PluginName>? loadingAfterPatch = null)
     {
+        var afterPatch = (loadingAfterPatch ?? []).ToHashSet();
         var before = (loadingBefore ?? [.. baseGame ?? [], .. cleanedModMasters ?? []]).ToHashSet();
         var plugins = ImmutableDictionary.CreateBuilder<PluginName, PluginTrust>();
         foreach (var plugin in neverTrusted ?? []) plugins[plugin] = Entry(ModTrust.Untrusted, TrustReason.NeverTrusted);
@@ -42,11 +45,11 @@ internal static class TestModTrust
         foreach (var plugin in trusted) plugins[plugin] = Entry(ModTrust.Trusted, TrustReason.Listed);
         foreach (var plugin in otherGroupPatches ?? []) plugins[plugin] = Entry(ModTrust.Untrusted, TrustReason.OtherGroupPatch) with { CarriesPatchMarker = true };
         plugins[cleanedMod] = Entry(ModTrust.Trusted, TrustReason.CleanedMod);
-        foreach (var plugin in plugins.Keys.ToList()) plugins[plugin] = plugins[plugin] with { LoadsBeforeCleanedMod = before.Contains(plugin) };
+        foreach (var plugin in plugins.Keys.ToList()) plugins[plugin] = plugins[plugin] with { LoadsBeforeCleanedMod = before.Contains(plugin), LoadsAfterPatch = afterPatch.Contains(plugin) };
         return new ModTrustTable(cleanedMod, patch, plugins.ToImmutable(), LoadsBeforeCleanedModCount: 0);
     }
 
     private static PluginTrust Entry(
         ModTrust trust, TrustReason? reason, bool requiresCleanedMod = false, bool isMasterOfCleanedMod = false, bool needsCleanedMod = false) =>
-        new(trust, reason, requiresCleanedMod, OtherMasterCount: 0, isMasterOfCleanedMod, needsCleanedMod, LoadsBeforeCleanedMod: false, CarriesPatchMarker: false);
+        new(trust, reason, requiresCleanedMod, OtherMasterCount: 0, isMasterOfCleanedMod, needsCleanedMod, LoadsBeforeCleanedMod: false, CarriesPatchMarker: false, LoadsAfterPatch: false);
 }

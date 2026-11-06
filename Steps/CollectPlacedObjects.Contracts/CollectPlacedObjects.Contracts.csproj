@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The target and other-mod placed objects the run reads from the load order, with the counts and the buffers used to query them. It references Ids, PluginRecordFacts, BoxAndTransformMath, BoxSpatialIndex and OrderIndependentParallelWork and holds no packages.</Description>
+    <Description>The target and other-mod placed objects the run reads from the load order, with the counts and the buffers used to query them, and the parts of records a restore gave back. It references Ids, PluginRecordFacts, BoxAndTransformMath, BoxSpatialIndex and OrderIndependentParallelWork and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />

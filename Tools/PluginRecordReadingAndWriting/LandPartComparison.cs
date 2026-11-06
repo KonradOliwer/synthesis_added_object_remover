@@ -26,8 +26,7 @@ internal static class LandPartComparison
             versions,
             read.Versions.Any(version => version.IsDeleted),
             HeightsToKeep(namedPluginChangedNoPoint,points[0].Heights, points[^1].Heights),
-            cellDeletedInAVersion,
-            version => LandHeightReader.Read(read.Versions[version]));
+            cellDeletedInAVersion);
     }
 
     /// <returns>Null when the named plugin changed no height or normal and both versions hold the same heights; they are then read when needed.</returns>

@@ -48,6 +48,17 @@ public static class KeyedGroups
         ];
     }
 
+    /// <returns>The value of the group each item stands in.</returns>
+    /// <remarks>Throws when an item is in more than one group.</remarks>
+    public static ImmutableDictionary<T, TValue> ValueByItem<TGroup, T, TValue>(
+        IEnumerable<TGroup> groups, Func<TGroup, IEnumerable<T>> itemsOf, Func<TGroup, TValue> valueOf)
+        where T : notnull
+    {
+        var all = groups.ToList();
+        RequireEachItemInOneGroup(all.Select(itemsOf));
+        return all.SelectMany(group => itemsOf(group).Select(item => KeyValuePair.Create(item, valueOf(group)))).ToImmutableDictionary();
+    }
+
     public static void RequireEachItemInOneGroup<T>(IEnumerable<IEnumerable<T>> groups)
     {
         HashSet<T> seen = [];

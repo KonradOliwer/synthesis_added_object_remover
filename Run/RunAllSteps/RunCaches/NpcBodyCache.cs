@@ -9,7 +9,7 @@ namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
 /// (<see cref="NpcBodySet"/>), and per NPC supplying its own traits the body it has. A base
 /// or list that resolves to no NPC at all has no body set. Which template flag makes an NPC take
 /// over its template's traits, how an NPC's own body is worked out and how possible bodies are reduced to
-/// distinct ones are the body rules of the too-close step, so they are passed in.
+/// distinct ones are the body rules of the too-close rule, so they are passed in.
 /// </summary>
 internal sealed class NpcBodyCache(
     IPluginRecords plugin,

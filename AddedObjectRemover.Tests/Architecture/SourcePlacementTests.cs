@@ -64,9 +64,10 @@ public class SourcePlacementTests
         ["Steps/RestoreWhereRemoved/NavmeshUndoPlan.cs"] = "Reads the judged Deleted flag of a navmesh, not a placed record's presence.",
         ["Steps/RestoreWhereRemoved/NavmeshGroupGuards.cs"] = "Reads the judged Deleted flag of a navmesh, and whether a later plugin changed a linked door's presence part; it decides nothing about whether the game has the door.",
         ["Steps/RestoreWhereRemoved/FinalPresence.cs"] = "Walks the enable-parent chain itself over the collector's winning presence of each placed record, to tell which records end removed once the run's orders and the restore are applied; it reads no record, only the presence facts the collector took.",
-        ["Rules/ObjectsThatCanCauseRemovals/OtherRecordChange.cs"] = "Compares the presence of two versions of another mod's record as one property of a change; it decides nothing about whether the game has the record.",
+        ["Steps/CollectPlacedObjects.Contracts/ResavedPlacedParts.cs"] = "Compares the presence of two versions of a placed record as one object property; it decides nothing about whether the game has the record.",
         ["Steps/CollectPlacedObjects.Contracts/EarlierVersion.cs"] = "Reads whether a restore brings back the presence part, which puts the record back into its earlier child list; it decides nothing about whether the game has the record.",
         ["Steps/RestoreWhereRemoved/DoorLinks.cs"] ="Reads whether a door's restore brings back its presence part, which its navmesh link goes back with; it decides nothing about whether the game has the door.",
+        ["RestoredPartsText.cs"] = "Names the presence part in the restored parts file; it decides nothing about whether the game has the record.",
     };
 
     private static readonly string[] ParallelismApis = ["Parallel.", "AsParallel", "Partitioner", "Task.Run", "new Thread("];

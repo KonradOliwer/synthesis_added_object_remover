@@ -132,10 +132,12 @@ internal sealed class NavmeshAndLandWorld
     }
 
     /// <summary>Builds the mods, lowest priority first, and writes their meshes under the Data folder.</summary>
-    public static IReadOnlyList<ISkyrimMod> Create(string dataFolder, NavmeshAndLandScenario scenario)
+    /// <param name="withACrateThatStays">Whether the cleaned mod also places a crate alone in an interior of its own, which nothing removes.</param>
+    public static IReadOnlyList<ISkyrimMod> Create(string dataFolder, NavmeshAndLandScenario scenario, bool withACrateThatStays = false)
     {
         FixtureMeshes.WriteAll(dataFolder);
         var world = new NavmeshAndLandWorld();
+        if (withACrateThatStays) world.PlaceACrateAloneInAnInterior();
         var cityModNeedsTheCleanedMod = scenario == NavmeshAndLandScenario.LandRaisedWithABlockRaisedAgainByACityModThatNeedsTheCleanedMod;
         var padMod = cityModNeedsTheCleanedMod ? new FixtureMod(PadPlugin, world._baseGame) : world._city;
         if (scenario == NavmeshAndLandScenario.DeletedWhereItsOnlyObjectStartsDisabled) world.PlaceADisabledCrateHereAndTheCrateWithItsPadInAnInterior();
@@ -176,6 +178,13 @@ internal sealed class NavmeshAndLandWorld
         _baseGame.Mod.Cells.AddInteriorCell(interior);
         new FixtureCell(_target, InteriorCopyIn(_target.Mod, interior)).Place("T_Crate", crateBase, Vector3.Zero);
         new FixtureCell(_city, InteriorCopyIn(_city.Mod, interior)).Place("C_Pad", _city.AddModeledStatic("C_PadBase", FixtureMeshes.PadModel), new Vector3(PadDistance, 0f, 0f));
+    }
+
+    private void PlaceACrateAloneInAnInterior()
+    {
+        var interior = new Cell(_baseGame.NextKey(), FixtureMod.Release) { EditorID = "AorCrateRoom", Flags = Cell.Flag.IsInteriorCell };
+        _baseGame.Mod.Cells.AddInteriorCell(interior);
+        new FixtureCell(_target, InteriorCopyIn(_target.Mod, interior)).Place("T_CrateThatStays", _target.AddModeledStatic("T_CrateThatStaysBase", FixtureMeshes.CrateModel), Vector3.Zero);
     }
 
     private static Cell InteriorCopyIn(ISkyrimMod mod, Cell interior)

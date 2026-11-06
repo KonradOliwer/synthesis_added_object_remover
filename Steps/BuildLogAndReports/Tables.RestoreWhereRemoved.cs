@@ -1,7 +1,9 @@
 using System.Collections.Immutable;
+using System.Numerics;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Steps.WriteThePatch.Contracts;
@@ -47,7 +49,7 @@ internal static partial class Tables
         var judged = new RestoreJudgements(result);
         var label = RestoreOutcomes.LabelsIn(world);
         var copyOf = clones.ToDictionary(clone => clone.Original, clone => clone.Copy);
-        ImmutableArray<ImmutableArray<string>> objects = [.. result.Objects.Select(change => RestoredWhereRemovedObjectRow(world, change, copyOf, label, context))];
+        ImmutableArray<ImmutableArray<string>> objects = [.. result.Objects.Select(change => RestoredWhereRemovedObjectRow(world, change, copyOf, judged.FollowedAfterGoingBack, label, context))];
         ImmutableArray<ImmutableArray<string>> cells =
         [
             .. result.Cells.Select(cell => RestoredWhereRemovedCellRow(world, cell, label)),
@@ -60,18 +62,71 @@ internal static partial class Tables
             {
                 CsvTable.WhenAnyRow(ReportFileNames.RestoredWhereRemovedObjectsFileName, RestoredWhereRemovedObjectsHeader, objects),
                 CsvTable.WhenAnyRow(ReportFileNames.RestoredWhereRemovedCellsFileName, RestoredWhereRemovedCellsHeader, cells),
+                CsvTable.WhenAnyRow(ReportFileNames.RestoredWhereRemovedFollowUpFileName, RestoredWhereRemovedFollowUpHeader, FollowUpRows(world, result.FollowUp)),
             }.OfType<CsvTable>(),
         ];
     }
 
+    private static readonly ImmutableArray<string> RestoredWhereRemovedFollowUpHeader =
+        ["kind", "formKey", "editorId", "worldspace", "x", "y", "z", "outcome", "newZ", "startedBy"];
+
+    /// <summary>The objects checked as the cleaned mod's that the follow-up decided, in target order, then the objects of trusted mods, in id order.</summary>
+    /// <remarks>The new height is empty for an object that was not pulled down.</remarks>
+    private static ImmutableArray<ImmutableArray<string>> FollowUpRows(CollectedObjects world, RestoreFollowUp followUp) =>
+    [
+        .. followUp.Targets.Select(followed => FollowUpRow(world, followed)),
+        .. followUp.Others.Select(other => FollowUpRow(world, other)),
+    ];
+
+    /// <remarks>Only an object of another mod the cleaned mod moved or replaced is restored.</remarks>
+    private static ImmutableArray<string> FollowUpRow(CollectedObjects world, FollowUpTarget followed)
+    {
+        var target = world.Targets[followed.Target.Index];
+        var (kind, decided) = followed.RestoredTo is null ? ("object the cleaned mod added or moved", "removed") : ("object the cleaned mod moved or replaced", "restored");
+        return FollowUpRow(world, kind, (target.Key, target.EditorId, target.SpaceKey, target.Transform.Position), decided, newZ: null, StartedBy(followed.StartedBy, followed.ByGround));
+    }
+
+    /// <summary>The keys of the placed records going back that started it, then "ground" when the ground going back down did too.</summary>
+    private static string StartedBy(ImmutableArray<RecordKey> startedBy, bool byGround) =>
+        string.Join(" ", startedBy.Select(key => key.ToString()).Concat(byGround ? ["ground"] : []));
+
+    private static ImmutableArray<string> FollowUpRow(CollectedObjects world, FollowUpOtherObject other)
+    {
+        var (outcome, placed) = (other.Outcome, other.Outcome.Object);
+        float? newZ = outcome.Fate == OtherModsObjectFate.PulledDown ? outcome.NewPosition.Z : null;
+        return FollowUpRow(world, "trusted mod's object", (placed.Key, placed.EditorId, placed.SpaceKey, placed.Position), OtherModsObjectText.Outcome(outcome.Fate), newZ, StartedBy(other.StartedBy, other.ByGround));
+    }
+
+    private static ImmutableArray<string> FollowUpRow(
+        CollectedObjects world, string kind, (RecordKey Key, string? EditorId, RecordKey Space, Vector3 Position) placed, string outcome, float? newZ, string startedBy) =>
+        CsvRow.Of(
+        [
+            Quote(kind),
+            Quote(placed.Key.ToString()),
+            OptionalText(placed.EditorId),
+            Quote(AreaText.Worldspace(world.Spaces[placed.Space])),
+            .. Numbers(placed.Position),
+            Quote(outcome),
+            OptionalText(newZ is { } z ? Number(z) : null),
+            Quote(startedBy),
+        ]);
+
     /// <param name="copyOf">The copy the patch added of each original that has one.</param>
+    /// <param name="followedAfterGoingBack">What the follow-up of what went back then does to each placed record that went back, by key.</param>
     /// <param name="label">Names a record a guard found.</param>
     private static ImmutableArray<string> RestoredWhereRemovedObjectRow(
-        CollectedObjects world, PlacedChangeJudged judged, IReadOnlyDictionary<RecordKey, RecordKey> copyOf, Func<RecordKey, string> label, ReportContext context)
+        CollectedObjects world,
+        PlacedChangeJudged judged,
+        IReadOnlyDictionary<RecordKey, RecordKey> copyOf,
+        IReadOnlyDictionary<RecordKey, OtherModsObjectOutcome> followedAfterGoingBack,
+        Func<RecordKey, string> label,
+        ReportContext context)
     {
         var change = judged.Change;
         var copy = copyOf.TryGetValue(change.Key, out var written) ? written.ToString() : null;
         var refused = judged.Cloning is { RefusedBy: not null } cloning ? RestoreWhereRemovedText.CopyRefused(cloning) : null;
+        var result = RestoreWhereRemovedText.Result(RestoreOutcomes.KeptBecause(judged, label), RestoreOutcomes.GoesBackWithCopy(judged));
+        var followed = followedAfterGoingBack.TryGetValue(change.Key, out var outcome) ? $"; {RestoreWhereRemovedText.ThenFollowedUp(outcome)}" : string.Empty;
         return CsvRow.Of(
         [
             Quote(change.Key.ToString()),
@@ -86,7 +141,7 @@ internal static partial class Tables
             OptionalText(LeftToLaterPlugins(change.Earlier)),
             .. AreaColumns(judged.OldPlace),
             .. AreaColumns(judged.WhereItIsNow),
-            Quote(RestoreWhereRemovedText.Result(RestoreOutcomes.KeptBecause(judged, label), RestoreOutcomes.GoesBackWithCopy(judged))),
+            Quote(result + followed),
             OptionalText(copy),
             OptionalText(refused),
         ]);

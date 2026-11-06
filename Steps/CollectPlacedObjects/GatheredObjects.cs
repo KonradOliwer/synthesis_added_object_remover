@@ -11,6 +11,8 @@ internal sealed class GatheredObjects
 
     public List<OtherObject> SupportOnlyObjects { get; } = [];
 
+    public List<TargetObject> CleanedModsObjectsOverriddenLater { get; } = [];
+
     public List<OverriddenOtherRecord> OverriddenOthers { get; } = [];
 
     public List<RecordKey> RemovedRecords { get; } = [];

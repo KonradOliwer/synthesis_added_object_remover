@@ -79,10 +79,13 @@ public sealed record TargetObject(
             earlier.Undo.HasFlag(PlacedParts.Rotation) ? earlier.Placement.Rotation : Rotation,
             earlier.Undo.HasFlag(PlacedParts.Scale) ? earlier.Placement.Scale : Transform.Scale));
 
-    /// <summary>The same object where it stands, as an object of <paramref name="changingMod"/> that has no accepted version and no role.</summary>
+    /// <summary>
+    /// The same object where it stands, as an object of <paramref name="changingMod"/>, which also wins past the patches, that has no
+    /// accepted version and no role.
+    /// </summary>
     public OtherObject AsOtherObject(OtherId id, PluginName changingMod) =>
         new(id, Key, SpaceKey, changingMod, EditorId, Base, Transform.Position, Rotation, Transform.Scale, IsPrimitive, HasMapMarker,
-            new ObjectChange(changingMod, AcceptedFrom: null), ReferenceRoles.None, new ObjectChange(changingMod, AcceptedFrom: null));
+            new ObjectChange(changingMod, AcceptedFrom: null), ReferenceRoles.None, new ObjectChange(changingMod, AcceptedFrom: null), changingMod);
 }
 
 /// <summary>Where a target object comes from. <see cref="CleanedMod"/> is the only origin of the target plugin's own objects.</summary>
@@ -136,6 +139,11 @@ public enum ReferenceRoles
 /// the objects of the plugins that need it count as changes there. Null when it is accepted there, and always when the scan did not
 /// judge the old places or found no changed object.
 /// </param>
+/// <param name="WinningModPastPatches">
+/// The plugin whose version wins once the versions that only carry what other plugins chose are passed over: this group's patch
+/// always, another group's patch where it only copies the version below it; the plugin that created it when every version read is
+/// passed over.
+/// </param>
 public readonly record struct OtherObject(
     OtherId Id,
     RecordKey Key,
@@ -150,7 +158,8 @@ public readonly record struct OtherObject(
     bool HasMapMarker,
     ObjectChange? Change,
     ReferenceRoles Roles,
-    ObjectChange? ChangeWithoutCleanedMod)
+    ObjectChange? ChangeWithoutCleanedMod,
+    PluginName WinningModPastPatches)
 {
     /// <summary>The cell the winning version stands in, when the final world deletes it; the patch writes nothing for the object then.</summary>
     public DeletedCell? CellDeleted { get; init; }
@@ -158,7 +167,8 @@ public readonly record struct OtherObject(
     /// <summary>
     /// How the game shows it differently from the values accepted in the world before the cleaned mod, where only the plugins that
     /// load before it are believed; a later plugin's re-save with the same values is no change there. Null when it stands as it stood
-    /// then, and always when the scan did not decide every object in the world without the cleaned mod.
+    /// then, and always when the scan did not decide every object in the world before the cleaned mod
+    /// (<see cref="ScanNeeds.DecideEveryObjectBeforeCleanedMod"/>).
     /// </summary>
     public ObjectChange? ChangeSinceBeforeCleanedMod { get; init; }
 

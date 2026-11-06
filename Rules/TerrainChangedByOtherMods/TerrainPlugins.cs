@@ -11,6 +11,9 @@ internal sealed class TerrainPlugins(AcceptedWorld accepted, LoadOrderPlugins lo
 
     private readonly LoadOrderPositions _positions = loadOrder.PositionsOfListed();
 
+    /// <summary>The plugin the output is written to, whose version alone can hold a value given back.</summary>
+    public PluginName Patch => accepted.Patch;
+
     /// <summary>How far the plugin's version of a land record, a cell or a worldspace is believed.</summary>
     public VersionTrust TrustOf(PluginName plugin) => accepted.TrustOf(plugin);
 

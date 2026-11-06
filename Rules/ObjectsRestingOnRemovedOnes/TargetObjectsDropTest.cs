@@ -18,12 +18,13 @@ internal sealed class TargetObjectsDropTest(
     OtherModsObjectRules rules,
     DropFinder drops,
     IBaseObjectShapes shapes,
+    ITerrainHeights terrain,
     Func<IVisibleObjectsOfAnyPlugin> objectsOfAnyPlugin,
     Execution execution) : ITargetObjectsDropTest
 {
     public bool[] FindHoldingUp(IReadOnlyList<(TargetId Holder, TargetId Resting)> pairs)
     {
-        var world = new SupportWorld(targets, visibleTargets, _ => true, objectsOfAnyPlugin(), SupportWorld.NoChanges, shapes);
+        var world = new SupportWorld(targets, visibleTargets, _ => true, objectsOfAnyPlugin(), SupportWorld.NoChanges, shapes, terrain);
         var rests = FindResting([.. pairs.Select(pair => pair.Resting).Distinct()], world);
         return ParallelMap.Run(
             execution,

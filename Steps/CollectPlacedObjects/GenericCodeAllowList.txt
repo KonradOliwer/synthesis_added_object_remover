@@ -8,4 +8,6 @@ RemovedForm.IsRemoved | Rule over a placed record's plugin facts (PresenceFacts,
 ResavedPlacedParts.PositionsDiffer | Rule over plain vectors: a placed record's position within the rounding of re-saving plugins, shared by Collect and the restore step.
 ResavedPlacedParts.RotationsDiffer | Rule over plain vectors: a placed record's rotation within the rounding of re-saving plugins, shared by Collect and the restore step.
 ResavedPlacedParts.ScalesDiffer | Rule over plain numbers: a placed record's scale within the rounding of re-saving plugins, shared by Collect and the restore step.
+ResavedPlacedParts.ObjectPropertyDiffers | Rule over a placed record's plugin facts (PlacedVersionFact, outside the domain list): do two versions differ in an object property, shared by Collect and the acceptance rule.
+ResavedPlacedParts.ObjectPropertiesDiffer | Rule over a placed record's plugin facts (PlacedVersionFact, outside the domain list): does a version only copy another.
 PartHistory.LastChangerAbove | Step of the rule of what the cleaned mod last changed, over version indices: which version above the cleaned mod's last changed a part.

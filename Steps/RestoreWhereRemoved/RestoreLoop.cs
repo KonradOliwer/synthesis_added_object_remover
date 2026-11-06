@@ -93,12 +93,12 @@ internal sealed record RestoreLoopInputs(
 /// </summary>
 /// <param name="placedGuards">Null when no placed record's areas let it go back.</param>
 /// <param name="terrainGuards">Null while the terrain is switched off.</param>
-/// <param name="clock">The run's clock, which times the placed guards' checks and the too-close check of the standing objects alone.</param>
+/// <param name="clock">The run's clock, which times the parts of the passes.</param>
 internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? terrainGuards, RestoreLoopInputs inputs, Func<TimeSpan> clock)
 {
     /// <returns>
     /// The state once a pass changes nothing, the follow-up of the placed records going back in it, how many passes ran, that one
-    /// included, the time of the placed guards' checks in all of them, and how many objects the changed-terrain rule still finds on
+    /// included, the time of each part of the passes in all of them, and how many objects the changed-terrain rule still finds on
     /// changed terrain in the final plans, where the restore writes nothing of what the check counts.
     /// </returns>
     /// <remarks>
@@ -106,16 +106,16 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
     /// quarter whose textures stay, a kept water level or a stopped terrain check, and none is ever taken back, so the passes are at
     /// most one more than the placed records, navmesh groups, grid points, quarters, water cells and checked objects together.
     /// </remarks>
-    public (RestoreState Final, RestoreFollowUp FollowUp, int Passes, TimeSpan PlacedGuardsTime, int TerrainFindingsLeft) Run(RestoreState start)
+    public (RestoreState Final, RestoreFollowUp FollowUp, int Passes, RestorePassTimes Times, int TerrainFindingsLeft) Run(RestoreState start)
     {
         var state = start;
-        var placedGuardsTime = TimeSpan.Zero;
+        var times = RestorePassTimes.None;
         for (var passes = 1; ; passes++)
         {
-            var input = ReadPassInput(state);
-            var (next, passPlacedGuardsTime, terrainFindings) = Pass(input);
-            placedGuardsTime += passPlacedGuardsTime;
-            if (next.Count == state.Count) return (state, input.FollowUp.Written, passes, placedGuardsTime, terrainFindings);
+            var (input, inputTimes) = ReadPassInput(state);
+            var (next, passTimes, terrainFindings) = Pass(input);
+            times = times.Plus(inputTimes).Plus(passTimes);
+            if (next.Count == state.Count) return (state, input.FollowUp.Written, passes, times, terrainFindings);
             state = next;
         }
     }
@@ -125,16 +125,31 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
     /// only what it keeps in place (a refusal, a lost copy or ground kept) joins the state. The last pass reads the final state, so its
     /// follow-up is the one written.
     /// </remarks>
-    private PassInput ReadPassInput(RestoreState state)
+    /// <returns>Also the time of reading the plans, of the follow-up and of reading what stands.</returns>
+    private (PassInput Input, RestorePassTimes Times) ReadPassInput(RestoreState state)
+    {
+        var (plans, plansTime) = RunTimed(() => ReadPlans(state));
+        var (followUp, followUpTime) = RunTimed(() => CheckFollowUp(plans));
+        var (standing, standingTime) = RunTimed(() => ReadWhatStands(plans.PlacedGoingBack, plans.WithClone, plans.PassPresence, followUp.TargetsDecided));
+        var input = new PassInput(state, plans.PlacedGoingBack, plans.WithClone, plans.PassPresence, plans.Land, followUp, standing, plans.Navmeshes);
+        return (input, RestorePassTimes.None with { PlansRead = plansTime, FollowUp = followUpTime, WhatStands = standingTime });
+    }
+
+    private PlansInPass ReadPlans(RestoreState state)
     {
         var placedGoingBack = state.PlacedGoingBack();
-        var withClone = state.GoingBackWithClone();
-        var presence = new PresenceInPass(inputs.FinalPresence, placedGoingBack.Contains);
-        var land = inputs.LandOf(state.Terrain, state.Water);
-        var followUp = placedGuards is null && land.Lowered.IsEmpty ? FollowUpChecks.None() : inputs.FollowUp.Check(placedGoingBack, withClone, presence, land);
-        return new PassInput(
-            state, placedGoingBack, withClone, presence, land, followUp, ReadWhatStands(placedGoingBack, withClone, presence, followUp.TargetsDecided), ReadNavmeshesAsPlanned(state));
+        return new PlansInPass(
+            placedGoingBack,
+            state.GoingBackWithClone(),
+            new PresenceInPass(inputs.FinalPresence, placedGoingBack.Contains),
+            inputs.LandOf(state.Terrain, state.Water),
+            ReadNavmeshesAsPlanned(state));
     }
+
+    private (T Result, TimeSpan Time) RunTimed<T>(Func<T> work) => Timed.Run(clock, work);
+
+    private FollowUpChecks CheckFollowUp(PlansInPass plans) =>
+        placedGuards is null && plans.Land.Lowered.IsEmpty ? FollowUpChecks.None() : inputs.FollowUp.Check(plans.PlacedGoingBack, plans.WithClone, plans.PassPresence, plans.Land);
 
     /// <remarks>A clone always ends present, whatever becomes of its record: it is a new record no order of the run removes.</remarks>
     /// <param name="decidedByFollowUp">The target objects the follow-up removes or restores, which stand nowhere they are checked.</param>
@@ -157,15 +172,21 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
             state.Navmeshes?.IndexOfTrianglesGoingBack() ?? new NavmeshIndex(_ => null),
             state.Navmeshes?.MembersGoingBack() ?? new HashSet<RecordKey>());
 
-    /// <returns>Also how many objects have a changed-terrain finding that counts in the plans before the pass.</returns>
-    private (RestoreState State, TimeSpan PlacedGuardsTime, int TerrainFindings) Pass(PassInput before)
+    /// <returns>Also the time of each part of the pass after reading its input, and how many objects have a changed-terrain finding that counts in the plans before the pass.</returns>
+    private (RestoreState State, RestorePassTimes Times, int TerrainFindings) Pass(PassInput before)
     {
-        var (standing, standingTime) = Timed.Run(clock, () => CheckStandingTooClose(before));
-        var (placed, clones, placedGuardsTime) = RefusePlaced(before, standing);
-        var counted = FindCountedTerrain(before);
-        var state = new RestoreState(
-            placed, clones, RefuseNavmeshGroups(before), ProtectGround(before, counted, standing.GroundKeptUnder), KeepWater(before, counted), AddStops(before.State, counted));
-        return (state, standingTime + placedGuardsTime, counted.Findings);
+        var (standing, standingTime) = RunTimed(() => CheckStandingTooClose(before));
+        var ((placed, clones), placedGuardsTime) = RunTimed(() => RefusePlaced(before, standing));
+        var ((counted, stops), terrainTime) = RunTimed(() => CheckChangedTerrain(before));
+        var (navmeshes, navmeshTime) = RunTimed(() => RefuseNavmeshGroups(before));
+        var (terrain, groundTime) = RunTimed(() => ProtectGround(before, counted, standing.GroundKeptUnder));
+        var (water, waterTime) = RunTimed(() => KeepWater(before, counted));
+        var state = new RestoreState(placed, clones, navmeshes, terrain, water, stops);
+        var times = RestorePassTimes.None with
+        {
+            PlacedGuards = standingTime + placedGuardsTime, ChangedTerrain = terrainTime, NavmeshGuards = navmeshTime, GroundProtected = groundTime, WaterKept = waterTime,
+        };
+        return (state, times, counted.Findings);
     }
 
     /// <summary>
@@ -176,6 +197,13 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
         placedGuards is null && before.FollowUp.PulledDown().Count == 0
             ? StandingTooCloseFound.None()
             : inputs.StandingTooClose.Value.Check(before.PlacedGoingBack, before.WithClone, before.PassPresence, before.FollowUp);
+
+    /// <returns>What the changed-terrain rule counts, and the stopped checks of the state before with those it stopped added.</returns>
+    private (TerrainKeeping Counted, ImmutableDictionary<TerrainChecked, PartFailure> Stops) CheckChangedTerrain(PassInput before)
+    {
+        var counted = FindCountedTerrain(before);
+        return (counted, AddStops(before.State, counted));
+    }
 
     private static ImmutableDictionary<TerrainChecked, PartFailure> AddStops(RestoreState before, TerrainKeeping counted)
     {
@@ -189,16 +217,14 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
     private TerrainKeeping FindCountedTerrain(PassInput before) =>
         inputs.TerrainChecks.Find(before.Standing.Judged(), terrainGuards is null ? [] : before.State.Terrain.Judged(), before.State.Water.Judged());
 
-    /// <summary>The placed guards and the copies' rules against the current plans, for the placed records still going back, and the time of their checks.</summary>
+    /// <summary>The placed guards and the copies' rules against the current plans, for the placed records still going back.</summary>
     /// <param name="standing">What the too-close check of the cleaned mod's objects that stand found in the pass.</param>
-    private (ImmutableArray<PlacedRefusal?> Placed, ImmutableArray<CloneJudged?> Clones, TimeSpan Time) RefusePlaced(PassInput before, StandingTooCloseFound standing)
+    private (ImmutableArray<PlacedRefusal?> Placed, ImmutableArray<CloneJudged?> Clones) RefusePlaced(PassInput before, StandingTooCloseFound standing)
     {
         var state = before.State;
-        if (placedGuards is null) return (state.Placed, state.Clones, TimeSpan.Zero);
+        if (placedGuards is null) return (state.Placed, state.Clones);
         var plans = new OtherKindsAsPlanned(before.Navmeshes.ThatStayChanged, before.Navmeshes.GoingBack);
-        var (checks, time) = Timed.Run(clock, () => placedGuards.CheckGoingBack(before.PlacedGoingBack, before.WithClone, plans, before.PassPresence, before.FollowUp, standing));
-        var (placed, clones) = checks.AppliedTo(state);
-        return (placed, clones, time);
+        return placedGuards.CheckGoingBack(before.PlacedGoingBack, before.WithClone, plans, before.PassPresence, before.FollowUp, standing).AppliedTo(state);
     }
 
     /// <summary>
@@ -262,6 +288,12 @@ internal sealed class RestoreLoop(PlacedGuards? placedGuards, TerrainGuards? ter
 
     /// <summary>A navmesh whose switch is off stays changed.</summary>
     private ImmutableArray<RecordKey> NavmeshesThatStayChanged(RestoreState state) => state.Navmeshes?.NavmeshesThatStayChanged() ?? inputs.ChangedNavmeshes;
+
+    /// <summary>What the state before a pass plans.</summary>
+    /// <param name="WithClone">Those of <paramref name="PlacedGoingBack"/> that go back with a copy.</param>
+    /// <param name="PassPresence">Whether a placed record ends removed with <paramref name="PlacedGoingBack"/> going back.</param>
+    /// <param name="Land">The ground and water the terrain and water plans leave.</param>
+    private sealed record PlansInPass(IReadOnlySet<int> PlacedGoingBack, IReadOnlySet<int> WithClone, PresenceInPass PassPresence, LandAfter Land, NavmeshesAsPlanned Navmeshes);
 
     /// <summary>What every guard of one pass reads of the state before it, computed once.</summary>
     /// <param name="WithClone">Those of <paramref name="PlacedGoingBack"/> that go back with a copy.</param>

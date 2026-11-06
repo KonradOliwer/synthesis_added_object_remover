@@ -97,8 +97,8 @@ public static class WhereRemovedRestorer
         var (planned, plansTime) = Timed.Run(clock, () => BuildPlans(input));
         var (guards, guardsTime) = Timed.Run(clock, () => RestoreGuardsBuilder.Build(planned.Inputs, planned.Plans));
         var loop = new RestoreLoop(guards.Placed, guards.Terrain, guards.LoopInputs, clock);
-        var ((state, followUp, passes, placedGuardsTime, terrainFindingsLeft), passesTime) = Timed.Run(clock, () => loop.Run(planned.Plans.Start));
-        var times = new RestoreWhereRemovedTimes(plansTime, guards.WorldTime, guardsTime - guards.WorldTime, passesTime, placedGuardsTime);
+        var ((state, followUp, passes, inPasses, terrainFindingsLeft), passesTime) = Timed.Run(clock, () => loop.Run(planned.Plans.Start));
+        var times = new RestoreWhereRemovedTimes(plansTime, guards.WorldTime, guardsTime - guards.WorldTime, passesTime, inPasses);
         return ResultOf(planned.Plans, state, new LoopEnd(followUp, passes, terrainFindingsLeft), times, input.Settings);
     }
 

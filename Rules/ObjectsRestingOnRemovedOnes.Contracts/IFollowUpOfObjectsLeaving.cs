@@ -20,7 +20,8 @@ public interface IFollowUpOfObjectsLeaving
     /// only found, as held up, and nothing is taken away for them. Decided on a working copy of <paramref name="decided"/>, which never
     /// changes; no target object and no copy is judged with the also-remove mode Nothing. The rounds measure the target objects where
     /// <paramref name="decided"/> places them. Last, the objects arriving somewhere that do not fit there (see
-    /// <see cref="FollowUpOutcomes.Arriving"/>), in every mode.
+    /// <see cref="FollowUpOutcomes.Arriving"/>), in every mode. Questions about the same <paramref name="standing"/> instance share what
+    /// is measured in its world alone, so asking with one instance spares measuring it again.
     /// </summary>
     /// <param name="decided">A later state of the decisions of <paramref name="standing"/>, whose rounds beyond them decide the target objects that leave.</param>
     FollowUpOutcomes Find(WorldStanding standing, IRemovalDecisions decided, ObjectsLeaving leaving);

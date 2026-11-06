@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
@@ -5,10 +6,10 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 namespace AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes;
 
 /// <summary>
-/// The weight of the surface touching anything of each judged object found so far, before any decision, which no decision
-/// changes; kept for all its settlings.
+/// The weight of the surface touching anything of each judged object found so far in the world before any decision; no decision
+/// changes it.
 /// </summary>
-internal sealed record WeightsBefore(Dictionary<OtherId, float> WeightOf);
+internal sealed record WeightsBefore(ConcurrentDictionary<OtherId, float> WeightOf);
 
 /// <summary>
 /// RemoveFloatingObject and PullObjectToTheGround, and KeepSupportingObject only to find who loses its support. An object is left without support when it loses its support
@@ -100,7 +101,8 @@ internal sealed class LeftWithoutSupport(
             () => new OtherObjectQueries(),
             (k, queries) => loss.FindWeightBefore(rules.StandingOf(missing[k]), original, queries),
             ParallelMap.AutomaticRangeSize);
-        for (var k = 0; k < missing.Count; k++) before.WeightOf.Add(missing[k].Id, found[k]);
+        // Two settlings sharing the memo at the same time may both add a weight; both measured it in the same world.
+        for (var k = 0; k < missing.Count; k++) before.WeightOf.TryAdd(missing[k].Id, found[k]);
     }
 
     /// <returns>The share of its support the object lost in <paramref name="world"/>, when it is left without support; null otherwise.</returns>

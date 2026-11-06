@@ -8,16 +8,12 @@ internal static partial class LogSections
 {
     public static LogSection BuildWriteSection(WriteSummary written, TimeSpan elapsed, ReportContext context)
     {
-        var total = written.Removed.Length + written.Restored.Length + written.Moved + written.Fitted + written.OtherModsObjectsRemoved + written.OtherModsObjectsPulledDown
-            + written.WrittenWhereRemoved;
+        var overrides = written.Overrides;
         List<string> lines =
         [
-            $"Wrote {TextFormat.Count(total)} overrides ({TextFormat.Count(written.Removed.Length)} removed"
-                + WhenAny(written.Restored.Length, "restored")
-                + WhenAny(written.Moved, "kept markers moved")
-                + WhenAny(written.Fitted, "shrunk or turned to fit")
-                + WhenAny(written.WrittenWhereRemoved, "to restore where the cleaned mod was removed")
-                + OtherModsObjectsWritten(written)
+            $"Wrote {TextFormat.Count(overrides.Values.Sum())} overrides ({TextFormat.Count(overrides.GetValueOrDefault(WrittenPart.Removed))} removed"
+                + string.Concat(NamedParts(overrides, UntitledParts).Select(part => Describe.ListSeparator + part))
+                + string.Concat(TitledParts.Select(group => TitledPartsText(overrides, group.Title, group.Parts)))
                 + ")"
                 + CopiesAdded(written)
                 + $"{Describe.TimedSuffix(elapsed, context)}.",
@@ -31,19 +27,47 @@ internal static partial class LogSections
         return new LogSection("write", [.. lines]);
     }
 
-    /// <summary>", 3 what", or nothing when there are none.</summary>
-    private static string WhenAny(int count, string what) => count > 0 ? $", {TextFormat.Count(count)} {what}" : string.Empty;
-
-    /// <summary>"; other mods' objects: 2 pulled down, 1 removed", leaving out a count of 0; nothing when both are 0.</summary>
-    private static string OtherModsObjectsWritten(WriteSummary written)
+    /// <summary>A part of the line that reports the written patch: what was done to its records, after a count of 1 and after any other count.</summary>
+    private readonly record struct WriteLinePart(WrittenPart Part, string Singular, string Plural)
     {
-        List<string> parts =
-        [
-            .. new[] { (Count: written.OtherModsObjectsPulledDown, What: "pulled down"), (Count: written.OtherModsObjectsRemoved, What: "removed") }
-                .Where(part => part.Count > 0)
-                .Select(part => $"{TextFormat.Count(part.Count)} {part.What}"),
-        ];
-        return parts.Count > 0 ? $"; other mods' objects: {string.Join(Describe.ListSeparator, parts)}" : string.Empty;
+        public WriteLinePart(WrittenPart part, string what)
+            : this(part, what, what)
+        {
+        }
+    }
+
+    /// <summary>The parts after the removed ones, before the titled groups, in the order printed.</summary>
+    private static readonly ImmutableArray<WriteLinePart> UntitledParts =
+    [
+        new(WrittenPart.Restored, "restored"),
+        new(WrittenPart.KeptMarkerMoved, "kept markers moved"),
+        new(WrittenPart.Fitted, "shrunk or turned to fit"),
+        new(WrittenPart.WhereRemoved, "to restore where the cleaned mod was removed"),
+    ];
+
+    /// <summary>The titled groups of parts, in the order printed.</summary>
+    private static readonly ImmutableArray<(string Title, ImmutableArray<WriteLinePart> Parts)> TitledParts =
+    [
+        ("other mods' objects", [new(WrittenPart.OtherModsObjectPulledDown, "pulled down"), new(WrittenPart.OtherModsObjectRemoved, "removed")]),
+        (
+            "follow-up of what went back",
+            [
+                new(WrittenPart.FollowUpRemoved, "removed"),
+                new(WrittenPart.FollowUpRestored, "restored"),
+                new(WrittenPart.FollowUpOtherModsObjectPulledDown, "other mods' object pulled down", "other mods' objects pulled down"),
+                new(WrittenPart.FollowUpOtherModsObjectRemoved, "other mods' object removed", "other mods' objects removed"),
+            ]),
+    ];
+
+    /// <summary>"2 restored" for each of the parts that has any record, in their order.</summary>
+    private static IEnumerable<string> NamedParts(ImmutableDictionary<WrittenPart, int> overrides, ImmutableArray<WriteLinePart> parts) =>
+        parts.Where(part => overrides.GetValueOrDefault(part.Part) > 0).Select(part => TextFormat.Count(overrides[part.Part], part.Singular, part.Plural));
+
+    /// <summary>"; title: 2 pulled down, 1 removed", leaving out a part without any record; nothing when none has any.</summary>
+    private static string TitledPartsText(ImmutableDictionary<WrittenPart, int> overrides, string title, ImmutableArray<WriteLinePart> parts)
+    {
+        List<string> named = [.. NamedParts(overrides, parts)];
+        return named.Count > 0 ? $"; {title}: {string.Join(Describe.ListSeparator, named)}" : string.Empty;
     }
 
     /// <summary>" and added 2 new records (copies of other mods' objects that went back, at the cleaned mod's place)", or nothing when there are none.</summary>

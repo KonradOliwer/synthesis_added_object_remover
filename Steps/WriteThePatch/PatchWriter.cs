@@ -29,32 +29,22 @@ public static class PatchWriter
     {
         var (final, targets, otherModsObjects, whereRemoved) = (input.Final, input.Targets, input.OtherModsObjects, input.WhereRemoved);
         var removed = ListRemovalsInWriteOrder(final);
-        var cloneOrders = CloneOrders(whereRemoved, input.CleanedMod);
-        List<WriteOrder> orders = [.. cloneOrders];
-        var enableParentsReplaced = 0;
-        foreach (var id in removed)
-        {
-            var target = targets[id.Index];
-            orders.AddRange(RemovalWrite.OrdersFor(target));
-            if (target.HasEnableParent) enableParentsReplaced++;
-        }
-
-        var fitted = ListFitsInWriteOrder(final, targets);
-        orders.AddRange(fitted);
-
         var restored = ListRestoresInWriteOrder(final);
-        orders.AddRange(restored.SelectMany(id => RestoreOrdersFor(targets[id.Index], EarlierVersionOf(final, id))));
-        var whereRemovedOrders = WhereRemovedOrders(whereRemoved).ToList();
-        orders.AddRange(whereRemovedOrders);
-
-        var moves = final.Moves.Select(move => new SetPosition(targets[move.Target.Index].Key, move.To)).ToList();
-        orders.AddRange(moves);
-
-        var otherRemovals = otherModsObjects.Objects.Where(outcome => outcome.IsRemoved).ToList();
-        orders.AddRange(otherRemovals.SelectMany(outcome => RemovalWrite.OrdersFor(outcome.Object)));
-        var pulled = otherModsObjects.Objects.Where(outcome => outcome.Fate == OtherModsObjectFate.PulledDown).Select(outcome => new SetPosition(outcome.Object.Key, outcome.NewPosition)).ToList();
-        orders.AddRange(pulled);
-        orders.AddRange(FollowUpOfRestoreOrders(whereRemoved.FollowUp, targets));
+        var cloneOrders = CloneOrders(whereRemoved, input.CleanedMod);
+        List<PartOrder> overrides =
+        [
+            .. InPart(WrittenPart.Removed, removed.SelectMany(id => RemovalWrite.OrdersFor(targets[id.Index]))),
+            .. InPart(WrittenPart.Fitted, ListFitsInWriteOrder(final, targets)),
+            .. InPart(WrittenPart.Restored, restored.SelectMany(id => RestoreOrdersFor(targets[id.Index], EarlierVersionOf(final, id)))),
+            .. InPart(WrittenPart.WhereRemoved, WhereRemovedOrders(whereRemoved)),
+            .. InPart(WrittenPart.KeptMarkerMoved, final.Moves.Select(move => new SetPosition(targets[move.Target.Index].Key, move.To))),
+            .. InPart(WrittenPart.OtherModsObjectRemoved, otherModsObjects.Objects.Where(outcome => outcome.IsRemoved).SelectMany(outcome => RemovalWrite.OrdersFor(outcome.Object))),
+            .. InPart(
+                WrittenPart.OtherModsObjectPulledDown,
+                otherModsObjects.Objects.Where(outcome => outcome.Fate == OtherModsObjectFate.PulledDown).Select(outcome => new SetPosition(outcome.Object.Key, outcome.NewPosition))),
+            .. FollowUpOfRestoreOrders(whereRemoved.FollowUp, targets),
+        ];
+        List<WriteOrder> orders = [.. cloneOrders, .. overrides.Select(entry => entry.Order)];
 
         var records = input.Plugin.ReadWritableRecords();
         var added = input.Writing.Write(records, orders);
@@ -62,14 +52,24 @@ public static class PatchWriter
         return new WriteSummary(
             removed,
             restored,
-            moves.Count,
-            enableParentsReplaced,
-            fitted.Count,
-            otherRemovals.Count,
-            pulled.Count,
-            whereRemovedOrders.Select(order => order.Record).Distinct().Count(),
+            removed.Count(id => targets[id.Index].HasEnableParent),
+            CountByLastPart(overrides),
             ClonesWritten(cloneOrders, added),
             RestoredPartsWritten.List(TargetsPutBack(final, restored, whereRemoved.FollowUp, targets), whereRemoved, input.CleanedMod));
+    }
+
+    /// <summary>An order that writes over an existing record, with the part it belongs to.</summary>
+    private readonly record struct PartOrder(WrittenPart Part, WriteOrder Order);
+
+    private static IEnumerable<PartOrder> InPart(WrittenPart part, IEnumerable<WriteOrder> orders) => orders.Select(order => new PartOrder(part, order));
+
+    /// <summary>Each record once, under the part of the order written last for it, which wins in the patch.</summary>
+    /// <param name="overrides">In write order.</param>
+    private static ImmutableDictionary<WrittenPart, int> CountByLastPart(List<PartOrder> overrides)
+    {
+        var lastPart = new Dictionary<RecordKey, WrittenPart>();
+        foreach (var (part, order) in overrides) lastPart[order.Record] = part;
+        return lastPart.Values.CountBy(part => part).ToImmutableDictionary();
     }
 
     /// <summary>Each target a removal step or the restore's follow-up puts back, with the version it goes back to.</summary>
@@ -137,18 +137,20 @@ public static class PatchWriter
     /// What the follow-up of the restore removes, restores and pulls down: the target objects in target order, then the objects of any
     /// plugin in id order. They come after the run's own orders, so a pull-down or removal of an object the run already pulled down wins.
     /// </summary>
-    private static IEnumerable<WriteOrder> FollowUpOfRestoreOrders(RestoreFollowUp followUp, ImmutableArray<TargetObject> targets) =>
+    private static IEnumerable<PartOrder> FollowUpOfRestoreOrders(RestoreFollowUp followUp, ImmutableArray<TargetObject> targets) =>
         followUp.Targets.SelectMany(followed => followed.RestoredTo is { } earlier
-                ? RestoreOrdersFor(targets[followed.Target.Index], earlier)
-                : RemovalWrite.OrdersFor(targets[followed.Target.Index]))
+                ? InPart(WrittenPart.FollowUpRestored, RestoreOrdersFor(targets[followed.Target.Index], earlier))
+                : InPart(WrittenPart.FollowUpRemoved, RemovalWrite.OrdersFor(targets[followed.Target.Index])))
             .Concat(followUp.Others.SelectMany(OrdersFor));
 
     /// <summary>Nothing for an object the follow-up leaves where it stands.</summary>
-    private static IEnumerable<WriteOrder> OrdersFor(FollowUpOtherObject other)
+    private static IEnumerable<PartOrder> OrdersFor(FollowUpOtherObject other)
     {
         var outcome = other.Outcome;
-        if (outcome.IsRemoved) return RemovalWrite.OrdersFor(outcome.Object);
-        return outcome.Fate == OtherModsObjectFate.PulledDown ? [new SetPosition(outcome.Object.Key, outcome.NewPosition)] : [];
+        if (outcome.IsRemoved) return InPart(WrittenPart.FollowUpOtherModsObjectRemoved, RemovalWrite.OrdersFor(outcome.Object));
+        return outcome.Fate == OtherModsObjectFate.PulledDown
+            ? InPart(WrittenPart.FollowUpOtherModsObjectPulledDown, [new SetPosition(outcome.Object.Key, outcome.NewPosition)])
+            : [];
     }
 
     /// <summary>The parts copied back first, then the heights, so the heights are written into the grids the rest brings back.</summary>

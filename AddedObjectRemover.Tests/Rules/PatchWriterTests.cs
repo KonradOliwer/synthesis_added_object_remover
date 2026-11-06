@@ -25,7 +25,7 @@ public sealed class PatchWriterTests
         Assert.Equal(
             written.Removed.Select(id => targets[id.Index].Key),
             writing.Orders.OfType<SetInitiallyDisabled>().Select(order => order.Record));
-        Assert.Equal(0, written.Moved);
+        Assert.Equal(0, written.Overrides.GetValueOrDefault(WrittenPart.KeptMarkerMoved));
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public sealed class PatchWriterTests
         var written = PatchWriter.Write(new(final, [.. targets], OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff(),new ReadPlugin(), writing, TestTargets.TargetName));
 
         Assert.Equal<WriteOrder>([new SetPosition(targets[3].Key, new Vector3(1, 2, 3))], writing.Orders);
-        Assert.Equal(1, written.Moved);
+        Assert.Equal(1, written.Overrides.GetValueOrDefault(WrittenPart.KeptMarkerMoved));
     }
 
     [Fact]
@@ -88,7 +88,7 @@ public sealed class PatchWriterTests
         var written = PatchWriter.Write(new(final, [.. targets], OtherModsObjectsResult.SwitchedOff, RestoreWhereRemovedResult.SwitchedOff(),new ReadPlugin(), writing, TestTargets.TargetName));
 
         Assert.Equal<WriteOrder>([new SetPlacement(targets[0].Key, to.Position, to.Rotation, to.Scale)], writing.Orders);
-        Assert.Equal((0, 1), (written.Removed.Length, written.Fitted));
+        Assert.Equal((0, 1), (written.Removed.Length, written.Overrides.GetValueOrDefault(WrittenPart.Fitted)));
     }
 
     [Fact]
@@ -124,7 +124,7 @@ public sealed class PatchWriterTests
                 new SetPosition(pulled.Key, new Vector3(4, 5, 10)),
             ],
             writing.Orders);
-        Assert.Equal((1, 1), (written.OtherModsObjectsRemoved, written.OtherModsObjectsPulledDown));
+        Assert.Equal((1, 1), (written.Overrides.GetValueOrDefault(WrittenPart.OtherModsObjectRemoved), written.Overrides.GetValueOrDefault(WrittenPart.OtherModsObjectPulledDown)));
     }
 
     [Theory]
@@ -272,7 +272,7 @@ public sealed class PatchWriterTests
 
         var written = PatchWriter.Write(new(final, [target], OtherModsObjectsResult.SwitchedOff, whereRemoved, new ReadPlugin(), writing, TestTargets.TargetName));
 
-        Assert.Equal((1, 2), (written.Restored.Length, written.WrittenWhereRemoved));
+        Assert.Equal((1, 2), (written.Restored.Length, written.Overrides.GetValueOrDefault(WrittenPart.WhereRemoved)));
         Assert.Equal<WriteOrder>(
             [
                 new CopyEarlierPlacedParts(target.Key, PlacedParts.Position | PlacedParts.Rotation | PlacedParts.Scale),
@@ -322,7 +322,7 @@ public sealed class PatchWriterTests
         Assert.Equal<Type>([typeof(AddClone), typeof(PlaceInCell), typeof(CopyEarlierPlacedParts), typeof(CopyEarlierCellParts)], writing.Orders.Select(order => order.GetType()));
         Assert.Equal(new AddClone(goesBack.Key, CloneMarker.Of(goesBack.Key, TestTargets.TargetName)), writing.Orders[0]);
         Assert.Equal([new CloneWritten(goesBack.Key, new RecordKey(TestTargets.PatchName, FirstAddedId))], written.Clones.ToArray());
-        Assert.Equal(2, written.WrittenWhereRemoved);
+        Assert.Equal((2, 2), (written.Overrides.GetValueOrDefault(WrittenPart.WhereRemoved), written.Overrides.Values.Sum()));
     }
 
     /// <summary>
@@ -499,7 +499,7 @@ public sealed class PatchWriterTests
         };
         var writing = new RecordingWriting();
 
-        PatchWriter.Write(new(final, [.. targets], settled, whereRemoved, new ReadPlugin(), writing, TestTargets.TargetName));
+        var written = PatchWriter.Write(new(final, [.. targets], settled, whereRemoved, new ReadPlugin(), writing, TestTargets.TargetName));
 
         Assert.Equal<WriteOrder>(
             [
@@ -512,6 +512,108 @@ public sealed class PatchWriterTests
                 new SetPosition(pulledByRun.Key, new Vector3(4, 5, 5)),
             ],
             writing.Orders);
+        AssertOverrides(
+            written,
+            writing,
+            new()
+            {
+                [WrittenPart.FollowUpRemoved] = 1,
+                [WrittenPart.FollowUpRestored] = 1,
+                [WrittenPart.FollowUpOtherModsObjectRemoved] = 1,
+                [WrittenPart.FollowUpOtherModsObjectPulledDown] = 1,
+            });
+    }
+
+    /// <summary>
+    /// The follow-up of the restore pulls down an object no order of the run writes, beside the run's own pull-down of another one: the
+    /// follow-up's is counted on its own, so the overrides counted are the records written.
+    /// </summary>
+    [Fact]
+    public void AnObjectOnlyTheFollowUpOfTheRestorePullsDownIsCountedAsTheFollowUpsAndInTheOverridesWritten()
+    {
+        var targets = TestTargets.CreateMany(1);
+        var final = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(1), TestBaseFacts.Unresolved), 1);
+        var other = ModKey.FromNameAndExtension("Other.esp");
+        var pulledByRun = TestShapes.Placed(other, 0, default, new Vector3(1, 2, 60));
+        var pulledByFollowUp = TestShapes.Placed(other, 1, default, new Vector3(4, 5, 60));
+        var settled = new OtherModsObjectsResult(
+            StepOutcome.Performed,
+            [new OtherModsObjectOutcome(pulledByRun, OtherModsObjectFate.PulledDown, LostShare: 1f, Drop: 50f, ReferenceRoles.None)],
+            Rounds: [],
+            ProposedRounds: [],
+            Failure: null);
+        var rock = ChangedRock(0x900);
+        var whereRemoved = RestoreWhereRemovedResult.SwitchedOff() with
+        {
+            FollowUp = new RestoreFollowUp(
+                [],
+                [new FollowUpOtherObject(new OtherModsObjectOutcome(pulledByFollowUp, OtherModsObjectFate.PulledDown, LostShare: 1f, Drop: 30f, ReferenceRoles.None), [rock.Key])]),
+        };
+        var writing = new RecordingWriting();
+
+        var written = PatchWriter.Write(new(final, [.. targets], settled, whereRemoved, new ReadPlugin(), writing, TestTargets.TargetName));
+
+        AssertOverrides(written, writing, new() { [WrittenPart.OtherModsObjectPulledDown] = 1, [WrittenPart.FollowUpOtherModsObjectPulledDown] = 1 });
+        Assert.Equal(2, written.Overrides.Values.Sum());
+    }
+
+    /// <summary>
+    /// The run removes an other mod's object and the follow-up of the restore removes it again: one record, counted once, under the
+    /// follow-up, whose order is written last.
+    /// </summary>
+    [Fact]
+    public void AnObjectTheRunRemovedAndTheFollowUpOfTheRestoreRemovesAgainIsOneOverrideOfTheFollowUp()
+    {
+        var targets = TestTargets.CreateMany(1);
+        var final = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(1), TestBaseFacts.Unresolved), 1);
+        var removed = TestShapes.Placed(ModKey.FromNameAndExtension("Other.esp"), 0, default, new Vector3(1, 2, 3));
+        var settled = new OtherModsObjectsResult(
+            StepOutcome.Performed,
+            [new OtherModsObjectOutcome(removed, OtherModsObjectFate.RemovedNothingBelow, LostShare: 1f, Drop: 0f, ReferenceRoles.None)],
+            Rounds: [],
+            ProposedRounds: [],
+            Failure: null);
+        var rock = ChangedRock(0x900);
+        var whereRemoved = RestoreWhereRemovedResult.SwitchedOff() with
+        {
+            FollowUp = new RestoreFollowUp([], [new FollowUpOtherObject(new OtherModsObjectOutcome(removed, OtherModsObjectFate.Removed, LostShare: 1f, Drop: 0f, ReferenceRoles.None), [rock.Key])]),
+        };
+        var writing = new RecordingWriting();
+
+        var written = PatchWriter.Write(new(final, [.. targets], settled, whereRemoved, new ReadPlugin(), writing, TestTargets.TargetName));
+
+        AssertOverrides(written, writing, new() { [WrittenPart.FollowUpOtherModsObjectRemoved] = 1 });
+    }
+
+    /// <summary>
+    /// A removal step restores a target object and the follow-up of the restore lists it again, restored: one record, counted once,
+    /// under the follow-up, whose order is written last; the removal step's restore stays in the restored targets for its report.
+    /// </summary>
+    [Fact]
+    public void ATargetARemovalStepRestoredThatTheFollowUpOfTheRestoreListsAgainIsOneOverrideOfTheFollowUp()
+    {
+        var target = TestTargets.Create(0, TestTargets.At(new Vector3(500, 0, 0)));
+        var earlier = EarlierAt(new EulerPlacement(new Vector3(1, 2, 3), Vector3.Zero, 1f));
+        var protection = ObjectsToKeep.Build([target], [], TestTargets.References(1), TestBaseFacts.Unresolved);
+        var final = RemovalDecisions.Start(protection, [new WhenRemoved.Restore(earlier)]).Apply(RoundKind.TooClose, [Propose(0)]);
+        var rock = ChangedRock(0x900);
+        var whereRemoved = RestoreWhereRemovedResult.SwitchedOff() with
+        {
+            FollowUp = new RestoreFollowUp([new FollowUpTarget(new TargetId(0), earlier, [rock.Key])], []),
+        };
+        var writing = new RecordingWriting();
+
+        var written = PatchWriter.Write(new(final, [target], OtherModsObjectsResult.SwitchedOff, whereRemoved, new ReadPlugin(), writing, TestTargets.TargetName));
+
+        Assert.Equal([0], written.Restored.Select(id => id.Index));
+        AssertOverrides(written, writing, new() { [WrittenPart.FollowUpRestored] = 1 });
+    }
+
+    /// <summary>The overrides by part are the expected ones, and they add up to the records the orders write, the copies' new records left out.</summary>
+    private static void AssertOverrides(WriteSummary written, RecordingWriting writing, Dictionary<WrittenPart, int> expected)
+    {
+        Assert.Equal(expected.OrderBy(entry => entry.Key), written.Overrides.OrderBy(entry => entry.Key));
+        Assert.Equal(writing.Orders.Where(order => order is not AddClone).Select(order => order.Record).Distinct().Count(), written.Overrides.Values.Sum());
     }
 
     /// <summary>
@@ -545,8 +647,12 @@ public sealed class PatchWriterTests
         };
         var writing = new RecordingWriting();
 
-        PatchWriter.Write(new(final, [.. targets], OtherModsObjectsResult.SwitchedOff, whereRemoved, new ReadPlugin(), writing, TestTargets.TargetName));
+        var written = PatchWriter.Write(new(final, [.. targets], OtherModsObjectsResult.SwitchedOff, whereRemoved, new ReadPlugin(), writing, TestTargets.TargetName));
 
+        AssertOverrides(
+            written,
+            writing,
+            new() { [fate == OtherModsObjectFate.PulledDown ? WrittenPart.FollowUpOtherModsObjectPulledDown : WrittenPart.FollowUpOtherModsObjectRemoved] = 1 });
         Assert.Equal<WriteOrder>(
             fate == OtherModsObjectFate.PulledDown
                 ? [new CopyEarlierPlacedParts(rock.Key, rock.Earlier.Undo), new SetPosition(rock.Key, new Vector3(3, 4, 20))]

@@ -55,7 +55,14 @@ public class RestoreWhereRemovedRunTests
                 "world after removal",
                 "objects that stay and guards set up, with the first collision layer read",
                 "passes",
+                "plans read in the passes",
+                "follow-up of what went back in the passes",
+                "objects that stand read in the passes",
                 "placed guards in the passes",
+                "changed-terrain check in the passes",
+                "navmesh guards in the passes",
+                "ground protected in the passes",
+                "water levels kept in the passes",
             ],
             parts);
     }

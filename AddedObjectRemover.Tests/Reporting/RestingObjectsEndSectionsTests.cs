@@ -516,7 +516,8 @@ public sealed class RestingObjectsEndSectionsTests
     public void Write_ShowsTheTimeOnlyInTheDetailedLogAndTheEnableParentLineAlways()
     {
         var written = new WriteSummary(
-            Removed: [.. Enumerable.Range(0, 5).Select(index => new TargetId(index))], Restored: [], Moved: 2, EnableParentsReplaced: 3, Fitted: 0, OtherModsObjectsRemoved: 0, OtherModsObjectsPulledDown: 0, WrittenWhereRemoved: 0, Clones: [], RestoredParts: []);
+            Removed: [.. Enumerable.Range(0, 5).Select(index => new TargetId(index))], Restored: [], EnableParentsReplaced: 3,
+            Overrides((WrittenPart.Removed, 5), (WrittenPart.KeptMarkerMoved, 2)), Clones: [], RestoredParts: []);
 
         Assert.Equal(
             [
@@ -530,14 +531,14 @@ public sealed class RestingObjectsEndSectionsTests
     [Fact]
     public void Write_OmitsTheEnableParentLineWhenNoneWasReplaced()
     {
-        Assert.Single(LogSections.BuildWriteSection(new WriteSummary([new TargetId(0)], [], 0, 0, 0, 0, 0, 0, [], []), Elapsed, Normal).Lines.ToList());
+        Assert.Single(LogSections.BuildWriteSection(Written(Overrides((WrittenPart.Removed, 1))), Elapsed, Normal).Lines.ToList());
     }
 
     [Fact]
     public void Write_CountsTheRestoredObjectsInTheTotalAndNamesThemAfterTheRemovedOnlyWhenThereAreAny()
     {
-        var withRestored = new WriteSummary([new TargetId(0)], Restored: [new TargetId(1), new TargetId(2)], Moved: 1, EnableParentsReplaced: 0, Fitted: 0, OtherModsObjectsRemoved: 0, OtherModsObjectsPulledDown: 0, WrittenWhereRemoved: 0, Clones: [], RestoredParts: []);
-        var withoutRestored = withRestored with { Restored = [] };
+        var withRestored = Written(Overrides((WrittenPart.Removed, 1), (WrittenPart.Restored, 2), (WrittenPart.KeptMarkerMoved, 1)));
+        var withoutRestored = Written(Overrides((WrittenPart.Removed, 1), (WrittenPart.KeptMarkerMoved, 1)));
 
         Assert.Equal("Wrote 4 overrides (1 removed, 2 restored, 1 kept markers moved).", LogSections.BuildWriteSection(withRestored, Elapsed, Normal).Lines[0]);
         Assert.Equal("Wrote 2 overrides (1 removed, 1 kept markers moved).", LogSections.BuildWriteSection(withoutRestored, Elapsed, Normal).Lines[0]);
@@ -546,7 +547,8 @@ public sealed class RestingObjectsEndSectionsTests
     [Fact]
     public void Write_NamesTheOtherModsObjectsPulledDownAndRemovedOnlyWhenThereAreAny()
     {
-        var written = new WriteSummary([new TargetId(0)], Restored: [], Moved: 0, EnableParentsReplaced: 0, Fitted: 1, OtherModsObjectsRemoved: 2, OtherModsObjectsPulledDown: 3, WrittenWhereRemoved: 0, Clones: [], RestoredParts: []);
+        var written = Written(
+            Overrides((WrittenPart.Removed, 1), (WrittenPart.Fitted, 1), (WrittenPart.OtherModsObjectRemoved, 2), (WrittenPart.OtherModsObjectPulledDown, 3)));
 
         Assert.Equal(
             "Wrote 7 overrides (1 removed, 1 shrunk or turned to fit; other mods' objects: 3 pulled down, 2 removed).",
@@ -554,9 +556,30 @@ public sealed class RestingObjectsEndSectionsTests
     }
 
     [Fact]
+    public void Write_CountsWhatTheFollowUpOfWhatWentBackWroteInTheTotalAndNamesOnlyItsPartsThatAreNotZero()
+    {
+        (WrittenPart, int)[] run = [(WrittenPart.Removed, 1), (WrittenPart.WhereRemoved, 3), (WrittenPart.OtherModsObjectPulledDown, 4)];
+        var written = Written(Overrides([.. run, (WrittenPart.FollowUpOtherModsObjectPulledDown, 2)]));
+        var everyPart = Written(
+            Overrides(
+            [
+                .. run, (WrittenPart.FollowUpRemoved, 1), (WrittenPart.FollowUpRestored, 2), (WrittenPart.FollowUpOtherModsObjectRemoved, 1),
+                (WrittenPart.FollowUpOtherModsObjectPulledDown, 3),
+            ]));
+
+        Assert.Equal(
+            "Wrote 10 overrides (1 removed, 3 to restore where the cleaned mod was removed; other mods' objects: 4 pulled down; follow-up of what went back: 2 other mods' objects pulled down).",
+            LogSections.BuildWriteSection(written, Elapsed, Normal).Lines[0]);
+        Assert.Equal(
+            "Wrote 15 overrides (1 removed, 3 to restore where the cleaned mod was removed; other mods' objects: 4 pulled down; follow-up of what went back: 1 removed, 2 restored, "
+            + "3 other mods' objects pulled down, 1 other mods' object removed).",
+            LogSections.BuildWriteSection(everyPart, Elapsed, Normal).Lines[0]);
+    }
+
+    [Fact]
     public void Write_CountsTheRecordsWrittenToRestoreWhereTheCleanedModWasRemovedInTheTotal()
     {
-        var written = new WriteSummary([new TargetId(0)], Restored: [], Moved: 0, EnableParentsReplaced: 0, Fitted: 0, OtherModsObjectsRemoved: 0, OtherModsObjectsPulledDown: 0, WrittenWhereRemoved: 5, Clones: [], RestoredParts: []);
+        var written = Written(Overrides((WrittenPart.Removed, 1), (WrittenPart.WhereRemoved, 5)));
 
         Assert.Equal("Wrote 6 overrides (1 removed, 5 to restore where the cleaned mod was removed).", LogSections.BuildWriteSection(written, Elapsed, Normal).Lines[0]);
     }
@@ -565,10 +588,10 @@ public sealed class RestingObjectsEndSectionsTests
     public void Write_NamesTheCopiesAddedAsNewRecordsOutsideTheOverrides()
     {
         var original = new RecordKey(new PluginName("Base.esm"), 0x901);
-        var written = new WriteSummary(
-            [new TargetId(0)], Restored: [], Moved: 0, EnableParentsReplaced: 0, Fitted: 0, OtherModsObjectsRemoved: 0, OtherModsObjectsPulledDown: 0, WrittenWhereRemoved: 2,
-            Clones: [new CloneWritten(original, new RecordKey(new PluginName("Patch.esp"), 0x800))],
-            RestoredParts: []);
+        var written = Written(Overrides((WrittenPart.Removed, 1), (WrittenPart.WhereRemoved, 2))) with
+        {
+            Clones = [new CloneWritten(original, new RecordKey(new PluginName("Patch.esp"), 0x800))],
+        };
 
         Assert.Equal(
             "Wrote 3 overrides (1 removed, 2 to restore where the cleaned mod was removed) and added 1 new record (copies of other mods' objects that went back, at the cleaned mod's place).",
@@ -770,6 +793,11 @@ public sealed class RestingObjectsEndSectionsTests
     private static ReportFilesResult Performed(ImmutableArray<WrittenTable> tables) => new(StepOutcome.Performed, tables, [], Failure: null);
 
     private static PartFailure Broke(PartKey part) => new(part, "it broke", Subject: null);
+
+    /// <summary>A summary with one removed target, no copies and no parts given back.</summary>
+    private static WriteSummary Written(ImmutableDictionary<WrittenPart, int> overrides) => new([new TargetId(0)], Restored: [], EnableParentsReplaced: 0, overrides, Clones: [], RestoredParts: []);
+
+    private static ImmutableDictionary<WrittenPart, int> Overrides(params (WrittenPart Part, int Count)[] parts) => parts.ToImmutableDictionary(part => part.Part, part => part.Count);
 
     private static ZeroWeightDiagnostic ZeroWeightOf(int target) =>
         new(

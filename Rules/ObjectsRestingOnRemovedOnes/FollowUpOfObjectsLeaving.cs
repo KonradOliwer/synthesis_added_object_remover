@@ -26,6 +26,12 @@ namespace AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes;
 /// </summary>
 internal sealed class FollowUpOfObjectsLeaving(SupportJudging judging, AlsoRemoveSettings alsoRemove, IAlsoRemoveRoundsAfter alsoRemoveRounds) : IFollowUpOfObjectsLeaving
 {
+    /// <summary>
+    /// The weights before are measured in the world of a <see cref="WorldStanding"/> alone, so every question about the same instance
+    /// shares them.
+    /// </summary>
+    private readonly ComputedOncePerKey<WorldStanding, WeightsBefore> _weightsBefore = new(Publication.BuiltOnce, ReferenceEqualityComparer.Instance);
+
     /// <summary>What one question reads besides the decisions.</summary>
     /// <param name="Others">The objects of any plugin as the run leaves them.</param>
     /// <param name="Leaving">The objects of any plugin leaving that can hold up others, in id order.</param>
@@ -65,7 +71,7 @@ internal sealed class FollowUpOfObjectsLeaving(SupportJudging judging, AlsoRemov
         var details = new List<RoundDetails?>();
         var current = FollowTargets(copy, standing.Decisions, decided, scene, targets, details);
         var before = WorldOf(standing.Decisions, scene);
-        var weightsBefore = new WeightsBefore([]);
+        var weightsBefore = _weightsBefore.Get(standing, () => new WeightsBefore(new()));
         while (true)
         {
             var judged = JudgeCopiesAndOthers(standing.Decisions, current, before, scene, weightsBefore);

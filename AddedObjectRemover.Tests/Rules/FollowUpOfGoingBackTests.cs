@@ -881,6 +881,27 @@ public sealed class FollowUpOfGoingBackTests
         Assert.NotEmpty(one.Written.Others);
     }
 
+    /// <summary>
+    /// The passes ask one follow-up about ever fewer rocks going back, and it keeps the weights before it measured between them: each
+    /// answer is the one a new follow-up gives, with one worker and with four.
+    /// </summary>
+    [Fact]
+    public void AFollowUpAskedPassAfterPassAnswersAsANewOneEachTimeWhateverTheNumberOfWorkers()
+    {
+        List<HashSet<int>> passes = [[.. Enumerable.Range(0, 30)], [.. Enumerable.Range(0, 30).Where(rock => rock % 2 == 0)], [.. Enumerable.Range(0, 10)]];
+
+        var fresh = ManyRocks().CheckOneAfterAnother(threads: 1, oneFollowUpForAll: false, passes);
+        Assert.All(
+            [ManyRocks().CheckOneAfterAnother(threads: 1, oneFollowUpForAll: true, passes), ManyRocks().CheckOneAfterAnother(threads: 4, oneFollowUpForAll: true, passes)],
+            shared =>
+            {
+                Assert.Equal(fresh.Select(WrittenTargets), shared.Select(WrittenTargets));
+                Assert.Equal(fresh.Select(WrittenOthers), shared.Select(WrittenOthers));
+                Assert.Equal(fresh.SelectMany(checks => checks.Written.Others.Select(other => other.Outcome)), shared.SelectMany(checks => checks.Written.Others.Select(other => other.Outcome)));
+            });
+        Assert.All(fresh, checks => Assert.NotEmpty(checks.Written.Others));
+    }
+
     /// <summary>The rock's key, as a list of the placed records that started a follow-up.</summary>
     private static readonly string RockStarter = RockKey(0, BaseGameMod).ToString();
 
@@ -933,13 +954,20 @@ public sealed class FollowUpOfGoingBackTests
     /// <summary>Rocks of the base game the cleaned mod moved, and objects resting on them.</summary>
     private sealed record ManyRockScene(List<RecordChangedByCleanedMod> Rocks, List<OtherObject> Others, List<Vector3> Pebbles)
     {
-        public FollowUpChecks Check(int threads)
+        public FollowUpChecks Check(int threads) => CheckOneAfterAnother(threads, oneFollowUpForAll: true, [[.. Enumerable.Range(0, Rocks.Count)]])[0];
+
+        /// <summary>The follow-up of each set of rocks going back, in order: asked of one follow-up, as the passes ask it, or of a new one each time.</summary>
+        public List<FollowUpChecks> CheckOneAfterAnother(int threads, bool oneFollowUpForAll, IReadOnlyList<HashSet<int>> goingBackSets)
         {
             ImmutableArray<TargetObject> targets = [.. Pebbles.Select((place, index) => PebbleTarget(index, place))];
             var collected = TestScenes.CreateWorld(targets, [.. Others.Select((other, index) => other with { Id = new OtherId(index) })]) with { ChangedRecords = [.. Rocks] };
-            var goingBack = Enumerable.Range(0, Rocks.Count).ToHashSet();
-            return new FollowUpOfGoingBack(RuleOver(collected, threads, Support()), DecisionsOver(targets), NothingTakenAway, Rocks, collected)
-                .Check(goingBack, new HashSet<int>(), PassOf(collected, Rocks, goingBack), land: null);
+            FollowUpOfGoingBack Create() => new(RuleOver(collected, threads, Support()), DecisionsOver(targets), NothingTakenAway, Rocks, collected);
+            var shared = Create();
+            return
+            [
+                .. goingBackSets.Select(goingBack =>
+                    (oneFollowUpForAll ? shared : Create()).Check(goingBack, new HashSet<int>(), PassOf(collected, Rocks, goingBack), land: null)),
+            ];
         }
     }
 

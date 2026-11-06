@@ -23,8 +23,8 @@ public class UnexpectedErrorRunTests
 
         var outcome = Run(log, inner => new FailingHomeCellPlugin(inner));
 
-        Assert.True(healthy.Written.Moved > 0);
-        Assert.Equal(0, outcome.Written.Moved);
+        Assert.True(healthy.Written.Overrides.GetValueOrDefault(WrittenPart.KeptMarkerMoved) > 0);
+        Assert.Equal(0, outcome.Written.Overrides.GetValueOrDefault(WrittenPart.KeptMarkerMoved));
         Assert.NotEmpty(outcome.Removals);
         Assert.Equal(healthy.Removals.Select(removal => removal.TargetIndex), outcome.Removals.Select(removal => removal.TargetIndex));
         Assert.Equal(outcome.Removals.Select(removal => removal.TargetIndex), outcome.Written.Removed.Select(id => id.Index));

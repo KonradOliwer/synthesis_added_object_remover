@@ -303,7 +303,14 @@ public sealed class RestoreWhereRemovedReportTests
             "Step time: Restore where removed, world after removal in 2.3s.",
             "Step time: Restore where removed, objects that stay and guards set up, with the first collision layer read in 3.4s.",
             "Step time: Restore where removed, passes in 4.5s.",
+            "Step time: Restore where removed, plans read in the passes in 0.7s.",
+            "Step time: Restore where removed, follow-up of what went back in the passes in 0.1s.",
+            "Step time: Restore where removed, objects that stand read in the passes in 0.2s.",
             "Step time: Restore where removed, placed guards in the passes in 5.6s.",
+            "Step time: Restore where removed, changed-terrain check in the passes in 0.3s.",
+            "Step time: Restore where removed, navmesh guards in the passes in 0.4s.",
+            "Step time: Restore where removed, ground protected in the passes in 0.5s.",
+            "Step time: Restore where removed, water levels kept in the passes in 0.6s.",
         ];
         Assert.Equal(expected, lines.TakeLast(expected.Length));
         Assert.DoesNotContain(Section(Scene(), Normal).Lines, line => line.StartsWith("Restore where removed", StringComparison.Ordinal) || line.StartsWith("Step time: ", StringComparison.Ordinal));
@@ -849,7 +856,15 @@ public sealed class RestoreWhereRemovedReportTests
                 WorldAfterRemoval: TimeSpan.FromSeconds(2.3),
                 GuardsSetUp: TimeSpan.FromSeconds(3.4),
                 Passes: TimeSpan.FromSeconds(4.5),
-                PlacedGuardsInPasses: TimeSpan.FromSeconds(5.6)));
+                InPasses: new RestorePassTimes(
+                    PlansRead: TimeSpan.FromSeconds(0.7),
+                    FollowUp: TimeSpan.FromSeconds(0.1),
+                    WhatStands: TimeSpan.FromSeconds(0.2),
+                    PlacedGuards: TimeSpan.FromSeconds(5.6),
+                    ChangedTerrain: TimeSpan.FromSeconds(0.3),
+                    NavmeshGuards: TimeSpan.FromSeconds(0.4),
+                    GroundProtected: TimeSpan.FromSeconds(0.5),
+                    WaterKept: TimeSpan.FromSeconds(0.6))));
 
     private static PlacedChangeJudged Restored(RecordChangedByCleanedMod change, AreaShare area) =>
         new(change, Never: null, area, WhereItIsNow: null, Refused: null, IsRestored: true, ChangeJudge.KindOf(change), KeptForArea: null, PlacedBack: null);

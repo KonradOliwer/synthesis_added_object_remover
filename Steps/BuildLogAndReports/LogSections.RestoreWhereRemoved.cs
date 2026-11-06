@@ -150,7 +150,14 @@ internal static partial class LogSections
         .. PartTimeLine("world after removal", times.WorldAfterRemoval, context),
         .. PartTimeLine("objects that stay and guards set up, with the first collision layer read", times.GuardsSetUp, context),
         .. PartTimeLine("passes", times.Passes, context),
-        .. PartTimeLine("placed guards in the passes", times.PlacedGuardsInPasses, context),
+        .. PartTimeLine("plans read in the passes", times.InPasses.PlansRead, context),
+        .. PartTimeLine("follow-up of what went back in the passes", times.InPasses.FollowUp, context),
+        .. PartTimeLine("objects that stand read in the passes", times.InPasses.WhatStands, context),
+        .. PartTimeLine("placed guards in the passes", times.InPasses.PlacedGuards, context),
+        .. PartTimeLine("changed-terrain check in the passes", times.InPasses.ChangedTerrain, context),
+        .. PartTimeLine("navmesh guards in the passes", times.InPasses.NavmeshGuards, context),
+        .. PartTimeLine("ground protected in the passes", times.InPasses.GroundProtected, context),
+        .. PartTimeLine("water levels kept in the passes", times.InPasses.WaterKept, context),
     ];
 
     private static ImmutableArray<string> PartTimeLine(string part, TimeSpan time, ReportContext context) =>

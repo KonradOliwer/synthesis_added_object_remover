@@ -115,7 +115,7 @@ internal static class RestoredWorldStaysClean
     private static void AssertNothingTakenAway(RunOutcome second)
     {
         Assert.True(second.Removals.IsEmpty, $"The second run removed: {string.Join(", ", second.Removals.Select(removal => second.Collected.Targets[removal.TargetIndex].Key))}");
-        Assert.Equal((0, 0), (second.Written.Fitted, second.Written.Moved));
+        Assert.Equal((0, 0), (second.Written.Overrides.GetValueOrDefault(WrittenPart.Fitted), second.Written.Overrides.GetValueOrDefault(WrittenPart.KeptMarkerMoved)));
         var takenAway = second.OtherModsObjects.TakenAway();
         Assert.True(takenAway.Count == 0, $"The second run took away: {string.Join(", ", takenAway.Keys.Select(id => second.Collected.Other(id).Key))}");
     }

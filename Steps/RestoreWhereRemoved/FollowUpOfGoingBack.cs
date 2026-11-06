@@ -99,6 +99,9 @@ internal sealed class FollowUpOfGoingBack(
 {
     private readonly ComputedOnce<ChangesOnceBack> _onceBack = new(() => ChangesOnceBack.Of(cleared, collected));
 
+    /// <summary>One instance for every pass, so the rule shares what it measures in that world between them.</summary>
+    private readonly WorldStanding _standing = new(final, othersTakenAway);
+
     /// <summary>A candidate that is no target, as its object where it stands now or, for one the game shows again, as it stands once back.</summary>
     private readonly record struct OtherCandidate(OtherObject Object, int Candidate);
 
@@ -117,8 +120,7 @@ internal sealed class FollowUpOfGoingBack(
         var othersLeaving = StandingOthersOf(leaving.Where(candidate => cleared[candidate].Target is null));
         var shownAgain = ShownAgainOf(leaving, pass);
         var copies = StandingOthersOf(withClone.Where(candidate => cleared[candidate].Target is null));
-        var outcomes = rule.Find(
-            new WorldStanding(final, othersTakenAway), Decided(targetsLeaving, pass), LeavingOf(goingBack, leaving, othersLeaving, shownAgain, copies, pass, land));
+        var outcomes = rule.Find(_standing, Decided(targetsLeaving, pass), LeavingOf(goingBack, leaving, othersLeaving, shownAgain, copies, pass, land));
         var othersLeavingById = othersLeaving.Concat(shownAgain).ToDictionary(entry => entry.Object.Id, entry => entry.Candidate);
         ThrowOnLeavingCandidateFollowed(outcomes, targetsLeaving, othersLeavingById);
         var starters = FollowUpStarters.Of(outcomes, targetsLeaving, othersLeavingById);

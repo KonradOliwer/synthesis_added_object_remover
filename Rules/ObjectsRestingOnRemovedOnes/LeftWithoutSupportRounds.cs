@@ -38,7 +38,7 @@ internal sealed class LeftWithoutSupportRounds(SupportJudging judging, AlsoRemov
         if (FindChangedTargets(decided.Targets, decided.Decided, rules).Count == 0) return new OtherModsObjectsResult(StepOutcome.Performed, [], [], [], Failure: null);
 
         var others = judging.Caches.VisibleObjectsOfAnyPlugin();
-        var before = new WeightsBefore([]);
+        var before = new WeightsBefore(new());
         var copy = decided.Decided.WorkingCopy();
         var current = decided.Decided;
         var standing = new StandingTargets(decided.AsMeasured, decided.VisibleAsMeasured, RoundsChecked: 0);
